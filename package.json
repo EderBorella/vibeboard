@@ -1,0 +1,26 @@
+{
+  "name": "vibeboard",
+  "version": "1.0.0",
+  "description": "<h1 align=\"center\">VibeBoard</h1>",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "build": "tsc -p tsconfig.json"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "gray-matter": "^4.0.3",
+    "yaml": "^2.9.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.43",
+    "typescript": "~5.5",
+    "vitest": "^2.1.9"
+  }
+}

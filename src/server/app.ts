@@ -1,8 +1,10 @@
 import Fastify, { type FastifyInstance, type FastifyReply } from 'fastify';
 import websocket from '@fastify/websocket';
+import { dirname } from 'node:path';
 import { scaffoldProject, type ScaffoldMode } from '../core/scaffold.js';
 import { createCard, updateCard, moveCard, archiveCard, type CreateCardInput } from '../core/mutations.js';
 import { findCard } from '../core/find.js';
+import { discoverProjects } from './discover.js';
 import type { ProjectSession } from './session.js';
 import type { BoardName, CardFrontmatter } from '../core/types.js';
 
@@ -39,6 +41,12 @@ export function buildApp(session: ProjectSession): FastifyInstance {
   app.register(async (api) => {
     api.get('/state', async () =>
       session.isOpen ? { open: true, snapshot: await session.snapshot() } : { open: false });
+
+    api.get('/projects', async (req) => {
+      const { root } = req.query as { root?: string };
+      const base = root ?? process.env.VIBEBOARD_ROOT ?? dirname(process.cwd());
+      return discoverProjects(base);
+    });
 
     api.post('/project/open', async (req, reply) => {
       const { path } = req.body as { path: string };

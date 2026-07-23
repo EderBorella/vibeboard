@@ -38,6 +38,26 @@ describe('parseCopilotLine', () => {
     });
   });
 
+  it('reports context from the last iteration, not the summed-across-calls total', () => {
+    // A multi-tool turn: top-level usage sums 3 calls (would read ~240k), but the window
+    // occupancy is the last call's prompt (~40k).
+    const line = JSON.stringify({
+      type: 'result', subtype: 'success', is_error: false, result: 'done', num_turns: 1, duration_ms: 100,
+      total_cost_usd: 0.5, session_id: 's',
+      usage: {
+        input_tokens: 30, cache_read_input_tokens: 200_000, cache_creation_input_tokens: 40_000, output_tokens: 900,
+        iterations: [
+          { input_tokens: 10, cache_read_input_tokens: 0, cache_creation_input_tokens: 33_000 },
+          { input_tokens: 10, cache_read_input_tokens: 33_000, cache_creation_input_tokens: 5_000 },
+          { input_tokens: 10, cache_read_input_tokens: 38_000, cache_creation_input_tokens: 2_000 },
+        ],
+      },
+    });
+    const [evt] = parseCopilotLine(line);
+    if (evt.kind !== 'result') throw new Error('expected result');
+    expect(evt.stats.contextTokens).toBe(10 + 38_000 + 2_000); // last iteration only
+  });
+
   it('ignores hook/thinking_tokens/rate_limit noise and malformed lines', () => {
     expect(parseCopilotLine(JSON.stringify({ type: 'system', subtype: 'thinking_tokens', estimated_tokens: 5 }))).toEqual([]);
     expect(parseCopilotLine(JSON.stringify({ type: 'rate_limit_event', rate_limit_info: {} }))).toEqual([]);

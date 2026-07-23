@@ -49,9 +49,14 @@ function contentEvents(content: unknown): CopilotEvent[] {
 }
 
 function resultStats(o: Record<string, unknown>): ResultStats {
-  const u = (o.usage ?? {}) as Record<string, number>;
+  const u = (o.usage ?? {}) as Record<string, unknown>;
   const n = (v: unknown): number => (typeof v === 'number' ? v : 0);
-  const contextTokens = n(u.input_tokens) + n(u.cache_read_input_tokens) + n(u.cache_creation_input_tokens);
+  // Top-level usage sums every model call in the turn (each tool round-trip re-reads the
+  // whole context), so it overstates window size. The LAST iteration's prompt tokens are
+  // the real context-window occupancy at the end of the turn.
+  const iters = Array.isArray(u.iterations) ? (u.iterations as Record<string, unknown>[]) : [];
+  const promptSrc = iters.length ? iters[iters.length - 1] : u;
+  const contextTokens = n(promptSrc.input_tokens) + n(promptSrc.cache_read_input_tokens) + n(promptSrc.cache_creation_input_tokens);
   return {
     ok: o.is_error === false,
     text: typeof o.result === 'string' ? o.result : '',

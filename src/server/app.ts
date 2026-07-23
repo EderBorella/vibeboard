@@ -1,4 +1,5 @@
 import Fastify, { type FastifyInstance, type FastifyReply } from 'fastify';
+import websocket from '@fastify/websocket';
 import { scaffoldProject, type ScaffoldMode } from '../core/scaffold.js';
 import { createCard, updateCard, moveCard, archiveCard, type CreateCardInput } from '../core/mutations.js';
 import { findCard } from '../core/find.js';
@@ -17,6 +18,23 @@ function ensureOpen(session: ProjectSession, reply: FastifyReply): boolean {
 
 export function buildApp(session: ProjectSession): FastifyInstance {
   const app = Fastify();
+
+  app.register(websocket);
+
+  app.register(async (root) => {
+    root.get('/ws', { websocket: true }, (socket) => {
+      const send = (snapshot: unknown): void => {
+        try {
+          socket.send(JSON.stringify({ type: 'snapshot', snapshot }));
+        } catch {
+          /* socket closed mid-send */
+        }
+      };
+      if (session.isOpen) void session.snapshot().then(send).catch(() => {});
+      const unsubscribe = session.subscribe(send);
+      socket.on('close', unsubscribe);
+    });
+  });
 
   app.register(async (api) => {
     api.get('/state', async () =>

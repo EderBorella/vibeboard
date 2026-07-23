@@ -1,17 +1,29 @@
 import { useEffect, useState } from 'react';
 import { listProjects, openProject, scaffoldProject, type ProjectRef } from '../api';
+import { slugify } from '../viewmodel';
 
 interface Props {
   onOpened: () => void;
 }
 
+// Force the project name toward the VibeBoard pattern (dash-separated, lowercase) as the
+// user types. Leading dashes are stripped; a trailing dash is tolerated so separators can
+// be typed mid-word. slugify() produces the final canonical form on submit.
+function toNamePattern(input: string): string {
+  return input.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+/, '');
+}
+
 export function ProjectGate({ onOpened }: Props) {
   const [projects, setProjects] = useState<ProjectRef[]>([]);
   const [openPath, setOpenPath] = useState('');
-  const [newPath, setNewPath] = useState('');
+  const [newParent, setNewParent] = useState('');
   const [newName, setNewName] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  const nameSlug = slugify(newName);
+  const parent = newParent.replace(/\/+$/, '');
+  const targetPath = parent && nameSlug ? `${parent}/${nameSlug}` : '';
 
   useEffect(() => { listProjects().then(setProjects).catch(() => setProjects([])); }, []);
 
@@ -60,21 +72,22 @@ export function ProjectGate({ onOpened }: Props) {
 
         <h3>New project</h3>
         <label className="gate-field">
-          <span>Path</span>
-          <input value={newPath} placeholder="/path/to/new-project" onChange={(e) => setNewPath(e.target.value)} />
+          <span>Location (parent folder)</span>
+          <input value={newParent} placeholder="/data/projects" onChange={(e) => setNewParent(e.target.value)} />
         </label>
         <label className="gate-field">
-          <span>Name</span>
+          <span>Name (dash-separated, lowercase)</span>
           <div className="gate-row">
-            <input value={newName} placeholder="My Project" onChange={(e) => setNewName(e.target.value)} />
+            <input value={newName} placeholder="my-project" onChange={(e) => setNewName(toNamePattern(e.target.value))} />
             <button
-              disabled={busy || !newPath || !newName}
-              onClick={() => run(() => scaffoldProject(newPath, newName))}
+              disabled={busy || !targetPath}
+              onClick={() => run(() => scaffoldProject(targetPath, nameSlug))}
             >
               Create
             </button>
           </div>
         </label>
+        {targetPath && <div className="gate-preview">Creates <code>{targetPath}</code></div>}
 
         {error && <div className="gate-error">{error}</div>}
       </div>

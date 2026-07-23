@@ -124,6 +124,15 @@ body {
   cursor: pointer;
 }
 .gate button:disabled { opacity: 0.5; cursor: default; }
+.gate-preview {
+  margin-top: 0.6rem;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+.gate-preview code {
+  font-family: ui-monospace, Menlo, monospace;
+  color: var(--accent);
+}
 .gate-error {
   margin-top: 1rem;
   color: #e06c75;

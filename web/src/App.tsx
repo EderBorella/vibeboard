@@ -5,12 +5,14 @@ import { getState, moveCard, archiveCard } from './api';
 import { Board } from './components/Board';
 import { ProjectGate } from './components/ProjectGate';
 import { CardEditor, type EditorState } from './components/CardEditor';
+import { CopilotPanel } from './copilot/CopilotPanel';
 
 export function App() {
   const [bump, setBump] = useState(0);
   const [showGate, setShowGate] = useState(false);
   const [ready, setReady] = useState(false);
   const [editor, setEditor] = useState<EditorState | null>(null);
+  const [copilotOpen, setCopilotOpen] = useState(false);
   const dragged = useRef<Card | null>(null);
   const { snapshot, conn } = useSnapshot(bump);
 
@@ -47,6 +49,11 @@ export function App() {
         {snapshot && !showGate && (
           <button className="switch-btn" onClick={() => setShowGate(true)}>Switch project</button>
         )}
+        {snapshot && !showGate && (
+          <button className={`switch-btn${copilotOpen ? ' active' : ''}`} onClick={() => setCopilotOpen((v) => !v)}>
+            {copilotOpen ? 'Hide copilot' : 'Copilot'}
+          </button>
+        )}
         <span className={`conn conn-${conn}`} title={`WebSocket ${conn}`} />
       </header>
 
@@ -57,6 +64,7 @@ export function App() {
       ) : !snapshot ? (
         <div className="empty">{conn === 'open' ? 'No project open.' : 'Connecting…'}</div>
       ) : (
+        <div className="work">
         <main className="boards">
           {BOARDS.map((board) => (
             <Board
@@ -73,6 +81,8 @@ export function App() {
             />
           ))}
         </main>
+        {copilotOpen && <CopilotPanel onClose={() => setCopilotOpen(false)} />}
+        </div>
       )}
 
       {editor && (

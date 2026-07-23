@@ -1,0 +1,19 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+*.tsbuildinfo
+
+# Planning & private material — kept local, not published
+docs/superpowers/
+notes/
+scratch/
+*.private.md
+.env
+.env.*
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store

@@ -19,6 +19,7 @@ async function fixture(): Promise<{ root: string; config: ProjectConfig }> {
 
 describe('boardOfId', () => {
   it('maps id prefixes to boards', () => {
+    expect(boardOfId('F-001')).toBe('features');
     expect(boardOfId('P-003')).toBe('product');
     expect(boardOfId('E-012')).toBe('engineering');
   });

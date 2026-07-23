@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { BoardName, Card } from '../shared';
+import { BOARDS, BOARD_LABELS, type BoardName, type Card } from '../shared';
 import { createCard, patchCard, getRaw, putRaw, setLinks as setLinksApi } from '../api';
 
 export type EditorState =
@@ -26,8 +26,6 @@ export function CardEditor({ editor, allCards, onClose, onSaved }: Props) {
 
   // Any card can link any other card; only exclude the card being edited itself.
   const linkable = allCards.filter((c) => c.id !== existing?.id);
-  const linkableProduct = linkable.filter((c) => c.board === 'product');
-  const linkableEngineering = linkable.filter((c) => c.board === 'engineering');
 
   const [tab, setTab] = useState<Tab>('form');
   const [title, setTitle] = useState(existing?.title ?? '');
@@ -124,22 +122,22 @@ export function CardEditor({ editor, allCards, onClose, onSaved }: Props) {
                   <div className="links-hint">No other cards yet to link.</div>
                 ) : (
                   <div className="links-list">
-                    {linkableProduct.length > 0 && <div className="links-group">Product</div>}
-                    {linkableProduct.map((c) => (
-                      <label key={c.id} className="link-option">
-                        <input type="checkbox" checked={links.includes(c.id)} onChange={() => toggleLink(c.id)} />
-                        <span className="link-id">{c.id}</span>
-                        <span className="link-title">{c.title}</span>
-                      </label>
-                    ))}
-                    {linkableEngineering.length > 0 && <div className="links-group">Engineering</div>}
-                    {linkableEngineering.map((c) => (
-                      <label key={c.id} className="link-option">
-                        <input type="checkbox" checked={links.includes(c.id)} onChange={() => toggleLink(c.id)} />
-                        <span className="link-id">{c.id}</span>
-                        <span className="link-title">{c.title}</span>
-                      </label>
-                    ))}
+                    {BOARDS.map((b) => {
+                      const group = linkable.filter((c) => c.board === b);
+                      if (group.length === 0) return null;
+                      return (
+                        <div key={b}>
+                          <div className="links-group">{BOARD_LABELS[b]}</div>
+                          {group.map((c) => (
+                            <label key={c.id} className="link-option">
+                              <input type="checkbox" checked={links.includes(c.id)} onChange={() => toggleLink(c.id)} />
+                              <span className="link-id">{c.id}</span>
+                              <span className="link-title">{c.title}</span>
+                            </label>
+                          ))}
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>

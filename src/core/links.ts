@@ -1,10 +1,12 @@
 import { readBoard } from './board.js';
 import { updateCard } from './mutations.js';
-import type { BoardName, Card, ProjectConfig } from './types.js';
+import { BOARDS, type BoardName, type Card, type ProjectConfig } from './types.js';
 
-// Link target ids are self-describing: "P-###" is a product card, "E-###" engineering.
+// Link target ids are self-describing: "F-###" feature, "P-###" product, "E-###" engineering.
 export function boardOfId(id: string): BoardName {
-  return id.startsWith('P') ? 'product' : 'engineering';
+  if (id.startsWith('F')) return 'features';
+  if (id.startsWith('P')) return 'product';
+  return 'engineering';
 }
 
 // Set `card`'s links to exactly `desired` and keep the relationship symmetric: every
@@ -20,11 +22,8 @@ export async function setCardLinks(
   const self = card.id;
   const desiredSet = new Set(desired.filter((id) => id !== self));
 
-  const [product, engineering] = await Promise.all([
-    readBoard(projectRoot, 'product', config),
-    readBoard(projectRoot, 'engineering', config),
-  ]);
-  const all = [...product, ...engineering];
+  const perBoard = await Promise.all(BOARDS.map((board) => readBoard(projectRoot, board, config)));
+  const all = perBoard.flat();
   const liveIds = new Set(all.map((c) => c.id));
 
   // Reconcile every other live card's back-reference to `self`.

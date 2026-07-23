@@ -1,7 +1,15 @@
 // Wire types the UI consumes. Mirrors the small public surface of src/core/types.ts
 // across the Vite/tsc boundary — keep in sync with the server's core.
 
-export type BoardName = 'product' | 'engineering';
+// Mirrors src/core/types.ts BOARDS — ordered, highest level of management first.
+export const BOARDS = ['features', 'product', 'engineering'] as const;
+export type BoardName = (typeof BOARDS)[number];
+
+export const BOARD_LABELS: Record<BoardName, string> = {
+  features: 'Features',
+  product: 'Product',
+  engineering: 'Engineering',
+};
 
 export interface Card {
   id: string;
@@ -44,5 +52,5 @@ export interface ProjectSnapshot {
   root: string;
   name: string;
   config: ProjectConfig;
-  boards: { product: Card[]; engineering: Card[] };
+  boards: Record<BoardName, Card[]>;
 }

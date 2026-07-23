@@ -1,26 +1,45 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { parse, stringify } from 'yaml';
-import type { ProjectConfig } from './types.js';
+import { BOARDS, type BoardName, type BoardConfig, type ProjectConfig } from './types.js';
 
 export const CONFIG_DIR = '.vibeboard';
 export const CONFIG_FILE = 'config.yaml';
+
+// Default columns per board. Features (highest level) mirrors Product for familiarity.
+const DEFAULT_COLUMNS: Record<BoardName, string[]> = {
+  features: ['Backlog', 'Todo', 'In Progress', 'Done'],
+  product: ['Backlog', 'Todo', 'In Progress', 'Done'],
+  engineering: ['Todo', 'In Progress', 'Review', 'Done'],
+};
 
 export function configPath(projectRoot: string): string {
   return join(projectRoot, CONFIG_DIR, CONFIG_FILE);
 }
 
 export function defaultConfig(name: string): ProjectConfig {
+  const boards = {} as Record<BoardName, BoardConfig>;
+  for (const board of BOARDS) boards[board] = { columns: [...DEFAULT_COLUMNS[board]] };
   return {
     name,
-    boards: {
-      product: { columns: ['Backlog', 'Todo', 'In Progress', 'Done'] },
-      engineering: { columns: ['Todo', 'In Progress', 'Review', 'Done'] },
-    },
+    boards,
     miniatureChars: 140,
     idPadding: 3,
     copilot: { backend: 'claude-code' },
   };
+}
+
+// Backfill any board missing from an older project's config with its default columns.
+// Returns whether anything changed, so callers can persist only when needed.
+export function ensureBoards(config: ProjectConfig): boolean {
+  let changed = false;
+  for (const board of BOARDS) {
+    if (!config.boards[board]) {
+      config.boards[board] = { columns: [...DEFAULT_COLUMNS[board]] };
+      changed = true;
+    }
+  }
+  return changed;
 }
 
 export async function readConfig(projectRoot: string): Promise<ProjectConfig> {

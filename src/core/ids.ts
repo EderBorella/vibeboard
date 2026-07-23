@@ -1,7 +1,13 @@
 import type { BoardName } from './types.js';
 
-export function idPrefix(board: BoardName): 'P' | 'E' {
-  return board === 'product' ? 'P' : 'E';
+const PREFIXES: Record<BoardName, string> = {
+  features: 'F',
+  product: 'P',
+  engineering: 'E',
+};
+
+export function idPrefix(board: BoardName): string {
+  return PREFIXES[board];
 }
 
 export function nextId(board: BoardName, existingIds: string[], padding: number): string {

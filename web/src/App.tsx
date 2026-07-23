@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { BoardName, Card } from './shared';
+import { BOARDS, BOARD_LABELS, type BoardName, type Card } from './shared';
 import { useSnapshot } from './useSnapshot';
 import { getState, moveCard, archiveCard } from './api';
 import { Board } from './components/Board';
@@ -58,15 +58,27 @@ export function App() {
         <div className="empty">{conn === 'open' ? 'No project open.' : 'Connecting…'}</div>
       ) : (
         <main className="boards">
-          <Board board="product" label="Product" cards={snapshot.boards.product} config={snapshot.config} onAdd={onAdd} onOpen={onOpen} onArchive={onArchive} onDragStart={onDragStart} onDrop={onDrop} />
-          <Board board="engineering" label="Engineering" cards={snapshot.boards.engineering} config={snapshot.config} onAdd={onAdd} onOpen={onOpen} onArchive={onArchive} onDragStart={onDragStart} onDrop={onDrop} />
+          {BOARDS.map((board) => (
+            <Board
+              key={board}
+              board={board}
+              label={BOARD_LABELS[board]}
+              cards={snapshot.boards[board] ?? []}
+              config={snapshot.config}
+              onAdd={onAdd}
+              onOpen={onOpen}
+              onArchive={onArchive}
+              onDragStart={onDragStart}
+              onDrop={onDrop}
+            />
+          ))}
         </main>
       )}
 
       {editor && (
         <CardEditor
           editor={editor}
-          allCards={[...(snapshot?.boards.product ?? []), ...(snapshot?.boards.engineering ?? [])]}
+          allCards={snapshot ? BOARDS.flatMap((b) => snapshot.boards[b] ?? []) : []}
           onClose={() => setEditor(null)}
           onSaved={() => setEditor(null)}
         />

@@ -1,5 +1,5 @@
 import chokidar, { type FSWatcher } from 'chokidar';
-import { readConfig } from '../core/config.js';
+import { readConfig, writeConfig, ensureBoards } from '../core/config.js';
 import { buildSnapshot, type ProjectSnapshot } from './snapshot.js';
 import type { ProjectConfig } from '../core/types.js';
 
@@ -24,7 +24,10 @@ export class ProjectSession {
   get config(): ProjectConfig | undefined { return this.#config; }
 
   async open(projectRoot: string): Promise<ProjectSnapshot> {
-    this.#config = await readConfig(projectRoot); // throws if not a VibeBoard project
+    const config = await readConfig(projectRoot); // throws if not a VibeBoard project
+    // Upgrade older projects created before a board existed: backfill missing boards.
+    if (ensureBoards(config)) await writeConfig(projectRoot, config);
+    this.#config = config;
     this.#root = projectRoot;
     await this.close(true);
 

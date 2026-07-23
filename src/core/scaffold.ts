@@ -3,7 +3,8 @@ import { join } from 'node:path';
 import { defaultConfig, writeConfig, CONFIG_DIR } from './config.js';
 import { boardColumnSlugs, ARCHIVE_SLUG } from './board.js';
 import { createCard } from './mutations.js';
-import type { BoardName, ProjectConfig } from './types.js';
+import { setCardLinks } from './links.js';
+import { BOARDS, type ProjectConfig } from './types.js';
 
 export type ScaffoldMode = 'greenfield' | 'brownfield';
 
@@ -14,7 +15,8 @@ export const VIBEBOARD_DOC = `# VibeBoard card conventions
 This project is managed by VibeBoard. Cards are markdown files in folders.
 
 ## Layout
-- Two boards: \`product/\` (what/why) and \`engineering/\` (how).
+- Three boards, highest level first: \`features/\` (capabilities/roadmap),
+  \`product/\` (what/why), and \`engineering/\` (how).
 - **Column = folder.** e.g. \`product/in-progress/P-001.md\`.
 - \`archive/\` (per board) holds soft-deleted cards; it is not a column.
 
@@ -22,7 +24,7 @@ This project is managed by VibeBoard. Cards are markdown files in folders.
 One card = one \`.md\` file with YAML frontmatter + a markdown body:
 \`\`\`
 ---
-id: E-010            # P-### product, E-### engineering; zero-padded; NEVER change on move
+id: E-010            # F-### feature, P-### product, E-### engineering; zero-padded; NEVER change on move
 title: ...
 description: ...     # optional short miniature summary
 order: 20            # position within the column
@@ -44,7 +46,7 @@ Markdown body.
 
 async function ensureFolders(projectRoot: string, config: ProjectConfig): Promise<void> {
   await mkdir(join(projectRoot, CONFIG_DIR), { recursive: true });
-  for (const board of ['product', 'engineering'] as BoardName[]) {
+  for (const board of BOARDS) {
     for (const slug of [...boardColumnSlugs(config, board), ARCHIVE_SLUG]) {
       await mkdir(join(projectRoot, board, slug), { recursive: true });
     }
@@ -69,6 +71,18 @@ async function writeClaudePointer(projectRoot: string, name: string, mode: Scaff
 }
 
 async function writeSampleCards(projectRoot: string, config: ProjectConfig, today: string): Promise<void> {
+  const feature = await createCard(
+    projectRoot,
+    config,
+    {
+      board: 'features',
+      columnSlug: 'todo',
+      title: 'Sample feature',
+      description: 'A high-level capability. Delete me once you get going.',
+      body: 'Describe the capability and its goal here.',
+    },
+    today,
+  );
   const product = await createCard(
     projectRoot,
     config,
@@ -81,19 +95,20 @@ async function writeSampleCards(projectRoot: string, config: ProjectConfig, toda
     },
     today,
   );
-  await createCard(
+  const engineering = await createCard(
     projectRoot,
     config,
     {
       board: 'engineering',
       columnSlug: 'todo',
       title: 'Sample engineering card',
-      description: 'An implementation task linked to the sample product card.',
-      links: [product.id],
+      description: 'An implementation task. Delete me once you get going.',
       body: 'Describe the how here.',
     },
     today,
   );
+  // Symmetric hierarchy trace: feature <-> product <-> engineering.
+  await setCardLinks(projectRoot, config, product, [feature.id, engineering.id]);
 }
 
 export async function scaffoldProject(

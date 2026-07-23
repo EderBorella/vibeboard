@@ -1,4 +1,15 @@
-export type BoardName = 'product' | 'engineering';
+// The ordered set of boards, highest level of project management first. Adding a board
+// here (plus its id prefix in ids.ts and default columns in config.ts) rolls it out
+// everywhere — snapshot, scaffold, links, and the UI all derive from this list.
+export const BOARDS = ['features', 'product', 'engineering'] as const;
+export type BoardName = (typeof BOARDS)[number];
+
+// Human-facing labels for each board.
+export const BOARD_LABELS: Record<BoardName, string> = {
+  features: 'Features',
+  product: 'Product',
+  engineering: 'Engineering',
+};
 
 export interface CardFrontmatter {
   id: string;            // "P-001" | "E-010"

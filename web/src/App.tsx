@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { BoardName, Card } from './shared';
 import { useSnapshot } from './useSnapshot';
-import { getState } from './api';
+import { getState, moveCard, archiveCard } from './api';
 import { Board } from './components/Board';
 import { ProjectGate } from './components/ProjectGate';
 import { CardEditor, type EditorState } from './components/CardEditor';
@@ -11,10 +11,19 @@ export function App() {
   const [showGate, setShowGate] = useState(false);
   const [ready, setReady] = useState(false);
   const [editor, setEditor] = useState<EditorState | null>(null);
+  const dragged = useRef<Card | null>(null);
   const { snapshot, conn } = useSnapshot(bump);
 
   const onAdd = (board: BoardName, columnSlug: string): void => setEditor({ mode: 'create', board, columnSlug });
   const onOpen = (card: Card): void => setEditor({ mode: 'edit', card });
+  const onDragStart = (card: Card): void => { dragged.current = card; };
+  const onArchive = (card: Card): void => { void archiveCard(card.board, card.id); };
+  const onDrop = (board: BoardName, columnSlug: string): void => {
+    const card = dragged.current;
+    dragged.current = null;
+    if (!card || card.board !== board || card.columnSlug === columnSlug) return; // no cross-board / no-op
+    void moveCard(card.board, card.id, columnSlug);
+  };
 
   useEffect(() => {
     getState()
@@ -49,8 +58,8 @@ export function App() {
         <div className="empty">{conn === 'open' ? 'No project open.' : 'Connecting…'}</div>
       ) : (
         <main className="boards">
-          <Board board="product" label="Product" cards={snapshot.boards.product} config={snapshot.config} onAdd={onAdd} onOpen={onOpen} />
-          <Board board="engineering" label="Engineering" cards={snapshot.boards.engineering} config={snapshot.config} onAdd={onAdd} onOpen={onOpen} />
+          <Board board="product" label="Product" cards={snapshot.boards.product} config={snapshot.config} onAdd={onAdd} onOpen={onOpen} onArchive={onArchive} onDragStart={onDragStart} onDrop={onDrop} />
+          <Board board="engineering" label="Engineering" cards={snapshot.boards.engineering} config={snapshot.config} onAdd={onAdd} onOpen={onOpen} onArchive={onArchive} onDragStart={onDragStart} onDrop={onDrop} />
         </main>
       )}
 

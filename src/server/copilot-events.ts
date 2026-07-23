@@ -19,7 +19,12 @@ export type CopilotEvent =
   | { kind: 'text'; text: string }
   | { kind: 'tool_use'; id: string; name: string; input: unknown }
   | { kind: 'tool_result'; text: string }
-  | { kind: 'result'; sessionId: string; stats: ResultStats };
+  | { kind: 'result'; sessionId: string; stats: ResultStats }
+  // Incremental (--include-partial-messages) streaming events:
+  | { kind: 'block_start'; block: 'text' | 'thinking' | 'tool_use' }
+  | { kind: 'text_delta'; text: string }
+  | { kind: 'thinking_delta'; text: string }
+  | { kind: 'block_stop' };
 
 interface RawBlock { type: string; text?: string; thinking?: string; id?: string; name?: string; input?: unknown; content?: unknown }
 
@@ -74,8 +79,37 @@ export function parseCopilotLine(line: string): CopilotEvent[] {
     case 'assistant':
     case 'user':
       return contentEvents((o.message as { content?: unknown })?.content);
+    case 'stream_event':
+      return streamEvents(o.event as StreamEvent | undefined);
     case 'result':
       return [{ kind: 'result', sessionId: String(o.session_id ?? ''), stats: resultStats(o) }];
+    default:
+      return [];
+  }
+}
+
+interface StreamEvent {
+  type?: string;
+  content_block?: { type?: string };
+  delta?: { type?: string; text?: string; thinking?: string };
+}
+
+// Incremental deltas from --include-partial-messages. Only text/thinking are surfaced;
+// the final `assistant` message still arrives and carries tool_use.
+function streamEvents(event: StreamEvent | undefined): CopilotEvent[] {
+  if (!event) return [];
+  switch (event.type) {
+    case 'content_block_start': {
+      const t = event.content_block?.type;
+      if (t === 'text' || t === 'thinking' || t === 'tool_use') return [{ kind: 'block_start', block: t }];
+      return [];
+    }
+    case 'content_block_delta':
+      if (event.delta?.type === 'text_delta') return [{ kind: 'text_delta', text: event.delta.text ?? '' }];
+      if (event.delta?.type === 'thinking_delta') return [{ kind: 'thinking_delta', text: event.delta.thinking ?? '' }];
+      return [];
+    case 'content_block_stop':
+      return [{ kind: 'block_stop' }];
     default:
       return [];
   }

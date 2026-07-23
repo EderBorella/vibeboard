@@ -10,10 +10,14 @@ export interface CopilotState {
   model: string | undefined;
 }
 
+export type EffortLevel = 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+
 export interface SendOptions {
   cwd: string;
   text: string;
   mode: PermissionMode;
+  model?: string;   // alias (opus/sonnet/haiku/fable) or full name; omit to inherit default
+  effort?: EffortLevel;
   onEvent: (event: CopilotEvent) => void;
 }
 
@@ -50,7 +54,9 @@ export class CopilotSession {
   async send(opts: SendOptions): Promise<void> {
     if (this.#child) throw new Error('Copilot is busy');
 
-    const args = ['-p', '--output-format', 'stream-json', '--verbose', '--permission-mode', opts.mode];
+    const args = ['-p', '--output-format', 'stream-json', '--include-partial-messages', '--verbose', '--permission-mode', opts.mode];
+    if (opts.model) args.push('--model', opts.model);
+    if (opts.effort) args.push('--effort', opts.effort);
     if (this.#sessionId) args.push('--resume', this.#sessionId);
     args.push(opts.text);
 

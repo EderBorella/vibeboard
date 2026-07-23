@@ -67,4 +67,14 @@ describe('CopilotSession', () => {
     expect(args).toContain('--permission-mode');
     expect(args[args.indexOf('--permission-mode') + 1]).toBe('plan');
   });
+
+  it('forwards model, effort, and requests partial-message streaming', async () => {
+    const session = new CopilotSession();
+    const events: CopilotEvent[] = [];
+    await session.send({ cwd: here, text: 'x', mode: 'acceptEdits', model: 'haiku', effort: 'low', onEvent: (e) => events.push(e) });
+    const args = lastArgs()[0];
+    expect(args).toContain('--include-partial-messages');
+    expect(args[args.indexOf('--model') + 1]).toBe('haiku');
+    expect(args[args.indexOf('--effort') + 1]).toBe('low');
+  });
 });

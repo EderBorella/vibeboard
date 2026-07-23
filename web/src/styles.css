@@ -209,6 +209,22 @@ body {
   cursor: pointer;
 }
 .copilot-actions button:disabled { opacity: 0.5; cursor: default; }
+.copilot-selects {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0 0.75rem 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+.copilot-selects select {
+  flex: 1;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.3rem 0.4rem;
+  font-size: 0.76rem;
+}
+.copilot-selects select:disabled { opacity: 0.5; }
 .copilot-body {
   flex: 1;
   overflow-y: auto;

@@ -1,6 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 export type PermissionMode = 'plan' | 'acceptEdits' | 'bypassPermissions';
+export type EffortLevel = 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+
+export interface TurnOptions {
+  mode: PermissionMode;
+  model?: string;   // '' / undefined = inherit claude's default
+  effort?: EffortLevel;
+}
 
 export interface TranscriptItem {
   id: number;
@@ -17,9 +24,11 @@ export interface CopilotStats {
 }
 
 interface CopilotEvent {
-  kind: 'init' | 'thinking' | 'text' | 'tool_use' | 'tool_result' | 'result';
+  kind: 'init' | 'thinking' | 'text' | 'tool_use' | 'tool_result' | 'result'
+    | 'block_start' | 'text_delta' | 'thinking_delta' | 'block_stop';
   text?: string;
   name?: string;
+  block?: 'text' | 'thinking' | 'tool_use';
   sessionId?: string;
   model?: string;
   stats?: { costUsd: number; durationMs: number; turns: number; contextTokens: number };
@@ -35,26 +44,47 @@ export function useCopilot() {
   const [stats, setStats] = useState<CopilotStats>(ZERO);
   const ws = useRef<WebSocket | null>(null);
   const nextId = useRef(1);
+  const streamId = useRef<number | null>(null); // bubble currently being streamed via deltas
+  const deltaMode = useRef(false);              // true once any delta seen (partial streaming on)
 
   const push = useCallback((item: Omit<TranscriptItem, 'id'>) => {
+    setItems((prev) => [...prev, { ...item, id: nextId.current++ }]);
+  }, []);
+
+  // Open a fresh streaming bubble (assistant text or thinking) for the next deltas.
+  const openStream = useCallback((kind: 'assistant' | 'thinking') => {
+    setItems((prev) => { const id = nextId.current++; streamId.current = id; return [...prev, { id, kind, text: '' }]; });
+  }, []);
+
+  const appendStream = useCallback((kind: 'assistant' | 'thinking', text: string) => {
     setItems((prev) => {
-      // Merge consecutive assistant text into one bubble for readability.
-      const last = prev[prev.length - 1];
-      if (item.kind === 'assistant' && last?.kind === 'assistant') {
-        return [...prev.slice(0, -1), { ...last, text: last.text + item.text }];
+      if (streamId.current != null) {
+        return prev.map((it) => (it.id === streamId.current ? { ...it, text: it.text + text } : it));
       }
-      return [...prev, { ...item, id: nextId.current++ }];
+      const id = nextId.current++;
+      streamId.current = id;
+      return [...prev, { id, kind, text }];
     });
   }, []);
 
   const apply = useCallback((e: CopilotEvent) => {
     switch (e.kind) {
       case 'init': setSessionId(e.sessionId); setModel(e.model); break;
-      case 'text': push({ kind: 'assistant', text: e.text ?? '' }); break;
-      case 'thinking': push({ kind: 'thinking', text: e.text ?? '' }); break;
-      case 'tool_use': push({ kind: 'tool', text: '', toolName: e.name }); break;
+      // Incremental streaming (preferred when the CLI sends partial messages):
+      case 'block_start':
+        if (e.block === 'text') openStream('assistant');
+        else if (e.block === 'thinking') openStream('thinking');
+        break;
+      case 'text_delta': deltaMode.current = true; appendStream('assistant', e.text ?? ''); break;
+      case 'thinking_delta': deltaMode.current = true; appendStream('thinking', e.text ?? ''); break;
+      case 'block_stop': streamId.current = null; break;
+      // Final block messages: skip text/thinking if we already streamed them as deltas.
+      case 'text': if (!deltaMode.current) push({ kind: 'assistant', text: e.text ?? '' }); break;
+      case 'thinking': if (!deltaMode.current) push({ kind: 'thinking', text: e.text ?? '' }); break;
+      case 'tool_use': streamId.current = null; push({ kind: 'tool', text: '', toolName: e.name }); break;
       case 'tool_result': break; // tool results are noisy; the board reflects file changes
       case 'result':
+        streamId.current = null;
         if (e.stats) setStats((s) => ({
           costUsd: s.costUsd + e.stats!.costUsd,
           turns: s.turns + e.stats!.turns,
@@ -63,7 +93,7 @@ export function useCopilot() {
         }));
         break;
     }
-  }, [push]);
+  }, [push, openStream, appendStream]);
 
   useEffect(() => {
     const socket = new WebSocket(`ws://${location.host}/ws`);
@@ -79,21 +109,22 @@ export function useCopilot() {
 
   const sendRaw = (payload: object): void => ws.current?.send(JSON.stringify(payload));
 
-  const send = useCallback((text: string, mode: PermissionMode) => {
+  const send = useCallback((text: string, opts: TurnOptions) => {
     if (!text.trim()) return;
     push({ kind: 'user', text });
-    sendRaw({ type: 'copilot:send', text, mode });
+    sendRaw({ type: 'copilot:send', text, ...opts });
   }, [push]);
 
-  const compact = useCallback((mode: PermissionMode) => {
+  const compact = useCallback((opts: TurnOptions) => {
     push({ kind: 'user', text: '/compact' });
-    sendRaw({ type: 'copilot:compact', mode });
+    sendRaw({ type: 'copilot:compact', ...opts });
   }, [push]);
 
   const newSession = useCallback(() => {
     sendRaw({ type: 'copilot:new' });
     setItems([]);
     setStats(ZERO);
+    streamId.current = null;
   }, []);
 
   const cancel = useCallback(() => sendRaw({ type: 'copilot:cancel' }), []);

@@ -45,6 +45,19 @@ describe('parseCopilotLine', () => {
     expect(parseCopilotLine('')).toEqual([]);
   });
 
+  it('parses partial-message stream events (block start/stop + text/thinking deltas)', () => {
+    const start = JSON.stringify({ type: 'stream_event', event: { type: 'content_block_start', index: 0, content_block: { type: 'text' } } });
+    const textDelta = JSON.stringify({ type: 'stream_event', event: { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: 'he' } } });
+    const thinkDelta = JSON.stringify({ type: 'stream_event', event: { type: 'content_block_delta', index: 0, delta: { type: 'thinking_delta', thinking: 'hm' } } });
+    const stop = JSON.stringify({ type: 'stream_event', event: { type: 'content_block_stop', index: 0 } });
+    const msgDelta = JSON.stringify({ type: 'stream_event', event: { type: 'message_delta', delta: {} } });
+    expect(parseCopilotLine(start)).toEqual([{ kind: 'block_start', block: 'text' }]);
+    expect(parseCopilotLine(textDelta)).toEqual([{ kind: 'text_delta', text: 'he' }]);
+    expect(parseCopilotLine(thinkDelta)).toEqual([{ kind: 'thinking_delta', text: 'hm' }]);
+    expect(parseCopilotLine(stop)).toEqual([{ kind: 'block_stop' }]);
+    expect(parseCopilotLine(msgDelta)).toEqual([]); // message_delta is noise
+  });
+
   it('handles a multi-block assistant message in order', () => {
     const multi = JSON.stringify({ type: 'assistant', message: { content: [{ type: 'thinking', thinking: 't' }, { type: 'text', text: 'a' }] } });
     expect(parseCopilotLine(multi)).toEqual([{ kind: 'thinking', text: 't' }, { kind: 'text', text: 'a' }]);

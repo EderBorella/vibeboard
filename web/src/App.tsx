@@ -6,6 +6,7 @@ import { Board } from './components/Board';
 import { ProjectGate } from './components/ProjectGate';
 import { CardEditor, type EditorState } from './components/CardEditor';
 import { CopilotPanel } from './copilot/CopilotPanel';
+import { useCopilot, type EffortLevel, type PermissionMode } from './copilot/useCopilot';
 
 export function App() {
   const [bump, setBump] = useState(0);
@@ -15,6 +16,13 @@ export function App() {
   const [copilotOpen, setCopilotOpen] = useState(false);
   const dragged = useRef<Card | null>(null);
   const { snapshot, conn } = useSnapshot(bump);
+
+  // Copilot state lives here (not in the panel) so the transcript + socket survive
+  // closing/reopening the dock. The server-side session persists regardless.
+  const copilot = useCopilot();
+  const [copilotMode, setCopilotMode] = useState<PermissionMode>('bypassPermissions');
+  const [copilotModel, setCopilotModel] = useState('');
+  const [copilotEffort, setCopilotEffort] = useState<'' | EffortLevel>('');
 
   const onAdd = (board: BoardName, columnSlug: string): void => setEditor({ mode: 'create', board, columnSlug });
   const onOpen = (card: Card): void => setEditor({ mode: 'edit', card });
@@ -81,7 +89,18 @@ export function App() {
             />
           ))}
         </main>
-        {copilotOpen && <CopilotPanel onClose={() => setCopilotOpen(false)} />}
+        {copilotOpen && (
+          <CopilotPanel
+            copilot={copilot}
+            mode={copilotMode}
+            model={copilotModel}
+            effort={copilotEffort}
+            onMode={setCopilotMode}
+            onModel={setCopilotModel}
+            onEffort={setCopilotEffort}
+            onClose={() => setCopilotOpen(false)}
+          />
+        )}
         </div>
       )}
 

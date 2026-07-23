@@ -7,7 +7,7 @@ import { createCard, updateCard, moveCard, archiveCard, type CreateCardInput } f
 import { findCard } from '../core/find.js';
 import { setCardLinks } from '../core/links.js';
 import { discoverProjects } from './discover.js';
-import { CopilotSession, type PermissionMode } from './copilot.js';
+import { CopilotSession, type PermissionMode, type EffortLevel } from './copilot.js';
 import type { ProjectSession } from './session.js';
 import type { BoardName, CardFrontmatter } from '../core/types.js';
 
@@ -34,7 +34,9 @@ export function buildApp(session: ProjectSession): FastifyInstance {
   };
   const copilotState = (): void => broadcast({ type: 'copilot:state', state: copilot.state });
 
-  async function handleCopilotSend(text: string, mode: PermissionMode): Promise<void> {
+  interface CopilotOpts { mode: PermissionMode; model?: string; effort?: EffortLevel }
+
+  async function handleCopilotSend(text: string, opts: CopilotOpts): Promise<void> {
     if (!session.isOpen) { broadcast({ type: 'copilot:error', error: 'No project open' }); return; }
     if (!text.trim()) return;
     try {
@@ -42,7 +44,9 @@ export function buildApp(session: ProjectSession): FastifyInstance {
       await copilot.send({
         cwd: session.root!,
         text,
-        mode,
+        mode: opts.mode,
+        model: opts.model,
+        effort: opts.effort,
         onEvent: (event) => broadcast({ type: 'copilot:event', event }),
       });
     } catch (err) {
@@ -53,14 +57,15 @@ export function buildApp(session: ProjectSession): FastifyInstance {
   }
 
   function handleCopilotMessage(raw: string): void {
-    let msg: { type?: string; text?: string; mode?: PermissionMode };
+    let msg: { type?: string; text?: string; mode?: PermissionMode; model?: string; effort?: EffortLevel };
     try { msg = JSON.parse(raw); } catch { return; }
+    const opts = (): CopilotOpts => ({ mode: msg.mode ?? 'bypassPermissions', model: msg.model, effort: msg.effort });
     switch (msg.type) {
       case 'copilot:send':
-        void handleCopilotSend(msg.text ?? '', msg.mode ?? 'bypassPermissions');
+        void handleCopilotSend(msg.text ?? '', opts());
         break;
       case 'copilot:compact':
-        void handleCopilotSend('/compact', msg.mode ?? 'bypassPermissions');
+        void handleCopilotSend('/compact', opts());
         break;
       case 'copilot:new':
         copilot.newSession();

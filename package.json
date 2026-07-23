@@ -1,31 +1,43 @@
 {
   "name": "vibeboard",
-  "version": "1.0.0",
-  "description": "<h1 align=\"center\">VibeBoard</h1>",
-  "main": "index.js",
-  "directories": {
-    "doc": "docs"
-  },
+  "version": "0.1.0",
+  "description": "A local-network cockpit for a markdown project board, editable by the AI CLI agents it orchestrates.",
+  "type": "module",
   "scripts": {
     "test": "vitest run",
-    "build": "tsc -p tsconfig.json"
+    "dev": "tsx watch src/server/main.ts",
+    "web:dev": "vite --config web/vite.config.ts",
+    "build": "tsc -p tsconfig.json && vite build --config web/vite.config.ts",
+    "start": "node dist/server/main.js"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "module",
+  "keywords": [
+    "kanban",
+    "markdown",
+    "local-first",
+    "ai-agents",
+    "self-hosted"
+  ],
+  "author": "Eder Borella",
+  "license": "MIT",
   "dependencies": {
+    "@fastify/static": "^10.1.2",
     "@fastify/websocket": "^11.3.0",
     "chokidar": "^4.0.3",
     "fastify": "^5.10.0",
     "gray-matter": "^4.0.3",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
     "yaml": "^2.9.0"
   },
   "devDependencies": {
     "@types/node": "^20.19.43",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
     "@types/ws": "^8.18.1",
+    "@vitejs/plugin-react": "^4.7.0",
     "tsx": "^4.23.1",
     "typescript": "~5.5",
+    "vite": "^5.4.21",
     "vitest": "^2.1.9",
     "ws": "^8.21.1"
   },

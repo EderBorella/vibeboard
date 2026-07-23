@@ -23,9 +23,9 @@ export function Column({
   return (
     <div
       className={`column${over ? ' column-over' : ''}`}
-      onDragOver={onDrop ? (e) => { e.preventDefault(); setOver(true); } : undefined}
+      onDragOver={onDrop ? (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setOver(true); } : undefined}
       onDragLeave={onDrop ? () => setOver(false) : undefined}
-      onDrop={onDrop ? () => { setOver(false); onDrop(board, slug); } : undefined}
+      onDrop={onDrop ? (e) => { e.preventDefault(); setOver(false); onDrop(board, slug); } : undefined}
     >
       <div className="column-head">
         <span className="column-title">{title}</span>

@@ -15,7 +15,13 @@ export function CardTile({ card, miniatureChars, onOpen, onArchive, onDragStart 
     <div
       className="tile"
       draggable={!!onDragStart}
-      onDragStart={() => onDragStart?.(card)}
+      onDragStart={(e) => {
+        // setData is required for the browser to actually start a native drag (Firefox
+        // won't drag at all without it). dragged card is tracked in App via onDragStart.
+        e.dataTransfer.setData('text/plain', card.id);
+        e.dataTransfer.effectAllowed = 'move';
+        onDragStart?.(card);
+      }}
       onClick={() => onOpen?.(card)}
     >
       <div className="tile-head">

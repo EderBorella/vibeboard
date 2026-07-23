@@ -15,12 +15,21 @@
   "license": "ISC",
   "type": "module",
   "dependencies": {
+    "@fastify/websocket": "^11.3.0",
+    "chokidar": "^4.0.3",
+    "fastify": "^5.10.0",
     "gray-matter": "^4.0.3",
     "yaml": "^2.9.0"
   },
   "devDependencies": {
     "@types/node": "^20.19.43",
+    "@types/ws": "^8.18.1",
+    "tsx": "^4.23.1",
     "typescript": "~5.5",
-    "vitest": "^2.1.9"
+    "vitest": "^2.1.9",
+    "ws": "^8.21.1"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }

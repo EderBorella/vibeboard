@@ -330,6 +330,32 @@ body {
 }
 .field input:focus, .field textarea:focus { outline: none; border-color: var(--accent); }
 .raw-area { font-family: ui-monospace, Menlo, monospace; font-size: 0.8rem; }
+.links-hint { color: var(--muted); font-size: 0.8rem; font-style: italic; }
+.links-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  max-height: 160px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.5rem;
+  background: var(--bg);
+}
+.link-option {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+.link-option input { cursor: pointer; }
+.link-id {
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 0.72rem;
+  color: var(--accent);
+}
+.link-title { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .modal-error {
   color: #e06c75;
   font-size: 0.82rem;

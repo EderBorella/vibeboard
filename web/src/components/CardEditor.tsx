@@ -8,6 +8,7 @@ export type EditorState =
 
 interface Props {
   editor: EditorState;
+  productCards: Card[];
   onClose: () => void;
   onSaved: () => void;
 }
@@ -19,7 +20,7 @@ function parseCsv(text: string): string[] {
   return text.split(',').map((s) => s.trim()).filter(Boolean);
 }
 
-export function CardEditor({ editor, onClose, onSaved }: Props) {
+export function CardEditor({ editor, productCards, onClose, onSaved }: Props) {
   const existing = editor.mode === 'edit' ? editor.card : null;
   const board = editor.mode === 'edit' ? editor.card.board : editor.board;
 
@@ -28,7 +29,12 @@ export function CardEditor({ editor, onClose, onSaved }: Props) {
   const [description, setDescription] = useState(existing?.description ?? '');
   const [tags, setTags] = useState(csv(existing?.tags ?? []));
   const [group, setGroup] = useState(existing?.group ?? '');
+  const [links, setLinks] = useState<string[]>(existing?.links ?? []);
   const [body, setBody] = useState(existing?.body ?? '');
+
+  function toggleLink(id: string): void {
+    setLinks((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  }
   const [raw, setRaw] = useState('');
   const [rawLoaded, setRawLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -56,6 +62,7 @@ export function CardEditor({ editor, onClose, onSaved }: Props) {
           title,
           description: description || undefined,
           tags: parseCsv(tags),
+          links: board === 'engineering' ? links : undefined,
           group: group || undefined,
           body: body || undefined,
         });
@@ -64,6 +71,7 @@ export function CardEditor({ editor, onClose, onSaved }: Props) {
           title,
           description,
           tags: parseCsv(tags),
+          links: board === 'engineering' ? links : undefined,
           group,
           body,
         });
@@ -105,6 +113,27 @@ export function CardEditor({ editor, onClose, onSaved }: Props) {
               <label className="field"><span>Group</span>
                 <input value={group} onChange={(e) => setGroup(e.target.value)} />
               </label>
+              {board === 'engineering' && (
+                <div className="field"><span>Linked product cards</span>
+                  {productCards.length === 0 ? (
+                    <div className="links-hint">No product cards yet — create one on the Product board to link.</div>
+                  ) : (
+                    <div className="links-list">
+                      {productCards.map((p) => (
+                        <label key={p.id} className="link-option">
+                          <input
+                            type="checkbox"
+                            checked={links.includes(p.id)}
+                            onChange={() => toggleLink(p.id)}
+                          />
+                          <span className="link-id">{p.id}</span>
+                          <span className="link-title">{p.title}</span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
               <label className="field"><span>Body (markdown)</span>
                 <textarea rows={8} value={body} onChange={(e) => setBody(e.target.value)} />
               </label>

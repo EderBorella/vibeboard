@@ -64,7 +64,12 @@ export function App() {
       )}
 
       {editor && (
-        <CardEditor editor={editor} onClose={() => setEditor(null)} onSaved={() => setEditor(null)} />
+        <CardEditor
+          editor={editor}
+          productCards={snapshot?.boards.product ?? []}
+          onClose={() => setEditor(null)}
+          onSaved={() => setEditor(null)}
+        />
       )}
     </div>
   );

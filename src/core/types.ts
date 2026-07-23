@@ -6,7 +6,7 @@ export interface CardFrontmatter {
   description?: string;  // optional miniature summary
   order: number;         // position within a column
   tags: string[];
-  links: string[];       // product ids; only meaningful on engineering cards
+  links: string[];       // ids of related cards on either board (symmetric)
   group?: string;        // optional visual grouping label
   created: string;       // ISO date "YYYY-MM-DD"
 }

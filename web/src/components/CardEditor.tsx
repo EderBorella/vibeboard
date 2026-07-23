@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { BoardName, Card } from '../shared';
-import { createCard, patchCard, getRaw, putRaw } from '../api';
+import { createCard, patchCard, getRaw, putRaw, setLinks as setLinksApi } from '../api';
 
 export type EditorState =
   | { mode: 'create'; board: BoardName; columnSlug: string }
@@ -8,7 +8,7 @@ export type EditorState =
 
 interface Props {
   editor: EditorState;
-  productCards: Card[];
+  allCards: Card[];
   onClose: () => void;
   onSaved: () => void;
 }
@@ -20,9 +20,14 @@ function parseCsv(text: string): string[] {
   return text.split(',').map((s) => s.trim()).filter(Boolean);
 }
 
-export function CardEditor({ editor, productCards, onClose, onSaved }: Props) {
+export function CardEditor({ editor, allCards, onClose, onSaved }: Props) {
   const existing = editor.mode === 'edit' ? editor.card : null;
   const board = editor.mode === 'edit' ? editor.card.board : editor.board;
+
+  // Any card can link any other card; only exclude the card being edited itself.
+  const linkable = allCards.filter((c) => c.id !== existing?.id);
+  const linkableProduct = linkable.filter((c) => c.board === 'product');
+  const linkableEngineering = linkable.filter((c) => c.board === 'engineering');
 
   const [tab, setTab] = useState<Tab>('form');
   const [title, setTitle] = useState(existing?.title ?? '');
@@ -56,25 +61,26 @@ export function CardEditor({ editor, productCards, onClose, onSaved }: Props) {
       if (tab === 'raw' && existing) {
         await putRaw(existing.board, existing.id, raw);
       } else if (editor.mode === 'create') {
-        await createCard({
+        // Create the card first, then reconcile links symmetrically by its new id.
+        const created = await createCard({
           board: editor.board,
           columnSlug: editor.columnSlug,
           title,
           description: description || undefined,
           tags: parseCsv(tags),
-          links: board === 'engineering' ? links : undefined,
           group: group || undefined,
           body: body || undefined,
         });
+        await setLinksApi(created.board, created.id, links);
       } else {
         await patchCard(existing!.board, existing!.id, {
           title,
           description,
           tags: parseCsv(tags),
-          links: board === 'engineering' ? links : undefined,
           group,
           body,
         });
+        await setLinksApi(existing!.board, existing!.id, links);
       }
       onSaved();
     } catch (e) {
@@ -113,27 +119,30 @@ export function CardEditor({ editor, productCards, onClose, onSaved }: Props) {
               <label className="field"><span>Group</span>
                 <input value={group} onChange={(e) => setGroup(e.target.value)} />
               </label>
-              {board === 'engineering' && (
-                <div className="field"><span>Linked product cards</span>
-                  {productCards.length === 0 ? (
-                    <div className="links-hint">No product cards yet — create one on the Product board to link.</div>
-                  ) : (
-                    <div className="links-list">
-                      {productCards.map((p) => (
-                        <label key={p.id} className="link-option">
-                          <input
-                            type="checkbox"
-                            checked={links.includes(p.id)}
-                            onChange={() => toggleLink(p.id)}
-                          />
-                          <span className="link-id">{p.id}</span>
-                          <span className="link-title">{p.title}</span>
-                        </label>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
+              <div className="field"><span>Linked cards</span>
+                {linkable.length === 0 ? (
+                  <div className="links-hint">No other cards yet to link.</div>
+                ) : (
+                  <div className="links-list">
+                    {linkableProduct.length > 0 && <div className="links-group">Product</div>}
+                    {linkableProduct.map((c) => (
+                      <label key={c.id} className="link-option">
+                        <input type="checkbox" checked={links.includes(c.id)} onChange={() => toggleLink(c.id)} />
+                        <span className="link-id">{c.id}</span>
+                        <span className="link-title">{c.title}</span>
+                      </label>
+                    ))}
+                    {linkableEngineering.length > 0 && <div className="links-group">Engineering</div>}
+                    {linkableEngineering.map((c) => (
+                      <label key={c.id} className="link-option">
+                        <input type="checkbox" checked={links.includes(c.id)} onChange={() => toggleLink(c.id)} />
+                        <span className="link-id">{c.id}</span>
+                        <span className="link-title">{c.title}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
               <label className="field"><span>Body (markdown)</span>
                 <textarea rows={8} value={body} onChange={(e) => setBody(e.target.value)} />
               </label>

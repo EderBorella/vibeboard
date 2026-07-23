@@ -66,7 +66,7 @@ export function App() {
       {editor && (
         <CardEditor
           editor={editor}
-          productCards={snapshot?.boards.product ?? []}
+          allCards={[...(snapshot?.boards.product ?? []), ...(snapshot?.boards.engineering ?? [])]}
           onClose={() => setEditor(null)}
           onSaved={() => setEditor(null)}
         />

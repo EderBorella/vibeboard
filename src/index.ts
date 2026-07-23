@@ -6,4 +6,5 @@ export * from './core/ids.js';
 export * from './core/board.js';
 export * from './core/find.js';
 export * from './core/mutations.js';
+export * from './core/links.js';
 export * from './core/scaffold.js';

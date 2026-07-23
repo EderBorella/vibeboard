@@ -351,6 +351,14 @@ body {
   padding: 0.5rem;
   background: var(--bg);
 }
+.links-group {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  margin: 0.3rem 0 0.1rem;
+}
+.links-group:first-child { margin-top: 0; }
 .link-option {
   display: flex;
   align-items: center;

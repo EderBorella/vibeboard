@@ -1,4 +1,4 @@
-import type { BoardName, CardFrontmatterPatch, ProjectSnapshot } from './shared';
+import type { BoardName, Card, CardFrontmatterPatch, ProjectSnapshot } from './shared';
 
 async function post<T>(url: string, body: unknown): Promise<T> {
   const res = await fetch(url, {
@@ -50,7 +50,7 @@ export interface CreateCardBody {
   body?: string;
 }
 
-export function createCard(input: CreateCardBody): Promise<unknown> {
+export function createCard(input: CreateCardBody): Promise<Card> {
   return post('/api/cards', input);
 }
 
@@ -71,6 +71,16 @@ export async function putRaw(board: BoardName, id: string, raw: string): Promise
     body: JSON.stringify({ raw }),
   });
   if (!res.ok) throw new Error('Failed to save card file');
+}
+
+// Symmetric link reconcile — updates both sides. The single path for link changes.
+export async function setLinks(board: BoardName, id: string, links: string[]): Promise<void> {
+  const res = await fetch(`/api/cards/${board}/${id}/links`, {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ links }),
+  });
+  if (!res.ok) throw new Error('Failed to update links');
 }
 
 export function moveCard(board: BoardName, id: string, toColumnSlug: string): Promise<unknown> {

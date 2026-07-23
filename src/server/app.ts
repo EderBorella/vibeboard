@@ -5,6 +5,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { scaffoldProject, type ScaffoldMode } from '../core/scaffold.js';
 import { createCard, updateCard, moveCard, archiveCard, type CreateCardInput } from '../core/mutations.js';
 import { findCard } from '../core/find.js';
+import { setCardLinks } from '../core/links.js';
 import { discoverProjects } from './discover.js';
 import type { ProjectSession } from './session.js';
 import type { BoardName, CardFrontmatter } from '../core/types.js';
@@ -94,6 +95,15 @@ export function buildApp(session: ProjectSession): FastifyInstance {
       if (!card) return reply.code(404).send({ error: 'Card not found' });
       await writeFile(card.filePath, raw, 'utf8');
       return { ok: true };
+    });
+
+    api.put('/cards/:board/:id/links', async (req, reply) => {
+      if (!ensureOpen(session, reply)) return;
+      const { board, id } = req.params as { board: BoardName; id: string };
+      const { links } = req.body as { links: string[] };
+      const card = await findCard(session.root!, board, id, session.config!);
+      if (!card) return reply.code(404).send({ error: 'Card not found' });
+      return setCardLinks(session.root!, session.config!, card, links);
     });
 
     api.post('/cards/:board/:id/move', async (req, reply) => {

@@ -19,6 +19,7 @@ export type CopilotEvent =
   | { kind: 'text'; text: string }
   | { kind: 'tool_use'; id: string; name: string; input: unknown }
   | { kind: 'tool_result'; text: string }
+  | { kind: 'usage'; contextTokens: number } // per-call window occupancy, from message.usage
   | { kind: 'result'; sessionId: string; stats: ResultStats }
   // Incremental (--include-partial-messages) streaming events:
   | { kind: 'block_start'; block: 'text' | 'thinking' | 'tool_use' }
@@ -27,6 +28,16 @@ export type CopilotEvent =
   | { kind: 'block_stop' };
 
 interface RawBlock { type: string; text?: string; thinking?: string; id?: string; name?: string; input?: unknown; content?: unknown }
+
+const num = (v: unknown): number => (typeof v === 'number' ? v : 0);
+
+// Context-window occupancy for a single model call = all prompt tokens
+// (uncached + cache-read + cache-creation). Sourced from an assistant message's own
+// usage — NOT the result's top-level usage, which sums every call in the turn.
+function contextFromUsage(usage: Record<string, unknown> | undefined): number | undefined {
+  if (!usage) return undefined;
+  return num(usage.input_tokens) + num(usage.cache_read_input_tokens) + num(usage.cache_creation_input_tokens);
+}
 
 function toolResultText(content: unknown): string {
   if (typeof content === 'string') return content;
@@ -81,7 +92,13 @@ export function parseCopilotLine(line: string): CopilotEvent[] {
       return o.subtype === 'init'
         ? [{ kind: 'init', sessionId: String(o.session_id ?? ''), model: String(o.model ?? ''), permissionMode: String(o.permissionMode ?? '') }]
         : [];
-    case 'assistant':
+    case 'assistant': {
+      const message = o.message as { content?: unknown; usage?: Record<string, unknown> };
+      const events = contentEvents(message?.content);
+      const ctx = contextFromUsage(message?.usage);
+      if (ctx !== undefined) events.push({ kind: 'usage', contextTokens: ctx });
+      return events;
+    }
     case 'user':
       return contentEvents((o.message as { content?: unknown })?.content);
     case 'stream_event':

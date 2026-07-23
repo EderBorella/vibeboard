@@ -38,6 +38,17 @@ describe('parseCopilotLine', () => {
     });
   });
 
+  it('emits per-call context from an assistant message usage (window occupancy)', () => {
+    const line = JSON.stringify({
+      type: 'assistant',
+      message: { content: [{ type: 'text', text: 'hi' }], usage: { input_tokens: 10, cache_creation_input_tokens: 32536, cache_read_input_tokens: 0, output_tokens: 3 } },
+      session_id: 's',
+    });
+    const events = parseCopilotLine(line);
+    expect(events).toContainEqual({ kind: 'text', text: 'hi' });
+    expect(events).toContainEqual({ kind: 'usage', contextTokens: 10 + 32536 + 0 });
+  });
+
   it('reports context from the last iteration, not the summed-across-calls total', () => {
     // A multi-tool turn: top-level usage sums 3 calls (would read ~240k), but the window
     // occupancy is the last call's prompt (~40k).

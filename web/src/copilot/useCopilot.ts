@@ -24,13 +24,14 @@ export interface CopilotStats {
 }
 
 interface CopilotEvent {
-  kind: 'init' | 'thinking' | 'text' | 'tool_use' | 'tool_result' | 'result'
+  kind: 'init' | 'thinking' | 'text' | 'tool_use' | 'tool_result' | 'result' | 'usage'
     | 'block_start' | 'text_delta' | 'thinking_delta' | 'block_stop';
   text?: string;
   name?: string;
   block?: 'text' | 'thinking' | 'tool_use';
   sessionId?: string;
   model?: string;
+  contextTokens?: number;
   stats?: { costUsd: number; durationMs: number; turns: number; contextTokens: number };
 }
 
@@ -70,26 +71,25 @@ export function useCopilot() {
   const apply = useCallback((e: CopilotEvent) => {
     switch (e.kind) {
       case 'init': setSessionId(e.sessionId); setModel(e.model); break;
-      // Incremental streaming (preferred when the CLI sends partial messages):
-      case 'block_start':
-        if (e.block === 'text') openStream('assistant');
-        else if (e.block === 'thinking') openStream('thinking');
-        break;
+      // Incremental text streaming. Thinking is intentionally not rendered.
+      case 'block_start': if (e.block === 'text') openStream('assistant'); break;
       case 'text_delta': deltaMode.current = true; appendStream('assistant', e.text ?? ''); break;
-      case 'thinking_delta': deltaMode.current = true; appendStream('thinking', e.text ?? ''); break;
+      case 'thinking_delta': break; // reasoning hidden
       case 'block_stop': streamId.current = null; break;
-      // Final block messages: skip text/thinking if we already streamed them as deltas.
       case 'text': if (!deltaMode.current) push({ kind: 'assistant', text: e.text ?? '' }); break;
-      case 'thinking': if (!deltaMode.current) push({ kind: 'thinking', text: e.text ?? '' }); break;
+      case 'thinking': break; // reasoning hidden
       case 'tool_use': streamId.current = null; push({ kind: 'tool', text: '', toolName: e.name }); break;
       case 'tool_result': break; // tool results are noisy; the board reflects file changes
+      // Context occupancy comes from each model call's own usage (last wins).
+      case 'usage': if (typeof e.contextTokens === 'number') setStats((s) => ({ ...s, contextTokens: e.contextTokens! })); break;
+      // Result carries cost/turns/duration only — its token totals are cross-call sums.
       case 'result':
         streamId.current = null;
         if (e.stats) setStats((s) => ({
+          ...s,
           costUsd: s.costUsd + e.stats!.costUsd,
           turns: s.turns + e.stats!.turns,
           lastDurationMs: e.stats!.durationMs,
-          contextTokens: e.stats!.contextTokens,
         }));
         break;
     }

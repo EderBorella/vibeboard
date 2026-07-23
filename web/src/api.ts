@@ -58,6 +58,21 @@ export function patchCard(board: BoardName, id: string, patchBody: CardFrontmatt
   return patch(`/api/cards/${board}/${id}`, patchBody);
 }
 
+export async function getRaw(board: BoardName, id: string): Promise<string> {
+  const res = await fetch(`/api/cards/${board}/${id}/raw`);
+  if (!res.ok) throw new Error('Failed to load card file');
+  return (await res.json()).raw as string;
+}
+
+export async function putRaw(board: BoardName, id: string, raw: string): Promise<void> {
+  const res = await fetch(`/api/cards/${board}/${id}/raw`, {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ raw }),
+  });
+  if (!res.ok) throw new Error('Failed to save card file');
+}
+
 export function moveCard(board: BoardName, id: string, toColumnSlug: string): Promise<unknown> {
   return post(`/api/cards/${board}/${id}/move`, { toColumnSlug });
 }

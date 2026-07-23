@@ -1,14 +1,20 @@
 import { useEffect, useState } from 'react';
+import type { BoardName, Card } from './shared';
 import { useSnapshot } from './useSnapshot';
 import { getState } from './api';
 import { Board } from './components/Board';
 import { ProjectGate } from './components/ProjectGate';
+import { CardEditor, type EditorState } from './components/CardEditor';
 
 export function App() {
   const [bump, setBump] = useState(0);
   const [showGate, setShowGate] = useState(false);
   const [ready, setReady] = useState(false);
+  const [editor, setEditor] = useState<EditorState | null>(null);
   const { snapshot, conn } = useSnapshot(bump);
+
+  const onAdd = (board: BoardName, columnSlug: string): void => setEditor({ mode: 'create', board, columnSlug });
+  const onOpen = (card: Card): void => setEditor({ mode: 'edit', card });
 
   useEffect(() => {
     getState()
@@ -43,9 +49,13 @@ export function App() {
         <div className="empty">{conn === 'open' ? 'No project open.' : 'Connecting…'}</div>
       ) : (
         <main className="boards">
-          <Board board="product" label="Product" cards={snapshot.boards.product} config={snapshot.config} />
-          <Board board="engineering" label="Engineering" cards={snapshot.boards.engineering} config={snapshot.config} />
+          <Board board="product" label="Product" cards={snapshot.boards.product} config={snapshot.config} onAdd={onAdd} onOpen={onOpen} />
+          <Board board="engineering" label="Engineering" cards={snapshot.boards.engineering} config={snapshot.config} onAdd={onAdd} onOpen={onOpen} />
         </main>
+      )}
+
+      {editor && (
+        <CardEditor editor={editor} onClose={() => setEditor(null)} onSaved={() => setEditor(null)} />
       )}
     </div>
   );

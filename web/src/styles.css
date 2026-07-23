@@ -259,3 +259,99 @@ body {
   padding: 0.05rem 0.45rem;
   color: var(--muted);
 }
+
+/* Modal editor */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  z-index: 20;
+}
+.modal {
+  width: 100%;
+  max-width: 620px;
+  max-height: 90vh;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+}
+.modal-head {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border);
+}
+.modal-title { font-weight: 600; }
+.modal-tabs { margin-left: auto; display: flex; gap: 0.25rem; }
+.modal-tabs button {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--muted);
+  border-radius: 6px;
+  padding: 0.2rem 0.6rem;
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+.modal-tabs button.active { color: var(--text); background: var(--panel-2); border-color: var(--border); }
+.modal-close { background: transparent; border: none; color: var(--muted); cursor: pointer; font-size: 0.95rem; }
+.modal-body {
+  padding: 1rem;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+.field { display: flex; flex-direction: column; gap: 0.3rem; }
+.field > span { font-size: 0.76rem; color: var(--muted); }
+.field input, .field textarea {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.5rem 0.6rem;
+  color: var(--text);
+  font-size: 0.85rem;
+  font-family: inherit;
+  resize: vertical;
+}
+.field input:focus, .field textarea:focus { outline: none; border-color: var(--accent); }
+.raw-area { font-family: ui-monospace, Menlo, monospace; font-size: 0.8rem; }
+.modal-error {
+  color: #e06c75;
+  font-size: 0.82rem;
+  background: rgba(224, 108, 117, 0.1);
+  border: 1px solid rgba(224, 108, 117, 0.3);
+  border-radius: 6px;
+  padding: 0.5rem 0.7rem;
+}
+.modal-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border-top: 1px solid var(--border);
+}
+.btn-primary {
+  background: var(--accent);
+  color: #0b1220;
+  border: none;
+  border-radius: 6px;
+  padding: 0.45rem 1rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn-secondary {
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.45rem 1rem;
+  cursor: pointer;
+}
+.btn-primary:disabled, .btn-secondary:disabled { opacity: 0.5; cursor: default; }

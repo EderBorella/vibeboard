@@ -1,6 +1,7 @@
 import Fastify, { type FastifyInstance, type FastifyReply } from 'fastify';
 import websocket from '@fastify/websocket';
 import { dirname } from 'node:path';
+import { readFile, writeFile } from 'node:fs/promises';
 import { scaffoldProject, type ScaffoldMode } from '../core/scaffold.js';
 import { createCard, updateCard, moveCard, archiveCard, type CreateCardInput } from '../core/mutations.js';
 import { findCard } from '../core/find.js';
@@ -75,6 +76,24 @@ export function buildApp(session: ProjectSession): FastifyInstance {
       const card = await findCard(session.root!, board, id, session.config!);
       if (!card) return reply.code(404).send({ error: 'Card not found' });
       return updateCard(session.root!, card, req.body as Partial<CardFrontmatter> & { body?: string });
+    });
+
+    api.get('/cards/:board/:id/raw', async (req, reply) => {
+      if (!ensureOpen(session, reply)) return;
+      const { board, id } = req.params as { board: BoardName; id: string };
+      const card = await findCard(session.root!, board, id, session.config!);
+      if (!card) return reply.code(404).send({ error: 'Card not found' });
+      return { raw: await readFile(card.filePath, 'utf8') };
+    });
+
+    api.put('/cards/:board/:id/raw', async (req, reply) => {
+      if (!ensureOpen(session, reply)) return;
+      const { board, id } = req.params as { board: BoardName; id: string };
+      const { raw } = req.body as { raw: string };
+      const card = await findCard(session.root!, board, id, session.config!);
+      if (!card) return reply.code(404).send({ error: 'Card not found' });
+      await writeFile(card.filePath, raw, 'utf8');
+      return { ok: true };
     });
 
     api.post('/cards/:board/:id/move', async (req, reply) => {

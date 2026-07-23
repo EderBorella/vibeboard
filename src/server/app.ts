@@ -7,10 +7,13 @@ import { createCard, updateCard, moveCard, archiveCard, type CreateCardInput } f
 import { findCard } from '../core/find.js';
 import { setCardLinks } from '../core/links.js';
 import { discoverProjects } from './discover.js';
+import { CopilotSession, type PermissionMode } from './copilot.js';
 import type { ProjectSession } from './session.js';
 import type { BoardName, CardFrontmatter } from '../core/types.js';
 
 const today = (): string => new Date().toISOString().slice(0, 10);
+
+interface WsClient { send: (data: string) => void }
 
 function ensureOpen(session: ProjectSession, reply: FastifyReply): boolean {
   if (!session.isOpen) {
@@ -22,11 +25,59 @@ function ensureOpen(session: ProjectSession, reply: FastifyReply): boolean {
 
 export function buildApp(session: ProjectSession): FastifyInstance {
   const app = Fastify();
+  const copilot = new CopilotSession();
+  const clients = new Set<WsClient>();
+
+  const broadcast = (msg: unknown): void => {
+    const data = JSON.stringify(msg);
+    for (const c of clients) { try { c.send(data); } catch { /* closed */ } }
+  };
+  const copilotState = (): void => broadcast({ type: 'copilot:state', state: copilot.state });
+
+  async function handleCopilotSend(text: string, mode: PermissionMode): Promise<void> {
+    if (!session.isOpen) { broadcast({ type: 'copilot:error', error: 'No project open' }); return; }
+    if (!text.trim()) return;
+    try {
+      copilotState(); // running flips true only once send starts; announce optimistically
+      await copilot.send({
+        cwd: session.root!,
+        text,
+        mode,
+        onEvent: (event) => broadcast({ type: 'copilot:event', event }),
+      });
+    } catch (err) {
+      broadcast({ type: 'copilot:error', error: err instanceof Error ? err.message : String(err) });
+    } finally {
+      copilotState();
+    }
+  }
+
+  function handleCopilotMessage(raw: string): void {
+    let msg: { type?: string; text?: string; mode?: PermissionMode };
+    try { msg = JSON.parse(raw); } catch { return; }
+    switch (msg.type) {
+      case 'copilot:send':
+        void handleCopilotSend(msg.text ?? '', msg.mode ?? 'bypassPermissions');
+        break;
+      case 'copilot:compact':
+        void handleCopilotSend('/compact', msg.mode ?? 'bypassPermissions');
+        break;
+      case 'copilot:new':
+        copilot.newSession();
+        copilotState();
+        break;
+      case 'copilot:cancel':
+        copilot.cancel();
+        copilotState();
+        break;
+    }
+  }
 
   app.register(websocket);
 
   app.register(async (root) => {
     root.get('/ws', { websocket: true }, (socket) => {
+      clients.add(socket);
       const send = (snapshot: unknown): void => {
         try {
           socket.send(JSON.stringify({ type: 'snapshot', snapshot }));
@@ -35,8 +86,10 @@ export function buildApp(session: ProjectSession): FastifyInstance {
         }
       };
       if (session.isOpen) void session.snapshot().then(send).catch(() => {});
+      socket.send(JSON.stringify({ type: 'copilot:state', state: copilot.state }));
       const unsubscribe = session.subscribe(send);
-      socket.on('close', unsubscribe);
+      socket.on('message', (raw: Buffer) => handleCopilotMessage(raw.toString('utf8')));
+      socket.on('close', () => { unsubscribe(); clients.delete(socket); });
     });
   });
 

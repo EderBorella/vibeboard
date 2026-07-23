@@ -104,6 +104,10 @@ VibeBoard is being built in the open, test-first, one subsystem at a time,
 starting with the files-as-database core. It is a personal project — expect rapid
 change while the POC comes together.
 
+## License
+
+Released under the [MIT License](./LICENSE).
+
 ## Acknowledgements
 
 Special thanks to **Adam Awan** for the inspiration behind VibeBoard.

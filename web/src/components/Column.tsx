@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { BoardName, Card } from '../shared';
 import { CardTile } from './CardTile';
 
@@ -18,11 +19,13 @@ export function Column({
   board, title, slug, cards, miniatureChars,
   onAdd, onOpen, onArchive, onDragStart, onDrop,
 }: Props) {
+  const [over, setOver] = useState(false);
   return (
     <div
-      className="column"
-      onDragOver={onDrop ? (e) => e.preventDefault() : undefined}
-      onDrop={onDrop ? () => onDrop(board, slug) : undefined}
+      className={`column${over ? ' column-over' : ''}`}
+      onDragOver={onDrop ? (e) => { e.preventDefault(); setOver(true); } : undefined}
+      onDragLeave={onDrop ? () => setOver(false) : undefined}
+      onDrop={onDrop ? () => { setOver(false); onDrop(board, slug); } : undefined}
     >
       <div className="column-head">
         <span className="column-title">{title}</span>

@@ -33,6 +33,7 @@ export function CardTile({ card, miniatureChars, onOpen, onArchive, onDragStart 
       </div>
       <div className="tile-title">{card.title}</div>
       {summary && <div className="tile-summary">{summary}</div>}
+      {card.group && <div className="tile-group">{card.group}</div>}
       {card.tags.length > 0 && (
         <div className="tile-tags">
           {card.tags.map((t) => <span key={t} className="tag">{t}</span>)}

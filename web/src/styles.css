@@ -17,7 +17,10 @@ body {
 
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-.app-shell { min-height: 100vh; display: flex; flex-direction: column; }
+/* Exactly one viewport tall, clipped — the boards and copilot scroll internally so the
+   page itself never scrolls (keeps the copilot input box on screen). dvh handles mobile
+   browser chrome. */
+.app-shell { height: 100vh; height: 100dvh; overflow: hidden; display: flex; flex-direction: column; }
 
 /* ---------- Top bar ---------- */
 .topbar {

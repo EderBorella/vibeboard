@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { BOARDS, BOARD_LABELS, backendCaps, type BoardName, type ProjectConfig } from '../shared';
 import { listModels, patchConfig, type ModelOption } from '../api';
+import { ModelPicker } from './ModelPicker';
 
 const BACKENDS: { value: string; label: string }[] = [
   { value: 'claude-code', label: 'Claude Code' },
@@ -79,12 +80,9 @@ export function SettingsModal({ config, onClose, onSaved }: Props) {
               ))}
             </div>
           </div>
-          <label className="field"><span>Default model</span>
-            <select value={model} onChange={(e) => setModel(e.target.value)}>
-              <option value="">(backend default)</option>
-              {models.map((m) => <option key={m.id} value={m.id}>{m.free ? `🆓 ${m.id}` : m.id}</option>)}
-            </select>
-          </label>
+          <div className="field"><span>Default model</span>
+            <ModelPicker models={models} value={model} onChange={setModel} />
+          </div>
           <label className="field"><span>Default {backend === 'opencode' ? 'variant' : 'effort'}</span>
             <select value={caps.efforts.some((e) => e.value === effort) ? effort : ''} onChange={(e) => setEffort(e.target.value)}>
               {caps.efforts.map((e) => <option key={e.value} value={e.value}>{e.label}</option>)}

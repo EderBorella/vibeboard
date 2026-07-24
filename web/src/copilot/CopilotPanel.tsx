@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { listModels, type ModelOption } from '../api';
 import { backendCaps } from '../shared';
+import { ModelPicker } from '../components/ModelPicker';
 import type { CopilotMode, EffortLevel, useCopilot } from './useCopilot';
 
 const CONTEXT_BUDGET = 200_000;
@@ -73,11 +74,8 @@ export function CopilotPanel({ copilot, backend, mode, model, effort, onMode, on
       </div>
 
       <div className="copilot-selects">
-        <select value={model} disabled={running} onChange={(e) => onModel(e.target.value)}>
-          <option value="">Default model</option>
-          {models.map((m) => <option key={m.id} value={m.id}>{m.free ? `🆓 ${m.id}` : m.id}</option>)}
-        </select>
-        <select value={effEffort} disabled={running} onChange={(e) => onEffort(e.target.value as '' | EffortLevel)}>
+        <ModelPicker models={models} value={model} disabled={running} onChange={onModel} />
+        <select className="effort-select" value={effEffort} disabled={running} onChange={(e) => onEffort(e.target.value as '' | EffortLevel)}>
           {caps.efforts.map((e) => <option key={e.value} value={e.value}>{e.label}</option>)}
         </select>
       </div>

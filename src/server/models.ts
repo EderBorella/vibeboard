@@ -1,4 +1,6 @@
-import { execFile } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 
 export interface ModelOption {
   id: string;
@@ -10,53 +12,82 @@ export function isFreeModel(id: string): boolean {
   return id.endsWith(':free') || id.includes('-free');
 }
 
-export function parseOpencodeModels(output: string): ModelOption[] {
-  return output.split('\n').map((l) => l.trim()).filter(Boolean).map((id) => ({ id, free: isFreeModel(id) }));
+// Dedupe by id and list free models first (this deployment leans on free tiers).
+export function mergeModels(lists: ModelOption[][]): ModelOption[] {
+  const seen = new Set<string>();
+  const out: ModelOption[] = [];
+  for (const m of lists.flat()) {
+    if (seen.has(m.id)) continue;
+    seen.add(m.id);
+    out.push(m);
+  }
+  return out.sort((a, b) => Number(b.free) - Number(a.free));
 }
 
 const CLAUDE_ALIASES = ['opus', 'sonnet', 'haiku', 'fable'];
 
-interface OrModel { id: string; pricing?: { prompt?: string; completion?: string } }
-let orCache: { at: number; models: ModelOption[] } | undefined;
-const OR_TTL_MS = 10 * 60 * 1000;
-
-// OpenRouter's free models, addressed for OpenCode as `openrouter/<id>`. Cached; failures
-// degrade to the last good list (or empty) so the dropdown never blocks on the network.
-export async function fetchOpenrouterFreeModels(): Promise<ModelOption[]> {
-  if (orCache && Date.now() - orCache.at < OR_TTL_MS) return orCache.models;
+// OpenCode credentials live here; we read provider names + keys to query the right APIs.
+function opencodeAuth(): Record<string, { key?: string; apiKey?: string }> {
   try {
-    const res = await fetch('https://openrouter.ai/api/v1/models', { signal: AbortSignal.timeout(8000) });
-    const json = (await res.json()) as { data?: OrModel[] };
-    const models = (json.data ?? [])
-      .filter((m) => m.id.endsWith(':free') || (m.pricing?.prompt === '0' && m.pricing?.completion === '0'))
-      .map((m) => ({ id: `openrouter/${m.id}`, free: true }));
-    orCache = { at: Date.now(), models };
+    return JSON.parse(readFileSync(join(homedir(), '.local/share/opencode/auth.json'), 'utf8'));
+  } catch {
+    return {};
+  }
+}
+
+interface Cache { at: number; models: ModelOption[] }
+const TTL_MS = 10 * 60 * 1000;
+const caches = new Map<string, Cache>();
+
+async function cached(key: string, fetcher: () => Promise<ModelOption[]>): Promise<ModelOption[]> {
+  const hit = caches.get(key);
+  if (hit && Date.now() - hit.at < TTL_MS) return hit.models;
+  try {
+    const models = await fetcher();
+    caches.set(key, { at: Date.now(), models });
     return models;
   } catch {
-    return orCache?.models ?? [];
+    return hit?.models ?? [];
   }
 }
 
-function opencodeModelsOutput(bin: string): Promise<string> {
-  return new Promise((resolve) => {
-    execFile(bin, ['models'], { maxBuffer: 1 << 20 }, (err, stdout) => resolve(err ? '' : stdout));
-  });
+// OpenRouter — precise live catalog; we surface the free tier (the paid list is huge).
+async function openrouterModels(): Promise<ModelOption[]> {
+  const res = await fetch('https://openrouter.ai/api/v1/models', { signal: AbortSignal.timeout(8000) });
+  const json = (await res.json()) as { data?: { id: string; pricing?: { prompt?: string; completion?: string } }[] };
+  return (json.data ?? [])
+    .filter((m) => m.id.endsWith(':free') || (m.pricing?.prompt === '0' && m.pricing?.completion === '0'))
+    .map((m) => ({ id: `openrouter/${m.id}`, free: true }));
 }
 
-// Free models first (this deployment leans on free tiers), then the rest.
-function freeFirst(models: ModelOption[]): ModelOption[] {
-  return [...models].sort((a, b) => Number(b.free) - Number(a.free));
+// DeepSeek — its own /models is authoritative and current (drops deprecated ids like
+// deepseek-chat that opencode's cached catalog still lists).
+async function deepseekModels(key: string): Promise<ModelOption[]> {
+  const res = await fetch('https://api.deepseek.com/models', { headers: { Authorization: `Bearer ${key}` }, signal: AbortSignal.timeout(8000) });
+  const json = (await res.json()) as { data?: { id: string }[] };
+  return (json.data ?? []).map((m) => ({ id: `deepseek/${m.id}`, free: false }));
 }
 
+// OpenCode's own free gateway models (usable without a provider key), from models.dev.
+async function opencodeGatewayFree(): Promise<ModelOption[]> {
+  const res = await fetch('https://models.dev/api.json', { signal: AbortSignal.timeout(8000) });
+  const json = (await res.json()) as Record<string, { models?: Record<string, unknown> }>;
+  const models = json.opencode?.models ?? {};
+  return Object.keys(models)
+    .filter((id) => isFreeModel(id))
+    .map((id) => ({ id: `opencode/${id}`, free: true }));
+}
+
+// Live, precise model list per backend. For opencode we query the actual provider APIs the
+// user has authed (plus the free OpenCode gateway) rather than the stale `opencode models`.
 export async function listBackendModels(backend: string): Promise<ModelOption[]> {
-  if (backend === 'opencode') {
-    const bin = process.env.VIBEBOARD_OPENCODE_BIN ?? 'opencode';
-    const [oc, openrouter] = await Promise.all([
-      opencodeModelsOutput(bin).then(parseOpencodeModels),
-      fetchOpenrouterFreeModels(),
-    ]);
-    const seen = new Set(oc.map((m) => m.id));
-    return freeFirst([...oc, ...openrouter.filter((m) => !seen.has(m.id))]);
-  }
-  return CLAUDE_ALIASES.map((id) => ({ id, free: false }));
+  if (backend !== 'opencode') return CLAUDE_ALIASES.map((id) => ({ id, free: false }));
+
+  const auth = opencodeAuth();
+  const tasks: Promise<ModelOption[]>[] = [cached('opencode-gateway', opencodeGatewayFree)];
+  if (auth.openrouter) tasks.push(cached('openrouter', openrouterModels));
+  const dsKey = auth.deepseek?.key ?? auth.deepseek?.apiKey;
+  if (dsKey) tasks.push(cached('deepseek', () => deepseekModels(dsKey)));
+
+  return mergeModels(await Promise.all(tasks));
 }

@@ -1,8 +1,11 @@
 import { spawn, type ChildProcess } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { parseCopilotLine, type CopilotEvent } from './copilot-events.js';
 
-// Maps to claude's --permission-mode. Default full-auto; the UI can pick per turn.
-export type PermissionMode = 'plan' | 'acceptEdits' | 'bypassPermissions';
+// UI-facing modes. 'research' shares plan permission but adds a research persona.
+export type CopilotMode = 'research' | 'plan' | 'acceptEdits' | 'bypassPermissions';
 
 export interface CopilotState {
   running: boolean;
@@ -15,15 +18,48 @@ export type EffortLevel = 'low' | 'medium' | 'high' | 'xhigh' | 'max';
 export interface SendOptions {
   cwd: string;
   text: string;
-  mode: PermissionMode;
+  mode: CopilotMode;
   model?: string;   // alias (opus/sonnet/haiku/fable) or full name; omit to inherit default
   effort?: EffortLevel;
   onEvent: (event: CopilotEvent) => void;
 }
 
+const RESEARCH_PERSONA = [
+  '# Research mode',
+  'You are brainstorming and researching, not building. Do NOT create or edit cards or',
+  'files. Use web search and web fetch to gather current information, explore options and',
+  'trade-offs, and think broadly. End with a concise summary of findings and a clear',
+  'recommendation the user can act on.',
+].join('\n');
+
+// Each UI mode → the claude --permission-mode it runs under, plus any extra persona.
+function resolveMode(mode: CopilotMode): { permission: string; persona?: string } {
+  switch (mode) {
+    case 'research': return { permission: 'plan', persona: RESEARCH_PERSONA };
+    case 'plan': return { permission: 'plan' };
+    case 'acceptEdits': return { permission: 'acceptEdits' };
+    case 'bypassPermissions': return { permission: 'bypassPermissions' };
+  }
+}
+
 // Resolved per spawn so tests can point at a shim via env without import-order pitfalls.
 function claudeBin(): string {
   return process.env.VIBEBOARD_CLAUDE_BIN ?? 'claude';
+}
+
+// The bundled VibeBoard instructions, appended to every turn's system prompt so the copilot
+// knows the model/conventions without spending tokens rediscovering them. Cached after first
+// read; resolved next to this module (copied into dist by the build).
+let cachedInstructions: string | undefined;
+function vibeboardInstructions(): string {
+  if (cachedInstructions !== undefined) return cachedInstructions;
+  try {
+    const path = resolve(dirname(fileURLToPath(import.meta.url)), 'copilot-system-prompt.md');
+    cachedInstructions = readFileSync(path, 'utf8');
+  } catch {
+    cachedInstructions = '';
+  }
+  return cachedInstructions;
 }
 
 // One headless Claude Code turn at a time, resumed across turns by session id, run in the
@@ -54,7 +90,11 @@ export class CopilotSession {
   async send(opts: SendOptions): Promise<void> {
     if (this.#child) throw new Error('Copilot is busy');
 
-    const args = ['-p', '--output-format', 'stream-json', '--include-partial-messages', '--verbose', '--permission-mode', opts.mode];
+    const { permission, persona } = resolveMode(opts.mode);
+    const appendPrompt = [vibeboardInstructions(), persona].filter(Boolean).join('\n\n');
+
+    const args = ['-p', '--output-format', 'stream-json', '--include-partial-messages', '--verbose', '--permission-mode', permission];
+    if (appendPrompt) args.push('--append-system-prompt', appendPrompt);
     if (opts.model) args.push('--model', opts.model);
     if (opts.effort) args.push('--effort', opts.effort);
     if (this.#sessionId) args.push('--resume', this.#sessionId);

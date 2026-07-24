@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterEach } from 'vitest';
 import { chmodSync, rmSync, readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { CopilotSession, type PermissionMode } from '../src/server/copilot.js';
+import { CopilotSession, type CopilotMode } from '../src/server/copilot.js';
 import type { CopilotEvent } from '../src/server/copilot-events.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -19,7 +19,7 @@ afterEach(() => {
   if (existsSync(ARGS_LOG)) rmSync(ARGS_LOG);
 });
 
-async function run(session: CopilotSession, text: string, mode: PermissionMode = 'bypassPermissions'): Promise<CopilotEvent[]> {
+async function run(session: CopilotSession, text: string, mode: CopilotMode = 'bypassPermissions'): Promise<CopilotEvent[]> {
   const events: CopilotEvent[] = [];
   await session.send({ cwd: here, text, mode, onEvent: (e) => events.push(e) });
   return events;
@@ -76,5 +76,24 @@ describe('CopilotSession', () => {
     expect(args).toContain('--include-partial-messages');
     expect(args[args.indexOf('--model') + 1]).toBe('haiku');
     expect(args[args.indexOf('--effort') + 1]).toBe('low');
+  });
+
+  it('appends the VibeBoard instructions on every turn', async () => {
+    const session = new CopilotSession();
+    await run(session, 'x', 'bypassPermissions');
+    const args = lastArgs()[0];
+    const append = args[args.indexOf('--append-system-prompt') + 1];
+    expect(append).toContain('VibeBoard copilot');
+    expect(append).toContain('A column is a folder');
+  });
+
+  it('research mode uses plan permission and adds the research persona', async () => {
+    const session = new CopilotSession();
+    await run(session, 'x', 'research');
+    const args = lastArgs()[0];
+    expect(args[args.indexOf('--permission-mode') + 1]).toBe('plan');
+    const append = args[args.indexOf('--append-system-prompt') + 1];
+    expect(append).toContain('Research mode');
+    expect(append).toContain('web search');
   });
 });

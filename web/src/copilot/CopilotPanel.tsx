@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import type { EffortLevel, PermissionMode, useCopilot } from './useCopilot';
+import type { CopilotMode, EffortLevel, useCopilot } from './useCopilot';
 
-const MODES: { value: PermissionMode; label: string; hint: string }[] = [
+const MODES: { value: CopilotMode; label: string; hint: string }[] = [
+  { value: 'research', label: 'Research', hint: 'brainstorm & web research, no edits' },
   { value: 'plan', label: 'Plan', hint: 'read & plan only, no edits' },
   { value: 'acceptEdits', label: 'Execute', hint: 'auto-accept file edits' },
   { value: 'bypassPermissions', label: 'Full-auto', hint: 'everything, unattended' },
@@ -29,10 +30,10 @@ function fmtK(n: number): string { return n >= 1000 ? `${(n / 1000).toFixed(1)}k
 
 interface Props {
   copilot: ReturnType<typeof useCopilot>;
-  mode: PermissionMode;
+  mode: CopilotMode;
   model: string;
   effort: '' | EffortLevel;
-  onMode: (m: PermissionMode) => void;
+  onMode: (m: CopilotMode) => void;
   onModel: (m: string) => void;
   onEffort: (e: '' | EffortLevel) => void;
   onClose: () => void;

@@ -7,7 +7,7 @@ import { createCard, updateCard, moveCard, archiveCard, type CreateCardInput } f
 import { findCard } from '../core/find.js';
 import { setCardLinks } from '../core/links.js';
 import { discoverProjects } from './discover.js';
-import { CopilotSession, type PermissionMode, type EffortLevel } from './copilot.js';
+import { CopilotSession, type CopilotMode, type EffortLevel } from './copilot.js';
 import type { ProjectSession } from './session.js';
 import type { BoardName, CardFrontmatter } from '../core/types.js';
 
@@ -34,7 +34,7 @@ export function buildApp(session: ProjectSession): FastifyInstance {
   };
   const copilotState = (): void => broadcast({ type: 'copilot:state', state: copilot.state });
 
-  interface CopilotOpts { mode: PermissionMode; model?: string; effort?: EffortLevel }
+  interface CopilotOpts { mode: CopilotMode; model?: string; effort?: EffortLevel }
 
   async function handleCopilotSend(text: string, opts: CopilotOpts): Promise<void> {
     if (!session.isOpen) { broadcast({ type: 'copilot:error', error: 'No project open' }); return; }
@@ -57,7 +57,7 @@ export function buildApp(session: ProjectSession): FastifyInstance {
   }
 
   function handleCopilotMessage(raw: string): void {
-    let msg: { type?: string; text?: string; mode?: PermissionMode; model?: string; effort?: EffortLevel };
+    let msg: { type?: string; text?: string; mode?: CopilotMode; model?: string; effort?: EffortLevel };
     try { msg = JSON.parse(raw); } catch { return; }
     const opts = (): CopilotOpts => ({ mode: msg.mode ?? 'bypassPermissions', model: msg.model, effort: msg.effort });
     switch (msg.type) {

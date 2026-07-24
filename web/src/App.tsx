@@ -6,7 +6,7 @@ import { Board } from './components/Board';
 import { ProjectGate } from './components/ProjectGate';
 import { CardEditor, type EditorState } from './components/CardEditor';
 import { CopilotPanel } from './copilot/CopilotPanel';
-import { useCopilot, type EffortLevel, type PermissionMode } from './copilot/useCopilot';
+import { useCopilot, type CopilotMode, type EffortLevel } from './copilot/useCopilot';
 
 export function App() {
   const [bump, setBump] = useState(0);
@@ -20,7 +20,7 @@ export function App() {
   // Copilot state lives here (not in the panel) so the transcript + socket survive
   // closing/reopening the dock. The server-side session persists regardless.
   const copilot = useCopilot();
-  const [copilotMode, setCopilotMode] = useState<PermissionMode>('bypassPermissions');
+  const [copilotMode, setCopilotMode] = useState<CopilotMode>('bypassPermissions');
   const [copilotModel, setCopilotModel] = useState('');
   const [copilotEffort, setCopilotEffort] = useState<'' | EffortLevel>('');
 

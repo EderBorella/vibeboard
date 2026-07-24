@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-export type PermissionMode = 'plan' | 'acceptEdits' | 'bypassPermissions';
+export type CopilotMode = 'research' | 'plan' | 'acceptEdits' | 'bypassPermissions';
 export type EffortLevel = 'low' | 'medium' | 'high' | 'xhigh' | 'max';
 
 export interface TurnOptions {
-  mode: PermissionMode;
+  mode: CopilotMode;
   model?: string;   // '' / undefined = inherit claude's default
   effort?: EffortLevel;
 }

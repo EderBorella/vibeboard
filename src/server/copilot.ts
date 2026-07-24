@@ -51,10 +51,12 @@ function claudeCommand(opts: SendOptions, sessionId: string | undefined): Comman
 }
 
 function opencodeCommand(opts: SendOptions, sessionId: string | undefined): Command {
-  const args = ['run', '--format', 'json', '--dir', opts.cwd];
+  // --auto is required headless: OpenCode has no way to answer a permission prompt without
+  // a TTY, so any tool use would hang forever without it. The mode persona (e.g. research =
+  // "do not edit") is the soft guardrail; true read-only enforcement isn't available via run.
+  const args = ['run', '--format', 'json', '--auto', '--dir', opts.cwd];
   if (opts.model) args.push('-m', opts.model);
   if (opts.effort) { const v = EFFORT_TO_VARIANT[opts.effort]; if (v) args.push('--variant', v); }
-  if (opts.mode === 'bypassPermissions') args.push('--auto');
   if (sessionId) args.push('-s', sessionId);
   // OpenCode has no --append-system-prompt; on the first turn of a session prepend the
   // VibeBoard instructions (+research directive) so it has the same context as Claude.
@@ -170,16 +172,28 @@ export class CopilotSession {
     });
     child.stderr?.on('data', (chunk: Buffer) => { stderr += chunk.toString('utf8'); });
 
+    // Don't hang forever: if a turn produces nothing for too long (slow/rate-limited
+    // provider, or a stuck child), kill it and tell the user instead of sitting on "working".
+    const timeoutMs = Number(process.env.VIBEBOARD_COPILOT_TIMEOUT_MS ?? 180000);
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      opts.onEvent({ kind: 'text', text: `\n[No response after ${Math.round(timeoutMs / 1000)}s — stopping. The model/provider may be slow or rate-limited; try a different model.]` });
+      child.kill('SIGTERM');
+    }, timeoutMs);
+
     await new Promise<void>((resolve) => {
       child.on('close', (code) => {
+        clearTimeout(timer);
         if (buf.trim()) emitLine(buf);
         this.#child = undefined;
-        if (code && code !== 0) {
+        if (!timedOut && code && code !== 0) {
           opts.onEvent({ kind: 'text', text: `\n[copilot exited (${code})]${stderr ? `\n${stderr.slice(0, 800)}` : ''}` });
         }
         resolve();
       });
       child.on('error', (err) => {
+        clearTimeout(timer);
         this.#child = undefined;
         opts.onEvent({ kind: 'text', text: `[copilot failed to start: ${err.message}]` });
         resolve();

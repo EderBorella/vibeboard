@@ -25,6 +25,7 @@ export function defaultConfig(name: string): ProjectConfig {
     boards,
     miniatureChars: 140,
     idPadding: 3,
+    keepChats: 20,
     copilot: { backend: 'claude-code' },
   };
 }

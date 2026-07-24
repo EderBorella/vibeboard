@@ -81,7 +81,25 @@ export interface ProjectConfig {
   boards: Record<BoardName, BoardConfig>;
   miniatureChars: number;
   idPadding: number;
+  keepChats: number;
   copilot: { backend: string; model?: string; effort?: string };
+}
+
+// Persisted copilot chat shapes — mirror src/core/chat.ts across the tsc/Vite boundary.
+export type TranscriptKind = 'user' | 'assistant' | 'tool' | 'error';
+export interface WireTranscriptItem {
+  kind: TranscriptKind;
+  text: string;
+  toolName?: string;
+}
+export interface ChatMeta {
+  id: string;
+  title: string;
+  backend: string;
+  model?: string;
+  createdAt: string;
+  updatedAt: string;
+  messageCount: number;
 }
 
 export interface ProjectSnapshot {

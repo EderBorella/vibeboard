@@ -38,5 +38,6 @@ export interface ProjectConfig {
   boards: Record<BoardName, BoardConfig>;
   miniatureChars: number;
   idPadding: number;
+  keepChats: number;     // retain the last N copilot chats per project (older pruned)
   copilot: { backend: string; model?: string; effort?: string };
 }

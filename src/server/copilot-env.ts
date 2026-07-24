@@ -1,4 +1,4 @@
-import { mkdirSync, symlinkSync, existsSync } from 'node:fs';
+import { mkdirSync, symlinkSync, existsSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
@@ -39,6 +39,14 @@ export function claudeConfigDir(): string {
 // default XDG_DATA_HOME (~/.local/share/opencode).
 export function opencodeConfigHome(): string {
   const dir = join(copilotHome(), 'opencode-xdg');
-  mkdirSync(dir, { recursive: true });
+  const cfgDir = join(dir, 'opencode');
+  mkdirSync(cfgDir, { recursive: true });
+  // Auto-approve tools. Headless there's no TTY/SSE to answer a permission prompt, so the
+  // default "ask" hangs on any file edit or command (e.g. creating a card). This is the
+  // serve-API equivalent of `run --auto`.
+  writeFileSync(
+    join(cfgDir, 'opencode.json'),
+    JSON.stringify({ $schema: 'https://opencode.ai/config.json', permission: 'allow' }, null, 2),
+  );
   return dir;
 }

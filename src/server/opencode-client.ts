@@ -54,18 +54,21 @@ async function postJson(url: string, body: unknown, signal?: AbortSignal): Promi
 }
 
 // Run one OpenCode turn over the persistent server. Reuses the session id across turns
-// (create one on first turn), returns the session id for the next turn.
+// (create one on first turn), returns the session id for the next turn. The project
+// directory is a QUERY param (`?directory=`) — that's how the shared server knows which
+// project to operate in (session + message both scoped to it).
 export async function opencodeTurn(opts: OpencodeTurnOptions): Promise<string> {
   const base = await opencodeBaseUrl();
+  const dq = `?directory=${encodeURIComponent(opts.cwd)}`;
   let sessionId = opts.sessionId;
   if (!sessionId) {
-    const session = (await postJson(`${base}/session`, { title: 'VibeBoard' }, opts.signal)) as { id?: string };
+    const session = (await postJson(`${base}/session${dq}`, { title: 'VibeBoard' }, opts.signal)) as { id?: string };
     sessionId = session.id ?? '';
   }
-  const body: Record<string, unknown> = { parts: [{ type: 'text', text: opts.text }], directory: opts.cwd };
+  const body: Record<string, unknown> = { parts: [{ type: 'text', text: opts.text }] };
   if (opts.model) body.model = splitModel(opts.model);
   if (opts.system) body.system = opts.system;
-  const data = (await postJson(`${base}/session/${sessionId}/message`, body, opts.signal)) as OcMessageResponse;
+  const data = (await postJson(`${base}/session/${sessionId}/message${dq}`, body, opts.signal)) as OcMessageResponse;
   for (const event of messageToEvents(data)) opts.onEvent(event);
   return sessionId;
 }

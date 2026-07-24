@@ -2,10 +2,17 @@ import { networkInterfaces } from 'node:os';
 import { ProjectSession } from './session.js';
 import { buildApp } from './app.js';
 import { registerStatic } from './static.js';
+import { stopOpencodeServer } from './opencode-server.js';
 
 const port = Number(process.env.VIBEBOARD_PORT ?? 4610);
 const session = new ProjectSession();
 const app = buildApp(session);
+
+// Don't leave the managed `opencode serve` orphaned when VibeBoard stops.
+for (const sig of ['SIGINT', 'SIGTERM'] as const) {
+  process.once(sig, () => { stopOpencodeServer(); process.exit(0); });
+}
+process.once('exit', stopOpencodeServer);
 
 function lanAddress(): string | undefined {
   for (const iface of Object.values(networkInterfaces())) {

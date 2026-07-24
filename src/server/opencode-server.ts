@@ -14,7 +14,9 @@ let child: ChildProcess | undefined;
 let urlPromise: Promise<string> | undefined;
 
 function startServer(): Promise<string> {
-  const port = Number(process.env.VIBEBOARD_OPENCODE_PORT ?? 4099);
+  // Default to port 0 (OS-assigned) so we never collide with a stray/previous serve; the
+  // actual URL is parsed from opencode's "listening on ..." line below.
+  const port = process.env.VIBEBOARD_OPENCODE_PORT ?? '0';
   const args = ['serve', '--port', String(port), '--hostname', '127.0.0.1'];
   // Isolate from the user's personal opencode config: a clean XDG_CONFIG_HOME means
   // opencode finds no ~/.config/opencode AGENTS.md/config/plugins. Auth + db stay in the

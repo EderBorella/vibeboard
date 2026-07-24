@@ -10,6 +10,7 @@ import { setCardLinks } from '../core/links.js';
 import { writeConfig } from '../core/config.js';
 import { discoverProjects } from './discover.js';
 import { CopilotSession, type Backend, type CopilotMode, type EffortLevel } from './copilot.js';
+import { ChatStore } from './chat-store.js';
 import type { ProjectSession } from './session.js';
 import type { BoardName, CardFrontmatter, ProjectConfig } from '../core/types.js';
 
@@ -28,6 +29,7 @@ function ensureOpen(session: ProjectSession, reply: FastifyReply): boolean {
 export function buildApp(session: ProjectSession): FastifyInstance {
   const app = Fastify();
   const copilot = new CopilotSession();
+  const chats = new ChatStore(session);
   const clients = new Set<WsClient>();
 
   const broadcast = (msg: unknown): void => {
@@ -35,6 +37,16 @@ export function buildApp(session: ProjectSession): FastifyInstance {
     for (const c of clients) { try { c.send(data); } catch { /* closed */ } }
   };
   const copilotState = (): void => broadcast({ type: 'copilot:state', state: copilot.state });
+  // Full replay (connect + explicit chat change): replaces the client's transcript.
+  const sendHistory = async (target?: WsClient): Promise<void> => {
+    const payload = { type: 'copilot:history', ...(await chats.historyPayload()) };
+    if (target) { try { target.send(JSON.stringify(payload)); } catch { /* closed */ } }
+    else broadcast(payload);
+  };
+  // Switcher-only update (after a turn): refreshes the chat list without touching items.
+  const broadcastChatList = async (): Promise<void> => {
+    broadcast({ type: 'copilot:chats', ...(await chats.chatList()) });
+  };
 
   interface CopilotOpts { mode: CopilotMode; model?: string; effort?: EffortLevel }
 
@@ -42,6 +54,7 @@ export function buildApp(session: ProjectSession): FastifyInstance {
     if (!session.isOpen) { broadcast({ type: 'copilot:error', error: 'No project open' }); return; }
     if (!text.trim()) return;
     try {
+      await chats.recordUser(text);
       copilotState(); // running flips true only once send starts; announce optimistically
       const cfg = session.config?.copilot;
       await copilot.send({
@@ -51,17 +64,21 @@ export function buildApp(session: ProjectSession): FastifyInstance {
         backend: ((cfg?.backend as Backend) ?? 'claude-code'),
         model: opts.model ?? cfg?.model,
         effort: (opts.effort ?? cfg?.effort) as EffortLevel | undefined,
-        onEvent: (event) => broadcast({ type: 'copilot:event', event }),
+        onEvent: (event) => { void chats.recordEvent(event); broadcast({ type: 'copilot:event', event }); },
       });
     } catch (err) {
-      broadcast({ type: 'copilot:error', error: err instanceof Error ? err.message : String(err) });
+      const message = err instanceof Error ? err.message : String(err);
+      chats.recordError(message);
+      broadcast({ type: 'copilot:error', error: message });
     } finally {
+      await chats.flush();
+      await broadcastChatList();
       copilotState();
     }
   }
 
   function handleCopilotMessage(raw: string): void {
-    let msg: { type?: string; text?: string; mode?: CopilotMode; model?: string; effort?: EffortLevel };
+    let msg: { type?: string; text?: string; chatId?: string; mode?: CopilotMode; model?: string; effort?: EffortLevel };
     try { msg = JSON.parse(raw); } catch { return; }
     const opts = (): CopilotOpts => ({ mode: msg.mode ?? 'bypassPermissions', model: msg.model, effort: msg.effort });
     switch (msg.type) {
@@ -72,14 +89,44 @@ export function buildApp(session: ProjectSession): FastifyInstance {
         void handleCopilotSend('/compact', opts());
         break;
       case 'copilot:new':
-        copilot.newSession();
-        copilotState();
+        void (async () => {
+          copilot.newSession();
+          await chats.newChat();
+          await sendHistory();
+          copilotState();
+        })();
+        break;
+      case 'copilot:open':
+        if (msg.chatId) void handleCopilotOpen(msg.chatId);
+        break;
+      case 'copilot:delete':
+        if (msg.chatId) void handleCopilotDelete(msg.chatId);
         break;
       case 'copilot:cancel':
         copilot.cancel();
         copilotState();
         break;
     }
+  }
+
+  // Reopen a stored chat: restore its transcript and, when the backend matches, resume the
+  // underlying CLI session so the next message continues it (a mismatch continues fresh — the
+  // ChatStore attaches a one-shot note to the history payload).
+  async function handleCopilotOpen(chatId: string): Promise<void> {
+    const info = await chats.open(chatId);
+    if (!info) return;
+    const backend = session.config?.copilot.backend ?? 'claude-code';
+    if (info.backend === backend) copilot.resume(info.cliSessionId, info.model);
+    else copilot.newSession();
+    await sendHistory();
+    copilotState();
+  }
+
+  async function handleCopilotDelete(chatId: string): Promise<void> {
+    const { wasCurrent } = await chats.delete(chatId);
+    if (wasCurrent) copilot.newSession();
+    await sendHistory();
+    copilotState();
   }
 
   app.register(websocket);
@@ -96,6 +143,7 @@ export function buildApp(session: ProjectSession): FastifyInstance {
       };
       if (session.isOpen) void session.snapshot().then(send).catch(() => {});
       socket.send(JSON.stringify({ type: 'copilot:state', state: copilot.state }));
+      if (session.isOpen) void sendHistory(socket).catch(() => {});
       const unsubscribe = session.subscribe(send);
       socket.on('message', (raw: Buffer) => handleCopilotMessage(raw.toString('utf8')));
       socket.on('close', () => { unsubscribe(); clients.delete(socket); });

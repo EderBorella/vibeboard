@@ -7,9 +7,10 @@ export type SnapshotListener = (snapshot: ProjectSnapshot) => void;
 
 const DEBOUNCE_MS = 80;
 
-// chokidar v4 removed glob support in `ignored`; use a path predicate.
+// chokidar v4 removed glob support in `ignored`; use a path predicate. `.vibeboard/` holds
+// config + persisted copilot chats — writes there must not trigger a board re-snapshot.
 function isIgnored(p: string): boolean {
-  return p.includes('/node_modules/') || p.includes('/.git/');
+  return p.includes('/node_modules/') || p.includes('/.git/') || p.includes('/.vibeboard');
 }
 
 export class ProjectSession {

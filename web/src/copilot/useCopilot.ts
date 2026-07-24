@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import type { ChatMeta, WireTranscriptItem } from '../shared';
 
 // Backend-specific; concrete values come from BACKEND_CAPS in shared.ts.
 export type CopilotMode = string;
@@ -44,6 +45,8 @@ export function useCopilot() {
   const [sessionId, setSessionId] = useState<string | undefined>();
   const [model, setModel] = useState<string | undefined>();
   const [stats, setStats] = useState<CopilotStats>(ZERO);
+  const [chats, setChats] = useState<ChatMeta[]>([]);
+  const [currentChatId, setCurrentChatId] = useState<string | undefined>();
   const ws = useRef<WebSocket | null>(null);
   const nextId = useRef(1);
   const streamId = useRef<number | null>(null); // bubble currently being streamed via deltas
@@ -51,6 +54,16 @@ export function useCopilot() {
 
   const push = useCallback((item: Omit<TranscriptItem, 'id'>) => {
     setItems((prev) => [...prev, { ...item, id: nextId.current++ }]);
+  }, []);
+
+  // Replace the whole transcript with a server-persisted one (on connect / chat switch).
+  // Re-ids locally so live-appended items after this never collide.
+  const hydrate = useCallback((wire: WireTranscriptItem[], newStats: CopilotStats) => {
+    nextId.current = 1;
+    streamId.current = null;
+    deltaMode.current = false;
+    setItems(wire.map((w) => ({ id: nextId.current++, kind: w.kind, text: w.text, toolName: w.toolName })));
+    setStats(newStats);
   }, []);
 
   // Open a fresh streaming bubble (assistant text or thinking) for the next deltas.
@@ -102,11 +115,13 @@ export function useCopilot() {
       const m = JSON.parse(ev.data as string);
       if (m.type === 'copilot:event') apply(m.event);
       else if (m.type === 'copilot:state') { setRunning(m.state.running); setSessionId(m.state.sessionId); setModel(m.state.model); }
+      else if (m.type === 'copilot:history') { setChats(m.chats); setCurrentChatId(m.currentChatId); hydrate(m.items, m.stats); }
+      else if (m.type === 'copilot:chats') { setChats(m.chats); setCurrentChatId(m.currentChatId); }
       else if (m.type === 'copilot:error') push({ kind: 'error', text: m.error });
     };
     ws.current = socket;
     return () => socket.close();
-  }, [apply, push]);
+  }, [apply, push, hydrate]);
 
   const sendRaw = (payload: object): void => ws.current?.send(JSON.stringify(payload));
 
@@ -134,7 +149,12 @@ export function useCopilot() {
     streamId.current = null;
   }, []);
 
+  // Switch to / delete a stored chat. The server responds with copilot:history (switch) or a
+  // fresh history (delete of the active chat), which re-hydrates the transcript.
+  const openChat = useCallback((chatId: string) => sendRaw({ type: 'copilot:open', chatId }), []);
+  const deleteChat = useCallback((chatId: string) => sendRaw({ type: 'copilot:delete', chatId }), []);
+
   const cancel = useCallback(() => sendRaw({ type: 'copilot:cancel' }), []);
 
-  return { items, running, sessionId, model, stats, send, compact, newSession, cancel };
+  return { items, running, sessionId, model, stats, chats, currentChatId, send, compact, newSession, openChat, deleteChat, cancel };
 }

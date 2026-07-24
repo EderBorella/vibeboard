@@ -9,6 +9,19 @@ const CONTEXT_BUDGET = 200_000;
 function fmtUsd(n: number): string { return `$${n.toFixed(n < 1 ? 4 : 2)}`; }
 function fmtK(n: number): string { return n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n); }
 
+// Compact relative time for the chat switcher (e.g. "just now", "5m", "2h", "3d").
+function relTime(iso: string): string {
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return '';
+  const s = Math.max(0, Math.round((Date.now() - then) / 1000));
+  if (s < 45) return 'just now';
+  const m = Math.round(s / 60);
+  if (m < 60) return `${m}m`;
+  const h = Math.round(m / 60);
+  if (h < 24) return `${h}h`;
+  return `${Math.round(h / 24)}d`;
+}
+
 interface Props {
   copilot: ReturnType<typeof useCopilot>;
   backend: string;
@@ -22,11 +35,13 @@ interface Props {
 }
 
 export function CopilotPanel({ copilot, backend, mode, model, effort, onMode, onModel, onEffort, onClose }: Props) {
-  const { items, running, model: activeModel, stats, send, compact, newSession, cancel } = copilot;
+  const { items, running, model: activeModel, stats, chats, currentChatId, send, compact, newSession, openChat, deleteChat, cancel } = copilot;
   const [draft, setDraft] = useState('');
   const [models, setModels] = useState<ModelOption[]>([]);
   const [status, setStatus] = useState<ModelStatus | null>(null);
+  const [chatMenu, setChatMenu] = useState(false);
   const bodyRef = useRef<HTMLDivElement>(null);
+  const currentTitle = chats.find((c) => c.id === currentChatId)?.title ?? 'New chat';
 
   // Model choices depend on the configured backend (claude aliases vs opencode models).
   useEffect(() => {
@@ -68,6 +83,33 @@ export function CopilotPanel({ copilot, backend, mode, model, effort, onMode, on
         <button className="copilot-x" onClick={onClose} title="Hide (session keeps running)">✕</button>
       </div>
 
+      <div className="copilot-chatbar">
+        <div className="chat-switcher">
+          <button className="chat-current" disabled={running} onClick={() => setChatMenu((v) => !v)} title="Chat history">
+            <span className="chat-current-title">{currentTitle}</span>
+            <span className="chat-caret">▾</span>
+          </button>
+          {chatMenu && (
+            <>
+              <div className="chat-menu-backdrop" onClick={() => setChatMenu(false)} />
+              <div className="chat-menu" role="menu">
+                {chats.length === 0 && <div className="chat-menu-empty">No saved chats yet</div>}
+                {chats.map((c) => (
+                  <div key={c.id} className={`chat-menu-item${c.id === currentChatId ? ' active' : ''}`}>
+                    <button className="chat-menu-open" onClick={() => { openChat(c.id); setChatMenu(false); }} title={c.title}>
+                      <span className="chat-menu-title">{c.title}</span>
+                      <span className="chat-menu-meta">{relTime(c.updatedAt)} · {c.messageCount} msg</span>
+                    </button>
+                    <button className="chat-del" title="Delete chat" onClick={() => deleteChat(c.id)}>✕</button>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+        <button className="chat-new" disabled={running} onClick={newSession} title="Start a fresh chat">+ New</button>
+      </div>
+
       <div className="copilot-controls">
         <div className="mode-group" role="group" aria-label="Mode">
           {caps.modes.map((m) => (
@@ -77,7 +119,6 @@ export function CopilotPanel({ copilot, backend, mode, model, effort, onMode, on
           ))}
         </div>
         <div className="copilot-actions">
-          <button onClick={newSession} disabled={running} title="Start a fresh session">New</button>
           <button onClick={() => compact(turnOpts())} disabled={running} title="Compact the conversation">Compact</button>
         </div>
       </div>

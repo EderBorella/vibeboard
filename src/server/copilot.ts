@@ -106,6 +106,14 @@ export class CopilotSession {
     this.#model = undefined;
   }
 
+  // Point the next send at a previous conversation (used when reopening a stored chat whose
+  // backend matches the current one). No-op while a turn is in flight.
+  resume(sessionId: string | undefined, model: string | undefined): void {
+    if (this.#child || this.#abort) return;
+    this.#sessionId = sessionId;
+    this.#model = model;
+  }
+
   cancel(): void {
     if (this.#child) { this.#child.kill('SIGTERM'); this.#child = undefined; }
     if (this.#abort) { this.#abort.abort(); this.#abort = undefined; }

@@ -29,6 +29,7 @@ export function SettingsModal({ config, onClose, onSaved }: Props) {
   });
   const [miniatureChars, setMiniatureChars] = useState(config.miniatureChars);
   const [idPadding, setIdPadding] = useState(config.idPadding);
+  const [keepChats, setKeepChats] = useState(config.keepChats ?? 20);
   const [models, setModels] = useState<ModelOption[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -52,6 +53,7 @@ export function SettingsModal({ config, onClose, onSaved }: Props) {
         boards,
         miniatureChars: Number(miniatureChars) || config.miniatureChars,
         idPadding: Number(idPadding) || config.idPadding,
+        keepChats: Number(keepChats) || (config.keepChats ?? 20),
       });
       onSaved();
     } catch (e) {
@@ -87,6 +89,9 @@ export function SettingsModal({ config, onClose, onSaved }: Props) {
             <select value={caps.efforts.some((e) => e.value === effort) ? effort : ''} onChange={(e) => setEffort(e.target.value)}>
               {caps.efforts.map((e) => <option key={e.value} value={e.value}>{e.label}</option>)}
             </select>
+          </label>
+          <label className="field"><span>Keep last N chats</span>
+            <input type="number" min={1} value={keepChats} onChange={(e) => setKeepChats(Number(e.target.value))} />
           </label>
 
           <div className="settings-section">Boards</div>

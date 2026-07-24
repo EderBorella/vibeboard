@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { BOARDS, BOARD_LABELS, type BoardName, type ProjectConfig } from '../shared';
-import { listModels, patchConfig } from '../api';
+import { listModels, patchConfig, type ModelOption } from '../api';
 
 const BACKENDS: { value: string; label: string }[] = [
   { value: 'claude-code', label: 'Claude Code' },
@@ -29,7 +29,7 @@ export function SettingsModal({ config, onClose, onSaved }: Props) {
   });
   const [miniatureChars, setMiniatureChars] = useState(config.miniatureChars);
   const [idPadding, setIdPadding] = useState(config.idPadding);
-  const [models, setModels] = useState<string[]>([]);
+  const [models, setModels] = useState<ModelOption[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -82,7 +82,7 @@ export function SettingsModal({ config, onClose, onSaved }: Props) {
           <label className="field"><span>Default model</span>
             <select value={model} onChange={(e) => setModel(e.target.value)}>
               <option value="">(backend default)</option>
-              {models.map((m) => <option key={m} value={m}>{m}</option>)}
+              {models.map((m) => <option key={m.id} value={m.id}>{m.free ? `🆓 ${m.id}` : m.id}</option>)}
             </select>
           </label>
           <label className="field"><span>Default effort</span>

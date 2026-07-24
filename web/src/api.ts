@@ -34,7 +34,9 @@ export function patchConfig(body: Partial<ProjectConfig>): Promise<ProjectConfig
   return patch<ProjectConfig>('/api/config', body);
 }
 
-export async function listModels(backend: string): Promise<string[]> {
+export interface ModelOption { id: string; free: boolean }
+
+export async function listModels(backend: string): Promise<ModelOption[]> {
   return (await fetch(`/api/models?backend=${encodeURIComponent(backend)}`)).json();
 }
 

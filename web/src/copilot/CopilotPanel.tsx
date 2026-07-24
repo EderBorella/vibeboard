@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { listModels } from '../api';
+import { listModels, type ModelOption } from '../api';
 import type { CopilotMode, EffortLevel, useCopilot } from './useCopilot';
 
 const MODES: { value: CopilotMode; label: string; hint: string }[] = [
@@ -37,7 +37,7 @@ interface Props {
 export function CopilotPanel({ copilot, backend, mode, model, effort, onMode, onModel, onEffort, onClose }: Props) {
   const { items, running, model: activeModel, stats, send, compact, newSession, cancel } = copilot;
   const [draft, setDraft] = useState('');
-  const [models, setModels] = useState<string[]>([]);
+  const [models, setModels] = useState<ModelOption[]>([]);
   const bodyRef = useRef<HTMLDivElement>(null);
 
   // Model choices depend on the configured backend (claude aliases vs opencode models).
@@ -84,7 +84,7 @@ export function CopilotPanel({ copilot, backend, mode, model, effort, onMode, on
       <div className="copilot-selects">
         <select value={model} disabled={running} onChange={(e) => onModel(e.target.value)}>
           <option value="">Default model</option>
-          {models.map((m) => <option key={m} value={m}>{m}</option>)}
+          {models.map((m) => <option key={m.id} value={m.id}>{m.free ? `🆓 ${m.id}` : m.id}</option>)}
         </select>
         <select value={effort} disabled={running} onChange={(e) => onEffort(e.target.value as '' | EffortLevel)}>
           {EFFORTS.map((e) => <option key={e.value} value={e.value}>{e.label}</option>)}

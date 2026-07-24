@@ -2,8 +2,8 @@ import Fastify, { type FastifyInstance, type FastifyReply } from 'fastify';
 import websocket from '@fastify/websocket';
 import { dirname } from 'node:path';
 import { readFile, writeFile } from 'node:fs/promises';
-import { execFile } from 'node:child_process';
 import { scaffoldProject, type ScaffoldMode } from '../core/scaffold.js';
+import { listBackendModels } from './models.js';
 import { createCard, updateCard, moveCard, archiveCard, type CreateCardInput } from '../core/mutations.js';
 import { findCard } from '../core/find.js';
 import { setCardLinks } from '../core/links.js';
@@ -126,17 +126,11 @@ export function buildApp(session: ProjectSession): FastifyInstance {
       return session.config;
     });
 
-    // Available models for a backend. claude → friendly aliases; opencode → `opencode models`.
+    // Available models for a backend as {id, free}. claude → aliases; opencode → its own
+    // models + OpenRouter's free tier, free ones flagged and listed first.
     api.get('/models', async (req) => {
       const { backend } = req.query as { backend?: string };
-      if (backend === 'opencode') {
-        const bin = process.env.VIBEBOARD_OPENCODE_BIN ?? 'opencode';
-        const out = await new Promise<string>((resolve) => {
-          execFile(bin, ['models'], { maxBuffer: 1 << 20 }, (err, stdout) => resolve(err ? '' : stdout));
-        });
-        return out.split('\n').map((l) => l.trim()).filter(Boolean);
-      }
-      return ['opus', 'sonnet', 'haiku', 'fable'];
+      return listBackendModels(backend ?? 'claude-code');
     });
 
     api.post('/project/open', async (req, reply) => {

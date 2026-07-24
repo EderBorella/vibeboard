@@ -4,6 +4,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseCopilotLine, type CopilotEvent } from './copilot-events.js';
 import { opencodeTurn } from './opencode-client.js';
+import { claudeConfigDir, isolationEnabled } from './copilot-env.js';
 
 // Modes/efforts are backend-specific (see BACKEND_CAPS on the web side). They're plain
 // strings here; each backend's command builder interprets its own values.
@@ -147,7 +148,9 @@ export class CopilotSession {
   // Claude Code: spawn `claude -p` per turn and stream its stdout.
   async #sendClaude(opts: SendOptions): Promise<void> {
     const { bin, args } = claudeCommand(opts, this.#sessionId);
-    const child = spawn(bin, args, { cwd: opts.cwd, env: process.env });
+    // Isolated config dir so the personal ~/.claude/CLAUDE.md, plugins, and hooks don't load.
+    const env = isolationEnabled() ? { ...process.env, CLAUDE_CONFIG_DIR: claudeConfigDir() } : process.env;
+    const child = spawn(bin, args, { cwd: opts.cwd, env });
     this.#child = child;
 
     let buf = '';

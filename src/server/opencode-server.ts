@@ -1,4 +1,5 @@
 import { spawn, type ChildProcess } from 'node:child_process';
+import { opencodeConfigHome, isolationEnabled } from './copilot-env.js';
 
 // A single managed `opencode serve` process, started lazily and reused for every turn.
 // We talk to it over HTTP (see opencode-client) — `opencode run` per turn hangs at init on
@@ -14,7 +15,12 @@ let urlPromise: Promise<string> | undefined;
 
 function startServer(): Promise<string> {
   const port = Number(process.env.VIBEBOARD_OPENCODE_PORT ?? 4099);
-  const proc = spawn(opencodeBin(), ['serve', '--port', String(port), '--hostname', '127.0.0.1'], { env: process.env });
+  const args = ['serve', '--port', String(port), '--hostname', '127.0.0.1'];
+  // Isolate from the user's personal opencode config: a clean XDG_CONFIG_HOME means
+  // opencode finds no ~/.config/opencode AGENTS.md/config/plugins. Auth + db stay in the
+  // default XDG_DATA_HOME (~/.local/share/opencode), so login is preserved.
+  const env = isolationEnabled() ? { ...process.env, XDG_CONFIG_HOME: opencodeConfigHome() } : process.env;
+  const proc = spawn(opencodeBin(), args, { env });
   child = proc;
 
   return new Promise<string>((resolve, reject) => {

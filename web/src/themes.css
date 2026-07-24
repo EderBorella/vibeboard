@@ -1,0 +1,59 @@
+/* VibeBoard themes
+ * ----------------
+ * Each theme is a `:root[data-theme="<key>"] { … }` block of CSS variables.
+ * To ADD A THEME: copy a block below, rename the key, tweak the values, then add the
+ * same key to THEMES in web/src/App.tsx so it shows in the dropdown, and rebuild.
+ * Only colours + a few appearance tokens live here — layout is in styles.css and is
+ * theme-agnostic.
+ */
+
+:root {
+  /* Shared, non-colour tokens (a theme may override these too). */
+  --radius: 10px;
+  --font-body: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-display: "Roboto Condensed", "Arial Narrow", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* Card sizing (responsive overrides live in styles.css container queries). */
+  --tile-h: 112px;
+  --tile-gap: 0.55rem;
+  --col-w: 248px;
+}
+
+/* Default palette = Cyberpunk (also applied when no data-theme is set, avoiding FOUC). */
+:root,
+:root[data-theme="cyberpunk"] {
+  --bg: #0c1418;            /* teal-black */
+  --panel: #111c22;
+  --panel-2: #16252c;       /* cards */
+  --border: #1f333b;
+  --text: #dbe7ea;
+  --muted: #7f9aa3;
+  --accent: #14b8a6;        /* teal — primary */
+  --accent-2: #f59e0b;      /* amber — secondary */
+  --on-accent: #04120f;     /* text on accent fills */
+  --danger: #ff5c6c;
+  --glow: 0 0 14px rgba(20, 184, 166, 0.40);
+  /* Signature: hazy teal→amber wash behind the boards. */
+  --wash:
+    radial-gradient(1100px 460px at 12% -12%, rgba(20, 184, 166, 0.12), transparent 60%),
+    radial-gradient(900px 460px at 104% 112%, rgba(245, 158, 11, 0.09), transparent 55%);
+  --scan: repeating-linear-gradient(180deg, rgba(255,255,255,0.03) 0 1px, transparent 1px 3px);
+}
+
+/* Classic Dark = the original neutral slate palette, no glow/wash. */
+:root[data-theme="classic-dark"] {
+  --bg: #0f1115;
+  --panel: #171a21;
+  --panel-2: #1e222b;
+  --border: #2a2f3a;
+  --text: #e6e9ef;
+  --muted: #9aa3b2;
+  --accent: #5b9dff;
+  --accent-2: #e6b450;
+  --on-accent: #0b1220;
+  --danger: #e06c75;
+  --glow: none;
+  --wash: none;
+  --scan: none;
+}

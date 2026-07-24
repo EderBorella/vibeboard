@@ -7,6 +7,8 @@ interface Props {
   label: string;
   cards: Card[];
   config: ProjectConfig;
+  collapsed?: boolean;
+  onToggle?: () => void;
   onAdd?: (board: BoardName, slug: string) => void;
   onOpen?: (card: Card) => void;
   onArchive?: (card: Card) => void;
@@ -14,14 +16,19 @@ interface Props {
   onDrop?: (board: BoardName, slug: string) => void;
 }
 
-export function Board({ board, label, cards, config, onAdd, onOpen, onArchive, onDragStart, onDrop }: Props) {
+export function Board({ board, label, cards, config, collapsed, onToggle, onAdd, onOpen, onArchive, onDragStart, onDrop }: Props) {
   const slugs = columnSlugs(config, board);
   const grouped = cardsByColumn(cards, slugs);
   const displayNames = config.boards[board].columns;
 
   return (
     <section className="board">
-      <h2 className="board-label">{label}</h2>
+      <button className="board-label" onClick={onToggle} aria-expanded={!collapsed}>
+        <span className="board-chevron">{collapsed ? '▸' : '▾'}</span>
+        {label}
+        <span className="board-count">{cards.length}</span>
+      </button>
+      {!collapsed && (
       <div className="board-columns">
         {slugs.map((slug, i) => (
           <Column
@@ -39,6 +46,7 @@ export function Board({ board, label, cards, config, onAdd, onOpen, onArchive, o
           />
         ))}
       </div>
+      )}
     </section>
   );
 }

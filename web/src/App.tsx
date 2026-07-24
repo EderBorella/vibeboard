@@ -8,6 +8,12 @@ import { CardEditor, type EditorState } from './components/CardEditor';
 import { CopilotPanel } from './copilot/CopilotPanel';
 import { useCopilot, type CopilotMode, type EffortLevel } from './copilot/useCopilot';
 
+// Add a theme here after adding its [data-theme] block in themes.css.
+const THEMES: { value: string; label: string }[] = [
+  { value: 'cyberpunk', label: 'Cyberpunk' },
+  { value: 'classic-dark', label: 'Classic Dark' },
+];
+
 export function App() {
   const [bump, setBump] = useState(0);
   const [showGate, setShowGate] = useState(false);
@@ -23,6 +29,24 @@ export function App() {
   const [copilotMode, setCopilotMode] = useState<CopilotMode>('bypassPermissions');
   const [copilotModel, setCopilotModel] = useState('');
   const [copilotEffort, setCopilotEffort] = useState<'' | EffortLevel>('');
+
+  // Theme: applied to <html data-theme>, persisted. Default cyberpunk.
+  const [theme, setTheme] = useState<string>(() => localStorage.getItem('vb-theme') || 'cyberpunk');
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    localStorage.setItem('vb-theme', theme);
+  }, [theme]);
+
+  // Collapsed boards, persisted.
+  const [collapsed, setCollapsed] = useState<Set<BoardName>>(() => {
+    try { return new Set(JSON.parse(localStorage.getItem('vb-collapsed') ?? '[]')); } catch { return new Set(); }
+  });
+  const toggleBoard = (b: BoardName): void => setCollapsed((prev) => {
+    const next = new Set(prev);
+    if (next.has(b)) next.delete(b); else next.add(b);
+    localStorage.setItem('vb-collapsed', JSON.stringify([...next]));
+    return next;
+  });
 
   const onAdd = (board: BoardName, columnSlug: string): void => setEditor({ mode: 'create', board, columnSlug });
   const onOpen = (card: Card): void => setEditor({ mode: 'edit', card });
@@ -54,15 +78,20 @@ export function App() {
       <header className="topbar">
         <span className="brand">VibeBoard</span>
         {snapshot && !showGate && <span className="project-name">{snapshot.name}</span>}
-        {snapshot && !showGate && (
-          <button className="switch-btn" onClick={() => setShowGate(true)}>Switch project</button>
-        )}
-        {snapshot && !showGate && (
-          <button className={`switch-btn${copilotOpen ? ' active' : ''}`} onClick={() => setCopilotOpen((v) => !v)}>
-            {copilotOpen ? 'Hide copilot' : 'Copilot'}
-          </button>
-        )}
-        <span className={`conn conn-${conn}`} title={`WebSocket ${conn}`} />
+        <div className="topbar-right">
+          <select className="theme-select" value={theme} title="Theme" onChange={(e) => setTheme(e.target.value)}>
+            {THEMES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+          </select>
+          {snapshot && !showGate && (
+            <button className="switch-btn" onClick={() => setShowGate(true)}>Switch project</button>
+          )}
+          {snapshot && !showGate && (
+            <button className={`switch-btn${copilotOpen ? ' active' : ''}`} onClick={() => setCopilotOpen((v) => !v)}>
+              {copilotOpen ? 'Hide copilot' : 'Copilot'}
+            </button>
+          )}
+          <span className={`conn conn-${conn}`} title={`WebSocket ${conn}`} />
+        </div>
       </header>
 
       {!ready ? (
@@ -81,6 +110,8 @@ export function App() {
               label={BOARD_LABELS[board]}
               cards={snapshot.boards[board] ?? []}
               config={snapshot.config}
+              collapsed={collapsed.has(board)}
+              onToggle={() => toggleBoard(board)}
               onAdd={onAdd}
               onOpen={onOpen}
               onArchive={onArchive}

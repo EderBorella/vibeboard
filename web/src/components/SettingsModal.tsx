@@ -1,12 +1,11 @@
 import { useEffect, useState } from 'react';
-import { BOARDS, BOARD_LABELS, type BoardName, type ProjectConfig } from '../shared';
+import { BOARDS, BOARD_LABELS, backendCaps, type BoardName, type ProjectConfig } from '../shared';
 import { listModels, patchConfig, type ModelOption } from '../api';
 
 const BACKENDS: { value: string; label: string }[] = [
   { value: 'claude-code', label: 'Claude Code' },
   { value: 'opencode', label: 'OpenCode' },
 ];
-const EFFORTS = ['', 'low', 'medium', 'high', 'xhigh', 'max'];
 
 interface Props {
   config: ProjectConfig;
@@ -32,6 +31,7 @@ export function SettingsModal({ config, onClose, onSaved }: Props) {
   const [models, setModels] = useState<ModelOption[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const caps = backendCaps(backend);
 
   // Models depend on the chosen backend (claude aliases vs `opencode models`).
   useEffect(() => {
@@ -85,9 +85,9 @@ export function SettingsModal({ config, onClose, onSaved }: Props) {
               {models.map((m) => <option key={m.id} value={m.id}>{m.free ? `🆓 ${m.id}` : m.id}</option>)}
             </select>
           </label>
-          <label className="field"><span>Default effort</span>
-            <select value={effort} onChange={(e) => setEffort(e.target.value)}>
-              {EFFORTS.map((e) => <option key={e} value={e}>{e || '(default)'}</option>)}
+          <label className="field"><span>Default {backend === 'opencode' ? 'variant' : 'effort'}</span>
+            <select value={caps.efforts.some((e) => e.value === effort) ? effort : ''} onChange={(e) => setEffort(e.target.value)}>
+              {caps.efforts.map((e) => <option key={e.value} value={e.value}>{e.label}</option>)}
             </select>
           </label>
 

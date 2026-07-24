@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-export type CopilotMode = 'research' | 'plan' | 'acceptEdits' | 'bypassPermissions';
-export type EffortLevel = 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+// Backend-specific; concrete values come from BACKEND_CAPS in shared.ts.
+export type CopilotMode = string;
+export type EffortLevel = string;
 
 export interface TurnOptions {
   mode: CopilotMode;
-  model?: string;   // '' / undefined = inherit claude's default
+  model?: string;   // '' / undefined = backend default
   effort?: EffortLevel;
 }
 

@@ -1,21 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { listModels, type ModelOption } from '../api';
+import { backendCaps } from '../shared';
 import type { CopilotMode, EffortLevel, useCopilot } from './useCopilot';
-
-const MODES: { value: CopilotMode; label: string; hint: string }[] = [
-  { value: 'research', label: 'Research', hint: 'brainstorm & web research, no edits' },
-  { value: 'plan', label: 'Plan', hint: 'read & plan only, no edits' },
-  { value: 'acceptEdits', label: 'Execute', hint: 'auto-accept file edits' },
-  { value: 'bypassPermissions', label: 'Full-auto', hint: 'everything, unattended' },
-];
-const EFFORTS: { value: '' | EffortLevel; label: string }[] = [
-  { value: '', label: 'Default effort' },
-  { value: 'low', label: 'Low' },
-  { value: 'medium', label: 'Medium' },
-  { value: 'high', label: 'High' },
-  { value: 'xhigh', label: 'X-high' },
-  { value: 'max', label: 'Max' },
-];
 
 const CONTEXT_BUDGET = 200_000;
 
@@ -49,7 +35,12 @@ export function CopilotPanel({ copilot, backend, mode, model, effort, onMode, on
 
   useEffect(() => { bodyRef.current?.scrollTo({ top: bodyRef.current.scrollHeight }); }, [items, running]);
 
-  const turnOpts = () => ({ mode, model: model || undefined, effort: effort || undefined });
+  // Modes/efforts are backend-specific; fall back to the backend's first valid value when
+  // the carried-over selection doesn't apply (e.g. after switching Claude ↔ OpenCode).
+  const caps = backendCaps(backend);
+  const effMode = caps.modes.some((m) => m.value === mode) ? mode : caps.modes[0].value;
+  const effEffort = caps.efforts.some((e) => e.value === effort) ? effort : '';
+  const turnOpts = () => ({ mode: effMode, model: model || undefined, effort: effEffort || undefined });
   const submit = (): void => {
     if (!draft.trim() || running) return;
     send(draft, turnOpts());
@@ -68,9 +59,9 @@ export function CopilotPanel({ copilot, backend, mode, model, effort, onMode, on
       </div>
 
       <div className="copilot-controls">
-        <div className="mode-group" role="group" aria-label="Permission mode">
-          {MODES.map((m) => (
-            <button key={m.value} className={`mode-btn${mode === m.value ? ' active' : ''}`} title={m.hint} disabled={running} onClick={() => onMode(m.value)}>
+        <div className="mode-group" role="group" aria-label="Mode">
+          {caps.modes.map((m) => (
+            <button key={m.value} className={`mode-btn${effMode === m.value ? ' active' : ''}`} title={m.hint} disabled={running} onClick={() => onMode(m.value)}>
               {m.label}
             </button>
           ))}
@@ -86,16 +77,16 @@ export function CopilotPanel({ copilot, backend, mode, model, effort, onMode, on
           <option value="">Default model</option>
           {models.map((m) => <option key={m.id} value={m.id}>{m.free ? `🆓 ${m.id}` : m.id}</option>)}
         </select>
-        <select value={effort} disabled={running} onChange={(e) => onEffort(e.target.value as '' | EffortLevel)}>
-          {EFFORTS.map((e) => <option key={e.value} value={e.value}>{e.label}</option>)}
+        <select value={effEffort} disabled={running} onChange={(e) => onEffort(e.target.value as '' | EffortLevel)}>
+          {caps.efforts.map((e) => <option key={e.value} value={e.value}>{e.label}</option>)}
         </select>
       </div>
 
       <div className="copilot-body" ref={bodyRef}>
         {items.length === 0 && (
           <div className="copilot-empty">
-            Ask the copilot to work on this project. It runs Claude Code in the project folder,
-            so card changes appear on the board as it works.
+            Ask the copilot to work on this project. It runs your configured backend
+            ({backend}) in the project folder, so card changes appear on the board as it works.
           </div>
         )}
         {items.map((it) => (

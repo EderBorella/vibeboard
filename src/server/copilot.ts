@@ -5,8 +5,10 @@ import { fileURLToPath } from 'node:url';
 import { parseCopilotLine, type CopilotEvent } from './copilot-events.js';
 import { parseOpencodeLine } from './copilot-opencode.js';
 
-// UI-facing modes. 'research' shares plan permission but adds a research persona.
-export type CopilotMode = 'research' | 'plan' | 'acceptEdits' | 'bypassPermissions';
+// Modes/efforts are backend-specific (see BACKEND_CAPS on the web side). They're plain
+// strings here; each backend's command builder interprets its own values.
+export type CopilotMode = string;
+export type EffortLevel = string;
 export type Backend = 'claude-code' | 'opencode';
 
 export interface CopilotState {
@@ -15,22 +17,15 @@ export interface CopilotState {
   model: string | undefined;
 }
 
-export type EffortLevel = 'low' | 'medium' | 'high' | 'xhigh' | 'max';
-
 export interface SendOptions {
   cwd: string;
   text: string;
   mode: CopilotMode;
   backend?: Backend; // default claude-code
   model?: string;    // claude: alias/full name · opencode: provider/model
-  effort?: EffortLevel;
+  effort?: EffortLevel; // claude: --effort scale · opencode: --variant scale
   onEvent: (event: CopilotEvent) => void;
 }
-
-// OpenCode's reasoning knob is --variant (minimal/high/max); map our effort scale onto it.
-const EFFORT_TO_VARIANT: Record<EffortLevel, string | undefined> = {
-  low: 'minimal', medium: undefined, high: 'high', xhigh: 'high', max: 'max',
-};
 
 function opencodeBin(): string {
   return process.env.VIBEBOARD_OPENCODE_BIN ?? 'opencode';
@@ -51,12 +46,11 @@ function claudeCommand(opts: SendOptions, sessionId: string | undefined): Comman
 }
 
 function opencodeCommand(opts: SendOptions, sessionId: string | undefined): Command {
-  // --auto is required headless: OpenCode has no way to answer a permission prompt without
-  // a TTY, so any tool use would hang forever without it. The mode persona (e.g. research =
-  // "do not edit") is the soft guardrail; true read-only enforcement isn't available via run.
+  // --auto is required headless: OpenCode can't answer a permission prompt without a TTY,
+  // so any tool use would hang without it. The research persona is the soft guardrail.
   const args = ['run', '--format', 'json', '--auto', '--dir', opts.cwd];
   if (opts.model) args.push('-m', opts.model);
-  if (opts.effort) { const v = EFFORT_TO_VARIANT[opts.effort]; if (v) args.push('--variant', v); }
+  if (opts.effort) args.push('--variant', opts.effort); // opencode's own scale: minimal/high/max
   if (sessionId) args.push('-s', sessionId);
   // OpenCode has no --append-system-prompt; on the first turn of a session prepend the
   // VibeBoard instructions (+research directive) so it has the same context as Claude.
@@ -78,13 +72,15 @@ const RESEARCH_PERSONA = [
   'recommendation the user can act on.',
 ].join('\n');
 
-// Each UI mode → the claude --permission-mode it runs under, plus any extra persona.
+// Claude Code mode → --permission-mode + optional persona. Unknown values fall back to a
+// safe permission mode (this only receives Claude modes; OpenCode routes elsewhere).
 function resolveMode(mode: CopilotMode): { permission: string; persona?: string } {
   switch (mode) {
     case 'research': return { permission: 'plan', persona: RESEARCH_PERSONA };
     case 'plan': return { permission: 'plan' };
     case 'acceptEdits': return { permission: 'acceptEdits' };
     case 'bypassPermissions': return { permission: 'bypassPermissions' };
+    default: return { permission: 'bypassPermissions' };
   }
 }
 

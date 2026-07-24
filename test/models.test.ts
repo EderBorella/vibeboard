@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isFreeModel, mergeModels, opencodeModelsFromProviders } from '../src/server/models.js';
+import { isFreeModel, mergeModels, modelsFromProvider } from '../src/server/models.js';
 
 describe('isFreeModel', () => {
   it('flags OpenRouter :free and OpenCode -free ids', () => {
@@ -21,24 +21,40 @@ describe('mergeModels', () => {
   });
 });
 
-describe('opencodeModelsFromProviders', () => {
-  it('extracts only the opencode gateway provider, prefixed and free-flagged', () => {
-    const json = {
-      providers: [
-        { id: 'deepseek', models: { 'deepseek-v4-flash': {}, 'deepseek-chat': {} } },
-        { id: 'openrouter', models: { 'microsoft/phi-4': {} } },
-        { id: 'opencode', models: { 'deepseek-v4-flash-free': {}, 'ling-3.0-flash-free': {}, 'big-pickle': {} } },
-      ],
-    };
-    expect(opencodeModelsFromProviders(json)).toEqual([
-      { id: 'opencode/deepseek-v4-flash-free', free: true },
-      { id: 'opencode/ling-3.0-flash-free', free: true },
-      { id: 'opencode/big-pickle', free: false },
-    ]);
+describe('modelsFromProvider', () => {
+  it('maps capabilities, limits and cost into a prefixed ModelOption', () => {
+    const out = modelsFromProvider('deepseek', {
+      'deepseek-v4-flash': {
+        name: 'DeepSeek V4 Flash',
+        capabilities: { toolcall: true, reasoning: true, attachment: false, input: { image: false } },
+        limit: { context: 1000000, output: 384000 },
+        cost: { input: 0.14, output: 0.28 },
+      },
+    });
+    expect(out).toEqual([{
+      id: 'deepseek/deepseek-v4-flash',
+      free: false,
+      name: 'DeepSeek V4 Flash',
+      promptPerM: 0.14,
+      completionPerM: 0.28,
+      contextLength: 1000000,
+      outputLimit: 384000,
+      caps: { toolCall: true, reasoning: true, vision: false, attachment: false },
+    }]);
   });
 
-  it('is safe on an empty / malformed payload', () => {
-    expect(opencodeModelsFromProviders({})).toEqual([]);
-    expect(opencodeModelsFromProviders({ providers: [{ id: 'opencode' }] })).toEqual([]);
+  it('marks a zero-cost model free and reads image input as vision', () => {
+    const [m] = modelsFromProvider('opencode', {
+      'ling-3.0-flash-free': { capabilities: { toolcall: false, input: { image: true } }, cost: { input: 0, output: 0 } },
+    });
+    expect(m.id).toBe('opencode/ling-3.0-flash-free');
+    expect(m.free).toBe(true);
+    expect(m.caps).toEqual({ toolCall: false, reasoning: undefined, vision: true, attachment: undefined });
+  });
+
+  it('is safe on empty / capability-less definitions', () => {
+    expect(modelsFromProvider('x', {})).toEqual([]);
+    const [m] = modelsFromProvider('x', { bare: {} });
+    expect(m).toMatchObject({ id: 'x/bare', free: true });
   });
 });

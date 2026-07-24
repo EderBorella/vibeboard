@@ -302,33 +302,51 @@ body {
 .mp-trigger:disabled { opacity: 0.5; cursor: default; }
 .mp-trigger-label { flex: 1; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-mono); }
 .mp-caret { color: var(--muted); }
-.mp-panel {
-  position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 30;
-  background: var(--panel); border: 1px solid var(--accent); border-radius: 8px;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.5); display: flex; flex-direction: column; overflow: hidden;
+/* Model picker modal */
+.mp-modal-backdrop { position: fixed; inset: 0; z-index: 60; background: rgba(0,0,0,0.55); display: flex; align-items: center; justify-content: center; padding: 1rem; }
+.mp-modal {
+  width: min(560px, 100%); max-height: 80vh; display: flex; flex-direction: column;
+  background: var(--panel); border: 1px solid var(--accent); border-radius: 10px;
+  box-shadow: var(--glow), 0 12px 40px rgba(0,0,0,0.5); overflow: hidden;
 }
+.mp-modal-head { display: flex; align-items: center; padding: 0.7rem 0.9rem; border-bottom: 1px solid var(--border); }
+.mp-modal-title { font-weight: 700; font-family: var(--font-display); text-transform: uppercase; letter-spacing: 0.12em; }
+.mp-modal-close { margin-left: auto; background: transparent; border: none; color: var(--muted); cursor: pointer; font-size: 0.9rem; }
 .mp-search {
-  margin: 0.4rem; padding: 0.4rem 0.5rem; background: var(--bg); color: var(--text);
-  border: 1px solid var(--border); border-radius: 6px; font-size: 0.8rem;
+  margin: 0.6rem 0.9rem 0.4rem; padding: 0.45rem 0.55rem; background: var(--bg); color: var(--text);
+  border: 1px solid var(--border); border-radius: 6px; font-size: 0.82rem;
 }
 .mp-search:focus { outline: none; border-color: var(--accent); }
-.mp-list { max-height: 260px; overflow-y: auto; padding: 0 0.25rem 0.35rem; }
-.mp-group { font-size: 0.64rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); padding: 0.4rem 0.4rem 0.2rem; }
+.mp-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; padding: 0 0.9rem 0.4rem; }
+.mp-chip {
+  background: var(--panel-2); color: var(--muted); border: 1px solid var(--border);
+  border-radius: 999px; padding: 0.22rem 0.6rem; font-size: 0.72rem; cursor: pointer;
+}
+.mp-chip:hover { border-color: var(--accent); }
+.mp-chip.on { background: var(--accent); color: var(--on-accent); border-color: var(--accent); font-weight: 600; }
+.mp-prov { margin-left: auto; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 0.22rem 0.4rem; font-size: 0.72rem; }
+.mp-count { padding: 0 0.9rem 0.3rem; font-size: 0.66rem; color: var(--muted); font-family: var(--font-mono); }
+.mp-list { flex: 1; overflow-y: auto; padding: 0 0.5rem 0.6rem; }
 .mp-item { display: flex; align-items: center; border-radius: 6px; }
 .mp-item:hover, .mp-sel { background: var(--panel-2); }
-.mp-star { background: transparent; border: none; color: var(--accent-2); cursor: pointer; font-size: 0.9rem; padding: 0.25rem 0.3rem; }
+.mp-star { background: transparent; border: none; color: var(--accent-2); cursor: pointer; font-size: 0.95rem; padding: 0.3rem 0.35rem; }
 .mp-pick, .mp-default {
-  flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.1rem;
+  flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.15rem;
   background: transparent; border: none; color: var(--text); cursor: pointer;
-  text-align: left; padding: 0.3rem 0.4rem; font-size: 0.78rem;
+  text-align: left; padding: 0.4rem 0.45rem; font-size: 0.8rem;
 }
-.mp-default { width: 100%; color: var(--muted); }
-.mp-pick-main { display: flex; align-items: center; gap: 0.35rem; min-width: 0; }
-.mp-free { flex: 0 0 auto; }
-.mp-id { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-mono); }
-.mp-meta { font-size: 0.66rem; color: var(--muted); }
-.mp-sel .mp-id, .mp-sel .mp-default { color: var(--accent); }
-.mp-empty { color: var(--muted); font-size: 0.78rem; padding: 0.5rem; font-style: italic; }
+.mp-default { width: 100%; color: var(--muted); border-bottom: 1px solid var(--border); border-radius: 0; margin-bottom: 0.2rem; }
+.mp-pick-top { display: flex; align-items: baseline; gap: 0.5rem; min-width: 0; }
+.mp-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.mp-price { flex: 0 0 auto; font-size: 0.7rem; color: var(--accent-2); font-family: var(--font-mono); }
+.mp-pick-bot { display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
+.mp-id { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-mono); font-size: 0.68rem; color: var(--muted); }
+.mp-badges { flex: 0 0 auto; display: flex; align-items: center; gap: 0.3rem; font-size: 0.72rem; }
+.mp-ctx { font-family: var(--font-mono); font-size: 0.66rem; color: var(--muted); }
+.mp-sel .mp-name, .mp-sel.mp-default { color: var(--accent); }
+.mp-empty { color: var(--muted); font-size: 0.8rem; padding: 0.8rem 0.5rem; font-style: italic; }
+
+.copilot-warn { padding: 0.4rem 0.75rem; font-size: 0.72rem; color: var(--danger); background: color-mix(in srgb, var(--danger) 12%, transparent); border-bottom: 1px solid var(--border); }
 .links-hint { color: var(--muted); font-size: 0.8rem; font-style: italic; }
 .links-list {
   display: flex; flex-direction: column; gap: 0.3rem; max-height: 180px; overflow-y: auto;

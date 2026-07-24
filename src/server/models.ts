@@ -3,12 +3,22 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { opencodeBaseUrl } from './opencode-server.js';
 
+export interface ModelCaps {
+  toolCall?: boolean;   // can call tools — the copilot needs this to edit cards
+  reasoning?: boolean;
+  vision?: boolean;     // accepts image input
+  attachment?: boolean;
+}
+
 export interface ModelOption {
   id: string;
   free: boolean;
-  promptPerM?: number;      // USD per 1M input tokens (OpenRouter)
+  name?: string;            // human display name
+  promptPerM?: number;      // USD per 1M input tokens
   completionPerM?: number;  // USD per 1M output tokens
-  contextLength?: number;
+  contextLength?: number;   // max context tokens
+  outputLimit?: number;     // max output tokens
+  caps?: ModelCaps;
 }
 
 export interface ModelStatus {
@@ -34,7 +44,11 @@ export function mergeModels(lists: ModelOption[][]): ModelOption[] {
   return out.sort((a, b) => Number(b.free) - Number(a.free));
 }
 
+// Claude aliases carry known caps (all support tools + reasoning + vision).
 const CLAUDE_ALIASES = ['opus', 'sonnet', 'haiku', 'fable'];
+function claudeAliasOption(id: string): ModelOption {
+  return { id, free: false, name: id[0].toUpperCase() + id.slice(1), caps: { toolCall: true, reasoning: true, vision: true, attachment: true } };
+}
 
 // OpenCode credentials live here; we read provider names + keys to query the right APIs.
 function opencodeAuth(): Record<string, { key?: string; apiKey?: string }> {
@@ -45,37 +59,20 @@ function opencodeAuth(): Record<string, { key?: string; apiKey?: string }> {
   }
 }
 
-interface Cache { at: number; models: ModelOption[] }
+interface Cache<T> { at: number; value: T }
 const TTL_MS = 10 * 60 * 1000;
-const caches = new Map<string, Cache>();
+const caches = new Map<string, Cache<unknown>>();
 
-async function cached(key: string, fetcher: () => Promise<ModelOption[]>): Promise<ModelOption[]> {
-  const hit = caches.get(key);
-  if (hit && Date.now() - hit.at < TTL_MS) return hit.models;
+async function cached<T>(key: string, fetcher: () => Promise<T>, fallback: T): Promise<T> {
+  const hit = caches.get(key) as Cache<T> | undefined;
+  if (hit && Date.now() - hit.at < TTL_MS) return hit.value;
   try {
-    const models = await fetcher();
-    caches.set(key, { at: Date.now(), models });
-    return models;
+    const value = await fetcher();
+    caches.set(key, { at: Date.now(), value });
+    return value;
   } catch {
-    return hit?.models ?? [];
+    return hit?.value ?? fallback;
   }
-}
-
-// OpenRouter — precise live catalog; we surface the free tier (the paid list is huge),
-// enriched with pricing + context length straight from the same call (no extra requests).
-interface OrModel { id: string; context_length?: number; pricing?: { prompt?: string; completion?: string } }
-async function openrouterModels(): Promise<ModelOption[]> {
-  const res = await fetch('https://openrouter.ai/api/v1/models', { signal: AbortSignal.timeout(8000) });
-  const json = (await res.json()) as { data?: OrModel[] };
-  return (json.data ?? [])
-    .filter((m) => m.id.endsWith(':free') || (m.pricing?.prompt === '0' && m.pricing?.completion === '0'))
-    .map((m) => ({
-      id: `openrouter/${m.id}`,
-      free: true,
-      promptPerM: m.pricing ? Number(m.pricing.prompt) * 1e6 : undefined,
-      completionPerM: m.pricing ? Number(m.pricing.completion) * 1e6 : undefined,
-      contextLength: m.context_length,
-    }));
 }
 
 // Live status/uptime for one model via OpenRouter's endpoints route. Only openrouter ids
@@ -101,46 +98,68 @@ export async function modelStatus(id: string): Promise<ModelStatus | null> {
   }
 }
 
-// DeepSeek — its own /models is authoritative and current (drops deprecated ids like
-// deepseek-chat that opencode's cached catalog still lists).
-async function deepseekModels(key: string): Promise<ModelOption[]> {
+// DeepSeek's own /models — the current, valid id set. Its registry entry in opencode
+// over-lists deprecated ids (deepseek-chat), so we intersect against this.
+async function deepseekIds(key: string): Promise<Set<string>> {
   const res = await fetch('https://api.deepseek.com/models', { headers: { Authorization: `Bearer ${key}` }, signal: AbortSignal.timeout(8000) });
   const json = (await res.json()) as { data?: { id: string }[] };
-  return (json.data ?? []).map((m) => ({ id: `deepseek/${m.id}`, free: false }));
+  return new Set((json.data ?? []).map((m) => m.id));
 }
 
-// OpenCode's own gateway models (usable without a provider key). Sourced from the RUNNING
-// opencode server's /config/providers — the authoritative list of what it will actually
-// accept. (models.dev's catalog drifts from the live gateway, so ids like qwen3.6-plus-free
-// there 500 with ProviderModelNotFoundError when selected.)
-interface OcProvider { id?: string; models?: Record<string, unknown> }
+// The rich per-model definition from OpenCode's /config/providers.
+interface OcModelDef {
+  name?: string;
+  capabilities?: { toolcall?: boolean; reasoning?: boolean; attachment?: boolean; input?: { image?: boolean } };
+  limit?: { context?: number; output?: number };
+  cost?: { input?: number; output?: number };
+}
+interface OcProviderFull { id?: string; models?: Record<string, OcModelDef> }
 
-// Pure: extract the opencode gateway's models from a /config/providers payload.
-export function opencodeModelsFromProviders(json: { providers?: OcProvider[] }): ModelOption[] {
-  const out: ModelOption[] = [];
-  for (const p of json.providers ?? []) {
-    if (p.id !== 'opencode') continue; // deepseek/openrouter come from their own precise sources
-    for (const id of Object.keys(p.models ?? {})) out.push({ id: `opencode/${id}`, free: isFreeModel(id) });
-  }
+function optionFromDef(id: string, m: OcModelDef): ModelOption {
+  const cost = m.cost ?? {};
+  const cap = m.capabilities ?? {};
+  return {
+    id,
+    free: (cost.input ?? 0) === 0 && (cost.output ?? 0) === 0,
+    name: m.name,
+    promptPerM: cost.input,
+    completionPerM: cost.output,
+    contextLength: m.limit?.context,
+    outputLimit: m.limit?.output,
+    caps: { toolCall: cap.toolcall, reasoning: cap.reasoning, vision: cap.input?.image, attachment: cap.attachment },
+  };
+}
+
+// Pure: map one provider's /config/providers entry to ModelOptions (ids as provider/model,
+// matching what opencode's HTTP API expects). Exported for testing.
+export function modelsFromProvider(providerId: string, models: Record<string, OcModelDef>): ModelOption[] {
+  return Object.entries(models).map(([id, def]) => optionFromDef(`${providerId}/${id}`, def));
+}
+
+// The running OpenCode server's provider catalog — authoritative for which models it will
+// accept, and rich with capabilities/limits/cost for every provider it has configured.
+async function fetchOpencodeCatalog(): Promise<Record<string, Record<string, OcModelDef>>> {
+  const base = await opencodeBaseUrl();
+  const res = await fetch(`${base}/config/providers`, { signal: AbortSignal.timeout(8000) });
+  const json = (await res.json()) as { providers?: OcProviderFull[] };
+  const out: Record<string, Record<string, OcModelDef>> = {};
+  for (const p of json.providers ?? []) if (p.id) out[p.id] = p.models ?? {};
   return out;
 }
 
-async function opencodeGatewayModels(): Promise<ModelOption[]> {
-  const base = await opencodeBaseUrl();
-  const res = await fetch(`${base}/config/providers`, { signal: AbortSignal.timeout(8000) });
-  return opencodeModelsFromProviders((await res.json()) as { providers?: OcProvider[] });
-}
-
-// Live, precise model list per backend. For opencode we query the actual provider APIs the
-// user has authed (plus the free OpenCode gateway) rather than the stale `opencode models`.
+// Live, capability-rich model list per backend. For opencode we read the running server's
+// catalog (authoritative — no models.dev drift), filtering DeepSeek to its live id set.
 export async function listBackendModels(backend: string): Promise<ModelOption[]> {
-  if (backend !== 'opencode') return CLAUDE_ALIASES.map((id) => ({ id, free: false }));
+  if (backend !== 'opencode') return CLAUDE_ALIASES.map(claudeAliasOption);
 
-  const auth = opencodeAuth();
-  const tasks: Promise<ModelOption[]>[] = [cached('opencode-gateway', opencodeGatewayModels)];
-  if (auth.openrouter) tasks.push(cached('openrouter', openrouterModels));
-  const dsKey = auth.deepseek?.key ?? auth.deepseek?.apiKey;
-  if (dsKey) tasks.push(cached('deepseek', () => deepseekModels(dsKey)));
+  const catalog = await cached<ModelOption[]>('oc-catalog', async () =>
+    Object.entries(await fetchOpencodeCatalog()).flatMap(([prov, models]) => modelsFromProvider(prov, models)), []);
 
-  return mergeModels(await Promise.all(tasks));
+  const dsKey = opencodeAuth().deepseek?.key ?? opencodeAuth().deepseek?.apiKey;
+  let models = catalog;
+  if (dsKey) {
+    const valid = await cached<Set<string>>('deepseek-ids', () => deepseekIds(dsKey), new Set());
+    if (valid.size) models = catalog.filter((m) => !m.id.startsWith('deepseek/') || valid.has(m.id.slice('deepseek/'.length)));
+  }
+  return mergeModels([models]);
 }

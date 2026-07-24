@@ -42,6 +42,8 @@ export function CopilotPanel({ copilot, backend, mode, model, effort, onMode, on
   const [chatMenu, setChatMenu] = useState(false);
   const bodyRef = useRef<HTMLDivElement>(null);
   const currentTitle = chats.find((c) => c.id === currentChatId)?.title ?? 'New chat';
+  // Warn when the chosen model can't call tools — the copilot can't touch cards without them.
+  const noTools = !!model && models.find((m) => m.id === model)?.caps?.toolCall === false;
 
   // Model choices depend on the configured backend (claude aliases vs opencode models).
   useEffect(() => {
@@ -129,6 +131,11 @@ export function CopilotPanel({ copilot, backend, mode, model, effort, onMode, on
           {caps.efforts.map((e) => <option key={e.value} value={e.value}>{e.label}</option>)}
         </select>
       </div>
+      {noTools && (
+        <div className="copilot-warn" role="alert">
+          ⚠ This model can’t use tools — the copilot can’t create or edit cards. Pick a 🔧 model.
+        </div>
+      )}
       {status && (
         <div className={`copilot-status ${status.up ? 'ok' : 'down'}`}>
           <span className="status-dot" />

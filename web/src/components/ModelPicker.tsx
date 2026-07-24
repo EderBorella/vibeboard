@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { ModelOption } from '../api';
 
 const FAV_KEY = 'vb-fav-models';
@@ -14,21 +14,41 @@ interface Props {
   disabled?: boolean;
 }
 
-// Searchable model dropdown with star-to-favorite (favorites pinned to top, persisted).
+// Provider is the id prefix (opencode/deepseek/openrouter); claude aliases have none.
+function providerOf(id: string): string {
+  const i = id.indexOf('/');
+  return i < 0 ? 'claude' : id.slice(0, i);
+}
+
+function fmtCtx(n?: number): string {
+  if (!n) return '';
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(n % 1_000_000 ? 1 : 0)}M`;
+  if (n >= 1000) return `${Math.round(n / 1000)}K`;
+  return String(n);
+}
+
+function fmtPrice(m: ModelOption): string {
+  if (m.free) return 'Free';
+  if (m.promptPerM == null) return '';
+  return `$${m.promptPerM} / $${m.completionPerM ?? 0}`;
+}
+
+// Model selector: a trigger button that opens a filterable modal. Filters default to
+// tool-capable (the copilot needs tools to edit cards). Favorites persist in localStorage.
 export function ModelPicker({ models, value, onChange, disabled }: Props) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
+  const [toolOnly, setToolOnly] = useState(true);
+  const [freeOnly, setFreeOnly] = useState(false);
+  const [visionOnly, setVisionOnly] = useState(false);
+  const [provider, setProvider] = useState('all');
   const [favs, setFavs] = useState<Set<string>>(loadFavs);
-  const ref = useRef<HTMLDivElement>(null);
 
-  // Close on outside click / Escape.
   useEffect(() => {
     if (!open) return;
-    const onDoc = (e: MouseEvent): void => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
     const onKey = (e: KeyboardEvent): void => { if (e.key === 'Escape') setOpen(false); };
-    document.addEventListener('mousedown', onDoc);
     document.addEventListener('keydown', onKey);
-    return () => { document.removeEventListener('mousedown', onDoc); document.removeEventListener('keydown', onKey); };
+    return () => document.removeEventListener('keydown', onKey);
   }, [open]);
 
   const toggleFav = (id: string): void => {
@@ -40,61 +60,92 @@ export function ModelPicker({ models, value, onChange, disabled }: Props) {
     });
   };
 
-  const pick = (id: string): void => { onChange(id); setOpen(false); setQuery(''); };
+  const pick = (id: string): void => { onChange(id); setOpen(false); };
 
-  const meta = (m: ModelOption): string => {
-    const parts: string[] = [];
-    if (m.free) parts.push('free');
-    else if (m.promptPerM != null) parts.push(`$${m.promptPerM.toFixed(2)}/${(m.completionPerM ?? 0).toFixed(2)} per M`);
-    if (m.contextLength) parts.push(`${Math.round(m.contextLength / 1000)}k ctx`);
-    return parts.join(' · ');
-  };
+  const providers = useMemo(() => {
+    const set = new Set(models.map((m) => providerOf(m.id)));
+    return ['all', ...[...set].sort()];
+  }, [models]);
 
-  const q = query.trim().toLowerCase();
-  const filtered = q ? models.filter((m) => m.id.toLowerCase().includes(q)) : models;
-  const favModels = filtered.filter((m) => favs.has(m.id));
-  const rest = filtered.filter((m) => !favs.has(m.id));
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return models.filter((m) => {
+      if (m.id === value) return true; // never hide the current selection
+      if (toolOnly && !m.caps?.toolCall) return false;
+      if (freeOnly && !m.free) return false;
+      if (visionOnly && !m.caps?.vision) return false;
+      if (provider !== 'all' && providerOf(m.id) !== provider) return false;
+      if (q && !`${m.id} ${m.name ?? ''}`.toLowerCase().includes(q)) return false;
+      return true;
+    }).sort((a, b) => {
+      const fa = favs.has(a.id), fb = favs.has(b.id);
+      if (fa !== fb) return fa ? -1 : 1;         // favorites first
+      if (a.free !== b.free) return a.free ? -1 : 1; // then free
+      return (a.name ?? a.id).localeCompare(b.name ?? b.id);
+    });
+  }, [models, query, toolOnly, freeOnly, visionOnly, provider, favs, value]);
 
   const selected = models.find((m) => m.id === value);
-  const label = value ? `${selected?.free ? '🆓 ' : ''}${value}` : 'Default model';
+  const label = value ? (selected?.name ?? value) : 'Default model';
 
-  const row = (m: ModelOption): React.ReactNode => (
-    <div key={m.id} className={`mp-item${m.id === value ? ' mp-sel' : ''}`}>
-      <button className="mp-star" title={favs.has(m.id) ? 'Unfavorite' : 'Favorite'} onClick={() => toggleFav(m.id)}>
-        {favs.has(m.id) ? '★' : '☆'}
-      </button>
-      <button className="mp-pick" onClick={() => pick(m.id)}>
-        <span className="mp-pick-main">
-          {m.free && <span className="mp-free">🆓</span>}
-          <span className="mp-id">{m.id}</span>
-        </span>
-        {meta(m) && <span className="mp-meta">{meta(m)}</span>}
-      </button>
-    </div>
+  const chip = (on: boolean, set: (v: boolean) => void, text: string): React.ReactNode => (
+    <button className={`mp-chip${on ? ' on' : ''}`} onClick={() => set(!on)}>{text}</button>
   );
 
   return (
-    <div className="mp" ref={ref}>
-      <button className="mp-trigger" disabled={disabled} onClick={() => setOpen((v) => !v)} title={label}>
-        <span className="mp-trigger-label">{label}</span>
+    <div className="mp">
+      <button className="mp-trigger" disabled={disabled} onClick={() => setOpen(true)} title={value || 'Default model'}>
+        <span className="mp-trigger-label">{selected?.free ? '🆓 ' : ''}{label}</span>
         <span className="mp-caret">▾</span>
       </button>
+
       {open && (
-        <div className="mp-panel">
-          <input
-            className="mp-search"
-            autoFocus
-            value={query}
-            placeholder="Search models…"
-            onChange={(e) => setQuery(e.target.value)}
-          />
-          <div className="mp-list">
-            <button className={`mp-default${value === '' ? ' mp-sel' : ''}`} onClick={() => pick('')}>Default model</button>
-            {favModels.length > 0 && <div className="mp-group">★ Favorites</div>}
-            {favModels.map(row)}
-            {favModels.length > 0 && rest.length > 0 && <div className="mp-group">All models</div>}
-            {rest.map(row)}
-            {filtered.length === 0 && <div className="mp-empty">No models match “{query}”.</div>}
+        <div className="mp-modal-backdrop" onClick={() => setOpen(false)}>
+          <div className="mp-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="mp-modal-head">
+              <span className="mp-modal-title">Choose a model</span>
+              <button className="mp-modal-close" onClick={() => setOpen(false)}>✕</button>
+            </div>
+
+            <input className="mp-search" autoFocus value={query} placeholder="Search by name or id…" onChange={(e) => setQuery(e.target.value)} />
+
+            <div className="mp-filters">
+              {chip(toolOnly, setToolOnly, '🔧 Tool use')}
+              {chip(freeOnly, setFreeOnly, '🆓 Free')}
+              {chip(visionOnly, setVisionOnly, '👁 Vision')}
+              <select className="mp-prov" value={provider} onChange={(e) => setProvider(e.target.value)}>
+                {providers.map((p) => <option key={p} value={p}>{p === 'all' ? 'All providers' : p}</option>)}
+              </select>
+            </div>
+
+            <div className="mp-count">{filtered.length} of {models.length} models</div>
+
+            <div className="mp-list">
+              <button className={`mp-default${value === '' ? ' mp-sel' : ''}`} onClick={() => pick('')}>Default model (backend decides)</button>
+              {filtered.map((m) => (
+                <div key={m.id} className={`mp-item${m.id === value ? ' mp-sel' : ''}`}>
+                  <button className="mp-star" title={favs.has(m.id) ? 'Unfavorite' : 'Favorite'} onClick={() => toggleFav(m.id)}>
+                    {favs.has(m.id) ? '★' : '☆'}
+                  </button>
+                  <button className="mp-pick" onClick={() => pick(m.id)}>
+                    <span className="mp-pick-top">
+                      <span className="mp-name">{m.name ?? m.id}</span>
+                      <span className="mp-price">{fmtPrice(m)}</span>
+                    </span>
+                    <span className="mp-pick-bot">
+                      <span className="mp-id">{m.id}</span>
+                      <span className="mp-badges">
+                        {m.contextLength ? <span className="mp-ctx">{fmtCtx(m.contextLength)}</span> : null}
+                        {m.caps?.toolCall && <span className="mp-badge" title="Tool use">🔧</span>}
+                        {m.caps?.reasoning && <span className="mp-badge" title="Reasoning">🧠</span>}
+                        {m.caps?.vision && <span className="mp-badge" title="Vision">👁</span>}
+                      </span>
+                    </span>
+                  </button>
+                </div>
+              ))}
+              {filtered.length === 0 && <div className="mp-empty">No models match the current filters.</div>}
+            </div>
           </div>
         </div>
       )}

@@ -34,12 +34,22 @@ export function patchConfig(body: Partial<ProjectConfig>): Promise<ProjectConfig
   return patch<ProjectConfig>('/api/config', body);
 }
 
+export interface ModelCaps {
+  toolCall?: boolean;
+  reasoning?: boolean;
+  vision?: boolean;
+  attachment?: boolean;
+}
+
 export interface ModelOption {
   id: string;
   free: boolean;
+  name?: string;
   promptPerM?: number;
   completionPerM?: number;
   contextLength?: number;
+  outputLimit?: number;
+  caps?: ModelCaps;
 }
 
 export interface ModelStatus { up: boolean; uptime?: number; endpoints: number }

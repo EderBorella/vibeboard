@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseCopilotLine, type CopilotEvent } from './copilot-events.js';
-import { parseOpencodeLine } from './copilot-opencode.js';
+import { opencodeTurn } from './opencode-client.js';
 
 // Modes/efforts are backend-specific (see BACKEND_CAPS on the web side). They're plain
 // strings here; each backend's command builder interprets its own values.
@@ -27,10 +27,6 @@ export interface SendOptions {
   onEvent: (event: CopilotEvent) => void;
 }
 
-function opencodeBin(): string {
-  return process.env.VIBEBOARD_OPENCODE_BIN ?? 'opencode';
-}
-
 interface Command { bin: string; args: string[] }
 
 function claudeCommand(opts: SendOptions, sessionId: string | undefined): Command {
@@ -45,24 +41,6 @@ function claudeCommand(opts: SendOptions, sessionId: string | undefined): Comman
   return { bin: claudeBin(), args };
 }
 
-function opencodeCommand(opts: SendOptions, sessionId: string | undefined): Command {
-  // --auto is required headless: OpenCode can't answer a permission prompt without a TTY,
-  // so any tool use would hang without it. The research persona is the soft guardrail.
-  const args = ['run', '--format', 'json', '--auto', '--dir', opts.cwd];
-  if (opts.model) args.push('-m', opts.model);
-  if (opts.effort) args.push('--variant', opts.effort); // opencode's own scale: minimal/high/max
-  if (sessionId) args.push('-s', sessionId);
-  // OpenCode has no --append-system-prompt; on the first turn of a session prepend the
-  // VibeBoard instructions (+research directive) so it has the same context as Claude.
-  let message = opts.text;
-  if (!sessionId) {
-    const persona = opts.mode === 'research' ? RESEARCH_PERSONA : '';
-    const preamble = [vibeboardInstructions(), persona].filter(Boolean).join('\n\n');
-    if (preamble) message = `${preamble}\n\n# Task\n${opts.text}`;
-  }
-  args.push(message);
-  return { bin: opencodeBin(), args };
-}
 
 const RESEARCH_PERSONA = [
   '# Research mode',
@@ -109,13 +87,18 @@ function vibeboardInstructions(): string {
 export class CopilotSession {
   #sessionId: string | undefined;
   #model: string | undefined;
-  #child: ChildProcess | undefined;
+  #child: ChildProcess | undefined;         // claude spawn
+  #abort: AbortController | undefined;       // opencode HTTP turn
 
   get state(): CopilotState {
-    return { running: this.#child !== undefined, sessionId: this.#sessionId, model: this.#model };
+    return {
+      running: this.#child !== undefined || this.#abort !== undefined,
+      sessionId: this.#sessionId,
+      model: this.#model,
+    };
   }
 
-  // Start a brand-new conversation on the next send (drops the resumable id).
+  // Start a brand-new conversation on the next send (drops the resumable session id).
   newSession(): void {
     this.cancel();
     this.#sessionId = undefined;
@@ -123,33 +106,53 @@ export class CopilotSession {
   }
 
   cancel(): void {
-    if (this.#child) {
-      this.#child.kill('SIGTERM');
-      this.#child = undefined;
-    }
+    if (this.#child) { this.#child.kill('SIGTERM'); this.#child = undefined; }
+    if (this.#abort) { this.#abort.abort(); this.#abort = undefined; }
   }
 
   async send(opts: SendOptions): Promise<void> {
-    if (this.#child) throw new Error('Copilot is busy');
-
+    if (this.#child || this.#abort) throw new Error('Copilot is busy');
     const backend: Backend = opts.backend ?? 'claude-code';
-    if (backend === 'opencode') this.#model = opts.model; // opencode doesn't announce its model
-    const { bin, args } = backend === 'opencode'
-      ? opencodeCommand(opts, this.#sessionId)
-      : claudeCommand(opts, this.#sessionId);
+    return backend === 'opencode' ? this.#sendOpencode(opts) : this.#sendClaude(opts);
+  }
 
+  // OpenCode: talk to a persistent `opencode serve` over HTTP (per-turn message, session
+  // reused across turns). The VibeBoard instructions go in the `system` field.
+  async #sendOpencode(opts: SendOptions): Promise<void> {
+    this.#model = opts.model;
+    const persona = opts.mode === 'research' ? RESEARCH_PERSONA : '';
+    const system = [vibeboardInstructions(), persona].filter(Boolean).join('\n\n');
+    const abort = new AbortController();
+    this.#abort = abort;
+    const timeoutMs = Number(process.env.VIBEBOARD_COPILOT_TIMEOUT_MS ?? 180000);
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      opts.onEvent({ kind: 'text', text: `\n[No response after ${Math.round(timeoutMs / 1000)}s — stopping. The provider may be slow or the model unavailable.]` });
+      abort.abort();
+    }, timeoutMs);
+    try {
+      this.#sessionId = await opencodeTurn({
+        cwd: opts.cwd, text: opts.text, model: opts.model, system,
+        sessionId: this.#sessionId, signal: abort.signal, onEvent: opts.onEvent,
+      });
+    } catch (err) {
+      if (!timedOut) opts.onEvent({ kind: 'text', text: `\n[opencode failed: ${err instanceof Error ? err.message : String(err)}]` });
+    } finally {
+      clearTimeout(timer);
+      this.#abort = undefined;
+    }
+  }
+
+  // Claude Code: spawn `claude -p` per turn and stream its stdout.
+  async #sendClaude(opts: SendOptions): Promise<void> {
+    const { bin, args } = claudeCommand(opts, this.#sessionId);
     const child = spawn(bin, args, { cwd: opts.cwd, env: process.env });
     this.#child = child;
 
     let buf = '';
     let stderr = '';
     const emitLine = (line: string): void => {
-      if (backend === 'opencode') {
-        const { events, sessionId } = parseOpencodeLine(line);
-        if (sessionId) this.#sessionId = sessionId;
-        for (const event of events) opts.onEvent(event);
-        return;
-      }
       for (const event of parseCopilotLine(line)) {
         if (event.kind === 'init') { this.#sessionId = event.sessionId; this.#model = event.model; }
         else if (event.kind === 'result' && event.sessionId) { this.#sessionId = event.sessionId; }
@@ -168,8 +171,6 @@ export class CopilotSession {
     });
     child.stderr?.on('data', (chunk: Buffer) => { stderr += chunk.toString('utf8'); });
 
-    // Don't hang forever: if a turn produces nothing for too long (slow/rate-limited
-    // provider, or a stuck child), kill it and tell the user instead of sitting on "working".
     const timeoutMs = Number(process.env.VIBEBOARD_COPILOT_TIMEOUT_MS ?? 180000);
     let timedOut = false;
     const timer = setTimeout(() => {

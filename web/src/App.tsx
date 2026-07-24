@@ -19,7 +19,7 @@ export function App() {
   const [showGate, setShowGate] = useState(false);
   const [ready, setReady] = useState(false);
   const [editor, setEditor] = useState<EditorState | null>(null);
-  const [copilotOpen, setCopilotOpen] = useState(false);
+  const [copilotOpen, setCopilotOpen] = useState(true);
   const dragged = useRef<Card | null>(null);
   const { snapshot, conn } = useSnapshot(bump);
 

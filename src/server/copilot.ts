@@ -3,9 +3,11 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseCopilotLine, type CopilotEvent } from './copilot-events.js';
+import { parseOpencodeLine } from './copilot-opencode.js';
 
 // UI-facing modes. 'research' shares plan permission but adds a research persona.
 export type CopilotMode = 'research' | 'plan' | 'acceptEdits' | 'bypassPermissions';
+export type Backend = 'claude-code' | 'opencode';
 
 export interface CopilotState {
   running: boolean;
@@ -19,9 +21,51 @@ export interface SendOptions {
   cwd: string;
   text: string;
   mode: CopilotMode;
-  model?: string;   // alias (opus/sonnet/haiku/fable) or full name; omit to inherit default
+  backend?: Backend; // default claude-code
+  model?: string;    // claude: alias/full name · opencode: provider/model
   effort?: EffortLevel;
   onEvent: (event: CopilotEvent) => void;
+}
+
+// OpenCode's reasoning knob is --variant (minimal/high/max); map our effort scale onto it.
+const EFFORT_TO_VARIANT: Record<EffortLevel, string | undefined> = {
+  low: 'minimal', medium: undefined, high: 'high', xhigh: 'high', max: 'max',
+};
+
+function opencodeBin(): string {
+  return process.env.VIBEBOARD_OPENCODE_BIN ?? 'opencode';
+}
+
+interface Command { bin: string; args: string[] }
+
+function claudeCommand(opts: SendOptions, sessionId: string | undefined): Command {
+  const { permission, persona } = resolveMode(opts.mode);
+  const appendPrompt = [vibeboardInstructions(), persona].filter(Boolean).join('\n\n');
+  const args = ['-p', '--output-format', 'stream-json', '--include-partial-messages', '--verbose', '--permission-mode', permission];
+  if (appendPrompt) args.push('--append-system-prompt', appendPrompt);
+  if (opts.model) args.push('--model', opts.model);
+  if (opts.effort) args.push('--effort', opts.effort);
+  if (sessionId) args.push('--resume', sessionId);
+  args.push(opts.text);
+  return { bin: claudeBin(), args };
+}
+
+function opencodeCommand(opts: SendOptions, sessionId: string | undefined): Command {
+  const args = ['run', '--format', 'json', '--dir', opts.cwd];
+  if (opts.model) args.push('-m', opts.model);
+  if (opts.effort) { const v = EFFORT_TO_VARIANT[opts.effort]; if (v) args.push('--variant', v); }
+  if (opts.mode === 'bypassPermissions') args.push('--auto');
+  if (sessionId) args.push('-s', sessionId);
+  // OpenCode has no --append-system-prompt; on the first turn of a session prepend the
+  // VibeBoard instructions (+research directive) so it has the same context as Claude.
+  let message = opts.text;
+  if (!sessionId) {
+    const persona = opts.mode === 'research' ? RESEARCH_PERSONA : '';
+    const preamble = [vibeboardInstructions(), persona].filter(Boolean).join('\n\n');
+    if (preamble) message = `${preamble}\n\n# Task\n${opts.text}`;
+  }
+  args.push(message);
+  return { bin: opencodeBin(), args };
 }
 
 const RESEARCH_PERSONA = [
@@ -90,22 +134,24 @@ export class CopilotSession {
   async send(opts: SendOptions): Promise<void> {
     if (this.#child) throw new Error('Copilot is busy');
 
-    const { permission, persona } = resolveMode(opts.mode);
-    const appendPrompt = [vibeboardInstructions(), persona].filter(Boolean).join('\n\n');
+    const backend: Backend = opts.backend ?? 'claude-code';
+    if (backend === 'opencode') this.#model = opts.model; // opencode doesn't announce its model
+    const { bin, args } = backend === 'opencode'
+      ? opencodeCommand(opts, this.#sessionId)
+      : claudeCommand(opts, this.#sessionId);
 
-    const args = ['-p', '--output-format', 'stream-json', '--include-partial-messages', '--verbose', '--permission-mode', permission];
-    if (appendPrompt) args.push('--append-system-prompt', appendPrompt);
-    if (opts.model) args.push('--model', opts.model);
-    if (opts.effort) args.push('--effort', opts.effort);
-    if (this.#sessionId) args.push('--resume', this.#sessionId);
-    args.push(opts.text);
-
-    const child = spawn(claudeBin(), args, { cwd: opts.cwd, env: process.env });
+    const child = spawn(bin, args, { cwd: opts.cwd, env: process.env });
     this.#child = child;
 
     let buf = '';
     let stderr = '';
     const emitLine = (line: string): void => {
+      if (backend === 'opencode') {
+        const { events, sessionId } = parseOpencodeLine(line);
+        if (sessionId) this.#sessionId = sessionId;
+        for (const event of events) opts.onEvent(event);
+        return;
+      }
       for (const event of parseCopilotLine(line)) {
         if (event.kind === 'init') { this.#sessionId = event.sessionId; this.#model = event.model; }
         else if (event.kind === 'result' && event.sessionId) { this.#sessionId = event.sessionId; }

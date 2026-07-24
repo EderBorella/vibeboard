@@ -12,6 +12,7 @@ const ARGS_LOG = join(here, 'fixtures', '.shim-args.log');
 beforeAll(() => {
   chmodSync(SHIM, 0o755);
   process.env.VIBEBOARD_CLAUDE_BIN = SHIM;
+  process.env.VIBEBOARD_OPENCODE_BIN = SHIM;
   process.env.VIBEBOARD_SHIM_ARGS = ARGS_LOG;
 });
 
@@ -95,5 +96,23 @@ describe('CopilotSession', () => {
     const append = args[args.indexOf('--append-system-prompt') + 1];
     expect(append).toContain('Research mode');
     expect(append).toContain('web search');
+  });
+
+  it('builds an opencode command: run --format json, model, variant, --auto, prepended instructions', async () => {
+    const session = new CopilotSession();
+    await session.send({
+      cwd: here, text: 'do it', mode: 'bypassPermissions', backend: 'opencode',
+      model: 'deepseek/deepseek-chat', effort: 'high', onEvent: () => {},
+    });
+    const args = lastArgs()[0];
+    expect(args.slice(0, 3)).toEqual(['run', '--format', 'json']);
+    expect(args[args.indexOf('-m') + 1]).toBe('deepseek/deepseek-chat');
+    expect(args[args.indexOf('--variant') + 1]).toBe('high');
+    expect(args).toContain('--auto');
+    expect(args).toContain('--dir');
+    // first turn prepends the VibeBoard instructions before the task
+    const message = args[args.length - 1];
+    expect(message).toContain('VibeBoard copilot');
+    expect(message).toContain('# Task\ndo it');
   });
 });

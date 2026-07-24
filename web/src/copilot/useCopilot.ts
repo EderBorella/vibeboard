@@ -109,13 +109,19 @@ export function useCopilot() {
 
   const sendRaw = (payload: object): void => ws.current?.send(JSON.stringify(payload));
 
+  // Reset streaming state at the start of a turn: Claude streams deltas, OpenCode sends a
+  // full text block — resetting per turn keeps both correct even if the backend changed.
+  const startTurn = (): void => { deltaMode.current = false; streamId.current = null; };
+
   const send = useCallback((text: string, opts: TurnOptions) => {
     if (!text.trim()) return;
+    startTurn();
     push({ kind: 'user', text });
     sendRaw({ type: 'copilot:send', text, ...opts });
   }, [push]);
 
   const compact = useCallback((opts: TurnOptions) => {
+    startTurn();
     push({ kind: 'user', text: '/compact' });
     sendRaw({ type: 'copilot:compact', ...opts });
   }, [push]);

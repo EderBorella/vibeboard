@@ -5,6 +5,7 @@ import { getState, moveCard, archiveCard } from './api';
 import { Board } from './components/Board';
 import { ProjectGate } from './components/ProjectGate';
 import { CardEditor, type EditorState } from './components/CardEditor';
+import { SettingsModal } from './components/SettingsModal';
 import { CopilotPanel } from './copilot/CopilotPanel';
 import { useCopilot, type CopilotMode, type EffortLevel } from './copilot/useCopilot';
 
@@ -20,6 +21,7 @@ export function App() {
   const [ready, setReady] = useState(false);
   const [editor, setEditor] = useState<EditorState | null>(null);
   const [copilotOpen, setCopilotOpen] = useState(true);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const dragged = useRef<Card | null>(null);
   const { snapshot, conn } = useSnapshot(bump);
 
@@ -83,6 +85,9 @@ export function App() {
             {THEMES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
           </select>
           {snapshot && !showGate && (
+            <button className="switch-btn" title="Settings" onClick={() => setSettingsOpen(true)}>⚙</button>
+          )}
+          {snapshot && !showGate && (
             <button className="switch-btn" onClick={() => setShowGate(true)}>Switch project</button>
           )}
           {snapshot && !showGate && (
@@ -123,6 +128,7 @@ export function App() {
         {copilotOpen && (
           <CopilotPanel
             copilot={copilot}
+            backend={snapshot.config.copilot.backend || 'claude-code'}
             mode={copilotMode}
             model={copilotModel}
             effort={copilotEffort}
@@ -133,6 +139,10 @@ export function App() {
           />
         )}
         </div>
+      )}
+
+      {settingsOpen && snapshot && (
+        <SettingsModal config={snapshot.config} onClose={() => setSettingsOpen(false)} onSaved={() => setSettingsOpen(false)} />
       )}
 
       {editor && (

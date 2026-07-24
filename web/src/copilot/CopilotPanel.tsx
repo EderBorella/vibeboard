@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { listModels } from '../api';
 import type { CopilotMode, EffortLevel, useCopilot } from './useCopilot';
 
 const MODES: { value: CopilotMode; label: string; hint: string }[] = [
@@ -6,13 +7,6 @@ const MODES: { value: CopilotMode; label: string; hint: string }[] = [
   { value: 'plan', label: 'Plan', hint: 'read & plan only, no edits' },
   { value: 'acceptEdits', label: 'Execute', hint: 'auto-accept file edits' },
   { value: 'bypassPermissions', label: 'Full-auto', hint: 'everything, unattended' },
-];
-const MODELS: { value: string; label: string }[] = [
-  { value: '', label: 'Default model' },
-  { value: 'opus', label: 'Opus' },
-  { value: 'sonnet', label: 'Sonnet' },
-  { value: 'haiku', label: 'Haiku' },
-  { value: 'fable', label: 'Fable' },
 ];
 const EFFORTS: { value: '' | EffortLevel; label: string }[] = [
   { value: '', label: 'Default effort' },
@@ -30,6 +24,7 @@ function fmtK(n: number): string { return n >= 1000 ? `${(n / 1000).toFixed(1)}k
 
 interface Props {
   copilot: ReturnType<typeof useCopilot>;
+  backend: string;
   mode: CopilotMode;
   model: string;
   effort: '' | EffortLevel;
@@ -39,10 +34,18 @@ interface Props {
   onClose: () => void;
 }
 
-export function CopilotPanel({ copilot, mode, model, effort, onMode, onModel, onEffort, onClose }: Props) {
+export function CopilotPanel({ copilot, backend, mode, model, effort, onMode, onModel, onEffort, onClose }: Props) {
   const { items, running, model: activeModel, stats, send, compact, newSession, cancel } = copilot;
   const [draft, setDraft] = useState('');
+  const [models, setModels] = useState<string[]>([]);
   const bodyRef = useRef<HTMLDivElement>(null);
+
+  // Model choices depend on the configured backend (claude aliases vs opencode models).
+  useEffect(() => {
+    let live = true;
+    listModels(backend).then((m) => { if (live) setModels(m); }).catch(() => { if (live) setModels([]); });
+    return () => { live = false; };
+  }, [backend]);
 
   useEffect(() => { bodyRef.current?.scrollTo({ top: bodyRef.current.scrollHeight }); }, [items, running]);
 
@@ -80,7 +83,8 @@ export function CopilotPanel({ copilot, mode, model, effort, onMode, onModel, on
 
       <div className="copilot-selects">
         <select value={model} disabled={running} onChange={(e) => onModel(e.target.value)}>
-          {MODELS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+          <option value="">Default model</option>
+          {models.map((m) => <option key={m} value={m}>{m}</option>)}
         </select>
         <select value={effort} disabled={running} onChange={(e) => onEffort(e.target.value as '' | EffortLevel)}>
           {EFFORTS.map((e) => <option key={e.value} value={e.value}>{e.label}</option>)}

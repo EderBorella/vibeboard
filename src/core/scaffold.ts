@@ -53,8 +53,10 @@ async function ensureFolders(projectRoot: string, config: ProjectConfig): Promis
   }
 }
 
-async function writeClaudePointer(projectRoot: string, name: string, mode: ScaffoldMode): Promise<void> {
-  const path = join(projectRoot, 'CLAUDE.md');
+// Write/point an agent instructions file (CLAUDE.md for Claude Code, AGENTS.md for
+// OpenCode) at VIBEBOARD.md so either backend picks up the conventions.
+async function writePointerFile(projectRoot: string, filename: string, name: string, mode: ScaffoldMode): Promise<void> {
+  const path = join(projectRoot, filename);
   if (mode === 'greenfield') {
     await writeFile(path, `# ${name}\n\n${POINTER}\n`, 'utf8');
     return;
@@ -63,7 +65,7 @@ async function writeClaudePointer(projectRoot: string, name: string, mode: Scaff
   try {
     existing = await readFile(path, 'utf8');
   } catch {
-    /* no existing CLAUDE.md */
+    /* no existing file */
   }
   if (existing.includes('VIBEBOARD.md')) return;
   const sep = existing.endsWith('\n') || existing === '' ? '' : '\n';
@@ -119,6 +121,7 @@ export async function scaffoldProject(
   await ensureFolders(projectRoot, config);
   await writeConfig(projectRoot, config);
   await writeFile(join(projectRoot, 'VIBEBOARD.md'), VIBEBOARD_DOC, 'utf8');
-  await writeClaudePointer(projectRoot, opts.name, opts.mode);
+  await writePointerFile(projectRoot, 'CLAUDE.md', opts.name, opts.mode);
+  await writePointerFile(projectRoot, 'AGENTS.md', opts.name, opts.mode);
   await writeSampleCards(projectRoot, config, opts.today);
 }

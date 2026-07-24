@@ -38,5 +38,5 @@ export interface ProjectConfig {
   boards: Record<BoardName, BoardConfig>;
   miniatureChars: number;
   idPadding: number;
-  copilot: { backend: string };
+  copilot: { backend: string; model?: string; effort?: string };
 }

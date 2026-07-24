@@ -52,6 +52,11 @@ export class ProjectSession {
     return buildSnapshot(this.#root);
   }
 
+  // Re-read config from disk into the live session (after a config write via the API).
+  async reloadConfig(): Promise<void> {
+    if (this.#root) this.#config = await readConfig(this.#root);
+  }
+
   subscribe(fn: SnapshotListener): () => void {
     this.#listeners.add(fn);
     return () => { this.#listeners.delete(fn); };

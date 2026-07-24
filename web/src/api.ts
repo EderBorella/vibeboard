@@ -1,4 +1,4 @@
-import type { BoardName, Card, CardFrontmatterPatch, ProjectSnapshot } from './shared';
+import type { BoardName, Card, CardFrontmatterPatch, ProjectConfig, ProjectSnapshot } from './shared';
 
 async function post<T>(url: string, body: unknown): Promise<T> {
   const res = await fetch(url, {
@@ -24,6 +24,18 @@ export interface ProjectRef { path: string; name: string }
 
 export async function getState(): Promise<{ open: boolean; snapshot?: ProjectSnapshot }> {
   return (await fetch('/api/state')).json();
+}
+
+export async function getConfig(): Promise<ProjectConfig> {
+  return (await fetch('/api/config')).json();
+}
+
+export function patchConfig(body: Partial<ProjectConfig>): Promise<ProjectConfig> {
+  return patch<ProjectConfig>('/api/config', body);
+}
+
+export async function listModels(backend: string): Promise<string[]> {
+  return (await fetch(`/api/models?backend=${encodeURIComponent(backend)}`)).json();
 }
 
 export async function listProjects(root?: string): Promise<ProjectRef[]> {

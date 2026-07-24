@@ -2,14 +2,16 @@ import Fastify, { type FastifyInstance, type FastifyReply } from 'fastify';
 import websocket from '@fastify/websocket';
 import { dirname } from 'node:path';
 import { readFile, writeFile } from 'node:fs/promises';
+import { execFile } from 'node:child_process';
 import { scaffoldProject, type ScaffoldMode } from '../core/scaffold.js';
 import { createCard, updateCard, moveCard, archiveCard, type CreateCardInput } from '../core/mutations.js';
 import { findCard } from '../core/find.js';
 import { setCardLinks } from '../core/links.js';
+import { writeConfig } from '../core/config.js';
 import { discoverProjects } from './discover.js';
-import { CopilotSession, type CopilotMode, type EffortLevel } from './copilot.js';
+import { CopilotSession, type Backend, type CopilotMode, type EffortLevel } from './copilot.js';
 import type { ProjectSession } from './session.js';
-import type { BoardName, CardFrontmatter } from '../core/types.js';
+import type { BoardName, CardFrontmatter, ProjectConfig } from '../core/types.js';
 
 const today = (): string => new Date().toISOString().slice(0, 10);
 
@@ -41,12 +43,14 @@ export function buildApp(session: ProjectSession): FastifyInstance {
     if (!text.trim()) return;
     try {
       copilotState(); // running flips true only once send starts; announce optimistically
+      const cfg = session.config?.copilot;
       await copilot.send({
         cwd: session.root!,
         text,
         mode: opts.mode,
-        model: opts.model,
-        effort: opts.effort,
+        backend: ((cfg?.backend as Backend) ?? 'claude-code'),
+        model: opts.model ?? cfg?.model,
+        effort: (opts.effort ?? cfg?.effort) as EffortLevel | undefined,
         onEvent: (event) => broadcast({ type: 'copilot:event', event }),
       });
     } catch (err) {
@@ -106,6 +110,33 @@ export function buildApp(session: ProjectSession): FastifyInstance {
       const { root } = req.query as { root?: string };
       const base = root ?? process.env.VIBEBOARD_ROOT ?? dirname(process.cwd());
       return discoverProjects(base);
+    });
+
+    api.get('/config', async (req, reply) => {
+      if (!ensureOpen(session, reply)) return;
+      return session.config;
+    });
+
+    api.patch('/config', async (req, reply) => {
+      if (!ensureOpen(session, reply)) return;
+      const patch = req.body as Partial<ProjectConfig>;
+      const merged: ProjectConfig = { ...session.config!, ...patch, copilot: { ...session.config!.copilot, ...(patch.copilot ?? {}) } };
+      await writeConfig(session.root!, merged);
+      await session.reloadConfig();
+      return session.config;
+    });
+
+    // Available models for a backend. claude → friendly aliases; opencode → `opencode models`.
+    api.get('/models', async (req) => {
+      const { backend } = req.query as { backend?: string };
+      if (backend === 'opencode') {
+        const bin = process.env.VIBEBOARD_OPENCODE_BIN ?? 'opencode';
+        const out = await new Promise<string>((resolve) => {
+          execFile(bin, ['models'], { maxBuffer: 1 << 20 }, (err, stdout) => resolve(err ? '' : stdout));
+        });
+        return out.split('\n').map((l) => l.trim()).filter(Boolean);
+      }
+      return ['opus', 'sonnet', 'haiku', 'fable'];
     });
 
     api.post('/project/open', async (req, reply) => {

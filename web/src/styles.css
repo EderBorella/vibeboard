@@ -163,6 +163,7 @@ body {
 /* ---------- Card tile (fixed size) ---------- */
 .tile {
   height: var(--tile-h);
+  flex: 0 0 var(--tile-h); /* don't let flex shrink the card — overflow into the column scroll instead */
   overflow: hidden;
   background: var(--panel-2);
   border: 1px solid var(--border);

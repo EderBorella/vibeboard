@@ -318,13 +318,15 @@ body {
 .mp-item:hover, .mp-sel { background: var(--panel-2); }
 .mp-star { background: transparent; border: none; color: var(--accent-2); cursor: pointer; font-size: 0.9rem; padding: 0.25rem 0.3rem; }
 .mp-pick, .mp-default {
-  flex: 1; min-width: 0; display: flex; align-items: center; gap: 0.35rem;
+  flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.1rem;
   background: transparent; border: none; color: var(--text); cursor: pointer;
   text-align: left; padding: 0.3rem 0.4rem; font-size: 0.78rem;
 }
 .mp-default { width: 100%; color: var(--muted); }
+.mp-pick-main { display: flex; align-items: center; gap: 0.35rem; min-width: 0; }
 .mp-free { flex: 0 0 auto; }
 .mp-id { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-mono); }
+.mp-meta { font-size: 0.66rem; color: var(--muted); }
 .mp-sel .mp-id, .mp-sel .mp-default { color: var(--accent); }
 .mp-empty { color: var(--muted); font-size: 0.78rem; padding: 0.5rem; font-style: italic; }
 .links-hint { color: var(--muted); font-size: 0.8rem; font-style: italic; }
@@ -376,6 +378,11 @@ body {
 .copilot-selects { display: flex; gap: 0.5rem; padding: 0 0.75rem 0.5rem; border-bottom: 1px solid var(--border); }
 .copilot-selects select { flex: 1; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 0.3rem 0.4rem; font-size: 0.76rem; }
 .copilot-selects select:disabled { opacity: 0.5; }
+.copilot-status { display: flex; align-items: center; gap: 0.4rem; padding: 0.3rem 0.75rem; font-size: 0.7rem; color: var(--muted); border-bottom: 1px solid var(--border); }
+.copilot-status .status-dot { width: 8px; height: 8px; border-radius: 50%; }
+.copilot-status.ok .status-dot { background: var(--accent); box-shadow: var(--glow); }
+.copilot-status.down .status-dot { background: var(--danger); }
+.copilot-status.down { color: var(--danger); }
 .copilot-body { flex: 1; overflow-y: auto; padding: 0.75rem; display: flex; flex-direction: column; gap: 0.5rem; }
 .copilot-empty { color: var(--muted); font-size: 0.82rem; line-height: 1.5; }
 .msg { font-size: 0.85rem; line-height: 1.45; white-space: pre-wrap; word-break: break-word; }

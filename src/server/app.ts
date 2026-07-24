@@ -3,7 +3,7 @@ import websocket from '@fastify/websocket';
 import { dirname } from 'node:path';
 import { readFile, writeFile } from 'node:fs/promises';
 import { scaffoldProject, type ScaffoldMode } from '../core/scaffold.js';
-import { listBackendModels } from './models.js';
+import { listBackendModels, modelStatus } from './models.js';
 import { createCard, updateCard, moveCard, archiveCard, type CreateCardInput } from '../core/mutations.js';
 import { findCard } from '../core/find.js';
 import { setCardLinks } from '../core/links.js';
@@ -131,6 +131,12 @@ export function buildApp(session: ProjectSession): FastifyInstance {
     api.get('/models', async (req) => {
       const { backend } = req.query as { backend?: string };
       return listBackendModels(backend ?? 'claude-code');
+    });
+
+    // Live status/uptime for one model (OpenRouter endpoints route); null if no source.
+    api.get('/model-status', async (req) => {
+      const { id } = req.query as { id?: string };
+      return { status: id ? await modelStatus(id) : null };
     });
 
     api.post('/project/open', async (req, reply) => {

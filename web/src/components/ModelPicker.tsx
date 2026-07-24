@@ -42,6 +42,14 @@ export function ModelPicker({ models, value, onChange, disabled }: Props) {
 
   const pick = (id: string): void => { onChange(id); setOpen(false); setQuery(''); };
 
+  const meta = (m: ModelOption): string => {
+    const parts: string[] = [];
+    if (m.free) parts.push('free');
+    else if (m.promptPerM != null) parts.push(`$${m.promptPerM.toFixed(2)}/${(m.completionPerM ?? 0).toFixed(2)} per M`);
+    if (m.contextLength) parts.push(`${Math.round(m.contextLength / 1000)}k ctx`);
+    return parts.join(' · ');
+  };
+
   const q = query.trim().toLowerCase();
   const filtered = q ? models.filter((m) => m.id.toLowerCase().includes(q)) : models;
   const favModels = filtered.filter((m) => favs.has(m.id));
@@ -56,8 +64,11 @@ export function ModelPicker({ models, value, onChange, disabled }: Props) {
         {favs.has(m.id) ? '★' : '☆'}
       </button>
       <button className="mp-pick" onClick={() => pick(m.id)}>
-        {m.free && <span className="mp-free">🆓</span>}
-        <span className="mp-id">{m.id}</span>
+        <span className="mp-pick-main">
+          {m.free && <span className="mp-free">🆓</span>}
+          <span className="mp-id">{m.id}</span>
+        </span>
+        {meta(m) && <span className="mp-meta">{meta(m)}</span>}
       </button>
     </div>
   );

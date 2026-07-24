@@ -34,10 +34,22 @@ export function patchConfig(body: Partial<ProjectConfig>): Promise<ProjectConfig
   return patch<ProjectConfig>('/api/config', body);
 }
 
-export interface ModelOption { id: string; free: boolean }
+export interface ModelOption {
+  id: string;
+  free: boolean;
+  promptPerM?: number;
+  completionPerM?: number;
+  contextLength?: number;
+}
+
+export interface ModelStatus { up: boolean; uptime?: number; endpoints: number }
 
 export async function listModels(backend: string): Promise<ModelOption[]> {
   return (await fetch(`/api/models?backend=${encodeURIComponent(backend)}`)).json();
+}
+
+export async function getModelStatus(id: string): Promise<ModelStatus | null> {
+  return (await fetch(`/api/model-status?id=${encodeURIComponent(id)}`)).json().then((r) => r.status);
 }
 
 export async function listProjects(root?: string): Promise<ProjectRef[]> {

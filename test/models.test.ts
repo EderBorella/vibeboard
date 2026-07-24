@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isFreeModel, mergeModels } from '../src/server/models.js';
+import { isFreeModel, mergeModels, opencodeModelsFromProviders } from '../src/server/models.js';
 
 describe('isFreeModel', () => {
   it('flags OpenRouter :free and OpenCode -free ids', () => {
@@ -18,5 +18,27 @@ describe('mergeModels', () => {
     ]);
     expect(merged.map((m) => m.id)).toEqual(['opencode/x-free', 'openrouter/a:free', 'deepseek/deepseek-v4-flash']);
     expect(merged.filter((m) => m.id === 'opencode/x-free')).toHaveLength(1); // deduped
+  });
+});
+
+describe('opencodeModelsFromProviders', () => {
+  it('extracts only the opencode gateway provider, prefixed and free-flagged', () => {
+    const json = {
+      providers: [
+        { id: 'deepseek', models: { 'deepseek-v4-flash': {}, 'deepseek-chat': {} } },
+        { id: 'openrouter', models: { 'microsoft/phi-4': {} } },
+        { id: 'opencode', models: { 'deepseek-v4-flash-free': {}, 'ling-3.0-flash-free': {}, 'big-pickle': {} } },
+      ],
+    };
+    expect(opencodeModelsFromProviders(json)).toEqual([
+      { id: 'opencode/deepseek-v4-flash-free', free: true },
+      { id: 'opencode/ling-3.0-flash-free', free: true },
+      { id: 'opencode/big-pickle', free: false },
+    ]);
+  });
+
+  it('is safe on an empty / malformed payload', () => {
+    expect(opencodeModelsFromProviders({})).toEqual([]);
+    expect(opencodeModelsFromProviders({ providers: [{ id: 'opencode' }] })).toEqual([]);
   });
 });

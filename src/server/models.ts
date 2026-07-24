@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { opencodeBaseUrl } from './opencode-server.js';
 
 export interface ModelOption {
   id: string;
@@ -108,14 +109,26 @@ async function deepseekModels(key: string): Promise<ModelOption[]> {
   return (json.data ?? []).map((m) => ({ id: `deepseek/${m.id}`, free: false }));
 }
 
-// OpenCode's own free gateway models (usable without a provider key), from models.dev.
-async function opencodeGatewayFree(): Promise<ModelOption[]> {
-  const res = await fetch('https://models.dev/api.json', { signal: AbortSignal.timeout(8000) });
-  const json = (await res.json()) as Record<string, { models?: Record<string, unknown> }>;
-  const models = json.opencode?.models ?? {};
-  return Object.keys(models)
-    .filter((id) => isFreeModel(id))
-    .map((id) => ({ id: `opencode/${id}`, free: true }));
+// OpenCode's own gateway models (usable without a provider key). Sourced from the RUNNING
+// opencode server's /config/providers — the authoritative list of what it will actually
+// accept. (models.dev's catalog drifts from the live gateway, so ids like qwen3.6-plus-free
+// there 500 with ProviderModelNotFoundError when selected.)
+interface OcProvider { id?: string; models?: Record<string, unknown> }
+
+// Pure: extract the opencode gateway's models from a /config/providers payload.
+export function opencodeModelsFromProviders(json: { providers?: OcProvider[] }): ModelOption[] {
+  const out: ModelOption[] = [];
+  for (const p of json.providers ?? []) {
+    if (p.id !== 'opencode') continue; // deepseek/openrouter come from their own precise sources
+    for (const id of Object.keys(p.models ?? {})) out.push({ id: `opencode/${id}`, free: isFreeModel(id) });
+  }
+  return out;
+}
+
+async function opencodeGatewayModels(): Promise<ModelOption[]> {
+  const base = await opencodeBaseUrl();
+  const res = await fetch(`${base}/config/providers`, { signal: AbortSignal.timeout(8000) });
+  return opencodeModelsFromProviders((await res.json()) as { providers?: OcProvider[] });
 }
 
 // Live, precise model list per backend. For opencode we query the actual provider APIs the
@@ -124,7 +137,7 @@ export async function listBackendModels(backend: string): Promise<ModelOption[]>
   if (backend !== 'opencode') return CLAUDE_ALIASES.map((id) => ({ id, free: false }));
 
   const auth = opencodeAuth();
-  const tasks: Promise<ModelOption[]>[] = [cached('opencode-gateway', opencodeGatewayFree)];
+  const tasks: Promise<ModelOption[]>[] = [cached('opencode-gateway', opencodeGatewayModels)];
   if (auth.openrouter) tasks.push(cached('openrouter', openrouterModels));
   const dsKey = auth.deepseek?.key ?? auth.deepseek?.apiKey;
   if (dsKey) tasks.push(cached('deepseek', () => deepseekModels(dsKey)));

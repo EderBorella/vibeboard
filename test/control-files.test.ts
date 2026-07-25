@@ -475,3 +475,87 @@ describe('control-files resources registry', () => {
     }
   });
 });
+
+describe('control-files listing filters and ordering', () => {
+  it('drops files under docs/ and resources/ that are not control documents', async () => {
+    const root = await tempDir();
+    await mkdir(join(root, 'docs'), { recursive: true });
+    await mkdir(join(root, 'resources'), { recursive: true });
+    await writeFile(join(root, 'docs', 'real.md'), 'x', 'utf8');
+    await writeFile(join(root, 'docs', 'diagram.png'), 'x', 'utf8');
+    await writeFile(join(root, 'resources', 'notes.md'), 'x', 'utf8');
+    await writeFile(join(root, 'resources', 'blob.bin'), 'x', 'utf8');
+
+    const groups = await listControlFiles(root);
+    // A descriptor-less path must be dropped, not carried through as a null entry. Note the
+    // deliberate asymmetry: docs/ is markdown-only, but resources/ takes any file, because
+    // reference material is not necessarily markdown.
+    expect(groups.find((g) => g.key === 'docs')!.files.map((f) => f.path)).toEqual(['docs/real.md']);
+    expect(groups.find((g) => g.key === 'resources')!.files.map((f) => f.path)).toEqual([
+      'resources/blob.bin',
+      'resources/notes.md',
+    ]);
+    expect(groups.every((g) => g.files.every((f) => f !== null))).toBe(true);
+  });
+
+  it('sorts listings by path, not by the order the filesystem hands them over', async () => {
+    const root = await tempDir();
+    await mkdir(join(root, 'docs'), { recursive: true });
+    // Written deliberately in reverse.
+    for (const n of ['zulu.md', 'mike.md', 'alpha.md']) await writeFile(join(root, 'docs', n), 'x', 'utf8');
+    for (const n of ['zebra.md', 'middle.md', 'apple.md']) await writeFile(join(root, n), 'x', 'utf8');
+
+    const groups = await listControlFiles(root);
+    expect(groups.find((g) => g.key === 'docs')!.files.map((f) => f.path)).toEqual([
+      'apple.md',
+      'middle.md',
+      'zebra.md',
+      'docs/alpha.md',
+      'docs/mike.md',
+      'docs/zulu.md',
+    ]);
+  });
+
+  it('scopes the docs and skills walks to their own folders', async () => {
+    const root = await tempDir();
+    await mkdir(join(root, 'docs'), { recursive: true });
+    await mkdir(join(root, '.claude', 'skills', 'one'), { recursive: true });
+    await writeFile(join(root, 'docs', 'd.md'), 'x', 'utf8');
+    await writeFile(join(root, '.claude', 'skills', 'one', 'SKILL.md'), 'x', 'utf8');
+    await writeFile(join(root, 'CLAUDE.md'), 'x', 'utf8');
+
+    const groups = await listControlFiles(root);
+    // A walk rooted anywhere wider would pull CLAUDE.md or the skill into the docs group.
+    expect(groups.find((g) => g.key === 'docs')!.files.map((f) => f.path)).toEqual(['docs/d.md']);
+    expect(groups.find((g) => g.key === 'skills')!.files.map((f) => f.path)).toEqual([
+      '.claude/skills/one/SKILL.md',
+    ]);
+  });
+});
+
+describe('control-files resources persistence', () => {
+  it('keeps the good entries and drops the bad ones from a mixed list', async () => {
+    const root = await tempDir();
+    await mkdir(join(root, '.vibeboard'), { recursive: true });
+    await writeFile(
+      join(root, '.vibeboard', 'resources.yaml'),
+      'links:\n  - title: Good\n    url: https://x.dev\n  - junk\n  - null\n  - title: "  "\n    url: "  "\n',
+      'utf8',
+    );
+    // A survivor of the shape [entry, null] would come back with a hole in it.
+    expect(await readResources(root)).toEqual([{ title: 'Good', url: 'https://x.dev' }]);
+  });
+
+  it('never writes a hole into the yaml for an entry it rejected', async () => {
+    const root = await tempDir();
+    await writeResources(root, [{ title: 'Keep', url: 'u' }, 'junk', null, 42, {}]);
+    const yaml = await readFile(join(root, '.vibeboard', 'resources.yaml'), 'utf8');
+    expect(yaml).toBe('links:\n  - title: Keep\n    url: u\n');
+  });
+
+  it('writes an empty list rather than failing when handed no array at all', async () => {
+    const root = await tempDir();
+    await writeResources(root, undefined as unknown as unknown[]);
+    expect(await readFile(join(root, '.vibeboard', 'resources.yaml'), 'utf8')).toBe('links: []\n');
+  });
+});

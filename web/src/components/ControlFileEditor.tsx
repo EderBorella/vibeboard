@@ -75,10 +75,7 @@ export function ControlFileEditor({
           spellCheck={false}
         />
       ) : (
-        <div
-          className="control-preview markdown"
-          dangerouslySetInnerHTML={{ __html: renderMarkdown(draft) }}
-        />
+        <div className="control-preview markdown">{renderMarkdown(draft)}</div>
       )}
     </>
   );

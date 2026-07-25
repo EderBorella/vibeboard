@@ -114,6 +114,25 @@ export function useCopilot(bump: number) {
     });
   }, []);
 
+  // Usage carries this call's window occupancy (last wins); result carries cost/turns/duration,
+  // which accumulate. Split out because they are the only cases that touch stats.
+  const applyStats = useCallback((e: CopilotEvent) => {
+    if (e.kind === 'usage') {
+      const tokens = e.contextTokens;
+      if (typeof tokens === 'number') setStats((s) => ({ ...s, contextTokens: tokens }));
+      return;
+    }
+    const turnStats = e.stats;
+    if (turnStats) {
+      setStats((s) => ({
+        ...s,
+        costUsd: s.costUsd + turnStats.costUsd,
+        turns: s.turns + turnStats.turns,
+        lastDurationMs: turnStats.durationMs,
+      }));
+    }
+  }, []);
+
   const apply = useCallback(
     (e: CopilotEvent) => {
       switch (e.kind) {
@@ -145,28 +164,16 @@ export function useCopilot(bump: number) {
           break;
         case 'tool_result':
           break; // tool results are noisy; the board reflects file changes
-        // Context occupancy comes from each model call's own usage (last wins).
-        case 'usage': {
-          const tokens = e.contextTokens;
-          if (typeof tokens === 'number') setStats((s) => ({ ...s, contextTokens: tokens }));
+        case 'usage':
+          applyStats(e);
           break;
-        }
-        // Result carries cost/turns/duration only — its token totals are cross-call sums.
-        case 'result': {
+        case 'result':
           streamId.current = null;
-          const turnStats = e.stats;
-          if (turnStats)
-            setStats((s) => ({
-              ...s,
-              costUsd: s.costUsd + turnStats.costUsd,
-              turns: s.turns + turnStats.turns,
-              lastDurationMs: turnStats.durationMs,
-            }));
+          applyStats(e);
           break;
-        }
       }
     },
-    [push, openStream, appendStream],
+    [push, openStream, appendStream, applyStats],
   );
 
   const ws = useSharedWs(bump);

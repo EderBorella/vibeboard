@@ -50,10 +50,12 @@
       // Off by choice: single-user local-first tool, driven by mouse and keyboard on the owner's
       // own machine. 75 of the 78 remaining errors were this group.
       "a11y": { "preset": "none" },
-      // warn, not error: complexity is a readability signal, not a defect — and the two densest
-      // functions are among the best-tested in the repo (93% and 80% of mutants killed).
+      // error, not warn, as of the commit that reached zero findings. A gate pointed at a standing
+      // backlog teaches everyone to ignore it; one armed at zero keeps the count there. Raising
+      // maxAllowedComplexity is not the fix if this fires — nesting is what the metric punishes,
+      // so flattening a conditional almost always beats extracting a function.
       "complexity": {
-        "noExcessiveCognitiveComplexity": { "level": "warn", "options": { "maxAllowedComplexity": 15 } }
+        "noExcessiveCognitiveComplexity": { "level": "error", "options": { "maxAllowedComplexity": 15 } }
       }
     }
   },

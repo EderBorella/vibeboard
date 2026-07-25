@@ -14,14 +14,16 @@ export function parseCardContent(content: string): { data: CardFrontmatter; body
       links: Array.isArray(d.links) ? d.links : [],
       group: d.group,
       created: d.created ?? '',
+      archived: d.archived,
+      archivedFrom: d.archivedFrom,
     },
     body: parsed.content.trim(),
   };
 }
 
 export function toFrontmatter(card: Card): CardFrontmatter {
-  const { id, title, description, order, tags, links, group, created } = card;
-  return { id, title, description, order, tags, links, group, created };
+  const { id, title, description, order, tags, links, group, created, archived, archivedFrom } = card;
+  return { id, title, description, order, tags, links, group, created, archived, archivedFrom };
 }
 
 export function serializeCard(fm: CardFrontmatter, body: string): string {
@@ -32,5 +34,8 @@ export function serializeCard(fm: CardFrontmatter, body: string): string {
   data.links = fm.links;
   if (fm.group !== undefined) data.group = fm.group;
   data.created = fm.created;
+  // Emitted only while archived, so a live card's file is unchanged by this feature.
+  if (fm.archived !== undefined) data.archived = fm.archived;
+  if (fm.archivedFrom !== undefined) data.archivedFrom = fm.archivedFrom;
   return matter.stringify(`${body}\n`, data);
 }

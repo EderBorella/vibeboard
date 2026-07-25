@@ -107,6 +107,23 @@ body {
   padding: 0 0.45rem;
 }
 
+.board-head { display: flex; align-items: center; gap: 0.5rem; }
+/* The archive toggle appears only once a board has archived cards, so it never advertises a
+   drawer with nothing in it. */
+.board-archive {
+  flex: 0 0 auto;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 0.7rem;
+  font-family: var(--font-mono);
+  padding: 0.1rem 0.5rem;
+}
+.board-archive:hover { color: var(--accent); border-color: var(--accent); }
+.board-archive.active { color: var(--accent); border-color: var(--accent); box-shadow: var(--glow); }
+
 .board-columns {
   display: flex;
   gap: 0.7rem;
@@ -114,6 +131,50 @@ body {
   overflow-x: auto;
   padding-bottom: 0.35rem;
 }
+
+/* ---------- Archive drawer ---------- */
+/* Deliberately not column-shaped: archived cards have no position, and a row of full tiles
+   would read as a fifth column you could drag into. */
+.archive-drawer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  max-height: 14rem;
+  overflow-y: auto;
+  background: var(--panel);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  padding: 0.5rem;
+}
+.archive-empty, .archive-error { color: var(--muted); font-size: 0.78rem; }
+.archive-error { color: var(--danger); }
+.archive-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.35rem 0.6rem;
+}
+.archive-meta { display: flex; align-items: baseline; gap: 0.5rem; flex: 0 0 auto; }
+.archive-when { color: var(--muted); font-size: 0.7rem; font-family: var(--font-mono); }
+.archive-title {
+  flex: 1; min-width: 0; text-align: left;
+  background: transparent; border: none; color: var(--text);
+  cursor: pointer; font-size: 0.82rem; font-family: inherit;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.archive-title:hover { color: var(--accent); }
+.archive-actions { display: flex; align-items: center; gap: 0.35rem; flex: 0 0 auto; }
+.archive-restore, .archive-column {
+  background: var(--panel); color: var(--text);
+  border: 1px solid var(--border); border-radius: 6px;
+  cursor: pointer; font-size: 0.72rem; font-family: inherit;
+  padding: 0.2rem 0.45rem;
+}
+.archive-restore:hover { border-color: var(--accent); color: var(--accent); }
+.archive-column { color: var(--muted); }
 
 /* ---------- Column ---------- */
 .column {

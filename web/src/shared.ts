@@ -56,10 +56,19 @@ export interface Card {
   links: string[];
   group?: string;
   created: string;
+  // Present only while the card sits in the archive.
+  archived?: string;     // ISO timestamp
+  archivedFrom?: string; // column slug it left
   board: BoardName;
   columnSlug: string;
   body: string;
   filePath: string;
+}
+
+// An archived card plus where a restore would put it back — resolved server-side, since the
+// original column may have been renamed away since.
+export interface ArchivedCard extends Card {
+  restoreTo: string;
 }
 
 // Fields the PATCH /cards endpoint accepts (frontmatter subset + optional body).
@@ -107,4 +116,7 @@ export interface ProjectSnapshot {
   name: string;
   config: ProjectConfig;
   boards: Record<BoardName, Card[]>;
+  // Counts only — the archive list is fetched on demand. A change here is the UI's cue to
+  // refetch an open drawer.
+  archivedCounts: Record<BoardName, number>;
 }

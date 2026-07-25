@@ -45,6 +45,20 @@ export async function readBoard(
   return cards;
 }
 
+// Newest first: the drawer's job is answering "what did I just throw away". Cards archived
+// before this was recorded have no timestamp and sort to the bottom.
 export async function readArchive(projectRoot: string, board: BoardName): Promise<Card[]> {
-  return readCardsFromFolder(projectRoot, board, ARCHIVE_SLUG);
+  const cards = await readCardsFromFolder(projectRoot, board, ARCHIVE_SLUG);
+  return cards.sort((a, b) => (b.archived ?? '').localeCompare(a.archived ?? '') || b.id.localeCompare(a.id));
+}
+
+// Counted rather than read, so it can ride along on every snapshot without opening files —
+// the archive is the one folder that only ever grows.
+export async function countArchived(projectRoot: string, board: BoardName): Promise<number> {
+  try {
+    const entries = await readdir(join(projectRoot, board, ARCHIVE_SLUG));
+    return entries.filter((n) => n.endsWith('.md')).length;
+  } catch {
+    return 0;
+  }
 }

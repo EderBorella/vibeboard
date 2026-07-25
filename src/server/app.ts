@@ -4,7 +4,11 @@ import { dirname } from 'node:path';
 import { readFile, writeFile } from 'node:fs/promises';
 import { scaffoldProject, type ScaffoldMode } from '../core/scaffold.js';
 import { listBackendModels, modelStatus } from './models.js';
-import { createCard, updateCard, moveCard, placeCard, archiveCard, type CreateCardInput } from '../core/mutations.js';
+import {
+  createCard, updateCard, moveCard, placeCard, archiveCard, restoreCard, restoreTarget,
+  type CreateCardInput,
+} from '../core/mutations.js';
+import { readArchive, ARCHIVE_SLUG } from '../core/board.js';
 import { findCard } from '../core/find.js';
 import { setCardLinks } from '../core/links.js';
 import { writeConfig } from '../core/config.js';
@@ -28,6 +32,9 @@ import { BOARDS, BOARD_LABELS } from '../core/types.js';
 import type { BoardName, CardFrontmatter, ProjectConfig } from '../core/types.js';
 
 const today = (): string => new Date().toISOString().slice(0, 10);
+// Full precision, unlike `created` — the archive drawer orders by it, and a day-granular
+// stamp would leave everything archived today in an arbitrary order.
+const nowIso = (): string => new Date().toISOString();
 
 interface WsClient { send: (data: string) => void }
 
@@ -377,7 +384,28 @@ export function buildApp(session: ProjectSession): FastifyInstance {
       const { board, id } = req.params as { board: BoardName; id: string };
       const card = await findCard(session.root!, board, id, session.config!);
       if (!card) return reply.code(404).send({ error: 'Card not found' });
-      return archiveCard(session.root!, card);
+      return archiveCard(session.root!, card, nowIso());
+    });
+
+    // The archive is fetched on demand rather than pushed with every snapshot — see
+    // buildSnapshot. `restoreTo` tells the UI where each card would land if restored now.
+    api.get('/archive/:board', async (req, reply) => {
+      if (!ensureOpen(session, reply)) return;
+      const { board } = req.params as { board: BoardName };
+      const cards = await readArchive(session.root!, board);
+      return { cards: cards.map((c) => ({ ...c, restoreTo: restoreTarget(session.config!, c) })) };
+    });
+
+    api.post('/cards/:board/:id/restore', async (req, reply) => {
+      if (!ensureOpen(session, reply)) return;
+      const { board, id } = req.params as { board: BoardName; id: string };
+      const { toColumnSlug } = (req.body ?? {}) as { toColumnSlug?: string };
+      const card = await findCard(session.root!, board, id, session.config!);
+      if (!card) return reply.code(404).send({ error: 'Card not found' });
+      if (card.columnSlug !== ARCHIVE_SLUG) return reply.code(400).send({ error: 'Card is not archived' });
+      const restored = await restoreCard(session.root!, session.config!, card, toColumnSlug);
+      if (restored === 'unknown-column') return reply.code(400).send({ error: 'Unknown column' });
+      return restored;
     });
   }, { prefix: '/api' });
 

@@ -7,6 +7,7 @@ import { archiveCard } from '../src/core/mutations.js';
 import { findCard } from '../src/core/find.js';
 
 const TODAY = '2026-07-23';
+const NOW = '2026-07-23T10:00:00.000Z';
 
 describe('findCard', () => {
   it('finds a live card by id', async () => {
@@ -29,7 +30,7 @@ describe('findCard', () => {
     await scaffoldProject(root, { name: 'F', mode: 'greenfield', today: TODAY });
     const config = await readConfig(root);
     const [card] = await readBoard(root, 'engineering', config);
-    await archiveCard(root, card);
+    await archiveCard(root, card, NOW);
     const found = await findCard(root, 'engineering', card.id, config);
     expect(found?.id).toBe(card.id);
     expect(found?.columnSlug).toBe('archive');

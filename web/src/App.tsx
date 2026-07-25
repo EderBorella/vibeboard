@@ -135,6 +135,7 @@ export function App() {
                 label={BOARD_LABELS[board]}
                 cards={snapshot.boards[board] ?? []}
                 config={snapshot.config}
+                archivedCount={snapshot.archivedCounts?.[board] ?? 0}
                 collapsed={collapsed.has(board)}
                 onToggle={() => toggleBoard(board)}
                 onAdd={onAdd}

@@ -20,6 +20,11 @@ export interface CardFrontmatter {
   links: string[];       // ids of related cards on either board (symmetric)
   group?: string;        // optional visual grouping label
   created: string;       // ISO date "YYYY-MM-DD"
+  // Set only while a card sits in archive/, cleared on restore. `archived` is a full
+  // timestamp (not a date like `created`) so the drawer can order by what was thrown away
+  // most recently; `archivedFrom` is the column slug to put it back into.
+  archived?: string;     // ISO timestamp
+  archivedFrom?: string; // column slug
 }
 
 export interface Card extends CardFrontmatter {

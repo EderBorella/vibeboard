@@ -31,6 +31,8 @@ tags: [backend]
 links: [P-001, E-002] # related cards on either board (symmetric)
 group: sync-epic     # optional grouping label
 created: 2026-07-23
+archived: ...          # only in archive/: ISO timestamp it was archived
+archivedFrom: doing    # only in archive/: column slug to restore it to
 ---
 Markdown body.
 \`\`\`
@@ -39,6 +41,9 @@ Markdown body.
 - To create a card, pick the next id = highest existing of that prefix + 1.
 - To move a card, move its file to another column folder — do not change its id.
 - Board and column come from the file path, never from frontmatter.
+- Archiving a card by hand: move it to \`archive/\` **and** set \`archived\` + \`archivedFrom\`,
+  or it cannot be put back where it came from. Restoring: move it out and delete both keys —
+  a live card never carries them.
 - Links are symmetric: relating two cards records each other's id in both \`links\` lists.
   Any pairing is allowed — product↔product, engineering↔engineering, or across boards.
 `;

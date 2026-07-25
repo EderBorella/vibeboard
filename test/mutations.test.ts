@@ -9,6 +9,7 @@ import {
 
 const config = defaultConfig('T');
 const TODAY = '2026-07-23';
+const NOW = '2026-07-23T10:00:00.000Z';
 
 describe('mutations', () => {
   it('creates a card with the next id and a file on disk', async () => {
@@ -29,7 +30,7 @@ describe('mutations', () => {
   it('does not reuse an archived id', async () => {
     const root = await tempDir();
     const c1 = await createCard(root, config, { board: 'product', columnSlug: 'todo', title: 'A' }, TODAY);
-    await archiveCard(root, c1);
+    await archiveCard(root, c1, NOW);
     const c2 = await createCard(root, config, { board: 'product', columnSlug: 'todo', title: 'B' }, TODAY);
     expect(c2.id).toBe('P-002');
   });
@@ -64,7 +65,7 @@ describe('mutations', () => {
   it('archives a card (moves it out of the board into archive)', async () => {
     const root = await tempDir();
     const card = await createCard(root, config, { board: 'engineering', columnSlug: 'todo', title: 'A' }, TODAY);
-    const archived = await archiveCard(root, card);
+    const archived = await archiveCard(root, card, NOW);
     expect(archived.columnSlug).toBe(ARCHIVE_SLUG);
     expect((await readBoard(root, 'engineering', config)).length).toBe(0);
     expect((await readArchive(root, 'engineering')).map((c) => c.id)).toEqual([card.id]);

@@ -5,6 +5,7 @@ import {
 } from '../src/index.js';
 
 const TODAY = '2026-07-23';
+const NOW = '2026-07-23T10:00:00.000Z';
 
 describe('end-to-end: scaffold → create → move → archive', () => {
   it('drives a project through the full lifecycle from the public API', async () => {
@@ -23,7 +24,7 @@ describe('end-to-end: scaffold → create → move → archive', () => {
     expect(board.find((c) => c.id === eng.id)?.columnSlug).toBe('in-progress');
 
     // archive it — it leaves the board
-    await archiveCard(root, eng);
+    await archiveCard(root, eng, NOW);
     board = await readBoard(root, 'engineering', config);
     expect(board.find((c) => c.id === eng.id)).toBeUndefined();
   });

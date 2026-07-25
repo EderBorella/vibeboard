@@ -2,7 +2,7 @@ import { mkdir, rename, writeFile } from 'node:fs/promises';
 import { join, basename } from 'node:path';
 import { serializeCard, toFrontmatter } from './card.js';
 import { nextId } from './ids.js';
-import { readBoard, readArchive, ARCHIVE_SLUG } from './board.js';
+import { readBoard, readArchive, boardColumnSlugs, ARCHIVE_SLUG } from './board.js';
 import type { Card, CardFrontmatter, BoardName, ProjectConfig } from './types.js';
 
 const ORDER_STEP = 10;
@@ -116,6 +116,33 @@ export async function placeCard(
   return { ...moved, order: (finalIndex + 1) * ORDER_STEP };
 }
 
-export async function archiveCard(projectRoot: string, card: Card): Promise<Card> {
-  return moveCard(projectRoot, card, ARCHIVE_SLUG);
+// Stamp before moving: `archivedFrom` is the only record of where the card came from, and
+// once the file is in archive/ its path no longer says.
+export async function archiveCard(projectRoot: string, card: Card, now: string): Promise<Card> {
+  const stamped = await updateCard(projectRoot, card, { archived: now, archivedFrom: card.columnSlug });
+  return moveCard(projectRoot, stamped, ARCHIVE_SLUG);
+}
+
+// Where a restore would land: the column it left, or the board's first column if that one has
+// since been renamed or removed. Never returns a folder no column maps to — an unreachable
+// card is worse than one in the wrong place.
+export function restoreTarget(config: ProjectConfig, card: Card): string {
+  const slugs = boardColumnSlugs(config, card.board);
+  return card.archivedFrom && slugs.includes(card.archivedFrom) ? card.archivedFrom : slugs[0];
+}
+
+// Put an archived card back on the board, at the end of the target column. `'unknown-column'`
+// when an explicitly requested column isn't configured for this board.
+export async function restoreCard(
+  projectRoot: string,
+  config: ProjectConfig,
+  card: Card,
+  toColumnSlug?: string,
+): Promise<Card | 'unknown-column'> {
+  if (toColumnSlug !== undefined && !boardColumnSlugs(config, card.board).includes(toColumnSlug)) {
+    return 'unknown-column';
+  }
+  const target = toColumnSlug ?? restoreTarget(config, card);
+  const cleared = await updateCard(projectRoot, card, { archived: undefined, archivedFrom: undefined });
+  return placeCard(projectRoot, config, cleared, target, null);
 }

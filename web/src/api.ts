@@ -1,4 +1,6 @@
-import type { BoardName, Card, CardFrontmatterPatch, ProjectConfig, ProjectSnapshot } from './shared';
+import type {
+  ArchivedCard, BoardName, Card, CardFrontmatterPatch, ProjectConfig, ProjectSnapshot,
+} from './shared';
 
 async function post<T>(url: string, body: unknown): Promise<T> {
   const res = await fetch(url, {
@@ -145,6 +147,20 @@ export function placeCard(
 
 export function archiveCard(board: BoardName, id: string): Promise<unknown> {
   return post(`/api/cards/${board}/${id}/archive`, {});
+}
+
+// Fetched on demand: the archive only grows, so it rides outside the snapshot. The snapshot's
+// archivedCounts tell the UI when this is worth calling again.
+export async function listArchive(board: BoardName): Promise<ArchivedCard[]> {
+  const res = await fetch(`/api/archive/${board}`);
+  if (!res.ok) throw new Error('Failed to load the archive');
+  return (await res.json()).cards as ArchivedCard[];
+}
+
+// Omit toColumnSlug to land in the column the card was archived from (or the board's first
+// column, if that one no longer exists).
+export function restoreCard(board: BoardName, id: string, toColumnSlug?: string): Promise<Card> {
+  return post<Card>(`/api/cards/${board}/${id}/restore`, toColumnSlug ? { toColumnSlug } : {});
 }
 
 // ---- Project Control -------------------------------------------------------

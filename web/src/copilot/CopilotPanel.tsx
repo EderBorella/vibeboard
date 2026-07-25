@@ -97,6 +97,7 @@ export function CopilotPanel({
     };
   }, [model]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: items/running are scroll triggers
   useEffect(() => {
     bodyRef.current?.scrollTo({ top: bodyRef.current.scrollHeight });
   }, [items, running]);

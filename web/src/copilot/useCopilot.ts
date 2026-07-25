@@ -199,14 +199,15 @@ export function useCopilot(bump: number) {
     [ws, apply, push, hydrate],
   );
 
-  const sendRaw = (payload: object): void => ws.send(payload);
+  // Wrapped so the turn helpers below can depend on them; ws is memoised, so both stay stable.
+  const sendRaw = useCallback((payload: object): void => ws.send(payload), [ws]);
 
   // Reset streaming state at the start of a turn: Claude streams deltas, OpenCode sends a
   // full text block — resetting per turn keeps both correct even if the backend changed.
-  const startTurn = (): void => {
+  const startTurn = useCallback((): void => {
     deltaMode.current = false;
     streamId.current = null;
-  };
+  }, []);
 
   const send = useCallback(
     (text: string, opts: TurnOptions) => {
@@ -215,7 +216,7 @@ export function useCopilot(bump: number) {
       push({ kind: 'user', text });
       sendRaw({ type: 'copilot:send', text, ...opts });
     },
-    [push],
+    [push, sendRaw, startTurn],
   );
 
   const compact = useCallback(
@@ -224,7 +225,7 @@ export function useCopilot(bump: number) {
       push({ kind: 'user', text: '/compact' });
       sendRaw({ type: 'copilot:compact', ...opts });
     },
-    [push],
+    [push, sendRaw, startTurn],
   );
 
   const newSession = useCallback(() => {
@@ -232,7 +233,7 @@ export function useCopilot(bump: number) {
     setItems([]);
     setStats(ZERO);
     streamId.current = null;
-  }, []);
+  }, [sendRaw]);
 
   // Switch to / delete a stored chat. The server responds with copilot:history (switch) or a
   // fresh history (delete of the active chat), which re-hydrates the transcript.
@@ -240,11 +241,11 @@ export function useCopilot(bump: number) {
   // (only valid when the chat's backend matches the one in force — override included).
   const openChat = useCallback(
     (chatId: string, backend?: string) => sendRaw({ type: 'copilot:open', chatId, backend }),
-    [],
+    [sendRaw],
   );
-  const deleteChat = useCallback((chatId: string) => sendRaw({ type: 'copilot:delete', chatId }), []);
+  const deleteChat = useCallback((chatId: string) => sendRaw({ type: 'copilot:delete', chatId }), [sendRaw]);
 
-  const cancel = useCallback(() => sendRaw({ type: 'copilot:cancel' }), []);
+  const cancel = useCallback(() => sendRaw({ type: 'copilot:cancel' }), [sendRaw]);
 
   return {
     items,

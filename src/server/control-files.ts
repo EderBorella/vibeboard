@@ -1,4 +1,5 @@
 import { readFile, writeFile, readdir, mkdir, rm, rename, realpath } from 'node:fs/promises';
+import type { Dirent } from 'node:fs';
 import { resolve, relative, join, dirname, basename, sep } from 'node:path';
 import { parse, stringify } from 'yaml';
 import { CONFIG_DIR } from '../core/config.js';
@@ -130,7 +131,7 @@ async function exists(abs: string): Promise<boolean> {
 async function walk(root: string, sub: string): Promise<string[]> {
   const out: string[] = [];
   async function rec(dir: string): Promise<void> {
-    let entries;
+    let entries: Dirent[];
     try {
       entries = await readdir(dir, { withFileTypes: true });
     } catch {
@@ -147,7 +148,7 @@ async function walk(root: string, sub: string): Promise<string[]> {
 }
 
 async function rootMarkdown(root: string): Promise<string[]> {
-  let entries;
+  let entries: Dirent[];
   try {
     entries = await readdir(root, { withFileTypes: true });
   } catch {

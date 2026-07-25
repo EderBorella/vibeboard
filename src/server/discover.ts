@@ -1,5 +1,5 @@
 import { readdir } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
+import { existsSync, type Dirent } from 'node:fs';
 import { join } from 'node:path';
 import { CONFIG_DIR, CONFIG_FILE, readConfig } from '../core/config.js';
 
@@ -11,7 +11,7 @@ export interface ProjectRef {
 // Shallow-scan a root directory for VibeBoard projects: immediate subdirectories that
 // contain a .vibeboard/config.yaml. Non-recursive; skips dotdirs and node_modules.
 export async function discoverProjects(root: string): Promise<ProjectRef[]> {
-  let entries;
+  let entries: Dirent[];
   try {
     entries = await readdir(root, { withFileTypes: true });
   } catch {

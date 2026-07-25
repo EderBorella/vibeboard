@@ -4,8 +4,14 @@ import { getResources, putResources, type ResourceLink } from '../api';
 // The links registry (.vibeboard/resources.yaml) — a small editable table of external
 // references the user (and copilot) can consult. It owns its own rows and dirty flag because
 // nothing outside this pane reads them; only errors are handed back up to the shared banner.
+// Rows carry a client-only id so React keys survive a delete: an index key would hand the
+// removed row's DOM node (and its focus) to its neighbour.
+type Row = ResourceLink & { rowId: string };
+let seq = 0;
+const withId = (l: ResourceLink): Row => ({ ...l, rowId: `r${seq++}` });
+
 export function ResourcesEditor({ onError }: { onError: (e: string | null) => void }) {
-  const [links, setLinks] = useState<ResourceLink[]>([]);
+  const [links, setLinks] = useState<Row[]>([]);
   const [dirty, setDirty] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -14,7 +20,7 @@ export function ResourcesEditor({ onError }: { onError: (e: string | null) => vo
     getResources()
       .then((l) => {
         if (live) {
-          setLinks(l);
+          setLinks(l.map(withId));
           setDirty(false);
         }
       })
@@ -29,7 +35,7 @@ export function ResourcesEditor({ onError }: { onError: (e: string | null) => vo
     setDirty(true);
   };
   const add = (): void => {
-    setLinks((prev) => [...prev, { title: '', url: '' }]);
+    setLinks((prev) => [...prev, withId({ title: '', url: '' })]);
     setDirty(true);
   };
   const removeRow = (i: number): void => {
@@ -42,7 +48,7 @@ export function ResourcesEditor({ onError }: { onError: (e: string | null) => vo
     onError(null);
     try {
       const clean = links.filter((l) => l.title.trim() || l.url.trim());
-      await putResources(clean);
+      await putResources(clean.map(({ title, url }) => ({ title, url })));
       setLinks(clean);
       setDirty(false);
     } catch (e) {
@@ -70,7 +76,7 @@ export function ResourcesEditor({ onError }: { onError: (e: string | null) => vo
           <div className="control-blank">No links yet. Add references the copilot can consult.</div>
         )}
         {links.map((l, i) => (
-          <div key={i} className="resource-row">
+          <div key={l.rowId} className="resource-row">
             <input
               className="res-title"
               placeholder="Title"

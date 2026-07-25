@@ -30,6 +30,7 @@ export function ArchiveDrawer({ board, config, count, onOpen }: Props) {
 
   // Refetch on mount and whenever the count moves. Restoring changes the count too, so the
   // list reconciles itself without an optimistic local update.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: count is a deliberate trigger
   useEffect(() => {
     let live = true;
     listArchive(board)

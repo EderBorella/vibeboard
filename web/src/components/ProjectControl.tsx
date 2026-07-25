@@ -66,12 +66,14 @@ export function ProjectControl({ snapshot }: Props) {
 
   // Initial load + live refresh: refetch the list whenever the project changes on disk, and
   // reload the open file's content when the editor has no unsaved edits.
+  // snapshot is a trigger, not an input: neither effect reads it.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: deliberate trigger
   useEffect(() => {
     void refreshGroups();
   }, [refreshGroups, snapshot]);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: adding file would loop via setFile
   useEffect(() => {
     if (file && !dirty) void loadFile(file.path);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [snapshot]);
 
   function select(path: string): void {

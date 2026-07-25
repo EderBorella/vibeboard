@@ -97,8 +97,8 @@ npm test             # vitest — the suite is the spec
 ## Configuration
 
 All configuration is via environment variables — see [`.env.example`](./.env.example)
-for the annotated list. VibeBoard does not auto-load `.env`; export the variables
-in your shell, or on Node >= 20.6 use `node --env-file=.env dist/server/main.js`.
+for the annotated list. Copy it to `.env` and VibeBoard loads it automatically on
+startup; anything already exported in your shell takes precedence.
 
 | Variable | Default | What it does |
 |---|---|---|

@@ -4,6 +4,15 @@ import { buildApp } from './app.js';
 import { registerStatic } from './static.js';
 import { stopOpencodeServer } from './opencode-server.js';
 
+// Load ./.env if the user has one, so `npm start` and `npm run dev` pick up local config with
+// no wrapper script. Node's own loader — no dependency. A missing .env is the normal case and
+// is silently ignored; anything already exported in the environment still wins.
+try {
+  process.loadEnvFile();
+} catch {
+  /* no .env — defaults and exported vars apply */
+}
+
 const port = Number(process.env.VIBEBOARD_PORT ?? 4610);
 // Loopback by default. VibeBoard has no authentication, and its copilot auto-approves tool
 // calls — it can read and write files anywhere in the open project. Exposing that to a network

@@ -10,6 +10,12 @@ const BACKENDS: { value: string; label: string }[] = [
   { value: 'opencode', label: 'OpenCode' },
 ];
 
+// Short backend label for the chat list — chats don't carry context across backends, so
+// each one is tagged with the backend it ran on.
+function backendLabel(b: string): string {
+  return BACKENDS.find((x) => x.value === b)?.label ?? b;
+}
+
 function fmtUsd(n: number): string { return `$${n.toFixed(n < 1 ? 4 : 2)}`; }
 function fmtK(n: number): string { return n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n); }
 
@@ -117,7 +123,10 @@ export function CopilotPanel({ copilot, backend, mode, model, effort, onMode, on
                 {chats.map((c) => (
                   <div key={c.id} className={`chat-menu-item${c.id === currentChatId ? ' active' : ''}`}>
                     <button className="chat-menu-open" onClick={() => { openChat(c.id); setChatMenu(false); }} title={c.title}>
-                      <span className="chat-menu-title">{c.title}</span>
+                      <span className="chat-menu-title">
+                        <span className={`chat-backend bk-${c.backend}`}>{backendLabel(c.backend)}</span>
+                        {c.title}
+                      </span>
                       <span className="chat-menu-meta">{relTime(c.updatedAt)} · {c.messageCount} msg</span>
                     </button>
                     <button className="chat-del" title="Delete chat" onClick={() => deleteChat(c.id)}>✕</button>

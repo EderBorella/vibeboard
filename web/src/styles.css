@@ -410,6 +410,13 @@ body {
 .chat-menu-open { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.1rem; background: transparent; border: none; color: var(--text); text-align: left; padding: 0.4rem 0.5rem; cursor: pointer; }
 .chat-menu-item.active .chat-menu-open { border-left: 2px solid var(--accent); }
 .chat-menu-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.76rem; }
+.chat-backend {
+  display: inline-block; margin-right: 0.4rem; padding: 0.02rem 0.35rem; border-radius: 999px;
+  font-size: 0.58rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; vertical-align: middle;
+  border: 1px solid var(--border);
+}
+.chat-backend.bk-claude-code { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 50%, transparent); }
+.chat-backend.bk-opencode { color: var(--accent-2); border-color: color-mix(in srgb, var(--accent-2) 50%, transparent); }
 .chat-menu-meta { font-size: 0.64rem; color: var(--muted); font-family: var(--font-mono); }
 .chat-del { background: transparent; border: none; color: var(--muted); cursor: pointer; padding: 0 0.5rem; font-size: 0.72rem; }
 .chat-del:hover { color: var(--accent-2); }

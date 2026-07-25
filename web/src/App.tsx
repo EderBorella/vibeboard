@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { BOARDS, BOARD_LABELS, type BoardName, type Card } from './shared';
 import { useSnapshot } from './useSnapshot';
-import { getState, moveCard, archiveCard, patchConfig } from './api';
+import { getState, placeCard, archiveCard, patchConfig } from './api';
 import { Board } from './components/Board';
 import { ProjectControl } from './components/ProjectControl';
 import { ProjectGate } from './components/ProjectGate';
@@ -64,11 +64,14 @@ export function App() {
     copilot.newSession();
     void patchConfig({ copilot: { backend, model: '' } });
   };
-  const onDrop = (board: BoardName, columnSlug: string): void => {
+  // Position the dragged card: reorder within its column, or move it into another one.
+  // beforeId is the card to land in front of; null means the end of the column.
+  const onDrop = (board: BoardName, columnSlug: string, beforeId: string | null): void => {
     const card = dragged.current;
     dragged.current = null;
-    if (!card || card.board !== board || card.columnSlug === columnSlug) return; // no cross-board / no-op
-    void moveCard(card.board, card.id, columnSlug);
+    if (!card || card.board !== board) return; // links cross boards, cards don't
+    if (beforeId === card.id) return; // dropped exactly where it already is
+    void placeCard(card.board, card.id, columnSlug, beforeId);
   };
 
   useEffect(() => {

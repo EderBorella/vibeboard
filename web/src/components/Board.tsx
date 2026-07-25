@@ -13,7 +13,7 @@ interface Props {
   onOpen?: (card: Card) => void;
   onArchive?: (card: Card) => void;
   onDragStart?: (card: Card) => void;
-  onDrop?: (board: BoardName, slug: string) => void;
+  onDrop?: (board: BoardName, slug: string, beforeId: string | null) => void;
 }
 
 export function Board({ board, label, cards, config, collapsed, onToggle, onAdd, onOpen, onArchive, onDragStart, onDrop }: Props) {

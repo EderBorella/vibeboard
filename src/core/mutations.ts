@@ -78,6 +78,44 @@ export async function reorderCard(projectRoot: string, card: Card, order: number
   return updateCard(projectRoot, card, { order });
 }
 
+// Put a card in a column at a specific position: move the file if the column changed, then
+// renumber that column's `order` fields to even multiples of ORDER_STEP.
+//
+// Position is expressed as "before this card" rather than an index, because the card being moved
+// occupies an index itself — dragging downward with a raw index is off by one — and because an id
+// still means the same thing if an agent changed the board while the drag was in flight. A
+// `beforeId` of null (or one not in the column) means the end.
+export async function placeCard(
+  projectRoot: string,
+  config: ProjectConfig,
+  card: Card,
+  toColumnSlug: string,
+  beforeId: string | null,
+): Promise<Card> {
+  // "Before itself" means stay put. Worth handling here rather than trusting the caller: the
+  // card is excluded from the sequence below, so its own id would look like an unknown
+  // beforeId and send it to the end of the column instead.
+  if (beforeId === card.id && card.columnSlug === toColumnSlug) return card;
+
+  const moved = card.columnSlug === toColumnSlug ? card : await moveCard(projectRoot, card, toColumnSlug);
+
+  // Re-read so we sequence against what is actually on disk, not a stale snapshot.
+  const live = await readBoard(projectRoot, moved.board, config);
+  const others = live.filter((c) => c.columnSlug === toColumnSlug && c.id !== moved.id);
+  const at = beforeId === null ? -1 : others.findIndex((c) => c.id === beforeId);
+  const ordered = at === -1 ? [...others, moved] : [...others.slice(0, at), moved, ...others.slice(at)];
+
+  // Write only the cards whose order actually changes — fewer writes means fewer watcher events.
+  await Promise.all(
+    ordered.map((c, i) => {
+      const order = (i + 1) * ORDER_STEP;
+      return c.order === order ? undefined : updateCard(projectRoot, c, { order });
+    }),
+  );
+  const finalIndex = ordered.findIndex((c) => c.id === moved.id);
+  return { ...moved, order: (finalIndex + 1) * ORDER_STEP };
+}
+
 export async function archiveCard(projectRoot: string, card: Card): Promise<Card> {
   return moveCard(projectRoot, card, ARCHIVE_SLUG);
 }

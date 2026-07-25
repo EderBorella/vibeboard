@@ -4,7 +4,7 @@ import { dirname } from 'node:path';
 import { readFile, writeFile } from 'node:fs/promises';
 import { scaffoldProject, type ScaffoldMode } from '../core/scaffold.js';
 import { listBackendModels, modelStatus } from './models.js';
-import { createCard, updateCard, moveCard, archiveCard, type CreateCardInput } from '../core/mutations.js';
+import { createCard, updateCard, moveCard, placeCard, archiveCard, type CreateCardInput } from '../core/mutations.js';
 import { findCard } from '../core/find.js';
 import { setCardLinks } from '../core/links.js';
 import { writeConfig } from '../core/config.js';
@@ -359,6 +359,17 @@ export function buildApp(session: ProjectSession): FastifyInstance {
       const card = await findCard(session.root!, board, id, session.config!);
       if (!card) return reply.code(404).send({ error: 'Card not found' });
       return moveCard(session.root!, card, toColumnSlug);
+    });
+
+    // Position a card: within its column (reorder) or into another one, in a single call.
+    // `beforeId: null` means the end of the column.
+    api.post('/cards/:board/:id/place', async (req, reply) => {
+      if (!ensureOpen(session, reply)) return;
+      const { board, id } = req.params as { board: BoardName; id: string };
+      const { toColumnSlug, beforeId } = req.body as { toColumnSlug: string; beforeId?: string | null };
+      const card = await findCard(session.root!, board, id, session.config!);
+      if (!card) return reply.code(404).send({ error: 'Card not found' });
+      return placeCard(session.root!, session.config!, card, toColumnSlug, beforeId ?? null);
     });
 
     api.post('/cards/:board/:id/archive', async (req, reply) => {

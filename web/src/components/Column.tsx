@@ -12,7 +12,8 @@ interface Props {
   onOpen?: (card: Card) => void;
   onArchive?: (card: Card) => void;
   onDragStart?: (card: Card) => void;
-  onDrop?: (board: BoardName, slug: string) => void;
+  // beforeId identifies the card to insert in front of; null means the end of the column.
+  onDrop?: (board: BoardName, slug: string, beforeId: string | null) => void;
 }
 
 export function Column({
@@ -20,12 +21,31 @@ export function Column({
   onAdd, onOpen, onArchive, onDragStart, onDrop,
 }: Props) {
   const [over, setOver] = useState(false);
+  // Which gap the card would land in: 0 = above the first tile, cards.length = at the end.
+  const [gap, setGap] = useState<number | null>(null);
+
+  const reset = (): void => { setOver(false); setGap(null); };
+  const release = (e: React.DragEvent): void => {
+    e.preventDefault();
+    const at = gap ?? cards.length;
+    reset();
+    onDrop?.(board, slug, at >= cards.length ? null : cards[at].id);
+  };
+
   return (
     <div
       className={`column${over ? ' column-over' : ''}`}
-      onDragOver={onDrop ? (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setOver(true); } : undefined}
-      onDragLeave={onDrop ? () => setOver(false) : undefined}
-      onDrop={onDrop ? (e) => { e.preventDefault(); setOver(false); onDrop(board, slug); } : undefined}
+      onDragOver={onDrop ? (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        setOver(true);
+        setGap((g) => g ?? cards.length); // over the column but not a tile → the end
+      } : undefined}
+      onDragLeave={onDrop ? (e) => {
+        // Ignore leaves fired while crossing between children of this column.
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) reset();
+      } : undefined}
+      onDrop={onDrop ? release : undefined}
     >
       <div className="column-head">
         <span className="column-title">{title}</span>
@@ -36,16 +56,30 @@ export function Column({
       </div>
       <div className="column-body">
         {cards.length === 0 && <div className="column-empty">Drop a card here</div>}
-        {cards.map((c) => (
-          <CardTile
+        {cards.map((c, i) => (
+          <div
             key={c.id}
-            card={c}
-            miniatureChars={miniatureChars}
-            onOpen={onOpen}
-            onArchive={onArchive}
-            onDragStart={onDragStart}
-          />
+            // Each tile owns the two gaps around it: the pointer's half decides which. Stop
+            // propagation so the column's own handler doesn't overwrite it with "the end".
+            onDragOver={onDrop ? (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              const box = e.currentTarget.getBoundingClientRect();
+              setOver(true);
+              setGap(e.clientY < box.top + box.height / 2 ? i : i + 1);
+            } : undefined}
+          >
+            {gap === i && <div className="drop-line" />}
+            <CardTile
+              card={c}
+              miniatureChars={miniatureChars}
+              onOpen={onOpen}
+              onArchive={onArchive}
+              onDragStart={onDragStart}
+            />
+          </div>
         ))}
+        {gap !== null && gap >= cards.length && cards.length > 0 && <div className="drop-line" />}
       </div>
     </div>
   );

@@ -132,6 +132,17 @@ export function moveCard(board: BoardName, id: string, toColumnSlug: string): Pr
   return post(`/api/cards/${board}/${id}/move`, { toColumnSlug });
 }
 
+// Position a card within a column, or move it into another one, in a single call. `beforeId`
+// is the card to insert in front of; null means the end. The server renumbers `order`.
+export function placeCard(
+  board: BoardName,
+  id: string,
+  toColumnSlug: string,
+  beforeId: string | null,
+): Promise<unknown> {
+  return post(`/api/cards/${board}/${id}/place`, { toColumnSlug, beforeId });
+}
+
 export function archiveCard(board: BoardName, id: string): Promise<unknown> {
   return post(`/api/cards/${board}/${id}/archive`, {});
 }

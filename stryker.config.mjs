@@ -22,6 +22,11 @@ export default {
   // minutes rather than hours.
   coverageAnalysis: 'perTest',
 
+  // The runner defaults `related` to TRUE, which narrows the run to vitest's --related module
+  // graph. That hid 137 of our 299 tests, so anything reaching the code without a static import
+  // (the route tests go through app.inject) scored its mutants as survivors. Costs ~4s.
+  vitest: { related: false },
+
   // Reuse results for mutants whose code and covering tests are both unchanged, so a re-run after
   // touching one file costs seconds. --force ignores the cache.
   incremental: true,

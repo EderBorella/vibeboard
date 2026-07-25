@@ -1,3 +1,4 @@
+import { mkdtempSync } from 'node:fs';
 import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -9,6 +10,14 @@ import { ProjectSession } from '../src/server/session.js';
 
 export async function tempDir(): Promise<string> {
   return mkdtemp(join(tmpdir(), 'vibeboard-'));
+}
+
+// Where fake-claude.mjs records the args it was spawned with. One log per process, outside the
+// repo: the shim appends and the tests index the log by position, so a shared path silently
+// interleaves other processes' args — which is what made Stryker's verdicts non-deterministic
+// across its parallel workers.
+export function shimArgsLog(): string {
+  return join(mkdtempSync(join(tmpdir(), 'vibeboard-shim-')), 'args.log');
 }
 
 export interface TestProject {

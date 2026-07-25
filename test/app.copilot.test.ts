@@ -3,7 +3,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { FastifyInstance } from 'fastify';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { openTestProject, wsClient } from './helpers.js';
+import { openTestProject, shimArgsLog, wsClient } from './helpers.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const SHIM = join(here, 'fixtures', 'fake-claude.mjs');
@@ -46,7 +46,7 @@ describe('copilot over /ws', () => {
 // The dock's controls are a SESSION OVERRIDE: the project config holds the defaults and is the
 // only persisted source, so per-turn values must win without ever changing the file.
 describe('copilot session override', () => {
-  const ARGS_LOG = join(here, 'fixtures', '.override-args.log');
+  const ARGS_LOG = shimArgsLog();
 
   async function turn(app: FastifyInstance, payload: Record<string, unknown>): Promise<string[]> {
     if (existsSync(ARGS_LOG)) rmSync(ARGS_LOG);

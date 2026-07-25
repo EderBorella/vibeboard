@@ -4,10 +4,11 @@ import { fileURLToPath } from 'node:url';
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { type CopilotMode, CopilotSession } from '../src/server/copilot.js';
 import type { CopilotEvent } from '../src/server/copilot-events.js';
+import { shimArgsLog } from './helpers.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const SHIM = join(here, 'fixtures', 'fake-claude.mjs');
-const ARGS_LOG = join(here, 'fixtures', '.shim-args.log');
+const ARGS_LOG = shimArgsLog();
 
 beforeAll(() => {
   chmodSync(SHIM, 0o755);

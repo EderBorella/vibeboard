@@ -1,0 +1,95 @@
+#!/usr/bin/env bash
+#
+# VibeBoard pre-commit gate. Runs the checks that are cheap enough to afford on every commit:
+# formatting, all three typechecks, and the full test suite. Roughly 4-5 seconds.
+#
+# Installed by the `prepare` script in package.json (git config core.hooksPath .githooks), so a
+# fresh clone gets it from `npm install` rather than from remembering to run something.
+#
+# Bypass with `git commit --no-verify` when you genuinely need to (a WIP checkpoint, a commit that
+# only exists to be amended). That escape hatch is the reason this can afford to be strict.
+#
+# Deliberately NOT here: `npm run mutate`. Mutation testing is minutes, not seconds, and it answers
+# a question ("would anyone notice if this broke") that does not need answering on every commit.
+
+set -uo pipefail
+cd "$(git rev-parse --show-toplevel)" || exit 1
+
+BIOME=./node_modules/.bin/biome
+VITEST=./node_modules/.bin/vitest
+LOGS=$(mktemp -d)
+trap 'rm -rf "$LOGS"' EXIT
+fail=0
+
+dim() { printf '\033[2m%s\033[0m\n' "$1"; }
+ok() { printf '\033[32m✓\033[0m %s\n' "$1"; }
+bad() {
+  printf '\033[31m✗\033[0m %s\n' "$1"
+  fail=1
+}
+
+# A commit touching only markdown or images cannot break a typecheck or a test. Skipping those
+# keeps card edits and doc commits instant, which is most of what this repo's own board produces.
+code_staged=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '\.(ts|tsx|json|jsonc|mjs|js)$' || true)
+if [ -z "$code_staged" ]; then
+  dim "pre-commit: no code staged, skipping typecheck and tests"
+  exit 0
+fi
+
+if [ ! -x "$BIOME" ] || [ ! -x "$VITEST" ]; then
+  printf '\033[31m✗\033[0m dependencies missing — run `npm install` (looked for %s)\n' "$BIOME"
+  exit 1
+fi
+
+# ---- formatting -------------------------------------------------------------------------------
+# Checks the whole tree, not just staged files: formatting drift anywhere is a one-command fix and
+# leaving it to rot is how a formatter stops being trusted.
+if "$BIOME" format >"$LOGS/format.log" 2>&1; then
+  ok "format"
+else
+  bad "format — run \`npm run format\` to fix"
+  tail -20 "$LOGS/format.log"
+fi
+
+# ---- typechecks (parallel) --------------------------------------------------------------------
+# Three independent tsconfigs (src is NodeNext, web is bundler-resolved, test covers both), so
+# these have no ordering dependency and cost ~1.2s each. Sequentially that is 4s of the budget.
+npm run typecheck --silent >"$LOGS/tsc-src.log" 2>&1 &
+p_src=$!
+npm run typecheck:web --silent >"$LOGS/tsc-web.log" 2>&1 &
+p_web=$!
+npm run typecheck:test --silent >"$LOGS/tsc-test.log" 2>&1 &
+p_test=$!
+
+wait $p_src && ok "typecheck src" || { bad "typecheck src"; tail -20 "$LOGS/tsc-src.log"; }
+wait $p_web && ok "typecheck web" || { bad "typecheck web"; tail -20 "$LOGS/tsc-web.log"; }
+wait $p_test && ok "typecheck test" || { bad "typecheck test"; tail -20 "$LOGS/tsc-test.log"; }
+
+# ---- tests ------------------------------------------------------------------------------------
+if "$VITEST" run --silent >"$LOGS/test.log" 2>&1; then
+  ok "tests"
+else
+  bad "tests"
+  tail -30 "$LOGS/test.log"
+fi
+
+# ---- lint (report only, for now) ---------------------------------------------------------------
+# Not blocking yet. The linter arrived after the code did: 98 errors across 21 files, 19 of them
+# web components carrying accessibility findings (untyped buttons, div click handlers). Gating on
+# that today would mean any UI edit must first clear an unrelated backlog, and a gate you have to
+# bypass constantly is worse than no gate.
+#
+# TO MAKE IT BLOCKING once the backlog is cleared: change `dim`/`true` below to `bad`, i.e.
+#   if "$BIOME" lint --max-diagnostics=none >"$LOGS/lint.log" 2>&1; then ok "lint"; else bad "lint"; fi
+if "$BIOME" lint --max-diagnostics=none >"$LOGS/lint.log" 2>&1; then
+  ok "lint"
+else
+  counts=$(grep -oE 'Found [0-9]+ (error|warning)s?' "$LOGS/lint.log" | paste -sd', ' -)
+  dim "  lint: ${counts:-findings present} (not blocking — see .githooks/pre-commit)"
+fi
+
+if [ "$fail" -ne 0 ]; then
+  printf '\n\033[31mcommit blocked.\033[0m Fix the above, or \033[1mgit commit --no-verify\033[0m to override.\n'
+  exit 1
+fi
+exit 0

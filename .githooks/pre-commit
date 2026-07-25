@@ -44,7 +44,7 @@ fi
 # ---- formatting -------------------------------------------------------------------------------
 # Checks the whole tree, not just staged files: formatting drift anywhere is a one-command fix and
 # leaving it to rot is how a formatter stops being trusted.
-if "$BIOME" format >"$LOGS/format.log" 2>&1; then
+if npm run format:check --silent >"$LOGS/format.log" 2>&1; then
   ok "format"
 else
   bad "format — run \`npm run format\` to fix"

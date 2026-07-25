@@ -1,0 +1,61 @@
+name: CI
+
+# This is a PRIVATE repo on the free tier: 2,000 Actions minutes a month, and billing rounds every
+# job up to a whole minute. Private-repo runners are also 2 vCPU / 7 GB (public repos get 4 vCPU),
+# so every choice below is about staying cheap rather than fast.
+
+on:
+  push:
+    branches: [main]
+    # A markdown-only push cannot break a typecheck, a test or the build. paths-ignore skips the
+    # run only when EVERY changed file matches, which mirrors what .githooks/pre-commit skips.
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'LICENSE'
+  workflow_dispatch:
+
+# A second push while the first run is still going makes the first result irrelevant. Cancelling
+# it is minutes back in the budget.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ONE job, deliberately. Splitting this into parallel lint / typecheck / test / build jobs would
+  # cost 4 billed minutes to do about 1 minute of work, because each job rounds up independently.
+  # Job-level parallelism is a luxury for repos with unlimited (public) minutes.
+  check:
+    runs-on: ubuntu-latest
+    # The platform default is 6 hours — a single hung job would burn 18% of the monthly allowance.
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          # .nvmrc is the single home for the Node version (lts/*); setup-node resolves it.
+          node-version-file: .nvmrc
+          cache: npm
+
+      # `ci`, not `install`: it installs exactly the lockfile and fails on drift. That is most of
+      # what this workflow adds over the local hook — a clean checkout catches a file that was
+      # never committed or a lockfile that disagrees with package.json, which no local run can.
+      - run: npm ci
+
+      - run: npm run format:check
+      - run: npm run check
+      - run: npm test
+      - run: npm run build
+
+      # Non-blocking, matching .githooks/pre-commit exactly. The linter arrived after the code: 98
+      # errors across 21 files, 19 of them accessibility findings in web components. Visible in the
+      # log so the number cannot quietly grow, but not fatal — a gate that is always red teaches
+      # people to ignore gates. Remove continue-on-error once the backlog is triaged.
+      - run: npm run lint
+        continue-on-error: true
+
+# Deliberately NOT here: `npm run mutate`. On a 2 vCPU runner Stryker's default concurrency is 1,
+# and the 844-mutant scope is ~30-40 minutes of single-worker time. Nightly would be 900-1,200
+# minutes a month, up to 60% of the free allowance, to answer a question that does not change
+# daily. Mutation testing is run locally, weekly, by hand.

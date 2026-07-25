@@ -12,6 +12,7 @@
     "lint": "biome check",
     "lint:fix": "biome check --write",
     "format": "biome format --write",
+    "format:check": "biome format",
     "mutate": "stryker run",
     "prepare": "git config core.hooksPath .githooks || true",
     "check": "npm run typecheck && npm run typecheck:web && npm run typecheck:test",

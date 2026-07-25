@@ -1,7 +1,8 @@
-import { readFile, writeFile, readdir, mkdir, rm, realpath } from 'node:fs/promises';
+import { readFile, writeFile, readdir, mkdir, rm, rename, realpath } from 'node:fs/promises';
 import { resolve, relative, join, dirname, basename, sep } from 'node:path';
 import { parse, stringify } from 'yaml';
 import { CONFIG_DIR } from '../core/config.js';
+import { slugify } from '../core/slug.js';
 
 // The Project Control tab's file controller. It exposes ONLY the documents that steer the
 // models — instructions, skills, docs, resources — behind a hard path sandbox + allow-list so
@@ -55,12 +56,22 @@ function categoryOf(rel: string): ControlCategory | null {
   return null;
 }
 
+// A skill is identified by its folder (`.claude/skills/<name>/SKILL.md`), so the folder is its
+// display name — every skill's file is literally called SKILL.md and would be indistinguishable.
+function displayName(rel: string, category: ControlCategory): string {
+  if (category === 'skills') {
+    const parts = rel.split('/');
+    return parts[2] ?? basename(rel); // .claude/skills/<name>/...
+  }
+  return basename(rel);
+}
+
 function descriptor(rel: string): ControlFile | null {
   const category = categoryOf(rel);
   if (!category) return null;
   return {
     path: rel,
-    name: basename(rel),
+    name: displayName(rel, category),
     category,
     managed: MANAGED.has(rel),
     deletable: category !== 'instructions',
@@ -181,6 +192,129 @@ export async function readControlFile(
     content = ''; // not yet created — treat as empty for the editor
   }
   return { ...r.file, content };
+}
+
+// --- Creating and renaming -------------------------------------------------
+// The client never builds paths: it asks for "a new skill" or "rename this to X" and the server
+// owns slugging, collision handling, and the per-category layout.
+
+const NEW_NAMES: Record<Exclude<ControlCategory, 'instructions'>, string> = {
+  skills: 'New skill',
+  docs: 'New doc',
+  resources: 'New resource',
+};
+
+export type CreatableCategory = keyof typeof NEW_NAMES;
+
+export function isCreatable(c: unknown): c is CreatableCategory {
+  return typeof c === 'string' && c in NEW_NAMES;
+}
+
+// Where a given display name lives, per category. Skills are a folder holding SKILL.md;
+// docs and resources are a single markdown file.
+function pathForName(category: CreatableCategory, name: string): string {
+  // Tolerate a typed extension ("Design notes.md") so it doesn't end up slugged into the
+  // filename as "design-notes-md".
+  const slug = slugify(name.replace(/\.md$/i, '')) || 'untitled';
+  if (category === 'skills') return `.claude/skills/${slug}/SKILL.md`;
+  return category === 'docs' ? `docs/${slug}.md` : `resources/${slug}.md`;
+}
+
+// What a rename must not clobber: the skill's folder, or the file itself.
+function occupiedPath(root: string, category: CreatableCategory, name: string): string {
+  const rel = pathForName(category, name);
+  return join(root, category === 'skills' ? dirname(rel) : rel);
+}
+
+async function pathExists(abs: string): Promise<boolean> {
+  try {
+    await readdir(abs);
+    return true; // a directory
+  } catch {
+    try {
+      await readFile(abs);
+      return true; // a file
+    } catch {
+      return false;
+    }
+  }
+}
+
+// "New doc" -> "New doc 2" -> "New doc 3" … so clicking + repeatedly never collides.
+async function freeName(root: string, category: CreatableCategory, base: string): Promise<string> {
+  for (let n = 1; n < 1000; n++) {
+    const candidate = n === 1 ? base : `${base} ${n}`;
+    if (!(await pathExists(occupiedPath(root, category, candidate)))) return candidate;
+  }
+  throw new Error('Could not find a free name');
+}
+
+function starterContent(category: CreatableCategory, name: string): string {
+  if (category === 'skills') {
+    // Frontmatter is what makes a skill discoverable by both CLIs; the name mirrors the folder.
+    return `---\nname: ${slugify(name)}\ndescription: What this skill does and when to use it.\n---\n\n# ${name}\n\nDescribe the steps here.\n`;
+  }
+  return `# ${name}\n\n`;
+}
+
+// Create a new file with a default, collision-free name. The UI then lets the user rename it
+// in place — no browser dialog, and the file exists immediately either way.
+export async function createControlFile(
+  root: string,
+  category: unknown,
+): Promise<ControlFile | null> {
+  if (!isCreatable(category)) return null;
+  const name = await freeName(root, category, NEW_NAMES[category]);
+  const rel = pathForName(category, name);
+  const r = await resolveControlPath(root, rel);
+  if (!r) return null;
+  await mkdir(dirname(r.abs), { recursive: true });
+  await writeFile(r.abs, starterContent(category, name), 'utf8');
+  return r.file;
+}
+
+// Rename by display name, staying inside the same category. Renames the skill's folder (not
+// SKILL.md) so the skill keeps its identity. Returns null on a bad path, 'taken' on collision.
+export async function renameControlFile(
+  root: string,
+  rel: unknown,
+  newName: unknown,
+): Promise<ControlFile | 'taken' | null> {
+  const current = await resolveControlPath(root, rel);
+  if (!current) return null;
+  const category = current.file.category;
+  if (!isCreatable(category)) return null; // instruction files are not renameable
+  if (typeof newName !== 'string' || !slugify(newName.replace(/\.md$/i, ''))) return null;
+
+  const targetRel = pathForName(category, newName);
+  if (targetRel === current.file.path) return current.file; // unchanged
+  const target = await resolveControlPath(root, targetRel);
+  if (!target) return null;
+  if (await pathExists(occupiedPath(root, category, newName))) return 'taken';
+
+  if (category === 'skills') {
+    await rename(dirname(current.abs), dirname(target.abs));
+    // Keep the skill's frontmatter name in step, but only when it still matches the folder we
+    // renamed away from — never overwrite a name the user chose themselves.
+    await syncSkillName(target.abs, basename(dirname(current.abs)), basename(dirname(target.abs)));
+  } else {
+    await mkdir(dirname(target.abs), { recursive: true });
+    await rename(current.abs, target.abs);
+  }
+  return target.file;
+}
+
+async function syncSkillName(abs: string, oldSlug: string, newSlug: string): Promise<void> {
+  try {
+    const body = await readFile(abs, 'utf8');
+    const updated = body.replace(
+      new RegExp(`^(name:\\s*)${oldSlug}\\s*$`, 'm'),
+      `$1${newSlug}`,
+    );
+    if (updated !== body) await writeFile(abs, updated, 'utf8');
+  } catch {
+    /* no SKILL.md yet, or unreadable — the folder rename already succeeded */
+  }
 }
 
 export async function writeControlFile(root: string, rel: unknown, content: string): Promise<boolean> {

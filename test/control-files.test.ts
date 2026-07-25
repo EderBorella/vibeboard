@@ -8,6 +8,8 @@ import {
   readControlFile,
   writeControlFile,
   deleteControlFile,
+  createControlFile,
+  renameControlFile,
   readResources,
   writeResources,
 } from '../src/server/control-files.js';
@@ -100,6 +102,98 @@ describe('control-files CRUD', () => {
     expect(await writeControlFile(root, '../escape.md', 'x')).toBe(false);
     expect(await readControlFile(root, '.vibeboard/config.yaml')).toBeNull();
     expect(await deleteControlFile(root, '../escape.md')).toBe('invalid');
+  });
+});
+
+describe('create with default names', () => {
+  it('names the first one "New doc" and numbers the rest to avoid collisions', async () => {
+    const root = await tempDir();
+    const a = await createControlFile(root, 'docs');
+    const b = await createControlFile(root, 'docs');
+    const c = await createControlFile(root, 'docs');
+    expect([a!.path, b!.path, c!.path]).toEqual(['docs/new-doc.md', 'docs/new-doc-2.md', 'docs/new-doc-3.md']);
+    // and they really exist on disk, independently
+    for (const f of [a, b, c]) expect((await readControlFile(root, f!.path))!.content).toContain('#');
+  });
+
+  it('creates a skill as a folder holding SKILL.md, with discoverable frontmatter', async () => {
+    const root = await tempDir();
+    const s = await createControlFile(root, 'skills');
+    expect(s!.path).toBe('.claude/skills/new-skill/SKILL.md');
+    expect(s!.name).toBe('new-skill'); // the folder, not "SKILL.md"
+    const { content } = (await readControlFile(root, s!.path))!;
+    expect(content).toMatch(/^---\nname: new-skill\ndescription:/);
+  });
+
+  it('numbers skills too, since the folder is what collides', async () => {
+    const root = await tempDir();
+    await createControlFile(root, 'skills');
+    const second = await createControlFile(root, 'skills');
+    expect(second!.path).toBe('.claude/skills/new-skill-2/SKILL.md');
+  });
+
+  it('refuses categories that cannot be created into', async () => {
+    const root = await tempDir();
+    expect(await createControlFile(root, 'instructions')).toBeNull();
+    expect(await createControlFile(root, 'nonsense')).toBeNull();
+  });
+});
+
+describe('rename', () => {
+  it('renames a doc by display name, slugging the filename', async () => {
+    const root = await tempDir();
+    const doc = await createControlFile(root, 'docs');
+    const renamed = await renameControlFile(root, doc!.path, 'Design Notes');
+    expect((renamed as { path: string }).path).toBe('docs/design-notes.md');
+    expect(await readControlFile(root, doc!.path)).toMatchObject({ content: '' }); // old path gone
+    const files = (await listControlFiles(root)).find((g) => g.key === 'docs')!.files;
+    expect(files.map((f) => f.path)).toEqual(['docs/design-notes.md']);
+  });
+
+  it('renames a skill by moving its folder and syncing the frontmatter name', async () => {
+    const root = await tempDir();
+    const skill = await createControlFile(root, 'skills');
+    const renamed = await renameControlFile(root, skill!.path, 'Greet the user');
+    expect((renamed as { path: string }).path).toBe('.claude/skills/greet-the-user/SKILL.md');
+    const { content } = (await readControlFile(root, '.claude/skills/greet-the-user/SKILL.md'))!;
+    expect(content).toContain('name: greet-the-user'); // frontmatter followed the folder
+    expect(content).not.toContain('name: new-skill');
+  });
+
+  it('leaves a hand-picked frontmatter name alone', async () => {
+    const root = await tempDir();
+    const skill = await createControlFile(root, 'skills');
+    await writeControlFile(root, skill!.path, '---\nname: my-own-choice\n---\nbody\n');
+    await renameControlFile(root, skill!.path, 'Renamed');
+    const { content } = (await readControlFile(root, '.claude/skills/renamed/SKILL.md'))!;
+    expect(content).toContain('name: my-own-choice');
+  });
+
+  it('tolerates a typed .md extension instead of slugging it into the name', async () => {
+    const root = await tempDir();
+    const doc = await createControlFile(root, 'docs');
+    const renamed = await renameControlFile(root, doc!.path, 'Design Notes.md');
+    expect((renamed as { path: string }).path).toBe('docs/design-notes.md'); // not design-notes-md.md
+  });
+
+  it('reports a collision instead of clobbering', async () => {
+    const root = await tempDir();
+    const a = await createControlFile(root, 'docs');
+    await renameControlFile(root, a!.path, 'Taken');
+    const b = await createControlFile(root, 'docs');
+    expect(await renameControlFile(root, b!.path, 'Taken')).toBe('taken');
+    // both still present
+    const files = (await listControlFiles(root)).find((g) => g.key === 'docs')!.files;
+    expect(files.map((f) => f.path).sort()).toEqual(['docs/new-doc.md', 'docs/taken.md']);
+  });
+
+  it('rejects instruction files, empty names, and paths outside the sandbox', async () => {
+    const root = await tempDir();
+    await writeControlFile(root, 'INSTRUCTIONS.md', 'x');
+    expect(await renameControlFile(root, 'INSTRUCTIONS.md', 'Nope')).toBeNull();
+    const doc = await createControlFile(root, 'docs');
+    expect(await renameControlFile(root, doc!.path, '   ')).toBeNull();
+    expect(await renameControlFile(root, '../escape.md', 'Nope')).toBeNull();
   });
 });
 

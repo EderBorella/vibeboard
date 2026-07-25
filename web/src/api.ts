@@ -172,6 +172,16 @@ export async function putControlFile(path: string, content: string): Promise<voi
   if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Failed to save file');
 }
 
+// Create with a server-assigned default name ("New doc", "New doc 2", …). The UI then renames
+// it in place, so no browser dialog is involved and the file exists either way.
+export function createControlFile(category: ControlCategory): Promise<ControlFile> {
+  return post<ControlFile>('/api/control/create', { category });
+}
+
+export function renameControlFile(path: string, name: string): Promise<ControlFile> {
+  return post<ControlFile>('/api/control/rename', { path, name });
+}
+
 export async function deleteControlFile(path: string): Promise<void> {
   const res = await fetch(`/api/control/file?path=${encodeURIComponent(path)}`, { method: 'DELETE' });
   if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Failed to delete file');

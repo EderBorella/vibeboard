@@ -4,10 +4,13 @@ import {
   getControlFile,
   putControlFile,
   deleteControlFile,
+  createControlFile,
+  renameControlFile,
   getResources,
   putResources,
   type ControlGroup,
   type ControlCategory,
+  type ControlFile,
   type ResourceLink,
 } from '../api';
 import type { ProjectSnapshot } from '../shared';
@@ -30,8 +33,10 @@ interface Props {
   snapshot: ProjectSnapshot;
 }
 
-function slugify(s: string): string {
-  return s.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+// Names are shown/edited without the .md extension — the server slugs what you type into the
+// real filename, so "Design Notes" becomes docs/design-notes.md.
+function editableName(name: string): string {
+  return name.replace(/\.md$/i, '');
 }
 
 export function ProjectControl({ snapshot }: Props) {
@@ -43,6 +48,10 @@ export function ProjectControl({ snapshot }: Props) {
   const [view, setView] = useState<'edit' | 'preview'>('edit');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Path currently being renamed in the list, plus its in-progress text. Set right after a
+  // create so the new file lands with its name selected and ready to type over.
+  const [renaming, setRenaming] = useState<string | null>(null);
+  const [renameDraft, setRenameDraft] = useState('');
 
   const refreshGroups = useCallback(async () => {
     try {
@@ -79,25 +88,44 @@ export function ProjectControl({ snapshot }: Props) {
     void loadFile(path);
   }
 
-  function newFile(category: ControlCategory): void {
-    let path: string | null = null;
-    if (category === 'skills') {
-      const name = window.prompt('New skill name:');
-      const slug = name && slugify(name);
-      if (slug) path = `.claude/skills/${slug}/SKILL.md`;
-    } else if (category === 'docs') {
-      const name = window.prompt('New document filename (e.g. design.md):');
-      if (name) { const n = name.trim(); path = `docs/${n.endsWith('.md') ? n : `${n}.md`}`; }
-    } else if (category === 'resources') {
-      const name = window.prompt('New resource filename (e.g. api-notes.md):');
-      if (name) path = `resources/${name.trim()}`;
+  // Create immediately with a server-assigned default name, then open it and put the list row
+  // into rename mode. No browser dialog — those can be suppressed, which would kill the feature.
+  async function newFile(category: ControlCategory): Promise<void> {
+    setError(null);
+    try {
+      const created = await createControlFile(category);
+      await refreshGroups();
+      setSelected(created.path);
+      await loadFile(created.path);
+      setRenaming(created.path);
+      setRenameDraft(editableName(created.name));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
     }
+  }
+
+  function startRename(f: ControlFile): void {
+    if (f.category === 'instructions') return; // fixed filenames the CLIs look for
+    setRenaming(f.path);
+    setRenameDraft(editableName(f.name));
+  }
+
+  async function commitRename(): Promise<void> {
+    const path = renaming;
     if (!path) return;
-    setSelected(path);
-    setFile({ path, name: path.split('/').pop()!, category, managed: false, deletable: true, content: '' });
-    setDraft('');
-    setDirty(true);
-    setView('edit');
+    const name = renameDraft.trim();
+    const current = groups.flatMap((g) => g.files).find((f) => f.path === path);
+    setRenaming(null);
+    if (!name || name === editableName(current?.name ?? '')) return; // nothing to do
+    setError(null);
+    try {
+      const updated = await renameControlFile(path, name);
+      await refreshGroups();
+      setSelected(updated.path);
+      await loadFile(updated.path);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
   }
 
   async function save(): Promise<void> {
@@ -141,7 +169,13 @@ export function ProjectControl({ snapshot }: Props) {
             <div className="control-group-head">
               <span>{g.label}</span>
               {g.key !== 'instructions' && (
-                <button className="control-new" title={`New ${g.label.toLowerCase().replace(/s$/, '')}`} onClick={() => newFile(g.key)}>＋</button>
+                <button
+                  className="control-new"
+                  title={`New ${g.label.toLowerCase().replace(/s$/, '')}`}
+                  onClick={() => void newFile(g.key)}
+                >
+                  ＋
+                </button>
               )}
             </div>
             {g.key === 'resources' && (
@@ -154,15 +188,32 @@ export function ProjectControl({ snapshot }: Props) {
             )}
             {g.files.length === 0 && g.key !== 'resources' && <div className="control-empty">— none —</div>}
             {g.files.map((f) => (
-              <button
-                key={f.path}
-                className={`control-item${selected === f.path ? ' active' : ''}`}
-                title={f.path}
-                onClick={() => select(f.path)}
-              >
-                <span className="control-item-name">{f.name}</span>
-                {f.managed && <span className="control-tag">managed</span>}
-              </button>
+              renaming === f.path ? (
+                <input
+                  key={f.path}
+                  className="control-rename"
+                  value={renameDraft}
+                  autoFocus
+                  onFocus={(e) => e.currentTarget.select()}
+                  onChange={(e) => setRenameDraft(e.target.value)}
+                  onBlur={() => void commitRename()}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') { e.preventDefault(); void commitRename(); }
+                    if (e.key === 'Escape') { e.preventDefault(); setRenaming(null); }
+                  }}
+                />
+              ) : (
+                <button
+                  key={f.path}
+                  className={`control-item${selected === f.path ? ' active' : ''}`}
+                  title={`${f.path}${f.deletable ? ' · double-click to rename' : ''}`}
+                  onClick={() => select(f.path)}
+                  onDoubleClick={() => startRename(f)}
+                >
+                  <span className="control-item-name">{f.name}</span>
+                  {f.managed && <span className="control-tag">managed</span>}
+                </button>
+              )
             ))}
           </div>
         ))}

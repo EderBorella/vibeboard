@@ -16,6 +16,8 @@ import {
   readControlFile,
   writeControlFile,
   deleteControlFile,
+  createControlFile,
+  renameControlFile,
   readResources,
   writeResources,
 } from './control-files.js';
@@ -219,6 +221,25 @@ export function buildApp(session: ProjectSession): FastifyInstance {
       const ok = await writeControlFile(session.root!, path, content ?? '');
       if (!ok) return reply.code(400).send({ error: 'Path not allowed' });
       return { ok: true };
+    });
+
+    // Create with a default, collision-free name ("New doc", "New doc 2", …). The UI renames it
+    // in place afterwards, so there is no browser dialog in the flow.
+    api.post('/control/create', async (req, reply) => {
+      if (!ensureOpen(session, reply)) return;
+      const { category } = req.body as { category?: string };
+      const file = await createControlFile(session.root!, category);
+      if (!file) return reply.code(400).send({ error: 'Cannot create in that category' });
+      return file;
+    });
+
+    api.post('/control/rename', async (req, reply) => {
+      if (!ensureOpen(session, reply)) return;
+      const { path, name } = req.body as { path?: string; name?: string };
+      const result = await renameControlFile(session.root!, path, name);
+      if (result === 'taken') return reply.code(409).send({ error: 'That name is already used' });
+      if (!result) return reply.code(400).send({ error: 'Cannot rename that file' });
+      return result;
     });
 
     api.delete('/control/file', async (req, reply) => {

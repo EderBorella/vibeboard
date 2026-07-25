@@ -500,6 +500,13 @@ body {
   border: 1px solid var(--border); border-radius: 4px; padding: 0.05rem 0.3rem;
 }
 .control-empty { color: var(--muted); font-size: 0.72rem; padding: 0 0.5rem; }
+/* Inline rename: sits exactly where the list row was, so the row appears to become editable. */
+.control-rename {
+  width: 100%; background: var(--bg); color: var(--text);
+  border: 1px solid var(--accent); border-radius: 6px;
+  padding: 0.35rem 0.5rem; font-size: 0.8rem; font-family: inherit;
+}
+.control-rename:focus { outline: none; box-shadow: var(--glow); }
 
 .control-editor { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
 .control-editor-head {

@@ -11,12 +11,44 @@ export default {
   packageManager: 'npm',
   testRunner: 'vitest',
 
-  // Deliberately narrower than "all of src". The first full run scored 66.49% total / 79.89%
-  // covered over 2446 mutants, and the untested remainder was almost entirely process plumbing:
-  // static.ts (0%), opencode-server.ts (3.3%) and models.ts (18%) exist to spawn things and serve
-  // files. Mutating a spawn lifecycle produces timeouts, not insight. Core logic and the HTTP
-  // routes are where a surviving mutant means something.
-  mutate: ['src/core/**/*.ts', 'src/server/routes/**/*.ts', '!src/core/types.ts'],
+  // Every module that has real tests, and nothing else — a file with no test scores 100%
+  // survivors and reports a gap we already know about, which only drags the number down without
+  // adding information.
+  //
+  // Deliberately NOT here:
+  // - static.ts, opencode-server.ts, main.ts: they spawn processes and serve files. Mutating a
+  //   spawn lifecycle produces timeouts, not insight.
+  // - types.ts / web/src/shared.ts: type declarations. The src<->web mirror is guarded by
+  //   test/mirror.test.ts instead.
+  // - web/src/api.ts: every test that touches it mocks it or imports only its types, so no
+  //   mutant there can be killed.
+  // - the React components with no test (Board, Column, CardTile, the copilot panels, …) and
+  //   the untested hooks — see notes/quality-backlog.md.
+  mutate: [
+    'src/core/**/*.ts',
+    '!src/core/types.ts',
+    'src/server/routes/**/*.ts',
+    // Server modules with their own tests. control-files.ts first: it is the path sandbox behind
+    // Project Control (the `..` rejection, the symlink realpath walk, the category allow-list)
+    // and the closest thing here to a security boundary.
+    'src/server/control-files.ts',
+    'src/server/copilot-events.ts',
+    'src/server/session.ts',
+    'src/server/snapshot.ts',
+    'src/server/chat-store.ts',
+    'src/server/discover.ts',
+    'src/server/app-state.ts',
+    'src/server/route-context.ts',
+    // Web modules with their own tests.
+    'web/src/markdown.tsx',
+    'web/src/viewmodel.ts',
+    'web/src/ws.ts',
+    'web/src/copilot/choice.ts',
+    'web/src/copilot/useCopilot.ts',
+    'web/src/components/CardEditor.tsx',
+    'web/src/components/ModelPicker.tsx',
+    'web/src/components/TopBar.tsx',
+  ],
 
   // perTest runs only the tests that actually cover each mutant, which is what keeps this in
   // minutes rather than hours.
@@ -39,6 +71,18 @@ export default {
   // Some mutants in the filesystem and watcher paths turn a guard into an await that never settles.
   // 30s is enough to let a genuinely slow test finish while still killing those as timeouts.
   timeoutMS: 30000,
+
+  // Static mutants (module-level constants and regexes) re-run the WHOLE suite per mutant, and
+  // with one worker per core that contention alone blows the timeout — so they were scoring as
+  // kills without any test having failed. Proof: twelve mutants of one regex on markdown.tsx:15
+  // split 5 timeout / 4 killed / 2 survived, same code, different scheduling. Ignoring them drops
+  // them out of the denominator instead of crediting 55 phantom kills; the constants concerned are
+  // asserted directly by tests anyway.
+  ignoreStatic: true,
+
+  // Report colouring only. `break` stays null deliberately: a blocking gate belongs in the commit
+  // that reaches the target, not pointed at a backlog that has to be bypassed.
+  thresholds: { high: 95, low: 85, break: null },
 
   // concurrency is left at Stryker's default (cpuCount - 1) on purpose — pinning it low is the
   // easiest way to make this look slower than it is.

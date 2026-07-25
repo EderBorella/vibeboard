@@ -45,6 +45,31 @@ describe('PATCH /api/config', () => {
 
     client.close();
   }, 5000);
+
+  // Regression: the copilot dock's model/effort pickers write straight to the config, one
+  // field at a time. If a partial copilot patch replaced the block wholesale, changing the
+  // model would wipe the effort (and vice versa) — the "my defaults don't save" bug.
+  it('merges a partial copilot patch instead of replacing the block', async () => {
+    session = new ProjectSession();
+    app = buildApp(session);
+    const root = await tempDir();
+    await app.inject({ method: 'POST', url: '/api/project/scaffold', payload: { path: root, name: 'Cfg', mode: 'greenfield' } });
+
+    const patch = async (copilot: unknown) =>
+      (await app!.inject({ method: 'PATCH', url: '/api/config', payload: { copilot } })).json().copilot;
+
+    // Model only: effort and backend survive.
+    let copilot = await patch({ backend: 'claude-code', model: 'sonnet' });
+    expect(copilot).toEqual({ backend: 'claude-code', model: 'sonnet', effort: 'high' });
+
+    // Effort only: the model just chosen survives.
+    copilot = await patch({ backend: 'claude-code', effort: 'max' });
+    expect(copilot).toEqual({ backend: 'claude-code', model: 'sonnet', effort: 'max' });
+
+    // And it is on disk, not just in memory — the picker's choice must outlive a reload.
+    const reread = (await app.inject({ method: 'GET', url: '/api/config' })).json();
+    expect(reread.copilot).toEqual({ backend: 'claude-code', model: 'sonnet', effort: 'max' });
+  });
 });
 
 describe('PATCH /api/config — column reconciliation', () => {

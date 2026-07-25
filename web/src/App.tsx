@@ -30,22 +30,20 @@ export function App() {
   // Copilot state lives here (not in the panel) so the transcript + socket survive
   // closing/reopening the dock. The server-side session persists regardless.
   const copilot = useCopilot();
+  // Mode is per-turn and deliberately NOT persisted — you pick it for the task at hand.
   const [copilotMode, setCopilotMode] = useState<CopilotMode>('bypassPermissions');
-  const [copilotModel, setCopilotModel] = useState('');
-  const [copilotEffort, setCopilotEffort] = useState<'' | EffortLevel>('');
 
-  // Seed the dock's model/effort from the project config when a project opens. Without this
-  // the dock would send its own default on every turn and silently override the configured
-  // one, since the controls now always send a concrete value rather than "you decide".
-  const seededFor = useRef<string | null>(null);
-  useEffect(() => {
-    if (!snapshot || seededFor.current === snapshot.root) return;
-    seededFor.current = snapshot.root;
-    const { backend, model, effort } = snapshot.config.copilot;
-    const fallback = backendDefaults(backend);
-    setCopilotModel(model || fallback.model);
-    setCopilotEffort(effort || fallback.effort);
-  }, [snapshot]);
+  // Model and effort come straight from the project config — no local copy. Two copies is
+  // what broke this before: the dock's picker only set React state, so changes vanished on
+  // reload, and a stale local value would override what Settings had just saved. The config
+  // is the single source of truth, and PATCH /config broadcasts a snapshot, so writing it
+  // updates the dock.
+  const copilotBackend = snapshot?.config.copilot.backend || DEFAULT_BACKEND;
+  const copilotDefaults = backendDefaults(copilotBackend);
+  const copilotModel = snapshot?.config.copilot.model || copilotDefaults.model;
+  const copilotEffort = snapshot?.config.copilot.effort || copilotDefaults.effort;
+  const onModel = (model: string): void => { void patchConfig({ copilot: { backend: copilotBackend, model } }); };
+  const onEffort = (effort: string): void => { void patchConfig({ copilot: { backend: copilotBackend, effort } }); };
 
   // Theme: applied to <html data-theme>, persisted. Default cyberpunk.
   const [theme, setTheme] = useState<string>(() => localStorage.getItem('vb-theme') || 'cyberpunk');
@@ -72,12 +70,10 @@ export function App() {
   // Switch the copilot backend: persist it, reset the (backend-specific) model, and start a
   // fresh chat so we don't try to resume a session under the other backend.
   const onBackend = (backend: string): void => {
-    if (backend === (snapshot?.config.copilot.backend || DEFAULT_BACKEND)) return;
+    if (backend === copilotBackend) return;
     // Model ids and effort scales don't cross backends — adopt the new backend's real
     // defaults instead of clearing to blank and letting the CLI pick silently.
     const next = backendDefaults(backend);
-    setCopilotModel(next.model);
-    setCopilotEffort(next.effort);
     copilot.newSession();
     void patchConfig({ copilot: { backend, model: next.model, effort: next.effort } });
   };
@@ -169,13 +165,13 @@ export function App() {
         {copilotOpen && (
           <CopilotPanel
             copilot={copilot}
-            backend={snapshot.config.copilot.backend || 'claude-code'}
+            backend={copilotBackend}
             mode={copilotMode}
             model={copilotModel}
             effort={copilotEffort}
             onMode={setCopilotMode}
-            onModel={setCopilotModel}
-            onEffort={setCopilotEffort}
+            onModel={onModel}
+            onEffort={onEffort}
             onBackend={onBackend}
             onClose={() => setCopilotOpen(false)}
           />

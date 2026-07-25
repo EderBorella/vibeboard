@@ -384,6 +384,11 @@ body {
 .copilot-title::before { content: "◈ "; color: var(--accent); }
 .copilot-model { font-size: 0.68rem; color: var(--muted); font-family: var(--font-mono); }
 .copilot-x { margin-left: auto; background: transparent; border: none; color: var(--muted); cursor: pointer; }
+.backend-toggle { display: flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+.bt-btn { background: var(--panel-2); color: var(--muted); border: none; border-right: 1px solid var(--border); padding: 0.18rem 0.5rem; font-size: 0.68rem; cursor: pointer; }
+.bt-btn:last-child { border-right: none; }
+.bt-btn.active { background: var(--accent); color: var(--on-accent); font-weight: 600; }
+.bt-btn:disabled { opacity: 0.6; cursor: default; }
 
 /* Chat switcher */
 .copilot-chatbar { display: flex; align-items: center; gap: 0.4rem; padding: 0.4rem 0.75rem; border-bottom: 1px solid var(--border); }

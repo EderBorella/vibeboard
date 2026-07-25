@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { BOARDS, BOARD_LABELS, type BoardName, type Card } from './shared';
 import { useSnapshot } from './useSnapshot';
-import { getState, moveCard, archiveCard } from './api';
+import { getState, moveCard, archiveCard, patchConfig } from './api';
 import { Board } from './components/Board';
 import { ProjectGate } from './components/ProjectGate';
 import { CardEditor, type EditorState } from './components/CardEditor';
@@ -54,6 +54,14 @@ export function App() {
   const onOpen = (card: Card): void => setEditor({ mode: 'edit', card });
   const onDragStart = (card: Card): void => { dragged.current = card; };
   const onArchive = (card: Card): void => { void archiveCard(card.board, card.id); };
+  // Switch the copilot backend: persist it, reset the (backend-specific) model, and start a
+  // fresh chat so we don't try to resume a session under the other backend.
+  const onBackend = (backend: string): void => {
+    if (backend === (snapshot?.config.copilot.backend || 'claude-code')) return;
+    setCopilotModel('');
+    copilot.newSession();
+    void patchConfig({ copilot: { backend, model: '' } });
+  };
   const onDrop = (board: BoardName, columnSlug: string): void => {
     const card = dragged.current;
     dragged.current = null;
@@ -135,6 +143,7 @@ export function App() {
             onMode={setCopilotMode}
             onModel={setCopilotModel}
             onEffort={setCopilotEffort}
+            onBackend={onBackend}
             onClose={() => setCopilotOpen(false)}
           />
         )}

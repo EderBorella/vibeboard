@@ -5,6 +5,10 @@ import { ModelPicker } from '../components/ModelPicker';
 import type { CopilotMode, EffortLevel, useCopilot } from './useCopilot';
 
 const CONTEXT_BUDGET = 200_000;
+const BACKENDS: { value: string; label: string }[] = [
+  { value: 'claude-code', label: 'Claude' },
+  { value: 'opencode', label: 'OpenCode' },
+];
 
 function fmtUsd(n: number): string { return `$${n.toFixed(n < 1 ? 4 : 2)}`; }
 function fmtK(n: number): string { return n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n); }
@@ -31,10 +35,11 @@ interface Props {
   onMode: (m: CopilotMode) => void;
   onModel: (m: string) => void;
   onEffort: (e: '' | EffortLevel) => void;
+  onBackend: (b: string) => void;
   onClose: () => void;
 }
 
-export function CopilotPanel({ copilot, backend, mode, model, effort, onMode, onModel, onEffort, onClose }: Props) {
+export function CopilotPanel({ copilot, backend, mode, model, effort, onMode, onModel, onEffort, onBackend, onClose }: Props) {
   const { items, running, model: activeModel, stats, chats, currentChatId, send, compact, newSession, openChat, deleteChat, cancel } = copilot;
   const [draft, setDraft] = useState('');
   const [models, setModels] = useState<ModelOption[]>([]);
@@ -81,6 +86,19 @@ export function CopilotPanel({ copilot, backend, mode, model, effort, onMode, on
     <aside className="copilot">
       <div className="copilot-head">
         <span className="copilot-title">Copilot</span>
+        <div className="backend-toggle" role="group" aria-label="Backend">
+          {BACKENDS.map((b) => (
+            <button
+              key={b.value}
+              className={`bt-btn${backend === b.value ? ' active' : ''}`}
+              disabled={running}
+              title={running ? 'Finish the current turn first' : `Switch to ${b.label} (starts a new chat)`}
+              onClick={() => onBackend(b.value)}
+            >
+              {b.label}
+            </button>
+          ))}
+        </div>
         {activeModel && <span className="copilot-model">{activeModel}</span>}
         <button className="copilot-x" onClick={onClose} title="Hide (session keeps running)">✕</button>
       </div>

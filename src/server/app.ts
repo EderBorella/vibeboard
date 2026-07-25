@@ -171,6 +171,9 @@ export function buildApp(session: ProjectSession): FastifyInstance {
       const merged: ProjectConfig = { ...session.config!, ...patch, copilot: { ...session.config!.copilot, ...(patch.copilot ?? {}) } };
       await writeConfig(session.root!, merged);
       await session.reloadConfig();
+      // Push the updated snapshot so all clients reflect the new config immediately (the
+      // watcher would also fire, but this is instant and race-free for the backend toggle).
+      broadcast({ type: 'snapshot', snapshot: await session.snapshot() });
       return session.config;
     });
 

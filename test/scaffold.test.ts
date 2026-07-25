@@ -39,6 +39,20 @@ describe('scaffoldProject', () => {
     await expect(access(join(root, 'VIBEBOARD.md'))).resolves.toBeUndefined();
   });
 
+  it('brownfield: adds the cockpit but no sample cards, leaving existing files alone', async () => {
+    const root = await tempDir();
+    await writeFile(join(root, 'README.md'), '# My real repo\n', 'utf8');
+    await scaffoldProject(root, { name: 'Adopted', mode: 'brownfield', today: TODAY });
+
+    const config = await readConfig(root);
+    for (const board of ['features', 'product', 'engineering'] as const) {
+      expect(await readBoard(root, board, config), board).toEqual([]); // no "delete me" cards
+    }
+    // the cockpit itself is there, and the pre-existing file is untouched
+    await expect(access(join(root, 'product', 'todo'))).resolves.toBeUndefined();
+    expect(await readFile(join(root, 'README.md'), 'utf8')).toBe('# My real repo\n');
+  });
+
   it('brownfield: does not duplicate the pointer on re-run', async () => {
     const root = await tempDir();
     await writeFile(join(root, 'CLAUDE.md'), '# X\n', 'utf8');

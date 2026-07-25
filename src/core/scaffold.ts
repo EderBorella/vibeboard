@@ -105,5 +105,8 @@ export async function scaffoldProject(
   const greenfield = opts.mode === 'greenfield';
   await ensurePointerFile(projectRoot, 'CLAUDE.md', opts.name, greenfield);
   await ensurePointerFile(projectRoot, 'AGENTS.md', opts.name, greenfield);
-  await writeSampleCards(projectRoot, config, opts.today);
+  // Sample cards demonstrate the shape for a brand-new project. Adopting an existing repo
+  // should add the cockpit and nothing else — three "delete me" cards would just be noise in
+  // someone's real project (and in their git status).
+  if (greenfield) await writeSampleCards(projectRoot, config, opts.today);
 }

@@ -18,12 +18,17 @@ export function ProjectGate({ onOpened }: Props) {
   const [openPath, setOpenPath] = useState('');
   const [newParent, setNewParent] = useState('');
   const [newName, setNewName] = useState('');
+  const [adoptPath, setAdoptPath] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const nameSlug = slugify(newName);
   const parent = newParent.replace(/\/+$/, '');
   const targetPath = parent && nameSlug ? `${parent}/${nameSlug}` : '';
+
+  // Adopting an existing repo: the project name comes from the folder itself.
+  const adoptTarget = adoptPath.trim().replace(/\/+$/, '');
+  const adoptName = slugify(adoptTarget.split('/').pop() ?? '') || 'project';
 
   useEffect(() => { listProjects().then(setProjects).catch(() => setProjects([])); }, []);
 
@@ -88,6 +93,30 @@ export function ProjectGate({ onOpened }: Props) {
           </div>
         </label>
         {targetPath && <div className="gate-preview">Creates <code>{targetPath}</code></div>}
+
+        <h3>Adopt an existing folder</h3>
+        <div className="gate-hint">
+          Adds the board structure to a repo you already have. Existing files are left alone —
+          only a pointer is appended to <code>CLAUDE.md</code> / <code>AGENTS.md</code>, and no
+          sample cards are created.
+        </div>
+        <label className="gate-field">
+          <span>Existing project folder</span>
+          <div className="gate-row">
+            <input
+              value={adoptPath}
+              placeholder="/path/to/existing-repo"
+              onChange={(e) => setAdoptPath(e.target.value)}
+            />
+            <button
+              disabled={busy || !adoptTarget}
+              onClick={() => run(() => scaffoldProject(adoptTarget, adoptName, 'brownfield'))}
+            >
+              Adopt
+            </button>
+          </div>
+        </label>
+        {adoptTarget && <div className="gate-preview">Adopts <code>{adoptTarget}</code> as <code>{adoptName}</code></div>}
 
         {error && <div className="gate-error">{error}</div>}
       </div>

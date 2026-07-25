@@ -71,8 +71,17 @@ export function openProject(path: string): Promise<{ snapshot: ProjectSnapshot }
   return post('/api/project/open', { path });
 }
 
-export function scaffoldProject(path: string, name: string): Promise<{ snapshot: ProjectSnapshot }> {
-  return post('/api/project/scaffold', { path, name, mode: 'greenfield' });
+// greenfield = a brand-new folder (full scaffold + sample cards).
+// brownfield = adopt an existing repo: add the cockpit alongside what's already there,
+// appending only pointers to CLAUDE.md / AGENTS.md and creating no sample cards.
+export type ScaffoldMode = 'greenfield' | 'brownfield';
+
+export function scaffoldProject(
+  path: string,
+  name: string,
+  mode: ScaffoldMode = 'greenfield',
+): Promise<{ snapshot: ProjectSnapshot }> {
+  return post('/api/project/scaffold', { path, name, mode });
 }
 
 export interface CreateCardBody {

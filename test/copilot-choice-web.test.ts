@@ -17,6 +17,13 @@ describe('resolveChoice', () => {
     expect(resolveChoice(undefined, {}))
       .toEqual({ backend: 'claude-code', model: 'opus', effort: 'high' });
   });
+
+  // Settings' backend buttons pass the clicked backend through here. Naming the backend that
+  // is ALREADY configured must keep its model — the button used to reset it to the built-in
+  // default, so re-clicking the active backend silently discarded your choice.
+  it('keeps the configured model when the override names the configured backend', () => {
+    expect(resolveChoice(claude, { backend: 'claude-code' })).toEqual(claude);
+  });
 });
 
 describe('clampToCaps', () => {

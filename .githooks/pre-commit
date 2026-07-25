@@ -84,7 +84,7 @@ fi
 if "$BIOME" lint --max-diagnostics=none >"$LOGS/lint.log" 2>&1; then
   ok "lint"
 else
-  counts=$(grep -oE 'Found [0-9]+ (error|warning)s?' "$LOGS/lint.log" | paste -sd', ' -)
+  counts=$(grep -oE 'Found [0-9]+ (error|warning)s?' "$LOGS/lint.log" | paste -sd'~' - | sed 's/~/, /g')
   dim "  lint: ${counts:-findings present} (not blocking — see .githooks/pre-commit)"
 fi
 

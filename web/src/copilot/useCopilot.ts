@@ -146,21 +146,24 @@ export function useCopilot(bump: number) {
         case 'tool_result':
           break; // tool results are noisy; the board reflects file changes
         // Context occupancy comes from each model call's own usage (last wins).
-        case 'usage':
-          if (typeof e.contextTokens === 'number')
-            setStats((s) => ({ ...s, contextTokens: e.contextTokens! }));
+        case 'usage': {
+          const tokens = e.contextTokens;
+          if (typeof tokens === 'number') setStats((s) => ({ ...s, contextTokens: tokens }));
           break;
+        }
         // Result carries cost/turns/duration only — its token totals are cross-call sums.
-        case 'result':
+        case 'result': {
           streamId.current = null;
-          if (e.stats)
+          const turnStats = e.stats;
+          if (turnStats)
             setStats((s) => ({
               ...s,
-              costUsd: s.costUsd + e.stats!.costUsd,
-              turns: s.turns + e.stats!.turns,
-              lastDurationMs: e.stats!.durationMs,
+              costUsd: s.costUsd + turnStats.costUsd,
+              turns: s.turns + turnStats.turns,
+              lastDurationMs: turnStats.durationMs,
             }));
           break;
+        }
       }
     },
     [push, openStream, appendStream],

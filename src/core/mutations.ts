@@ -63,7 +63,7 @@ export async function createCard(
 // `projectRoot` is unused — a card's file path is absolute (Card.filePath) — but every other
 // mutation takes it, and breaking that symmetry for one function costs more than it saves.
 export async function updateCard(
-  projectRoot: string,
+  _projectRoot: string,
   card: Card,
   patch: Partial<CardFrontmatter> & { body?: string },
 ): Promise<Card> {

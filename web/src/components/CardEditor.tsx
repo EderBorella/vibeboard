@@ -79,14 +79,14 @@ export function CardEditor({ editor, allCards, onClose, onSaved }: Props) {
         });
         await setLinksApi(created.board, created.id, links);
       } else {
-        await patchCard(existing!.board, existing!.id, {
+        await patchCard(editor.card.board, editor.card.id, {
           title,
           description,
           tags: parseCsv(tags),
           group,
           body,
         });
-        await setLinksApi(existing!.board, existing!.id, links);
+        await setLinksApi(editor.card.board, editor.card.id, links);
       }
       onSaved();
     } catch (e) {
@@ -101,7 +101,7 @@ export function CardEditor({ editor, allCards, onClose, onSaved }: Props) {
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
           <span className="modal-title">
-            {editor.mode === 'create' ? `New ${board} card` : `${existing!.id} · ${board}`}
+            {editor.mode === 'create' ? `New ${board} card` : `${editor.card.id} · ${board}`}
           </span>
           <div className="modal-tabs">
             <button className={tab === 'form' ? 'active' : ''} onClick={() => setTab('form')}>

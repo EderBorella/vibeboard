@@ -43,7 +43,9 @@ export function createCopilotTurns(ctx: AppCtx): {
     resolveCopilotSelection(session.config?.copilot, { backend: override }).backend as Backend;
 
   async function handleCopilotSend(text: string, opts: CopilotOpts): Promise<void> {
-    if (!session.isOpen) {
+    // Read root rather than isOpen, so the cwd below needs no assertion.
+    const root = session.root;
+    if (!root) {
       broadcast({ type: 'copilot:error', error: 'No project open' });
       return;
     }
@@ -57,7 +59,7 @@ export function createCopilotTurns(ctx: AppCtx): {
         effort: opts.effort,
       });
       await copilot.send({
-        cwd: session.root!,
+        cwd: root,
         text,
         mode: opts.mode,
         backend: choice.backend as Backend,

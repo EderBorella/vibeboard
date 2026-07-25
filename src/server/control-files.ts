@@ -163,7 +163,8 @@ async function rootMarkdown(root: string): Promise<string[]> {
 export async function listControlFiles(root: string): Promise<ControlGroup[]> {
   const instructions: ControlFile[] = [];
   for (const name of INSTRUCTION_FILES) {
-    if (await exists(join(root, name))) instructions.push(descriptor(name)!);
+    const file = descriptor(name);
+    if (file && (await exists(join(root, name)))) instructions.push(file);
   }
   const toFiles = (rels: string[]): ControlFile[] =>
     rels.map(descriptor).filter((f): f is ControlFile => f !== null);
@@ -349,7 +350,8 @@ export async function readResources(root: string): Promise<ResourceLink[]> {
   try {
     const raw = await readFile(join(root, RESOURCES_YAML), 'utf8');
     const parsed = parse(raw) as { links?: unknown[] } | null;
-    const links = Array.isArray(parsed?.links) ? parsed!.links : [];
+    const rawLinks = parsed?.links;
+    const links = Array.isArray(rawLinks) ? rawLinks : [];
     return links.map(cleanLink).filter((l): l is ResourceLink => l !== null);
   } catch {
     return [];

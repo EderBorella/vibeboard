@@ -142,7 +142,7 @@ export function ProjectControl({ snapshot }: Props) {
   }
 
   async function remove(): Promise<void> {
-    if (!file || !file.deletable) return;
+    if (!file?.deletable) return;
     if (!window.confirm(`Delete ${file.path}? This removes the file from disk.`)) return;
     setBusy(true);
     setError(null);

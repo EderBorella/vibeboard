@@ -119,7 +119,7 @@ export class ChatStore {
     try {
       const raw = await readFile(join(this.#dir(root), `${id}.json`), 'utf8');
       const chat = JSON.parse(raw) as StoredChat;
-      return chat && chat.id ? chat : undefined;
+      return chat?.id ? chat : undefined;
     } catch {
       return undefined;
     }
@@ -147,10 +147,11 @@ export class ChatStore {
   async #allChats(): Promise<StoredChat[]> {
     const root = this.#session.root;
     const disk = root ? await this.#readAll(root) : [];
-    if (this.#current) {
-      const idx = disk.findIndex((c) => c.id === this.#current!.id);
-      if (idx >= 0) disk[idx] = this.#current;
-      else disk.push(this.#current);
+    const current = this.#current;
+    if (current) {
+      const idx = disk.findIndex((c) => c.id === current.id);
+      if (idx >= 0) disk[idx] = current;
+      else disk.push(current);
       disk.sort(descByUpdated);
     }
     return disk;

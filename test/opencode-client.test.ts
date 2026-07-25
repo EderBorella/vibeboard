@@ -33,7 +33,7 @@ describe('messageToEvents', () => {
     expect(events).toContainEqual({ kind: 'text', text: 'ok' });
     expect(events).toContainEqual({ kind: 'usage', contextTokens: 11774 });
     const result = events.find((e) => e.kind === 'result');
-    if (!result || result.kind !== 'result') throw new Error('expected result');
+    if (result?.kind !== 'result') throw new Error('expected result');
     expect(result.sessionId).toBe('ses_x');
     expect(result.stats).toMatchObject({
       ok: true,
@@ -53,7 +53,7 @@ describe('messageToEvents', () => {
     const events = messageToEvents(data);
     expect(events.some((e) => e.kind === 'text' && e.text.includes('model deprecated'))).toBe(true);
     const result = events.find((e) => e.kind === 'result');
-    if (!result || result.kind !== 'result') throw new Error('expected result');
+    if (result?.kind !== 'result') throw new Error('expected result');
     expect(result.stats.ok).toBe(false);
   });
 });

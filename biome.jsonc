@@ -1,0 +1,72 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.5.5/schema.json",
+
+  // .gitignore is the single source of truth for what is not ours: dist/, node_modules/,
+  // docs/superpowers/, coverage/ are all already listed there, so they need no second home here.
+  "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
+
+  // Source only, listed explicitly. A bare "check everything" would also format package.json and
+  // package-lock.json — the lockfile is generated, 20k+ lines, and must stay byte-for-byte npm's.
+  "files": {
+    "includes": [
+      "src/**/*.ts",
+      "web/src/**/*.ts",
+      "web/src/**/*.tsx",
+      "test/**/*.ts",
+      "vitest.config.ts",
+      "web/vite.config.ts"
+    ]
+  },
+
+  // Matches the style the codebase already had: 2-space indent, single quotes, always-semicolons.
+  // lineWidth 110 rather than Biome's default 80 because p95 of existing lines is 95 chars; 80
+  // would reflow comment blocks that are deliberately wrapped to sit beside the code they explain.
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 110
+  },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "single",
+      "jsxQuoteStyle": "double",
+      "semicolons": "always",
+      "trailingCommas": "all",
+      "arrowParentheses": "always",
+      "bracketSpacing": true
+    }
+  },
+
+  "linter": {
+    "enabled": true,
+    // The react domain is what enables useExhaustiveDependencies. Without it a stale useEffect
+    // dependency list is invisible — the class of bug that made the copilot dock overwrite the
+    // saved defaults (an effect keyed on snapshot.root while reading snapshot.config).
+    "domains": { "react": "recommended" },
+    "rules": {
+      // `preset` replaced the deprecated `recommended: true` in 2.x.
+      "preset": "recommended",
+      // warn, not error: high cognitive complexity is a readability signal, not a defect. Mutation
+      // testing showed the two densest functions (routes/config.ts at 31, core/config.ts at 21) are
+      // among the best-tested in the repo at 93% and 80% killed. Blocking on this would be noise.
+      "complexity": {
+        "noExcessiveCognitiveComplexity": { "level": "warn", "options": { "maxAllowedComplexity": 15 } }
+      }
+    }
+  },
+
+  "overrides": [
+    {
+      // Non-null assertions are a real smell in src/ — each one overrules the type system rather
+      // than handling the case. In tests they are how you say "the fixture obviously has this";
+      // 64 of the repo's 116 live here and flagging them would bury the src/ ones that matter.
+      "includes": ["test/**"],
+      "linter": {
+        "rules": {
+          "style": { "noNonNullAssertion": "off" }
+        }
+      }
+    }
+  ]
+}

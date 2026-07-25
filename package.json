@@ -9,6 +9,10 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "typecheck:web": "tsc --noEmit -p web/tsconfig.json",
     "typecheck:test": "tsc --noEmit -p tsconfig.test.json",
+    "lint": "biome check",
+    "lint:fix": "biome check --write",
+    "format": "biome format --write",
+    "mutate": "stryker run",
     "check": "npm run typecheck && npm run typecheck:web && npm run typecheck:test",
     "dev": "tsx watch src/server/main.ts",
     "web:dev": "vite --config web/vite.config.ts",
@@ -43,6 +47,9 @@
     "yaml": "^2.9.0"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.5.5",
+    "@stryker-mutator/core": "^9.6.1",
+    "@stryker-mutator/vitest-runner": "^9.6.1",
     "@types/node": "^24.13.3",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",

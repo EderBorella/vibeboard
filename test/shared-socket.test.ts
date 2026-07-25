@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { SharedSocket } from '../web/src/ws.js';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ConnState } from '../web/src/ws.js';
+import { SharedSocket } from '../web/src/ws.js';
 
 // The client's shared socket is the one piece of the two-sockets-into-one change that the
 // server-side tests cannot reach: each of those opens a single client, so none of them

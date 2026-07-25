@@ -1,5 +1,5 @@
+import { countArchived, readBoard } from '../core/board.js';
 import { readConfig } from '../core/config.js';
-import { readBoard, countArchived } from '../core/board.js';
 import { BOARDS, type BoardName, type Card, type ProjectConfig } from '../core/types.js';
 
 export interface ProjectSnapshot {

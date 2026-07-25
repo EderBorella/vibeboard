@@ -1,12 +1,12 @@
-import { describe, it, expect } from 'vitest';
-import { tempDir } from './helpers.js';
-import { scaffoldProject } from '../src/core/scaffold.js';
-import { readConfig } from '../src/core/config.js';
-import { createCard } from '../src/core/mutations.js';
+import { describe, expect, it } from 'vitest';
 import { readBoard } from '../src/core/board.js';
+import { readConfig } from '../src/core/config.js';
 import { findCard } from '../src/core/find.js';
 import { boardOfId, setCardLinks } from '../src/core/links.js';
+import { createCard } from '../src/core/mutations.js';
+import { scaffoldProject } from '../src/core/scaffold.js';
 import type { ProjectConfig } from '../src/core/types.js';
+import { tempDir } from './helpers.js';
 
 const TODAY = '2026-07-23';
 

@@ -1,4 +1,4 @@
-import { writeFile, readFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 // The user's own standing instructions live here — freely editable by the user AND the

@@ -1,6 +1,6 @@
-import type { BackendCaps } from '../shared';
 import type { ModelOption } from '../api';
 import { ModelPicker } from '../components/ModelPicker';
+import type { BackendCaps } from '../shared';
 
 interface Props {
   // Modes and efforts are backend-specific; the caller passes the caps of the backend in force.

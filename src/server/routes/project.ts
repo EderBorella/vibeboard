@@ -1,9 +1,9 @@
-import type { FastifyInstance } from 'fastify';
 import { dirname } from 'node:path';
-import { scaffoldProject, type ScaffoldMode } from '../../core/scaffold.js';
-import { discoverProjects } from '../discover.js';
+import type { FastifyInstance } from 'fastify';
+import { type ScaffoldMode, scaffoldProject } from '../../core/scaffold.js';
 import { rememberProject } from '../app-state.js';
-import { today, type AppCtx } from '../route-context.js';
+import { discoverProjects } from '../discover.js';
+import { type AppCtx, today } from '../route-context.js';
 
 export async function registerProjectRoutes(api: FastifyInstance, ctx: AppCtx): Promise<void> {
   api.get('/state', async () =>

@@ -1,7 +1,7 @@
-import { describe, it, expect, afterEach } from 'vitest';
-import { openTestProject } from './helpers.js';
-import { ProjectSession } from '../src/server/session.js';
+import { afterEach, describe, expect, it } from 'vitest';
 import { buildApp } from '../src/server/app.js';
+import { ProjectSession } from '../src/server/session.js';
+import { openTestProject } from './helpers.js';
 
 // Only the "no project open" test builds a session by hand — it must NOT have a project.
 let bare: ProjectSession | undefined;

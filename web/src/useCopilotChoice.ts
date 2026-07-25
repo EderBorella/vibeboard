@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
+import { isOverridden, resolveChoice } from './copilot/choice';
 import type { CopilotChoice, CopilotConfig } from './shared';
-import { resolveChoice, isOverridden } from './copilot/choice';
 
 // One source of truth for the defaults: the project config, written ONLY by Settings.
 // The dock's controls are a session override — they never touch the file, so switching

@@ -1,17 +1,17 @@
-import { describe, it, expect, afterEach, beforeEach } from 'vitest';
-import { writeFile, rm, readFile } from 'node:fs/promises';
+import { readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { tempDir } from './helpers.js';
+import type { FastifyInstance } from 'fastify';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { buildApp } from '../src/server/app.js';
 import {
   readState,
-  writeState,
   rememberProject,
   restoreLastProject,
   stateFile,
+  writeState,
 } from '../src/server/app-state.js';
 import { ProjectSession } from '../src/server/session.js';
-import { buildApp } from '../src/server/app.js';
-import type { FastifyInstance } from 'fastify';
+import { tempDir } from './helpers.js';
 
 let session: ProjectSession | undefined;
 let app: FastifyInstance | undefined;

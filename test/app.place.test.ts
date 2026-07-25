@@ -1,6 +1,6 @@
-import { describe, it, expect } from 'vitest';
-import { openTestProject } from './helpers.js';
 import type { FastifyInstance } from 'fastify';
+import { describe, expect, it } from 'vitest';
+import { openTestProject } from './helpers.js';
 
 interface WireCard {
   id: string;

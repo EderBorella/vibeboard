@@ -1,7 +1,7 @@
 import { readdir, rename } from 'node:fs/promises';
 import { join } from 'node:path';
-import { slugify } from './slug.js';
 import { ARCHIVE_SLUG } from './board.js';
+import { slugify } from './slug.js';
 import type { BoardName } from './types.js';
 
 // Keeping config and disk in step when columns change.

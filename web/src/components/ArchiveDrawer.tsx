@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import type { ArchivedCard, BoardName, ProjectConfig } from '../shared';
 import { listArchive, restoreCard } from '../api';
+import type { ArchivedCard, BoardName, ProjectConfig } from '../shared';
 import { columnSlugs } from '../viewmodel';
 
 interface Props {

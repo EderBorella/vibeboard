@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { ProjectSnapshot } from './shared';
-import { useSharedWs, type ConnState } from './ws';
+import { type ConnState, useSharedWs } from './ws';
 
 export type { ConnState };
 

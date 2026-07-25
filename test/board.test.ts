@@ -1,9 +1,9 @@
-import { describe, it, expect } from 'vitest';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { tempDir } from './helpers.js';
+import { describe, expect, it } from 'vitest';
+import { ARCHIVE_SLUG, boardColumnSlugs, readArchive, readBoard } from '../src/core/board.js';
 import { defaultConfig } from '../src/core/config.js';
-import { readBoard, readArchive, boardColumnSlugs, ARCHIVE_SLUG } from '../src/core/board.js';
+import { tempDir } from './helpers.js';
 
 async function writeCard(root: string, rel: string, body: string) {
   const path = join(root, rel);

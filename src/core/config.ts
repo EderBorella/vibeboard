@@ -1,8 +1,8 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { parse, stringify } from 'yaml';
-import { BOARDS, type BoardName, type BoardConfig, type CopilotConfig, type ProjectConfig } from './types.js';
 import { BACKEND_DEFAULTS, DEFAULT_BACKEND, defaultBackendMap } from './backends.js';
+import { BOARDS, type BoardConfig, type BoardName, type CopilotConfig, type ProjectConfig } from './types.js';
 
 // Tokens the copilot context bar treats as full. Per-project rather than hardcoded: context
 // windows differ by an order of magnitude between models, so one baked-in number is wrong for

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { BOARDS, BOARD_LABELS, type BoardName, type Card } from '../shared';
-import { createCard, patchCard, getRaw, putRaw, setLinks as setLinksApi } from '../api';
+import { createCard, getRaw, patchCard, putRaw, setLinks as setLinksApi } from '../api';
+import { BOARD_LABELS, BOARDS, type BoardName, type Card } from '../shared';
 
 export type EditorState =
   | { mode: 'create'; board: BoardName; columnSlug: string }

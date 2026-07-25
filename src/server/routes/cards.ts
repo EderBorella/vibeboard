@@ -1,19 +1,19 @@
-import type { FastifyInstance } from 'fastify';
 import { readFile, writeFile } from 'node:fs/promises';
-import {
-  createCard,
-  updateCard,
-  placeCard,
-  archiveCard,
-  restoreCard,
-  restoreTarget,
-  type CreateCardInput,
-} from '../../core/mutations.js';
-import { readArchive, ARCHIVE_SLUG } from '../../core/board.js';
+import type { FastifyInstance } from 'fastify';
+import { ARCHIVE_SLUG, readArchive } from '../../core/board.js';
 import { findCard } from '../../core/find.js';
 import { setCardLinks } from '../../core/links.js';
+import {
+  archiveCard,
+  type CreateCardInput,
+  createCard,
+  placeCard,
+  restoreCard,
+  restoreTarget,
+  updateCard,
+} from '../../core/mutations.js';
 import type { BoardName, CardFrontmatter } from '../../core/types.js';
-import { ensureOpen, today, nowIso, type AppCtx } from '../route-context.js';
+import { type AppCtx, ensureOpen, nowIso, today } from '../route-context.js';
 
 export async function registerCardRoutes(api: FastifyInstance, ctx: AppCtx): Promise<void> {
   api.post('/cards', async (req, reply) => {

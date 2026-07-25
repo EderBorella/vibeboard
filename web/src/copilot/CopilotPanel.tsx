@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { listModels, getModelStatus, type ModelOption, type ModelStatus } from '../api';
+import { getModelStatus, listModels, type ModelOption, type ModelStatus } from '../api';
 import { backendCaps, backendDefaults } from '../shared';
-import { clampToCaps } from './choice';
-import { BACKENDS } from './format';
 import { ChatSwitcher } from './ChatSwitcher';
 import { CopilotControls } from './CopilotControls';
 import { CopilotReadout } from './CopilotReadout';
+import { clampToCaps } from './choice';
+import { BACKENDS } from './format';
 import type { CopilotMode, EffortLevel, useCopilot } from './useCopilot';
 
 interface Props {

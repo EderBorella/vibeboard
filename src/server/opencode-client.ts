@@ -1,4 +1,4 @@
-import { num, type CopilotEvent } from './copilot-events.js';
+import { type CopilotEvent, num } from './copilot-events.js';
 import { opencodeBaseUrl } from './opencode-server.js';
 
 // OpenCode's HTTP API wants the model as { providerID, modelID }. Our ids are

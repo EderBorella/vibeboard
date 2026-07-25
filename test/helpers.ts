@@ -1,11 +1,11 @@
 import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import type { FastifyInstance } from 'fastify';
 import { onTestFinished } from 'vitest';
 import WebSocket from 'ws';
-import type { FastifyInstance } from 'fastify';
-import { ProjectSession } from '../src/server/session.js';
 import { buildApp } from '../src/server/app.js';
+import { ProjectSession } from '../src/server/session.js';
 
 export async function tempDir(): Promise<string> {
   return mkdtemp(join(tmpdir(), 'vibeboard-'));

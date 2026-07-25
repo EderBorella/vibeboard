@@ -1,9 +1,9 @@
 import { networkInterfaces } from 'node:os';
-import { ProjectSession } from './session.js';
 import { buildApp } from './app.js';
-import { registerStatic } from './static.js';
-import { stopOpencodeServer } from './opencode-server.js';
 import { restoreLastProject } from './app-state.js';
+import { stopOpencodeServer } from './opencode-server.js';
+import { ProjectSession } from './session.js';
+import { registerStatic } from './static.js';
 
 // Load ./.env if the user has one, so `npm start` and `npm run dev` pick up local config with
 // no wrapper script. Node's own loader — no dependency. A missing .env is the normal case and

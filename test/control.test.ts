@@ -1,9 +1,9 @@
-import { describe, it, expect } from 'vitest';
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { tempDir } from './helpers.js';
-import { scaffoldProject } from '../src/core/scaffold.js';
+import { describe, expect, it } from 'vitest';
 import { ensureControlFiles } from '../src/core/control.js';
+import { scaffoldProject } from '../src/core/scaffold.js';
+import { tempDir } from './helpers.js';
 
 const read = (root: string, name: string): Promise<string> => readFile(join(root, name), 'utf8');
 

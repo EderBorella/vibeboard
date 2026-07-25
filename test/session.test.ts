@@ -1,9 +1,9 @@
-import { describe, it, expect, afterEach } from 'vitest';
-import { tempDir } from './helpers.js';
-import { scaffoldProject } from '../src/core/scaffold.js';
+import { afterEach, describe, expect, it } from 'vitest';
 import { createCard } from '../src/core/mutations.js';
+import { scaffoldProject } from '../src/core/scaffold.js';
 import { ProjectSession } from '../src/server/session.js';
 import type { ProjectSnapshot } from '../src/server/snapshot.js';
+import { tempDir } from './helpers.js';
 
 const TODAY = '2026-07-23';
 let session: ProjectSession | undefined;

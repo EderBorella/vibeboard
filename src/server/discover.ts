@@ -1,5 +1,5 @@
+import { type Dirent, existsSync } from 'node:fs';
 import { readdir } from 'node:fs/promises';
-import { existsSync, type Dirent } from 'node:fs';
 import { join } from 'node:path';
 import { CONFIG_DIR, CONFIG_FILE, readConfig } from '../core/config.js';
 

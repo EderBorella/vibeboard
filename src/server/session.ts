@@ -1,14 +1,14 @@
 import chokidar, { type FSWatcher } from 'chokidar';
 import {
+  ensureBoards,
+  ensureContextBudget,
+  ensureCopilotDefaults,
   readConfig,
   writeConfig,
-  ensureBoards,
-  ensureCopilotDefaults,
-  ensureContextBudget,
 } from '../core/config.js';
 import { ensureControlFiles } from '../core/control.js';
-import { buildSnapshot, type ProjectSnapshot } from './snapshot.js';
 import type { ProjectConfig } from '../core/types.js';
+import { buildSnapshot, type ProjectSnapshot } from './snapshot.js';
 
 type SnapshotListener = (snapshot: ProjectSnapshot) => void;
 

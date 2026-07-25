@@ -1,8 +1,8 @@
-import { describe, it, expect } from 'vitest';
-import { mkdir, writeFile, readdir } from 'node:fs/promises';
+import { mkdir, readdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { describe, expect, it } from 'vitest';
+import { reconcileColumns, validateColumns } from '../src/core/columns.js';
 import { tempDir } from './helpers.js';
-import { validateColumns, reconcileColumns } from '../src/core/columns.js';
 
 async function board(root: string, slugs: string[], cards: Record<string, string[]> = {}): Promise<void> {
   for (const slug of [...slugs, 'archive']) {

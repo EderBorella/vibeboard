@@ -1,8 +1,8 @@
-import { describe, it, expect, afterEach } from 'vitest';
 import { createServer, type Server } from 'node:http';
-import { opencodeTurn } from '../src/server/opencode-client.js';
+import { afterEach, describe, expect, it } from 'vitest';
 import { CopilotSession } from '../src/server/copilot.js';
 import type { CopilotEvent } from '../src/server/copilot-events.js';
+import { opencodeTurn } from '../src/server/opencode-client.js';
 
 interface Captured {
   url: string;

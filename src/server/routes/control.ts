@@ -1,15 +1,15 @@
 import type { FastifyInstance } from 'fastify';
 import {
+  createControlFile,
+  deleteControlFile,
   listControlFiles,
   readControlFile,
-  writeControlFile,
-  deleteControlFile,
-  createControlFile,
-  renameControlFile,
   readResources,
+  renameControlFile,
+  writeControlFile,
   writeResources,
 } from '../control-files.js';
-import { ensureOpen, type AppCtx } from '../route-context.js';
+import { type AppCtx, ensureOpen } from '../route-context.js';
 
 // Project Control: the file controller for documents that steer the models. Every path is
 // sandboxed to the project root + an allow-list inside control-files.ts.

@@ -1,9 +1,9 @@
 import type { FastifyInstance } from 'fastify';
+import { isRefused, reconcileColumns, validateColumns } from '../../core/columns.js';
 import { writeConfig } from '../../core/config.js';
-import { validateColumns, reconcileColumns, isRefused } from '../../core/columns.js';
-import { BOARDS, BOARD_LABELS } from '../../core/types.js';
 import type { ProjectConfig } from '../../core/types.js';
-import { ensureOpen, type AppCtx } from '../route-context.js';
+import { BOARD_LABELS, BOARDS } from '../../core/types.js';
+import { type AppCtx, ensureOpen } from '../route-context.js';
 
 // Merge `boards` per board and `copilot.backends` per backend, not wholesale: a patch carrying
 // one board would otherwise drop the others (and ensureBoards would silently reset them), and a

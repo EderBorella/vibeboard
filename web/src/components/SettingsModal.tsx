@@ -1,16 +1,16 @@
 import { useEffect, useState } from 'react';
+import { listModels, type ModelOption, patchConfig } from '../api';
+import { clampToCaps, resolveChoice } from '../copilot/choice';
 import {
-  BOARDS,
   BOARD_LABELS,
-  DEFAULT_CONTEXT_BUDGET,
+  BOARDS,
+  type BoardName,
   backendCaps,
   backendDefaults,
-  type BoardName,
   type CopilotBackendConfig,
+  DEFAULT_CONTEXT_BUDGET,
   type ProjectConfig,
 } from '../shared';
-import { listModels, patchConfig, type ModelOption } from '../api';
-import { resolveChoice, clampToCaps } from '../copilot/choice';
 import { ModelPicker } from './ModelPicker';
 
 const BACKENDS: { value: string; label: string }[] = [

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mocked before the module under test is imported, so saveCard closes over these.
 vi.mock('../web/src/api.js', () => ({
@@ -9,8 +9,8 @@ vi.mock('../web/src/api.js', () => ({
   setLinks: vi.fn(async () => undefined),
 }));
 
-import { saveCard, initialFields, type SaveInput } from '../web/src/components/CardEditor.js';
 import { createCard, patchCard, putRaw, setLinks } from '../web/src/api.js';
+import { initialFields, type SaveInput, saveCard } from '../web/src/components/CardEditor.js';
 import type { Card } from '../web/src/shared.js';
 
 const card = (over: Partial<Card> = {}): Card =>

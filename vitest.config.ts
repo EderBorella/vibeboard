@@ -1,6 +1,6 @@
-import { defineConfig } from 'vitest/config';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   // The web build gets this from @vitejs/plugin-react; the test transform needs it stated, or JSX

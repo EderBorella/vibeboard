@@ -1,9 +1,9 @@
-import { describe, it, expect, beforeAll } from 'vitest';
-import { existsSync, rmSync, readFileSync, chmodSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { chmodSync, existsSync, readFileSync, rmSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { openTestProject, wsClient } from './helpers.js';
+import { fileURLToPath } from 'node:url';
 import type { FastifyInstance } from 'fastify';
+import { beforeAll, describe, expect, it } from 'vitest';
+import { openTestProject, wsClient } from './helpers.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const SHIM = join(here, 'fixtures', 'fake-claude.mjs');

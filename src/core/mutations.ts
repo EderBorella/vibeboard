@@ -1,9 +1,9 @@
 import { mkdir, rename, writeFile } from 'node:fs/promises';
-import { join, basename } from 'node:path';
+import { basename, join } from 'node:path';
+import { ARCHIVE_SLUG, boardColumnSlugs, readArchive, readBoard } from './board.js';
 import { serializeCard, toFrontmatter } from './card.js';
 import { nextId } from './ids.js';
-import { readBoard, readArchive, boardColumnSlugs, ARCHIVE_SLUG } from './board.js';
-import type { Card, CardFrontmatter, BoardName, ProjectConfig } from './types.js';
+import type { BoardName, Card, CardFrontmatter, ProjectConfig } from './types.js';
 
 const ORDER_STEP = 10;
 

@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { resolveCopilotSelection } from '../src/core/copilot-choice.js';
 
 // The configured shape holds one saved slot per backend, so switching connector cannot

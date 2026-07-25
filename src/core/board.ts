@@ -2,7 +2,7 @@ import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { parseCardContent } from './card.js';
 import { slugify } from './slug.js';
-import type { Card, BoardName, ProjectConfig } from './types.js';
+import type { BoardName, Card, ProjectConfig } from './types.js';
 
 export const ARCHIVE_SLUG = 'archive';
 

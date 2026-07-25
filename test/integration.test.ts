@@ -1,6 +1,6 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
+import { archiveCard, createCard, moveCard, readBoard, readConfig, scaffoldProject } from '../src/index.js';
 import { tempDir } from './helpers.js';
-import { scaffoldProject, readConfig, readBoard, createCard, moveCard, archiveCard } from '../src/index.js';
 
 const TODAY = '2026-07-23';
 const NOW = '2026-07-23T10:00:00.000Z';

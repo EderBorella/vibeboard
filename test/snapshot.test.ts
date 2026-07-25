@@ -1,7 +1,7 @@
-import { describe, it, expect } from 'vitest';
-import { tempDir } from './helpers.js';
+import { describe, expect, it } from 'vitest';
 import { scaffoldProject } from '../src/core/scaffold.js';
 import { buildSnapshot } from '../src/server/snapshot.js';
+import { tempDir } from './helpers.js';
 
 const TODAY = '2026-07-23';
 

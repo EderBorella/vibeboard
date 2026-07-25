@@ -1,5 +1,5 @@
-import { spawn, type ChildProcess } from 'node:child_process';
-import { opencodeConfigHome, isolationEnabled } from './copilot-env.js';
+import { type ChildProcess, spawn } from 'node:child_process';
+import { isolationEnabled, opencodeConfigHome } from './copilot-env.js';
 
 // A single managed `opencode serve` process, started lazily and reused for every turn.
 // We talk to it over HTTP (see opencode-client) — `opencode run` per turn hangs at init on

@@ -1,5 +1,5 @@
-import type { FastifyInstance } from 'fastify';
 import websocket from '@fastify/websocket';
+import type { FastifyInstance } from 'fastify';
 import type { AppCtx, WsClient } from './route-context.js';
 
 // Fan-out to every connected browser. A send on a closed socket is swallowed: a client that

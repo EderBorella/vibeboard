@@ -1,10 +1,10 @@
-import { describe, it, expect } from 'vitest';
-import { readFile, writeFile, access } from 'node:fs/promises';
+import { access, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { tempDir } from './helpers.js';
-import { scaffoldProject } from '../src/core/scaffold.js';
-import { readConfig } from '../src/core/config.js';
+import { describe, expect, it } from 'vitest';
 import { readBoard } from '../src/core/board.js';
+import { readConfig } from '../src/core/config.js';
+import { scaffoldProject } from '../src/core/scaffold.js';
+import { tempDir } from './helpers.js';
 
 const TODAY = '2026-07-23';
 

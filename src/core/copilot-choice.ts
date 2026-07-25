@@ -1,4 +1,4 @@
-import { DEFAULT_BACKEND, backendDefaults } from './backends.js';
+import { backendDefaults, DEFAULT_BACKEND } from './backends.js';
 
 // The ONE place backend/model/effort precedence is decided.
 //

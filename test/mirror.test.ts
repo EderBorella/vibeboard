@@ -1,6 +1,6 @@
-import { describe, it, expect } from 'vitest';
-import * as core from '../src/core/types.js';
+import { describe, expect, it } from 'vitest';
 import * as coreBackends from '../src/core/backends.js';
+import * as core from '../src/core/types.js';
 import * as web from '../web/src/shared.js';
 
 // web/src/shared.ts hand-mirrors the server's wire contract across the tsc/Vite boundary

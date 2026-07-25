@@ -1,6 +1,6 @@
-import { describe, it, expect } from 'vitest';
-import { columnSlugs, cardsByColumn, miniature, canPlace } from '../web/src/viewmodel.js';
+import { describe, expect, it } from 'vitest';
 import type { Card, ProjectConfig } from '../web/src/shared.js';
+import { canPlace, cardsByColumn, columnSlugs, miniature } from '../web/src/viewmodel.js';
 
 const config: ProjectConfig = {
   name: 'T',

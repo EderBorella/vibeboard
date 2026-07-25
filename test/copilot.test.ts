@@ -1,8 +1,8 @@
-import { describe, it, expect, beforeAll, afterEach } from 'vitest';
-import { chmodSync, rmSync, readFileSync, existsSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { chmodSync, existsSync, readFileSync, rmSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { CopilotSession, type CopilotMode } from '../src/server/copilot.js';
+import { fileURLToPath } from 'node:url';
+import { afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { type CopilotMode, CopilotSession } from '../src/server/copilot.js';
 import type { CopilotEvent } from '../src/server/copilot-events.js';
 
 const here = dirname(fileURLToPath(import.meta.url));

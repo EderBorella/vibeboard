@@ -1,9 +1,9 @@
-import { describe, it, expect } from 'vitest';
-import { join } from 'node:path';
 import { mkdir, writeFile } from 'node:fs/promises';
-import { tempDir } from './helpers.js';
+import { join } from 'node:path';
+import { describe, expect, it } from 'vitest';
 import { scaffoldProject } from '../src/core/scaffold.js';
 import { discoverProjects } from '../src/server/discover.js';
+import { tempDir } from './helpers.js';
 
 describe('discoverProjects', () => {
   it('finds scaffolded projects in immediate subdirs, sorted by name, ignoring non-projects', async () => {

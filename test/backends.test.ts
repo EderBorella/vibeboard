@@ -1,18 +1,18 @@
-import { describe, it, expect } from 'vitest';
 import { readFile } from 'node:fs/promises';
+import { describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
-import { tempDir } from './helpers.js';
-import { BACKEND_DEFAULTS, DEFAULT_BACKEND, backendDefaults } from '../src/core/backends.js';
+import { BACKEND_DEFAULTS, backendDefaults, DEFAULT_BACKEND } from '../src/core/backends.js';
 import {
-  defaultConfig,
-  ensureCopilotDefaults,
   configPath,
-  writeConfig,
+  defaultConfig,
   ensureContextBudget,
+  ensureCopilotDefaults,
+  writeConfig,
 } from '../src/core/config.js';
 import { scaffoldProject } from '../src/core/scaffold.js';
-import { ProjectSession } from '../src/server/session.js';
 import type { ProjectConfig } from '../src/core/types.js';
+import { ProjectSession } from '../src/server/session.js';
+import { tempDir } from './helpers.js';
 
 const TODAY = '2026-07-23';
 

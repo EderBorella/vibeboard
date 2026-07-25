@@ -1,11 +1,11 @@
-import { describe, it, expect } from 'vitest';
 import { readdir } from 'node:fs/promises';
 import { join } from 'node:path';
-import { tempDir } from './helpers.js';
-import { ChatStore } from '../src/server/chat-store.js';
+import { describe, expect, it } from 'vitest';
 import { defaultConfig } from '../src/core/config.js';
 import type { ProjectConfig } from '../src/core/types.js';
+import { ChatStore } from '../src/server/chat-store.js';
 import type { CopilotEvent } from '../src/server/copilot-events.js';
+import { tempDir } from './helpers.js';
 
 interface Ref {
   root: string | undefined;

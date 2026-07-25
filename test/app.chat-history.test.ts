@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeAll } from 'vitest';
 import { chmodSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { openTestProject, wsClient } from './helpers.js';
 
 const here = dirname(fileURLToPath(import.meta.url));

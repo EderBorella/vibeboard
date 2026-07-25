@@ -1,8 +1,8 @@
-import { describe, it, expect } from 'vitest';
 import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
+import { describe, expect, it } from 'vitest';
+import { CONFIG_DIR, defaultConfig, readConfig, writeConfig } from '../src/core/config.js';
 import { tempDir } from './helpers.js';
-import { defaultConfig, readConfig, writeConfig, CONFIG_DIR } from '../src/core/config.js';
 
 describe('config', () => {
   it('defaultConfig has both boards and sane defaults', () => {

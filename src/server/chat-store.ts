@@ -1,17 +1,17 @@
-import { mkdir, readFile, writeFile, readdir, rm } from 'node:fs/promises';
-import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import type { CopilotEvent } from './copilot-events.js';
-import type { ProjectConfig } from '../core/types.js';
+import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { DEFAULT_BACKEND } from '../core/backends.js';
 import {
-  type StoredChat,
   type ChatMeta,
   type ChatStats,
+  type StoredChat,
   type TranscriptItem,
   ZERO_STATS,
 } from '../core/chat.js';
-import { DEFAULT_BACKEND } from '../core/backends.js';
 import { resolveCopilotSelection } from '../core/copilot-choice.js';
+import type { ProjectConfig } from '../core/types.js';
+import type { CopilotEvent } from './copilot-events.js';
 
 // Persists copilot conversations per project as JSON files under
 // <project>/.vibeboard/chat/<id>.json. The server is the source of truth: it tees the

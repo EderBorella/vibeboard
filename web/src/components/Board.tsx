@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import type { BoardName, Card, ProjectConfig } from '../shared';
 import { cardsByColumn, columnSlugs } from '../viewmodel';
-import { Column } from './Column';
 import { ArchiveDrawer } from './ArchiveDrawer';
+import { Column } from './Column';
 
 interface Props {
   board: BoardName;

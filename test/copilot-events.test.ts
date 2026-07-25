@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { parseCopilotLine } from '../src/server/copilot-events.js';
 
 // Lines shaped exactly like real `claude --output-format stream-json` output.

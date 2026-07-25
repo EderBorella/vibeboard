@@ -1,18 +1,18 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { BOARDS, BOARD_LABELS, DEFAULT_CONTEXT_BUDGET, type BoardName, type Card } from './shared';
-import { canPlace } from './viewmodel';
-import { useSnapshot } from './useSnapshot';
-import { useCopilotChoice } from './useCopilotChoice';
-import { useTheme, useCollapsedBoards } from './useLocalPrefs';
-import { getState, placeCard, archiveCard } from './api';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { archiveCard, getState, placeCard } from './api';
 import { Board } from './components/Board';
+import { CardEditor, type EditorState } from './components/CardEditor';
 import { ProjectControl } from './components/ProjectControl';
 import { ProjectGate } from './components/ProjectGate';
-import { CardEditor, type EditorState } from './components/CardEditor';
 import { SettingsModal } from './components/SettingsModal';
 import { TopBar } from './components/TopBar';
 import { CopilotPanel } from './copilot/CopilotPanel';
-import { useCopilot, type CopilotMode } from './copilot/useCopilot';
+import { type CopilotMode, useCopilot } from './copilot/useCopilot';
+import { BOARD_LABELS, BOARDS, type BoardName, type Card, DEFAULT_CONTEXT_BUDGET } from './shared';
+import { useCopilotChoice } from './useCopilotChoice';
+import { useCollapsedBoards, useTheme } from './useLocalPrefs';
+import { useSnapshot } from './useSnapshot';
+import { canPlace } from './viewmodel';
 
 export function App() {
   const [bump, setBump] = useState(0);

@@ -1,4 +1,4 @@
-import { readBoard, readArchive } from './board.js';
+import { readArchive, readBoard } from './board.js';
 import type { BoardName, Card, ProjectConfig } from './types.js';
 
 export async function findCard(

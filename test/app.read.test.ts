@@ -1,7 +1,7 @@
-import { describe, it, expect, afterEach } from 'vitest';
-import { tempDir } from './helpers.js';
-import { ProjectSession } from '../src/server/session.js';
+import { afterEach, describe, expect, it } from 'vitest';
 import { buildApp } from '../src/server/app.js';
+import { ProjectSession } from '../src/server/session.js';
+import { tempDir } from './helpers.js';
 
 let session: ProjectSession | undefined;
 

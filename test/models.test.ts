@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { mergeModels, modelsFromProvider } from '../src/server/models.js';
 
 describe('mergeModels', () => {

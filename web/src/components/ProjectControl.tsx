@@ -1,18 +1,18 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
-  listControlFiles,
-  getControlFile,
-  putControlFile,
-  deleteControlFile,
-  createControlFile,
-  renameControlFile,
-  type ControlGroup,
   type ControlCategory,
   type ControlFile,
+  type ControlGroup,
+  createControlFile,
+  deleteControlFile,
+  getControlFile,
+  listControlFiles,
+  putControlFile,
+  renameControlFile,
 } from '../api';
 import type { ProjectSnapshot } from '../shared';
-import { ControlFileList, RESOURCES_SENTINEL } from './ControlFileList';
 import { ControlFileEditor, type ControlView, type OpenFile } from './ControlFileEditor';
+import { ControlFileList, RESOURCES_SENTINEL } from './ControlFileList';
 import { ResourcesEditor } from './ResourcesEditor';
 
 interface Props {

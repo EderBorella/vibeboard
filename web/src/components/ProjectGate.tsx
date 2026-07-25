@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { listProjects, openProject, scaffoldProject, type ProjectRef } from '../api';
+import { listProjects, openProject, type ProjectRef, scaffoldProject } from '../api';
 import { slugify } from '../viewmodel';
 
 interface Props {

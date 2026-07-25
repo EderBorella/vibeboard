@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { parseCardContent, serializeCard } from '../src/core/card.js';
 import type { CardFrontmatter } from '../src/core/types.js';
 

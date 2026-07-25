@@ -1,18 +1,18 @@
-import { describe, it, expect } from 'vitest';
-import { mkdir, writeFile, symlink, readFile } from 'node:fs/promises';
+import { mkdir, readFile, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { tempDir } from './helpers.js';
+import { describe, expect, it } from 'vitest';
 import {
-  resolveControlPath,
+  createControlFile,
+  deleteControlFile,
   listControlFiles,
   readControlFile,
-  writeControlFile,
-  deleteControlFile,
-  createControlFile,
-  renameControlFile,
   readResources,
+  renameControlFile,
+  resolveControlPath,
+  writeControlFile,
   writeResources,
 } from '../src/server/control-files.js';
+import { tempDir } from './helpers.js';
 
 describe('control-files path sandbox', () => {
   it('rejects traversal, absolute paths, and non-control paths', async () => {

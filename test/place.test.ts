@@ -1,10 +1,10 @@
-import { describe, it, expect } from 'vitest';
-import { tempDir } from './helpers.js';
-import { scaffoldProject } from '../src/core/scaffold.js';
-import { readConfig } from '../src/core/config.js';
+import { describe, expect, it } from 'vitest';
 import { readBoard } from '../src/core/board.js';
+import { readConfig } from '../src/core/config.js';
 import { createCard, placeCard } from '../src/core/mutations.js';
+import { scaffoldProject } from '../src/core/scaffold.js';
 import type { Card, ProjectConfig } from '../src/core/types.js';
+import { tempDir } from './helpers.js';
 
 const TODAY = '2026-07-25';
 

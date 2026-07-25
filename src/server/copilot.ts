@@ -1,11 +1,11 @@
-import { spawn, type ChildProcess } from 'node:child_process';
+import { type ChildProcess, spawn } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseCopilotLine, type CopilotEvent } from './copilot-events.js';
-import { opencodeTurn } from './opencode-client.js';
+import { backendDefaults, DEFAULT_BACKEND } from '../core/backends.js';
 import { claudeConfigDir, isolationEnabled } from './copilot-env.js';
-import { DEFAULT_BACKEND, backendDefaults } from '../core/backends.js';
+import { type CopilotEvent, parseCopilotLine } from './copilot-events.js';
+import { opencodeTurn } from './opencode-client.js';
 
 // Modes/efforts are backend-specific (see BACKEND_CAPS on the web side). They're plain
 // strings here; each backend's command builder interprets its own values.

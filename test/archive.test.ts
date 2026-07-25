@@ -1,10 +1,10 @@
-import { describe, it, expect } from 'vitest';
 import { readFile } from 'node:fs/promises';
-import { tempDir } from './helpers.js';
+import { describe, expect, it } from 'vitest';
+import { ARCHIVE_SLUG, countArchived, readArchive, readBoard } from '../src/core/board.js';
 import { defaultConfig } from '../src/core/config.js';
-import { readBoard, readArchive, countArchived, ARCHIVE_SLUG } from '../src/core/board.js';
-import { createCard, moveCard, archiveCard, restoreCard, restoreTarget } from '../src/core/mutations.js';
+import { archiveCard, createCard, moveCard, restoreCard, restoreTarget } from '../src/core/mutations.js';
 import type { Card, ProjectConfig } from '../src/core/types.js';
+import { tempDir } from './helpers.js';
 
 const config = defaultConfig('T');
 const TODAY = '2026-07-23';

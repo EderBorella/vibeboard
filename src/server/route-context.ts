@@ -1,8 +1,8 @@
 import type { FastifyReply } from 'fastify';
-import type { ProjectSession } from './session.js';
 import type { ProjectConfig } from '../core/types.js';
-import type { CopilotSession } from './copilot.js';
 import type { ChatStore } from './chat-store.js';
+import type { CopilotSession } from './copilot.js';
+import type { ProjectSession } from './session.js';
 
 // The shared surface every route group and the WS layer needs. Passed explicitly rather
 // than closed over, so each route module is a plain function of its context and can be

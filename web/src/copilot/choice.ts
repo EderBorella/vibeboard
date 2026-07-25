@@ -1,9 +1,9 @@
 import {
-  DEFAULT_BACKEND,
   backendCaps,
   backendDefaults,
   type CopilotChoice,
   type CopilotConfig,
+  DEFAULT_BACKEND,
 } from '../shared';
 
 // Accepts the legacy single-slot shape too, so a config not yet migrated still resolves.

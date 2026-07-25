@@ -5,11 +5,13 @@ import type { Card, ProjectConfig } from '../web/src/shared.js';
 const config: ProjectConfig = {
   name: 'T',
   boards: {
+    features: { columns: ['Backlog', 'Done'] },
     product: { columns: ['Backlog', 'In Progress', 'Done'] },
     engineering: { columns: ['Todo', 'Done'] },
   },
   miniatureChars: 10,
   idPadding: 3,
+  keepChats: 20,
   copilot: { backend: 'claude-code' },
 };
 

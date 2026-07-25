@@ -74,12 +74,14 @@ else
 fi
 
 # ---- lint --------------------------------------------------------------------------------------
-# Blocking as of zero errors. Warnings do not fail this — there are 69 of them (non-null
-# assertions, complexity) and biome exits 0 on warnings alone, which is the behaviour we want.
-if "$BIOME" lint --max-diagnostics=none >"$LOGS/lint.log" 2>&1; then
+# `npm run lint` is `biome check`, the SAME command CI runs — not `biome lint`. That distinction
+# cost a red CI run: `check` also reports assists (import organisation), which neither `biome lint`
+# nor `biome format` mentions, so the hook passed 87 findings straight through to the pipeline.
+# Warnings alone do not fail it; biome exits 0 on those.
+if npm run lint --silent >"$LOGS/lint.log" 2>&1; then
   ok "lint"
 else
-  bad "lint"
+  bad "lint — most of this is auto-fixable with \`npm run lint:fix\`"
   grep -vE '^\s*$' "$LOGS/lint.log" | head -30
 fi
 

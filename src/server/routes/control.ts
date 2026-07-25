@@ -14,7 +14,7 @@ import { ensureOpen, type AppCtx } from '../route-context.js';
 // Project Control: the file controller for documents that steer the models. Every path is
 // sandboxed to the project root + an allow-list inside control-files.ts.
 export async function registerControlRoutes(api: FastifyInstance, ctx: AppCtx): Promise<void> {
-  api.get('/control/files', async (req, reply) => {
+  api.get('/control/files', async (_req, reply) => {
     if (!ensureOpen(ctx.session, reply)) return;
     return { groups: await listControlFiles(ctx.session.root!) };
   });
@@ -63,7 +63,7 @@ export async function registerControlRoutes(api: FastifyInstance, ctx: AppCtx): 
     return { ok: true };
   });
 
-  api.get('/control/resources', async (req, reply) => {
+  api.get('/control/resources', async (_req, reply) => {
     if (!ensureOpen(ctx.session, reply)) return;
     return { links: await readResources(ctx.session.root!) };
   });

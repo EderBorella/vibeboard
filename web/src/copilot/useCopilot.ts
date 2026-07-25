@@ -6,7 +6,7 @@ import { useSharedWs } from '../ws';
 export type CopilotMode = string;
 export type EffortLevel = string;
 
-export interface TurnOptions {
+interface TurnOptions {
   mode: CopilotMode;
   // Sent per turn because the dock's controls are a session override — the config holds the
   // defaults, and anything omitted here falls back to them server-side.

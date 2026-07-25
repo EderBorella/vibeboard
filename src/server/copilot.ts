@@ -13,13 +13,13 @@ export type CopilotMode = string;
 export type EffortLevel = string;
 export type Backend = 'claude-code' | 'opencode';
 
-export interface CopilotState {
+interface CopilotState {
   running: boolean;
   sessionId: string | undefined;
   model: string | undefined;
 }
 
-export interface SendOptions {
+interface SendOptions {
   cwd: string;
   text: string;
   mode: CopilotMode;
@@ -42,7 +42,6 @@ function claudeCommand(opts: SendOptions, sessionId: string | undefined): Comman
   args.push(opts.text);
   return { bin: claudeBin(), args };
 }
-
 
 const RESEARCH_PERSONA = [
   '# Research mode',

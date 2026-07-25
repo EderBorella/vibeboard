@@ -8,7 +8,7 @@ import type { ProjectSession } from './session.js';
 // open project lives only in memory, so every restart drops you back to the project gate — and
 // any client mid-session starts erroring until you pick a project again.
 
-export interface AppState {
+interface AppState {
   lastProject?: string;
 }
 

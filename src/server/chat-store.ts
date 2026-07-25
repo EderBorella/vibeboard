@@ -24,7 +24,7 @@ interface SessionRef {
   config: ProjectConfig | undefined;
 }
 
-export interface HistoryPayload {
+interface HistoryPayload {
   chats: ChatMeta[];
   currentChatId: string | undefined;
   items: TranscriptItem[];

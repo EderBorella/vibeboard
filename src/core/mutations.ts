@@ -56,6 +56,8 @@ export async function createCard(
   return card;
 }
 
+// `projectRoot` is unused — a card's file path is absolute (Card.filePath) — but every other
+// mutation takes it, and breaking that symmetry for one function costs more than it saves.
 export async function updateCard(
   projectRoot: string,
   card: Card,

@@ -10,7 +10,7 @@ export function splitModel(model: string): { providerID: string; modelID: string
 
 interface OcPart { type?: string; text?: string; id?: string; tool?: string; name?: string; state?: { input?: unknown } }
 interface OcInfo { sessionID?: string; cost?: number; error?: { name?: string; data?: { message?: string } }; tokens?: { input?: number; output?: number; cache?: { read?: number; write?: number } } }
-export interface OcMessageResponse { info?: OcInfo; parts?: OcPart[] }
+interface OcMessageResponse { info?: OcInfo; parts?: OcPart[] }
 
 // Map a POST /session/:id/message response into the shared CopilotEvent stream.
 export function messageToEvents(data: OcMessageResponse): CopilotEvent[] {
@@ -35,7 +35,7 @@ export function messageToEvents(data: OcMessageResponse): CopilotEvent[] {
   return events;
 }
 
-export interface OpencodeTurnOptions {
+interface OpencodeTurnOptions {
   cwd: string;
   text: string;
   model?: string;

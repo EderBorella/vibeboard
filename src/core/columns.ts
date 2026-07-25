@@ -19,9 +19,9 @@ import type { BoardName } from './types.js';
 // Anything that mixes a rename with a reorder is ambiguous, so we refuse rather than guess and
 // risk moving cards into the wrong column.
 
-export interface ColumnsChanged { renamed: { from: string; to: string }[] }
-export interface ColumnsRefused { error: string }
-export type ReconcileResult = ColumnsChanged | ColumnsRefused;
+interface ColumnsChanged { renamed: { from: string; to: string }[] }
+interface ColumnsRefused { error: string }
+type ReconcileResult = ColumnsChanged | ColumnsRefused;
 
 export function isRefused(r: ReconcileResult): r is ColumnsRefused {
   return 'error' in r;

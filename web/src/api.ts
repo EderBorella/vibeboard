@@ -82,7 +82,7 @@ export function scaffoldProject(
   return post('/api/project/scaffold', { path, name, mode });
 }
 
-export interface CreateCardBody {
+interface CreateCardBody {
   board: BoardName;
   columnSlug: string;
   title: string;

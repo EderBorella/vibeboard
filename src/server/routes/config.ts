@@ -6,7 +6,7 @@ import type { ProjectConfig } from '../../core/types.js';
 import { ensureOpen, type AppCtx } from '../route-context.js';
 
 export async function registerConfigRoutes(api: FastifyInstance, ctx: AppCtx): Promise<void> {
-  api.get('/config', async (req, reply) => {
+  api.get('/config', async (_req, reply) => {
     if (!ensureOpen(ctx.session, reply)) return;
     return ctx.session.config;
   });

@@ -5,7 +5,7 @@ import fastifyStatic from '@fastify/static';
 import type { FastifyInstance } from 'fastify';
 
 // Resolve the built UI relative to this compiled module: dist/server/static.js -> dist/web.
-export function webRoot(): string {
+function webRoot(): string {
   return resolve(dirname(fileURLToPath(import.meta.url)), '../web');
 }
 

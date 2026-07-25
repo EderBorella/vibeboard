@@ -15,13 +15,13 @@ import { DEFAULT_BACKEND, backendDefaults } from './backends.js';
 // single shared slot, switching fell back to the built-in default and the next save overwrote
 // the model chosen for the backend being left.
 
-export interface CopilotSelection {
+interface CopilotSelection {
   backend: string;
   model: string;
   effort: string;
 }
 
-export interface CopilotOverride {
+interface CopilotOverride {
   backend?: string;
   model?: string;
   effort?: string;

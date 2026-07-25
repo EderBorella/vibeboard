@@ -204,9 +204,9 @@ const NEW_NAMES: Record<Exclude<ControlCategory, 'instructions'>, string> = {
   resources: 'New resource',
 };
 
-export type CreatableCategory = keyof typeof NEW_NAMES;
+type CreatableCategory = keyof typeof NEW_NAMES;
 
-export function isCreatable(c: unknown): c is CreatableCategory {
+function isCreatable(c: unknown): c is CreatableCategory {
   return typeof c === 'string' && c in NEW_NAMES;
 }
 

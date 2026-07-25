@@ -3,7 +3,7 @@
 // content blocks, so parsing returns an array. Unknown/among-the-noise lines (hooks,
 // thinking_tokens, rate_limit_event) map to [] and are simply not forwarded.
 
-export interface ResultStats {
+interface ResultStats {
   ok: boolean;
   text: string;
   costUsd: number;

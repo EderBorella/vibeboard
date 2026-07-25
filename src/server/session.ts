@@ -4,7 +4,7 @@ import { ensureControlFiles } from '../core/control.js';
 import { buildSnapshot, type ProjectSnapshot } from './snapshot.js';
 import type { ProjectConfig } from '../core/types.js';
 
-export type SnapshotListener = (snapshot: ProjectSnapshot) => void;
+type SnapshotListener = (snapshot: ProjectSnapshot) => void;
 
 const DEBOUNCE_MS = 80;
 

@@ -5,9 +5,7 @@ import { resolveChoice, isOverridden } from './copilot/choice';
 // One source of truth for the defaults: the project config, written ONLY by Settings.
 // The dock's controls are a session override — they never touch the file, so switching
 // connector for one conversation can't rewrite what you configured.
-export function useCopilotChoice(
-  configured: CopilotConfig | undefined,
-): {
+export function useCopilotChoice(configured: CopilotConfig | undefined): {
   choice: CopilotChoice;
   overridden: boolean;
   setModel: (m: string) => void;

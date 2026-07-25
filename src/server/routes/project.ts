@@ -7,7 +7,8 @@ import { today, type AppCtx } from '../route-context.js';
 
 export async function registerProjectRoutes(api: FastifyInstance, ctx: AppCtx): Promise<void> {
   api.get('/state', async () =>
-    ctx.session.isOpen ? { open: true, snapshot: await ctx.session.snapshot() } : { open: false });
+    ctx.session.isOpen ? { open: true, snapshot: await ctx.session.snapshot() } : { open: false },
+  );
 
   api.get('/projects', async (req) => {
     const { root } = req.query as { root?: string };

@@ -18,13 +18,19 @@ export function useTheme(): [string, (t: string) => void] {
 // Collapsed boards, persisted.
 export function useCollapsedBoards(): [Set<BoardName>, (b: BoardName) => void] {
   const [collapsed, setCollapsed] = useState<Set<BoardName>>(() => {
-    try { return new Set(JSON.parse(localStorage.getItem('vb-collapsed') ?? '[]')); } catch { return new Set(); }
+    try {
+      return new Set(JSON.parse(localStorage.getItem('vb-collapsed') ?? '[]'));
+    } catch {
+      return new Set();
+    }
   });
-  const toggleBoard = (b: BoardName): void => setCollapsed((prev) => {
-    const next = new Set(prev);
-    if (next.has(b)) next.delete(b); else next.add(b);
-    localStorage.setItem('vb-collapsed', JSON.stringify([...next]));
-    return next;
-  });
+  const toggleBoard = (b: BoardName): void =>
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(b)) next.delete(b);
+      else next.add(b);
+      localStorage.setItem('vb-collapsed', JSON.stringify([...next]));
+      return next;
+    });
   return [collapsed, toggleBoard];
 }

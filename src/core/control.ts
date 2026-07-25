@@ -33,7 +33,8 @@ point the CLIs here. Put your own guidance in this file rather than those.
 // The @-imports we keep present in CLAUDE.md / AGENTS.md so both CLIs load the VibeBoard
 // conventions and the user's project instructions.
 const IMPORTS = ['@VIBEBOARD.md', `@${INSTRUCTIONS_FILE}`];
-const POINTER_NOTE = 'See VIBEBOARD.md for card conventions and INSTRUCTIONS.md for project-specific instructions.';
+const POINTER_NOTE =
+  'See VIBEBOARD.md for card conventions and INSTRUCTIONS.md for project-specific instructions.';
 
 // Write (greenfield) or upgrade (brownfield/existing) a CLI pointer file so it imports both
 // VIBEBOARD.md and INSTRUCTIONS.md. Greenfield writes a fresh file; otherwise we append only

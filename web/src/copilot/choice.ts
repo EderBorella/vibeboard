@@ -1,4 +1,10 @@
-import { DEFAULT_BACKEND, backendCaps, backendDefaults, type CopilotChoice, type CopilotConfig } from '../shared';
+import {
+  DEFAULT_BACKEND,
+  backendCaps,
+  backendDefaults,
+  type CopilotChoice,
+  type CopilotConfig,
+} from '../shared';
 
 // Accepts the legacy single-slot shape too, so a config not yet migrated still resolves.
 type Configured = Pick<CopilotConfig, 'backend'> & Partial<Omit<CopilotConfig, 'backend'>>;
@@ -17,9 +23,8 @@ export function resolveChoice(
 ): CopilotChoice {
   const backend = override.backend || configured?.backend || DEFAULT_BACKEND;
   // An unmigrated config's single pair describes the backend selected when it was written.
-  const legacy = backend === configured?.backend
-    ? { model: configured?.model, effort: configured?.effort }
-    : undefined;
+  const legacy =
+    backend === configured?.backend ? { model: configured?.model, effort: configured?.effort } : undefined;
   const saved = configured?.backends?.[backend] ?? legacy;
   const fallback = backendDefaults(backend);
   // `||` not `??`, so a blank left in an old config falls through to the real default.
@@ -46,10 +51,7 @@ export function clampToCaps(choice: CopilotChoice, mode: string): { mode: string
 // RESOLVED selections rather than asking "is any override field set": switching connector away
 // and back leaves `{backend}` set while changing nothing, and claiming a session override in
 // that state reads as the UI losing track of itself.
-export function isOverridden(
-  configured: Configured | undefined,
-  override: Partial<CopilotChoice>,
-): boolean {
+export function isOverridden(configured: Configured | undefined, override: Partial<CopilotChoice>): boolean {
   const now = resolveChoice(configured, override);
   const base = resolveChoice(configured, {});
   return now.backend !== base.backend || now.model !== base.model || now.effort !== base.effort;

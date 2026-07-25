@@ -30,7 +30,7 @@ interface CopilotOverride {
 interface ConfiguredCopilot {
   backend: string;
   backends?: Record<string, { model?: string; effort?: string }>;
-  model?: string;  // legacy single slot
+  model?: string; // legacy single slot
   effort?: string; // legacy single slot
 }
 
@@ -41,9 +41,8 @@ export function resolveCopilotSelection(
   const backend = override.backend || configured?.backend || DEFAULT_BACKEND;
   // An unmigrated config's single pair describes whichever backend was selected when it was
   // written, so it counts as that backend's slot and no other.
-  const legacy = backend === configured?.backend
-    ? { model: configured?.model, effort: configured?.effort }
-    : undefined;
+  const legacy =
+    backend === configured?.backend ? { model: configured?.model, effort: configured?.effort } : undefined;
   const saved = configured?.backends?.[backend] ?? legacy;
   const fallback = backendDefaults(backend);
   // `||` not `??`: a blank left by an older config must fall through to the real default

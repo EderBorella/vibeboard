@@ -13,9 +13,13 @@ export function useSnapshot(bump: number): { snapshot: ProjectSnapshot | null; c
   const [conn, setConn] = useState<ConnState>('connecting');
   const ws = useSharedWs(bump);
 
-  useEffect(() => ws.subscribe((msg) => {
-    if (msg.type === 'snapshot') setSnapshot(msg.snapshot as ProjectSnapshot);
-  }), [ws]);
+  useEffect(
+    () =>
+      ws.subscribe((msg) => {
+        if (msg.type === 'snapshot') setSnapshot(msg.snapshot as ProjectSnapshot);
+      }),
+    [ws],
+  );
 
   useEffect(() => ws.onConn(setConn), [ws]);
 

@@ -5,7 +5,12 @@ import type { AppCtx, WsClient } from './route-context.js';
 // Per-turn options are the dock's SESSION OVERRIDE. The project config holds the defaults
 // and is the only persisted source; anything omitted here falls back to it. Precedence
 // lives in resolveCopilotSelection — see src/core/copilot-choice.ts.
-interface CopilotOpts { mode: CopilotMode; backend?: string; model?: string; effort?: EffortLevel }
+interface CopilotOpts {
+  mode: CopilotMode;
+  backend?: string;
+  model?: string;
+  effort?: EffortLevel;
+}
 
 // Everything the copilot channel does over /ws: turn orchestration, chat open/delete, and
 // the three broadcast shapes the client distinguishes (state, full history, chat list).
@@ -20,8 +25,13 @@ export function createCopilotTurns(ctx: AppCtx): {
   // Full replay (connect + explicit chat change): replaces the client's transcript.
   const sendHistory = async (target?: WsClient): Promise<void> => {
     const payload = { type: 'copilot:history', ...(await chats.historyPayload()) };
-    if (target) { try { target.send(JSON.stringify(payload)); } catch { /* closed */ } }
-    else broadcast(payload);
+    if (target) {
+      try {
+        target.send(JSON.stringify(payload));
+      } catch {
+        /* closed */
+      }
+    } else broadcast(payload);
   };
   // Switcher-only update (after a turn): refreshes the chat list without touching items.
   const broadcastChatList = async (): Promise<void> => {
@@ -30,16 +40,21 @@ export function createCopilotTurns(ctx: AppCtx): {
 
   // The backend in force for a turn: the override, else the configured default.
   const effectiveBackend = (override?: string): Backend =>
-    (resolveCopilotSelection(session.config?.copilot, { backend: override }).backend as Backend);
+    resolveCopilotSelection(session.config?.copilot, { backend: override }).backend as Backend;
 
   async function handleCopilotSend(text: string, opts: CopilotOpts): Promise<void> {
-    if (!session.isOpen) { broadcast({ type: 'copilot:error', error: 'No project open' }); return; }
+    if (!session.isOpen) {
+      broadcast({ type: 'copilot:error', error: 'No project open' });
+      return;
+    }
     if (!text.trim()) return;
     try {
       await chats.recordUser(text);
       copilotState(); // running flips true only once send starts; announce optimistically
       const choice = resolveCopilotSelection(session.config?.copilot, {
-        backend: opts.backend, model: opts.model, effort: opts.effort,
+        backend: opts.backend,
+        model: opts.model,
+        effort: opts.effort,
       });
       await copilot.send({
         cwd: session.root!,
@@ -48,7 +63,10 @@ export function createCopilotTurns(ctx: AppCtx): {
         backend: choice.backend as Backend,
         model: choice.model,
         effort: choice.effort as EffortLevel,
-        onEvent: (event) => { void chats.recordEvent(event); broadcast({ type: 'copilot:event', event }); },
+        onEvent: (event) => {
+          void chats.recordEvent(event);
+          broadcast({ type: 'copilot:event', event });
+        },
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -62,10 +80,25 @@ export function createCopilotTurns(ctx: AppCtx): {
   }
 
   function handleCopilotMessage(raw: string): void {
-    let msg: { type?: string; text?: string; chatId?: string; mode?: CopilotMode; backend?: string; model?: string; effort?: EffortLevel };
-    try { msg = JSON.parse(raw); } catch { return; }
+    let msg: {
+      type?: string;
+      text?: string;
+      chatId?: string;
+      mode?: CopilotMode;
+      backend?: string;
+      model?: string;
+      effort?: EffortLevel;
+    };
+    try {
+      msg = JSON.parse(raw);
+    } catch {
+      return;
+    }
     const opts = (): CopilotOpts => ({
-      mode: msg.mode ?? 'bypassPermissions', backend: msg.backend, model: msg.model, effort: msg.effort,
+      mode: msg.mode ?? 'bypassPermissions',
+      backend: msg.backend,
+      model: msg.model,
+      effort: msg.effort,
     });
     switch (msg.type) {
       case 'copilot:send':

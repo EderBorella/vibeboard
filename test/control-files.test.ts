@@ -23,8 +23,8 @@ describe('control-files path sandbox', () => {
       '.vibeboard/config.yaml',
       '.vibeboard/chat/x.json',
       'features/todo/F-001.md', // a card
-      'secret.txt',             // root, not markdown
-      'docs/nested/pic.png',    // docs but not markdown
+      'secret.txt', // root, not markdown
+      'docs/nested/pic.png', // docs but not markdown
       '',
     ]) {
       expect(await resolveControlPath(root, bad), bad).toBeNull();
@@ -94,7 +94,7 @@ describe('control-files CRUD', () => {
 
     await writeControlFile(root, 'CLAUDE.md', 'managed');
     expect(await deleteControlFile(root, 'CLAUDE.md')).toBe('not-allowed');
-    expect((await readFile(join(root, 'CLAUDE.md'), 'utf8'))).toBe('managed'); // untouched
+    expect(await readFile(join(root, 'CLAUDE.md'), 'utf8')).toBe('managed'); // untouched
   });
 
   it('write/read/delete reject non-control paths', async () => {
@@ -111,7 +111,11 @@ describe('create with default names', () => {
     const a = await createControlFile(root, 'docs');
     const b = await createControlFile(root, 'docs');
     const c = await createControlFile(root, 'docs');
-    expect([a!.path, b!.path, c!.path]).toEqual(['docs/new-doc.md', 'docs/new-doc-2.md', 'docs/new-doc-3.md']);
+    expect([a!.path, b!.path, c!.path]).toEqual([
+      'docs/new-doc.md',
+      'docs/new-doc-2.md',
+      'docs/new-doc-3.md',
+    ]);
     // and they really exist on disk, independently
     for (const f of [a, b, c]) expect((await readControlFile(root, f!.path))!.content).toContain('#');
   });
@@ -203,9 +207,9 @@ describe('resources registry', () => {
     await mkdir(join(root, '.vibeboard'), { recursive: true });
     await writeResources(root, [
       { title: 'Docs', url: 'https://example.com', note: 'ref' },
-      { title: '', url: '' },            // dropped
-      'nonsense',                         // dropped
-      { title: 'NoUrl' },                 // kept (title only)
+      { title: '', url: '' }, // dropped
+      'nonsense', // dropped
+      { title: 'NoUrl' }, // kept (title only)
     ]);
     const links = await readResources(root);
     expect(links).toEqual([

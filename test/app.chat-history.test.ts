@@ -12,8 +12,17 @@ beforeAll(() => {
   process.env.VIBEBOARD_CLAUDE_BIN = SHIM;
 });
 
-interface Item { kind: string; text: string; toolName?: string }
-interface Msg { type: string; items?: Item[]; chats?: { id: string; title: string }[]; currentChatId?: string }
+interface Item {
+  kind: string;
+  text: string;
+  toolName?: string;
+}
+interface Msg {
+  type: string;
+  items?: Item[];
+  chats?: { id: string; title: string }[];
+  currentChatId?: string;
+}
 
 const lastHistory = (m: Msg[]): Msg | undefined => [...m].reverse().find((x) => x.type === 'copilot:history');
 
@@ -30,7 +39,9 @@ describe('copilot chat history over /ws', () => {
 
     c1.send({ type: 'copilot:send', text: 'hi', mode: 'plan' });
     // After the turn, a copilot:chats update lists the new chat titled from the first message.
-    await c1.waitUntil((m) => m.some((x) => x.type === 'copilot:chats' && (x.chats ?? []).some((c) => c.title === 'hi')));
+    await c1.waitUntil((m) =>
+      m.some((x) => x.type === 'copilot:chats' && (x.chats ?? []).some((c) => c.title === 'hi')),
+    );
 
     // A brand-new connection replays the persisted transcript (user 'hi' + assistant 'fresh').
     const c2 = wsClient<Msg>(address);
@@ -45,13 +56,19 @@ describe('copilot chat history over /ws', () => {
 
     // New chat: broadcast history with empty items and a different current id; old chat retained.
     c1.send({ type: 'copilot:new' });
-    await c1.waitUntil((m) => { const h = lastHistory(m); return !!h && h.currentChatId !== hiChatId && (h.items ?? []).length === 0; });
+    await c1.waitUntil((m) => {
+      const h = lastHistory(m);
+      return !!h && h.currentChatId !== hiChatId && (h.items ?? []).length === 0;
+    });
     const afterNew = lastHistory(c1.messages)!;
     expect(afterNew.chats!.some((c) => c.id === hiChatId)).toBe(true);
 
     // Delete the old chat: it disappears from the list.
     c1.send({ type: 'copilot:delete', chatId: hiChatId });
-    await c1.waitUntil((m) => { const h = lastHistory(m); return !!h && !(h.chats ?? []).some((c) => c.id === hiChatId); });
+    await c1.waitUntil((m) => {
+      const h = lastHistory(m);
+      return !!h && !(h.chats ?? []).some((c) => c.id === hiChatId);
+    });
 
     c1.close();
     c2.close();

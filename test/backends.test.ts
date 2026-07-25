@@ -48,13 +48,16 @@ describe('defaultConfig', () => {
 });
 
 describe('ensureCopilotDefaults', () => {
-  const cfg = (copilot: unknown): ProjectConfig => ({ ...defaultConfig('T'), copilot } as ProjectConfig);
+  const cfg = (copilot: unknown): ProjectConfig => ({ ...defaultConfig('T'), copilot }) as ProjectConfig;
 
   it('seeds a slot for every known backend', () => {
     const config = cfg({ backend: 'claude-code' });
     expect(ensureCopilotDefaults(config)).toBe(true);
     expect(config.copilot.backends['claude-code']).toEqual({ model: 'opus', effort: 'high' });
-    expect(config.copilot.backends.opencode).toEqual({ model: 'opencode/deepseek-v4-flash-free', effort: 'high' });
+    expect(config.copilot.backends.opencode).toEqual({
+      model: 'opencode/deepseek-v4-flash-free',
+      effort: 'high',
+    });
   });
 
   // Migration: the pre-per-backend shape carried one pair, describing whichever backend was
@@ -134,13 +137,20 @@ describe('opening a project', () => {
     await scaffoldProject(root, { name: 'Old', mode: 'greenfield', today: TODAY });
     // Rewind to the pre-per-backend shape: one pair, no slots.
     const stale = parse(await readFile(configPath(root), 'utf8')) as ProjectConfig;
-    stale.copilot = { backend: 'opencode', model: 'opencode/big-pickle', effort: 'low' } as ProjectConfig['copilot'];
+    stale.copilot = {
+      backend: 'opencode',
+      model: 'opencode/big-pickle',
+      effort: 'low',
+    } as ProjectConfig['copilot'];
     await writeConfig(root, stale);
 
     const session = new ProjectSession();
     try {
       const snapshot = await session.open(root);
-      expect(snapshot.config.copilot.backends.opencode).toEqual({ model: 'opencode/big-pickle', effort: 'low' });
+      expect(snapshot.config.copilot.backends.opencode).toEqual({
+        model: 'opencode/big-pickle',
+        effort: 'low',
+      });
       expect(snapshot.config.copilot.model).toBeUndefined();
       // Written through, so the next reader sees it too.
       const onDisk = parse(await readFile(configPath(root), 'utf8')) as ProjectConfig;

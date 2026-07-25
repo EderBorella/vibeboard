@@ -2,15 +2,24 @@ import { describe, it, expect } from 'vitest';
 import { openTestProject } from './helpers.js';
 import type { FastifyInstance } from 'fastify';
 
-interface WireCard { id: string; title: string; columnSlug: string; restoreTo?: string }
+interface WireCard {
+  id: string;
+  title: string;
+  columnSlug: string;
+  restoreTo?: string;
+}
 
 async function setup(): Promise<{ app: FastifyInstance; ids: string[] }> {
   // brownfield = no sample cards, so the archive under test is entirely ours
   const { app } = await openTestProject({ name: 'Arc', mode: 'brownfield' });
   const ids: string[] = [];
-  for (const [columnSlug, title] of [['todo', 'a'], ['in-progress', 'b']] as const) {
+  for (const [columnSlug, title] of [
+    ['todo', 'a'],
+    ['in-progress', 'b'],
+  ] as const) {
     const res = await app.inject({
-      method: 'POST', url: '/api/cards',
+      method: 'POST',
+      url: '/api/cards',
       payload: { board: 'product', columnSlug, title },
     });
     ids.push(res.json().id);
@@ -21,7 +30,8 @@ async function setup(): Promise<{ app: FastifyInstance; ids: string[] }> {
 const archive = async (a: FastifyInstance): Promise<WireCard[]> =>
   (await a.inject({ method: 'GET', url: '/api/archive/product' })).json().cards;
 
-const state = async (a: FastifyInstance) => (await a.inject({ method: 'GET', url: '/api/state' })).json().snapshot;
+const state = async (a: FastifyInstance) =>
+  (await a.inject({ method: 'GET', url: '/api/state' })).json().snapshot;
 
 describe('archive + restore routes', () => {
   it('lists archived cards with where each would be restored to', async () => {
@@ -53,7 +63,11 @@ describe('archive + restore routes', () => {
     const { app, ids } = await setup();
     await app.inject({ method: 'POST', url: `/api/cards/product/${ids[1]}/archive`, payload: {} });
 
-    const res = await app.inject({ method: 'POST', url: `/api/cards/product/${ids[1]}/restore`, payload: {} });
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/cards/product/${ids[1]}/restore`,
+      payload: {},
+    });
 
     expect(res.statusCode).toBe(200);
     expect(res.json().columnSlug).toBe('in-progress');
@@ -68,7 +82,8 @@ describe('archive + restore routes', () => {
     await app.inject({ method: 'POST', url: `/api/cards/product/${ids[1]}/archive`, payload: {} });
 
     const res = await app.inject({
-      method: 'POST', url: `/api/cards/product/${ids[1]}/restore`,
+      method: 'POST',
+      url: `/api/cards/product/${ids[1]}/restore`,
       payload: { toColumnSlug: 'todo' },
     });
 
@@ -80,7 +95,8 @@ describe('archive + restore routes', () => {
     await app.inject({ method: 'POST', url: `/api/cards/product/${ids[1]}/archive`, payload: {} });
 
     const res = await app.inject({
-      method: 'POST', url: `/api/cards/product/${ids[1]}/restore`,
+      method: 'POST',
+      url: `/api/cards/product/${ids[1]}/restore`,
       payload: { toColumnSlug: 'nope' },
     });
 
@@ -90,7 +106,11 @@ describe('archive + restore routes', () => {
 
   it('400s on restoring a card that is not archived', async () => {
     const { app, ids } = await setup();
-    const res = await app.inject({ method: 'POST', url: `/api/cards/product/${ids[0]}/restore`, payload: {} });
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/cards/product/${ids[0]}/restore`,
+      payload: {},
+    });
     expect(res.statusCode).toBe(400);
   });
 

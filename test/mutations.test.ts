@@ -12,15 +12,23 @@ const NOW = '2026-07-23T10:00:00.000Z';
 describe('mutations', () => {
   it('creates a card with the next id and a file on disk', async () => {
     const root = await tempDir();
-    const card = await createCard(root, config,
-      { board: 'engineering', columnSlug: 'todo', title: 'First', links: ['P-001'] }, TODAY);
+    const card = await createCard(
+      root,
+      config,
+      { board: 'engineering', columnSlug: 'todo', title: 'First', links: ['P-001'] },
+      TODAY,
+    );
     expect(card.id).toBe('E-001');
     expect(card.created).toBe(TODAY);
     expect(card.links).toEqual(['P-001']);
     await expect(access(card.filePath)).resolves.toBeUndefined();
 
-    const second = await createCard(root, config,
-      { board: 'engineering', columnSlug: 'todo', title: 'Second' }, TODAY);
+    const second = await createCard(
+      root,
+      config,
+      { board: 'engineering', columnSlug: 'todo', title: 'Second' },
+      TODAY,
+    );
     expect(second.id).toBe('E-002');
     expect(second.order).toBeGreaterThan(card.order);
   });
@@ -55,7 +63,12 @@ describe('mutations', () => {
 
   it('archives a card (moves it out of the board into archive)', async () => {
     const root = await tempDir();
-    const card = await createCard(root, config, { board: 'engineering', columnSlug: 'todo', title: 'A' }, TODAY);
+    const card = await createCard(
+      root,
+      config,
+      { board: 'engineering', columnSlug: 'todo', title: 'A' },
+      TODAY,
+    );
     const archived = await archiveCard(root, card, NOW);
     expect(archived.columnSlug).toBe(ARCHIVE_SLUG);
     expect((await readBoard(root, 'engineering', config)).length).toBe(0);

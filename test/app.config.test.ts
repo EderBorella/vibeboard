@@ -1,7 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { openTestProject, wsClient } from './helpers.js';
 
-interface WsMessage { type: string; snapshot?: { config?: { copilot?: { backend?: string } } } }
+interface WsMessage {
+  type: string;
+  snapshot?: { config?: { copilot?: { backend?: string } } };
+}
 
 describe('PATCH /api/config', () => {
   // Regression: the "Save does nothing" bug when switching backend. PATCH /config pushes a
@@ -18,7 +21,9 @@ describe('PATCH /api/config', () => {
 
     await app.inject({ method: 'PATCH', url: '/api/config', payload: { copilot: { backend: 'opencode' } } });
 
-    const updated = await client.waitFor((m) => m.type === 'snapshot' && m.snapshot?.config?.copilot?.backend === 'opencode');
+    const updated = await client.waitFor(
+      (m) => m.type === 'snapshot' && m.snapshot?.config?.copilot?.backend === 'opencode',
+    );
     expect(updated.snapshot!.config!.copilot!.backend).toBe('opencode');
 
     client.close();
@@ -69,11 +74,14 @@ describe('PATCH /api/config — column reconciliation', () => {
 
     // The scaffold puts a sample card in product/todo.
     const before = await app.inject({ method: 'GET', url: '/api/state' });
-    const seeded = before.json().snapshot.boards.product.filter((c: { columnSlug: string }) => c.columnSlug === 'todo');
+    const seeded = before
+      .json()
+      .snapshot.boards.product.filter((c: { columnSlug: string }) => c.columnSlug === 'todo');
     expect(seeded.length).toBeGreaterThan(0);
 
     const res = await app.inject({
-      method: 'PATCH', url: '/api/config',
+      method: 'PATCH',
+      url: '/api/config',
       payload: { boards: { product: { columns: ['Backlog', 'Next', 'In Progress', 'Done'] } } },
     });
     expect(res.statusCode).toBe(200);
@@ -82,7 +90,10 @@ describe('PATCH /api/config — column reconciliation', () => {
     const cards = after.json().snapshot.boards.product;
     expect(cards.filter((c: { columnSlug: string }) => c.columnSlug === 'next')).toHaveLength(seeded.length);
     expect(cards.map((c: { id: string }) => c.id).sort()).toEqual(
-      before.json().snapshot.boards.product.map((c: { id: string }) => c.id).sort(),
+      before
+        .json()
+        .snapshot.boards.product.map((c: { id: string }) => c.id)
+        .sort(),
     ); // nothing lost
   });
 
@@ -90,7 +101,8 @@ describe('PATCH /api/config — column reconciliation', () => {
     const { app } = await openTestProject({ name: 'Cols' });
 
     const res = await app.inject({
-      method: 'PATCH', url: '/api/config',
+      method: 'PATCH',
+      url: '/api/config',
       payload: { boards: { product: { columns: ['Backlog', 'In Progress', 'Done'] } } }, // drops Todo
     });
     expect(res.statusCode).toBe(409);
@@ -104,7 +116,11 @@ describe('PATCH /api/config — column reconciliation', () => {
   // board dropped the others from config.yaml — and ensureBoards then reset them to defaults.
   it('leaves boards absent from the patch untouched', async () => {
     const { app } = await openTestProject({ name: 'Cols' });
-    await app.inject({ method: 'PATCH', url: '/api/config', payload: { boards: { engineering: { columns: ['Todo', 'Shipped'] } } } });
+    await app.inject({
+      method: 'PATCH',
+      url: '/api/config',
+      payload: { boards: { engineering: { columns: ['Todo', 'Shipped'] } } },
+    });
 
     const cfg = (await app.inject({ method: 'GET', url: '/api/config' })).json();
     expect(cfg.boards.engineering.columns).toEqual(['Todo', 'Shipped']);
@@ -115,8 +131,15 @@ describe('PATCH /api/config — column reconciliation', () => {
   it('rejects a reserved or duplicate column name', async () => {
     const { app } = await openTestProject({ name: 'Cols' });
 
-    for (const columns of [['Todo', 'Archive'], ['Todo', 'todo']]) {
-      const res = await app.inject({ method: 'PATCH', url: '/api/config', payload: { boards: { product: { columns } } } });
+    for (const columns of [
+      ['Todo', 'Archive'],
+      ['Todo', 'todo'],
+    ]) {
+      const res = await app.inject({
+        method: 'PATCH',
+        url: '/api/config',
+        payload: { boards: { product: { columns } } },
+      });
       expect(res.statusCode).toBe(400);
     }
   });

@@ -1,8 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { tempDir } from './helpers.js';
-import {
-  scaffoldProject, readConfig, readBoard, createCard, moveCard, archiveCard,
-} from '../src/index.js';
+import { scaffoldProject, readConfig, readBoard, createCard, moveCard, archiveCard } from '../src/index.js';
 
 const TODAY = '2026-07-23';
 const NOW = '2026-07-23T10:00:00.000Z';
@@ -14,8 +12,12 @@ describe('end-to-end: scaffold → create → move → archive', () => {
     const config = await readConfig(root);
 
     // create an engineering card
-    let eng = await createCard(root, config,
-      { board: 'engineering', columnSlug: 'todo', title: 'Build the thing' }, TODAY);
+    let eng = await createCard(
+      root,
+      config,
+      { board: 'engineering', columnSlug: 'todo', title: 'Build the thing' },
+      TODAY,
+    );
     expect(eng.id).toBe('E-002'); // E-001 is the sample card
 
     // move it across the board

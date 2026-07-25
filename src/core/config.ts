@@ -48,11 +48,18 @@ export function ensureCopilotDefaults(config: ProjectConfig): boolean {
   if (!config.copilot) config.copilot = { backend: DEFAULT_BACKEND, backends: {} };
   const copilot = config.copilot;
   let changed = false;
-  if (!copilot.backend) { copilot.backend = DEFAULT_BACKEND; changed = true; }
-  if (!copilot.backends) { copilot.backends = {}; changed = true; }
+  if (!copilot.backend) {
+    copilot.backend = DEFAULT_BACKEND;
+    changed = true;
+  }
+  if (!copilot.backends) {
+    copilot.backends = {};
+    changed = true;
+  }
 
   if (copilot.model || copilot.effort) {
-    const slot = copilot.backends[copilot.backend] ?? (copilot.backends[copilot.backend] = { model: '', effort: '' });
+    const slot =
+      copilot.backends[copilot.backend] ?? (copilot.backends[copilot.backend] = { model: '', effort: '' });
     if (!slot.model && copilot.model) slot.model = copilot.model;
     if (!slot.effort && copilot.effort) slot.effort = copilot.effort;
     delete copilot.model;
@@ -62,9 +69,19 @@ export function ensureCopilotDefaults(config: ProjectConfig): boolean {
 
   for (const [name, defaults] of Object.entries(BACKEND_DEFAULTS)) {
     const slot = copilot.backends[name];
-    if (!slot) { copilot.backends[name] = { ...defaults }; changed = true; continue; }
-    if (!slot.model) { slot.model = defaults.model; changed = true; }
-    if (!slot.effort) { slot.effort = defaults.effort; changed = true; }
+    if (!slot) {
+      copilot.backends[name] = { ...defaults };
+      changed = true;
+      continue;
+    }
+    if (!slot.model) {
+      slot.model = defaults.model;
+      changed = true;
+    }
+    if (!slot.effort) {
+      slot.effort = defaults.effort;
+      changed = true;
+    }
   }
 
   if (typeof config.contextBudget !== 'number' || config.contextBudget <= 0) {

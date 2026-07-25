@@ -11,16 +11,31 @@ export function ResourcesEditor({ onError }: { onError: (e: string | null) => vo
 
   useEffect(() => {
     let live = true;
-    getResources().then((l) => { if (live) { setLinks(l); setDirty(false); } }).catch((e) => onError(e.message));
-    return () => { live = false; };
+    getResources()
+      .then((l) => {
+        if (live) {
+          setLinks(l);
+          setDirty(false);
+        }
+      })
+      .catch((e) => onError(e.message));
+    return () => {
+      live = false;
+    };
   }, [onError]);
 
   const update = (i: number, patch: Partial<ResourceLink>): void => {
     setLinks((prev) => prev.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
     setDirty(true);
   };
-  const add = (): void => { setLinks((prev) => [...prev, { title: '', url: '' }]); setDirty(true); };
-  const removeRow = (i: number): void => { setLinks((prev) => prev.filter((_, idx) => idx !== i)); setDirty(true); };
+  const add = (): void => {
+    setLinks((prev) => [...prev, { title: '', url: '' }]);
+    setDirty(true);
+  };
+  const removeRow = (i: number): void => {
+    setLinks((prev) => prev.filter((_, idx) => idx !== i));
+    setDirty(true);
+  };
 
   async function save(): Promise<void> {
     setBusy(true);
@@ -42,18 +57,41 @@ export function ResourcesEditor({ onError }: { onError: (e: string | null) => vo
       <div className="control-editor-head">
         <span className="control-editor-path">Links registry{dirty ? ' •' : ''}</span>
         <div className="control-editor-actions">
-          <button className="btn-secondary" onClick={add}>＋ Add link</button>
-          <button className="btn-primary" disabled={busy || !dirty} onClick={save}>Save</button>
+          <button className="btn-secondary" onClick={add}>
+            ＋ Add link
+          </button>
+          <button className="btn-primary" disabled={busy || !dirty} onClick={save}>
+            Save
+          </button>
         </div>
       </div>
       <div className="resources-table">
-        {links.length === 0 && <div className="control-blank">No links yet. Add references the copilot can consult.</div>}
+        {links.length === 0 && (
+          <div className="control-blank">No links yet. Add references the copilot can consult.</div>
+        )}
         {links.map((l, i) => (
           <div key={i} className="resource-row">
-            <input className="res-title" placeholder="Title" value={l.title} onChange={(e) => update(i, { title: e.target.value })} />
-            <input className="res-url" placeholder="https://…" value={l.url} onChange={(e) => update(i, { url: e.target.value })} />
-            <input className="res-note" placeholder="Note (optional)" value={l.note ?? ''} onChange={(e) => update(i, { note: e.target.value })} />
-            <button className="res-del" title="Remove" onClick={() => removeRow(i)}>✕</button>
+            <input
+              className="res-title"
+              placeholder="Title"
+              value={l.title}
+              onChange={(e) => update(i, { title: e.target.value })}
+            />
+            <input
+              className="res-url"
+              placeholder="https://…"
+              value={l.url}
+              onChange={(e) => update(i, { url: e.target.value })}
+            />
+            <input
+              className="res-note"
+              placeholder="Note (optional)"
+              value={l.note ?? ''}
+              onChange={(e) => update(i, { note: e.target.value })}
+            />
+            <button className="res-del" title="Remove" onClick={() => removeRow(i)}>
+              ✕
+            </button>
           </div>
         ))}
       </div>

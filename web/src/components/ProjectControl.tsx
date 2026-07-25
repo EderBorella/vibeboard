@@ -66,7 +66,9 @@ export function ProjectControl({ snapshot }: Props) {
 
   // Initial load + live refresh: refetch the list whenever the project changes on disk, and
   // reload the open file's content when the editor has no unsaved edits.
-  useEffect(() => { void refreshGroups(); }, [refreshGroups, snapshot]);
+  useEffect(() => {
+    void refreshGroups();
+  }, [refreshGroups, snapshot]);
   useEffect(() => {
     if (file && !dirty) void loadFile(file.path);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -74,7 +76,10 @@ export function ProjectControl({ snapshot }: Props) {
 
   function select(path: string): void {
     setSelected(path);
-    if (path === RESOURCES_SENTINEL) { setFile(null); return; }
+    if (path === RESOURCES_SENTINEL) {
+      setFile(null);
+      return;
+    }
     void loadFile(path);
   }
 
@@ -177,7 +182,10 @@ export function ProjectControl({ snapshot }: Props) {
             view={view}
             busy={busy}
             onView={setView}
-            onDraft={(v) => { setDraft(v); setDirty(true); }}
+            onDraft={(v) => {
+              setDraft(v);
+              setDirty(true);
+            }}
             onSave={save}
             onDelete={remove}
           />

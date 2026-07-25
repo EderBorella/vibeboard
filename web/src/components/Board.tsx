@@ -20,8 +20,18 @@ interface Props {
 }
 
 export function Board({
-  board, label, cards, config, archivedCount = 0, collapsed,
-  onToggle, onAdd, onOpen, onArchive, onDragStart, onDrop,
+  board,
+  label,
+  cards,
+  config,
+  archivedCount = 0,
+  collapsed,
+  onToggle,
+  onAdd,
+  onOpen,
+  onArchive,
+  onDragStart,
+  onDrop,
 }: Props) {
   const [showArchive, setShowArchive] = useState(false);
   const slugs = columnSlugs(config, board);

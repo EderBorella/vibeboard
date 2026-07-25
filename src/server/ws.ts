@@ -8,7 +8,13 @@ export function createBroadcaster(): { clients: Set<WsClient>; broadcast: (msg: 
   const clients = new Set<WsClient>();
   const broadcast = (msg: unknown): void => {
     const data = JSON.stringify(msg);
-    for (const c of clients) { try { c.send(data); } catch { /* closed */ } }
+    for (const c of clients) {
+      try {
+        c.send(data);
+      } catch {
+        /* closed */
+      }
+    }
   };
   return { clients, broadcast };
 }
@@ -38,12 +44,19 @@ export function registerWs(
           /* socket closed mid-send */
         }
       };
-      if (ctx.session.isOpen) void ctx.session.snapshot().then(send).catch(() => {});
+      if (ctx.session.isOpen)
+        void ctx.session
+          .snapshot()
+          .then(send)
+          .catch(() => {});
       socket.send(JSON.stringify({ type: 'copilot:state', state: ctx.copilot.state }));
       if (ctx.session.isOpen) void sendHistory(socket).catch(() => {});
       const unsubscribe = ctx.session.subscribe(send);
       socket.on('message', (raw: Buffer) => onMessage(raw.toString('utf8')));
-      socket.on('close', () => { unsubscribe(); clients.delete(socket); });
+      socket.on('close', () => {
+        unsubscribe();
+        clients.delete(socket);
+      });
     });
   });
 }

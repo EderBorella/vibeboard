@@ -23,13 +23,16 @@ export function buildApp(session: ProjectSession): FastifyInstance {
 
   registerWs(app, ctx, clients, turns.handleMessage, turns.sendHistory);
 
-  app.register(async (api) => {
-    await registerProjectRoutes(api, ctx);
-    await registerConfigRoutes(api, ctx);
-    await registerModelRoutes(api, ctx);
-    await registerControlRoutes(api, ctx);
-    await registerCardRoutes(api, ctx);
-  }, { prefix: '/api' });
+  app.register(
+    async (api) => {
+      await registerProjectRoutes(api, ctx);
+      await registerConfigRoutes(api, ctx);
+      await registerModelRoutes(api, ctx);
+      await registerControlRoutes(api, ctx);
+      await registerCardRoutes(api, ctx);
+    },
+    { prefix: '/api' },
+  );
 
   return app;
 }

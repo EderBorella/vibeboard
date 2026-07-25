@@ -8,8 +8,10 @@ const savedIsolate = process.env.VIBEBOARD_COPILOT_ISOLATE;
 const savedHome = process.env.VIBEBOARD_COPILOT_HOME;
 
 afterEach(() => {
-  if (savedIsolate === undefined) delete process.env.VIBEBOARD_COPILOT_ISOLATE; else process.env.VIBEBOARD_COPILOT_ISOLATE = savedIsolate;
-  if (savedHome === undefined) delete process.env.VIBEBOARD_COPILOT_HOME; else process.env.VIBEBOARD_COPILOT_HOME = savedHome;
+  if (savedIsolate === undefined) delete process.env.VIBEBOARD_COPILOT_ISOLATE;
+  else process.env.VIBEBOARD_COPILOT_ISOLATE = savedIsolate;
+  if (savedHome === undefined) delete process.env.VIBEBOARD_COPILOT_HOME;
+  else process.env.VIBEBOARD_COPILOT_HOME = savedHome;
 });
 
 describe('isolationEnabled', () => {

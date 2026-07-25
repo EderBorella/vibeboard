@@ -13,7 +13,11 @@ beforeAll(() => {
   process.env.VIBEBOARD_CLAUDE_BIN = SHIM;
 });
 
-interface Msg { type: string; event?: { kind: string; text?: string }; state?: { running: boolean } }
+interface Msg {
+  type: string;
+  event?: { kind: string; text?: string };
+  state?: { running: boolean };
+}
 
 describe('copilot over /ws', () => {
   it('streams copilot events for a turn and reports idle state at the end', async () => {
@@ -33,7 +37,8 @@ describe('copilot over /ws', () => {
 
     // an idle state should arrive after the turn completes
     await client.waitUntil((all) =>
-      all.some((m) => m.type === 'copilot:state' && m.state?.running === false && all.indexOf(m) > 2));
+      all.some((m) => m.type === 'copilot:state' && m.state?.running === false && all.indexOf(m) > 2),
+    );
     client.close();
   }, 8000);
 });
@@ -106,7 +111,10 @@ describe('copilot session override', () => {
   });
 
   it('falls back to the built-in default for a backend with no saved slot', async () => {
-    const app = await open({ backend: 'opencode', backends: { opencode: { model: 'opencode/big-pickle', effort: 'max' } } });
+    const app = await open({
+      backend: 'opencode',
+      backends: { opencode: { model: 'opencode/big-pickle', effort: 'max' } },
+    });
     const args = await turn(app, { mode: 'plan', backend: 'claude-code' });
     expect(args[args.indexOf('--model') + 1]).toBe('opus');
   });

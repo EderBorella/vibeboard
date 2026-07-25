@@ -25,7 +25,10 @@ const app = buildApp(session);
 
 // Don't leave the managed `opencode serve` orphaned when VibeBoard stops.
 for (const sig of ['SIGINT', 'SIGTERM'] as const) {
-  process.once(sig, () => { stopOpencodeServer(); process.exit(0); });
+  process.once(sig, () => {
+    stopOpencodeServer();
+    process.exit(0);
+  });
 }
 process.once('exit', stopOpencodeServer);
 

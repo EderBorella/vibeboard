@@ -1,7 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { openTestProject, wsClient } from './helpers.js';
 
-interface WsMessage { type: string; snapshot: { boards: { engineering: { title: string }[] } } }
+interface WsMessage {
+  type: string;
+  snapshot: { boards: { engineering: { title: string }[] } };
+}
 
 describe('/ws live sync', () => {
   it('sends a snapshot on connect and again when a card is created', async () => {
@@ -22,8 +25,9 @@ describe('/ws live sync', () => {
       payload: { board: 'engineering', columnSlug: 'todo', title: 'Live card' },
     });
 
-    const updated = await client.waitFor((m) =>
-      m.type === 'snapshot' && m.snapshot.boards.engineering.some((c) => c.title === 'Live card'));
+    const updated = await client.waitFor(
+      (m) => m.type === 'snapshot' && m.snapshot.boards.engineering.some((c) => c.title === 'Live card'),
+    );
     expect(updated.snapshot.boards.engineering.some((c) => c.title === 'Live card')).toBe(true);
 
     client.close();

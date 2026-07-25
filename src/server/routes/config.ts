@@ -42,8 +42,14 @@ export async function registerConfigRoutes(api: FastifyInstance, ctx: AppCtx): P
       for (const board of BOARDS) {
         const next = patch.boards[board]?.columns;
         if (!next) continue;
-        const result = await reconcileColumns(ctx.session.root!, board, ctx.session.config!.boards[board].columns, next);
-        if (isRefused(result)) return reply.code(409).send({ error: `${BOARD_LABELS[board]}: ${result.error}` });
+        const result = await reconcileColumns(
+          ctx.session.root!,
+          board,
+          ctx.session.config!.boards[board].columns,
+          next,
+        );
+        if (isRefused(result))
+          return reply.code(409).send({ error: `${BOARD_LABELS[board]}: ${result.error}` });
       }
     }
 

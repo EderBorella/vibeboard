@@ -10,7 +10,11 @@ describe('raw card editing', () => {
     expect(raw.json().raw).toContain('id: E-001');
 
     const edited = `${raw.json().raw}\n\nAppended by raw editor.`;
-    const put = await app.inject({ method: 'PUT', url: '/api/cards/engineering/E-001/raw', payload: { raw: edited } });
+    const put = await app.inject({
+      method: 'PUT',
+      url: '/api/cards/engineering/E-001/raw',
+      payload: { raw: edited },
+    });
     expect(put.json().ok).toBe(true);
 
     const state = await app.inject({ method: 'GET', url: '/api/state' });

@@ -3,7 +3,13 @@ import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import type { CopilotEvent } from './copilot-events.js';
 import type { ProjectConfig } from '../core/types.js';
-import { type StoredChat, type ChatMeta, type ChatStats, type TranscriptItem, ZERO_STATS } from '../core/chat.js';
+import {
+  type StoredChat,
+  type ChatMeta,
+  type ChatStats,
+  type TranscriptItem,
+  ZERO_STATS,
+} from '../core/chat.js';
 import { DEFAULT_BACKEND } from '../core/backends.js';
 import { resolveCopilotSelection } from '../core/copilot-choice.js';
 
@@ -61,15 +67,19 @@ export class ChatStore {
     this.#session = session;
   }
 
-  #dir(root: string): string { return join(root, ...CHAT_SUBDIR); }
-  #keep(): number { return Math.max(1, this.#session.config?.keepChats ?? 20); }
-  #backend(): string { return this.#session.config?.copilot.backend ?? DEFAULT_BACKEND; }
+  #dir(root: string): string {
+    return join(root, ...CHAT_SUBDIR);
+  }
+  #keep(): number {
+    return Math.max(1, this.#session.config?.keepChats ?? 20);
+  }
+  #backend(): string {
+    return this.#session.config?.copilot.backend ?? DEFAULT_BACKEND;
+  }
   // Via the resolver, not `copilot.model`: model/effort live in a per-backend slot now, and
   // the legacy top-level field is dropped on migration.
   #model(): string | undefined {
-    return this.#session.config
-      ? resolveCopilotSelection(this.#session.config.copilot, {}).model
-      : undefined;
+    return this.#session.config ? resolveCopilotSelection(this.#session.config.copilot, {}).model : undefined;
   }
 
   // Drop in-memory state when the open project changes, so the next access loads the new
@@ -119,7 +129,11 @@ export class ChatStore {
   // in-memory current merged over its on-disk version.
   async #readAll(root: string): Promise<StoredChat[]> {
     let names: string[];
-    try { names = await readdir(this.#dir(root)); } catch { return []; }
+    try {
+      names = await readdir(this.#dir(root));
+    } catch {
+      return [];
+    }
     const out: StoredChat[] = [];
     for (const n of names) {
       if (!n.endsWith('.json')) continue;
@@ -135,7 +149,8 @@ export class ChatStore {
     const disk = root ? await this.#readAll(root) : [];
     if (this.#current) {
       const idx = disk.findIndex((c) => c.id === this.#current!.id);
-      if (idx >= 0) disk[idx] = this.#current; else disk.push(this.#current);
+      if (idx >= 0) disk[idx] = this.#current;
+      else disk.push(this.#current);
       disk.sort(descByUpdated);
     }
     return disk;
@@ -163,7 +178,10 @@ export class ChatStore {
 
   #scheduleWrite(): void {
     if (this.#writeTimer) clearTimeout(this.#writeTimer);
-    this.#writeTimer = setTimeout(() => { this.#writeTimer = undefined; void this.#persistNow(); }, WRITE_DEBOUNCE_MS);
+    this.#writeTimer = setTimeout(() => {
+      this.#writeTimer = undefined;
+      void this.#persistNow();
+    }, WRITE_DEBOUNCE_MS);
   }
 
   async #persistNow(): Promise<void> {
@@ -173,11 +191,15 @@ export class ChatStore {
     const dir = this.#dir(root);
     const file = join(dir, `${c.id}.json`);
     const data = JSON.stringify(c, null, 2);
-    this.#writeChain = this.#writeChain.then(async () => {
-      await mkdir(dir, { recursive: true });
-      await writeFile(file, data, 'utf8');
-      await this.#prune();
-    }).catch(() => { /* transient disk error; a later write retries */ });
+    this.#writeChain = this.#writeChain
+      .then(async () => {
+        await mkdir(dir, { recursive: true });
+        await writeFile(file, data, 'utf8');
+        await this.#prune();
+      })
+      .catch(() => {
+        /* transient disk error; a later write retries */
+      });
     await this.#writeChain;
   }
 
@@ -190,7 +212,11 @@ export class ChatStore {
     const currentId = this.#current?.id;
     const doomed = all.slice(keep).filter((c) => c.id !== currentId);
     for (const c of doomed) {
-      try { await rm(join(this.#dir(root), `${c.id}.json`)); } catch { /* already gone */ }
+      try {
+        await rm(join(this.#dir(root), `${c.id}.json`));
+      } catch {
+        /* already gone */
+      }
     }
   }
 
@@ -220,7 +246,10 @@ export class ChatStore {
         if (event.model) c.model = event.model;
         break;
       case 'text':
-        if (event.text) { c.items.push({ kind: 'assistant', text: event.text }); this.#touch(c); }
+        if (event.text) {
+          c.items.push({ kind: 'assistant', text: event.text });
+          this.#touch(c);
+        }
         break;
       case 'tool_use':
         c.items.push({ kind: 'tool', text: '', toolName: event.name });
@@ -274,8 +303,17 @@ export class ChatStore {
     this.#rebindIfNeeded();
     const root = this.#session.root;
     const wasCurrent = this.#current?.id === id;
-    if (root) { try { await rm(join(this.#dir(root), `${id}.json`)); } catch { /* already gone */ } }
-    if (wasCurrent) { this.#current = this.#blank(); this.#currentPromise = undefined; }
+    if (root) {
+      try {
+        await rm(join(this.#dir(root), `${id}.json`));
+      } catch {
+        /* already gone */
+      }
+    }
+    if (wasCurrent) {
+      this.#current = this.#blank();
+      this.#currentPromise = undefined;
+    }
     return { wasCurrent };
   }
 
@@ -296,7 +334,10 @@ export class ChatStore {
   }
 
   async flush(): Promise<void> {
-    if (this.#writeTimer) { clearTimeout(this.#writeTimer); this.#writeTimer = undefined; }
+    if (this.#writeTimer) {
+      clearTimeout(this.#writeTimer);
+      this.#writeTimer = undefined;
+    }
     await this.#persistNow();
     await this.#writeChain;
   }

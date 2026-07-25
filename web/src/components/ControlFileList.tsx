@@ -24,8 +24,16 @@ interface Props {
 // themselves — which swap to a text input while being renamed. Presentation only; every action
 // is a callback, so the parent stays the single owner of selection and rename state.
 export function ControlFileList({
-  groups, selected, renaming, renameDraft,
-  onSelect, onNew, onStartRename, onRenameDraft, onCommitRename, onCancelRename,
+  groups,
+  selected,
+  renaming,
+  renameDraft,
+  onSelect,
+  onNew,
+  onStartRename,
+  onRenameDraft,
+  onCommitRename,
+  onCancelRename,
 }: Props) {
   return (
     <nav className="control-list">
@@ -52,7 +60,7 @@ export function ControlFileList({
             </button>
           )}
           {g.files.length === 0 && g.key !== 'resources' && <div className="control-empty">— none —</div>}
-          {g.files.map((f) => (
+          {g.files.map((f) =>
             renaming === f.path ? (
               <input
                 key={f.path}
@@ -63,8 +71,14 @@ export function ControlFileList({
                 onChange={(e) => onRenameDraft(e.target.value)}
                 onBlur={onCommitRename}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') { e.preventDefault(); onCommitRename(); }
-                  if (e.key === 'Escape') { e.preventDefault(); onCancelRename(); }
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    onCommitRename();
+                  }
+                  if (e.key === 'Escape') {
+                    e.preventDefault();
+                    onCancelRename();
+                  }
                 }}
               />
             ) : (
@@ -78,8 +92,8 @@ export function ControlFileList({
                 <span className="control-item-name">{f.name}</span>
                 {f.managed && <span className="control-tag">managed</span>}
               </button>
-            )
-          ))}
+            ),
+          )}
         </div>
       ))}
     </nav>

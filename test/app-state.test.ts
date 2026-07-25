@@ -2,7 +2,13 @@ import { describe, it, expect, afterEach, beforeEach } from 'vitest';
 import { writeFile, rm, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tempDir } from './helpers.js';
-import { readState, writeState, rememberProject, restoreLastProject, stateFile } from '../src/server/app-state.js';
+import {
+  readState,
+  writeState,
+  rememberProject,
+  restoreLastProject,
+  stateFile,
+} from '../src/server/app-state.js';
 import { ProjectSession } from '../src/server/session.js';
 import { buildApp } from '../src/server/app.js';
 import type { FastifyInstance } from 'fastify';
@@ -28,7 +34,11 @@ async function scaffolded(name = 'Remembered'): Promise<string> {
   const root = await tempDir();
   const s = new ProjectSession();
   const a = buildApp(s);
-  await a.inject({ method: 'POST', url: '/api/project/scaffold', payload: { path: root, name, mode: 'greenfield' } });
+  await a.inject({
+    method: 'POST',
+    url: '/api/project/scaffold',
+    payload: { path: root, name, mode: 'greenfield' },
+  });
   await a.close();
   await s.close();
   return root;
@@ -111,7 +121,11 @@ describe('the server records what you open', () => {
     const notAProject = await tempDir();
     session = new ProjectSession();
     app = buildApp(session);
-    const res = await app.inject({ method: 'POST', url: '/api/project/open', payload: { path: notAProject } });
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/project/open',
+      payload: { path: notAProject },
+    });
     expect(res.statusCode).toBe(400);
     expect(await readState()).toEqual({});
   });

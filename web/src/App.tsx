@@ -36,16 +36,27 @@ export function App() {
   const [copilotMode, setCopilotMode] = useState<CopilotMode>('bypassPermissions');
 
   // Backend/model/effort: the config holds the defaults, the dock holds a session override.
-  const { choice, overridden, setModel, setEffort, setBackend, reset: onResetCopilot } =
-    useCopilotChoice(snapshot?.config.copilot);
+  const {
+    choice,
+    overridden,
+    setModel,
+    setEffort,
+    setBackend,
+    reset: onResetCopilot,
+  } = useCopilotChoice(snapshot?.config.copilot);
 
   const [theme, setTheme] = useTheme();
   const [collapsed, toggleBoard] = useCollapsedBoards();
 
-  const onAdd = (board: BoardName, columnSlug: string): void => setEditor({ mode: 'create', board, columnSlug });
+  const onAdd = (board: BoardName, columnSlug: string): void =>
+    setEditor({ mode: 'create', board, columnSlug });
   const onOpen = (card: Card): void => setEditor({ mode: 'edit', card });
-  const onDragStart = (card: Card): void => { dragged.current = card; };
-  const onArchive = (card: Card): void => { void archiveCard(card.board, card.id); };
+  const onDragStart = (card: Card): void => {
+    dragged.current = card;
+  };
+  const onArchive = (card: Card): void => {
+    void archiveCard(card.board, card.id);
+  };
   // Start a fresh chat on a backend switch, since a session belongs to the backend that
   // created it. Coordinating that is the shell's job; useCopilotChoice owns the override state.
   const onBackend = (backend: string): void => {
@@ -84,22 +95,48 @@ export function App() {
         {snapshot && !showGate && <span className="project-name">{snapshot.name}</span>}
         {snapshot && !showGate && (
           <div className="topbar-tabs" role="group" aria-label="View">
-            <button className={`tab-btn${tab === 'boards' ? ' active' : ''}`} onClick={() => setTab('boards')}>Boards</button>
-            <button className={`tab-btn${tab === 'control' ? ' active' : ''}`} onClick={() => setTab('control')}>Project Control</button>
+            <button
+              className={`tab-btn${tab === 'boards' ? ' active' : ''}`}
+              onClick={() => setTab('boards')}
+            >
+              Boards
+            </button>
+            <button
+              className={`tab-btn${tab === 'control' ? ' active' : ''}`}
+              onClick={() => setTab('control')}
+            >
+              Project Control
+            </button>
           </div>
         )}
         <div className="topbar-right">
-          <select className="theme-select" value={theme} title="Theme" onChange={(e) => setTheme(e.target.value)}>
-            {THEMES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+          <select
+            className="theme-select"
+            value={theme}
+            title="Theme"
+            onChange={(e) => setTheme(e.target.value)}
+          >
+            {THEMES.map((t) => (
+              <option key={t.value} value={t.value}>
+                {t.label}
+              </option>
+            ))}
           </select>
           {snapshot && !showGate && (
-            <button className="switch-btn" title="Settings" onClick={() => setSettingsOpen(true)}>⚙</button>
+            <button className="switch-btn" title="Settings" onClick={() => setSettingsOpen(true)}>
+              ⚙
+            </button>
           )}
           {snapshot && !showGate && (
-            <button className="switch-btn" onClick={() => setShowGate(true)}>Switch project</button>
+            <button className="switch-btn" onClick={() => setShowGate(true)}>
+              Switch project
+            </button>
           )}
           {snapshot && !showGate && (
-            <button className={`switch-btn${copilotOpen ? ' active' : ''}`} onClick={() => setCopilotOpen((v) => !v)}>
+            <button
+              className={`switch-btn${copilotOpen ? ' active' : ''}`}
+              onClick={() => setCopilotOpen((v) => !v)}
+            >
               {copilotOpen ? 'Hide copilot' : 'Copilot'}
             </button>
           )}
@@ -115,51 +152,55 @@ export function App() {
         <div className="empty">{conn === 'open' ? 'No project open.' : 'Connecting…'}</div>
       ) : (
         <div className="work">
-        {tab === 'boards' ? (
-          <main className="boards">
-            {BOARDS.map((board) => (
-              <Board
-                key={board}
-                board={board}
-                label={BOARD_LABELS[board]}
-                cards={snapshot.boards[board] ?? []}
-                config={snapshot.config}
-                archivedCount={snapshot.archivedCounts?.[board] ?? 0}
-                collapsed={collapsed.has(board)}
-                onToggle={() => toggleBoard(board)}
-                onAdd={onAdd}
-                onOpen={onOpen}
-                onArchive={onArchive}
-                onDragStart={onDragStart}
-                onDrop={onDrop}
-              />
-            ))}
-          </main>
-        ) : (
-          <ProjectControl snapshot={snapshot} />
-        )}
-        {copilotOpen && (
-          <CopilotPanel
-            copilot={copilot}
-            backend={choice.backend}
-            mode={copilotMode}
-            model={choice.model}
-            effort={choice.effort}
-            onMode={setCopilotMode}
-            onModel={setModel}
-            onEffort={setEffort}
-            onBackend={onBackend}
-            overridden={overridden}
-            contextBudget={snapshot.config.contextBudget ?? DEFAULT_CONTEXT_BUDGET}
-            onReset={onResetCopilot}
-            onClose={() => setCopilotOpen(false)}
-          />
-        )}
+          {tab === 'boards' ? (
+            <main className="boards">
+              {BOARDS.map((board) => (
+                <Board
+                  key={board}
+                  board={board}
+                  label={BOARD_LABELS[board]}
+                  cards={snapshot.boards[board] ?? []}
+                  config={snapshot.config}
+                  archivedCount={snapshot.archivedCounts?.[board] ?? 0}
+                  collapsed={collapsed.has(board)}
+                  onToggle={() => toggleBoard(board)}
+                  onAdd={onAdd}
+                  onOpen={onOpen}
+                  onArchive={onArchive}
+                  onDragStart={onDragStart}
+                  onDrop={onDrop}
+                />
+              ))}
+            </main>
+          ) : (
+            <ProjectControl snapshot={snapshot} />
+          )}
+          {copilotOpen && (
+            <CopilotPanel
+              copilot={copilot}
+              backend={choice.backend}
+              mode={copilotMode}
+              model={choice.model}
+              effort={choice.effort}
+              onMode={setCopilotMode}
+              onModel={setModel}
+              onEffort={setEffort}
+              onBackend={onBackend}
+              overridden={overridden}
+              contextBudget={snapshot.config.contextBudget ?? DEFAULT_CONTEXT_BUDGET}
+              onReset={onResetCopilot}
+              onClose={() => setCopilotOpen(false)}
+            />
+          )}
         </div>
       )}
 
       {settingsOpen && snapshot && (
-        <SettingsModal config={snapshot.config} onClose={() => setSettingsOpen(false)} onSaved={() => setSettingsOpen(false)} />
+        <SettingsModal
+          config={snapshot.config}
+          onClose={() => setSettingsOpen(false)}
+          onSaved={() => setSettingsOpen(false)}
+        />
       )}
 
       {editor && (

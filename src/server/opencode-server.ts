@@ -31,16 +31,28 @@ function startServer(): Promise<string> {
     const onData = (c: Buffer): void => {
       out += c.toString('utf8');
       const m = out.match(/listening on (http:\/\/\S+)/i);
-      if (m && !settled) { settled = true; clearTimeout(timer); resolve(m[1].trim()); }
+      if (m && !settled) {
+        settled = true;
+        clearTimeout(timer);
+        resolve(m[1].trim());
+      }
     };
     proc.stdout?.on('data', onData);
     proc.stderr?.on('data', onData);
     proc.on('exit', (code) => {
-      child = undefined; urlPromise = undefined;
-      if (!settled) { settled = true; clearTimeout(timer); reject(new Error(`opencode serve exited (${code}): ${out.slice(0, 300)}`)); }
+      child = undefined;
+      urlPromise = undefined;
+      if (!settled) {
+        settled = true;
+        clearTimeout(timer);
+        reject(new Error(`opencode serve exited (${code}): ${out.slice(0, 300)}`));
+      }
     });
     const timer = setTimeout(() => {
-      if (!settled) { settled = true; reject(new Error('opencode serve did not report a listening URL in time')); }
+      if (!settled) {
+        settled = true;
+        reject(new Error('opencode serve did not report a listening URL in time'));
+      }
     }, 20000);
   });
 }
@@ -53,5 +65,9 @@ export function opencodeBaseUrl(): Promise<string> {
 }
 
 export function stopOpencodeServer(): void {
-  if (child) { child.kill('SIGTERM'); child = undefined; urlPromise = undefined; }
+  if (child) {
+    child.kill('SIGTERM');
+    child = undefined;
+    urlPromise = undefined;
+  }
 }

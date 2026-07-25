@@ -15,19 +15,31 @@ describe('/api/control', () => {
 
   it('creates, reads back, and rejects an out-of-bounds write', async () => {
     const { app } = await openTestProject({ name: 'Ctl' });
-    const put = await app.inject({ method: 'PUT', url: '/api/control/file', payload: { path: 'docs/notes.md', content: '# Notes' } });
+    const put = await app.inject({
+      method: 'PUT',
+      url: '/api/control/file',
+      payload: { path: 'docs/notes.md', content: '# Notes' },
+    });
     expect(put.statusCode).toBe(200);
 
     const get = await app.inject({ method: 'GET', url: '/api/control/file?path=docs/notes.md' });
     expect(get.json().content).toBe('# Notes');
 
-    const bad = await app.inject({ method: 'PUT', url: '/api/control/file', payload: { path: '../evil.md', content: 'x' } });
+    const bad = await app.inject({
+      method: 'PUT',
+      url: '/api/control/file',
+      payload: { path: '../evil.md', content: 'x' },
+    });
     expect(bad.statusCode).toBe(400);
   });
 
   it('round-trips the resources registry', async () => {
     const { app } = await openTestProject({ name: 'Ctl' });
-    await app.inject({ method: 'PUT', url: '/api/control/resources', payload: { links: [{ title: 'Ref', url: 'https://x.dev' }] } });
+    await app.inject({
+      method: 'PUT',
+      url: '/api/control/resources',
+      payload: { links: [{ title: 'Ref', url: 'https://x.dev' }] },
+    });
     const res = await app.inject({ method: 'GET', url: '/api/control/resources' });
     expect(res.json().links).toEqual([{ title: 'Ref', url: 'https://x.dev' }]);
   });

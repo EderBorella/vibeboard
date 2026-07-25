@@ -8,14 +8,20 @@ async function board(root: string, slugs: string[], cards: Record<string, string
   for (const slug of [...slugs, 'archive']) {
     await mkdir(join(root, 'product', slug), { recursive: true });
     for (const id of cards[slug] ?? []) {
-      await writeFile(join(root, 'product', slug, `${id}.md`), `---\nid: ${id}\ntitle: t\norder: 10\ntags: []\nlinks: []\ncreated: 2026-07-25\n---\n`, 'utf8');
+      await writeFile(
+        join(root, 'product', slug, `${id}.md`),
+        `---\nid: ${id}\ntitle: t\norder: 10\ntags: []\nlinks: []\ncreated: 2026-07-25\n---\n`,
+        'utf8',
+      );
     }
   }
 }
 
 const dirs = async (root: string): Promise<string[]> =>
   (await readdir(join(root, 'product'), { withFileTypes: true }))
-    .filter((e) => e.isDirectory()).map((e) => e.name).sort();
+    .filter((e) => e.isDirectory())
+    .map((e) => e.name)
+    .sort();
 
 describe('validateColumns', () => {
   it('accepts a normal list', () => {
@@ -45,7 +51,12 @@ describe('reconcileColumns — rename', () => {
     const root = await tempDir();
     await board(root, ['backlog', 'todo', 'done'], { todo: ['P-001', 'P-002'] });
 
-    const result = await reconcileColumns(root, 'product', ['Backlog', 'Todo', 'Done'], ['Backlog', 'Next', 'Done']);
+    const result = await reconcileColumns(
+      root,
+      'product',
+      ['Backlog', 'Todo', 'Done'],
+      ['Backlog', 'Next', 'Done'],
+    );
     expect(result).toEqual({ renamed: [{ from: 'todo', to: 'next' }] });
     expect(await dirs(root)).toEqual(['archive', 'backlog', 'done', 'next']);
     // both cards came with it
@@ -56,14 +67,21 @@ describe('reconcileColumns — rename', () => {
     const root = await tempDir();
     await board(root, ['todo', 'done'], { todo: ['P-001'] });
     const result = await reconcileColumns(root, 'product', ['Todo', 'Done'], ['Next', 'Shipped']);
-    expect(result).toEqual({ renamed: [{ from: 'todo', to: 'next' }, { from: 'done', to: 'shipped' }] });
+    expect(result).toEqual({
+      renamed: [
+        { from: 'todo', to: 'next' },
+        { from: 'done', to: 'shipped' },
+      ],
+    });
     expect(await dirs(root)).toEqual(['archive', 'next', 'shipped']);
   });
 
   it('is a no-op when nothing changed', async () => {
     const root = await tempDir();
     await board(root, ['todo', 'done']);
-    expect(await reconcileColumns(root, 'product', ['Todo', 'Done'], ['Todo', 'Done'])).toEqual({ renamed: [] });
+    expect(await reconcileColumns(root, 'product', ['Todo', 'Done'], ['Todo', 'Done'])).toEqual({
+      renamed: [],
+    });
   });
 
   it('treats an identical set in a new order as a pure reorder — no folder touched', async () => {

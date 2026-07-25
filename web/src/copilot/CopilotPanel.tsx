@@ -26,10 +26,34 @@ interface Props {
 }
 
 export function CopilotPanel({
-  copilot, backend, mode, model, effort, contextBudget,
-  onMode, onModel, onEffort, onBackend, overridden, onReset, onClose,
+  copilot,
+  backend,
+  mode,
+  model,
+  effort,
+  contextBudget,
+  onMode,
+  onModel,
+  onEffort,
+  onBackend,
+  overridden,
+  onReset,
+  onClose,
 }: Props) {
-  const { items, running, model: activeModel, stats, chats, currentChatId, send, compact, newSession, openChat, deleteChat, cancel } = copilot;
+  const {
+    items,
+    running,
+    model: activeModel,
+    stats,
+    chats,
+    currentChatId,
+    send,
+    compact,
+    newSession,
+    openChat,
+    deleteChat,
+    cancel,
+  } = copilot;
   const [draft, setDraft] = useState('');
   const [models, setModels] = useState<ModelOption[]>([]);
   const [status, setStatus] = useState<ModelStatus | null>(null);
@@ -47,19 +71,35 @@ export function CopilotPanel({
   // Model choices depend on the configured backend (claude aliases vs opencode models).
   useEffect(() => {
     let live = true;
-    listModels(backend).then((m) => { if (live) setModels(m); }).catch(() => { if (live) setModels([]); });
-    return () => { live = false; };
+    listModels(backend)
+      .then((m) => {
+        if (live) setModels(m);
+      })
+      .catch(() => {
+        if (live) setModels([]);
+      });
+    return () => {
+      live = false;
+    };
   }, [backend]);
 
   // Live status/uptime for the selected model (OpenRouter only; null otherwise).
   useEffect(() => {
     let live = true;
     setStatus(null);
-    getModelStatus(model).then((s) => { if (live) setStatus(s); }).catch(() => {});
-    return () => { live = false; };
+    getModelStatus(model)
+      .then((s) => {
+        if (live) setStatus(s);
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
   }, [model]);
 
-  useEffect(() => { bodyRef.current?.scrollTo({ top: bodyRef.current.scrollHeight }); }, [items, running]);
+  useEffect(() => {
+    bodyRef.current?.scrollTo({ top: bodyRef.current.scrollHeight });
+  }, [items, running]);
 
   // Always concrete — the server would fill these in anyway, and sending them keeps what the
   // UI shows and what runs the same thing.
@@ -90,7 +130,9 @@ export function CopilotPanel({
           ))}
         </div>
         {activeModel && <span className="copilot-model">{activeModel}</span>}
-        <button className="copilot-x" onClick={onClose} title="Hide (session keeps running)">✕</button>
+        <button className="copilot-x" onClick={onClose} title="Hide (session keeps running)">
+          ✕
+        </button>
       </div>
 
       <ChatSwitcher
@@ -120,7 +162,9 @@ export function CopilotPanel({
       {overridden && (
         <div className="copilot-override">
           Just for this session — the project default is unchanged.
-          <button className="copilot-reset" onClick={onReset} disabled={running}>Use default</button>
+          <button className="copilot-reset" onClick={onReset} disabled={running}>
+            Use default
+          </button>
         </div>
       )}
       {noTools && (
@@ -140,15 +184,19 @@ export function CopilotPanel({
       <div className="copilot-body" ref={bodyRef}>
         {items.length === 0 && (
           <div className="copilot-empty">
-            Ask the copilot to work on this project. It runs your configured backend
-            ({backend}) in the project folder, so card changes appear on the board as it works.
+            Ask the copilot to work on this project. It runs your configured backend ({backend}) in the
+            project folder, so card changes appear on the board as it works.
           </div>
         )}
         {items.map((it) => (
           <div key={it.id} className={`msg msg-${it.kind}`}>
-            {it.kind === 'tool' ? <span className="msg-tool">⚙ {it.toolName}</span>
-              : it.kind === 'thinking' ? <span className="msg-thinking">{it.text}</span>
-              : it.text}
+            {it.kind === 'tool' ? (
+              <span className="msg-tool">⚙ {it.toolName}</span>
+            ) : it.kind === 'thinking' ? (
+              <span className="msg-thinking">{it.text}</span>
+            ) : (
+              it.text
+            )}
           </div>
         ))}
         {running && <div className="msg msg-running">…working</div>}
@@ -161,12 +209,23 @@ export function CopilotPanel({
           value={draft}
           placeholder={running ? 'Running…' : 'Message the copilot (Enter to send)'}
           onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); } }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              submit();
+            }
+          }}
           rows={3}
         />
-        {running
-          ? <button className="btn-secondary" onClick={cancel}>Stop</button>
-          : <button className="btn-primary" onClick={submit} disabled={!draft.trim()}>Send</button>}
+        {running ? (
+          <button className="btn-secondary" onClick={cancel}>
+            Stop
+          </button>
+        ) : (
+          <button className="btn-primary" onClick={submit} disabled={!draft.trim()}>
+            Send
+          </button>
+        )}
       </div>
     </aside>
   );

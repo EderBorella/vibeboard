@@ -20,7 +20,10 @@ export interface BackendCaps {
 
 // Mirrors src/core/backends.ts. Real defaults, never blank: a blank model let each CLI pick
 // silently, so nothing in the UI could tell you which model actually answered.
-export interface BackendDefaults { model: string; effort: string }
+export interface BackendDefaults {
+  model: string;
+  effort: string;
+}
 export const DEFAULT_BACKEND = 'claude-code';
 export const BACKEND_DEFAULTS: Record<string, BackendDefaults> = {
   'claude-code': { model: 'opus', effort: 'high' },
@@ -34,7 +37,10 @@ export function backendDefaults(backend: string | undefined): BackendDefaults {
 // holds a partial session override that is never persisted.
 // Mirrors src/core/types.ts. One saved model/effort slot per backend: a model id belongs to
 // exactly one backend, so a single shared slot could not survive switching connector.
-export interface CopilotBackendConfig { model: string; effort: string }
+export interface CopilotBackendConfig {
+  model: string;
+  effort: string;
+}
 
 // Mirrors DEFAULT_CONTEXT_BUDGET in src/core/config.ts.
 export const DEFAULT_CONTEXT_BUDGET = 200_000;
@@ -42,7 +48,7 @@ export const DEFAULT_CONTEXT_BUDGET = 200_000;
 export interface CopilotConfig {
   backend: string;
   backends: Record<string, CopilotBackendConfig>;
-  model?: string;  // legacy single slot, dropped on migration
+  model?: string; // legacy single slot, dropped on migration
   effort?: string; // legacy single slot, dropped on migration
 }
 
@@ -60,8 +66,11 @@ export const BACKEND_CAPS: Record<string, BackendCaps> = {
       { value: 'bypassPermissions', label: 'Full-auto', hint: 'everything, unattended' },
     ],
     efforts: [
-      { value: 'low', label: 'Low' }, { value: 'medium', label: 'Medium' },
-      { value: 'high', label: 'High' }, { value: 'xhigh', label: 'X-high' }, { value: 'max', label: 'Max' },
+      { value: 'low', label: 'Low' },
+      { value: 'medium', label: 'Medium' },
+      { value: 'high', label: 'High' },
+      { value: 'xhigh', label: 'X-high' },
+      { value: 'max', label: 'Max' },
     ],
   },
   opencode: {
@@ -73,8 +82,10 @@ export const BACKEND_CAPS: Record<string, BackendCaps> = {
     // OpenCode's own reasoning scale, sent as the message `variant`. These are the variant
     // names its models actually publish — "minimal" was listed here but isn't one of them.
     efforts: [
-      { value: 'low', label: 'Low' }, { value: 'medium', label: 'Medium' },
-      { value: 'high', label: 'High' }, { value: 'max', label: 'Max' },
+      { value: 'low', label: 'Low' },
+      { value: 'medium', label: 'Medium' },
+      { value: 'high', label: 'High' },
+      { value: 'max', label: 'Max' },
     ],
   },
 };
@@ -93,7 +104,7 @@ export interface Card {
   group?: string;
   created: string;
   // Present only while the card sits in the archive.
-  archived?: string;     // ISO timestamp
+  archived?: string; // ISO timestamp
   archivedFrom?: string; // column slug it left
   board: BoardName;
   columnSlug: string;

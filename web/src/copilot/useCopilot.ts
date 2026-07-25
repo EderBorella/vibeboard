@@ -23,15 +23,25 @@ export interface TranscriptItem {
 }
 
 export interface CopilotStats {
-  costUsd: number;      // cumulative across turns this session
-  turns: number;        // cumulative
+  costUsd: number; // cumulative across turns this session
+  turns: number; // cumulative
   lastDurationMs: number;
   contextTokens: number; // latest turn's prompt tokens (window occupancy)
 }
 
 interface CopilotEvent {
-  kind: 'init' | 'thinking' | 'text' | 'tool_use' | 'tool_result' | 'result' | 'usage'
-    | 'block_start' | 'text_delta' | 'thinking_delta' | 'block_stop';
+  kind:
+    | 'init'
+    | 'thinking'
+    | 'text'
+    | 'tool_use'
+    | 'tool_result'
+    | 'result'
+    | 'usage'
+    | 'block_start'
+    | 'text_delta'
+    | 'thinking_delta'
+    | 'block_stop';
   text?: string;
   name?: string;
   block?: 'text' | 'thinking' | 'tool_use';
@@ -68,7 +78,7 @@ export function useCopilot(bump: number) {
   const [currentChatId, setCurrentChatId] = useState<string | undefined>();
   const nextId = useRef(1);
   const streamId = useRef<number | null>(null); // bubble currently being streamed via deltas
-  const deltaMode = useRef(false);              // true once any delta seen (partial streaming on)
+  const deltaMode = useRef(false); // true once any delta seen (partial streaming on)
 
   const push = useCallback((item: Omit<TranscriptItem, 'id'>) => {
     setItems((prev) => [...prev, { ...item, id: nextId.current++ }]);
@@ -86,7 +96,11 @@ export function useCopilot(bump: number) {
 
   // Open a fresh streaming bubble (assistant text or thinking) for the next deltas.
   const openStream = useCallback((kind: 'assistant' | 'thinking') => {
-    setItems((prev) => { const id = nextId.current++; streamId.current = id; return [...prev, { id, kind, text: '' }]; });
+    setItems((prev) => {
+      const id = nextId.current++;
+      streamId.current = id;
+      return [...prev, { id, kind, text: '' }];
+    });
   }, []);
 
   const appendStream = useCallback((kind: 'assistant' | 'thinking', text: string) => {
@@ -100,75 +114,118 @@ export function useCopilot(bump: number) {
     });
   }, []);
 
-  const apply = useCallback((e: CopilotEvent) => {
-    switch (e.kind) {
-      case 'init': setSessionId(e.sessionId); setModel(e.model); break;
-      // Incremental text streaming. Thinking is intentionally not rendered.
-      case 'block_start': if (e.block === 'text') openStream('assistant'); break;
-      case 'text_delta': deltaMode.current = true; appendStream('assistant', e.text ?? ''); break;
-      case 'thinking_delta': break; // reasoning hidden
-      case 'block_stop': streamId.current = null; break;
-      case 'text': if (!deltaMode.current) push({ kind: 'assistant', text: e.text ?? '' }); break;
-      case 'thinking': break; // reasoning hidden
-      case 'tool_use': streamId.current = null; push({ kind: 'tool', text: '', toolName: e.name }); break;
-      case 'tool_result': break; // tool results are noisy; the board reflects file changes
-      // Context occupancy comes from each model call's own usage (last wins).
-      case 'usage': if (typeof e.contextTokens === 'number') setStats((s) => ({ ...s, contextTokens: e.contextTokens! })); break;
-      // Result carries cost/turns/duration only — its token totals are cross-call sums.
-      case 'result':
-        streamId.current = null;
-        if (e.stats) setStats((s) => ({
-          ...s,
-          costUsd: s.costUsd + e.stats!.costUsd,
-          turns: s.turns + e.stats!.turns,
-          lastDurationMs: e.stats!.durationMs,
-        }));
-        break;
-    }
-  }, [push, openStream, appendStream]);
+  const apply = useCallback(
+    (e: CopilotEvent) => {
+      switch (e.kind) {
+        case 'init':
+          setSessionId(e.sessionId);
+          setModel(e.model);
+          break;
+        // Incremental text streaming. Thinking is intentionally not rendered.
+        case 'block_start':
+          if (e.block === 'text') openStream('assistant');
+          break;
+        case 'text_delta':
+          deltaMode.current = true;
+          appendStream('assistant', e.text ?? '');
+          break;
+        case 'thinking_delta':
+          break; // reasoning hidden
+        case 'block_stop':
+          streamId.current = null;
+          break;
+        case 'text':
+          if (!deltaMode.current) push({ kind: 'assistant', text: e.text ?? '' });
+          break;
+        case 'thinking':
+          break; // reasoning hidden
+        case 'tool_use':
+          streamId.current = null;
+          push({ kind: 'tool', text: '', toolName: e.name });
+          break;
+        case 'tool_result':
+          break; // tool results are noisy; the board reflects file changes
+        // Context occupancy comes from each model call's own usage (last wins).
+        case 'usage':
+          if (typeof e.contextTokens === 'number')
+            setStats((s) => ({ ...s, contextTokens: e.contextTokens! }));
+          break;
+        // Result carries cost/turns/duration only — its token totals are cross-call sums.
+        case 'result':
+          streamId.current = null;
+          if (e.stats)
+            setStats((s) => ({
+              ...s,
+              costUsd: s.costUsd + e.stats!.costUsd,
+              turns: s.turns + e.stats!.turns,
+              lastDurationMs: e.stats!.durationMs,
+            }));
+          break;
+      }
+    },
+    [push, openStream, appendStream],
+  );
 
   const ws = useSharedWs(bump);
-  useEffect(() => ws.subscribe((raw) => {
-    // One cast at the wire boundary; the switch narrows from there. A board snapshot arriving
-    // on the shared socket matches no case and is ignored.
-    const m = raw as WsCopilotMessage;
-    switch (m.type) {
-      case 'copilot:event':
-        apply(m.event);
-        break;
-      case 'copilot:state':
-        setRunning(m.state.running); setSessionId(m.state.sessionId); setModel(m.state.model);
-        break;
-      case 'copilot:history':
-        setChats(m.chats); setCurrentChatId(m.currentChatId); hydrate(m.items, m.stats);
-        break;
-      case 'copilot:chats':
-        setChats(m.chats); setCurrentChatId(m.currentChatId);
-        break;
-      case 'copilot:error':
-        push({ kind: 'error', text: m.error });
-        break;
-    }
-  }), [ws, apply, push, hydrate]);
+  useEffect(
+    () =>
+      ws.subscribe((raw) => {
+        // One cast at the wire boundary; the switch narrows from there. A board snapshot arriving
+        // on the shared socket matches no case and is ignored.
+        const m = raw as WsCopilotMessage;
+        switch (m.type) {
+          case 'copilot:event':
+            apply(m.event);
+            break;
+          case 'copilot:state':
+            setRunning(m.state.running);
+            setSessionId(m.state.sessionId);
+            setModel(m.state.model);
+            break;
+          case 'copilot:history':
+            setChats(m.chats);
+            setCurrentChatId(m.currentChatId);
+            hydrate(m.items, m.stats);
+            break;
+          case 'copilot:chats':
+            setChats(m.chats);
+            setCurrentChatId(m.currentChatId);
+            break;
+          case 'copilot:error':
+            push({ kind: 'error', text: m.error });
+            break;
+        }
+      }),
+    [ws, apply, push, hydrate],
+  );
 
   const sendRaw = (payload: object): void => ws.send(payload);
 
   // Reset streaming state at the start of a turn: Claude streams deltas, OpenCode sends a
   // full text block — resetting per turn keeps both correct even if the backend changed.
-  const startTurn = (): void => { deltaMode.current = false; streamId.current = null; };
+  const startTurn = (): void => {
+    deltaMode.current = false;
+    streamId.current = null;
+  };
 
-  const send = useCallback((text: string, opts: TurnOptions) => {
-    if (!text.trim()) return;
-    startTurn();
-    push({ kind: 'user', text });
-    sendRaw({ type: 'copilot:send', text, ...opts });
-  }, [push]);
+  const send = useCallback(
+    (text: string, opts: TurnOptions) => {
+      if (!text.trim()) return;
+      startTurn();
+      push({ kind: 'user', text });
+      sendRaw({ type: 'copilot:send', text, ...opts });
+    },
+    [push],
+  );
 
-  const compact = useCallback((opts: TurnOptions) => {
-    startTurn();
-    push({ kind: 'user', text: '/compact' });
-    sendRaw({ type: 'copilot:compact', ...opts });
-  }, [push]);
+  const compact = useCallback(
+    (opts: TurnOptions) => {
+      startTurn();
+      push({ kind: 'user', text: '/compact' });
+      sendRaw({ type: 'copilot:compact', ...opts });
+    },
+    [push],
+  );
 
   const newSession = useCallback(() => {
     sendRaw({ type: 'copilot:new' });
@@ -181,10 +238,27 @@ export function useCopilot(bump: number) {
   // fresh history (delete of the active chat), which re-hydrates the transcript.
   // The backend rides along so the server can decide whether to resume the stored CLI session
   // (only valid when the chat's backend matches the one in force — override included).
-  const openChat = useCallback((chatId: string, backend?: string) => sendRaw({ type: 'copilot:open', chatId, backend }), []);
+  const openChat = useCallback(
+    (chatId: string, backend?: string) => sendRaw({ type: 'copilot:open', chatId, backend }),
+    [],
+  );
   const deleteChat = useCallback((chatId: string) => sendRaw({ type: 'copilot:delete', chatId }), []);
 
   const cancel = useCallback(() => sendRaw({ type: 'copilot:cancel' }), []);
 
-  return { items, running, sessionId, model, stats, chats, currentChatId, send, compact, newSession, openChat, deleteChat, cancel };
+  return {
+    items,
+    running,
+    sessionId,
+    model,
+    stats,
+    chats,
+    currentChatId,
+    send,
+    compact,
+    newSession,
+    openChat,
+    deleteChat,
+    cancel,
+  };
 }

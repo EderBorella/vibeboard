@@ -4,7 +4,10 @@ import { opencodeTurn } from '../src/server/opencode-client.js';
 import { CopilotSession } from '../src/server/copilot.js';
 import type { CopilotEvent } from '../src/server/copilot-events.js';
 
-interface Captured { url: string; body: Record<string, unknown> }
+interface Captured {
+  url: string;
+  body: Record<string, unknown>;
+}
 
 let server: Server | undefined;
 const saved = process.env.VIBEBOARD_OPENCODE_URL;
@@ -21,15 +24,19 @@ afterEach(async () => {
 async function fakeOpencode(seen: Captured[]): Promise<void> {
   server = createServer((req, res) => {
     let raw = '';
-    req.on('data', (c) => { raw += c; });
+    req.on('data', (c) => {
+      raw += c;
+    });
     req.on('end', () => {
       seen.push({ url: req.url ?? '', body: raw ? JSON.parse(raw) : {} });
       res.writeHead(200, { 'content-type': 'application/json' });
-      res.end(JSON.stringify(
-        (req.url ?? '').includes('/message')
-          ? { info: { sessionID: 'ses_fake' }, parts: [{ type: 'text', text: 'ok' }] }
-          : { id: 'ses_fake' },
-      ));
+      res.end(
+        JSON.stringify(
+          (req.url ?? '').includes('/message')
+            ? { info: { sessionID: 'ses_fake' }, parts: [{ type: 'text', text: 'ok' }] }
+            : { id: 'ses_fake' },
+        ),
+      );
     });
   });
   await new Promise<void>((r) => server!.listen(0, '127.0.0.1', r));
@@ -46,7 +53,10 @@ describe('opencodeTurn', () => {
     await fakeOpencode(seen);
 
     await opencodeTurn({
-      cwd: '/tmp', text: 'hi', model: 'opencode/deepseek-v4-flash-free', variant: 'high',
+      cwd: '/tmp',
+      text: 'hi',
+      model: 'opencode/deepseek-v4-flash-free',
+      variant: 'high',
       onEvent: () => {},
     });
 
@@ -72,7 +82,11 @@ describe('CopilotSession on the opencode backend', () => {
     const events: CopilotEvent[] = [];
 
     await new CopilotSession().send({
-      cwd: '/tmp', text: 'hi', mode: 'build', backend: 'opencode', onEvent: (e) => events.push(e),
+      cwd: '/tmp',
+      text: 'hi',
+      mode: 'build',
+      backend: 'opencode',
+      onEvent: (e) => events.push(e),
     });
 
     const body = message(seen);

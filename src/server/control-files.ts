@@ -11,11 +11,11 @@ import { slugify } from '../core/slug.js';
 export type ControlCategory = 'instructions' | 'skills' | 'docs' | 'resources';
 
 export interface ControlFile {
-  path: string;        // project-root-relative, POSIX
-  name: string;        // basename for display
+  path: string; // project-root-relative, POSIX
+  name: string; // basename for display
   category: ControlCategory;
-  managed: boolean;    // VibeBoard-managed (copilot-blocked; user edits behind a disclaimer)
-  deletable: boolean;  // instruction files are never deletable
+  managed: boolean; // VibeBoard-managed (copilot-blocked; user edits behind a disclaimer)
+  deletable: boolean; // instruction files are never deletable
 }
 
 export interface ControlGroup {
@@ -259,10 +259,7 @@ function starterContent(category: CreatableCategory, name: string): string {
 
 // Create a new file with a default, collision-free name. The UI then lets the user rename it
 // in place — no browser dialog, and the file exists immediately either way.
-export async function createControlFile(
-  root: string,
-  category: unknown,
-): Promise<ControlFile | null> {
+export async function createControlFile(root: string, category: unknown): Promise<ControlFile | null> {
   if (!isCreatable(category)) return null;
   const name = await freeName(root, category, NEW_NAMES[category]);
   const rel = pathForName(category, name);
@@ -307,10 +304,7 @@ export async function renameControlFile(
 async function syncSkillName(abs: string, oldSlug: string, newSlug: string): Promise<void> {
   try {
     const body = await readFile(abs, 'utf8');
-    const updated = body.replace(
-      new RegExp(`^(name:\\s*)${oldSlug}\\s*$`, 'm'),
-      `$1${newSlug}`,
-    );
+    const updated = body.replace(new RegExp(`^(name:\\s*)${oldSlug}\\s*$`, 'm'), `$1${newSlug}`);
     if (updated !== body) await writeFile(abs, updated, 'utf8');
   } catch {
     /* no SKILL.md yet, or unreadable — the folder rename already succeeded */
@@ -362,9 +356,7 @@ export async function readResources(root: string): Promise<ResourceLink[]> {
 }
 
 export async function writeResources(root: string, links: unknown[]): Promise<void> {
-  const clean = Array.isArray(links)
-    ? links.map(cleanLink).filter((l): l is ResourceLink => l !== null)
-    : [];
+  const clean = Array.isArray(links) ? links.map(cleanLink).filter((l): l is ResourceLink => l !== null) : [];
   await mkdir(join(root, CONFIG_DIR), { recursive: true });
   await writeFile(join(root, RESOURCES_YAML), stringify({ links: clean }), 'utf8');
 }

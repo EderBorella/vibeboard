@@ -12,21 +12,21 @@ export interface TranscriptItem {
 }
 
 export interface ChatStats {
-  costUsd: number;       // cumulative across turns in this chat
-  turns: number;         // cumulative
+  costUsd: number; // cumulative across turns in this chat
+  turns: number; // cumulative
   lastDurationMs: number;
   contextTokens: number; // latest turn's window occupancy
 }
 
 // Lightweight header for the switcher list (no transcript body).
 export interface ChatMeta {
-  id: string;            // VibeBoard's own id (crypto.randomUUID)
-  title: string;         // first user message, truncated; else a timestamp
-  backend: string;       // backend the chat was created under
+  id: string; // VibeBoard's own id (crypto.randomUUID)
+  title: string; // first user message, truncated; else a timestamp
+  backend: string; // backend the chat was created under
   model?: string;
-  createdAt: string;     // ISO
-  updatedAt: string;     // ISO
-  messageCount: number;  // number of transcript items
+  createdAt: string; // ISO
+  updatedAt: string; // ISO
+  messageCount: number; // number of transcript items
 }
 
 // The full persisted chat (one JSON file under <project>/.vibeboard/chat/<id>.json).

@@ -24,17 +24,30 @@ interface SendOptions {
   text: string;
   mode: CopilotMode;
   backend?: Backend; // default claude-code
-  model?: string;    // claude: alias/full name · opencode: provider/model
+  model?: string; // claude: alias/full name · opencode: provider/model
   effort?: EffortLevel; // claude: --effort scale · opencode: --variant scale
   onEvent: (event: CopilotEvent) => void;
 }
 
-interface Command { bin: string; args: string[] }
+interface Command {
+  bin: string;
+  args: string[];
+}
 
 function claudeCommand(opts: SendOptions, sessionId: string | undefined): Command {
   const { permission, persona } = resolveMode(opts.mode);
-  const appendPrompt = [vibeboardInstructions(), projectInstructions(opts.cwd), persona].filter(Boolean).join('\n\n');
-  const args = ['-p', '--output-format', 'stream-json', '--include-partial-messages', '--verbose', '--permission-mode', permission];
+  const appendPrompt = [vibeboardInstructions(), projectInstructions(opts.cwd), persona]
+    .filter(Boolean)
+    .join('\n\n');
+  const args = [
+    '-p',
+    '--output-format',
+    'stream-json',
+    '--include-partial-messages',
+    '--verbose',
+    '--permission-mode',
+    permission,
+  ];
   if (appendPrompt) args.push('--append-system-prompt', appendPrompt);
   if (opts.model) args.push('--model', opts.model);
   if (opts.effort) args.push('--effort', opts.effort);
@@ -55,11 +68,16 @@ const RESEARCH_PERSONA = [
 // safe permission mode (this only receives Claude modes; OpenCode routes elsewhere).
 function resolveMode(mode: CopilotMode): { permission: string; persona?: string } {
   switch (mode) {
-    case 'research': return { permission: 'plan', persona: RESEARCH_PERSONA };
-    case 'plan': return { permission: 'plan' };
-    case 'acceptEdits': return { permission: 'acceptEdits' };
-    case 'bypassPermissions': return { permission: 'bypassPermissions' };
-    default: return { permission: 'bypassPermissions' };
+    case 'research':
+      return { permission: 'plan', persona: RESEARCH_PERSONA };
+    case 'plan':
+      return { permission: 'plan' };
+    case 'acceptEdits':
+      return { permission: 'acceptEdits' };
+    case 'bypassPermissions':
+      return { permission: 'bypassPermissions' };
+    default:
+      return { permission: 'bypassPermissions' };
   }
 }
 
@@ -100,8 +118,8 @@ function projectInstructions(cwd: string): string {
 export class CopilotSession {
   #sessionId: string | undefined;
   #model: string | undefined;
-  #child: ChildProcess | undefined;         // claude spawn
-  #abort: AbortController | undefined;       // opencode HTTP turn
+  #child: ChildProcess | undefined; // claude spawn
+  #abort: AbortController | undefined; // opencode HTTP turn
 
   get state(): CopilotState {
     return {
@@ -127,8 +145,14 @@ export class CopilotSession {
   }
 
   cancel(): void {
-    if (this.#child) { this.#child.kill('SIGTERM'); this.#child = undefined; }
-    if (this.#abort) { this.#abort.abort(); this.#abort = undefined; }
+    if (this.#child) {
+      this.#child.kill('SIGTERM');
+      this.#child = undefined;
+    }
+    if (this.#abort) {
+      this.#abort.abort();
+      this.#abort = undefined;
+    }
   }
 
   async send(opts: SendOptions): Promise<void> {
@@ -154,23 +178,38 @@ export class CopilotSession {
   async #sendOpencode(opts: SendOptions): Promise<void> {
     this.#model = opts.model;
     const persona = opts.mode === 'research' ? RESEARCH_PERSONA : '';
-    const system = [vibeboardInstructions(), projectInstructions(opts.cwd), persona].filter(Boolean).join('\n\n');
+    const system = [vibeboardInstructions(), projectInstructions(opts.cwd), persona]
+      .filter(Boolean)
+      .join('\n\n');
     const abort = new AbortController();
     this.#abort = abort;
     const timeoutMs = Number(process.env.VIBEBOARD_COPILOT_TIMEOUT_MS ?? 180000);
     let timedOut = false;
     const timer = setTimeout(() => {
       timedOut = true;
-      opts.onEvent({ kind: 'text', text: `\n[No response after ${Math.round(timeoutMs / 1000)}s — stopping. The provider may be slow or the model unavailable.]` });
+      opts.onEvent({
+        kind: 'text',
+        text: `\n[No response after ${Math.round(timeoutMs / 1000)}s — stopping. The provider may be slow or the model unavailable.]`,
+      });
       abort.abort();
     }, timeoutMs);
     try {
       this.#sessionId = await opencodeTurn({
-        cwd: opts.cwd, text: opts.text, model: opts.model, variant: opts.effort, system,
-        sessionId: this.#sessionId, signal: abort.signal, onEvent: opts.onEvent,
+        cwd: opts.cwd,
+        text: opts.text,
+        model: opts.model,
+        variant: opts.effort,
+        system,
+        sessionId: this.#sessionId,
+        signal: abort.signal,
+        onEvent: opts.onEvent,
       });
     } catch (err) {
-      if (!timedOut) opts.onEvent({ kind: 'text', text: `\n[opencode failed: ${err instanceof Error ? err.message : String(err)}]` });
+      if (!timedOut)
+        opts.onEvent({
+          kind: 'text',
+          text: `\n[opencode failed: ${err instanceof Error ? err.message : String(err)}]`,
+        });
     } finally {
       clearTimeout(timer);
       this.#abort = undefined;
@@ -189,8 +228,12 @@ export class CopilotSession {
     let stderr = '';
     const emitLine = (line: string): void => {
       for (const event of parseCopilotLine(line)) {
-        if (event.kind === 'init') { this.#sessionId = event.sessionId; this.#model = event.model; }
-        else if (event.kind === 'result' && event.sessionId) { this.#sessionId = event.sessionId; }
+        if (event.kind === 'init') {
+          this.#sessionId = event.sessionId;
+          this.#model = event.model;
+        } else if (event.kind === 'result' && event.sessionId) {
+          this.#sessionId = event.sessionId;
+        }
         opts.onEvent(event);
       }
     };
@@ -204,13 +247,18 @@ export class CopilotSession {
         emitLine(line);
       }
     });
-    child.stderr?.on('data', (chunk: Buffer) => { stderr += chunk.toString('utf8'); });
+    child.stderr?.on('data', (chunk: Buffer) => {
+      stderr += chunk.toString('utf8');
+    });
 
     const timeoutMs = Number(process.env.VIBEBOARD_COPILOT_TIMEOUT_MS ?? 180000);
     let timedOut = false;
     const timer = setTimeout(() => {
       timedOut = true;
-      opts.onEvent({ kind: 'text', text: `\n[No response after ${Math.round(timeoutMs / 1000)}s — stopping. The model/provider may be slow or rate-limited; try a different model.]` });
+      opts.onEvent({
+        kind: 'text',
+        text: `\n[No response after ${Math.round(timeoutMs / 1000)}s — stopping. The model/provider may be slow or rate-limited; try a different model.]`,
+      });
       child.kill('SIGTERM');
     }, timeoutMs);
 
@@ -220,7 +268,10 @@ export class CopilotSession {
         if (buf.trim()) emitLine(buf);
         this.#child = undefined;
         if (!timedOut && code && code !== 0) {
-          opts.onEvent({ kind: 'text', text: `\n[copilot exited (${code})]${stderr ? `\n${stderr.slice(0, 800)}` : ''}` });
+          opts.onEvent({
+            kind: 'text',
+            text: `\n[copilot exited (${code})]${stderr ? `\n${stderr.slice(0, 800)}` : ''}`,
+          });
         }
         resolve();
       });

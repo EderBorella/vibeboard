@@ -28,7 +28,11 @@ describe('PUT /cards/:board/:id/links', () => {
 
   it('404 for a missing card', async () => {
     const { app } = await openTestProject({ name: 'L' });
-    const res = await app.inject({ method: 'PUT', url: '/api/cards/product/P-999/links', payload: { links: [] } });
+    const res = await app.inject({
+      method: 'PUT',
+      url: '/api/cards/product/P-999/links',
+      payload: { links: [] },
+    });
     expect(res.statusCode).toBe(404);
   });
 });

@@ -20,14 +20,21 @@ afterEach(() => {
   if (existsSync(ARGS_LOG)) rmSync(ARGS_LOG);
 });
 
-async function run(session: CopilotSession, text: string, mode: CopilotMode = 'bypassPermissions'): Promise<CopilotEvent[]> {
+async function run(
+  session: CopilotSession,
+  text: string,
+  mode: CopilotMode = 'bypassPermissions',
+): Promise<CopilotEvent[]> {
   const events: CopilotEvent[] = [];
   await session.send({ cwd: here, text, mode, onEvent: (e) => events.push(e) });
   return events;
 }
 
 function lastArgs(): string[][] {
-  return readFileSync(ARGS_LOG, 'utf8').trim().split('\n').map((l) => JSON.parse(l));
+  return readFileSync(ARGS_LOG, 'utf8')
+    .trim()
+    .split('\n')
+    .map((l) => JSON.parse(l));
 }
 
 describe('CopilotSession', () => {
@@ -71,7 +78,14 @@ describe('CopilotSession', () => {
 
   it('forwards model, effort, and requests partial-message streaming', async () => {
     const session = new CopilotSession();
-    await session.send({ cwd: here, text: 'x', mode: 'acceptEdits', model: 'haiku', effort: 'low', onEvent: () => {} });
+    await session.send({
+      cwd: here,
+      text: 'x',
+      mode: 'acceptEdits',
+      model: 'haiku',
+      effort: 'low',
+      onEvent: () => {},
+    });
     const args = lastArgs()[0];
     expect(args).toContain('--include-partial-messages');
     expect(args[args.indexOf('--model') + 1]).toBe('haiku');
@@ -113,5 +127,4 @@ describe('CopilotSession', () => {
     expect(append).toContain('Research mode');
     expect(append).toContain('web search');
   });
-
 });

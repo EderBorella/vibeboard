@@ -62,7 +62,7 @@ describe('readArchive', () => {
 
 describe('restoreTarget', () => {
   const card = (archivedFrom?: string): Card =>
-    ({ board: 'engineering', archivedFrom, columnSlug: ARCHIVE_SLUG } as Card);
+    ({ board: 'engineering', archivedFrom, columnSlug: ARCHIVE_SLUG }) as Card;
 
   it('is the column the card left', () => {
     expect(restoreTarget(config, card('in-progress'))).toBe('in-progress');
@@ -77,9 +77,7 @@ describe('restoreTarget', () => {
   });
 
   it('falls back for cards archived before archivedFrom was recorded', () => {
-    expect(restoreTarget(config, card(undefined))).toBe(
-      config.boards.engineering.columns[0].toLowerCase(),
-    );
+    expect(restoreTarget(config, card(undefined))).toBe(config.boards.engineering.columns[0].toLowerCase());
   });
 });
 

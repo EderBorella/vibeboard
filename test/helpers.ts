@@ -71,7 +71,9 @@ export function wsClient<M = Record<string, unknown>>(address: string): WsTestCl
   const waitUntil = (pred: (all: M[]) => boolean): Promise<void> =>
     new Promise((resolve) => {
       if (pred(messages)) return resolve();
-      waiters.push(() => { if (pred(messages)) resolve(); });
+      waiters.push(() => {
+        if (pred(messages)) resolve();
+      });
     });
   const waitFor = async (pred: (m: M) => boolean): Promise<M> => {
     await waitUntil((all) => all.some(pred));

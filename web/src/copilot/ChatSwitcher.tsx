@@ -23,7 +23,12 @@ export function ChatSwitcher({ chats, currentChatId, backend, running, onOpen, o
   return (
     <div className="copilot-chatbar">
       <div className="chat-switcher">
-        <button className="chat-current" disabled={running} onClick={() => setChatMenu((v) => !v)} title="Chat history">
+        <button
+          className="chat-current"
+          disabled={running}
+          onClick={() => setChatMenu((v) => !v)}
+          title="Chat history"
+        >
           <span className="chat-current-title">{currentTitle}</span>
           <span className="chat-caret">▾</span>
         </button>
@@ -34,21 +39,34 @@ export function ChatSwitcher({ chats, currentChatId, backend, running, onOpen, o
               {chats.length === 0 && <div className="chat-menu-empty">No saved chats yet</div>}
               {chats.map((c) => (
                 <div key={c.id} className={`chat-menu-item${c.id === currentChatId ? ' active' : ''}`}>
-                  <button className="chat-menu-open" onClick={() => { onOpen(c.id, backend); setChatMenu(false); }} title={c.title}>
+                  <button
+                    className="chat-menu-open"
+                    onClick={() => {
+                      onOpen(c.id, backend);
+                      setChatMenu(false);
+                    }}
+                    title={c.title}
+                  >
                     <span className="chat-menu-title">
                       <span className={`chat-backend bk-${c.backend}`}>{backendLabel(c.backend)}</span>
                       {c.title}
                     </span>
-                    <span className="chat-menu-meta">{relTime(c.updatedAt)} · {c.messageCount} msg</span>
+                    <span className="chat-menu-meta">
+                      {relTime(c.updatedAt)} · {c.messageCount} msg
+                    </span>
                   </button>
-                  <button className="chat-del" title="Delete chat" onClick={() => onDelete(c.id)}>✕</button>
+                  <button className="chat-del" title="Delete chat" onClick={() => onDelete(c.id)}>
+                    ✕
+                  </button>
                 </div>
               ))}
             </div>
           </>
         )}
       </div>
-      <button className="chat-new" disabled={running} onClick={onNew} title="Start a fresh chat">+ New</button>
+      <button className="chat-new" disabled={running} onClick={onNew} title="Start a fresh chat">
+        + New
+      </button>
     </div>
   );
 }

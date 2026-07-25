@@ -48,7 +48,8 @@ describe('placeCard — reordering inside a column', () => {
     const { root, config, cards } = await seeded();
     await placeCard(root, config, cards[2], 'todo', cards[0].id);
     const orders = (await readBoard(root, 'product', config))
-      .filter((c) => c.columnSlug === 'todo').map((c) => c.order);
+      .filter((c) => c.columnSlug === 'todo')
+      .map((c) => c.order);
     expect(orders).toEqual([10, 20, 30]);
   });
 
@@ -75,7 +76,12 @@ describe('placeCard — reordering inside a column', () => {
 describe('placeCard — across columns', () => {
   it('moves the file to the new column at the requested position', async () => {
     const { root, config, cards } = await seeded();
-    const target = await createCard(root, config, { board: 'product', columnSlug: 'done', title: 'shipped' }, TODAY);
+    const target = await createCard(
+      root,
+      config,
+      { board: 'product', columnSlug: 'done', title: 'shipped' },
+      TODAY,
+    );
 
     const moved = await placeCard(root, config, cards[0], 'done', target.id); // before 'shipped'
     expect(moved.columnSlug).toBe('done');
@@ -94,7 +100,12 @@ describe('placeCard — across columns', () => {
 
   it('leaves other columns untouched', async () => {
     const { root, config, cards } = await seeded();
-    const other = await createCard(root, config, { board: 'product', columnSlug: 'backlog', title: 'later' }, TODAY);
+    const other = await createCard(
+      root,
+      config,
+      { board: 'product', columnSlug: 'backlog', title: 'later' },
+      TODAY,
+    );
     await placeCard(root, config, cards[0], 'done', null);
     const backlog = (await readBoard(root, 'product', config)).filter((c) => c.columnSlug === 'backlog');
     expect(backlog.map((c) => c.order)).toEqual([other.order]);

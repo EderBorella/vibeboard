@@ -32,7 +32,11 @@ export async function createCard(
     readBoard(projectRoot, input.board, config),
     readArchive(projectRoot, input.board),
   ]);
-  const id = nextId(input.board, [...live, ...archived].map((c) => c.id), config.idPadding);
+  const id = nextId(
+    input.board,
+    [...live, ...archived].map((c) => c.id),
+    config.idPadding,
+  );
   const maxOrder = live
     .filter((c) => c.columnSlug === input.columnSlug)
     .reduce((m, c) => Math.max(m, c.order), 0);

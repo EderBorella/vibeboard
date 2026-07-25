@@ -12,30 +12,30 @@ export const BOARD_LABELS: Record<BoardName, string> = {
 };
 
 export interface CardFrontmatter {
-  id: string;            // "P-001" | "E-010"
+  id: string; // "P-001" | "E-010"
   title: string;
-  description?: string;  // optional miniature summary
-  order: number;         // position within a column
+  description?: string; // optional miniature summary
+  order: number; // position within a column
   tags: string[];
-  links: string[];       // ids of related cards on either board (symmetric)
-  group?: string;        // optional visual grouping label
-  created: string;       // ISO date "YYYY-MM-DD"
+  links: string[]; // ids of related cards on either board (symmetric)
+  group?: string; // optional visual grouping label
+  created: string; // ISO date "YYYY-MM-DD"
   // Set only while a card sits in archive/, cleared on restore. `archived` is a full
   // timestamp (not a date like `created`) so the drawer can order by what was thrown away
   // most recently; `archivedFrom` is the column slug to put it back into.
-  archived?: string;     // ISO timestamp
+  archived?: string; // ISO timestamp
   archivedFrom?: string; // column slug
 }
 
 export interface Card extends CardFrontmatter {
-  board: BoardName;      // derived from path
-  columnSlug: string;    // derived from path; "archive" if soft-deleted
-  body: string;          // markdown body
-  filePath: string;      // absolute path on disk
+  board: BoardName; // derived from path
+  columnSlug: string; // derived from path; "archive" if soft-deleted
+  body: string; // markdown body
+  filePath: string; // absolute path on disk
 }
 
 export interface BoardConfig {
-  columns: string[];     // ordered display names
+  columns: string[]; // ordered display names
 }
 
 // One saved model/effort per backend. A model id belongs to exactly one backend ("opus" to
@@ -61,7 +61,7 @@ export interface ProjectConfig {
   boards: Record<BoardName, BoardConfig>;
   miniatureChars: number;
   idPadding: number;
-  keepChats: number;     // retain the last N copilot chats per project (older pruned)
+  keepChats: number; // retain the last N copilot chats per project (older pruned)
   contextBudget: number; // tokens the copilot context bar treats as full
   copilot: CopilotConfig;
 }

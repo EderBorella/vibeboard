@@ -17,13 +17,25 @@ class FakeSocket {
   onmessage: ((ev: { data: string }) => void) | null = null;
   onclose: (() => void) | null = null;
 
-  constructor(public url: string) { FakeSocket.instances.push(this); }
-  send(data: string): void { this.sent.push(data); }
+  constructor(public url: string) {
+    FakeSocket.instances.push(this);
+  }
+  send(data: string): void {
+    this.sent.push(data);
+  }
   // close() deliberately does NOT fire onclose: the real event is asynchronous, and the
   // ordering between it and a subsequent reconnect is exactly what these tests pin down.
-  close(): void { this.closed = true; }
-  fireClose(): void { this.readyState = 3; this.onclose?.(); }
-  fireOpen(): void { this.readyState = FakeSocket.OPEN; this.onopen?.(); }
+  close(): void {
+    this.closed = true;
+  }
+  fireClose(): void {
+    this.readyState = 3;
+    this.onclose?.();
+  }
+  fireOpen(): void {
+    this.readyState = FakeSocket.OPEN;
+    this.onopen?.();
+  }
 }
 
 const live = (): FakeSocket[] => FakeSocket.instances.filter((s) => !s.closed);
@@ -60,12 +72,15 @@ describe('SharedSocket', () => {
     const seen: ConnState[] = [];
     s.onConn((c) => seen.push(c));
 
-    s.acquire(); s.acquire();   // board + copilot mount
+    s.acquire();
+    s.acquire(); // board + copilot mount
     const first = FakeSocket.instances[0];
-    s.release(); s.release();   // StrictMode cleanup — refs reaches 0
-    s.acquire(); s.acquire();   // StrictMode remount
+    s.release();
+    s.release(); // StrictMode cleanup — refs reaches 0
+    s.acquire();
+    s.acquire(); // StrictMode remount
 
-    first.fireClose();          // the superseded socket's close finally arrives
+    first.fireClose(); // the superseded socket's close finally arrives
     vi.advanceTimersByTime(5000);
 
     expect(live()).toHaveLength(1);

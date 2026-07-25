@@ -27,8 +27,12 @@ export function claudeConfigDir(): string {
   const real = join(homedir(), '.claude', '.credentials.json');
   const link = join(dir, '.credentials.json');
   if (existsSync(real)) {
-    try { symlinkSync(real, link); } catch (err) {
-      if ((err as NodeJS.ErrnoException).code !== 'EEXIST') { /* auth will fail loudly if this matters */ }
+    try {
+      symlinkSync(real, link);
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== 'EEXIST') {
+        /* auth will fail loudly if this matters */
+      }
     }
   }
   return dir;

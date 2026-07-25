@@ -6,7 +6,9 @@ import type { ChatStore } from './chat-store.js';
 // The shared surface every route group and the WS layer needs. Passed explicitly rather
 // than closed over, so each route module is a plain function of its context and can be
 // read (and tested) without the rest of the app.
-export interface WsClient { send: (data: string) => void }
+export interface WsClient {
+  send: (data: string) => void;
+}
 
 export interface AppCtx {
   session: ProjectSession;

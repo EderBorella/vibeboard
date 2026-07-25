@@ -18,21 +18,30 @@ describe('resolveChoice', () => {
   // Regression: switching connector used to fall back to the built-in default, and Settings
   // then saved that over the model chosen for the backend being left.
   it('reads each backend own saved slot', () => {
-    expect(resolveChoice(configured, { backend: 'opencode' }))
-      .toEqual({ backend: 'opencode', model: 'opencode/big-pickle', effort: 'max' });
-    expect(resolveChoice({ ...configured, backend: 'opencode' }, { backend: 'claude-code' }))
-      .toEqual(selected);
+    expect(resolveChoice(configured, { backend: 'opencode' })).toEqual({
+      backend: 'opencode',
+      model: 'opencode/big-pickle',
+      effort: 'max',
+    });
+    expect(resolveChoice({ ...configured, backend: 'opencode' }, { backend: 'claude-code' })).toEqual(
+      selected,
+    );
   });
 
   it('falls back to the built-in default for a backend never configured', () => {
-    const onlyClaude = { backend: 'claude-code', backends: { 'claude-code': { model: 'sonnet', effort: 'low' } } };
-    expect(resolveChoice(onlyClaude, { backend: 'opencode' }))
-      .toEqual({ backend: 'opencode', model: 'opencode/deepseek-v4-flash-free', effort: 'high' });
+    const onlyClaude = {
+      backend: 'claude-code',
+      backends: { 'claude-code': { model: 'sonnet', effort: 'low' } },
+    };
+    expect(resolveChoice(onlyClaude, { backend: 'opencode' })).toEqual({
+      backend: 'opencode',
+      model: 'opencode/deepseek-v4-flash-free',
+      effort: 'high',
+    });
   });
 
   it('falls back entirely with no snapshot yet', () => {
-    expect(resolveChoice(undefined, {}))
-      .toEqual({ backend: 'claude-code', model: 'opus', effort: 'high' });
+    expect(resolveChoice(undefined, {})).toEqual({ backend: 'claude-code', model: 'opus', effort: 'high' });
   });
 
   it('reads the legacy single-slot shape as the selected backend own', () => {
@@ -50,19 +59,25 @@ describe('clampToCaps', () => {
   // OpenCode has no plan/acceptEdits permission split, so a Claude mode must not survive
   // the switch — the dock would render a selected button that does not exist.
   it('falls back to the backend first mode when the carried-over one does not apply', () => {
-    expect(clampToCaps({ backend: 'opencode', model: 'x', effort: 'high' }, 'acceptEdits'))
-      .toEqual({ mode: 'build', effort: 'high' });
+    expect(clampToCaps({ backend: 'opencode', model: 'x', effort: 'high' }, 'acceptEdits')).toEqual({
+      mode: 'build',
+      effort: 'high',
+    });
   });
 
   it('keeps a mode and effort that the backend does support', () => {
-    expect(clampToCaps({ backend: 'claude-code', model: 'opus', effort: 'xhigh' }, 'plan'))
-      .toEqual({ mode: 'plan', effort: 'xhigh' });
+    expect(clampToCaps({ backend: 'claude-code', model: 'opus', effort: 'xhigh' }, 'plan')).toEqual({
+      mode: 'plan',
+      effort: 'xhigh',
+    });
   });
 
   // "xhigh" is a Claude effort; OpenCode publishes low|medium|high|max.
   it('falls back to the backend default effort when the scale differs', () => {
-    expect(clampToCaps({ backend: 'opencode', model: 'x', effort: 'xhigh' }, 'build'))
-      .toEqual({ mode: 'build', effort: 'high' });
+    expect(clampToCaps({ backend: 'opencode', model: 'x', effort: 'xhigh' }, 'build')).toEqual({
+      mode: 'build',
+      effort: 'high',
+    });
   });
 });
 

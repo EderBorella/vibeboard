@@ -21,6 +21,9 @@ export async function buildSnapshot(projectRoot: string): Promise<ProjectSnapsho
   ]);
   const boards = {} as Record<BoardName, Card[]>;
   const archivedCounts = {} as Record<BoardName, number>;
-  BOARDS.forEach((board, i) => { boards[board] = read[i]; archivedCounts[board] = counts[i]; });
+  BOARDS.forEach((board, i) => {
+    boards[board] = read[i];
+    archivedCounts[board] = counts[i];
+  });
   return { root: projectRoot, name: config.name, config, boards, archivedCounts };
 }

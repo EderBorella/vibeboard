@@ -15,9 +15,14 @@ interface Props {
 
 type Tab = 'form' | 'raw';
 
-function csv(values: string[]): string { return values.join(', '); }
+function csv(values: string[]): string {
+  return values.join(', ');
+}
 function parseCsv(text: string): string[] {
-  return text.split(',').map((s) => s.trim()).filter(Boolean);
+  return text
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
 }
 
 export function CardEditor({ editor, allCards, onClose, onSaved }: Props) {
@@ -47,7 +52,10 @@ export function CardEditor({ editor, allCards, onClose, onSaved }: Props) {
   useEffect(() => {
     if (tab === 'raw' && existing && !rawLoaded) {
       getRaw(existing.board, existing.id)
-        .then((text) => { setRaw(text); setRawLoaded(true); })
+        .then((text) => {
+          setRaw(text);
+          setRawLoaded(true);
+        })
         .catch((e) => setError(e instanceof Error ? e.message : String(e)));
     }
   }, [tab, existing, rawLoaded]);
@@ -96,28 +104,45 @@ export function CardEditor({ editor, allCards, onClose, onSaved }: Props) {
             {editor.mode === 'create' ? `New ${board} card` : `${existing!.id} · ${board}`}
           </span>
           <div className="modal-tabs">
-            <button className={tab === 'form' ? 'active' : ''} onClick={() => setTab('form')}>Form</button>
-            {existing && <button className={tab === 'raw' ? 'active' : ''} onClick={() => setTab('raw')}>Raw</button>}
+            <button className={tab === 'form' ? 'active' : ''} onClick={() => setTab('form')}>
+              Form
+            </button>
+            {existing && (
+              <button className={tab === 'raw' ? 'active' : ''} onClick={() => setTab('raw')}>
+                Raw
+              </button>
+            )}
           </div>
-          <button className="modal-close" onClick={onClose}>✕</button>
+          <button className="modal-close" onClick={onClose}>
+            ✕
+          </button>
         </div>
 
         <div className="modal-body">
           {tab === 'form' ? (
             <>
-              <label className="field"><span>Title</span>
+              <label className="field">
+                <span>Title</span>
                 <input value={title} onChange={(e) => setTitle(e.target.value)} autoFocus />
               </label>
-              <label className="field"><span>Description</span>
-                <input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Miniature summary" />
+              <label className="field">
+                <span>Description</span>
+                <input
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Miniature summary"
+                />
               </label>
-              <label className="field"><span>Tags (comma-separated)</span>
+              <label className="field">
+                <span>Tags (comma-separated)</span>
                 <input value={tags} onChange={(e) => setTags(e.target.value)} />
               </label>
-              <label className="field"><span>Group</span>
+              <label className="field">
+                <span>Group</span>
                 <input value={group} onChange={(e) => setGroup(e.target.value)} />
               </label>
-              <div className="field"><span>Linked cards</span>
+              <div className="field">
+                <span>Linked cards</span>
                 {linkable.length === 0 ? (
                   <div className="links-hint">No other cards yet to link.</div>
                 ) : (
@@ -130,7 +155,11 @@ export function CardEditor({ editor, allCards, onClose, onSaved }: Props) {
                           <div className="links-group">{BOARD_LABELS[b]}</div>
                           {group.map((c) => (
                             <label key={c.id} className="link-option">
-                              <input type="checkbox" checked={links.includes(c.id)} onChange={() => toggleLink(c.id)} />
+                              <input
+                                type="checkbox"
+                                checked={links.includes(c.id)}
+                                onChange={() => toggleLink(c.id)}
+                              />
                               <span className="link-id">{c.id}</span>
                               <span className="link-title">{c.title}</span>
                             </label>
@@ -141,12 +170,14 @@ export function CardEditor({ editor, allCards, onClose, onSaved }: Props) {
                   </div>
                 )}
               </div>
-              <label className="field"><span>Body (markdown)</span>
+              <label className="field">
+                <span>Body (markdown)</span>
                 <textarea rows={8} value={body} onChange={(e) => setBody(e.target.value)} />
               </label>
             </>
           ) : (
-            <label className="field field-grow"><span>File contents (frontmatter + body)</span>
+            <label className="field field-grow">
+              <span>File contents (frontmatter + body)</span>
               <textarea
                 className="raw-area"
                 rows={18}
@@ -160,12 +191,10 @@ export function CardEditor({ editor, allCards, onClose, onSaved }: Props) {
         </div>
 
         <div className="modal-foot">
-          <button className="btn-secondary" onClick={onClose} disabled={busy}>Cancel</button>
-          <button
-            className="btn-primary"
-            onClick={save}
-            disabled={busy || (tab === 'form' && !title.trim())}
-          >
+          <button className="btn-secondary" onClick={onClose} disabled={busy}>
+            Cancel
+          </button>
+          <button className="btn-primary" onClick={save} disabled={busy || (tab === 'form' && !title.trim())}>
             Save
           </button>
         </div>

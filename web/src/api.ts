@@ -1,5 +1,10 @@
 import type {
-  ArchivedCard, BoardName, Card, CardFrontmatterPatch, ProjectConfig, ProjectSnapshot,
+  ArchivedCard,
+  BoardName,
+  Card,
+  CardFrontmatterPatch,
+  ProjectConfig,
+  ProjectSnapshot,
 } from './shared';
 
 async function post<T>(url: string, body: unknown): Promise<T> {
@@ -22,7 +27,10 @@ async function patch<T>(url: string, body: unknown): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-export interface ProjectRef { path: string; name: string }
+export interface ProjectRef {
+  path: string;
+  name: string;
+}
 
 export async function getState(): Promise<{ open: boolean; snapshot?: ProjectSnapshot }> {
   return (await fetch('/api/state')).json();
@@ -50,7 +58,11 @@ export interface ModelOption {
   caps?: ModelCaps;
 }
 
-export interface ModelStatus { up: boolean; uptime?: number; endpoints: number }
+export interface ModelStatus {
+  up: boolean;
+  uptime?: number;
+  endpoints: number;
+}
 
 export async function listModels(backend: string): Promise<ModelOption[]> {
   return (await fetch(`/api/models?backend=${encodeURIComponent(backend)}`)).json();

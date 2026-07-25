@@ -33,9 +33,18 @@ export function ArchiveDrawer({ board, config, count, onOpen }: Props) {
   useEffect(() => {
     let live = true;
     listArchive(board)
-      .then((c) => { if (live) { setCards(c); setError(null); } })
-      .catch((e: Error) => { if (live) setError(e.message); });
-    return () => { live = false; };
+      .then((c) => {
+        if (live) {
+          setCards(c);
+          setError(null);
+        }
+      })
+      .catch((e: Error) => {
+        if (live) setError(e.message);
+      });
+    return () => {
+      live = false;
+    };
   }, [board, count]);
 
   const restore = (card: ArchivedCard, toColumnSlug?: string): void => {
@@ -73,10 +82,16 @@ export function ArchiveDrawer({ board, config, count, onOpen }: Props) {
               className="archive-column"
               value=""
               title="Restore to another column"
-              onChange={(e) => { if (e.target.value) restore(c, e.target.value); }}
+              onChange={(e) => {
+                if (e.target.value) restore(c, e.target.value);
+              }}
             >
               <option value="">Elsewhere…</option>
-              {slugs.map((slug, i) => <option key={slug} value={slug}>{labels[i]}</option>)}
+              {slugs.map((slug, i) => (
+                <option key={slug} value={slug}>
+                  {labels[i]}
+                </option>
+              ))}
             </select>
           </div>
         </div>

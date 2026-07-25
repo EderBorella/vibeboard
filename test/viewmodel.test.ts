@@ -18,8 +18,17 @@ const config: ProjectConfig = {
 
 function card(partial: Partial<Card>): Card {
   return {
-    id: 'E-001', title: 'x', order: 0, tags: [], links: [], created: '2026-07-23',
-    board: 'engineering', columnSlug: 'todo', body: '', filePath: '/x.md', ...partial,
+    id: 'E-001',
+    title: 'x',
+    order: 0,
+    tags: [],
+    links: [],
+    created: '2026-07-23',
+    board: 'engineering',
+    columnSlug: 'todo',
+    body: '',
+    filePath: '/x.md',
+    ...partial,
   };
 }
 

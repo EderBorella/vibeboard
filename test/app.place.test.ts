@@ -2,7 +2,12 @@ import { describe, it, expect } from 'vitest';
 import { openTestProject } from './helpers.js';
 import type { FastifyInstance } from 'fastify';
 
-interface WireCard { id: string; title: string; columnSlug: string; order: number }
+interface WireCard {
+  id: string;
+  title: string;
+  columnSlug: string;
+  order: number;
+}
 
 async function setup(): Promise<{ app: FastifyInstance; ids: string[] }> {
   // brownfield = no sample cards, so the order under test is entirely ours
@@ -10,7 +15,8 @@ async function setup(): Promise<{ app: FastifyInstance; ids: string[] }> {
   const ids: string[] = [];
   for (const title of ['a', 'b', 'c']) {
     const res = await app.inject({
-      method: 'POST', url: '/api/cards',
+      method: 'POST',
+      url: '/api/cards',
       payload: { board: 'product', columnSlug: 'todo', title },
     });
     ids.push(res.json().id);
@@ -29,7 +35,8 @@ describe('POST /cards/:board/:id/place', () => {
     expect((await column(app, 'todo')).map((c) => c.title)).toEqual(['a', 'b', 'c']);
 
     const res = await app.inject({
-      method: 'POST', url: `/api/cards/product/${ids[2]}/place`,
+      method: 'POST',
+      url: `/api/cards/product/${ids[2]}/place`,
       payload: { toColumnSlug: 'todo', beforeId: ids[0] },
     });
     expect(res.statusCode).toBe(200);
@@ -40,7 +47,8 @@ describe('POST /cards/:board/:id/place', () => {
   it('treats a null beforeId as the end of the column', async () => {
     const { app, ids } = await setup();
     await app.inject({
-      method: 'POST', url: `/api/cards/product/${ids[0]}/place`,
+      method: 'POST',
+      url: `/api/cards/product/${ids[0]}/place`,
       payload: { toColumnSlug: 'todo', beforeId: null },
     });
     expect((await column(app, 'todo')).map((c) => c.title)).toEqual(['b', 'c', 'a']);
@@ -48,8 +56,16 @@ describe('POST /cards/:board/:id/place', () => {
 
   it('moves a card into another column at a position', async () => {
     const { app, ids } = await setup();
-    await app.inject({ method: 'POST', url: `/api/cards/product/${ids[0]}/place`, payload: { toColumnSlug: 'done', beforeId: null } });
-    await app.inject({ method: 'POST', url: `/api/cards/product/${ids[1]}/place`, payload: { toColumnSlug: 'done', beforeId: ids[0] } });
+    await app.inject({
+      method: 'POST',
+      url: `/api/cards/product/${ids[0]}/place`,
+      payload: { toColumnSlug: 'done', beforeId: null },
+    });
+    await app.inject({
+      method: 'POST',
+      url: `/api/cards/product/${ids[1]}/place`,
+      payload: { toColumnSlug: 'done', beforeId: ids[0] },
+    });
 
     expect((await column(app, 'done')).map((c) => c.title)).toEqual(['b', 'a']);
     expect((await column(app, 'todo')).map((c) => c.title)).toEqual(['c']);
@@ -58,7 +74,8 @@ describe('POST /cards/:board/:id/place', () => {
   it('404s for an unknown card', async () => {
     const { app } = await setup();
     const res = await app.inject({
-      method: 'POST', url: '/api/cards/product/P-999/place',
+      method: 'POST',
+      url: '/api/cards/product/P-999/place',
       payload: { toColumnSlug: 'todo', beforeId: null },
     });
     expect(res.statusCode).toBe(404);

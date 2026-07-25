@@ -12,8 +12,12 @@ export function backendLabel(b: string): string {
   return BACKENDS.find((x) => x.value === b)?.label ?? b;
 }
 
-export function fmtUsd(n: number): string { return `$${n.toFixed(n < 1 ? 4 : 2)}`; }
-export function fmtK(n: number): string { return n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n); }
+export function fmtUsd(n: number): string {
+  return `$${n.toFixed(n < 1 ? 4 : 2)}`;
+}
+export function fmtK(n: number): string {
+  return n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n);
+}
 
 // Compact relative time for the chat switcher (e.g. "just now", "5m", "2h", "3d").
 export function relTime(iso: string): string {

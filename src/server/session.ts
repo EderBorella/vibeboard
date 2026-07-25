@@ -22,9 +22,15 @@ export class ProjectSession {
   #listeners = new Set<SnapshotListener>();
   #timer: ReturnType<typeof setTimeout> | undefined;
 
-  get isOpen(): boolean { return this.#root !== undefined; }
-  get root(): string | undefined { return this.#root; }
-  get config(): ProjectConfig | undefined { return this.#config; }
+  get isOpen(): boolean {
+    return this.#root !== undefined;
+  }
+  get root(): string | undefined {
+    return this.#root;
+  }
+  get config(): ProjectConfig | undefined {
+    return this.#config;
+  }
 
   async open(projectRoot: string): Promise<ProjectSnapshot> {
     const config = await readConfig(projectRoot); // throws if not a VibeBoard project
@@ -49,9 +55,18 @@ export class ProjectSession {
   }
 
   async close(keepState = false): Promise<void> {
-    if (this.#timer) { clearTimeout(this.#timer); this.#timer = undefined; }
-    if (this.#watcher) { await this.#watcher.close(); this.#watcher = undefined; }
-    if (!keepState) { this.#root = undefined; this.#config = undefined; }
+    if (this.#timer) {
+      clearTimeout(this.#timer);
+      this.#timer = undefined;
+    }
+    if (this.#watcher) {
+      await this.#watcher.close();
+      this.#watcher = undefined;
+    }
+    if (!keepState) {
+      this.#root = undefined;
+      this.#config = undefined;
+    }
   }
 
   async snapshot(): Promise<ProjectSnapshot> {
@@ -66,15 +81,21 @@ export class ProjectSession {
 
   subscribe(fn: SnapshotListener): () => void {
     this.#listeners.add(fn);
-    return () => { this.#listeners.delete(fn); };
+    return () => {
+      this.#listeners.delete(fn);
+    };
   }
 
   #scheduleBroadcast(): void {
     if (this.#timer) clearTimeout(this.#timer);
     this.#timer = setTimeout(() => {
       void this.snapshot()
-        .then((s) => { for (const fn of this.#listeners) fn(s); })
-        .catch(() => { /* transient FS race; a later event will refresh */ });
+        .then((s) => {
+          for (const fn of this.#listeners) fn(s);
+        })
+        .catch(() => {
+          /* transient FS race; a later event will refresh */
+        });
     }, DEBOUNCE_MS);
   }
 }

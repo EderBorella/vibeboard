@@ -29,12 +29,17 @@ export class SharedSocket {
     this.#refs -= 1;
     if (this.#refs > 0) return;
     this.#closing = true;
-    if (this.#retry) { clearTimeout(this.#retry); this.#retry = undefined; }
+    if (this.#retry) {
+      clearTimeout(this.#retry);
+      this.#retry = undefined;
+    }
     this.#socket?.close();
     this.#socket = undefined;
   }
 
-  #setConn(c: ConnState): void { for (const fn of this.#connListeners) fn(c); }
+  #setConn(c: ConnState): void {
+    for (const fn of this.#connListeners) fn(c);
+  }
 
   #connect(): void {
     this.#closing = false;
@@ -48,7 +53,9 @@ export class SharedSocket {
     // reconnect, orphaning the live socket: two sockets per tab, which is the bug this file
     // exists to fix.
     const stale = (): boolean => this.#socket !== socket;
-    socket.onopen = () => { if (!stale()) this.#setConn('open'); };
+    socket.onopen = () => {
+      if (!stale()) this.#setConn('open');
+    };
     socket.onmessage = (ev) => {
       if (stale()) return;
       const msg = JSON.parse(ev.data as string) as Record<string, unknown>;
@@ -63,12 +70,16 @@ export class SharedSocket {
 
   subscribe(fn: Listener): () => void {
     this.#listeners.add(fn);
-    return () => { this.#listeners.delete(fn); };
+    return () => {
+      this.#listeners.delete(fn);
+    };
   }
 
   onConn(fn: (c: ConnState) => void): () => void {
     this.#connListeners.add(fn);
-    return () => { this.#connListeners.delete(fn); };
+    return () => {
+      this.#connListeners.delete(fn);
+    };
   }
 
   send(payload: object): void {

@@ -27,7 +27,15 @@ export type CopilotEvent =
   | { kind: 'thinking_delta'; text: string }
   | { kind: 'block_stop' };
 
-interface RawBlock { type: string; text?: string; thinking?: string; id?: string; name?: string; input?: unknown; content?: unknown }
+interface RawBlock {
+  type: string;
+  text?: string;
+  thinking?: string;
+  id?: string;
+  name?: string;
+  input?: unknown;
+  content?: unknown;
+}
 
 export const num = (v: unknown): number => (typeof v === 'number' ? v : 0);
 
@@ -36,7 +44,9 @@ export const num = (v: unknown): number => (typeof v === 'number' ? v : 0);
 // usage — NOT the result's top-level usage, which sums every call in the turn.
 function contextFromUsage(usage: Record<string, unknown> | undefined): number | undefined {
   if (!usage) return undefined;
-  return num(usage.input_tokens) + num(usage.cache_read_input_tokens) + num(usage.cache_creation_input_tokens);
+  return (
+    num(usage.input_tokens) + num(usage.cache_read_input_tokens) + num(usage.cache_creation_input_tokens)
+  );
 }
 
 function toolResultText(content: unknown): string {
@@ -53,7 +63,8 @@ function contentEvents(content: unknown): CopilotEvent[] {
   for (const b of content as RawBlock[]) {
     if (b.type === 'text' && b.text) out.push({ kind: 'text', text: b.text });
     else if (b.type === 'thinking' && b.thinking) out.push({ kind: 'thinking', text: b.thinking });
-    else if (b.type === 'tool_use') out.push({ kind: 'tool_use', id: b.id ?? '', name: b.name ?? '', input: b.input });
+    else if (b.type === 'tool_use')
+      out.push({ kind: 'tool_use', id: b.id ?? '', name: b.name ?? '', input: b.input });
     else if (b.type === 'tool_result') out.push({ kind: 'tool_result', text: toolResultText(b.content) });
   }
   return out;
@@ -66,7 +77,10 @@ function resultStats(o: Record<string, unknown>): ResultStats {
   // the real context-window occupancy at the end of the turn.
   const iters = Array.isArray(u.iterations) ? (u.iterations as Record<string, unknown>[]) : [];
   const promptSrc = iters.length ? iters[iters.length - 1] : u;
-  const contextTokens = num(promptSrc.input_tokens) + num(promptSrc.cache_read_input_tokens) + num(promptSrc.cache_creation_input_tokens);
+  const contextTokens =
+    num(promptSrc.input_tokens) +
+    num(promptSrc.cache_read_input_tokens) +
+    num(promptSrc.cache_creation_input_tokens);
   return {
     ok: o.is_error === false,
     text: typeof o.result === 'string' ? o.result : '',
@@ -89,7 +103,14 @@ export function parseCopilotLine(line: string): CopilotEvent[] {
   switch (o.type) {
     case 'system':
       return o.subtype === 'init'
-        ? [{ kind: 'init', sessionId: String(o.session_id ?? ''), model: String(o.model ?? ''), permissionMode: String(o.permissionMode ?? '') }]
+        ? [
+            {
+              kind: 'init',
+              sessionId: String(o.session_id ?? ''),
+              model: String(o.model ?? ''),
+              permissionMode: String(o.permissionMode ?? ''),
+            },
+          ]
         : [];
     case 'assistant': {
       const message = o.message as { content?: unknown; usage?: Record<string, unknown> };
@@ -127,7 +148,8 @@ function streamEvents(event: StreamEvent | undefined): CopilotEvent[] {
     }
     case 'content_block_delta':
       if (event.delta?.type === 'text_delta') return [{ kind: 'text_delta', text: event.delta.text ?? '' }];
-      if (event.delta?.type === 'thinking_delta') return [{ kind: 'thinking_delta', text: event.delta.thinking ?? '' }];
+      if (event.delta?.type === 'thinking_delta')
+        return [{ kind: 'thinking_delta', text: event.delta.thinking ?? '' }];
       return [];
     case 'content_block_stop':
       return [{ kind: 'block_stop' }];

@@ -42,13 +42,16 @@ describe('app mutation routes', () => {
 
     await app.inject({ method: 'POST', url: `/api/cards/engineering/${id}/archive` });
     const state = await app.inject({ method: 'GET', url: '/api/state' });
-    expect(state.json().snapshot.boards.engineering.find((c: { id: string }) => c.id === id))
-      .toBeUndefined();
+    expect(state.json().snapshot.boards.engineering.find((c: { id: string }) => c.id === id)).toBeUndefined();
   });
 
   it('returns 404 for a missing card', async () => {
     const { app } = await openTestProject({ name: 'Mut' });
-    const res = await app.inject({ method: 'PATCH', url: '/api/cards/product/P-999', payload: { title: 'x' } });
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/api/cards/product/P-999',
+      payload: { title: 'x' },
+    });
     expect(res.statusCode).toBe(404);
   });
 

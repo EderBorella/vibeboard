@@ -1,7 +1,12 @@
 import type { FastifyInstance } from 'fastify';
 import { readFile, writeFile } from 'node:fs/promises';
 import {
-  createCard, updateCard, placeCard, archiveCard, restoreCard, restoreTarget,
+  createCard,
+  updateCard,
+  placeCard,
+  archiveCard,
+  restoreCard,
+  restoreTarget,
   type CreateCardInput,
 } from '../../core/mutations.js';
 import { readArchive, ARCHIVE_SLUG } from '../../core/board.js';

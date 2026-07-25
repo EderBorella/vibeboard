@@ -26,12 +26,19 @@ export function CardTile({ card, miniatureChars, onOpen, onArchive, onDragStart 
     >
       <div className="tile-head">
         <span className="tile-id">{card.id}</span>
-        {card.links.length > 0 && <span className="tile-link" title={card.links.join(', ')}>🔗 {card.links.length}</span>}
+        {card.links.length > 0 && (
+          <span className="tile-link" title={card.links.join(', ')}>
+            🔗 {card.links.length}
+          </span>
+        )}
         {onArchive && (
           <button
             className="tile-archive"
             title="Archive"
-            onClick={(e) => { e.stopPropagation(); onArchive(card); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              onArchive(card);
+            }}
           >
             ✕
           </button>
@@ -42,7 +49,11 @@ export function CardTile({ card, miniatureChars, onOpen, onArchive, onDragStart 
       {card.group && <div className="tile-group">{card.group}</div>}
       {card.tags.length > 0 && (
         <div className="tile-tags">
-          {card.tags.map((t) => <span key={t} className="tag">{t}</span>)}
+          {card.tags.map((t) => (
+            <span key={t} className="tag">
+              {t}
+            </span>
+          ))}
         </div>
       )}
     </div>

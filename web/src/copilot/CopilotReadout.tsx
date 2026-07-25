@@ -13,9 +13,15 @@ export function CopilotReadout({ stats, budget }: { stats: CopilotStats; budget:
       <span title="cumulative session cost">{fmtUsd(stats.costUsd)}</span>
       <span>{stats.turns} turns</span>
       <span>{(stats.lastDurationMs / 1000).toFixed(1)}s</span>
-      <span className={`ctx${nearFull ? ' ctx-warn' : ''}`} title={`context window: ${stats.contextTokens.toLocaleString()} / ${budget.toLocaleString()} tokens`}>
-        <span className="ctx-bar"><span className="ctx-fill" style={{ width: `${pct}%` }} /></span>
-        ctx {fmtK(stats.contextTokens)}{nearFull ? ' · consider /compact' : ''}
+      <span
+        className={`ctx${nearFull ? ' ctx-warn' : ''}`}
+        title={`context window: ${stats.contextTokens.toLocaleString()} / ${budget.toLocaleString()} tokens`}
+      >
+        <span className="ctx-bar">
+          <span className="ctx-fill" style={{ width: `${pct}%` }} />
+        </span>
+        ctx {fmtK(stats.contextTokens)}
+        {nearFull ? ' · consider /compact' : ''}
       </span>
     </div>
   );

@@ -1,7 +1,13 @@
 import { useEffect, useState } from 'react';
 import {
-  BOARDS, BOARD_LABELS, DEFAULT_CONTEXT_BUDGET, backendCaps, backendDefaults,
-  type BoardName, type CopilotBackendConfig, type ProjectConfig,
+  BOARDS,
+  BOARD_LABELS,
+  DEFAULT_CONTEXT_BUDGET,
+  backendCaps,
+  backendDefaults,
+  type BoardName,
+  type CopilotBackendConfig,
+  type ProjectConfig,
 } from '../shared';
 import { listModels, patchConfig, type ModelOption } from '../api';
 import { resolveChoice, clampToCaps } from '../copilot/choice';
@@ -19,7 +25,10 @@ interface Props {
 }
 
 function parseCsv(text: string): string[] {
-  return text.split(',').map((s) => s.trim()).filter(Boolean);
+  return text
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
 }
 
 export function SettingsModal({ config, onClose, onSaved }: Props) {
@@ -53,8 +62,16 @@ export function SettingsModal({ config, onClose, onSaved }: Props) {
   // Models depend on the chosen backend (claude aliases vs `opencode models`).
   useEffect(() => {
     let live = true;
-    listModels(backend).then((m) => { if (live) setModels(m); }).catch(() => { if (live) setModels([]); });
-    return () => { live = false; };
+    listModels(backend)
+      .then((m) => {
+        if (live) setModels(m);
+      })
+      .catch(() => {
+        if (live) setModels([]);
+      });
+    return () => {
+      live = false;
+    };
   }, [backend]);
 
   async function save(): Promise<void> {
@@ -85,12 +102,15 @@ export function SettingsModal({ config, onClose, onSaved }: Props) {
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
           <span className="modal-title">Settings</span>
-          <button className="modal-close" onClick={onClose}>✕</button>
+          <button className="modal-close" onClick={onClose}>
+            ✕
+          </button>
         </div>
 
         <div className="modal-body">
           <div className="settings-section">Copilot</div>
-          <div className="field"><span>Backend</span>
+          <div className="field">
+            <span>Backend</span>
             <div className="mode-group">
               {BACKENDS.map((b) => (
                 <button
@@ -106,50 +126,81 @@ export function SettingsModal({ config, onClose, onSaved }: Props) {
               ))}
             </div>
           </div>
-          <div className="field"><span>Default model</span>
-            <ModelPicker models={models} value={model} defaultModel={backendDefaults(backend).model} onChange={setModel} />
+          <div className="field">
+            <span>Default model</span>
+            <ModelPicker
+              models={models}
+              value={model}
+              defaultModel={backendDefaults(backend).model}
+              onChange={setModel}
+            />
           </div>
-          <label className="field"><span>Default {backend === 'opencode' ? 'variant' : 'effort'}</span>
+          <label className="field">
+            <span>Default {backend === 'opencode' ? 'variant' : 'effort'}</span>
             <select
               value={clampToCaps({ backend, model, effort }, 'plan').effort}
               onChange={(e) => setEffort(e.target.value)}
             >
-              {caps.efforts.map((e) => <option key={e.value} value={e.value}>{e.label}</option>)}
+              {caps.efforts.map((e) => (
+                <option key={e.value} value={e.value}>
+                  {e.label}
+                </option>
+              ))}
             </select>
           </label>
-          <label className="field"><span>Keep last N chats</span>
-            <input type="number" min={1} value={keepChats} onChange={(e) => setKeepChats(Number(e.target.value))} />
-          </label>
-          <label className="field"><span>Context window (tokens)</span>
+          <label className="field">
+            <span>Keep last N chats</span>
             <input
-              type="number" min={1000} step={1000} value={contextBudget}
+              type="number"
+              min={1}
+              value={keepChats}
+              onChange={(e) => setKeepChats(Number(e.target.value))}
+            />
+          </label>
+          <label className="field">
+            <span>Context window (tokens)</span>
+            <input
+              type="number"
+              min={1000}
+              step={1000}
+              value={contextBudget}
               onChange={(e) => setContextBudget(Number(e.target.value))}
             />
           </label>
           <div className="settings-hint">
-            What the context bar treats as full. Set it to the window of the model you actually
-            use — {DEFAULT_CONTEXT_BUDGET.toLocaleString()} over-reports occupancy several times
-            over on a million-token model.
+            What the context bar treats as full. Set it to the window of the model you actually use —{' '}
+            {DEFAULT_CONTEXT_BUDGET.toLocaleString()} over-reports occupancy several times over on a
+            million-token model.
           </div>
 
           <div className="settings-section">Boards</div>
           <div className="settings-hint">
-            Columns are comma-separated (left→right). Renaming one moves its folder, so its cards
-            come with it. A column that still holds cards can't be removed, and renaming and
-            reordering in the same save is refused — do those one at a time.
+            Columns are comma-separated (left→right). Renaming one moves its folder, so its cards come with
+            it. A column that still holds cards can't be removed, and renaming and reordering in the same save
+            is refused — do those one at a time.
           </div>
           {BOARDS.map((b) => (
-            <label key={b} className="field"><span>{BOARD_LABELS[b]} columns</span>
-              <input value={columns[b]} onChange={(e) => setColumns((c) => ({ ...c, [b]: e.target.value }))} />
+            <label key={b} className="field">
+              <span>{BOARD_LABELS[b]} columns</span>
+              <input
+                value={columns[b]}
+                onChange={(e) => setColumns((c) => ({ ...c, [b]: e.target.value }))}
+              />
             </label>
           ))}
 
           <div className="settings-section">Cards</div>
           <div className="settings-row">
-            <label className="field"><span>Miniature length</span>
-              <input type="number" value={miniatureChars} onChange={(e) => setMiniatureChars(Number(e.target.value))} />
+            <label className="field">
+              <span>Miniature length</span>
+              <input
+                type="number"
+                value={miniatureChars}
+                onChange={(e) => setMiniatureChars(Number(e.target.value))}
+              />
             </label>
-            <label className="field"><span>ID padding</span>
+            <label className="field">
+              <span>ID padding</span>
               <input type="number" value={idPadding} onChange={(e) => setIdPadding(Number(e.target.value))} />
             </label>
           </div>
@@ -158,8 +209,12 @@ export function SettingsModal({ config, onClose, onSaved }: Props) {
         </div>
 
         <div className="modal-foot">
-          <button className="btn-secondary" onClick={onClose} disabled={busy}>Cancel</button>
-          <button className="btn-primary" onClick={save} disabled={busy}>Save</button>
+          <button className="btn-secondary" onClick={onClose} disabled={busy}>
+            Cancel
+          </button>
+          <button className="btn-primary" onClick={save} disabled={busy}>
+            Save
+          </button>
         </div>
       </div>
     </div>

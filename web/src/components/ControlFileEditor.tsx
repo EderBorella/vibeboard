@@ -24,26 +24,47 @@ interface Props {
 // itself as either a textarea or rendered markdown. A fragment, not a wrapper element — these
 // are direct children of .control-editor and the layout depends on that.
 export function ControlFileEditor({
-  file, draft, dirty, view, busy, onView, onDraft, onSave, onDelete,
+  file,
+  draft,
+  dirty,
+  view,
+  busy,
+  onView,
+  onDraft,
+  onSave,
+  onDelete,
 }: Props) {
   return (
     <>
       <div className="control-editor-head">
-        <span className="control-editor-path">{file.path}{dirty ? ' •' : ''}</span>
+        <span className="control-editor-path">
+          {file.path}
+          {dirty ? ' •' : ''}
+        </span>
         <div className="control-tabs" role="group" aria-label="View">
-          <button className={view === 'edit' ? 'active' : ''} onClick={() => onView('edit')}>Edit</button>
-          <button className={view === 'preview' ? 'active' : ''} onClick={() => onView('preview')}>Preview</button>
+          <button className={view === 'edit' ? 'active' : ''} onClick={() => onView('edit')}>
+            Edit
+          </button>
+          <button className={view === 'preview' ? 'active' : ''} onClick={() => onView('preview')}>
+            Preview
+          </button>
         </div>
         <div className="control-editor-actions">
-          {file.deletable && <button className="btn-danger" disabled={busy} onClick={onDelete}>Delete</button>}
-          <button className="btn-primary" disabled={busy || !dirty} onClick={onSave}>Save</button>
+          {file.deletable && (
+            <button className="btn-danger" disabled={busy} onClick={onDelete}>
+              Delete
+            </button>
+          )}
+          <button className="btn-primary" disabled={busy || !dirty} onClick={onSave}>
+            Save
+          </button>
         </div>
       </div>
       {file.managed && (
         <div className="control-disclaimer" role="alert">
-          ⚠ <strong>{file.name}</strong> is managed by VibeBoard — the copilot won’t edit it, and
-          it steers how the boards work. Edit only if you know what you’re doing. For your own
-          standing instructions, use <strong>INSTRUCTIONS.md</strong> instead.
+          ⚠ <strong>{file.name}</strong> is managed by VibeBoard — the copilot won’t edit it, and it steers
+          how the boards work. Edit only if you know what you’re doing. For your own standing instructions,
+          use <strong>INSTRUCTIONS.md</strong> instead.
         </div>
       )}
       {view === 'edit' ? (
@@ -54,7 +75,10 @@ export function ControlFileEditor({
           spellCheck={false}
         />
       ) : (
-        <div className="control-preview markdown" dangerouslySetInnerHTML={{ __html: renderMarkdown(draft) }} />
+        <div
+          className="control-preview markdown"
+          dangerouslySetInnerHTML={{ __html: renderMarkdown(draft) }}
+        />
       )}
     </>
   );

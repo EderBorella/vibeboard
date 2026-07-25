@@ -7,11 +7,16 @@ import { defaultConfig } from '../src/core/config.js';
 import type { ProjectConfig } from '../src/core/types.js';
 import type { CopilotEvent } from '../src/server/copilot-events.js';
 
-interface Ref { root: string | undefined; config: ProjectConfig | undefined }
+interface Ref {
+  root: string | undefined;
+  config: ProjectConfig | undefined;
+}
 
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
-async function fresh(overrides: Partial<ProjectConfig> = {}): Promise<{ ref: Ref; store: ChatStore; chatDir: string }> {
+async function fresh(
+  overrides: Partial<ProjectConfig> = {},
+): Promise<{ ref: Ref; store: ChatStore; chatDir: string }> {
   const root = await tempDir();
   const config = { ...defaultConfig('t'), ...overrides };
   const ref: Ref = { root, config };
@@ -19,7 +24,8 @@ async function fresh(overrides: Partial<ProjectConfig> = {}): Promise<{ ref: Ref
 }
 
 const resultEvent = (sessionId: string, costUsd = 0.01): CopilotEvent => ({
-  kind: 'result', sessionId,
+  kind: 'result',
+  sessionId,
   stats: { ok: true, text: '', costUsd, durationMs: 1200, turns: 1, contextTokens: 3000, outputTokens: 50 },
 });
 
@@ -123,9 +129,12 @@ describe('ChatStore', () => {
 
   it('lists chats newest-first', async () => {
     const { store } = await fresh();
-    await store.recordUser('older'); await store.flush(); await sleep(8);
+    await store.recordUser('older');
+    await store.flush();
+    await sleep(8);
     await store.newChat();
-    await store.recordUser('newer'); await store.flush();
+    await store.recordUser('newer');
+    await store.flush();
     const { chats } = await store.chatList();
     expect(chats[0].title).toBe('newer');
     expect(chats[1].title).toBe('older');

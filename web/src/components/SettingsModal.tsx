@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react';
-import { BOARDS, BOARD_LABELS, backendCaps, type BoardName, type ProjectConfig } from '../shared';
+import {
+  BOARDS, BOARD_LABELS, DEFAULT_BACKEND, backendCaps, backendDefaults,
+  type BoardName, type ProjectConfig,
+} from '../shared';
 import { listModels, patchConfig, type ModelOption } from '../api';
 import { ModelPicker } from './ModelPicker';
 
@@ -19,9 +22,10 @@ function parseCsv(text: string): string[] {
 }
 
 export function SettingsModal({ config, onClose, onSaved }: Props) {
-  const [backend, setBackend] = useState(config.copilot.backend || 'claude-code');
-  const [model, setModel] = useState(config.copilot.model ?? '');
-  const [effort, setEffort] = useState(config.copilot.effort ?? '');
+  const [backend, setBackend] = useState(config.copilot.backend || DEFAULT_BACKEND);
+  // Never blank: an unset model used to mean "the CLI picks", which hid what was running.
+  const [model, setModel] = useState(config.copilot.model || backendDefaults(config.copilot.backend).model);
+  const [effort, setEffort] = useState(config.copilot.effort || backendDefaults(config.copilot.backend).effort);
   const [columns, setColumns] = useState<Record<BoardName, string>>(() => {
     const o = {} as Record<BoardName, string>;
     for (const b of BOARDS) o[b] = (config.boards[b]?.columns ?? []).join(', ');
@@ -76,17 +80,30 @@ export function SettingsModal({ config, onClose, onSaved }: Props) {
           <div className="field"><span>Backend</span>
             <div className="mode-group">
               {BACKENDS.map((b) => (
-                <button key={b.value} className={`mode-btn${backend === b.value ? ' active' : ''}`} onClick={() => { setBackend(b.value); setModel(''); }}>
+                <button
+                  key={b.value}
+                  className={`mode-btn${backend === b.value ? ' active' : ''}`}
+                  // Model ids don't cross backends, so adopt the new backend's defaults
+                  // rather than clearing to blank.
+                  onClick={() => {
+                    setBackend(b.value);
+                    setModel(backendDefaults(b.value).model);
+                    setEffort(backendDefaults(b.value).effort);
+                  }}
+                >
                   {b.label}
                 </button>
               ))}
             </div>
           </div>
           <div className="field"><span>Default model</span>
-            <ModelPicker models={models} value={model} onChange={setModel} />
+            <ModelPicker models={models} value={model} defaultModel={backendDefaults(backend).model} onChange={setModel} />
           </div>
           <label className="field"><span>Default {backend === 'opencode' ? 'variant' : 'effort'}</span>
-            <select value={caps.efforts.some((e) => e.value === effort) ? effort : ''} onChange={(e) => setEffort(e.target.value)}>
+            <select
+              value={caps.efforts.some((e) => e.value === effort) ? effort : backendDefaults(backend).effort}
+              onChange={(e) => setEffort(e.target.value)}
+            >
               {caps.efforts.map((e) => <option key={e.value} value={e.value}>{e.label}</option>)}
             </select>
           </label>

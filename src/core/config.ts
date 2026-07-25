@@ -2,6 +2,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { parse, stringify } from 'yaml';
 import { BOARDS, type BoardName, type BoardConfig, type ProjectConfig } from './types.js';
+import { DEFAULT_BACKEND, backendDefaults } from './backends.js';
 
 export const CONFIG_DIR = '.vibeboard';
 export const CONFIG_FILE = 'config.yaml';
@@ -26,8 +27,22 @@ export function defaultConfig(name: string): ProjectConfig {
     miniatureChars: 140,
     idPadding: 3,
     keepChats: 20,
-    copilot: { backend: 'claude-code' },
+    copilot: { backend: DEFAULT_BACKEND, ...backendDefaults(DEFAULT_BACKEND) },
   };
+}
+
+// Backfill a copilot model/effort for projects configured before those had real defaults.
+// A blank model used to mean "whatever the CLI picks", which hid the model actually in use.
+// Returns whether anything changed, so callers persist only when needed.
+export function ensureCopilotDefaults(config: ProjectConfig): boolean {
+  if (!config.copilot) config.copilot = { backend: DEFAULT_BACKEND };
+  const copilot = config.copilot;
+  let changed = false;
+  if (!copilot.backend) { copilot.backend = DEFAULT_BACKEND; changed = true; }
+  const defaults = backendDefaults(copilot.backend);
+  if (!copilot.model) { copilot.model = defaults.model; changed = true; }
+  if (!copilot.effort) { copilot.effort = defaults.effort; changed = true; }
+  return changed;
 }
 
 // Backfill any board missing from an older project's config with its default columns.

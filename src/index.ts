@@ -1,5 +1,6 @@
 export * from './core/types.js';
 export * from './core/slug.js';
+export * from './core/backends.js';
 export * from './core/config.js';
 export * from './core/card.js';
 export * from './core/ids.js';

@@ -15,7 +15,19 @@ export const BOARD_LABELS: Record<BoardName, string> = {
 // controls from here; the server maps these values to each CLI's flags.
 export interface BackendCaps {
   modes: { value: string; label: string; hint: string }[];
-  efforts: { value: string; label: string }[]; // value '' = backend default
+  efforts: { value: string; label: string }[]; // every value is real — no blank "let it decide"
+}
+
+// Mirrors src/core/backends.ts. Real defaults, never blank: a blank model let each CLI pick
+// silently, so nothing in the UI could tell you which model actually answered.
+export interface BackendDefaults { model: string; effort: string }
+export const DEFAULT_BACKEND = 'claude-code';
+export const BACKEND_DEFAULTS: Record<string, BackendDefaults> = {
+  'claude-code': { model: 'opus', effort: 'high' },
+  opencode: { model: 'opencode/deepseek-v4-flash-free', effort: 'high' },
+};
+export function backendDefaults(backend: string | undefined): BackendDefaults {
+  return BACKEND_DEFAULTS[backend ?? ''] ?? BACKEND_DEFAULTS[DEFAULT_BACKEND];
 }
 export const BACKEND_CAPS: Record<string, BackendCaps> = {
   'claude-code': {
@@ -26,7 +38,7 @@ export const BACKEND_CAPS: Record<string, BackendCaps> = {
       { value: 'bypassPermissions', label: 'Full-auto', hint: 'everything, unattended' },
     ],
     efforts: [
-      { value: '', label: 'Default effort' }, { value: 'low', label: 'Low' }, { value: 'medium', label: 'Medium' },
+      { value: 'low', label: 'Low' }, { value: 'medium', label: 'Medium' },
       { value: 'high', label: 'High' }, { value: 'xhigh', label: 'X-high' }, { value: 'max', label: 'Max' },
     ],
   },
@@ -36,8 +48,10 @@ export const BACKEND_CAPS: Record<string, BackendCaps> = {
       { value: 'build', label: 'Build', hint: 'auto-approve; can edit files' },
       { value: 'research', label: 'Research', hint: 'brainstorm & web (persona-guided, still auto)' },
     ],
-    efforts: [ // maps to --variant (OpenCode's own reasoning scale)
-      { value: '', label: 'Default variant' }, { value: 'minimal', label: 'Minimal' },
+    // OpenCode's own reasoning scale, sent as the message `variant`. These are the variant
+    // names its models actually publish — "minimal" was listed here but isn't one of them.
+    efforts: [
+      { value: 'low', label: 'Low' }, { value: 'medium', label: 'Medium' },
       { value: 'high', label: 'High' }, { value: 'max', label: 'Max' },
     ],
   },

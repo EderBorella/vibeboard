@@ -41,6 +41,9 @@ export interface OpencodeTurnOptions {
   cwd: string;
   text: string;
   model?: string;
+  // OpenCode's reasoning scale, per-model (`low | medium | high | max` on models that have
+  // one). This is what the UI calls "effort" for Claude; OpenCode names it a variant.
+  variant?: string;
   system?: string;
   sessionId?: string;
   signal?: AbortSignal;
@@ -67,6 +70,7 @@ export async function opencodeTurn(opts: OpencodeTurnOptions): Promise<string> {
   }
   const body: Record<string, unknown> = { parts: [{ type: 'text', text: opts.text }] };
   if (opts.model) body.model = splitModel(opts.model);
+  if (opts.variant) body.variant = opts.variant;
   if (opts.system) body.system = opts.system;
   const data = (await postJson(`${base}/session/${sessionId}/message${dq}`, body, opts.signal)) as OcMessageResponse;
   for (const event of messageToEvents(data)) opts.onEvent(event);

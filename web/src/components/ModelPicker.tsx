@@ -9,7 +9,8 @@ function loadFavs(): Set<string> {
 
 interface Props {
   models: ModelOption[];
-  value: string;               // '' = backend default
+  value: string;
+  defaultModel: string;        // this backend's default — pinned to the top of the list
   onChange: (id: string) => void;
   disabled?: boolean;
 }
@@ -35,7 +36,7 @@ function fmtPrice(m: ModelOption): string {
 
 // Model selector: a trigger button that opens a filterable modal. Filters default to
 // tool-capable (the copilot needs tools to edit cards). Favorites persist in localStorage.
-export function ModelPicker({ models, value, onChange, disabled }: Props) {
+export function ModelPicker({ models, value, defaultModel, onChange, disabled }: Props) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [toolOnly, setToolOnly] = useState(true);
@@ -70,7 +71,7 @@ export function ModelPicker({ models, value, onChange, disabled }: Props) {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return models.filter((m) => {
-      if (m.id === value) return true; // never hide the current selection
+      if (m.id === value || m.id === defaultModel) return true; // never hide the selection or the default
       if (toolOnly && !m.caps?.toolCall) return false;
       if (freeOnly && !m.free) return false;
       if (visionOnly && !m.caps?.vision) return false;
@@ -78,15 +79,18 @@ export function ModelPicker({ models, value, onChange, disabled }: Props) {
       if (q && !`${m.id} ${m.name ?? ''}`.toLowerCase().includes(q)) return false;
       return true;
     }).sort((a, b) => {
+      // The backend's default sits at the top, above favourites: it's the answer to "what
+      // am I getting if I don't think about this?", so it should never need scrolling for.
+      if ((a.id === defaultModel) !== (b.id === defaultModel)) return a.id === defaultModel ? -1 : 1;
       const fa = favs.has(a.id), fb = favs.has(b.id);
-      if (fa !== fb) return fa ? -1 : 1;         // favorites first
+      if (fa !== fb) return fa ? -1 : 1;         // favorites next
       if (a.free !== b.free) return a.free ? -1 : 1; // then free
       return (a.name ?? a.id).localeCompare(b.name ?? b.id);
     });
-  }, [models, query, toolOnly, freeOnly, visionOnly, provider, favs, value]);
+  }, [models, query, toolOnly, freeOnly, visionOnly, provider, favs, value, defaultModel]);
 
   const selected = models.find((m) => m.id === value);
-  const label = value ? (selected?.name ?? value) : 'Default model';
+  const label = selected?.name ?? value ?? '';
 
   const chip = (on: boolean, set: (v: boolean) => void, text: string): React.ReactNode => (
     <button className={`mp-chip${on ? ' on' : ''}`} onClick={() => set(!on)}>{text}</button>
@@ -94,7 +98,7 @@ export function ModelPicker({ models, value, onChange, disabled }: Props) {
 
   return (
     <div className="mp">
-      <button className="mp-trigger" disabled={disabled} onClick={() => setOpen(true)} title={value || 'Default model'}>
+      <button className="mp-trigger" disabled={disabled} onClick={() => setOpen(true)} title={value}>
         <span className="mp-trigger-label">{selected?.free ? '🆓 ' : ''}{label}</span>
         <span className="mp-caret">▾</span>
       </button>
@@ -121,15 +125,15 @@ export function ModelPicker({ models, value, onChange, disabled }: Props) {
             <div className="mp-count">{filtered.length} of {models.length} models</div>
 
             <div className="mp-list">
-              <button className={`mp-default${value === '' ? ' mp-sel' : ''}`} onClick={() => pick('')}>Default model (backend decides)</button>
               {filtered.map((m) => (
-                <div key={m.id} className={`mp-item${m.id === value ? ' mp-sel' : ''}`}>
+                <div key={m.id} className={`mp-item${m.id === value ? ' mp-sel' : ''}${m.id === defaultModel ? ' mp-def' : ''}`}>
                   <button className="mp-star" title={favs.has(m.id) ? 'Unfavorite' : 'Favorite'} onClick={() => toggleFav(m.id)}>
                     {favs.has(m.id) ? '★' : '☆'}
                   </button>
                   <button className="mp-pick" onClick={() => pick(m.id)}>
                     <span className="mp-pick-top">
                       <span className="mp-name">{m.name ?? m.id}</span>
+                      {m.id === defaultModel && <span className="mp-def-tag">default</span>}
                       <span className="mp-price">{fmtPrice(m)}</span>
                     </span>
                     <span className="mp-pick-bot">

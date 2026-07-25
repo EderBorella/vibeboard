@@ -7,7 +7,9 @@ export type EffortLevel = string;
 
 export interface TurnOptions {
   mode: CopilotMode;
-  model?: string;   // '' / undefined = backend default
+  // The panel always sends concrete values; the server fills in the backend's default if
+  // either is missing (an old config, or a caller that isn't the panel).
+  model?: string;
   effort?: EffortLevel;
 }
 

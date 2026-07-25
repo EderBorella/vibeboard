@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { parseCopilotLine, type CopilotEvent } from './copilot-events.js';
 import { opencodeTurn } from './opencode-client.js';
 import { claudeConfigDir, isolationEnabled } from './copilot-env.js';
+import { DEFAULT_BACKEND, backendDefaults } from '../core/backends.js';
 
 // Modes/efforts are backend-specific (see BACKEND_CAPS on the web side). They're plain
 // strings here; each backend's command builder interprets its own values.
@@ -133,8 +134,18 @@ export class CopilotSession {
 
   async send(opts: SendOptions): Promise<void> {
     if (this.#child || this.#abort) throw new Error('Copilot is busy');
-    const backend: Backend = opts.backend ?? 'claude-code';
-    return backend === 'opencode' ? this.#sendOpencode(opts) : this.#sendClaude(opts);
+    const backend: Backend = opts.backend ?? (DEFAULT_BACKEND as Backend);
+    // Fill in the backend's real default rather than letting a blank through: the CLIs each
+    // pick silently, which makes "which model answered?" unanswerable. Belt and braces —
+    // the config carries these too, but a raw WebSocket call or an unmigrated config doesn't.
+    const defaults = backendDefaults(backend);
+    const resolved: SendOptions = {
+      ...opts,
+      backend,
+      model: opts.model || defaults.model,
+      effort: opts.effort || defaults.effort,
+    };
+    return backend === 'opencode' ? this.#sendOpencode(resolved) : this.#sendClaude(resolved);
   }
 
   // OpenCode: talk to a persistent `opencode serve` over HTTP (per-turn message, session
@@ -154,7 +165,7 @@ export class CopilotSession {
     }, timeoutMs);
     try {
       this.#sessionId = await opencodeTurn({
-        cwd: opts.cwd, text: opts.text, model: opts.model, system,
+        cwd: opts.cwd, text: opts.text, model: opts.model, variant: opts.effort, system,
         sessionId: this.#sessionId, signal: abort.signal, onEvent: opts.onEvent,
       });
     } catch (err) {

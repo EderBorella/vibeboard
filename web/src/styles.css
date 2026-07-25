@@ -393,12 +393,18 @@ body {
 .mp-item { display: flex; align-items: center; border-radius: 6px; }
 .mp-item:hover, .mp-sel { background: var(--panel-2); }
 .mp-star { background: transparent; border: none; color: var(--accent-2); cursor: pointer; font-size: 0.95rem; padding: 0.3rem 0.35rem; }
-.mp-pick, .mp-default {
+.mp-pick {
   flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.15rem;
   background: transparent; border: none; color: var(--text); cursor: pointer;
   text-align: left; padding: 0.4rem 0.45rem; font-size: 0.8rem;
 }
-.mp-default { width: 100%; color: var(--muted); border-bottom: 1px solid var(--border); border-radius: 0; margin-bottom: 0.2rem; }
+/* The backend's default is pinned first in the list — mark it so it reads as the safe pick
+   rather than just whatever happened to sort to the top. */
+.mp-def { border-left: 2px solid var(--accent); }
+.mp-def-tag {
+  flex: 0 0 auto; font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--accent); border: 1px solid var(--accent); border-radius: 999px; padding: 0 0.35rem;
+}
 .mp-pick-top { display: flex; align-items: baseline; gap: 0.5rem; min-width: 0; }
 .mp-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
 .mp-price { flex: 0 0 auto; font-size: 0.7rem; color: var(--accent-2); font-family: var(--font-mono); }
@@ -406,7 +412,7 @@ body {
 .mp-id { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-mono); font-size: 0.68rem; color: var(--muted); }
 .mp-badges { flex: 0 0 auto; display: flex; align-items: center; gap: 0.3rem; font-size: 0.72rem; }
 .mp-ctx { font-family: var(--font-mono); font-size: 0.66rem; color: var(--muted); }
-.mp-sel .mp-name, .mp-sel.mp-default { color: var(--accent); }
+.mp-sel .mp-name { color: var(--accent); }
 .mp-empty { color: var(--muted); font-size: 0.8rem; padding: 0.8rem 0.5rem; font-style: italic; }
 
 .copilot-warn { padding: 0.4rem 0.75rem; font-size: 0.72rem; color: var(--danger); background: color-mix(in srgb, var(--danger) 12%, transparent); border-bottom: 1px solid var(--border); }

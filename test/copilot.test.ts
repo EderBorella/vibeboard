@@ -79,6 +79,24 @@ describe('CopilotSession', () => {
     expect(args[args.indexOf('--effort') + 1]).toBe('low');
   });
 
+  it('spawns with a real model and effort when the caller names neither', async () => {
+    // A blank model used to mean "let the CLI pick", which made the model in use invisible.
+    const session = new CopilotSession();
+    await run(session, 'x');
+    const args = lastArgs()[0];
+    expect(args[args.indexOf('--model') + 1]).toBe('opus');
+    expect(args[args.indexOf('--effort') + 1]).toBe('high');
+  });
+
+  it('treats empty strings as unset rather than passing them through', async () => {
+    const session = new CopilotSession();
+    const events: CopilotEvent[] = [];
+    await session.send({ cwd: here, text: 'x', mode: 'plan', model: '', effort: '', onEvent: (e) => events.push(e) });
+    const args = lastArgs()[0];
+    expect(args[args.indexOf('--model') + 1]).toBe('opus');
+    expect(args[args.indexOf('--effort') + 1]).toBe('high');
+  });
+
   it('appends the VibeBoard instructions on every turn', async () => {
     const session = new CopilotSession();
     await run(session, 'x', 'bypassPermissions');

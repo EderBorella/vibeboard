@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { BOARDS, BOARD_LABELS, type BoardName, type Card } from './shared';
+import { BOARDS, BOARD_LABELS, DEFAULT_BACKEND, backendDefaults, type BoardName, type Card } from './shared';
 import { useSnapshot } from './useSnapshot';
 import { getState, placeCard, archiveCard, patchConfig } from './api';
 import { Board } from './components/Board';
@@ -34,6 +34,19 @@ export function App() {
   const [copilotModel, setCopilotModel] = useState('');
   const [copilotEffort, setCopilotEffort] = useState<'' | EffortLevel>('');
 
+  // Seed the dock's model/effort from the project config when a project opens. Without this
+  // the dock would send its own default on every turn and silently override the configured
+  // one, since the controls now always send a concrete value rather than "you decide".
+  const seededFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (!snapshot || seededFor.current === snapshot.root) return;
+    seededFor.current = snapshot.root;
+    const { backend, model, effort } = snapshot.config.copilot;
+    const fallback = backendDefaults(backend);
+    setCopilotModel(model || fallback.model);
+    setCopilotEffort(effort || fallback.effort);
+  }, [snapshot]);
+
   // Theme: applied to <html data-theme>, persisted. Default cyberpunk.
   const [theme, setTheme] = useState<string>(() => localStorage.getItem('vb-theme') || 'cyberpunk');
   useEffect(() => {
@@ -59,10 +72,14 @@ export function App() {
   // Switch the copilot backend: persist it, reset the (backend-specific) model, and start a
   // fresh chat so we don't try to resume a session under the other backend.
   const onBackend = (backend: string): void => {
-    if (backend === (snapshot?.config.copilot.backend || 'claude-code')) return;
-    setCopilotModel('');
+    if (backend === (snapshot?.config.copilot.backend || DEFAULT_BACKEND)) return;
+    // Model ids and effort scales don't cross backends — adopt the new backend's real
+    // defaults instead of clearing to blank and letting the CLI pick silently.
+    const next = backendDefaults(backend);
+    setCopilotModel(next.model);
+    setCopilotEffort(next.effort);
     copilot.newSession();
-    void patchConfig({ copilot: { backend, model: '' } });
+    void patchConfig({ copilot: { backend, model: next.model, effort: next.effort } });
   };
   // Position the dragged card: reorder within its column, or move it into another one.
   // beforeId is the card to land in front of; null means the end of the column.

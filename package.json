@@ -20,6 +20,14 @@
   ],
   "author": "Eder Borella",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/EderBorella/vibeboard.git"
+  },
+  "homepage": "https://github.com/EderBorella/vibeboard#readme",
+  "bugs": {
+    "url": "https://github.com/EderBorella/vibeboard/issues"
+  },
   "dependencies": {
     "@fastify/static": "^10.1.2",
     "@fastify/websocket": "^11.3.0",
@@ -31,7 +39,7 @@
     "yaml": "^2.9.0"
   },
   "devDependencies": {
-    "@types/node": "^20.19.43",
+    "@types/node": "^24.13.3",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@types/ws": "^8.18.1",

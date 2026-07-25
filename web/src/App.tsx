@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { BOARDS, BOARD_LABELS, type BoardName, type Card, type CopilotChoice } from './shared';
-import { resolveChoice, isOverridden } from './copilot/choice';
+import { BOARDS, BOARD_LABELS, type BoardName, type Card } from './shared';
 import { useSnapshot } from './useSnapshot';
+import { useCopilotChoice } from './useCopilotChoice';
+import { useTheme, useCollapsedBoards } from './useLocalPrefs';
 import { getState, placeCard, archiveCard } from './api';
 import { Board } from './components/Board';
 import { ProjectControl } from './components/ProjectControl';
@@ -34,59 +35,23 @@ export function App() {
   // Mode is per-turn and deliberately NOT persisted — you pick it for the task at hand.
   const [copilotMode, setCopilotMode] = useState<CopilotMode>('bypassPermissions');
 
-  // One source of truth for the defaults: the project config, written ONLY by Settings.
-  // The dock's controls are a session override — they never touch the file, so switching
-  // connector for one conversation can't rewrite what you configured.
-  const [override, setOverride] = useState<Partial<CopilotChoice>>({});
+  // Backend/model/effort: the config holds the defaults, the dock holds a session override.
+  const { choice, overridden, setModel, setEffort, setBackend, reset: onResetCopilot } =
+    useCopilotChoice(snapshot?.config.copilot);
 
-  // A Settings save is an explicit statement of intent, so it clears the session override —
-  // otherwise a stale dock value would keep winning over the defaults you just changed.
-  const configured = snapshot?.config.copilot;
-  const configKey = `${configured?.backend ?? ''}|${configured?.model ?? ''}|${configured?.effort ?? ''}`;
-  const lastConfigKey = useRef(configKey);
-  useEffect(() => {
-    if (lastConfigKey.current === configKey) return;
-    lastConfigKey.current = configKey;
-    setOverride({});
-  }, [configKey]);
-
-  // Precedence lives in one place, shared with Settings and mirrored on the server.
-  const choice = resolveChoice(configured, override);
-  const overridden = isOverridden(override);
-
-  const onModel = (model: string): void => setOverride((o) => ({ ...o, model }));
-  const onEffort = (effort: string): void => setOverride((o) => ({ ...o, effort }));
-  const onResetCopilot = (): void => setOverride({});
-
-  // Theme: applied to <html data-theme>, persisted. Default cyberpunk.
-  const [theme, setTheme] = useState<string>(() => localStorage.getItem('vb-theme') || 'cyberpunk');
-  useEffect(() => {
-    document.documentElement.dataset.theme = theme;
-    localStorage.setItem('vb-theme', theme);
-  }, [theme]);
-
-  // Collapsed boards, persisted.
-  const [collapsed, setCollapsed] = useState<Set<BoardName>>(() => {
-    try { return new Set(JSON.parse(localStorage.getItem('vb-collapsed') ?? '[]')); } catch { return new Set(); }
-  });
-  const toggleBoard = (b: BoardName): void => setCollapsed((prev) => {
-    const next = new Set(prev);
-    if (next.has(b)) next.delete(b); else next.add(b);
-    localStorage.setItem('vb-collapsed', JSON.stringify([...next]));
-    return next;
-  });
+  const [theme, setTheme] = useTheme();
+  const [collapsed, toggleBoard] = useCollapsedBoards();
 
   const onAdd = (board: BoardName, columnSlug: string): void => setEditor({ mode: 'create', board, columnSlug });
   const onOpen = (card: Card): void => setEditor({ mode: 'edit', card });
   const onDragStart = (card: Card): void => { dragged.current = card; };
   const onArchive = (card: Card): void => { void archiveCard(card.board, card.id); };
-  // Switch connector for THIS SESSION only — the configured default is untouched. Start a
-  // fresh chat, since a session belongs to the backend that created it. Model and effort drop
-  // out of the override too: they belong to the backend being left.
+  // Start a fresh chat on a backend switch, since a session belongs to the backend that
+  // created it. Coordinating that is the shell's job; useCopilotChoice owns the override state.
   const onBackend = (backend: string): void => {
     if (backend === choice.backend) return;
     copilot.newSession();
-    setOverride({ backend });
+    setBackend(backend);
   };
   // Position the dragged card: reorder within its column, or move it into another one.
   // beforeId is the card to land in front of; null means the end of the column.
@@ -181,8 +146,8 @@ export function App() {
             model={choice.model}
             effort={choice.effort}
             onMode={setCopilotMode}
-            onModel={onModel}
-            onEffort={onEffort}
+            onModel={setModel}
+            onEffort={setEffort}
             onBackend={onBackend}
             overridden={overridden}
             onReset={onResetCopilot}

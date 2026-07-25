@@ -2,36 +2,11 @@ import { useEffect, useRef, useState } from 'react';
 import { listModels, getModelStatus, type ModelOption, type ModelStatus } from '../api';
 import { backendCaps, backendDefaults } from '../shared';
 import { clampToCaps } from './choice';
-import { ModelPicker } from '../components/ModelPicker';
+import { BACKENDS } from './format';
+import { ChatSwitcher } from './ChatSwitcher';
+import { CopilotControls } from './CopilotControls';
+import { CopilotReadout } from './CopilotReadout';
 import type { CopilotMode, EffortLevel, useCopilot } from './useCopilot';
-
-const CONTEXT_BUDGET = 200_000;
-const BACKENDS: { value: string; label: string }[] = [
-  { value: 'claude-code', label: 'Claude' },
-  { value: 'opencode', label: 'OpenCode' },
-];
-
-// Short backend label for the chat list — chats don't carry context across backends, so
-// each one is tagged with the backend it ran on.
-function backendLabel(b: string): string {
-  return BACKENDS.find((x) => x.value === b)?.label ?? b;
-}
-
-function fmtUsd(n: number): string { return `$${n.toFixed(n < 1 ? 4 : 2)}`; }
-function fmtK(n: number): string { return n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n); }
-
-// Compact relative time for the chat switcher (e.g. "just now", "5m", "2h", "3d").
-function relTime(iso: string): string {
-  const then = new Date(iso).getTime();
-  if (Number.isNaN(then)) return '';
-  const s = Math.max(0, Math.round((Date.now() - then) / 1000));
-  if (s < 45) return 'just now';
-  const m = Math.round(s / 60);
-  if (m < 60) return `${m}m`;
-  const h = Math.round(m / 60);
-  if (h < 24) return `${h}h`;
-  return `${Math.round(h / 24)}d`;
-}
 
 interface Props {
   copilot: ReturnType<typeof useCopilot>;
@@ -57,19 +32,16 @@ export function CopilotPanel({
   const [draft, setDraft] = useState('');
   const [models, setModels] = useState<ModelOption[]>([]);
   const [status, setStatus] = useState<ModelStatus | null>(null);
-  const [chatMenu, setChatMenu] = useState(false);
   const bodyRef = useRef<HTMLDivElement>(null);
-  const currentTitle = chats.find((c) => c.id === currentChatId)?.title ?? 'New chat';
 
   // Modes and efforts are backend-specific, so a selection carried across a backend switch
   // gets clamped to what this backend actually publishes. The model arrives already
   // resolved — App owns precedence.
   const caps = backendCaps(backend);
   const { mode: effMode, effort: effEffort } = clampToCaps({ backend, model, effort }, mode);
-  const effModel = model;
 
   // Warn when the chosen model can't call tools — the copilot can't touch cards without them.
-  const noTools = models.find((m) => m.id === effModel)?.caps?.toolCall === false;
+  const noTools = models.find((m) => m.id === model)?.caps?.toolCall === false;
 
   // Model choices depend on the configured backend (claude aliases vs opencode models).
   useEffect(() => {
@@ -82,9 +54,9 @@ export function CopilotPanel({
   useEffect(() => {
     let live = true;
     setStatus(null);
-    getModelStatus(effModel).then((s) => { if (live) setStatus(s); }).catch(() => {});
+    getModelStatus(model).then((s) => { if (live) setStatus(s); }).catch(() => {});
     return () => { live = false; };
-  }, [effModel]);
+  }, [model]);
 
   useEffect(() => { bodyRef.current?.scrollTo({ top: bodyRef.current.scrollHeight }); }, [items, running]);
 
@@ -92,15 +64,12 @@ export function CopilotPanel({
   // UI shows and what runs the same thing.
   // The backend goes too: the dock is a session override, so the server can't assume the
   // configured one is in force.
-  const turnOpts = () => ({ mode: effMode, backend, model: effModel, effort: effEffort });
+  const turnOpts = () => ({ mode: effMode, backend, model, effort: effEffort });
   const submit = (): void => {
     if (!draft.trim() || running) return;
     send(draft, turnOpts());
     setDraft('');
   };
-
-  const pct = Math.min(100, Math.round((stats.contextTokens / CONTEXT_BUDGET) * 100));
-  const nearFull = stats.contextTokens > CONTEXT_BUDGET * 0.8;
 
   return (
     <aside className="copilot">
@@ -123,55 +92,30 @@ export function CopilotPanel({
         <button className="copilot-x" onClick={onClose} title="Hide (session keeps running)">✕</button>
       </div>
 
-      <div className="copilot-chatbar">
-        <div className="chat-switcher">
-          <button className="chat-current" disabled={running} onClick={() => setChatMenu((v) => !v)} title="Chat history">
-            <span className="chat-current-title">{currentTitle}</span>
-            <span className="chat-caret">▾</span>
-          </button>
-          {chatMenu && (
-            <>
-              <div className="chat-menu-backdrop" onClick={() => setChatMenu(false)} />
-              <div className="chat-menu" role="menu">
-                {chats.length === 0 && <div className="chat-menu-empty">No saved chats yet</div>}
-                {chats.map((c) => (
-                  <div key={c.id} className={`chat-menu-item${c.id === currentChatId ? ' active' : ''}`}>
-                    <button className="chat-menu-open" onClick={() => { openChat(c.id, backend); setChatMenu(false); }} title={c.title}>
-                      <span className="chat-menu-title">
-                        <span className={`chat-backend bk-${c.backend}`}>{backendLabel(c.backend)}</span>
-                        {c.title}
-                      </span>
-                      <span className="chat-menu-meta">{relTime(c.updatedAt)} · {c.messageCount} msg</span>
-                    </button>
-                    <button className="chat-del" title="Delete chat" onClick={() => deleteChat(c.id)}>✕</button>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-        </div>
-        <button className="chat-new" disabled={running} onClick={newSession} title="Start a fresh chat">+ New</button>
-      </div>
+      <ChatSwitcher
+        chats={chats}
+        currentChatId={currentChatId}
+        backend={backend}
+        running={running}
+        onOpen={openChat}
+        onDelete={deleteChat}
+        onNew={newSession}
+      />
 
-      <div className="copilot-controls">
-        <div className="mode-group" role="group" aria-label="Mode">
-          {caps.modes.map((m) => (
-            <button key={m.value} className={`mode-btn${effMode === m.value ? ' active' : ''}`} title={m.hint} disabled={running} onClick={() => onMode(m.value)}>
-              {m.label}
-            </button>
-          ))}
-        </div>
-        <div className="copilot-actions">
-          <button onClick={() => compact(turnOpts())} disabled={running} title="Compact the conversation">Compact</button>
-        </div>
-      </div>
+      <CopilotControls
+        caps={caps}
+        effMode={effMode}
+        effEffort={effEffort}
+        effModel={model}
+        defaultModel={backendDefaults(backend).model}
+        models={models}
+        running={running}
+        onMode={onMode}
+        onModel={onModel}
+        onEffort={onEffort}
+        onCompact={() => compact(turnOpts())}
+      />
 
-      <div className="copilot-selects">
-        <ModelPicker models={models} value={effModel} defaultModel={backendDefaults(backend).model} disabled={running} onChange={onModel} />
-        <select className="effort-select" value={effEffort} disabled={running} onChange={(e) => onEffort(e.target.value)}>
-          {caps.efforts.map((e) => <option key={e.value} value={e.value}>{e.label}</option>)}
-        </select>
-      </div>
       {overridden && (
         <div className="copilot-override">
           Just for this session — the project default is unchanged.
@@ -209,15 +153,7 @@ export function CopilotPanel({
         {running && <div className="msg msg-running">…working</div>}
       </div>
 
-      <div className="copilot-readout">
-        <span title="cumulative session cost">{fmtUsd(stats.costUsd)}</span>
-        <span>{stats.turns} turns</span>
-        <span>{(stats.lastDurationMs / 1000).toFixed(1)}s</span>
-        <span className={`ctx${nearFull ? ' ctx-warn' : ''}`} title={`context window: ${stats.contextTokens.toLocaleString()} / ${CONTEXT_BUDGET.toLocaleString()} tokens`}>
-          <span className="ctx-bar"><span className="ctx-fill" style={{ width: `${pct}%` }} /></span>
-          ctx {fmtK(stats.contextTokens)}{nearFull ? ' · consider /compact' : ''}
-        </span>
-      </div>
+      <CopilotReadout stats={stats} />
 
       <div className="copilot-input">
         <textarea

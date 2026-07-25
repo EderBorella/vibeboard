@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { columnSlugs, cardsByColumn, miniature } from '../web/src/viewmodel.js';
+import { columnSlugs, cardsByColumn, miniature, canPlace } from '../web/src/viewmodel.js';
 import type { Card, ProjectConfig } from '../web/src/shared.js';
 
 const config: ProjectConfig = {
@@ -63,5 +63,24 @@ describe('miniature', () => {
 
   it('returns empty string when neither description nor body is present', () => {
     expect(miniature(card({ description: undefined, body: '' }), 10)).toBe('');
+  });
+});
+
+describe('canPlace', () => {
+  const card = (over: Partial<Card> = {}): Card => ({ id: 'E-001', board: 'engineering', ...over }) as Card;
+
+  it('refuses a drop with nothing being dragged', () => {
+    expect(canPlace(null, 'engineering', null)).toBe(false);
+  });
+
+  it('refuses a drop onto a different board', () => {
+    // Links cross boards; cards do not.
+    expect(canPlace(card(), 'product', null)).toBe(false);
+    expect(canPlace(card(), 'engineering', null)).toBe(true);
+  });
+
+  it('refuses a drop exactly where the card already sits', () => {
+    expect(canPlace(card(), 'engineering', 'E-001')).toBe(false);
+    expect(canPlace(card(), 'engineering', 'E-002')).toBe(true);
   });
 });

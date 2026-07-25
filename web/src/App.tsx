@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { BOARDS, BOARD_LABELS, DEFAULT_CONTEXT_BUDGET, type BoardName, type Card } from './shared';
+import { canPlace } from './viewmodel';
 import { useSnapshot } from './useSnapshot';
 import { useCopilotChoice } from './useCopilotChoice';
 import { useTheme, useCollapsedBoards } from './useLocalPrefs';
@@ -9,14 +10,9 @@ import { ProjectControl } from './components/ProjectControl';
 import { ProjectGate } from './components/ProjectGate';
 import { CardEditor, type EditorState } from './components/CardEditor';
 import { SettingsModal } from './components/SettingsModal';
+import { TopBar } from './components/TopBar';
 import { CopilotPanel } from './copilot/CopilotPanel';
 import { useCopilot, type CopilotMode } from './copilot/useCopilot';
-
-// Add a theme here after adding its [data-theme] block in themes.css.
-const THEMES: { value: string; label: string }[] = [
-  { value: 'cyberpunk', label: 'Cyberpunk' },
-  { value: 'classic-dark', label: 'Classic Dark' },
-];
 
 export function App() {
   const [bump, setBump] = useState(0);
@@ -69,8 +65,7 @@ export function App() {
   const onDrop = (board: BoardName, columnSlug: string, beforeId: string | null): void => {
     const card = dragged.current;
     dragged.current = null;
-    if (!card || card.board !== board) return; // links cross boards, cards don't
-    if (beforeId === card.id) return; // dropped exactly where it already is
+    if (!canPlace(card, board, beforeId)) return;
     void placeCard(card.board, card.id, columnSlug, beforeId);
   };
 
@@ -88,112 +83,76 @@ export function App() {
     setBump((b) => b + 1);
   }
 
+  // A flat chain rather than nested ternaries in the JSX: same four outcomes, and cognitive
+  // complexity counts nesting far more heavily than sequence.
+  let content: ReactNode;
+  if (!ready) content = <div className="empty">Loading…</div>;
+  else if (showGate) content = <ProjectGate onOpened={onOpened} />;
+  else if (!snapshot)
+    content = <div className="empty">{conn === 'open' ? 'No project open.' : 'Connecting…'}</div>;
+  else
+    content = (
+      <div className="work">
+        {tab === 'boards' ? (
+          <main className="boards">
+            {BOARDS.map((board) => (
+              <Board
+                key={board}
+                board={board}
+                label={BOARD_LABELS[board]}
+                cards={snapshot.boards[board] ?? []}
+                config={snapshot.config}
+                archivedCount={snapshot.archivedCounts?.[board] ?? 0}
+                collapsed={collapsed.has(board)}
+                onToggle={() => toggleBoard(board)}
+                onAdd={onAdd}
+                onOpen={onOpen}
+                onArchive={onArchive}
+                onDragStart={onDragStart}
+                onDrop={onDrop}
+              />
+            ))}
+          </main>
+        ) : (
+          <ProjectControl snapshot={snapshot} />
+        )}
+        {copilotOpen && (
+          <CopilotPanel
+            copilot={copilot}
+            backend={choice.backend}
+            mode={copilotMode}
+            model={choice.model}
+            effort={choice.effort}
+            onMode={setCopilotMode}
+            onModel={setModel}
+            onEffort={setEffort}
+            onBackend={onBackend}
+            overridden={overridden}
+            contextBudget={snapshot.config.contextBudget ?? DEFAULT_CONTEXT_BUDGET}
+            onReset={onResetCopilot}
+            onClose={() => setCopilotOpen(false)}
+          />
+        )}
+      </div>
+    );
+
   return (
     <div className="app-shell">
-      <header className="topbar">
-        <span className="brand">VibeBoard</span>
-        {snapshot && !showGate && <span className="project-name">{snapshot.name}</span>}
-        {snapshot && !showGate && (
-          <div className="topbar-tabs" role="group" aria-label="View">
-            <button
-              className={`tab-btn${tab === 'boards' ? ' active' : ''}`}
-              onClick={() => setTab('boards')}
-            >
-              Boards
-            </button>
-            <button
-              className={`tab-btn${tab === 'control' ? ' active' : ''}`}
-              onClick={() => setTab('control')}
-            >
-              Project Control
-            </button>
-          </div>
-        )}
-        <div className="topbar-right">
-          <select
-            className="theme-select"
-            value={theme}
-            title="Theme"
-            onChange={(e) => setTheme(e.target.value)}
-          >
-            {THEMES.map((t) => (
-              <option key={t.value} value={t.value}>
-                {t.label}
-              </option>
-            ))}
-          </select>
-          {snapshot && !showGate && (
-            <button className="switch-btn" title="Settings" onClick={() => setSettingsOpen(true)}>
-              ⚙
-            </button>
-          )}
-          {snapshot && !showGate && (
-            <button className="switch-btn" onClick={() => setShowGate(true)}>
-              Switch project
-            </button>
-          )}
-          {snapshot && !showGate && (
-            <button
-              className={`switch-btn${copilotOpen ? ' active' : ''}`}
-              onClick={() => setCopilotOpen((v) => !v)}
-            >
-              {copilotOpen ? 'Hide copilot' : 'Copilot'}
-            </button>
-          )}
-          <span className={`conn conn-${conn}`} title={`WebSocket ${conn}`} />
-        </div>
-      </header>
+      <TopBar
+        showProject={Boolean(snapshot) && !showGate}
+        projectName={snapshot?.name}
+        tab={tab}
+        onTab={setTab}
+        theme={theme}
+        onTheme={setTheme}
+        copilotOpen={copilotOpen}
+        onToggleCopilot={() => setCopilotOpen((v) => !v)}
+        onSettings={() => setSettingsOpen(true)}
+        onSwitchProject={() => setShowGate(true)}
+        conn={conn}
+      />
 
-      {!ready ? (
-        <div className="empty">Loading…</div>
-      ) : showGate ? (
-        <ProjectGate onOpened={onOpened} />
-      ) : !snapshot ? (
-        <div className="empty">{conn === 'open' ? 'No project open.' : 'Connecting…'}</div>
-      ) : (
-        <div className="work">
-          {tab === 'boards' ? (
-            <main className="boards">
-              {BOARDS.map((board) => (
-                <Board
-                  key={board}
-                  board={board}
-                  label={BOARD_LABELS[board]}
-                  cards={snapshot.boards[board] ?? []}
-                  config={snapshot.config}
-                  archivedCount={snapshot.archivedCounts?.[board] ?? 0}
-                  collapsed={collapsed.has(board)}
-                  onToggle={() => toggleBoard(board)}
-                  onAdd={onAdd}
-                  onOpen={onOpen}
-                  onArchive={onArchive}
-                  onDragStart={onDragStart}
-                  onDrop={onDrop}
-                />
-              ))}
-            </main>
-          ) : (
-            <ProjectControl snapshot={snapshot} />
-          )}
-          {copilotOpen && (
-            <CopilotPanel
-              copilot={copilot}
-              backend={choice.backend}
-              mode={copilotMode}
-              model={choice.model}
-              effort={choice.effort}
-              onMode={setCopilotMode}
-              onModel={setModel}
-              onEffort={setEffort}
-              onBackend={onBackend}
-              overridden={overridden}
-              contextBudget={snapshot.config.contextBudget ?? DEFAULT_CONTEXT_BUDGET}
-              onReset={onResetCopilot}
-              onClose={() => setCopilotOpen(false)}
-            />
-          )}
-        </div>
-      )}
+      {content}
 
       {settingsOpen && snapshot && (
         <SettingsModal

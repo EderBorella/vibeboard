@@ -9,6 +9,13 @@ export function slugify(name: string): string {
     .replace(/^-+|-+$/g, '');
 }
 
+// Whether a drop should actually move the card. Two things are not moves: a card dropped on a
+// different board (links cross boards, cards do not), and a card dropped exactly where it sits.
+export function canPlace(card: Card | null, board: BoardName, beforeId: string | null): card is Card {
+  if (!card || card.board !== board) return false;
+  return beforeId !== card.id;
+}
+
 export function columnSlugs(config: ProjectConfig, board: BoardName): string[] {
   return config.boards[board].columns.map(slugify);
 }

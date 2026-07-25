@@ -1,0 +1,82 @@
+// Add a theme here after adding its [data-theme] block in themes.css.
+const THEMES: { value: string; label: string }[] = [
+  { value: 'cyberpunk', label: 'Cyberpunk' },
+  { value: 'classic-dark', label: 'Classic Dark' },
+];
+
+interface Props {
+  // False while loading, on the project gate, or with no project open — everything except the
+  // brand, the theme picker and the connection dot is hidden behind it.
+  showProject: boolean;
+  projectName?: string;
+  tab: 'boards' | 'control';
+  onTab: (tab: 'boards' | 'control') => void;
+  theme: string;
+  onTheme: (theme: string) => void;
+  copilotOpen: boolean;
+  onToggleCopilot: () => void;
+  onSettings: () => void;
+  onSwitchProject: () => void;
+  conn: string;
+}
+
+export function TopBar({
+  showProject,
+  projectName,
+  tab,
+  onTab,
+  theme,
+  onTheme,
+  copilotOpen,
+  onToggleCopilot,
+  onSettings,
+  onSwitchProject,
+  conn,
+}: Props) {
+  return (
+    <header className="topbar">
+      <span className="brand">VibeBoard</span>
+      {showProject && <span className="project-name">{projectName}</span>}
+      {showProject && (
+        <div className="topbar-tabs" role="group" aria-label="View">
+          <button className={`tab-btn${tab === 'boards' ? ' active' : ''}`} onClick={() => onTab('boards')}>
+            Boards
+          </button>
+          <button className={`tab-btn${tab === 'control' ? ' active' : ''}`} onClick={() => onTab('control')}>
+            Project Control
+          </button>
+        </div>
+      )}
+      <div className="topbar-right">
+        <select
+          className="theme-select"
+          value={theme}
+          title="Theme"
+          onChange={(e) => onTheme(e.target.value)}
+        >
+          {THEMES.map((t) => (
+            <option key={t.value} value={t.value}>
+              {t.label}
+            </option>
+          ))}
+        </select>
+        {showProject && (
+          <button className="switch-btn" title="Settings" onClick={onSettings}>
+            ⚙
+          </button>
+        )}
+        {showProject && (
+          <button className="switch-btn" onClick={onSwitchProject}>
+            Switch project
+          </button>
+        )}
+        {showProject && (
+          <button className={`switch-btn${copilotOpen ? ' active' : ''}`} onClick={onToggleCopilot}>
+            {copilotOpen ? 'Hide copilot' : 'Copilot'}
+          </button>
+        )}
+        <span className={`conn conn-${conn}`} title={`WebSocket ${conn}`} />
+      </div>
+    </header>
+  );
+}

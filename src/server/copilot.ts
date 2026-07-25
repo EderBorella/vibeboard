@@ -135,9 +135,11 @@ export class CopilotSession {
   async send(opts: SendOptions): Promise<void> {
     if (this.#child || this.#abort) throw new Error('Copilot is busy');
     const backend: Backend = opts.backend ?? (DEFAULT_BACKEND as Backend);
-    // Fill in the backend's real default rather than letting a blank through: the CLIs each
-    // pick silently, which makes "which model answered?" unanswerable. Belt and braces —
-    // the config carries these too, but a raw WebSocket call or an unmigrated config doesn't.
+    // Belt and braces, deliberately kept after resolveCopilotSelection landed: this guards a
+    // caller that bypasses the route layer entirely (a raw WebSocket client, or an
+    // unmigrated config), where nothing has resolved a default yet. Pinned by
+    // test/copilot.test.ts ('spawns with a real model and effort when the caller names
+    // neither') and test/opencode-variant.test.ts.
     const defaults = backendDefaults(backend);
     const resolved: SendOptions = {
       ...opts,

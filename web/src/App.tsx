@@ -1,8 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import {
-  BOARDS, BOARD_LABELS, DEFAULT_BACKEND, backendDefaults,
-  type BoardName, type Card, type CopilotChoice,
-} from './shared';
+import { BOARDS, BOARD_LABELS, type BoardName, type Card, type CopilotChoice } from './shared';
+import { resolveChoice, isOverridden } from './copilot/choice';
 import { useSnapshot } from './useSnapshot';
 import { getState, placeCard, archiveCard } from './api';
 import { Board } from './components/Board';
@@ -52,16 +50,9 @@ export function App() {
     setOverride({});
   }, [configKey]);
 
-  // Effective values: override first, then the config, then the backend's built-in default.
-  // The config's model belongs to the CONFIGURED backend — a model id means nothing to the
-  // other one — so overriding the backend falls through to that backend's own default.
-  const copilotBackend = override.backend ?? configured?.backend ?? DEFAULT_BACKEND;
-  const fromConfig = copilotBackend === configured?.backend ? configured : undefined;
-  const fallback = backendDefaults(copilotBackend);
-  // `||` not `??`, so a blank left over in an old config falls through to the real default.
-  const copilotModel = override.model || fromConfig?.model || fallback.model;
-  const copilotEffort = override.effort || fromConfig?.effort || fallback.effort;
-  const overridden = override.backend !== undefined || override.model !== undefined || override.effort !== undefined;
+  // Precedence lives in one place, shared with Settings and mirrored on the server.
+  const choice = resolveChoice(configured, override);
+  const overridden = isOverridden(override);
 
   const onModel = (model: string): void => setOverride((o) => ({ ...o, model }));
   const onEffort = (effort: string): void => setOverride((o) => ({ ...o, effort }));
@@ -93,7 +84,7 @@ export function App() {
   // fresh chat, since a session belongs to the backend that created it. Model and effort drop
   // out of the override too: they belong to the backend being left.
   const onBackend = (backend: string): void => {
-    if (backend === copilotBackend) return;
+    if (backend === choice.backend) return;
     copilot.newSession();
     setOverride({ backend });
   };
@@ -185,10 +176,10 @@ export function App() {
         {copilotOpen && (
           <CopilotPanel
             copilot={copilot}
-            backend={copilotBackend}
+            backend={choice.backend}
             mode={copilotMode}
-            model={copilotModel}
-            effort={copilotEffort}
+            model={choice.model}
+            effort={choice.effort}
             onMode={setCopilotMode}
             onModel={onModel}
             onEffort={onEffort}

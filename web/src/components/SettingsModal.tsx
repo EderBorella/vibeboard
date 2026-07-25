@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import {
-  BOARDS, BOARD_LABELS, DEFAULT_BACKEND, backendCaps, backendDefaults,
+  BOARDS, BOARD_LABELS, backendCaps, backendDefaults,
   type BoardName, type ProjectConfig,
 } from '../shared';
 import { listModels, patchConfig, type ModelOption } from '../api';
+import { resolveChoice, clampToCaps } from '../copilot/choice';
 import { ModelPicker } from './ModelPicker';
 
 const BACKENDS: { value: string; label: string }[] = [
@@ -22,10 +23,11 @@ function parseCsv(text: string): string[] {
 }
 
 export function SettingsModal({ config, onClose, onSaved }: Props) {
-  const [backend, setBackend] = useState(config.copilot.backend || DEFAULT_BACKEND);
+  const initial = resolveChoice(config.copilot, {});
+  const [backend, setBackend] = useState(initial.backend);
   // Never blank: an unset model used to mean "the CLI picks", which hid what was running.
-  const [model, setModel] = useState(config.copilot.model || backendDefaults(config.copilot.backend).model);
-  const [effort, setEffort] = useState(config.copilot.effort || backendDefaults(config.copilot.backend).effort);
+  const [model, setModel] = useState(initial.model);
+  const [effort, setEffort] = useState(initial.effort);
   const [columns, setColumns] = useState<Record<BoardName, string>>(() => {
     const o = {} as Record<BoardName, string>;
     for (const b of BOARDS) o[b] = (config.boards[b]?.columns ?? []).join(', ');
@@ -84,11 +86,13 @@ export function SettingsModal({ config, onClose, onSaved }: Props) {
                   key={b.value}
                   className={`mode-btn${backend === b.value ? ' active' : ''}`}
                   // Model ids don't cross backends, so adopt the new backend's defaults
-                  // rather than clearing to blank.
+                  // rather than clearing to blank. resolveChoice does exactly that when the
+                  // override names a different backend than the config.
                   onClick={() => {
-                    setBackend(b.value);
-                    setModel(backendDefaults(b.value).model);
-                    setEffort(backendDefaults(b.value).effort);
+                    const next = resolveChoice(config.copilot, { backend: b.value });
+                    setBackend(next.backend);
+                    setModel(next.model);
+                    setEffort(next.effort);
                   }}
                 >
                   {b.label}
@@ -101,7 +105,7 @@ export function SettingsModal({ config, onClose, onSaved }: Props) {
           </div>
           <label className="field"><span>Default {backend === 'opencode' ? 'variant' : 'effort'}</span>
             <select
-              value={caps.efforts.some((e) => e.value === effort) ? effort : backendDefaults(backend).effort}
+              value={clampToCaps({ backend, model, effort }, 'plan').effort}
               onChange={(e) => setEffort(e.target.value)}
             >
               {caps.efforts.map((e) => <option key={e.value} value={e.value}>{e.label}</option>)}

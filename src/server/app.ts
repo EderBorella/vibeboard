@@ -30,6 +30,7 @@ import {
 import type { ProjectSession } from './session.js';
 import { BOARDS, BOARD_LABELS } from '../core/types.js';
 import { DEFAULT_BACKEND } from '../core/backends.js';
+import { resolveCopilotSelection } from '../core/copilot-choice.js';
 import type { BoardName, CardFrontmatter, ProjectConfig } from '../core/types.js';
 
 const today = (): string => new Date().toISOString().slice(0, 10);
@@ -70,12 +71,13 @@ export function buildApp(session: ProjectSession): FastifyInstance {
   };
 
   // Per-turn options are the dock's SESSION OVERRIDE. The project config holds the defaults
-  // and is the only persisted source; anything omitted here falls back to it.
+  // and is the only persisted source; anything omitted here falls back to it. Precedence
+  // lives in resolveCopilotSelection — see src/core/copilot-choice.ts.
   interface CopilotOpts { mode: CopilotMode; backend?: string; model?: string; effort?: EffortLevel }
 
   // The backend in force for a turn: the override, else the configured default.
   const effectiveBackend = (override?: string): Backend =>
-    ((override || session.config?.copilot.backend || DEFAULT_BACKEND) as Backend);
+    (resolveCopilotSelection(session.config?.copilot, { backend: override }).backend as Backend);
 
   async function handleCopilotSend(text: string, opts: CopilotOpts): Promise<void> {
     if (!session.isOpen) { broadcast({ type: 'copilot:error', error: 'No project open' }); return; }
@@ -83,19 +85,16 @@ export function buildApp(session: ProjectSession): FastifyInstance {
     try {
       await chats.recordUser(text);
       copilotState(); // running flips true only once send starts; announce optimistically
-      const cfg = session.config?.copilot;
-      const backend = effectiveBackend(opts.backend);
-      // The config's model/effort describe the CONFIGURED backend; they mean nothing to a
-      // different one, so an overridden backend uses only what the dock sent (and failing
-      // that, CopilotSession fills in that backend's built-in default).
-      const useConfig = backend === (cfg?.backend ?? DEFAULT_BACKEND);
+      const choice = resolveCopilotSelection(session.config?.copilot, {
+        backend: opts.backend, model: opts.model, effort: opts.effort,
+      });
       await copilot.send({
         cwd: session.root!,
         text,
         mode: opts.mode,
-        backend,
-        model: opts.model || (useConfig ? cfg?.model : undefined),
-        effort: (opts.effort || (useConfig ? cfg?.effort : undefined)) as EffortLevel | undefined,
+        backend: choice.backend as Backend,
+        model: choice.model,
+        effort: choice.effort as EffortLevel,
         onEvent: (event) => { void chats.recordEvent(event); broadcast({ type: 'copilot:event', event }); },
       });
     } catch (err) {

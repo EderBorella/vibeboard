@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { listModels, getModelStatus, type ModelOption, type ModelStatus } from '../api';
 import { backendCaps, backendDefaults } from '../shared';
+import { clampToCaps } from './choice';
 import { ModelPicker } from '../components/ModelPicker';
 import type { CopilotMode, EffortLevel, useCopilot } from './useCopilot';
 
@@ -60,13 +61,12 @@ export function CopilotPanel({
   const bodyRef = useRef<HTMLDivElement>(null);
   const currentTitle = chats.find((c) => c.id === currentChatId)?.title ?? 'New chat';
 
-  // Modes/efforts/models are backend-specific; fall back to this backend's default when the
-  // carried-over selection doesn't apply (e.g. after switching Claude ↔ OpenCode).
+  // Modes and efforts are backend-specific, so a selection carried across a backend switch
+  // gets clamped to what this backend actually publishes. The model arrives already
+  // resolved — App owns precedence.
   const caps = backendCaps(backend);
-  const defaults = backendDefaults(backend);
-  const effMode = caps.modes.some((m) => m.value === mode) ? mode : caps.modes[0].value;
-  const effEffort = caps.efforts.some((e) => e.value === effort) ? effort : defaults.effort;
-  const effModel = model || defaults.model;
+  const { mode: effMode, effort: effEffort } = clampToCaps({ backend, model, effort }, mode);
+  const effModel = model;
 
   // Warn when the chosen model can't call tools — the copilot can't touch cards without them.
   const noTools = models.find((m) => m.id === effModel)?.caps?.toolCall === false;
@@ -167,7 +167,7 @@ export function CopilotPanel({
       </div>
 
       <div className="copilot-selects">
-        <ModelPicker models={models} value={effModel} defaultModel={defaults.model} disabled={running} onChange={onModel} />
+        <ModelPicker models={models} value={effModel} defaultModel={backendDefaults(backend).model} disabled={running} onChange={onModel} />
         <select className="effort-select" value={effEffort} disabled={running} onChange={(e) => onEffort(e.target.value)}>
           {caps.efforts.map((e) => <option key={e.value} value={e.value}>{e.label}</option>)}
         </select>

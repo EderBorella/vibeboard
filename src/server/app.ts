@@ -5,7 +5,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { scaffoldProject, type ScaffoldMode } from '../core/scaffold.js';
 import { listBackendModels, modelStatus } from './models.js';
 import {
-  createCard, updateCard, moveCard, placeCard, archiveCard, restoreCard, restoreTarget,
+  createCard, updateCard, placeCard, archiveCard, restoreCard, restoreTarget,
   type CreateCardInput,
 } from '../core/mutations.js';
 import { readArchive, ARCHIVE_SLUG } from '../core/board.js';
@@ -370,15 +370,6 @@ export function buildApp(session: ProjectSession): FastifyInstance {
       const card = await findCard(session.root!, board, id, session.config!);
       if (!card) return reply.code(404).send({ error: 'Card not found' });
       return setCardLinks(session.root!, session.config!, card, links);
-    });
-
-    api.post('/cards/:board/:id/move', async (req, reply) => {
-      if (!ensureOpen(session, reply)) return;
-      const { board, id } = req.params as { board: BoardName; id: string };
-      const { toColumnSlug } = req.body as { toColumnSlug: string };
-      const card = await findCard(session.root!, board, id, session.config!);
-      if (!card) return reply.code(404).send({ error: 'Card not found' });
-      return moveCard(session.root!, card, toColumnSlug);
     });
 
     // Position a card: within its column (reorder) or into another one, in a single call.

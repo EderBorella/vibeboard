@@ -24,7 +24,7 @@ afterEach(async () => {
 });
 
 describe('app mutation routes', () => {
-  it('creates, patches, moves, and archives a card through HTTP', async () => {
+  it('creates, patches, places, and archives a card through HTTP', async () => {
     const { app } = await openProject();
 
     const created = await app.inject({
@@ -43,10 +43,12 @@ describe('app mutation routes', () => {
     });
     expect(patched.json().title).toBe('Renamed via API');
 
+    // `place` with beforeId: null is "move to the end of that column" — the same job the
+    // old /move route did, plus the order renumbering the board actually needs.
     const moved = await app.inject({
       method: 'POST',
-      url: `/api/cards/engineering/${id}/move`,
-      payload: { toColumnSlug: 'in-progress' },
+      url: `/api/cards/engineering/${id}/place`,
+      payload: { toColumnSlug: 'in-progress', beforeId: null },
     });
     expect(moved.json().columnSlug).toBe('in-progress');
 

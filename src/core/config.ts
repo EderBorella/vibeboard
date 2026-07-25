@@ -1,7 +1,7 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { parse, stringify } from 'yaml';
-import { BOARDS, type BoardName, type BoardConfig, type ProjectConfig } from './types.js';
+import { BOARDS, type BoardName, type BoardConfig, type CopilotConfig, type ProjectConfig } from './types.js';
 import { BACKEND_DEFAULTS, DEFAULT_BACKEND, defaultBackendMap } from './backends.js';
 
 // Tokens the copilot context bar treats as full. Per-project rather than hardcoded: context
@@ -37,36 +37,23 @@ export function defaultConfig(name: string): ProjectConfig {
   };
 }
 
-// Bring an older config's copilot block up to date. Returns whether anything changed, so
-// callers persist only when needed. Two upgrades:
-//  - single slot → per-backend: the old `model`/`effort` describe whichever backend was
-//    selected, so they move into that backend's slot and the legacy keys are dropped. Without
-//    this, switching connector discarded the model you had chosen for the other one.
-//  - a missing or blank slot for a known backend gets its built-in default; a blank used to
-//    mean "let the CLI pick", which hid the model actually in use.
-export function ensureCopilotDefaults(config: ProjectConfig): boolean {
-  if (!config.copilot) config.copilot = { backend: DEFAULT_BACKEND, backends: {} };
-  const copilot = config.copilot;
+// The old `model`/`effort` pair described whichever backend was selected when it was written, so
+// it becomes that backend's slot and the legacy keys go.
+function migrateLegacySlot(copilot: CopilotConfig): boolean {
+  if (!copilot.model && !copilot.effort) return false;
+  copilot.backends[copilot.backend] ??= { model: '', effort: '' };
+  const slot = copilot.backends[copilot.backend];
+  if (!slot.model && copilot.model) slot.model = copilot.model;
+  if (!slot.effort && copilot.effort) slot.effort = copilot.effort;
+  delete copilot.model;
+  delete copilot.effort;
+  return true;
+}
+
+// A missing or blank slot for a known backend gets its built-in default; a blank used to mean
+// "let the CLI pick", which hid the model actually in use.
+function seedBackendSlots(copilot: CopilotConfig): boolean {
   let changed = false;
-  if (!copilot.backend) {
-    copilot.backend = DEFAULT_BACKEND;
-    changed = true;
-  }
-  if (!copilot.backends) {
-    copilot.backends = {};
-    changed = true;
-  }
-
-  if (copilot.model || copilot.effort) {
-    copilot.backends[copilot.backend] ??= { model: '', effort: '' };
-    const slot = copilot.backends[copilot.backend];
-    if (!slot.model && copilot.model) slot.model = copilot.model;
-    if (!slot.effort && copilot.effort) slot.effort = copilot.effort;
-    delete copilot.model;
-    delete copilot.effort;
-    changed = true;
-  }
-
   for (const [name, defaults] of Object.entries(BACKEND_DEFAULTS)) {
     const slot = copilot.backends[name];
     if (!slot) {
@@ -83,12 +70,32 @@ export function ensureCopilotDefaults(config: ProjectConfig): boolean {
       changed = true;
     }
   }
+  return changed;
+}
 
-  if (typeof config.contextBudget !== 'number' || config.contextBudget <= 0) {
-    config.contextBudget = DEFAULT_CONTEXT_BUDGET;
+// Bring an older config's copilot block up to date, returning whether anything changed so callers
+// persist only when needed. Without the legacy migration, switching connector discarded the model
+// chosen for the other one.
+export function ensureCopilotDefaults(config: ProjectConfig): boolean {
+  if (!config.copilot) config.copilot = { backend: DEFAULT_BACKEND, backends: {} };
+  const copilot = config.copilot;
+  let changed = false;
+  if (!copilot.backend) {
+    copilot.backend = DEFAULT_BACKEND;
     changed = true;
   }
-  return changed;
+  if (!copilot.backends) {
+    copilot.backends = {};
+    changed = true;
+  }
+  return [changed, migrateLegacySlot(copilot), seedBackendSlots(copilot)].some(Boolean);
+}
+
+// Not a copilot concern, so not inside ensureCopilotDefaults despite arriving with it.
+export function ensureContextBudget(config: ProjectConfig): boolean {
+  if (typeof config.contextBudget === 'number' && config.contextBudget > 0) return false;
+  config.contextBudget = DEFAULT_CONTEXT_BUDGET;
+  return true;
 }
 
 // Backfill any board missing from an older project's config with its default columns.

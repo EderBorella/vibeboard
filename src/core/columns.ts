@@ -62,38 +62,35 @@ async function folderExists(dir: string): Promise<boolean> {
   }
 }
 
-export async function reconcileColumns(
-  projectRoot: string,
-  board: BoardName,
-  oldNames: string[],
-  newNames: string[],
-): Promise<ReconcileResult> {
-  const oldSlugs = oldNames.map(slugify);
-  const newSlugs = newNames.map(slugify);
+type Renames = { from: string; to: string }[];
+type DirOf = (slug: string) => string;
+
+// Pair renames positionally, but only where BOTH sides are genuinely new/gone — if the name at
+// this position moved somewhere else in the list, the edit is a reorder+rename mix.
+function pairRenames(oldSlugs: string[], newSlugs: string[]): Renames | ColumnsRefused {
+  if (oldSlugs.length !== newSlugs.length) return [];
   const oldSet = new Set(oldSlugs);
   const newSet = new Set(newSlugs);
-  const dir = (slug: string): string => join(projectRoot, board, slug);
-
-  // Same set of columns: at most a reorder, which is purely a config concern.
-  const sameSet = oldSlugs.length === newSlugs.length && oldSlugs.every((s) => newSet.has(s));
-  if (sameSet) return { renamed: [] };
-
-  // Pair renames positionally, but only where BOTH sides are genuinely new/gone — if the name
-  // at this position moved somewhere else in the list, the edit is a reorder+rename mix.
-  const renamed: { from: string; to: string }[] = [];
-  if (oldSlugs.length === newSlugs.length) {
-    for (let i = 0; i < oldSlugs.length; i++) {
-      if (oldSlugs[i] === newSlugs[i]) continue;
-      const goneFromList = !newSet.has(oldSlugs[i]);
-      const brandNew = !oldSet.has(newSlugs[i]);
-      if (!goneFromList || !brandNew) {
-        return { error: 'That mixes renaming and reordering columns. Please make one change at a time.' };
-      }
-      renamed.push({ from: oldSlugs[i], to: newSlugs[i] });
+  const renamed: Renames = [];
+  for (let i = 0; i < oldSlugs.length; i++) {
+    if (oldSlugs[i] === newSlugs[i]) continue;
+    if (newSet.has(oldSlugs[i]) || oldSet.has(newSlugs[i])) {
+      return { error: 'That mixes renaming and reordering columns. Please make one change at a time.' };
     }
+    renamed.push({ from: oldSlugs[i], to: newSlugs[i] });
   }
+  return renamed;
+}
 
-  // Removals: a column that vanished and was not renamed away must not take cards with it.
+// A column that vanished and was not renamed away must not take cards with it.
+async function refuseNonEmptyRemoval(
+  dir: DirOf,
+  oldNames: string[],
+  oldSlugs: string[],
+  newSlugs: string[],
+  renamed: Renames,
+): Promise<ColumnsRefused | null> {
+  const newSet = new Set(newSlugs);
   const renamedFrom = new Set(renamed.map((r) => r.from));
   for (let i = 0; i < oldSlugs.length; i++) {
     const slug = oldSlugs[i];
@@ -105,8 +102,16 @@ export async function reconcileColumns(
       };
     }
   }
+  return null;
+}
 
-  // Never merge into an occupied folder — that would mix two columns' cards together.
+// Never merge into an occupied folder — that would mix two columns' cards together.
+async function refuseOccupiedTarget(
+  dir: DirOf,
+  renamed: Renames,
+  newNames: string[],
+  newSlugs: string[],
+): Promise<ColumnsRefused | null> {
   for (const r of renamed) {
     if (await folderExists(dir(r.to))) {
       const target = newNames[newSlugs.indexOf(r.to)];
@@ -115,6 +120,32 @@ export async function reconcileColumns(
       };
     }
   }
+  return null;
+}
+
+export async function reconcileColumns(
+  projectRoot: string,
+  board: BoardName,
+  oldNames: string[],
+  newNames: string[],
+): Promise<ReconcileResult> {
+  const oldSlugs = oldNames.map(slugify);
+  const newSlugs = newNames.map(slugify);
+  const dir: DirOf = (slug) => join(projectRoot, board, slug);
+
+  // Same set of columns: at most a reorder, which is purely a config concern.
+  const newSet = new Set(newSlugs);
+  if (oldSlugs.length === newSlugs.length && oldSlugs.every((s) => newSet.has(s))) {
+    return { renamed: [] };
+  }
+
+  const renamed = pairRenames(oldSlugs, newSlugs);
+  if (!Array.isArray(renamed)) return renamed;
+
+  const removal = await refuseNonEmptyRemoval(dir, oldNames, oldSlugs, newSlugs, renamed);
+  if (removal) return removal;
+  const occupied = await refuseOccupiedTarget(dir, renamed, newNames, newSlugs);
+  if (occupied) return occupied;
 
   for (const r of renamed) {
     if (await folderExists(dir(r.from))) await rename(dir(r.from), dir(r.to));

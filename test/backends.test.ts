@@ -3,7 +3,13 @@ import { readFile } from 'node:fs/promises';
 import { parse } from 'yaml';
 import { tempDir } from './helpers.js';
 import { BACKEND_DEFAULTS, DEFAULT_BACKEND, backendDefaults } from '../src/core/backends.js';
-import { defaultConfig, ensureCopilotDefaults, configPath, writeConfig } from '../src/core/config.js';
+import {
+  defaultConfig,
+  ensureCopilotDefaults,
+  configPath,
+  writeConfig,
+  ensureContextBudget,
+} from '../src/core/config.js';
 import { scaffoldProject } from '../src/core/scaffold.js';
 import { ProjectSession } from '../src/server/session.js';
 import type { ProjectConfig } from '../src/core/types.js';
@@ -108,17 +114,17 @@ describe('ensureCopilotDefaults', () => {
   it('backfills a missing or nonsensical context budget', () => {
     const missing = { ...defaultConfig('T') } as ProjectConfig;
     delete (missing as { contextBudget?: number }).contextBudget;
-    expect(ensureCopilotDefaults(missing)).toBe(true);
+    expect(ensureContextBudget(missing)).toBe(true);
     expect(missing.contextBudget).toBe(200_000);
 
     const zero = { ...defaultConfig('T'), contextBudget: 0 } as ProjectConfig;
-    expect(ensureCopilotDefaults(zero)).toBe(true);
+    expect(ensureContextBudget(zero)).toBe(true);
     expect(zero.contextBudget).toBe(200_000);
   });
 
   it('keeps a deliberate context budget', () => {
     const config = { ...defaultConfig('T'), contextBudget: 1_000_000 } as ProjectConfig;
-    expect(ensureCopilotDefaults(config)).toBe(false);
+    expect(ensureContextBudget(config)).toBe(false);
     expect(config.contextBudget).toBe(1_000_000);
   });
 });

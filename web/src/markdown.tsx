@@ -42,6 +42,32 @@ function inline(text: string): ReactNode[] {
   return out;
 }
 
+// What a single line is, decided before anything is emitted. Keeping the grammar separate from
+// the emitting keeps both readable — the loop below becomes one case per block kind.
+type Block =
+  | { kind: 'fence' }
+  | { kind: 'blank' }
+  | { kind: 'heading'; level: number; text: string }
+  | { kind: 'hr' }
+  | { kind: 'quote'; text: string }
+  | { kind: 'item'; list: 'ul' | 'ol'; text: string }
+  | { kind: 'para'; text: string };
+
+function classify(line: string): Block {
+  const trimmed = line.trim();
+  if (trimmed.startsWith('```')) return { kind: 'fence' };
+  if (trimmed === '') return { kind: 'blank' };
+  const heading = /^(#{1,6})\s+(.*)$/.exec(line);
+  if (heading) return { kind: 'heading', level: heading[1].length, text: heading[2] };
+  if (/^(---|\*\*\*|___)\s*$/.test(trimmed)) return { kind: 'hr' };
+  if (trimmed.startsWith('>')) return { kind: 'quote', text: trimmed.replace(/^>\s?/, '') };
+  const ul = /^\s*[-*+]\s+(.*)$/.exec(line);
+  if (ul) return { kind: 'item', list: 'ul', text: ul[1] };
+  const ol = /^\s*\d+\.\s+(.*)$/.exec(line);
+  if (ol) return { kind: 'item', list: 'ol', text: ol[1] };
+  return { kind: 'para', text: trimmed };
+}
+
 export function renderMarkdown(src: string): ReactNode[] {
   const lines = src.replace(/\r\n/g, '\n').split('\n');
   const out: ReactNode[] = [];
@@ -76,64 +102,51 @@ export function renderMarkdown(src: string): ReactNode[] {
     }
   };
 
-  for (const line of lines) {
-    const trimmed = line.trim();
-
-    if (trimmed.startsWith('```')) {
-      if (code) flushCode();
-      else {
-        flushPara();
-        flushList();
-        code = [];
-      }
-      continue;
-    }
-    if (code) {
-      code.push(line);
-      continue;
-    }
-
-    if (trimmed === '') {
-      flushPara();
-      flushList();
-      continue;
-    }
-
-    const heading = /^(#{1,6})\s+(.*)$/.exec(line);
-    if (heading) {
-      flushPara();
-      flushList();
-      out.push(createElement(HEADINGS[heading[1].length - 1], { key: k() }, inline(heading[2])));
-      continue;
-    }
-
-    if (/^(---|\*\*\*|___)\s*$/.test(trimmed)) {
-      flushPara();
-      flushList();
-      out.push(<hr key={k()} />);
-      continue;
-    }
-
-    if (trimmed.startsWith('>')) {
-      flushPara();
-      flushList();
-      out.push(<blockquote key={k()}>{inline(trimmed.replace(/^>\s?/, ''))}</blockquote>);
-      continue;
-    }
-
-    const ul = /^\s*[-*+]\s+(.*)$/.exec(line);
-    const ol = /^\s*\d+\.\s+(.*)$/.exec(line);
-    if (ul || ol) {
-      flushPara();
-      const want: 'ul' | 'ol' = ul ? 'ul' : 'ol';
-      if (listType && listType !== want) flushList();
-      listType = want;
-      items.push(<li key={k()}>{inline((ul ?? ol)?.[1] ?? '')}</li>);
-      continue;
-    }
-
+  const flushBlocks = (): void => {
+    flushPara();
     flushList();
-    para.push(trimmed);
+  };
+
+  for (const line of lines) {
+    // Inside a fence every line is literal until the closing ```.
+    if (code) {
+      if (line.trim().startsWith('```')) flushCode();
+      else code.push(line);
+      continue;
+    }
+
+    const block = classify(line);
+    switch (block.kind) {
+      case 'fence':
+        flushBlocks();
+        code = [];
+        break;
+      case 'blank':
+        flushBlocks();
+        break;
+      case 'heading':
+        flushBlocks();
+        out.push(createElement(HEADINGS[block.level - 1], { key: k() }, inline(block.text)));
+        break;
+      case 'hr':
+        flushBlocks();
+        out.push(<hr key={k()} />);
+        break;
+      case 'quote':
+        flushBlocks();
+        out.push(<blockquote key={k()}>{inline(block.text)}</blockquote>);
+        break;
+      case 'item':
+        flushPara();
+        if (listType && listType !== block.list) flushList();
+        listType = block.list;
+        items.push(<li key={k()}>{inline(block.text)}</li>);
+        break;
+      case 'para':
+        flushList();
+        para.push(block.text);
+        break;
+    }
   }
 
   flushCode();

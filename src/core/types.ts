@@ -38,11 +38,30 @@ export interface BoardConfig {
   columns: string[];     // ordered display names
 }
 
+// One saved model/effort per backend. A model id belongs to exactly one backend ("opus" to
+// Claude Code, "opencode/…" to OpenCode), so a single shared slot could not survive a switch:
+// changing connector fell back to the built-in default and saving then overwrote the model
+// chosen for the backend being left.
+export interface CopilotBackendConfig {
+  model: string;
+  effort: string;
+}
+
+export interface CopilotConfig {
+  backend: string;
+  backends: Record<string, CopilotBackendConfig>;
+  // The pre-per-backend shape: a single pair describing whichever backend was selected.
+  // Read during migration (ensureCopilotDefaults folds them into `backends`), never written.
+  model?: string;
+  effort?: string;
+}
+
 export interface ProjectConfig {
   name: string;
   boards: Record<BoardName, BoardConfig>;
   miniatureChars: number;
   idPadding: number;
   keepChats: number;     // retain the last N copilot chats per project (older pruned)
-  copilot: { backend: string; model?: string; effort?: string };
+  contextBudget: number; // tokens the copilot context bar treats as full
+  copilot: CopilotConfig;
 }

@@ -27,3 +27,9 @@ export const BACKEND_DEFAULTS: Record<string, BackendDefaults> = {
 export function backendDefaults(backend: string | undefined): BackendDefaults {
   return BACKEND_DEFAULTS[backend ?? ''] ?? BACKEND_DEFAULTS[DEFAULT_BACKEND];
 }
+
+// A full per-backend map seeded with the built-in defaults: the starting point for a new
+// project, and the backfill for a backend a config has never selected.
+export function defaultBackendMap(): Record<string, BackendDefaults> {
+  return Object.fromEntries(Object.entries(BACKEND_DEFAULTS).map(([k, v]) => [k, { ...v }]));
+}

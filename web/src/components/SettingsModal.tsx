@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
-  BOARDS, BOARD_LABELS, backendCaps, backendDefaults,
-  type BoardName, type ProjectConfig,
+  BOARDS, BOARD_LABELS, DEFAULT_CONTEXT_BUDGET, backendCaps, backendDefaults,
+  type BoardName, type CopilotBackendConfig, type ProjectConfig,
 } from '../shared';
 import { listModels, patchConfig, type ModelOption } from '../api';
 import { resolveChoice, clampToCaps } from '../copilot/choice';
@@ -23,11 +23,19 @@ function parseCsv(text: string): string[] {
 }
 
 export function SettingsModal({ config, onClose, onSaved }: Props) {
-  const initial = resolveChoice(config.copilot, {});
-  const [backend, setBackend] = useState(initial.backend);
+  const [backend, setBackend] = useState(resolveChoice(config.copilot, {}).backend);
+  // One editable slot per backend, so editing OpenCode's model cannot disturb Claude's. The
+  // two are separate settings that happen to share one pair of controls; keeping a single slot
+  // meant switching connector overwrote the model saved for the one you left.
+  const [slots, setSlots] = useState<Record<string, CopilotBackendConfig>>(() => {
+    const o: Record<string, CopilotBackendConfig> = {};
+    for (const b of BACKENDS) o[b.value] = resolveChoice(config.copilot, { backend: b.value });
+    return o;
+  });
   // Never blank: an unset model used to mean "the CLI picks", which hid what was running.
-  const [model, setModel] = useState(initial.model);
-  const [effort, setEffort] = useState(initial.effort);
+  const { model, effort } = slots[backend] ?? resolveChoice(config.copilot, { backend });
+  const setModel = (m: string): void => setSlots((s) => ({ ...s, [backend]: { ...s[backend], model: m } }));
+  const setEffort = (e: string): void => setSlots((s) => ({ ...s, [backend]: { ...s[backend], effort: e } }));
   const [columns, setColumns] = useState<Record<BoardName, string>>(() => {
     const o = {} as Record<BoardName, string>;
     for (const b of BOARDS) o[b] = (config.boards[b]?.columns ?? []).join(', ');
@@ -36,6 +44,7 @@ export function SettingsModal({ config, onClose, onSaved }: Props) {
   const [miniatureChars, setMiniatureChars] = useState(config.miniatureChars);
   const [idPadding, setIdPadding] = useState(config.idPadding);
   const [keepChats, setKeepChats] = useState(config.keepChats ?? 20);
+  const [contextBudget, setContextBudget] = useState(config.contextBudget ?? DEFAULT_CONTEXT_BUDGET);
   const [models, setModels] = useState<ModelOption[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -55,11 +64,13 @@ export function SettingsModal({ config, onClose, onSaved }: Props) {
       const boards = {} as ProjectConfig['boards'];
       for (const b of BOARDS) boards[b] = { columns: parseCsv(columns[b]) };
       await patchConfig({
-        copilot: { backend, model: model || undefined, effort: effort || undefined },
+        // Every backend's slot, not just the active one — the modal can edit both.
+        copilot: { backend, backends: slots },
         boards,
         miniatureChars: Number(miniatureChars) || config.miniatureChars,
         idPadding: Number(idPadding) || config.idPadding,
         keepChats: Number(keepChats) || (config.keepChats ?? 20),
+        contextBudget: Number(contextBudget) || DEFAULT_CONTEXT_BUDGET,
       });
       onSaved();
     } catch (e) {
@@ -85,15 +96,10 @@ export function SettingsModal({ config, onClose, onSaved }: Props) {
                 <button
                   key={b.value}
                   className={`mode-btn${backend === b.value ? ' active' : ''}`}
-                  // Model ids don't cross backends, so adopt the new backend's defaults
-                  // rather than clearing to blank. resolveChoice does exactly that when the
-                  // override names a different backend than the config.
-                  onClick={() => {
-                    const next = resolveChoice(config.copilot, { backend: b.value });
-                    setBackend(next.backend);
-                    setModel(next.model);
-                    setEffort(next.effort);
-                  }}
+                  // Only the selected backend changes: each backend's model/effort live in
+                  // their own slot, so switching here reveals that backend's saved choice
+                  // instead of overwriting it with a built-in default.
+                  onClick={() => setBackend(b.value)}
                 >
                   {b.label}
                 </button>
@@ -114,6 +120,17 @@ export function SettingsModal({ config, onClose, onSaved }: Props) {
           <label className="field"><span>Keep last N chats</span>
             <input type="number" min={1} value={keepChats} onChange={(e) => setKeepChats(Number(e.target.value))} />
           </label>
+          <label className="field"><span>Context window (tokens)</span>
+            <input
+              type="number" min={1000} step={1000} value={contextBudget}
+              onChange={(e) => setContextBudget(Number(e.target.value))}
+            />
+          </label>
+          <div className="settings-hint">
+            What the context bar treats as full. Set it to the window of the model you actually
+            use — {DEFAULT_CONTEXT_BUDGET.toLocaleString()} over-reports occupancy several times
+            over on a million-token model.
+          </div>
 
           <div className="settings-section">Boards</div>
           <div className="settings-hint">

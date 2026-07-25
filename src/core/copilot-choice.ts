@@ -7,10 +7,13 @@ import { DEFAULT_BACKEND, backendDefaults } from './backends.js';
 // them in step. They didn't: a stale copy is what made "switch connector for one chat"
 // rewrite the project defaults.
 //
-// Precedence: override → configured default → the backend's own built-in default.
-// The one subtlety: a model id is backend-specific. If the override names a DIFFERENT
-// backend, the configured model and effort are discarded rather than carried across —
-// "sonnet" means nothing to OpenCode.
+// Precedence: override → the backend's own saved slot → the backend's built-in default.
+//
+// A model id is backend-specific, so each backend keeps its own slot. Reading the slot FOR THE
+// BACKEND IN FORCE is what makes switching connector non-destructive: it can never hand
+// OpenCode a Claude model id, and it never has to discard the other backend's choice. With a
+// single shared slot, switching fell back to the built-in default and the next save overwrote
+// the model chosen for the backend being left.
 
 export interface CopilotSelection {
   backend: string;
@@ -24,19 +27,30 @@ export interface CopilotOverride {
   effort?: string;
 }
 
+interface ConfiguredCopilot {
+  backend: string;
+  backends?: Record<string, { model?: string; effort?: string }>;
+  model?: string;  // legacy single slot
+  effort?: string; // legacy single slot
+}
+
 export function resolveCopilotSelection(
-  configured: { backend: string; model?: string; effort?: string } | undefined,
+  configured: ConfiguredCopilot | undefined,
   override: CopilotOverride,
 ): CopilotSelection {
   const backend = override.backend || configured?.backend || DEFAULT_BACKEND;
-  // Only inherit the configured model/effort when they belong to the backend in force.
-  const inherited = backend === configured?.backend ? configured : undefined;
+  // An unmigrated config's single pair describes whichever backend was selected when it was
+  // written, so it counts as that backend's slot and no other.
+  const legacy = backend === configured?.backend
+    ? { model: configured?.model, effort: configured?.effort }
+    : undefined;
+  const saved = configured?.backends?.[backend] ?? legacy;
   const fallback = backendDefaults(backend);
-  // `||` not `??`: a blank in a config written before real defaults existed must fall
-  // through, not be treated as a deliberate choice.
+  // `||` not `??`: a blank left by an older config must fall through to the real default
+  // rather than count as a deliberate choice.
   return {
     backend,
-    model: override.model || inherited?.model || fallback.model,
-    effort: override.effort || inherited?.effort || fallback.effort,
+    model: override.model || saved?.model || fallback.model,
+    effort: override.effort || saved?.effort || fallback.effort,
   };
 }

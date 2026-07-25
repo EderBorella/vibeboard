@@ -1,24 +1,32 @@
-import { DEFAULT_BACKEND, backendCaps, backendDefaults, type CopilotChoice } from '../shared';
+import { DEFAULT_BACKEND, backendCaps, backendDefaults, type CopilotChoice, type CopilotConfig } from '../shared';
+
+// Accepts the legacy single-slot shape too, so a config not yet migrated still resolves.
+type Configured = Pick<CopilotConfig, 'backend'> & Partial<Omit<CopilotConfig, 'backend'>>;
 
 // The client half of copilot selection. Deliberately mirrors src/core/copilot-choice.ts
 // rather than importing it: web/ is bundler-resolved and src/ is NodeNext with mandatory
 // .js extensions, so the two live on opposite sides of that boundary (see web/src/shared.ts).
 // test/copilot-choice-web.test.ts asserts the two agree on the shared cases.
 
-// Precedence: override → configured default → the backend's own default. An overridden
-// backend does NOT inherit the other backend's model id.
+// Precedence: override → the backend's own saved slot → the backend's built-in default.
+// Reading the slot FOR THE BACKEND IN FORCE is what makes switching connector non-destructive:
+// it can never hand OpenCode a Claude model id, and never discards the other backend's choice.
 export function resolveChoice(
-  configured: { backend: string; model?: string; effort?: string } | undefined,
+  configured: Configured | undefined,
   override: Partial<CopilotChoice>,
 ): CopilotChoice {
   const backend = override.backend || configured?.backend || DEFAULT_BACKEND;
-  const inherited = backend === configured?.backend ? configured : undefined;
+  // An unmigrated config's single pair describes the backend selected when it was written.
+  const legacy = backend === configured?.backend
+    ? { model: configured?.model, effort: configured?.effort }
+    : undefined;
+  const saved = configured?.backends?.[backend] ?? legacy;
   const fallback = backendDefaults(backend);
   // `||` not `??`, so a blank left in an old config falls through to the real default.
   return {
     backend,
-    model: override.model || inherited?.model || fallback.model,
-    effort: override.effort || inherited?.effort || fallback.effort,
+    model: override.model || saved?.model || fallback.model,
+    effort: override.effort || saved?.effort || fallback.effort,
   };
 }
 
@@ -34,6 +42,15 @@ export function clampToCaps(choice: CopilotChoice, mode: string): { mode: string
   };
 }
 
-export function isOverridden(override: Partial<CopilotChoice>): boolean {
-  return override.backend !== undefined || override.model !== undefined || override.effort !== undefined;
+// Whether the dock is actually running something other than the project default. Compares the
+// RESOLVED selections rather than asking "is any override field set": switching connector away
+// and back leaves `{backend}` set while changing nothing, and claiming a session override in
+// that state reads as the UI losing track of itself.
+export function isOverridden(
+  configured: Configured | undefined,
+  override: Partial<CopilotChoice>,
+): boolean {
+  const now = resolveChoice(configured, override);
+  const base = resolveChoice(configured, {});
+  return now.backend !== base.backend || now.model !== base.model || now.effort !== base.effort;
 }

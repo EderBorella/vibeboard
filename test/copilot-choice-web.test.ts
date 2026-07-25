@@ -1,15 +1,32 @@
 import { describe, it, expect } from 'vitest';
 import { resolveChoice, clampToCaps, isOverridden } from '../web/src/copilot/choice.js';
 
-const claude = { backend: 'claude-code', model: 'sonnet', effort: 'low' };
+const configured = {
+  backend: 'claude-code',
+  backends: {
+    'claude-code': { model: 'sonnet', effort: 'low' },
+    opencode: { model: 'opencode/big-pickle', effort: 'max' },
+  },
+};
+const selected = { backend: 'claude-code', model: 'sonnet', effort: 'low' };
 
 describe('resolveChoice', () => {
   it('matches the server resolver on the configured default', () => {
-    expect(resolveChoice(claude, {})).toEqual(claude);
+    expect(resolveChoice(configured, {})).toEqual(selected);
   });
 
-  it('drops the configured model when the backend is overridden', () => {
-    expect(resolveChoice(claude, { backend: 'opencode' }))
+  // Regression: switching connector used to fall back to the built-in default, and Settings
+  // then saved that over the model chosen for the backend being left.
+  it('reads each backend own saved slot', () => {
+    expect(resolveChoice(configured, { backend: 'opencode' }))
+      .toEqual({ backend: 'opencode', model: 'opencode/big-pickle', effort: 'max' });
+    expect(resolveChoice({ ...configured, backend: 'opencode' }, { backend: 'claude-code' }))
+      .toEqual(selected);
+  });
+
+  it('falls back to the built-in default for a backend never configured', () => {
+    const onlyClaude = { backend: 'claude-code', backends: { 'claude-code': { model: 'sonnet', effort: 'low' } } };
+    expect(resolveChoice(onlyClaude, { backend: 'opencode' }))
       .toEqual({ backend: 'opencode', model: 'opencode/deepseek-v4-flash-free', effort: 'high' });
   });
 
@@ -18,11 +35,14 @@ describe('resolveChoice', () => {
       .toEqual({ backend: 'claude-code', model: 'opus', effort: 'high' });
   });
 
-  // Settings' backend buttons pass the clicked backend through here. Naming the backend that
-  // is ALREADY configured must keep its model — the button used to reset it to the built-in
-  // default, so re-clicking the active backend silently discarded your choice.
+  it('reads the legacy single-slot shape as the selected backend own', () => {
+    const legacy = { backend: 'claude-code', model: 'haiku', effort: 'max' };
+    expect(resolveChoice(legacy, {})).toEqual({ backend: 'claude-code', model: 'haiku', effort: 'max' });
+    expect(resolveChoice(legacy, { backend: 'opencode' }).model).toBe('opencode/deepseek-v4-flash-free');
+  });
+
   it('keeps the configured model when the override names the configured backend', () => {
-    expect(resolveChoice(claude, { backend: 'claude-code' })).toEqual(claude);
+    expect(resolveChoice(configured, { backend: 'claude-code' })).toEqual(selected);
   });
 });
 
@@ -47,9 +67,19 @@ describe('clampToCaps', () => {
 });
 
 describe('isOverridden', () => {
-  it('is false for an empty override and true for any set field', () => {
-    expect(isOverridden({})).toBe(false);
-    expect(isOverridden({ effort: 'max' })).toBe(true);
-    expect(isOverridden({ backend: 'opencode' })).toBe(true);
+  it('is true only when the resolved selection actually differs from the default', () => {
+    expect(isOverridden(configured, {})).toBe(false);
+    expect(isOverridden(configured, { effort: 'xhigh' })).toBe(true);
+    expect(isOverridden(configured, { backend: 'opencode' })).toBe(true);
+  });
+
+  // Switching connector away and back leaves `{backend}` set while resolving to exactly the
+  // configured default. Claiming a session override there made the dock look confused.
+  it('is false when an override names the configured backend', () => {
+    expect(isOverridden(configured, { backend: 'claude-code' })).toBe(false);
+  });
+
+  it('is false when an override restates the configured value', () => {
+    expect(isOverridden(configured, { model: 'sonnet', effort: 'low' })).toBe(false);
   });
 });

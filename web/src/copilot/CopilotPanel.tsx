@@ -19,13 +19,14 @@ interface Props {
   onEffort: (e: EffortLevel) => void;
   onBackend: (b: string) => void;
   // True when any dock control differs from the configured default; clearing goes back to it.
+  contextBudget: number;
   overridden: boolean;
   onReset: () => void;
   onClose: () => void;
 }
 
 export function CopilotPanel({
-  copilot, backend, mode, model, effort,
+  copilot, backend, mode, model, effort, contextBudget,
   onMode, onModel, onEffort, onBackend, overridden, onReset, onClose,
 }: Props) {
   const { items, running, model: activeModel, stats, chats, currentChatId, send, compact, newSession, openChat, deleteChat, cancel } = copilot;
@@ -153,7 +154,7 @@ export function CopilotPanel({
         {running && <div className="msg msg-running">…working</div>}
       </div>
 
-      <CopilotReadout stats={stats} />
+      <CopilotReadout stats={stats} budget={contextBudget} />
 
       <div className="copilot-input">
         <textarea

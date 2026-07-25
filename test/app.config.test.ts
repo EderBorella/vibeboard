@@ -48,8 +48,10 @@ describe('PATCH /api/config', () => {
   }, 5000);
 
   // The config is the only persisted source for copilot defaults, so a partial patch must
-  // merge: replacing the block wholesale would wipe whichever field the caller left out.
-  it('merges a partial copilot patch instead of replacing the block', async () => {
+  // merge — per backend, not just per field. Replacing `backends` wholesale would discard the
+  // model saved for the backend the patch doesn't mention, which is the loss that per-backend
+  // slots exist to prevent.
+  it('merges a partial copilot patch per backend instead of replacing the block', async () => {
     session = new ProjectSession();
     app = buildApp(session);
     const root = await tempDir();
@@ -58,17 +60,33 @@ describe('PATCH /api/config', () => {
     const patch = async (copilot: unknown) =>
       (await app!.inject({ method: 'PATCH', url: '/api/config', payload: { copilot } })).json().copilot;
 
-    // Model only: effort and backend survive.
-    let copilot = await patch({ backend: 'claude-code', model: 'sonnet' });
-    expect(copilot).toEqual({ backend: 'claude-code', model: 'sonnet', effort: 'high' });
+    // One backend's slot: the other backend's slot is untouched.
+    let copilot = await patch({ backend: 'claude-code', backends: { 'claude-code': { model: 'sonnet' } } });
+    expect(copilot.backends['claude-code']).toEqual({ model: 'sonnet', effort: 'high' });
+    expect(copilot.backends.opencode).toEqual({ model: 'opencode/deepseek-v4-flash-free', effort: 'high' });
 
-    // Effort only: the model just chosen survives.
-    copilot = await patch({ backend: 'claude-code', effort: 'max' });
-    expect(copilot).toEqual({ backend: 'claude-code', model: 'sonnet', effort: 'max' });
+    // Switching the selected backend does NOT rewrite either slot.
+    copilot = await patch({ backend: 'opencode' });
+    expect(copilot.backend).toBe('opencode');
+    expect(copilot.backends['claude-code']).toEqual({ model: 'sonnet', effort: 'high' });
 
-    // And it is on disk, not just in memory — the picker's choice must outlive a reload.
+    // And it is on disk, not just in memory — the choice must outlive a reload.
     const reread = (await app.inject({ method: 'GET', url: '/api/config' })).json();
-    expect(reread.copilot).toEqual({ backend: 'claude-code', model: 'sonnet', effort: 'max' });
+    expect(reread.copilot.backends['claude-code'].model).toBe('sonnet');
+    expect(reread.copilot.backend).toBe('opencode');
+  });
+
+  it('persists a context budget the copilot bar can use', async () => {
+    session = new ProjectSession();
+    app = buildApp(session);
+    const root = await tempDir();
+    await app.inject({ method: 'POST', url: '/api/project/scaffold', payload: { path: root, name: 'Cfg', mode: 'greenfield' } });
+
+    const fresh = (await app.inject({ method: 'GET', url: '/api/config' })).json();
+    expect(fresh.contextBudget).toBe(200_000);
+
+    await app.inject({ method: 'PATCH', url: '/api/config', payload: { contextBudget: 1_000_000 } });
+    expect((await app.inject({ method: 'GET', url: '/api/config' })).json().contextBudget).toBe(1_000_000);
   });
 });
 

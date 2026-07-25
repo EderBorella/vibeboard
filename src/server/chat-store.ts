@@ -5,6 +5,7 @@ import type { CopilotEvent } from './copilot-events.js';
 import type { ProjectConfig } from '../core/types.js';
 import { type StoredChat, type ChatMeta, type ChatStats, type TranscriptItem, ZERO_STATS } from '../core/chat.js';
 import { DEFAULT_BACKEND } from '../core/backends.js';
+import { resolveCopilotSelection } from '../core/copilot-choice.js';
 
 // Persists copilot conversations per project as JSON files under
 // <project>/.vibeboard/chat/<id>.json. The server is the source of truth: it tees the
@@ -63,6 +64,13 @@ export class ChatStore {
   #dir(root: string): string { return join(root, ...CHAT_SUBDIR); }
   #keep(): number { return Math.max(1, this.#session.config?.keepChats ?? 20); }
   #backend(): string { return this.#session.config?.copilot.backend ?? DEFAULT_BACKEND; }
+  // Via the resolver, not `copilot.model`: model/effort live in a per-backend slot now, and
+  // the legacy top-level field is dropped on migration.
+  #model(): string | undefined {
+    return this.#session.config
+      ? resolveCopilotSelection(this.#session.config.copilot, {}).model
+      : undefined;
+  }
 
   // Drop in-memory state when the open project changes, so the next access loads the new
   // project's chats.
@@ -82,7 +90,7 @@ export class ChatStore {
       id: randomUUID(),
       title: '',
       backend: this.#backend(),
-      model: this.#session.config?.copilot.model,
+      model: this.#model(),
       createdAt: now,
       updatedAt: now,
       messageCount: 0,

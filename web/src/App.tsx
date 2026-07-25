@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { BOARDS, BOARD_LABELS, type BoardName, type Card } from './shared';
+import { BOARDS, BOARD_LABELS, DEFAULT_CONTEXT_BUDGET, type BoardName, type Card } from './shared';
 import { useSnapshot } from './useSnapshot';
 import { useCopilotChoice } from './useCopilotChoice';
 import { useTheme, useCollapsedBoards } from './useLocalPrefs';
@@ -150,6 +150,7 @@ export function App() {
             onEffort={setEffort}
             onBackend={onBackend}
             overridden={overridden}
+            contextBudget={snapshot.config.contextBudget ?? DEFAULT_CONTEXT_BUDGET}
             onReset={onResetCopilot}
             onClose={() => setCopilotOpen(false)}
           />

@@ -2,7 +2,12 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { parse, stringify } from 'yaml';
 import { BOARDS, type BoardName, type BoardConfig, type ProjectConfig } from './types.js';
-import { DEFAULT_BACKEND, backendDefaults } from './backends.js';
+import { BACKEND_DEFAULTS, DEFAULT_BACKEND, defaultBackendMap } from './backends.js';
+
+// Tokens the copilot context bar treats as full. Per-project rather than hardcoded: context
+// windows differ by an order of magnitude between models, so one baked-in number is wrong for
+// most of them (200k over-reported occupancy 5× on a 1M-context model).
+export const DEFAULT_CONTEXT_BUDGET = 200_000;
 
 export const CONFIG_DIR = '.vibeboard';
 export const CONFIG_FILE = 'config.yaml';
@@ -27,21 +32,45 @@ export function defaultConfig(name: string): ProjectConfig {
     miniatureChars: 140,
     idPadding: 3,
     keepChats: 20,
-    copilot: { backend: DEFAULT_BACKEND, ...backendDefaults(DEFAULT_BACKEND) },
+    contextBudget: DEFAULT_CONTEXT_BUDGET,
+    copilot: { backend: DEFAULT_BACKEND, backends: defaultBackendMap() },
   };
 }
 
-// Backfill a copilot model/effort for projects configured before those had real defaults.
-// A blank model used to mean "whatever the CLI picks", which hid the model actually in use.
-// Returns whether anything changed, so callers persist only when needed.
+// Bring an older config's copilot block up to date. Returns whether anything changed, so
+// callers persist only when needed. Two upgrades:
+//  - single slot → per-backend: the old `model`/`effort` describe whichever backend was
+//    selected, so they move into that backend's slot and the legacy keys are dropped. Without
+//    this, switching connector discarded the model you had chosen for the other one.
+//  - a missing or blank slot for a known backend gets its built-in default; a blank used to
+//    mean "let the CLI pick", which hid the model actually in use.
 export function ensureCopilotDefaults(config: ProjectConfig): boolean {
-  if (!config.copilot) config.copilot = { backend: DEFAULT_BACKEND };
+  if (!config.copilot) config.copilot = { backend: DEFAULT_BACKEND, backends: {} };
   const copilot = config.copilot;
   let changed = false;
   if (!copilot.backend) { copilot.backend = DEFAULT_BACKEND; changed = true; }
-  const defaults = backendDefaults(copilot.backend);
-  if (!copilot.model) { copilot.model = defaults.model; changed = true; }
-  if (!copilot.effort) { copilot.effort = defaults.effort; changed = true; }
+  if (!copilot.backends) { copilot.backends = {}; changed = true; }
+
+  if (copilot.model || copilot.effort) {
+    const slot = copilot.backends[copilot.backend] ?? (copilot.backends[copilot.backend] = { model: '', effort: '' });
+    if (!slot.model && copilot.model) slot.model = copilot.model;
+    if (!slot.effort && copilot.effort) slot.effort = copilot.effort;
+    delete copilot.model;
+    delete copilot.effort;
+    changed = true;
+  }
+
+  for (const [name, defaults] of Object.entries(BACKEND_DEFAULTS)) {
+    const slot = copilot.backends[name];
+    if (!slot) { copilot.backends[name] = { ...defaults }; changed = true; continue; }
+    if (!slot.model) { slot.model = defaults.model; changed = true; }
+    if (!slot.effort) { slot.effort = defaults.effort; changed = true; }
+  }
+
+  if (typeof config.contextBudget !== 'number' || config.contextBudget <= 0) {
+    config.contextBudget = DEFAULT_CONTEXT_BUDGET;
+    changed = true;
+  }
   return changed;
 }
 

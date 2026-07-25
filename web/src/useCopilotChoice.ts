@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import type { CopilotChoice } from './shared';
+import type { CopilotChoice, CopilotConfig } from './shared';
 import { resolveChoice, isOverridden } from './copilot/choice';
 
 // One source of truth for the defaults: the project config, written ONLY by Settings.
 // The dock's controls are a session override — they never touch the file, so switching
 // connector for one conversation can't rewrite what you configured.
 export function useCopilotChoice(
-  configured: { backend: string; model?: string; effort?: string } | undefined,
+  configured: CopilotConfig | undefined,
 ): {
   choice: CopilotChoice;
   overridden: boolean;
@@ -19,7 +19,10 @@ export function useCopilotChoice(
 
   // A Settings save is an explicit statement of intent, so it clears the session override —
   // otherwise a stale dock value would keep winning over the defaults you just changed.
-  const configKey = `${configured?.backend ?? ''}|${configured?.model ?? ''}|${configured?.effort ?? ''}`;
+  // Covers the whole block, per-backend slots included — a save that changes only the slot for
+  // some backend still has to clear the override, or the dock keeps overriding what you meant
+  // to change.
+  const configKey = JSON.stringify(configured ?? null);
   const lastConfigKey = useRef(configKey);
   useEffect(() => {
     if (lastConfigKey.current === configKey) return;
@@ -32,7 +35,7 @@ export function useCopilotChoice(
 
   return {
     choice,
-    overridden: isOverridden(override),
+    overridden: isOverridden(configured, override),
     setModel: (model: string): void => setOverride((o) => ({ ...o, model })),
     setEffort: (effort: string): void => setOverride((o) => ({ ...o, effort })),
     // Switch connector for THIS SESSION only — the configured default is untouched. Model and

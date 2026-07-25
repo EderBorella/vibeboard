@@ -16,10 +16,16 @@ export async function registerConfigRoutes(api: FastifyInstance, ctx: AppCtx): P
     const patch = req.body as Partial<ProjectConfig>;
     // Merge `boards` per board, not wholesale: a patch carrying only one board would
     // otherwise drop the others, and ensureBoards would silently reset them to defaults.
+    // Same for `copilot.backends`, per backend: a patch naming one backend's slot must not
+    // discard the other's remembered model — that loss is the bug per-backend slots fix.
+    const backends = { ...ctx.session.config!.copilot?.backends };
+    for (const [name, slot] of Object.entries(patch.copilot?.backends ?? {})) {
+      backends[name] = { ...backends[name], ...slot };
+    }
     const merged: ProjectConfig = {
       ...ctx.session.config!,
       ...patch,
-      copilot: { ...ctx.session.config!.copilot, ...(patch.copilot ?? {}) },
+      copilot: { ...ctx.session.config!.copilot, ...(patch.copilot ?? {}), backends },
       boards: { ...ctx.session.config!.boards, ...(patch.boards ?? {}) },
     };
 

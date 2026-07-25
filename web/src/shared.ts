@@ -32,6 +32,20 @@ export function backendDefaults(backend: string | undefined): BackendDefaults {
 
 // One copilot selection. The project config holds the default (Settings writes it); the dock
 // holds a partial session override that is never persisted.
+// Mirrors src/core/types.ts. One saved model/effort slot per backend: a model id belongs to
+// exactly one backend, so a single shared slot could not survive switching connector.
+export interface CopilotBackendConfig { model: string; effort: string }
+
+// Mirrors DEFAULT_CONTEXT_BUDGET in src/core/config.ts.
+export const DEFAULT_CONTEXT_BUDGET = 200_000;
+
+export interface CopilotConfig {
+  backend: string;
+  backends: Record<string, CopilotBackendConfig>;
+  model?: string;  // legacy single slot, dropped on migration
+  effort?: string; // legacy single slot, dropped on migration
+}
+
 export interface CopilotChoice {
   backend: string;
   model: string;
@@ -113,7 +127,8 @@ export interface ProjectConfig {
   miniatureChars: number;
   idPadding: number;
   keepChats: number;
-  copilot: { backend: string; model?: string; effort?: string };
+  contextBudget: number;
+  copilot: CopilotConfig;
 }
 
 // Persisted copilot chat shapes — mirror src/core/chat.ts across the tsc/Vite boundary.

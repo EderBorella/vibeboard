@@ -1,7 +1,6 @@
 // Pure display helpers for the copilot dock. No React, no state — just the formatters and the
 // backend list the dock's controls render from.
 
-export const CONTEXT_BUDGET = 200_000;
 export const BACKENDS: { value: string; label: string }[] = [
   { value: 'claude-code', label: 'Claude' },
   { value: 'opencode', label: 'OpenCode' },

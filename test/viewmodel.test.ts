@@ -12,7 +12,8 @@ const config: ProjectConfig = {
   miniatureChars: 10,
   idPadding: 3,
   keepChats: 20,
-  copilot: { backend: 'claude-code' },
+  contextBudget: 200_000,
+  copilot: { backend: 'claude-code', backends: {} },
 };
 
 function card(partial: Partial<Card>): Card {

@@ -91,29 +91,52 @@ describe('copilot session override', () => {
     return root;
   }
 
+  const configured = {
+    backend: 'claude-code',
+    backends: {
+      'claude-code': { model: 'sonnet', effort: 'low' },
+      opencode: { model: 'opencode/big-pickle', effort: 'max' },
+    },
+  };
+
   it('uses the configured default when the turn names nothing', async () => {
-    await open({ backend: 'claude-code', model: 'sonnet', effort: 'low' });
+    await open(configured);
     const args = await turn({ mode: 'plan' });
     expect(args[args.indexOf('--model') + 1]).toBe('sonnet');
     expect(args[args.indexOf('--effort') + 1]).toBe('low');
   });
 
   it('lets a per-turn value win over the configured default', async () => {
-    const root = await open({ backend: 'claude-code', model: 'sonnet', effort: 'low' });
+    await open(configured);
     const args = await turn({ mode: 'plan', backend: 'claude-code', model: 'haiku', effort: 'max' });
     expect(args[args.indexOf('--model') + 1]).toBe('haiku');
     expect(args[args.indexOf('--effort') + 1]).toBe('max');
     // The file is untouched — that is the whole point of an override.
     const onDisk = (await app!.inject({ method: 'GET', url: '/api/config' })).json();
-    expect(onDisk.copilot).toEqual({ backend: 'claude-code', model: 'sonnet', effort: 'low' });
-    expect(root).toBeTruthy();
+    expect(onDisk.copilot.backend).toBe('claude-code');
+    expect(onDisk.copilot.backends['claude-code']).toEqual({ model: 'sonnet', effort: 'low' });
   });
 
-  it('ignores the configured model when the turn overrides the backend', async () => {
-    // "sonnet" means nothing to OpenCode, so an overridden backend must not inherit it.
-    await open({ backend: 'opencode', model: 'opencode/big-pickle', effort: 'high' });
+  // Regression: the configured model belongs to ONE backend. Overriding the backend must read
+  // THAT backend's own slot — not the selected backend's model, and not the built-in default
+  // when a saved choice exists. Previously this yielded 'opus' and a save then destroyed the
+  // slot, so one round-trip through the connector toggle lost both models.
+  //
+  // Overriding *to* claude-code (rather than away from it) so the arg-logging shim sees the
+  // spawn: the opencode backend talks HTTP and passes no CLI flags. The opencode direction is
+  // covered at the resolver level in test/copilot-choice.test.ts.
+  it('reads the overridden backend own slot, not the selected backend model', async () => {
+    await open({ ...configured, backend: 'opencode' });
     const args = await turn({ mode: 'plan', backend: 'claude-code' });
-    expect(args[args.indexOf('--model') + 1]).toBe('opus'); // claude-code's own default
+    expect(args[args.indexOf('--model') + 1]).toBe('sonnet'); // claude's saved slot
+    expect(args[args.indexOf('--effort') + 1]).toBe('low');
     expect(args).not.toContain('opencode/big-pickle');
+    expect(args).not.toContain('opus'); // the built-in default, i.e. the old broken answer
+  });
+
+  it('falls back to the built-in default for a backend with no saved slot', async () => {
+    await open({ backend: 'opencode', backends: { opencode: { model: 'opencode/big-pickle', effort: 'max' } } });
+    const args = await turn({ mode: 'plan', backend: 'claude-code' });
+    expect(args[args.indexOf('--model') + 1]).toBe('opus');
   });
 });

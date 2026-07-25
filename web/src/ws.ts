@@ -12,7 +12,7 @@ type Listener = (msg: Record<string, unknown>) => void;
 //
 // Reference-counted on purpose: React StrictMode mounts effects twice in dev, so a naive
 // "close on unmount" would tear the socket down under the second subscriber.
-class SharedSocket {
+export class SharedSocket {
   #socket: WebSocket | undefined;
   #listeners = new Set<Listener>();
   #connListeners = new Set<(c: ConnState) => void>();
@@ -41,12 +41,21 @@ class SharedSocket {
     this.#setConn('connecting');
     const socket = new WebSocket(`ws://${location.host}/ws`);
     this.#socket = socket;
-    socket.onopen = () => this.#setConn('open');
+    // Every handler ignores a socket we have already replaced. close() is asynchronous, so a
+    // released socket's events can land AFTER a new one is connecting — the StrictMode
+    // remount does exactly that (release to 0, re-acquire, then the old close arrives). Without
+    // this guard the stale close saw `#closing === false` and `#refs > 0` again and scheduled a
+    // reconnect, orphaning the live socket: two sockets per tab, which is the bug this file
+    // exists to fix.
+    const stale = (): boolean => this.#socket !== socket;
+    socket.onopen = () => { if (!stale()) this.#setConn('open'); };
     socket.onmessage = (ev) => {
+      if (stale()) return;
       const msg = JSON.parse(ev.data as string) as Record<string, unknown>;
       for (const fn of this.#listeners) fn(msg);
     };
     socket.onclose = () => {
+      if (stale()) return;
       this.#setConn('closed');
       if (!this.#closing && this.#refs > 0) this.#retry = setTimeout(() => this.#connect(), 1000);
     };

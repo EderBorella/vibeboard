@@ -3,6 +3,7 @@ import { ProjectSession } from './session.js';
 import { buildApp } from './app.js';
 import { registerStatic } from './static.js';
 import { stopOpencodeServer } from './opencode-server.js';
+import { restoreLastProject } from './app-state.js';
 
 // Load ./.env if the user has one, so `npm start` and `npm run dev` pick up local config with
 // no wrapper script. Node's own loader — no dependency. A missing .env is the normal case and
@@ -39,10 +40,13 @@ function lanAddress(): string | undefined {
 
 async function start(): Promise<void> {
   const served = await registerStatic(app);
+  // Reopen whatever was open last, so a restart doesn't dump you back at the project gate.
+  const reopened = await restoreLastProject(session);
   await app.listen({ port, host });
   const lan = isLoopback ? undefined : lanAddress();
   console.log(`\n  VibeBoard running`);
   console.log(`  → http://localhost:${port}${lan ? `\n  → http://${lan}:${port}  (LAN)` : ''}`);
+  if (reopened) console.log(`  → reopened ${reopened}`);
   if (isLoopback) {
     console.log(`\n  This machine only. To reach it from other devices: VIBEBOARD_HOST=0.0.0.0`);
   }

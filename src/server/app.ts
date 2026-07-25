@@ -12,6 +12,7 @@ import { validateColumns, reconcileColumns, isRefused } from '../core/columns.js
 import { discoverProjects } from './discover.js';
 import { CopilotSession, type Backend, type CopilotMode, type EffortLevel } from './copilot.js';
 import { ChatStore } from './chat-store.js';
+import { rememberProject } from './app-state.js';
 import {
   listControlFiles,
   readControlFile,
@@ -294,7 +295,9 @@ export function buildApp(session: ProjectSession): FastifyInstance {
     api.post('/project/open', async (req, reply) => {
       const { path } = req.body as { path: string };
       try {
-        return { snapshot: await session.open(path) };
+        const snapshot = await session.open(path);
+        await rememberProject(path); // reopened automatically on the next start
+        return { snapshot };
       } catch {
         return reply.code(400).send({ error: 'Not a VibeBoard project' });
       }
@@ -303,7 +306,9 @@ export function buildApp(session: ProjectSession): FastifyInstance {
     api.post('/project/scaffold', async (req) => {
       const { path, name, mode } = req.body as { path: string; name: string; mode: ScaffoldMode };
       await scaffoldProject(path, { name, mode, today: today() });
-      return { snapshot: await session.open(path) };
+      const snapshot = await session.open(path);
+      await rememberProject(path);
+      return { snapshot };
     });
 
     api.post('/cards', async (req, reply) => {

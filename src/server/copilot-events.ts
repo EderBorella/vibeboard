@@ -29,7 +29,7 @@ export type CopilotEvent =
 
 interface RawBlock { type: string; text?: string; thinking?: string; id?: string; name?: string; input?: unknown; content?: unknown }
 
-const num = (v: unknown): number => (typeof v === 'number' ? v : 0);
+export const num = (v: unknown): number => (typeof v === 'number' ? v : 0);
 
 // Context-window occupancy for a single model call = all prompt tokens
 // (uncached + cache-read + cache-creation). Sourced from an assistant message's own
@@ -61,21 +61,20 @@ function contentEvents(content: unknown): CopilotEvent[] {
 
 function resultStats(o: Record<string, unknown>): ResultStats {
   const u = (o.usage ?? {}) as Record<string, unknown>;
-  const n = (v: unknown): number => (typeof v === 'number' ? v : 0);
   // Top-level usage sums every model call in the turn (each tool round-trip re-reads the
   // whole context), so it overstates window size. The LAST iteration's prompt tokens are
   // the real context-window occupancy at the end of the turn.
   const iters = Array.isArray(u.iterations) ? (u.iterations as Record<string, unknown>[]) : [];
   const promptSrc = iters.length ? iters[iters.length - 1] : u;
-  const contextTokens = n(promptSrc.input_tokens) + n(promptSrc.cache_read_input_tokens) + n(promptSrc.cache_creation_input_tokens);
+  const contextTokens = num(promptSrc.input_tokens) + num(promptSrc.cache_read_input_tokens) + num(promptSrc.cache_creation_input_tokens);
   return {
     ok: o.is_error === false,
     text: typeof o.result === 'string' ? o.result : '',
-    costUsd: n(o.total_cost_usd),
-    durationMs: n(o.duration_ms),
-    turns: n(o.num_turns),
+    costUsd: num(o.total_cost_usd),
+    durationMs: num(o.duration_ms),
+    turns: num(o.num_turns),
     contextTokens,
-    outputTokens: n(u.output_tokens),
+    outputTokens: num(u.output_tokens),
   };
 }
 

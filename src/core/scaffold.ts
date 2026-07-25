@@ -4,7 +4,7 @@ import { defaultConfig, writeConfig, CONFIG_DIR } from './config.js';
 import { boardColumnSlugs, ARCHIVE_SLUG } from './board.js';
 import { createCard } from './mutations.js';
 import { setCardLinks } from './links.js';
-import { ensurePointerFile, INSTRUCTIONS_FILE, INSTRUCTIONS_DOC } from './control.js';
+import { ensurePointerFile, INSTRUCTIONS_FILE, INSTRUCTIONS_DOC, POINTER_FILES } from './control.js';
 import { BOARDS, type ProjectConfig } from './types.js';
 
 export type ScaffoldMode = 'greenfield' | 'brownfield';

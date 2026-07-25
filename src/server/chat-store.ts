@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import type { CopilotEvent } from './copilot-events.js';
 import type { ProjectConfig } from '../core/types.js';
 import { type StoredChat, type ChatMeta, type ChatStats, type TranscriptItem, ZERO_STATS } from '../core/chat.js';
+import { DEFAULT_BACKEND } from '../core/backends.js';
 
 // Persists copilot conversations per project as JSON files under
 // <project>/.vibeboard/chat/<id>.json. The server is the source of truth: it tees the
@@ -61,7 +62,7 @@ export class ChatStore {
 
   #dir(root: string): string { return join(root, ...CHAT_SUBDIR); }
   #keep(): number { return Math.max(1, this.#session.config?.keepChats ?? 20); }
-  #backend(): string { return this.#session.config?.copilot.backend ?? 'claude-code'; }
+  #backend(): string { return this.#session.config?.copilot.backend ?? DEFAULT_BACKEND; }
 
   // Drop in-memory state when the open project changes, so the next access loads the new
   // project's chats.

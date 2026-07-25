@@ -1,4 +1,4 @@
-import type { CopilotEvent } from './copilot-events.js';
+import { num, type CopilotEvent } from './copilot-events.js';
 import { opencodeBaseUrl } from './opencode-server.js';
 
 // OpenCode's HTTP API wants the model as { providerID, modelID }. Our ids are
@@ -7,8 +7,6 @@ export function splitModel(model: string): { providerID: string; modelID: string
   const i = model.indexOf('/');
   return i < 0 ? { providerID: model, modelID: model } : { providerID: model.slice(0, i), modelID: model.slice(i + 1) };
 }
-
-const num = (v: unknown): number => (typeof v === 'number' ? v : 0);
 
 interface OcPart { type?: string; text?: string; id?: string; tool?: string; name?: string; state?: { input?: unknown } }
 interface OcInfo { sessionID?: string; cost?: number; error?: { name?: string; data?: { message?: string } }; tokens?: { input?: number; output?: number; cache?: { read?: number; write?: number } } }

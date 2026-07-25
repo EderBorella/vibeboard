@@ -29,6 +29,7 @@ import {
 } from './control-files.js';
 import type { ProjectSession } from './session.js';
 import { BOARDS, BOARD_LABELS } from '../core/types.js';
+import { DEFAULT_BACKEND } from '../core/backends.js';
 import type { BoardName, CardFrontmatter, ProjectConfig } from '../core/types.js';
 
 const today = (): string => new Date().toISOString().slice(0, 10);
@@ -74,7 +75,7 @@ export function buildApp(session: ProjectSession): FastifyInstance {
 
   // The backend in force for a turn: the override, else the configured default.
   const effectiveBackend = (override?: string): Backend =>
-    ((override || session.config?.copilot.backend || 'claude-code') as Backend);
+    ((override || session.config?.copilot.backend || DEFAULT_BACKEND) as Backend);
 
   async function handleCopilotSend(text: string, opts: CopilotOpts): Promise<void> {
     if (!session.isOpen) { broadcast({ type: 'copilot:error', error: 'No project open' }); return; }
@@ -87,7 +88,7 @@ export function buildApp(session: ProjectSession): FastifyInstance {
       // The config's model/effort describe the CONFIGURED backend; they mean nothing to a
       // different one, so an overridden backend uses only what the dock sent (and failing
       // that, CopilotSession fills in that backend's built-in default).
-      const useConfig = backend === (cfg?.backend ?? 'claude-code');
+      const useConfig = backend === (cfg?.backend ?? DEFAULT_BACKEND);
       await copilot.send({
         cwd: session.root!,
         text,
@@ -240,7 +241,7 @@ export function buildApp(session: ProjectSession): FastifyInstance {
     // models + OpenRouter's free tier, free ones flagged and listed first.
     api.get('/models', async (req) => {
       const { backend } = req.query as { backend?: string };
-      return listBackendModels(backend ?? 'claude-code');
+      return listBackendModels(backend ?? DEFAULT_BACKEND);
     });
 
     // Live status/uptime for one model (OpenRouter endpoints route); null if no source.

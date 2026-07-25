@@ -95,7 +95,11 @@ export function SettingsModal({ config, onClose, onSaved }: Props) {
           </label>
 
           <div className="settings-section">Boards</div>
-          <div className="settings-hint">Columns are comma-separated (left→right). Renaming or removing a column doesn't move existing cards — move them first.</div>
+          <div className="settings-hint">
+            Columns are comma-separated (left→right). Renaming one moves its folder, so its cards
+            come with it. A column that still holds cards can't be removed, and renaming and
+            reordering in the same save is refused — do those one at a time.
+          </div>
           {BOARDS.map((b) => (
             <label key={b} className="field"><span>{BOARD_LABELS[b]} columns</span>
               <input value={columns[b]} onChange={(e) => setColumns((c) => ({ ...c, [b]: e.target.value }))} />

@@ -46,3 +46,76 @@ describe('PATCH /api/config', () => {
     client.close();
   }, 5000);
 });
+
+describe('PATCH /api/config — column reconciliation', () => {
+  // Regression: a column IS a folder. Renaming one used to leave its cards in the old folder,
+  // where nothing reads them — they vanished from the board and looked deleted.
+  it('renames the folder so the column keeps its cards', async () => {
+    session = new ProjectSession();
+    app = buildApp(session);
+    const root = await tempDir();
+    await app.inject({ method: 'POST', url: '/api/project/scaffold', payload: { path: root, name: 'Cols', mode: 'greenfield' } });
+
+    // The scaffold puts a sample card in product/todo.
+    const before = await app.inject({ method: 'GET', url: '/api/state' });
+    const seeded = before.json().snapshot.boards.product.filter((c: { columnSlug: string }) => c.columnSlug === 'todo');
+    expect(seeded.length).toBeGreaterThan(0);
+
+    const res = await app.inject({
+      method: 'PATCH', url: '/api/config',
+      payload: { boards: { product: { columns: ['Backlog', 'Next', 'In Progress', 'Done'] } } },
+    });
+    expect(res.statusCode).toBe(200);
+
+    const after = await app.inject({ method: 'GET', url: '/api/state' });
+    const cards = after.json().snapshot.boards.product;
+    expect(cards.filter((c: { columnSlug: string }) => c.columnSlug === 'next')).toHaveLength(seeded.length);
+    expect(cards.map((c: { id: string }) => c.id).sort()).toEqual(
+      before.json().snapshot.boards.product.map((c: { id: string }) => c.id).sort(),
+    ); // nothing lost
+  });
+
+  it('refuses to remove a column that still holds cards, and saves nothing', async () => {
+    session = new ProjectSession();
+    app = buildApp(session);
+    const root = await tempDir();
+    await app.inject({ method: 'POST', url: '/api/project/scaffold', payload: { path: root, name: 'Cols', mode: 'greenfield' } });
+
+    const res = await app.inject({
+      method: 'PATCH', url: '/api/config',
+      payload: { boards: { product: { columns: ['Backlog', 'In Progress', 'Done'] } } }, // drops Todo
+    });
+    expect(res.statusCode).toBe(409);
+    expect(res.json().error).toMatch(/Todo/);
+
+    const cfg = await app.inject({ method: 'GET', url: '/api/config' });
+    expect(cfg.json().boards.product.columns).toContain('Todo'); // unchanged
+  });
+
+  // Regression: `{...config, ...patch}` replaced `boards` wholesale, so a patch naming one
+  // board dropped the others from config.yaml — and ensureBoards then reset them to defaults.
+  it('leaves boards absent from the patch untouched', async () => {
+    session = new ProjectSession();
+    app = buildApp(session);
+    const root = await tempDir();
+    await app.inject({ method: 'POST', url: '/api/project/scaffold', payload: { path: root, name: 'Cols', mode: 'greenfield' } });
+    await app.inject({ method: 'PATCH', url: '/api/config', payload: { boards: { engineering: { columns: ['Todo', 'Shipped'] } } } });
+
+    const cfg = (await app.inject({ method: 'GET', url: '/api/config' })).json();
+    expect(cfg.boards.engineering.columns).toEqual(['Todo', 'Shipped']);
+    expect(cfg.boards.product.columns).toEqual(['Backlog', 'Todo', 'In Progress', 'Done']);
+    expect(cfg.boards.features.columns).toEqual(['Backlog', 'Todo', 'In Progress', 'Done']);
+  });
+
+  it('rejects a reserved or duplicate column name', async () => {
+    session = new ProjectSession();
+    app = buildApp(session);
+    const root = await tempDir();
+    await app.inject({ method: 'POST', url: '/api/project/scaffold', payload: { path: root, name: 'Cols', mode: 'greenfield' } });
+
+    for (const columns of [['Todo', 'Archive'], ['Todo', 'todo']]) {
+      const res = await app.inject({ method: 'PATCH', url: '/api/config', payload: { boards: { product: { columns } } } });
+      expect(res.statusCode).toBe(400);
+    }
+  });
+});

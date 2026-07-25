@@ -8,6 +8,7 @@ import { createCard, updateCard, moveCard, archiveCard, type CreateCardInput } f
 import { findCard } from '../core/find.js';
 import { setCardLinks } from '../core/links.js';
 import { writeConfig } from '../core/config.js';
+import { validateColumns, reconcileColumns, isRefused } from '../core/columns.js';
 import { discoverProjects } from './discover.js';
 import { CopilotSession, type Backend, type CopilotMode, type EffortLevel } from './copilot.js';
 import { ChatStore } from './chat-store.js';
@@ -22,6 +23,7 @@ import {
   writeResources,
 } from './control-files.js';
 import type { ProjectSession } from './session.js';
+import { BOARDS, BOARD_LABELS } from '../core/types.js';
 import type { BoardName, CardFrontmatter, ProjectConfig } from '../core/types.js';
 
 const today = (): string => new Date().toISOString().slice(0, 10);
@@ -178,7 +180,33 @@ export function buildApp(session: ProjectSession): FastifyInstance {
     api.patch('/config', async (req, reply) => {
       if (!ensureOpen(session, reply)) return;
       const patch = req.body as Partial<ProjectConfig>;
-      const merged: ProjectConfig = { ...session.config!, ...patch, copilot: { ...session.config!.copilot, ...(patch.copilot ?? {}) } };
+      // Merge `boards` per board, not wholesale: a patch carrying only one board would
+      // otherwise drop the others, and ensureBoards would silently reset them to defaults.
+      const merged: ProjectConfig = {
+        ...session.config!,
+        ...patch,
+        copilot: { ...session.config!.copilot, ...(patch.copilot ?? {}) },
+        boards: { ...session.config!.boards, ...(patch.boards ?? {}) },
+      };
+
+      // A column is a folder, so a column edit has to move folders too — otherwise the renamed
+      // column's cards stay in the old folder and silently vanish from the board. Validate and
+      // reconcile before persisting; refuse the whole save if any board can't be reconciled.
+      if (patch.boards) {
+        for (const board of BOARDS) {
+          const next = patch.boards[board]?.columns;
+          if (!next) continue;
+          const invalid = validateColumns(next);
+          if (invalid) return reply.code(400).send({ error: `${BOARD_LABELS[board]}: ${invalid}` });
+        }
+        for (const board of BOARDS) {
+          const next = patch.boards[board]?.columns;
+          if (!next) continue;
+          const result = await reconcileColumns(session.root!, board, session.config!.boards[board].columns, next);
+          if (isRefused(result)) return reply.code(409).send({ error: `${BOARD_LABELS[board]}: ${result.error}` });
+        }
+      }
+
       await writeConfig(session.root!, merged);
       await session.reloadConfig();
       // Push the updated snapshot so all clients reflect the new config immediately (the

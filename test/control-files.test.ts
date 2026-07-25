@@ -14,6 +14,55 @@ import {
 } from '../src/server/control-files.js';
 import { tempDir } from './helpers.js';
 
+// The allow-list in categoryOf runs on the path AS GIVEN, before anything is resolved. So the
+// dangerous shape is a traversal that normalises back inside the root: it satisfies the allow-list
+// under one category and lands on a file governed by another. `docs/../CLAUDE.md` classifies as
+// `docs` — deletable — while CLAUDE.md is an instruction file that must never be deletable.
+// Removing the `..` guard leaves the whole suite green, so this is its only witness.
+describe('control-files traversal that normalises back inside the root', () => {
+  it.each([
+    'docs/../CLAUDE.md',
+    'docs/../INSTRUCTIONS.md',
+    'docs/../VIBEBOARD.md',
+    'docs/../.claude/skills/x/SKILL.md',
+    'docs/../docs/notes.md',
+    'docs/./../docs/notes.md',
+    'resources/../CLAUDE.md',
+  ])('refuses %s', async (bad) => {
+    expect(await resolveControlPath(await tempDir(), bad)).toBeNull();
+  });
+
+  it('does not let a traversal borrow a deletable category to reach a protected file', async () => {
+    const root = await tempDir();
+    await writeFile(join(root, 'CLAUDE.md'), '# managed\n', 'utf8');
+
+    // Were this allowed it would resolve to CLAUDE.md while describing itself as a doc, and
+    // deletable: true would let the delete route remove a file the UI protects.
+    expect(await resolveControlPath(root, 'docs/../CLAUDE.md')).toBeNull();
+    expect(await deleteControlFile(root, 'docs/../CLAUDE.md')).toBe('invalid');
+    expect(await readFile(join(root, 'CLAUDE.md'), 'utf8')).toBe('# managed\n');
+  });
+
+  it('refuses a non-string path instead of throwing', async () => {
+    const root = await tempDir();
+    for (const bad of [null, undefined, 123, {}, [], true]) {
+      expect(await resolveControlPath(root, bad), String(bad)).toBeNull();
+    }
+  });
+
+  it('fails closed when the project root itself cannot be resolved', async () => {
+    expect(await resolveControlPath(join(await tempDir(), 'gone'), 'docs/x.md')).toBeNull();
+  });
+
+  it('allows the resources registry but nothing else under the config dir', async () => {
+    const root = await tempDir();
+    expect(await resolveControlPath(root, '.vibeboard/resources.yaml')).not.toBeNull();
+    for (const bad of ['.vibeboard/config.yaml', '.vibeboard/chat/a.json', '.vibeboard/notes.md']) {
+      expect(await resolveControlPath(root, bad), bad).toBeNull();
+    }
+  });
+});
+
 describe('control-files path sandbox', () => {
   it('rejects traversal, absolute paths, and non-control paths', async () => {
     const root = await tempDir();
@@ -221,5 +270,208 @@ describe('resources registry', () => {
   it('returns [] when the file is missing', async () => {
     const root = await tempDir();
     expect(await readResources(root)).toEqual([]);
+  });
+});
+
+describe('control-files listing', () => {
+  it('lists root markdown as docs, excluding the four instruction files', async () => {
+    const root = await tempDir();
+    for (const name of ['README.md', 'notes.md', 'CLAUDE.md', 'AGENTS.md', 'VIBEBOARD.md', 'INSTRUCTIONS.md'])
+      await writeFile(join(root, name), '# x\n', 'utf8');
+    await writeFile(join(root, 'todo.txt'), 'x', 'utf8'); // not markdown
+    await mkdir(join(root, 'looks.md'), { recursive: true }); // a directory, not a file
+
+    const groups = await listControlFiles(root);
+    const docs = groups.find((g) => g.key === 'docs')!;
+    expect(docs.files.map((f) => f.path)).toEqual(['README.md', 'notes.md']);
+    // The instruction files appear once, in their own group, and are never deletable.
+    const instructions = groups.find((g) => g.key === 'instructions')!;
+    expect(instructions.files.map((f) => f.path)).toEqual([
+      'INSTRUCTIONS.md',
+      'CLAUDE.md',
+      'AGENTS.md',
+      'VIBEBOARD.md',
+    ]);
+    expect(instructions.files.every((f) => f.deletable)).toBe(false);
+  });
+
+  it('omits an instruction file that does not exist on disk', async () => {
+    const root = await tempDir();
+    await writeFile(join(root, 'CLAUDE.md'), '# x\n', 'utf8');
+    const instructions = (await listControlFiles(root)).find((g) => g.key === 'instructions')!;
+    expect(instructions.files.map((f) => f.path)).toEqual(['CLAUDE.md']);
+  });
+
+  it('walks docs and skills recursively, sorted, and names a skill by its folder', async () => {
+    const root = await tempDir();
+    await mkdir(join(root, 'docs', 'deep'), { recursive: true });
+    await writeFile(join(root, 'docs', 'b.md'), 'x', 'utf8');
+    await writeFile(join(root, 'docs', 'a.md'), 'x', 'utf8');
+    await writeFile(join(root, 'docs', 'deep', 'c.md'), 'x', 'utf8');
+    await mkdir(join(root, '.claude', 'skills', 'zeta'), { recursive: true });
+    await writeFile(join(root, '.claude', 'skills', 'zeta', 'SKILL.md'), 'x', 'utf8');
+
+    const groups = await listControlFiles(root);
+    expect(groups.find((g) => g.key === 'docs')!.files.map((f) => f.path)).toEqual([
+      'docs/a.md',
+      'docs/b.md',
+      'docs/deep/c.md',
+    ]);
+    const skills = groups.find((g) => g.key === 'skills')!.files;
+    // Every skill's file is literally SKILL.md, so the folder is the display name.
+    expect(skills.map((f) => f.name)).toEqual(['zeta']);
+    expect(skills[0].path).toBe('.claude/skills/zeta/SKILL.md');
+  });
+
+  it('returns four labelled groups, all empty, for a bare directory', async () => {
+    const groups = await listControlFiles(await tempDir());
+    expect(groups.map((g) => [g.key, g.label])).toEqual([
+      ['instructions', 'Instructions'],
+      ['skills', 'Skills'],
+      ['docs', 'Docs'],
+      ['resources', 'Resources'],
+    ]);
+    expect(groups.every((g) => g.files.length === 0)).toBe(true);
+  });
+
+  it('marks only the VibeBoard-managed instruction files as managed', async () => {
+    const root = await tempDir();
+    for (const n of ['INSTRUCTIONS.md', 'CLAUDE.md', 'AGENTS.md', 'VIBEBOARD.md'])
+      await writeFile(join(root, n), 'x', 'utf8');
+    const files = (await listControlFiles(root)).find((g) => g.key === 'instructions')!.files;
+    expect(files.filter((f) => f.managed).map((f) => f.path)).toEqual([
+      'CLAUDE.md',
+      'AGENTS.md',
+      'VIBEBOARD.md',
+    ]);
+  });
+
+  it('reads a control file that does not exist yet as empty rather than failing', async () => {
+    const file = await readControlFile(await tempDir(), 'docs/never-written.md');
+    expect(file).toMatchObject({ path: 'docs/never-written.md', content: '' });
+  });
+});
+
+describe('control-files naming', () => {
+  it.each([
+    ['docs', 'docs/new-doc.md'],
+    ['resources', 'resources/new-resource.md'],
+    ['skills', '.claude/skills/new-skill/SKILL.md'],
+  ])('creates a %s at %s', async (category, path) => {
+    expect((await createControlFile(await tempDir(), category))?.path).toBe(path);
+  });
+
+  it.each(['instructions', 'bogus', '', null, undefined, 42])('refuses category %p', async (category) => {
+    expect(await createControlFile(await tempDir(), category)).toBeNull();
+  });
+
+  it('counts up only from the second name, and treats a skill folder as occupied', async () => {
+    const root = await tempDir();
+    expect((await createControlFile(root, 'docs'))?.path).toBe('docs/new-doc.md');
+    expect((await createControlFile(root, 'docs'))?.path).toBe('docs/new-doc-2.md');
+    expect((await createControlFile(root, 'docs'))?.path).toBe('docs/new-doc-3.md');
+    // Skills collide on the FOLDER, not the file.
+    expect((await createControlFile(root, 'skills'))?.path).toBe('.claude/skills/new-skill/SKILL.md');
+    expect((await createControlFile(root, 'skills'))?.path).toBe('.claude/skills/new-skill-2/SKILL.md');
+  });
+
+  it('gives a new skill frontmatter whose name mirrors its folder, and a doc just a heading', async () => {
+    const root = await tempDir();
+    await createControlFile(root, 'skills');
+    const skill = await readControlFile(root, '.claude/skills/new-skill/SKILL.md');
+    expect(skill!.content).toBe(
+      '---\nname: new-skill\ndescription: What this skill does and when to use it.\n---\n\n# New skill\n\nDescribe the steps here.\n',
+    );
+
+    await createControlFile(root, 'docs');
+    expect((await readControlFile(root, 'docs/new-doc.md'))!.content).toBe('# New doc\n\n');
+  });
+
+  it.each([
+    ['Design Notes', 'docs/design-notes.md'],
+    ['Design Notes.md', 'docs/design-notes.md'],
+    ['Design Notes.MD', 'docs/design-notes.md'],
+    ['  Spaced  Out  ', 'docs/spaced-out.md'],
+  ])('renames to %s -> %s', async (name, expected) => {
+    const root = await tempDir();
+    await createControlFile(root, 'docs');
+    expect((await renameControlFile(root, 'docs/new-doc.md', name)) as { path: string }).toMatchObject({
+      path: expected,
+    });
+  });
+
+  it.each(['', '   ', '///', '.md', null, 42])('refuses the new name %p', async (name) => {
+    const root = await tempDir();
+    await createControlFile(root, 'docs');
+    expect(await renameControlFile(root, 'docs/new-doc.md', name)).toBeNull();
+  });
+
+  it('treats a rename to the same slug as a no-op rather than a collision', async () => {
+    const root = await tempDir();
+    await createControlFile(root, 'docs');
+    // "New doc" already lives at docs/new-doc.md — same target, so not 'taken'.
+    expect((await renameControlFile(root, 'docs/new-doc.md', 'New doc')) as { path: string }).toMatchObject({
+      path: 'docs/new-doc.md',
+    });
+  });
+
+  it('keeps a skill frontmatter name in step, but never overwrites one the user chose', async () => {
+    const root = await tempDir();
+    await createControlFile(root, 'skills');
+    await renameControlFile(root, '.claude/skills/new-skill/SKILL.md', 'Deploy steps');
+    const moved = await readControlFile(root, '.claude/skills/deploy-steps/SKILL.md');
+    expect(moved!.content).toContain('name: deploy-steps');
+
+    // A hand-chosen name no longer matches the folder, so a later rename must leave it alone.
+    await writeControlFile(root, '.claude/skills/deploy-steps/SKILL.md', '---\nname: mine\n---\n');
+    await renameControlFile(root, '.claude/skills/deploy-steps/SKILL.md', 'Ship it');
+    expect((await readControlFile(root, '.claude/skills/ship-it/SKILL.md'))!.content).toContain('name: mine');
+  });
+});
+
+describe('control-files resources registry', () => {
+  it.each([
+    [
+      { title: '  Ref  ', url: '  https://x.dev  ' },
+      { title: 'Ref', url: 'https://x.dev' },
+    ],
+    [
+      { title: 'T', url: 'u', note: '  n  ' },
+      { title: 'T', url: 'u', note: 'n' },
+    ],
+    [
+      { title: 'T', url: 'u', note: '   ' },
+      { title: 'T', url: 'u' },
+    ],
+    [{ title: 'only title' }, { title: 'only title', url: '' }],
+    [{ url: 'only url' }, { title: '', url: 'only url' }],
+  ])('cleans %o', async (input, expected) => {
+    const root = await tempDir();
+    await writeResources(root, [input]);
+    expect(await readResources(root)).toEqual([expected]);
+  });
+
+  it.each([[{}], ['a string'], [42], [null], [[]], [{ title: '  ', url: '  ' }], [{ note: 'orphan' }]])(
+    'drops the unusable entry %p',
+    async (input) => {
+      const root = await tempDir();
+      await writeResources(root, [input]);
+      expect(await readResources(root)).toEqual([]);
+    },
+  );
+
+  it('writes an empty registry when handed something that is not an array', async () => {
+    const root = await tempDir();
+    await writeResources(root, 'nonsense' as unknown as unknown[]);
+    expect(await readResources(root)).toEqual([]);
+  });
+
+  it('reads an empty list when the yaml has no usable links key', async () => {
+    const root = await tempDir();
+    await mkdir(join(root, '.vibeboard'), { recursive: true });
+    for (const yaml of ['links: not-a-list\n', 'other: 1\n', 'null\n', '[]\n']) {
+      await writeFile(join(root, '.vibeboard', 'resources.yaml'), yaml, 'utf8');
+      expect(await readResources(root), yaml).toEqual([]);
+    }
   });
 });

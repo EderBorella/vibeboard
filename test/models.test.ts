@@ -1,14 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isFreeModel, mergeModels, modelsFromProvider } from '../src/server/models.js';
-
-describe('isFreeModel', () => {
-  it('flags OpenRouter :free and OpenCode -free ids', () => {
-    expect(isFreeModel('openrouter/deepseek/deepseek-r1:free')).toBe(true);
-    expect(isFreeModel('opencode/deepseek-v4-flash-free')).toBe(true);
-    expect(isFreeModel('deepseek/deepseek-v4-flash')).toBe(false);
-    expect(isFreeModel('opus')).toBe(false);
-  });
-});
+import { mergeModels, modelsFromProvider } from '../src/server/models.js';
 
 describe('mergeModels', () => {
   it('dedupes by id and lists free models first', () => {

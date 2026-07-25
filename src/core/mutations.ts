@@ -74,10 +74,6 @@ export async function moveCard(projectRoot: string, card: Card, toColumnSlug: st
   return { ...card, columnSlug: toColumnSlug, filePath: newPath };
 }
 
-export async function reorderCard(projectRoot: string, card: Card, order: number): Promise<Card> {
-  return updateCard(projectRoot, card, { order });
-}
-
 // Put a card in a column at a specific position: move the file if the column changed, then
 // renumber that column's `order` fields to even multiples of ORDER_STEP.
 //

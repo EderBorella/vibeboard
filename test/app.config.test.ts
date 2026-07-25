@@ -18,9 +18,10 @@ afterEach(async () => {
 interface WsMessage { type: string; snapshot?: { config?: { copilot?: { backend?: string } } } }
 
 describe('PATCH /api/config', () => {
-  // Regression: config lives under .vibeboard/, which the board watcher ignores, so a config
-  // save must explicitly push a fresh snapshot — otherwise the UI never reflects the change
-  // (the "Save does nothing" bug when switching backend).
+  // Regression: the "Save does nothing" bug when switching backend. PATCH /config pushes a
+  // snapshot itself rather than waiting on the watcher — instant and race-free for the
+  // backend toggle. (The watcher DOES also see .vibeboard/config.yaml since c318024; only
+  // .vibeboard/chat is ignored — see isIgnored in src/server/session.ts.)
   it('broadcasts an updated snapshot so clients see the new backend', async () => {
     session = new ProjectSession();
     app = buildApp(session);

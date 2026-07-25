@@ -11,7 +11,7 @@ import { ProjectGate } from './components/ProjectGate';
 import { CardEditor, type EditorState } from './components/CardEditor';
 import { SettingsModal } from './components/SettingsModal';
 import { CopilotPanel } from './copilot/CopilotPanel';
-import { useCopilot, type CopilotMode, type EffortLevel } from './copilot/useCopilot';
+import { useCopilot, type CopilotMode } from './copilot/useCopilot';
 
 // Add a theme here after adding its [data-theme] block in themes.css.
 const THEMES: { value: string; label: string }[] = [

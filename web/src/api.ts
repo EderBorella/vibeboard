@@ -28,10 +28,6 @@ export async function getState(): Promise<{ open: boolean; snapshot?: ProjectSna
   return (await fetch('/api/state')).json();
 }
 
-export async function getConfig(): Promise<ProjectConfig> {
-  return (await fetch('/api/config')).json();
-}
-
 export function patchConfig(body: Partial<ProjectConfig>): Promise<ProjectConfig> {
   return patch<ProjectConfig>('/api/config', body);
 }
@@ -128,10 +124,6 @@ export async function setLinks(board: BoardName, id: string, links: string[]): P
     body: JSON.stringify({ links }),
   });
   if (!res.ok) throw new Error('Failed to update links');
-}
-
-export function moveCard(board: BoardName, id: string, toColumnSlug: string): Promise<unknown> {
-  return post(`/api/cards/${board}/${id}/move`, { toColumnSlug });
 }
 
 // Position a card within a column, or move it into another one, in a single call. `beforeId`

@@ -37,10 +37,10 @@ interface Props {
   backend: string;
   mode: CopilotMode;
   model: string;
-  effort: '' | EffortLevel;
+  effort: EffortLevel;
   onMode: (m: CopilotMode) => void;
   onModel: (m: string) => void;
-  onEffort: (e: '' | EffortLevel) => void;
+  onEffort: (e: EffortLevel) => void;
   onBackend: (b: string) => void;
   // True when any dock control differs from the configured default; clearing goes back to it.
   overridden: boolean;
@@ -168,7 +168,7 @@ export function CopilotPanel({
 
       <div className="copilot-selects">
         <ModelPicker models={models} value={effModel} defaultModel={defaults.model} disabled={running} onChange={onModel} />
-        <select className="effort-select" value={effEffort} disabled={running} onChange={(e) => onEffort(e.target.value as '' | EffortLevel)}>
+        <select className="effort-select" value={effEffort} disabled={running} onChange={(e) => onEffort(e.target.value)}>
           {caps.efforts.map((e) => <option key={e.value} value={e.value}>{e.label}</option>)}
         </select>
       </div>

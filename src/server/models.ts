@@ -27,11 +27,6 @@ export interface ModelStatus {
   endpoints: number;  // how many providers serve it
 }
 
-// Free models: OpenRouter uses a ":free" suffix; OpenCode's gateway uses "-free".
-export function isFreeModel(id: string): boolean {
-  return id.endsWith(':free') || id.includes('-free');
-}
-
 // Dedupe by id and list free models first (this deployment leans on free tiers).
 export function mergeModels(lists: ModelOption[][]): ModelOption[] {
   const seen = new Set<string>();

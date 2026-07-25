@@ -3,9 +3,7 @@ import { readFile, access } from 'node:fs/promises';
 import { tempDir } from './helpers.js';
 import { defaultConfig } from '../src/core/config.js';
 import { readBoard, readArchive, ARCHIVE_SLUG } from '../src/core/board.js';
-import {
-  createCard, updateCard, moveCard, reorderCard, archiveCard,
-} from '../src/core/mutations.js';
+import { createCard, updateCard, moveCard, archiveCard } from '../src/core/mutations.js';
 
 const config = defaultConfig('T');
 const TODAY = '2026-07-23';
@@ -53,13 +51,6 @@ describe('mutations', () => {
     expect(moved.id).toBe(card.id);
     const board = await readBoard(root, 'product', config);
     expect(board.find((c) => c.id === card.id)?.columnSlug).toBe('in-progress');
-  });
-
-  it('reorders a card by rewriting order', async () => {
-    const root = await tempDir();
-    const card = await createCard(root, config, { board: 'product', columnSlug: 'todo', title: 'A' }, TODAY);
-    const reordered = await reorderCard(root, card, 999);
-    expect(reordered.order).toBe(999);
   });
 
   it('archives a card (moves it out of the board into archive)', async () => {

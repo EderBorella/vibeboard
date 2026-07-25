@@ -98,3 +98,60 @@ describe('isOverridden', () => {
     expect(isOverridden(configured, { model: 'sonnet', effort: 'low' })).toBe(false);
   });
 });
+
+describe('isOverridden compares resolved selections', () => {
+  const configured = {
+    backend: 'claude-code',
+    backends: {
+      'claude-code': { model: 'sonnet', effort: 'low' },
+      opencode: { model: 'opencode/x', effort: 'max' },
+    },
+  };
+
+  it('is false when the override names the backend already selected', () => {
+    // Switching connector away and back leaves {backend} set while changing nothing; claiming an
+    // override in that state reads as the UI losing track of itself.
+    expect(isOverridden(configured, { backend: 'claude-code' })).toBe(false);
+  });
+
+  it.each([
+    [{ backend: 'opencode' }, true],
+    [{ model: 'haiku' }, true],
+    [{ effort: 'high' }, true],
+    [{}, false],
+    [{ model: 'sonnet' }, false], // same value as configured
+    [{ effort: 'low' }, false],
+    [{ backend: 'claude-code', model: 'sonnet', effort: 'low' }, false], // all redundant
+  ])('reports %o as overridden=%p', (override, expected) => {
+    expect(isOverridden(configured, override)).toBe(expected);
+  });
+
+  it('detects each field independently rather than short-circuiting on the first', () => {
+    // A comparison that only looked at backend, or only at model, would miss these.
+    expect(isOverridden(configured, { backend: 'claude-code', model: 'haiku', effort: 'low' })).toBe(true);
+    expect(isOverridden(configured, { backend: 'claude-code', model: 'sonnet', effort: 'high' })).toBe(true);
+  });
+
+  it('is false with no configured project and an empty override', () => {
+    expect(isOverridden(undefined, {})).toBe(false);
+  });
+});
+
+// Backend alone must register as an override. With both slots holding identical values, changing
+// backend leaves model and effort untouched, so only the backend comparison can notice.
+describe('isOverridden notices a backend-only change', () => {
+  const twins = {
+    backend: 'claude-code',
+    backends: {
+      'claude-code': { model: 'same', effort: 'same' },
+      opencode: { model: 'same', effort: 'same' },
+    },
+  };
+
+  it('is true when only the backend differs', () => {
+    const now = resolveChoice(twins, { backend: 'opencode' });
+    const base = resolveChoice(twins, {});
+    expect([now.model, now.effort]).toEqual([base.model, base.effort]);
+    expect(isOverridden(twins, { backend: 'opencode' })).toBe(true);
+  });
+});

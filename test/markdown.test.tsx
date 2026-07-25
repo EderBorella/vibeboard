@@ -135,3 +135,108 @@ describe('renderMarkdown escaping', () => {
     ]);
   });
 });
+
+// The grammar in classify() is all anchored regexes with explicit whitespace quantifiers, and
+// every one of those pieces is load-bearing: a dropped anchor makes a line elsewhere match, and
+// `\s+` collapsed to `\s` leaks whitespace into the captured text.
+describe('renderMarkdown grammar edges', () => {
+  it('eats all the space after the hashes, not just one', () => {
+    expect(md('##   Spaced').querySelector('h2')?.textContent).toBe('Spaced');
+  });
+
+  it.each(['x---', '---x', '-- -', 'a***b'])('does not treat %p as a rule', (src) => {
+    expect(md(src).querySelector('hr')).toBeNull();
+  });
+
+  it.each(['---', '***', '___', '---   ', '  ---  '])('treats %p as a rule', (src) => {
+    expect(md(src).querySelector('hr')).not.toBeNull();
+  });
+
+  it('strips the marker from a quote with or without a following space', () => {
+    expect(md('>tight').querySelector('blockquote')?.textContent).toBe('tight');
+    expect(md('> loose').querySelector('blockquote')?.textContent).toBe('loose');
+    expect(md('>  extra').querySelector('blockquote')?.textContent).toBe(' extra');
+  });
+
+  it('accepts an indented bullet and eats the whole gap after the marker', () => {
+    expect(md('  - indented').querySelector('li')?.textContent).toBe('indented');
+    expect(md('-   wide gap').querySelector('li')?.textContent).toBe('wide gap');
+    expect(md('* star').querySelector('li')?.textContent).toBe('star');
+    expect(md('+ plus').querySelector('li')?.textContent).toBe('plus');
+  });
+
+  it('numbers an ordered item with more than one digit', () => {
+    const out = md('10. ten');
+    expect(out.querySelector('ol')).not.toBeNull();
+    expect(out.querySelector('li')?.textContent).toBe('ten');
+  });
+
+  it('eats the whole gap after an ordered marker, and keeps a multi-word tail', () => {
+    expect(md('1.   spaced out').querySelector('li')?.textContent).toBe('spaced out');
+    expect(md('  2. indented').querySelector('li')?.textContent).toBe('indented');
+  });
+
+  it('starts a new list when the marker kind changes', () => {
+    const out = md('- a\n- b\n1. c\n2. d');
+    expect(out.querySelectorAll('ul')).toHaveLength(1);
+    expect(out.querySelectorAll('ol')).toHaveLength(1);
+    expect([...out.querySelectorAll('ul li')].map((li) => li.textContent)).toEqual(['a', 'b']);
+    expect([...out.querySelectorAll('ol li')].map((li) => li.textContent)).toEqual(['c', 'd']);
+  });
+
+  it('opens a fence with an info string and closes one that is indented', () => {
+    const out = md('```ts\nconst a = 1;\nconst b = 2;\n   ```\nafter');
+    expect(out.querySelector('pre code')?.textContent).toBe('const a = 1;\nconst b = 2;');
+    expect(out.querySelector('p')?.textContent).toBe('after');
+  });
+
+  it('opens a fence that is itself indented', () => {
+    expect(md('   ```\nliteral\n```').querySelector('pre code')?.textContent).toBe('literal');
+  });
+
+  it('emits nothing but the block itself — no empty paragraph or list alongside it', () => {
+    expect(md('# Only').children).toHaveLength(1);
+    expect(md('---').children).toHaveLength(1);
+    expect(md('- one').children).toHaveLength(1);
+    expect(md('\n\n\n').children).toHaveLength(0);
+  });
+
+  it('renders no stray text nodes around a span that opens the line', () => {
+    const out = md('**bold** tail');
+    expect(out.querySelector('p')?.textContent).toBe('bold tail');
+    expect(out.querySelector('strong')?.textContent).toBe('bold');
+    // A span later in the line keeps the text before it.
+    expect(md('pre **bold**').querySelector('p')?.textContent).toBe('pre bold');
+  });
+
+  it('joins a wrapped paragraph with single spaces and nothing else', () => {
+    expect(md('one\ntwo\nthree').querySelector('p')?.textContent).toBe('one two three');
+  });
+});
+
+describe('renderMarkdown anchoring and accumulator resets', () => {
+  it('only starts an ordered item at the beginning of a line', () => {
+    // An unanchored pattern would find "1." mid-sentence and turn prose into a list.
+    expect(md('see 1. this').querySelector('ol')).toBeNull();
+    expect(md('see 1. this').querySelector('p')?.textContent).toBe('see 1. this');
+  });
+
+  it('emits nothing beyond the blocks themselves', () => {
+    // textContent, not querySelector: a seeded accumulator leaks as a bare text node that a
+    // tag-based selector cannot see.
+    expect(md('# Only').textContent).toBe('Only');
+    expect(md('just a paragraph').textContent).toBe('just a paragraph');
+    expect(md('- a\n- b\n1. c').textContent).toBe('abc');
+  });
+
+  it('starts the second list from empty after the first is flushed', () => {
+    const out = md('- a\n1. b\n- c');
+    expect([...out.querySelectorAll('ul, ol')].map((l) => l.textContent)).toEqual(['a', 'b', 'c']);
+  });
+
+  it('closes a fence on a line that opens with the marker even if more follows', () => {
+    const out = md('```\ninside\n```ts\nafter');
+    expect(out.querySelector('pre code')?.textContent).toBe('inside');
+    expect(out.querySelector('p')?.textContent).toBe('after');
+  });
+});

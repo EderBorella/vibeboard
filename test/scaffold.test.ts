@@ -28,6 +28,63 @@ describe('scaffoldProject', () => {
     expect(engineering[0].links).toContain(product[0].id);
   });
 
+  // The sample cards are the first thing a new user reads, and they are also the worked example
+  // of the three-board hierarchy — so their wording is behaviour, not decoration.
+  it('greenfield: seeds one sample card per board, each explaining its own level', async () => {
+    const root = await tempDir();
+    await scaffoldProject(root, { name: 'Demo', mode: 'greenfield', today: TODAY });
+    const config = await readConfig(root);
+
+    const expected = {
+      features: {
+        title: 'Sample feature',
+        description: 'A high-level capability. Delete me once you get going.',
+        body: 'Describe the capability and its goal here.',
+      },
+      product: {
+        title: 'Sample product card',
+        description: 'A product outcome. Delete me once you get going.',
+        body: 'Describe the what/why here.',
+      },
+      engineering: {
+        title: 'Sample engineering card',
+        description: 'An implementation task. Delete me once you get going.',
+        body: 'Describe the how here.',
+      },
+    } as const;
+
+    for (const board of ['features', 'product', 'engineering'] as const) {
+      const cards = await readBoard(root, board, config);
+      expect(cards, board).toHaveLength(1);
+      expect(cards[0].title, board).toBe(expected[board].title);
+      expect(cards[0].description, board).toBe(expected[board].description);
+      expect(cards[0].body?.trim(), board).toBe(expected[board].body);
+      expect(cards[0].columnSlug, board).toBe('todo');
+    }
+  });
+
+  it('greenfield: links the product sample to both the feature and the engineering card', async () => {
+    const root = await tempDir();
+    await scaffoldProject(root, { name: 'Demo', mode: 'greenfield', today: TODAY });
+    const config = await readConfig(root);
+
+    const [feature] = await readBoard(root, 'features', config);
+    const [product] = await readBoard(root, 'product', config);
+    const [engineering] = await readBoard(root, 'engineering', config);
+    expect(product.links).toEqual(expect.arrayContaining([feature.id, engineering.id]));
+    // Symmetric: each end points back at the middle.
+    expect(feature.links).toContain(product.id);
+    expect(engineering.links).toContain(product.id);
+  });
+
+  it('writes the card conventions doc the CLIs are pointed at', async () => {
+    const root = await tempDir();
+    await scaffoldProject(root, { name: 'Demo', mode: 'greenfield', today: TODAY });
+    const doc = await readFile(join(root, 'VIBEBOARD.md'), 'utf8');
+    expect(doc).toContain('# VibeBoard card conventions');
+    expect(doc).toContain('Board and column come from the file path, never from frontmatter.');
+  });
+
   it('brownfield: preserves an existing CLAUDE.md, appending only a pointer', async () => {
     const root = await tempDir();
     await writeFile(join(root, 'CLAUDE.md'), '# Existing Project\n\nImportant rules here.\n', 'utf8');

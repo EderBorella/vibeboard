@@ -136,4 +136,66 @@ describe('reconcileColumns — add and remove', () => {
     expect(result).toHaveProperty('error');
     expect((await readdir(join(root, 'product', 'todo'))).sort()).toEqual(['P-001.md']);
   });
+
+  // The case above is actually refused earlier, as a rename/reorder mix, so it never reaches the
+  // occupied-target check. Getting there needs a target folder that exists on disk WITHOUT being
+  // a configured column — a leftover from a column removed earlier, which is exactly when
+  // silently merging two columns' cards would be worst.
+  it('refuses to merge into a stray folder left behind by an earlier removal', async () => {
+    const root = await tempDir();
+    await board(root, ['todo'], { todo: ['P-001'] });
+    await mkdir(join(root, 'product', 'review'), { recursive: true });
+
+    const result = await reconcileColumns(root, 'product', ['Todo'], ['Review']);
+    expect(result).toEqual({
+      error:
+        'A folder for "Review" already exists. Rename it to something else, or merge the cards yourself.',
+    });
+    // The cards stay exactly where they were.
+    expect((await readdir(join(root, 'product', 'todo'))).sort()).toEqual(['P-001.md']);
+  });
+
+  it('says "1 card", not "1 cards", when refusing to remove a column holding one', async () => {
+    const root = await tempDir();
+    await board(root, ['todo', 'review'], { review: ['P-001'] });
+    const result = await reconcileColumns(root, 'product', ['Todo', 'Review'], ['Todo']);
+    expect(result).toEqual({
+      error: '"Review" still has 1 card. Move or archive them before removing the column.',
+    });
+  });
+
+  it('names the column and an exact count when refusing to remove a populated one', async () => {
+    const root = await tempDir();
+    await board(root, ['todo', 'review'], { review: ['P-001', 'P-002'] });
+    const result = await reconcileColumns(root, 'product', ['Todo', 'Review'], ['Todo']);
+    expect(result).toEqual({
+      error: '"Review" still has 2 cards. Move or archive them before removing the column.',
+    });
+  });
+
+  it('counts only markdown when deciding whether a column is empty', async () => {
+    const root = await tempDir();
+    await board(root, ['todo', 'review']);
+    // Editor litter is not a card and must not block removing the column.
+    await writeFile(join(root, 'product', 'review', '.DS_Store'), '', 'utf8');
+    await writeFile(join(root, 'product', 'review', 'notes.txt'), 'x', 'utf8');
+
+    expect(await reconcileColumns(root, 'product', ['Todo', 'Review'], ['Todo'])).toEqual({ renamed: [] });
+  });
+
+  it('removes a column whose folder was never created', async () => {
+    const root = await tempDir();
+    await board(root, ['todo']); // "Review" is configured but has no folder yet
+    expect(await reconcileColumns(root, 'product', ['Todo', 'Review'], ['Todo'])).toEqual({ renamed: [] });
+  });
+
+  it('renames a column that has no folder yet without failing', async () => {
+    const root = await tempDir();
+    await board(root, ['todo']);
+    // "Review" was added but never received a card, so there is nothing on disk to move.
+    expect(await reconcileColumns(root, 'product', ['Todo', 'Review'], ['Todo', 'Done'])).toEqual({
+      renamed: [{ from: 'review', to: 'done' }],
+    });
+    expect(await dirs(root)).toEqual(['archive', 'todo']);
+  });
 });

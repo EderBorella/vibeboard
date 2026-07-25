@@ -23,6 +23,49 @@ async function seeded(): Promise<{ root: string; config: ProjectConfig; cards: C
 const titlesIn = async (root: string, config: ProjectConfig, slug: string): Promise<string[]> =>
   (await readBoard(root, 'product', config)).filter((c) => c.columnSlug === slug).map((c) => c.title);
 
+describe('createCard — ordering and defaults', () => {
+  it('numbers each column from the first step, independently of its neighbours', async () => {
+    const { root, config } = await seeded(); // todo already holds three cards at 10/20/30
+    const review = await createCard(
+      root,
+      config,
+      { board: 'product', columnSlug: 'backlog', title: 'r' },
+      TODAY,
+    );
+    // A max order taken across the whole board rather than the column would start this at 40.
+    expect(review.order).toBe(10);
+  });
+
+  it('continues from the highest order already in that column', async () => {
+    const { root, config } = await seeded();
+    const fourth = await createCard(
+      root,
+      config,
+      { board: 'product', columnSlug: 'todo', title: 'f' },
+      TODAY,
+    );
+    expect(fourth.order).toBe(40);
+  });
+
+  it('defaults the optional fields rather than leaving them undefined', async () => {
+    const { root, config } = await seeded();
+    const card = await createCard(
+      root,
+      config,
+      { board: 'product', columnSlug: 'todo', title: 'bare' },
+      TODAY,
+    );
+    expect(card.tags).toEqual([]);
+    expect(card.links).toEqual([]);
+    expect(card.body).toBe('');
+
+    // And they survive the round trip to disk as empty rather than missing.
+    const [reread] = (await readBoard(root, 'product', config)).filter((c) => c.id === card.id);
+    expect(reread.tags).toEqual([]);
+    expect(reread.links).toEqual([]);
+  });
+});
+
 describe('placeCard — reordering inside a column', () => {
   it('moves a card to the top when placed before the first', async () => {
     const { root, config, cards } = await seeded();
@@ -60,9 +103,45 @@ describe('placeCard — reordering inside a column', () => {
     expect(live.map((c) => c.id).sort()).toEqual(cards.map((c) => c.id).sort());
   });
 
-  it('is a no-op when placed before itself', async () => {
+  // The caller answers the HTTP request from the returned card, so its order must be the final
+  // one — not the order it had on the way in.
+  it('returns the card carrying its new order', async () => {
     const { root, config, cards } = await seeded();
-    await placeCard(root, config, cards[1], 'todo', cards[1].id);
+    const moved = await placeCard(root, config, cards[2], 'todo', cards[0].id); // third to the top
+    expect(moved.order).toBe(10);
+    expect(moved.id).toBe(cards[2].id);
+
+    const end = await placeCard(root, config, moved, 'todo', null); // and back to the end
+    expect(end.order).toBe(30);
+  });
+
+  // "Before itself" only means "stay put" within the same column. Dragged into a different one it
+  // is a real move, and short-circuiting on the id alone would silently drop the card.
+  it('still moves a card given its own id as the target in another column', async () => {
+    const { root, config, cards } = await seeded();
+    const moved = await placeCard(root, config, cards[1], 'backlog', cards[1].id);
+    expect(moved.columnSlug).toBe('backlog');
+    expect(await titlesIn(root, config, 'backlog')).toEqual(['second']);
+    expect(await titlesIn(root, config, 'todo')).toEqual(['first', 'third']);
+  });
+
+  it('assigns every card in the column its exact order after an insert at the top', async () => {
+    const { root, config, cards } = await seeded();
+    await placeCard(root, config, cards[2], 'todo', cards[0].id);
+    const live = (await readBoard(root, 'product', config)).filter((c) => c.columnSlug === 'todo');
+    // Title and order together: a sequence built from the wrong card set can land the right
+    // titles on the wrong numbers.
+    expect(live.map((c) => [c.title, c.order])).toEqual([
+      ['third', 10],
+      ['first', 20],
+      ['second', 30],
+    ]);
+  });
+
+  it('is a no-op when placed before itself, returning the card unchanged', async () => {
+    const { root, config, cards } = await seeded();
+    const same = await placeCard(root, config, cards[1], 'todo', cards[1].id);
+    expect(same).toEqual(cards[1]);
     expect(await titlesIn(root, config, 'todo')).toEqual(['first', 'second', 'third']);
   });
 
@@ -109,5 +188,23 @@ describe('placeCard — across columns', () => {
     await placeCard(root, config, cards[0], 'done', null);
     const backlog = (await readBoard(root, 'product', config)).filter((c) => c.columnSlug === 'backlog');
     expect(backlog.map((c) => c.order)).toEqual([other.order]);
+  });
+
+  // Orders are per-column, so a sequence built from the whole board instead of the one column
+  // still looks right often enough to pass. Asserting both columns together closes that: four
+  // cards would be numbered 10/20/30/40, and whichever card takes the 40 breaks one of these.
+  it('renumbers only the column being reordered', async () => {
+    const { root, config, cards } = await seeded();
+    const other = await createCard(
+      root,
+      config,
+      { board: 'product', columnSlug: 'backlog', title: 'later' },
+      TODAY,
+    );
+
+    await placeCard(root, config, cards[2], 'todo', cards[0].id); // reorder within todo only
+    const live = await readBoard(root, 'product', config);
+    expect(live.filter((c) => c.columnSlug === 'todo').map((c) => c.order)).toEqual([10, 20, 30]);
+    expect(live.filter((c) => c.columnSlug === 'backlog').map((c) => c.order)).toEqual([other.order]);
   });
 });

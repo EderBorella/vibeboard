@@ -42,10 +42,16 @@ interface Props {
   onModel: (m: string) => void;
   onEffort: (e: '' | EffortLevel) => void;
   onBackend: (b: string) => void;
+  // True when any dock control differs from the configured default; clearing goes back to it.
+  overridden: boolean;
+  onReset: () => void;
   onClose: () => void;
 }
 
-export function CopilotPanel({ copilot, backend, mode, model, effort, onMode, onModel, onEffort, onBackend, onClose }: Props) {
+export function CopilotPanel({
+  copilot, backend, mode, model, effort,
+  onMode, onModel, onEffort, onBackend, overridden, onReset, onClose,
+}: Props) {
   const { items, running, model: activeModel, stats, chats, currentChatId, send, compact, newSession, openChat, deleteChat, cancel } = copilot;
   const [draft, setDraft] = useState('');
   const [models, setModels] = useState<ModelOption[]>([]);
@@ -84,7 +90,9 @@ export function CopilotPanel({ copilot, backend, mode, model, effort, onMode, on
 
   // Always concrete — the server would fill these in anyway, and sending them keeps what the
   // UI shows and what runs the same thing.
-  const turnOpts = () => ({ mode: effMode, model: effModel, effort: effEffort });
+  // The backend goes too: the dock is a session override, so the server can't assume the
+  // configured one is in force.
+  const turnOpts = () => ({ mode: effMode, backend, model: effModel, effort: effEffort });
   const submit = (): void => {
     if (!draft.trim() || running) return;
     send(draft, turnOpts());
@@ -128,7 +136,7 @@ export function CopilotPanel({ copilot, backend, mode, model, effort, onMode, on
                 {chats.length === 0 && <div className="chat-menu-empty">No saved chats yet</div>}
                 {chats.map((c) => (
                   <div key={c.id} className={`chat-menu-item${c.id === currentChatId ? ' active' : ''}`}>
-                    <button className="chat-menu-open" onClick={() => { openChat(c.id); setChatMenu(false); }} title={c.title}>
+                    <button className="chat-menu-open" onClick={() => { openChat(c.id, backend); setChatMenu(false); }} title={c.title}>
                       <span className="chat-menu-title">
                         <span className={`chat-backend bk-${c.backend}`}>{backendLabel(c.backend)}</span>
                         {c.title}
@@ -164,6 +172,12 @@ export function CopilotPanel({ copilot, backend, mode, model, effort, onMode, on
           {caps.efforts.map((e) => <option key={e.value} value={e.value}>{e.label}</option>)}
         </select>
       </div>
+      {overridden && (
+        <div className="copilot-override">
+          Just for this session — the project default is unchanged.
+          <button className="copilot-reset" onClick={onReset} disabled={running}>Use default</button>
+        </div>
+      )}
       {noTools && (
         <div className="copilot-warn" role="alert">
           ⚠ This model can’t use tools — the copilot can’t create or edit cards. Pick a 🔧 model.

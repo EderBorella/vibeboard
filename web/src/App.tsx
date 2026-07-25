@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { BOARDS, BOARD_LABELS, DEFAULT_BACKEND, backendDefaults, type BoardName, type Card } from './shared';
+import {
+  BOARDS, BOARD_LABELS, DEFAULT_BACKEND, backendDefaults,
+  type BoardName, type Card, type CopilotChoice,
+} from './shared';
 import { useSnapshot } from './useSnapshot';
-import { getState, placeCard, archiveCard, patchConfig } from './api';
+import { getState, placeCard, archiveCard } from './api';
 import { Board } from './components/Board';
 import { ProjectControl } from './components/ProjectControl';
 import { ProjectGate } from './components/ProjectGate';
@@ -33,17 +36,36 @@ export function App() {
   // Mode is per-turn and deliberately NOT persisted — you pick it for the task at hand.
   const [copilotMode, setCopilotMode] = useState<CopilotMode>('bypassPermissions');
 
-  // Model and effort come straight from the project config — no local copy. Two copies is
-  // what broke this before: the dock's picker only set React state, so changes vanished on
-  // reload, and a stale local value would override what Settings had just saved. The config
-  // is the single source of truth, and PATCH /config broadcasts a snapshot, so writing it
-  // updates the dock.
-  const copilotBackend = snapshot?.config.copilot.backend || DEFAULT_BACKEND;
-  const copilotDefaults = backendDefaults(copilotBackend);
-  const copilotModel = snapshot?.config.copilot.model || copilotDefaults.model;
-  const copilotEffort = snapshot?.config.copilot.effort || copilotDefaults.effort;
-  const onModel = (model: string): void => { void patchConfig({ copilot: { backend: copilotBackend, model } }); };
-  const onEffort = (effort: string): void => { void patchConfig({ copilot: { backend: copilotBackend, effort } }); };
+  // One source of truth for the defaults: the project config, written ONLY by Settings.
+  // The dock's controls are a session override — they never touch the file, so switching
+  // connector for one conversation can't rewrite what you configured.
+  const [override, setOverride] = useState<Partial<CopilotChoice>>({});
+
+  // A Settings save is an explicit statement of intent, so it clears the session override —
+  // otherwise a stale dock value would keep winning over the defaults you just changed.
+  const configured = snapshot?.config.copilot;
+  const configKey = `${configured?.backend ?? ''}|${configured?.model ?? ''}|${configured?.effort ?? ''}`;
+  const lastConfigKey = useRef(configKey);
+  useEffect(() => {
+    if (lastConfigKey.current === configKey) return;
+    lastConfigKey.current = configKey;
+    setOverride({});
+  }, [configKey]);
+
+  // Effective values: override first, then the config, then the backend's built-in default.
+  // The config's model belongs to the CONFIGURED backend — a model id means nothing to the
+  // other one — so overriding the backend falls through to that backend's own default.
+  const copilotBackend = override.backend ?? configured?.backend ?? DEFAULT_BACKEND;
+  const fromConfig = copilotBackend === configured?.backend ? configured : undefined;
+  const fallback = backendDefaults(copilotBackend);
+  // `||` not `??`, so a blank left over in an old config falls through to the real default.
+  const copilotModel = override.model || fromConfig?.model || fallback.model;
+  const copilotEffort = override.effort || fromConfig?.effort || fallback.effort;
+  const overridden = override.backend !== undefined || override.model !== undefined || override.effort !== undefined;
+
+  const onModel = (model: string): void => setOverride((o) => ({ ...o, model }));
+  const onEffort = (effort: string): void => setOverride((o) => ({ ...o, effort }));
+  const onResetCopilot = (): void => setOverride({});
 
   // Theme: applied to <html data-theme>, persisted. Default cyberpunk.
   const [theme, setTheme] = useState<string>(() => localStorage.getItem('vb-theme') || 'cyberpunk');
@@ -67,15 +89,13 @@ export function App() {
   const onOpen = (card: Card): void => setEditor({ mode: 'edit', card });
   const onDragStart = (card: Card): void => { dragged.current = card; };
   const onArchive = (card: Card): void => { void archiveCard(card.board, card.id); };
-  // Switch the copilot backend: persist it, reset the (backend-specific) model, and start a
-  // fresh chat so we don't try to resume a session under the other backend.
+  // Switch connector for THIS SESSION only — the configured default is untouched. Start a
+  // fresh chat, since a session belongs to the backend that created it. Model and effort drop
+  // out of the override too: they belong to the backend being left.
   const onBackend = (backend: string): void => {
     if (backend === copilotBackend) return;
-    // Model ids and effort scales don't cross backends — adopt the new backend's real
-    // defaults instead of clearing to blank and letting the CLI pick silently.
-    const next = backendDefaults(backend);
     copilot.newSession();
-    void patchConfig({ copilot: { backend, model: next.model, effort: next.effort } });
+    setOverride({ backend });
   };
   // Position the dragged card: reorder within its column, or move it into another one.
   // beforeId is the card to land in front of; null means the end of the column.
@@ -173,6 +193,8 @@ export function App() {
             onModel={onModel}
             onEffort={onEffort}
             onBackend={onBackend}
+            overridden={overridden}
+            onReset={onResetCopilot}
             onClose={() => setCopilotOpen(false)}
           />
         )}

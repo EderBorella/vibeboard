@@ -7,8 +7,9 @@ export type EffortLevel = string;
 
 export interface TurnOptions {
   mode: CopilotMode;
-  // The panel always sends concrete values; the server fills in the backend's default if
-  // either is missing (an old config, or a caller that isn't the panel).
+  // Sent per turn because the dock's controls are a session override — the config holds the
+  // defaults, and anything omitted here falls back to them server-side.
+  backend?: string;
   model?: string;
   effort?: EffortLevel;
 }
@@ -153,7 +154,9 @@ export function useCopilot() {
 
   // Switch to / delete a stored chat. The server responds with copilot:history (switch) or a
   // fresh history (delete of the active chat), which re-hydrates the transcript.
-  const openChat = useCallback((chatId: string) => sendRaw({ type: 'copilot:open', chatId }), []);
+  // The backend rides along so the server can decide whether to resume the stored CLI session
+  // (only valid when the chat's backend matches the one in force — override included).
+  const openChat = useCallback((chatId: string, backend?: string) => sendRaw({ type: 'copilot:open', chatId, backend }), []);
   const deleteChat = useCallback((chatId: string) => sendRaw({ type: 'copilot:delete', chatId }), []);
 
   const cancel = useCallback(() => sendRaw({ type: 'copilot:cancel' }), []);

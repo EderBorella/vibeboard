@@ -29,6 +29,14 @@ export const BACKEND_DEFAULTS: Record<string, BackendDefaults> = {
 export function backendDefaults(backend: string | undefined): BackendDefaults {
   return BACKEND_DEFAULTS[backend ?? ''] ?? BACKEND_DEFAULTS[DEFAULT_BACKEND];
 }
+
+// One copilot selection. The project config holds the default (Settings writes it); the dock
+// holds a partial session override that is never persisted.
+export interface CopilotChoice {
+  backend: string;
+  model: string;
+  effort: string;
+}
 export const BACKEND_CAPS: Record<string, BackendCaps> = {
   'claude-code': {
     modes: [

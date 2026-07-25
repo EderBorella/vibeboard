@@ -415,6 +415,20 @@ body {
 .mp-sel .mp-name { color: var(--accent); }
 .mp-empty { color: var(--muted); font-size: 0.8rem; padding: 0.8rem 0.5rem; font-style: italic; }
 
+/* Session-override notice: the dock's controls don't write the project default, so say so
+   rather than leaving the user to wonder why Settings still shows something else. */
+.copilot-override {
+  display: flex; align-items: center; gap: 0.5rem;
+  font-size: 0.7rem; color: var(--muted);
+  padding: 0.25rem 0.6rem;
+}
+.copilot-reset {
+  margin-left: auto; background: var(--panel-2); color: var(--text);
+  border: 1px solid var(--border); border-radius: 6px;
+  cursor: pointer; font-size: 0.68rem; font-family: inherit; padding: 0.1rem 0.4rem;
+}
+.copilot-reset:hover { border-color: var(--accent); color: var(--accent); }
+
 .copilot-warn { padding: 0.4rem 0.75rem; font-size: 0.72rem; color: var(--danger); background: color-mix(in srgb, var(--danger) 12%, transparent); border-bottom: 1px solid var(--border); }
 .links-hint { color: var(--muted); font-size: 0.8rem; font-style: italic; }
 .links-list {

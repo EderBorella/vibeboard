@@ -46,9 +46,8 @@ describe('PATCH /api/config', () => {
     client.close();
   }, 5000);
 
-  // Regression: the copilot dock's model/effort pickers write straight to the config, one
-  // field at a time. If a partial copilot patch replaced the block wholesale, changing the
-  // model would wipe the effort (and vice versa) — the "my defaults don't save" bug.
+  // The config is the only persisted source for copilot defaults, so a partial patch must
+  // merge: replacing the block wholesale would wipe whichever field the caller left out.
   it('merges a partial copilot patch instead of replacing the block', async () => {
     session = new ProjectSession();
     app = buildApp(session);

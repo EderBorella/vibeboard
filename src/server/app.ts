@@ -68,7 +68,13 @@ export function buildApp(session: ProjectSession): FastifyInstance {
     broadcast({ type: 'copilot:chats', ...(await chats.chatList()) });
   };
 
-  interface CopilotOpts { mode: CopilotMode; model?: string; effort?: EffortLevel }
+  // Per-turn options are the dock's SESSION OVERRIDE. The project config holds the defaults
+  // and is the only persisted source; anything omitted here falls back to it.
+  interface CopilotOpts { mode: CopilotMode; backend?: string; model?: string; effort?: EffortLevel }
+
+  // The backend in force for a turn: the override, else the configured default.
+  const effectiveBackend = (override?: string): Backend =>
+    ((override || session.config?.copilot.backend || 'claude-code') as Backend);
 
   async function handleCopilotSend(text: string, opts: CopilotOpts): Promise<void> {
     if (!session.isOpen) { broadcast({ type: 'copilot:error', error: 'No project open' }); return; }
@@ -77,13 +83,18 @@ export function buildApp(session: ProjectSession): FastifyInstance {
       await chats.recordUser(text);
       copilotState(); // running flips true only once send starts; announce optimistically
       const cfg = session.config?.copilot;
+      const backend = effectiveBackend(opts.backend);
+      // The config's model/effort describe the CONFIGURED backend; they mean nothing to a
+      // different one, so an overridden backend uses only what the dock sent (and failing
+      // that, CopilotSession fills in that backend's built-in default).
+      const useConfig = backend === (cfg?.backend ?? 'claude-code');
       await copilot.send({
         cwd: session.root!,
         text,
         mode: opts.mode,
-        backend: ((cfg?.backend as Backend) ?? 'claude-code'),
-        model: opts.model ?? cfg?.model,
-        effort: (opts.effort ?? cfg?.effort) as EffortLevel | undefined,
+        backend,
+        model: opts.model || (useConfig ? cfg?.model : undefined),
+        effort: (opts.effort || (useConfig ? cfg?.effort : undefined)) as EffortLevel | undefined,
         onEvent: (event) => { void chats.recordEvent(event); broadcast({ type: 'copilot:event', event }); },
       });
     } catch (err) {
@@ -98,9 +109,11 @@ export function buildApp(session: ProjectSession): FastifyInstance {
   }
 
   function handleCopilotMessage(raw: string): void {
-    let msg: { type?: string; text?: string; chatId?: string; mode?: CopilotMode; model?: string; effort?: EffortLevel };
+    let msg: { type?: string; text?: string; chatId?: string; mode?: CopilotMode; backend?: string; model?: string; effort?: EffortLevel };
     try { msg = JSON.parse(raw); } catch { return; }
-    const opts = (): CopilotOpts => ({ mode: msg.mode ?? 'bypassPermissions', model: msg.model, effort: msg.effort });
+    const opts = (): CopilotOpts => ({
+      mode: msg.mode ?? 'bypassPermissions', backend: msg.backend, model: msg.model, effort: msg.effort,
+    });
     switch (msg.type) {
       case 'copilot:send':
         void handleCopilotSend(msg.text ?? '', opts());
@@ -117,7 +130,7 @@ export function buildApp(session: ProjectSession): FastifyInstance {
         })();
         break;
       case 'copilot:open':
-        if (msg.chatId) void handleCopilotOpen(msg.chatId);
+        if (msg.chatId) void handleCopilotOpen(msg.chatId, msg.backend);
         break;
       case 'copilot:delete':
         if (msg.chatId) void handleCopilotDelete(msg.chatId);
@@ -132,10 +145,10 @@ export function buildApp(session: ProjectSession): FastifyInstance {
   // Reopen a stored chat: restore its transcript and, when the backend matches, resume the
   // underlying CLI session so the next message continues it (a mismatch continues fresh — the
   // ChatStore attaches a one-shot note to the history payload).
-  async function handleCopilotOpen(chatId: string): Promise<void> {
+  async function handleCopilotOpen(chatId: string, backendOverride?: string): Promise<void> {
     const info = await chats.open(chatId);
     if (!info) return;
-    const backend = session.config?.copilot.backend ?? 'claude-code';
+    const backend = effectiveBackend(backendOverride);
     if (info.backend === backend) copilot.resume(info.cliSessionId, info.model);
     else copilot.newSession();
     await sendHistory();

@@ -73,7 +73,7 @@ export function ProjectGate({ onOpened }: Props) {
         <h3>New project</h3>
         <label className="gate-field">
           <span>Location (parent folder)</span>
-          <input value={newParent} placeholder="/data/projects" onChange={(e) => setNewParent(e.target.value)} />
+          <input value={newParent} placeholder="/path/to/projects" onChange={(e) => setNewParent(e.target.value)} />
         </label>
         <label className="gate-field">
           <span>Name (dash-separated, lowercase)</span>

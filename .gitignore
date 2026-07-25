@@ -5,17 +5,39 @@ node_modules/
 dist/
 *.tsbuildinfo
 
+# Local notes / private working files
 docs/superpowers/
 notes/
 scratch/
 *.private.md
+
+# Secrets — never commit. (.env.example IS committed: it documents the vars.)
 .env
 .env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+.npmrc
+.netrc
+credentials.json
+auth.json
+id_rsa*
+
+# Copilot chat transcripts: full AI conversations, per project. Never commit these
+# — VibeBoard writes them to <project>/.vibeboard/chat/ (see src/server/chat-store.ts).
+.vibeboard/chat/
 
 # Editor / OS
 .vscode/
 .idea/
 .DS_Store
+
+# Local state / caches
+coverage/
+.vite/
+*.log
 
 # test shim scratch
 test/fixtures/.shim-args.log

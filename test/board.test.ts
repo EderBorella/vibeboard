@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { ARCHIVE_SLUG, boardColumnSlugs, readArchive, readBoard } from '../src/core/board.js';
+import { ARCHIVE_SLUG, boardColumnSlugs, countArchived, readArchive, readBoard } from '../src/core/board.js';
 import { defaultConfig } from '../src/core/config.js';
 import { tempDir } from './helpers.js';
 
@@ -57,5 +57,50 @@ describe('readBoard', () => {
   it('maps configured column names to slugs', () => {
     const slugs = boardColumnSlugs(defaultConfig('T'), 'product');
     expect(slugs).toEqual(['backlog', 'todo', 'in-progress', 'done']);
+  });
+
+  // Cards are markdown files, but a column folder is an ordinary directory the user can drop
+  // anything into — editor litter must not surface as a card with an empty id.
+  it('ignores anything that is not markdown in a column folder', async () => {
+    const root = await tempDir();
+    await writeCard(root, 'product/todo/P-001.md', '---\nid: P-001\ntitle: real\norder: 10\n---\nbody');
+    await writeCard(root, 'product/todo/.DS_Store', '');
+    await writeCard(root, 'product/todo/notes.txt', 'scratch');
+
+    const cards = await readBoard(root, 'product', defaultConfig('T'));
+    expect(cards.map((c) => c.id)).toEqual(['P-001']);
+  });
+
+  it('sorts the archive newest first, leaving undated cards at the bottom', async () => {
+    const root = await tempDir();
+    const card = (id: string, archived?: string): string =>
+      `---\nid: ${id}\ntitle: ${id}\norder: 10\ncreated: 2026-07-01\n${archived ? `archived: '${archived}'\n` : ''}---\nbody`;
+    // Two undated cards, and one of them read first: the comparator only ever receives an
+    // already-sorted element as its second argument, so a single undated card written last
+    // never exercises the missing-timestamp path at all.
+    await writeCard(root, 'engineering/archive/E-000.md', card('E-000'));
+    await writeCard(root, 'engineering/archive/E-001.md', card('E-001', '2026-07-20T10:00:00Z'));
+    await writeCard(root, 'engineering/archive/E-002.md', card('E-002', '2026-07-25T10:00:00Z'));
+    await writeCard(root, 'engineering/archive/E-003.md', card('E-003'));
+
+    // Dated newest first, then the undated ones by descending id.
+    expect((await readArchive(root, 'engineering')).map((c) => c.id)).toEqual([
+      'E-002',
+      'E-001',
+      'E-003',
+      'E-000',
+    ]);
+  });
+});
+
+describe('countArchived', () => {
+  it('counts only markdown, and zero for a board that has never archived', async () => {
+    const root = await tempDir();
+    expect(await countArchived(root, 'product')).toBe(0);
+
+    await writeCard(root, 'product/archive/P-001.md', '---\nid: P-001\ntitle: a\norder: 10\n---\n');
+    await writeCard(root, 'product/archive/P-002.md', '---\nid: P-002\ntitle: b\norder: 20\n---\n');
+    await writeCard(root, 'product/archive/.DS_Store', '');
+    expect(await countArchived(root, 'product')).toBe(2);
   });
 });

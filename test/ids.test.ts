@@ -3,6 +3,7 @@ import { idPrefix, nextId } from '../src/core/ids.js';
 
 describe('ids', () => {
   it('maps boards to prefixes', () => {
+    expect(idPrefix('features')).toBe('F');
     expect(idPrefix('product')).toBe('P');
     expect(idPrefix('engineering')).toBe('E');
   });

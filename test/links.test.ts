@@ -73,4 +73,59 @@ describe('setCardLinks (symmetric)', () => {
     const fresh = await findCard(root, 'product', a.id, config);
     expect(fresh!.links).toEqual([]);
   });
+
+  // The reconcile loop decides per card between add, remove and leave alone. Each of the three
+  // outcomes needs its own witness, or a mixed-up condition still satisfies the others.
+  it('leaves a card that should keep its link untouched', async () => {
+    const { root, config } = await fixture();
+    const a = await createCard(root, config, { board: 'product', columnSlug: 'todo', title: 'A' }, TODAY);
+    const b = await createCard(root, config, { board: 'product', columnSlug: 'todo', title: 'B' }, TODAY);
+    await setCardLinks(root, config, a, [b.id]);
+
+    // Re-setting the same link must not strip the back-reference it already holds.
+    const freshA = await findCard(root, 'product', a.id, config);
+    await setCardLinks(root, config, freshA!, [b.id]);
+    expect((await findCard(root, 'product', b.id, config))!.links).toContain(a.id);
+  });
+
+  it('does not touch a card that is neither linked nor desired', async () => {
+    const { root, config } = await fixture();
+    const a = await createCard(root, config, { board: 'product', columnSlug: 'todo', title: 'A' }, TODAY);
+    const b = await createCard(root, config, { board: 'product', columnSlug: 'todo', title: 'B' }, TODAY);
+    const bystander = await createCard(
+      root,
+      config,
+      { board: 'product', columnSlug: 'todo', title: 'C' },
+      TODAY,
+    );
+
+    await setCardLinks(root, config, a, [b.id]);
+    expect((await findCard(root, 'product', bystander.id, config))!.links).toEqual([]);
+  });
+
+  // Removing a back-reference must remove exactly that one. If the card losing it holds no other
+  // link, dropping the single id and dropping everything look identical — so the shared target
+  // here deliberately holds two.
+  it('removes only this card own back-reference, leaving the target other links', async () => {
+    const { root, config } = await fixture();
+    const a = await createCard(root, config, { board: 'product', columnSlug: 'todo', title: 'A' }, TODAY);
+    const b = await createCard(root, config, { board: 'product', columnSlug: 'todo', title: 'B' }, TODAY);
+    const shared = await createCard(
+      root,
+      config,
+      { board: 'engineering', columnSlug: 'todo', title: 'shared' },
+      TODAY,
+    );
+
+    await setCardLinks(root, config, a, [shared.id]);
+    await setCardLinks(root, config, b, [shared.id]);
+    expect((await findCard(root, 'engineering', shared.id, config))!.links).toEqual(
+      expect.arrayContaining([a.id, b.id]),
+    );
+
+    // A drops its link; B's must survive on `shared`.
+    const freshA = await findCard(root, 'product', a.id, config);
+    await setCardLinks(root, config, freshA!, []);
+    expect((await findCard(root, 'engineering', shared.id, config))!.links).toEqual([b.id]);
+  });
 });

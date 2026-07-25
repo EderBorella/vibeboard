@@ -43,6 +43,15 @@ describe('card parse/serialize', () => {
     expect(data.description).toBeUndefined();
   });
 
+  // A hand-written or truncated file. These three are strings everywhere downstream, so the
+  // reader must not let undefined reach the board.
+  it('falls back to empty strings when the identity fields are missing', () => {
+    const { data } = parseCardContent('---\norder: 20\n---\n\nbody\n');
+    expect(data.id).toBe('');
+    expect(data.title).toBe('');
+    expect(data.created).toBe('');
+  });
+
   it('round-trips a full card through serialize then parse', () => {
     const out = serializeCard(fm, 'The body.');
     const { data, body } = parseCardContent(out);

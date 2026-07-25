@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { buildApp } from '../src/server/app.js';
+import { ProjectSession } from '../src/server/session.js';
 import { openTestProject, wsClient } from './helpers.js';
 
 interface WsMessage {
@@ -128,19 +130,59 @@ describe('PATCH /api/config — column reconciliation', () => {
     expect(cfg.boards.features.columns).toEqual(['Backlog', 'Todo', 'In Progress', 'Done']);
   });
 
-  it('rejects a reserved or duplicate column name', async () => {
+  // The refusal names the board it came from: a patch can carry all three, and "that name is
+  // reserved" is useless without knowing which board rejected it.
+  it.each([
+    {
+      columns: ['Todo', 'Archive'],
+      error: 'Product: "Archive" is reserved — archive is where deleted cards go.',
+    },
+    {
+      columns: ['Todo', 'todo'],
+      error: 'Product: Duplicate column "todo" — names must differ after slugging.',
+    },
+    { columns: [], error: 'Product: A board needs at least one column.' },
+    { columns: ['Todo', '///'], error: 'Product: "///" is not a valid column name.' },
+  ])('rejects $columns, naming the board', async ({ columns, error }) => {
     const { app } = await openTestProject({ name: 'Cols' });
-
-    for (const columns of [
-      ['Todo', 'Archive'],
-      ['Todo', 'todo'],
-    ]) {
-      const res = await app.inject({
-        method: 'PATCH',
-        url: '/api/config',
-        payload: { boards: { product: { columns } } },
-      });
-      expect(res.statusCode).toBe(400);
-    }
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/api/config',
+      payload: { boards: { product: { columns } } },
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json()).toEqual({ error });
   });
+
+  it('names the offending board when the patch carries more than one', async () => {
+    const { app } = await openTestProject({ name: 'Cols' });
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/api/config',
+      payload: {
+        boards: { product: { columns: ['Todo'] }, engineering: { columns: ['Todo', 'Archive'] } },
+      },
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().error).toMatch(/^Engineering: /);
+  });
+});
+
+describe('/api/config with no project open', () => {
+  it.each([{ method: 'GET' as const }, { method: 'PATCH' as const }])(
+    '409s on $method /api/config',
+    async ({ method }) => {
+      const session = new ProjectSession();
+      const app = buildApp(session);
+      const res = await app.inject({
+        method,
+        url: '/api/config',
+        ...(method === 'PATCH' ? { payload: { miniatureChars: 10 } } : {}),
+      });
+      expect(res.statusCode).toBe(409);
+      expect(res.json()).toEqual({ error: 'No project open' });
+      await app.close();
+      await session.close();
+    },
+  );
 });

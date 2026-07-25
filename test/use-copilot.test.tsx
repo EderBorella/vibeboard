@@ -170,3 +170,146 @@ describe('useCopilot sending', () => {
     expect(fake.sent).toMatchObject([{ type: 'copilot:new' }]);
   });
 });
+
+describe('useCopilot event dispatch', () => {
+  it.each([
+    ['thinking', { kind: 'thinking', text: 'reasoning' }],
+    ['thinking_delta', { kind: 'thinking_delta', text: 'reasoning' }],
+    ['tool_result', { kind: 'tool_result', text: 'noisy output' }],
+  ])('renders nothing for a %s event', (_label, e) => {
+    const { result } = renderHook(() => useCopilot(0));
+    event(e);
+    expect(result.current.items).toEqual([]);
+  });
+
+  it('records the session id and model from init', () => {
+    const { result } = renderHook(() => useCopilot(0));
+    event({ kind: 'init', sessionId: 's-9', model: 'opus', permissionMode: 'plan' });
+    expect(result.current.sessionId).toBe('s-9');
+    expect(result.current.model).toBe('opus');
+  });
+
+  it('opens a stream only for a text block, not a thinking or tool_use one', () => {
+    const { result } = renderHook(() => useCopilot(0));
+    event({ kind: 'block_start', block: 'thinking' });
+    event({ kind: 'block_start', block: 'tool_use' });
+    expect(result.current.items).toEqual([]);
+
+    event({ kind: 'block_start', block: 'text' });
+    event({ kind: 'text_delta', text: 'streamed' });
+    expect(result.current.items).toMatchObject([{ kind: 'assistant', text: 'streamed' }]);
+  });
+
+  it('suppresses a finalised text once deltas have been seen, to avoid printing it twice', () => {
+    const { result } = renderHook(() => useCopilot(0));
+    event({ kind: 'block_start', block: 'text' });
+    event({ kind: 'text_delta', text: 'streamed' });
+    event({ kind: 'block_stop' });
+    event({ kind: 'text', text: 'streamed' }); // the same content arriving whole
+    expect(result.current.items).toMatchObject([{ kind: 'assistant', text: 'streamed' }]);
+  });
+
+  it('names the tool on a tool_use and closes any open stream', () => {
+    const { result } = renderHook(() => useCopilot(0));
+    event({ kind: 'block_start', block: 'text' });
+    event({ kind: 'text_delta', text: 'about to call' });
+    event({ kind: 'tool_use', id: 't1', name: 'Edit', input: {} });
+    event({ kind: 'text_delta', text: 'after' });
+    // The stream was closed, so the trailing delta starts a NEW assistant item.
+    expect(result.current.items).toMatchObject([
+      { kind: 'assistant', text: 'about to call' },
+      { kind: 'tool', toolName: 'Edit' },
+      { kind: 'assistant', text: 'after' },
+    ]);
+  });
+
+  it('treats a missing text on a delta or a finalised block as empty', () => {
+    const { result } = renderHook(() => useCopilot(0));
+    event({ kind: 'text' });
+    expect(result.current.items).toMatchObject([{ kind: 'assistant', text: '' }]);
+  });
+
+  it('surfaces a server error as an error item', () => {
+    const { result } = renderHook(() => useCopilot(0));
+    emit({ type: 'copilot:error', error: 'boom' });
+    expect(result.current.items).toMatchObject([{ kind: 'error', text: 'boom' }]);
+  });
+
+  it('gives every item a distinct id, increasing as they arrive', () => {
+    const { result } = renderHook(() => useCopilot(0));
+    event({ kind: 'text', text: 'a' });
+    event({ kind: 'text', text: 'b' });
+    event({ kind: 'text', text: 'c' });
+    const ids = result.current.items.map((i: { id: number }) => i.id);
+    expect(new Set(ids).size).toBe(3);
+    expect([...ids].sort((x, y) => x - y)).toEqual(ids);
+  });
+});
+
+describe('useCopilot wire payloads', () => {
+  it.each([
+    ['cancel', (r: Record<string, (...a: unknown[]) => void>) => r.cancel(), { type: 'copilot:cancel' }],
+    ['newSession', (r: Record<string, (...a: unknown[]) => void>) => r.newSession(), { type: 'copilot:new' }],
+    [
+      'deleteChat',
+      (r: Record<string, (...a: unknown[]) => void>) => r.deleteChat('c-1'),
+      { type: 'copilot:delete', chatId: 'c-1' },
+    ],
+    [
+      'openChat',
+      (r: Record<string, (...a: unknown[]) => void>) => r.openChat('c-2', 'opencode'),
+      { type: 'copilot:open', chatId: 'c-2', backend: 'opencode' },
+    ],
+  ])('%s sends the exact payload', (_label, call, expected) => {
+    const { result } = renderHook(() => useCopilot(0));
+    act(() => call(result.current as unknown as Record<string, (...a: unknown[]) => void>));
+    expect(fake.sent).toEqual([expected]);
+  });
+
+  it('carries the turn options on send and on compact, and echoes the user turn', () => {
+    const { result } = renderHook(() => useCopilot(0));
+    const opts = { mode: 'plan', backend: 'claude-code', model: 'opus', effort: 'high' };
+
+    act(() => result.current.send('do it', opts));
+    expect(fake.sent).toEqual([{ type: 'copilot:send', text: 'do it', ...opts }]);
+    expect(result.current.items).toMatchObject([{ kind: 'user', text: 'do it' }]);
+
+    act(() => result.current.compact(opts));
+    expect(fake.sent[1]).toEqual({ type: 'copilot:compact', ...opts });
+    expect(result.current.items[1]).toMatchObject({ kind: 'user', text: '/compact' });
+  });
+
+  it.each(['', '   ', '\n\t'])('refuses to send the blank message %p', (text) => {
+    const { result } = renderHook(() => useCopilot(0));
+    act(() => result.current.send(text, { mode: 'plan' }));
+    expect(fake.sent).toEqual([]);
+    expect(result.current.items).toEqual([]);
+  });
+
+  it('clears the transcript and stats on a new session', () => {
+    const { result } = renderHook(() => useCopilot(0));
+    event({ kind: 'text', text: 'old' });
+    event({ kind: 'result', sessionId: 's', stats: { ok: true, text: '', costUsd: 1, durationMs: 2, turns: 1, contextTokens: 3, outputTokens: 4 } });
+    expect(result.current.items).toHaveLength(1);
+
+    act(() => result.current.newSession());
+    expect(result.current.items).toEqual([]);
+    expect(result.current.stats).toMatchObject({ turns: 0, costUsd: 0 });
+  });
+});
+
+// Every callback is memoised so the dock's children do not re-render on each transcript update.
+// A dependency array that lists the wrong thing shows up here and nowhere else.
+describe('useCopilot callback identity', () => {
+  it('keeps every returned callback stable across a re-render', () => {
+    const { result, rerender } = renderHook(() => useCopilot(0));
+    const before = { ...result.current };
+
+    event({ kind: 'text', text: 'changes state' });
+    rerender();
+
+    for (const name of ['send', 'compact', 'cancel', 'newSession', 'openChat', 'deleteChat'] as const) {
+      expect(result.current[name], name).toBe(before[name]);
+    }
+  });
+});

@@ -102,7 +102,7 @@ describe('restoreCard', () => {
   it('lands at the end of the target column', async () => {
     const root = await tempDir();
     const first = await make(root, 'todo', 'first');
-    const second = await make(root, 'todo', 'second');
+    await make(root, 'todo', 'second'); // stays put; only its position relative to `first` matters
     const archived = await archiveCard(root, first, at('10:00'));
 
     await restoreCard(root, config, archived);

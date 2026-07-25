@@ -108,8 +108,11 @@ export async function scaffoldProject(
   await writeFile(join(projectRoot, 'VIBEBOARD.md'), VIBEBOARD_DOC, 'utf8');
   await writeFile(join(projectRoot, INSTRUCTIONS_FILE), INSTRUCTIONS_DOC, 'utf8');
   const greenfield = opts.mode === 'greenfield';
-  await ensurePointerFile(projectRoot, 'CLAUDE.md', opts.name, greenfield);
-  await ensurePointerFile(projectRoot, 'AGENTS.md', opts.name, greenfield);
+  // Driven by the same list ensureControlFiles walks, so adding a CLI's pointer file is one
+  // edit rather than two places that must agree.
+  for (const filename of POINTER_FILES) {
+    await ensurePointerFile(projectRoot, filename, opts.name, greenfield);
+  }
   // Sample cards demonstrate the shape for a brand-new project. Adopting an existing repo
   // should add the cockpit and nothing else — three "delete me" cards would just be noise in
   // someone's real project (and in their git status).

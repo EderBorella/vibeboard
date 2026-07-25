@@ -30,7 +30,7 @@ export function App() {
 
   // Copilot state lives here (not in the panel) so the transcript + socket survive
   // closing/reopening the dock. The server-side session persists regardless.
-  const copilot = useCopilot();
+  const copilot = useCopilot(bump);
   // Mode is per-turn and deliberately NOT persisted — you pick it for the task at hand.
   const [copilotMode, setCopilotMode] = useState<CopilotMode>('bypassPermissions');
 

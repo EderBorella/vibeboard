@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ChatMeta, WireTranscriptItem } from '../shared';
+import { useSharedWs } from '../ws';
 
 // Backend-specific; concrete values come from BACKEND_CAPS in shared.ts.
 export type CopilotMode = string;
@@ -42,7 +43,22 @@ interface CopilotEvent {
 
 const ZERO: CopilotStats = { costUsd: 0, turns: 0, lastDurationMs: 0, contextTokens: 0 };
 
-export function useCopilot() {
+// The copilot half of the shared /ws stream. Board snapshots come down the same socket and are
+// simply not matched here — useSnapshot handles those.
+type WsCopilotMessage =
+  | { type: 'copilot:event'; event: CopilotEvent }
+  | { type: 'copilot:state'; state: { running: boolean; sessionId?: string; model?: string } }
+  | {
+      type: 'copilot:history';
+      chats: ChatMeta[];
+      currentChatId?: string;
+      items: WireTranscriptItem[];
+      stats: CopilotStats;
+    }
+  | { type: 'copilot:chats'; chats: ChatMeta[]; currentChatId?: string }
+  | { type: 'copilot:error'; error: string };
+
+export function useCopilot(bump: number) {
   const [items, setItems] = useState<TranscriptItem[]>([]);
   const [running, setRunning] = useState(false);
   const [sessionId, setSessionId] = useState<string | undefined>();
@@ -50,7 +66,6 @@ export function useCopilot() {
   const [stats, setStats] = useState<CopilotStats>(ZERO);
   const [chats, setChats] = useState<ChatMeta[]>([]);
   const [currentChatId, setCurrentChatId] = useState<string | undefined>();
-  const ws = useRef<WebSocket | null>(null);
   const nextId = useRef(1);
   const streamId = useRef<number | null>(null); // bubble currently being streamed via deltas
   const deltaMode = useRef(false);              // true once any delta seen (partial streaming on)
@@ -112,21 +127,31 @@ export function useCopilot() {
     }
   }, [push, openStream, appendStream]);
 
-  useEffect(() => {
-    const socket = new WebSocket(`ws://${location.host}/ws`);
-    socket.onmessage = (ev) => {
-      const m = JSON.parse(ev.data as string);
-      if (m.type === 'copilot:event') apply(m.event);
-      else if (m.type === 'copilot:state') { setRunning(m.state.running); setSessionId(m.state.sessionId); setModel(m.state.model); }
-      else if (m.type === 'copilot:history') { setChats(m.chats); setCurrentChatId(m.currentChatId); hydrate(m.items, m.stats); }
-      else if (m.type === 'copilot:chats') { setChats(m.chats); setCurrentChatId(m.currentChatId); }
-      else if (m.type === 'copilot:error') push({ kind: 'error', text: m.error });
-    };
-    ws.current = socket;
-    return () => socket.close();
-  }, [apply, push, hydrate]);
+  const ws = useSharedWs(bump);
+  useEffect(() => ws.subscribe((raw) => {
+    // One cast at the wire boundary; the switch narrows from there. A board snapshot arriving
+    // on the shared socket matches no case and is ignored.
+    const m = raw as WsCopilotMessage;
+    switch (m.type) {
+      case 'copilot:event':
+        apply(m.event);
+        break;
+      case 'copilot:state':
+        setRunning(m.state.running); setSessionId(m.state.sessionId); setModel(m.state.model);
+        break;
+      case 'copilot:history':
+        setChats(m.chats); setCurrentChatId(m.currentChatId); hydrate(m.items, m.stats);
+        break;
+      case 'copilot:chats':
+        setChats(m.chats); setCurrentChatId(m.currentChatId);
+        break;
+      case 'copilot:error':
+        push({ kind: 'error', text: m.error });
+        break;
+    }
+  }), [ws, apply, push, hydrate]);
 
-  const sendRaw = (payload: object): void => ws.current?.send(JSON.stringify(payload));
+  const sendRaw = (payload: object): void => ws.send(payload);
 
   // Reset streaming state at the start of a turn: Claude streams deltas, OpenCode sends a
   // full text block — resetting per turn keeps both correct even if the backend changed.

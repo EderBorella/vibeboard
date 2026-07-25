@@ -240,12 +240,10 @@ export class CopilotSession {
 
     child.stdout?.on('data', (chunk: Buffer) => {
       buf += chunk.toString('utf8');
-      let nl: number;
-      while ((nl = buf.indexOf('\n')) >= 0) {
-        const line = buf.slice(0, nl);
-        buf = buf.slice(nl + 1);
-        emitLine(line);
-      }
+      // Last piece is the incomplete tail; it stays buffered until the next chunk.
+      const lines = buf.split('\n');
+      buf = lines.pop() ?? '';
+      for (const line of lines) emitLine(line);
     });
     child.stderr?.on('data', (chunk: Buffer) => {
       stderr += chunk.toString('utf8');

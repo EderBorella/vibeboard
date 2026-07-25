@@ -58,8 +58,8 @@ export function ensureCopilotDefaults(config: ProjectConfig): boolean {
   }
 
   if (copilot.model || copilot.effort) {
-    const slot =
-      copilot.backends[copilot.backend] ?? (copilot.backends[copilot.backend] = { model: '', effort: '' });
+    copilot.backends[copilot.backend] ??= { model: '', effort: '' };
+    const slot = copilot.backends[copilot.backend];
     if (!slot.model && copilot.model) slot.model = copilot.model;
     if (!slot.effort && copilot.effort) slot.effort = copilot.effort;
     delete copilot.model;

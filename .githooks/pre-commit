@@ -73,19 +73,14 @@ else
   tail -30 "$LOGS/test.log"
 fi
 
-# ---- lint (report only, for now) ---------------------------------------------------------------
-# Not blocking yet. The linter arrived after the code did: 98 errors across 21 files, 19 of them
-# web components carrying accessibility findings (untyped buttons, div click handlers). Gating on
-# that today would mean any UI edit must first clear an unrelated backlog, and a gate you have to
-# bypass constantly is worse than no gate.
-#
-# TO MAKE IT BLOCKING once the backlog is cleared: change `dim`/`true` below to `bad`, i.e.
-#   if "$BIOME" lint --max-diagnostics=none >"$LOGS/lint.log" 2>&1; then ok "lint"; else bad "lint"; fi
+# ---- lint --------------------------------------------------------------------------------------
+# Blocking as of zero errors. Warnings do not fail this — there are 69 of them (non-null
+# assertions, complexity) and biome exits 0 on warnings alone, which is the behaviour we want.
 if "$BIOME" lint --max-diagnostics=none >"$LOGS/lint.log" 2>&1; then
   ok "lint"
 else
-  counts=$(grep -oE 'Found [0-9]+ (error|warning)s?' "$LOGS/lint.log" | paste -sd'~' - | sed 's/~/, /g')
-  dim "  lint: ${counts:-findings present} (not blocking — see .githooks/pre-commit)"
+  bad "lint"
+  grep -vE '^\s*$' "$LOGS/lint.log" | head -30
 fi
 
 if [ "$fail" -ne 0 ]; then

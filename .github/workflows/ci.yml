@@ -48,12 +48,8 @@ jobs:
       - run: npm test
       - run: npm run build
 
-      # Non-blocking, matching .githooks/pre-commit exactly. The linter arrived after the code: 98
-      # errors across 21 files, 19 of them accessibility findings in web components. Visible in the
-      # log so the number cannot quietly grow, but not fatal — a gate that is always red teaches
-      # people to ignore gates. Remove continue-on-error once the backlog is triaged.
+      # Blocking, matching .githooks/pre-commit. Warnings alone do not fail it.
       - run: npm run lint
-        continue-on-error: true
 
 # Deliberately NOT here: `npm run mutate`. On a 2 vCPU runner Stryker's default concurrency is 1,
 # and the 844-mutant scope is ~30-40 minutes of single-worker time. Nightly would be 900-1,200

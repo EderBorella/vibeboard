@@ -1,5 +1,6 @@
 import type { FastifyReply } from 'fastify';
 import type { ProjectSession } from './session.js';
+import type { ProjectConfig } from '../core/types.js';
 import type { CopilotSession } from './copilot.js';
 import type { ChatStore } from './chat-store.js';
 
@@ -23,8 +24,13 @@ export const today = (): string => new Date().toISOString().slice(0, 10);
 // stamp would leave everything archived today in an arbitrary order.
 export const nowIso = (): string => new Date().toISOString();
 
-export function ensureOpen(session: ProjectSession, reply: FastifyReply): boolean {
-  if (!session.isOpen) {
+// A type predicate, not a boolean: past this guard `root` and `config` are known to be set, so
+// handlers read them directly instead of asserting non-null at every use.
+export function ensureOpen(
+  session: ProjectSession,
+  reply: FastifyReply,
+): session is ProjectSession & { root: string; config: ProjectConfig } {
+  if (!session.root || !session.config) {
     reply.code(409).send({ error: 'No project open' });
     return false;
   }

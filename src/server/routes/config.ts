@@ -18,15 +18,15 @@ export async function registerConfigRoutes(api: FastifyInstance, ctx: AppCtx): P
     // otherwise drop the others, and ensureBoards would silently reset them to defaults.
     // Same for `copilot.backends`, per backend: a patch naming one backend's slot must not
     // discard the other's remembered model — that loss is the bug per-backend slots fix.
-    const backends = { ...ctx.session.config!.copilot?.backends };
+    const backends = { ...ctx.session.config.copilot?.backends };
     for (const [name, slot] of Object.entries(patch.copilot?.backends ?? {})) {
       backends[name] = { ...backends[name], ...slot };
     }
     const merged: ProjectConfig = {
-      ...ctx.session.config!,
+      ...ctx.session.config,
       ...patch,
-      copilot: { ...ctx.session.config!.copilot, ...(patch.copilot ?? {}), backends },
-      boards: { ...ctx.session.config!.boards, ...(patch.boards ?? {}) },
+      copilot: { ...ctx.session.config.copilot, ...(patch.copilot ?? {}), backends },
+      boards: { ...ctx.session.config.boards, ...(patch.boards ?? {}) },
     };
 
     // A column is a folder, so a column edit has to move folders too — otherwise the renamed
@@ -43,9 +43,9 @@ export async function registerConfigRoutes(api: FastifyInstance, ctx: AppCtx): P
         const next = patch.boards[board]?.columns;
         if (!next) continue;
         const result = await reconcileColumns(
-          ctx.session.root!,
+          ctx.session.root,
           board,
-          ctx.session.config!.boards[board].columns,
+          ctx.session.config.boards[board].columns,
           next,
         );
         if (isRefused(result))
@@ -53,7 +53,7 @@ export async function registerConfigRoutes(api: FastifyInstance, ctx: AppCtx): P
       }
     }
 
-    await writeConfig(ctx.session.root!, merged);
+    await writeConfig(ctx.session.root, merged);
     await ctx.session.reloadConfig();
     // Push the updated snapshot so all clients reflect the new config immediately (the
     // watcher would also fire, but this is instant and race-free for the backend toggle).

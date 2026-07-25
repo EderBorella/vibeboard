@@ -16,13 +16,13 @@ import { ensureOpen, type AppCtx } from '../route-context.js';
 export async function registerControlRoutes(api: FastifyInstance, ctx: AppCtx): Promise<void> {
   api.get('/control/files', async (_req, reply) => {
     if (!ensureOpen(ctx.session, reply)) return;
-    return { groups: await listControlFiles(ctx.session.root!) };
+    return { groups: await listControlFiles(ctx.session.root) };
   });
 
   api.get('/control/file', async (req, reply) => {
     if (!ensureOpen(ctx.session, reply)) return;
     const { path } = req.query as { path?: string };
-    const file = await readControlFile(ctx.session.root!, path);
+    const file = await readControlFile(ctx.session.root, path);
     if (!file) return reply.code(400).send({ error: 'Path not allowed' });
     return file;
   });
@@ -30,7 +30,7 @@ export async function registerControlRoutes(api: FastifyInstance, ctx: AppCtx): 
   api.put('/control/file', async (req, reply) => {
     if (!ensureOpen(ctx.session, reply)) return;
     const { path, content } = req.body as { path?: string; content?: string };
-    const ok = await writeControlFile(ctx.session.root!, path, content ?? '');
+    const ok = await writeControlFile(ctx.session.root, path, content ?? '');
     if (!ok) return reply.code(400).send({ error: 'Path not allowed' });
     return { ok: true };
   });
@@ -40,7 +40,7 @@ export async function registerControlRoutes(api: FastifyInstance, ctx: AppCtx): 
   api.post('/control/create', async (req, reply) => {
     if (!ensureOpen(ctx.session, reply)) return;
     const { category } = req.body as { category?: string };
-    const file = await createControlFile(ctx.session.root!, category);
+    const file = await createControlFile(ctx.session.root, category);
     if (!file) return reply.code(400).send({ error: 'Cannot create in that category' });
     return file;
   });
@@ -48,7 +48,7 @@ export async function registerControlRoutes(api: FastifyInstance, ctx: AppCtx): 
   api.post('/control/rename', async (req, reply) => {
     if (!ensureOpen(ctx.session, reply)) return;
     const { path, name } = req.body as { path?: string; name?: string };
-    const result = await renameControlFile(ctx.session.root!, path, name);
+    const result = await renameControlFile(ctx.session.root, path, name);
     if (result === 'taken') return reply.code(409).send({ error: 'That name is already used' });
     if (!result) return reply.code(400).send({ error: 'Cannot rename that file' });
     return result;
@@ -57,7 +57,7 @@ export async function registerControlRoutes(api: FastifyInstance, ctx: AppCtx): 
   api.delete('/control/file', async (req, reply) => {
     if (!ensureOpen(ctx.session, reply)) return;
     const { path } = req.query as { path?: string };
-    const result = await deleteControlFile(ctx.session.root!, path);
+    const result = await deleteControlFile(ctx.session.root, path);
     if (result === 'invalid') return reply.code(400).send({ error: 'Path not allowed' });
     if (result === 'not-allowed') return reply.code(400).send({ error: 'This file cannot be deleted' });
     return { ok: true };
@@ -65,13 +65,13 @@ export async function registerControlRoutes(api: FastifyInstance, ctx: AppCtx): 
 
   api.get('/control/resources', async (_req, reply) => {
     if (!ensureOpen(ctx.session, reply)) return;
-    return { links: await readResources(ctx.session.root!) };
+    return { links: await readResources(ctx.session.root) };
   });
 
   api.put('/control/resources', async (req, reply) => {
     if (!ensureOpen(ctx.session, reply)) return;
     const { links } = req.body as { links?: unknown[] };
-    await writeResources(ctx.session.root!, links ?? []);
+    await writeResources(ctx.session.root, links ?? []);
     return { ok: true };
   });
 }

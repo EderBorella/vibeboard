@@ -32,7 +32,7 @@ interface Command { bin: string; args: string[] }
 
 function claudeCommand(opts: SendOptions, sessionId: string | undefined): Command {
   const { permission, persona } = resolveMode(opts.mode);
-  const appendPrompt = [vibeboardInstructions(), persona].filter(Boolean).join('\n\n');
+  const appendPrompt = [vibeboardInstructions(), projectInstructions(opts.cwd), persona].filter(Boolean).join('\n\n');
   const args = ['-p', '--output-format', 'stream-json', '--include-partial-messages', '--verbose', '--permission-mode', permission];
   if (appendPrompt) args.push('--append-system-prompt', appendPrompt);
   if (opts.model) args.push('--model', opts.model);
@@ -83,6 +83,18 @@ function vibeboardInstructions(): string {
   return cachedInstructions;
 }
 
+// The user's own project instructions (INSTRUCTIONS.md at the project root), read FRESH each
+// turn — no cache — so edits (by the user or the copilot) take effect on the next message with
+// no restart. Injected into the system prompt for both backends. Absent/empty file → no-op.
+function projectInstructions(cwd: string): string {
+  try {
+    const body = readFileSync(resolve(cwd, 'INSTRUCTIONS.md'), 'utf8').trim();
+    return body ? `# Project instructions (from INSTRUCTIONS.md)\n\n${body}` : '';
+  } catch {
+    return '';
+  }
+}
+
 // One headless Claude Code turn at a time, resumed across turns by session id, run in the
 // open project's directory so its file edits flow back through the board watcher.
 export class CopilotSession {
@@ -130,7 +142,7 @@ export class CopilotSession {
   async #sendOpencode(opts: SendOptions): Promise<void> {
     this.#model = opts.model;
     const persona = opts.mode === 'research' ? RESEARCH_PERSONA : '';
-    const system = [vibeboardInstructions(), persona].filter(Boolean).join('\n\n');
+    const system = [vibeboardInstructions(), projectInstructions(opts.cwd), persona].filter(Boolean).join('\n\n');
     const abort = new AbortController();
     this.#abort = abort;
     const timeoutMs = Number(process.env.VIBEBOARD_COPILOT_TIMEOUT_MS ?? 180000);

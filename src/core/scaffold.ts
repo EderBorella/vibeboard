@@ -1,14 +1,13 @@
-import { mkdir, writeFile, readFile } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { defaultConfig, writeConfig, CONFIG_DIR } from './config.js';
 import { boardColumnSlugs, ARCHIVE_SLUG } from './board.js';
 import { createCard } from './mutations.js';
 import { setCardLinks } from './links.js';
+import { ensurePointerFile, INSTRUCTIONS_FILE, INSTRUCTIONS_DOC } from './control.js';
 import { BOARDS, type ProjectConfig } from './types.js';
 
 export type ScaffoldMode = 'greenfield' | 'brownfield';
-
-const POINTER = 'See VIBEBOARD.md for card conventions.';
 
 export const VIBEBOARD_DOC = `# VibeBoard card conventions
 
@@ -51,25 +50,6 @@ async function ensureFolders(projectRoot: string, config: ProjectConfig): Promis
       await mkdir(join(projectRoot, board, slug), { recursive: true });
     }
   }
-}
-
-// Write/point an agent instructions file (CLAUDE.md for Claude Code, AGENTS.md for
-// OpenCode) at VIBEBOARD.md so either backend picks up the conventions.
-async function writePointerFile(projectRoot: string, filename: string, name: string, mode: ScaffoldMode): Promise<void> {
-  const path = join(projectRoot, filename);
-  if (mode === 'greenfield') {
-    await writeFile(path, `# ${name}\n\n${POINTER}\n`, 'utf8');
-    return;
-  }
-  let existing = '';
-  try {
-    existing = await readFile(path, 'utf8');
-  } catch {
-    /* no existing file */
-  }
-  if (existing.includes('VIBEBOARD.md')) return;
-  const sep = existing.endsWith('\n') || existing === '' ? '' : '\n';
-  await writeFile(path, `${existing}${sep}\n${POINTER}\n`, 'utf8');
 }
 
 async function writeSampleCards(projectRoot: string, config: ProjectConfig, today: string): Promise<void> {
@@ -121,7 +101,9 @@ export async function scaffoldProject(
   await ensureFolders(projectRoot, config);
   await writeConfig(projectRoot, config);
   await writeFile(join(projectRoot, 'VIBEBOARD.md'), VIBEBOARD_DOC, 'utf8');
-  await writePointerFile(projectRoot, 'CLAUDE.md', opts.name, opts.mode);
-  await writePointerFile(projectRoot, 'AGENTS.md', opts.name, opts.mode);
+  await writeFile(join(projectRoot, INSTRUCTIONS_FILE), INSTRUCTIONS_DOC, 'utf8');
+  const greenfield = opts.mode === 'greenfield';
+  await ensurePointerFile(projectRoot, 'CLAUDE.md', opts.name, greenfield);
+  await ensurePointerFile(projectRoot, 'AGENTS.md', opts.name, greenfield);
   await writeSampleCards(projectRoot, config, opts.today);
 }

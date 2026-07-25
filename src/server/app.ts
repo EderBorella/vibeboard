@@ -11,6 +11,14 @@ import { writeConfig } from '../core/config.js';
 import { discoverProjects } from './discover.js';
 import { CopilotSession, type Backend, type CopilotMode, type EffortLevel } from './copilot.js';
 import { ChatStore } from './chat-store.js';
+import {
+  listControlFiles,
+  readControlFile,
+  writeControlFile,
+  deleteControlFile,
+  readResources,
+  writeResources,
+} from './control-files.js';
 import type { ProjectSession } from './session.js';
 import type { BoardName, CardFrontmatter, ProjectConfig } from '../core/types.js';
 
@@ -188,6 +196,50 @@ export function buildApp(session: ProjectSession): FastifyInstance {
     api.get('/model-status', async (req) => {
       const { id } = req.query as { id?: string };
       return { status: id ? await modelStatus(id) : null };
+    });
+
+    // Project Control: the file controller for documents that steer the models. Every path is
+    // sandboxed to the project root + an allow-list inside control-files.ts.
+    api.get('/control/files', async (req, reply) => {
+      if (!ensureOpen(session, reply)) return;
+      return { groups: await listControlFiles(session.root!) };
+    });
+
+    api.get('/control/file', async (req, reply) => {
+      if (!ensureOpen(session, reply)) return;
+      const { path } = req.query as { path?: string };
+      const file = await readControlFile(session.root!, path);
+      if (!file) return reply.code(400).send({ error: 'Path not allowed' });
+      return file;
+    });
+
+    api.put('/control/file', async (req, reply) => {
+      if (!ensureOpen(session, reply)) return;
+      const { path, content } = req.body as { path?: string; content?: string };
+      const ok = await writeControlFile(session.root!, path, content ?? '');
+      if (!ok) return reply.code(400).send({ error: 'Path not allowed' });
+      return { ok: true };
+    });
+
+    api.delete('/control/file', async (req, reply) => {
+      if (!ensureOpen(session, reply)) return;
+      const { path } = req.query as { path?: string };
+      const result = await deleteControlFile(session.root!, path);
+      if (result === 'invalid') return reply.code(400).send({ error: 'Path not allowed' });
+      if (result === 'not-allowed') return reply.code(400).send({ error: 'This file cannot be deleted' });
+      return { ok: true };
+    });
+
+    api.get('/control/resources', async (req, reply) => {
+      if (!ensureOpen(session, reply)) return;
+      return { links: await readResources(session.root!) };
+    });
+
+    api.put('/control/resources', async (req, reply) => {
+      if (!ensureOpen(session, reply)) return;
+      const { links } = req.body as { links?: unknown[] };
+      await writeResources(session.root!, links ?? []);
+      return { ok: true };
     });
 
     api.post('/project/open', async (req, reply) => {

@@ -126,3 +126,68 @@ export function moveCard(board: BoardName, id: string, toColumnSlug: string): Pr
 export function archiveCard(board: BoardName, id: string): Promise<unknown> {
   return post(`/api/cards/${board}/${id}/archive`, {});
 }
+
+// ---- Project Control -------------------------------------------------------
+
+export type ControlCategory = 'instructions' | 'skills' | 'docs' | 'resources';
+
+export interface ControlFile {
+  path: string;
+  name: string;
+  category: ControlCategory;
+  managed: boolean;
+  deletable: boolean;
+}
+
+export interface ControlGroup {
+  key: ControlCategory;
+  label: string;
+  files: ControlFile[];
+}
+
+export interface ResourceLink {
+  title: string;
+  url: string;
+  note?: string;
+}
+
+export async function listControlFiles(): Promise<ControlGroup[]> {
+  const res = await fetch('/api/control/files');
+  if (!res.ok) throw new Error('Failed to load control files');
+  return (await res.json()).groups as ControlGroup[];
+}
+
+export async function getControlFile(path: string): Promise<ControlFile & { content: string }> {
+  const res = await fetch(`/api/control/file?path=${encodeURIComponent(path)}`);
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Failed to load file');
+  return res.json();
+}
+
+export async function putControlFile(path: string, content: string): Promise<void> {
+  const res = await fetch('/api/control/file', {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ path, content }),
+  });
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Failed to save file');
+}
+
+export async function deleteControlFile(path: string): Promise<void> {
+  const res = await fetch(`/api/control/file?path=${encodeURIComponent(path)}`, { method: 'DELETE' });
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Failed to delete file');
+}
+
+export async function getResources(): Promise<ResourceLink[]> {
+  const res = await fetch('/api/control/resources');
+  if (!res.ok) throw new Error('Failed to load resources');
+  return (await res.json()).links as ResourceLink[];
+}
+
+export async function putResources(links: ResourceLink[]): Promise<void> {
+  const res = await fetch('/api/control/resources', {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ links }),
+  });
+  if (!res.ok) throw new Error('Failed to save resources');
+}

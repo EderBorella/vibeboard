@@ -3,6 +3,7 @@ import { BOARDS, BOARD_LABELS, type BoardName, type Card } from './shared';
 import { useSnapshot } from './useSnapshot';
 import { getState, moveCard, archiveCard, patchConfig } from './api';
 import { Board } from './components/Board';
+import { ProjectControl } from './components/ProjectControl';
 import { ProjectGate } from './components/ProjectGate';
 import { CardEditor, type EditorState } from './components/CardEditor';
 import { SettingsModal } from './components/SettingsModal';
@@ -22,6 +23,7 @@ export function App() {
   const [editor, setEditor] = useState<EditorState | null>(null);
   const [copilotOpen, setCopilotOpen] = useState(true);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [tab, setTab] = useState<'boards' | 'control'>('boards');
   const dragged = useRef<Card | null>(null);
   const { snapshot, conn } = useSnapshot(bump);
 
@@ -88,6 +90,12 @@ export function App() {
       <header className="topbar">
         <span className="brand">VibeBoard</span>
         {snapshot && !showGate && <span className="project-name">{snapshot.name}</span>}
+        {snapshot && !showGate && (
+          <div className="topbar-tabs" role="group" aria-label="View">
+            <button className={`tab-btn${tab === 'boards' ? ' active' : ''}`} onClick={() => setTab('boards')}>Boards</button>
+            <button className={`tab-btn${tab === 'control' ? ' active' : ''}`} onClick={() => setTab('control')}>Project Control</button>
+          </div>
+        )}
         <div className="topbar-right">
           <select className="theme-select" value={theme} title="Theme" onChange={(e) => setTheme(e.target.value)}>
             {THEMES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
@@ -115,24 +123,28 @@ export function App() {
         <div className="empty">{conn === 'open' ? 'No project open.' : 'Connecting…'}</div>
       ) : (
         <div className="work">
-        <main className="boards">
-          {BOARDS.map((board) => (
-            <Board
-              key={board}
-              board={board}
-              label={BOARD_LABELS[board]}
-              cards={snapshot.boards[board] ?? []}
-              config={snapshot.config}
-              collapsed={collapsed.has(board)}
-              onToggle={() => toggleBoard(board)}
-              onAdd={onAdd}
-              onOpen={onOpen}
-              onArchive={onArchive}
-              onDragStart={onDragStart}
-              onDrop={onDrop}
-            />
-          ))}
-        </main>
+        {tab === 'boards' ? (
+          <main className="boards">
+            {BOARDS.map((board) => (
+              <Board
+                key={board}
+                board={board}
+                label={BOARD_LABELS[board]}
+                cards={snapshot.boards[board] ?? []}
+                config={snapshot.config}
+                collapsed={collapsed.has(board)}
+                onToggle={() => toggleBoard(board)}
+                onAdd={onAdd}
+                onOpen={onOpen}
+                onArchive={onArchive}
+                onDragStart={onDragStart}
+                onDrop={onDrop}
+              />
+            ))}
+          </main>
+        ) : (
+          <ProjectControl snapshot={snapshot} />
+        )}
         {copilotOpen && (
           <CopilotPanel
             copilot={copilot}

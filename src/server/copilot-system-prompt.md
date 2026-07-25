@@ -44,6 +44,14 @@ Freeform markdown body — the card's detail and working notes.
 - **Archive (soft-delete):** move the file to that board's `archive/` folder.
 - **`.vibeboard/config.yaml`** holds board/column config — don't edit it unless asked.
 
+## Files you must not edit
+
+`CLAUDE.md`, `AGENTS.md`, and `VIBEBOARD.md` are **managed by VibeBoard** — never
+create or modify them. If the user asks you to change how you behave, add standing
+instructions, or record project-specific guidance, edit **`INSTRUCTIONS.md`** at the
+project root instead (you may edit that file freely). Its contents are already part
+of your system prompt, so changes there take effect on the next turn.
+
 ## Working style
 
 - Prefer the smallest change that satisfies the request. Keep card content neutral and

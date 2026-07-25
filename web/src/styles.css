@@ -460,3 +460,103 @@ body {
 @media (prefers-reduced-motion: reduce) {
   * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
+
+/* ---------- Top tabs (Boards | Project Control) ---------- */
+.topbar-tabs { display: flex; gap: 0.25rem; margin-left: 0.5rem; }
+.tab-btn {
+  background: transparent; color: var(--muted); border: 1px solid transparent;
+  border-radius: 6px; padding: 0.3rem 0.7rem; font-size: 0.78rem; cursor: pointer;
+  font-family: var(--font-display); letter-spacing: 0.04em;
+}
+.tab-btn:hover { color: var(--text); }
+.tab-btn.active { color: var(--accent); border-color: var(--border); background: var(--panel-2); box-shadow: var(--glow); }
+
+/* ---------- Project Control tab ---------- */
+.control { flex: 1; min-width: 0; display: flex; background: var(--wash); }
+.control-list {
+  width: 260px; flex-shrink: 0; overflow-y: auto; padding: 0.75rem;
+  border-right: 1px solid var(--border); display: flex; flex-direction: column; gap: 0.9rem;
+}
+.control-group { display: flex; flex-direction: column; gap: 0.15rem; }
+.control-group-head {
+  display: flex; align-items: center; justify-content: space-between;
+  font-family: var(--font-display); text-transform: uppercase; letter-spacing: 0.12em;
+  font-size: 0.68rem; color: var(--muted); padding: 0 0.15rem 0.15rem;
+}
+.control-new {
+  background: transparent; border: none; color: var(--accent); cursor: pointer;
+  font-size: 0.95rem; line-height: 1; padding: 0 0.2rem;
+}
+.control-item {
+  display: flex; align-items: center; gap: 0.4rem; width: 100%; text-align: left;
+  background: transparent; color: var(--text); border: 1px solid transparent;
+  border-radius: 6px; padding: 0.35rem 0.5rem; font-size: 0.8rem; cursor: pointer;
+}
+.control-item:hover { background: var(--panel-2); }
+.control-item.active { background: var(--panel-2); border-color: var(--accent); color: var(--accent); }
+.control-item-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.control-tag {
+  font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--accent-2);
+  border: 1px solid var(--border); border-radius: 4px; padding: 0.05rem 0.3rem;
+}
+.control-empty { color: var(--muted); font-size: 0.72rem; padding: 0 0.5rem; }
+
+.control-editor { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
+.control-editor-head {
+  display: flex; align-items: center; gap: 0.5rem; padding: 0.55rem 0.9rem;
+  border-bottom: 1px solid var(--border); background: var(--panel);
+}
+.control-editor-path { font-family: var(--font-mono); font-size: 0.76rem; color: var(--muted); }
+.control-tabs { display: flex; gap: 0.25rem; margin-left: 0.5rem; }
+.control-tabs button {
+  background: var(--panel-2); color: var(--muted); border: 1px solid var(--border);
+  border-radius: 6px; padding: 0.2rem 0.6rem; font-size: 0.74rem; cursor: pointer;
+}
+.control-tabs button.active { color: var(--text); border-color: var(--accent); }
+.control-editor-actions { margin-left: auto; display: flex; gap: 0.4rem; }
+.btn-danger {
+  background: transparent; color: var(--danger); border: 1px solid var(--border);
+  border-radius: 6px; padding: 0.35rem 0.8rem; font-size: 0.78rem; cursor: pointer;
+}
+.btn-danger:hover { border-color: var(--danger); }
+.btn-danger:disabled { opacity: 0.5; cursor: default; }
+.control-disclaimer {
+  margin: 0.6rem 0.9rem 0; padding: 0.5rem 0.7rem; font-size: 0.76rem; line-height: 1.45;
+  color: var(--text); background: color-mix(in srgb, var(--danger) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--danger) 40%, var(--border)); border-radius: 6px;
+}
+.control-textarea {
+  flex: 1; margin: 0.75rem 0.9rem; resize: none; background: var(--bg); color: var(--text);
+  border: 1px solid var(--border); border-radius: 6px; padding: 0.8rem;
+  font-family: var(--font-mono); font-size: 0.82rem; line-height: 1.5;
+}
+.control-textarea:focus { outline: none; border-color: var(--accent); }
+.control-preview { flex: 1; overflow-y: auto; padding: 0.75rem 1.1rem; }
+.control-blank { margin: auto; color: var(--muted); padding: 2rem; }
+.control-error { padding: 0.5rem 0.9rem; color: var(--danger); font-size: 0.78rem; }
+
+/* Rendered markdown (preview pane) */
+.markdown { line-height: 1.6; color: var(--text); }
+.markdown h1, .markdown h2, .markdown h3 { font-family: var(--font-display); margin: 1rem 0 0.5rem; }
+.markdown h1 { font-size: 1.3rem; } .markdown h2 { font-size: 1.1rem; } .markdown h3 { font-size: 0.98rem; }
+.markdown p { margin: 0.5rem 0; }
+.markdown ul, .markdown ol { margin: 0.5rem 0 0.5rem 1.3rem; }
+.markdown li { margin: 0.2rem 0; }
+.markdown code { font-family: var(--font-mono); font-size: 0.85em; background: var(--panel-2); padding: 0.05rem 0.3rem; border-radius: 4px; }
+.markdown pre { background: var(--panel-2); border: 1px solid var(--border); border-radius: 6px; padding: 0.7rem; overflow-x: auto; }
+.markdown pre code { background: transparent; padding: 0; }
+.markdown a { color: var(--accent); }
+.markdown blockquote { margin: 0.5rem 0; padding-left: 0.8rem; border-left: 3px solid var(--border); color: var(--muted); }
+.markdown hr { border: none; border-top: 1px solid var(--border); margin: 1rem 0; }
+
+/* Resources links registry */
+.resources-table { flex: 1; overflow-y: auto; padding: 0.75rem 0.9rem; display: flex; flex-direction: column; gap: 0.4rem; }
+.resource-row { display: flex; gap: 0.4rem; align-items: center; }
+.resource-row input {
+  background: var(--bg); color: var(--text); border: 1px solid var(--border);
+  border-radius: 6px; padding: 0.35rem 0.5rem; font-size: 0.8rem;
+}
+.resource-row input:focus { outline: none; border-color: var(--accent); }
+.res-title { flex: 1; } .res-url { flex: 1.4; } .res-note { flex: 1.2; }
+.res-del { background: transparent; border: none; color: var(--muted); cursor: pointer; font-size: 0.9rem; }
+.res-del:hover { color: var(--danger); }

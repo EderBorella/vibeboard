@@ -25,6 +25,97 @@ function parseCsv(text: string): string[] {
     .filter(Boolean);
 }
 
+export interface CardFields {
+  title: string;
+  description: string;
+  tags: string;
+  group: string;
+  body: string;
+}
+
+export interface SaveInput {
+  editor: EditorState;
+  tab: Tab;
+  fields: CardFields;
+  links: string[];
+  raw: string;
+}
+
+// Which write a save performs depends on the tab and the mode: the Raw tab writes the file
+// verbatim, create posts a new card then reconciles links by its assigned id, edit patches.
+export async function saveCard(input: SaveInput): Promise<void> {
+  const { editor, tab, fields, links, raw } = input;
+  if (tab === 'raw' && editor.mode === 'edit') {
+    await putRaw(editor.card.board, editor.card.id, raw);
+    return;
+  }
+  if (editor.mode === 'create') {
+    const created = await createCard({
+      board: editor.board,
+      columnSlug: editor.columnSlug,
+      title: fields.title,
+      description: fields.description || undefined,
+      tags: parseCsv(fields.tags),
+      group: fields.group || undefined,
+      body: fields.body || undefined,
+    });
+    await setLinksApi(created.board, created.id, links);
+    return;
+  }
+  await patchCard(editor.card.board, editor.card.id, {
+    title: fields.title,
+    description: fields.description,
+    tags: parseCsv(fields.tags),
+    group: fields.group,
+    body: fields.body,
+  });
+  await setLinksApi(editor.card.board, editor.card.id, links);
+}
+
+// Initial form values, derived once from the card being edited (all blank when creating).
+export function initialFields(existing: Card | null): CardFields {
+  return {
+    title: existing?.title ?? '',
+    description: existing?.description ?? '',
+    tags: csv(existing?.tags ?? []),
+    group: existing?.group ?? '',
+    body: existing?.body ?? '',
+  };
+}
+
+// The link picker: cards grouped by board, boards with nothing to offer omitted.
+function LinkPicker({
+  linkable,
+  links,
+  onToggle,
+}: {
+  linkable: Card[];
+  links: string[];
+  onToggle: (id: string) => void;
+}) {
+  if (linkable.length === 0) return <div className="links-hint">No other cards yet to link.</div>;
+  return (
+    <div className="links-list">
+      {BOARDS.map((b) => {
+        const group = linkable.filter((c) => c.board === b);
+        if (group.length === 0) return null;
+        return (
+          <div key={b}>
+            <div className="links-group">{BOARD_LABELS[b]}</div>
+            {group.map((c) => (
+              <label key={c.id} className="link-option">
+                <input type="checkbox" checked={links.includes(c.id)} onChange={() => onToggle(c.id)} />
+                <span className="link-id">{c.id}</span>
+                <span className="link-title">{c.title}</span>
+              </label>
+            ))}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export function CardEditor({ editor, allCards, onClose, onSaved }: Props) {
   const existing = editor.mode === 'edit' ? editor.card : null;
   const board = editor.mode === 'edit' ? editor.card.board : editor.board;
@@ -33,12 +124,13 @@ export function CardEditor({ editor, allCards, onClose, onSaved }: Props) {
   const linkable = allCards.filter((c) => c.id !== existing?.id);
 
   const [tab, setTab] = useState<Tab>('form');
-  const [title, setTitle] = useState(existing?.title ?? '');
-  const [description, setDescription] = useState(existing?.description ?? '');
-  const [tags, setTags] = useState(csv(existing?.tags ?? []));
-  const [group, setGroup] = useState(existing?.group ?? '');
+  const init = initialFields(existing);
+  const [title, setTitle] = useState(init.title);
+  const [description, setDescription] = useState(init.description);
+  const [tags, setTags] = useState(init.tags);
+  const [group, setGroup] = useState(init.group);
   const [links, setLinks] = useState<string[]>(existing?.links ?? []);
-  const [body, setBody] = useState(existing?.body ?? '');
+  const [body, setBody] = useState(init.body);
 
   function toggleLink(id: string): void {
     setLinks((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
@@ -64,30 +156,7 @@ export function CardEditor({ editor, allCards, onClose, onSaved }: Props) {
     setBusy(true);
     setError(null);
     try {
-      if (tab === 'raw' && existing) {
-        await putRaw(existing.board, existing.id, raw);
-      } else if (editor.mode === 'create') {
-        // Create the card first, then reconcile links symmetrically by its new id.
-        const created = await createCard({
-          board: editor.board,
-          columnSlug: editor.columnSlug,
-          title,
-          description: description || undefined,
-          tags: parseCsv(tags),
-          group: group || undefined,
-          body: body || undefined,
-        });
-        await setLinksApi(created.board, created.id, links);
-      } else {
-        await patchCard(editor.card.board, editor.card.id, {
-          title,
-          description,
-          tags: parseCsv(tags),
-          group,
-          body,
-        });
-        await setLinksApi(editor.card.board, editor.card.id, links);
-      }
+      await saveCard({ editor, tab, fields: { title, description, tags, group, body }, links, raw });
       onSaved();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -143,32 +212,7 @@ export function CardEditor({ editor, allCards, onClose, onSaved }: Props) {
               </label>
               <div className="field">
                 <span>Linked cards</span>
-                {linkable.length === 0 ? (
-                  <div className="links-hint">No other cards yet to link.</div>
-                ) : (
-                  <div className="links-list">
-                    {BOARDS.map((b) => {
-                      const group = linkable.filter((c) => c.board === b);
-                      if (group.length === 0) return null;
-                      return (
-                        <div key={b}>
-                          <div className="links-group">{BOARD_LABELS[b]}</div>
-                          {group.map((c) => (
-                            <label key={c.id} className="link-option">
-                              <input
-                                type="checkbox"
-                                checked={links.includes(c.id)}
-                                onChange={() => toggleLink(c.id)}
-                              />
-                              <span className="link-id">{c.id}</span>
-                              <span className="link-title">{c.title}</span>
-                            </label>
-                          ))}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
+                <LinkPicker linkable={linkable} links={links} onToggle={toggleLink} />
               </div>
               <label className="field">
                 <span>Body (markdown)</span>

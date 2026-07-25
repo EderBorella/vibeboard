@@ -71,8 +71,7 @@ describe('CopilotSession', () => {
 
   it('forwards model, effort, and requests partial-message streaming', async () => {
     const session = new CopilotSession();
-    const events: CopilotEvent[] = [];
-    await session.send({ cwd: here, text: 'x', mode: 'acceptEdits', model: 'haiku', effort: 'low', onEvent: (e) => events.push(e) });
+    await session.send({ cwd: here, text: 'x', mode: 'acceptEdits', model: 'haiku', effort: 'low', onEvent: () => {} });
     const args = lastArgs()[0];
     expect(args).toContain('--include-partial-messages');
     expect(args[args.indexOf('--model') + 1]).toBe('haiku');
@@ -90,8 +89,7 @@ describe('CopilotSession', () => {
 
   it('treats empty strings as unset rather than passing them through', async () => {
     const session = new CopilotSession();
-    const events: CopilotEvent[] = [];
-    await session.send({ cwd: here, text: 'x', mode: 'plan', model: '', effort: '', onEvent: (e) => events.push(e) });
+    await session.send({ cwd: here, text: 'x', mode: 'plan', model: '', effort: '', onEvent: () => {} });
     const args = lastArgs()[0];
     expect(args[args.indexOf('--model') + 1]).toBe('opus');
     expect(args[args.indexOf('--effort') + 1]).toBe('high');

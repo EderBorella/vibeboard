@@ -1,27 +1,12 @@
-import { describe, it, expect, afterEach } from 'vitest';
-import { tempDir } from './helpers.js';
-import { ProjectSession } from '../src/server/session.js';
-import { buildApp } from '../src/server/app.js';
+import { describe, it, expect } from 'vitest';
+import { openTestProject } from './helpers.js';
 import type { FastifyInstance } from 'fastify';
-
-let session: ProjectSession | undefined;
-let app: FastifyInstance | undefined;
-
-afterEach(async () => {
-  await app?.close();
-  await session?.close();
-  app = undefined;
-  session = undefined;
-});
 
 interface WireCard { id: string; title: string; columnSlug: string; restoreTo?: string }
 
 async function setup(): Promise<{ app: FastifyInstance; ids: string[] }> {
-  session = new ProjectSession();
-  app = buildApp(session);
-  const root = await tempDir();
   // brownfield = no sample cards, so the archive under test is entirely ours
-  await app.inject({ method: 'POST', url: '/api/project/scaffold', payload: { path: root, name: 'Arc', mode: 'brownfield' } });
+  const { app } = await openTestProject({ name: 'Arc', mode: 'brownfield' });
   const ids: string[] = [];
   for (const [columnSlug, title] of [['todo', 'a'], ['in-progress', 'b']] as const) {
     const res = await app.inject({

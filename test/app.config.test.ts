@@ -1,19 +1,5 @@
-import { describe, it, expect, afterEach } from 'vitest';
-import WebSocket from 'ws';
-import { tempDir } from './helpers.js';
-import { ProjectSession } from '../src/server/session.js';
-import { buildApp } from '../src/server/app.js';
-import type { FastifyInstance } from 'fastify';
-
-let session: ProjectSession | undefined;
-let app: FastifyInstance | undefined;
-
-afterEach(async () => {
-  await app?.close();
-  await session?.close();
-  app = undefined;
-  session = undefined;
-});
+import { describe, it, expect } from 'vitest';
+import { openTestProject, wsClient } from './helpers.js';
 
 interface WsMessage { type: string; snapshot?: { config?: { copilot?: { backend?: string } } } }
 
@@ -23,25 +9,16 @@ describe('PATCH /api/config', () => {
   // backend toggle. (The watcher DOES also see .vibeboard/config.yaml since c318024; only
   // .vibeboard/chat is ignored — see isIgnored in src/server/session.ts.)
   it('broadcasts an updated snapshot so clients see the new backend', async () => {
-    session = new ProjectSession();
-    app = buildApp(session);
-    const root = await tempDir();
-    await app.inject({ method: 'POST', url: '/api/project/scaffold', payload: { path: root, name: 'Cfg', mode: 'greenfield' } });
+    const { app } = await openTestProject({ name: 'Cfg' });
 
     const address = await app.listen({ port: 0, host: '127.0.0.1' });
-    const client = new WebSocket(`${address.replace('http', 'ws')}/ws`);
-    const messages: WsMessage[] = [];
-    const waiters: Array<(m: WsMessage) => void> = [];
-    client.on('message', (d) => { const m = JSON.parse(d.toString()) as WsMessage; messages.push(m); waiters.forEach((w) => w(m)); });
-    const waitFor = (pred: (m: WsMessage) => boolean): Promise<WsMessage> =>
-      new Promise((resolve) => { const e = messages.find(pred); if (e) return resolve(e); waiters.push((m) => { if (pred(m)) resolve(m); }); });
-
-    await new Promise<void>((r) => client.on('open', () => r()));
-    await waitFor((m) => m.type === 'snapshot'); // initial (claude-code default)
+    const client = wsClient<WsMessage>(address);
+    await client.open;
+    await client.waitFor((m) => m.type === 'snapshot'); // initial (claude-code default)
 
     await app.inject({ method: 'PATCH', url: '/api/config', payload: { copilot: { backend: 'opencode' } } });
 
-    const updated = await waitFor((m) => m.type === 'snapshot' && m.snapshot?.config?.copilot?.backend === 'opencode');
+    const updated = await client.waitFor((m) => m.type === 'snapshot' && m.snapshot?.config?.copilot?.backend === 'opencode');
     expect(updated.snapshot!.config!.copilot!.backend).toBe('opencode');
 
     client.close();
@@ -52,13 +29,10 @@ describe('PATCH /api/config', () => {
   // model saved for the backend the patch doesn't mention, which is the loss that per-backend
   // slots exist to prevent.
   it('merges a partial copilot patch per backend instead of replacing the block', async () => {
-    session = new ProjectSession();
-    app = buildApp(session);
-    const root = await tempDir();
-    await app.inject({ method: 'POST', url: '/api/project/scaffold', payload: { path: root, name: 'Cfg', mode: 'greenfield' } });
+    const { app } = await openTestProject({ name: 'Cfg' });
 
     const patch = async (copilot: unknown) =>
-      (await app!.inject({ method: 'PATCH', url: '/api/config', payload: { copilot } })).json().copilot;
+      (await app.inject({ method: 'PATCH', url: '/api/config', payload: { copilot } })).json().copilot;
 
     // One backend's slot: the other backend's slot is untouched.
     let copilot = await patch({ backend: 'claude-code', backends: { 'claude-code': { model: 'sonnet' } } });
@@ -77,10 +51,7 @@ describe('PATCH /api/config', () => {
   });
 
   it('persists a context budget the copilot bar can use', async () => {
-    session = new ProjectSession();
-    app = buildApp(session);
-    const root = await tempDir();
-    await app.inject({ method: 'POST', url: '/api/project/scaffold', payload: { path: root, name: 'Cfg', mode: 'greenfield' } });
+    const { app } = await openTestProject({ name: 'Cfg' });
 
     const fresh = (await app.inject({ method: 'GET', url: '/api/config' })).json();
     expect(fresh.contextBudget).toBe(200_000);
@@ -94,10 +65,7 @@ describe('PATCH /api/config — column reconciliation', () => {
   // Regression: a column IS a folder. Renaming one used to leave its cards in the old folder,
   // where nothing reads them — they vanished from the board and looked deleted.
   it('renames the folder so the column keeps its cards', async () => {
-    session = new ProjectSession();
-    app = buildApp(session);
-    const root = await tempDir();
-    await app.inject({ method: 'POST', url: '/api/project/scaffold', payload: { path: root, name: 'Cols', mode: 'greenfield' } });
+    const { app } = await openTestProject({ name: 'Cols' });
 
     // The scaffold puts a sample card in product/todo.
     const before = await app.inject({ method: 'GET', url: '/api/state' });
@@ -119,10 +87,7 @@ describe('PATCH /api/config — column reconciliation', () => {
   });
 
   it('refuses to remove a column that still holds cards, and saves nothing', async () => {
-    session = new ProjectSession();
-    app = buildApp(session);
-    const root = await tempDir();
-    await app.inject({ method: 'POST', url: '/api/project/scaffold', payload: { path: root, name: 'Cols', mode: 'greenfield' } });
+    const { app } = await openTestProject({ name: 'Cols' });
 
     const res = await app.inject({
       method: 'PATCH', url: '/api/config',
@@ -138,10 +103,7 @@ describe('PATCH /api/config — column reconciliation', () => {
   // Regression: `{...config, ...patch}` replaced `boards` wholesale, so a patch naming one
   // board dropped the others from config.yaml — and ensureBoards then reset them to defaults.
   it('leaves boards absent from the patch untouched', async () => {
-    session = new ProjectSession();
-    app = buildApp(session);
-    const root = await tempDir();
-    await app.inject({ method: 'POST', url: '/api/project/scaffold', payload: { path: root, name: 'Cols', mode: 'greenfield' } });
+    const { app } = await openTestProject({ name: 'Cols' });
     await app.inject({ method: 'PATCH', url: '/api/config', payload: { boards: { engineering: { columns: ['Todo', 'Shipped'] } } } });
 
     const cfg = (await app.inject({ method: 'GET', url: '/api/config' })).json();
@@ -151,10 +113,7 @@ describe('PATCH /api/config — column reconciliation', () => {
   });
 
   it('rejects a reserved or duplicate column name', async () => {
-    session = new ProjectSession();
-    app = buildApp(session);
-    const root = await tempDir();
-    await app.inject({ method: 'POST', url: '/api/project/scaffold', payload: { path: root, name: 'Cols', mode: 'greenfield' } });
+    const { app } = await openTestProject({ name: 'Cols' });
 
     for (const columns of [['Todo', 'Archive'], ['Todo', 'todo']]) {
       const res = await app.inject({ method: 'PATCH', url: '/api/config', payload: { boards: { product: { columns } } } });

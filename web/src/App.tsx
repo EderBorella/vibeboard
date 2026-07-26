@@ -21,6 +21,7 @@ import {
   type CardFrontmatterPatch,
   DEFAULT_CONTEXT_BUDGET,
 } from './shared';
+import { useSkills } from './skills/useSkills';
 import { useCopilotChoice } from './useCopilotChoice';
 import { useCollapsedBoards, useTheme } from './useLocalPrefs';
 import { useSnapshot } from './useSnapshot';
@@ -61,6 +62,9 @@ export function App() {
 
   const [theme, setTheme] = useTheme();
   const [collapsed, toggleBoard] = useCollapsedBoards();
+  // Refetched on every snapshot, so a SKILL.md written by the user or an agent reaches the rail
+  // without a reload.
+  const catalogue = useSkills(snapshot);
 
   const allCards = snapshot ? BOARDS.flatMap((b) => snapshot.boards[b] ?? []) : [];
   // Chips come from every card, not the filtered set, so the bar does not shrink out from under
@@ -144,6 +148,8 @@ export function App() {
               onOpenCard={onOpen}
               onPatch={onPatch}
               onLinks={onLinks}
+              skills={catalogue.skills}
+              invalid={catalogue.invalid}
             />
           ),
         },

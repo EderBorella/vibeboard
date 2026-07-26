@@ -591,7 +591,8 @@ body {
 }
 .cs-action:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
 .cs-action:disabled { opacity: 0.45; cursor: default; }
-.cs-note { margin: 0.2rem 0 0; font-size: 0.68rem; font-style: italic; color: var(--muted); }
+.cs-empty { margin: 0.2rem 0 0; font-size: 0.7rem; color: var(--muted); line-height: 1.4; }
+.cs-invalid { margin: 0.3rem 0 0; font-size: 0.7rem; color: var(--danger); cursor: help; }
 
 /* Inline editing: a field looks like text until hovered, and becomes an input on click. */
 .inline-view {

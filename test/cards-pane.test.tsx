@@ -52,6 +52,8 @@ const props = {
   onPatch: vi.fn(),
   onLinks: vi.fn(),
   config,
+  skills: [],
+  invalid: [],
 };
 
 describe('CardsPane', () => {
@@ -228,6 +230,33 @@ describe('CardsPane', () => {
     fireEvent.click(screen.getByText('Change'));
     fireEvent.click(screen.getByText('E-002').closest('label')?.querySelector('input') as HTMLElement);
     expect(onLinks.mock.calls).toEqual([[live[0], ['E-002']]]);
+  });
+
+  it('hands the catalogue to the rail, skills and invalid files alike', () => {
+    // Without this, the pane could pass an empty list and every rail test would still pass — the
+    // planted defect that found this gap was exactly that.
+    render(
+      <CardsPane
+        {...props}
+        skills={[
+          {
+            slug: 'execute',
+            path: '.claude/skills/execute/SKILL.md',
+            name: 'Execute',
+            description: 'Implement the card',
+            boards: [],
+            columns: [],
+            prompt: 'p',
+          },
+        ]}
+        invalid={[{ slug: 'broken', path: '.claude/skills/broken/SKILL.md', reason: 'needs a name' }]}
+        tabs={[ref('E-001')]}
+        activeId="E-001"
+        live={[card('E-001')]}
+      />,
+    );
+    expect(screen.getByText('Execute').className).toBe('cs-action');
+    expect(screen.getByText('⚠ 1 skill file invalid')).toBeTruthy();
   });
 
   it('rails the open card with its skill actions, and drops the rail when none is open', () => {

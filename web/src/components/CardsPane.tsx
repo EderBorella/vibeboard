@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { InvalidSkill, Skill } from '../api';
 import type { CardRef } from '../dock/tabs';
 import { resolveTab } from '../dock/tabs';
 import type { Card, CardFrontmatterPatch, ProjectConfig } from '../shared';
@@ -17,6 +18,10 @@ interface Props {
   onOpenCard: (card: Card) => void;
   onPatch: (card: Card, patch: CardFrontmatterPatch) => void;
   onLinks: (card: Card, links: string[]) => void;
+  // The skill catalogue, passed straight to the rail. Fetched once by the shell rather than per
+  // pane, so switching card costs no request.
+  skills: Skill[];
+  invalid: InvalidSkill[];
 }
 
 export function CardsPane({
@@ -29,6 +34,8 @@ export function CardsPane({
   onOpenCard,
   onPatch,
   onLinks,
+  skills,
+  invalid,
 }: Props) {
   const [raw, setRaw] = useState(false);
   // Falls back to the first tab so a stale activeId cannot leave the pane blank. Resolved once:
@@ -100,7 +107,7 @@ export function CardsPane({
         </div>
         {/* Actions belong to a card, so the rail goes when there is none — an empty rail would take
             width off the card for nothing. */}
-        {card && <CardSkills card={card} />}
+        {card && <CardSkills card={card} skills={skills} invalid={invalid} />}
       </div>
     </div>
   );

@@ -62,6 +62,7 @@ export default {
     'web/src/skills/useSkills.ts',
     'web/src/runs/useCardRuns.ts',
     'web/src/runs/useRuns.ts',
+    'web/src/runs/useDispatch.ts',
     'web/src/runs/viewmodel.ts',
     'web/src/copilot/choice.ts',
     'web/src/copilot/format.ts',

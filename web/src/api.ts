@@ -17,6 +17,16 @@ async function post<T>(url: string, body: unknown): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+async function put<T>(url: string, body: unknown): Promise<T> {
+  const res = await fetch(url, {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? res.statusText);
+  return res.json() as Promise<T>;
+}
+
 async function patch<T>(url: string, body: unknown): Promise<T> {
   const res = await fetch(url, {
     method: 'PATCH',
@@ -351,4 +361,19 @@ export function dispatchRun(body: DispatchRequest): Promise<{ run: RunRecord }> 
 
 export function cancelRun(run: string): Promise<{ ok: boolean }> {
   return post<{ ok: boolean }>(`/api/runs/${encodeURIComponent(run)}/cancel`, {});
+}
+
+// Write a skill from its fields; the server serialises the YAML and answers with the catalogue as it
+// now reads it — including a validation failure the fields alone could not predict.
+export function putSkill(
+  slug: string,
+  fields: {
+    name: string;
+    description: string;
+    boards: BoardName[];
+    columns: string[];
+    prompt: string;
+  },
+): Promise<SkillCatalogue> {
+  return put<SkillCatalogue>(`/api/skills/${encodeURIComponent(slug)}`, fields);
 }

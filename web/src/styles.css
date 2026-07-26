@@ -975,3 +975,18 @@ body {
   margin-left: 0.35rem; font-family: var(--font-mono); font-size: 0.62rem;
   background: var(--accent-2); color: var(--on-accent); border-radius: 999px; padding: 0 0.32rem;
 }
+
+/* ---------- Skill editor (fields view in Project Control) ---------- */
+.skill-editor { display: flex; flex-direction: column; gap: 0.6rem; padding: 0.8rem 1.1rem; overflow-y: auto; }
+.skill-row { display: flex; align-items: center; gap: 0.6rem; }
+.skill-label { width: 6rem; flex: 0 0 auto; font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+.skill-input, .skill-prompt {
+  flex: 1; min-width: 0; background: var(--bg); color: var(--text);
+  border: 1px solid var(--border); border-radius: 6px; padding: 0.35rem 0.5rem; font: inherit; font-size: 0.85rem;
+}
+.skill-prompt { resize: vertical; font-family: var(--font-mono); font-size: 0.8rem; }
+.skill-scope { border: 1px solid var(--border); border-radius: 8px; padding: 0.4rem 0.7rem 0.6rem; margin: 0; }
+.skill-scope legend { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; padding: 0 0.3rem; }
+.skill-hint { margin: 0 0 0.3rem; font-size: 0.7rem; color: var(--muted); font-style: italic; }
+.skill-foot { display: flex; justify-content: flex-end; }
+.skill-invalid { padding: 1rem 1.1rem; color: var(--danger); font-size: 0.85rem; line-height: 1.5; }

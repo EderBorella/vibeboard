@@ -113,3 +113,22 @@ export function skillsForCard(skills: Skill[], board: BoardName, columnSlug: str
       (s.columns.length === 0 || s.columns.includes(columnSlug)),
   );
 }
+
+// The fields a skill is authored from. What the editor sends; the file is derived from it, so the
+// YAML is written in exactly one place.
+export interface SkillFields {
+  name: string;
+  description: string;
+  boards: BoardName[];
+  columns: string[];
+  prompt: string;
+}
+
+// Write a skill file from its fields. Empty scoping lists are omitted rather than written as `[]`:
+// "every board" is the absence of a restriction, and an empty list reads like a mistake.
+export function serializeSkill(fields: SkillFields): string {
+  const lines = [`name: ${fields.name.trim()}`, `description: ${fields.description.trim()}`];
+  if (fields.boards.length > 0) lines.push(`boards: [${fields.boards.join(', ')}]`);
+  if (fields.columns.length > 0) lines.push(`columns: [${fields.columns.join(', ')}]`);
+  return `---\n${lines.join('\n')}\n---\n${fields.prompt.trim()}\n`;
+}

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useState } from 'react';
 import {
   type ControlCategory,
   type ControlFile,
@@ -8,12 +8,15 @@ import {
   getControlFile,
   listControlFiles,
   putControlFile,
+  putSkill,
   renameControlFile,
 } from '../api';
 import type { ProjectSnapshot } from '../shared';
+import { useSkills } from '../skills/useSkills';
 import { ControlFileEditor, type ControlView, type OpenFile } from './ControlFileEditor';
 import { ControlFileList, RESOURCES_SENTINEL } from './ControlFileList';
 import { ResourcesEditor } from './ResourcesEditor';
+import { SkillEditor } from './SkillEditor';
 
 interface Props {
   // Bumps whenever the project changes on disk (shared snapshot stream) so the file list and
@@ -42,6 +45,9 @@ export function ProjectControl({ snapshot }: Props) {
   // create so the new file lands with its name selected and ready to type over.
   const [renaming, setRenaming] = useState<string | null>(null);
   const [renameDraft, setRenameDraft] = useState('');
+  // The catalogue, so a skill can be edited as fields. Refetched on every snapshot, which includes
+  // the write this editor just made.
+  const catalogue = useSkills(snapshot);
 
   const refreshGroups = useCallback(async () => {
     try {
@@ -58,7 +64,8 @@ export function ProjectControl({ snapshot }: Props) {
       setFile(f);
       setDraft(f.content);
       setDirty(false);
-      setView('edit');
+      // A skill opens as fields; anything else is text.
+      setView(f.category === 'skills' ? 'fields' : 'edit');
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
@@ -158,6 +165,43 @@ export function ProjectControl({ snapshot }: Props) {
     }
   }
 
+  // The fields view for a skill: the parsed skill when it is valid, and the reason when it is not —
+  // an invalid file has no fields to show, so the only honest thing is to say why and let Raw fix it.
+  function skillFields(open: OpenFile): ReactNode {
+    const valid = catalogue.skills.find((s) => s.path === open.path);
+    if (valid) {
+      return (
+        <SkillEditor
+          key={valid.slug}
+          skill={valid}
+          config={snapshot.config}
+          busy={busy}
+          onSave={async (fields) => {
+            setBusy(true);
+            setError(null);
+            try {
+              await putSkill(valid.slug, fields);
+              await loadFile(open.path);
+              await refreshGroups();
+            } catch (e) {
+              setError(e instanceof Error ? e.message : String(e));
+            } finally {
+              setBusy(false);
+            }
+          }}
+        />
+      );
+    }
+    const invalid = catalogue.invalid.find((i) => i.path === open.path);
+    return (
+      <p className="skill-invalid">
+        {invalid
+          ? `This skill is not valid, so it does not appear on any card: ${invalid.reason}. Fix it in Raw.`
+          : 'Loading…'}
+      </p>
+    );
+  }
+
   return (
     <section className="control">
       <ControlFileList
@@ -179,6 +223,8 @@ export function ProjectControl({ snapshot }: Props) {
         ) : file ? (
           <ControlFileEditor
             file={file}
+            fieldsAvailable={file.category === 'skills'}
+            fields={skillFields(file)}
             draft={draft}
             dirty={dirty}
             view={view}

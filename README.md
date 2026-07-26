@@ -145,7 +145,10 @@ expose it to the public internet.
 - **Skill rail** beside an open card, driven by `.claude/skills/*/SKILL.md` files
   you can add or edit. A skill declares the boards and columns it belongs to, so
   the rail shows only what fits the card in front of you, and a file that fails
-  validation is reported with the reason rather than silently ignored
+  validation is reported with the reason rather than silently ignored. Author one
+  as **fields** in Project Control — name, description, and boards and columns
+  ticked from the live config, so an invalid scope cannot be typed — with `Raw`
+  always one click away, because the file is still the truth
 - **Run a skill as an agent**: pick connector, model, effort and mode (all
   pre-filled from your defaults), add a prompt and attach project files, and the
   agent works the card. It reports back through a file contract, so a run either
@@ -176,8 +179,6 @@ expose it to the public internet.
 
 **On the roadmap**
 
-- **Skill editor** — author a skill as fields rather than YAML, with the boards
-  and columns picked from the live config
 - **Embedded terminal** — a full interactive agent session in the browser
 - **Plugin management** in the Project Control tab
 - **External resources** — attach reference folders, PDFs, and notes to a project

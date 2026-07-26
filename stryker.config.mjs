@@ -82,6 +82,7 @@ export default {
     'web/src/components/ExecutionView.tsx',
     'web/src/components/BoardsView.tsx',
     'web/src/components/WorkArea.tsx',
+    'web/src/components/SkillEditor.tsx',
     'web/src/components/UtilityDock.tsx',
     'web/src/components/ModelPicker.tsx',
     'web/src/components/model-format.ts',

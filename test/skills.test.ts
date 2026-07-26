@@ -5,6 +5,7 @@ import {
   parseSkill,
   type Skill,
   type SkillParse,
+  serializeSkill,
   skillPath,
   skillsForCard,
 } from '../src/core/skills.js';
@@ -200,5 +201,53 @@ describe('skillsForCard', () => {
       'Eng',
       'Anywhere',
     ]);
+  });
+});
+
+describe('serializeSkill', () => {
+  it('round-trips through parseSkill', () => {
+    const text = serializeSkill({
+      name: 'Execute',
+      description: 'Implement the card',
+      boards: ['engineering'],
+      columns: ['todo', 'in-progress'],
+      prompt: 'Do the work.\n\nCarefully.',
+    });
+    const parsed = parseSkill('execute', text, config);
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+    expect(parsed.skill).toEqual({
+      slug: 'execute',
+      path: '.claude/skills/execute/SKILL.md',
+      name: 'Execute',
+      description: 'Implement the card',
+      boards: ['engineering'],
+      columns: ['todo', 'in-progress'],
+      prompt: 'Do the work.\n\nCarefully.',
+    });
+  });
+
+  it('omits an empty scope rather than writing an empty list', () => {
+    // "Every board" is the absence of a restriction; `boards: []` reads like a mistake, and a reader
+    // of the file should not have to know they mean the same thing.
+    const text = serializeSkill({
+      name: 'N',
+      description: 'D',
+      boards: [],
+      columns: [],
+      prompt: 'P',
+    });
+    expect(text).toBe('---\nname: N\ndescription: D\n---\nP\n');
+  });
+
+  it('trims what it is given', () => {
+    const text = serializeSkill({
+      name: '  N  ',
+      description: '  D  ',
+      boards: [],
+      columns: [],
+      prompt: '\n  P  \n',
+    });
+    expect(text).toBe('---\nname: N\ndescription: D\n---\nP\n');
   });
 });

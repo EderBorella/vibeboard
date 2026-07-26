@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { CardRef } from '../dock/tabs';
 import { resolveTab } from '../dock/tabs';
 import type { Card, CardFrontmatterPatch, ProjectConfig } from '../shared';
+import { CardSkills } from './CardSkills';
 import { CardView } from './CardView';
 import { RawPane } from './RawPane';
 
@@ -76,25 +77,30 @@ export function CardsPane({
         )}
       </div>
 
-      <div className="cards-body">
-        {card && raw && <RawPane key={card.id} card={card} />}
-        {card && !raw && (
-          <CardView
-            card={card}
-            config={config}
-            allCards={live}
-            onOpenCard={onOpenCard}
-            onPatch={editable ? (patch) => onPatch(card, patch) : undefined}
-            onLinks={editable ? (links) => onLinks(card, links) : undefined}
-          />
-        )}
-        {!card && (
-          // Either nothing is open, or the card left the board while its tab was — deleted outside
-          // the app, or its file moved. Saying so beats an empty pane that looks broken.
-          <div className="cards-gone">
-            {activeRef ? `${activeRef.id} is no longer on the board.` : 'No card open.'}
-          </div>
-        )}
+      <div className="cards-main">
+        <div className="cards-body">
+          {card && raw && <RawPane key={card.id} card={card} />}
+          {card && !raw && (
+            <CardView
+              card={card}
+              config={config}
+              allCards={live}
+              onOpenCard={onOpenCard}
+              onPatch={editable ? (patch) => onPatch(card, patch) : undefined}
+              onLinks={editable ? (links) => onLinks(card, links) : undefined}
+            />
+          )}
+          {!card && (
+            // Either nothing is open, or the card left the board while its tab was — deleted outside
+            // the app, or its file moved. Saying so beats an empty pane that looks broken.
+            <div className="cards-gone">
+              {activeRef ? `${activeRef.id} is no longer on the board.` : 'No card open.'}
+            </div>
+          )}
+        </div>
+        {/* Actions belong to a card, so the rail goes when there is none — an empty rail would take
+            width off the card for nothing. */}
+        {card && <CardSkills card={card} />}
       </div>
     </div>
   );

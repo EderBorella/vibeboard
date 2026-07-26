@@ -465,7 +465,9 @@ body {
 .link-id { font-family: var(--font-mono); font-size: 0.72rem; color: var(--accent); }
 .link-title { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* ---------- Card view (read-only tab) ---------- */
-.cardview { display: flex; flex-direction: column; gap: 0.6rem; }
+/* `anywhere` rather than `break-word`: only `anywhere` also shrinks the min-content size, so a long
+   unbroken token (a path, a URL) cannot stretch the flex items below past the pane. */
+.cardview { display: flex; flex-direction: column; gap: 0.6rem; overflow-wrap: anywhere; }
 .cv-title { font-family: var(--font-display); font-size: 1.25rem; line-height: 1.3; margin: 0; }
 .cv-meta {
   display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem;
@@ -568,8 +570,28 @@ body {
   border-radius: 6px; padding: 0.18rem 0.7rem; cursor: pointer; font-size: 0.76rem;
 }
 .cards-edit:hover { border-color: var(--accent); color: var(--accent); }
-.cards-body { flex: 1; overflow-y: auto; padding: 0.7rem 1rem; }
+.cards-main { flex: 1; min-height: 0; display: flex; }
+.cards-body { flex: 1; min-width: 0; overflow-y: auto; padding: 0.7rem 1rem; }
 .cards-gone { color: var(--muted); font-size: 0.82rem; font-style: italic; padding: 1rem 0; }
+
+/* Card action rail. Fixed width so the card body keeps a predictable measure whichever card is up. */
+.card-skills {
+  flex: 0 0 11rem; min-width: 0; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 0.35rem;
+  padding: 0.7rem 0.6rem; border-left: 1px solid var(--border); background: var(--panel-2);
+}
+.cs-head {
+  margin: 0 0 0.1rem; font-family: var(--font-display); font-size: 0.72rem;
+  text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted);
+}
+.cs-action {
+  background: var(--panel); color: var(--text); border: 1px solid var(--border);
+  border-radius: 6px; padding: 0.32rem 0.6rem; font-size: 0.8rem; text-align: left;
+  cursor: pointer;
+}
+.cs-action:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.cs-action:disabled { opacity: 0.45; cursor: default; }
+.cs-note { margin: 0.2rem 0 0; font-size: 0.68rem; font-style: italic; color: var(--muted); }
 
 /* Inline editing: a field looks like text until hovered, and becomes an input on click. */
 .inline-view {
@@ -577,6 +599,10 @@ body {
   color: inherit; font: inherit; text-align: left; cursor: text;
   padding: 0.1rem 0.35rem; margin: -0.1rem -0.35rem; width: 100%;
   display: block;
+  /* A <button> is a flex item whose automatic minimum size is its content on ONE line, and that
+     beats width:100% — which is why an editable description ran off the pane while the body (a div)
+     wrapped. Without this, the fix is invisible in the read-only view and absent in the edit one. */
+  min-width: 0;
 }
 .inline-view:hover { border-color: var(--border); background: var(--bg); }
 .inline-empty { color: var(--muted); font-style: italic; font-size: 0.8rem; }

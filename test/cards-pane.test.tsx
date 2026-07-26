@@ -230,6 +230,32 @@ describe('CardsPane', () => {
     expect(onLinks.mock.calls).toEqual([[live[0], ['E-002']]]);
   });
 
+  it('rails the open card with its skill actions, and drops the rail when none is open', () => {
+    const live = [card('E-001')];
+    const { container, rerender } = render(
+      <CardsPane {...props} tabs={[ref('E-001')]} activeId="E-001" live={live} />,
+    );
+    // Beside the body, not inside it: side-by-side is what gives the card a bounded measure, which
+    // is the whole reason a long description used to run off the pane.
+    expect(container.querySelector('.cards-main > .cards-body')).toBeTruthy();
+    expect(container.querySelector('.cards-main > .card-skills')?.getAttribute('aria-label')).toBe(
+      'Skills for E-001',
+    );
+
+    rerender(<CardsPane {...props} tabs={[]} activeId={null} live={live} />);
+    expect(container.querySelector('.card-skills')).toBeNull();
+  });
+
+  it('keeps the rail up with the file showing, so switching to Raw does not shift the layout', async () => {
+    const { container } = render(
+      <CardsPane {...props} tabs={[ref('E-001')]} activeId="E-001" live={[card('E-001')]} />,
+    );
+    await act(async () => {
+      fireEvent.click(screen.getByText('Raw'));
+    });
+    expect(container.querySelector('.card-skills')).toBeTruthy();
+  });
+
   it('edits a live card in place, and refuses to for an archived one', () => {
     // An archived card is not in the snapshot, so a patch would land on disk with nothing able to
     // show it — the pane offers no editing rather than lying about it.

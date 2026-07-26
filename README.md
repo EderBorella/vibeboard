@@ -160,7 +160,9 @@ expose it to the public internet.
 **On the roadmap**
 
 - **Skill buttons** — user-defined per-card actions (Execute, Research, Review…),
-  each routed to a chosen model and backend, with token/cost tracking
+  each routed to a chosen model and backend, with token/cost tracking. The rail
+  beside an open card is already there; the actions in it are placeholders and
+  disabled until the routing exists
 - **Embedded terminal** — a full interactive agent session in the browser
 - **Plugin management** in the Project Control tab
 - **External resources** — attach reference folders, PDFs, and notes to a project

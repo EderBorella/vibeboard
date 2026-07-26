@@ -877,3 +877,53 @@ body {
   border-radius: 6px; padding: 0.4rem 0.6rem;
 }
 .dispatch-foot { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 0.2rem; }
+
+/* ---------- Reports (a card's run history, and one report) ---------- */
+/* Deliberately not link-shaped: chips and times, so it cannot be mistaken for the card links. */
+.reports { display: flex; flex-direction: column; gap: 0.25rem; border-top: 1px solid var(--border); padding-top: 0.5rem; }
+.reports-head { margin: 0; font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+.report-row { display: flex; align-items: center; gap: 0.35rem; }
+.report-open {
+  flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 0.5rem;
+  background: transparent; border: 1px solid transparent; border-radius: 6px;
+  color: inherit; cursor: pointer; font: inherit; text-align: left; padding: 0.15rem 0.35rem;
+}
+.report-open:hover { border-color: var(--accent); }
+.report-chip {
+  flex: 0 0 auto; font-family: var(--font-mono); font-size: 0.62rem;
+  text-transform: uppercase; letter-spacing: 0.06em;
+  border: 1px solid var(--border); border-radius: 999px; padding: 0 0.4rem;
+}
+.chip-success { color: var(--accent); border-color: var(--accent); }
+.chip-attention { color: var(--accent-2); border-color: var(--accent-2); }
+.chip-failed, .chip-interrupted { color: var(--danger); border-color: var(--danger); }
+.chip-running, .chip-queued { color: var(--text); border-color: var(--text); }
+.chip-cancelled { color: var(--muted); }
+.report-skill { flex: 0 0 auto; font-size: 0.78rem; }
+.report-when { flex: 0 0 auto; color: var(--muted); font-family: var(--font-mono); font-size: 0.66rem; }
+.report-summary {
+  flex: 1; min-width: 0; color: var(--muted); font-size: 0.74rem;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.report-stop {
+  flex: 0 0 auto; background: var(--panel-2); color: var(--muted);
+  border: 1px solid var(--border); border-radius: 6px; cursor: pointer;
+  font-size: 0.68rem; padding: 0.1rem 0.4rem;
+}
+.report-stop:hover { color: var(--danger); border-color: var(--danger); }
+
+.report { display: flex; flex-direction: column; gap: 0.5rem; overflow-wrap: anywhere; }
+.report-head { display: flex; align-items: center; gap: 0.5rem; }
+.report-title { margin: 0; font-family: var(--font-display); font-size: 1rem; }
+.report-meta { display: flex; flex-wrap: wrap; gap: 0.2rem 1rem; margin: 0; font-size: 0.72rem; }
+.report-meta div { display: flex; gap: 0.35rem; }
+.report-meta dt { color: var(--muted); }
+.report-meta dd { margin: 0; font-family: var(--font-mono); }
+.report-lead { margin: 0; font-size: 0.9rem; padding-left: 0.7rem; border-left: 3px solid var(--accent); }
+.report-note { margin: 0; font-size: 0.82rem; color: var(--accent-2); }
+.report-prompt { margin: 0; font-size: 0.8rem; color: var(--muted); }
+.report-prompt-label { text-transform: uppercase; letter-spacing: 0.06em; font-size: 0.68rem; }
+.report-body { border-top: 1px solid var(--border); padding-top: 0.4rem; }
+.report-empty { color: var(--muted); font-style: italic; font-size: 0.82rem; }
+.report-created { display: flex; flex-direction: column; gap: 0.2rem; }
+.report-foot { display: flex; align-items: center; justify-content: flex-end; gap: 0.5rem; }

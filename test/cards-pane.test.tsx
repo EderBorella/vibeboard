@@ -1,9 +1,11 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 const api = vi.hoisted(() => ({
   getRaw: vi.fn(async () => 'file of the active card'),
   putRaw: vi.fn(async () => undefined),
+  listCardRuns: vi.fn(async () => [] as unknown[]),
+  cancelRun: vi.fn(async () => ({ ok: true })),
 }));
 vi.mock('../web/src/api.js', () => api);
 vi.mock('../web/src/api', () => api);
@@ -63,6 +65,8 @@ const props = {
     onRun: vi.fn(async () => {}),
     onBackend: vi.fn(),
   },
+  trigger: 0,
+  onMove: vi.fn(),
 };
 
 describe('CardsPane', () => {
@@ -405,6 +409,50 @@ describe('CardsPane', () => {
     expect(action.disabled).toBe(true);
     fireEvent.click(action);
     expect(screen.queryByLabelText('Run Execute on E-009')).toBeNull();
+  });
+
+  it('lists the card’s runs, and opens one in place of the card', async () => {
+    api.listCardRuns.mockResolvedValueOnce([
+      {
+        run: '20260726-143012-a1b2',
+        card: 'E-001',
+        board: 'engineering',
+        skill: 'execute',
+        status: 'success',
+        started: '2026-07-26T14:30:12.000Z',
+        finished: '2026-07-26T14:41:55.000Z',
+        backend: 'claude-code',
+        model: 'opus',
+        effort: 'high',
+        mode: 'bypassPermissions',
+        summary: 'did the thing',
+        report: '## What I did',
+      },
+    ]);
+    const { container } = render(
+      <CardsPane {...props} tabs={[ref('E-001')]} activeId="E-001" live={[card('E-001')]} />,
+    );
+    await waitFor(() => expect(screen.getByText('did the thing')).toBeTruthy());
+
+    await act(async () => {
+      fireEvent.click(document.querySelector('.report-open') as HTMLElement);
+    });
+    expect(screen.getByLabelText('Report from execute on E-001')).toBeTruthy();
+    expect(container.querySelector('.cardview')).toBeNull();
+  });
+
+  it('asks for the runs of whichever card is active', async () => {
+    api.listCardRuns.mockClear();
+    render(
+      <CardsPane
+        {...props}
+        tabs={[ref('E-001'), ref('E-002')]}
+        activeId="E-002"
+        live={[card('E-001'), card('E-002')]}
+      />,
+    );
+    await waitFor(() => expect(api.listCardRuns).toHaveBeenCalled());
+    expect(api.listCardRuns.mock.calls[0]).toEqual(['engineering', 'E-002']);
   });
 
   it('edits a live card in place, and refuses to for an archived one', () => {

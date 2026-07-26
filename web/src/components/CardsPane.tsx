@@ -1,12 +1,23 @@
 import { useState } from 'react';
-import type { DispatchRequest, InvalidSkill, ModelOption, Skill } from '../api';
+import {
+  cancelRun,
+  type DispatchRequest,
+  type InvalidSkill,
+  type ModelOption,
+  type RunRecord,
+  type Skill,
+} from '../api';
 import type { CardRef } from '../dock/tabs';
 import { resolveTab } from '../dock/tabs';
+import { useCardRuns } from '../runs/useCardRuns';
 import type { Card, CardFrontmatterPatch, ProjectConfig } from '../shared';
+import { CardReports } from './CardReports';
 import { CardSkills } from './CardSkills';
+import { CardTabs } from './CardTabs';
 import { CardView } from './CardView';
 import { DispatchPane } from './DispatchPane';
 import { RawPane } from './RawPane';
+import { ReportPane } from './ReportPane';
 
 // Everything the details step needs, grouped: threading eight more props through the pane would
 // bury the four it has of its own.
@@ -39,11 +50,19 @@ interface Props {
   skills: Skill[];
   invalid: InvalidSkill[];
   dispatch: DispatchContext;
+  // Bumped whenever the project changes on disk, which is what makes the run list live: a record is
+  // written into a board folder, so the watcher already pushes a snapshot on every status change.
+  trigger: unknown;
+  onMove: (card: Card, columnSlug: string) => void;
 }
 
 // What the body is showing. A union rather than two booleans: Raw and a dispatch form are mutually
 // exclusive, and two flags would allow a state that means nothing.
-type View = { kind: 'card' } | { kind: 'raw' } | { kind: 'dispatch'; skill: Skill };
+type View =
+  | { kind: 'card' }
+  | { kind: 'raw' }
+  | { kind: 'dispatch'; skill: Skill; previous?: RunRecord; prompt?: string }
+  | { kind: 'report'; run: string };
 
 export function CardsPane({
   tabs,
@@ -58,6 +77,8 @@ export function CardsPane({
   skills,
   invalid,
   dispatch,
+  trigger,
+  onMove,
 }: Props) {
   const [view, setView] = useState<View>({ kind: 'card' });
   // Falls back to the first tab so a stale activeId cannot leave the pane blank. Resolved once:
@@ -69,6 +90,10 @@ export function CardsPane({
   // An archived card is not in the snapshot, so a patch would land on disk with nothing to show it.
   const editable = card !== null && !card.archived;
   const toCard = (): void => setView({ kind: 'card' });
+  const runs = useCardRuns(card?.board, card?.id, trigger);
+  // Resolved by id rather than held as an object: the record changes on disk while the pane is open,
+  // and a captured copy would keep showing 'running' after the run finished.
+  const shown = view.kind === 'report' ? runs.find((r) => r.run === view.run) : undefined;
 
   // A dispatch that lands returns to the card, where its report will appear; one the server refused
   // keeps the form up with the reason.
@@ -78,40 +103,16 @@ export function CardsPane({
 
   return (
     <div className="cards-pane">
-      <div className="cards-tabs" role="tablist">
-        {tabs.map((t) => (
-          <span key={t.id} className={`cards-tab${t.id === activeTabId ? ' active' : ''}`}>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={t.id === activeTabId}
-              className="cards-tab-label"
-              onClick={() => onFocus(t.id)}
-            >
-              {resolveTab(t, live)?.title ?? t.id}
-            </button>
-            <button
-              type="button"
-              className="cards-tab-x"
-              title={`Close ${t.id}`}
-              onClick={() => onClose(t.id)}
-            >
-              ✕
-            </button>
-          </span>
-        ))}
-        {card && (
-          <button
-            type="button"
-            className={`cards-raw${view.kind === 'raw' ? ' active' : ''}`}
-            title="Show the card's file, frontmatter and all"
-            aria-pressed={view.kind === 'raw'}
-            onClick={() => setView(view.kind === 'raw' ? { kind: 'card' } : { kind: 'raw' })}
-          >
-            Raw
-          </button>
-        )}
-      </div>
+      <CardTabs
+        tabs={tabs}
+        activeTabId={activeTabId}
+        live={live}
+        rawAvailable={card !== null}
+        rawActive={view.kind === 'raw'}
+        onFocus={onFocus}
+        onClose={onClose}
+        onToggleRaw={() => setView(view.kind === 'raw' ? { kind: 'card' } : { kind: 'raw' })}
+      />
 
       <div className="cards-main">
         <div className="cards-body">
@@ -131,15 +132,38 @@ export function CardsPane({
               onBackend={dispatch.onBackend}
             />
           )}
-          {card && view.kind === 'card' && (
-            <CardView
+          {card && shown && (
+            <ReportPane
+              record={shown}
               card={card}
               config={config}
-              allCards={live}
+              createdCards={live.filter((c) => shown.created?.includes(c.id))}
               onOpenCard={onOpenCard}
-              onPatch={editable ? (patch) => onPatch(card, patch) : undefined}
-              onLinks={editable ? (links) => onLinks(card, links) : undefined}
+              onMove={(columnSlug) => {
+                onMove(card, columnSlug);
+                toCard();
+              }}
+              onBack={toCard}
             />
+          )}
+          {card && view.kind === 'card' && (
+            <>
+              <CardView
+                card={card}
+                config={config}
+                allCards={live}
+                onOpenCard={onOpenCard}
+                onPatch={editable ? (patch) => onPatch(card, patch) : undefined}
+                onLinks={editable ? (links) => onLinks(card, links) : undefined}
+              />
+              <CardReports
+                runs={runs}
+                onOpen={(r) => setView({ kind: 'report', run: r.run })}
+                onCancel={(r) => {
+                  void cancelRun(r.run).catch(() => {});
+                }}
+              />
+            </>
           )}
           {!card && (
             // Either nothing is open, or the card left the board while its tab was — deleted outside

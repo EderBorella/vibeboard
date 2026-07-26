@@ -101,6 +101,11 @@ export function App() {
     void archiveCard(card.board, card.id);
   };
   const onTag = (tag: string): void => setActiveTags((prev) => toggleTag(prev, tag));
+  // Moving a card after a successful run is the user's click, never something the run does: 'Review'
+  // does not exist on every board, and a wrong automatic move is worse than none.
+  const onMoveCard = (card: Card, columnSlug: string): void => {
+    void placeCard(card.board, card.id, columnSlug, null);
+  };
   // Start a fresh chat on a backend switch, since a session belongs to the backend that
   // created it. Coordinating that is the shell's job; useCopilotChoice owns the override state.
   const onBackend = (backend: string): void => {
@@ -163,6 +168,8 @@ export function App() {
                 onRun: dispatch.run,
                 onBackend: onBackend,
               }}
+              trigger={snapshot}
+              onMove={onMoveCard}
             />
           ),
         },

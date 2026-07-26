@@ -22,3 +22,34 @@ describe('discoverProjects', () => {
     expect(await discoverProjects('/no/such/dir/vb')).toEqual([]);
   });
 });
+
+describe('discoverProjects skips and ordering', () => {
+  // A valid project in a place the scan must refuse to look.
+  const plant = async (root: string, dir: string, name: string): Promise<void> => {
+    await mkdir(join(root, dir), { recursive: true });
+    await scaffoldProject(join(root, dir), { name, mode: 'brownfield', today: '2026-07-25' });
+  };
+
+  it.each(['.hidden', '.config', 'node_modules'])('ignores a project inside %s', async (dir) => {
+    const root = await tempDir();
+    await plant(root, dir, 'Should Not Appear');
+    await plant(root, 'visible', 'Visible');
+    expect((await discoverProjects(root)).map((p) => p.name)).toEqual(['Visible']);
+  });
+
+  it('orders by project name, not by directory name', async () => {
+    const root = await tempDir();
+    // Directory order and name order deliberately disagree.
+    await plant(root, 'aaa-dir', 'Zebra');
+    await plant(root, 'zzz-dir', 'Alpha');
+    expect((await discoverProjects(root)).map((p) => p.name)).toEqual(['Alpha', 'Zebra']);
+  });
+
+  it('skips a directory whose config exists but cannot be parsed', async () => {
+    const root = await tempDir();
+    await plant(root, 'good', 'Good');
+    await mkdir(join(root, 'broken', '.vibeboard'), { recursive: true });
+    await writeFile(join(root, 'broken', '.vibeboard', 'config.yaml'), '{{{ not yaml', 'utf8');
+    expect((await discoverProjects(root)).map((p) => p.name)).toEqual(['Good']);
+  });
+});

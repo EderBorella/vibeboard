@@ -17,7 +17,9 @@ const DEBOUNCE_MS = 80;
 // chokidar v4 removed glob support in `ignored`; use a path predicate. Ignore only the chat
 // store (`.vibeboard/chat/`) — its frequent writes must not churn the board. `config.yaml`
 // (also under .vibeboard) IS watched, so config edits still push a fresh snapshot.
-function isIgnored(p: string): boolean {
+// Exported for its own test: driving it through a real watcher is slow and racy, and the
+// path list is exactly the kind of thing that rots silently.
+export function isIgnored(p: string): boolean {
   return p.includes('/node_modules/') || p.includes('/.git/') || p.includes('/.vibeboard/chat');
 }
 

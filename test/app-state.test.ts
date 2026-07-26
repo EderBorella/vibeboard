@@ -1,4 +1,5 @@
 import { readFile, rm, writeFile } from 'node:fs/promises';
+import { homedir } from 'node:os';
 import { join } from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -128,5 +129,46 @@ describe('the server records what you open', () => {
     });
     expect(res.statusCode).toBe(400);
     expect(await readState()).toEqual({});
+  });
+});
+
+describe('stateFile and readState defaults', () => {
+  it('falls back to ~/.vibeboard/state.json when no override is set', () => {
+    delete process.env.VIBEBOARD_STATE_FILE;
+    const path = stateFile();
+    expect(path.endsWith(join('.vibeboard', 'state.json'))).toBe(true);
+    expect(path.startsWith(homedir())).toBe(true);
+  });
+
+  it('honours the override when one is set', () => {
+    process.env.VIBEBOARD_STATE_FILE = '/tmp/explicit-state.json';
+    expect(stateFile()).toBe('/tmp/explicit-state.json');
+  });
+
+  it.each(['null', '42', '"a string"', '[]', 'true'])(
+    'reads an empty state from the non-object payload %p',
+    async (payload) => {
+      const file = join(await tempDir(), 'state.json');
+      process.env.VIBEBOARD_STATE_FILE = file;
+      await writeFile(file, payload, 'utf8');
+      expect(await readState()).toEqual({});
+    },
+  );
+
+  it.each([['{"lastProject":42}'], ['{"lastProject":null}'], ['{"other":"x"}']])(
+    'ignores a lastProject that is not a string: %s',
+    async (payload) => {
+      const file = join(await tempDir(), 'state.json');
+      process.env.VIBEBOARD_STATE_FILE = file;
+      await writeFile(file, payload, 'utf8');
+      expect(await readState()).toEqual({});
+    },
+  );
+
+  it('reads back a string lastProject and nothing else', async () => {
+    const file = join(await tempDir(), 'state.json');
+    process.env.VIBEBOARD_STATE_FILE = file;
+    await writeFile(file, '{"lastProject":"/p","junk":1}', 'utf8');
+    expect(await readState()).toEqual({ lastProject: '/p' });
   });
 });

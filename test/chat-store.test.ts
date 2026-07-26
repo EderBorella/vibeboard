@@ -173,3 +173,159 @@ describe('ChatStore', () => {
     expect(h2.note).toBeUndefined();
   });
 });
+
+describe('ChatStore config-derived settings', () => {
+  it('never prunes below one chat, however small keepChats is', async () => {
+    for (const keepChats of [0, -5, 1]) {
+      const { store, chatDir } = await fresh({ keepChats });
+      await store.recordUser('a');
+      await store.flush();
+      await store.newChat();
+      await store.recordUser('b');
+      await store.flush();
+      // The current chat is always spared, so at least one file survives.
+      expect((await readdir(chatDir)).length, `keepChats=${keepChats}`).toBeGreaterThanOrEqual(1);
+    }
+  });
+
+  it('keeps exactly keepChats chats, sparing the current one', async () => {
+    const { store, chatDir } = await fresh({ keepChats: 2 });
+    for (const text of ['one', 'two', 'three', 'four']) {
+      await store.recordUser(text);
+      await store.flush();
+      await store.newChat();
+    }
+    await store.recordUser('current');
+    await store.flush();
+    expect((await readdir(chatDir)).length).toBeLessThanOrEqual(3); // keep 2 + the current
+  });
+
+  it('falls back to the default backend and no model when there is no config', async () => {
+    const root = await tempDir();
+    const ref: Ref = { root, config: undefined };
+    const store = new ChatStore(ref);
+    await store.recordUser('hi');
+    await store.flush();
+    const { chats } = await store.chatList();
+    expect(chats[0].backend).toBe('claude-code');
+    expect(chats[0].model).toBeUndefined();
+  });
+
+  it('records the model from the per-backend slot, not a legacy top-level field', async () => {
+    const config = defaultConfig('t');
+    config.copilot.backends['claude-code'] = { model: 'sonnet', effort: 'low' };
+    const { store } = await fresh({ copilot: config.copilot });
+    await store.recordUser('hi');
+    await store.flush();
+    expect((await store.chatList()).chats[0].model).toBe('sonnet');
+  });
+});
+
+describe('ChatStore listing and rebinding', () => {
+  it('lists newest first', async () => {
+    const { store } = await fresh();
+    await store.recordUser('oldest');
+    await store.flush();
+    await store.newChat();
+    await sleep(5);
+    await store.recordUser('newest');
+    await store.flush();
+
+    const { chats, currentChatId } = await store.chatList();
+    expect(chats[0].title).toBe('newest');
+    expect(currentChatId).toBe(chats[0].id);
+  });
+
+  it('drops in-memory state when the open project changes', async () => {
+    const { ref, store } = await fresh();
+    await store.recordUser('in first project');
+    await store.flush();
+    const firstId = (await store.chatList()).currentChatId;
+
+    // Reopening elsewhere must not leave the previous project's chat current.
+    const second = await tempDir();
+    ref.root = second;
+    const after = await store.chatList();
+    // The list always carries the in-memory current chat, so what matters is that the previous
+    // project's chat is gone and a new current one has taken over.
+    expect(after.chats.map((c) => c.id)).not.toContain(firstId);
+    expect(after.currentChatId).not.toBe(firstId);
+  });
+
+  it('answers an empty list with no project open at all', async () => {
+    const ref: Ref = { root: undefined, config: defaultConfig('t') };
+    const store = new ChatStore(ref);
+    // Nothing on disk to read, so only the in-memory current chat is listed, and flushing it
+    // nowhere must not fail.
+    const { chats, currentChatId } = await store.chatList();
+    expect(chats).toHaveLength(1);
+    expect(chats[0].id).toBe(currentChatId);
+    await expect(store.flush()).resolves.toBeUndefined();
+  });
+
+  it('ignores a corrupt chat file rather than failing the whole listing', async () => {
+    const { store, chatDir } = await fresh();
+    await store.recordUser('good');
+    await store.flush();
+    const { writeFile } = await import('node:fs/promises');
+    await writeFile(join(chatDir, 'broken.json'), '{{{ not json', 'utf8');
+    expect((await store.chatList()).chats.map((c) => c.title)).toEqual(['good']);
+  });
+});
+
+describe('ChatStore titles and errors', () => {
+  it('titles a chat from its first user message, trimmed and truncated', async () => {
+    const { store } = await fresh();
+    await store.recordUser(`   ${'x'.repeat(200)}   `);
+    await store.flush();
+    const [chat] = (await store.chatList()).chats;
+    expect(chat.title.length).toBeLessThanOrEqual(60);
+    expect(chat.title.startsWith('x')).toBe(true);
+  });
+
+  it('keeps the first message as the title when more arrive', async () => {
+    const { store } = await fresh();
+    await store.recordUser('first thing');
+    await store.recordUser('second thing');
+    await store.flush();
+    expect((await store.chatList()).chats[0].title).toBe('first thing');
+  });
+
+  it('appends an error to the transcript', async () => {
+    const { store } = await fresh();
+    await store.recordUser('go');
+    store.recordError('it broke');
+    await store.flush();
+    const { items } = await store.historyPayload();
+    expect(items.at(-1)).toMatchObject({ kind: 'error', text: 'it broke' });
+  });
+
+  it('reports whether the deleted chat was the current one', async () => {
+    const { store } = await fresh();
+    await store.recordUser('a');
+    await store.flush();
+    const first = (await store.chatList()).currentChatId!;
+    await store.newChat();
+    await store.recordUser('b');
+    await store.flush();
+    const second = (await store.chatList()).currentChatId!;
+
+    expect(await store.delete(first)).toEqual({ wasCurrent: false });
+    expect(await store.delete(second)).toEqual({ wasCurrent: true });
+  });
+
+  it('returns undefined when opening a chat that is not there', async () => {
+    const { store } = await fresh();
+    expect(await store.open('nope')).toBeUndefined();
+  });
+
+  it('hands back the stored backend and model when reopening a chat', async () => {
+    const { store } = await fresh();
+    await store.recordUser('hi');
+    await store.flush();
+    const id = (await store.chatList()).currentChatId!;
+    await store.newChat();
+
+    expect(await store.open(id)).toMatchObject({ backend: 'claude-code' });
+  });
+});

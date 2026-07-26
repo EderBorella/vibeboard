@@ -41,6 +41,9 @@ export interface RunnerOptions {
   // How many may run at once. A function, because it comes from the open project's config and the
   // open project changes.
   maxConcurrent: () => number;
+  // Overrides the executable a run spawns. Tests pass their shim here rather than through the
+  // environment, which is shared with every other test file in the process.
+  bin?: string;
   // Called whenever a record changes on disk, so the WS layer can push it without polling.
   onUpdate?: (record: RunRecord) => void;
 }
@@ -169,6 +172,7 @@ export class AgentRunner {
       model: input.model,
       effort: input.effort,
       timeoutMs: this.#opts.timeoutMs,
+      bin: this.#opts.bin,
       onEvent: (event) => {
         void appendTranscript(root, run, JSON.stringify(event)).catch(() => {
           /* a lost transcript line must never fail the run */

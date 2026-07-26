@@ -1,6 +1,7 @@
 #!/usr/bin/env node
-// Test shim standing in for an agent running a skill. Behaves per VIBEBOARD_SHIM_BEHAVIOUR so one
-// file covers every way a run can end:
+// Test shim standing in for an agent running a skill. Behaviour comes from a [[behaviour:x]] marker
+// in the prompt it was given — NOT from the environment, which is shared with every other test file
+// in the process and so cannot be relied on. One file covers every way a run can end:
 //
 //   success   — writes a success report and exits 0
 //   attention — writes an attention report with options
@@ -21,7 +22,7 @@ if (process.env.VIBEBOARD_SHIM_ARGS) {
 
 const prompt = args[args.length - 1] ?? '';
 const match = prompt.match(/\.vibeboard\/runs\/[\w.-]+\.report\.md/);
-const behaviour = process.env.VIBEBOARD_SHIM_BEHAVIOUR ?? 'success';
+const behaviour = (prompt.match(/\[\[behaviour:(\w+)\]\]/) ?? [])[1] ?? 'success';
 
 const say = (obj) => process.stdout.write(`${JSON.stringify(obj)}\n`);
 say({

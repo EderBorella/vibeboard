@@ -1,6 +1,7 @@
+import { chmodSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type { RunRecord } from '../src/core/runs.js';
 import { buildApp } from '../src/server/app.js';
 import { readRun, writeRun } from '../src/server/run-store.js';
@@ -8,20 +9,20 @@ import { ProjectSession } from '../src/server/session.js';
 import { openTestProject, shimArgsLog, type TestProject, wsClient } from './helpers.js';
 
 const SHIM = join(process.cwd(), 'test', 'fixtures', 'fake-agent.mjs');
+// Stryker runs the suite from a sandbox COPY of the repo, and the copy does not carry the executable
+// bit — so the shim could not be spawned there and every run was recorded as failed, which failed
+// the dry run before any mutant existed. Restoring it here costs nothing and works either way.
+chmodSync(SHIM, 0o755);
 
-beforeEach(() => {
-  process.env.VIBEBOARD_CLAUDE_BIN = SHIM;
-  process.env.VIBEBOARD_SHIM_BEHAVIOUR = 'success';
-});
-afterEach(() => {
-  delete process.env.VIBEBOARD_CLAUDE_BIN;
-  delete process.env.VIBEBOARD_SHIM_BEHAVIOUR;
-});
+// The shim is passed to the app rather than set in the environment, and its behaviour travels in the
+// dispatch prompt: env is shared with every other test file in the process, and a sibling rewriting
+// it mid-run is what made Stryker's dry run fail where `npm test` passed.
+const hang = '[[behaviour:hang]]';
 
 // A scaffolded project has sample cards and the seeded skills, which is exactly what a dispatch
 // needs. Returns the engineering sample card's id.
 async function projectWithCard(): Promise<TestProject & { card: string }> {
-  const project = await openTestProject();
+  const project = await openTestProject({ runBin: SHIM });
   const state = (await project.app.inject({ method: 'GET', url: '/api/state' })).json() as {
     snapshot: { boards: { engineering: { id: string }[] } };
   };
@@ -29,10 +30,11 @@ async function projectWithCard(): Promise<TestProject & { card: string }> {
 }
 
 async function settled(project: TestProject, card: string, run: string): Promise<RunRecord> {
-  for (let i = 0; i < 100; i++) {
+  // 30s: these spawn a real child, and the suite is run with heavy concurrency by Stryker.
+  for (let i = 0; i < 300; i++) {
     const record = await readRun(project.root, 'engineering', card, run);
     if (record && record.status !== 'running' && record.status !== 'queued') return record;
-    await new Promise((r) => setTimeout(r, 50));
+    await new Promise((r) => setTimeout(r, 100));
   }
   throw new Error('run never settled');
 }
@@ -158,7 +160,6 @@ describe('POST /api/runs', () => {
 
   it('queues a second dispatch rather than refusing it', async () => {
     // The default cap is 3, so this needs the project's own cap lowered to one.
-    process.env.VIBEBOARD_SHIM_BEHAVIOUR = 'hang';
     const project = await projectWithCard();
     await project.app.inject({
       method: 'PATCH',
@@ -169,7 +170,7 @@ describe('POST /api/runs', () => {
       project.app.inject({
         method: 'POST',
         url: '/api/runs',
-        payload: { board: 'engineering', card: project.card, skill: 'execute' },
+        payload: { board: 'engineering', card: project.card, skill: 'execute', prompt: hang },
       });
 
     const first = (await post()).json() as { run: RunRecord };
@@ -201,13 +202,12 @@ describe('POST /api/runs', () => {
 
 describe('GET /api/runs', () => {
   it('lists every run newest first, with the ids currently in flight', async () => {
-    process.env.VIBEBOARD_SHIM_BEHAVIOUR = 'hang';
     const project = await projectWithCard();
     const { run } = (
       await project.app.inject({
         method: 'POST',
         url: '/api/runs',
-        payload: { board: 'engineering', card: project.card, skill: 'execute' },
+        payload: { board: 'engineering', card: project.card, skill: 'execute', prompt: hang },
       })
     ).json() as { run: RunRecord };
 
@@ -255,13 +255,12 @@ describe('GET /api/runs', () => {
 
 describe('POST /api/runs/:run/cancel', () => {
   it('stops a run in flight and records it as cancelled', async () => {
-    process.env.VIBEBOARD_SHIM_BEHAVIOUR = 'hang';
     const project = await projectWithCard();
     const { run } = (
       await project.app.inject({
         method: 'POST',
         url: '/api/runs',
-        payload: { board: 'engineering', card: project.card, skill: 'execute' },
+        payload: { board: 'engineering', card: project.card, skill: 'execute', prompt: hang },
       })
     ).json() as { run: RunRecord };
 

@@ -34,10 +34,10 @@ export interface TestProject {
 // the server are closed even when an assertion throws half way through a test. That means it
 // must be called from inside a test, not from beforeAll.
 export async function openTestProject(
-  opts: { name?: string; mode?: 'greenfield' | 'brownfield' } = {},
+  opts: { name?: string; mode?: 'greenfield' | 'brownfield'; runBin?: string } = {},
 ): Promise<TestProject> {
   const session = new ProjectSession();
-  const app = buildApp(session);
+  const app = buildApp(session, { runBin: opts.runBin });
   const root = await tempDir();
   await app.inject({
     method: 'POST',

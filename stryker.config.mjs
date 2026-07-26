@@ -18,6 +18,10 @@ export default {
   // Deliberately NOT here:
   // - static.ts, opencode-server.ts, main.ts: they spawn processes and serve files. Mutating a
   //   spawn lifecycle produces timeouts, not insight.
+  // agent-runner.ts IS in scope, but note why its tests are slow on purpose: they drive a real child
+  // process through the VIBEBOARD_CLAUDE_BIN shim, and with 19 concurrent runners a spawn can take
+  // seconds to start. At a 5s run timeout that lost the race and failed the DRY RUN — before any
+  // mutant existed — so the timeouts there are deliberately generous.
   // - types.ts / web/src/shared.ts: type declarations. The src<->web mirror is guarded by
   //   test/mirror.test.ts instead.
   // - web/src/api.ts: every test that touches it mocks it or imports only its types, so no
@@ -35,9 +39,9 @@ export default {
     // and the closest thing here to a security boundary.
     'src/server/control-files.ts',
     'src/server/skill-catalogue.ts',
+    'src/server/agent-runner.ts',
     'src/server/run-store.ts',
     'src/server/run-prompt.ts',
-    'src/server/agent-runner.ts',
     'src/server/agent-turn.ts',
     'src/server/copilot-events.ts',
     'src/server/session.ts',

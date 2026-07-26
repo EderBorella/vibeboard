@@ -31,6 +31,10 @@ export interface AgentTurnOptions {
   // prompt in, one report out.
   sessionId?: string;
   timeoutMs: number;
+  // Which executable to spawn. Passed explicitly by callers that must not depend on process-wide
+  // state: a test setting VIBEBOARD_CLAUDE_BIN in a beforeEach races any sibling test file sharing
+  // the process, which is how Stryker's dry run started failing where `npm test` passed.
+  bin?: string;
   onEvent: (event: CopilotEvent) => void;
 }
 
@@ -73,9 +77,9 @@ function resolveMode(mode: CopilotMode): { permission: string; persona?: string 
   }
 }
 
-// Resolved per spawn so tests can point at a shim via env without import-order pitfalls.
-function claudeBin(): string {
-  return process.env.VIBEBOARD_CLAUDE_BIN ?? 'claude';
+// An explicit bin wins; otherwise the env var, resolved per spawn so import order cannot matter.
+function claudeBin(bin: string | undefined): string {
+  return bin ?? process.env.VIBEBOARD_CLAUDE_BIN ?? 'claude';
 }
 
 // The bundled VibeBoard instructions, appended to every turn's system prompt so the copilot
@@ -126,7 +130,7 @@ function claudeCommand(opts: AgentTurnOptions): { bin: string; args: string[] } 
   if (opts.effort) args.push('--effort', opts.effort);
   if (opts.sessionId) args.push('--resume', opts.sessionId);
   args.push(opts.text);
-  return { bin: claudeBin(), args };
+  return { bin: claudeBin(opts.bin), args };
 }
 
 // OpenCode: talk to a persistent `opencode serve` over HTTP (per-turn message, session reused

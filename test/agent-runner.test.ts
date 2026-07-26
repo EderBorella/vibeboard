@@ -1,6 +1,7 @@
+import { chmodSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { RunRecord } from '../src/core/runs.js';
 import type { Skill } from '../src/core/skills.js';
 import type { Card } from '../src/core/types.js';
@@ -9,6 +10,10 @@ import { listCardRuns, readRun, reportPath, transcriptTail } from '../src/server
 import { tempDir } from './helpers.js';
 
 const SHIM = join(process.cwd(), 'test', 'fixtures', 'fake-agent.mjs');
+// Stryker runs the suite from a sandbox COPY of the repo, and the copy does not carry the executable
+// bit — so the shim could not be spawned there and every run was recorded as failed, which failed
+// the dry run before any mutant existed. Restoring it here costs nothing and works either way.
+chmodSync(SHIM, 0o755);
 
 const skill: Skill = {
   slug: 'execute',
@@ -45,6 +50,8 @@ const input = (root: string, over: Partial<DispatchInput> = {}): DispatchInput =
   model: 'shim',
   effort: 'high',
   mode: 'bypassPermissions',
+  // Defaults to a shim that succeeds; a test wanting another ending passes behaving('…').
+  userPrompt: '[[behaviour:success]]',
   ...over,
 });
 
@@ -53,9 +60,14 @@ function runner(root: string, over: Partial<RunnerOptions> = {}) {
   const updates: RunRecord[] = [];
   const instance = new AgentRunner({
     root: () => root,
+    bin: SHIM,
     now: () => new Date('2026-07-26T14:30:12.000Z'),
     suffix: () => 'a1b2',
-    timeoutMs: 5000,
+    // Generous on purpose: these tests spawn a real child process, and Stryker runs 19 vitest
+    // workers at once. At 5s the spawn itself lost the race under that load and the run was recorded
+    // as timed out — which failed Stryker's DRY RUN and so blocked mutation testing for the whole
+    // project. The one test that wants a timeout sets its own.
+    timeoutMs: 20_000,
     maxConcurrent: () => 1,
     onUpdate: (r) => updates.push(r),
     ...over,
@@ -66,23 +78,22 @@ function runner(root: string, over: Partial<RunnerOptions> = {}) {
 // Waits for the record to reach a final state on disk. Real time, not fake timers: the run ends in
 // a child process exit and a file write, neither of which a faked clock can flush.
 async function settled(root: string, run: string): Promise<RunRecord> {
-  for (let i = 0; i < 100; i++) {
+  // Up to 30s, for the same reason the runner timeout is generous: under Stryker's concurrency a
+  // child process can take seconds just to start.
+  for (let i = 0; i < 300; i++) {
     const record = await readRun(root, 'engineering', 'E-010', run);
     if (record && record.status !== 'running' && record.status !== 'queued') return record;
-    await new Promise((r) => setTimeout(r, 50));
+    await new Promise((r) => setTimeout(r, 100));
   }
   throw new Error('run never settled');
 }
 
-beforeEach(() => {
-  process.env.VIBEBOARD_CLAUDE_BIN = SHIM;
-  process.env.VIBEBOARD_SHIM_BEHAVIOUR = 'success';
-});
-afterEach(() => {
-  delete process.env.VIBEBOARD_CLAUDE_BIN;
-  delete process.env.VIBEBOARD_SHIM_BEHAVIOUR;
-  vi.restoreAllMocks();
-});
+afterEach(() => vi.restoreAllMocks());
+
+// How the shim is told what to do: a marker in the prompt, not an environment variable. Env is
+// shared with every other test file in the process, and a sibling's beforeEach rewriting it mid-run
+// is what made Stryker's dry run fail where `npm test` passed.
+const behaving = (behaviour: string) => ({ userPrompt: `[[behaviour:${behaviour}]]` });
 
 describe('AgentRunner.dispatch', () => {
   it('writes a running record straight away and answers with it', async () => {
@@ -116,10 +127,10 @@ describe('AgentRunner.dispatch', () => {
   });
 
   it('folds an attention report, options and all', async () => {
-    process.env.VIBEBOARD_SHIM_BEHAVIOUR = 'attention';
+    const shim = behaving('attention');
     const root = await tempDir();
     const { instance } = runner(root);
-    const { run } = await instance.dispatch(input(root));
+    const { run } = await instance.dispatch(input(root, shim));
     const final = await settled(root, run);
 
     expect(final.status).toBe('attention');
@@ -129,10 +140,10 @@ describe('AgentRunner.dispatch', () => {
 
   it('needs attention when the agent finishes without a report', async () => {
     // The contract's whole point: silence is not success.
-    process.env.VIBEBOARD_SHIM_BEHAVIOUR = 'silent';
+    const shim = behaving('silent');
     const root = await tempDir();
     const { instance } = runner(root);
-    const { run } = await instance.dispatch(input(root));
+    const { run } = await instance.dispatch(input(root, shim));
     const final = await settled(root, run);
 
     expect(final.status).toBe('attention');
@@ -143,10 +154,10 @@ describe('AgentRunner.dispatch', () => {
   });
 
   it('needs attention when the report frontmatter is malformed', async () => {
-    process.env.VIBEBOARD_SHIM_BEHAVIOUR = 'garbage';
+    const shim = behaving('garbage');
     const root = await tempDir();
     const { instance } = runner(root);
-    const { run } = await instance.dispatch(input(root));
+    const { run } = await instance.dispatch(input(root, shim));
     const final = await settled(root, run);
 
     expect(final.status).toBe('attention');
@@ -154,10 +165,10 @@ describe('AgentRunner.dispatch', () => {
   });
 
   it('fails, with the exit code, when the agent crashes', async () => {
-    process.env.VIBEBOARD_SHIM_BEHAVIOUR = 'crash';
+    const shim = behaving('crash');
     const root = await tempDir();
     const { instance } = runner(root);
-    const { run } = await instance.dispatch(input(root));
+    const { run } = await instance.dispatch(input(root, shim));
     const final = await settled(root, run);
 
     expect(final.status).toBe('failed');
@@ -165,10 +176,10 @@ describe('AgentRunner.dispatch', () => {
   });
 
   it('records a cancelled run as cancelled, not failed', async () => {
-    process.env.VIBEBOARD_SHIM_BEHAVIOUR = 'hang';
+    const shim = behaving('hang');
     const root = await tempDir();
     const { instance } = runner(root);
-    const { run } = await instance.dispatch(input(root));
+    const { run } = await instance.dispatch(input(root, shim));
 
     expect(instance.cancel(run)).toBe(true);
     const final = await settled(root, run);
@@ -177,10 +188,10 @@ describe('AgentRunner.dispatch', () => {
   });
 
   it('fails a run that outlives its timeout', async () => {
-    process.env.VIBEBOARD_SHIM_BEHAVIOUR = 'hang';
+    const shim = behaving('hang');
     const root = await tempDir();
     const { instance } = runner(root, { timeoutMs: 300 });
-    const { run } = await instance.dispatch(input(root));
+    const { run } = await instance.dispatch(input(root, shim));
     const final = await settled(root, run);
 
     expect(final.status).toBe('failed');
@@ -189,12 +200,12 @@ describe('AgentRunner.dispatch', () => {
 
   it('queues a run past the cap instead of refusing it', async () => {
     // A run is minutes of work, so "busy, try again" would be the wrong answer.
-    process.env.VIBEBOARD_SHIM_BEHAVIOUR = 'hang';
+    const shim = behaving('hang');
     const root = await tempDir();
     let n = 0;
     const { instance } = runner(root, { suffix: () => `s${++n}` });
-    const first = await instance.dispatch(input(root));
-    const second = await instance.dispatch(input(root));
+    const first = await instance.dispatch(input(root, shim));
+    const second = await instance.dispatch(input(root, shim));
 
     expect(first.status).toBe('running');
     expect(second.status).toBe('queued');
@@ -228,14 +239,14 @@ describe('AgentRunner.dispatch', () => {
   });
 
   it('runs several at once when the cap allows it', async () => {
-    process.env.VIBEBOARD_SHIM_BEHAVIOUR = 'hang';
+    const shim = behaving('hang');
     const root = await tempDir();
     let n = 0;
     const { instance } = runner(root, { suffix: () => `s${++n}`, maxConcurrent: () => 3 });
     const runs = [
-      await instance.dispatch(input(root)),
-      await instance.dispatch(input(root)),
-      await instance.dispatch(input(root)),
+      await instance.dispatch(input(root, shim)),
+      await instance.dispatch(input(root, shim)),
+      await instance.dispatch(input(root, shim)),
     ];
     expect(runs.map((r) => r.status)).toEqual(['running', 'running', 'running']);
     expect(instance.activeIds).toHaveLength(3);
@@ -247,28 +258,28 @@ describe('AgentRunner.dispatch', () => {
   });
 
   it('reads the cap per dispatch, so changing it takes effect without a restart', async () => {
-    process.env.VIBEBOARD_SHIM_BEHAVIOUR = 'hang';
+    const shim = behaving('hang');
     const root = await tempDir();
     let n = 0;
     let cap = 1;
     const { instance } = runner(root, { suffix: () => `s${++n}`, maxConcurrent: () => cap });
-    const first = await instance.dispatch(input(root));
-    expect((await instance.dispatch(input(root))).status).toBe('queued');
+    const first = await instance.dispatch(input(root, shim));
+    expect((await instance.dispatch(input(root, shim))).status).toBe('queued');
 
     cap = 5;
-    expect((await instance.dispatch(input(root))).status).toBe('running');
+    expect((await instance.dispatch(input(root, shim))).status).toBe('running');
 
     for (const id of [...instance.activeIds, ...instance.queuedIds]) instance.cancel(id);
     await settled(root, first.run);
   });
 
   it('cancels a run that never started, without spawning anything', async () => {
-    process.env.VIBEBOARD_SHIM_BEHAVIOUR = 'hang';
+    const shim = behaving('hang');
     const root = await tempDir();
     let n = 0;
     const { instance } = runner(root, { suffix: () => `s${++n}` });
-    const first = await instance.dispatch(input(root));
-    const waiting = await instance.dispatch(input(root));
+    const first = await instance.dispatch(input(root, shim));
+    const waiting = await instance.dispatch(input(root, shim));
 
     expect(instance.cancel(waiting.run)).toBe(true);
     const ended = await settled(root, waiting.run);
@@ -368,9 +379,10 @@ describe('AgentRunner.dispatch', () => {
     // A second dispatch needs a different id, so the clock moves on.
     const second = new AgentRunner({
       root: () => root,
+      bin: SHIM,
       now: () => new Date('2026-07-26T15:00:00.000Z'),
       suffix: () => 'c3d4',
-      timeoutMs: 5000,
+      timeoutMs: 20_000,
       maxConcurrent: () => 1,
     });
     const next = await second.dispatch(input(root));
@@ -382,9 +394,9 @@ describe('AgentRunner.dispatch', () => {
   });
 
   it('fails the record rather than hanging when the agent cannot start', async () => {
-    process.env.VIBEBOARD_CLAUDE_BIN = join(await tempDir(), 'no-such-binary');
     const root = await tempDir();
-    const { instance } = runner(root);
+    // A bin that does not exist, passed explicitly rather than through the environment.
+    const { instance } = runner(root, { bin: join(root, 'no-such-binary') });
     const { run } = await instance.dispatch(input(root));
     const final = await settled(root, run);
     expect(final.status).toBe('failed');

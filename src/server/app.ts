@@ -17,7 +17,7 @@ import { createBroadcaster, registerWs } from './ws.js';
 
 // Composition root: wire the session, copilot and chat store into one context, register the
 // WS channel, then mount each route group under /api. Route bodies live in ./routes.
-export function buildApp(session: ProjectSession): FastifyInstance {
+export function buildApp(session: ProjectSession, opts: { runBin?: string } = {}): FastifyInstance {
   const app = Fastify();
   const copilot = new CopilotSession();
   const chats = new ChatStore(session);
@@ -32,6 +32,7 @@ export function buildApp(session: ProjectSession): FastifyInstance {
     // Read per dispatch from the open project's config, so changing it in Settings takes effect
     // without a restart.
     maxConcurrent: () => session.config?.maxConcurrentRuns ?? DEFAULT_MAX_RUNS,
+    bin: opts.runBin,
     onUpdate: (record) => broadcast({ type: 'run:update', record }),
   });
   const ctx: AppCtx = { session, copilot, chats, runner, broadcast };

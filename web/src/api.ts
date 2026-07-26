@@ -241,3 +241,36 @@ export async function putResources(links: ResourceLink[]): Promise<void> {
   });
   if (!res.ok) throw new Error('Failed to save resources');
 }
+
+// --- Skills ---------------------------------------------------------------
+// Mirrors src/core/skills.ts. A skill carries no backend, model, effort or mode — those are
+// chosen per dispatch, so every skill works on every backend.
+
+export interface Skill {
+  slug: string;
+  path: string;
+  name: string;
+  description: string;
+  boards: BoardName[];
+  columns: string[];
+  prompt: string;
+}
+
+// A skill file that failed validation: absent from the rail, reported with its reason so it is
+// distinguishable from a skill nobody wrote.
+export interface InvalidSkill {
+  slug: string;
+  path: string;
+  reason: string;
+}
+
+export interface SkillCatalogue {
+  skills: Skill[];
+  invalid: InvalidSkill[];
+}
+
+export async function listSkills(): Promise<SkillCatalogue> {
+  const res = await fetch('/api/skills');
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? res.statusText);
+  return res.json() as Promise<SkillCatalogue>;
+}

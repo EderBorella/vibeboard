@@ -1,0 +1,82 @@
+// @vitest-environment jsdom
+import { renderHook, waitFor } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const api = vi.hoisted(() => ({ listSkills: vi.fn() }));
+vi.mock('../web/src/api.js', () => api);
+vi.mock('../web/src/api', () => api);
+
+const { useSkills } = await import('../web/src/skills/useSkills.js');
+
+const catalogue = (slug: string) => ({
+  skills: [
+    {
+      slug,
+      path: `.claude/skills/${slug}/SKILL.md`,
+      name: slug,
+      description: 'd',
+      boards: [],
+      columns: [],
+      prompt: 'p',
+    },
+  ],
+  invalid: [],
+});
+
+beforeEach(() => api.listSkills.mockReset());
+
+describe('useSkills', () => {
+  it('starts empty, so the rail renders before the fetch lands', () => {
+    api.listSkills.mockResolvedValue(catalogue('execute'));
+    const { result } = renderHook(() => useSkills(0));
+    expect(result.current).toEqual({ skills: [], invalid: [] });
+  });
+
+  it('serves the catalogue once it arrives', async () => {
+    api.listSkills.mockResolvedValue(catalogue('execute'));
+    const { result } = renderHook(() => useSkills(0));
+    await waitFor(() => expect(result.current.skills.map((s) => s.slug)).toEqual(['execute']));
+  });
+
+  it('refetches when the trigger changes, so a skill written on disk shows up', async () => {
+    api.listSkills
+      .mockResolvedValueOnce(catalogue('execute'))
+      .mockResolvedValueOnce(catalogue('review'));
+    const { result, rerender } = renderHook(({ t }) => useSkills(t), { initialProps: { t: 0 } });
+    await waitFor(() => expect(result.current.skills.map((s) => s.slug)).toEqual(['execute']));
+    rerender({ t: 1 });
+    await waitFor(() => expect(result.current.skills.map((s) => s.slug)).toEqual(['review']));
+    expect(api.listSkills).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not refetch when the trigger is unchanged', async () => {
+    api.listSkills.mockResolvedValue(catalogue('execute'));
+    const { rerender } = renderHook(({ t }) => useSkills(t), { initialProps: { t: 0 } });
+    await waitFor(() => expect(api.listSkills).toHaveBeenCalledTimes(1));
+    rerender({ t: 0 });
+    expect(api.listSkills).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the last good catalogue when a refetch fails', async () => {
+    // An empty rail would read as "this project has no skills"; the previous list is the least
+    // misleading thing to show until the next trigger retries.
+    api.listSkills
+      .mockResolvedValueOnce(catalogue('execute'))
+      .mockRejectedValueOnce(new Error('offline'));
+    const { result, rerender } = renderHook(({ t }) => useSkills(t), { initialProps: { t: 0 } });
+    await waitFor(() => expect(result.current.skills.map((s) => s.slug)).toEqual(['execute']));
+    rerender({ t: 1 });
+    await waitFor(() => expect(api.listSkills).toHaveBeenCalledTimes(2));
+    expect(result.current.skills.map((s) => s.slug)).toEqual(['execute']);
+  });
+
+  it('stays empty when the first fetch fails, rather than throwing into the render', async () => {
+    // `Once`, not a persistent rejecting implementation: on a mocked-module export the persistent
+    // form leaves a derived promise that vitest's end-of-test check reports as unhandled, even
+    // though the hook's own catch demonstrably runs. One mount makes one call, so Once is exact.
+    api.listSkills.mockRejectedValueOnce(new Error('offline'));
+    const { result } = renderHook(() => useSkills(0));
+    await waitFor(() => expect(api.listSkills).toHaveBeenCalled());
+    expect(result.current).toEqual({ skills: [], invalid: [] });
+  });
+});

@@ -1,15 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { ModelOption } from '../api';
-
-const FAV_KEY = 'vb-fav-models';
-
-function loadFavs(): Set<string> {
-  try {
-    return new Set(JSON.parse(localStorage.getItem(FAV_KEY) ?? '[]'));
-  } catch {
-    return new Set();
-  }
-}
+import { fmtCtx, fmtPrice, loadFavs, providerOf, saveFavs } from './model-format';
 
 interface Props {
   models: ModelOption[];
@@ -17,25 +8,6 @@ interface Props {
   defaultModel: string; // this backend's default — pinned to the top of the list
   onChange: (id: string) => void;
   disabled?: boolean;
-}
-
-// Provider is the id prefix (opencode/deepseek/openrouter); claude aliases have none.
-function providerOf(id: string): string {
-  const i = id.indexOf('/');
-  return i < 0 ? 'claude' : id.slice(0, i);
-}
-
-function fmtCtx(n?: number): string {
-  if (!n) return '';
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(n % 1_000_000 ? 1 : 0)}M`;
-  if (n >= 1000) return `${Math.round(n / 1000)}K`;
-  return String(n);
-}
-
-function fmtPrice(m: ModelOption): string {
-  if (m.free) return 'Free';
-  if (m.promptPerM == null) return '';
-  return `$${m.promptPerM} / $${m.completionPerM ?? 0}`;
 }
 
 export interface ModelFilter {
@@ -103,7 +75,7 @@ export function ModelPicker({ models, value, defaultModel, onChange, disabled }:
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
-      localStorage.setItem(FAV_KEY, JSON.stringify([...next]));
+      saveFavs(next);
       return next;
     });
   };

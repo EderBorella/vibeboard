@@ -47,6 +47,7 @@ export default {
     'web/src/copilot/useCopilot.ts',
     'web/src/components/CardEditor.tsx',
     'web/src/components/ModelPicker.tsx',
+    'web/src/components/model-format.ts',
     'web/src/components/TopBar.tsx',
   ],
 

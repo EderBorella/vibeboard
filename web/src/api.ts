@@ -325,10 +325,18 @@ export interface DispatchRequest {
   mode?: string;
 }
 
-export async function listRuns(): Promise<{ runs: RunRecord[]; active: string[] }> {
+export interface RunList {
+  runs: RunRecord[];
+  // Ids the server currently has processes for, and ids waiting for a slot. The records carry the
+  // same information, but only the server knows which of them it is actually holding.
+  active: string[];
+  queued: string[];
+}
+
+export async function listRuns(): Promise<RunList> {
   const res = await fetch('/api/runs');
   if (!res.ok) throw new Error('Failed to load runs');
-  return res.json() as Promise<{ runs: RunRecord[]; active: string[] }>;
+  return res.json() as Promise<RunList>;
 }
 
 export async function listCardRuns(board: BoardName, card: string): Promise<RunRecord[]> {

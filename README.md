@@ -49,9 +49,11 @@ your-project/
 │   ├── todo/         E-010.md
 │   ├── review/
 │   └── archive/                 # soft-deleted cards, recoverable
+│   └── results/                 # one file per skill run, per card — not a column
 ├── .vibeboard/
 │   ├── config.yaml           # columns, ordering, settings
-│   └── chat/                 # copilot transcripts (git-ignore these)
+│   ├── chat/                 # copilot transcripts (git-ignore these)
+│   └── runs/                 # run transcripts and staged agent reports
 ├── VIBEBOARD.md             # card conventions (also read by AI agents)
 └── INSTRUCTIONS.md          # your own standing instructions for the copilot
 ```
@@ -110,11 +112,12 @@ startup; anything already exported in your shell takes precedence.
 | `VIBEBOARD_OPENCODE_PORT` | `0` (OS-assigned) | Port for the spawned `opencode serve` |
 | `VIBEBOARD_OPENCODE_URL` | *(unset)* | Attach to your own `opencode serve` instead of spawning one |
 | `VIBEBOARD_COPILOT_TIMEOUT_MS` | `180000` | Per-turn copilot timeout |
+| `VIBEBOARD_RUN_TIMEOUT_MS` | `1800000` | How long a skill run may take before it is stopped |
 | `VIBEBOARD_COPILOT_HOME` | `~/.vibeboard/copilot` | Clean config home used to isolate the copilot |
 | `VIBEBOARD_COPILOT_ISOLATE` | isolation on | Set `0` to let the copilot load your personal CLI config |
 
-Per-project settings (board columns, chat retention, copilot backend and model)
-live in that project's `.vibeboard/config.yaml` and are editable in the UI.
+Per-project settings (board columns, chat retention, copilot backend and model,
+and `maxConcurrentRuns`) live in that project's `.vibeboard/config.yaml`.
 
 ### ⚠️ Security
 
@@ -142,8 +145,17 @@ expose it to the public internet.
 - **Skill rail** beside an open card, driven by `.claude/skills/*/SKILL.md` files
   you can add or edit. A skill declares the boards and columns it belongs to, so
   the rail shows only what fits the card in front of you, and a file that fails
-  validation is reported with the reason rather than silently ignored. Dispatch
-  arrives with the run engine
+  validation is reported with the reason rather than silently ignored
+- **Run a skill as an agent**: pick connector, model, effort and mode (all
+  pre-filled from your defaults), add a prompt and attach project files, and the
+  agent works the card. It reports back through a file contract, so a run either
+  **succeeds** — report on the card, with links to any cards it created — or
+  **needs you**, with options to choose from. Choosing one dispatches again
+  carrying the previous report, so the work iterates until you close the card
+- **Execution dashboard**: every run in the project across In progress, Requires
+  attention and Done, with a badge when something is waiting on you. Stop a run
+  from there, or open the card it belongs to. Runs past
+  `maxConcurrentRuns` (default 3) queue rather than being refused
 - **Tag filter** across all three boards at once: click a tag on a card or a chip
   in the bar, and each further tag narrows the boards to cards carrying all of them
 - Symmetric card links across any pair of boards
@@ -164,10 +176,7 @@ expose it to the public internet.
 
 **On the roadmap**
 
-- **Skill dispatch** — run a card's skill as an agent: pick backend, model and
-  effort, add a prompt and attachments, and get a report back that either
-  succeeds or asks you a question. The rail and the skill files are in place;
-  the run engine, the reports and the Execution dashboard are next
+- **Plugin management** in the Project Control tab
 - **Embedded terminal** — a full interactive agent session in the browser
 - **Plugin management** in the Project Control tab
 - **External resources** — attach reference folders, PDFs, and notes to a project

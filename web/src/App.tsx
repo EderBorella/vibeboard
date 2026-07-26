@@ -1,32 +1,21 @@
 import { type ReactNode, useEffect, useRef, useState } from 'react';
-import { archiveCard, createCard, getState, patchCard, placeCard, setLinks } from './api';
-import { Board } from './components/Board';
-import { CardsPane } from './components/CardsPane';
-import { ProjectControl } from './components/ProjectControl';
+import { archiveCard, cancelRun, createCard, getState, patchCard, placeCard, setLinks } from './api';
 import { ProjectGate } from './components/ProjectGate';
 import { SettingsModal } from './components/SettingsModal';
-import { TagFilter } from './components/TagFilter';
-import { TopBar } from './components/TopBar';
-import { UtilityDock } from './components/UtilityDock';
-import { CopilotPanel } from './copilot/CopilotPanel';
+import { type MainTab, TopBar } from './components/TopBar';
+import { WorkArea } from './components/WorkArea';
 import { type CopilotMode, useCopilot } from './copilot/useCopilot';
-import type { DockPane } from './dock/panes';
 import { useCardTabs } from './dock/useCardTabs';
 import { useDock } from './dock/useDock';
 import { useDispatch } from './runs/useDispatch';
-import {
-  BOARD_LABELS,
-  BOARDS,
-  type BoardName,
-  type Card,
-  type CardFrontmatterPatch,
-  DEFAULT_CONTEXT_BUDGET,
-} from './shared';
+import { useRuns } from './runs/useRuns';
+import { needsAttention } from './runs/viewmodel';
+import { BOARDS, type BoardName, type Card, type CardFrontmatterPatch } from './shared';
 import { useSkills } from './skills/useSkills';
 import { useCopilotChoice } from './useCopilotChoice';
 import { useCollapsedBoards, useTheme } from './useLocalPrefs';
 import { useSnapshot } from './useSnapshot';
-import { canPlace, filterByTags, presentTags, tagCounts, toggleTag } from './viewmodel';
+import { canPlace, presentTags, tagCounts, toggleTag } from './viewmodel';
 
 export function App() {
   const [bump, setBump] = useState(0);
@@ -34,7 +23,7 @@ export function App() {
   const [ready, setReady] = useState(false);
   const [copilotOpen, setCopilotOpen] = useState(true);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [tab, setTab] = useState<'boards' | 'control'>('boards');
+  const [tab, setTab] = useState<MainTab>('boards');
   // Tag filter: one filter across all three boards, and deliberately NOT persisted — a filter
   // restored on the next load reads as cards having gone missing.
   const [activeTags, setActiveTags] = useState<string[]>([]);
@@ -69,6 +58,8 @@ export function App() {
   // Everything the details step needs. `choice.backend` drives the model list, so switching
   // connector in the form reloads it exactly as it does in the copilot dock.
   const dispatch = useDispatch(choice.backend, snapshot);
+  // Every run in the project, for the Execution tab and its badge.
+  const allRuns = useRuns(snapshot);
 
   const allCards = snapshot ? BOARDS.flatMap((b) => snapshot.boards[b] ?? []) : [];
   // Chips come from every card, not the filtered set, so the bar does not shrink out from under
@@ -139,43 +130,6 @@ export function App() {
 
   // The dock's occupants. Cards is the only one today; a terminal would be one more entry here
   // and one more component, with no change to UtilityDock.
-  const panes: DockPane[] = snapshot
-    ? [
-        {
-          id: 'cards',
-          label: 'Cards',
-          // No badge at zero: "Cards 0" is noise, and the pane says so itself.
-          badge: cards.tabs.length || undefined,
-          render: () => (
-            <CardsPane
-              tabs={cards.tabs}
-              activeId={cards.activeId}
-              live={allCards}
-              config={snapshot.config}
-              onFocus={cards.focus}
-              onClose={cards.close}
-              onOpenCard={onOpen}
-              onPatch={onPatch}
-              onLinks={onLinks}
-              skills={catalogue.skills}
-              invalid={catalogue.invalid}
-              dispatch={{
-                defaults: choice,
-                models: dispatch.models,
-                attachable: dispatch.attachable,
-                busy: dispatch.busy,
-                error: dispatch.error,
-                onRun: dispatch.run,
-                onBackend: onBackend,
-              }}
-              trigger={snapshot}
-              onMove={onMoveCard}
-            />
-          ),
-        },
-      ]
-    : [];
-
   // A flat chain rather than nested ternaries in the JSX: same four outcomes, and cognitive
   // complexity counts nesting far more heavily than sequence.
   let content: ReactNode;
@@ -185,66 +139,54 @@ export function App() {
     content = <div className="empty">{conn === 'open' ? 'No project open.' : 'Connecting…'}</div>;
   else
     content = (
-      <div className="work">
-        {/* The dock belongs inside this column, not across the window: the copilot keeps its full
-            height beside it, which is the whole point of docking rather than overlaying. */}
-        <div className="work-main">
-          {tab === 'boards' ? (
-            <main className="boards">
-              <TagFilter tags={tags} active={active} onToggle={onTag} onClear={() => setActiveTags([])} />
-              {BOARDS.map((board) => (
-                <Board
-                  key={board}
-                  board={board}
-                  label={BOARD_LABELS[board]}
-                  cards={filterByTags(snapshot.boards[board] ?? [], active)}
-                  config={snapshot.config}
-                  archivedCount={snapshot.archivedCounts?.[board] ?? 0}
-                  collapsed={collapsed.has(board)}
-                  onToggle={() => toggleBoard(board)}
-                  onAdd={onAdd}
-                  onOpen={onOpen}
-                  onArchive={onArchive}
-                  onDragStart={onDragStart}
-                  onTag={onTag}
-                  onDrop={onDrop}
-                />
-              ))}
-            </main>
-          ) : (
-            <ProjectControl snapshot={snapshot} />
-          )}
-          <UtilityDock
-            panes={panes}
-            activeId={dock.pane}
-            onPane={dock.show}
-            collapsed={dock.collapsed}
-            onCollapse={dock.toggle}
-          />
-        </div>
-        {copilotOpen && (
-          <CopilotPanel
-            copilot={copilot}
-            backend={choice.backend}
-            mode={copilotMode}
-            model={choice.model}
-            effort={choice.effort}
-            onMode={setCopilotMode}
-            onModel={setModel}
-            onEffort={setEffort}
-            onBackend={onBackend}
-            overridden={overridden}
-            contextBudget={snapshot.config.contextBudget ?? DEFAULT_CONTEXT_BUDGET}
-            onReset={onResetCopilot}
-            onClose={() => setCopilotOpen(false)}
-          />
-        )}
-      </div>
+      <WorkArea
+        snapshot={snapshot}
+        tab={tab}
+        allCards={allCards}
+        runs={allRuns}
+        skills={catalogue}
+        cards={cards}
+        dock={dock}
+        copilot={{
+          state: copilot,
+          open: copilotOpen,
+          mode: copilotMode,
+          choice,
+          overridden,
+          onMode: setCopilotMode,
+          onModel: setModel,
+          onEffort: setEffort,
+          onBackend,
+          onReset: onResetCopilot,
+          onClose: () => setCopilotOpen(false),
+        }}
+        dispatch={dispatch}
+        boards={{
+          tags,
+          activeTags: active,
+          collapsed,
+          onToggleBoard: toggleBoard,
+          onTag,
+          onClearTags: () => setActiveTags([]),
+        }}
+        onAdd={onAdd}
+        onOpen={onOpen}
+        onArchive={onArchive}
+        onDragStart={onDragStart}
+        onDrop={onDrop}
+        onPatch={onPatch}
+        onLinks={onLinks}
+        onMoveCard={onMoveCard}
+        onCancelRun={(record) => {
+          void cancelRun(record.run).catch(() => {});
+        }}
+      />
     );
 
   return (
     <div className="app-shell">
       <TopBar
+        attentionCount={allRuns.runs.filter((r) => needsAttention(r.status)).length}
         showProject={Boolean(snapshot) && !showGate}
         projectName={snapshot?.name}
         tab={tab}

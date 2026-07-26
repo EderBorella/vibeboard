@@ -4,13 +4,18 @@ const THEMES: { value: string; label: string }[] = [
   { value: 'classic-dark', label: 'Classic Dark' },
 ];
 
+export type MainTab = 'boards' | 'execution' | 'control';
+
 interface Props {
   // False while loading, on the project gate, or with no project open — everything except the
   // brand, the theme picker and the connection dot is hidden behind it.
   showProject: boolean;
   projectName?: string;
-  tab: 'boards' | 'control';
-  onTab: (tab: 'boards' | 'control') => void;
+  tab: MainTab;
+  onTab: (tab: MainTab) => void;
+  // Runs waiting for a decision. Shown on the Execution tab as a badge, because a run that needs
+  // you is easy to miss on a board you are not looking at.
+  attentionCount: number;
   theme: string;
   onTheme: (theme: string) => void;
   copilotOpen: boolean;
@@ -24,6 +29,7 @@ export function TopBar({
   showProject,
   projectName,
   tab,
+  attentionCount,
   onTab,
   theme,
   onTheme,
@@ -41,6 +47,13 @@ export function TopBar({
         <div className="topbar-tabs" role="group" aria-label="View">
           <button className={`tab-btn${tab === 'boards' ? ' active' : ''}`} onClick={() => onTab('boards')}>
             Boards
+          </button>
+          <button
+            className={`tab-btn${tab === 'execution' ? ' active' : ''}`}
+            onClick={() => onTab('execution')}
+          >
+            Execution
+            {attentionCount > 0 && <span className="tab-badge">{attentionCount}</span>}
           </button>
           <button className={`tab-btn${tab === 'control' ? ' active' : ''}`} onClick={() => onTab('control')}>
             Project Control

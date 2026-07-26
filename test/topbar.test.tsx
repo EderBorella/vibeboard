@@ -16,6 +16,7 @@ const props = {
   onToggleCopilot: vi.fn(),
   onSettings: vi.fn(),
   onSwitchProject: vi.fn(),
+  attentionCount: 0,
   conn: 'open',
 };
 

@@ -35,9 +35,15 @@ export function skillPath(slug: string): string {
   return `.claude/skills/${slug}/SKILL.md`;
 }
 
-// A predicate, not a boolean: it narrows, so the caller needs no cast to BoardName.
+// Predicates, not booleans: they narrow, so the caller needs no cast to BoardName. The array form
+// is what lets one guard narrow the whole list — filtering afterwards would be a second pass that
+// can never remove anything, since the guard has already returned.
 function isBoard(value: string): value is BoardName {
   return (BOARDS as readonly string[]).includes(value);
+}
+
+function areBoards(values: string[]): values is BoardName[] {
+  return values.every(isBoard);
 }
 
 function asStrings(value: unknown): string[] {
@@ -64,10 +70,8 @@ export function parseSkill(slug: string, content: string, config: ProjectConfig)
   if (prompt === '') return bad('needs a prompt — the body is empty');
 
   // Slugged before comparing, so "Engineering" and "In Progress" work as written.
-  const claimed = asStrings(data.boards).map(slugify);
-  const unknownBoard = claimed.find((b) => !isBoard(b));
-  if (unknownBoard !== undefined) return bad(`unknown board "${unknownBoard}"`);
-  const boards = claimed.filter(isBoard);
+  const boards = asStrings(data.boards).map(slugify);
+  if (!areBoards(boards)) return bad(`unknown board "${boards.find((b) => !isBoard(b))}"`);
 
   const columns = asStrings(data.columns).map(slugify);
   const allowed = allowedColumns(config, boards);

@@ -60,6 +60,16 @@ describe('readSkills', () => {
     expect(invalid.map((i) => i.slug)).toEqual(['z-run']);
   });
 
+  it('returns a sorted list whatever order the filesystem hands the folders back in', async () => {
+    // Twelve folders created in a shuffled order. readdir returns hash order on ext4, so this is
+    // what actually witnesses the sort — a two-folder fixture can come back already sorted by
+    // chance, in which case removing the sort changes nothing.
+    const names = ['m3', 'a9', 'z1', 'q7', 'b2', 'y8', 'c5', 'x4', 'd6', 'w0', 'e1', 'v2'];
+    const root = await withSkills(Object.fromEntries(names.map((n) => [n, file(n)])));
+    const { skills } = await readSkills(root, config);
+    expect(skills.map((s) => s.slug)).toEqual([...names].sort());
+  });
+
   it('ignores a loose file sitting beside the skill folders', async () => {
     const root = await withSkills({ execute: file('Execute') });
     await writeFile(join(root, '.claude', 'skills', 'README.md'), '# not a skill\n', 'utf8');

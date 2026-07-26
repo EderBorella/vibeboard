@@ -139,6 +139,11 @@ expose it to the public internet.
   host other tools (a terminal) as further panes
 - **Click any field to edit it**, in place, committing on its own — no form, no
   Save button. `Raw` in the dock swaps the card for its file, frontmatter and all
+- **Skill rail** beside an open card, driven by `.claude/skills/*/SKILL.md` files
+  you can add or edit. A skill declares the boards and columns it belongs to, so
+  the rail shows only what fits the card in front of you, and a file that fails
+  validation is reported with the reason rather than silently ignored. Dispatch
+  arrives with the run engine
 - **Tag filter** across all three boards at once: click a tag on a card or a chip
   in the bar, and each further tag narrows the boards to cards carrying all of them
 - Symmetric card links across any pair of boards
@@ -159,10 +164,10 @@ expose it to the public internet.
 
 **On the roadmap**
 
-- **Skill buttons** — user-defined per-card actions (Execute, Research, Review…),
-  each routed to a chosen model and backend, with token/cost tracking. The rail
-  beside an open card is already there; the actions in it are placeholders and
-  disabled until the routing exists
+- **Skill dispatch** — run a card's skill as an agent: pick backend, model and
+  effort, add a prompt and attachments, and get a report back that either
+  succeeds or asks you a question. The rail and the skill files are in place;
+  the run engine, the reports and the Execution dashboard are next
 - **Embedded terminal** — a full interactive agent session in the browser
 - **Plugin management** in the Project Control tab
 - **External resources** — attach reference folders, PDFs, and notes to a project

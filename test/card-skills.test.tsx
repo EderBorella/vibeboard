@@ -81,6 +81,11 @@ describe('CardSkills', () => {
     ).toBeTruthy();
   });
 
+  it('shows no empty state when the card does have skills', () => {
+    render(<CardSkills card={card()} skills={[skill()]} invalid={[]} />);
+    expect(document.querySelector('.cs-empty')).toBeNull();
+  });
+
   it('counts invalid skill files and names each reason on hover', () => {
     const invalid: InvalidSkill[] = [
       { slug: 'a', path: '.claude/skills/a/SKILL.md', reason: 'needs a description' },

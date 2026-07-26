@@ -34,6 +34,7 @@ export default {
     // Project Control (the `..` rejection, the symlink realpath walk, the category allow-list)
     // and the closest thing here to a security boundary.
     'src/server/control-files.ts',
+    'src/server/skill-catalogue.ts',
     'src/server/copilot-events.ts',
     'src/server/session.ts',
     'src/server/snapshot.ts',
@@ -49,7 +50,8 @@ export default {
     'web/src/dock/tabs.ts',
     'web/src/dock/useCardTabs.ts',
     'web/src/dock/useDock.ts',
-    'web/src/dock/skills.ts',
+    'web/src/skills/filter.ts',
+    'web/src/skills/useSkills.ts',
     'web/src/copilot/choice.ts',
     'web/src/copilot/format.ts',
     'web/src/useSnapshot.ts',

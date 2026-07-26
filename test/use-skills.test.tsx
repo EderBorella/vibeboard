@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const api = vi.hoisted(() => ({ listSkills: vi.fn() }));
@@ -68,6 +68,29 @@ describe('useSkills', () => {
     rerender({ t: 1 });
     await waitFor(() => expect(api.listSkills).toHaveBeenCalledTimes(2));
     expect(result.current.skills.map((s) => s.slug)).toEqual(['execute']);
+  });
+
+  it('ignores a slow response that lands after the trigger moved on', async () => {
+    // The cancel flag's actual job. Without it, a first fetch that resolves late overwrites the
+    // newer catalogue, so the rail shows the previous project's — or the previous card's — skills.
+    let landFirst: (c: unknown) => void = () => {};
+    api.listSkills
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            landFirst = resolve;
+          }),
+      )
+      .mockResolvedValueOnce(catalogue('review'));
+
+    const { result, rerender } = renderHook(({ t }) => useSkills(t), { initialProps: { t: 0 } });
+    rerender({ t: 1 });
+    await waitFor(() => expect(result.current.skills.map((s) => s.slug)).toEqual(['review']));
+
+    await act(async () => {
+      landFirst(catalogue('execute'));
+    });
+    expect(result.current.skills.map((s) => s.slug)).toEqual(['review']);
   });
 
   it('stays empty when the first fetch fails, rather than throwing into the render', async () => {

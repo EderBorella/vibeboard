@@ -52,7 +52,7 @@ const input = (root: string, over: Partial<DispatchInput> = {}): DispatchInput =
 function runner(root: string, over: Partial<RunnerOptions> = {}) {
   const updates: RunRecord[] = [];
   const instance = new AgentRunner({
-    root,
+    root: () => root,
     now: () => new Date('2026-07-26T14:30:12.000Z'),
     suffix: () => 'a1b2',
     timeoutMs: 5000,
@@ -284,7 +284,7 @@ describe('AgentRunner.dispatch', () => {
     await settled(root, first.run);
     // A second dispatch needs a different id, so the clock moves on.
     const second = new AgentRunner({
-      root,
+      root: () => root,
       now: () => new Date('2026-07-26T15:00:00.000Z'),
       suffix: () => 'c3d4',
       timeoutMs: 5000,

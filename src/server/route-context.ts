@@ -1,5 +1,6 @@
 import type { FastifyReply } from 'fastify';
 import type { ProjectConfig } from '../core/types.js';
+import type { AgentRunner } from './agent-runner.js';
 import type { ChatStore } from './chat-store.js';
 import type { CopilotSession } from './copilot.js';
 import type { ProjectSession } from './session.js';
@@ -15,6 +16,9 @@ export interface AppCtx {
   session: ProjectSession;
   copilot: CopilotSession;
   chats: ChatStore;
+  // Skill runs. Separate from `copilot` deliberately: the chat is one conversation at a time, a run
+  // is one prompt in and one report out, and neither should be able to block the other.
+  runner: AgentRunner;
   broadcast: (msg: unknown) => void;
 }
 

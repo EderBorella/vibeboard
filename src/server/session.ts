@@ -8,6 +8,7 @@ import {
 } from '../core/config.js';
 import { ensureControlFiles } from '../core/control.js';
 import type { ProjectConfig } from '../core/types.js';
+import { markInterrupted } from './run-store.js';
 import { buildSnapshot, type ProjectSnapshot } from './snapshot.js';
 
 type SnapshotListener = (snapshot: ProjectSnapshot) => void;
@@ -59,6 +60,10 @@ export class ProjectSession {
     await ensureControlFiles(projectRoot);
     this.#config = config;
     this.#root = projectRoot;
+    // Any run still claiming to be in flight belongs to a previous process: its child died with the
+    // server that spawned it. Done here rather than at each caller so both paths — opening a project
+    // and reopening the last one on boot — are covered by one call.
+    await markInterrupted(projectRoot, new Date().toISOString());
     await this.close(true);
 
     const watcher = chokidar.watch(projectRoot, {

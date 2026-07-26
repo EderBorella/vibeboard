@@ -30,7 +30,9 @@ export interface DispatchInput {
 }
 
 export interface RunnerOptions {
-  root: string;
+  // A function, not a string: the open project can change, and a run must finish inside the project
+  // it started in. Resolved once per dispatch and carried through, never re-read at completion.
+  root: () => string;
   // Injected so a test can pin both. Nothing here reads the clock or the RNG directly.
   now: () => Date;
   suffix: () => string;
@@ -76,7 +78,8 @@ export class AgentRunner {
   // answer immediately; the outcome lands later through onUpdate.
   async dispatch(input: DispatchInput): Promise<RunRecord> {
     if (this.isBusy()) throw new Error('A run is already in flight');
-    const { root, now, suffix } = this.#opts;
+    const { now, suffix } = this.#opts;
+    const root = this.#opts.root();
     const startedAt = now();
     const run = runId(startedAt, suffix());
 
@@ -130,19 +133,18 @@ export class AgentRunner {
 
     // Not awaited: dispatch answers as soon as the record exists, and the ending arrives through
     // onUpdate. Errors are folded into the record rather than thrown into nowhere.
-    void this.#settle(run, record, turn);
+    void this.#settle(root, run, record, turn);
     return record;
   }
 
-  async #settle(run: string, record: RunRecord, turn: RunningTurn): Promise<void> {
-    const { root } = this.#opts;
+  async #settle(root: string, run: string, record: RunRecord, turn: RunningTurn): Promise<void> {
     let final: RunRecord;
     try {
       const result = await turn.done;
       const cancelled = this.#active.get(run)?.cancelled === true;
       const finishedAt = this.#opts.now().toISOString();
       const folded = await foldReport(root, record, finishedAt);
-      final = folded ?? (await this.#endWithoutReport(record, result, cancelled, finishedAt));
+      final = folded ?? (await this.#endWithoutReport(root, record, result, cancelled, finishedAt));
     } catch (err) {
       final = withoutReport(
         record,
@@ -160,12 +162,13 @@ export class AgentRunner {
   // No report file. Which of the four endings it was decides the status, and the note is what the
   // UI shows in place of a report — with the transcript tail, so "it did nothing" is checkable.
   async #endWithoutReport(
+    root: string,
     record: RunRecord,
     result: { exitCode: number | null; timedOut: boolean },
     cancelled: boolean,
     finishedAt: string,
   ): Promise<RunRecord> {
-    const { root, timeoutMs } = this.#opts;
+    const { timeoutMs } = this.#opts;
     const tail = await transcriptTail(root, record.run);
     let status: RunRecord['status'] = 'attention';
     let note = 'The agent finished without writing a report.';

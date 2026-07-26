@@ -35,6 +35,7 @@ export default {
     // and the closest thing here to a security boundary.
     'src/server/control-files.ts',
     'src/server/skill-catalogue.ts',
+    'src/server/agent-turn.ts',
     'src/server/copilot-events.ts',
     'src/server/session.ts',
     'src/server/snapshot.ts',

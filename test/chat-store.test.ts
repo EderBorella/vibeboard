@@ -1,4 +1,4 @@
-import { readdir } from 'node:fs/promises';
+import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { defaultConfig } from '../src/core/config.js';
@@ -327,5 +327,120 @@ describe('ChatStore titles and errors', () => {
     await store.newChat();
 
     expect(await store.open(id)).toMatchObject({ backend: 'claude-code' });
+  });
+});
+
+// The write path: a 150ms debounce, a promise chain so writes never interleave, and a prune that
+// must never take the chat you are looking at. This is the code that decides whether history
+// survives, so each guard gets its own witness.
+describe('ChatStore write path', () => {
+  const files = async (dir: string): Promise<string[]> => {
+    try {
+      return (await readdir(dir)).sort();
+    } catch {
+      return [];
+    }
+  };
+
+  it('never writes a blank chat', async () => {
+    const { store, chatDir } = await fresh();
+    await store.flush(); // a fresh store has a current chat with no items
+    expect(await files(chatDir)).toEqual([]);
+
+    await store.newChat();
+    await store.flush();
+    expect(await files(chatDir)).toEqual([]);
+  });
+
+  it('ignores an error recorded before any chat exists', async () => {
+    const { store, chatDir } = await fresh();
+    store.recordError('nothing to attach to');
+    await store.flush();
+    expect(await files(chatDir)).toEqual([]);
+  });
+
+  it('writes nothing at all with no project open', async () => {
+    const ref: Ref = { root: undefined, config: defaultConfig('t') };
+    const store = new ChatStore(ref);
+    await store.recordUser('into the void');
+    await expect(store.flush()).resolves.toBeUndefined();
+  });
+
+  // Real timers on purpose: the debounced write ends in real filesystem I/O, which fake timers
+  // cannot flush, so a faked clock can never observe the write actually landing.
+  it('restarts the debounce on each change rather than writing on a fixed schedule', async () => {
+    const { store, chatDir } = await fresh();
+    await store.recordUser('first');
+    await sleep(100);
+    expect(await files(chatDir)).toEqual([]); // 100ms in, not yet
+
+    await store.recordUser('second'); // resets the window
+    await sleep(100);
+    expect(await files(chatDir)).toEqual([]); // 200ms after the first change, still nothing
+
+    await sleep(150);
+    expect((await files(chatDir)).length).toBe(1);
+  }, 10000);
+
+  it('flush writes immediately and leaves nothing scheduled behind it', async () => {
+    const { store, chatDir } = await fresh();
+    await store.recordUser('now please');
+    await store.flush();
+    expect((await files(chatDir)).length).toBe(1);
+
+    const before = await readFile(join(chatDir, (await files(chatDir))[0]), 'utf8');
+    await sleep(250); // well past the debounce; no second write should land
+    expect(await readFile(join(chatDir, (await files(chatDir))[0]), 'utf8')).toBe(before);
+  }, 10000);
+});
+
+describe('ChatStore prune boundaries', () => {
+  const filesIn = async (dir: string): Promise<number> => (await readdir(dir)).length;
+
+  // Build `n` finished chats, oldest first, then leave a fresh current one.
+  const seed = async (keepChats: number, n: number) => {
+    const f = await fresh({ keepChats });
+    const ids: string[] = [];
+    for (let i = 0; i < n; i++) {
+      await f.store.recordUser(`chat ${i}`);
+      await f.store.flush();
+      ids.push((await f.store.chatList()).currentChatId!);
+      await sleep(5); // distinct updatedAt so the ordering is deterministic
+      await f.store.newChat();
+    }
+    return { ...f, ids };
+  };
+
+  it('keeps everything while the count is within the limit', async () => {
+    const { chatDir } = await seed(3, 3);
+    expect(await filesIn(chatDir)).toBe(3);
+  });
+
+  it('drops the oldest once the limit is exceeded', async () => {
+    const { store, chatDir, ids } = await seed(2, 3);
+    await store.recordUser('current');
+    await store.flush();
+    const remaining = (await readdir(chatDir)).map((n) => n.replace('.json', ''));
+    expect(remaining).not.toContain(ids[0]); // the oldest went
+    expect(remaining).toContain(ids[2]); // the newest stayed
+  });
+
+  it('prunes as it goes, so the limit holds across a long session', async () => {
+    const { chatDir } = await seed(1, 4);
+    // Each write prunes, so the count never drifts above the limit plus the current chat.
+    expect(await filesIn(chatDir)).toBeLessThanOrEqual(2);
+  });
+
+  it('keeps the chat being written, and it is always the newest', async () => {
+    const { store, chatDir, ids } = await seed(2, 3);
+    await store.recordUser('current');
+    await store.flush();
+    const current = (await store.chatList()).currentChatId;
+    const remaining = (await readdir(chatDir)).map((n) => n.replace('.json', ''));
+    expect(remaining).toContain(current);
+    // Note: persistNow touches the current chat before pruning, so it is always first in the
+    // newest-first ordering and can never fall inside slice(keep). The `id !== currentId` filter
+    // in #prune is therefore defensive — unreachable through the public API.
+    expect(remaining).toContain(ids[2]);
   });
 });

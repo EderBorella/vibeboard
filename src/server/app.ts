@@ -8,6 +8,7 @@ import { registerConfigRoutes } from './routes/config.js';
 import { registerControlRoutes } from './routes/control.js';
 import { registerModelRoutes } from './routes/models.js';
 import { registerProjectRoutes } from './routes/project.js';
+import { registerSkillRoutes } from './routes/skills.js';
 import type { ProjectSession } from './session.js';
 import { createBroadcaster, registerWs } from './ws.js';
 
@@ -29,6 +30,7 @@ export function buildApp(session: ProjectSession): FastifyInstance {
       await registerConfigRoutes(api, ctx);
       await registerModelRoutes(api, ctx);
       await registerControlRoutes(api, ctx);
+      await registerSkillRoutes(api, ctx);
       await registerCardRoutes(api, ctx);
     },
     { prefix: '/api' },

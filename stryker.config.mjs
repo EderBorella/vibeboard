@@ -48,6 +48,7 @@ export default {
     'web/src/dock/panes.ts',
     'web/src/dock/tabs.ts',
     'web/src/dock/useCardTabs.ts',
+    'web/src/dock/useDock.ts',
     'web/src/copilot/choice.ts',
     'web/src/copilot/format.ts',
     'web/src/useSnapshot.ts',

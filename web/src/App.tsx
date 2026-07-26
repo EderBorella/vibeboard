@@ -12,6 +12,7 @@ import { CopilotPanel } from './copilot/CopilotPanel';
 import { type CopilotMode, useCopilot } from './copilot/useCopilot';
 import type { DockPane } from './dock/panes';
 import { useCardTabs } from './dock/useCardTabs';
+import { useDock } from './dock/useDock';
 import {
   BOARD_LABELS,
   BOARDS,
@@ -21,7 +22,7 @@ import {
   DEFAULT_CONTEXT_BUDGET,
 } from './shared';
 import { useCopilotChoice } from './useCopilotChoice';
-import { useCollapsedBoards, useDockCollapsed, useTheme } from './useLocalPrefs';
+import { useCollapsedBoards, useTheme } from './useLocalPrefs';
 import { useSnapshot } from './useSnapshot';
 import { canPlace, filterByTags, presentTags, tagCounts, toggleTag } from './viewmodel';
 
@@ -38,7 +39,7 @@ export function App() {
   // Open cards, one dock tab each. The state lives in its own hook so it is testable without
   // mounting the shell — see dock/useCardTabs.ts.
   const cards = useCardTabs();
-  const [dockPane, setDockPane] = useState<string | null>(null);
+  const dock = useDock();
   const dragged = useRef<Card | null>(null);
   const { snapshot, conn } = useSnapshot(bump);
 
@@ -60,7 +61,6 @@ export function App() {
 
   const [theme, setTheme] = useTheme();
   const [collapsed, toggleBoard] = useCollapsedBoards();
-  const [dockCollapsed, toggleDock] = useDockCollapsed();
 
   const allCards = snapshot ? BOARDS.flatMap((b) => snapshot.boards[b] ?? []) : [];
   // Chips come from every card, not the filtered set, so the bar does not shrink out from under
@@ -84,7 +84,7 @@ export function App() {
   // and the card stay usable together. Editing is still the modal, reached from the pane.
   const onOpen = (card: Card): void => {
     cards.open(card, allCards);
-    setDockPane('cards');
+    dock.show('cards'); // unfolds the dock too, or the card opens out of sight
   };
   const onDragStart = (card: Card): void => {
     dragged.current = card;
@@ -190,10 +190,10 @@ export function App() {
           )}
           <UtilityDock
             panes={panes}
-            activeId={dockPane}
-            onPane={setDockPane}
-            collapsed={dockCollapsed}
-            onCollapse={toggleDock}
+            activeId={dock.pane}
+            onPane={dock.show}
+            collapsed={dock.collapsed}
+            onCollapse={dock.toggle}
           />
         </div>
         {copilotOpen && (

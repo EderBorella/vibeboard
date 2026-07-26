@@ -17,16 +17,17 @@ export function useTheme(): [string, (t: string) => void] {
 
 // Utility dock folded away, persisted. Distinct from the dock having no pane with content, which
 // removes it entirely — this is the user having chosen to fold it.
-export function useDockCollapsed(): [boolean, () => void] {
+export function useDockCollapsed(): [boolean, (next: boolean) => void] {
   const [collapsed, setCollapsed] = useState<boolean>(
     () => localStorage.getItem('vb-dock-collapsed') === '1',
   );
-  const toggle = (): void =>
-    setCollapsed((prev) => {
-      localStorage.setItem('vb-dock-collapsed', prev ? '0' : '1');
-      return !prev;
-    });
-  return [collapsed, toggle];
+  // Takes the value rather than toggling: opening a card has to make the dock visible whatever
+  // state it was in, and a toggle cannot express that.
+  const set = (next: boolean): void => {
+    localStorage.setItem('vb-dock-collapsed', next ? '1' : '0');
+    setCollapsed(next);
+  };
+  return [collapsed, set];
 }
 
 // Collapsed boards, persisted.

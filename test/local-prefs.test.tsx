@@ -93,15 +93,21 @@ describe('useDockCollapsed', () => {
     expect(renderHook(() => useDockCollapsed()).result.current[0]).toBe(false);
   });
 
-  it('toggles and persists each way', () => {
+  it('sets and persists each value', () => {
     const { result } = renderHook(() => useDockCollapsed());
 
-    act(() => result.current[1]());
+    act(() => result.current[1](true));
     expect(result.current[0]).toBe(true);
     expect(localStorage.getItem('vb-dock-collapsed')).toBe('1');
 
-    act(() => result.current[1]());
+    act(() => result.current[1](false));
     expect(result.current[0]).toBe(false);
+    expect(localStorage.getItem('vb-dock-collapsed')).toBe('0');
+  });
+
+  it('writes the value it is given even when it matches, so a no-op still records', () => {
+    const { result } = renderHook(() => useDockCollapsed());
+    act(() => result.current[1](false));
     expect(localStorage.getItem('vb-dock-collapsed')).toBe('0');
   });
 });

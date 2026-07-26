@@ -1,5 +1,6 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { seedSkills } from './seed-skills.js';
 
 // The user's own standing instructions live here — freely editable by the user AND the
 // copilot, and injected into the copilot's system prompt every turn. Keeping it separate
@@ -75,4 +76,7 @@ export async function ensureControlFiles(projectRoot: string): Promise<void> {
   for (const filename of POINTER_FILES) {
     await ensurePointerFile(projectRoot, filename, '', false);
   }
+  // Skills for a project that predates them. Guarded inside: an existing `.claude/skills` is left
+  // alone, so a skill the user deleted never comes back.
+  await seedSkills(projectRoot);
 }

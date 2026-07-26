@@ -5,6 +5,7 @@ import { CONFIG_DIR, defaultConfig, writeConfig } from './config.js';
 import { ensurePointerFile, INSTRUCTIONS_DOC, INSTRUCTIONS_FILE, POINTER_FILES } from './control.js';
 import { setCardLinks } from './links.js';
 import { createCard } from './mutations.js';
+import { seedSkills } from './seed-skills.js';
 import { BOARDS, type ProjectConfig } from './types.js';
 
 export type ScaffoldMode = 'greenfield' | 'brownfield';
@@ -113,6 +114,10 @@ export async function scaffoldProject(
   for (const filename of POINTER_FILES) {
     await ensurePointerFile(projectRoot, filename, opts.name, greenfield);
   }
+  // Both modes: the guard inside leaves an adopted repo's own `.claude/skills` untouched. Written
+  // here as well as in ensureControlFiles for the same reason INSTRUCTIONS.md is — scaffolding has
+  // to produce a complete project without depending on a later open.
+  await seedSkills(projectRoot);
   // Sample cards demonstrate the shape for a brand-new project. Adopting an existing repo
   // should add the cockpit and nothing else — three "delete me" cards would just be noise in
   // someone's real project (and in their git status).

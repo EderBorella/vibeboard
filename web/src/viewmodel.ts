@@ -31,6 +31,28 @@ export function cardsByColumn(cards: Card[], slugs: string[]): Record<string, Ca
   return grouped;
 }
 
+// The configured display name for a column slug — 'in-progress' back to 'In Progress'. Falls back
+// to the slug itself when the column has been renamed out from under the card, which is a real
+// state: the file keeps sitting in the old folder until something moves it.
+export function columnLabel(config: ProjectConfig, board: BoardName, slug: string): string {
+  return config.boards[board].columns.find((name) => slugify(name) === slug) ?? slug;
+}
+
+// Where a card sits, for the read-only view. An archived card's own column IS the archive folder,
+// so the informative place is the column it was archived from — itself possibly renamed away.
+export function cardPlace(config: ProjectConfig, card: Card): string {
+  if (!card.archived) return columnLabel(config, card.board, card.columnSlug);
+  return card.archivedFrom
+    ? `Archived · from ${columnLabel(config, card.board, card.archivedFrom)}`
+    : 'Archived';
+}
+
+// The cards a link list names, in the order the links are written. Ids that no longer resolve are
+// dropped rather than rendered as ghosts: the other side may have been deleted outside the app.
+export function linkedCards(all: Card[], ids: readonly string[]): Card[] {
+  return ids.map((id) => all.find((c) => c.id === id)).filter((c): c is Card => c !== undefined);
+}
+
 export interface TagCount {
   tag: string;
   count: number;

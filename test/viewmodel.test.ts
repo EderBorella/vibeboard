@@ -2,9 +2,12 @@ import { describe, expect, it } from 'vitest';
 import type { Card, ProjectConfig } from '../web/src/shared.js';
 import {
   canPlace,
+  cardPlace,
   cardsByColumn,
+  columnLabel,
   columnSlugs,
   filterByTags,
+  linkedCards,
   miniature,
   presentTags,
   slugify,
@@ -280,5 +283,68 @@ describe('presentTags', () => {
 
   it('drops everything when the board has no tags left', () => {
     expect(presentTags(['bug'], [])).toEqual([]);
+  });
+});
+
+describe('columnLabel', () => {
+  it('recovers the configured display name from a slug', () => {
+    expect(columnLabel(config, 'product', 'in-progress')).toBe('In Progress');
+    expect(columnLabel(config, 'product', 'backlog')).toBe('Backlog');
+  });
+
+  it('resolves per board, not across them', () => {
+    // 'todo' is a column of engineering only; product must not borrow it.
+    expect(columnLabel(config, 'engineering', 'todo')).toBe('Todo');
+    expect(columnLabel(config, 'product', 'todo')).toBe('todo');
+  });
+
+  it('falls back to the slug when the column was renamed away', () => {
+    // The card's file keeps sitting in the old folder until something moves it, so this is a
+    // state the view has to render, not an impossible one.
+    expect(columnLabel(config, 'features', 'shipped')).toBe('shipped');
+  });
+});
+
+describe('cardPlace', () => {
+  it('is the column display name for a live card', () => {
+    expect(cardPlace(config, card({ board: 'product', columnSlug: 'in-progress' }))).toBe('In Progress');
+  });
+
+  it('names the column an archived card came from, not the archive folder it sits in', () => {
+    const archived = card({
+      board: 'product',
+      columnSlug: 'archive',
+      archived: '2026-07-26T10:00:00.000Z',
+      archivedFrom: 'in-progress',
+    });
+    expect(cardPlace(config, archived)).toBe('Archived · from In Progress');
+  });
+
+  it('says only Archived when the origin was never recorded', () => {
+    // Hand-archived files can carry `archived` without `archivedFrom`; 'Archived · from archive'
+    // would be worse than saying less.
+    expect(cardPlace(config, card({ columnSlug: 'archive', archived: '2026-07-26T10:00:00.000Z' }))).toBe(
+      'Archived',
+    );
+  });
+});
+
+describe('linkedCards', () => {
+  const a = card({ id: 'E-001' });
+  const b = card({ id: 'P-002', board: 'product' });
+  const all = [a, b];
+
+  it('resolves ids in the order the links are written, not board order', () => {
+    expect(linkedCards(all, ['P-002', 'E-001']).map((c) => c.id)).toEqual(['P-002', 'E-001']);
+  });
+
+  it('drops an id nothing resolves, keeping the rest', () => {
+    // A card deleted outside the app leaves its id behind in the other side's links.
+    expect(linkedCards(all, ['E-001', 'GONE-9']).map((c) => c.id)).toEqual(['E-001']);
+  });
+
+  it('is empty for no links and for links nothing matches', () => {
+    expect(linkedCards(all, [])).toEqual([]);
+    expect(linkedCards(all, ['GONE-9'])).toEqual([]);
   });
 });

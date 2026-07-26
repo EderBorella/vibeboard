@@ -1,6 +1,8 @@
-import { useEffect, useState } from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
 import { createCard, getRaw, patchCard, putRaw, setLinks as setLinksApi } from '../api';
-import { BOARD_LABELS, BOARDS, type BoardName, type Card } from '../shared';
+import type { BoardName, Card, ProjectConfig } from '../shared';
+import { CardForm } from './CardForm';
+import { CardView } from './CardView';
 
 export type EditorState =
   | { mode: 'create'; board: BoardName; columnSlug: string }
@@ -9,11 +11,14 @@ export type EditorState =
 interface Props {
   editor: EditorState;
   allCards: Card[];
+  config: ProjectConfig;
   onClose: () => void;
   onSaved: () => void;
 }
 
-type Tab = 'form' | 'raw';
+// 'view' is read-only and exists in edit mode only — there is nothing to read before a card is
+// created. saveCard therefore only ever sees 'form' or 'raw': the View tab renders no Save button.
+type Tab = 'view' | 'form' | 'raw';
 
 function csv(values: string[]): string {
   return values.join(', ');
@@ -83,54 +88,76 @@ export function initialFields(existing: Card | null): CardFields {
   };
 }
 
-// The link picker: cards grouped by board, boards with nothing to offer omitted.
-function LinkPicker({
-  linkable,
-  links,
-  onToggle,
-}: {
-  linkable: Card[];
-  links: string[];
-  onToggle: (id: string) => void;
-}) {
-  if (linkable.length === 0) return <div className="links-hint">No other cards yet to link.</div>;
+// The tab strip. Its own function because each `active` ternary and each edit-mode-only guard
+// counts against the shell's complexity budget, and there are five of them in nine lines.
+function ModalTabs({ tab, onTab, hasCard }: { tab: Tab; onTab: (tab: Tab) => void; hasCard: boolean }) {
   return (
-    <div className="links-list">
-      {BOARDS.map((b) => {
-        const group = linkable.filter((c) => c.board === b);
-        if (group.length === 0) return null;
-        return (
-          <div key={b}>
-            <div className="links-group">{BOARD_LABELS[b]}</div>
-            {group.map((c) => (
-              <label key={c.id} className="link-option">
-                <input type="checkbox" checked={links.includes(c.id)} onChange={() => onToggle(c.id)} />
-                <span className="link-id">{c.id}</span>
-                <span className="link-title">{c.title}</span>
-              </label>
-            ))}
-          </div>
-        );
-      })}
+    <div className="modal-tabs">
+      {hasCard && (
+        <button className={tab === 'view' ? 'active' : ''} onClick={() => onTab('view')}>
+          View
+        </button>
+      )}
+      <button className={tab === 'form' ? 'active' : ''} onClick={() => onTab('form')}>
+        Form
+      </button>
+      {hasCard && (
+        <button className={tab === 'raw' ? 'active' : ''} onClick={() => onTab('raw')}>
+          Raw
+        </button>
+      )}
     </div>
   );
 }
 
-export function CardEditor({ editor, allCards, onClose, onSaved }: Props) {
+// The footer: read-only tab offers Close + Edit, the writing tabs Cancel + Save.
+function ModalFoot({
+  tab,
+  busy,
+  saveDisabled,
+  onClose,
+  onEdit,
+  onSave,
+}: {
+  tab: Tab;
+  busy: boolean;
+  saveDisabled: boolean;
+  onClose: () => void;
+  onEdit: () => void;
+  onSave: () => void;
+}) {
+  return (
+    <div className="modal-foot">
+      <button className="btn-secondary" onClick={onClose} disabled={busy}>
+        {tab === 'view' ? 'Close' : 'Cancel'}
+      </button>
+      {tab === 'view' ? (
+        // The obvious way out of a read-only pane, since View is where opening a card lands.
+        <button className="btn-primary" onClick={onEdit}>
+          Edit
+        </button>
+      ) : (
+        <button className="btn-primary" onClick={onSave} disabled={saveDisabled}>
+          Save
+        </button>
+      )}
+    </div>
+  );
+}
+
+export function CardEditor({ editor, allCards, config, onClose, onSaved }: Props) {
   const existing = editor.mode === 'edit' ? editor.card : null;
   const board = editor.mode === 'edit' ? editor.card.board : editor.board;
 
   // Any card can link any other card; only exclude the card being edited itself.
   const linkable = allCards.filter((c) => c.id !== existing?.id);
 
-  const [tab, setTab] = useState<Tab>('form');
-  const init = initialFields(existing);
-  const [title, setTitle] = useState(init.title);
-  const [description, setDescription] = useState(init.description);
-  const [tags, setTags] = useState(init.tags);
-  const [group, setGroup] = useState(init.group);
+  // Opening a card reads it; creating one has nothing to read.
+  const [tab, setTab] = useState<Tab>(existing ? 'view' : 'form');
+  const [fields, setFields] = useState<CardFields>(() => initialFields(existing));
   const [links, setLinks] = useState<string[]>(existing?.links ?? []);
-  const [body, setBody] = useState(init.body);
+
+  const onField = (patch: Partial<CardFields>): void => setFields((f) => ({ ...f, ...patch }));
 
   function toggleLink(id: string): void {
     setLinks((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
@@ -156,7 +183,7 @@ export function CardEditor({ editor, allCards, onClose, onSaved }: Props) {
     setBusy(true);
     setError(null);
     try {
-      await saveCard({ editor, tab, fields: { title, description, tags, group, body }, links, raw });
+      await saveCard({ editor, tab, fields, links, raw });
       onSaved();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -165,6 +192,34 @@ export function CardEditor({ editor, allCards, onClose, onSaved }: Props) {
     }
   }
 
+  // One pane per tab, chosen before the JSX: a three-way ternary inside it would nest, and
+  // nesting is what the complexity rule punishes.
+  let pane: ReactNode;
+  if (tab === 'view' && existing) pane = <CardView card={existing} config={config} allCards={allCards} />;
+  else if (tab === 'form')
+    pane = (
+      <CardForm
+        fields={fields}
+        onField={onField}
+        linkable={linkable}
+        links={links}
+        onToggleLink={toggleLink}
+      />
+    );
+  else
+    pane = (
+      <label className="field field-grow">
+        <span>File contents (frontmatter + body)</span>
+        <textarea
+          className="raw-area"
+          rows={18}
+          value={raw}
+          onChange={(e) => setRaw(e.target.value)}
+          placeholder={rawLoaded ? '' : 'Loading…'}
+        />
+      </label>
+    );
+
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
@@ -172,76 +227,25 @@ export function CardEditor({ editor, allCards, onClose, onSaved }: Props) {
           <span className="modal-title">
             {editor.mode === 'create' ? `New ${board} card` : `${editor.card.id} · ${board}`}
           </span>
-          <div className="modal-tabs">
-            <button className={tab === 'form' ? 'active' : ''} onClick={() => setTab('form')}>
-              Form
-            </button>
-            {existing && (
-              <button className={tab === 'raw' ? 'active' : ''} onClick={() => setTab('raw')}>
-                Raw
-              </button>
-            )}
-          </div>
+          <ModalTabs tab={tab} onTab={setTab} hasCard={existing !== null} />
           <button className="modal-close" onClick={onClose}>
             ✕
           </button>
         </div>
 
         <div className="modal-body">
-          {tab === 'form' ? (
-            <>
-              <label className="field">
-                <span>Title</span>
-                <input value={title} onChange={(e) => setTitle(e.target.value)} autoFocus />
-              </label>
-              <label className="field">
-                <span>Description</span>
-                <input
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Miniature summary"
-                />
-              </label>
-              <label className="field">
-                <span>Tags (comma-separated)</span>
-                <input value={tags} onChange={(e) => setTags(e.target.value)} />
-              </label>
-              <label className="field">
-                <span>Group</span>
-                <input value={group} onChange={(e) => setGroup(e.target.value)} />
-              </label>
-              <div className="field">
-                <span>Linked cards</span>
-                <LinkPicker linkable={linkable} links={links} onToggle={toggleLink} />
-              </div>
-              <label className="field">
-                <span>Body (markdown)</span>
-                <textarea rows={8} value={body} onChange={(e) => setBody(e.target.value)} />
-              </label>
-            </>
-          ) : (
-            <label className="field field-grow">
-              <span>File contents (frontmatter + body)</span>
-              <textarea
-                className="raw-area"
-                rows={18}
-                value={raw}
-                onChange={(e) => setRaw(e.target.value)}
-                placeholder={rawLoaded ? '' : 'Loading…'}
-              />
-            </label>
-          )}
+          {pane}
           {error && <div className="modal-error">{error}</div>}
         </div>
 
-        <div className="modal-foot">
-          <button className="btn-secondary" onClick={onClose} disabled={busy}>
-            Cancel
-          </button>
-          <button className="btn-primary" onClick={save} disabled={busy || (tab === 'form' && !title.trim())}>
-            Save
-          </button>
-        </div>
+        <ModalFoot
+          tab={tab}
+          busy={busy}
+          saveDisabled={busy || (tab === 'form' && !fields.title.trim())}
+          onClose={onClose}
+          onEdit={() => setTab('form')}
+          onSave={save}
+        />
       </div>
     </div>
   );

@@ -175,10 +175,12 @@ export function App() {
         />
       )}
 
-      {editor && (
+      {/* snapshot is only ever set, never cleared, so a card cannot be open without one. */}
+      {editor && snapshot && (
         <CardEditor
           editor={editor}
           allCards={allCards}
+          config={snapshot.config}
           onClose={() => setEditor(null)}
           onSaved={() => setEditor(null)}
         />

@@ -127,6 +127,7 @@ export function App() {
               onFocus={cards.focus}
               onClose={cards.close}
               onEdit={(card) => setEditor({ mode: 'edit', card })}
+              onOpenCard={onOpen}
             />
           ),
         },

@@ -133,6 +133,10 @@ expose it to the public internet.
 
 - Three kanban boards backed by folders-as-columns
 - Create / edit / move / reorder / tag / group / link / archive cards
+- **Utility dock** at the bottom of the work area: cards open as tabs there rather
+  than in a modal, so the boards and the copilot stay usable, and a card's links
+  are clickable — following one opens it as another tab. Collapsible, and built to
+  host other tools (a terminal) as further panes
 - Card editor with a friendly form **and** a raw-markdown toggle
 - **Tag filter** across all three boards at once: click a tag on a card or a chip
   in the bar, and each further tag narrows the boards to cards carrying all of them

@@ -42,6 +42,7 @@ const props = {
   onFocus: vi.fn(),
   onClose: vi.fn(),
   onEdit: vi.fn(),
+  onOpenCard: vi.fn(),
   config,
 };
 
@@ -143,6 +144,23 @@ describe('CardsPane', () => {
     );
     expect(screen.getAllByText('archived one').length).toBeGreaterThan(0);
     expect(screen.queryByText('E-009 is no longer on the board.')).toBeNull();
+  });
+
+  it('opens a linked card as another tab', () => {
+    // The browsing loop the dock exists for: a link in the pane re-targets the pane.
+    const onOpenCard = vi.fn();
+    const linked = card('E-002');
+    render(
+      <CardsPane
+        {...props}
+        onOpenCard={onOpenCard}
+        tabs={[ref('E-001')]}
+        activeId="E-001"
+        live={[card('E-001', { links: ['E-002'] }), linked]}
+      />,
+    );
+    screen.getByTitle('Open E-002').click();
+    expect(onOpenCard.mock.calls).toEqual([[linked]]);
   });
 
   it('offers Edit for the active card, and not when there is nothing to edit', () => {

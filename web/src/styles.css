@@ -488,6 +488,14 @@ body {
 .cv-links { display: flex; flex-direction: column; gap: 0.25rem; }
 .cv-label { font-size: 0.72rem; color: var(--muted); }
 .cv-link { display: flex; gap: 0.5rem; align-items: baseline; font-size: 0.82rem; }
+/* A link is a button wherever it can actually open the card (CardView's onOpenCard). */
+.cv-link-btn {
+  background: transparent; border: 1px solid transparent; border-radius: 6px;
+  color: inherit; cursor: pointer; font: inherit; text-align: left;
+  padding: 0.1rem 0.35rem; width: fit-content;
+}
+.cv-link-btn:hover { border-color: var(--accent); }
+.cv-link-btn:hover .link-title { color: var(--accent); }
 .cv-body { border-top: 1px solid var(--border); padding-top: 0.4rem; }
 .cv-nobody { color: var(--muted); font-size: 0.82rem; font-style: italic; }
 

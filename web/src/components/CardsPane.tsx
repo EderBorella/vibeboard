@@ -11,9 +11,11 @@ interface Props {
   onFocus: (id: string) => void;
   onClose: (id: string) => void;
   onEdit: (card: Card) => void;
+  // A linked card opens as another tab, which is the browsing loop the dock exists for.
+  onOpenCard: (card: Card) => void;
 }
 
-export function CardsPane({ tabs, activeId, live, config, onFocus, onClose, onEdit }: Props) {
+export function CardsPane({ tabs, activeId, live, config, onFocus, onClose, onEdit, onOpenCard }: Props) {
   // Falls back to the first tab so a stale activeId cannot leave the pane blank. Resolved once:
   // inside the tab list it can never be absent, and repeating the optional chain there would only
   // add guards no caller can reach.
@@ -54,7 +56,7 @@ export function CardsPane({ tabs, activeId, live, config, onFocus, onClose, onEd
 
       <div className="cards-body">
         {card ? (
-          <CardView card={card} config={config} allCards={live} />
+          <CardView card={card} config={config} allCards={live} onOpenCard={onOpenCard} />
         ) : (
           // The card left the board while its tab was open — deleted outside the app, or its file
           // moved. Saying so beats an empty pane that looks broken.

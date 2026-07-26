@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { cleanup, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CardView } from '../web/src/components/CardView.js';
 import type { Card, ProjectConfig } from '../web/src/shared.js';
 
@@ -99,6 +99,34 @@ describe('CardView', () => {
     expect(screen.getByText('E-001')).toBeTruthy();
     expect(screen.getByText('Wire the tab')).toBeTruthy();
     expect(screen.queryByText('GONE-9')).toBeNull();
+  });
+
+  it('makes each link a button that reports the card to open', () => {
+    const other = card({ id: 'E-001', board: 'engineering', title: 'Wire the tab' });
+    const onOpenCard = vi.fn();
+    render(
+      <CardView
+        card={card({ links: ['E-001'] })}
+        config={config}
+        allCards={[other]}
+        onOpenCard={onOpenCard}
+      />,
+    );
+    const link = screen.getByTitle('Open E-001');
+    expect(link.tagName).toBe('BUTTON');
+    link.click();
+    expect(onOpenCard.mock.calls).toEqual([[other]]);
+  });
+
+  it('leaves links as plain rows where nothing can open them', () => {
+    // A view with no handler must not offer navigation it cannot perform.
+    const other = card({ id: 'E-001', title: 'Wire the tab' });
+    const { container } = render(
+      <CardView card={card({ links: ['E-001'] })} config={config} allCards={[other]} />,
+    );
+    expect(screen.queryByTitle('Open E-001')).toBeNull();
+    expect(container.querySelectorAll('button')).toHaveLength(0);
+    expect(container.querySelector('.cv-link')?.tagName).toBe('DIV');
   });
 
   it('omits the tag row, the description and the link list when the card has none', () => {

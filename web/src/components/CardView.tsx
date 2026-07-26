@@ -6,11 +6,14 @@ interface Props {
   card: Card;
   config: ProjectConfig;
   allCards: Card[];
+  // Opens a linked card. Without it the links stay plain rows — nothing in the archive drawer's
+  // future or a preview pane should promise navigation it cannot perform.
+  onOpenCard?: (card: Card) => void;
 }
 
 // The card as a reader sees it: the frontmatter as chrome, the body as rendered markdown, and no
 // control that could change anything. The editing surfaces are the Form and Raw tabs.
-export function CardView({ card, config, allCards }: Props) {
+export function CardView({ card, config, allCards, onOpenCard }: Props) {
   const linked = linkedCards(allCards, card.links);
 
   return (
@@ -40,12 +43,25 @@ export function CardView({ card, config, allCards }: Props) {
       {linked.length > 0 && (
         <div className="cv-links">
           <div className="cv-label">Linked cards</div>
-          {linked.map((c) => (
-            <div key={c.id} className="cv-link">
-              <span className="link-id">{c.id}</span>
-              <span className="link-title">{c.title}</span>
-            </div>
-          ))}
+          {linked.map((c) =>
+            onOpenCard ? (
+              <button
+                key={c.id}
+                type="button"
+                className="cv-link cv-link-btn"
+                title={`Open ${c.id}`}
+                onClick={() => onOpenCard(c)}
+              >
+                <span className="link-id">{c.id}</span>
+                <span className="link-title">{c.title}</span>
+              </button>
+            ) : (
+              <div key={c.id} className="cv-link">
+                <span className="link-id">{c.id}</span>
+                <span className="link-title">{c.title}</span>
+              </div>
+            ),
+          )}
         </div>
       )}
 

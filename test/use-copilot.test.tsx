@@ -4,24 +4,43 @@ import { renderHook, act } from '@testing-library/react';
 
 // A stand-in for the shared socket: keeps the subscribers so a test can push events, and records
 // what the hook sends. vi.hoisted because vi.mock's factory runs before the module body.
-const fake = vi.hoisted(() => {
-  const handlers = new Set<(m: unknown) => void>();
+// Keyed by bump like the real useSharedWs, so a bump change hands the hook a genuinely different
+// socket. Without that the mock returns one object forever, every dependency array is trivially
+// stable, and nothing can tell a correct dep list from a frozen one.
+const h = vi.hoisted(() => {
+  const make = () => {
+    const handlers = new Set<(m: unknown) => void>();
+    return {
+      handlers,
+      sent: [] as object[],
+      subscribe(fn: (m: unknown) => void) {
+        handlers.add(fn);
+        return () => handlers.delete(fn);
+      },
+      send(payload: object) {
+        this.sent.push(payload);
+      },
+    };
+  };
+  const byBump = new Map<number, ReturnType<typeof make>>();
   return {
-    handlers,
-    sent: [] as object[],
-    subscribe(fn: (m: unknown) => void) {
-      handlers.add(fn);
-      return () => handlers.delete(fn);
-    },
-    send(payload: object) {
-      this.sent.push(payload);
+    byBump,
+    get(bump: number) {
+      let s = byBump.get(bump);
+      if (!s) {
+        s = make();
+        byBump.set(bump, s);
+      }
+      return s;
     },
   };
 });
 
-vi.mock('../web/src/ws.js', () => ({ useSharedWs: () => fake }));
+vi.mock('../web/src/ws.js', () => ({ useSharedWs: (bump: number) => h.get(bump) }));
 
 import { useCopilot } from '../web/src/copilot/useCopilot.js';
+
+const fake = h.get(0);
 
 const emit = (msg: unknown): void => {
   act(() => {
@@ -31,8 +50,10 @@ const emit = (msg: unknown): void => {
 const event = (e: object): void => emit({ type: 'copilot:event', event: e });
 
 beforeEach(() => {
-  fake.handlers.clear();
-  fake.sent.length = 0;
+  for (const s of h.byBump.values()) {
+    s.handlers.clear();
+    s.sent.length = 0;
+  }
 });
 
 describe('useCopilot transcript', () => {
@@ -311,5 +332,148 @@ describe('useCopilot callback identity', () => {
     for (const name of ['send', 'compact', 'cancel', 'newSession', 'openChat', 'deleteChat'] as const) {
       expect(result.current[name], name).toBe(before[name]);
     }
+  });
+});
+
+describe('useCopilot rebuilds its callbacks when the socket changes', () => {
+  it('hands out new callbacks after a bump, and sends on the new socket', () => {
+    const { result, rerender } = renderHook(({ bump }) => useCopilot(bump), {
+      initialProps: { bump: 0 },
+    });
+    const before = { ...result.current };
+
+    rerender({ bump: 7 });
+    for (const name of ['send', 'compact', 'cancel', 'newSession', 'openChat', 'deleteChat'] as const) {
+      expect(result.current[name], name).not.toBe(before[name]);
+    }
+
+    // And the rebuilt callback talks to the new socket, not the one it closed over before.
+    act(() => result.current.cancel());
+    expect(h.get(7).sent).toEqual([{ type: 'copilot:cancel' }]);
+    expect(h.get(0).sent).toEqual([]);
+  });
+});
+
+describe('useCopilot streaming mechanics', () => {
+  it('starts idle with an empty transcript', () => {
+    const { result } = renderHook(() => useCopilot(0));
+    expect(result.current.running).toBe(false);
+    expect(result.current.items).toEqual([]);
+  });
+
+  it('a text block start alone opens an empty assistant bubble', () => {
+    const { result } = renderHook(() => useCopilot(0));
+    event({ kind: 'block_start', block: 'text' });
+    expect(result.current.items).toMatchObject([{ kind: 'assistant', text: '' }]);
+  });
+
+  it('a delta with no block start opens an assistant bubble on demand', () => {
+    const { result } = renderHook(() => useCopilot(0));
+    event({ kind: 'text_delta', text: 'orphan' });
+    expect(result.current.items).toMatchObject([{ kind: 'assistant', text: 'orphan' }]);
+  });
+
+  it('concatenates consecutive deltas into one bubble', () => {
+    const { result } = renderHook(() => useCopilot(0));
+    event({ kind: 'block_start', block: 'text' });
+    event({ kind: 'text_delta', text: 'one ' });
+    event({ kind: 'text_delta', text: 'two' });
+    expect(result.current.items).toMatchObject([{ kind: 'assistant', text: 'one two' }]);
+  });
+
+  it('block_stop closes the bubble so the next delta starts a new one', () => {
+    const { result } = renderHook(() => useCopilot(0));
+    event({ kind: 'block_start', block: 'text' });
+    event({ kind: 'text_delta', text: 'first' });
+    event({ kind: 'block_stop' });
+    event({ kind: 'text_delta', text: 'second' });
+    expect(result.current.items).toMatchObject([
+      { kind: 'assistant', text: 'first' },
+      { kind: 'assistant', text: 'second' },
+    ]);
+  });
+
+  it('gives stream-created bubbles increasing ids too', () => {
+    const { result } = renderHook(() => useCopilot(0));
+    event({ kind: 'block_start', block: 'text' });
+    event({ kind: 'block_stop' });
+    event({ kind: 'text_delta', text: 'x' });
+    event({ kind: 'tool_use', id: 't', name: 'Read', input: {} });
+    const ids = result.current.items.map((i: { id: number }) => i.id);
+    expect(ids).toEqual([...ids].sort((a, b) => a - b));
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('records a tool call as an empty tool item carrying only the name', () => {
+    const { result } = renderHook(() => useCopilot(0));
+    event({ kind: 'tool_use', id: 't', name: 'Grep', input: { q: 1 } });
+    expect(result.current.items).toMatchObject([{ kind: 'tool', text: '', toolName: 'Grep' }]);
+  });
+
+  it('takes window occupancy from a usage event', () => {
+    const { result } = renderHook(() => useCopilot(0));
+    event({ kind: 'usage', contextTokens: 4321 });
+    expect(result.current.stats.contextTokens).toBe(4321);
+  });
+
+  it('replaces the chat list on copilot:chats without touching the transcript', () => {
+    const { result } = renderHook(() => useCopilot(0));
+    event({ kind: 'text', text: 'keep me' });
+    emit({
+      type: 'copilot:chats',
+      chats: [{ id: 'c-1', title: 'One' }],
+      currentChatId: 'c-1',
+    });
+    expect(result.current.chats).toMatchObject([{ id: 'c-1', title: 'One' }]);
+    expect(result.current.currentChatId).toBe('c-1');
+    expect(result.current.items).toHaveLength(1);
+  });
+
+  it('clears delta mode on hydrate, so a finalised text still prints', () => {
+    const { result } = renderHook(() => useCopilot(0));
+    event({ kind: 'text_delta', text: 'streamed' }); // delta mode on
+    emit({
+      type: 'copilot:history',
+      items: [
+        { kind: 'user', text: 'restored' },
+        { kind: 'assistant', text: 'and its answer' },
+      ],
+      stats: { turns: 1, costUsd: 0, lastDurationMs: 0, contextTokens: 0, outputTokens: 0 },
+      chats: [],
+      currentChatId: undefined,
+    });
+    // Re-ided from 1 upward, in order, so live items appended later cannot collide.
+    expect(result.current.items).toMatchObject([
+      { kind: 'user', text: 'restored' },
+      { kind: 'assistant', text: 'and its answer' },
+    ]);
+    const ids = result.current.items.map((i: { id: number }) => i.id);
+    expect(ids).toEqual([...ids].sort((a, b) => a - b));
+    expect(new Set(ids).size).toBe(2);
+
+    event({ kind: 'text', text: 'after hydrate' });
+    expect(result.current.items).toHaveLength(3);
+  });
+
+  it('clears delta mode at the start of a turn, so a non-streaming backend still prints', () => {
+    const { result } = renderHook(() => useCopilot(0));
+    event({ kind: 'text_delta', text: 'streamed' }); // delta mode on
+    act(() => result.current.send('next turn', { mode: 'plan' }));
+    event({ kind: 'text', text: 'whole answer' }); // OpenCode sends a full block
+    expect(result.current.items).toMatchObject([
+      { kind: 'assistant', text: 'streamed' },
+      { kind: 'user', text: 'next turn' },
+      { kind: 'assistant', text: 'whole answer' },
+    ]);
+  });
+});
+
+describe('useCopilot missing delta text', () => {
+  it('appends nothing rather than undefined when a delta carries no text', () => {
+    const { result } = renderHook(() => useCopilot(0));
+    event({ kind: 'block_start', block: 'text' });
+    event({ kind: 'text_delta', text: 'kept' });
+    event({ kind: 'text_delta' });
+    expect(result.current.items).toMatchObject([{ kind: 'assistant', text: 'kept' }]);
   });
 });

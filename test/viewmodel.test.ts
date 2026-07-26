@@ -1,6 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import type { Card, ProjectConfig } from '../web/src/shared.js';
-import { canPlace, cardsByColumn, columnSlugs, miniature, slugify } from '../web/src/viewmodel.js';
+import {
+  canPlace,
+  cardsByColumn,
+  columnSlugs,
+  filterByTags,
+  miniature,
+  presentTags,
+  slugify,
+  tagCounts,
+  toggleTag,
+} from '../web/src/viewmodel.js';
 
 const config: ProjectConfig = {
   name: 'T',
@@ -159,5 +169,116 @@ describe('miniature', () => {
   it('returns a source of exactly the limit untouched, and truncates one longer', () => {
     expect(miniature(c({ description: 'abcde' }), 5)).toBe('abcde');
     expect(miniature(c({ description: 'abcdef' }), 5)).toBe('abcd…');
+  });
+});
+
+describe('tagCounts', () => {
+  it('counts cards per tag, most-used first', () => {
+    const cards = [
+      card({ id: 'E-1', tags: ['bug', 'ui'] }),
+      card({ id: 'E-2', tags: ['bug', 'api'] }),
+      card({ id: 'E-3', tags: ['bug'] }),
+      card({ id: 'E-4', tags: ['ui'] }),
+    ];
+    // Exact array: the ORDER is the contract the filter bar depends on, not the membership.
+    expect(tagCounts(cards)).toEqual([
+      { tag: 'bug', count: 3 },
+      { tag: 'ui', count: 2 },
+      { tag: 'api', count: 1 },
+    ]);
+  });
+
+  it('ranks by count before name: a bigger late-alphabet tag outranks a smaller early one', () => {
+    const cards = [card({ tags: ['zeta'] }), card({ tags: ['zeta'] }), card({ tags: ['alpha'] })];
+    expect(tagCounts(cards)).toEqual([
+      { tag: 'zeta', count: 2 },
+      { tag: 'alpha', count: 1 },
+    ]);
+  });
+
+  it('breaks a genuine tie alphabetically, whatever order the tags were written in', () => {
+    // Equal counts, inserted in reverse-alphabetical order, so insertion order and the
+    // required order disagree — the only fixture shape the name tiebreak is reachable from.
+    const cards = [card({ tags: ['zeta', 'mid', 'alpha'] })];
+    expect(tagCounts(cards)).toEqual([
+      { tag: 'alpha', count: 1 },
+      { tag: 'mid', count: 1 },
+      { tag: 'zeta', count: 1 },
+    ]);
+  });
+
+  it('counts a card once per tag even when the card repeats it', () => {
+    expect(tagCounts([card({ tags: ['bug', 'bug'] })])).toEqual([{ tag: 'bug', count: 1 }]);
+  });
+
+  it('is empty when nothing is tagged', () => {
+    expect(tagCounts([card({ tags: [] }), card({ tags: [] })])).toEqual([]);
+    expect(tagCounts([])).toEqual([]);
+  });
+});
+
+describe('filterByTags', () => {
+  const bugUi = card({ id: 'E-1', tags: ['bug', 'ui'] });
+  const bug = card({ id: 'E-2', tags: ['bug'] });
+  const none = card({ id: 'E-3', tags: [] });
+  const cards = [bugUi, bug, none];
+
+  it('passes every card when no tag is active', () => {
+    expect(filterByTags(cards, [])).toEqual(cards);
+  });
+
+  it('keeps only the cards carrying the active tag', () => {
+    expect(filterByTags(cards, ['bug']).map((c) => c.id)).toEqual(['E-1', 'E-2']);
+  });
+
+  it('requires ALL active tags, not any of them', () => {
+    // The distinguishing case for AND vs OR: E-2 carries one of the two and must drop out.
+    expect(filterByTags(cards, ['bug', 'ui']).map((c) => c.id)).toEqual(['E-1']);
+  });
+
+  it('yields nothing for a tag no card carries', () => {
+    expect(filterByTags(cards, ['nope'])).toEqual([]);
+  });
+
+  it('leaves the input untouched', () => {
+    filterByTags(cards, ['bug']);
+    expect(cards.map((c) => c.id)).toEqual(['E-1', 'E-2', 'E-3']);
+  });
+});
+
+describe('toggleTag', () => {
+  it('appends a tag that is not active', () => {
+    expect(toggleTag(['bug'], 'ui')).toEqual(['bug', 'ui']);
+  });
+
+  it('removes a tag that is active, keeping the order of the rest', () => {
+    expect(toggleTag(['bug', 'ui', 'api'], 'ui')).toEqual(['bug', 'api']);
+  });
+
+  it('does not mutate the array it is given', () => {
+    const active = ['bug'];
+    expect(toggleTag(active, 'bug')).toEqual([]);
+    expect(active).toEqual(['bug']);
+  });
+});
+
+describe('presentTags', () => {
+  const present = [
+    { tag: 'bug', count: 2 },
+    { tag: 'ui', count: 1 },
+  ];
+
+  it('keeps the active tags that still exist, in their order', () => {
+    expect(presentTags(['ui', 'bug'], present)).toEqual(['ui', 'bug']);
+  });
+
+  it('drops an active tag no card carries any more', () => {
+    // The card holding 'stale' was edited or archived: its chip is gone from the bar, so keeping
+    // it active would filter the boards with nothing left to click.
+    expect(presentTags(['bug', 'stale'], present)).toEqual(['bug']);
+  });
+
+  it('drops everything when the board has no tags left', () => {
+    expect(presentTags(['bug'], [])).toEqual([]);
   });
 });

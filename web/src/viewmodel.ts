@@ -31,6 +31,44 @@ export function cardsByColumn(cards: Card[], slugs: string[]): Record<string, Ca
   return grouped;
 }
 
+export interface TagCount {
+  tag: string;
+  count: number;
+}
+
+// Every tag in use across the given cards, with how many cards carry it. A card counts once per
+// tag however many times it repeats it — nothing stops `tags: bug, bug` reaching a file, and the
+// number in the filter bar is a card count.
+// Ordered by count descending, then alphabetically, so the bar does not reshuffle on every
+// snapshot push.
+export function tagCounts(cards: Card[]): TagCount[] {
+  const counts = new Map<string, number>();
+  for (const c of cards) {
+    for (const tag of new Set(c.tags)) counts.set(tag, (counts.get(tag) ?? 0) + 1);
+  }
+  return [...counts]
+    .map(([tag, count]) => ({ tag, count }))
+    .sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag));
+}
+
+// Cards carrying EVERY active tag. Clicking a second tag therefore narrows the board rather than
+// widening it, and an empty filter passes everything (`[].every` is true).
+export function filterByTags(cards: Card[], active: readonly string[]): Card[] {
+  return cards.filter((c) => active.every((tag) => c.tags.includes(tag)));
+}
+
+// The active tags that still exist on the board. A tag edited off the last card carrying it loses
+// its chip, so leaving it active would filter cards away with no control left to undo it.
+export function presentTags(active: readonly string[], present: TagCount[]): string[] {
+  const names = new Set(present.map((p) => p.tag));
+  return active.filter((t) => names.has(t));
+}
+
+// Add or remove one tag from the active filter, leaving the order of the rest alone.
+export function toggleTag(active: readonly string[], tag: string): string[] {
+  return active.includes(tag) ? active.filter((t) => t !== tag) : [...active, tag];
+}
+
 // One-line summary for a card tile: description if set, else the body, trimmed to `chars`.
 export function miniature(card: Card, chars: number): string {
   const source = (card.description ?? card.body ?? '').trim();

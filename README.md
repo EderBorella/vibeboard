@@ -134,6 +134,8 @@ expose it to the public internet.
 - Three kanban boards backed by folders-as-columns
 - Create / edit / move / reorder / tag / group / link / archive cards
 - Card editor with a friendly form **and** a raw-markdown toggle
+- **Tag filter** across all three boards at once: click a tag on a card or a chip
+  in the bar, and each further tag narrows the boards to cards carrying all of them
 - Symmetric card links across any pair of boards
 - Configurable columns per board
 - Open any project folder, or scan a root for existing VibeBoard projects

@@ -266,6 +266,31 @@ body {
   background: var(--panel); border: 1px solid var(--border);
   border-radius: 999px; padding: 0.02rem 0.4rem;
 }
+/* A tag on a tile is a real button wherever it can filter the board (CardTile's onTag). */
+.tag-btn { cursor: pointer; font-family: inherit; line-height: inherit; }
+.tag-btn:hover { color: var(--accent); border-color: var(--accent); }
+
+/* ---------- Tag filter bar ---------- */
+.tag-filter { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; }
+.tag-chip {
+  display: inline-flex; align-items: center; gap: 0.3rem;
+  font-size: 0.68rem; font-family: var(--font-mono);
+  color: var(--muted); background: var(--panel-2);
+  border: 1px solid var(--border); border-radius: 999px;
+  padding: 0.1rem 0.5rem; cursor: pointer;
+}
+.tag-chip:hover { color: var(--accent); border-color: var(--accent); }
+.tag-chip.active {
+  color: var(--on-accent); background: var(--accent);
+  border-color: var(--accent); box-shadow: var(--glow);
+}
+.tag-chip-count { opacity: 0.7; font-size: 0.62rem; }
+.tag-filter-clear {
+  font-size: 0.68rem; color: var(--muted);
+  background: transparent; border: none; cursor: pointer;
+  text-decoration: underline; padding: 0.1rem 0.2rem;
+}
+.tag-filter-clear:hover { color: var(--accent); }
 
 /* ---------- Responsive: 3 thresholds on the board area (reacts to copilot too) ---------- */
 @container vbboards (max-width: 720px) {

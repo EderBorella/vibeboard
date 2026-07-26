@@ -12,6 +12,7 @@ interface Props {
   onOpen?: (card: Card) => void;
   onArchive?: (card: Card) => void;
   onDragStart?: (card: Card) => void;
+  onTag?: (tag: string) => void;
   // beforeId identifies the card to insert in front of; null means the end of the column.
   onDrop?: (board: BoardName, slug: string, beforeId: string | null) => void;
 }
@@ -26,6 +27,7 @@ export function Column({
   onOpen,
   onArchive,
   onDragStart,
+  onTag,
   onDrop,
 }: Props) {
   const [over, setOver] = useState(false);
@@ -101,6 +103,7 @@ export function Column({
               onOpen={onOpen}
               onArchive={onArchive}
               onDragStart={onDragStart}
+              onTag={onTag}
             />
           </div>
         ))}

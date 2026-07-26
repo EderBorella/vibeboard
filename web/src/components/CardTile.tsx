@@ -7,9 +7,12 @@ interface Props {
   onOpen?: (card: Card) => void;
   onArchive?: (card: Card) => void;
   onDragStart?: (card: Card) => void;
+  // Clicking a tag on the tile toggles it in the board filter. Omitted where filtering makes no
+  // sense (the archive drawer), which leaves the tags as plain labels.
+  onTag?: (tag: string) => void;
 }
 
-export function CardTile({ card, miniatureChars, onOpen, onArchive, onDragStart }: Props) {
+export function CardTile({ card, miniatureChars, onOpen, onArchive, onDragStart, onTag }: Props) {
   const summary = miniature(card, miniatureChars);
   return (
     <div
@@ -49,11 +52,26 @@ export function CardTile({ card, miniatureChars, onOpen, onArchive, onDragStart 
       {card.group && <div className="tile-group">{card.group}</div>}
       {card.tags.length > 0 && (
         <div className="tile-tags">
-          {card.tags.map((t) => (
-            <span key={t} className="tag">
-              {t}
-            </span>
-          ))}
+          {card.tags.map((t) =>
+            onTag ? (
+              <button
+                key={t}
+                className="tag tag-btn"
+                title={`Filter by ${t}`}
+                // Without this the tile's own onClick opens the editor as well.
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onTag(t);
+                }}
+              >
+                {t}
+              </button>
+            ) : (
+              <span key={t} className="tag">
+                {t}
+              </span>
+            ),
+          )}
         </div>
       )}
     </div>

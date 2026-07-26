@@ -76,3 +76,36 @@ export function parseSkill(slug: string, content: string, config: ProjectConfig)
 
   return { ok: true, skill: { slug, path, name, description, boards, columns, prompt } };
 }
+
+// Two files may declare the same name; the path decides. The caller reads the folder in sorted
+// order, so "first wins" is deterministic rather than filesystem-dependent.
+export function dedupeSkills(parsed: SkillParse[]): { skills: Skill[]; invalid: InvalidSkill[] } {
+  const skills: Skill[] = [];
+  const invalid: InvalidSkill[] = [];
+  const taken = new Map<string, string>(); // slugged name -> the path that claimed it
+  for (const entry of parsed) {
+    if (!entry.ok) {
+      invalid.push(entry.invalid);
+      continue;
+    }
+    const { slug, path, name } = entry.skill;
+    const owner = taken.get(slugify(name));
+    if (owner !== undefined) {
+      invalid.push({ slug, path, reason: `duplicate name "${name}" (already used by ${owner})` });
+      continue;
+    }
+    taken.set(slugify(name), path);
+    skills.push(entry.skill);
+  }
+  return { skills, invalid };
+}
+
+// Which skills belong to a card. An empty list means "no restriction", so an unrestricted skill is
+// offered everywhere — the common case for a skill the user has not scoped.
+export function skillsForCard(skills: Skill[], board: BoardName, columnSlug: string): Skill[] {
+  return skills.filter(
+    (s) =>
+      (s.boards.length === 0 || s.boards.includes(board)) &&
+      (s.columns.length === 0 || s.columns.includes(columnSlug)),
+  );
+}

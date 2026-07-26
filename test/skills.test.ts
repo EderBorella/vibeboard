@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { defaultConfig } from '../src/core/config.js';
-import { parseSkill, skillPath } from '../src/core/skills.js';
+import {
+  dedupeSkills,
+  parseSkill,
+  type Skill,
+  type SkillParse,
+  skillPath,
+  skillsForCard,
+} from '../src/core/skills.js';
 
 const config = defaultConfig('T');
 
@@ -103,6 +110,95 @@ describe('parseSkill', () => {
       'path',
       'prompt',
       'slug',
+    ]);
+  });
+});
+
+const skill = (over: Partial<Skill> = {}): Skill => ({
+  slug: 'execute',
+  path: '.claude/skills/execute/SKILL.md',
+  name: 'Execute',
+  description: 'd',
+  boards: [],
+  columns: [],
+  prompt: 'p',
+  ...over,
+});
+const ok = (s: Skill): SkillParse => ({ ok: true, skill: s });
+
+describe('dedupeSkills', () => {
+  it('keeps valid skills and collects invalid ones separately', () => {
+    const a = skill();
+    const bad = { slug: 'b', path: skillPath('b'), reason: 'needs a name' };
+    const r = dedupeSkills([ok(a), { ok: false, invalid: bad }]);
+    expect(r.skills).toEqual([a]);
+    expect(r.invalid).toEqual([bad]);
+  });
+
+  it('lets the first of a duplicated name win, and says who took it', () => {
+    const first = skill({ slug: 'execute' });
+    const second = skill({ slug: 'run-it', path: skillPath('run-it') });
+    const r = dedupeSkills([ok(first), ok(second)]);
+    expect(r.skills).toEqual([first]);
+    expect(r.invalid).toEqual([
+      {
+        slug: 'run-it',
+        path: skillPath('run-it'),
+        reason: 'duplicate name "Execute" (already used by .claude/skills/execute/SKILL.md)',
+      },
+    ]);
+  });
+
+  it('treats names that differ only in case or spacing as the same name', () => {
+    const r = dedupeSkills([ok(skill()), ok(skill({ slug: 'b', path: skillPath('b'), name: 'execute' }))]);
+    expect(r.skills).toHaveLength(1);
+    expect(r.invalid).toHaveLength(1);
+  });
+
+  it('keeps two genuinely different names', () => {
+    const r = dedupeSkills([
+      ok(skill()),
+      ok(skill({ slug: 'review', path: skillPath('review'), name: 'Review' })),
+    ]);
+    expect(r.skills.map((s) => s.name)).toEqual(['Execute', 'Review']);
+    expect(r.invalid).toEqual([]);
+  });
+});
+
+describe('skillsForCard', () => {
+  const anywhere = skill({ slug: 'anywhere', name: 'Anywhere' });
+  const engOnly = skill({ slug: 'eng', name: 'Eng', boards: ['engineering'] });
+  const todoOnly = skill({ slug: 'todo', name: 'Todo', columns: ['todo'] });
+  const engTodo = skill({ slug: 'both', name: 'Both', boards: ['engineering'], columns: ['todo'] });
+  const all = [anywhere, engOnly, todoOnly, engTodo];
+
+  it('offers an unrestricted skill everywhere', () => {
+    expect(skillsForCard([anywhere], 'product', 'backlog')).toEqual([anywhere]);
+  });
+
+  it('restricts by board', () => {
+    expect(skillsForCard(all, 'engineering', 'todo').map((s) => s.name)).toEqual([
+      'Anywhere',
+      'Eng',
+      'Todo',
+      'Both',
+    ]);
+    expect(skillsForCard(all, 'product', 'todo').map((s) => s.name)).toEqual(['Anywhere', 'Todo']);
+  });
+
+  it('restricts by column', () => {
+    expect(skillsForCard(all, 'engineering', 'done').map((s) => s.name)).toEqual(['Anywhere', 'Eng']);
+  });
+
+  it('requires both to match when both are declared', () => {
+    expect(skillsForCard([engTodo], 'product', 'todo')).toEqual([]);
+    expect(skillsForCard([engTodo], 'engineering', 'done')).toEqual([]);
+  });
+
+  it('keeps the order it was given', () => {
+    expect(skillsForCard([engOnly, anywhere], 'engineering', 'todo').map((s) => s.name)).toEqual([
+      'Eng',
+      'Anywhere',
     ]);
   });
 });

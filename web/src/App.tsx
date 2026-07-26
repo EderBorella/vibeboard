@@ -13,6 +13,7 @@ import { type CopilotMode, useCopilot } from './copilot/useCopilot';
 import type { DockPane } from './dock/panes';
 import { useCardTabs } from './dock/useCardTabs';
 import { useDock } from './dock/useDock';
+import { useDispatch } from './runs/useDispatch';
 import {
   BOARD_LABELS,
   BOARDS,
@@ -65,6 +66,9 @@ export function App() {
   // Refetched on every snapshot, so a SKILL.md written by the user or an agent reaches the rail
   // without a reload.
   const catalogue = useSkills(snapshot);
+  // Everything the details step needs. `choice.backend` drives the model list, so switching
+  // connector in the form reloads it exactly as it does in the copilot dock.
+  const dispatch = useDispatch(choice.backend, snapshot);
 
   const allCards = snapshot ? BOARDS.flatMap((b) => snapshot.boards[b] ?? []) : [];
   // Chips come from every card, not the filtered set, so the bar does not shrink out from under
@@ -150,6 +154,15 @@ export function App() {
               onLinks={onLinks}
               skills={catalogue.skills}
               invalid={catalogue.invalid}
+              dispatch={{
+                defaults: choice,
+                models: dispatch.models,
+                attachable: dispatch.attachable,
+                busy: dispatch.busy,
+                error: dispatch.error,
+                onRun: dispatch.run,
+                onBackend: onBackend,
+              }}
             />
           ),
         },

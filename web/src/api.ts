@@ -274,3 +274,73 @@ export async function listSkills(): Promise<SkillCatalogue> {
   if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? res.statusText);
   return res.json() as Promise<SkillCatalogue>;
 }
+
+// --- Runs -----------------------------------------------------------------
+// Mirrors src/core/runs.ts. Frontmatter is VibeBoard's record of a dispatch; `report` is the
+// agent's own words, verbatim.
+
+export type RunStatus =
+  | 'queued'
+  | 'running'
+  | 'success'
+  | 'attention'
+  | 'failed'
+  | 'cancelled'
+  | 'interrupted';
+
+export interface RunRecord {
+  run: string;
+  card: string;
+  board: BoardName;
+  skill: string;
+  status: RunStatus;
+  started: string;
+  backend: string;
+  model: string;
+  effort: string;
+  mode: string;
+  outcome?: 'success' | 'attention';
+  finished?: string;
+  previous?: string;
+  prompt?: string;
+  attached?: string[];
+  summary?: string;
+  options?: string[];
+  created?: string[];
+  // VibeBoard's explanation when there is no report to speak for the run.
+  note?: string;
+  report: string;
+}
+
+export interface DispatchRequest {
+  board: BoardName;
+  card: string;
+  skill: string;
+  prompt?: string;
+  attachments?: string[];
+  previous?: string;
+  backend?: string;
+  model?: string;
+  effort?: string;
+  mode?: string;
+}
+
+export async function listRuns(): Promise<{ runs: RunRecord[]; active: string[] }> {
+  const res = await fetch('/api/runs');
+  if (!res.ok) throw new Error('Failed to load runs');
+  return res.json() as Promise<{ runs: RunRecord[]; active: string[] }>;
+}
+
+export async function listCardRuns(board: BoardName, card: string): Promise<RunRecord[]> {
+  const res = await fetch(`/api/runs/${board}/${encodeURIComponent(card)}`);
+  if (!res.ok) throw new Error('Failed to load this card’s runs');
+  return (await res.json()).runs as RunRecord[];
+}
+
+export function dispatchRun(body: DispatchRequest): Promise<{ run: RunRecord }> {
+  return post<{ run: RunRecord }>('/api/runs', body);
+}
+
+export function cancelRun(run: string): Promise<{ ok: boolean }> {
+  return post<{ ok: boolean }>(`/api/runs/${encodeURIComponent(run)}/cancel`, {});
+}

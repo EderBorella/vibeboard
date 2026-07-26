@@ -54,6 +54,15 @@ const props = {
   config,
   skills: [],
   invalid: [],
+  dispatch: {
+    defaults: { backend: 'claude-code', model: 'opus', effort: 'high' },
+    models: [],
+    attachable: [],
+    busy: false,
+    error: null,
+    onRun: vi.fn(async () => {}),
+    onBackend: vi.fn(),
+  },
 };
 
 describe('CardsPane', () => {
@@ -283,6 +292,119 @@ describe('CardsPane', () => {
       fireEvent.click(screen.getByText('Raw'));
     });
     expect(container.querySelector('.card-skills')).toBeTruthy();
+  });
+
+  it('opens the details step for the skill that was clicked, and comes back', () => {
+    const skills = [
+      {
+        slug: 'execute',
+        path: '.claude/skills/execute/SKILL.md',
+        name: 'Execute',
+        description: 'Implement the card',
+        boards: [],
+        columns: [],
+        prompt: 'p',
+      },
+    ];
+    const { container } = render(
+      <CardsPane
+        {...props}
+        skills={skills}
+        tabs={[ref('E-001')]}
+        activeId="E-001"
+        live={[card('E-001')]}
+      />,
+    );
+    fireEvent.click(screen.getByText('Execute'));
+    expect(screen.getByLabelText('Run Execute on E-001')).toBeTruthy();
+    // The card is replaced, not covered: nothing overlays anything in the dock.
+    expect(container.querySelector('.cardview')).toBeNull();
+
+    fireEvent.click(screen.getByText('Cancel'));
+    expect(container.querySelector('.cardview')).toBeTruthy();
+    expect(screen.queryByLabelText('Run Execute on E-001')).toBeNull();
+  });
+
+  it('returns to the card once a dispatch lands, and stays put when it is refused', async () => {
+    const skills = [
+      {
+        slug: 'execute',
+        path: '.claude/skills/execute/SKILL.md',
+        name: 'Execute',
+        description: 'Implement the card',
+        boards: [],
+        columns: [],
+        prompt: 'p',
+      },
+    ];
+    const onRun = vi.fn(async () => {});
+    const { container, rerender } = render(
+      <CardsPane
+        {...props}
+        dispatch={{ ...props.dispatch, onRun }}
+        skills={skills}
+        tabs={[ref('E-001')]}
+        activeId="E-001"
+        live={[card('E-001')]}
+      />,
+    );
+    fireEvent.click(screen.getByText('Execute'));
+    await act(async () => {
+      fireEvent.click(screen.getByText('Run Execute'));
+    });
+    expect(onRun).toHaveBeenCalledTimes(1);
+    expect(container.querySelector('.cardview')).toBeTruthy();
+
+    // A refusal keeps the form up, with the shell's error showing.
+    const rejecting = vi.fn(async () => {
+      throw new Error('A run is already in flight');
+    });
+    rerender(
+      <CardsPane
+        {...props}
+        dispatch={{ ...props.dispatch, onRun: rejecting, error: 'A run is already in flight' }}
+        skills={skills}
+        tabs={[ref('E-001')]}
+        activeId="E-001"
+        live={[card('E-001')]}
+      />,
+    );
+    fireEvent.click(screen.getByText('Execute'));
+    await act(async () => {
+      fireEvent.click(screen.getByText('Run Execute'));
+    });
+    expect(screen.getByLabelText('Run Execute on E-001')).toBeTruthy();
+    expect(screen.getByText('A run is already in flight')).toBeTruthy();
+  });
+
+  it('offers no run on an archived card, however many skills fit it', () => {
+    // The rail is rendered either way, but a run edits the project and reports against a card that
+    // is not on the board — so the actions are dead rather than misleading.
+    const skills = [
+      {
+        slug: 'execute',
+        path: '.claude/skills/execute/SKILL.md',
+        name: 'Execute',
+        description: 'Implement the card',
+        boards: [],
+        columns: [],
+        prompt: 'p',
+      },
+    ];
+    const frozen = card('E-009', { archived: '2026-07-26T10:00:00Z' });
+    render(
+      <CardsPane
+        {...props}
+        skills={skills}
+        tabs={[{ board: 'engineering', id: 'E-009', frozen }]}
+        activeId="E-009"
+        live={[]}
+      />,
+    );
+    const action = screen.getByText('Execute') as HTMLButtonElement;
+    expect(action.disabled).toBe(true);
+    fireEvent.click(action);
+    expect(screen.queryByLabelText('Run Execute on E-009')).toBeNull();
   });
 
   it('edits a live card in place, and refuses to for an archived one', () => {

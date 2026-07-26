@@ -8,12 +8,14 @@ interface Props {
   // Files that failed validation. Counted here because a skill that silently never appears is
   // indistinguishable from one nobody wrote.
   invalid: InvalidSkill[];
+  // Absent for an archived card: a run edits the project and reports against a card that is not on
+  // the board, so there would be nowhere for the result to show.
+  onRun?: (skill: Skill) => void;
 }
 
 // The card's action rail, driven by the skill files on disk and scoped to this card's board and
-// column. Every action is disabled until the run engine lands: a live-looking button that does
-// nothing reads as a broken feature rather than an unbuilt one.
-export function CardSkills({ card, skills, invalid }: Props) {
+// column. Clicking one opens the details step — nothing dispatches from here.
+export function CardSkills({ card, skills, invalid, onRun }: Props) {
   const mine = skillsForCard(skills, card.board, card.columnSlug);
   return (
     <aside className="card-skills" aria-label={`Skills for ${card.id}`}>
@@ -23,8 +25,9 @@ export function CardSkills({ card, skills, invalid }: Props) {
           key={s.slug}
           type="button"
           className="cs-action"
-          disabled
-          title={`${s.description} — dispatch arrives with the run engine`}
+          disabled={onRun === undefined}
+          title={onRun ? s.description : `${s.description} — archived cards cannot be run`}
+          onClick={() => onRun?.(s)}
         >
           {s.name}
         </button>

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { InvalidSkill, Skill } from '../web/src/api.js';
 import { CardSkills } from '../web/src/components/CardSkills.js';
 import type { Card } from '../web/src/shared.js';
@@ -44,12 +44,11 @@ describe('CardSkills', () => {
         card={card()}
         skills={[skill(), skill({ slug: 'review', name: 'Review', description: 'Critique it' })]}
         invalid={[]}
+        onRun={vi.fn()}
       />,
     );
     expect(actions().map((b) => b.textContent)).toEqual(['Execute', 'Review']);
-    expect(actions()[1].getAttribute('title')).toBe(
-      'Critique it — dispatch arrives with the run engine',
-    );
+    expect(actions()[1].getAttribute('title')).toBe('Critique it');
   });
 
   it('shows only the skills scoped to this card', () => {
@@ -68,9 +67,27 @@ describe('CardSkills', () => {
     expect(actions().map((b) => b.textContent)).toEqual(['Anywhere']);
   });
 
-  it('disables every action, since dispatch does not exist yet', () => {
+  it('runs the skill it was clicked on', () => {
+    const onRun = vi.fn();
+    const review = skill({ slug: 'review', name: 'Review' });
+    render(<CardSkills card={card()} skills={[skill(), review]} invalid={[]} onRun={onRun} />);
+    fireEvent.click(actions()[1]);
+    expect(onRun.mock.calls).toEqual([[review]]);
+  });
+
+  it('disables every action for an archived card, and says why', () => {
+    // A run edits the project and reports against a card that is not on the board, so there would
+    // be nowhere for the result to show.
     render(<CardSkills card={card()} skills={[skill()]} invalid={[]} />);
     expect(actions().every((b) => b.disabled)).toBe(true);
+    expect(actions()[0].getAttribute('title')).toBe(
+      'Implement the card — archived cards cannot be run',
+    );
+  });
+
+  it('enables the actions when a run handler is given', () => {
+    render(<CardSkills card={card()} skills={[skill()]} invalid={[]} onRun={vi.fn()} />);
+    expect(actions().every((b) => b.disabled)).toBe(false);
   });
 
   it('says so when no skill fits this column, and where to add one', () => {

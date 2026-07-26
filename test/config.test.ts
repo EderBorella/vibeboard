@@ -4,10 +4,12 @@ import { describe, expect, it } from 'vitest';
 import {
   CONFIG_DIR,
   DEFAULT_CONTEXT_BUDGET,
+  DEFAULT_MAX_RUNS,
   defaultConfig,
   ensureBoards,
   ensureContextBudget,
   ensureCopilotDefaults,
+  ensureMaxRuns,
   readConfig,
   writeConfig,
 } from '../src/core/config.js';
@@ -159,6 +161,34 @@ describe('ensureContextBudget', () => {
       expect(config.contextBudget).toBe(DEFAULT_CONTEXT_BUDGET);
     },
   );
+});
+
+describe('ensureMaxRuns', () => {
+  it('leaves a positive cap alone', () => {
+    const config = { ...defaultConfig('T'), maxConcurrentRuns: 8 };
+    expect(ensureMaxRuns(config)).toBe(false);
+    expect(config.maxConcurrentRuns).toBe(8);
+  });
+
+  // Zero and negatives would mean "never run anything", which nobody means by a cap. A quoted
+  // number is the case the typeof half guards: YAML yields '2' happily, and `>= '2'` compares as
+  // a string.
+  it.each([0, -1, undefined, 'three' as unknown as number, '2' as unknown as number])(
+    'replaces %p with the default',
+    (value) => {
+      const config = { ...defaultConfig('T'), maxConcurrentRuns: value as number };
+      expect(ensureMaxRuns(config)).toBe(true);
+      expect(config.maxConcurrentRuns).toBe(DEFAULT_MAX_RUNS);
+    },
+  );
+
+  it('is what a project written before runs existed gets', () => {
+    const old = { ...defaultConfig('T') } as Record<string, unknown>;
+    delete old.maxConcurrentRuns;
+    const config = old as unknown as Parameters<typeof ensureMaxRuns>[0];
+    expect(ensureMaxRuns(config)).toBe(true);
+    expect(config.maxConcurrentRuns).toBe(DEFAULT_MAX_RUNS);
+  });
 });
 
 describe('ensureBoards', () => {

@@ -63,5 +63,8 @@ export interface ProjectConfig {
   idPadding: number;
   keepChats: number; // retain the last N copilot chats per project (older pruned)
   contextBudget: number; // tokens the copilot context bar treats as full
+  // How many skill runs may be in flight at once. Past it, a dispatch queues rather than being
+  // refused — a run is minutes of work, so "come back and click again" is the wrong answer.
+  maxConcurrentRuns: number;
   copilot: CopilotConfig;
 }

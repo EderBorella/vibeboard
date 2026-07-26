@@ -56,6 +56,7 @@ function runner(root: string, over: Partial<RunnerOptions> = {}) {
     now: () => new Date('2026-07-26T14:30:12.000Z'),
     suffix: () => 'a1b2',
     timeoutMs: 5000,
+    maxConcurrent: () => 1,
     onUpdate: (r) => updates.push(r),
     ...over,
   });
@@ -186,17 +187,99 @@ describe('AgentRunner.dispatch', () => {
     expect(final.note).toBe('The agent was still running after 0s and was stopped.');
   });
 
-  it('refuses a second run while one is in flight, at a cap of one', async () => {
+  it('queues a run past the cap instead of refusing it', async () => {
+    // A run is minutes of work, so "busy, try again" would be the wrong answer.
     process.env.VIBEBOARD_SHIM_BEHAVIOUR = 'hang';
     const root = await tempDir();
-    const { instance } = runner(root);
-    const { run } = await instance.dispatch(input(root));
-    expect(instance.isBusy()).toBe(true);
-    await expect(instance.dispatch(input(root))).rejects.toThrow('A run is already in flight');
+    let n = 0;
+    const { instance } = runner(root, { suffix: () => `s${++n}` });
+    const first = await instance.dispatch(input(root));
+    const second = await instance.dispatch(input(root));
 
-    instance.cancel(run);
-    await settled(root, run);
-    expect(instance.isBusy()).toBe(false);
+    expect(first.status).toBe('running');
+    expect(second.status).toBe('queued');
+    expect(instance.activeIds).toEqual([first.run]);
+    expect(instance.queuedIds).toEqual([second.run]);
+    // On disk as queued, so a restart can see it was waiting rather than lose it silently.
+    expect((await readRun(root, 'engineering', 'E-010', second.run))?.status).toBe('queued');
+
+    instance.cancel(first.run);
+    instance.cancel(second.run);
+    await settled(root, first.run);
+    await settled(root, second.run);
+  });
+
+  it('starts the waiting run as soon as a slot frees, oldest first', async () => {
+    const root = await tempDir();
+    let n = 0;
+    const { instance, updates } = runner(root, { suffix: () => `s${++n}` });
+    const first = await instance.dispatch(input(root));
+    const second = await instance.dispatch(input(root));
+    const third = await instance.dispatch(input(root));
+    expect([second.status, third.status]).toEqual(['queued', 'queued']);
+
+    // The shim succeeds immediately, so the first run ends and the queue drains itself.
+    for (const r of [first, second, third]) expect((await settled(root, r.run)).status).toBe('success');
+    expect(instance.queuedIds).toEqual([]);
+    expect(instance.activeIds).toEqual([]);
+    // Oldest first: the second run reached 'running' before the third did.
+    const running = updates.filter((u) => u.status === 'running').map((u) => u.run);
+    expect(running).toEqual([first.run, second.run, third.run]);
+  });
+
+  it('runs several at once when the cap allows it', async () => {
+    process.env.VIBEBOARD_SHIM_BEHAVIOUR = 'hang';
+    const root = await tempDir();
+    let n = 0;
+    const { instance } = runner(root, { suffix: () => `s${++n}`, maxConcurrent: () => 3 });
+    const runs = [
+      await instance.dispatch(input(root)),
+      await instance.dispatch(input(root)),
+      await instance.dispatch(input(root)),
+    ];
+    expect(runs.map((r) => r.status)).toEqual(['running', 'running', 'running']);
+    expect(instance.activeIds).toHaveLength(3);
+
+    for (const r of runs) {
+      instance.cancel(r.run);
+      await settled(root, r.run);
+    }
+  });
+
+  it('reads the cap per dispatch, so changing it takes effect without a restart', async () => {
+    process.env.VIBEBOARD_SHIM_BEHAVIOUR = 'hang';
+    const root = await tempDir();
+    let n = 0;
+    let cap = 1;
+    const { instance } = runner(root, { suffix: () => `s${++n}`, maxConcurrent: () => cap });
+    const first = await instance.dispatch(input(root));
+    expect((await instance.dispatch(input(root))).status).toBe('queued');
+
+    cap = 5;
+    expect((await instance.dispatch(input(root))).status).toBe('running');
+
+    for (const id of [...instance.activeIds, ...instance.queuedIds]) instance.cancel(id);
+    await settled(root, first.run);
+  });
+
+  it('cancels a run that never started, without spawning anything', async () => {
+    process.env.VIBEBOARD_SHIM_BEHAVIOUR = 'hang';
+    const root = await tempDir();
+    let n = 0;
+    const { instance } = runner(root, { suffix: () => `s${++n}` });
+    const first = await instance.dispatch(input(root));
+    const waiting = await instance.dispatch(input(root));
+
+    expect(instance.cancel(waiting.run)).toBe(true);
+    const ended = await settled(root, waiting.run);
+    expect(ended.status).toBe('cancelled');
+    expect(ended.note).toBe('You stopped this run before it started.');
+    expect(instance.queuedIds).toEqual([]);
+    // The running one is untouched by cancelling a queued sibling.
+    expect(instance.activeIds).toEqual([first.run]);
+
+    instance.cancel(first.run);
+    await settled(root, first.run);
   });
 
   it('frees the slot however the run ended', async () => {
@@ -288,6 +371,7 @@ describe('AgentRunner.dispatch', () => {
       now: () => new Date('2026-07-26T15:00:00.000Z'),
       suffix: () => 'c3d4',
       timeoutMs: 5000,
+      maxConcurrent: () => 1,
     });
     const next = await second.dispatch(input(root));
     await settled(root, next.run);

@@ -156,26 +156,37 @@ describe('POST /api/runs', () => {
     expect(res.json()).toEqual({ error: 'That card is archived' });
   });
 
-  it('refuses a second dispatch while one is in flight, and says why', async () => {
+  it('queues a second dispatch rather than refusing it', async () => {
+    // The default cap is 3, so this needs the project's own cap lowered to one.
     process.env.VIBEBOARD_SHIM_BEHAVIOUR = 'hang';
     const project = await projectWithCard();
-    const first = (
-      await project.app.inject({
+    await project.app.inject({
+      method: 'PATCH',
+      url: '/api/config',
+      payload: { maxConcurrentRuns: 1 },
+    });
+    const post = () =>
+      project.app.inject({
         method: 'POST',
         url: '/api/runs',
         payload: { board: 'engineering', card: project.card, skill: 'execute' },
-      })
-    ).json() as { run: RunRecord };
+      });
 
-    const second = await project.app.inject({
-      method: 'POST',
-      url: '/api/runs',
-      payload: { board: 'engineering', card: project.card, skill: 'execute' },
-    });
-    expect(second.statusCode).toBe(409);
-    expect((second.json() as { error: string }).error).toBe('A run is already in flight');
+    const first = (await post()).json() as { run: RunRecord };
+    const second = await post();
+    expect(second.statusCode).toBe(200);
+    expect((second.json() as { run: RunRecord }).run.status).toBe('queued');
 
-    await project.app.inject({ method: 'POST', url: `/api/runs/${first.run.run}/cancel` });
+    const listed = (await project.app.inject({ method: 'GET', url: '/api/runs' })).json() as {
+      active: string[];
+      queued: string[];
+    };
+    expect(listed.active).toEqual([first.run.run]);
+    expect(listed.queued).toEqual([(second.json() as { run: RunRecord }).run.run]);
+
+    for (const id of [...listed.active, ...listed.queued]) {
+      await project.app.inject({ method: 'POST', url: `/api/runs/${id}/cancel` });
+    }
     await settled(project, project.card, first.run.run);
   });
 

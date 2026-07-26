@@ -3,6 +3,7 @@ import {
   ensureBoards,
   ensureContextBudget,
   ensureCopilotDefaults,
+  ensureMaxRuns,
   readConfig,
   writeConfig,
 } from '../core/config.js';
@@ -52,9 +53,12 @@ export class ProjectSession {
     const config = await readConfig(projectRoot); // throws if not a VibeBoard project
     // Upgrade older projects: backfill missing boards, and a real copilot model/effort for
     // configs written when those could be blank.
-    const upgraded = [ensureBoards(config), ensureCopilotDefaults(config), ensureContextBudget(config)].some(
-      Boolean,
-    );
+    const upgraded = [
+      ensureBoards(config),
+      ensureCopilotDefaults(config),
+      ensureContextBudget(config),
+      ensureMaxRuns(config),
+    ].some(Boolean);
     if (upgraded) await writeConfig(projectRoot, config);
     // Backfill INSTRUCTIONS.md + CLI pointer imports for projects created before Project Control.
     await ensureControlFiles(projectRoot);

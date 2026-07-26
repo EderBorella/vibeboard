@@ -17,6 +17,7 @@ const config: ProjectConfig = {
   idPadding: 3,
   keepChats: 20,
   contextBudget: 200_000,
+  maxConcurrentRuns: 3,
   copilot: { backend: 'claude-code', backends: {} },
 };
 

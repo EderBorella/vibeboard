@@ -1,4 +1,5 @@
 import Fastify, { type FastifyInstance } from 'fastify';
+import { DEFAULT_MAX_RUNS } from '../core/config.js';
 import { AgentRunner } from './agent-runner.js';
 import { ChatStore } from './chat-store.js';
 import { CopilotSession } from './copilot.js';
@@ -28,6 +29,9 @@ export function buildApp(session: ProjectSession): FastifyInstance {
     now: () => new Date(),
     suffix: () => Math.random().toString(36).slice(2, 6),
     timeoutMs: Number(process.env.VIBEBOARD_RUN_TIMEOUT_MS ?? 1_800_000),
+    // Read per dispatch from the open project's config, so changing it in Settings takes effect
+    // without a restart.
+    maxConcurrent: () => session.config?.maxConcurrentRuns ?? DEFAULT_MAX_RUNS,
     onUpdate: (record) => broadcast({ type: 'run:update', record }),
   });
   const ctx: AppCtx = { session, copilot, chats, runner, broadcast };

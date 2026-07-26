@@ -9,6 +9,10 @@ import { BOARDS, type BoardConfig, type BoardName, type CopilotConfig, type Proj
 // most of them (200k over-reported occupancy 5× on a 1M-context model).
 export const DEFAULT_CONTEXT_BUDGET = 200_000;
 
+// Runs in flight at once. Three is enough to keep a board moving without turning a laptop into a
+// space heater or racing several agents over the same files.
+export const DEFAULT_MAX_RUNS = 3;
+
 export const CONFIG_DIR = '.vibeboard';
 export const CONFIG_FILE = 'config.yaml';
 
@@ -33,6 +37,7 @@ export function defaultConfig(name: string): ProjectConfig {
     idPadding: 3,
     keepChats: 20,
     contextBudget: DEFAULT_CONTEXT_BUDGET,
+    maxConcurrentRuns: DEFAULT_MAX_RUNS,
     copilot: { backend: DEFAULT_BACKEND, backends: defaultBackendMap() },
   };
 }
@@ -95,6 +100,14 @@ export function ensureCopilotDefaults(config: ProjectConfig): boolean {
 export function ensureContextBudget(config: ProjectConfig): boolean {
   if (typeof config.contextBudget === 'number' && config.contextBudget > 0) return false;
   config.contextBudget = DEFAULT_CONTEXT_BUDGET;
+  return true;
+}
+
+// Backfill for projects written before runs existed. A zero or negative cap would mean "never run
+// anything", which is never what anyone meant by it.
+export function ensureMaxRuns(config: ProjectConfig): boolean {
+  if (typeof config.maxConcurrentRuns === 'number' && config.maxConcurrentRuns > 0) return false;
+  config.maxConcurrentRuns = DEFAULT_MAX_RUNS;
   return true;
 }
 

@@ -138,6 +138,25 @@ describe('opening a project', () => {
     expect(onDisk.contextBudget).toBe(200_000);
   });
 
+  it('backfills a run cap on open, for a project written before runs existed', async () => {
+    const root = await tempDir();
+    await scaffoldProject(root, { name: 'Old', mode: 'greenfield', today: TODAY });
+    const stale = parse(await readFile(configPath(root), 'utf8')) as Record<string, unknown>;
+    delete stale.maxConcurrentRuns;
+    await writeConfig(root, stale as unknown as ProjectConfig);
+
+    const session = new ProjectSession();
+    try {
+      await session.open(root);
+      expect(session.config?.maxConcurrentRuns).toBe(3);
+      // Persisted, so the next open does not have to migrate it again.
+      const onDisk = parse(await readFile(configPath(root), 'utf8')) as ProjectConfig;
+      expect(onDisk.maxConcurrentRuns).toBe(3);
+    } finally {
+      await session.close();
+    }
+  });
+
   it('migrates a legacy config on open and persists it', async () => {
     const root = await tempDir();
     await scaffoldProject(root, { name: 'Old', mode: 'greenfield', today: TODAY });

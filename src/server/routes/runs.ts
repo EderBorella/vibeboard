@@ -102,7 +102,11 @@ export async function registerRunRoutes(api: FastifyInstance, ctx: AppCtx): Prom
   // Every run in the project, newest first — the Execution dashboard's list.
   api.get('/runs', async (_req, reply) => {
     if (!ensureOpen(ctx.session, reply)) return;
-    return { runs: await listRuns(ctx.session.root), active: ctx.runner.activeIds };
+    return {
+      runs: await listRuns(ctx.session.root),
+      active: ctx.runner.activeIds,
+      queued: ctx.runner.queuedIds,
+    };
   });
 
   // One card's history, oldest first: the Reports section on the card.

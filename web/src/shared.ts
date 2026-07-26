@@ -139,6 +139,7 @@ export interface ProjectConfig {
   idPadding: number;
   keepChats: number;
   contextBudget: number;
+  maxConcurrentRuns: number;
   copilot: CopilotConfig;
 }
 

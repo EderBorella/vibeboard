@@ -176,10 +176,12 @@ expose it to the public internet.
 
 **On the roadmap**
 
-- **Plugin management** in the Project Control tab
+- **Skill editor** — author a skill as fields rather than YAML, with the boards
+  and columns picked from the live config
 - **Embedded terminal** — a full interactive agent session in the browser
 - **Plugin management** in the Project Control tab
 - **External resources** — attach reference folders, PDFs, and notes to a project
+- **Token and cost accounting** per run
 
 ## Design principles
 

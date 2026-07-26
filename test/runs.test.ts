@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   isInFlight,
+  needsResolution,
   parseAgentReport,
   parseRun,
   RUN_STATUSES,
@@ -9,6 +10,7 @@ import {
   serializeRun,
   withoutReport,
   withReport,
+  withResolution,
 } from '../src/core/runs.js';
 
 const record = (over: Partial<RunRecord> = {}): RunRecord => ({
@@ -215,5 +217,33 @@ describe('withoutReport', () => {
 describe('isInFlight', () => {
   it('is true only for queued and running', () => {
     expect(RUN_STATUSES.filter(isInFlight)).toEqual(['queued', 'running']);
+  });
+});
+
+describe('needsResolution', () => {
+  it('is true for exactly the endings a person has to answer', () => {
+    // Not `success` (finished work) and not `cancelled` (a decision already taken). Not queued or
+    // running either: those have not ended, and stopping one is cancel, not a resolution.
+    const asking = RUN_STATUSES.filter((status) => needsResolution(record({ status })));
+    expect(asking).toEqual(['attention', 'failed', 'interrupted']);
+  });
+
+  it('is false once the run carries a resolution, whatever it says it was', () => {
+    // The bug this exists for: without this field, an attention run asks for ever.
+    for (const status of ['attention', 'failed', 'interrupted'] as const) {
+      expect(needsResolution(record({ status, resolved: '2026-07-26T21:30:00.000Z' }))).toBe(false);
+    }
+  });
+});
+
+describe('withResolution', () => {
+  it('stamps the record and changes nothing else', () => {
+    const asking = record({ status: 'attention', outcome: 'attention', summary: 'bigger than one card' });
+    expect(withResolution(asking, 'T')).toEqual({ ...asking, resolved: 'T' });
+  });
+
+  it('survives a round trip through the file, so a reload does not forget', () => {
+    const resolved = withResolution(record({ status: 'attention' }), '2026-07-26T21:30:00.000Z');
+    expect(parseRun(serializeRun(resolved))?.resolved).toBe('2026-07-26T21:30:00.000Z');
   });
 });

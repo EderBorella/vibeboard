@@ -76,6 +76,26 @@ describe('CardReports', () => {
     ]);
   });
 
+  it('marks a run that has been dealt with, without pretending it ended differently', () => {
+    // The row still says "Needs you" — that IS how it ended — with the decision appended. The exact
+    // string, not a substring: the point is that both halves are there.
+    render(
+      <CardReports
+        runs={[
+          run({ run: 'a', status: 'attention' }),
+          run({ run: 'b', status: 'attention', resolved: '2026-07-26T21:30:00.000Z' }),
+        ]}
+        onOpen={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+    expect([...document.querySelectorAll('.report-chip')].map((e) => e.textContent)).toEqual([
+      'Needs you · dealt with',
+      'Needs you',
+    ]);
+    expect(document.querySelectorAll('.report-row.resolved')).toHaveLength(1);
+  });
+
   it('says what each status means to a person, not what it is called', () => {
     render(
       <CardReports
@@ -147,6 +167,7 @@ describe('ReportPane', () => {
     createdCards: [] as Card[],
     onOpenCard: vi.fn(),
     onMove: vi.fn(),
+    onClose: vi.fn(),
     onBack: vi.fn(),
     onContinue: vi.fn(),
     canContinue: true,
@@ -273,11 +294,37 @@ describe('ReportPane', () => {
     expect(onContinue.mock.calls).toEqual([['Do the store only']]);
   });
 
-  it('closes through the same handler that moves, since closing IS a move', () => {
+  it('closes through its own handler, not the move one — closing also resolves the run', () => {
+    // Two different facts. `onMove` moves a card and nothing else; `onClose` records that the run
+    // has been dealt with as well, which is what stops it asking again from the dashboard.
     const onMove = vi.fn();
-    render(<ReportPane {...props} onMove={onMove} record={run({ status: 'attention' })} />);
+    const onClose = vi.fn();
+    render(
+      <ReportPane {...props} onMove={onMove} onClose={onClose} record={run({ status: 'attention' })} />,
+    );
     fireEvent.click(screen.getByText('Close card'));
-    expect(onMove.mock.calls).toEqual([['done']]);
+    expect(onClose.mock.calls).toEqual([['done']]);
+    expect(onMove).not.toHaveBeenCalled();
+  });
+
+  it('offers options for an interrupted run, which until now had no button anywhere', () => {
+    // It sits under "Requires attention" in the dashboard, so it must be answerable somewhere.
+    render(<ReportPane {...props} record={run({ status: 'interrupted', report: '' })} />);
+    expect(screen.getByLabelText('What next')).toBeTruthy();
+  });
+
+  it('drops the options once the run has been dealt with, and says when', () => {
+    render(
+      <ReportPane
+        {...props}
+        record={run({ status: 'attention', resolved: '2026-07-26T21:30:00.000Z' })}
+      />,
+    );
+    expect(screen.queryByLabelText('What next')).toBeNull();
+    expect(screen.getByText('Dealt with')).toBeTruthy();
+    expect(screen.getByText('2026-07-26 21:30:00')).toBeTruthy();
+    // The status still reads as it ended: how the run finished is not what the user decided about it.
+    expect(screen.getByText('attention')).toBeTruthy();
   });
 
   it('offers no move at all for a run that did not succeed', () => {
@@ -312,6 +359,7 @@ describe('ActiveReport', () => {
     skills,
     onOpenCard: vi.fn(),
     onMove: vi.fn(),
+    onClose: vi.fn(),
     onBack: vi.fn(),
     onContinue: vi.fn(),
   };

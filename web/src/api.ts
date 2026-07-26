@@ -311,6 +311,8 @@ export interface RunRecord {
   mode: string;
   outcome?: 'success' | 'attention';
   finished?: string;
+  // When the user dealt with it. `status` is how the run ended; this is the decision taken about it.
+  resolved?: string;
   previous?: string;
   prompt?: string;
   attached?: string[];
@@ -361,6 +363,14 @@ export function dispatchRun(body: DispatchRequest): Promise<{ run: RunRecord }> 
 
 export function cancelRun(run: string): Promise<{ ok: boolean }> {
   return post<{ ok: boolean }>(`/api/runs/${encodeURIComponent(run)}/cancel`, {});
+}
+
+// Mark a run dealt with, so it stops asking. Idempotent on the server: two clicks are one decision.
+export function resolveRun(board: BoardName, card: string, run: string): Promise<{ run: RunRecord }> {
+  return post<{ run: RunRecord }>(
+    `/api/runs/${board}/${encodeURIComponent(card)}/${encodeURIComponent(run)}/resolve`,
+    {},
+  );
 }
 
 // Write a skill from its fields; the server serialises the YAML and answers with the catalogue as it

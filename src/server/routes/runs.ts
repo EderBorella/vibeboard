@@ -8,7 +8,7 @@ import type { DispatchInput } from '../agent-runner.js';
 import type { Backend } from '../agent-turn.js';
 import { readResources } from '../control-files.js';
 import { type AppCtx, ensureOpen, nowIso } from '../route-context.js';
-import { listCardRuns, listRuns, readRun } from '../run-store.js';
+import { listCardRuns, listRuns, readRun, resolveRun } from '../run-store.js';
 import { readSkills } from '../skill-catalogue.js';
 
 // Dispatching and reading runs.
@@ -127,6 +127,17 @@ export async function registerRunRoutes(api: FastifyInstance, ctx: AppCtx): Prom
       // The cap, today. Phase 5 replaces it with a queue, at which point this stops being a refusal.
       return reply.code(409).send({ error: err instanceof Error ? err.message : String(err) });
     }
+  });
+
+  // "I have dealt with this." Board and card in the path, like the list above: a run id is unique,
+  // but finding its record without them would mean walking every results folder.
+  api.post('/runs/:board/:card/:run/resolve', async (req, reply) => {
+    if (!ensureOpen(ctx.session, reply)) return;
+    const { board, card, run } = req.params as { board: string; card: string; run: string };
+    if (!isBoard(board)) return reply.code(400).send({ error: 'Unknown board' });
+    const record = await resolveRun(ctx.session.root, board, card, run, nowIso());
+    if (!record) return reply.code(404).send({ error: 'No such run' });
+    return { run: record };
   });
 
   api.post('/runs/:run/cancel', async (req, reply) => {

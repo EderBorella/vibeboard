@@ -20,16 +20,27 @@ export function groupOf(status: RunStatus): RunGroup {
   return GROUPS[status];
 }
 
-// Worth a badge: something ended in a state only a person can resolve.
-export function needsAttention(status: RunStatus): boolean {
-  return groupOf(status) === 'attention';
+// Where a run belongs once the user has had their say. A resolved run keeps its status — it still
+// reads as `attention` or `failed`, because that is how it ended — but it has stopped waiting, so it
+// sits with the rest of the history.
+//
+// An in-flight run is grouped by its status regardless: the server will not resolve one, but a
+// hand-edited record must not be able to file a live process under history.
+export function groupFor(record: RunRecord): RunGroup {
+  const group = groupOf(record.status);
+  return record.resolved && group !== 'active' ? 'done' : group;
+}
+
+// Worth a badge: ended in a state only a person can resolve, and nobody has.
+export function needsAttention(record: RunRecord): boolean {
+  return groupFor(record) === 'attention';
 }
 
 // Runs in each group. Order within a group is the order given (the API lists newest first) except
 // for the active one, where the oldest is the one that has been going longest and matters most.
 export function groupRuns(runs: RunRecord[]): Record<RunGroup, RunRecord[]> {
   const out: Record<RunGroup, RunRecord[]> = { active: [], attention: [], done: [] };
-  for (const record of runs) out[groupOf(record.status)].push(record);
+  for (const record of runs) out[groupFor(record)].push(record);
   out.active.reverse();
   return out;
 }

@@ -32,14 +32,18 @@ export function CardReports({ runs, onOpen, onCancel }: Props) {
     <section className="reports" aria-label="Reports">
       <h4 className="reports-head">Reports</h4>
       {[...runs].reverse().map((r) => (
-        <div key={r.run} className={`report-row status-${r.status}`}>
+        <div key={r.run} className={`report-row status-${r.status}${r.resolved ? ' resolved' : ''}`}>
           <button
             type="button"
             className="report-open"
             title={`Open the report from ${r.skill}`}
             onClick={() => onOpen(r)}
           >
-            <span className={`report-chip chip-${r.status}`}>{LABELS[r.status]}</span>
+            {/* A resolved run keeps its chip — it did end needing you — but says it was answered,
+                so the history reads as history rather than a row still asking. */}
+            <span className={`report-chip chip-${r.status}`}>
+              {r.resolved ? `${LABELS[r.status]} · dealt with` : LABELS[r.status]}
+            </span>
             <span className="report-skill">{r.skill}</span>
             <span className="report-when">{when(r)}</span>
             <span className="report-summary">{r.summary ?? r.note ?? ''}</span>

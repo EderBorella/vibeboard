@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { RunRecord, RunStatus } from '../web/src/api.js';
-import { elapsed, groupOf, groupRuns, needsAttention } from '../web/src/runs/viewmodel.js';
+import { elapsed, groupFor, groupOf, groupRuns, needsAttention } from '../web/src/runs/viewmodel.js';
 
 const run = (over: Partial<RunRecord> = {}): RunRecord => ({
   run: 'r1',
@@ -48,7 +48,47 @@ describe('groupOf', () => {
   });
 
   it('counts only the attention column as needing you', () => {
-    expect(STATUSES.filter(needsAttention)).toEqual(['attention', 'failed', 'interrupted']);
+    expect(STATUSES.filter((status) => needsAttention(run({ status }))).sort()).toEqual([
+      'attention',
+      'failed',
+      'interrupted',
+    ]);
+  });
+});
+
+describe('a run that has been dealt with', () => {
+  it('stops needing you, whatever it says it was', () => {
+    // The fix for the bug this was built for: an attention run stayed in the column and on the badge
+    // for ever, because status alone can never say "and I have answered it".
+    for (const status of ['attention', 'failed', 'interrupted'] as RunStatus[]) {
+      expect(needsAttention(run({ status }))).toBe(true);
+      expect(needsAttention(run({ status, resolved: '2026-07-26T21:30:00.000Z' }))).toBe(false);
+    }
+  });
+
+  it('joins the history rather than vanishing', () => {
+    // Resolved is not deleted: the run still happened, and its report is still the record of it.
+    const grouped = groupRuns([
+      run({ run: 'answered', status: 'attention', resolved: '2026-07-26T21:30:00.000Z' }),
+      run({ run: 'waiting', status: 'attention' }),
+    ]);
+    expect(grouped.attention.map((r) => r.run)).toEqual(['waiting']);
+    expect(grouped.done.map((r) => r.run)).toEqual(['answered']);
+  });
+
+  it('leaves an in-flight run alone — resolving is not stopping', () => {
+    // A queued or running record with a `resolved` stamp should not be possible, but if one appears,
+    // showing it as history would hide a live process.
+    const grouped = groupRuns([
+      run({ run: 'live', status: 'running', resolved: '2026-07-26T21:30:00.000Z' }),
+    ]);
+    expect(grouped.active.map((r) => r.run)).toEqual(['live']);
+  });
+
+  it('keeps its status untouched, because that is how it ended', () => {
+    expect(groupOf('attention')).toBe('attention');
+    expect(groupFor(run({ status: 'attention' }))).toBe('attention');
+    expect(groupFor(run({ status: 'attention', resolved: '2026-07-26T21:30:00.000Z' }))).toBe('done');
   });
 });
 

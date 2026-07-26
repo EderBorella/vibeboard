@@ -13,6 +13,9 @@ interface Props {
   now: number;
   onOpenCard: (card: Card, run: RunRecord) => void;
   onCancel: (run: RunRecord) => void;
+  // Deal with a run without opening its card. The only way to clear an interrupted run whose card
+  // has since been closed, and the quick path for one you have already read.
+  onResolve: (run: RunRecord) => void;
 }
 
 const COLUMNS = [
@@ -24,7 +27,7 @@ const COLUMNS = [
 // Every run in the project, in three columns: what is happening, what is waiting for a decision,
 // and what came back. Failed and interrupted runs sit under "Requires attention" rather than
 // "Done" — burying a broken run under successes is how it goes unnoticed for a week.
-export function ExecutionView({ runs, active, queued, cards, now, onOpenCard, onCancel }: Props) {
+export function ExecutionView({ runs, active, queued, cards, now, onOpenCard, onCancel, onResolve }: Props) {
   const grouped = groupRuns(runs);
 
   return (
@@ -70,6 +73,16 @@ export function ExecutionView({ runs, active, queued, cards, now, onOpenCard, on
                       onClick={() => onCancel(record)}
                     >
                       Stop
+                    </button>
+                  )}
+                  {column.key === 'attention' && (
+                    <button
+                      type="button"
+                      className="report-dismiss"
+                      title={`Mark the ${record.skill} run on ${record.card} dealt with`}
+                      onClick={() => onResolve(record)}
+                    >
+                      Dismiss
                     </button>
                   )}
                 </div>

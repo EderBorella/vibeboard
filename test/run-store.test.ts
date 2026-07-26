@@ -12,6 +12,8 @@ import {
   recordPath,
   reportContract,
   reportPath,
+  resolveCardRuns,
+  resolveRun,
   takeAgentReport,
   transcriptTail,
   writeRun,
@@ -223,5 +225,83 @@ describe('markInterrupted', () => {
     const before = await readFile(recordPath(root, 'engineering', 'E-010', done.run), 'utf8');
     await markInterrupted(root, 'T1');
     expect(await readFile(recordPath(root, 'engineering', 'E-010', done.run), 'utf8')).toBe(before);
+  });
+});
+
+describe('resolveRun', () => {
+  it('stamps the record on disk, so a reload still knows it was dealt with', async () => {
+    const root = await tempDir();
+    await writeRun(root, record({ status: 'attention' }));
+    const resolved = await resolveRun(root, 'engineering', 'E-010', record().run, 'T');
+    expect(resolved?.resolved).toBe('T');
+    expect((await readRun(root, 'engineering', 'E-010', record().run))?.resolved).toBe('T');
+  });
+
+  it('keeps the status it ended with — the decision is a second fact, not a replacement', async () => {
+    const root = await tempDir();
+    await writeRun(root, record({ status: 'attention', outcome: 'attention', summary: 'too big' }));
+    const resolved = await resolveRun(root, 'engineering', 'E-010', record().run, 'T');
+    expect(resolved?.status).toBe('attention');
+    expect(resolved?.summary).toBe('too big');
+  });
+
+  it('is a no-op the second time, rather than restamping', async () => {
+    // Both the dashboard and the card offer this, and a move into the last column does it too.
+    const root = await tempDir();
+    await writeRun(root, record({ status: 'attention' }));
+    await resolveRun(root, 'engineering', 'E-010', record().run, 'FIRST');
+    const again = await resolveRun(root, 'engineering', 'E-010', record().run, 'SECOND');
+    expect(again?.resolved).toBe('FIRST');
+  });
+
+  it('leaves a run that was never asking byte-identical', async () => {
+    const root = await tempDir();
+    const done = record({ status: 'success', outcome: 'success', finished: 'T0', report: 'ok' });
+    await writeRun(root, done);
+    const before = await readFile(recordPath(root, 'engineering', 'E-010', done.run), 'utf8');
+    expect((await resolveRun(root, 'engineering', 'E-010', done.run, 'T1'))?.resolved).toBeUndefined();
+    expect(await readFile(recordPath(root, 'engineering', 'E-010', done.run), 'utf8')).toBe(before);
+  });
+
+  it('refuses to resolve a run that has not ended', async () => {
+    // Stopping a live run is cancel. Resolving one would file a running process under history.
+    const root = await tempDir();
+    await writeRun(root, record({ status: 'running' }));
+    expect((await resolveRun(root, 'engineering', 'E-010', record().run, 'T'))?.resolved).toBeUndefined();
+  });
+
+  it('answers null for a run that does not exist', async () => {
+    expect(await resolveRun(await tempDir(), 'engineering', 'E-010', 'nope', 'T')).toBeNull();
+  });
+});
+
+describe('resolveCardRuns', () => {
+  it('resolves every run still asking, and counts them', async () => {
+    const root = await tempDir();
+    await writeRun(root, record({ run: 'r-attention', status: 'attention' }));
+    await writeRun(root, record({ run: 'r-failed', status: 'failed' }));
+    await writeRun(root, record({ run: 'r-interrupted', status: 'interrupted' }));
+    await writeRun(root, record({ run: 'r-success', status: 'success' }));
+    await writeRun(root, record({ run: 'r-already', status: 'attention', resolved: 'EARLIER' }));
+
+    expect(await resolveCardRuns(root, 'engineering', 'E-010', 'T')).toBe(3);
+    const byId = new Map((await listCardRuns(root, 'engineering', 'E-010')).map((r) => [r.run, r]));
+    expect(byId.get('r-attention')?.resolved).toBe('T');
+    expect(byId.get('r-failed')?.resolved).toBe('T');
+    expect(byId.get('r-interrupted')?.resolved).toBe('T');
+    expect(byId.get('r-success')?.resolved).toBeUndefined();
+    expect(byId.get('r-already')?.resolved).toBe('EARLIER');
+  });
+
+  it('touches only the card it was asked about', async () => {
+    const root = await tempDir();
+    await writeRun(root, record({ status: 'attention' }));
+    await writeRun(root, record({ card: 'E-011', status: 'attention' }));
+    expect(await resolveCardRuns(root, 'engineering', 'E-011', 'T')).toBe(1);
+    expect((await readRun(root, 'engineering', 'E-010', record().run))?.resolved).toBeUndefined();
+  });
+
+  it('says nothing was waiting for a card with no runs', async () => {
+    expect(await resolveCardRuns(await tempDir(), 'engineering', 'E-010', 'T')).toBe(0);
   });
 });

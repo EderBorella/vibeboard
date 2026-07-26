@@ -11,6 +11,8 @@ interface Props {
   skills: Skill[];
   onOpenCard: (card: Card) => void;
   onMove: (columnSlug: string) => void;
+  // Ignore and close: resolve the run, then move the card.
+  onClose: (columnSlug: string) => void;
   onBack: () => void;
   // Continue from this run with a starting prompt. Given the skill, because resolving it is this
   // component's job, not the caller's.
@@ -28,6 +30,7 @@ export function ActiveReport({
   skills,
   onOpenCard,
   onMove,
+  onClose,
   onBack,
   onContinue,
 }: Props) {
@@ -42,6 +45,7 @@ export function ActiveReport({
       createdCards={live.filter((c) => record.created?.includes(c.id))}
       onOpenCard={onOpenCard}
       onMove={onMove}
+      onClose={onClose}
       onBack={onBack}
       canContinue={skill !== undefined}
       onContinue={(prompt) => {

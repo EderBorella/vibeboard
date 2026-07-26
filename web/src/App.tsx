@@ -1,5 +1,14 @@
 import { type ReactNode, useEffect, useRef, useState } from 'react';
-import { archiveCard, cancelRun, createCard, getState, patchCard, placeCard, setLinks } from './api';
+import {
+  archiveCard,
+  cancelRun,
+  createCard,
+  getState,
+  patchCard,
+  placeCard,
+  resolveRun,
+  setLinks,
+} from './api';
 import { ProjectGate } from './components/ProjectGate';
 import { SettingsModal } from './components/SettingsModal';
 import { type MainTab, TopBar } from './components/TopBar';
@@ -180,13 +189,16 @@ export function App() {
         onCancelRun={(record) => {
           void cancelRun(record.run).catch(() => {});
         }}
+        onResolveRun={(record) => {
+          void resolveRun(record.board, record.card, record.run).catch(() => {});
+        }}
       />
     );
 
   return (
     <div className="app-shell">
       <TopBar
-        attentionCount={allRuns.runs.filter((r) => needsAttention(r.status)).length}
+        attentionCount={allRuns.runs.filter(needsAttention).length}
         showProject={Boolean(snapshot) && !showGate}
         projectName={snapshot?.name}
         tab={tab}

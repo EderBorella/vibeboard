@@ -12,8 +12,18 @@ import {
   restoreTarget,
   updateCard,
 } from '../../core/mutations.js';
-import type { BoardName, CardFrontmatter } from '../../core/types.js';
+import { slugify } from '../../core/slug.js';
+import type { BoardName, CardFrontmatter, ProjectConfig } from '../../core/types.js';
 import { type AppCtx, ensureOpen, nowIso, today } from '../route-context.js';
+import { resolveCardRuns } from '../run-store.js';
+
+// A card in its board's last column is closed, so nothing on it is still waiting for a decision.
+// Which column that is comes from the config rather than a name: "done" is a convention, and a
+// project may call it anything.
+function isClosingColumn(config: ProjectConfig, board: BoardName, columnSlug: string): boolean {
+  const last = config.boards[board].columns.at(-1);
+  return last !== undefined && slugify(last) === columnSlug;
+}
 
 export async function registerCardRoutes(api: FastifyInstance, ctx: AppCtx): Promise<void> {
   api.post('/cards', async (req, reply) => {
@@ -63,9 +73,17 @@ export async function registerCardRoutes(api: FastifyInstance, ctx: AppCtx): Pro
     if (!ensureOpen(ctx.session, reply)) return;
     const { board, id } = req.params as { board: BoardName; id: string };
     const { toColumnSlug, beforeId } = req.body as { toColumnSlug: string; beforeId?: string | null };
-    const card = await findCard(ctx.session.root, board, id, ctx.session.config);
+    const { root, config } = ctx.session;
+    const card = await findCard(root, board, id, config);
     if (!card) return reply.code(404).send({ error: 'Card not found' });
-    return placeCard(ctx.session.root, ctx.session.config, card, toColumnSlug, beforeId ?? null);
+    const placed = await placeCard(root, config, card, toColumnSlug, beforeId ?? null);
+    // Closing a card resolves its runs. Done on the move rather than in the watcher: writing run
+    // records in response to filesystem events, inside the folder the watcher watches, is a loop —
+    // so a card moved by an agent editing files directly still needs Dismiss.
+    if (isClosingColumn(config, board, placed.columnSlug)) {
+      await resolveCardRuns(root, board, placed.id, nowIso());
+    }
+    return placed;
   });
 
   api.post('/cards/:board/:id/archive', async (req, reply) => {

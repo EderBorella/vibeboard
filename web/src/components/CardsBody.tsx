@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { cancelRun, type RunRecord, type Skill } from '../api';
+import { cancelRun, type RunRecord, resolveRun, type Skill } from '../api';
 import type { CardRef } from '../dock/tabs';
 import type { Card, CardFrontmatterPatch, ProjectConfig } from '../shared';
 import { ActiveReport } from './ActiveReport';
@@ -94,6 +94,15 @@ export function CardsBody({
         onOpenCard={onOpenCard}
         onMove={(columnSlug) => {
           onMove(card, columnSlug);
+          toCard();
+        }}
+        onClose={(columnSlug) => {
+          // Resolve first, then move: a move into the board's last column resolves the card's runs
+          // server-side, and by then this one already is — so the record is written once whichever
+          // column was picked. The pane returns to the card immediately either way.
+          void resolveRun(card.board, card.id, shown.run)
+            .catch(() => {})
+            .finally(() => onMove(card, columnSlug));
           toCard();
         }}
         onBack={toCard}

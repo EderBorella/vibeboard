@@ -3,12 +3,14 @@ import { join } from 'node:path';
 import { CONFIG_DIR } from '../core/config.js';
 import {
   isInFlight,
+  needsResolution,
   parseAgentReport,
   parseRun,
   type RunRecord,
   serializeRun,
   withoutReport,
   withReport,
+  withResolution,
 } from '../core/runs.js';
 import { BOARDS, type BoardName } from '../core/types.js';
 
@@ -147,6 +149,37 @@ export async function markInterrupted(root: string, at: string): Promise<number>
     );
   }
   return stale.length;
+}
+
+// Mark one run dealt with. Returns the record either way: resolving one twice, or resolving a run
+// that was never asking, is a no-op rather than an error — the dashboard and the card both offer the
+// action, and two clicks must not mean two writes.
+export async function resolveRun(
+  root: string,
+  board: BoardName,
+  card: string,
+  run: string,
+  at: string,
+): Promise<RunRecord | null> {
+  const record = await readRun(root, board, card, run);
+  if (!record) return null;
+  if (!needsResolution(record)) return record;
+  const resolved = withResolution(record, at);
+  await writeRun(root, resolved);
+  return resolved;
+}
+
+// Every unresolved run on one card, dealt with at once — what closing the card means. Returns how
+// many were written, so a caller can tell "nothing was waiting" from "three were".
+export async function resolveCardRuns(
+  root: string,
+  board: BoardName,
+  card: string,
+  at: string,
+): Promise<number> {
+  const pending = (await listCardRuns(root, board, card)).filter(needsResolution);
+  for (const record of pending) await writeRun(root, withResolution(record, at));
+  return pending.length;
 }
 
 // Fold a finished agent report into the record. Returns the updated record, or null when the agent

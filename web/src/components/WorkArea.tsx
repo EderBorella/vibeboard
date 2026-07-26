@@ -61,6 +61,7 @@ export interface WorkAreaProps {
   onLinks: (card: Card, links: string[]) => void;
   onMoveCard: (card: Card, columnSlug: string) => void;
   onCancelRun: (record: RunRecord) => void;
+  onResolveRun: (record: RunRecord) => void;
 }
 
 // Everything below the top bar: the active view, the utility dock beneath it, and the copilot beside
@@ -139,6 +140,7 @@ export function WorkArea(props: WorkAreaProps) {
             now={Date.now()}
             onOpenCard={props.onOpen}
             onCancel={props.onCancelRun}
+            onResolve={props.onResolveRun}
           />
         )}
         {tab === 'control' && <ProjectControl snapshot={snapshot} />}

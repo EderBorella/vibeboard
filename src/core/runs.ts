@@ -37,6 +37,10 @@ export interface RunRecord {
   mode: string;
   outcome?: RunOutcome;
   finished?: string;
+  // When the user dealt with it. `status` says how the run ended, which is a fact about the agent
+  // and never changes; this says the decision has been taken, which is a fact about the user. A
+  // `resolved` status would have overwritten the first with the second and lost it.
+  resolved?: string;
   previous?: string; // the run this one continues
   prompt?: string; // the user's additional prompt, verbatim
   attached?: string[]; // paths passed to the agent
@@ -91,7 +95,7 @@ export function serializeRun(record: RunRecord): string {
   const data: Record<string, unknown> = {};
   // Written in a deliberate order: identity, then state, then what was asked, then what came back.
   // A run file is something a human reads in a diff.
-  for (const key of ['run', 'card', 'board', 'skill', 'status', 'outcome'] as const) {
+  for (const key of ['run', 'card', 'board', 'skill', 'status', 'outcome', 'resolved'] as const) {
     if (front[key] !== undefined) data[key] = front[key];
   }
   for (const key of [
@@ -117,7 +121,7 @@ export function serializeRun(record: RunRecord): string {
 // Fields that are simply absent when unset, rather than present and empty. Gathered in loops
 // rather than a chain of conditional spreads: same behaviour, and a dozen ternaries in one
 // expression is what pushed parseRun past the complexity gate.
-const TEXT_OPTIONALS = ['finished', 'previous', 'prompt', 'summary', 'note'] as const;
+const TEXT_OPTIONALS = ['finished', 'resolved', 'previous', 'prompt', 'summary', 'note'] as const;
 const LIST_OPTIONALS = ['attached', 'options', 'created'] as const;
 
 function optionalFields(d: Record<string, unknown>): Partial<RunRecord> {
@@ -218,4 +222,19 @@ export function withoutReport(
 // spawned it, so a record still claiming to run is stale rather than live.
 export function isInFlight(status: RunStatus): boolean {
   return status === 'queued' || status === 'running';
+}
+
+// Statuses that leave something for a person to decide. `success` and `cancelled` do not: one is
+// finished work, the other is a decision already taken. In-flight runs are not resolvable either —
+// they have not ended, and stopping one is `cancel`, not a resolution.
+export const RESOLVABLE_STATUSES: readonly RunStatus[] = ['attention', 'failed', 'interrupted'];
+
+// Still asking for a decision. The single source for that question: the server filters on it when a
+// card closes, and the dashboard's grouping is asserted against it in test/mirror.test.ts.
+export function needsResolution(record: RunRecord): boolean {
+  return record.resolved === undefined && RESOLVABLE_STATUSES.includes(record.status);
+}
+
+export function withResolution(record: RunRecord, at: string): RunRecord {
+  return { ...record, resolved: at };
 }

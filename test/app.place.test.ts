@@ -1,5 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { describe, expect, it } from 'vitest';
+import type { RunRecord } from '../src/core/runs.js';
+import { readRun, writeRun } from '../src/server/run-store.js';
 import { openTestProject } from './helpers.js';
 
 interface WireCard {
@@ -9,9 +11,9 @@ interface WireCard {
   order: number;
 }
 
-async function setup(): Promise<{ app: FastifyInstance; ids: string[] }> {
+async function setup(): Promise<{ app: FastifyInstance; ids: string[]; root: string }> {
   // brownfield = no sample cards, so the order under test is entirely ours
-  const { app } = await openTestProject({ name: 'Ord', mode: 'brownfield' });
+  const { app, root } = await openTestProject({ name: 'Ord', mode: 'brownfield' });
   const ids: string[] = [];
   for (const title of ['a', 'b', 'c']) {
     const res = await app.inject({
@@ -21,7 +23,7 @@ async function setup(): Promise<{ app: FastifyInstance; ids: string[] }> {
     });
     ids.push(res.json().id);
   }
-  return { app, ids };
+  return { app, ids, root };
 }
 
 const column = async (a: FastifyInstance, slug: string): Promise<WireCard[]> => {
@@ -79,5 +81,88 @@ describe('POST /cards/:board/:id/place', () => {
       payload: { toColumnSlug: 'todo', beforeId: null },
     });
     expect(res.statusCode).toBe(404);
+  });
+});
+
+describe('closing a card resolves the runs on it', () => {
+  // Your ruling: reaching the board's LAST column means the card is closed, so nothing on it is
+  // still waiting for a decision. Done on the move rather than in the watcher — writing run records
+  // in response to filesystem events, inside the folder the watcher watches, is a loop.
+  const asking = (card: string, run: string): RunRecord => ({
+    run,
+    card,
+    board: 'product',
+    skill: 'execute',
+    status: 'attention',
+    started: '2026-07-26T21:00:00.000Z',
+    backend: 'opencode',
+    model: 'nemotron',
+    effort: 'max',
+    mode: 'build',
+    report: 'needs a decision',
+  });
+
+  it('resolves them when the card lands in the last column', async () => {
+    const { app, ids, root } = await setup();
+    await writeRun(root, asking(ids[0], 'r-one'));
+    await writeRun(root, asking(ids[0], 'r-two'));
+
+    await app.inject({
+      method: 'POST',
+      url: `/api/cards/product/${ids[0]}/place`,
+      payload: { toColumnSlug: 'done', beforeId: null },
+    });
+
+    expect((await readRun(root, 'product', ids[0], 'r-one'))?.resolved).toBeTruthy();
+    expect((await readRun(root, 'product', ids[0], 'r-two'))?.resolved).toBeTruthy();
+  });
+
+  it('leaves them asking for any other column — only the last one closes a card', async () => {
+    // 'In Progress' is not the end of the board, so a card passing through it has decided nothing.
+    const { app, ids, root } = await setup();
+    await writeRun(root, asking(ids[0], 'r-one'));
+    await app.inject({
+      method: 'POST',
+      url: `/api/cards/product/${ids[0]}/place`,
+      payload: { toColumnSlug: 'in-progress', beforeId: null },
+    });
+    expect((await readRun(root, 'product', ids[0], 'r-one'))?.resolved).toBeUndefined();
+  });
+
+  it('leaves another card’s runs alone', async () => {
+    const { app, ids, root } = await setup();
+    await writeRun(root, asking(ids[0], 'r-mine'));
+    await writeRun(root, asking(ids[1], 'r-theirs'));
+    await app.inject({
+      method: 'POST',
+      url: `/api/cards/product/${ids[0]}/place`,
+      payload: { toColumnSlug: 'done', beforeId: null },
+    });
+    expect((await readRun(root, 'product', ids[0], 'r-mine'))?.resolved).toBeTruthy();
+    expect((await readRun(root, 'product', ids[1], 'r-theirs'))?.resolved).toBeUndefined();
+  });
+
+  it('does not touch a run that succeeded, or one already dealt with', async () => {
+    const { app, ids, root } = await setup();
+    await writeRun(root, { ...asking(ids[0], 'r-done'), status: 'success' });
+    await writeRun(root, { ...asking(ids[0], 'r-earlier'), resolved: 'EARLIER' });
+    await app.inject({
+      method: 'POST',
+      url: `/api/cards/product/${ids[0]}/place`,
+      payload: { toColumnSlug: 'done', beforeId: null },
+    });
+    expect((await readRun(root, 'product', ids[0], 'r-done'))?.resolved).toBeUndefined();
+    expect((await readRun(root, 'product', ids[0], 'r-earlier'))?.resolved).toBe('EARLIER');
+  });
+
+  it('still places the card when it has no runs at all', async () => {
+    const { app, ids } = await setup();
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/cards/product/${ids[0]}/place`,
+      payload: { toColumnSlug: 'done', beforeId: null },
+    });
+    expect(res.statusCode).toBe(200);
+    expect((await column(app, 'done')).map((c) => c.title)).toEqual(['a']);
   });
 });

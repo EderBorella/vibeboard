@@ -6,6 +6,7 @@ const api = vi.hoisted(() => ({
   putRaw: vi.fn(async () => undefined),
   listCardRuns: vi.fn(async () => [] as unknown[]),
   cancelRun: vi.fn(async () => ({ ok: true })),
+  resolveRun: vi.fn(async () => ({ run: {} })),
 }));
 vi.mock('../web/src/api.js', () => api);
 vi.mock('../web/src/api', () => api);
@@ -516,6 +517,88 @@ describe('CardsPane', () => {
     expect((onRun.mock.calls[0] as unknown as [{ previous?: string }])[0].previous).toBe(
       '20260726-141000-9f3e',
     );
+  });
+
+  it('resolves the run as well as moving the card when you ignore and close', async () => {
+    // The bug this fixes: closing the card left the run sitting under "Requires attention" for ever,
+    // because a status is written once and nothing said "answered". Both calls, or it comes back.
+    api.listCardRuns.mockResolvedValueOnce([
+      {
+        run: '20260726-141000-9f3e',
+        card: 'E-001',
+        board: 'engineering',
+        skill: 'execute',
+        status: 'attention',
+        started: '2026-07-26T14:10:00.000Z',
+        backend: 'claude-code',
+        model: 'opus',
+        effort: 'high',
+        mode: 'bypassPermissions',
+        summary: 'bigger than one card',
+        report: 'x',
+      },
+    ]);
+    const onMove = vi.fn();
+    render(
+      <CardsPane
+        {...props}
+        onMove={onMove}
+        tabs={[ref('E-001')]}
+        activeId="E-001"
+        live={[card('E-001')]}
+      />,
+    );
+    await waitFor(() => expect(screen.getByText('bigger than one card')).toBeTruthy());
+    await act(async () => {
+      fireEvent.click(document.querySelector('.report-open') as HTMLElement);
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByText('Close card'));
+    });
+
+    // Last-called rather than the whole call list: the api mock is shared by every test in this file
+    // and is not reset between them, so an exact list would break when a neighbour is added.
+    expect(api.resolveRun).toHaveBeenLastCalledWith('engineering', 'E-001', '20260726-141000-9f3e');
+    expect(onMove.mock.calls).toEqual([[card('E-001'), 'done']]);
+  });
+
+  it('still moves the card when resolving the run fails', async () => {
+    // The move is the user's instruction; a failed write of our own bookkeeping must not swallow it.
+    api.resolveRun.mockRejectedValueOnce(new Error('offline'));
+    api.listCardRuns.mockResolvedValueOnce([
+      {
+        run: '20260726-141000-9f3e',
+        card: 'E-001',
+        board: 'engineering',
+        skill: 'execute',
+        status: 'attention',
+        started: '2026-07-26T14:10:00.000Z',
+        backend: 'claude-code',
+        model: 'opus',
+        effort: 'high',
+        mode: 'bypassPermissions',
+        summary: 'bigger than one card',
+        report: 'x',
+      },
+    ]);
+    const onMove = vi.fn();
+    render(
+      <CardsPane
+        {...props}
+        onMove={onMove}
+        tabs={[ref('E-001')]}
+        activeId="E-001"
+        live={[card('E-001')]}
+      />,
+    );
+    await waitFor(() => expect(screen.getByText('bigger than one card')).toBeTruthy());
+    await act(async () => {
+      fireEvent.click(document.querySelector('.report-open') as HTMLElement);
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByText('Close card'));
+    });
+    expect(onMove.mock.calls).toEqual([[card('E-001'), 'done']]);
   });
 
   it('refuses to continue a run whose skill has been deleted, and says so', async () => {

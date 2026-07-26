@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { RunRecord } from '../api';
 import { renderMarkdown } from '../markdown';
+import { needsAttention } from '../runs/viewmodel';
 import type { Card, ProjectConfig } from '../shared';
 import { slugify } from '../viewmodel';
 import { ReportOptions } from './ReportOptions';
@@ -15,6 +16,9 @@ interface Props {
   onOpenCard: (card: Card) => void;
   // Moving the card is the user's click, never a consequence of the run finishing.
   onMove: (columnSlug: string) => void;
+  // Ignore and close: the run is dealt with AND the card moves. One click, two facts, because
+  // "I am not acting on this" is a decision about the run as much as about the card.
+  onClose: (columnSlug: string) => void;
   onBack: () => void;
   // Continue from this run: opens the details step carrying this record as `previous`, so the agent
   // gets the report it is following on from.
@@ -31,6 +35,7 @@ export function ReportPane({
   createdCards,
   onOpenCard,
   onMove,
+  onClose,
   onBack,
   onContinue,
   canContinue,
@@ -77,6 +82,13 @@ export function ReportPane({
             <dd>{record.attached.join(', ')}</dd>
           </div>
         )}
+        {/* Shown for what it is: the run still reads as `attention`, and this is the answer to it. */}
+        {record.resolved && (
+          <div>
+            <dt>Dealt with</dt>
+            <dd>{record.resolved.replace('T', ' ').slice(0, 19)}</dd>
+          </div>
+        )}
       </dl>
 
       {record.summary && <p className="report-lead">{record.summary}</p>}
@@ -111,16 +123,18 @@ export function ReportPane({
         </div>
       )}
 
-      {/* A run that needs attention gets options; one that succeeded gets a move. Both are the
-          user's click — nothing here happens because a run ended. */}
-      {(record.status === 'attention' || record.status === 'failed') && (
+      {/* A run still waiting on someone gets options; one that succeeded gets a move. Both are the
+          user's click — nothing here happens because a run ended. `needsAttention` rather than a
+          status list: it also covers an interrupted run, which until now had no button anywhere, and
+          it drops the options once the run has been dealt with. */}
+      {needsAttention(record) && (
         <ReportOptions
           options={record.options ?? []}
           cardId={record.card}
           columns={columns.map((name) => ({ slug: slugify(name), name }))}
           currentColumn={card.columnSlug}
           onContinue={onContinue}
-          onClose={onMove}
+          onClose={onClose}
           canContinue={canContinue}
         />
       )}

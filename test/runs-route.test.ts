@@ -276,6 +276,75 @@ describe('POST /api/runs/:run/cancel', () => {
   });
 });
 
+describe('POST /api/runs/:board/:card/:run/resolve', () => {
+  // A run that ended needing a decision asked for ever before this: status is written once, so
+  // nothing could ever say "answered". This is the write that says it.
+  const asking = (card: string): RunRecord => ({
+    run: 'r-asking',
+    card,
+    board: 'engineering',
+    skill: 'execute',
+    status: 'attention',
+    started: '2026-07-26T21:00:00.000Z',
+    backend: 'opencode',
+    model: 'nemotron',
+    effort: 'max',
+    mode: 'build',
+    report: 'three cards, not one',
+  });
+
+  it('stamps the run and answers with the record as it now reads', async () => {
+    const project = await projectWithCard();
+    await writeRun(project.root, asking(project.card));
+    const res = await project.app.inject({
+      method: 'POST',
+      url: `/api/runs/engineering/${project.card}/r-asking/resolve`,
+    });
+    expect(res.statusCode).toBe(200);
+    const { run } = res.json() as { run: RunRecord };
+    expect(run.resolved).toBeTruthy();
+    // The status is untouched: how it ended is not what the user decided about it.
+    expect(run.status).toBe('attention');
+    expect((await readRun(project.root, 'engineering', project.card, 'r-asking'))?.resolved).toBeTruthy();
+  });
+
+  it('is idempotent — two clicks are one decision', async () => {
+    const project = await projectWithCard();
+    await writeRun(project.root, asking(project.card));
+    const url = `/api/runs/engineering/${project.card}/r-asking/resolve`;
+    const first = (await project.app.inject({ method: 'POST', url })).json() as { run: RunRecord };
+    const second = (await project.app.inject({ method: 'POST', url })).json() as { run: RunRecord };
+    expect(second.run.resolved).toBe(first.run.resolved);
+  });
+
+  it('404s for a run that does not exist', async () => {
+    const project = await projectWithCard();
+    const res = await project.app.inject({
+      method: 'POST',
+      url: `/api/runs/engineering/${project.card}/nope/resolve`,
+    });
+    expect(res.statusCode).toBe(404);
+    expect(res.json()).toEqual({ error: 'No such run' });
+  });
+
+  it('400s for a board that is not one', async () => {
+    const project = await projectWithCard();
+    const res = await project.app.inject({
+      method: 'POST',
+      url: `/api/runs/nonsense/${project.card}/r-asking/resolve`,
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json()).toEqual({ error: 'Unknown board' });
+  });
+
+  it('refuses with 409 when no project is open', async () => {
+    const app = buildApp(new ProjectSession());
+    const res = await app.inject({ method: 'POST', url: '/api/runs/engineering/E-001/r/resolve' });
+    expect(res.statusCode).toBe(409);
+    await app.close();
+  });
+});
+
 describe('run updates over the socket', () => {
   it('pushes every status change, so the UI needs no polling', async () => {
     const project = await projectWithCard();

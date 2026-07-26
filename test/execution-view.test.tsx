@@ -44,6 +44,7 @@ const props = {
   now: Date.parse('2026-07-26T14:31:00.000Z'),
   onOpenCard: vi.fn(),
   onCancel: vi.fn(),
+  onResolve: vi.fn(),
 };
 
 const column = (label: string): HTMLElement => screen.getByLabelText(label);
@@ -122,6 +123,49 @@ describe('ExecutionView', () => {
     render(<ExecutionView {...props} active={['a']} runs={[record]} onCancel={onCancel} />);
     fireEvent.click(screen.getByText('Stop'));
     expect(onCancel.mock.calls).toEqual([[record]]);
+  });
+
+  it('files a run that has been dealt with under Done, not under attention', () => {
+    // The bug: an attention run stayed in this column for ever, because a status is written once.
+    render(
+      <ExecutionView
+        {...props}
+        runs={[
+          run({ run: 'answered', status: 'attention', resolved: '2026-07-26T21:30:00.000Z' }),
+          run({ run: 'waiting', status: 'attention' }),
+        ]}
+      />,
+    );
+    expect(column('Requires attention').querySelectorAll('.exec-run')).toHaveLength(1);
+    expect(column('Done').querySelectorAll('.exec-run')).toHaveLength(1);
+  });
+
+  it('offers Dismiss for whatever is still waiting, and nothing else', () => {
+    // Including an interrupted run, which has no options anywhere else and would otherwise hold the
+    // badge for ever. Not offered in the other two columns: there is nothing to decide.
+    render(
+      <ExecutionView
+        {...props}
+        active={['a']}
+        runs={[
+          run({ run: 'a', status: 'running' }),
+          run({ run: 'b', status: 'attention' }),
+          run({ run: 'c', status: 'interrupted' }),
+          run({ run: 'd', status: 'success' }),
+          run({ run: 'e', status: 'attention', resolved: '2026-07-26T21:30:00.000Z' }),
+        ]}
+      />,
+    );
+    expect(document.querySelectorAll('.report-dismiss')).toHaveLength(2);
+    expect(column('Requires attention').querySelectorAll('.report-dismiss')).toHaveLength(2);
+  });
+
+  it('dismisses the run it was asked to dismiss', () => {
+    const onResolve = vi.fn();
+    const record = run({ run: 'b', status: 'attention' });
+    render(<ExecutionView {...props} runs={[record]} onResolve={onResolve} />);
+    fireEvent.click(screen.getByText('Dismiss'));
+    expect(onResolve.mock.calls).toEqual([[record]]);
   });
 
   it('shows the agent’s summary, or VibeBoard’s note when there is none', () => {

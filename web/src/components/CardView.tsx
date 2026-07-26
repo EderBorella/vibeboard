@@ -1,71 +1,103 @@
 import { renderMarkdown } from '../markdown';
-import { BOARD_LABELS, type Card, type ProjectConfig } from '../shared';
-import { cardPlace, linkedCards } from '../viewmodel';
+import { BOARD_LABELS, type Card, type CardFrontmatterPatch, type ProjectConfig } from '../shared';
+import { cardPlace, csv, parseCsv } from '../viewmodel';
+import { CardLinks } from './CardLinks';
+import { InlineField } from './InlineField';
 
 interface Props {
   card: Card;
   config: ProjectConfig;
   allCards: Card[];
-  // Opens a linked card. Without it the links stay plain rows — nothing in the archive drawer's
-  // future or a preview pane should promise navigation it cannot perform.
+  // Opens a linked card. Without it the links stay plain rows rather than promising navigation
+  // that cannot happen.
   onOpenCard?: (card: Card) => void;
+  // Commits one field. Absent for an archived card: the patch would succeed on disk, but archived
+  // cards are not in the snapshot, so the pane could never show the result.
+  onPatch?: (patch: CardFrontmatterPatch) => void;
+  onLinks?: (links: string[]) => void;
 }
 
-// The card as a reader sees it: the frontmatter as chrome, the body as rendered markdown, and no
-// control that could change anything. The editing surfaces are the Form and Raw tabs.
-export function CardView({ card, config, allCards, onOpenCard }: Props) {
-  const linked = linkedCards(allCards, card.links);
+// The card as a reader sees it, and — where a patch handler is given — as an editor does: every
+// field is click-to-edit in place, committing on its own rather than through a form and a Save.
+export function CardView({ card, config, allCards, onOpenCard, onPatch, onLinks }: Props) {
+  const field = (
+    key: keyof CardFrontmatterPatch & ('title' | 'description' | 'group'),
+    label: string,
+    placeholder: string,
+    className: string,
+  ) =>
+    onPatch ? (
+      <InlineField
+        value={card[key] ?? ''}
+        label={label}
+        placeholder={placeholder}
+        className={className}
+        required={key === 'title'}
+        onCommit={(value) => onPatch({ [key]: value })}
+      />
+    ) : null;
 
   return (
     <article className="cardview">
-      <h2 className="cv-title">{card.title}</h2>
+      {onPatch ? field('title', 'title', 'Untitled', 'cv-title') : <h2 className="cv-title">{card.title}</h2>}
 
       <div className="cv-meta">
         <span className="cv-crumb">
           {BOARD_LABELS[card.board]} › {cardPlace(config, card)}
         </span>
         <span className="cv-created">Created {card.created}</span>
-        {card.group && <span className="cv-group">{card.group}</span>}
+        {onPatch
+          ? field('group', 'group', '+ group', 'cv-group')
+          : card.group && <span className="cv-group">{card.group}</span>}
       </div>
 
-      {card.tags.length > 0 && (
-        <div className="cv-tags">
-          {card.tags.map((t) => (
-            <span key={t} className="tag">
-              {t}
+      {onPatch ? (
+        <InlineField
+          value={csv(card.tags)}
+          label="tags"
+          placeholder="+ tags"
+          className="cv-tags-edit"
+          display={(value) => (
+            <span className="cv-tags">
+              {parseCsv(value).map((t) => (
+                <span key={t} className="tag">
+                  {t}
+                </span>
+              ))}
             </span>
-          ))}
-        </div>
-      )}
-
-      {card.description && <p className="cv-desc">{card.description}</p>}
-
-      {linked.length > 0 && (
-        <div className="cv-links">
-          <div className="cv-label">Linked cards</div>
-          {linked.map((c) =>
-            onOpenCard ? (
-              <button
-                key={c.id}
-                type="button"
-                className="cv-link cv-link-btn"
-                title={`Open ${c.id}`}
-                onClick={() => onOpenCard(c)}
-              >
-                <span className="link-id">{c.id}</span>
-                <span className="link-title">{c.title}</span>
-              </button>
-            ) : (
-              <div key={c.id} className="cv-link">
-                <span className="link-id">{c.id}</span>
-                <span className="link-title">{c.title}</span>
-              </div>
-            ),
           )}
-        </div>
+          onCommit={(value) => onPatch({ tags: parseCsv(value) })}
+        />
+      ) : (
+        card.tags.length > 0 && (
+          <div className="cv-tags">
+            {card.tags.map((t) => (
+              <span key={t} className="tag">
+                {t}
+              </span>
+            ))}
+          </div>
+        )
       )}
 
-      {card.body.trim() ? (
+      {onPatch
+        ? field('description', 'description', '+ description', 'cv-desc')
+        : card.description && <p className="cv-desc">{card.description}</p>}
+
+      <CardLinks card={card} allCards={allCards} onOpenCard={onOpenCard} onLinks={onLinks} />
+
+      {onPatch ? (
+        <InlineField
+          value={card.body}
+          label="body"
+          placeholder="+ body"
+          className="cv-body markdown"
+          multiline
+          rows={10}
+          display={(value) => <>{renderMarkdown(value)}</>}
+          onCommit={(body) => onPatch({ body })}
+        />
+      ) : card.body.trim() ? (
         <div className="markdown cv-body">{renderMarkdown(card.body)}</div>
       ) : (
         <div className="cv-nobody">No body yet.</div>

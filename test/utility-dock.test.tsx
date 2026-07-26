@@ -11,7 +11,6 @@ afterEach(cleanup);
 const pane = (id: string, over: Partial<DockPane> = {}): DockPane => ({
   id,
   label: id.toUpperCase(),
-  hasContent: true,
   render: () => <div data-testid={`body-${id}`}>{id} body</div>,
   ...over,
 });
@@ -24,24 +23,17 @@ const props = {
 };
 
 describe('UtilityDock', () => {
-  it('renders a tab per pane with content and mounts only the active body', () => {
+  it('renders a tab per pane and mounts only the active body', () => {
     render(<UtilityDock {...props} panes={[pane('cards'), pane('terminal')]} activeId="cards" />);
     expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual(['CARDS', 'TERMINAL']);
     expect(screen.getByTestId('body-cards')).toBeTruthy();
     expect(screen.queryByTestId('body-terminal')).toBeNull();
   });
 
-  it('renders nothing at all when no pane has content', () => {
+  it('renders nothing at all with no panes', () => {
     // An empty strip would cost the boards a row of height for chrome that can do nothing.
-    const { container } = render(
-      <UtilityDock {...props} panes={[pane('cards', { hasContent: false })]} />,
-    );
+    const { container } = render(<UtilityDock {...props} panes={[]} />);
     expect(container.innerHTML).toBe('');
-  });
-
-  it('leaves a pane with no content out of the strip', () => {
-    render(<UtilityDock {...props} panes={[pane('cards'), pane('terminal', { hasContent: false })]} />);
-    expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual(['CARDS']);
   });
 
   it('marks the active tab and reports a click on another', () => {

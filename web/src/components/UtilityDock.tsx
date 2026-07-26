@@ -1,4 +1,4 @@
-import { activePane, type DockPane, visiblePanes } from '../dock/panes';
+import { activePane, type DockPane } from '../dock/panes';
 
 interface Props {
   panes: DockPane[];
@@ -11,15 +11,14 @@ interface Props {
 // The dock below the work area: a strip of pane tabs, a collapse toggle, and the active pane's
 // body. It carries no knowledge of any particular pane — see dock/panes.ts.
 export function UtilityDock({ panes, activeId, onPane, collapsed, onCollapse }: Props) {
-  const visible = visiblePanes(panes);
   const active = activePane(panes, activeId);
-  // Nothing to show: no empty bar taking a row of height off the boards.
+  // No panes at all: no empty bar taking a row of height off the boards.
   if (!active) return null;
 
   return (
     <section className="dock" aria-label="Utilities">
       <div className="dock-strip" role="tablist">
-        {visible.map((p) => (
+        {panes.map((p) => (
           <button
             key={p.id}
             type="button"
@@ -47,7 +46,7 @@ export function UtilityDock({ panes, activeId, onPane, collapsed, onCollapse }: 
           dock away as well as switching pane. `.dock-body[hidden]` is spelled out in the CSS: the
           UA rule for [hidden] loses to any display declaration. */}
       <div className="dock-body" hidden={collapsed}>
-        {visible
+        {panes
           .filter((p) => p.id === active.id || p.keepMounted)
           .map((p) => (
             <div key={p.id} className="dock-pane" hidden={p.id !== active.id}>

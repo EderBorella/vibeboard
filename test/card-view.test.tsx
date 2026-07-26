@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CardView } from '../web/src/components/CardView.js';
 import type { Card, ProjectConfig } from '../web/src/shared.js';
@@ -145,5 +145,102 @@ describe('CardView', () => {
       />,
     );
     expect(screen.getByText('Product › Archived · from Backlog')).toBeTruthy();
+  });
+});
+
+// The editable surface: with a patch handler every field is click-to-edit and commits on its own.
+describe('CardView editing', () => {
+  const editable = (over: Partial<Card> = {}, onPatch = vi.fn()) => ({
+    onPatch,
+    ...render(<CardView card={card(over)} config={config} allCards={[]} onPatch={onPatch} />),
+  });
+
+  it.each([
+    ['title', 'cv-title', 'a new title', { title: 'a new title' }],
+    ['description', 'cv-desc', 'a summary', { description: 'a summary' }],
+    ['group', 'cv-group', 'Platform', { group: 'Platform' }],
+    ['body', 'cv-body', 'new body', { body: 'new body' }],
+  ])('commits %s on its own, patching only that field', (label, _cls, typed, patch) => {
+    const onPatch = vi.fn();
+    editable({ title: 'old', description: 'old', group: 'old', body: 'old' }, onPatch);
+    fireEvent.click(screen.getByTitle(`Edit ${label}`));
+    fireEvent.change(screen.getByLabelText(label), { target: { value: typed } });
+    fireEvent.blur(screen.getByLabelText(label));
+    expect(onPatch.mock.calls).toEqual([[patch]]);
+  });
+
+  it('commits tags as a parsed list, not as the line that was typed', () => {
+    const onPatch = vi.fn();
+    editable({ tags: ['ui'] }, onPatch);
+    fireEvent.click(screen.getByTitle('Edit tags'));
+    fireEvent.change(screen.getByLabelText('tags'), { target: { value: 'ui, bug,' } });
+    fireEvent.blur(screen.getByLabelText('tags'));
+    expect(onPatch.mock.calls).toEqual([[{ tags: ['ui', 'bug'] }]]);
+  });
+
+  it('shows tags as chips and the body as markdown while not editing', () => {
+    const { container } = editable({ tags: ['ui', 'bug'], body: '## Plan' });
+    expect([...container.querySelectorAll('.cv-tags .tag')].map((t) => t.textContent)).toEqual([
+      'ui',
+      'bug',
+    ]);
+    expect(container.querySelector('.cv-body h2')?.textContent).toBe('Plan');
+  });
+
+  it('offers every empty field as something to click', () => {
+    editable({ title: 'kept', description: undefined, group: undefined, tags: [], body: '' });
+    expect(screen.getByTitle('Edit description').textContent).toBe('+ description');
+    expect(screen.getByTitle('Edit group').textContent).toBe('+ group');
+    expect(screen.getByTitle('Edit tags').textContent).toBe('+ tags');
+    expect(screen.getByTitle('Edit body').textContent).toBe('+ body');
+  });
+
+  it('has no editable field at all without a patch handler', () => {
+    // The archived case: the pane cannot show the result of a patch, so it offers none.
+    const { container } = render(
+      <CardView card={card({ title: 'archived' })} config={config} allCards={[]} />,
+    );
+    expect(container.querySelectorAll('.inline-view')).toHaveLength(0);
+    expect(container.querySelector('.cv-title')?.tagName).toBe('H2');
+  });
+});
+
+describe('CardView field wiring', () => {
+  const patchOf = (over: Partial<Card>, label: string, typed: string) => {
+    const onPatch = vi.fn();
+    render(<CardView card={card(over)} config={config} allCards={[]} onPatch={onPatch} />);
+    fireEvent.click(screen.getByTitle(`Edit ${label}`));
+    fireEvent.change(screen.getByLabelText(label), { target: { value: typed } });
+    fireEvent.blur(screen.getByLabelText(label));
+    return onPatch;
+  };
+
+  it('refuses to empty the title but allows emptying the others', () => {
+    // Only the title is required — a card with no name is unfindable everywhere it is listed.
+    expect(patchOf({ title: 'kept' }, 'title', '   ')).not.toHaveBeenCalled();
+    cleanup();
+    expect(patchOf({ description: 'gone' }, 'description', '').mock.calls).toEqual([
+      [{ description: '' }],
+    ]);
+  });
+
+  it('names each empty field by what it would add', () => {
+    render(<CardView card={card({ title: '' })} config={config} allCards={[]} onPatch={vi.fn()} />);
+    expect(screen.getByTitle('Edit title').textContent).toBe('Untitled');
+  });
+
+  it('keeps the display classes the theme styles the fields by', () => {
+    const { container } = render(
+      <CardView
+        card={card({ group: 'Platform', description: 'a summary' })}
+        config={config}
+        allCards={[]}
+        onPatch={vi.fn()}
+      />,
+    );
+    expect(container.querySelector('.cv-title.inline-view')).toBeTruthy();
+    expect(container.querySelector('.cv-group.inline-view')).toBeTruthy();
+    expect(container.querySelector('.cv-desc.inline-view')).toBeTruthy();
+    expect(container.querySelector('.cv-body.inline-view')).toBeTruthy();
   });
 });

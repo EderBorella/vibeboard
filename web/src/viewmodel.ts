@@ -53,6 +53,20 @@ export function linkedCards(all: Card[], ids: readonly string[]): Card[] {
   return ids.map((id) => all.find((c) => c.id === id)).filter((c): c is Card => c !== undefined);
 }
 
+// A list of values as one comma-separated line, and back. Blank entries are dropped, so a trailing
+// comma while typing does not become an empty tag. Duplicates are left alone: tagCounts is what
+// decides a card counts once per tag.
+export function csv(values: string[]): string {
+  return values.join(', ');
+}
+
+export function parseCsv(text: string): string[] {
+  return text
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
 export interface TagCount {
   tag: string;
   count: number;

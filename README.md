@@ -137,7 +137,8 @@ expose it to the public internet.
   than in a modal, so the boards and the copilot stay usable, and a card's links
   are clickable — following one opens it as another tab. Collapsible, and built to
   host other tools (a terminal) as further panes
-- Card editor with a friendly form **and** a raw-markdown toggle
+- **Click any field to edit it**, in place, committing on its own — no form, no
+  Save button. `Raw` in the dock swaps the card for its file, frontmatter and all
 - **Tag filter** across all three boards at once: click a tag on a card or a chip
   in the bar, and each further tag narrows the boards to cards carrying all of them
 - Symmetric card links across any pair of boards

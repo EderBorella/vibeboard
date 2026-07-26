@@ -359,12 +359,6 @@ body {
 }
 .modal-head { display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); }
 .modal-title { font-weight: 600; font-family: var(--font-display); letter-spacing: 0.04em; }
-.modal-tabs { margin-left: auto; display: flex; gap: 0.25rem; }
-.modal-tabs button {
-  background: transparent; border: 1px solid transparent; color: var(--muted);
-  border-radius: 6px; padding: 0.2rem 0.6rem; cursor: pointer; font-size: 0.8rem;
-}
-.modal-tabs button.active { color: var(--text); background: var(--panel-2); border-color: var(--border); }
 .modal-close { background: transparent; border: none; color: var(--muted); cursor: pointer; font-size: 0.95rem; }
 .modal-body { padding: 1rem; overflow-y: auto; display: flex; flex-direction: column; gap: 0.7rem; }
 .field { display: flex; flex-direction: column; gap: 0.3rem; }
@@ -576,6 +570,45 @@ body {
 .cards-edit:hover { border-color: var(--accent); color: var(--accent); }
 .cards-body { flex: 1; overflow-y: auto; padding: 0.7rem 1rem; }
 .cards-gone { color: var(--muted); font-size: 0.82rem; font-style: italic; padding: 1rem 0; }
+
+/* Inline editing: a field looks like text until hovered, and becomes an input on click. */
+.inline-view {
+  background: transparent; border: 1px solid transparent; border-radius: 6px;
+  color: inherit; font: inherit; text-align: left; cursor: text;
+  padding: 0.1rem 0.35rem; margin: -0.1rem -0.35rem; width: 100%;
+  display: block;
+}
+.inline-view:hover { border-color: var(--border); background: var(--bg); }
+.inline-empty { color: var(--muted); font-style: italic; font-size: 0.8rem; }
+.inline-edit {
+  width: 100%; background: var(--bg); color: var(--text);
+  border: 1px solid var(--accent); border-radius: 6px;
+  padding: 0.1rem 0.35rem; font: inherit; font-family: inherit; resize: vertical;
+}
+.inline-edit:focus { outline: none; }
+/* The title keeps its display face while editable. */
+.cv-title.inline-view, .cv-title.inline-edit { font-family: var(--font-display); font-size: 1.25rem; }
+.cv-group.inline-view { width: auto; display: inline-block; }
+.cv-tags-edit { min-height: 1.4rem; }
+.cv-links .cv-label { display: flex; align-items: center; gap: 0.5rem; }
+.cv-link-edit {
+  background: transparent; border: none; color: var(--muted);
+  cursor: pointer; font-size: 0.7rem; text-decoration: underline; padding: 0;
+}
+.cv-link-edit:hover { color: var(--accent); }
+
+/* Raw pane (the card's file, inside the dock) */
+.raw-pane { flex: 1; display: flex; flex-direction: column; gap: 0.4rem; min-height: 0; }
+.raw-pane .raw-area { flex: 1; min-height: 8rem; }
+.raw-foot { display: flex; align-items: center; justify-content: flex-end; gap: 0.6rem; }
+.raw-error { color: var(--danger); font-size: 0.78rem; margin-right: auto; }
+.cards-raw {
+  margin-left: auto; flex: 0 0 auto;
+  background: var(--panel-2); color: var(--text); border: 1px solid var(--border);
+  border-radius: 6px; padding: 0.18rem 0.7rem; cursor: pointer; font-size: 0.76rem;
+}
+.cards-raw:hover { border-color: var(--accent); color: var(--accent); }
+.cards-raw.active { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
 
 /* ---------- Copilot dock (shrink side-by-side) ---------- */
 .copilot {

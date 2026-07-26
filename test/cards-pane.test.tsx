@@ -1,7 +1,14 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { CardsPane } from '../web/src/components/CardsPane.js';
+const api = vi.hoisted(() => ({
+  getRaw: vi.fn(async () => 'file of the active card'),
+  putRaw: vi.fn(async () => undefined),
+}));
+vi.mock('../web/src/api.js', () => api);
+vi.mock('../web/src/api', () => api);
+
+const { CardsPane } = await import('../web/src/components/CardsPane.js');
 import type { CardRef } from '../web/src/dock/tabs.js';
 import type { Card, ProjectConfig } from '../web/src/shared.js';
 
@@ -41,8 +48,9 @@ const ref = (id: string): CardRef => ({ board: 'engineering', id });
 const props = {
   onFocus: vi.fn(),
   onClose: vi.fn(),
-  onEdit: vi.fn(),
   onOpenCard: vi.fn(),
+  onPatch: vi.fn(),
+  onLinks: vi.fn(),
   config,
 };
 
@@ -163,16 +171,84 @@ describe('CardsPane', () => {
     expect(onOpenCard.mock.calls).toEqual([[linked]]);
   });
 
-  it('offers Edit for the active card, and not when there is nothing to edit', () => {
-    const onEdit = vi.fn();
+  it('offers the Raw toggle for the active card, and not when there is no card', () => {
     const live = [card('E-001')];
     const { rerender } = render(
-      <CardsPane {...props} onEdit={onEdit} tabs={[ref('E-001')]} activeId="E-001" live={live} />,
+      <CardsPane {...props} tabs={[ref('E-001')]} activeId="E-001" live={live} />,
     );
-    screen.getByText('Edit').click();
-    expect(onEdit.mock.calls).toEqual([[live[0]]]);
+    const toggle = screen.getByText('Raw');
+    expect(toggle.getAttribute('aria-pressed')).toBe('false');
+    expect(toggle.className).toBe('cards-raw');
 
-    rerender(<CardsPane {...props} onEdit={onEdit} tabs={[ref('E-009')]} activeId="E-009" live={live} />);
-    expect(screen.queryByText('Edit')).toBeNull();
+    rerender(<CardsPane {...props} tabs={[]} activeId={null} live={live} />);
+    expect(screen.queryByText('Raw')).toBeNull();
   });
+
+  it('swaps the card view for its file, and back again', async () => {
+    const { container } = render(
+      <CardsPane {...props} tabs={[ref('E-001')]} activeId="E-001" live={[card('E-001')]} />,
+    );
+    expect(container.querySelector('.cardview')).toBeTruthy();
+
+    await act(async () => {
+      fireEvent.click(screen.getByText('Raw'));
+    });
+    expect(screen.getByText('Raw').className).toBe('cards-raw active');
+    expect(screen.getByText('Raw').getAttribute('aria-pressed')).toBe('true');
+    expect(container.querySelector('.cardview')).toBeNull();
+    expect((screen.getByLabelText('card file') as HTMLTextAreaElement).value).toBe(
+      'file of the active card',
+    );
+
+    await act(async () => {
+      fireEvent.click(screen.getByText('Raw'));
+    });
+    expect(container.querySelector('.cardview')).toBeTruthy();
+    expect(screen.queryByLabelText('card file')).toBeNull();
+  });
+
+  it('reports an inline edit against the card it belongs to', () => {
+    const onPatch = vi.fn();
+    const live = [card('E-001')];
+    render(
+      <CardsPane {...props} onPatch={onPatch} tabs={[ref('E-001')]} activeId="E-001" live={live} />,
+    );
+    fireEvent.click(screen.getByTitle('Edit title'));
+    fireEvent.change(screen.getByLabelText('title'), { target: { value: 'renamed' } });
+    fireEvent.blur(screen.getByLabelText('title'));
+    expect(onPatch.mock.calls).toEqual([[live[0], { title: 'renamed' }]]);
+  });
+
+  it('reports a link change against the card it belongs to', () => {
+    const onLinks = vi.fn();
+    const live = [card('E-001'), card('E-002')];
+    render(
+      <CardsPane {...props} onLinks={onLinks} tabs={[ref('E-001')]} activeId="E-001" live={live} />,
+    );
+    fireEvent.click(screen.getByText('Change'));
+    fireEvent.click(screen.getByText('E-002').closest('label')?.querySelector('input') as HTMLElement);
+    expect(onLinks.mock.calls).toEqual([[live[0], ['E-002']]]);
+  });
+
+  it('edits a live card in place, and refuses to for an archived one', () => {
+    // An archived card is not in the snapshot, so a patch would land on disk with nothing able to
+    // show it — the pane offers no editing rather than lying about it.
+    const live = [card('E-001')];
+    const { container, rerender } = render(
+      <CardsPane {...props} tabs={[ref('E-001')]} activeId="E-001" live={live} />,
+    );
+    expect(container.querySelector('.inline-view')).toBeTruthy();
+
+    const frozen = card('E-009', { archived: '2026-07-26T10:00:00Z' });
+    rerender(
+      <CardsPane
+        {...props}
+        tabs={[{ board: 'engineering', id: 'E-009', frozen }]}
+        activeId="E-009"
+        live={[]}
+      />,
+    );
+    expect(container.querySelector('.inline-view')).toBeNull();
+  });
+
 });

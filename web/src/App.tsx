@@ -1,7 +1,6 @@
 import { type ReactNode, useEffect, useRef, useState } from 'react';
-import { archiveCard, getState, placeCard } from './api';
+import { archiveCard, createCard, getState, patchCard, placeCard, setLinks } from './api';
 import { Board } from './components/Board';
-import { CardEditor, type EditorState } from './components/CardEditor';
 import { CardsPane } from './components/CardsPane';
 import { ProjectControl } from './components/ProjectControl';
 import { ProjectGate } from './components/ProjectGate';
@@ -13,7 +12,14 @@ import { CopilotPanel } from './copilot/CopilotPanel';
 import { type CopilotMode, useCopilot } from './copilot/useCopilot';
 import type { DockPane } from './dock/panes';
 import { useCardTabs } from './dock/useCardTabs';
-import { BOARD_LABELS, BOARDS, type BoardName, type Card, DEFAULT_CONTEXT_BUDGET } from './shared';
+import {
+  BOARD_LABELS,
+  BOARDS,
+  type BoardName,
+  type Card,
+  type CardFrontmatterPatch,
+  DEFAULT_CONTEXT_BUDGET,
+} from './shared';
 import { useCopilotChoice } from './useCopilotChoice';
 import { useCollapsedBoards, useDockCollapsed, useTheme } from './useLocalPrefs';
 import { useSnapshot } from './useSnapshot';
@@ -23,7 +29,6 @@ export function App() {
   const [bump, setBump] = useState(0);
   const [showGate, setShowGate] = useState(false);
   const [ready, setReady] = useState(false);
-  const [editor, setEditor] = useState<EditorState | null>(null);
   const [copilotOpen, setCopilotOpen] = useState(true);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [tab, setTab] = useState<'boards' | 'control'>('boards');
@@ -63,8 +68,18 @@ export function App() {
   const tags = tagCounts(allCards);
   const active = presentTags(activeTags, tags);
 
-  const onAdd = (board: BoardName, columnSlug: string): void =>
-    setEditor({ mode: 'create', board, columnSlug });
+  // Creating a card writes it straight away and docks it, with the title ready to type over.
+  // There is no create dialog: every field is editable in the pane, so a form would only be a
+  // second way to do the same thing.
+  const onAdd = (board: BoardName, columnSlug: string): void => {
+    void createCard({ board, columnSlug, title: 'Untitled' }).then(onOpen);
+  };
+  const onPatch = (card: Card, patch: CardFrontmatterPatch): void => {
+    void patchCard(card.board, card.id, patch);
+  };
+  const onLinks = (card: Card, links: string[]): void => {
+    void setLinks(card.board, card.id, links);
+  };
   // Opening a card docks it instead of covering the app with a modal, so the boards, the copilot
   // and the card stay usable together. Editing is still the modal, reached from the pane.
   const onOpen = (card: Card): void => {
@@ -116,8 +131,8 @@ export function App() {
         {
           id: 'cards',
           label: 'Cards',
-          badge: cards.tabs.length,
-          hasContent: cards.tabs.length > 0,
+          // No badge at zero: "Cards 0" is noise, and the pane says so itself.
+          badge: cards.tabs.length || undefined,
           render: () => (
             <CardsPane
               tabs={cards.tabs}
@@ -126,8 +141,9 @@ export function App() {
               config={snapshot.config}
               onFocus={cards.focus}
               onClose={cards.close}
-              onEdit={(card) => setEditor({ mode: 'edit', card })}
               onOpenCard={onOpen}
+              onPatch={onPatch}
+              onLinks={onLinks}
             />
           ),
         },
@@ -223,17 +239,6 @@ export function App() {
           config={snapshot.config}
           onClose={() => setSettingsOpen(false)}
           onSaved={() => setSettingsOpen(false)}
-        />
-      )}
-
-      {/* snapshot is only ever set, never cleared, so a card cannot be open without one. */}
-      {editor && snapshot && (
-        <CardEditor
-          editor={editor}
-          allCards={allCards}
-          config={snapshot.config}
-          onClose={() => setEditor(null)}
-          onSaved={() => setEditor(null)}
         />
       )}
     </div>

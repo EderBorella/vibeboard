@@ -6,9 +6,11 @@ import {
   cardsByColumn,
   columnLabel,
   columnSlugs,
+  csv,
   filterByTags,
   linkedCards,
   miniature,
+  parseCsv,
   presentTags,
   slugify,
   tagCounts,
@@ -346,5 +348,27 @@ describe('linkedCards', () => {
   it('is empty for no links and for links nothing matches', () => {
     expect(linkedCards(all, [])).toEqual([]);
     expect(linkedCards(all, ['GONE-9'])).toEqual([]);
+  });
+});
+
+describe('csv and parseCsv', () => {
+  it('joins with a comma and a space, and splits back to the same list', () => {
+    expect(csv(['ui', 'bug'])).toBe('ui, bug');
+    expect(parseCsv('ui, bug')).toEqual(['ui', 'bug']);
+  });
+
+  it('drops blank entries, so a trailing comma while typing is not an empty tag', () => {
+    expect(parseCsv('ui, , bug,')).toEqual(['ui', 'bug']);
+    expect(parseCsv('')).toEqual([]);
+    expect(parseCsv('   ')).toEqual([]);
+  });
+
+  it('trims each entry but keeps duplicates', () => {
+    // tagCounts is what decides a card counts once per tag; this is just the text format.
+    expect(parseCsv('  ui ,bug,  ui ')).toEqual(['ui', 'bug', 'ui']);
+  });
+
+  it('renders an empty list as an empty line', () => {
+    expect(csv([])).toBe('');
   });
 });

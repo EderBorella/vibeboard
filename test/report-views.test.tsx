@@ -2,6 +2,7 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { RunRecord } from '../web/src/api.js';
+import { ActiveReport } from '../web/src/components/ActiveReport.js';
 import { CardReports } from '../web/src/components/CardReports.js';
 import { ReportPane } from '../web/src/components/ReportPane.js';
 import type { Card, ProjectConfig } from '../web/src/shared.js';
@@ -146,6 +147,8 @@ describe('ReportPane', () => {
     onOpenCard: vi.fn(),
     onMove: vi.fn(),
     onBack: vi.fn(),
+    onContinue: vi.fn(),
+    canContinue: true,
   };
 
   it('renders the agent’s report as markdown', () => {
@@ -232,6 +235,50 @@ describe('ReportPane', () => {
     expect((screen.getByText('Move card') as HTMLButtonElement).disabled).toBe(true);
   });
 
+  it('offers options, not a move, for a run that needs attention', () => {
+    render(
+      <ReportPane
+        {...props}
+        record={run({ status: 'attention', options: ['Split it in two'], outcome: 'attention' })}
+      />,
+    );
+    expect(screen.getByLabelText('What next')).toBeTruthy();
+    expect(screen.getByText('Split it in two')).toBeTruthy();
+    expect(screen.queryByText('Move card')).toBeNull();
+  });
+
+  it('offers options for a failed run too — it also needs deciding', () => {
+    render(<ReportPane {...props} record={run({ status: 'failed', report: '' })} />);
+    expect(screen.getByLabelText('What next')).toBeTruthy();
+  });
+
+  it('offers neither options nor a move for a run that was stopped', () => {
+    // Nothing to decide: dispatch again when you want to.
+    render(<ReportPane {...props} record={run({ status: 'cancelled', report: '' })} />);
+    expect(screen.queryByLabelText('What next')).toBeNull();
+    expect(screen.queryByText('Move card')).toBeNull();
+  });
+
+  it('passes a chosen option up as the prompt to continue with', () => {
+    const onContinue = vi.fn();
+    render(
+      <ReportPane
+        {...props}
+        onContinue={onContinue}
+        record={run({ status: 'attention', options: ['Do the store only'] })}
+      />,
+    );
+    fireEvent.click(screen.getByText('Do the store only'));
+    expect(onContinue.mock.calls).toEqual([['Do the store only']]);
+  });
+
+  it('closes through the same handler that moves, since closing IS a move', () => {
+    const onMove = vi.fn();
+    render(<ReportPane {...props} onMove={onMove} record={run({ status: 'attention' })} />);
+    fireEvent.click(screen.getByText('Close card'));
+    expect(onMove.mock.calls).toEqual([['done']]);
+  });
+
   it('offers no move at all for a run that did not succeed', () => {
     render(<ReportPane {...props} record={run({ status: 'attention' })} />);
     expect(screen.queryByText('Move card')).toBeNull();
@@ -242,5 +289,69 @@ describe('ReportPane', () => {
     render(<ReportPane {...props} onBack={onBack} record={run()} />);
     fireEvent.click(screen.getByTitle('Back to the card'));
     expect(onBack).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('ActiveReport', () => {
+  const skills = [
+    {
+      slug: 'execute',
+      path: '.claude/skills/execute/SKILL.md',
+      name: 'Execute',
+      description: 'Implement the card',
+      boards: [],
+      columns: [],
+      prompt: 'p',
+    },
+  ];
+  const props = {
+    card: card(),
+    config,
+    live: [card(), card({ id: 'E-041', title: 'Split one' })],
+    skills,
+    onOpenCard: vi.fn(),
+    onMove: vi.fn(),
+    onBack: vi.fn(),
+    onContinue: vi.fn(),
+  };
+
+  it('links only the created ids that resolve against the live board', () => {
+    // An agent can claim a card it never wrote. A dead link would be worse than none, and this is
+    // the only place that filter lives.
+    render(<ActiveReport {...props} record={run({ created: ['E-041', 'E-999'] })} />);
+    // The EXACT set: E-999 was never on the board, but E-010 is — so asserting only that E-999 is
+    // absent would pass just as well if the filter were dropped entirely.
+    expect([...document.querySelectorAll('.report-created .link-id')].map((e) => e.textContent)).toEqual([
+      'E-041',
+    ]);
+  });
+
+  it('links nothing when the run created nothing', () => {
+    render(<ActiveReport {...props} record={run()} />);
+    expect(document.querySelector('.report-created')).toBeNull();
+  });
+
+  it('hands the resolved skill to the continuation', () => {
+    const onContinue = vi.fn();
+    render(
+      <ActiveReport
+        {...props}
+        onContinue={onContinue}
+        record={run({ status: 'attention', options: ['Split it'] })}
+      />,
+    );
+    fireEvent.click(screen.getByText('Split it'));
+    expect(onContinue.mock.calls).toEqual([[skills[0], 'Split it']]);
+  });
+
+  it('cannot continue a run whose skill has gone', () => {
+    render(
+      <ActiveReport
+        {...props}
+        skills={[]}
+        record={run({ status: 'attention', options: ['Split it'] })}
+      />,
+    );
+    expect((screen.getByText('Split it') as HTMLButtonElement).disabled).toBe(true);
   });
 });

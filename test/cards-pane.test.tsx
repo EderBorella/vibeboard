@@ -455,6 +455,101 @@ describe('CardsPane', () => {
     expect(api.listCardRuns.mock.calls[0]).toEqual(['engineering', 'E-002']);
   });
 
+  it('continues an attention report into the details step, carrying the run and the prompt', async () => {
+    // The iteration loop: the option fills the prompt, the record becomes `previous`, and the skill
+    // is looked up from the catalogue by the slug the record names.
+    const skills = [
+      {
+        slug: 'execute',
+        path: '.claude/skills/execute/SKILL.md',
+        name: 'Execute',
+        description: 'Implement the card',
+        boards: [],
+        columns: [],
+        prompt: 'p',
+      },
+    ];
+    api.listCardRuns.mockResolvedValueOnce([
+      {
+        run: '20260726-141000-9f3e',
+        card: 'E-001',
+        board: 'engineering',
+        skill: 'execute',
+        status: 'attention',
+        outcome: 'attention',
+        started: '2026-07-26T14:10:00.000Z',
+        finished: '2026-07-26T14:20:00.000Z',
+        backend: 'claude-code',
+        model: 'opus',
+        effort: 'high',
+        mode: 'bypassPermissions',
+        summary: 'bigger than one card',
+        options: ['Split it in two'],
+        report: '## What I found',
+      },
+    ]);
+    const onRun = vi.fn(async () => {});
+    render(
+      <CardsPane
+        {...props}
+        dispatch={{ ...props.dispatch, onRun }}
+        skills={skills}
+        tabs={[ref('E-001')]}
+        activeId="E-001"
+        live={[card('E-001')]}
+      />,
+    );
+    await waitFor(() => expect(screen.getByText('bigger than one card')).toBeTruthy());
+    await act(async () => {
+      fireEvent.click(document.querySelector('.report-open') as HTMLElement);
+    });
+    fireEvent.click(screen.getByText('Split it in two'));
+
+    expect(screen.getByLabelText('Run Execute on E-001')).toBeTruthy();
+    expect((screen.getByLabelText('Anything to add?') as HTMLTextAreaElement).value).toBe(
+      'Split it in two',
+    );
+    await act(async () => {
+      fireEvent.click(screen.getByText('Run Execute'));
+    });
+    expect((onRun.mock.calls[0] as unknown as [{ previous?: string }])[0].previous).toBe(
+      '20260726-141000-9f3e',
+    );
+  });
+
+  it('refuses to continue a run whose skill has been deleted, and says so', async () => {
+    // Without this the options would be live and the click would silently do nothing, since the
+    // pane cannot build a dispatch without the skill.
+    api.listCardRuns.mockResolvedValueOnce([
+      {
+        run: '20260726-141000-9f3e',
+        card: 'E-001',
+        board: 'engineering',
+        skill: 'deleted-skill',
+        status: 'attention',
+        started: '2026-07-26T14:10:00.000Z',
+        backend: 'claude-code',
+        model: 'opus',
+        effort: 'high',
+        mode: 'bypassPermissions',
+        summary: 'needs a decision',
+        options: ['Do the other thing'],
+        report: 'x',
+      },
+    ]);
+    render(
+      <CardsPane {...props} skills={[]} tabs={[ref('E-001')]} activeId="E-001" live={[card('E-001')]} />,
+    );
+    await waitFor(() => expect(screen.getByText('needs a decision')).toBeTruthy());
+    await act(async () => {
+      fireEvent.click(document.querySelector('.report-open') as HTMLElement);
+    });
+    expect(screen.getByText(/no longer in the project/)).toBeTruthy();
+    expect((screen.getByText('Do the other thing') as HTMLButtonElement).disabled).toBe(true);
+    // Closing the card still works — that needs no skill.
+    expect((screen.getByText('Close card') as HTMLButtonElement).disabled).toBe(false);
+  });
+
   it('edits a live card in place, and refuses to for an archived one', () => {
     // An archived card is not in the snapshot, so a patch would land on disk with nothing able to
     // show it — the pane offers no editing rather than lying about it.

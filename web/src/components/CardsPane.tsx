@@ -1,23 +1,12 @@
 import { useState } from 'react';
-import {
-  cancelRun,
-  type DispatchRequest,
-  type InvalidSkill,
-  type ModelOption,
-  type RunRecord,
-  type Skill,
-} from '../api';
+import type { DispatchRequest, InvalidSkill, ModelOption, RunRecord, Skill } from '../api';
 import type { CardRef } from '../dock/tabs';
 import { resolveTab } from '../dock/tabs';
 import { useCardRuns } from '../runs/useCardRuns';
 import type { Card, CardFrontmatterPatch, ProjectConfig } from '../shared';
-import { CardReports } from './CardReports';
 import { CardSkills } from './CardSkills';
+import { CardsBody } from './CardsBody';
 import { CardTabs } from './CardTabs';
-import { CardView } from './CardView';
-import { DispatchPane } from './DispatchPane';
-import { RawPane } from './RawPane';
-import { ReportPane } from './ReportPane';
 
 // Everything the details step needs, grouped: threading eight more props through the pane would
 // bury the four it has of its own.
@@ -58,7 +47,7 @@ interface Props {
 
 // What the body is showing. A union rather than two booleans: Raw and a dispatch form are mutually
 // exclusive, and two flags would allow a state that means nothing.
-type View =
+export type View =
   | { kind: 'card' }
   | { kind: 'raw' }
   | { kind: 'dispatch'; skill: Skill; previous?: RunRecord; prompt?: string }
@@ -89,7 +78,6 @@ export function CardsPane({
   const card = activeRef ? resolveTab(activeRef, live) : null;
   // An archived card is not in the snapshot, so a patch would land on disk with nothing to show it.
   const editable = card !== null && !card.archived;
-  const toCard = (): void => setView({ kind: 'card' });
   const runs = useCardRuns(card?.board, card?.id, trigger);
   // Resolved by id rather than held as an object: the record changes on disk while the pane is open,
   // and a captured copy would keep showing 'running' after the run finished.
@@ -98,7 +86,10 @@ export function CardsPane({
   // A dispatch that lands returns to the card, where its report will appear; one the server refused
   // keeps the form up with the reason.
   const run = (request: DispatchRequest): void => {
-    void dispatch.onRun(request).then(toCard, () => {});
+    void dispatch.onRun(request).then(
+      () => setView({ kind: 'card' }),
+      () => {},
+    );
   };
 
   return (
@@ -116,62 +107,24 @@ export function CardsPane({
 
       <div className="cards-main">
         <div className="cards-body">
-          {card && view.kind === 'raw' && <RawPane key={card.id} card={card} />}
-          {card && view.kind === 'dispatch' && (
-            <DispatchPane
-              key={`${card.id}:${view.skill.slug}`}
-              skill={view.skill}
-              card={card}
-              defaults={dispatch.defaults}
-              models={dispatch.models}
-              attachable={dispatch.attachable}
-              busy={dispatch.busy}
-              error={dispatch.error}
-              onDispatch={run}
-              onBack={toCard}
-              onBackend={dispatch.onBackend}
-            />
-          )}
-          {card && shown && (
-            <ReportPane
-              record={shown}
-              card={card}
-              config={config}
-              createdCards={live.filter((c) => shown.created?.includes(c.id))}
-              onOpenCard={onOpenCard}
-              onMove={(columnSlug) => {
-                onMove(card, columnSlug);
-                toCard();
-              }}
-              onBack={toCard}
-            />
-          )}
-          {card && view.kind === 'card' && (
-            <>
-              <CardView
-                card={card}
-                config={config}
-                allCards={live}
-                onOpenCard={onOpenCard}
-                onPatch={editable ? (patch) => onPatch(card, patch) : undefined}
-                onLinks={editable ? (links) => onLinks(card, links) : undefined}
-              />
-              <CardReports
-                runs={runs}
-                onOpen={(r) => setView({ kind: 'report', run: r.run })}
-                onCancel={(r) => {
-                  void cancelRun(r.run).catch(() => {});
-                }}
-              />
-            </>
-          )}
-          {!card && (
-            // Either nothing is open, or the card left the board while its tab was — deleted outside
-            // the app, or its file moved. Saying so beats an empty pane that looks broken.
-            <div className="cards-gone">
-              {activeRef ? `${activeRef.id} is no longer on the board.` : 'No card open.'}
-            </div>
-          )}
+          <CardsBody
+            card={card}
+            activeRef={activeRef}
+            view={view}
+            setView={setView}
+            config={config}
+            live={live}
+            runs={runs}
+            shown={shown}
+            skills={skills}
+            editable={editable}
+            dispatch={dispatch}
+            onOpenCard={onOpenCard}
+            onPatch={onPatch}
+            onLinks={onLinks}
+            onMove={onMove}
+            onRun={run}
+          />
         </div>
         {/* Actions belong to a card, so the rail goes when there is none — an empty rail would take
             width off the card for nothing. */}

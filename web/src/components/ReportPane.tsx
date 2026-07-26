@@ -3,6 +3,7 @@ import type { RunRecord } from '../api';
 import { renderMarkdown } from '../markdown';
 import type { Card, ProjectConfig } from '../shared';
 import { slugify } from '../viewmodel';
+import { ReportOptions } from './ReportOptions';
 
 interface Props {
   record: RunRecord;
@@ -15,10 +16,25 @@ interface Props {
   // Moving the card is the user's click, never a consequence of the run finishing.
   onMove: (columnSlug: string) => void;
   onBack: () => void;
+  // Continue from this run: opens the details step carrying this record as `previous`, so the agent
+  // gets the report it is following on from.
+  onContinue: (prompt: string) => void;
+  // False when the skill this run used has since been deleted.
+  canContinue: boolean;
 }
 
 // One run's report: what was dispatched, what came back, and what the user may want to do next.
-export function ReportPane({ record, card, config, createdCards, onOpenCard, onMove, onBack }: Props) {
+export function ReportPane({
+  record,
+  card,
+  config,
+  createdCards,
+  onOpenCard,
+  onMove,
+  onBack,
+  onContinue,
+  canContinue,
+}: Props) {
   const columns = config.boards[card.board].columns;
   // Defaults to a column named Review where the board has one — it does not exist on every board,
   // and guessing another would move a card somewhere nobody asked for.
@@ -93,6 +109,20 @@ export function ReportPane({ record, card, config, createdCards, onOpenCard, onM
             </button>
           ))}
         </div>
+      )}
+
+      {/* A run that needs attention gets options; one that succeeded gets a move. Both are the
+          user's click — nothing here happens because a run ended. */}
+      {(record.status === 'attention' || record.status === 'failed') && (
+        <ReportOptions
+          options={record.options ?? []}
+          cardId={record.card}
+          columns={columns.map((name) => ({ slug: slugify(name), name }))}
+          currentColumn={card.columnSlug}
+          onContinue={onContinue}
+          onClose={onMove}
+          canContinue={canContinue}
+        />
       )}
 
       {record.status === 'success' && (

@@ -927,3 +927,19 @@ body {
 .report-empty { color: var(--muted); font-style: italic; font-size: 0.82rem; }
 .report-created { display: flex; flex-direction: column; gap: 0.2rem; }
 .report-foot { display: flex; align-items: center; justify-content: flex-end; gap: 0.5rem; }
+
+/* Options on a report that needs attention. The agent's suggestions and the fixed ones look the
+   same on purpose — they all lead to the same editable prompt. */
+.options { display: flex; flex-direction: column; gap: 0.3rem; border-top: 1px solid var(--border); padding-top: 0.5rem; }
+.options-head { margin: 0; font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+.options-warn { margin: 0; font-size: 0.76rem; color: var(--danger); }
+.option-btn {
+  text-align: left; background: var(--panel-2); color: var(--text);
+  border: 1px solid var(--border); border-radius: 6px;
+  padding: 0.35rem 0.6rem; font: inherit; font-size: 0.82rem; cursor: pointer;
+}
+.option-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.option-btn:disabled { opacity: 0.45; cursor: default; }
+.option-fixed { border-style: dashed; }
+.options-close { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.2rem; }
+.options-close-label { font-size: 0.78rem; color: var(--muted); margin-right: auto; }

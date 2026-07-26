@@ -15,6 +15,20 @@ export function useTheme(): [string, (t: string) => void] {
   return [theme, setTheme];
 }
 
+// Utility dock folded away, persisted. Distinct from the dock having no pane with content, which
+// removes it entirely — this is the user having chosen to fold it.
+export function useDockCollapsed(): [boolean, () => void] {
+  const [collapsed, setCollapsed] = useState<boolean>(
+    () => localStorage.getItem('vb-dock-collapsed') === '1',
+  );
+  const toggle = (): void =>
+    setCollapsed((prev) => {
+      localStorage.setItem('vb-dock-collapsed', prev ? '0' : '1');
+      return !prev;
+    });
+  return [collapsed, toggle];
+}
+
 // Collapsed boards, persisted.
 export function useCollapsedBoards(): [Set<BoardName>, (b: BoardName) => void] {
   const [collapsed, setCollapsed] = useState<Set<BoardName>>(() => {

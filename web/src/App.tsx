@@ -2,16 +2,20 @@ import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { archiveCard, getState, placeCard } from './api';
 import { Board } from './components/Board';
 import { CardEditor, type EditorState } from './components/CardEditor';
+import { CardsPane } from './components/CardsPane';
 import { ProjectControl } from './components/ProjectControl';
 import { ProjectGate } from './components/ProjectGate';
 import { SettingsModal } from './components/SettingsModal';
 import { TagFilter } from './components/TagFilter';
 import { TopBar } from './components/TopBar';
+import { UtilityDock } from './components/UtilityDock';
 import { CopilotPanel } from './copilot/CopilotPanel';
 import { type CopilotMode, useCopilot } from './copilot/useCopilot';
+import type { DockPane } from './dock/panes';
+import { useCardTabs } from './dock/useCardTabs';
 import { BOARD_LABELS, BOARDS, type BoardName, type Card, DEFAULT_CONTEXT_BUDGET } from './shared';
 import { useCopilotChoice } from './useCopilotChoice';
-import { useCollapsedBoards, useTheme } from './useLocalPrefs';
+import { useCollapsedBoards, useDockCollapsed, useTheme } from './useLocalPrefs';
 import { useSnapshot } from './useSnapshot';
 import { canPlace, filterByTags, presentTags, tagCounts, toggleTag } from './viewmodel';
 
@@ -26,6 +30,10 @@ export function App() {
   // Tag filter: one filter across all three boards, and deliberately NOT persisted — a filter
   // restored on the next load reads as cards having gone missing.
   const [activeTags, setActiveTags] = useState<string[]>([]);
+  // Open cards, one dock tab each. The state lives in its own hook so it is testable without
+  // mounting the shell — see dock/useCardTabs.ts.
+  const cards = useCardTabs();
+  const [dockPane, setDockPane] = useState<string | null>(null);
   const dragged = useRef<Card | null>(null);
   const { snapshot, conn } = useSnapshot(bump);
 
@@ -47,10 +55,22 @@ export function App() {
 
   const [theme, setTheme] = useTheme();
   const [collapsed, toggleBoard] = useCollapsedBoards();
+  const [dockCollapsed, toggleDock] = useDockCollapsed();
+
+  const allCards = snapshot ? BOARDS.flatMap((b) => snapshot.boards[b] ?? []) : [];
+  // Chips come from every card, not the filtered set, so the bar does not shrink out from under
+  // the pointer as you narrow — the counts stay absolute for the same reason.
+  const tags = tagCounts(allCards);
+  const active = presentTags(activeTags, tags);
 
   const onAdd = (board: BoardName, columnSlug: string): void =>
     setEditor({ mode: 'create', board, columnSlug });
-  const onOpen = (card: Card): void => setEditor({ mode: 'edit', card });
+  // Opening a card docks it instead of covering the app with a modal, so the boards, the copilot
+  // and the card stay usable together. Editing is still the modal, reached from the pane.
+  const onOpen = (card: Card): void => {
+    cards.open(card, allCards);
+    setDockPane('cards');
+  };
   const onDragStart = (card: Card): void => {
     dragged.current = card;
   };
@@ -86,13 +106,32 @@ export function App() {
   function onOpened(): void {
     setShowGate(false);
     setBump((b) => b + 1);
+    cards.clear(); // the open tabs all belong to the project being left
   }
 
-  const allCards = snapshot ? BOARDS.flatMap((b) => snapshot.boards[b] ?? []) : [];
-  // Chips come from every card, not the filtered set, so the bar does not shrink out from under
-  // the pointer as you narrow — the counts stay absolute for the same reason.
-  const tags = tagCounts(allCards);
-  const active = presentTags(activeTags, tags);
+  // The dock's occupants. Cards is the only one today; a terminal would be one more entry here
+  // and one more component, with no change to UtilityDock.
+  const panes: DockPane[] = snapshot
+    ? [
+        {
+          id: 'cards',
+          label: 'Cards',
+          badge: cards.tabs.length,
+          hasContent: cards.tabs.length > 0,
+          render: () => (
+            <CardsPane
+              tabs={cards.tabs}
+              activeId={cards.activeId}
+              live={allCards}
+              config={snapshot.config}
+              onFocus={cards.focus}
+              onClose={cards.close}
+              onEdit={(card) => setEditor({ mode: 'edit', card })}
+            />
+          ),
+        },
+      ]
+    : [];
 
   // A flat chain rather than nested ternaries in the JSX: same four outcomes, and cognitive
   // complexity counts nesting far more heavily than sequence.
@@ -104,31 +143,42 @@ export function App() {
   else
     content = (
       <div className="work">
-        {tab === 'boards' ? (
-          <main className="boards">
-            <TagFilter tags={tags} active={active} onToggle={onTag} onClear={() => setActiveTags([])} />
-            {BOARDS.map((board) => (
-              <Board
-                key={board}
-                board={board}
-                label={BOARD_LABELS[board]}
-                cards={filterByTags(snapshot.boards[board] ?? [], active)}
-                config={snapshot.config}
-                archivedCount={snapshot.archivedCounts?.[board] ?? 0}
-                collapsed={collapsed.has(board)}
-                onToggle={() => toggleBoard(board)}
-                onAdd={onAdd}
-                onOpen={onOpen}
-                onArchive={onArchive}
-                onDragStart={onDragStart}
-                onTag={onTag}
-                onDrop={onDrop}
-              />
-            ))}
-          </main>
-        ) : (
-          <ProjectControl snapshot={snapshot} />
-        )}
+        {/* The dock belongs inside this column, not across the window: the copilot keeps its full
+            height beside it, which is the whole point of docking rather than overlaying. */}
+        <div className="work-main">
+          {tab === 'boards' ? (
+            <main className="boards">
+              <TagFilter tags={tags} active={active} onToggle={onTag} onClear={() => setActiveTags([])} />
+              {BOARDS.map((board) => (
+                <Board
+                  key={board}
+                  board={board}
+                  label={BOARD_LABELS[board]}
+                  cards={filterByTags(snapshot.boards[board] ?? [], active)}
+                  config={snapshot.config}
+                  archivedCount={snapshot.archivedCounts?.[board] ?? 0}
+                  collapsed={collapsed.has(board)}
+                  onToggle={() => toggleBoard(board)}
+                  onAdd={onAdd}
+                  onOpen={onOpen}
+                  onArchive={onArchive}
+                  onDragStart={onDragStart}
+                  onTag={onTag}
+                  onDrop={onDrop}
+                />
+              ))}
+            </main>
+          ) : (
+            <ProjectControl snapshot={snapshot} />
+          )}
+          <UtilityDock
+            panes={panes}
+            activeId={dockPane}
+            onPane={setDockPane}
+            collapsed={dockCollapsed}
+            onCollapse={toggleDock}
+          />
+        </div>
         {copilotOpen && (
           <CopilotPanel
             copilot={copilot}

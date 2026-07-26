@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { useCollapsedBoards, useTheme } from '../web/src/useLocalPrefs.js';
+import { useCollapsedBoards, useDockCollapsed, useTheme } from '../web/src/useLocalPrefs.js';
 
 // These preferences belong to the browser, not the project. The storage keys are load-bearing:
 // changing one silently loses everybody's saved preference, so they are asserted literally.
@@ -74,5 +74,34 @@ describe('useCollapsedBoards', () => {
     expect([...result.current[0]].sort()).toEqual(['features', 'product']);
     act(() => result.current[1]('product'));
     expect([...result.current[0]]).toEqual(['features']);
+  });
+});
+
+describe('useDockCollapsed', () => {
+  it('starts expanded', () => {
+    expect(renderHook(() => useDockCollapsed()).result.current[0]).toBe(false);
+  });
+
+  it('restores a stored collapse', () => {
+    localStorage.setItem('vb-dock-collapsed', '1');
+    expect(renderHook(() => useDockCollapsed()).result.current[0]).toBe(true);
+  });
+
+  it.each(['0', '', 'true', 'yes'])('treats the stored value %p as expanded', (raw) => {
+    // Only the literal '1' collapses — anything else, including a truthy-looking string, must not.
+    localStorage.setItem('vb-dock-collapsed', raw);
+    expect(renderHook(() => useDockCollapsed()).result.current[0]).toBe(false);
+  });
+
+  it('toggles and persists each way', () => {
+    const { result } = renderHook(() => useDockCollapsed());
+
+    act(() => result.current[1]());
+    expect(result.current[0]).toBe(true);
+    expect(localStorage.getItem('vb-dock-collapsed')).toBe('1');
+
+    act(() => result.current[1]());
+    expect(result.current[0]).toBe(false);
+    expect(localStorage.getItem('vb-dock-collapsed')).toBe('0');
   });
 });

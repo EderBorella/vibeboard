@@ -22,8 +22,8 @@ export default {
   //   test/mirror.test.ts instead.
   // - web/src/api.ts: every test that touches it mocks it or imports only its types, so no
   //   mutant there can be killed.
-  // - the React components with no test (Board, Column, CardTile, the copilot panels, …) and
-  //   the untested hooks — see notes/quality-backlog.md.
+  // - the React components with no test (Board, Column, CardTile, the copilot panels, …) —
+  //   see notes/quality-backlog.md.
   mutate: [
     'src/core/**/*.ts',
     '!src/core/types.ts',
@@ -44,6 +44,10 @@ export default {
     'web/src/viewmodel.ts',
     'web/src/ws.ts',
     'web/src/copilot/choice.ts',
+    'web/src/copilot/format.ts',
+    'web/src/useSnapshot.ts',
+    'web/src/useLocalPrefs.ts',
+    'web/src/useCopilotChoice.ts',
     'web/src/copilot/useCopilot.ts',
     'web/src/components/CardEditor.tsx',
     'web/src/components/ModelPicker.tsx',

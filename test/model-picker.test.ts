@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ModelOption } from '../web/src/api.js';
-import { compareModels, type ModelFilter, matchesFilter } from '../web/src/components/ModelPicker.js';
+import { compareModels, type ModelFilter, matchesFilter } from '../web/src/components/model-filter.js';
 
 const model = (id: string, over: Partial<ModelOption> = {}): ModelOption =>
   ({ id, name: id, free: false, caps: { toolCall: true, vision: false }, ...over }) as ModelOption;
@@ -46,6 +46,15 @@ describe('matchesFilter', () => {
     expect(matchesFilter(model('a/x', { name: 'Other' }), filter({ query: '  OTHER ' }))).toBe(true);
   });
 
+  it('treats a model that reports no capabilities at all as lacking them', () => {
+    // The API does not always send `caps`. Reading through it without a guard throws inside a
+    // useMemo, which takes the whole picker down rather than showing an unfiltered list.
+    const bare = { id: 'a/bare', name: 'Bare', free: false } as ModelOption;
+    expect(matchesFilter(bare, filter({ toolOnly: true }))).toBe(false);
+    expect(matchesFilter(bare, filter({ visionOnly: true }))).toBe(false);
+    expect(matchesFilter(bare, filter())).toBe(true);
+  });
+
   it('never hides the current selection or the backend default', () => {
     // Every filter set against it, and it still survives — otherwise the list would imply the
     // selected model is not what is in force.
@@ -87,5 +96,23 @@ describe('compareModels', () => {
   it('is a stable ordering for equal models', () => {
     const ctx = { defaultModel: '', favs: new Set<string>() };
     expect(compareModels(model('a'), model('a'), ctx)).toBe(0);
+  });
+
+  it('pins the default in BOTH directions, whichever side it is compared from', () => {
+    // Asserted on the comparator itself rather than through sort(): a comparator that answers -1 to
+    // everything can still produce the expected order for one particular input, so a sorted list is
+    // not proof that the rule holds.
+    const ctx = { defaultModel: 'd', favs: new Set<string>() };
+    expect(compareModels(model('d'), model('a'), ctx)).toBe(-1);
+    expect(compareModels(model('a'), model('d'), ctx)).toBe(1);
+    // And it must not claim a difference when neither side is the default.
+    expect(compareModels(model('a'), model('a'), ctx)).toBe(0);
+  });
+
+  it('orders two unnamed models by id, without stringifying the missing name', () => {
+    // `?? a.id` where the ids sort the opposite way to the word "undefined": with a mutant that lets
+    // the undefined name through, localeCompare compares against "undefined" and reverses these two.
+    const ctx = { defaultModel: '', favs: new Set<string>() };
+    expect(sorted(['x', 'v'], ctx, { x: { name: undefined }, v: { name: undefined } })).toEqual(['v', 'x']);
   });
 });

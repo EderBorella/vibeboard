@@ -77,6 +77,8 @@ export default {
     'web/src/components/RawPane.tsx',
     'web/src/components/CardsPane.tsx',
     'web/src/components/CardsBody.tsx',
+    'web/src/components/BoardsView.tsx',
+    'web/src/components/WorkArea.tsx',
     'web/src/components/ActiveReport.tsx',
     'web/src/components/CardSkills.tsx',
     'web/src/components/DispatchPane.tsx',
@@ -85,11 +87,13 @@ export default {
     'web/src/components/ReportPane.tsx',
     'web/src/components/ReportOptions.tsx',
     'web/src/components/ExecutionView.tsx',
-    'web/src/components/BoardsView.tsx',
-    'web/src/components/WorkArea.tsx',
     'web/src/components/SkillEditor.tsx',
     'web/src/components/UtilityDock.tsx',
-    'web/src/components/ModelPicker.tsx',
+    // ModelPicker.tsx is deliberately NOT here. Its decision logic — which models to show and in
+    // what order — was lifted into model-filter.ts, which IS measured; what is left is a modal of
+    // chips, and its residue was 85 unreached JSX string and attribute mutants. Owner's ruling
+    // (2026-07-27): test the small shells, exclude this one and say why.
+    'web/src/components/model-filter.ts',
     'web/src/components/model-format.ts',
     'web/src/components/TagFilter.tsx',
     'web/src/components/TopBar.tsx',

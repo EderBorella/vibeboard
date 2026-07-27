@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Skill } from '../web/src/api.js';
 import { SkillEditor } from '../web/src/components/SkillEditor.js';
@@ -111,5 +111,113 @@ describe('SkillEditor', () => {
     render(<SkillEditor {...props} busy skill={skill()} />);
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Do it' } });
     expect((screen.getByText('Save skill') as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it('un-ticks a board that was ticked, rather than adding it twice', () => {
+    // The toggle is a ternary over `includes`: a mutant that always adds ends up with the board
+    // listed twice, which the file then carries and the rail double-counts.
+    const onSave = saver();
+    render(<SkillEditor {...props} onSave={onSave} skill={skill({ boards: ['engineering'] })} />);
+    expect(box('Engineering').checked).toBe(true);
+    fireEvent.click(box('Engineering'));
+    expect(box('Engineering').checked).toBe(false);
+    fireEvent.click(screen.getByText('Save skill'));
+    expect(onSave.mock.calls[0][0].boards).toEqual([]);
+  });
+
+  it('adds a second board without losing the first', () => {
+    const onSave = saver();
+    render(<SkillEditor {...props} onSave={onSave} skill={skill({ boards: ['engineering'] })} />);
+    fireEvent.click(box('Product'));
+    fireEvent.click(screen.getByText('Save skill'));
+    expect(onSave.mock.calls[0][0].boards).toEqual(['engineering', 'product']);
+  });
+
+  it('toggles a column off, keeping the others', () => {
+    const onSave = saver();
+    render(
+      <SkillEditor
+        {...props}
+        onSave={onSave}
+        skill={skill({ boards: ['engineering'], columns: ['todo', 'review'] })}
+      />,
+    );
+    fireEvent.click(box('Todo'));
+    expect(box('Todo').checked).toBe(false);
+    fireEvent.click(screen.getByText('Save skill'));
+    expect(onSave.mock.calls[0][0].columns).toEqual(['review']);
+  });
+
+  it('adds a column without losing the ones already ticked', () => {
+    const onSave = saver();
+    render(
+      <SkillEditor {...props} onSave={onSave} skill={skill({ boards: ['engineering'], columns: ['todo'] })} />,
+    );
+    fireEvent.click(box('Review'));
+    fireEvent.click(screen.getByText('Save skill'));
+    expect(onSave.mock.calls[0][0].columns).toEqual(['todo', 'review']);
+  });
+
+  it('keeps a ticked column that the new scope still allows', () => {
+    // The other half of the pruning rule: `Done` exists on both boards, so widening the scope must
+    // not drop it. A prune that cleared everything would pass the narrowing test and fail here.
+    const onSave = saver();
+    render(
+      <SkillEditor {...props} onSave={onSave} skill={skill({ boards: ['engineering'], columns: ['done'] })} />,
+    );
+    fireEvent.click(box('Product'));
+    fireEvent.click(screen.getByText('Save skill'));
+    expect(onSave.mock.calls[0][0]).toMatchObject({
+      boards: ['engineering', 'product'],
+      columns: ['done'],
+    });
+  });
+
+  it('offers every column again when the last board is un-ticked', () => {
+    render(<SkillEditor {...props} skill={skill({ boards: ['product'] })} />);
+    expect(screen.queryByText('Review')).toBeNull();
+    fireEvent.click(box('Product'));
+    // Back to nothing ticked, which means every board — so engineering's columns return.
+    expect(screen.getByText('Review')).toBeTruthy();
+  });
+
+  it('notices an edit to the description or the prompt, not just the name', () => {
+    // Each field wires its own handler. A dead one leaves the button disabled with the user's text
+    // on screen: an edit that silently cannot be saved.
+    const { unmount } = render(<SkillEditor {...props} skill={skill()} />);
+    fireEvent.change(screen.getByLabelText('Description'), { target: { value: 'New words' } });
+    expect((screen.getByText('Save skill') as HTMLButtonElement).disabled).toBe(false);
+    unmount();
+
+    render(<SkillEditor {...props} skill={skill()} />);
+    fireEvent.change(screen.getByLabelText('Prompt'), { target: { value: 'New prompt' } });
+    expect((screen.getByText('Save skill') as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it('saves the edited description and prompt, not the originals', () => {
+    const onSave = saver();
+    render(<SkillEditor {...props} onSave={onSave} skill={skill()} />);
+    fireEvent.change(screen.getByLabelText('Description'), { target: { value: 'New words' } });
+    fireEvent.change(screen.getByLabelText('Prompt'), { target: { value: 'New prompt' } });
+    fireEvent.click(screen.getByText('Save skill'));
+    expect(onSave.mock.calls[0][0]).toMatchObject({ description: 'New words', prompt: 'New prompt' });
+  });
+
+  it.each(['Description', 'Prompt'])('refuses to save an empty %s', (label) => {
+    render(<SkillEditor {...props} skill={skill()} />);
+    fireEvent.change(screen.getByLabelText(label), { target: { value: '   ' } });
+    expect((screen.getByText('Save skill') as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it('goes clean once the save lands, so one edit cannot be sent twice', async () => {
+    const onSave = saver();
+    render(<SkillEditor {...props} onSave={onSave} skill={skill()} />);
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Do it' } });
+    const button = screen.getByText('Save skill') as HTMLButtonElement;
+    expect(button.disabled).toBe(false);
+    await act(async () => {
+      fireEvent.click(button);
+    });
+    expect(button.disabled).toBe(true);
   });
 });

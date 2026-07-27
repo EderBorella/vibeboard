@@ -132,14 +132,86 @@ describe('POST /api/runs', () => {
   });
 
   it('refuses an unknown skill, card or board rather than dispatching something wrong', async () => {
+    // The MESSAGE as well as the code: it is what the dispatch pane shows the user, so "something
+    // was refused" and "that skill no longer exists" are not interchangeable.
     const project = await projectWithCard();
     const post = (payload: object) => project.app.inject({ method: 'POST', url: '/api/runs', payload });
 
-    expect((await post({ board: 'nope', card: project.card, skill: 'execute' })).statusCode).toBe(400);
-    expect((await post({ board: 'engineering', card: 'E-999', skill: 'execute' })).statusCode).toBe(404);
-    expect(
-      (await post({ board: 'engineering', card: project.card, skill: 'no-such-skill' })).statusCode,
-    ).toBe(404);
+    const badBoard = await post({ board: 'nope', card: project.card, skill: 'execute' });
+    expect([badBoard.statusCode, badBoard.json()]).toEqual([400, { error: 'Unknown board' }]);
+
+    const badCard = await post({ board: 'engineering', card: 'E-999', skill: 'execute' });
+    expect([badCard.statusCode, badCard.json()]).toEqual([404, { error: 'No such card' }]);
+
+    const badSkill = await post({ board: 'engineering', card: project.card, skill: 'no-such-skill' });
+    expect([badSkill.statusCode, badSkill.json()]).toEqual([404, { error: 'No such skill' }]);
+  });
+
+  it('refuses a board that is not even a string', async () => {
+    // The body is JSON from a client, not a typed call: `isBoard` has to reject the wrong TYPE, not
+    // just an unknown name, or a number reaches findCard as a folder.
+    const project = await projectWithCard();
+    const res = await project.app.inject({
+      method: 'POST',
+      url: '/api/runs',
+      payload: { board: 7, card: project.card, skill: 'execute' },
+    });
+    expect([res.statusCode, res.json()]).toEqual([400, { error: 'Unknown board' }]);
+  });
+
+  it('defaults mode and attaches nothing when the request says neither', async () => {
+    // Both defaults are load-bearing: an agent with no mode must still be allowed to work, and an
+    // empty attachment list must stay empty rather than becoming a path the agent tries to read.
+    const project = await projectWithCard();
+    const { run } = (
+      await project.app.inject({
+        method: 'POST',
+        url: '/api/runs',
+        payload: { board: 'engineering', card: project.card, skill: 'execute' },
+      })
+    ).json() as { run: RunRecord };
+    expect(run.mode).toBe('bypassPermissions');
+    expect(run.attached).toBeUndefined();
+    await settled(project, project.card, run.run);
+  });
+
+  it('resolves links against the live board, dropping ids that no longer exist', async () => {
+    // The client's view of a card's links can be stale, and a card can be deleted between renders.
+    // A dangling id must not reach the prompt — the agent would go looking for a card that is gone.
+    const argsLog = shimArgsLog();
+    process.env.VIBEBOARD_SHIM_ARGS = argsLog;
+    await writeFile(argsLog, '', 'utf8');
+    const project = await projectWithCard();
+
+    const raw = (
+      await project.app.inject({ method: 'GET', url: `/api/cards/engineering/${project.card}/raw` })
+    ).json() as { raw: string };
+    // Straight into the file: the links API refuses an id that does not exist, which is exactly the
+    // state we need to arrive at some other way.
+    await project.app.inject({
+      method: 'PUT',
+      url: `/api/cards/engineering/${project.card}/raw`,
+      payload: { raw: raw.raw.replace('links:', 'links:\n  - E-404-gone') },
+    });
+
+    const { run } = (
+      await project.app.inject({
+        method: 'POST',
+        url: '/api/runs',
+        payload: { board: 'engineering', card: project.card, skill: 'execute' },
+      })
+    ).json() as { run: RunRecord };
+    await settled(project, project.card, run.run);
+    delete process.env.VIBEBOARD_SHIM_ARGS;
+
+    const prompt = JSON.parse((await readFile(argsLog, 'utf8')).trim().split('\n').at(-1) as string).at(
+      -1,
+    ) as string;
+    // The id itself still appears — it is in the card's own frontmatter, which is quoted verbatim.
+    // What must not appear is a SECTION for it: that is the part built from resolved cards, and an
+    // unresolved one would render as a heading with nothing, or as `undefined`.
+    const sections = [...prompt.matchAll(/^### (.+)$/gm)].map((m) => m[1]);
+    expect(sections).toEqual(['P-001 — Sample product card']);
   });
 
   it('refuses to run against an archived card', async () => {
@@ -272,7 +344,57 @@ describe('POST /api/runs/:run/cancel', () => {
   it('says so for a run that is not in flight', async () => {
     const project = await projectWithCard();
     const res = await project.app.inject({ method: 'POST', url: '/api/runs/nope/cancel' });
-    expect(res.statusCode).toBe(404);
+    expect([res.statusCode, res.json()]).toEqual([404, { error: 'That run is not in flight' }]);
+  });
+
+  it('confirms a stop with the time it happened', async () => {
+    // `ok: true` and a real timestamp: the dashboard uses the acknowledgement to stop offering Stop,
+    // and a `false` or missing flag would leave the button live on a run already dying.
+    const project = await projectWithCard();
+    const { run } = (
+      await project.app.inject({
+        method: 'POST',
+        url: '/api/runs',
+        payload: { board: 'engineering', card: project.card, skill: 'execute', prompt: hang },
+      })
+    ).json() as { run: RunRecord };
+    const body = (
+      await project.app.inject({ method: 'POST', url: `/api/runs/${run.run}/cancel` })
+    ).json() as { ok: boolean; at: string };
+    expect(body.ok).toBe(true);
+    expect(Number.isNaN(Date.parse(body.at))).toBe(false);
+    await settled(project, project.card, run.run);
+  });
+});
+
+describe('GET /api/runs/:board/:card', () => {
+  it('refuses a board that is not one, rather than reading a folder by that name', async () => {
+    const project = await projectWithCard();
+    const res = await project.app.inject({ method: 'GET', url: '/api/runs/nonsense/E-001' });
+    expect([res.statusCode, res.json()]).toEqual([400, { error: 'Unknown board' }]);
+  });
+
+  it('is empty for a card that has never been run', async () => {
+    const project = await projectWithCard();
+    const res = await project.app.inject({ method: 'GET', url: '/api/runs/features/F-001' });
+    expect([res.statusCode, res.json()]).toEqual([200, { runs: [] }]);
+  });
+});
+
+describe('every run route refuses when no project is open', () => {
+  // One test per route rather than one for the group: each handler carries its own guard, and a
+  // missing one answers 500 from a null root instead of saying what is wrong.
+  it.each([
+    ['GET', '/api/runs'],
+    ['GET', '/api/runs/engineering/E-001'],
+    ['POST', '/api/runs'],
+    ['POST', '/api/runs/engineering/E-001/r1/resolve'],
+    ['POST', '/api/runs/r1/cancel'],
+  ])('%s %s', async (method, url) => {
+    const app = buildApp(new ProjectSession());
+    const res = await app.inject({ method: method as 'GET' | 'POST', url, payload: {} });
+    expect([res.statusCode, res.json()]).toEqual([409, { error: 'No project open' }]);
+    await app.close();
   });
 });
 

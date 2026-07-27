@@ -46,7 +46,18 @@ const REPORTS = {
   garbage: '---\noutcome: [unclosed\n---\nI tried\n',
 };
 
-if (behaviour === 'hang') {
+if (behaviour === 'chatty') {
+  // Many events then an immediate exit with no report. The point is the race: every line must be on
+  // disk before the runner reads the transcript tail to stand in for the missing report.
+  for (let i = 0; i < 20; i++) {
+    say({
+      type: 'assistant',
+      message: { content: [{ type: 'text', text: `step ${i}` }] },
+      session_id: 'shim-run',
+    });
+  }
+  process.exit(0);
+} else if (behaviour === 'hang') {
   setInterval(() => {}, 1000); // never exits; the test cancels or times it out
 } else {
   const body = REPORTS[behaviour];

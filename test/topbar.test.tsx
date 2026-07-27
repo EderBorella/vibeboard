@@ -8,7 +8,7 @@ afterEach(cleanup);
 const props = {
   showProject: true,
   projectName: 'Demo',
-  tab: 'boards' as 'boards' | 'control',
+  tab: 'boards' as 'boards' | 'execution' | 'control',
   onTab: vi.fn(),
   theme: 'cyberpunk',
   onTheme: vi.fn(),
@@ -47,6 +47,44 @@ describe('TopBar', () => {
     expect(screen.getByText('Boards').className).not.toContain('active');
     screen.getByText('Boards').click();
     expect(onTab).toHaveBeenCalledWith('boards');
+  });
+
+  it('marks and switches to Execution, the tab the earlier test predated', () => {
+    // Three tabs, three separate buttons: the props type here said 'boards' | 'control', so nothing
+    // had ever clicked this one or checked that it highlights.
+    const onTab = vi.fn();
+    render(<TopBar {...props} tab="execution" onTab={onTab} />);
+    expect(screen.getByText('Execution').className).toContain('active');
+    expect(screen.getByText('Boards').className).not.toContain('active');
+    expect(screen.getByText('Project Control').className).not.toContain('active');
+    screen.getByText('Execution').click();
+    expect(onTab).toHaveBeenCalledWith('execution');
+  });
+
+  it('switches to Project Control by name, not by position', () => {
+    const onTab = vi.fn();
+    render(<TopBar {...props} onTab={onTab} />);
+    screen.getByText('Project Control').click();
+    expect(onTab).toHaveBeenCalledWith('control');
+  });
+
+  it('badges the count of runs waiting on you, and shows nothing at zero', () => {
+    // The badge is the only ambient signal that a run needs a decision. At zero it must be absent
+    // rather than a "0" — an empty badge reads as something to do.
+    render(<TopBar {...props} attentionCount={0} />);
+    expect(document.querySelector('.tab-badge')).toBeNull();
+    cleanup();
+    render(<TopBar {...props} attentionCount={3} />);
+    expect(document.querySelector('.tab-badge')?.textContent).toBe('3');
+  });
+
+  it('reports a theme change', () => {
+    const onTheme = vi.fn();
+    render(<TopBar {...props} onTheme={onTheme} />);
+    const select = screen.getByTitle('Theme') as HTMLSelectElement;
+    select.value = 'classic-dark';
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+    expect(onTheme).toHaveBeenCalledWith('classic-dark');
   });
 
   it('labels the copilot button by what the click will do', () => {

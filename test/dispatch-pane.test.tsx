@@ -128,6 +128,43 @@ describe('DispatchPane', () => {
     expect(document.querySelector('.dispatch-attach')).toBeNull();
   });
 
+  it('un-ticks an attachment, rather than attaching it twice', () => {
+    // The toggle is a ternary over `includes`; a mutant that always adds sends the same path twice,
+    // and the agent reads the same file twice.
+    const onDispatch = vi.fn();
+    render(<DispatchPane {...props} attachable={['docs/api.md']} onDispatch={onDispatch} />);
+    fireEvent.click(screen.getByText('docs/api.md'));
+    fireEvent.click(screen.getByText('docs/api.md'));
+    fireEvent.click(screen.getByText('Run Execute'));
+    expect(dispatched(onDispatch).attachments).toEqual([]);
+  });
+
+  it('counts the attachments in the summary, so a collapsed section still says so', () => {
+    // The section collapses, and this count is the only thing that tells you something is attached
+    // without opening it.
+    render(<DispatchPane {...props} attachable={['docs/api.md', 'resources/spec.md']} />);
+    const summary = document.querySelector('summary') as HTMLElement;
+    expect(summary.textContent).toBe('Attach material');
+    fireEvent.click(screen.getByText('docs/api.md'));
+    expect(summary.textContent).toBe('Attach material (1)');
+    fireEvent.click(screen.getByText('resources/spec.md'));
+    expect(summary.textContent).toBe('Attach material (2)');
+  });
+
+  it('marks the chosen connector and mode, so the form shows what will run', () => {
+    // Both are switch rows where only the highlight says which is selected. With none marked, the
+    // form silently claims nothing is chosen when something always is.
+    render(<DispatchPane {...props} />);
+    expect(screen.getByText('claude-code').className).toContain('active');
+    expect(screen.getByText('opencode').className).not.toContain('active');
+    expect(document.querySelectorAll('.mode-btn.active')).toHaveLength(1);
+  });
+
+  it('leaves the error line out entirely when there is no error', () => {
+    render(<DispatchPane {...props} error={null} />);
+    expect(document.querySelector('.dispatch-error')).toBeNull();
+  });
+
   it('carries the run it continues, and says so', () => {
     const previous = { run: '20260726-141000-9f3e' } as RunRecord;
     const onDispatch = vi.fn();

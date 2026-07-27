@@ -96,6 +96,90 @@ describe('CardReports', () => {
     expect(document.querySelectorAll('.report-row.resolved')).toHaveLength(1);
   });
 
+  it('dates each run to the minute, from when it finished', () => {
+    // Trimmed to minutes and the T replaced: the raw ISO string is unreadable in a list, and a run's
+    // own timestamps are what a person means by "when" — the id is a stamp too, but it is not this.
+    render(
+      <CardReports
+        runs={[run({ started: '2026-07-26T14:30:12.000Z', finished: '2026-07-26T14:41:55.000Z' })]}
+        onOpen={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+    expect(document.querySelector('.report-when')?.textContent).toBe('2026-07-26 14:41');
+  });
+
+  it('falls back to when it started for a run that has not finished', () => {
+    render(
+      <CardReports
+        runs={[run({ status: 'running', started: '2026-07-26T14:30:12.000Z', finished: undefined })]}
+        onOpen={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+    expect(document.querySelector('.report-when')?.textContent).toBe('2026-07-26 14:30');
+  });
+
+  it('leaves the summary blank rather than printing undefined', () => {
+    render(
+      <CardReports
+        runs={[run({ summary: undefined, note: undefined })]}
+        onOpen={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+    expect(document.querySelector('.report-summary')?.textContent).toBe('');
+  });
+
+  it('prefers the agent’s summary, and falls back to VibeBoard’s note', () => {
+    render(
+      <CardReports
+        runs={[
+          run({ run: 'a', summary: 'did the thing', note: 'ignored' }),
+          run({ run: 'b', summary: undefined, note: 'The agent finished without writing a report.' }),
+        ]}
+        onOpen={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+    expect([...document.querySelectorAll('.report-summary')].map((e) => e.textContent)).toEqual([
+      'The agent finished without writing a report.',
+      'did the thing',
+    ]);
+  });
+
+  it.each([
+    ['running', true],
+    ['queued', true],
+    ['attention', false],
+    ['success', false],
+    ['failed', false],
+    ['interrupted', false],
+  ])('offers Stop for a %s run: %s', (status, stoppable) => {
+    // Both in-flight statuses, and nothing else: offering Stop on a finished run is a button that
+    // can only fail, and withholding it from a queued one leaves no way to clear the queue.
+    render(
+      <CardReports
+        runs={[run({ status: status as RunRecord['status'] })]}
+        onOpen={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+    expect(document.querySelectorAll('.report-stop').length === 1).toBe(stoppable);
+  });
+
+  it('names the run each button belongs to, so a card with several is unambiguous', () => {
+    render(
+      <CardReports
+        runs={[run({ status: 'running', skill: 'research' })]}
+        onOpen={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+    expect(screen.getByTitle('Open the report from research')).toBeTruthy();
+    expect(screen.getByTitle('Stop the research run')).toBeTruthy();
+  });
+
   it('says what each status means to a person, not what it is called', () => {
     render(
       <CardReports
@@ -337,6 +421,69 @@ describe('ReportPane', () => {
     render(<ReportPane {...props} onBack={onBack} record={run()} />);
     fireEvent.click(screen.getByTitle('Back to the card'));
     expect(onBack).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows both timestamps to the second, readably', () => {
+    // To the SECOND here, unlike the history row's minutes: this is the page where you work out why
+    // a run took as long as it did.
+    render(
+      <ReportPane
+        {...props}
+        record={run({ started: '2026-07-26T14:30:12.000Z', finished: '2026-07-26T14:41:55.000Z' })}
+      />,
+    );
+    expect(screen.getByText('2026-07-26 14:30:12')).toBeTruthy();
+    expect(screen.getByText('2026-07-26 14:41:55')).toBeTruthy();
+  });
+
+  it('leaves out the rows it has nothing for', () => {
+    // A run still going has no finish time, most runs attach nothing, and a bare label with an empty
+    // value reads as data that failed to load.
+    render(
+      <ReportPane
+        {...props}
+        record={run({
+          status: 'running',
+          finished: undefined,
+          attached: undefined,
+          summary: undefined,
+          note: undefined,
+          prompt: undefined,
+        })}
+      />,
+    );
+    expect(screen.queryByText('Finished')).toBeNull();
+    expect(screen.queryByText('Attached')).toBeNull();
+    expect(screen.queryByText('Dealt with')).toBeNull();
+    expect(document.querySelector('.report-lead')).toBeNull();
+    expect(document.querySelector('.report-note')).toBeNull();
+    expect(document.querySelector('.report-prompt')).toBeNull();
+  });
+
+  it('lists what was attached, comma separated', () => {
+    render(<ReportPane {...props} record={run({ attached: ['docs/api.md', 'resources/spec.md'] })} />);
+    expect(screen.getByText('docs/api.md, resources/spec.md')).toBeTruthy();
+  });
+
+  it('shows VibeBoard’s note when the agent left no summary of its own', () => {
+    render(
+      <ReportPane
+        {...props}
+        record={run({ status: 'attention', summary: undefined, note: 'The agent wrote no report.' })}
+      />,
+    );
+    expect(document.querySelector('.report-note')?.textContent).toBe('The agent wrote no report.');
+    expect(document.querySelector('.report-lead')).toBeNull();
+  });
+
+  it('offers the fixed options even when the agent suggested none', () => {
+    // `?? []` matters: an attention run with no options must still be answerable, or the card is
+    // stuck with a report and no way forward.
+    render(<ReportPane {...props} record={run({ status: 'attention', options: undefined })} />);
+    expect(screen.getByText('Create new cards')).toBeTruthy();
+    expect(screen.getByText('Write my own input')).toBeTruthy();
+    expect(screen.getByText('Close card')).toBeTruthy();
+    expect(document.querySelectorAll('.option-btn')).toHaveLength(2);
   });
 });
 

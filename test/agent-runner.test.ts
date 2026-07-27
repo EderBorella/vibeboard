@@ -153,6 +153,21 @@ describe('AgentRunner.dispatch', () => {
     expect(final.report).toContain('working (silent)');
   });
 
+  it('keeps every transcript line, in order, when the agent exits the moment it stops talking', async () => {
+    // A REGRESSION test for a real race, not a hypothetical one: the appends used to be fired and
+    // forgotten, so #settle read the tail while writes were still in flight and lines went missing —
+    // from the one thing that stands in for a report when the agent wrote none. Twenty events and an
+    // immediate exit is what makes it near-certain rather than occasional.
+    const shim = behaving('chatty');
+    const root = await tempDir();
+    const { instance } = runner(root);
+    const { run } = await instance.dispatch(input(root, shim));
+    const final = await settled(root, run);
+
+    const steps = [...final.report.matchAll(/step (\d+)/g)].map((m) => Number(m[1]));
+    expect(steps).toEqual([...Array(20).keys()]);
+  });
+
   it('needs attention when the report frontmatter is malformed', async () => {
     const shim = behaving('garbage');
     const root = await tempDir();

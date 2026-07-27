@@ -66,6 +66,8 @@ export class AgentRunner {
   #opts: RunnerOptions;
   #active = new Map<string, Active>();
   #queue: Queued[] = [];
+  // One append chain per run, so its transcript lines are written in order and can be waited for.
+  #transcripts = new Map<string, Promise<void>>();
 
   constructor(opts: RunnerOptions) {
     this.#opts = opts;
@@ -174,9 +176,18 @@ export class AgentRunner {
       timeoutMs: this.#opts.timeoutMs,
       bin: this.#opts.bin,
       onEvent: (event) => {
-        void appendTranscript(root, run, JSON.stringify(event)).catch(() => {
-          /* a lost transcript line must never fail the run */
-        });
+        // Chained, not fired and forgotten. Two reasons, both real: concurrent appends of one line
+        // each can interleave mid-line, and #settle reads the tail as soon as the process closes —
+        // so an unawaited write lands AFTER the read and the line is missing from the report. That
+        // matters most in the case the tail exists for, an agent that finished having said nothing.
+        this.#transcripts.set(
+          run,
+          (this.#transcripts.get(run) ?? Promise.resolve())
+            .then(() => appendTranscript(root, run, JSON.stringify(event)))
+            .catch(() => {
+              /* a lost transcript line must never fail the run */
+            }),
+        );
       },
     });
     this.#active.set(run, { turn, cancelled: false });
@@ -207,6 +218,8 @@ export class AgentRunner {
       const result = await turn.done;
       const cancelled = this.#active.get(run)?.cancelled === true;
       const finishedAt = this.#opts.now().toISOString();
+      // Every transcript line on disk before anything reads the tail.
+      await this.#transcripts.get(run);
       const folded = await foldReport(root, record, finishedAt);
       final = folded ?? (await this.#endWithoutReport(root, record, result, cancelled, finishedAt));
     } catch (err) {
@@ -219,6 +232,7 @@ export class AgentRunner {
       await writeRun(root, final);
     } finally {
       this.#active.delete(run);
+      this.#transcripts.delete(run);
     }
     this.#opts.onUpdate?.(final);
     // A slot just freed, so whatever was waiting starts now. After the update, so the dashboard sees

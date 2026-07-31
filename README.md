@@ -179,6 +179,10 @@ expose it to the public internet.
   free tier or provider, with context window and per-million pricing shown
 - **Managed chat history**: transcripts persist per project, survive reloads,
   and are browsable in a switcher with configurable retention
+- **What each run cost**, recorded on the run itself: money, wall time, model
+  round-trips, context and output tokens — for runs that failed as well as ones
+  that worked, since those spent tokens too. Shown in full on the report, and as
+  a single figure on the card and the Execution dashboard
 - **Project Control tab**: view and edit the documents that steer the models —
   `INSTRUCTIONS.md`, skills, project docs, and a resources registry
 - Config isolation, so your personal `CLAUDE.md`, plugins and hooks do not leak
@@ -189,8 +193,11 @@ expose it to the public internet.
 
 - **Embedded terminal** — a full interactive agent session in the browser
 - **Plugin management** in the Project Control tab
-- **External resources** — attach reference folders, PDFs, and notes to a project
-- **Token and cost accounting** per run
+- **External resources** — attach reference *folders* and PDFs to a project.
+  Markdown notes and a link registry are already in Project Control; what is
+  missing is anything that is not a single markdown file
+- **Cost across runs** — a per-card and per-project total. Each run now records
+  its own; nothing yet adds them up
 
 ## Design principles
 

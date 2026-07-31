@@ -50,6 +50,7 @@ export default {
     'src/server/discover.ts',
     'src/server/app-state.ts',
     'src/server/route-context.ts',
+    'src/server/logging.ts',
     // Web modules with their own tests.
     'web/src/markdown.tsx',
     'web/src/viewmodel.ts',

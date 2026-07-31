@@ -14,6 +14,10 @@ export default defineConfig({
     // Per-process, so concurrent runs (Stryker spawns one per worker) don't share one file.
     env: {
       VIBEBOARD_STATE_FILE: join(mkdtempSync(join(tmpdir(), 'vibeboard-state-')), 'state.json'),
+      // The server's logger is on by default (src/server/logging.ts). Silence it for the suite —
+      // every file that builds an app, directly or through openTestProject, would otherwise bury
+      // the test output in request lines. test/logging.test.ts passes its own logger instead.
+      VIBEBOARD_LOG_LEVEL: 'silent',
     },
   },
 });

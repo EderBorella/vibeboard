@@ -1,9 +1,10 @@
-import Fastify, { type FastifyInstance } from 'fastify';
+import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastify';
 import { DEFAULT_MAX_RUNS } from '../core/config.js';
 import { AgentRunner } from './agent-runner.js';
 import { ChatStore } from './chat-store.js';
 import { CopilotSession } from './copilot.js';
 import { createCopilotTurns } from './copilot-turns.js';
+import { loggerOptions } from './logging.js';
 import type { AppCtx } from './route-context.js';
 import { registerCardRoutes } from './routes/cards.js';
 import { registerConfigRoutes } from './routes/config.js';
@@ -17,8 +18,13 @@ import { createBroadcaster, registerWs } from './ws.js';
 
 // Composition root: wire the session, copilot and chat store into one context, register the
 // WS channel, then mount each route group under /api. Route bodies live in ./routes.
-export function buildApp(session: ProjectSession, opts: { runBin?: string } = {}): FastifyInstance {
-  const app = Fastify();
+export function buildApp(
+  session: ProjectSession,
+  // `logger` overrides what the environment asks for — test/logging.test.ts passes a stream so it
+  // can read the lines back, which is the only way to prove the logger is actually wired.
+  opts: { runBin?: string; logger?: FastifyServerOptions['logger'] } = {},
+): FastifyInstance {
+  const app = Fastify({ logger: opts.logger ?? loggerOptions() });
   const copilot = new CopilotSession();
   const chats = new ChatStore(session);
   const { clients, broadcast } = createBroadcaster();

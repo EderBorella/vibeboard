@@ -60,6 +60,6 @@ async function start(): Promise<void> {
 }
 
 start().catch((err) => {
-  console.error(err);
+  app.log.fatal(err, 'VibeBoard failed to start');
   process.exit(1);
 });

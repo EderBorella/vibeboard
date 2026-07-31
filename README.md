@@ -107,6 +107,7 @@ startup; anything already exported in your shell takes precedence.
 | `VIBEBOARD_PORT` | `4610` | Port for the web UI + API |
 | `VIBEBOARD_HOST` | `127.0.0.1` | Interface to bind. `0.0.0.0` exposes it to your LAN |
 | `VIBEBOARD_ROOT` | parent of cwd | Folder scanned for existing projects |
+| `VIBEBOARD_LOG_LEVEL` | `info` | Server log level, as JSON lines on stdout. `silent` turns logging off |
 | `VIBEBOARD_CLAUDE_BIN` | `claude` | Claude Code executable |
 | `VIBEBOARD_OPENCODE_BIN` | `opencode` | OpenCode executable |
 | `VIBEBOARD_OPENCODE_PORT` | `0` (OS-assigned) | Port for the spawned `opencode serve` |

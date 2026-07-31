@@ -917,7 +917,9 @@ body {
 .chip-attention { color: var(--accent-2); border-color: var(--accent-2); }
 .chip-failed, .chip-interrupted { color: var(--danger); border-color: var(--danger); }
 .chip-running, .chip-queued { color: var(--text); border-color: var(--text); }
-.chip-cancelled { color: var(--muted); }
+/* Stopping a run is a decision, not a fault — but it is still an ending that produced nothing, and
+   grey made it disappear into the row. Same red as failed: what they have in common is "no report". */
+.chip-cancelled { color: var(--danger); border-color: var(--danger); }
 .report-skill { flex: 0 0 auto; font-size: 0.78rem; }
 /* Money reads as data, not prose: mono, so a card's runs line up down the column. */
 .report-cost { flex: 0 0 auto; color: var(--muted); font-family: var(--font-mono); font-size: 0.66rem; }
@@ -932,8 +934,11 @@ body {
   font-size: 0.68rem; padding: 0.1rem 0.4rem;
 }
 .report-stop:hover { color: var(--danger); border-color: var(--danger); }
-/* A run that has been dealt with is history: still readable, no longer shouting. */
-.report-row.resolved .report-chip { color: var(--muted); border-color: var(--border); }
+/* A run that has been dealt with is history: still readable, no longer shouting. Dimmed rather than
+   greyed — repainting the chip muted threw away the one thing it encodes, which is HOW the run ended,
+   and left "Stopped" and "Needs you · dealt with" looking identical. The "· dealt with" text says it
+   was answered; the colour is still free to say what it was. */
+.report-row.resolved .report-chip { opacity: 0.6; }
 .report-row.resolved .report-skill { color: var(--muted); }
 .report-dismiss {
   flex: 0 0 auto; align-self: flex-start; background: var(--panel-2); color: var(--muted);

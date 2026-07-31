@@ -1,4 +1,4 @@
-import { mkdir, readFile, symlink, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
@@ -144,6 +144,60 @@ describe('control-files CRUD', () => {
     await writeControlFile(root, 'CLAUDE.md', 'managed');
     expect(await deleteControlFile(root, 'CLAUDE.md')).toBe('not-allowed');
     expect(await readFile(join(root, 'CLAUDE.md'), 'utf8')).toBe('managed'); // untouched
+  });
+
+  it('takes the skill folder with SKILL.md when nothing else is in it', async () => {
+    // The bug this fixes: the folder survived, readSkills saw a directory with no SKILL.md, and
+    // every card's rail warned about it — with no file for Project Control to select, so nothing
+    // could clear the warning.
+    const root = await tempDir();
+    await writeControlFile(root, '.claude/skills/greet/SKILL.md', 'skill');
+
+    expect(await deleteControlFile(root, '.claude/skills/greet/SKILL.md')).toBe('ok');
+    await expect(readdir(join(root, '.claude/skills/greet'))).rejects.toThrow();
+    // The skills root itself is untouched — only the one folder went.
+    expect(await readdir(join(root, '.claude/skills'))).toEqual([]);
+  });
+
+  it('leaves a skill folder that still holds something the user put there', async () => {
+    // Deleting SKILL.md is not permission to delete a script beside it. The folder then simply is
+    // not a skill any more, and the catalogue ignores it.
+    const root = await tempDir();
+    await writeControlFile(root, '.claude/skills/greet/SKILL.md', 'skill');
+    await writeFile(join(root, '.claude/skills/greet/run.sh'), '#!/bin/sh\n', 'utf8');
+
+    expect(await deleteControlFile(root, '.claude/skills/greet/SKILL.md')).toBe('ok');
+    expect(await readdir(join(root, '.claude/skills/greet'))).toEqual(['run.sh']);
+  });
+
+  it('removes no directory when the deleted file is nested inside a skill', async () => {
+    const root = await tempDir();
+    await writeControlFile(root, '.claude/skills/greet/SKILL.md', 'skill');
+    await mkdir(join(root, '.claude/skills/greet/scripts'), { recursive: true });
+    await writeFile(join(root, '.claude/skills/greet/scripts/a.sh'), 'x', 'utf8');
+
+    expect(await deleteControlFile(root, '.claude/skills/greet/scripts/a.sh')).toBe('ok');
+    // The scripts folder is now empty, and stays: only a skill's own SKILL.md takes a folder.
+    expect(await readdir(join(root, '.claude/skills/greet/scripts'))).toEqual([]);
+    expect(await readdir(join(root, '.claude/skills/greet'))).toContain('SKILL.md');
+  });
+
+  it('takes no folder when the last file in a skill folder is not SKILL.md', async () => {
+    // Only SKILL.md carries the skill's identity. Deleting a stray note that happens to be the last
+    // thing in the folder must not take the folder with it — the user made that folder on purpose,
+    // and it is theirs until they say otherwise.
+    const root = await tempDir();
+    await writeControlFile(root, '.claude/skills/greet/notes.md', 'just a note');
+
+    expect(await deleteControlFile(root, '.claude/skills/greet/notes.md')).toBe('ok');
+    expect(await readdir(join(root, '.claude/skills/greet'))).toEqual([]);
+  });
+
+  it('takes no folder when a doc is deleted', async () => {
+    const root = await tempDir();
+    await writeControlFile(root, 'docs/notes.md', '# n');
+    expect(await deleteControlFile(root, 'docs/notes.md')).toBe('ok');
+    expect(await readdir(join(root, 'docs'))).toEqual([]);
   });
 
   it('write/read/delete reject non-control paths', async () => {

@@ -1,5 +1,5 @@
 import type { Dirent } from 'node:fs';
-import { mkdir, readdir, readFile, realpath, rename, rm, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, realpath, rename, rm, rmdir, writeFile } from 'node:fs/promises';
 import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 import { parse, stringify } from 'yaml';
 import { CONFIG_DIR } from '../core/config.js';
@@ -333,7 +333,26 @@ export async function deleteControlFile(
   } catch {
     /* already gone */
   }
+  if (r.file.category === 'skills') await dropEmptySkillFolder(root, r.file.path);
   return 'ok';
+}
+
+// A skill IS its folder — renameControlFile moves the folder rather than SKILL.md for exactly that
+// reason — so removing the file used to leave a folder behind that was no longer a skill.
+//
+// rmdir, not a recursive remove: a skill folder may hold scripts or templates the user put there,
+// and deleting SKILL.md is not permission to delete those. A folder that survives because something
+// else is in it is simply no longer a skill, and the catalogue ignores it (see skill-catalogue.ts).
+async function dropEmptySkillFolder(root: string, rel: string): Promise<void> {
+  // Only the skill's own SKILL.md: `.claude/skills/<slug>/SKILL.md` and nothing deeper, so deleting
+  // a nested file never removes a directory, and the skills root itself can never be the target.
+  const parts = rel.split('/');
+  if (parts.length !== 4 || parts[3] !== 'SKILL.md') return;
+  try {
+    await rmdir(join(root, parts.slice(0, 3).join('/')));
+  } catch {
+    /* not empty, or already gone — either way the folder stays and is not a skill */
+  }
 }
 
 function cleanLink(l: unknown): ResourceLink | null {

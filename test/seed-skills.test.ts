@@ -45,11 +45,20 @@ describe('seedSkills', () => {
   });
 
   it('leaves an adopted repo that already has its own skills untouched', async () => {
+    // A real skill, not a bare folder: the fixture used to be an empty directory and read the
+    // result out of `invalid`, which only worked while an empty folder counted as an invalid skill.
+    // What this test is about is that seeding neither overwrites what is already there nor adds its
+    // own beside it.
     const root = await tempDir();
     await mkdir(join(root, '.claude', 'skills', 'their-skill'), { recursive: true });
+    const theirs = '---\nname: their-skill\ndescription: what they wrote\n---\nTheir prompt.\n';
+    await writeFile(join(root, '.claude', 'skills', 'their-skill', 'SKILL.md'), theirs, 'utf8');
+
     expect(await seedSkills(root)).toBe(false);
     const { skills, invalid } = await readSkills(root, config);
-    expect([...skills.map((s) => s.slug), ...invalid.map((i) => i.slug)]).toEqual(['their-skill']);
+    expect(skills.map((s) => s.slug)).toEqual(['their-skill']);
+    expect(invalid).toEqual([]);
+    expect(skills[0].prompt).toBe('Their prompt.');
   });
 
   it('does not edit a seed already on disk', async () => {

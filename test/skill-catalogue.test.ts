@@ -32,14 +32,27 @@ describe('readSkills', () => {
     expect(invalid).toEqual([]);
   });
 
-  it('reports a folder with no SKILL.md instead of skipping it silently', async () => {
+  it('ignores a folder with no SKILL.md — it is not a skill, and not an invalid file either', async () => {
+    // This USED to be reported as `invalid: no SKILL.md in the folder`, on the reasoning that
+    // silence was worse than a warning. In practice the warning was unclearable: it appears on
+    // every card's skill rail, and an empty folder has no file for Project Control to select, so
+    // nothing in the app could remove it. Reporting a missing file as an invalid file was also
+    // just untrue. A folder that arrives this way is now silent, and the Explorer tab is where it
+    // gets deleted.
     const root = await withSkills({ execute: file('Execute') });
     await mkdir(join(root, '.claude', 'skills', 'empty'), { recursive: true });
     const { skills, invalid } = await readSkills(root, config);
     expect(skills.map((s) => s.slug)).toEqual(['execute']);
-    expect(invalid).toEqual([
-      { slug: 'empty', path: '.claude/skills/empty/SKILL.md', reason: 'no SKILL.md in the folder' },
-    ]);
+    expect(invalid).toEqual([]);
+  });
+
+  it('still reports a SKILL.md that is really there and really wrong', async () => {
+    // The distinction that matters: a missing file is not a finding, a broken one is.
+    const root = await withSkills({ broken: '---\nname: Broken\n---\nno description\n' });
+    await mkdir(join(root, '.claude', 'skills', 'empty'), { recursive: true });
+    const { skills, invalid } = await readSkills(root, config);
+    expect(skills).toEqual([]);
+    expect(invalid.map((i) => i.slug)).toEqual(['broken']);
   });
 
   it('separates an invalid file from the valid ones', async () => {

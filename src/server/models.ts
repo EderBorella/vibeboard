@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import type { Log } from './logging.js';
 import { opencodeBaseUrl } from './opencode-server.js';
 
 export interface ModelCaps {
@@ -66,14 +67,17 @@ interface Cache<T> {
 const TTL_MS = 10 * 60 * 1000;
 const caches = new Map<string, Cache<unknown>>();
 
-async function cached<T>(key: string, fetcher: () => Promise<T>, fallback: T): Promise<T> {
+async function cached<T>(key: string, fetcher: () => Promise<T>, fallback: T, log?: Log): Promise<T> {
   const hit = caches.get(key) as Cache<T> | undefined;
   if (hit && Date.now() - hit.at < TTL_MS) return hit.value;
   try {
     const value = await fetcher();
     caches.set(key, { at: Date.now(), value });
     return value;
-  } catch {
+  } catch (err) {
+    // Serving a stale list, or an empty one, is the right answer for the UI and a terrible answer
+    // for whoever is wondering why their model is missing. `stale` says which of the two happened.
+    log?.warn({ err, key, stale: hit !== undefined }, 'model catalogue fetch failed');
     return hit?.value ?? fallback;
   }
 }
@@ -81,7 +85,7 @@ async function cached<T>(key: string, fetcher: () => Promise<T>, fallback: T): P
 // Live status/uptime for one model via OpenRouter's endpoints route. Only openrouter ids
 // have a status source; others return null. Cached briefly (its own cache).
 const statusCache = new Map<string, { at: number; value: ModelStatus | null }>();
-export async function modelStatus(id: string): Promise<ModelStatus | null> {
+export async function modelStatus(id: string, log?: Log): Promise<ModelStatus | null> {
   if (!id.startsWith('openrouter/')) return null;
   const hit = statusCache.get(id);
   if (hit && Date.now() - hit.at < TTL_MS) return hit.value;
@@ -100,7 +104,8 @@ export async function modelStatus(id: string): Promise<ModelStatus | null> {
     const value: ModelStatus = { up, uptime: uptime || undefined, endpoints: eps.length };
     statusCache.set(id, { at: Date.now(), value });
     return value;
-  } catch {
+  } catch (err) {
+    log?.warn({ err, id }, 'model status fetch failed');
     return hit?.value ?? null;
   }
 }
@@ -172,7 +177,7 @@ async function fetchOpencodeCatalog(): Promise<Record<string, Record<string, OcM
 
 // Live, capability-rich model list per backend. For opencode we read the running server's
 // catalog (authoritative — no models.dev drift), filtering DeepSeek to its live id set.
-export async function listBackendModels(backend: string): Promise<ModelOption[]> {
+export async function listBackendModels(backend: string, log?: Log): Promise<ModelOption[]> {
   if (backend !== 'opencode') return CLAUDE_ALIASES.map(claudeAliasOption);
 
   const catalog = await cached<ModelOption[]>(
@@ -182,12 +187,13 @@ export async function listBackendModels(backend: string): Promise<ModelOption[]>
         modelsFromProvider(prov, models),
       ),
     [],
+    log,
   );
 
   const dsKey = opencodeAuth().deepseek?.key ?? opencodeAuth().deepseek?.apiKey;
   let models = catalog;
   if (dsKey) {
-    const valid = await cached<Set<string>>('deepseek-ids', () => deepseekIds(dsKey), new Set());
+    const valid = await cached<Set<string>>('deepseek-ids', () => deepseekIds(dsKey), new Set(), log);
     if (valid.size)
       models = catalog.filter(
         (m) => !m.id.startsWith('deepseek/') || valid.has(m.id.slice('deepseek/'.length)),

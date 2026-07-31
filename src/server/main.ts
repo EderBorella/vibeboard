@@ -1,7 +1,7 @@
 import { networkInterfaces } from 'node:os';
 import { buildApp } from './app.js';
 import { restoreLastProject } from './app-state.js';
-import { serverLogger } from './logging.js';
+import { installCrashHandlers, serverLogger } from './logging.js';
 import { stopOpencodeServer } from './opencode-server.js';
 import { ProjectSession } from './session.js';
 import { registerStatic } from './static.js';
@@ -26,6 +26,9 @@ const session = new ProjectSession();
 // it is — a log nobody can find is barely better than no log.
 const logging = serverLogger();
 const app = buildApp(session, { logger: logging.options });
+// Anything that rejects or throws outside a request used to end the process in silence. Node exits
+// on both of these by default, so this only adds the record of why.
+installCrashHandlers(app.log);
 
 // Don't leave the managed `opencode serve` orphaned when VibeBoard stops.
 for (const sig of ['SIGINT', 'SIGTERM'] as const) {

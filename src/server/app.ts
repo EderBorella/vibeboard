@@ -4,7 +4,7 @@ import { AgentRunner } from './agent-runner.js';
 import { ChatStore } from './chat-store.js';
 import { CopilotSession } from './copilot.js';
 import { createCopilotTurns } from './copilot-turns.js';
-import { serverLogger } from './logging.js';
+import { type Log, serverLogger } from './logging.js';
 import type { AppCtx } from './route-context.js';
 import { registerCardRoutes } from './routes/cards.js';
 import { registerConfigRoutes } from './routes/config.js';
@@ -26,8 +26,14 @@ export function buildApp(
   opts: { runBin?: string; logger?: FastifyServerOptions['logger'] } = {},
 ): FastifyInstance {
   const app = Fastify({ logger: opts.logger ?? serverLogger().options });
+  // Each subsystem logs under its own `component`, so the file can be filtered by area:
+  //   jq 'select(.component == "watcher")' logs/vibeboard-*.log
+  const log: Log = app.log;
   const copilot = new CopilotSession();
-  const chats = new ChatStore(session);
+  const chats = new ChatStore(session, log.child({ component: 'chat' }));
+  // The watcher and the debounced snapshot broadcast happen with no request in flight, and the
+  // session is constructed before the app — so the composition root hands it the logger.
+  session.attachLogger(log.child({ component: 'watcher' }));
   const { clients, broadcast } = createBroadcaster();
   // A run does real work — implementing a card, not answering a question — so its patience is its
   // own, an order of magnitude beyond the chat's per-turn timeout.
@@ -41,8 +47,9 @@ export function buildApp(
     maxConcurrent: () => session.config?.maxConcurrentRuns ?? DEFAULT_MAX_RUNS,
     bin: opts.runBin,
     onUpdate: (record) => broadcast({ type: 'run:update', record }),
+    log: log.child({ component: 'runner' }),
   });
-  const ctx: AppCtx = { session, copilot, chats, runner, broadcast };
+  const ctx: AppCtx = { session, copilot, chats, runner, broadcast, log };
   const turns = createCopilotTurns(ctx);
 
   registerWs(app, ctx, clients, turns.handleMessage, turns.sendHistory);

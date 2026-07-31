@@ -2,7 +2,7 @@ import { mkdtempSync } from 'node:fs';
 import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyServerOptions } from 'fastify';
 import { onTestFinished } from 'vitest';
 import WebSocket from 'ws';
 import { buildApp } from '../src/server/app.js';
@@ -34,10 +34,16 @@ export interface TestProject {
 // the server are closed even when an assertion throws half way through a test. That means it
 // must be called from inside a test, not from beforeAll.
 export async function openTestProject(
-  opts: { name?: string; mode?: 'greenfield' | 'brownfield'; runBin?: string } = {},
+  opts: {
+    name?: string;
+    mode?: 'greenfield' | 'brownfield';
+    runBin?: string;
+    // Silent unless a test asks otherwise; pass a stream to read back what the subsystems logged.
+    logger?: FastifyServerOptions['logger'];
+  } = {},
 ): Promise<TestProject> {
   const session = new ProjectSession();
-  const app = buildApp(session, { runBin: opts.runBin });
+  const app = buildApp(session, { runBin: opts.runBin, logger: opts.logger });
   const root = await tempDir();
   await app.inject({
     method: 'POST',

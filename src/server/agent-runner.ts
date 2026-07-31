@@ -2,6 +2,7 @@ import { type RunRecord, runId, withoutReport } from '../core/runs.js';
 import type { Skill } from '../core/skills.js';
 import type { BoardName, Card } from '../core/types.js';
 import { type Backend, type RunningTurn, runAgentTurn } from './agent-turn.js';
+import type { Log } from './logging.js';
 import { buildRunPrompt } from './run-prompt.js';
 import { appendTranscript, foldReport, reportContract, transcriptTail, writeRun } from './run-store.js';
 
@@ -46,6 +47,9 @@ export interface RunnerOptions {
   bin?: string;
   // Called whenever a record changes on disk, so the WS layer can push it without polling.
   onUpdate?: (record: RunRecord) => void;
+  // A run outlives the request that dispatched it, so there is no request logger to reach for when
+  // one of its background writes fails. Optional: a runner without one behaves exactly as before.
+  log?: Log;
 }
 
 interface Active {
@@ -184,9 +188,10 @@ export class AgentRunner {
           run,
           (this.#transcripts.get(run) ?? Promise.resolve())
             .then(() => appendTranscript(root, run, JSON.stringify(event)))
-            .catch(() => {
-              /* a lost transcript line must never fail the run */
-            }),
+            // A lost transcript line must never fail the run — but the transcript is the fallback
+            // the report is built from when the agent writes none, so a gap in it explains an
+            // otherwise inexplicable empty report.
+            .catch((err) => this.#opts.log?.warn({ err, run }, 'transcript append failed')),
         );
       },
     });
@@ -205,9 +210,9 @@ export class AgentRunner {
       const running: RunRecord = { ...next.record, status: 'running' };
       void writeRun(next.root, running)
         .then(() => this.#opts.onUpdate?.(running))
-        .catch(() => {
-          /* the record is already on disk as queued; the run still starts */
-        });
+        // The record is already on disk as queued and the run still starts, so this is survivable —
+        // but it leaves a running run displayed as queued, which looks like a stuck queue.
+        .catch((err) => this.#opts.log?.warn({ err, run: running.run }, 'queued run write failed'));
       this.#start(next.root, running, next.input);
     }
   }

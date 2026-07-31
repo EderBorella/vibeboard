@@ -33,6 +33,7 @@ export function registerWs(
   sendHistory: (target?: WsClient) => Promise<void>,
 ): void {
   app.register(websocket);
+  const log = ctx.log.child({ component: 'ws' });
 
   app.register(async (root) => {
     root.get('/ws', { websocket: true }, (socket) => {
@@ -44,13 +45,17 @@ export function registerWs(
           /* socket closed mid-send */
         }
       };
+      // Both of these are a new client's FIRST payload. Failing here leaves that browser showing an
+      // empty board or an empty chat with no error anywhere, and no second attempt: nothing retries
+      // a connect.
       if (ctx.session.isOpen)
         void ctx.session
           .snapshot()
           .then(send)
-          .catch(() => {});
+          .catch((err) => log.warn({ err }, 'initial snapshot failed'));
       socket.send(JSON.stringify({ type: 'copilot:state', state: ctx.copilot.state }));
-      if (ctx.session.isOpen) void sendHistory(socket).catch(() => {});
+      if (ctx.session.isOpen)
+        void sendHistory(socket).catch((err) => log.warn({ err }, 'initial chat history failed'));
       const unsubscribe = ctx.session.subscribe(send);
       socket.on('message', (raw: Buffer) => onMessage(raw.toString('utf8')));
       socket.on('close', () => {

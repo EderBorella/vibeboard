@@ -31,14 +31,15 @@ describe('GET /api/models', () => {
     const res = await app().inject({ method: 'GET', url: '/api/models' });
     expect(res.statusCode).toBe(200);
     // Asserting the argument, not just the response: a fallback that passed undefined through
-    // would still answer 200 with the same body.
-    expect(listBackendModels).toHaveBeenCalledWith('claude-code');
+    // would still answer 200 with the same body. The second argument is the request's logger, so a
+    // failed catalogue fetch leaves a line — asserted as "something", since the object is pino's.
+    expect(listBackendModels).toHaveBeenCalledWith('claude-code', expect.anything());
     expect(res.json()).toEqual([{ id: 'claude-code/m', free: true }]);
   });
 
   it('passes the requested backend through', async () => {
     const res = await app().inject({ method: 'GET', url: '/api/models?backend=opencode' });
-    expect(listBackendModels).toHaveBeenCalledWith('opencode');
+    expect(listBackendModels).toHaveBeenCalledWith('opencode', expect.anything());
     expect(res.json()).toEqual([{ id: 'opencode/m', free: true }]);
   });
 });
@@ -47,7 +48,7 @@ describe('GET /api/model-status', () => {
   it('wraps the status for a named model', async () => {
     const res = await app().inject({ method: 'GET', url: '/api/model-status?id=openrouter/x' });
     expect(res.statusCode).toBe(200);
-    expect(modelStatus).toHaveBeenCalledWith('openrouter/x');
+    expect(modelStatus).toHaveBeenCalledWith('openrouter/x', expect.anything());
     expect(res.json()).toEqual({ status: { up: true, uptime: 99, endpoints: 2 } });
   });
 

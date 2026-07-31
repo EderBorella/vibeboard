@@ -12,6 +12,7 @@ import {
 import { resolveCopilotSelection } from '../core/copilot-choice.js';
 import type { ProjectConfig } from '../core/types.js';
 import type { CopilotEvent } from './copilot-events.js';
+import type { Log } from './logging.js';
 
 // Persists copilot conversations per project as JSON files under
 // <project>/.vibeboard/chat/<id>.json. The server is the source of truth: it tees the
@@ -62,9 +63,11 @@ export class ChatStore {
   #note: string | undefined; // one-shot mismatch note for the next history payload
   #writeTimer: ReturnType<typeof setTimeout> | undefined;
   #writeChain: Promise<void> = Promise.resolve();
+  #log: Log | undefined;
 
-  constructor(session: SessionRef) {
+  constructor(session: SessionRef, log?: Log) {
     this.#session = session;
+    this.#log = log;
   }
 
   #dir(root: string): string {
@@ -198,9 +201,9 @@ export class ChatStore {
         await writeFile(file, data, 'utf8');
         await this.#prune();
       })
-      .catch(() => {
-        /* transient disk error; a later write retries */
-      });
+      // A later write retries, so one failure is survivable — but if they all fail the conversation
+      // is gone at the next reload with nothing to explain it. Error, not warn: this is data loss.
+      .catch((err) => this.#log?.error({ err, chat: c.id }, 'chat write failed'));
     await this.#writeChain;
   }
 

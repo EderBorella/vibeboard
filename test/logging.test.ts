@@ -177,9 +177,14 @@ describe('serverLogger', () => {
     for (const day of ['01', '02', '03']) writeFileSync(join(dir, `vibeboard-2026-07-${day}.log`), 'x');
 
     serverLogger({ VIBEBOARD_LOG_DIR: dir, VIBEBOARD_LOG_KEEP: '2' }, new Date('2026-07-31T10:00:00.000Z'));
-    // Today's file is absent, not missing: createWriteStream opens on the first write, so a boot
-    // that logs nothing leaves no empty file behind.
-    expect(readdirSync(dir).sort()).toEqual(['vibeboard-2026-07-02.log', 'vibeboard-2026-07-03.log']);
+    // Today's file exists straight away: it is opened with openSync rather than lazily, so a file
+    // that cannot be written fails here, where it can still fall back, instead of later with the
+    // lines already lost.
+    expect(readdirSync(dir).sort()).toEqual([
+      'vibeboard-2026-07-02.log',
+      'vibeboard-2026-07-03.log',
+      'vibeboard-2026-07-31.log',
+    ]);
   });
 
   it('writes no file when silenced, and none when the folder is opted out of', async () => {

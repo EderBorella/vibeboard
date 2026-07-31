@@ -1,4 +1,4 @@
-import { createWriteStream, mkdirSync, readdirSync, rmSync } from 'node:fs';
+import { mkdirSync, openSync, readdirSync, rmSync, writeSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { Writable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
@@ -86,11 +86,10 @@ export function serverLogger(env: NodeJS.ProcessEnv = process.env, now: Date = n
     mkdirSync(dir, { recursive: true });
     pruneLogs(dir, resolveKeep(env.VIBEBOARD_LOG_KEEP));
     const file = logFileFor(dir, now);
-    const stream = createWriteStream(file, { flags: 'a' });
-    // A log that cannot be written must not take the server with it, and must not recurse by
-    // logging its own failure to the stream that just failed.
-    stream.on('error', (err) => console.error('log write failed:', err.message));
-    return { options: { level, stream: asDestination(stream) }, file };
+    // openSync, not createWriteStream: opened here rather than lazily, so a file that cannot be
+    // written (a root-owned log left by a sudo run) is caught below instead of surfacing later as a
+    // stream error with the lines already lost.
+    return { options: { level, stream: fileDestination(openSync(file, 'a')) }, file };
   } catch (err) {
     // An unwritable folder (read-only install, wrong owner) degrades to stdout rather than
     // preventing startup. Said out loud, because silently losing the logs is the original bug.
@@ -99,14 +98,45 @@ export function serverLogger(env: NodeJS.ProcessEnv = process.env, now: Date = n
   }
 }
 
-// pino writes to anything with write(); wrapping keeps it from closing or ending the file stream on
-// its own, so the process controls the file's lifetime. Backpressure is ignored on purpose — a debug
-// log must never stall a request, and the buffer it can build at these volumes is nothing.
-function asDestination(stream: Writable): Writable {
+// Synchronous writes, deliberately. A buffered stream loses whatever it is holding when the process
+// exits, which is precisely the moment the last line matters most — the crash handlers below log
+// fatal and then exit. At a handful of lines per interaction the cost of writeSync is nothing.
+function fileDestination(fd: number): Writable {
   return new Writable({
-    write(chunk, _enc, cb) {
-      stream.write(chunk);
+    write(chunk: Buffer, _enc, cb) {
+      try {
+        // Loop: writeSync is allowed to write less than the whole buffer.
+        for (let off = 0; off < chunk.length; ) off += writeSync(fd, chunk, off);
+      } catch (err) {
+        // Never rethrow into pino, and never log this failure through the logger that just failed.
+        console.error('log write failed:', (err as Error).message);
+      }
       cb();
     },
+  });
+}
+
+// The subset of pino the subsystems use. Narrow on purpose: a fake in a test is five vi.fn()s, and
+// nothing outside this module needs to know a logger comes from Fastify.
+export interface Log {
+  debug(obj: object, msg?: string): void;
+  info(obj: object, msg?: string): void;
+  warn(obj: object, msg?: string): void;
+  error(obj: object, msg?: string): void;
+  fatal(obj: object, msg?: string): void;
+  child(bindings: Record<string, unknown>): Log;
+}
+
+// A crash outside the request lifecycle used to kill the process in silence. Node's own default is
+// already to exit on both of these, so this only adds the record of WHY — it does not decide to
+// keep running in a state the code did not expect.
+export function installCrashHandlers(log: Log, exit: (code: number) => void = process.exit): void {
+  process.on('unhandledRejection', (reason) => {
+    log.fatal({ err: reason }, 'unhandled rejection — exiting');
+    exit(1);
+  });
+  process.on('uncaughtException', (err) => {
+    log.fatal({ err }, 'uncaught exception — exiting');
+    exit(1);
   });
 }

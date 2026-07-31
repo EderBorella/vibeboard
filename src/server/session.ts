@@ -9,6 +9,7 @@ import {
 } from '../core/config.js';
 import { ensureControlFiles } from '../core/control.js';
 import type { ProjectConfig } from '../core/types.js';
+import type { Log } from './logging.js';
 import { markInterrupted } from './run-store.js';
 import { buildSnapshot, type ProjectSnapshot } from './snapshot.js';
 
@@ -38,6 +39,7 @@ export class ProjectSession {
   #watcher: FSWatcher | undefined;
   #listeners = new Set<SnapshotListener>();
   #timer: ReturnType<typeof setTimeout> | undefined;
+  #log: Log | undefined;
 
   get isOpen(): boolean {
     return this.#root !== undefined;
@@ -112,6 +114,12 @@ export class ProjectSession {
     };
   }
 
+  // Set by buildApp: a session is constructed before the app that logs for it, and everything below
+  // runs from a watcher event rather than a request, so there is no other way in.
+  attachLogger(log: Log): void {
+    this.#log = log;
+  }
+
   #scheduleBroadcast(): void {
     if (this.#timer) clearTimeout(this.#timer);
     this.#timer = setTimeout(() => {
@@ -119,9 +127,10 @@ export class ProjectSession {
         .then((s) => {
           for (const fn of this.#listeners) fn(s);
         })
-        .catch(() => {
-          /* transient FS race; a later event will refresh */
-        });
+        // A transient FS race and a real problem look identical from here, and a later event will
+        // refresh either way — so this stays non-fatal, but it stops being invisible. When the
+        // boards have quietly stopped updating, this is the line that says why.
+        .catch((err) => this.#log?.warn({ err }, 'snapshot broadcast failed'));
     }, DEBOUNCE_MS);
   }
 }

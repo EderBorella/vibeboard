@@ -8,12 +8,13 @@ export async function registerModelRoutes(api: FastifyInstance, _ctx: AppCtx): P
   // models + OpenRouter's free tier, free ones flagged and listed first.
   api.get('/models', async (req) => {
     const { backend } = req.query as { backend?: string };
-    return listBackendModels(backend ?? DEFAULT_BACKEND);
+    // req.log, so a failed catalogue fetch is recorded against the request that asked for it.
+    return listBackendModels(backend ?? DEFAULT_BACKEND, req.log);
   });
 
   // Live status/uptime for one model (OpenRouter endpoints route); null if no source.
   api.get('/model-status', async (req) => {
     const { id } = req.query as { id?: string };
-    return { status: id ? await modelStatus(id) : null };
+    return { status: id ? await modelStatus(id, req.log) : null };
   });
 }

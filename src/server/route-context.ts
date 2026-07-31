@@ -3,6 +3,7 @@ import type { ProjectConfig } from '../core/types.js';
 import type { AgentRunner } from './agent-runner.js';
 import type { ChatStore } from './chat-store.js';
 import type { CopilotSession } from './copilot.js';
+import type { Log } from './logging.js';
 import type { ProjectSession } from './session.js';
 
 // The shared surface every route group and the WS layer needs. Passed explicitly rather
@@ -20,6 +21,9 @@ export interface AppCtx {
   // is one prompt in and one report out, and neither should be able to block the other.
   runner: AgentRunner;
   broadcast: (msg: unknown) => void;
+  // Route handlers already have `request.log`. This is for everything that happens with no request to
+  // hang off: the watcher, the WS channel, a run settling long after its dispatch was answered.
+  log: Log;
 }
 
 export const today = (): string => new Date().toISOString().slice(0, 10);

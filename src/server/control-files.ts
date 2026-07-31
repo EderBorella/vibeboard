@@ -1,9 +1,10 @@
 import type { Dirent } from 'node:fs';
-import { mkdir, readdir, readFile, realpath, rename, rm, rmdir, writeFile } from 'node:fs/promises';
-import { basename, dirname, join, relative, resolve, sep } from 'node:path';
+import { mkdir, readdir, readFile, rename, rm, rmdir, writeFile } from 'node:fs/promises';
+import { basename, dirname, join, relative, sep } from 'node:path';
 import { parse, stringify } from 'yaml';
 import { CONFIG_DIR } from '../core/config.js';
 import { slugify } from '../core/slug.js';
+import { resolveInRoot } from './fs-sandbox.js';
 
 // The Project Control tab's file controller. It exposes ONLY the documents that steer the
 // models — instructions, skills, docs, resources — behind a hard path sandbox + allow-list so
@@ -79,43 +80,19 @@ function descriptor(rel: string): ControlFile | null {
   };
 }
 
-// Resolve a client path to an absolute path inside the project root AND an allowed category,
-// or null on any violation. Symlink-safe: the nearest existing ancestor is realpath-checked so
-// a symlink inside the tree can't point outside it.
+// Resolve a client path to an absolute path inside the project root AND an allowed category, or
+// null on any violation. The sandbox half (traversal, absolute paths, symlinks escaping the root)
+// lives in fs-sandbox.ts and is shared with the Explorer; the allow-list half is this module's own
+// and is what keeps Project Control to the documents that steer the models.
 export async function resolveControlPath(
   root: string,
   rel: unknown,
 ): Promise<{ abs: string; file: ControlFile } | null> {
-  if (typeof rel !== 'string' || rel === '') return null;
-  const posix = rel.split(sep).join('/');
-  if (posix.startsWith('/') || posix.split('/').includes('..')) return null;
-  const file = descriptor(posix);
+  const resolved = await resolveInRoot(root, rel);
+  if (!resolved) return null;
+  const file = descriptor(resolved.rel);
   if (!file) return null;
-  const abs = resolve(root, posix);
-  const back = relative(root, abs);
-  if (back === '' || back.startsWith('..')) return null;
-  if (!(await withinRootRealpath(root, abs))) return null;
-  return { abs, file };
-}
-
-async function withinRootRealpath(root: string, abs: string): Promise<boolean> {
-  let rootReal: string;
-  try {
-    rootReal = await realpath(root);
-  } catch {
-    return false;
-  }
-  let cur = abs;
-  for (;;) {
-    try {
-      const real = await realpath(cur);
-      return real === rootReal || real.startsWith(rootReal + sep);
-    } catch {
-      const parent = resolve(cur, '..');
-      if (parent === cur) return false; // hit filesystem root without finding an existing ancestor
-      cur = parent;
-    }
-  }
+  return { abs: resolved.abs, file };
 }
 
 async function exists(abs: string): Promise<boolean> {

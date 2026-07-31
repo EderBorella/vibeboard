@@ -9,6 +9,7 @@ import type { AppCtx } from './route-context.js';
 import { registerCardRoutes } from './routes/cards.js';
 import { registerConfigRoutes } from './routes/config.js';
 import { registerControlRoutes } from './routes/control.js';
+import { registerExplorerRoutes } from './routes/explorer.js';
 import { registerModelRoutes } from './routes/models.js';
 import { registerProjectRoutes } from './routes/project.js';
 import { registerRunRoutes } from './routes/runs.js';
@@ -60,6 +61,7 @@ export function buildApp(
       await registerConfigRoutes(api, ctx);
       await registerModelRoutes(api, ctx);
       await registerControlRoutes(api, ctx);
+      await registerExplorerRoutes(api, ctx);
       await registerSkillRoutes(api, ctx);
       await registerRunRoutes(api, ctx);
       await registerCardRoutes(api, ctx);

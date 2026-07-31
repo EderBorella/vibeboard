@@ -18,6 +18,8 @@ export default defineConfig({
       // every file that builds an app, directly or through openTestProject, would otherwise bury
       // the test output in request lines. test/logging.test.ts passes its own logger instead.
       VIBEBOARD_LOG_LEVEL: 'silent',
+      // And belt-and-braces: even a test that raises the level writes no file into the repo.
+      VIBEBOARD_LOG_DIR: '',
     },
   },
 });

@@ -1,6 +1,7 @@
 import { networkInterfaces } from 'node:os';
 import { buildApp } from './app.js';
 import { restoreLastProject } from './app-state.js';
+import { serverLogger } from './logging.js';
 import { stopOpencodeServer } from './opencode-server.js';
 import { ProjectSession } from './session.js';
 import { registerStatic } from './static.js';
@@ -21,7 +22,10 @@ const port = Number(process.env.VIBEBOARD_PORT ?? 4610);
 const host = process.env.VIBEBOARD_HOST ?? '127.0.0.1';
 const isLoopback = host === '127.0.0.1' || host === 'localhost' || host === '::1';
 const session = new ProjectSession();
-const app = buildApp(session);
+// Resolved here rather than inside buildApp so the file is opened once and the banner can say where
+// it is — a log nobody can find is barely better than no log.
+const logging = serverLogger();
+const app = buildApp(session, { logger: logging.options });
 
 // Don't leave the managed `opencode serve` orphaned when VibeBoard stops.
 for (const sig of ['SIGINT', 'SIGTERM'] as const) {
@@ -50,6 +54,7 @@ async function start(): Promise<void> {
   console.log(`\n  VibeBoard running`);
   console.log(`  → http://localhost:${port}${lan ? `\n  → http://${lan}:${port}  (LAN)` : ''}`);
   if (reopened) console.log(`  → reopened ${reopened}`);
+  if (logging.file) console.log(`  → logging to ${logging.file}`);
   if (isLoopback) {
     console.log(`\n  This machine only. To reach it from other devices: VIBEBOARD_HOST=0.0.0.0`);
   }
@@ -61,5 +66,8 @@ async function start(): Promise<void> {
 
 start().catch((err) => {
   app.log.fatal(err, 'VibeBoard failed to start');
+  // Also on stderr: the log goes to a file by default, and a server that never started must say so
+  // in the terminal that launched it rather than only somewhere you have not thought to look.
+  console.error(err);
   process.exit(1);
 });

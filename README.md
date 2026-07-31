@@ -107,7 +107,9 @@ startup; anything already exported in your shell takes precedence.
 | `VIBEBOARD_PORT` | `4610` | Port for the web UI + API |
 | `VIBEBOARD_HOST` | `127.0.0.1` | Interface to bind. `0.0.0.0` exposes it to your LAN |
 | `VIBEBOARD_ROOT` | parent of cwd | Folder scanned for existing projects |
-| `VIBEBOARD_LOG_LEVEL` | `info` | Server log level, as JSON lines on stdout. `silent` turns logging off |
+| `VIBEBOARD_LOG_LEVEL` | `info` | Server log level. `silent` turns logging off |
+| `VIBEBOARD_LOG_DIR` | `logs/` in the install | Where the log files go. Empty writes to stdout instead |
+| `VIBEBOARD_LOG_KEEP` | `14` | Daily log files to keep; older ones are pruned at startup |
 | `VIBEBOARD_CLAUDE_BIN` | `claude` | Claude Code executable |
 | `VIBEBOARD_OPENCODE_BIN` | `opencode` | OpenCode executable |
 | `VIBEBOARD_OPENCODE_PORT` | `0` (OS-assigned) | Port for the spawned `opencode serve` |
@@ -119,6 +121,11 @@ startup; anything already exported in your shell takes precedence.
 
 Per-project settings (board columns, chat retention, copilot backend and model,
 and `maxConcurrentRuns`) live in that project's `.vibeboard/config.yaml`.
+
+The server writes one JSON-lines log file per day to `logs/` inside its own
+folder — every request, and any error a route throws, with its stack. It is
+gitignored, pruned to the last two weeks, and the path is printed at startup;
+`tail -f` it, or pipe it through `jq` when something misbehaves.
 
 ### ⚠️ Security
 

@@ -4,7 +4,7 @@ import { AgentRunner } from './agent-runner.js';
 import { ChatStore } from './chat-store.js';
 import { CopilotSession } from './copilot.js';
 import { createCopilotTurns } from './copilot-turns.js';
-import { loggerOptions } from './logging.js';
+import { serverLogger } from './logging.js';
 import type { AppCtx } from './route-context.js';
 import { registerCardRoutes } from './routes/cards.js';
 import { registerConfigRoutes } from './routes/config.js';
@@ -20,11 +20,12 @@ import { createBroadcaster, registerWs } from './ws.js';
 // WS channel, then mount each route group under /api. Route bodies live in ./routes.
 export function buildApp(
   session: ProjectSession,
-  // `logger` overrides what the environment asks for — test/logging.test.ts passes a stream so it
-  // can read the lines back, which is the only way to prove the logger is actually wired.
+  // `logger` overrides what the environment asks for. main.ts passes one so the log file is opened
+  // exactly once and it can name the file in the startup banner; test/logging.test.ts passes a
+  // stream to read the lines back, which is the only way to prove the logger is really wired.
   opts: { runBin?: string; logger?: FastifyServerOptions['logger'] } = {},
 ): FastifyInstance {
-  const app = Fastify({ logger: opts.logger ?? loggerOptions() });
+  const app = Fastify({ logger: opts.logger ?? serverLogger().options });
   const copilot = new CopilotSession();
   const chats = new ChatStore(session);
   const { clients, broadcast } = createBroadcaster();

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { getModelStatus, listModels, type ModelOption, type ModelStatus } from '../api';
+import { useConfirm } from '../confirm/useConfirm';
 import { backendCaps, backendDefaults } from '../shared';
 import { ChatSwitcher } from './ChatSwitcher';
 import { CopilotControls } from './CopilotControls';
@@ -54,6 +55,7 @@ export function CopilotPanel({
     deleteChat,
     cancel,
   } = copilot;
+  const { confirm, dialog } = useConfirm();
   const [draft, setDraft] = useState('');
   const [models, setModels] = useState<ModelOption[]>([]);
   const [status, setStatus] = useState<ModelStatus | null>(null);
@@ -142,7 +144,18 @@ export function CopilotPanel({
         backend={backend}
         running={running}
         onOpen={openChat}
-        onDelete={deleteChat}
+        onDelete={(chatId) => {
+          const chat = chats.find((c) => c.id === chatId);
+          void confirm({
+            title: 'Delete this chat?',
+            // Named: the switcher lists several, and they are told apart by their first line.
+            body: `“${chat?.title ?? chatId}” is removed from disk. This cannot be undone.`,
+            action: 'Delete chat',
+            danger: true,
+          }).then((ok) => {
+            if (ok) deleteChat(chatId);
+          });
+        }}
         onNew={newSession}
       />
 
@@ -228,6 +241,8 @@ export function CopilotPanel({
           </button>
         )}
       </div>
+
+      {dialog}
     </aside>
   );
 }

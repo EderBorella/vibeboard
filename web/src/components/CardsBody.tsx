@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react';
 import { cancelRun, type RunRecord, resolveRun, type Skill } from '../api';
+import { stopRunRequest } from '../confirm/requests';
+import { useConfirm } from '../confirm/useConfirm';
 import type { CardRef } from '../dock/tabs';
 import type { Card, CardFrontmatterPatch, ProjectConfig } from '../shared';
 import { ActiveReport } from './ActiveReport';
@@ -54,6 +56,7 @@ export function CardsBody({
   onRun,
 }: Props) {
   const toCard = (): void => setView({ kind: 'card' });
+  const { confirm, dialog } = useConfirm();
   let body: ReactNode;
   if (!card) {
     // Either nothing is open, or the card left the board while its tab was — deleted outside the
@@ -124,12 +127,21 @@ export function CardsBody({
           runs={runs}
           onOpen={(r) => setView({ kind: 'report', run: r.run })}
           onCancel={(r) => {
-            void cancelRun(r.run).catch(() => {});
+            void confirm(stopRunRequest(r)).then((ok) => {
+              if (ok) void cancelRun(r.run).catch(() => {});
+            });
           }}
         />
       </>
     );
   }
 
-  return body;
+  // The dialog travels with the body: Stop is asked from the report list below, and a pane that
+  // returned only `body` would leave the question with nowhere to appear.
+  return (
+    <>
+      {body}
+      {dialog}
+    </>
+  );
 }

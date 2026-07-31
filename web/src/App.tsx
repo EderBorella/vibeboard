@@ -13,6 +13,8 @@ import { ProjectGate } from './components/ProjectGate';
 import { SettingsModal } from './components/SettingsModal';
 import { type MainTab, TopBar } from './components/TopBar';
 import { WorkArea } from './components/WorkArea';
+import { archiveCardRequest, stopRunRequest } from './confirm/requests';
+import { useConfirm } from './confirm/useConfirm';
 import { type CopilotMode, useCopilot } from './copilot/useCopilot';
 import { useCardTabs } from './dock/useCardTabs';
 import { useDock } from './dock/useDock';
@@ -33,6 +35,9 @@ export function App() {
   const [copilotOpen, setCopilotOpen] = useState(true);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [tab, setTab] = useState<MainTab>('boards');
+  // Asked before anything irreversible. `dialog` is rendered at the bottom of the shell, above
+  // everything else — see useConfirm.
+  const { confirm, dialog } = useConfirm();
   // Tag filter: one filter across all three boards, and deliberately NOT persisted — a filter
   // restored on the next load reads as cards having gone missing.
   const [activeTags, setActiveTags] = useState<string[]>([]);
@@ -97,8 +102,12 @@ export function App() {
   const onDragStart = (card: Card): void => {
     dragged.current = card;
   };
+  // Reversible, and the copy says so — but it is a one-click ✕ on every tile, which makes it the
+  // easiest thing here to do by accident.
   const onArchive = (card: Card): void => {
-    void archiveCard(card.board, card.id);
+    void confirm(archiveCardRequest(card)).then((ok) => {
+      if (ok) void archiveCard(card.board, card.id);
+    });
   };
   const onTag = (tag: string): void => setActiveTags((prev) => toggleTag(prev, tag));
   // Moving a card after a successful run is the user's click, never something the run does: 'Review'
@@ -187,7 +196,9 @@ export function App() {
         onLinks={onLinks}
         onMoveCard={onMoveCard}
         onCancelRun={(record) => {
-          void cancelRun(record.run).catch(() => {});
+          void confirm(stopRunRequest(record)).then((ok) => {
+            if (ok) void cancelRun(record.run).catch(() => {});
+          });
         }}
         onResolveRun={(record) => {
           void resolveRun(record.board, record.card, record.run).catch(() => {});
@@ -221,6 +232,8 @@ export function App() {
           onSaved={() => setSettingsOpen(false)}
         />
       )}
+
+      {dialog}
     </div>
   );
 }

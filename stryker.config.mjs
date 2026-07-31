@@ -66,6 +66,8 @@ export default {
     'web/src/runs/useDispatch.ts',
     'web/src/runs/viewmodel.ts',
     'web/src/runs/format.ts',
+    'web/src/confirm/useConfirm.tsx',
+    'web/src/confirm/requests.ts',
     'web/src/copilot/choice.ts',
     'web/src/copilot/format.ts',
     'web/src/useSnapshot.ts',

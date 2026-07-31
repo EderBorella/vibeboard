@@ -443,6 +443,52 @@ describe('CardsPane', () => {
     expect(container.querySelector('.cardview')).toBeNull();
   });
 
+  // One in-flight run on the open card, for the two Stop tests below.
+  const runningRun = {
+    run: '20260726-143012-a1b2',
+    card: 'E-001',
+    board: 'engineering',
+    skill: 'execute',
+    status: 'running',
+    started: '2026-07-26T14:30:12.000Z',
+    backend: 'claude-code',
+    model: 'opus',
+    effort: 'high',
+    mode: 'bypassPermissions',
+    report: '',
+  };
+
+  const openCardWithRunningRun = async (): Promise<void> => {
+    api.cancelRun.mockClear();
+    api.listCardRuns.mockResolvedValueOnce([runningRun]);
+    render(<CardsPane {...props} tabs={[ref('E-001')]} activeId="E-001" live={[card('E-001')]} />);
+    await waitFor(() => expect(screen.getByText('Stop')).toBeTruthy());
+    await act(async () => {
+      fireEvent.click(screen.getByText('Stop'));
+    });
+  };
+
+  it('asks before stopping a run, and stops nothing while the question is open', async () => {
+    await openCardWithRunningRun();
+    // The question names the skill, and NOTHING has been stopped yet.
+    expect(screen.getByText('Stop the execute run?')).toBeTruthy();
+    expect(api.cancelRun).not.toHaveBeenCalled();
+
+    await act(async () => {
+      fireEvent.click(screen.getByText('Cancel'));
+    });
+    expect(api.cancelRun).not.toHaveBeenCalled();
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('stops the run once the question is answered yes', async () => {
+    await openCardWithRunningRun();
+    await act(async () => {
+      fireEvent.click(screen.getByText('Stop the run'));
+    });
+    expect(api.cancelRun).toHaveBeenCalledWith('20260726-143012-a1b2');
+  });
+
   it('asks for the runs of whichever card is active', async () => {
     api.listCardRuns.mockClear();
     render(

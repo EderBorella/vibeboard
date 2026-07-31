@@ -11,6 +11,7 @@ import {
   putSkill,
   renameControlFile,
 } from '../api';
+import { useConfirm } from '../confirm/useConfirm';
 import type { ProjectSnapshot } from '../shared';
 import { useSkills } from '../skills/useSkills';
 import { ControlFileEditor, type ControlView, type OpenFile } from './ControlFileEditor';
@@ -41,6 +42,7 @@ export function ProjectControl({ snapshot }: Props) {
   const [view, setView] = useState<ControlView>('edit');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { confirm, dialog } = useConfirm();
   // Path currently being renamed in the list, plus its in-progress text. Set right after a
   // create so the new file lands with its name selected and ready to type over.
   const [renaming, setRenaming] = useState<string | null>(null);
@@ -150,7 +152,13 @@ export function ProjectControl({ snapshot }: Props) {
 
   async function remove(): Promise<void> {
     if (!file?.deletable) return;
-    if (!window.confirm(`Delete ${file.path}? This removes the file from disk.`)) return;
+    const ok = await confirm({
+      title: `Delete ${file.name}?`,
+      body: `${file.path} is removed from disk. This cannot be undone.`,
+      action: 'Delete file',
+      danger: true,
+    });
+    if (!ok) return;
     setBusy(true);
     setError(null);
     try {
@@ -242,6 +250,8 @@ export function ProjectControl({ snapshot }: Props) {
         )}
         {error && <div className="control-error">{error}</div>}
       </div>
+
+      {dialog}
     </section>
   );
 }

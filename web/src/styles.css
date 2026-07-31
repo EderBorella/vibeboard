@@ -388,6 +388,25 @@ body {
 .mp-trigger:disabled { opacity: 0.5; cursor: default; }
 .mp-trigger-label { flex: 1; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-mono); }
 .mp-caret { color: var(--muted); }
+/* ---------- Confirm dialog ---------- */
+/* Above every other modal: it can be asked from inside one (deleting a file in Project Control). */
+.confirm-backdrop { z-index: 80; }
+.confirm { max-width: 420px; }
+.confirm-body { margin: 0; font-size: 0.82rem; color: var(--muted); }
+.confirm-actions { display: flex; justify-content: flex-end; gap: 0.5rem; }
+.confirm-cancel, .confirm-go {
+  background: var(--panel); color: var(--text);
+  border: 1px solid var(--border); border-radius: 6px;
+  cursor: pointer; font-size: 0.78rem; font-family: inherit;
+  padding: 0.3rem 0.7rem;
+}
+.confirm-cancel:hover { border-color: var(--accent); color: var(--accent); }
+/* The destructive button is the one that looks dangerous; a reversible action keeps the plain style,
+   so the two do not read as equally final. */
+.confirm-go:hover { border-color: var(--accent); color: var(--accent); }
+.confirm-go.danger { color: var(--danger); border-color: var(--danger); }
+.confirm-go.danger:hover { background: var(--danger); color: var(--bg); }
+
 /* Model picker modal */
 .mp-modal-backdrop { position: fixed; inset: 0; z-index: 60; background: rgba(0,0,0,0.55); display: flex; align-items: center; justify-content: center; padding: 1rem; }
 .mp-modal {

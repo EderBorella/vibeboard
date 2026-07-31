@@ -1,7 +1,8 @@
-import { type RunRecord, runId, withoutReport } from '../core/runs.js';
+import { type RunRecord, type RunUsage, runId, withoutReport, withUsage } from '../core/runs.js';
 import type { Skill } from '../core/skills.js';
 import type { BoardName, Card } from '../core/types.js';
 import { type Backend, type RunningTurn, runAgentTurn } from './agent-turn.js';
+import type { ResultStats } from './copilot-events.js';
 import type { Log } from './logging.js';
 import { buildRunPrompt } from './run-prompt.js';
 import { appendTranscript, foldReport, reportContract, transcriptTail, writeRun } from './run-store.js';
@@ -64,6 +65,19 @@ interface Queued {
   record: RunRecord;
   root: string;
   input: DispatchInput;
+}
+
+// The turn's stats as the record keeps them: `ok` and `text` belong to the turn, not to the ledger,
+// and the numbers are copied verbatim — a zero cost is what a free model really cost, not a gap.
+function usageFromStats(stats: ResultStats | undefined): RunUsage | undefined {
+  if (!stats) return undefined;
+  return {
+    costUsd: stats.costUsd,
+    durationMs: stats.durationMs,
+    turns: stats.turns,
+    contextTokens: stats.contextTokens,
+    outputTokens: stats.outputTokens,
+  };
 }
 
 export class AgentRunner {
@@ -225,8 +239,11 @@ export class AgentRunner {
       const finishedAt = this.#opts.now().toISOString();
       // Every transcript line on disk before anything reads the tail.
       await this.#transcripts.get(run);
-      const folded = await foldReport(root, record, finishedAt);
-      final = folded ?? (await this.#endWithoutReport(root, record, result, cancelled, finishedAt));
+      // Attached here, once, so BOTH endings carry it: a run that failed or was cancelled still
+      // spent tokens, and that is exactly when you want to know how many.
+      const spent = withUsage(record, usageFromStats(result.stats));
+      const folded = await foldReport(root, spent, finishedAt);
+      final = folded ?? (await this.#endWithoutReport(root, spent, result, cancelled, finishedAt));
     } catch (err) {
       final = withoutReport(
         record,

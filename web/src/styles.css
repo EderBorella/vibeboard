@@ -900,6 +900,8 @@ body {
 .chip-running, .chip-queued { color: var(--text); border-color: var(--text); }
 .chip-cancelled { color: var(--muted); }
 .report-skill { flex: 0 0 auto; font-size: 0.78rem; }
+/* Money reads as data, not prose: mono, so a card's runs line up down the column. */
+.report-cost { flex: 0 0 auto; color: var(--muted); font-family: var(--font-mono); font-size: 0.66rem; }
 .report-when { flex: 0 0 auto; color: var(--muted); font-family: var(--font-mono); font-size: 0.66rem; }
 .report-summary {
   flex: 1; min-width: 0; color: var(--muted); font-size: 0.74rem;
@@ -972,6 +974,9 @@ body {
 }
 .exec-run-top { display: flex; align-items: baseline; gap: 0.4rem; width: 100%; }
 .exec-skill { font-size: 0.78rem; }
+/* Cost takes the push-right when present, so cost and elapsed sit together at the end of the row. */
+.exec-cost { margin-left: auto; color: var(--muted); font-family: var(--font-mono); font-size: 0.66rem; }
+.exec-cost + .exec-when { margin-left: 0; }
 .exec-when { margin-left: auto; color: var(--muted); font-family: var(--font-mono); font-size: 0.66rem; }
 .exec-card {
   width: 100%; text-align: left; background: transparent; border: 1px solid transparent;

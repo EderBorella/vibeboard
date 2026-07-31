@@ -120,6 +120,27 @@ describe('CardReports', () => {
     expect(document.querySelector('.report-when')?.textContent).toBe('2026-07-26 14:30');
   });
 
+  it('shows each run’s cost, and nothing where it is unknown', () => {
+    render(
+      <CardReports
+        runs={[run({ usage: { costUsd: 0.0421 } }), run({ run: 'r2', usage: undefined })]}
+        onOpen={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+    // One row has a cost, the other has no element at all — not an empty one, which would leave a
+    // gap implying the run was free.
+    const costs = [...document.querySelectorAll('.report-cost')].map((n) => n.textContent);
+    expect(costs).toEqual(['$0.042']);
+  });
+
+  it('shows a free run as $0 rather than as unknown', () => {
+    render(
+      <CardReports runs={[run({ usage: { costUsd: 0 } })]} onOpen={vi.fn()} onCancel={vi.fn()} />,
+    );
+    expect(document.querySelector('.report-cost')?.textContent).toBe('$0');
+  });
+
   it('leaves the summary blank rather than printing undefined', () => {
     render(
       <CardReports
@@ -266,6 +287,25 @@ describe('ReportPane', () => {
     render(<ReportPane {...props} record={run({ prompt: 'only the token store' })} />);
     expect(screen.getByText('opus · high · bypassPermissions')).toBeTruthy();
     expect(screen.getByText(/only the token store/)).toBeTruthy();
+  });
+
+  it('says what the run cost, in full', () => {
+    render(
+      <ReportPane
+        {...props}
+        record={run({
+          usage: { costUsd: 0.0421, durationMs: 62_431, turns: 7, contextTokens: 48_210 },
+        })}
+      />,
+    );
+    expect(screen.getByText('Usage')).toBeTruthy();
+    expect(screen.getByText('$0.042 · 1m 2s · 7 turns · 48.2k ctx')).toBeTruthy();
+  });
+
+  it('omits the usage row entirely for a run that never reported any', () => {
+    // Older runs have no usage. A row reading "$0" would claim the run was free.
+    render(<ReportPane {...props} record={run()} />);
+    expect(screen.queryByText('Usage')).toBeNull();
   });
 
   it('says a run left no report rather than showing an empty pane', () => {

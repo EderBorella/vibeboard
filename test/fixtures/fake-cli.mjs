@@ -48,6 +48,8 @@ const RESULT = {
   num_turns: 1,
   duration_ms: 5,
   session_id: 'shim-session',
+  // A real cost, so a test can tell "captured it" from "defaulted to zero".
+  total_cost_usd: 0.0125,
   usage: { input_tokens: 5, output_tokens: 7 },
 };
 

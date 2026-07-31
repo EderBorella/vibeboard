@@ -99,6 +99,21 @@ describe('ExecutionView', () => {
     expect(screen.getByText('1m 0s')).toBeTruthy();
   });
 
+  it('shows what a finished run cost, and nothing for one still going', () => {
+    // A run in flight has reported no usage yet, so the slot stays empty rather than reading $0.
+    render(
+      <ExecutionView
+        {...props}
+        runs={[
+          run({ run: 'r1', status: 'success', usage: { costUsd: 0.0421 } }),
+          run({ run: 'r2', status: 'running' }),
+        ]}
+      />,
+    );
+    const costs = [...document.querySelectorAll('.exec-cost')].map((n) => n.textContent);
+    expect(costs).toEqual(['$0.042']);
+  });
+
   it('offers Stop only for runs the server is actually holding', () => {
     // A record can say `running` while the server has already moved on — after a restart, say. Only
     // the server knows what it can still stop.

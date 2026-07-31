@@ -1,4 +1,5 @@
 import type { RunRecord, RunStatus } from '../api';
+import { costLabel } from '../runs/format';
 
 interface Props {
   runs: RunRecord[];
@@ -45,6 +46,9 @@ export function CardReports({ runs, onOpen, onCancel }: Props) {
               {r.resolved ? `${LABELS[r.status]} · dealt with` : LABELS[r.status]}
             </span>
             <span className="report-skill">{r.skill}</span>
+            {/* Cost only, and only when reported: the row has one line, and the full breakdown is
+                one click away in the report itself. */}
+            {costLabel(r.usage) && <span className="report-cost">{costLabel(r.usage)}</span>}
             <span className="report-when">{when(r)}</span>
             <span className="report-summary">{r.summary ?? r.note ?? ''}</span>
           </button>

@@ -298,6 +298,16 @@ export type RunStatus =
   | 'cancelled'
   | 'interrupted';
 
+// What the turn cost. Mirrors RunUsage in src/core/runs.ts. Every field is optional and zero is a
+// real value — a free model costs nothing — so absence and zero must not render the same way.
+export interface RunUsage {
+  costUsd?: number;
+  durationMs?: number;
+  turns?: number;
+  contextTokens?: number;
+  outputTokens?: number;
+}
+
 export interface RunRecord {
   run: string;
   card: string;
@@ -321,6 +331,7 @@ export interface RunRecord {
   created?: string[];
   // VibeBoard's explanation when there is no report to speak for the run.
   note?: string;
+  usage?: RunUsage; // what it cost, when the backend said
   report: string;
 }
 

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { RunRecord } from '../api';
 import { renderMarkdown } from '../markdown';
+import { usageLine } from '../runs/format';
 import { needsAttention } from '../runs/viewmodel';
 import type { Card, ProjectConfig } from '../shared';
 import { slugify } from '../viewmodel';
@@ -80,6 +81,14 @@ export function ReportPane({
           <div>
             <dt>Attached</dt>
             <dd>{record.attached.join(', ')}</dd>
+          </div>
+        )}
+        {/* "Usage", not "Cost": for Claude Code this is the API-equivalent figure, which is not what
+            a subscription was billed. Absent for older runs and for a turn that died before saying. */}
+        {record.usage && (
+          <div>
+            <dt>Usage</dt>
+            <dd>{usageLine(record.usage)}</dd>
           </div>
         )}
         {/* Shown for what it is: the run still reads as `attention`, and this is the answer to it. */}

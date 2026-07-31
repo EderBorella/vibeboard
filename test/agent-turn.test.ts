@@ -184,7 +184,25 @@ describe('the claude stream', () => {
       model: 'shim-model',
       exitCode: 0,
       timedOut: false,
+      // Carried out of the turn, not merely forwarded to onEvent: this is what the run record bills
+      // from. Exact equality, so a field silently dropped from the mapping fails here.
+      stats: {
+        ok: true,
+        text: 'done',
+        costUsd: 0.0125,
+        durationMs: 5,
+        turns: 1,
+        contextTokens: 5,
+        outputTokens: 7,
+      },
     });
+  });
+
+  it('reports no stats when the CLI never sent a result line', async () => {
+    // A killed or crashed turn spent something, but nothing said how much — inventing zeros would
+    // read as "this run was free".
+    const { result } = await claudeTurn({}, '[[behaviour:notail]]');
+    expect(result.stats).toBeUndefined();
   });
 
   it('takes the session id from the result when there was no init', async () => {
@@ -363,6 +381,51 @@ describe('the opencode backend', () => {
       exitCode: 0,
       timedOut: false,
     });
+  });
+
+  it('taps the result event on its way through, so the run can be billed', async () => {
+    // The client returns only a session id — the stats arrive as one of the events it forwards, so
+    // this module has to watch them go past rather than read them off a return value.
+    const stats = {
+      ok: true,
+      text: 'done',
+      costUsd: 0.004,
+      durationMs: 900,
+      turns: 2,
+      contextTokens: 1200,
+      outputTokens: 34,
+    };
+    client.opencodeTurn.mockImplementation(async (opts: { onEvent: (e: CopilotEvent) => void }) => {
+      opts.onEvent({ kind: 'result', sessionId: 'oc-session', stats });
+      return 'oc-session';
+    });
+
+    const { result, events } = await opencodeTurn();
+    expect(result.stats).toEqual(stats);
+    // Tapping must not swallow it: the chat renders from these events.
+    expect(events).toEqual([{ kind: 'result', sessionId: 'oc-session', stats }]);
+  });
+
+  it('still reports what a failed turn spent', async () => {
+    // The stats arrive before the failure, and a turn that burned tokens and then broke is exactly
+    // the one worth accounting for.
+    const stats = {
+      ok: false,
+      text: '',
+      costUsd: 0.002,
+      durationMs: 100,
+      turns: 1,
+      contextTokens: 10,
+      outputTokens: 0,
+    };
+    client.opencodeTurn.mockImplementation(async (opts: { onEvent: (e: CopilotEvent) => void }) => {
+      opts.onEvent({ kind: 'result', sessionId: 'oc-session', stats });
+      throw new Error('provider exploded');
+    });
+
+    const { result } = await opencodeTurn();
+    expect(result.exitCode).toBe(1);
+    expect(result.stats).toEqual(stats);
   });
 
   it('adds the research persona only in research mode, and nothing else', async () => {

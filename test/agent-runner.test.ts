@@ -126,6 +126,58 @@ describe('AgentRunner.dispatch', () => {
     expect(updates.at(-1)?.status).toBe('success');
   });
 
+  it('records what the run cost, read back from the file on disk', async () => {
+    // Through serialize and parse, not just in memory: the dashboard reads these files.
+    const root = await tempDir();
+    const { instance } = runner(root);
+    const { run } = await instance.dispatch(input(root));
+    const final = await settled(root, run);
+
+    expect(final.usage).toEqual({
+      costUsd: 0.0125,
+      durationMs: 1250,
+      turns: 3,
+      // input + cache read: window occupancy, not the sum of every call in the turn.
+      contextTokens: 100,
+      outputTokens: 7,
+    });
+  });
+
+  it('records a zero cost as zero, not as unknown', async () => {
+    // Free models are the common case on OpenCode. A run that cost nothing and a run that never
+    // said what it cost are different facts, and only one of them is worth showing as blank.
+    const root = await tempDir();
+    const { instance } = runner(root);
+    const { run } = await instance.dispatch(input(root, behaving('free')));
+    const final = await settled(root, run);
+
+    expect(final.status).toBe('success');
+    expect(final.usage?.costUsd).toBe(0);
+  });
+
+  it('records what a crashed run spent, since it spent it anyway', async () => {
+    // The reason usage is attached BEFORE the ending is decided: the failing runs are the ones you
+    // most want the bill for.
+    const root = await tempDir();
+    const { instance } = runner(root);
+    const { run } = await instance.dispatch(input(root, behaving('crash')));
+    const final = await settled(root, run);
+
+    expect(final.status).toBe('failed');
+    expect(final.usage?.costUsd).toBe(0.0125);
+    expect(final.usage?.turns).toBe(3);
+  });
+
+  it('leaves usage absent when the agent never reported any', async () => {
+    // `chatty` exits without a result line. Zeros here would read as "this run was free".
+    const root = await tempDir();
+    const { instance } = runner(root);
+    const { run } = await instance.dispatch(input(root, behaving('chatty')));
+    const final = await settled(root, run);
+
+    expect(final.usage).toBeUndefined();
+  });
+
   it('folds an attention report, options and all', async () => {
     const shim = behaving('attention');
     const root = await tempDir();

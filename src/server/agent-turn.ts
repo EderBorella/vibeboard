@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { claudeConfigDir, isolationEnabled } from './copilot-env.js';
-import { type CopilotEvent, parseCopilotLine } from './copilot-events.js';
+import { type CopilotEvent, parseCopilotLine, type ResultStats } from './copilot-events.js';
 import { opencodeTurn } from './opencode-client.js';
 
 // ONE agent turn: build the command, run it, stream its events, report how it ended.
@@ -45,6 +45,9 @@ export interface AgentTurnResult {
   model?: string;
   exitCode: number | null;
   timedOut: boolean;
+  // What the turn cost, from the backend's own result event — both backends report one, normalised
+  // by copilot-events. Absent when the turn died before saying (failed to start, killed, timed out).
+  stats?: ResultStats;
 }
 
 export interface RunningTurn {
@@ -147,6 +150,14 @@ function startOpencode(opts: AgentTurnOptions): RunningTurn {
     abort.abort();
   }, opts.timeoutMs);
 
+  // Tapped on the way through rather than returned by the client: the result event is one of the
+  // events the caller is already being sent, and a failed turn still reports what it spent.
+  let stats: ResultStats | undefined;
+  const onEvent = (event: CopilotEvent): void => {
+    if (event.kind === 'result') stats = event.stats;
+    opts.onEvent(event);
+  };
+
   const done = (async (): Promise<AgentTurnResult> => {
     try {
       const sessionId = await opencodeTurn({
@@ -157,16 +168,16 @@ function startOpencode(opts: AgentTurnOptions): RunningTurn {
         system: systemPrompt(opts.cwd, opts.mode === 'research' ? RESEARCH_PERSONA : ''),
         sessionId: opts.sessionId,
         signal: abort.signal,
-        onEvent: opts.onEvent,
+        onEvent,
       });
-      return { sessionId, model: opts.model, exitCode: 0, timedOut };
+      return { sessionId, model: opts.model, exitCode: 0, timedOut, stats };
     } catch (err) {
       if (!timedOut)
         opts.onEvent({
           kind: 'text',
           text: `\n[opencode failed: ${err instanceof Error ? err.message : String(err)}]`,
         });
-      return { model: opts.model, exitCode: 1, timedOut };
+      return { model: opts.model, exitCode: 1, timedOut, stats };
     } finally {
       clearTimeout(timer);
     }
@@ -184,6 +195,7 @@ function startClaude(opts: AgentTurnOptions): RunningTurn {
 
   let sessionId = opts.sessionId;
   let model: string | undefined;
+  let stats: ResultStats | undefined;
   let buf = '';
   let stderr = '';
   const emitLine = (line: string): void => {
@@ -191,8 +203,10 @@ function startClaude(opts: AgentTurnOptions): RunningTurn {
       if (event.kind === 'init') {
         sessionId = event.sessionId;
         model = event.model;
-      } else if (event.kind === 'result' && event.sessionId) {
-        sessionId = event.sessionId;
+      } else if (event.kind === 'result') {
+        // The session id is conditional (it is not always present); the stats are not.
+        if (event.sessionId) sessionId = event.sessionId;
+        stats = event.stats;
       }
       opts.onEvent(event);
     }
@@ -229,11 +243,12 @@ function startClaude(opts: AgentTurnOptions): RunningTurn {
           text: `\n[copilot exited (${code})]${stderr ? `\n${stderr.slice(0, 800)}` : ''}`,
         });
       }
-      settle({ sessionId, model, exitCode: code, timedOut });
+      settle({ sessionId, model, exitCode: code, timedOut, stats });
     });
     child.on('error', (err) => {
       clearTimeout(timer);
       opts.onEvent({ kind: 'text', text: `[copilot failed to start: ${err.message}]` });
+      // No stats: a process that never started never reported any.
       settle({ sessionId, model, exitCode: null, timedOut });
     });
   });

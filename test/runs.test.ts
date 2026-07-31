@@ -11,6 +11,7 @@ import {
   withoutReport,
   withReport,
   withResolution,
+  withUsage,
 } from '../src/core/runs.js';
 
 const record = (over: Partial<RunRecord> = {}): RunRecord => ({
@@ -55,6 +56,7 @@ describe('serializeRun / parseRun', () => {
       summary: 'bigger than one card',
       options: ['split it', 'do the store only'],
       created: ['E-041', 'E-042'],
+      usage: { costUsd: 0.0421, durationMs: 62431, turns: 7, contextTokens: 48210, outputTokens: 1832 },
       report: '## What I found\n\nThree cards, not one.',
     });
     expect(parseRun(serializeRun(full))).toEqual(full);
@@ -112,6 +114,73 @@ describe('serializeRun / parseRun', () => {
       '---\nrun: r\ncard: E-1\nskill: x\nboard: engineering\nstatus: success\noptions: ["", " "]\n---\nb\n',
     );
     expect(parsed?.options).toBeUndefined();
+  });
+});
+
+describe('withUsage', () => {
+  it('attaches what the turn spent', () => {
+    const spent = withUsage(record(), { costUsd: 0.01, turns: 2 });
+    expect(spent.usage).toEqual({ costUsd: 0.01, turns: 2 });
+  });
+
+  it('leaves the record alone when the backend said nothing', () => {
+    // Not `usage: {}` — a turn that never reported is different from one that reported zeros, and
+    // the record should not claim otherwise.
+    const before = record();
+    expect(withUsage(before, undefined)).toBe(before);
+  });
+
+  it('does not mutate the record it is given', () => {
+    const before = record();
+    withUsage(before, { costUsd: 1 });
+    expect(before.usage).toBeUndefined();
+  });
+});
+
+describe('parseRun usage', () => {
+  const withUsageYaml = (yaml: string): RunRecord | null =>
+    parseRun(`---\nrun: r\ncard: E-1\nskill: x\nboard: engineering\nstatus: success\n${yaml}---\nb\n`);
+
+  it('keeps a zero cost, because a free model really did cost nothing', () => {
+    // The trap this exists for: `if (usage.costUsd)` anywhere on the read or render path turns a
+    // genuine zero into "unknown", and free models are the common case on OpenCode.
+    const parsed = withUsageYaml('usage:\n  costUsd: 0\n  turns: 3\n');
+    expect(parsed?.usage).toEqual({ costUsd: 0, turns: 3 });
+  });
+
+  it.each([
+    ['a string', 'usage:\n  costUsd: "0.04"\n'],
+    ['a negative', 'usage:\n  costUsd: -1\n'],
+    ['not a number at all', 'usage:\n  costUsd: yesterday\n'],
+    ['null', 'usage:\n  costUsd: null\n'],
+    ['a nested object', 'usage:\n  costUsd:\n    amount: 4\n'],
+  ])('drops %s rather than rendering it', (_case, yaml) => {
+    expect(withUsageYaml(yaml)?.usage).toBeUndefined();
+  });
+
+  it('keeps the good fields when only some are junk', () => {
+    expect(withUsageYaml('usage:\n  costUsd: bogus\n  durationMs: 1500\n')?.usage).toEqual({
+      durationMs: 1500,
+    });
+  });
+
+  it('ignores keys it does not know', () => {
+    // Frontmatter is hand-editable, and a stray key must not reach the UI as a mystery row.
+    expect(withUsageYaml('usage:\n  turns: 2\n  bananas: 9\n')?.usage).toEqual({ turns: 2 });
+  });
+
+  it.each([
+    ['usage is a scalar', 'usage: 4\n'],
+    ['usage is a string', 'usage: expensive\n'],
+    ['usage is absent', ''],
+    ['usage is an empty map', 'usage: {}\n'],
+  ])('treats %s as no usage at all', (_case, yaml) => {
+    expect(withUsageYaml(yaml)?.usage).toBeUndefined();
+  });
+
+  it('writes no usage key for a record that has none', () => {
+    // An empty `usage: {}` in every old run file would be noise in a diff for no information.
+    expect(serializeRun(record())).not.toContain('usage');
   });
 });
 

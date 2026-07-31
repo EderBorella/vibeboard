@@ -24,6 +24,20 @@ export type RunStatus = (typeof RUN_STATUSES)[number];
 export const RUN_OUTCOMES = ['success', 'attention'] as const;
 export type RunOutcome = (typeof RUN_OUTCOMES)[number];
 
+// What the turn cost. Every field is optional and every one may legitimately be zero — a free model
+// really does cost nothing — so absence and zero are different facts and are kept apart.
+//
+// `costUsd` is what the backend reports. For Claude Code that is the API-EQUIVALENT cost: on a Max or
+// Pro subscription it is not what you were billed, it is what those tokens would have cost on the
+// API. The UI says "usage" rather than "cost" for that reason.
+export interface RunUsage {
+  costUsd?: number;
+  durationMs?: number;
+  turns?: number; // model round-trips inside the one agent turn, not runs
+  contextTokens?: number; // window occupancy at the end of the turn
+  outputTokens?: number;
+}
+
 export interface RunRecord {
   run: string; // sortable id, also the filename
   card: string;
@@ -48,6 +62,7 @@ export interface RunRecord {
   options?: string[]; // the agent's options — attention only
   created?: string[]; // card ids the run created
   note?: string; // VibeBoard's own explanation when there is no report to speak for the run
+  usage?: RunUsage; // what it cost, when the backend said
   report: string; // the body: the agent's report, verbatim
 }
 
@@ -66,6 +81,22 @@ function asStrings(value: unknown): string[] | undefined {
   if (!Array.isArray(value)) return undefined;
   const list = value.map((v) => String(v).trim()).filter((v) => v !== '');
   return list.length > 0 ? list : undefined;
+}
+
+const USAGE_KEYS = ['costUsd', 'durationMs', 'turns', 'contextTokens', 'outputTokens'] as const;
+
+// A hand-edited or half-written file can put anything here. Zero is kept — a free model costs
+// nothing and that is worth recording — but NaN, Infinity, negatives and non-numbers are not facts
+// about a run, so they are dropped rather than rendered.
+function asUsage(value: unknown): RunUsage | undefined {
+  if (!value || typeof value !== 'object') return undefined;
+  const source = value as Record<string, unknown>;
+  const usage: RunUsage = {};
+  for (const key of USAGE_KEYS) {
+    const n = source[key];
+    if (typeof n === 'number' && Number.isFinite(n) && n >= 0) usage[key] = n;
+  }
+  return Object.keys(usage).length > 0 ? usage : undefined;
 }
 
 function asText(value: unknown): string | undefined {
@@ -112,6 +143,7 @@ export function serializeRun(record: RunRecord): string {
     'options',
     'created',
     'note',
+    'usage',
   ] as const) {
     if (front[key] !== undefined) data[key] = front[key];
   }
@@ -127,6 +159,8 @@ const LIST_OPTIONALS = ['attached', 'options', 'created'] as const;
 function optionalFields(d: Record<string, unknown>): Partial<RunRecord> {
   const out: Partial<RunRecord> = {};
   if (isOutcome(d.outcome)) out.outcome = d.outcome;
+  const usage = asUsage(d.usage);
+  if (usage !== undefined) out.usage = usage;
   for (const key of TEXT_OPTIONALS) {
     const value = asText(d[key]);
     if (value !== undefined) out[key] = value;
@@ -216,6 +250,13 @@ export function withoutReport(
   transcriptTail = '',
 ): RunRecord {
   return { ...record, status, finished, note, report: transcriptTail.trim() };
+}
+
+// What the turn cost, attached before either ending is decided — a run that failed or was cancelled
+// still spent tokens, and that is exactly when knowing so matters. Absent usage leaves the record
+// untouched rather than writing an empty `usage: {}`.
+export function withUsage(record: RunRecord, usage: RunUsage | undefined): RunRecord {
+  return usage === undefined ? record : { ...record, usage };
 }
 
 // In-flight statuses cannot survive a restart: the child process is gone with the server that

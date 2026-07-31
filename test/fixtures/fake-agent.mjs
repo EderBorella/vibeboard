@@ -9,6 +9,7 @@
 //   garbage   — writes a report with malformed frontmatter
 //   crash     — exits non-zero without a report
 //   hang      — never exits, for cancel and timeout
+//   free      — like success, but reports a cost of exactly 0 (a free model)
 //
 // The report path is read from the prompt it was given, exactly as a real agent would: that means
 // these tests fail if the prompt stops naming the path.
@@ -45,6 +46,8 @@ const REPORTS = {
     '---\noutcome: attention\nsummary: bigger than one card\noptions:\n  - Split it in two\n  - Do the store only\n---\n## What I found\n\nThree cards, not one.\n',
   garbage: '---\noutcome: [unclosed\n---\nI tried\n',
 };
+// A free run still succeeds; only its cost differs.
+REPORTS.free = REPORTS.success;
 
 if (behaviour === 'chatty') {
   // Many events then an immediate exit with no report. The point is the race: every line must be on
@@ -71,10 +74,12 @@ if (behaviour === 'chatty') {
     subtype: 'success',
     is_error: false,
     result: 'done',
-    num_turns: 1,
-    duration_ms: 5,
+    num_turns: 3,
+    duration_ms: 1250,
     session_id: 'shim-run',
-    usage: { input_tokens: 5, output_tokens: 7 },
+    // `free` reports a genuine zero, which must survive to the record as zero and not as "unknown".
+    total_cost_usd: behaviour === 'free' ? 0 : 0.0125,
+    usage: { input_tokens: 5, cache_read_input_tokens: 95, output_tokens: 7 },
   });
   process.exit(behaviour === 'crash' ? 2 : 0);
 }

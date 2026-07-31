@@ -1,4 +1,5 @@
 import type { RunRecord } from '../api';
+import { costLabel } from '../runs/format';
 import { elapsed, groupRuns } from '../runs/viewmodel';
 import type { Card } from '../shared';
 
@@ -49,6 +50,9 @@ export function ExecutionView({ runs, active, queued, cards, now, onOpenCard, on
                   <div className="exec-run-top">
                     <span className={`report-chip chip-${record.status}`}>{record.status}</span>
                     <span className="exec-skill">{record.skill}</span>
+                    {/* What it cost, beside how long it took — the two things a dashboard row is
+                        actually asked. Absent while a run is still in flight. */}
+                    {costLabel(record.usage) && <span className="exec-cost">{costLabel(record.usage)}</span>}
                     <span className="exec-when">{elapsed(record, now)}</span>
                   </div>
                   <button

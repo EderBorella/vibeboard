@@ -6,10 +6,12 @@ import {
   type FileRead,
   type FsNode,
   listDir,
+  moveFsNode,
   renameFsNode,
 } from '../api';
 import { useConfirm } from '../confirm/useConfirm';
 import { formatBytes } from '../explorer/format';
+import { nameOf, parentOf } from '../explorer/paths';
 import { deleteEmptyFolderRequest, deleteEntryRequest, deleteFolderRequest } from '../explorer/requests';
 import { useOpenFile } from '../explorer/useOpenFile';
 import { useTree } from '../explorer/useTree';
@@ -20,16 +22,6 @@ import { FileTree } from './FileTree';
 interface Props {
   // Bumps whenever the project changes on disk, so the tree and the open file follow along.
   snapshot: ProjectSnapshot;
-}
-
-function parentOf(path: string): string {
-  const cut = path.lastIndexOf('/');
-  return cut === -1 ? '' : path.slice(0, cut);
-}
-
-function nameOf(path: string): string {
-  const cut = path.lastIndexOf('/');
-  return cut === -1 ? path : path.slice(cut + 1);
 }
 
 // Where a new file or folder should land: inside the selected folder, beside the selected file, or in
@@ -58,6 +50,9 @@ export function ExplorerView({ snapshot }: Props) {
   // name selected and ready to type over — no browser prompt, which can be suppressed.
   const [renaming, setRenaming] = useState<string | null>(null);
   const [renameDraft, setRenameDraft] = useState('');
+  // What is being dragged. State rather than a ref, unlike the board's: the tree needs to re-render to
+  // stop offering the folders this node cannot legally land in.
+  const [dragging, setDragging] = useState<FsNode | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   function activate(node: FsNode): void {
@@ -137,6 +132,24 @@ export function ExplorerView({ snapshot }: Props) {
     await tree.reload(parentOf(node.path));
   }
 
+  // Drop onto a folder row, or onto the header for the project root. The server checks the same three
+  // refusals; FileTree simply does not light up a row it knows would be refused.
+  async function dropInto(dir: string): Promise<void> {
+    const node = dragging;
+    setDragging(null);
+    if (!node) return;
+    setError(null);
+    try {
+      const moved = await moveFsNode(node.path, dir);
+      await tree.reload(parentOf(node.path)); // where it came from
+      await tree.open(dir); // and where it went, expanded so it can be seen to have arrived
+      setSelected(moved);
+      if (open.file?.path === node.path) await open.open(moved.path);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  }
+
   function startRename(node: FsNode): void {
     setRenaming(node.path);
     setRenameDraft(node.name);
@@ -175,6 +188,9 @@ export function ExplorerView({ snapshot }: Props) {
         onRefresh={() => void tree.refresh()}
         onNew={(kind) => void newNode(kind)}
         onDelete={() => void remove()}
+        dragging={dragging}
+        onDragStart={setDragging}
+        onDropInto={(dir) => void dropInto(dir)}
         onStartRename={startRename}
         onRenameDraft={setRenameDraft}
         onCommitRename={() => void commitRename()}

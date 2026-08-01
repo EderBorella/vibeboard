@@ -1,5 +1,7 @@
+import { useState } from 'react';
 import type { FsNode } from '../api';
 import { formatBytes } from '../explorer/format';
+import { canDropInto } from '../explorer/paths';
 import type { TreeRow } from '../explorer/useTree';
 
 interface Props {
@@ -21,6 +23,11 @@ interface Props {
   onRefresh: () => void;
   onNew: (kind: 'file' | 'dir') => void;
   onDelete: () => void;
+  // Drag to move. The node being dragged lives in the parent, because the drop handler needs it and
+  // the row that started the drag is not the row that ends it.
+  dragging: FsNode | null;
+  onDragStart: (node: FsNode | null) => void;
+  onDropInto: (dir: string) => void;
   onStartRename: (node: FsNode) => void;
   onRenameDraft: (value: string) => void;
   onCommitRename: () => void;
@@ -53,22 +60,55 @@ interface NodeRowProps {
   depth: number;
   expanded: boolean;
   active: boolean;
+  // A folder that the current drag could legitimately land in, and whether the pointer is over it.
+  droppable: boolean;
+  over: boolean;
   onActivate: (node: FsNode) => void;
   onStartRename: (node: FsNode) => void;
+  onDragStart: (node: FsNode | null) => void;
+  onOver: (path: string | null) => void;
+  onDropInto: (dir: string) => void;
 }
 
 // Its own component rather than a branch inside the map: the twisty, the tags and the size are four
 // nested conditionals, and cognitive complexity is charged for nesting far more than for length.
-function NodeRow({ node, depth, expanded, active, onActivate, onStartRename }: NodeRowProps) {
+function NodeRow(props: NodeRowProps) {
+  const { node, depth, expanded, active, droppable, over } = props;
   const twist = expandable(node) ? (expanded ? '▾' : '▸') : '';
   return (
     <button
-      className={`control-item explorer-item${active ? ' active' : ''}`}
+      className={`control-item explorer-item${active ? ' active' : ''}${over ? ' explorer-over' : ''}`}
       style={indent(depth)}
       title={title(node)}
       aria-expanded={expandable(node) ? expanded : undefined}
-      onClick={() => onActivate(node)}
-      onDoubleClick={() => onStartRename(node)}
+      draggable
+      onClick={() => props.onActivate(node)}
+      onDoubleClick={() => props.onStartRename(node)}
+      onDragStart={(e) => {
+        e.dataTransfer.setData('text/plain', node.path); // Firefox starts no drag without this
+        e.dataTransfer.effectAllowed = 'move';
+        props.onDragStart(node);
+      }}
+      onDragEnd={() => props.onDragStart(null)}
+      onDragOver={
+        droppable
+          ? (e) => {
+              e.preventDefault(); // without this the drop never fires
+              e.dataTransfer.dropEffect = 'move';
+              props.onOver(node.path);
+            }
+          : undefined
+      }
+      onDragLeave={droppable ? () => props.onOver(null) : undefined}
+      onDrop={
+        droppable
+          ? (e) => {
+              e.preventDefault();
+              props.onOver(null);
+              props.onDropInto(node.path);
+            }
+          : undefined
+      }
     >
       <span className="explorer-twist">{twist}</span>
       <span className="explorer-icon">{icon(node)}</span>
@@ -127,12 +167,38 @@ function MoreRow({ depth, count }: { depth: number; count: number }) {
 // The left-hand tree: the project as it is on disk, one row per entry, lazily filled in as folders
 // are opened. Presentation only — every action is a callback.
 export function FileTree(props: Props) {
-  const { rows, selected, busy, error, newIn, renaming, renameDraft } = props;
+  const { rows, selected, busy, error, newIn, renaming, renameDraft, dragging } = props;
   const where = newIn === '' ? 'the project root' : newIn;
+  // Which row the pointer is over during a drag. Local, because it is nothing but a highlight.
+  const [over, setOver] = useState<string | null>(null);
+  // The header doubles as the project root's drop target: there is no row for the root, so without it
+  // a file dragged into a folder could never come back out.
+  const rootDroppable = canDropInto(dragging, '');
   return (
     <nav className="control-list explorer-list">
-      <div className="control-group-head explorer-head">
-        <span>Files</span>
+      <div
+        className={`control-group-head explorer-head${over === '' ? ' explorer-over' : ''}`}
+        onDragOver={
+          rootDroppable
+            ? (e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                setOver('');
+              }
+            : undefined
+        }
+        onDragLeave={rootDroppable ? () => setOver(null) : undefined}
+        onDrop={
+          rootDroppable
+            ? (e) => {
+                e.preventDefault();
+                setOver(null);
+                props.onDropInto('');
+              }
+            : undefined
+        }
+      >
+        <span>{dragging && rootDroppable ? 'Drop here for the project root' : 'Files'}</span>
         <div className="explorer-actions">
           <button className="control-new" title={`New file in ${where}`} onClick={() => props.onNew('file')}>
             📄＋
@@ -180,8 +246,13 @@ export function FileTree(props: Props) {
             depth={row.depth}
             expanded={row.expanded}
             active={selected?.path === row.node.path}
+            droppable={expandable(row.node) && canDropInto(dragging, row.node.path)}
+            over={over === row.node.path}
             onActivate={props.onActivate}
             onStartRename={props.onStartRename}
+            onDragStart={props.onDragStart}
+            onOver={setOver}
+            onDropInto={props.onDropInto}
           />
         );
       })}

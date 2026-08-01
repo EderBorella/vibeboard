@@ -12,6 +12,7 @@ const api = vi.hoisted(() => ({
   renameFsNode: vi.fn(),
   deleteFsEntry: vi.fn(),
   deleteFsTree: vi.fn(),
+  moveFsNode: vi.fn(),
 }));
 vi.mock('../web/src/api.js', () => api);
 vi.mock('../web/src/api', () => api);
@@ -28,6 +29,7 @@ beforeEach(() => {
   api.renameFsNode.mockReset();
   api.deleteFsEntry.mockReset();
   api.deleteFsTree.mockReset();
+  api.moveFsNode.mockReset();
 });
 
 const dir = (path: string): FsNode => ({ path, name: path.split('/').pop() ?? path, kind: 'dir' });
@@ -516,5 +518,133 @@ describe('ExplorerView — deleting', () => {
     await waitFor(() => expect(screen.getByRole('dialog')).toBeTruthy());
     fireEvent.click(screen.getByRole('button', { name: 'Delete file' }));
     await waitFor(() => expect(screen.getByText('Path not allowed')).toBeTruthy());
+  });
+});
+
+// jsdom builds no DataTransfer, so drag events carry a stand-in. setData is what Firefox needs to
+// start a drag at all, and dropEffect is written during dragover, so both have to exist.
+function transfer(): { setData: () => void; effectAllowed: string; dropEffect: string } {
+  return { setData: () => {}, effectAllowed: '', dropEffect: '' };
+}
+
+const dragTo = (from: HTMLElement, to: HTMLElement): void => {
+  const dataTransfer = transfer();
+  fireEvent.dragStart(from, { dataTransfer });
+  fireEvent.dragOver(to, { dataTransfer });
+  fireEvent.drop(to, { dataTransfer });
+};
+
+describe('ExplorerView — dragging to move', () => {
+  const twoFolders = (path: string): Promise<DirListing> =>
+    Promise.resolve(
+      path === ''
+        ? listing('', [dir('attic'), dir('docs'), file('a.md')])
+        : listing(path, path === 'docs' ? [file('docs/inside.md')] : []),
+    );
+
+  it('moves a file onto a folder row', async () => {
+    api.listDir.mockImplementation(twoFolders);
+    api.moveFsNode.mockResolvedValue({ path: 'docs/a.md', name: 'a.md', kind: 'file', size: 10 });
+    render(<ExplorerView snapshot={snapshot} />);
+    await waitFor(() => expect(screen.getByText('a.md')).toBeTruthy());
+
+    dragTo(row('a.md'), row('docs'));
+    await waitFor(() => expect(api.moveFsNode.mock.calls).toEqual([['a.md', 'docs']]));
+  });
+
+  it('moves a file back to the project root by dropping on the header', async () => {
+    // There is no row for the root, so without the header as a target a file dragged into a folder
+    // could never come back out.
+    api.listDir.mockImplementation(twoFolders);
+    api.moveFsNode.mockResolvedValue({ path: 'inside.md', name: 'inside.md', kind: 'file', size: 2 });
+    render(<ExplorerView snapshot={snapshot} />);
+    await waitFor(() => expect(screen.getByText('docs')).toBeTruthy());
+    fireEvent.click(row('docs'));
+    await waitFor(() => expect(screen.getByText('inside.md')).toBeTruthy());
+
+    const header = screen.getByText('Files').parentElement as HTMLElement;
+    dragTo(row('inside.md'), header);
+    await waitFor(() => expect(api.moveFsNode.mock.calls).toEqual([['docs/inside.md', '']]));
+  });
+
+  it('says what the header is for while a drag is in flight', async () => {
+    api.listDir.mockImplementation(twoFolders);
+    render(<ExplorerView snapshot={snapshot} />);
+    await waitFor(() => expect(screen.getByText('docs')).toBeTruthy());
+    fireEvent.click(row('docs'));
+    await waitFor(() => expect(screen.getByText('inside.md')).toBeTruthy());
+
+    expect(screen.getByText('Files')).toBeTruthy();
+    fireEvent.dragStart(row('inside.md'), { dataTransfer: transfer() });
+    expect(screen.getByText('Drop here for the project root')).toBeTruthy();
+    fireEvent.dragEnd(row('inside.md'));
+    expect(screen.getByText('Files')).toBeTruthy();
+  });
+
+  it('does not offer the root to something already in it', async () => {
+    // a.md is at the root: the header must stay a header rather than inviting a no-op move.
+    api.listDir.mockImplementation(twoFolders);
+    render(<ExplorerView snapshot={snapshot} />);
+    await waitFor(() => expect(screen.getByText('a.md')).toBeTruthy());
+
+    fireEvent.dragStart(row('a.md'), { dataTransfer: transfer() });
+    expect(screen.getByText('Files')).toBeTruthy();
+    const header = screen.getByText('Files').parentElement as HTMLElement;
+    fireEvent.drop(header, { dataTransfer: transfer() });
+    expect(api.moveFsNode).not.toHaveBeenCalled();
+  });
+
+  it('refuses a drop onto a folder into itself', async () => {
+    // `attic` onto `attic`: the drop handler is not even attached, so this fires nothing at all.
+    api.listDir.mockImplementation(twoFolders);
+    render(<ExplorerView snapshot={snapshot} />);
+    await waitFor(() => expect(screen.getByText('attic')).toBeTruthy());
+
+    dragTo(row('attic'), row('attic'));
+    expect(api.moveFsNode).not.toHaveBeenCalled();
+  });
+
+  it('refuses a drop into a folder the entry is already in', async () => {
+    api.listDir.mockImplementation(twoFolders);
+    render(<ExplorerView snapshot={snapshot} />);
+    await waitFor(() => expect(screen.getByText('docs')).toBeTruthy());
+    fireEvent.click(row('docs'));
+    await waitFor(() => expect(screen.getByText('inside.md')).toBeTruthy());
+
+    dragTo(row('inside.md'), row('docs'));
+    expect(api.moveFsNode).not.toHaveBeenCalled();
+  });
+
+  it('re-lists both ends of the move, and follows the open file to its new path', async () => {
+    api.listDir.mockImplementation(twoFolders);
+    api.readFsFile.mockImplementation((p: string) => Promise.resolve(text(p, 'body')));
+    api.moveFsNode.mockResolvedValue({ path: 'docs/a.md', name: 'a.md', kind: 'file', size: 10 });
+    render(<ExplorerView snapshot={snapshot} />);
+    await waitFor(() => expect(screen.getByText('a.md')).toBeTruthy());
+    fireEvent.click(row('a.md'));
+    await waitFor(() => expect(screen.getByRole('textbox')).toBeTruthy());
+
+    api.listDir.mockClear();
+    dragTo(row('a.md'), row('docs'));
+    await waitFor(() => expect(api.moveFsNode).toHaveBeenCalled());
+    // Both the folder it left and the folder it arrived in are stale otherwise.
+    await waitFor(() =>
+      expect(api.listDir.mock.calls.map(([p]) => p).sort()).toEqual(expect.arrayContaining(['', 'docs'])),
+    );
+    await waitFor(() =>
+      expect(screen.getByText('docs/a.md', { selector: '.control-editor-path' })).toBeTruthy(),
+    );
+  });
+
+  it('surfaces a refused move', async () => {
+    api.listDir.mockImplementation(twoFolders);
+    api.moveFsNode.mockRejectedValueOnce(new Error('Something with that name is already there'));
+    render(<ExplorerView snapshot={snapshot} />);
+    await waitFor(() => expect(screen.getByText('a.md')).toBeTruthy());
+
+    dragTo(row('a.md'), row('docs'));
+    await waitFor(() =>
+      expect(screen.getByText('Something with that name is already there')).toBeTruthy(),
+    );
   });
 });

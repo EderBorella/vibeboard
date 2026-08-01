@@ -808,6 +808,8 @@ body {
 .explorer-more { color: var(--muted); font-size: 0.68rem; font-style: italic; padding: 0.2rem 0.5rem; }
 .explorer-actions { display: flex; gap: 0.1rem; }
 .explorer-actions button:disabled { opacity: 0.3; cursor: not-allowed; }
+/* Where a dragged entry would land. */
+.explorer-over { background: var(--panel-2); border-color: var(--accent); box-shadow: var(--glow); }
 
 /* Typed confirmation: for the actions that destroy more than the one thing they name. */
 .confirm-require {

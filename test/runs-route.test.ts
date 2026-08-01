@@ -30,6 +30,22 @@ async function projectWithCard(): Promise<TestProject & { card: string }> {
   return { ...project, card: state.snapshot.boards.engineering[0].id };
 }
 
+// The prompt the shim was spawned with: the last line of the args log, last argument of the call.
+async function promptFrom(argsLog: string): Promise<string> {
+  const line = (await readFile(argsLog, 'utf8')).trim().split('\n').at(-1) as string;
+  return (JSON.parse(line) as string[]).at(-1) as string;
+}
+
+// Records what the shim is spawned with, for a test that asserts on the prompt. Per-process path from
+// the helper, never a fixed one in the repo: two test files sharing one log is what made Stryker's
+// verdicts non-deterministic.
+async function recordingShimArgs(): Promise<string> {
+  const argsLog = shimArgsLog();
+  process.env.VIBEBOARD_SHIM_ARGS = argsLog;
+  await writeFile(argsLog, '', 'utf8');
+  return argsLog;
+}
+
 async function settled(project: TestProject, card: string, run: string): Promise<RunRecord> {
   // 30s: these spawn a real child, and the suite is run with heavy concurrency by Stryker.
   for (let i = 0; i < 300; i++) {
@@ -103,14 +119,10 @@ describe('POST /api/runs', () => {
     await settled(project, project.card, run.run);
   });
 
-  it('passes the card and its linked cards into the prompt', async () => {
+  it('passes the card, its linked cards and the project columns into the prompt', async () => {
     // The sample project links product to feature and engineering, so a dispatch on the engineering
     // card must see P-001 quoted — that is the intent it would otherwise have to guess.
-    // Per-process path from the helper, never a fixed one in the repo: two test files sharing one
-    // log is what made Stryker's verdicts non-deterministic before.
-    const argsLog = shimArgsLog();
-    process.env.VIBEBOARD_SHIM_ARGS = argsLog;
-    await writeFile(argsLog, '', 'utf8');
+    const argsLog = await recordingShimArgs();
     const project = await projectWithCard();
     const { run } = (
       await project.app.inject({
@@ -122,14 +134,58 @@ describe('POST /api/runs', () => {
     await settled(project, project.card, run.run);
     delete process.env.VIBEBOARD_SHIM_ARGS;
 
-    const prompt = JSON.parse((await readFile(argsLog, 'utf8')).trim().split('\n').at(-1) as string).at(
-      -1,
-    ) as string;
+    const prompt = await promptFrom(argsLog);
     expect(prompt).toContain('# Execute');
     expect(prompt).toContain(`## The card: ${project.card}`);
     expect(prompt).toContain('## Linked cards');
     expect(prompt).toContain('### P-001');
     expect(prompt).toContain(`${RUNS_DIR}/${run.run}.report.md`);
+    // A scaffolded project has the default columns, and all three boards are listed — the `execute`
+    // skill is scoped to engineering, but where a skill RUNS is not where it may WRITE.
+    expect(prompt).toContain(
+      [
+        '- **features**: Backlog (backlog), Todo (todo), In Progress (in-progress), Done (done)',
+        '- **product**: Backlog (backlog), Todo (todo), In Progress (in-progress), Done (done)',
+        '- **engineering**: Backlog (backlog), In Progress (in-progress), Review (review), Done (done)',
+      ].join('\n'),
+    );
+    expect(prompt).toContain('Do NOT create a new column');
+  });
+
+  it("lists the OPEN project's columns, not the built-in defaults", async () => {
+    // The assertion that would have caught the bug. Asserting the defaults proves nothing on its own:
+    // the same assertion passes with the config never read. Renaming engineering's columns first is
+    // what distinguishes "read this project's config" from "printed what the defaults happen to say".
+    const argsLog = await recordingShimArgs();
+    const project = await projectWithCard();
+    const patched = await project.app.inject({
+      method: 'PATCH',
+      url: '/api/config',
+      payload: { boards: { engineering: { columns: ['Icebox', 'On Deck', 'Shipping', 'Landed'] } } },
+    });
+    expect(patched.statusCode).toBe(200);
+
+    const { run } = (
+      await project.app.inject({
+        method: 'POST',
+        url: '/api/runs',
+        payload: { board: 'engineering', card: project.card, skill: 'execute' },
+      })
+    ).json() as { run: RunRecord };
+    await settled(project, project.card, run.run);
+    delete process.env.VIBEBOARD_SHIM_ARGS;
+
+    const prompt = await promptFrom(argsLog);
+    expect(prompt).toContain(
+      '- **engineering**: Icebox (icebox), On Deck (on-deck), Shipping (shipping), Landed (landed)',
+    );
+    // Review is engineering's alone among the defaults, so its absence — not merely Icebox's presence
+    // — is what rules out a hardcoded list.
+    expect(prompt).not.toContain('Review (review)');
+    // The boards that were not patched are still there, and still their own columns.
+    expect(prompt).toContain(
+      '- **product**: Backlog (backlog), Todo (todo), In Progress (in-progress), Done (done)',
+    );
   });
 
   it('refuses an unknown skill, card or board rather than dispatching something wrong', async () => {
@@ -179,9 +235,7 @@ describe('POST /api/runs', () => {
   it('resolves links against the live board, dropping ids that no longer exist', async () => {
     // The client's view of a card's links can be stale, and a card can be deleted between renders.
     // A dangling id must not reach the prompt — the agent would go looking for a card that is gone.
-    const argsLog = shimArgsLog();
-    process.env.VIBEBOARD_SHIM_ARGS = argsLog;
-    await writeFile(argsLog, '', 'utf8');
+    const argsLog = await recordingShimArgs();
     const project = await projectWithCard();
 
     const raw = (
@@ -205,9 +259,7 @@ describe('POST /api/runs', () => {
     await settled(project, project.card, run.run);
     delete process.env.VIBEBOARD_SHIM_ARGS;
 
-    const prompt = JSON.parse((await readFile(argsLog, 'utf8')).trim().split('\n').at(-1) as string).at(
-      -1,
-    ) as string;
+    const prompt = await promptFrom(argsLog);
     // The id itself still appears — it is in the card's own frontmatter, which is quoted verbatim.
     // What must not appear is a SECTION for it: that is the part built from resolved cards, and an
     // unresolved one would render as a heading with nothing, or as `undefined`.

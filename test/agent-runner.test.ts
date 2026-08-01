@@ -43,6 +43,17 @@ const card = (root: string): Card =>
 const input = (root: string, over: Partial<DispatchInput> = {}): DispatchInput => ({
   skill,
   card: card(root),
+  // Columns are per-project config, so these are this fixture's own — not the defaults — and they
+  // include the column the card above sits in. The runner only carries them to the prompt.
+  boardColumns: [
+    {
+      board: 'engineering',
+      columns: [
+        { name: 'Todo', slug: 'todo' },
+        { name: 'Doing', slug: 'doing' },
+      ],
+    },
+  ],
   cardFile: '---\nid: E-010\n---\ndetail',
   linked: [],
   attachments: [],

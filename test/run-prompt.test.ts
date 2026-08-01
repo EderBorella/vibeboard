@@ -1,10 +1,31 @@
 import { describe, expect, it } from 'vitest';
-import { boardRel, DOCS_DIR, RESOURCES_DIR, RUNS_DIR, skillRel } from '../src/core/layout.js';
+import {
+  ARCHIVE_SLUG,
+  boardRel,
+  DOCS_DIR,
+  RESOURCES_DIR,
+  RESULTS_DIR,
+  RUNS_DIR,
+  skillRel,
+} from '../src/core/layout.js';
 import type { Skill } from '../src/core/skills.js';
 import type { BoardName, Card } from '../src/core/types.js';
-import { buildRunPrompt, type PromptInputs } from '../src/server/run-prompt.js';
+import { type BoardColumns, buildRunPrompt, type PromptInputs } from '../src/server/run-prompt.js';
 
 const ROOT = '/p';
+
+// Engineering has no Todo — asserting against a column the board does not have would describe an
+// impossible project, which is how a card came to be written into a folder nothing reads.
+const ENGINEERING_COLUMN = 'backlog';
+
+const columns = (...names: string[]): { name: string; slug: string }[] =>
+  names.map((name) => ({ name, slug: name.toLowerCase().replace(/ /g, '-') }));
+
+const boardColumns: BoardColumns[] = [
+  { board: 'features', columns: columns('Backlog', 'Todo', 'In Progress', 'Done') },
+  { board: 'product', columns: columns('Backlog', 'Todo', 'In Progress', 'Done') },
+  { board: 'engineering', columns: columns('Backlog', 'In Progress', 'Review', 'Done') },
+];
 
 const skill: Skill = {
   slug: 'execute',
@@ -22,19 +43,20 @@ const card = (over: Partial<Card> = {}): Card =>
     title: 'Token store',
     description: 'Persist refresh tokens',
     board: 'engineering' as BoardName,
-    columnSlug: 'todo',
+    columnSlug: ENGINEERING_COLUMN,
     order: 10,
     tags: [],
     links: [],
     created: '2026-07-26',
     body: 'Some detail.',
-    filePath: `${ROOT}/${boardRel('engineering', 'todo', 'E-010.md')}`,
+    filePath: `${ROOT}/${boardRel('engineering', ENGINEERING_COLUMN, 'E-010.md')}`,
     ...over,
   }) as Card;
 
 const inputs = (over: Partial<PromptInputs> = {}): PromptInputs => ({
   skill,
   card: card(),
+  boardColumns,
   cardFile: '---\nid: E-010\ntitle: Token store\n---\nSome detail.',
   linked: [],
   attachments: [],
@@ -55,8 +77,71 @@ describe('buildRunPrompt', () => {
   it('includes the card file verbatim, with its project-relative path', () => {
     const text = buildRunPrompt(inputs());
     expect(text).toContain('## The card: E-010');
-    expect(text).toContain(`File: ${boardRel('engineering', 'todo', 'E-010.md')}`);
+    expect(text).toContain(`File: ${boardRel('engineering', ENGINEERING_COLUMN, 'E-010.md')}`);
     expect(text).toContain('```markdown\n---\nid: E-010\ntitle: Token store\n---\nSome detail.\n```');
+  });
+
+  it('states every column of every board, by name AND by slug', () => {
+    // The whole section, exactly: this is a prompt, so the wording IS the behaviour. The agent needs
+    // the name to reason with ("the backlog") and the slug to type into a path, and slugging is
+    // one-way — a prompt carrying only one of the two leaves it deriving the other.
+    const text = buildRunPrompt(inputs());
+    expect(text).toContain(
+      [
+        "## The project's columns",
+        '',
+        'Every column this project has, by board — the name, then the folder slug you write in a path:',
+        '',
+        '- **features**: Backlog (backlog), Todo (todo), In Progress (in-progress), Done (done)',
+        '- **product**: Backlog (backlog), Todo (todo), In Progress (in-progress), Done (done)',
+        '- **engineering**: Backlog (backlog), In Progress (in-progress), Review (review), Done (done)',
+      ].join('\n'),
+    );
+  });
+
+  it('forbids inventing a column, and rules out the two folders that are not columns', () => {
+    // The actual failure mode: asked for cards "in the right column" with no list to choose from, an
+    // agent wrote to `engineering/backlog/` — and because column = folder the write CREATED it, so
+    // four cards sat where readBoard never looks. `archive/` and `results/` are the next wrong guess,
+    // being real folders beside the real columns.
+    const text = buildRunPrompt(inputs());
+    expect(text).toContain(
+      'A card must go in one of the columns listed above, named by its slug. Do NOT create a new column\nfolder: a column IS a folder,',
+    );
+    expect(text).toContain(
+      `\`${ARCHIVE_SLUG}/\` and \`${RESULTS_DIR}/\` sit beside the\ncolumns on disk but are NOT columns; no card belongs in either.`,
+    );
+  });
+
+  it('lists boards the skill is NOT scoped to, because that is where it writes', () => {
+    // The skill fixture is scoped to engineering and the card is an engineering card, yet features and
+    // product are still listed. The seeded break-down skill is the reverse case and the reason: scoped
+    // to features and product, its whole job is creating ENGINEERING cards. A prompt listing only the
+    // skill's own boards would omit precisely the board being written to.
+    const text = buildRunPrompt(inputs());
+    expect(skill.boards).toEqual(['engineering']);
+    for (const line of [
+      '- **features**: Backlog (backlog)',
+      '- **product**: Backlog (backlog)',
+      '- **engineering**: Backlog (backlog)',
+    ]) {
+      expect(text).toContain(line);
+    }
+  });
+
+  it('omits the section rather than promising columns it was given none of', () => {
+    const text = buildRunPrompt(inputs({ boardColumns: [] }));
+    expect(text).not.toContain("## The project's columns");
+    expect(text).not.toContain('Do NOT create a new column');
+  });
+
+  it('puts the columns straight after the card, before the linked cards', () => {
+    // Next to the one column the prompt already names — the card's own — so the example and the full
+    // set are read together.
+    const text = buildRunPrompt(inputs({ linked: [card({ id: 'P-001', board: 'product' })] }));
+    const at = (needle: string): number => text.indexOf(needle);
+    expect(at('## The card: E-010')).toBeLessThan(at("## The project's columns"));
+    expect(at("## The project's columns")).toBeLessThan(at('## Linked cards'));
   });
 
   it('always ends with the report contract, naming the exact path', () => {
@@ -119,17 +204,17 @@ describe('buildRunPrompt', () => {
           card({
             id: 'E-011',
             board: 'engineering',
-            columnSlug: 'todo',
+            columnSlug: 'review',
             title: 'Rotate keys',
             body: 'Rotate on the hour.',
-            filePath: `${ROOT}/${boardRel('engineering', 'todo', 'E-011.md')}`,
+            filePath: `${ROOT}/${boardRel('engineering', 'review', 'E-011.md')}`,
           }),
         ],
       }),
     );
     expect(text).toContain('### P-001 — Stay signed in\n\nUsers lose their session daily.');
     // The engineering card is listed but not quoted — its file path is enough.
-    expect(text).toContain('- **E-011** (engineering/todo) — Rotate keys');
+    expect(text).toContain('- **E-011** (engineering/review) — Rotate keys');
     expect(text).not.toContain('Rotate on the hour.');
   });
 

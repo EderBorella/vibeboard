@@ -1,13 +1,14 @@
 import { readFile } from 'node:fs/promises';
 import type { FastifyInstance } from 'fastify';
-import { readBoard } from '../../core/board.js';
+import { boardColumnSlugs, readBoard } from '../../core/board.js';
 import { resolveCopilotSelection } from '../../core/copilot-choice.js';
 import { findCard } from '../../core/find.js';
-import { BOARDS, type BoardName } from '../../core/types.js';
+import { BOARDS, type BoardName, type ProjectConfig } from '../../core/types.js';
 import type { DispatchInput } from '../agent-runner.js';
 import type { Backend } from '../agent-turn.js';
 import { readResources } from '../control-files.js';
 import { type AppCtx, ensureOpen, nowIso } from '../route-context.js';
+import type { BoardColumns } from '../run-prompt.js';
 import { listCardRuns, listRuns, readRun, resolveRun } from '../run-store.js';
 import { readSkills } from '../skill-catalogue.js';
 
@@ -32,6 +33,23 @@ interface DispatchBody {
   model?: string;
   effort?: string;
   mode?: string;
+}
+
+// EVERY board's columns, never just the skill's. `Skill.boards` scopes where a skill may be
+// dispatched FROM, not where it may write to: the break-down skill is scoped to features and product
+// precisely so it can turn one of those cards into engineering cards. Scoping this to `skill.boards`
+// would therefore have left the agent guessing at exactly the board it was sent to write to — the
+// hole this section exists to close. (An empty `skill.boards` means every board anyway, so half the
+// skills would get all three regardless; three short lines is not worth a rule with two answers.)
+function everyBoardColumns(config: ProjectConfig): BoardColumns[] {
+  return BOARDS.map((board) => {
+    // Index-parallel by construction: boardColumnSlugs is a 1:1 map over this same list.
+    const slugs = boardColumnSlugs(config, board);
+    return {
+      board,
+      columns: config.boards[board].columns.map((name, i) => ({ name, slug: slugs[i] })),
+    };
+  });
 }
 
 // Turn a request into everything the runner needs, or into the refusal to send back. Separated from
@@ -84,6 +102,7 @@ async function resolveDispatch(
     input: {
       skill,
       card,
+      boardColumns: everyBoardColumns(config),
       cardFile,
       linked,
       attachments: Array.isArray(body.attachments) ? body.attachments.map(String) : [],

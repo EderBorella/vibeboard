@@ -1,6 +1,7 @@
 import { relative } from 'node:path';
+import { ARCHIVE_SLUG, RESULTS_DIR } from '../core/layout.js';
 import type { Skill } from '../core/skills.js';
-import type { Card } from '../core/types.js';
+import type { BoardName, Card } from '../core/types.js';
 
 // The dispatch prompt: everything the agent is told about one run, in one string.
 //
@@ -11,9 +12,19 @@ import type { Card } from '../core/types.js';
 // machinery already appends those to the system prompt for both backends (agent-turn.ts), so
 // repeating them would spend tokens saying the same thing twice.
 
+// One board's columns as the agent must see them: the name to reason with and the slug to type into a
+// path. Neither is derivable from the other — slugging is one-way — so a column carries both.
+export interface BoardColumns {
+  board: BoardName;
+  columns: { name: string; slug: string }[];
+}
+
 export interface PromptInputs {
   skill: Skill;
   card: Card;
+  // The columns that exist, per board, in the order they are displayed. A list rather than a Record
+  // so rendering is a plain map, and so the caller chooses which boards a run is told about.
+  boardColumns: BoardColumns[];
   // The card's file, verbatim. Small and always needed, so it goes in rather than being fetched.
   cardFile: string;
   // Cards this one links to. `body` is included only where it earns its tokens — see linkedSection.
@@ -39,6 +50,27 @@ function section(heading: string, body: string): string {
 function cardLine(card: Card): string {
   const where = `${card.board}/${card.columnSlug}`;
   return `- **${card.id}** (${where}) — ${card.title}${card.description ? `: ${card.description}` : ''}`;
+}
+
+// Where a card is allowed to live. This used to be absent, and the only column the prompt named was
+// the source card's own — so a skill asking for cards "in the right column" was unanswerable and the
+// agent guessed. Because column = folder, the guess did not fail: it CREATED
+// `engineering/backlog/`, which no column mapped to, and four cards landed where readBoard does not
+// look. The prohibition is therefore stated, not implied.
+function columnsSection(boardColumns: BoardColumns[]): string {
+  const lines = boardColumns.map(
+    ({ board, columns }) => `- **${board}**: ${columns.map((c) => `${c.name} (${c.slug})`).join(', ')}`,
+  );
+  return [
+    'Every column this project has, by board — the name, then the folder slug you write in a path:',
+    '',
+    ...lines,
+    '',
+    'A card must go in one of the columns listed above, named by its slug. Do NOT create a new column',
+    'folder: a column IS a folder, so a name that is not listed does not fail — it creates a folder the',
+    `board never reads, and the card is invisible. \`${ARCHIVE_SLUG}/\` and \`${RESULTS_DIR}/\` sit beside the`,
+    'columns on disk but are NOT columns; no card belongs in either.',
+  ].join('\n');
 }
 
 // Linked cards: every one identified, and the *product* ones quoted in full. A product card carries
@@ -91,6 +123,11 @@ export function buildRunPrompt(input: PromptInputs): string {
     ),
   ];
 
+  // Straight after the card, which names one column: the full set belongs next to the one example of
+  // it. Omitted when empty — a heading promising "every column" above nothing would be a lie.
+  if (input.boardColumns.length > 0) {
+    parts.push(section("The project's columns", columnsSection(input.boardColumns)));
+  }
   if (input.linked.length > 0) {
     parts.push(section('Linked cards', linkedSection(input.linked, input.projectRoot)));
   }

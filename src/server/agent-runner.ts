@@ -4,7 +4,7 @@ import type { BoardName, Card } from '../core/types.js';
 import { type Backend, type RunningTurn, runAgentTurn } from './agent-turn.js';
 import type { ResultStats } from './copilot-events.js';
 import type { Log } from './logging.js';
-import { buildRunPrompt } from './run-prompt.js';
+import { type BoardColumns, buildRunPrompt } from './run-prompt.js';
 import { appendTranscript, foldReport, reportContract, transcriptTail, writeRun } from './run-store.js';
 
 // Runs skills as agents.
@@ -20,6 +20,9 @@ import { appendTranscript, foldReport, reportContract, transcriptTail, writeRun 
 export interface DispatchInput {
   skill: Skill;
   card: Card;
+  // Carried, not derived: the runner reads no config, and the columns must be the ones the project
+  // had when the dispatch was resolved — a queued run may start after they were renamed.
+  boardColumns: BoardColumns[];
   cardFile: string;
   linked: Card[];
   attachments: string[];
@@ -176,6 +179,7 @@ export class AgentRunner {
     const prompt = buildRunPrompt({
       skill: input.skill,
       card: input.card,
+      boardColumns: input.boardColumns,
       cardFile: input.cardFile,
       linked: input.linked,
       attachments: input.attachments,

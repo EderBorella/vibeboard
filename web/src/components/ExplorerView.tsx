@@ -1,14 +1,32 @@
-import { useCallback, useEffect, useState } from 'react';
-import { type FileRead, type FsNode, putFsFile, readFsFile } from '../api';
+import { useState } from 'react';
+import { createFsNode, type FileRead, type FsNode, renameFsNode } from '../api';
 import { formatBytes } from '../explorer/format';
+import { useOpenFile } from '../explorer/useOpenFile';
 import { useTree } from '../explorer/useTree';
 import type { ProjectSnapshot } from '../shared';
-import { EditorBody, EditorShell, type EditorView } from './EditorShell';
+import { EditorBody, EditorShell } from './EditorShell';
 import { FileTree } from './FileTree';
 
 interface Props {
   // Bumps whenever the project changes on disk, so the tree and the open file follow along.
   snapshot: ProjectSnapshot;
+}
+
+function parentOf(path: string): string {
+  const cut = path.lastIndexOf('/');
+  return cut === -1 ? '' : path.slice(0, cut);
+}
+
+function nameOf(path: string): string {
+  const cut = path.lastIndexOf('/');
+  return cut === -1 ? path : path.slice(cut + 1);
+}
+
+// Where a new file or folder should land: inside the selected folder, beside the selected file, or in
+// the project root when nothing is selected.
+function newInFor(selected: FsNode | null): string {
+  if (!selected) return '';
+  return selected.kind === 'dir' && !selected.escapes ? selected.path : parentOf(selected.path);
 }
 
 // Why a file cannot be edited here, in the words the pane shows. Both are honest about being
@@ -19,113 +37,121 @@ function unopenable(read: FileRead): string {
     : `${formatBytes(read.size)} — too large to open in the editor. It can still be renamed, moved or deleted.`;
 }
 
-// The Explorer tab: the whole project as a tree, with a text editor beside it. Owns what is selected,
-// what is loaded and the editor buffer; the tree and the shell are presentation.
+// The Explorer tab: the whole project as a tree, with a text editor beside it. Owns the selection and
+// the folder operations; the buffer is useOpenFile's and the rows are useTree's.
 export function ExplorerView({ snapshot }: Props) {
   const tree = useTree(snapshot);
-  const [selected, setSelected] = useState<string | null>(null);
-  const [open, setOpen] = useState<FileRead | null>(null);
-  const [draft, setDraft] = useState('');
-  const [dirty, setDirty] = useState(false);
-  const [view, setView] = useState<EditorView>('edit');
-  const [busy, setBusy] = useState(false);
+  const open = useOpenFile(snapshot);
+  const [selected, setSelected] = useState<FsNode | null>(null);
+  // The row being renamed and the text in it. Set right after a create, so a new file lands with its
+  // name selected and ready to type over — no browser prompt, which can be suppressed.
+  const [renaming, setRenaming] = useState<string | null>(null);
+  const [renameDraft, setRenameDraft] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async (path: string): Promise<void> => {
-    setError(null);
-    try {
-      const read = await readFsFile(path);
-      setOpen(read);
-      setDraft(read.kind === 'text' ? read.content : '');
-      setDirty(false);
-    } catch (e) {
-      setOpen(null);
-      setError(e instanceof Error ? e.message : String(e));
-    }
-  }, []);
-
-  // Follow the file on disk while the buffer is clean, so an agent's edit appears — and never while
-  // it is dirty, which would throw away typing. `snapshot` is the trigger; nothing here reads it.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: deliberate trigger
-  useEffect(() => {
-    if (selected && !dirty) void load(selected);
-  }, [snapshot]);
-
   function activate(node: FsNode): void {
+    setSelected(node);
     if (node.kind === 'dir' || node.escapes || node.kind === 'other') {
       tree.toggle(node);
       return;
     }
-    setSelected(node.path);
-    void load(node.path);
+    void open.open(node.path);
   }
 
   async function save(): Promise<void> {
-    if (open?.kind !== 'text') return;
-    setBusy(true);
+    const file = open.file;
+    if (file && (await open.save())) await tree.reload(parentOf(file.path));
+  }
+
+  async function newNode(kind: 'file' | 'dir'): Promise<void> {
+    const parent = newInFor(selected);
     setError(null);
     try {
-      await putFsFile(open.path, draft);
-      setDirty(false);
-      await load(open.path);
-      await tree.reload(parentOf(open.path)); // the size in the tree just changed
+      const node = await createFsNode(parent, kind);
+      await tree.open(parent); // expand it, or the new row lands out of sight in a closed folder
+      setSelected(node);
+      setRenaming(node.path);
+      setRenameDraft(node.name);
+      if (kind === 'file') await open.open(node.path);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setBusy(false);
     }
   }
 
+  function startRename(node: FsNode): void {
+    setRenaming(node.path);
+    setRenameDraft(node.name);
+  }
+
+  async function commitRename(): Promise<void> {
+    const path = renaming;
+    if (!path) return;
+    const name = renameDraft.trim();
+    setRenaming(null);
+    if (!name || name === nameOf(path)) return; // nothing to do
+    setError(null);
+    try {
+      const moved = await renameFsNode(path, name);
+      await tree.reload(parentOf(path));
+      setSelected(moved);
+      // The open file just changed path underneath the editor; re-open it under its new name.
+      if (open.file?.path === path) await open.open(moved.path);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  const file = open.file;
   return (
     <section className="control explorer">
       <FileTree
         rows={tree.rows}
-        selected={selected}
+        selected={selected?.path ?? null}
         busy={tree.busy}
         error={tree.error}
+        newIn={newInFor(selected)}
+        renaming={renaming}
+        renameDraft={renameDraft}
         onActivate={activate}
         onRefresh={() => void tree.refresh()}
+        onNew={(kind) => void newNode(kind)}
+        onStartRename={startRename}
+        onRenameDraft={setRenameDraft}
+        onCommitRename={() => void commitRename()}
+        onCancelRename={() => setRenaming(null)}
       />
 
       <div className="control-editor">
-        {open ? (
+        {file ? (
           <EditorShell
-            path={open.path}
-            dirty={dirty}
-            views={open.kind === 'text' ? ['edit', 'preview'] : []}
-            view={view}
-            onView={setView}
+            path={file.path}
+            dirty={open.dirty}
+            views={file.kind === 'text' ? ['edit', 'preview'] : []}
+            view={open.view}
+            onView={open.setView}
             actions={
-              open.kind === 'text' && (
-                <button className="btn-primary" disabled={busy || !dirty} onClick={() => void save()}>
+              file.kind === 'text' && (
+                <button
+                  className="btn-primary"
+                  disabled={open.busy || !open.dirty}
+                  onClick={() => void save()}
+                >
                   Save
                 </button>
               )
             }
           >
-            {open.kind === 'text' ? (
-              <EditorBody
-                view={view}
-                draft={draft}
-                onDraft={(v) => {
-                  setDraft(v);
-                  setDirty(true);
-                }}
-              />
+            {file.kind === 'text' ? (
+              <EditorBody view={open.view} draft={open.draft} onDraft={open.edit} />
             ) : (
-              <div className="control-blank">{unopenable(open)}</div>
+              <div className="control-blank">{unopenable(file)}</div>
             )}
           </EditorShell>
         ) : (
           <div className="control-blank">Select a file to view or edit it.</div>
         )}
-        {error && <div className="control-error">{error}</div>}
+        {(error ?? open.error) && <div className="control-error">{error ?? open.error}</div>}
       </div>
     </section>
   );
-}
-
-function parentOf(path: string): string {
-  const cut = path.lastIndexOf('/');
-  return cut === -1 ? '' : path.slice(0, cut);
 }

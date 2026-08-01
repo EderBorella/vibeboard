@@ -154,6 +154,111 @@ describe('PUT /api/explorer/file', () => {
   });
 });
 
+describe('POST /api/explorer/create', () => {
+  it('creates a file and a folder in the root, and reports them back', async () => {
+    const { app } = await openTestProject({ name: 'E' });
+    const file = await app.inject({
+      method: 'POST',
+      url: '/api/explorer/create',
+      payload: { parent: '', kind: 'file' },
+    });
+    expect(file.statusCode).toBe(200);
+    expect(file.json()).toEqual({ path: 'Untitled.md', name: 'Untitled.md', kind: 'file', size: 0 });
+
+    const dir = await app.inject({
+      method: 'POST',
+      url: '/api/explorer/create',
+      payload: { parent: '', kind: 'dir' },
+    });
+    expect(dir.json()).toEqual({ path: 'New folder', name: 'New folder', kind: 'dir' });
+  });
+
+  it('400s on a kind it does not make, or a parent it cannot use', async () => {
+    const { app } = await openTestProject({ name: 'E' });
+    for (const payload of [
+      { parent: '', kind: 'symlink' },
+      { parent: '', kind: undefined },
+      { parent: 'INSTRUCTIONS.md', kind: 'file' },
+      { parent: '../..', kind: 'file' },
+    ]) {
+      const res = await app.inject({ method: 'POST', url: '/api/explorer/create', payload });
+      expect(res.statusCode).toBe(400);
+      expect(res.json()).toEqual({ error: 'Cannot create that here' });
+    }
+  });
+});
+
+describe('POST /api/explorer/rename and /move', () => {
+  it('renames a file', async () => {
+    const { app, root } = await openTestProject({ name: 'E' });
+    await writeFile(join(root, 'old.md'), 'body', 'utf8');
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/explorer/rename',
+      payload: { path: 'old.md', name: 'new.md' },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({ path: 'new.md', name: 'new.md', kind: 'file' });
+    expect(await readFile(join(root, 'new.md'), 'utf8')).toBe('body');
+  });
+
+  it('moves a file into a folder', async () => {
+    const { app, root } = await openTestProject({ name: 'E' });
+    await writeFile(join(root, 'a.md'), 'body', 'utf8');
+    await mkdir(join(root, 'docs'), { recursive: true });
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/explorer/move',
+      payload: { path: 'a.md', to: 'docs' },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({ path: 'docs/a.md' });
+  });
+
+  it('409s on a collision, with a message about the name', async () => {
+    const { app, root } = await openTestProject({ name: 'E' });
+    await writeFile(join(root, 'a.md'), 'a', 'utf8');
+    await writeFile(join(root, 'b.md'), 'b', 'utf8');
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/explorer/rename',
+      payload: { path: 'a.md', name: 'b.md' },
+    });
+    expect(res.statusCode).toBe(409);
+    expect(res.json()).toEqual({ error: 'Something with that name is already there' });
+  });
+
+  it('400s on a folder moved inside itself, distinctly from any other refusal', async () => {
+    const { app, root } = await openTestProject({ name: 'E' });
+    await mkdir(join(root, 'a', 'b'), { recursive: true });
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/explorer/move',
+      payload: { path: 'a', to: 'a/b' },
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json()).toEqual({ error: 'A folder cannot be moved inside itself' });
+  });
+
+  it('400s on a name that is really a path, and on the project root', async () => {
+    const { app, root } = await openTestProject({ name: 'E' });
+    await writeFile(join(root, 'a.md'), 'a', 'utf8');
+    // `docs` has to EXIST for this to pin anything: without it, a rename to "docs/a.md" would be
+    // refused for having no destination folder, and the assertion would pass even with the guard
+    // removed. Verified by planting exactly that.
+    await mkdir(join(root, 'docs'), { recursive: true });
+    for (const payload of [
+      { path: 'a.md', name: 'docs/a.md' },
+      { path: 'a.md', name: '' },
+      { path: '', name: 'x.md' },
+    ]) {
+      const res = await app.inject({ method: 'POST', url: '/api/explorer/rename', payload });
+      expect(res.statusCode).toBe(400);
+      expect(res.json()).toEqual({ error: 'Path not allowed' });
+    }
+  });
+});
+
 describe('explorer routes with no project open', () => {
   const routes = [
     { method: 'GET' as const, url: '/api/explorer/list' },
@@ -163,6 +268,13 @@ describe('explorer routes with no project open', () => {
       url: '/api/explorer/file',
       payload: { path: 'INSTRUCTIONS.md', content: 'x' },
     },
+    { method: 'POST' as const, url: '/api/explorer/create', payload: { parent: '', kind: 'file' } },
+    {
+      method: 'POST' as const,
+      url: '/api/explorer/rename',
+      payload: { path: 'a.md', name: 'b.md' },
+    },
+    { method: 'POST' as const, url: '/api/explorer/move', payload: { path: 'a.md', to: 'docs' } },
   ];
 
   it.each(routes)('409s on $method $url', async ({ method, url, payload }) => {

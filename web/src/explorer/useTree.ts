@@ -36,7 +36,10 @@ export interface Tree {
   busy: boolean;
   error: string | null;
   toggle: (node: FsNode) => void;
-  // Re-list one directory: what a create, rename or delete calls for its parent.
+  // Expand a directory and re-list it, whether or not it was already open. What a create calls, so
+  // the new row is visible in a folder the user had collapsed.
+  open: (path: string) => Promise<void>;
+  // Re-list one directory: what a rename or delete calls for its parent.
   reload: (path: string) => Promise<void>;
   // Re-list everything currently open.
   refresh: () => Promise<void>;
@@ -92,6 +95,14 @@ export function useTree(trigger?: unknown): Tree {
     [reload, rebuild],
   );
 
+  const open = useCallback(
+    async (path: string): Promise<void> => {
+      expanded.current.add(path);
+      await reload(path); // rebuilds, so the newly-opened folder appears with its contents
+    },
+    [reload],
+  );
+
   // First load, and a re-list whenever the project changes on disk. `trigger` is a signal, not an
   // input — nothing here reads it. Note it does not cover everything: session.ts's watcher ignores
   // node_modules, .git and .vibeboard/{chat,runs}, so changes there wait for the ⟳.
@@ -100,5 +111,5 @@ export function useTree(trigger?: unknown): Tree {
     void refresh();
   }, [trigger]);
 
-  return { rows, busy, error, toggle, reload, refresh };
+  return { rows, busy, error, toggle, open, reload, refresh };
 }

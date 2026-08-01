@@ -806,6 +806,7 @@ body {
 /* The tail of a capped listing. Deliberately not styled as an error — the folder is fine, the
    listing is simply not all of it. */
 .explorer-more { color: var(--muted); font-size: 0.68rem; font-style: italic; padding: 0.2rem 0.5rem; }
+.explorer-actions { display: flex; gap: 0.1rem; }
 /* Inline rename: sits exactly where the list row was, so the row appears to become editable. */
 .control-rename {
   width: 100%; background: var(--bg); color: var(--text);

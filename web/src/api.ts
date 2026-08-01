@@ -300,6 +300,22 @@ export async function putFsFile(path: string, content: string): Promise<void> {
   if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Failed to save file');
 }
 
+// Created with a server-assigned default name ("Untitled.md", "Untitled 2.md", …), which the tree
+// then renames in place. The client never builds a path — same rule as the control routes.
+export function createFsNode(parent: string, kind: 'file' | 'dir'): Promise<FsNode> {
+  return post<FsNode>('/api/explorer/create', { parent, kind });
+}
+
+// `name` is a literal basename, not a path: a rename must not be able to relocate anything.
+export function renameFsNode(path: string, name: string): Promise<FsNode> {
+  return post<FsNode>('/api/explorer/rename', { path, name });
+}
+
+// `to` is the destination folder; the name comes along unchanged.
+export function moveFsNode(path: string, to: string): Promise<FsNode> {
+  return post<FsNode>('/api/explorer/move', { path, to });
+}
+
 // --- Skills ---------------------------------------------------------------
 // Mirrors src/core/skills.ts. A skill carries no backend, model, effort or mode — those are
 // chosen per dispatch, so every skill works on every backend.

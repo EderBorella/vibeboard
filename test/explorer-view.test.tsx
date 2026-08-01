@@ -8,6 +8,8 @@ const api = vi.hoisted(() => ({
   listDir: vi.fn(),
   readFsFile: vi.fn(),
   putFsFile: vi.fn(),
+  createFsNode: vi.fn(),
+  renameFsNode: vi.fn(),
 }));
 vi.mock('../web/src/api.js', () => api);
 vi.mock('../web/src/api', () => api);
@@ -20,6 +22,8 @@ beforeEach(() => {
   api.listDir.mockReset();
   api.readFsFile.mockReset();
   api.putFsFile.mockReset();
+  api.createFsNode.mockReset();
+  api.renameFsNode.mockReset();
 });
 
 const dir = (path: string): FsNode => ({ path, name: path.split('/').pop() ?? path, kind: 'dir' });
@@ -213,5 +217,133 @@ describe('ExplorerView', () => {
 
     fireEvent.click(screen.getByTitle('Re-read the project from disk'));
     await waitFor(() => expect(api.listDir.mock.calls).toEqual([[''], ['']]));
+  });
+});
+
+describe('ExplorerView — creating and renaming', () => {
+  it('creates a file in the root, opens it, and puts its row straight into rename mode', async () => {
+    // The whole flow in one: no browser prompt anywhere, because a suppressed prompt would leave no
+    // way to name anything.
+    api.listDir
+      .mockResolvedValueOnce(listing('', []))
+      .mockResolvedValue(listing('', [file('Untitled.md', 0)]));
+    api.createFsNode.mockResolvedValue({ path: 'Untitled.md', name: 'Untitled.md', kind: 'file', size: 0 });
+    api.readFsFile.mockResolvedValue(text('Untitled.md', ''));
+    render(<ExplorerView snapshot={snapshot} />);
+    await waitFor(() => expect(screen.getByText('— empty —')).toBeTruthy());
+
+    fireEvent.click(screen.getByTitle('New file in the project root'));
+    await waitFor(() => expect(api.createFsNode.mock.calls).toEqual([['', 'file']]));
+    // The row is an input carrying the new name, ready to type over.
+    await waitFor(() =>
+      expect((screen.getByDisplayValue('Untitled.md') as HTMLInputElement).tagName).toBe('INPUT'),
+    );
+    expect(api.readFsFile.mock.calls).toEqual([['Untitled.md']]);
+  });
+
+  it('creates a folder without trying to open it', async () => {
+    api.listDir.mockResolvedValue(listing('', [dir('New folder')]));
+    api.createFsNode.mockResolvedValue({ path: 'New folder', name: 'New folder', kind: 'dir' });
+    render(<ExplorerView snapshot={snapshot} />);
+    await waitFor(() => expect(screen.getByTitle(/New folder in/)).toBeTruthy());
+
+    fireEvent.click(screen.getByTitle('New folder in the project root'));
+    await waitFor(() => expect(api.createFsNode.mock.calls).toEqual([['', 'dir']]));
+    expect(api.readFsFile).not.toHaveBeenCalled();
+  });
+
+  it('creates inside the selected folder, and says so before you click', async () => {
+    // The buttons name their destination: a ＋ whose target you have to guess is how files end up in
+    // the wrong folder.
+    api.listDir.mockImplementation((path: string) =>
+      Promise.resolve(path === '' ? listing('', [dir('docs')]) : listing('docs', [])),
+    );
+    api.createFsNode.mockResolvedValue({ path: 'docs/Untitled.md', name: 'Untitled.md', kind: 'file', size: 0 });
+    api.readFsFile.mockResolvedValue(text('docs/Untitled.md', ''));
+    render(<ExplorerView snapshot={snapshot} />);
+    await waitFor(() => expect(screen.getByText('docs')).toBeTruthy());
+
+    fireEvent.click(row('docs'));
+    await waitFor(() => expect(screen.getByTitle('New file in docs')).toBeTruthy());
+    fireEvent.click(screen.getByTitle('New file in docs'));
+    await waitFor(() => expect(api.createFsNode.mock.calls).toEqual([['docs', 'file']]));
+  });
+
+  it('creates beside the selected FILE, not inside it', async () => {
+    api.listDir.mockImplementation((path: string) =>
+      Promise.resolve(path === '' ? listing('', [dir('docs')]) : listing('docs', [file('docs/a.md')])),
+    );
+    api.readFsFile.mockResolvedValue(text('docs/a.md', 'a'));
+    render(<ExplorerView snapshot={snapshot} />);
+    await waitFor(() => expect(screen.getByText('docs')).toBeTruthy());
+    fireEvent.click(row('docs'));
+    await waitFor(() => expect(screen.getByText('a.md')).toBeTruthy());
+
+    fireEvent.click(row('a.md'));
+    await waitFor(() => expect(screen.getByTitle('New file in docs')).toBeTruthy());
+  });
+
+  it('renames on Enter and re-opens the file under its new path', async () => {
+    api.listDir.mockResolvedValue(listing('', [file('old.md')]));
+    // Keyed by path, not a fixed value: a mock that answers with the old path however it is called
+    // cannot tell a re-open under the new name from no re-open at all.
+    api.readFsFile.mockImplementation((p: string) => Promise.resolve(text(p, 'body')));
+    api.renameFsNode.mockResolvedValue({ path: 'new name.md', name: 'new name.md', kind: 'file', size: 4 });
+    render(<ExplorerView snapshot={snapshot} />);
+    await waitFor(() => expect(screen.getByText('old.md')).toBeTruthy());
+    fireEvent.click(row('old.md'));
+    await waitFor(() => expect(screen.getByRole('textbox')).toBeTruthy());
+
+    fireEvent.doubleClick(row('old.md'));
+    const input = screen.getByDisplayValue('old.md');
+    fireEvent.change(input, { target: { value: 'new name.md' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    await waitFor(() => expect(api.renameFsNode.mock.calls).toEqual([['old.md', 'new name.md']]));
+    // The editor was showing the old path; it must follow the file rather than keep a dead one.
+    await waitFor(() =>
+      expect(screen.getByText('new name.md', { selector: '.control-editor-path' })).toBeTruthy(),
+    );
+  });
+
+  it('cancels a rename on Escape, and does not rename when the name is unchanged', async () => {
+    api.listDir.mockResolvedValue(listing('', [file('a.md')]));
+    render(<ExplorerView snapshot={snapshot} />);
+    await waitFor(() => expect(screen.getByText('a.md')).toBeTruthy());
+
+    fireEvent.doubleClick(row('a.md'));
+    fireEvent.change(screen.getByDisplayValue('a.md'), { target: { value: 'b.md' } });
+    fireEvent.keyDown(screen.getByDisplayValue('b.md'), { key: 'Escape' });
+    expect(api.renameFsNode).not.toHaveBeenCalled();
+    await waitFor(() => expect(screen.getByText('a.md')).toBeTruthy()); // back to a row
+
+    // And committing the name it already has is a no-op, not a rename onto itself.
+    fireEvent.doubleClick(row('a.md'));
+    fireEvent.keyDown(screen.getByDisplayValue('a.md'), { key: 'Enter' });
+    expect(api.renameFsNode).not.toHaveBeenCalled();
+  });
+
+  it('shows what the server said when a name is taken', async () => {
+    api.listDir.mockResolvedValue(listing('', [file('a.md'), file('b.md')]));
+    api.renameFsNode.mockRejectedValueOnce(new Error('Something with that name is already there'));
+    render(<ExplorerView snapshot={snapshot} />);
+    await waitFor(() => expect(screen.getByText('a.md')).toBeTruthy());
+
+    fireEvent.doubleClick(row('a.md'));
+    fireEvent.change(screen.getByDisplayValue('a.md'), { target: { value: 'b.md' } });
+    fireEvent.keyDown(screen.getByDisplayValue('b.md'), { key: 'Enter' });
+    await waitFor(() =>
+      expect(screen.getByText('Something with that name is already there')).toBeTruthy(),
+    );
+  });
+
+  it('surfaces a refused create', async () => {
+    api.listDir.mockResolvedValue(listing('', []));
+    api.createFsNode.mockRejectedValueOnce(new Error('Cannot create that here'));
+    render(<ExplorerView snapshot={snapshot} />);
+    await waitFor(() => expect(screen.getByTitle(/New file in/)).toBeTruthy());
+
+    fireEvent.click(screen.getByTitle('New file in the project root'));
+    await waitFor(() => expect(screen.getByText('Cannot create that here')).toBeTruthy());
   });
 });

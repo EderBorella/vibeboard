@@ -8,6 +8,7 @@ import {
   writeConfig,
 } from '../core/config.js';
 import { ensureControlFiles } from '../core/control.js';
+import { CHAT_DIR, RUNS_DIR } from '../core/layout.js';
 import type { ProjectConfig } from '../core/types.js';
 import type { Log } from './logging.js';
 import { markInterrupted } from './run-store.js';
@@ -17,19 +18,20 @@ type SnapshotListener = (snapshot: ProjectSnapshot) => void;
 
 const DEBOUNCE_MS = 80;
 
-// chokidar v4 removed glob support in `ignored`; use a path predicate. Ignore the chat store
-// (`.vibeboard/chat/`) and the run scratch area (`.vibeboard/runs/`) — both are written constantly
-// while a turn streams, and neither changes the board. `config.yaml` (also under .vibeboard) IS
-// watched, so config edits still push a fresh snapshot. A run's *record* lives in a board folder
-// and is deliberately NOT ignored: writing one should refresh the card's reports.
+// chokidar v4 removed glob support in `ignored`; use a path predicate. Ignore the chat store and
+// the run scratch area — both are written constantly while a turn streams, and neither changes the
+// board. Everything else inside the config folder IS watched: the cards live there, so ignoring the
+// folder wholesale would stop the board updating live, and `config.yaml` edits still push a fresh
+// snapshot. A run's *record* lives in a board folder and is deliberately NOT ignored: writing one
+// should refresh the card's reports.
 // Exported for its own test: driving it through a real watcher is slow and racy, and the
 // path list is exactly the kind of thing that rots silently.
 export function isIgnored(p: string): boolean {
   return (
     p.includes('/node_modules/') ||
     p.includes('/.git/') ||
-    p.includes('/.vibeboard/chat') ||
-    p.includes('/.vibeboard/runs')
+    p.includes(`/${CHAT_DIR}`) ||
+    p.includes(`/${RUNS_DIR}`)
   );
 }
 
@@ -62,7 +64,8 @@ export class ProjectSession {
       ensureMaxRuns(config),
     ].some(Boolean);
     if (upgraded) await writeConfig(projectRoot, config);
-    // Backfill INSTRUCTIONS.md + CLI pointer imports for projects created before Project Control.
+    // Backfill the instructions document + CLI pointer imports for projects created before
+    // Project Control.
     await ensureControlFiles(projectRoot);
     this.#config = config;
     this.#root = projectRoot;

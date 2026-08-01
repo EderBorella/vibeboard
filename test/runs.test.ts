@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { DOCS_DIR } from '../src/core/layout.js';
 import {
   isInFlight,
   needsResolution,
@@ -52,7 +53,7 @@ describe('serializeRun / parseRun', () => {
       finished: '2026-07-26T14:41:55.000Z',
       previous: '20260726-141000-9f3e',
       prompt: 'focus on the token store',
-      attached: ['docs/api.md'],
+      attached: [`${DOCS_DIR}/api.md`],
       summary: 'bigger than one card',
       options: ['split it', 'do the store only'],
       created: ['E-041', 'E-042'],
@@ -238,7 +239,7 @@ describe('parseAgentReport', () => {
 describe('withReport', () => {
   it('takes the agent verdict and body but keeps VibeBoard timings and dispatch', () => {
     const folded = withReport(
-      record({ prompt: 'mine', attached: ['docs/a.md'] }),
+      record({ prompt: 'mine', attached: [`${DOCS_DIR}/a.md`] }),
       { outcome: 'success', summary: 'done', created: ['E-041'], body: '## Did it' },
       '2026-07-26T15:00:00.000Z',
     );
@@ -252,7 +253,7 @@ describe('withReport', () => {
     expect(folded.started).toBe('2026-07-26T14:30:12.000Z');
     expect(folded.model).toBe('opus');
     expect(folded.prompt).toBe('mine');
-    expect(folded.attached).toEqual(['docs/a.md']);
+    expect(folded.attached).toEqual([`${DOCS_DIR}/a.md`]);
   });
 
   it('leaves optional agent fields absent when the report omits them', () => {

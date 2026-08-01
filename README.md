@@ -37,26 +37,38 @@ living in SSH. VibeBoard replaces that with a visual cockpit you open at
 
 ```
 your-project/
-├── features/                # the "capabilities / roadmap" board
-│   ├── backlog/
-│   ├── todo/         F-001.md
-│   └── done/
-├── product/                 # the "what / why" board
-│   ├── backlog/
-│   ├── in-progress/  P-001.md   →  links: [F-001, E-010]
-│   └── done/
-├── engineering/             # the "how" board
-│   ├── todo/         E-010.md
-│   ├── review/
-│   └── archive/                 # soft-deleted cards, recoverable
-│   └── results/                 # one file per skill run, per card — not a column
-├── .vibeboard/
-│   ├── config.yaml           # columns, ordering, settings
-│   ├── chat/                 # copilot transcripts (git-ignore these)
-│   └── runs/                 # run transcripts and staged agent reports
-├── VIBEBOARD.md             # card conventions (also read by AI agents)
-└── INSTRUCTIONS.md          # your own standing instructions for the copilot
+├── CLAUDE.md                     # pointer: Claude Code finds this by name, at the root
+├── AGENTS.md                     # pointer: OpenCode finds this by name, at the root
+└── .vibeboard/                   # everything else VibeBoard owns, in one folder
+    ├── boards/
+    │   ├── features/             # the "capabilities / roadmap" board
+    │   │   ├── backlog/
+    │   │   ├── todo/         F-001.md
+    │   │   └── done/
+    │   ├── product/              # the "what / why" board
+    │   │   ├── backlog/
+    │   │   ├── in-progress/  P-001.md   →  links: [F-001, E-010]
+    │   │   └── done/
+    │   └── engineering/          # the "how" board
+    │       ├── todo/         E-010.md
+    │       ├── review/
+    │       ├── archive/          # soft-deleted cards, recoverable
+    │       └── results/          # one file per skill run, per card — not a column
+    ├── skills/                   # <slug>/SKILL.md — the skill rail beside a card
+    ├── docs/                     # project docs, editable from Project Control
+    ├── resources/                # reference files you attach to a run
+    ├── VIBEBOARD.md              # card conventions (also read by AI agents)
+    ├── INSTRUCTIONS.md           # your own standing instructions for the copilot
+    ├── config.yaml               # columns, ordering, settings
+    ├── resources.yaml            # the links registry
+    ├── chat/                     # copilot transcripts (git-ignore these)
+    └── runs/                     # run transcripts and staged agent reports
 ```
+
+Only the two pointer files sit at the root, and not by choice: each CLI
+auto-discovers its own by name in the working directory, so neither can live
+inside the folder. Everything else is one folder deep, which keeps an adopted
+repository's own root untouched.
 
 - **Column = folder.** Moving a card moves its file. The path is the single
   source of truth for a card's board and column.
@@ -150,7 +162,7 @@ expose it to the public internet.
   host other tools (a terminal) as further panes
 - **Click any field to edit it**, in place, committing on its own — no form, no
   Save button. `Raw` in the dock swaps the card for its file, frontmatter and all
-- **Skill rail** beside an open card, driven by `.claude/skills/*/SKILL.md` files
+- **Skill rail** beside an open card, driven by `.vibeboard/skills/*/SKILL.md` files
   you can add or edit. A skill declares the boards and columns it belongs to, so
   the rail shows only what fits the card in front of you, and a file that fails
   validation is reported with the reason rather than silently ignored. Author one
@@ -184,7 +196,7 @@ expose it to the public internet.
   that worked, since those spent tokens too. Shown in full on the report, and as
   a single figure on the card and the Execution dashboard
 - **Project Control tab**: view and edit the documents that steer the models —
-  `INSTRUCTIONS.md`, skills, project docs, and a resources registry
+  `.vibeboard/INSTRUCTIONS.md`, skills, project docs, and a resources registry
 - Config isolation, so your personal `CLAUDE.md`, plugins and hooks do not leak
   into the project's copilot
 - Themes (Cyberpunk, Classic Dark)

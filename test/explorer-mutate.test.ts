@@ -1,6 +1,7 @@
 import { lstat, mkdir, readFile, readlink, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { SKILLS_DIR, skillRel } from '../src/core/layout.js';
 import { listDir, MAX_EDIT_BYTES } from '../src/server/explorer-list.js';
 import {
   createNode,
@@ -357,9 +358,9 @@ describe('deleteNode', () => {
     // A skill folder left behind with no SKILL.md was invisible in Project Control and therefore
     // unremovable. This is the line that clears it.
     const root = await tempDir();
-    await mkdir(join(root, '.claude', 'skills', 'new-skill'), { recursive: true });
-    expect(await deleteNode(root, '.claude/skills/new-skill')).toBe('ok');
-    expect(await names(root, '.claude/skills')).toEqual([]);
+    await mkdir(join(root, skillRel('new-skill')), { recursive: true });
+    expect(await deleteNode(root, skillRel('new-skill'))).toBe('ok');
+    expect(await names(root, SKILLS_DIR)).toEqual([]);
   });
 
   it('refuses a folder with contents rather than emptying it', async () => {

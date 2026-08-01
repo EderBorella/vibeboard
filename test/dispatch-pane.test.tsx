@@ -1,9 +1,13 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { DOCS_DIR, RESOURCES_DIR, skillRel } from '../src/core/layout.js';
 import type { DispatchRequest, RunRecord, Skill } from '../web/src/api.js';
 import { DispatchPane } from '../web/src/components/DispatchPane.js';
 import type { Card } from '../web/src/shared.js';
+
+const API = `${DOCS_DIR}/api.md`;
+const SPEC = `${RESOURCES_DIR}/spec.md`;
 
 afterEach(cleanup);
 
@@ -24,7 +28,7 @@ const card = (over: Partial<Card> = {}): Card =>
 
 const skill: Skill = {
   slug: 'execute',
-  path: '.claude/skills/execute/SKILL.md',
+  path: skillRel('execute', 'SKILL.md'),
   name: 'Execute',
   description: 'Implement the card',
   boards: [],
@@ -116,11 +120,11 @@ describe('DispatchPane', () => {
   it('attaches only what was ticked', () => {
     const onDispatch = vi.fn();
     render(
-      <DispatchPane {...props} attachable={['docs/api.md', 'resources/spec.md']} onDispatch={onDispatch} />,
+      <DispatchPane {...props} attachable={[API, SPEC]} onDispatch={onDispatch} />,
     );
-    fireEvent.click(screen.getByText('resources/spec.md'));
+    fireEvent.click(screen.getByText(SPEC));
     fireEvent.click(screen.getByText('Run Execute'));
-    expect(dispatched(onDispatch).attachments).toEqual(['resources/spec.md']);
+    expect(dispatched(onDispatch).attachments).toEqual([SPEC]);
   });
 
   it('offers no attachment section when the project has nothing to attach', () => {
@@ -132,9 +136,9 @@ describe('DispatchPane', () => {
     // The toggle is a ternary over `includes`; a mutant that always adds sends the same path twice,
     // and the agent reads the same file twice.
     const onDispatch = vi.fn();
-    render(<DispatchPane {...props} attachable={['docs/api.md']} onDispatch={onDispatch} />);
-    fireEvent.click(screen.getByText('docs/api.md'));
-    fireEvent.click(screen.getByText('docs/api.md'));
+    render(<DispatchPane {...props} attachable={[API]} onDispatch={onDispatch} />);
+    fireEvent.click(screen.getByText(API));
+    fireEvent.click(screen.getByText(API));
     fireEvent.click(screen.getByText('Run Execute'));
     expect(dispatched(onDispatch).attachments).toEqual([]);
   });
@@ -142,12 +146,12 @@ describe('DispatchPane', () => {
   it('counts the attachments in the summary, so a collapsed section still says so', () => {
     // The section collapses, and this count is the only thing that tells you something is attached
     // without opening it.
-    render(<DispatchPane {...props} attachable={['docs/api.md', 'resources/spec.md']} />);
+    render(<DispatchPane {...props} attachable={[API, SPEC]} />);
     const summary = document.querySelector('summary') as HTMLElement;
     expect(summary.textContent).toBe('Attach material');
-    fireEvent.click(screen.getByText('docs/api.md'));
+    fireEvent.click(screen.getByText(API));
     expect(summary.textContent).toBe('Attach material (1)');
-    fireEvent.click(screen.getByText('resources/spec.md'));
+    fireEvent.click(screen.getByText(SPEC));
     expect(summary.textContent).toBe('Attach material (2)');
   });
 

@@ -1,6 +1,6 @@
 import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { CONFIG_DIR } from '../core/config.js';
+import { boardRel, RESULTS_DIR, RUNS_DIR } from '../core/layout.js';
 import {
   isInFlight,
   needsResolution,
@@ -16,26 +16,24 @@ import { BOARDS, type BoardName } from '../core/types.js';
 
 // Run records on disk.
 //
-// `<board>/results/<CARD-ID>/<runId>.md` — beside the card, so a card's history travels with it in
-// git, and invisible to the board because readBoard only reads folders named by configured columns.
+// `<board>/results/<CARD-ID>/<runId>.md` inside the boards folder — beside the card, so a card's
+// history travels with it in git, and invisible to the board because readBoard only reads folders
+// named by configured columns.
 //
-// The agent never writes here. It writes its report to `.vibeboard/runs/<runId>.report.md` and this
-// module folds it in, because the record's frontmatter is ours: agents rewrite files wholesale, and
-// a shared file would lose the timings. Anything in a results folder that does not parse as a run
-// is ignored rather than trusted.
-
-export const RESULTS_DIR = 'results';
-export const RUNS_DIR = `${CONFIG_DIR}/runs`;
+// The agent never writes here. It writes its report under `RUNS_DIR` and this module folds it in,
+// because the record's frontmatter is ours: agents rewrite files wholesale, and a shared file would
+// lose the timings. Anything in a results folder that does not parse as a run is ignored rather
+// than trusted.
 
 function cardDir(root: string, board: BoardName, card: string): string {
-  return join(root, board, RESULTS_DIR, card);
+  return join(root, boardRel(board, RESULTS_DIR, card));
 }
 
 export function recordPath(root: string, board: BoardName, card: string, run: string): string {
   return join(cardDir(root, board, card), `${run}.md`);
 }
 
-// Where the agent is told to write. Under `.vibeboard/runs` so a chatty agent does not churn the
+// Where the agent is told to write. Under the runs folder so a chatty agent does not churn the
 // board watcher, and so a half-written report never sits in a card's folder.
 export function reportPath(root: string, run: string): string {
   return join(root, RUNS_DIR, `${run}.report.md`);
@@ -92,7 +90,7 @@ export async function listRuns(root: string): Promise<RunRecord[]> {
   for (const board of BOARDS) {
     let cards: string[];
     try {
-      cards = (await readdir(join(root, board, RESULTS_DIR), { withFileTypes: true }))
+      cards = (await readdir(join(root, boardRel(board, RESULTS_DIR)), { withFileTypes: true }))
         .filter((e) => e.isDirectory())
         .map((e) => e.name);
     } catch {

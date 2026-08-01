@@ -2,6 +2,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { defaultConfig } from '../src/core/config.js';
+import { SKILLS_DIR, skillRel } from '../src/core/layout.js';
 import { readSkills } from '../src/server/skill-catalogue.js';
 import { tempDir } from './helpers.js';
 
@@ -10,8 +11,8 @@ const config = defaultConfig('T');
 async function withSkills(files: Record<string, string>): Promise<string> {
   const root = await tempDir();
   for (const [slug, content] of Object.entries(files)) {
-    await mkdir(join(root, '.claude', 'skills', slug), { recursive: true });
-    await writeFile(join(root, '.claude', 'skills', slug, 'SKILL.md'), content, 'utf8');
+    await mkdir(join(root, skillRel(slug)), { recursive: true });
+    await writeFile(join(root, skillRel(slug, 'SKILL.md')), content, 'utf8');
   }
   return root;
 }
@@ -40,7 +41,7 @@ describe('readSkills', () => {
     // just untrue. A folder that arrives this way is now silent, and the Explorer tab is where it
     // gets deleted.
     const root = await withSkills({ execute: file('Execute') });
-    await mkdir(join(root, '.claude', 'skills', 'empty'), { recursive: true });
+    await mkdir(join(root, skillRel('empty')), { recursive: true });
     const { skills, invalid } = await readSkills(root, config);
     expect(skills.map((s) => s.slug)).toEqual(['execute']);
     expect(invalid).toEqual([]);
@@ -49,7 +50,7 @@ describe('readSkills', () => {
   it('still reports a SKILL.md that is really there and really wrong', async () => {
     // The distinction that matters: a missing file is not a finding, a broken one is.
     const root = await withSkills({ broken: '---\nname: Broken\n---\nno description\n' });
-    await mkdir(join(root, '.claude', 'skills', 'empty'), { recursive: true });
+    await mkdir(join(root, skillRel('empty')), { recursive: true });
     const { skills, invalid } = await readSkills(root, config);
     expect(skills).toEqual([]);
     expect(invalid.map((i) => i.slug)).toEqual(['broken']);
@@ -85,7 +86,7 @@ describe('readSkills', () => {
 
   it('ignores a loose file sitting beside the skill folders', async () => {
     const root = await withSkills({ execute: file('Execute') });
-    await writeFile(join(root, '.claude', 'skills', 'README.md'), '# not a skill\n', 'utf8');
+    await writeFile(join(root, SKILLS_DIR, 'README.md'), '# not a skill\n', 'utf8');
     const { skills, invalid } = await readSkills(root, config);
     expect(skills.map((s) => s.slug)).toEqual(['execute']);
     expect(invalid).toEqual([]);

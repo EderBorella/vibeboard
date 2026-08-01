@@ -1,10 +1,13 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { DOCS_DIR, POINTER_FILES } from '../src/core/layout.js';
 import {
   ControlFileEditor,
   type OpenFile,
 } from '../web/src/components/ControlFileEditor.js';
+
+const [CLAUDE_MD] = POINTER_FILES;
 
 afterEach(cleanup);
 
@@ -13,7 +16,7 @@ afterEach(cleanup);
 // no-op: these passed against the old shape and must pass unchanged against the new one.
 
 const file = (over: Partial<OpenFile> = {}): OpenFile => ({
-  path: 'docs/design.md',
+  path: `${DOCS_DIR}/design.md`,
   name: 'design.md',
   category: 'docs',
   managed: false,
@@ -43,10 +46,10 @@ function mount(over: Partial<Parameters<typeof ControlFileEditor>[0]> = {}) {
 describe('ControlFileEditor', () => {
   it('shows the path, and marks it when the buffer is dirty', () => {
     mount();
-    expect(screen.getByText('docs/design.md')).toBeTruthy();
+    expect(screen.getByText(`${DOCS_DIR}/design.md`)).toBeTruthy();
     cleanup();
     mount({ dirty: true });
-    expect(screen.getByText('docs/design.md •')).toBeTruthy();
+    expect(screen.getByText(`${DOCS_DIR}/design.md •`)).toBeTruthy();
   });
 
   it('offers Edit and Preview, and Fields only where fields mean something', () => {
@@ -111,12 +114,12 @@ describe('ControlFileEditor', () => {
     expect(calls.onDelete).toHaveBeenCalledOnce();
 
     cleanup();
-    mount({ file: file({ deletable: false, category: 'instructions', name: 'CLAUDE.md' }) });
+    mount({ file: file({ deletable: false, category: 'instructions', name: CLAUDE_MD }) });
     expect(screen.queryByRole('button', { name: 'Delete' })).toBeNull();
   });
 
   it('warns on a VibeBoard-managed file, and only on one', () => {
-    mount({ file: file({ managed: true, name: 'CLAUDE.md', path: 'CLAUDE.md' }) });
+    mount({ file: file({ managed: true, name: CLAUDE_MD, path: CLAUDE_MD }) });
     const notice = screen.getByRole('alert');
     expect(notice.textContent).toContain('managed by VibeBoard');
     expect(notice.textContent).toContain('INSTRUCTIONS.md');

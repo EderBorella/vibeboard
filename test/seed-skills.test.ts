@@ -2,6 +2,7 @@ import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { defaultConfig } from '../src/core/config.js';
+import { skillRel } from '../src/core/layout.js';
 import { SEED_SKILLS, seedSkills } from '../src/core/seed-skills.js';
 import { readSkills } from '../src/server/skill-catalogue.js';
 import { tempDir } from './helpers.js';
@@ -37,7 +38,7 @@ describe('seedSkills', () => {
   it('leaves an existing skills folder alone, so a deleted skill stays deleted', async () => {
     const root = await tempDir();
     await seedSkills(root);
-    await rm(join(root, '.claude', 'skills', SEED_SKILLS[0].slug), { recursive: true });
+    await rm(join(root, skillRel(SEED_SKILLS[0].slug)), { recursive: true });
 
     expect(await seedSkills(root)).toBe(false);
     const { skills } = await readSkills(root, config);
@@ -50,9 +51,9 @@ describe('seedSkills', () => {
     // What this test is about is that seeding neither overwrites what is already there nor adds its
     // own beside it.
     const root = await tempDir();
-    await mkdir(join(root, '.claude', 'skills', 'their-skill'), { recursive: true });
+    await mkdir(join(root, skillRel('their-skill')), { recursive: true });
     const theirs = '---\nname: their-skill\ndescription: what they wrote\n---\nTheir prompt.\n';
-    await writeFile(join(root, '.claude', 'skills', 'their-skill', 'SKILL.md'), theirs, 'utf8');
+    await writeFile(join(root, skillRel('their-skill', 'SKILL.md')), theirs, 'utf8');
 
     expect(await seedSkills(root)).toBe(false);
     const { skills, invalid } = await readSkills(root, config);
@@ -64,7 +65,7 @@ describe('seedSkills', () => {
   it('does not edit a seed already on disk', async () => {
     const root = await tempDir();
     await seedSkills(root);
-    const path = join(root, '.claude', 'skills', SEED_SKILLS[0].slug, 'SKILL.md');
+    const path = join(root, skillRel(SEED_SKILLS[0].slug, 'SKILL.md'));
     const mine = '---\nname: Mine\ndescription: my own\n---\nMy prompt.\n';
     await writeFile(path, mine, 'utf8');
     await seedSkills(root);

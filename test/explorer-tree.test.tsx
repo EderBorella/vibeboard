@@ -170,10 +170,16 @@ describe('useTree', () => {
     await waitFor(() => expect(result.current.rows).toHaveLength(1));
 
     act(() => result.current.toggle(dir('gone')));
-    await waitFor(() => expect(result.current.error).toBeNull());
-    expect(result.current.rows).toEqual([
-      { kind: 'node', node: dir('gone'), depth: 0, expanded: false },
-    ]);
+    // Waiting on the ROWS, not on `error`. `error` is already null before the toggle, so a waitFor on
+    // it is satisfied on the first tick and the assertions below then race the collapse — which is
+    // exactly how this flaked once under full-suite load. Toggling sets `expanded: true` immediately
+    // and the failed listing collapses it back, so the row is the only thing that changes twice.
+    await waitFor(() =>
+      expect(result.current.rows).toEqual([
+        { kind: 'node', node: dir('gone'), depth: 0, expanded: false },
+      ]),
+    );
+    expect(result.current.error).toBeNull();
   });
 
   it('re-lists one folder on request, for after a write', async () => {

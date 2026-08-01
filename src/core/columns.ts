@@ -1,6 +1,6 @@
 import { readdir, rename } from 'node:fs/promises';
 import { join } from 'node:path';
-import { ARCHIVE_SLUG } from './board.js';
+import { ARCHIVE_SLUG, boardRel } from './layout.js';
 import { slugify } from './slug.js';
 import type { BoardName } from './types.js';
 
@@ -131,7 +131,7 @@ export async function reconcileColumns(
 ): Promise<ReconcileResult> {
   const oldSlugs = oldNames.map(slugify);
   const newSlugs = newNames.map(slugify);
-  const dir: DirOf = (slug) => join(projectRoot, board, slug);
+  const dir: DirOf = (slug) => join(projectRoot, boardRel(board, slug));
 
   // Same set of columns: at most a reorder, which is purely a config concern.
   const newSet = new Set(newSlugs);

@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { skillRel } from '../src/core/layout.js';
 
 const api = vi.hoisted(() => ({ listSkills: vi.fn() }));
 vi.mock('../web/src/api.js', () => api);
@@ -12,7 +13,7 @@ const catalogue = (slug: string) => ({
   skills: [
     {
       slug,
-      path: `.claude/skills/${slug}/SKILL.md`,
+      path: skillRel(slug, 'SKILL.md'),
       name: slug,
       description: 'd',
       boards: [],

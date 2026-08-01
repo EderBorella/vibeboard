@@ -10,19 +10,19 @@ import {
   ZERO_STATS,
 } from '../core/chat.js';
 import { resolveCopilotSelection } from '../core/copilot-choice.js';
+import { CHAT_DIR } from '../core/layout.js';
 import type { ProjectConfig } from '../core/types.js';
 import type { CopilotEvent } from './copilot-events.js';
 import type { Log } from './logging.js';
 
 // Persists copilot conversations per project as JSON files under
-// <project>/.vibeboard/chat/<id>.json. The server is the source of truth: it tees the
+// <project>/<CHAT_DIR>/<id>.json. The server is the source of truth: it tees the
 // copilot's event stream through recordEvent(), coalescing events into the same
 // TranscriptItem shape the client renders, so a reload/reconnect can replay the chat.
 //
 // Bound to the open project via a lightweight session ref (root + config); it self-heals
 // when the open project changes (drops the in-memory current chat).
 
-const CHAT_SUBDIR = ['.vibeboard', 'chat'];
 const TITLE_MAX = 60;
 const WRITE_DEBOUNCE_MS = 150;
 
@@ -71,7 +71,7 @@ export class ChatStore {
   }
 
   #dir(root: string): string {
-    return join(root, ...CHAT_SUBDIR);
+    return join(root, CHAT_DIR);
   }
   #keep(): number {
     return Math.max(1, this.#session.config?.keepChats ?? 20);

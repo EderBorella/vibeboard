@@ -8,10 +8,13 @@ re-discover how VibeBoard works.
 
 ## The data model (know this — don't go looking for it)
 
+- **Everything VibeBoard owns lives under `.vibeboard/`** at the project root. The rest of
+  the project is not its business.
 - **Three boards, highest level first:** `features/` (capabilities / roadmap),
-  `product/` (what & why), `engineering/` (how). Each board is a top-level folder.
-- **A column is a folder.** e.g. `product/in-progress/P-001.md`. The card's board and
-  column come from its **path**, never from frontmatter.
+  `product/` (what & why), `engineering/` (how). Each board is a folder under
+  `.vibeboard/boards/`.
+- **A column is a folder.** e.g. `.vibeboard/boards/product/in-progress/P-001.md`. The
+  card's board and column come from its **path**, never from frontmatter.
 - **One card = one `.md` file** with YAML frontmatter and a markdown body:
 
 ```markdown
@@ -35,8 +38,8 @@ Freeform markdown body — the card's detail and working notes.
 
 ## How to do the common operations (by editing files)
 
-- **Create a card:** write a new `.md` in the target `board/column/` folder with the next
-  free id and complete frontmatter (`created` = today, sensible `order`).
+- **Create a card:** write a new `.md` in the target `.vibeboard/boards/<board>/<column>/`
+  folder with the next free id and complete frontmatter (`created` = today, sensible `order`).
 - **Move a card:** move the file to another column folder in the same board. Do **not**
   change its id or filename.
 - **Link cards (symmetric):** links may connect any two cards on any boards. Add each
@@ -46,17 +49,17 @@ Freeform markdown body — the card's detail and working notes.
 
 ## Files you must not edit
 
-`CLAUDE.md`, `AGENTS.md`, and `VIBEBOARD.md` are **managed by VibeBoard** — never
-create or modify them. If the user asks you to change how you behave, add standing
-instructions, or record project-specific guidance, edit **`INSTRUCTIONS.md`** at the
-project root instead (you may edit that file freely). Its contents are already part
-of your system prompt, so changes there take effect on the next turn.
+`CLAUDE.md` and `AGENTS.md` (at the project root) and `.vibeboard/VIBEBOARD.md` are
+**managed by VibeBoard** — never create or modify them. If the user asks you to change how
+you behave, add standing instructions, or record project-specific guidance, edit
+**`.vibeboard/INSTRUCTIONS.md`** instead (you may edit that file freely). Its contents are
+already part of your system prompt, so changes there take effect on the next turn.
 
 ## Working style
 
 - Prefer the smallest change that satisfies the request. Keep card content neutral and
   professional.
-- The project's own `CLAUDE.md` / `VIBEBOARD.md` and existing cards are your source for
+- The project's own `CLAUDE.md` / `.vibeboard/VIBEBOARD.md` and existing cards are your source for
   **project-specific** context (goals, domain, conventions). Read them when you need
   project detail — but you already know the VibeBoard mechanics above.
 - After changing cards, briefly say what you changed (ids and columns), since the user

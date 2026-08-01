@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { CONFIG_DIR, CONFIG_FILE } from '../src/core/layout.js';
 import { scaffoldProject } from '../src/core/scaffold.js';
 import { discoverProjects } from '../src/server/discover.js';
 import { tempDir } from './helpers.js';
@@ -48,8 +49,8 @@ describe('discoverProjects skips and ordering', () => {
   it('skips a directory whose config exists but cannot be parsed', async () => {
     const root = await tempDir();
     await plant(root, 'good', 'Good');
-    await mkdir(join(root, 'broken', '.vibeboard'), { recursive: true });
-    await writeFile(join(root, 'broken', '.vibeboard', 'config.yaml'), '{{{ not yaml', 'utf8');
+    await mkdir(join(root, 'broken', CONFIG_DIR), { recursive: true });
+    await writeFile(join(root, 'broken', CONFIG_DIR, CONFIG_FILE), '{{{ not yaml', 'utf8');
     expect((await discoverProjects(root)).map((p) => p.name)).toEqual(['Good']);
   });
 });

@@ -5,10 +5,11 @@ import { resolveInRoot, withinRootRealpath } from './fs-sandbox.js';
 
 // Reading the project as a filesystem, for the Explorer tab.
 //
-// No allow-list and no filtering, unlike control-files.ts: `.git/`, `node_modules/`, `.vibeboard/`
-// and the board folders are all listed, because an entry the app hides is an entry the user cannot
-// remove — which is the bug that prompted this tab (an empty skill folder that could be neither
-// seen nor deleted). What the tab does NOT do is leave the project root; see fs-sandbox.ts.
+// No allow-list and no filtering, unlike control-files.ts: `.git/`, `node_modules/` and all of
+// `.vibeboard/` (cards, chat and run stores included) are listed, because an entry the app hides is
+// an entry the user cannot remove — which is the bug that prompted this tab (an empty skill folder
+// that could be neither seen nor deleted). What the tab does NOT do is leave the project root; see
+// fs-sandbox.ts.
 
 // A directory is listed 500 entries at a time. `.git/objects` and `node_modules` are reachable now,
 // so a cap is unavoidable — but the listing carries how many it left out, and the tree says so.

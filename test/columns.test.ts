@@ -2,14 +2,15 @@ import { mkdir, readdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { reconcileColumns, validateColumns } from '../src/core/columns.js';
+import { ARCHIVE_SLUG, boardRel } from '../src/core/layout.js';
 import { tempDir } from './helpers.js';
 
 async function board(root: string, slugs: string[], cards: Record<string, string[]> = {}): Promise<void> {
-  for (const slug of [...slugs, 'archive']) {
-    await mkdir(join(root, 'product', slug), { recursive: true });
+  for (const slug of [...slugs, ARCHIVE_SLUG]) {
+    await mkdir(join(root, boardRel('product', slug)), { recursive: true });
     for (const id of cards[slug] ?? []) {
       await writeFile(
-        join(root, 'product', slug, `${id}.md`),
+        join(root, boardRel('product', slug, `${id}.md`)),
         `---\nid: ${id}\ntitle: t\norder: 10\ntags: []\nlinks: []\ncreated: 2026-07-25\n---\n`,
         'utf8',
       );
@@ -18,7 +19,7 @@ async function board(root: string, slugs: string[], cards: Record<string, string
 }
 
 const dirs = async (root: string): Promise<string[]> =>
-  (await readdir(join(root, 'product'), { withFileTypes: true }))
+  (await readdir(join(root, boardRel('product')), { withFileTypes: true }))
     .filter((e) => e.isDirectory())
     .map((e) => e.name)
     .sort();
@@ -60,7 +61,7 @@ describe('reconcileColumns — rename', () => {
     expect(result).toEqual({ renamed: [{ from: 'todo', to: 'next' }] });
     expect(await dirs(root)).toEqual(['archive', 'backlog', 'done', 'next']);
     // both cards came with it
-    expect((await readdir(join(root, 'product', 'next'))).sort()).toEqual(['P-001.md', 'P-002.md']);
+    expect((await readdir(join(root, boardRel('product', 'next')))).sort()).toEqual(['P-001.md', 'P-002.md']);
   });
 
   it('handles two renames at once', async () => {
@@ -90,7 +91,7 @@ describe('reconcileColumns — rename', () => {
     const result = await reconcileColumns(root, 'product', ['Backlog', 'Todo'], ['Todo', 'Backlog']);
     expect(result).toEqual({ renamed: [] });
     expect(await dirs(root)).toEqual(['archive', 'backlog', 'todo']);
-    expect(await readdir(join(root, 'product', 'todo'))).toEqual(['P-001.md']);
+    expect(await readdir(join(root, boardRel('product', 'todo')))).toEqual(['P-001.md']);
   });
 
   it('refuses to guess when a rename is mixed with a reorder', async () => {
@@ -125,7 +126,10 @@ describe('reconcileColumns — add and remove', () => {
     expect((result as { error: string }).error).toMatch(/Review/);
     expect((result as { error: string }).error).toMatch(/2 card/);
     // nothing moved or lost
-    expect((await readdir(join(root, 'product', 'review'))).sort()).toEqual(['P-001.md', 'P-002.md']);
+    expect((await readdir(join(root, boardRel('product', 'review')))).sort()).toEqual([
+      'P-001.md',
+      'P-002.md',
+    ]);
   });
 
   it('refuses a rename whose target folder already exists', async () => {
@@ -134,7 +138,7 @@ describe('reconcileColumns — add and remove', () => {
     // "Todo" -> "Next" would merge into an existing folder.
     const result = await reconcileColumns(root, 'product', ['Todo', 'Next'], ['Next', 'Next 2']);
     expect(result).toHaveProperty('error');
-    expect((await readdir(join(root, 'product', 'todo'))).sort()).toEqual(['P-001.md']);
+    expect((await readdir(join(root, boardRel('product', 'todo')))).sort()).toEqual(['P-001.md']);
   });
 
   // The case above is actually refused earlier, as a rename/reorder mix, so it never reaches the
@@ -144,7 +148,7 @@ describe('reconcileColumns — add and remove', () => {
   it('refuses to merge into a stray folder left behind by an earlier removal', async () => {
     const root = await tempDir();
     await board(root, ['todo'], { todo: ['P-001'] });
-    await mkdir(join(root, 'product', 'review'), { recursive: true });
+    await mkdir(join(root, boardRel('product', 'review')), { recursive: true });
 
     const result = await reconcileColumns(root, 'product', ['Todo'], ['Review']);
     expect(result).toEqual({
@@ -152,7 +156,7 @@ describe('reconcileColumns — add and remove', () => {
         'A folder for "Review" already exists. Rename it to something else, or merge the cards yourself.',
     });
     // The cards stay exactly where they were.
-    expect((await readdir(join(root, 'product', 'todo'))).sort()).toEqual(['P-001.md']);
+    expect((await readdir(join(root, boardRel('product', 'todo')))).sort()).toEqual(['P-001.md']);
   });
 
   it('says "1 card", not "1 cards", when refusing to remove a column holding one', async () => {
@@ -177,8 +181,8 @@ describe('reconcileColumns — add and remove', () => {
     const root = await tempDir();
     await board(root, ['todo', 'review']);
     // Editor litter is not a card and must not block removing the column.
-    await writeFile(join(root, 'product', 'review', '.DS_Store'), '', 'utf8');
-    await writeFile(join(root, 'product', 'review', 'notes.txt'), 'x', 'utf8');
+    await writeFile(join(root, boardRel('product', 'review', '.DS_Store')), '', 'utf8');
+    await writeFile(join(root, boardRel('product', 'review', 'notes.txt')), 'x', 'utf8');
 
     expect(await reconcileColumns(root, 'product', ['Todo', 'Review'], ['Todo'])).toEqual({ renamed: [] });
   });

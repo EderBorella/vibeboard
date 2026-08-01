@@ -2,6 +2,7 @@ import { chmodSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { boardRel, DOCS_DIR, skillRel } from '../src/core/layout.js';
 import type { RunRecord } from '../src/core/runs.js';
 import type { Skill } from '../src/core/skills.js';
 import type { Card } from '../src/core/types.js';
@@ -17,7 +18,7 @@ chmodSync(SHIM, 0o755);
 
 const skill: Skill = {
   slug: 'execute',
-  path: '.claude/skills/execute/SKILL.md',
+  path: skillRel('execute', 'SKILL.md'),
   name: 'Execute',
   description: 'Implement the card',
   boards: [],
@@ -36,7 +37,7 @@ const card = (root: string): Card =>
     links: [],
     created: '2026-07-26',
     body: 'detail',
-    filePath: join(root, 'engineering', 'todo', 'E-010.md'),
+    filePath: join(root, boardRel('engineering', 'todo', 'E-010.md')),
   }) as Card;
 
 const input = (root: string, over: Partial<DispatchInput> = {}): DispatchInput => ({
@@ -378,7 +379,7 @@ describe('AgentRunner.dispatch', () => {
     const { run } = await instance.dispatch(
       input(root, {
         userPrompt: '  only the token store  ',
-        attachments: ['docs/api.md'],
+        attachments: [`${DOCS_DIR}/api.md`],
         model: 'opus',
         effort: 'low',
         mode: 'plan',
@@ -386,7 +387,7 @@ describe('AgentRunner.dispatch', () => {
     );
     const final = await settled(root, run);
     expect(final.prompt).toBe('only the token store');
-    expect(final.attached).toEqual(['docs/api.md']);
+    expect(final.attached).toEqual([`${DOCS_DIR}/api.md`]);
     expect(final.model).toBe('opus');
     expect(final.effort).toBe('low');
     expect(final.mode).toBe('plan');
@@ -472,8 +473,12 @@ describe('AgentRunner.dispatch', () => {
 
   it('does not need the results folder to exist first', async () => {
     const root = await tempDir();
-    await mkdir(join(root, 'engineering', 'todo'), { recursive: true });
-    await writeFile(join(root, 'engineering', 'todo', 'E-010.md'), '---\nid: E-010\n---\nx\n', 'utf8');
+    await mkdir(join(root, boardRel('engineering', 'todo')), { recursive: true });
+    await writeFile(
+      join(root, boardRel('engineering', 'todo', 'E-010.md')),
+      '---\nid: E-010\n---\nx\n',
+      'utf8',
+    );
     const { instance } = runner(root);
     const { run } = await instance.dispatch(input(root));
     expect((await settled(root, run)).status).toBe('success');

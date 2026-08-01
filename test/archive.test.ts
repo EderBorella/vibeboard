@@ -1,7 +1,8 @@
 import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
-import { ARCHIVE_SLUG, countArchived, readArchive, readBoard } from '../src/core/board.js';
+import { countArchived, readArchive, readBoard } from '../src/core/board.js';
 import { defaultConfig } from '../src/core/config.js';
+import { ARCHIVE_SLUG } from '../src/core/layout.js';
 import { archiveCard, createCard, moveCard, restoreCard, restoreTarget } from '../src/core/mutations.js';
 import type { Card, ProjectConfig } from '../src/core/types.js';
 import { tempDir } from './helpers.js';

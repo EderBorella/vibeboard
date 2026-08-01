@@ -1,8 +1,9 @@
 import { mkdir, rename, writeFile } from 'node:fs/promises';
 import { basename, join } from 'node:path';
-import { ARCHIVE_SLUG, boardColumnSlugs, readArchive, readBoard } from './board.js';
+import { boardColumnSlugs, readArchive, readBoard } from './board.js';
 import { serializeCard, toFrontmatter } from './card.js';
 import { nextId } from './ids.js';
+import { ARCHIVE_SLUG, boardRel } from './layout.js';
 import type { BoardName, Card, CardFrontmatter, ProjectConfig } from './types.js';
 
 const ORDER_STEP = 10;
@@ -40,7 +41,7 @@ export async function createCard(
   const maxOrder = live
     .filter((c) => c.columnSlug === input.columnSlug)
     .reduce((m, c) => Math.max(m, c.order), 0);
-  const dir = join(projectRoot, input.board, input.columnSlug);
+  const dir = join(projectRoot, boardRel(input.board, input.columnSlug));
   await mkdir(dir, { recursive: true });
   const card: Card = {
     id,
@@ -73,7 +74,7 @@ export async function updateCard(
 }
 
 export async function moveCard(projectRoot: string, card: Card, toColumnSlug: string): Promise<Card> {
-  const dir = join(projectRoot, card.board, toColumnSlug);
+  const dir = join(projectRoot, boardRel(card.board, toColumnSlug));
   await mkdir(dir, { recursive: true });
   const newPath = join(dir, basename(card.filePath));
   await rename(card.filePath, newPath);

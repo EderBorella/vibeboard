@@ -22,7 +22,9 @@ if (process.env.VIBEBOARD_SHIM_ARGS) {
 }
 
 const prompt = args[args.length - 1] ?? '';
-const match = prompt.match(/\.vibeboard\/runs\/[\w.-]+\.report\.md/);
+// The contract puts the path on a line of its own inside a fenced block, so match a whole line
+// rather than a folder this shim would otherwise have to keep in step with core/layout.ts.
+const match = prompt.match(/^[\w./-]+\.report\.md$/m);
 const behaviour = (prompt.match(/\[\[behaviour:(\w+)\]\]/) ?? [])[1] ?? 'success';
 
 const say = (obj) => process.stdout.write(`${JSON.stringify(obj)}\n`);

@@ -1,8 +1,9 @@
 import matter from 'gray-matter';
 import type { BoardName } from './types.js';
 
-// A run is a file: `<board>/results/<CARD-ID>/<runId>.md`. Its frontmatter is VibeBoard's record of
-// what was dispatched and how it ended; its body is the agent's report, verbatim.
+// A run is a file: `<board>/results/<CARD-ID>/<runId>.md` inside the boards folder (core/layout.ts).
+// Its frontmatter is VibeBoard's record of what was dispatched and how it ended; its body is the
+// agent's report, verbatim.
 //
 // `readBoard` only reads folders named by configured columns (core/board.ts), so a `results/` folder
 // is invisible to the board with no exclusion logic — which is why the card's run history can live

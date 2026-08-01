@@ -1,6 +1,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { boardRel, CONFIG_DIR, CONFIG_FILE, DOCS_DIR, RESULTS_DIR, RUNS_DIR } from '../src/core/layout.js';
 import { type RunRecord, runId } from '../src/core/runs.js';
 import {
   appendTranscript,
@@ -41,7 +42,7 @@ describe('run records on disk', () => {
     const root = await tempDir();
     await writeRun(root, record());
     expect(recordPath(root, 'engineering', 'E-010', '20260726-143012-a1b2')).toBe(
-      join(root, 'engineering', 'results', 'E-010', '20260726-143012-a1b2.md'),
+      join(root, boardRel('engineering', RESULTS_DIR, 'E-010', '20260726-143012-a1b2.md')),
     );
     // `results` is not a configured column, so readBoard cannot see it — this is the whole reason
     // the record can live next to the card.
@@ -52,7 +53,7 @@ describe('run records on disk', () => {
 
   it('reads back what it wrote', async () => {
     const root = await tempDir();
-    const written = record({ prompt: 'do it', attached: ['docs/a.md'] });
+    const written = record({ prompt: 'do it', attached: [`${DOCS_DIR}/a.md`] });
     await writeRun(root, written);
     expect(await readRun(root, 'engineering', 'E-010', written.run)).toEqual(written);
   });
@@ -89,7 +90,7 @@ describe('listCardRuns', () => {
     // A results folder is ordinary disk: a note someone dropped there is not a phantom run.
     const root = await tempDir();
     await writeRun(root, record());
-    const dir = join(root, 'engineering', 'results', 'E-010');
+    const dir = join(root, boardRel('engineering', RESULTS_DIR, 'E-010'));
     await writeFile(join(dir, 'notes.md'), '# just my notes\n', 'utf8');
     await writeFile(join(dir, 'half.md'), '---\nrun: x\n---\nincomplete\n', 'utf8');
     expect((await listCardRuns(root, 'engineering', 'E-010')).map((r) => r.run)).toEqual([record().run]);
@@ -116,7 +117,7 @@ describe('listRuns', () => {
   it('ignores a loose file where card folders live', async () => {
     const root = await tempDir();
     await writeRun(root, record());
-    await writeFile(join(root, 'engineering', 'results', 'stray.md'), 'hello\n', 'utf8');
+    await writeFile(join(root, boardRel('engineering', RESULTS_DIR, 'stray.md')), 'hello\n', 'utf8');
     expect(await listRuns(root)).toHaveLength(1);
   });
 });
@@ -124,22 +125,23 @@ describe('listRuns', () => {
 describe('the agent report handoff', () => {
   it('tells the agent a path under .vibeboard, never inside a card folder', async () => {
     // The record's frontmatter is ours. Agents rewrite files wholesale, so they get their own path.
-    expect(reportContract('r1')).toBe('.vibeboard/runs/r1.report.md');
+    expect(reportContract('r1')).toBe(`${RUNS_DIR}/r1.report.md`);
     const root = await tempDir();
-    expect(reportPath(root, 'r1')).toBe(join(root, '.vibeboard', 'runs', 'r1.report.md'));
+    expect(reportPath(root, 'r1')).toBe(join(root, RUNS_DIR, 'r1.report.md'));
   });
 
   it('is not watched, so a streaming run does not churn the board', () => {
-    expect(isIgnored('/p/.vibeboard/runs/r1.report.md')).toBe(true);
-    expect(isIgnored('/p/.vibeboard/runs/r1.log.jsonl')).toBe(true);
-    // The record itself IS watched: writing one should refresh the card's reports.
-    expect(isIgnored('/p/engineering/results/E-010/r1.md')).toBe(false);
-    expect(isIgnored('/p/.vibeboard/config.yaml')).toBe(false);
+    expect(isIgnored(`/p/${RUNS_DIR}/r1.report.md`)).toBe(true);
+    expect(isIgnored(`/p/${RUNS_DIR}/r1.log.jsonl`)).toBe(true);
+    // The record itself IS watched: writing one should refresh the card's reports. It now sits
+    // inside the config folder like the runs scratch area, so "ignore .vibeboard" would break it.
+    expect(isIgnored(`/p/${boardRel('engineering', RESULTS_DIR, 'E-010', 'r1.md')}`)).toBe(false);
+    expect(isIgnored(`/p/${CONFIG_DIR}/${CONFIG_FILE}`)).toBe(false);
   });
 
   it('consumes the report, so a later run cannot inherit an earlier one', async () => {
     const root = await tempDir();
-    await mkdir(join(root, '.vibeboard', 'runs'), { recursive: true });
+    await mkdir(join(root, RUNS_DIR), { recursive: true });
     await writeFile(reportPath(root, 'r1'), '---\noutcome: success\n---\ndone\n', 'utf8');
     expect(await takeAgentReport(root, 'r1')).toContain('outcome: success');
     expect(await takeAgentReport(root, 'r1')).toBeNull();
@@ -153,7 +155,7 @@ describe('the agent report handoff', () => {
     const root = await tempDir();
     const started = record({ prompt: 'mine' });
     await writeRun(root, started);
-    await mkdir(join(root, '.vibeboard', 'runs'), { recursive: true });
+    await mkdir(join(root, RUNS_DIR), { recursive: true });
     await writeFile(
       reportPath(root, started.run),
       '---\noutcome: success\nsummary: all done\ncreated: [E-041]\n---\n## Did it\n',

@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { skillRel } from '../src/core/layout.js';
 const api = vi.hoisted(() => ({
   getRaw: vi.fn(async () => 'file of the active card'),
   putRaw: vi.fn(async () => undefined),
@@ -256,7 +257,7 @@ describe('CardsPane', () => {
         skills={[
           {
             slug: 'execute',
-            path: '.claude/skills/execute/SKILL.md',
+            path: skillRel('execute', 'SKILL.md'),
             name: 'Execute',
             description: 'Implement the card',
             boards: [],
@@ -264,7 +265,7 @@ describe('CardsPane', () => {
             prompt: 'p',
           },
         ]}
-        invalid={[{ slug: 'broken', path: '.claude/skills/broken/SKILL.md', reason: 'needs a name' }]}
+        invalid={[{ slug: 'broken', path: skillRel('broken', 'SKILL.md'), reason: 'needs a name' }]}
         tabs={[ref('E-001')]}
         activeId="E-001"
         live={[card('E-001')]}
@@ -304,7 +305,7 @@ describe('CardsPane', () => {
     const skills = [
       {
         slug: 'execute',
-        path: '.claude/skills/execute/SKILL.md',
+        path: skillRel('execute', 'SKILL.md'),
         name: 'Execute',
         description: 'Implement the card',
         boards: [],
@@ -335,7 +336,7 @@ describe('CardsPane', () => {
     const skills = [
       {
         slug: 'execute',
-        path: '.claude/skills/execute/SKILL.md',
+        path: skillRel('execute', 'SKILL.md'),
         name: 'Execute',
         description: 'Implement the card',
         boards: [],
@@ -389,7 +390,7 @@ describe('CardsPane', () => {
     const skills = [
       {
         slug: 'execute',
-        path: '.claude/skills/execute/SKILL.md',
+        path: skillRel('execute', 'SKILL.md'),
         name: 'Execute',
         description: 'Implement the card',
         boards: [],
@@ -509,7 +510,7 @@ describe('CardsPane', () => {
     const skills = [
       {
         slug: 'execute',
-        path: '.claude/skills/execute/SKILL.md',
+        path: skillRel('execute', 'SKILL.md'),
         name: 'Execute',
         description: 'Implement the card',
         boards: [],

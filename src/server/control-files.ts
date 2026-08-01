@@ -2,13 +2,23 @@ import type { Dirent } from 'node:fs';
 import { mkdir, readdir, readFile, rename, rm, rmdir, writeFile } from 'node:fs/promises';
 import { basename, dirname, join, relative, sep } from 'node:path';
 import { parse, stringify } from 'yaml';
-import { CONFIG_DIR } from '../core/config.js';
+import {
+  CONFIG_DIR,
+  CONVENTIONS_FILE,
+  DOCS_DIR,
+  INSTRUCTIONS_FILE,
+  POINTER_FILES,
+  RESOURCES_DIR,
+  RESOURCES_YAML,
+  SKILLS_DIR,
+  skillRel,
+} from '../core/layout.js';
 import { slugify } from '../core/slug.js';
 import { resolveInRoot } from './fs-sandbox.js';
 
 // The Project Control tab's file controller. It exposes ONLY the documents that steer the
 // models — instructions, skills, docs, resources — behind a hard path sandbox + allow-list so
-// a client can never read or write cards, `.vibeboard/` internals, or anything outside root.
+// a client can never read or write cards, machine state, or anything outside root.
 
 export type ControlCategory = 'instructions' | 'skills' | 'docs' | 'resources';
 
@@ -32,11 +42,12 @@ export interface ResourceLink {
   note?: string;
 }
 
-// The four fixed instruction files. INSTRUCTIONS.md is freely editable; the other three are
-// VibeBoard-managed (soft-blocked for the copilot, user-editable with a disclaimer).
-const INSTRUCTION_FILES = ['INSTRUCTIONS.md', 'CLAUDE.md', 'AGENTS.md', 'VIBEBOARD.md'];
-const MANAGED = new Set(['CLAUDE.md', 'AGENTS.md', 'VIBEBOARD.md']);
-const RESOURCES_YAML = `${CONFIG_DIR}/resources.yaml`;
+// The four fixed instruction files: the two documents inside the config folder, plus the two CLI
+// pointer files that must stay at the project root. The instructions document is freely editable;
+// the other three are VibeBoard-managed (soft-blocked for the copilot, user-editable behind a
+// disclaimer).
+const INSTRUCTION_FILES: string[] = [INSTRUCTIONS_FILE, ...POINTER_FILES, CONVENTIONS_FILE];
+const MANAGED = new Set<string>([...POINTER_FILES, CONVENTIONS_FILE]);
 
 const GROUP_LABELS: Record<ControlCategory, string> = {
   instructions: 'Instructions',
@@ -45,26 +56,30 @@ const GROUP_LABELS: Record<ControlCategory, string> = {
   resources: 'Resources',
 };
 
-// Classify a root-relative POSIX path into a control category, or null if it is not a
-// control-plane path (cards, `config.yaml`, other `.vibeboard/**`, node_modules, …).
+// Classify a root-relative POSIX path into a control category, or null if it is not a control-plane
+// path. A pure allow-list: the named subtrees inside the config folder are the content the tab
+// steers, and everything else — cards, `config.yaml`, the chat and run stores, the rest of the
+// project — falls through to null.
 function categoryOf(rel: string): ControlCategory | null {
-  if (rel === RESOURCES_YAML) return 'resources';
-  if (rel.startsWith(`${CONFIG_DIR}/`)) return null; // everything else under .vibeboard is off-limits
   if (INSTRUCTION_FILES.includes(rel)) return 'instructions';
-  if (rel.startsWith('.claude/skills/')) return 'skills';
-  if (rel.startsWith('resources/')) return 'resources';
-  if (rel.startsWith('docs/') && rel.endsWith('.md')) return 'docs';
-  if (!rel.includes('/') && rel.endsWith('.md')) return 'docs'; // root-level markdown
+  if (rel === RESOURCES_YAML) return 'resources';
+  if (rel.startsWith(`${SKILLS_DIR}/`)) return 'skills';
+  if (rel.startsWith(`${RESOURCES_DIR}/`)) return 'resources';
+  if (rel.startsWith(`${DOCS_DIR}/`) && rel.endsWith('.md')) return 'docs';
   return null;
 }
 
-// A skill is identified by its folder (`.claude/skills/<name>/SKILL.md`), so the folder is its
-// display name — every skill's file is literally called SKILL.md and would be indistinguishable.
+// The slug in `<skills dir>/<slug>/…`, or '' for a path that names no skill folder. One home for
+// the parsing, so the depth of the skills root is never counted by hand.
+function skillSlug(rel: string): string {
+  if (!rel.startsWith(`${SKILLS_DIR}/`)) return '';
+  return rel.slice(SKILLS_DIR.length + 1).split('/')[0];
+}
+
+// A skill is identified by its folder, so the folder is its display name — every skill's file is
+// literally called SKILL.md and would be indistinguishable.
 function displayName(rel: string, category: ControlCategory): string {
-  if (category === 'skills') {
-    const parts = rel.split('/');
-    return parts[2] ?? basename(rel); // .claude/skills/<name>/...
-  }
+  if (category === 'skills') return skillSlug(rel) || basename(rel);
   return basename(rel);
 }
 
@@ -124,19 +139,6 @@ async function walk(root: string, sub: string): Promise<string[]> {
   return out.sort();
 }
 
-async function rootMarkdown(root: string): Promise<string[]> {
-  let entries: Dirent[];
-  try {
-    entries = await readdir(root, { withFileTypes: true });
-  } catch {
-    return [];
-  }
-  return entries
-    .filter((e) => e.isFile() && e.name.endsWith('.md') && !INSTRUCTION_FILES.includes(e.name))
-    .map((e) => e.name)
-    .sort();
-}
-
 export async function listControlFiles(root: string): Promise<ControlGroup[]> {
   const instructions: ControlFile[] = [];
   for (const name of INSTRUCTION_FILES) {
@@ -146,9 +148,9 @@ export async function listControlFiles(root: string): Promise<ControlGroup[]> {
   const toFiles = (rels: string[]): ControlFile[] =>
     rels.map(descriptor).filter((f): f is ControlFile => f !== null);
 
-  const skills = toFiles(await walk(root, '.claude/skills'));
-  const docs = toFiles([...(await rootMarkdown(root)), ...(await walk(root, 'docs'))]);
-  const resources = toFiles(await walk(root, 'resources')); // resources.yaml handled separately
+  const skills = toFiles(await walk(root, SKILLS_DIR));
+  const docs = toFiles(await walk(root, DOCS_DIR));
+  const resources = toFiles(await walk(root, RESOURCES_DIR)); // resources.yaml handled separately
 
   return [
     { key: 'instructions', label: GROUP_LABELS.instructions, files: instructions },
@@ -195,8 +197,8 @@ function pathForName(category: CreatableCategory, name: string): string {
   // Tolerate a typed extension ("Design notes.md") so it doesn't end up slugged into the
   // filename as "design-notes-md".
   const slug = slugify(name.replace(/\.md$/i, '')) || 'untitled';
-  if (category === 'skills') return `.claude/skills/${slug}/SKILL.md`;
-  return category === 'docs' ? `docs/${slug}.md` : `resources/${slug}.md`;
+  if (category === 'skills') return skillRel(slug, 'SKILL.md');
+  return category === 'docs' ? `${DOCS_DIR}/${slug}.md` : `${RESOURCES_DIR}/${slug}.md`;
 }
 
 // What a rename must not clobber: the skill's folder, or the file itself.
@@ -321,12 +323,13 @@ export async function deleteControlFile(
 // and deleting SKILL.md is not permission to delete those. A folder that survives because something
 // else is in it is simply no longer a skill, and the catalogue ignores it (see skill-catalogue.ts).
 async function dropEmptySkillFolder(root: string, rel: string): Promise<void> {
-  // Only the skill's own SKILL.md: `.claude/skills/<slug>/SKILL.md` and nothing deeper, so deleting
-  // a nested file never removes a directory, and the skills root itself can never be the target.
-  const parts = rel.split('/');
-  if (parts.length !== 4 || parts[3] !== 'SKILL.md') return;
+  // Only the skill's own SKILL.md, matched by reconstructing the path it would have: nothing deeper
+  // qualifies, so deleting a nested file never removes a directory, and the skills root itself can
+  // never be the target.
+  const slug = skillSlug(rel);
+  if (!slug || rel !== skillRel(slug, 'SKILL.md')) return;
   try {
-    await rmdir(join(root, parts.slice(0, 3).join('/')));
+    await rmdir(join(root, skillRel(slug)));
   } catch {
     /* not empty, or already gone — either way the folder stays and is not a skill */
   }

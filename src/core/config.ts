@@ -2,6 +2,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { parse, stringify } from 'yaml';
 import { BACKEND_DEFAULTS, DEFAULT_BACKEND, defaultBackendMap } from './backends.js';
+import { CONFIG_DIR, CONFIG_FILE } from './layout.js';
 import { BOARDS, type BoardConfig, type BoardName, type CopilotConfig, type ProjectConfig } from './types.js';
 
 // Tokens the copilot context bar treats as full. Per-project rather than hardcoded: context
@@ -12,9 +13,6 @@ export const DEFAULT_CONTEXT_BUDGET = 200_000;
 // Runs in flight at once. Three is enough to keep a board moving without turning a laptop into a
 // space heater or racing several agents over the same files.
 export const DEFAULT_MAX_RUNS = 3;
-
-export const CONFIG_DIR = '.vibeboard';
-export const CONFIG_FILE = 'config.yaml';
 
 // Default columns per board. Features (highest level) mirrors Product for familiarity.
 const DEFAULT_COLUMNS: Record<BoardName, string[]> = {

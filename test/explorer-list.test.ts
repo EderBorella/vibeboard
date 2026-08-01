@@ -1,6 +1,7 @@
 import { mkdir, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { BOARDS_DIR, boardRel, CONFIG_DIR, CONFIG_FILE, RUNS_DIR } from '../src/core/layout.js';
 import { listDir, MAX_EDIT_BYTES, MAX_ENTRIES, readFileNode } from '../src/server/explorer-list.js';
 import { tempDir } from './helpers.js';
 
@@ -29,26 +30,28 @@ describe('listDir', () => {
     expect(listing?.parent).toBeNull();
   });
 
-  it('hides nothing — .git, node_modules and .vibeboard are all listed', async () => {
+  it('hides nothing — .git, node_modules and the whole config folder are all listed', async () => {
     // The ruling this tab exists for: the tree shows what is on disk. An entry the app hides is an
     // entry the user cannot delete, which is exactly the empty-skill-folder bug in another costume.
-    // A future "helpful" filter has to fail here.
+    // A future "helpful" filter has to fail here — and now that the cards live inside `.vibeboard/`
+    // too, a filter on that one folder would hide the board itself.
     const root = await tree({
       '.git/HEAD': 'ref: refs/heads/main\n',
       'node_modules/left-pad/index.js': 'module.exports = 1\n',
-      '.vibeboard/config.yaml': 'name: T\n',
-      '.vibeboard/runs/live.json': '{}',
-      'features/todo/card.md': '---\n---\n',
+      [`${CONFIG_DIR}/${CONFIG_FILE}`]: 'name: T\n',
+      [`${RUNS_DIR}/live.json`]: '{}',
+      [boardRel('features', 'todo', 'card.md')]: '---\n---\n',
       'README.md': '# hi\n',
     });
-    expect(names(await listDir(root, ''))).toEqual([
-      '.git',
-      '.vibeboard',
-      'features',
-      'node_modules',
-      'README.md',
+    expect(names(await listDir(root, ''))).toEqual(['.git', CONFIG_DIR, 'node_modules', 'README.md']);
+    // Paths rather than names, so the folder holding the boards is the constant and not a
+    // basename spelled out by hand.
+    expect((await listDir(root, CONFIG_DIR))?.entries.map((e) => e.path)).toEqual([
+      BOARDS_DIR,
+      RUNS_DIR,
+      `${CONFIG_DIR}/${CONFIG_FILE}`,
     ]);
-    expect(names(await listDir(root, '.vibeboard'))).toEqual(['runs', 'config.yaml']);
+    expect(names(await listDir(root, boardRel('features')))).toEqual(['todo']);
   });
 
   it('sorts a shuffled directory the same way on every filesystem', async () => {

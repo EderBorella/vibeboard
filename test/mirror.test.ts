@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import * as coreBackends from '../src/core/backends.js';
+import { skillRel } from '../src/core/layout.js';
 import * as coreRuns from '../src/core/runs.js';
 import * as coreSkills from '../src/core/skills.js';
 import * as core from '../src/core/types.js';
@@ -31,7 +32,7 @@ describe('web/shared mirrors src/core', () => {
     // stops the copies drifting: one table of cases, both implementations, same answers.
     const s = (over: Partial<coreSkills.Skill>): coreSkills.Skill => ({
       slug: 'x',
-      path: '.claude/skills/x/SKILL.md',
+      path: skillRel('x', 'SKILL.md'),
       name: 'X',
       description: 'd',
       boards: [],

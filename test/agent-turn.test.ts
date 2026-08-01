@@ -1,4 +1,4 @@
-import { chmodSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -11,6 +11,7 @@ vi.mock('../src/server/opencode-client.js', () => client);
 
 const { runAgentTurn } = await import('../src/server/agent-turn.js');
 
+import { INSTRUCTIONS_FILE } from '../src/core/layout.js';
 import type { AgentTurnOptions, AgentTurnResult } from '../src/server/agent-turn.js';
 import type { CopilotEvent } from '../src/server/copilot-events.js';
 
@@ -29,6 +30,12 @@ beforeEach(() => {
   log = join(dir, 'args.log');
   client.opencodeTurn.mockReset();
 });
+
+// The instructions document lives in a folder now, so writing it means creating that folder first.
+function writeInstructions(body: string): void {
+  mkdirSync(dirname(join(dir, INSTRUCTIONS_FILE)), { recursive: true });
+  writeFileSync(join(dir, INSTRUCTIONS_FILE), body, 'utf8');
+}
 
 interface Turn {
   result: AgentTurnResult;
@@ -139,15 +146,15 @@ describe('the claude command', () => {
     // Both paths return an empty section, and the difference between "no section" and "an empty
     // section joined in" is two blank lines nobody can see in a substring assertion.
     const none = appended((await claudeTurn()).argv);
-    writeFileSync(join(dir, 'INSTRUCTIONS.md'), '   \n\n', 'utf8');
+    writeInstructions('   \n\n');
     expect(appended((await claudeTurn()).argv)).toBe(none);
   });
 
   it('joins the project’s section on with exactly one blank line', async () => {
     const bundled = readFileSync(join(here, '..', 'src', 'server', 'copilot-system-prompt.md'), 'utf8');
-    writeFileSync(join(dir, 'INSTRUCTIONS.md'), 'Prefer small cards.', 'utf8');
+    writeInstructions('Prefer small cards.');
     expect(appended((await claudeTurn()).argv)).toBe(
-      `${bundled}\n\n# Project instructions (from INSTRUCTIONS.md)\n\nPrefer small cards.`,
+      `${bundled}\n\n# Project instructions (from ${INSTRUCTIONS_FILE})\n\nPrefer small cards.`,
     );
   });
 
@@ -156,14 +163,14 @@ describe('the claude command', () => {
     // file exists and one after it must differ, or an edit would need a server restart.
     const before = appended((await claudeTurn()).argv);
     expect(before).not.toContain('Project instructions');
-    writeFileSync(join(dir, 'INSTRUCTIONS.md'), 'Always ask about the schema.', 'utf8');
+    writeInstructions('Always ask about the schema.');
     const after = appended((await claudeTurn()).argv);
-    expect(after).toContain('# Project instructions (from INSTRUCTIONS.md)');
+    expect(after).toContain(`# Project instructions (from ${INSTRUCTIONS_FILE})`);
     expect(after).toContain('Always ask about the schema.');
   });
 
   it('says nothing about project instructions when the file is empty', async () => {
-    writeFileSync(join(dir, 'INSTRUCTIONS.md'), '   \n\n', 'utf8');
+    writeInstructions('   \n\n');
     expect(appended((await claudeTurn()).argv)).not.toContain('Project instructions');
   });
 
@@ -454,7 +461,7 @@ describe('the opencode backend', () => {
   });
 
   it('carries the project’s own instructions too', async () => {
-    writeFileSync(join(dir, 'INSTRUCTIONS.md'), 'Prefer small cards.', 'utf8');
+    writeInstructions('Prefer small cards.');
     client.opencodeTurn.mockResolvedValue('s');
     await opencodeTurn();
     expect(client.opencodeTurn.mock.calls[0][0].system).toContain('Prefer small cards.');

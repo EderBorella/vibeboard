@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { skillRel } from '../src/core/layout.js';
 import type { InvalidSkill, Skill } from '../web/src/api.js';
 import { CardSkills } from '../web/src/components/CardSkills.js';
 import type { Card } from '../web/src/shared.js';
@@ -24,7 +25,7 @@ const card = (over: Partial<Card> = {}): Card =>
 
 const skill = (over: Partial<Skill> = {}): Skill => ({
   slug: 'execute',
-  path: '.claude/skills/execute/SKILL.md',
+  path: skillRel('execute', 'SKILL.md'),
   name: 'Execute',
   description: 'Implement the card',
   boards: [],
@@ -105,13 +106,13 @@ describe('CardSkills', () => {
 
   it('counts invalid skill files and names each reason on hover', () => {
     const invalid: InvalidSkill[] = [
-      { slug: 'a', path: '.claude/skills/a/SKILL.md', reason: 'needs a description' },
-      { slug: 'b', path: '.claude/skills/b/SKILL.md', reason: 'unknown board "backlog"' },
+      { slug: 'a', path: skillRel('a', 'SKILL.md'), reason: 'needs a description' },
+      { slug: 'b', path: skillRel('b', 'SKILL.md'), reason: 'unknown board "backlog"' },
     ];
     render(<CardSkills card={card()} skills={[skill()]} invalid={invalid} />);
     const warn = screen.getByText('⚠ 2 skill files invalid');
     expect(warn.getAttribute('title')).toBe(
-      '.claude/skills/a/SKILL.md: needs a description\n.claude/skills/b/SKILL.md: unknown board "backlog"',
+      `${skillRel('a', 'SKILL.md')}: needs a description\n${skillRel('b', 'SKILL.md')}: unknown board "backlog"`,
     );
   });
 

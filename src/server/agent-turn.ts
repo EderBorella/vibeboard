@@ -2,6 +2,7 @@ import { type ChildProcess, spawn } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { INSTRUCTIONS_FILE } from '../core/layout.js';
 import { claudeConfigDir, isolationEnabled } from './copilot-env.js';
 import { type CopilotEvent, parseCopilotLine, type ResultStats } from './copilot-events.js';
 import { opencodeTurn } from './opencode-client.js';
@@ -100,13 +101,13 @@ function vibeboardInstructions(): string {
   return cachedInstructions;
 }
 
-// The user's own project instructions (INSTRUCTIONS.md at the project root), read FRESH each
-// turn — no cache — so edits (by the user or the copilot) take effect on the next message with
-// no restart. Injected into the system prompt for both backends. Absent/empty file → no-op.
+// The user's own project instructions, read FRESH each turn — no cache — so edits (by the user or
+// the copilot) take effect on the next message with no restart. Injected into the system prompt for
+// both backends. Absent/empty file → no-op.
 function projectInstructions(cwd: string): string {
   try {
-    const body = readFileSync(resolve(cwd, 'INSTRUCTIONS.md'), 'utf8').trim();
-    return body ? `# Project instructions (from INSTRUCTIONS.md)\n\n${body}` : '';
+    const body = readFileSync(resolve(cwd, INSTRUCTIONS_FILE), 'utf8').trim();
+    return body ? `# Project instructions (from ${INSTRUCTIONS_FILE})\n\n${body}` : '';
   } catch {
     return '';
   }

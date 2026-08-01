@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { boardRel, DOCS_DIR, RESOURCES_DIR, RUNS_DIR, skillRel } from '../src/core/layout.js';
 import type { Skill } from '../src/core/skills.js';
 import type { BoardName, Card } from '../src/core/types.js';
 import { buildRunPrompt, type PromptInputs } from '../src/server/run-prompt.js';
@@ -7,7 +8,7 @@ const ROOT = '/p';
 
 const skill: Skill = {
   slug: 'execute',
-  path: '.claude/skills/execute/SKILL.md',
+  path: skillRel('execute', 'SKILL.md'),
   name: 'Execute',
   description: 'Implement the card',
   boards: ['engineering'],
@@ -27,7 +28,7 @@ const card = (over: Partial<Card> = {}): Card =>
     links: [],
     created: '2026-07-26',
     body: 'Some detail.',
-    filePath: '/p/engineering/todo/E-010.md',
+    filePath: `${ROOT}/${boardRel('engineering', 'todo', 'E-010.md')}`,
     ...over,
   }) as Card;
 
@@ -38,7 +39,7 @@ const inputs = (over: Partial<PromptInputs> = {}): PromptInputs => ({
   linked: [],
   attachments: [],
   links: [],
-  reportPath: '.vibeboard/runs/r1.report.md',
+  reportPath: `${RUNS_DIR}/r1.report.md`,
   projectRoot: ROOT,
   ...over,
 });
@@ -54,14 +55,14 @@ describe('buildRunPrompt', () => {
   it('includes the card file verbatim, with its project-relative path', () => {
     const text = buildRunPrompt(inputs());
     expect(text).toContain('## The card: E-010');
-    expect(text).toContain('File: engineering/todo/E-010.md');
+    expect(text).toContain(`File: ${boardRel('engineering', 'todo', 'E-010.md')}`);
     expect(text).toContain('```markdown\n---\nid: E-010\ntitle: Token store\n---\nSome detail.\n```');
   });
 
   it('always ends with the report contract, naming the exact path', () => {
-    const text = buildRunPrompt(inputs({ reportPath: '.vibeboard/runs/xyz.report.md' }));
+    const text = buildRunPrompt(inputs({ reportPath: `${RUNS_DIR}/xyz.report.md` }));
     expect(text).toContain('## Reporting (required)');
-    expect(text).toContain('.vibeboard/runs/xyz.report.md');
+    expect(text).toContain(`${RUNS_DIR}/xyz.report.md`);
     expect(text).toContain('outcome: success');
     expect(text).toContain('A run with no report file counts as needing attention');
     // The contract is last: nothing may come after the instruction on how to report.
@@ -91,14 +92,14 @@ describe('buildRunPrompt', () => {
             columnSlug: 'todo',
             title: 'Auth',
             description: undefined,
-            filePath: '/p/features/todo/F-002.md',
+            filePath: `${ROOT}/${boardRel('features', 'todo', 'F-002.md')}`,
             body: '',
           }),
         ],
       }),
     );
     expect(text).toContain('- **F-002** (features/todo) — Auth');
-    expect(text).toContain('file: features/todo/F-002.md');
+    expect(text).toContain(`file: ${boardRel('features', 'todo', 'F-002.md')}`);
   });
 
   it('quotes a linked PRODUCT card in full, because it carries the intent', () => {
@@ -113,7 +114,7 @@ describe('buildRunPrompt', () => {
             columnSlug: 'in-progress',
             title: 'Stay signed in',
             body: 'Users lose their session daily.',
-            filePath: '/p/product/in-progress/P-001.md',
+            filePath: `${ROOT}/${boardRel('product', 'in-progress', 'P-001.md')}`,
           }),
           card({
             id: 'E-011',
@@ -121,7 +122,7 @@ describe('buildRunPrompt', () => {
             columnSlug: 'todo',
             title: 'Rotate keys',
             body: 'Rotate on the hour.',
-            filePath: '/p/engineering/todo/E-011.md',
+            filePath: `${ROOT}/${boardRel('engineering', 'todo', 'E-011.md')}`,
           }),
         ],
       }),
@@ -141,10 +142,10 @@ describe('buildRunPrompt', () => {
   });
 
   it('passes attachments as paths, not content', () => {
-    const text = buildRunPrompt(inputs({ attachments: ['docs/api.md', 'resources/spec.md'] }));
+    const text = buildRunPrompt(inputs({ attachments: [`${DOCS_DIR}/api.md`, `${RESOURCES_DIR}/spec.md`] }));
     expect(text).toContain('## Attached material');
-    expect(text).toContain('- docs/api.md');
-    expect(text).toContain('- resources/spec.md');
+    expect(text).toContain(`- ${DOCS_DIR}/api.md`);
+    expect(text).toContain(`- ${RESOURCES_DIR}/spec.md`);
   });
 
   it('renders reference links as links', () => {
@@ -171,7 +172,7 @@ describe('buildRunPrompt', () => {
       inputs({
         userPrompt: 'only the token store',
         linked: [card({ id: 'P-001', board: 'product' })],
-        attachments: ['docs/a.md'],
+        attachments: [`${DOCS_DIR}/a.md`],
         previousReport: 'earlier',
       }),
     );
@@ -194,6 +195,8 @@ describe('buildRunPrompt', () => {
     // Both are already appended to the system prompt by agent-turn.ts. Repeating them here would
     // pay twice for the same words.
     const text = buildRunPrompt(inputs());
+    // The basenames, not the constants: a mention without the `.vibeboard/` prefix is still a
+    // mention, and the two documents kept their names when they moved.
     expect(text).not.toContain('VIBEBOARD.md');
     expect(text).not.toContain('INSTRUCTIONS.md');
   });

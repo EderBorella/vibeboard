@@ -1,7 +1,8 @@
 import { type Dirent, existsSync } from 'node:fs';
 import { readdir } from 'node:fs/promises';
 import { join } from 'node:path';
-import { CONFIG_DIR, CONFIG_FILE, readConfig } from '../core/config.js';
+import { readConfig } from '../core/config.js';
+import { CONFIG_DIR, CONFIG_FILE } from '../core/layout.js';
 
 export interface ProjectRef {
   path: string;

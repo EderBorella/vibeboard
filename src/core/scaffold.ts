@@ -1,8 +1,17 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { ARCHIVE_SLUG, boardColumnSlugs } from './board.js';
-import { CONFIG_DIR, defaultConfig, writeConfig } from './config.js';
-import { ensurePointerFile, INSTRUCTIONS_DOC, INSTRUCTIONS_FILE, POINTER_FILES } from './control.js';
+import { boardColumnSlugs } from './board.js';
+import { defaultConfig, writeConfig } from './config.js';
+import { ensurePointerFile, INSTRUCTIONS_DOC } from './control.js';
+import {
+  ARCHIVE_SLUG,
+  BOARDS_DIR,
+  boardRel,
+  CONFIG_DIR,
+  CONVENTIONS_FILE,
+  INSTRUCTIONS_FILE,
+  POINTER_FILES,
+} from './layout.js';
 import { setCardLinks } from './links.js';
 import { createCard } from './mutations.js';
 import { seedSkills } from './seed-skills.js';
@@ -15,10 +24,12 @@ export const VIBEBOARD_DOC = `# VibeBoard card conventions
 This project is managed by VibeBoard. Cards are markdown files in folders.
 
 ## Layout
-- Three boards, highest level first: \`features/\` (capabilities/roadmap),
-  \`product/\` (what/why), and \`engineering/\` (how).
-- **Column = folder.** e.g. \`product/in-progress/P-001.md\`.
-- \`archive/\` (per board) holds soft-deleted cards; it is not a column.
+- Everything VibeBoard owns lives under \`${CONFIG_DIR}/\`; the rest of the project is not its
+  business.
+- Three boards, highest level first: \`${BOARDS_DIR}/features/\` (capabilities/roadmap),
+  \`${BOARDS_DIR}/product/\` (what/why), and \`${BOARDS_DIR}/engineering/\` (how).
+- **Column = folder.** e.g. \`${boardRel('product', 'in-progress', 'P-001.md')}\`.
+- \`${ARCHIVE_SLUG}/\` (per board) holds soft-deleted cards; it is not a column.
 
 ## Card file
 One card = one \`.md\` file with YAML frontmatter + a markdown body:
@@ -53,7 +64,7 @@ async function ensureFolders(projectRoot: string, config: ProjectConfig): Promis
   await mkdir(join(projectRoot, CONFIG_DIR), { recursive: true });
   for (const board of BOARDS) {
     for (const slug of [...boardColumnSlugs(config, board), ARCHIVE_SLUG]) {
-      await mkdir(join(projectRoot, board, slug), { recursive: true });
+      await mkdir(join(projectRoot, boardRel(board, slug)), { recursive: true });
     }
   }
 }
@@ -106,7 +117,7 @@ export async function scaffoldProject(
   const config = defaultConfig(opts.name);
   await ensureFolders(projectRoot, config);
   await writeConfig(projectRoot, config);
-  await writeFile(join(projectRoot, 'VIBEBOARD.md'), VIBEBOARD_DOC, 'utf8');
+  await writeFile(join(projectRoot, CONVENTIONS_FILE), VIBEBOARD_DOC, 'utf8');
   await writeFile(join(projectRoot, INSTRUCTIONS_FILE), INSTRUCTIONS_DOC, 'utf8');
   const greenfield = opts.mode === 'greenfield';
   // Driven by the same list ensureControlFiles walks, so adding a CLI's pointer file is one
@@ -114,9 +125,9 @@ export async function scaffoldProject(
   for (const filename of POINTER_FILES) {
     await ensurePointerFile(projectRoot, filename, opts.name, greenfield);
   }
-  // Both modes: the guard inside leaves an adopted repo's own `.claude/skills` untouched. Written
-  // here as well as in ensureControlFiles for the same reason INSTRUCTIONS.md is — scaffolding has
-  // to produce a complete project without depending on a later open.
+  // Both modes: the guard inside leaves an existing skills folder untouched. Written here as well
+  // as in ensureControlFiles for the same reason the instructions document is — scaffolding has to
+  // produce a complete project without depending on a later open.
   await seedSkills(projectRoot);
   // Sample cards demonstrate the shape for a brand-new project. Adopting an existing repo
   // should add the cockpit and nothing else — three "delete me" cards would just be noise in

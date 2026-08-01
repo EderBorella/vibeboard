@@ -26,7 +26,7 @@ interface Props {
 }
 
 // Names are shown/edited without the .md extension — the server slugs what you type into the
-// real filename, so "Design Notes" becomes docs/design-notes.md.
+// real filename, so "Design Notes" becomes .vibeboard/docs/design-notes.md.
 function editableName(name: string): string {
   return name.replace(/\.md$/i, '');
 }
@@ -111,7 +111,9 @@ export function ProjectControl({ snapshot }: Props) {
   }
 
   function startRename(f: ControlFile): void {
-    if (f.category === 'instructions') return; // fixed filenames the CLIs look for
+    // Fixed names: the two pointer files the CLIs discover at the project root, plus the two
+    // documents inside .vibeboard/ that VibeBoard reads by name.
+    if (f.category === 'instructions') return;
     setRenaming(f.path);
     setRenameDraft(editableName(f.name));
   }

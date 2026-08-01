@@ -1,6 +1,9 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { DOCS_DIR } from '../src/core/layout.js';
+
+const NOTES = `${DOCS_DIR}/notes.md`;
 
 // The two irreversible actions that live outside the card pane: deleting a chat, and deleting a file
 // from Project Control. Each is asserted the same way — the question appears, NOTHING happens while
@@ -10,11 +13,11 @@ const api = vi.hoisted(() => ({
     {
       key: 'docs',
       label: 'Docs',
-      files: [{ path: 'docs/notes.md', name: 'notes.md', category: 'docs', managed: false, deletable: true }],
+      files: [{ path: NOTES, name: 'notes.md', category: 'docs', managed: false, deletable: true }],
     },
   ]),
   getControlFile: vi.fn(async () => ({
-    path: 'docs/notes.md',
+    path: NOTES,
     name: 'notes.md',
     category: 'docs',
     managed: false,
@@ -103,7 +106,7 @@ describe('Project Control — deleting a file', () => {
     await act(async () => {
       fireEvent.click(screen.getByText('Delete file'));
     });
-    expect(api.deleteControlFile).toHaveBeenCalledWith('docs/notes.md');
+    expect(api.deleteControlFile).toHaveBeenCalledWith(NOTES);
   });
 });
 

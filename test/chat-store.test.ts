@@ -2,6 +2,7 @@ import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { defaultConfig } from '../src/core/config.js';
+import { CHAT_DIR } from '../src/core/layout.js';
 import type { ProjectConfig } from '../src/core/types.js';
 import { ChatStore } from '../src/server/chat-store.js';
 import type { CopilotEvent } from '../src/server/copilot-events.js';
@@ -20,7 +21,7 @@ async function fresh(
   const root = await tempDir();
   const config = { ...defaultConfig('t'), ...overrides };
   const ref: Ref = { root, config };
-  return { ref, store: new ChatStore(ref), chatDir: join(root, '.vibeboard', 'chat') };
+  return { ref, store: new ChatStore(ref), chatDir: join(root, CHAT_DIR) };
 }
 
 const resultEvent = (sessionId: string, costUsd = 0.01): CopilotEvent => ({

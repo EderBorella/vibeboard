@@ -1,10 +1,9 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { parseCardContent } from './card.js';
+import { ARCHIVE_SLUG, boardRel } from './layout.js';
 import { slugify } from './slug.js';
 import type { BoardName, Card, ProjectConfig } from './types.js';
-
-export const ARCHIVE_SLUG = 'archive';
 
 export function boardColumnSlugs(config: ProjectConfig, board: BoardName): string[] {
   return config.boards[board].columns.map(slugify);
@@ -15,7 +14,7 @@ async function readCardsFromFolder(
   board: BoardName,
   columnSlug: string,
 ): Promise<Card[]> {
-  const dir = join(projectRoot, board, columnSlug);
+  const dir = join(projectRoot, boardRel(board, columnSlug));
   let entries: string[];
   try {
     entries = await readdir(dir);
@@ -56,7 +55,7 @@ export async function readArchive(projectRoot: string, board: BoardName): Promis
 // the archive is the one folder that only ever grows.
 export async function countArchived(projectRoot: string, board: BoardName): Promise<number> {
   try {
-    const entries = await readdir(join(projectRoot, board, ARCHIVE_SLUG));
+    const entries = await readdir(join(projectRoot, boardRel(board, ARCHIVE_SLUG)));
     return entries.filter((n) => n.endsWith('.md')).length;
   } catch {
     return 0;

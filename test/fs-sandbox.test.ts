@@ -1,6 +1,7 @@
 import { mkdir, symlink, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { skillRel } from '../src/core/layout.js';
 import { normaliseRel, resolveInRoot, withinRootRealpath } from '../src/server/fs-sandbox.js';
 import { tempDir } from './helpers.js';
 
@@ -26,7 +27,8 @@ describe('normaliseRel', () => {
 
   it('keeps a plain relative path as it is', () => {
     expect(normaliseRel('docs/design.md')).toBe('docs/design.md');
-    expect(normaliseRel('.claude/skills/review/SKILL.md')).toBe('.claude/skills/review/SKILL.md');
+    // A real path the app builds, dot-prefixed and several segments deep: it must survive verbatim.
+    expect(normaliseRel(skillRel('review', 'SKILL.md'))).toBe(skillRel('review', 'SKILL.md'));
   });
 
   it('tidies redundant segments so one file has one path', () => {

@@ -1,5 +1,6 @@
 import { mkdir, readdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { SKILLS_DIR } from './layout.js';
 
 // The skills a project starts with. They are ordinary files: the user edits or deletes them like
 // any other, and nothing here is special-cased later.
@@ -8,8 +9,6 @@ import { join } from 'node:path';
 // may have renamed its columns. Boards are fixed by BOARDS, so board scoping is always valid.
 //
 // No model, effort, backend or mode: see the header of core/skills.ts.
-
-const SKILLS_DIR = '.claude/skills';
 
 export const SEED_SKILLS: { slug: string; content: string }[] = [
   {
@@ -96,8 +95,8 @@ Change nothing on disk except the report you are asked to write.
 ];
 
 // Seed ONLY when the skills folder is absent. Deleting a skill removes its folder and leaves
-// `.claude/skills/` behind, so this is what makes a deletion permanent — and it also means an
-// adopted repo that already keeps its own skills there is never written into.
+// the skills root behind, so this is what makes a deletion permanent — and it also means a
+// project that already keeps its own skills there is never written into.
 export async function seedSkills(root: string): Promise<boolean> {
   const dir = join(root, SKILLS_DIR);
   try {

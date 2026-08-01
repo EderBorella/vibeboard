@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { skillRel } from '../src/core/layout.js';
 import type { Skill } from '../web/src/api.js';
 import { SkillEditor } from '../web/src/components/SkillEditor.js';
 import type { ProjectConfig } from '../web/src/shared.js';
@@ -24,7 +25,7 @@ const config: ProjectConfig = {
 
 const skill = (over: Partial<Skill> = {}): Skill => ({
   slug: 'execute',
-  path: '.claude/skills/execute/SKILL.md',
+  path: skillRel('execute', 'SKILL.md'),
   name: 'Execute',
   description: 'Implement the card',
   boards: [],

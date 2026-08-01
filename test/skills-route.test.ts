@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { skillRel } from '../src/core/layout.js';
 import { buildApp } from '../src/server/app.js';
 import { ProjectSession } from '../src/server/session.js';
 import { openTestProject } from './helpers.js';
@@ -17,19 +18,15 @@ describe('GET /api/skills', () => {
 
   it('reports an invalid skill separately rather than hiding it entirely', async () => {
     const { app, root } = await openTestProject();
-    await mkdir(join(root, '.claude', 'skills', 'broken'), { recursive: true });
-    await writeFile(
-      join(root, '.claude', 'skills', 'broken', 'SKILL.md'),
-      '---\nname: Broken\n---\nx\n',
-      'utf8',
-    );
+    await mkdir(join(root, skillRel('broken')), { recursive: true });
+    await writeFile(join(root, skillRel('broken', 'SKILL.md')), '---\nname: Broken\n---\nx\n', 'utf8');
     const body = (await app.inject({ method: 'GET', url: '/api/skills' })).json() as {
       skills: { slug: string }[];
       invalid: { slug: string; path: string; reason: string }[];
     };
     expect(body.skills.map((s) => s.slug)).not.toContain('broken');
     expect(body.invalid).toEqual([
-      { slug: 'broken', path: '.claude/skills/broken/SKILL.md', reason: 'needs a description' },
+      { slug: 'broken', path: skillRel('broken', 'SKILL.md'), reason: 'needs a description' },
     ]);
   });
 
@@ -40,9 +37,9 @@ describe('GET /api/skills', () => {
     const before = (await app.inject({ method: 'GET', url: '/api/skills' })).json() as {
       skills: { slug: string }[];
     };
-    await mkdir(join(root, '.claude', 'skills', 'fresh'), { recursive: true });
+    await mkdir(join(root, skillRel('fresh')), { recursive: true });
     await writeFile(
-      join(root, '.claude', 'skills', 'fresh', 'SKILL.md'),
+      join(root, skillRel('fresh', 'SKILL.md')),
       '---\nname: Fresh\ndescription: brand new\n---\nDo it.\n',
       'utf8',
     );
@@ -91,7 +88,7 @@ describe('PUT /api/skills/:slug', () => {
       payload: { name: 'Brand new', description: 'D', boards: [], columns: [], prompt: 'P' },
     });
     const { readFile } = await import('node:fs/promises');
-    const onDisk = await readFile(join(root, '.claude', 'skills', 'brand-new', 'SKILL.md'), 'utf8');
+    const onDisk = await readFile(join(root, skillRel('brand-new', 'SKILL.md')), 'utf8');
     expect(onDisk).toBe('---\nname: Brand new\ndescription: D\n---\nP\n');
   });
 
@@ -113,7 +110,7 @@ describe('PUT /api/skills/:slug', () => {
     ).json() as { skills: { slug: string }[]; invalid: { slug: string; reason: string }[] };
     expect(body.skills.map((s) => s.slug)).not.toContain('execute');
     expect(body.invalid).toEqual([
-      { slug: 'execute', path: '.claude/skills/execute/SKILL.md', reason: 'unknown column "review"' },
+      { slug: 'execute', path: skillRel('execute', 'SKILL.md'), reason: 'unknown column "review"' },
     ]);
   });
 

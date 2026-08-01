@@ -33,7 +33,7 @@ export async function registerSkillRoutes(api: FastifyInstance, ctx: AppCtx): Pr
 
   // Write a skill from its fields. The YAML is serialised here, never in the browser, so there is one
   // place that knows the file format — and it goes through the control-file sandbox, so a slug can
-  // never escape `.claude/skills`.
+  // never escape the skills folder.
   api.put('/skills/:slug', async (req, reply) => {
     if (!ensureOpen(ctx.session, reply)) return;
     const { slug } = req.params as { slug: string };

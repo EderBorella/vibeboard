@@ -1,6 +1,16 @@
 import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
+import {
+  boardRel,
+  CHAT_DIR,
+  CONFIG_DIR,
+  CONFIG_FILE,
+  DOCS_DIR,
+  POINTER_FILES,
+  RESULTS_DIR,
+  RUNS_DIR,
+} from '../src/core/layout.js';
 import { createCard } from '../src/core/mutations.js';
 import { scaffoldProject } from '../src/core/scaffold.js';
 import { isIgnored, ProjectSession } from '../src/server/session.js';
@@ -57,24 +67,26 @@ describe('ProjectSession', () => {
 });
 
 // The watcher's ignore list, tested directly: driving it through chokidar is slow and racy, and
-// the distinction that matters is subtle — .vibeboard/chat is ignored so the chat store's frequent
-// writes do not churn the board, but config.yaml lives under .vibeboard too and IS watched, so a
-// config edit still pushes a fresh snapshot.
+// the distinction that matters is subtle — the chat and run stores are ignored so their constant
+// writes do not churn the board, but almost everything else now lives under `.vibeboard/` too
+// (cards included), so ignoring the folder wholesale would stop the board updating at all.
 describe('isIgnored', () => {
   it.each([
     '/p/node_modules/x/index.js',
     '/p/.git/HEAD',
-    '/p/.vibeboard/chat/abc.json',
-    '/p/.vibeboard/chat',
+    `/p/${CHAT_DIR}/abc.json`,
+    `/p/${CHAT_DIR}`,
+    `/p/${RUNS_DIR}/r1.log.jsonl`,
   ])('ignores %s', (p) => {
     expect(isIgnored(p)).toBe(true);
   });
 
   it.each([
-    '/p/.vibeboard/config.yaml',
-    '/p/product/todo/P-001.md',
-    '/p/docs/notes.md',
-    '/p/CLAUDE.md',
+    `/p/${CONFIG_DIR}/${CONFIG_FILE}`,
+    `/p/${boardRel('product', 'todo', 'P-001.md')}`,
+    `/p/${boardRel('product', RESULTS_DIR, 'P-001', 'r1.md')}`,
+    `/p/${DOCS_DIR}/notes.md`,
+    `/p/${POINTER_FILES[0]}`,
     '/p/my-node_modules-notes.md',
   ])('watches %s', (p) => {
     expect(isIgnored(p)).toBe(false);
@@ -121,7 +133,7 @@ describe('ProjectSession lifecycle', () => {
     await scaffoldProject(root, { name: 'Un', mode: 'brownfield', today: '2026-07-25' });
     await s.open(root);
     await writeFile(
-      join(root, 'product', 'todo', 'P-900.md'),
+      join(root, boardRel('product', 'todo', 'P-900.md')),
       '---\nid: P-900\ntitle: t\norder: 10\n---\n',
       'utf8',
     );
@@ -142,7 +154,7 @@ describe('ProjectSession lifecycle', () => {
     const card = (id: string): string =>
       `---\nid: ${id}\ntitle: t\norder: 10\ntags: []\nlinks: []\ncreated: 2026-07-25\n---\n`;
     for (const id of ['P-901', 'P-902', 'P-903']) {
-      await writeFile(join(root, 'product', 'todo', `${id}.md`), card(id), 'utf8');
+      await writeFile(join(root, boardRel('product', 'todo', `${id}.md`)), card(id), 'utf8');
     }
     await new Promise((r) => setTimeout(r, 400));
 

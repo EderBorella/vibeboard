@@ -3,10 +3,12 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { readBoard } from '../src/core/board.js';
 import { readConfig } from '../src/core/config.js';
+import { ARCHIVE_SLUG, boardRel, CONVENTIONS_FILE, POINTER_FILES } from '../src/core/layout.js';
 import { scaffoldProject } from '../src/core/scaffold.js';
 import { tempDir } from './helpers.js';
 
 const TODAY = '2026-07-23';
+const [CLAUDE_MD] = POINTER_FILES;
 
 describe('scaffoldProject', () => {
   it('greenfield: writes config, folders, docs, sample cards, and a fresh CLAUDE.md', async () => {
@@ -15,12 +17,12 @@ describe('scaffoldProject', () => {
 
     const config = await readConfig(root);
     expect(config.name).toBe('Demo');
-    await expect(access(join(root, 'product', 'archive'))).resolves.toBeUndefined();
-    await expect(access(join(root, 'engineering', 'archive'))).resolves.toBeUndefined();
-    await expect(access(join(root, 'VIBEBOARD.md'))).resolves.toBeUndefined();
+    await expect(access(join(root, boardRel('product', ARCHIVE_SLUG)))).resolves.toBeUndefined();
+    await expect(access(join(root, boardRel('engineering', ARCHIVE_SLUG)))).resolves.toBeUndefined();
+    await expect(access(join(root, CONVENTIONS_FILE))).resolves.toBeUndefined();
 
-    const claude = await readFile(join(root, 'CLAUDE.md'), 'utf8');
-    expect(claude).toContain('VIBEBOARD.md');
+    const claude = await readFile(join(root, CLAUDE_MD), 'utf8');
+    expect(claude).toContain(CONVENTIONS_FILE);
 
     const product = await readBoard(root, 'product', config);
     const engineering = await readBoard(root, 'engineering', config);
@@ -80,20 +82,20 @@ describe('scaffoldProject', () => {
   it('writes the card conventions doc the CLIs are pointed at', async () => {
     const root = await tempDir();
     await scaffoldProject(root, { name: 'Demo', mode: 'greenfield', today: TODAY });
-    const doc = await readFile(join(root, 'VIBEBOARD.md'), 'utf8');
+    const doc = await readFile(join(root, CONVENTIONS_FILE), 'utf8');
     expect(doc).toContain('# VibeBoard card conventions');
     expect(doc).toContain('Board and column come from the file path, never from frontmatter.');
   });
 
   it('brownfield: preserves an existing CLAUDE.md, appending only a pointer', async () => {
     const root = await tempDir();
-    await writeFile(join(root, 'CLAUDE.md'), '# Existing Project\n\nImportant rules here.\n', 'utf8');
+    await writeFile(join(root, CLAUDE_MD), '# Existing Project\n\nImportant rules here.\n', 'utf8');
     await scaffoldProject(root, { name: 'Adopted', mode: 'brownfield', today: TODAY });
 
-    const claude = await readFile(join(root, 'CLAUDE.md'), 'utf8');
+    const claude = await readFile(join(root, CLAUDE_MD), 'utf8');
     expect(claude).toContain('Important rules here.');
-    expect(claude).toContain('VIBEBOARD.md');
-    await expect(access(join(root, 'VIBEBOARD.md'))).resolves.toBeUndefined();
+    expect(claude).toContain(CONVENTIONS_FILE);
+    await expect(access(join(root, CONVENTIONS_FILE))).resolves.toBeUndefined();
   });
 
   it('brownfield: adds the cockpit but no sample cards, leaving existing files alone', async () => {
@@ -106,16 +108,16 @@ describe('scaffoldProject', () => {
       expect(await readBoard(root, board, config), board).toEqual([]); // no "delete me" cards
     }
     // the cockpit itself is there, and the pre-existing file is untouched
-    await expect(access(join(root, 'product', 'todo'))).resolves.toBeUndefined();
+    await expect(access(join(root, boardRel('product', 'todo')))).resolves.toBeUndefined();
     expect(await readFile(join(root, 'README.md'), 'utf8')).toBe('# My real repo\n');
   });
 
   it('brownfield: does not duplicate the pointer on re-run', async () => {
     const root = await tempDir();
-    await writeFile(join(root, 'CLAUDE.md'), '# X\n', 'utf8');
+    await writeFile(join(root, CLAUDE_MD), '# X\n', 'utf8');
     await scaffoldProject(root, { name: 'A', mode: 'brownfield', today: TODAY });
     await scaffoldProject(root, { name: 'A', mode: 'brownfield', today: TODAY });
-    const claude = await readFile(join(root, 'CLAUDE.md'), 'utf8');
-    expect(claude.match(/VIBEBOARD\.md/g)?.length).toBe(1);
+    const claude = await readFile(join(root, CLAUDE_MD), 'utf8');
+    expect(claude.split(`@${CONVENTIONS_FILE}`).length - 1).toBe(1);
   });
 });

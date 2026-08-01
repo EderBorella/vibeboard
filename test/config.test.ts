@@ -2,7 +2,6 @@ import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
-  CONFIG_DIR,
   DEFAULT_CONTEXT_BUDGET,
   DEFAULT_MAX_RUNS,
   defaultConfig,
@@ -13,6 +12,7 @@ import {
   readConfig,
   writeConfig,
 } from '../src/core/config.js';
+import { CONFIG_DIR } from '../src/core/layout.js';
 import type { CopilotConfig, ProjectConfig } from '../src/core/types.js';
 import { tempDir } from './helpers.js';
 

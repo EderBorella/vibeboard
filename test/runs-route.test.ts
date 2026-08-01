@@ -2,6 +2,7 @@ import { chmodSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { boardRel, RESULTS_DIR, RUNS_DIR } from '../src/core/layout.js';
 import type { RunRecord } from '../src/core/runs.js';
 import { buildApp } from '../src/server/app.js';
 import { readRun, writeRun } from '../src/server/run-store.js';
@@ -128,7 +129,7 @@ describe('POST /api/runs', () => {
     expect(prompt).toContain(`## The card: ${project.card}`);
     expect(prompt).toContain('## Linked cards');
     expect(prompt).toContain('### P-001');
-    expect(prompt).toContain(`.vibeboard/runs/${run.run}.report.md`);
+    expect(prompt).toContain(`${RUNS_DIR}/${run.run}.report.md`);
   });
 
   it('refuses an unknown skill, card or board rather than dispatching something wrong', async () => {
@@ -515,7 +516,7 @@ describe('runs interrupted by a restart', () => {
 
   it('leaves a project with no runs alone', async () => {
     const project = await openTestProject();
-    await mkdir(join(project.root, 'engineering', 'results'), { recursive: true });
+    await mkdir(join(project.root, boardRel('engineering', RESULTS_DIR)), { recursive: true });
     const session = new ProjectSession();
     await expect(session.open(project.root)).resolves.toBeTruthy();
     await session.close();

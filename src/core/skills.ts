@@ -1,9 +1,10 @@
 import matter from 'gray-matter';
 import { boardColumnSlugs } from './board.js';
+import { skillRel } from './layout.js';
 import { slugify } from './slug.js';
 import { BOARDS, type BoardName, type ProjectConfig } from './types.js';
 
-// A skill is a file: `.claude/skills/<slug>/SKILL.md`, frontmatter plus a prompt body.
+// A skill is a file: `<skills dir>/<slug>/SKILL.md` (core/layout.ts), frontmatter plus a prompt body.
 //
 // It carries NO execution knobs — no backend, model, effort or permission mode. A model id
 // belongs to exactly one backend (core/backends.ts), so a skill naming one would silently become
@@ -32,7 +33,7 @@ export interface InvalidSkill {
 export type SkillParse = { ok: true; skill: Skill } | { ok: false; invalid: InvalidSkill };
 
 export function skillPath(slug: string): string {
-  return `.claude/skills/${slug}/SKILL.md`;
+  return skillRel(slug, 'SKILL.md');
 }
 
 // Predicates, not booleans: they narrow, so the caller needs no cast to BoardName. The array form

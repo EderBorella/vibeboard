@@ -1,7 +1,8 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import type { FastifyInstance } from 'fastify';
-import { ARCHIVE_SLUG, readArchive } from '../../core/board.js';
+import { readArchive } from '../../core/board.js';
 import { findCard } from '../../core/find.js';
+import { ARCHIVE_SLUG } from '../../core/layout.js';
 import { setCardLinks } from '../../core/links.js';
 import {
   archiveCard,

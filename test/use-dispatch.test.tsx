@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { DOCS_DIR, INSTRUCTIONS_FILE, RESOURCES_DIR, skillRel } from '../src/core/layout.js';
 
 const api = vi.hoisted(() => ({
   listModels: vi.fn(),
@@ -23,10 +24,14 @@ const file = (category: string, path: string) => ({
 });
 
 const groups = () => [
-  { key: 'instructions', label: 'Instructions', files: [file('instructions', 'INSTRUCTIONS.md')] },
-  { key: 'skills', label: 'Skills', files: [file('skills', '.claude/skills/execute/SKILL.md')] },
-  { key: 'docs', label: 'Docs', files: [file('docs', 'VIBEBOARD.md'), file('docs', 'docs/api.md')] },
-  { key: 'resources', label: 'Resources', files: [file('resources', 'resources/notes.md')] },
+  { key: 'instructions', label: 'Instructions', files: [file('instructions', INSTRUCTIONS_FILE)] },
+  { key: 'skills', label: 'Skills', files: [file('skills', skillRel('execute', 'SKILL.md'))] },
+  {
+    key: 'docs',
+    label: 'Docs',
+    files: [file('docs', `${DOCS_DIR}/guide.md`), file('docs', `${DOCS_DIR}/api.md`)],
+  },
+  { key: 'resources', label: 'Resources', files: [file('resources', `${RESOURCES_DIR}/notes.md`)] },
 ];
 
 const request = { board: 'engineering' as const, card: 'E-001', skill: 'execute' };
@@ -115,9 +120,9 @@ describe('useDispatch — the attachable files', () => {
     const { result } = renderHook(() => useDispatch('claude', 0));
     await waitFor(() =>
       expect(result.current.attachable).toEqual([
-        'VIBEBOARD.md',
-        'docs/api.md',
-        'resources/notes.md',
+        `${DOCS_DIR}/guide.md`,
+        `${DOCS_DIR}/api.md`,
+        `${RESOURCES_DIR}/notes.md`,
       ]),
     );
   });
@@ -179,7 +184,7 @@ describe('useDispatch — running one', () => {
 
   it('passes the request through untouched', async () => {
     const { result } = renderHook(() => useDispatch('claude', 0));
-    const full = { ...request, prompt: 'go', attachments: ['docs/api.md'], previous: 'r1' };
+    const full = { ...request, prompt: 'go', attachments: [`${DOCS_DIR}/api.md`], previous: 'r1' };
     await act(async () => {
       await result.current.run(full);
     });

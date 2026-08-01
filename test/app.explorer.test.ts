@@ -1,10 +1,13 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
+import { boardRel, CONFIG_DIR, INSTRUCTIONS_FILE, POINTER_FILES, SKILLS_DIR } from '../src/core/layout.js';
 import { buildApp } from '../src/server/app.js';
 import type { DirListing, FileRead } from '../src/server/explorer-list.js';
 import { ProjectSession } from '../src/server/session.js';
 import { openTestProject } from './helpers.js';
+
+const [CLAUDE_MD] = POINTER_FILES;
 
 // The Explorer's HTTP surface. The module tests cover what each function decides; these cover the
 // codes and messages the UI actually branches on.
@@ -24,22 +27,25 @@ describe('GET /api/explorer/list', () => {
     expect(listing.path).toBe('');
     expect(listing.parent).toBeNull();
     const names = listing.entries.map((e) => e.name);
-    // A scaffolded project: its instruction files and its own internals, both visible.
-    expect(names).toContain('INSTRUCTIONS.md');
-    expect(names).toContain('.vibeboard');
-    expect(names).toContain('.claude');
+    // A scaffolded project: the CLI pointer file that has to stay at the root, and the one folder
+    // holding everything else, both visible.
+    expect(names).toContain(CLAUDE_MD);
+    expect(names).toContain(CONFIG_DIR);
   });
 
   it('lists a subdirectory', async () => {
     const { app } = await openTestProject({ name: 'E' });
-    const res = await app.inject({ method: 'GET', url: '/api/explorer/list?path=.claude/skills' });
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/explorer/list?path=${encodeURIComponent(SKILLS_DIR)}`,
+    });
     expect(res.statusCode).toBe(200);
-    expect((res.json() as DirListing).parent).toBe('.claude');
+    expect((res.json() as DirListing).parent).toBe(CONFIG_DIR);
   });
 
   it('400s on traversal, a missing directory, and a file', async () => {
     const { app } = await openTestProject({ name: 'E' });
-    for (const path of ['../..', 'nope', 'INSTRUCTIONS.md']) {
+    for (const path of ['../..', 'nope', INSTRUCTIONS_FILE]) {
       const res = await app.inject({
         method: 'GET',
         url: `/api/explorer/list?path=${encodeURIComponent(path)}`,
@@ -78,9 +84,12 @@ describe('GET /api/explorer/file', () => {
     // Two different messages because they are two different problems: one is a wrong click, the
     // other is a path the server will not touch.
     const { app } = await openTestProject({ name: 'E' });
-    // `.claude` really exists in a scaffolded project — a directory that does NOT exist is refused
+    // `.vibeboard` really exists in a scaffolded project — a directory that does NOT exist is refused
     // as a path, not reported as a non-file, which is the distinction being asserted here.
-    const dir = await app.inject({ method: 'GET', url: '/api/explorer/file?path=.claude' });
+    const dir = await app.inject({
+      method: 'GET',
+      url: `/api/explorer/file?path=${encodeURIComponent(CONFIG_DIR)}`,
+    });
     expect(dir.statusCode).toBe(400);
     expect(dir.json()).toEqual({ error: 'Not a file' });
 
@@ -101,18 +110,21 @@ describe('PUT /api/explorer/file', () => {
     const res = await app.inject({
       method: 'PUT',
       url: '/api/explorer/file',
-      payload: { path: 'INSTRUCTIONS.md', content: '# mine\n' },
+      payload: { path: INSTRUCTIONS_FILE, content: '# mine\n' },
     });
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual({ ok: true });
-    expect(await readFile(join(root, 'INSTRUCTIONS.md'), 'utf8')).toBe('# mine\n');
+    expect(await readFile(join(root, INSTRUCTIONS_FILE), 'utf8')).toBe('# mine\n');
   });
 
   it('reaches a card file, which Project Control cannot', async () => {
     // The point of the tab: the board's own markdown is part of the project, and the watcher pushes
     // a snapshot when it changes, so an edit here shows up on the board.
     const { app, root } = await openTestProject({ name: 'E' });
-    const listing = await app.inject({ method: 'GET', url: '/api/explorer/list?path=features/todo' });
+    const listing = await app.inject({
+      method: 'GET',
+      url: `/api/explorer/list?path=${encodeURIComponent(boardRel('features', 'todo'))}`,
+    });
     const card = (listing.json() as DirListing).entries.find((e) => e.name.endsWith('.md'));
     expect(card).toBeDefined();
 
@@ -142,7 +154,7 @@ describe('PUT /api/explorer/file', () => {
 
   it('400s on a path it will not touch', async () => {
     const { app } = await openTestProject({ name: 'E' });
-    for (const path of ['../escape.md', '', '.claude']) {
+    for (const path of ['../escape.md', '', CONFIG_DIR]) {
       const res = await app.inject({
         method: 'PUT',
         url: '/api/explorer/file',
@@ -178,7 +190,7 @@ describe('POST /api/explorer/create', () => {
     for (const payload of [
       { parent: '', kind: 'symlink' },
       { parent: '', kind: undefined },
-      { parent: 'INSTRUCTIONS.md', kind: 'file' },
+      { parent: INSTRUCTIONS_FILE, kind: 'file' },
       { parent: '../..', kind: 'file' },
     ]) {
       const res = await app.inject({ method: 'POST', url: '/api/explorer/create', payload });
@@ -322,21 +334,24 @@ describe('DELETE /api/explorer/entry and /tree', () => {
       const res = await app.inject({ method: 'DELETE', url });
       expect(res.statusCode).toBe(400);
     }
-    // Still a project: the instruction files are where they were.
+    // Still a project: the config folder and its instructions are where they were.
     const listing = await app.inject({ method: 'GET', url: '/api/explorer/list' });
-    expect((listing.json() as DirListing).entries.map((e) => e.name)).toContain('INSTRUCTIONS.md');
-    expect(await readFile(join(root, 'INSTRUCTIONS.md'), 'utf8')).not.toBe('');
+    expect((listing.json() as DirListing).entries.map((e) => e.name)).toContain(CONFIG_DIR);
+    expect(await readFile(join(root, INSTRUCTIONS_FILE), 'utf8')).not.toBe('');
   });
 });
 
 describe('explorer routes with no project open', () => {
   const routes = [
     { method: 'GET' as const, url: '/api/explorer/list' },
-    { method: 'GET' as const, url: '/api/explorer/file?path=INSTRUCTIONS.md' },
+    {
+      method: 'GET' as const,
+      url: `/api/explorer/file?path=${encodeURIComponent(INSTRUCTIONS_FILE)}`,
+    },
     {
       method: 'PUT' as const,
       url: '/api/explorer/file',
-      payload: { path: 'INSTRUCTIONS.md', content: 'x' },
+      payload: { path: INSTRUCTIONS_FILE, content: 'x' },
     },
     { method: 'POST' as const, url: '/api/explorer/create', payload: { parent: '', kind: 'file' } },
     {

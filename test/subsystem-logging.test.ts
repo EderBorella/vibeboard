@@ -2,6 +2,7 @@ import { rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { Writable } from 'node:stream';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { CONFIG_DIR, CONFIG_FILE } from '../src/core/layout.js';
 import { buildApp } from '../src/server/app.js';
 import { ChatStore } from '../src/server/chat-store.js';
 import { installCrashHandlers, type Log } from '../src/server/logging.js';
@@ -178,7 +179,7 @@ describe('buildApp wiring', () => {
     const failure = await waitForLine(lines, 'snapshot broadcast failed');
     expect(failure?.component).toBe('watcher');
     expect(failure?.level).toBe(40); // warn — a later event may still recover
-    expect((failure?.err as { path?: string })?.path).toBe(join(project.root, '.vibeboard/config.yaml'));
+    expect((failure?.err as { path?: string })?.path).toBe(join(project.root, CONFIG_DIR, CONFIG_FILE));
   });
 
   it('tags the WS channel with its component, as pino actually emits it', async () => {

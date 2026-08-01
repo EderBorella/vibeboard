@@ -3,6 +3,7 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { CONFIG_DIR } from '../src/core/layout.js';
 import { buildApp } from '../src/server/app.js';
 import {
   readState,
@@ -101,7 +102,7 @@ describe('restoreLastProject', () => {
   it('does nothing when the folder is no longer a VibeBoard project', async () => {
     const root = await scaffolded();
     await rememberProject(root);
-    await rm(join(root, '.vibeboard'), { recursive: true, force: true });
+    await rm(join(root, CONFIG_DIR), { recursive: true, force: true });
 
     session = new ProjectSession();
     expect(await restoreLastProject(session)).toBeUndefined();

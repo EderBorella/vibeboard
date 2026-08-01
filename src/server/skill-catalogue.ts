@@ -1,11 +1,11 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { SKILLS_DIR, skillRel } from '../core/layout.js';
 import { dedupeSkills, type InvalidSkill, parseSkill, type Skill, type SkillParse } from '../core/skills.js';
 import type { ProjectConfig } from '../core/types.js';
 
-// Where skills live. Already a Project Control category (control-files.ts), so the user can
-// create, rename, edit and delete them with no new file plumbing.
-export const SKILLS_DIR = '.claude/skills';
+// Reading the skills folder. It is already a Project Control category (control-files.ts), so the
+// user can create, rename, edit and delete skills with no new file plumbing.
 
 export interface SkillCatalogue {
   skills: Skill[];
@@ -30,7 +30,7 @@ export async function readSkills(root: string, config: ProjectConfig): Promise<S
   for (const slug of slugs) {
     let content: string;
     try {
-      content = await readFile(join(root, SKILLS_DIR, slug, 'SKILL.md'), 'utf8');
+      content = await readFile(join(root, skillRel(slug, 'SKILL.md')), 'utf8');
     } catch {
       // A folder with no SKILL.md is not a skill — and it is not an invalid skill FILE either,
       // because there is no file. It used to be reported as one, which put a warning on every

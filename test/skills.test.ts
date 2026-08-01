@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { defaultConfig } from '../src/core/config.js';
+import { skillRel } from '../src/core/layout.js';
 import {
   dedupeSkills,
   parseSkill,
@@ -21,7 +22,7 @@ describe('parseSkill', () => {
     if (!r.ok) return;
     expect(r.skill).toEqual({
       slug: 'execute',
-      path: '.claude/skills/execute/SKILL.md',
+      path: skillRel('execute', 'SKILL.md'),
       name: 'Execute',
       description: 'Implement the card',
       boards: [],
@@ -31,7 +32,7 @@ describe('parseSkill', () => {
   });
 
   it('states the path a slug lives at', () => {
-    expect(skillPath('break-down')).toBe('.claude/skills/break-down/SKILL.md');
+    expect(skillPath('break-down')).toBe(skillRel('break-down', 'SKILL.md'));
   });
 
   it.each([
@@ -117,7 +118,7 @@ describe('parseSkill', () => {
 
 const skill = (over: Partial<Skill> = {}): Skill => ({
   slug: 'execute',
-  path: '.claude/skills/execute/SKILL.md',
+  path: skillRel('execute', 'SKILL.md'),
   name: 'Execute',
   description: 'd',
   boards: [],
@@ -145,7 +146,7 @@ describe('dedupeSkills', () => {
       {
         slug: 'run-it',
         path: skillPath('run-it'),
-        reason: 'duplicate name "Execute" (already used by .claude/skills/execute/SKILL.md)',
+        reason: `duplicate name "Execute" (already used by ${skillRel('execute', 'SKILL.md')})`,
       },
     ]);
   });
@@ -218,7 +219,7 @@ describe('serializeSkill', () => {
     if (!parsed.ok) return;
     expect(parsed.skill).toEqual({
       slug: 'execute',
-      path: '.claude/skills/execute/SKILL.md',
+      path: skillRel('execute', 'SKILL.md'),
       name: 'Execute',
       description: 'Implement the card',
       boards: ['engineering'],

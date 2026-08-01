@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { DOCS_DIR, RESOURCES_DIR, skillRel } from '../src/core/layout.js';
 import type { RunRecord } from '../web/src/api.js';
 import { ActiveReport } from '../web/src/components/ActiveReport.js';
 import { CardReports } from '../web/src/components/CardReports.js';
@@ -501,8 +502,9 @@ describe('ReportPane', () => {
   });
 
   it('lists what was attached, comma separated', () => {
-    render(<ReportPane {...props} record={run({ attached: ['docs/api.md', 'resources/spec.md'] })} />);
-    expect(screen.getByText('docs/api.md, resources/spec.md')).toBeTruthy();
+    const attached = [`${DOCS_DIR}/api.md`, `${RESOURCES_DIR}/spec.md`];
+    render(<ReportPane {...props} record={run({ attached })} />);
+    expect(screen.getByText(attached.join(', '))).toBeTruthy();
   });
 
   it('shows VibeBoard’s note when the agent left no summary of its own', () => {
@@ -531,7 +533,7 @@ describe('ActiveReport', () => {
   const skills = [
     {
       slug: 'execute',
-      path: '.claude/skills/execute/SKILL.md',
+      path: skillRel('execute', 'SKILL.md'),
       name: 'Execute',
       description: 'Implement the card',
       boards: [],

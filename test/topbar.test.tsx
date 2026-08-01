@@ -8,7 +8,7 @@ afterEach(cleanup);
 const props = {
   showProject: true,
   projectName: 'Demo',
-  tab: 'boards' as 'boards' | 'execution' | 'control',
+  tab: 'boards' as 'boards' | 'execution' | 'control' | 'explorer',
   onTab: vi.fn(),
   theme: 'cyberpunk',
   onTheme: vi.fn(),
@@ -59,6 +59,16 @@ describe('TopBar', () => {
     expect(screen.getByText('Project Control').className).not.toContain('active');
     screen.getByText('Execution').click();
     expect(onTab).toHaveBeenCalledWith('execution');
+  });
+
+  it('marks and switches to Explorer, which is a different tab from Project Control', () => {
+    // The two are easy to conflate: both are file panes, and both carry `.control` in the DOM.
+    const onTab = vi.fn();
+    render(<TopBar {...props} tab="explorer" onTab={onTab} />);
+    expect(screen.getByText('Explorer').className).toContain('active');
+    expect(screen.getByText('Project Control').className).not.toContain('active');
+    screen.getByText('Explorer').click();
+    expect(onTab).toHaveBeenCalledWith('explorer');
   });
 
   it('switches to Project Control by name, not by position', () => {

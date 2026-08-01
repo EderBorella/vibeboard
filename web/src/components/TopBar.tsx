@@ -4,7 +4,7 @@ const THEMES: { value: string; label: string }[] = [
   { value: 'classic-dark', label: 'Classic Dark' },
 ];
 
-export type MainTab = 'boards' | 'execution' | 'control';
+export type MainTab = 'boards' | 'execution' | 'control' | 'explorer';
 
 interface Props {
   // False while loading, on the project gate, or with no project open — everything except the
@@ -57,6 +57,12 @@ export function TopBar({
           </button>
           <button className={`tab-btn${tab === 'control' ? ' active' : ''}`} onClick={() => onTab('control')}>
             Project Control
+          </button>
+          <button
+            className={`tab-btn${tab === 'explorer' ? ' active' : ''}`}
+            onClick={() => onTab('explorer')}
+          >
+            Explorer
           </button>
         </div>
       )}

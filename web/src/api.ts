@@ -252,6 +252,54 @@ export async function putResources(links: ResourceLink[]): Promise<void> {
   if (!res.ok) throw new Error('Failed to save resources');
 }
 
+// ---- Explorer --------------------------------------------------------------
+// The project as it is on disk. No category and no allow-list, unlike the control files above —
+// the only boundary is the project root, enforced server-side.
+
+export interface FsNode {
+  path: string; // root-relative POSIX
+  name: string;
+  kind: 'file' | 'dir' | 'other';
+  size?: number;
+  symlink?: true;
+  target?: string;
+  escapes?: true; // points outside the project: shown so it can be removed, never opened
+}
+
+export interface DirListing {
+  path: string;
+  parent: string | null;
+  entries: FsNode[];
+  truncated?: number; // entries the server did not return
+}
+
+// Three outcomes rather than a boolean: what the pane says differs, so the difference is data.
+export type FileRead =
+  | { kind: 'text'; path: string; name: string; size: number; content: string }
+  | { kind: 'binary'; path: string; name: string; size: number }
+  | { kind: 'too-large'; path: string; name: string; size: number };
+
+export async function listDir(path: string): Promise<DirListing> {
+  const res = await fetch(`/api/explorer/list?path=${encodeURIComponent(path)}`);
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Failed to list folder');
+  return res.json();
+}
+
+export async function readFsFile(path: string): Promise<FileRead> {
+  const res = await fetch(`/api/explorer/file?path=${encodeURIComponent(path)}`);
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Failed to load file');
+  return res.json();
+}
+
+export async function putFsFile(path: string, content: string): Promise<void> {
+  const res = await fetch('/api/explorer/file', {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ path, content }),
+  });
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Failed to save file');
+}
+
 // --- Skills ---------------------------------------------------------------
 // Mirrors src/core/skills.ts. A skill carries no backend, model, effort or mode — those are
 // chosen per dispatch, so every skill works on every backend.

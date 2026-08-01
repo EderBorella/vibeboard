@@ -793,6 +793,19 @@ body {
 }
 
 .control-empty { color: var(--muted); font-size: 0.72rem; padding: 0 0.5rem; }
+
+/* The Explorer's tree. One flat list of rows indented by depth, not nested elements, so tab order
+   and reading order are the same thing. Wider than the control list: paths run deep. */
+.explorer-list { width: 320px; gap: 0.1rem; }
+.explorer-head { position: sticky; top: -0.75rem; background: var(--wash); z-index: 1; padding-top: 0.15rem; }
+.explorer-item { padding-right: 0.4rem; gap: 0.25rem; }
+/* Fixed width so names line up whether or not a row has a twisty. */
+.explorer-twist { width: 0.7rem; flex-shrink: 0; color: var(--muted); font-size: 0.65rem; }
+.explorer-icon { flex-shrink: 0; font-size: 0.72rem; }
+.explorer-size { flex-shrink: 0; color: var(--muted); font-size: 0.65rem; font-family: var(--font-mono); }
+/* The tail of a capped listing. Deliberately not styled as an error — the folder is fine, the
+   listing is simply not all of it. */
+.explorer-more { color: var(--muted); font-size: 0.68rem; font-style: italic; padding: 0.2rem 0.5rem; }
 /* Inline rename: sits exactly where the list row was, so the row appears to become editable. */
 .control-rename {
   width: 100%; background: var(--bg); color: var(--text);

@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { buildApp } from '../src/server/app.js';
@@ -95,16 +95,80 @@ describe('GET /api/explorer/file', () => {
   });
 });
 
+describe('PUT /api/explorer/file', () => {
+  it('saves a text file', async () => {
+    const { app, root } = await openTestProject({ name: 'E' });
+    const res = await app.inject({
+      method: 'PUT',
+      url: '/api/explorer/file',
+      payload: { path: 'INSTRUCTIONS.md', content: '# mine\n' },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ ok: true });
+    expect(await readFile(join(root, 'INSTRUCTIONS.md'), 'utf8')).toBe('# mine\n');
+  });
+
+  it('reaches a card file, which Project Control cannot', async () => {
+    // The point of the tab: the board's own markdown is part of the project, and the watcher pushes
+    // a snapshot when it changes, so an edit here shows up on the board.
+    const { app, root } = await openTestProject({ name: 'E' });
+    const listing = await app.inject({ method: 'GET', url: '/api/explorer/list?path=features/todo' });
+    const card = (listing.json() as DirListing).entries.find((e) => e.name.endsWith('.md'));
+    expect(card).toBeDefined();
+
+    const res = await app.inject({
+      method: 'PUT',
+      url: '/api/explorer/file',
+      payload: { path: card?.path, content: '---\ntitle: Edited\n---\n' },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(await readFile(join(root, card?.path ?? ''), 'utf8')).toContain('title: Edited');
+  });
+
+  it('refuses to overwrite a file it could not show, with a message saying why', async () => {
+    const { app, root } = await openTestProject({ name: 'E' });
+    await writeFile(join(root, 'logo.png'), Buffer.from([0x89, 0x00, 0x4e]));
+    const res = await app.inject({
+      method: 'PUT',
+      url: '/api/explorer/file',
+      payload: { path: 'logo.png', content: 'clobbered' },
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json()).toEqual({
+      error: 'This file is not editable text — refusing to overwrite it',
+    });
+    expect(await readFile(join(root, 'logo.png'))).toEqual(Buffer.from([0x89, 0x00, 0x4e]));
+  });
+
+  it('400s on a path it will not touch', async () => {
+    const { app } = await openTestProject({ name: 'E' });
+    for (const path of ['../escape.md', '', '.claude']) {
+      const res = await app.inject({
+        method: 'PUT',
+        url: '/api/explorer/file',
+        payload: { path, content: 'x' },
+      });
+      expect(res.statusCode).toBe(400);
+      expect(res.json()).toEqual({ error: 'Path not allowed' });
+    }
+  });
+});
+
 describe('explorer routes with no project open', () => {
   const routes = [
     { method: 'GET' as const, url: '/api/explorer/list' },
     { method: 'GET' as const, url: '/api/explorer/file?path=INSTRUCTIONS.md' },
+    {
+      method: 'PUT' as const,
+      url: '/api/explorer/file',
+      payload: { path: 'INSTRUCTIONS.md', content: 'x' },
+    },
   ];
 
-  it.each(routes)('409s on $method $url', async ({ method, url }) => {
+  it.each(routes)('409s on $method $url', async ({ method, url, payload }) => {
     bare = new ProjectSession();
     const app = buildApp(bare);
-    const res = await app.inject({ method, url });
+    const res = await app.inject({ method, url, ...(payload ? { payload } : {}) });
     expect(res.statusCode).toBe(409);
     expect(res.json()).toEqual({ error: 'No project open' });
     await app.close();

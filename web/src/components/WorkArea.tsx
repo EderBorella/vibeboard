@@ -10,6 +10,7 @@ import type { TagCount } from '../viewmodel';
 import { BoardsView } from './BoardsView';
 import { CardsPane } from './CardsPane';
 import { ExecutionView } from './ExecutionView';
+import { ExplorerView } from './ExplorerView';
 import { ProjectControl } from './ProjectControl';
 import type { MainTab } from './TopBar';
 import { UtilityDock } from './UtilityDock';
@@ -144,6 +145,7 @@ export function WorkArea(props: WorkAreaProps) {
           />
         )}
         {tab === 'control' && <ProjectControl snapshot={snapshot} />}
+        {tab === 'explorer' && <ExplorerView snapshot={snapshot} />}
         <UtilityDock
           panes={panes}
           activeId={dock.pane}

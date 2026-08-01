@@ -93,7 +93,7 @@ const copilotState = {
 
 const props = {
   snapshot,
-  tab: 'boards' as 'boards' | 'execution' | 'control',
+  tab: 'boards' as 'boards' | 'execution' | 'control' | 'explorer',
   allCards: [] as Card[],
   runs: { runs: [], active: [], queued: [] },
   skills: { skills: [], invalid: [] },
@@ -141,12 +141,15 @@ const props = {
   onResolveRun: vi.fn(),
 };
 
-// Which of the three main views is on screen. Exactly one should ever be.
+// Which of the main views is on screen. Exactly one should ever be.
+// The Explorer reuses Project Control's two-column layout, so it carries `.control` as well as
+// `.explorer` — hence `:not(.explorer)` rather than a bare `.control`, which would report both.
 const shown = (): string[] => {
   const views: string[] = [];
   if (document.querySelector('main.boards')) views.push('boards');
   if (document.querySelector('main.execution')) views.push('execution');
-  if (document.querySelector('.control')) views.push('control');
+  if (document.querySelector('.control:not(.explorer)')) views.push('control');
+  if (document.querySelector('.control.explorer')) views.push('explorer');
   return views;
 };
 
@@ -155,6 +158,7 @@ describe('WorkArea', () => {
     ['boards', 'boards'],
     ['execution', 'execution'],
     ['control', 'control'],
+    ['explorer', 'explorer'],
   ])('shows only the %s view for that tab', (tab, expected) => {
     render(<WorkArea {...props} tab={tab as 'boards'} />);
     expect(shown()).toEqual([expected]);
@@ -163,7 +167,7 @@ describe('WorkArea', () => {
   it('never renders two views at once', () => {
     // A REGRESSION test: a two-way ternary here once rendered Project Control underneath the
     // Execution view, because with three tabs `boards ? … : …` puts the else-branch on both others.
-    for (const tab of ['boards', 'execution', 'control'] as const) {
+    for (const tab of ['boards', 'execution', 'control', 'explorer'] as const) {
       const { unmount } = render(<WorkArea {...props} tab={tab} />);
       expect(shown()).toHaveLength(1);
       unmount();
@@ -171,7 +175,7 @@ describe('WorkArea', () => {
   });
 
   it('keeps the utility dock on every tab, because a card outlives the view you opened it from', () => {
-    for (const tab of ['boards', 'execution', 'control'] as const) {
+    for (const tab of ['boards', 'execution', 'control', 'explorer'] as const) {
       const { unmount } = render(<WorkArea {...props} tab={tab} />);
       expect(screen.getByText('Cards')).toBeTruthy();
       unmount();

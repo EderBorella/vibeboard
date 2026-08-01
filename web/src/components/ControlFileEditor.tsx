@@ -1,11 +1,13 @@
 import type { ReactNode } from 'react';
 import type { ControlFile } from '../api';
-import { renderMarkdown } from '../markdown';
+import { EditorBody, EditorShell, type EditorView } from './EditorShell';
 
 // A control file as opened for editing: its listing metadata plus the content on disk.
 export type OpenFile = ControlFile & { content: string };
 
-export type ControlView = 'fields' | 'edit' | 'preview';
+// Re-exported so Project Control's own modules keep importing their view type from here — the shell
+// owns the type because the Explorer needs it too.
+export type ControlView = EditorView;
 
 interface Props {
   file: OpenFile;
@@ -27,9 +29,8 @@ interface Props {
   onDelete: () => void;
 }
 
-// The open file's pane: path + view tabs + actions, the managed-file warning, and the buffer
-// itself as either a textarea or rendered markdown. A fragment, not a wrapper element — these
-// are direct children of .control-editor and the layout depends on that.
+// The open control file's pane. The chrome is EditorShell, shared with the Explorer; what is left
+// here is what only Project Control has — the managed-file disclaimer, and a skill's fields.
 export function ControlFileEditor({
   file,
   draft,
@@ -43,27 +44,16 @@ export function ControlFileEditor({
   fieldsAvailable,
   fields,
 }: Props) {
+  const views: EditorView[] = fieldsAvailable ? ['fields', 'edit', 'preview'] : ['edit', 'preview'];
   return (
-    <>
-      <div className="control-editor-head">
-        <span className="control-editor-path">
-          {file.path}
-          {dirty ? ' •' : ''}
-        </span>
-        <div className="control-tabs" role="group" aria-label="View">
-          {fieldsAvailable && (
-            <button className={view === 'fields' ? 'active' : ''} onClick={() => onView('fields')}>
-              Fields
-            </button>
-          )}
-          <button className={view === 'edit' ? 'active' : ''} onClick={() => onView('edit')}>
-            Edit
-          </button>
-          <button className={view === 'preview' ? 'active' : ''} onClick={() => onView('preview')}>
-            Preview
-          </button>
-        </div>
-        <div className="control-editor-actions">
+    <EditorShell
+      path={file.path}
+      dirty={dirty}
+      views={views}
+      view={view}
+      onView={onView}
+      actions={
+        <>
           {file.deletable && (
             <button className="btn-danger" disabled={busy} onClick={onDelete}>
               Delete
@@ -74,25 +64,19 @@ export function ControlFileEditor({
               Save
             </button>
           )}
-        </div>
-      </div>
-      {file.managed && (
-        <div className="control-disclaimer" role="alert">
-          ⚠ <strong>{file.name}</strong> is managed by VibeBoard — the copilot won’t edit it, and it steers
-          how the boards work. Edit only if you know what you’re doing. For your own standing instructions,
-          use <strong>INSTRUCTIONS.md</strong> instead.
-        </div>
-      )}
-      {view === 'fields' && fields}
-      {view === 'edit' && (
-        <textarea
-          className="control-textarea"
-          value={draft}
-          onChange={(e) => onDraft(e.target.value)}
-          spellCheck={false}
-        />
-      )}
-      {view === 'preview' && <div className="control-preview markdown">{renderMarkdown(draft)}</div>}
-    </>
+        </>
+      }
+      notice={
+        file.managed && (
+          <div className="control-disclaimer" role="alert">
+            ⚠ <strong>{file.name}</strong> is managed by VibeBoard — the copilot won’t edit it, and it steers
+            how the boards work. Edit only if you know what you’re doing. For your own standing instructions,
+            use <strong>INSTRUCTIONS.md</strong> instead.
+          </div>
+        )
+      }
+    >
+      {view === 'fields' ? fields : <EditorBody view={view} draft={draft} onDraft={onDraft} />}
+    </EditorShell>
   );
 }

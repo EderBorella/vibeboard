@@ -1,12 +1,16 @@
 import { rm, writeFile } from 'node:fs/promises';
+import { createServer, type Server } from 'node:http';
 import { join } from 'node:path';
 import { Writable } from 'node:stream';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CONFIG_DIR, CONFIG_FILE } from '../src/core/layout.js';
 import { buildApp } from '../src/server/app.js';
 import { ChatStore } from '../src/server/chat-store.js';
+import type { CopilotEvent } from '../src/server/copilot-events.js';
 import { installCrashHandlers, type Log } from '../src/server/logging.js';
 import { modelStatus } from '../src/server/models.js';
+import { opencodeTurn } from '../src/server/opencode-client.js';
+import { capStartupLog, opencodeBaseUrl, stopOpencodeServer } from '../src/server/opencode-server.js';
 import { ProjectSession } from '../src/server/session.js';
 import { openTestProject, tempDir, wsClient } from './helpers.js';
 
@@ -200,5 +204,125 @@ describe('buildApp wiring', () => {
     expect(failure).toBeDefined();
     expect(failure?.component).toBe('ws');
     expect(failure?.level).toBe(40); // warn
+  });
+});
+
+// The OpenCode backend is two module singletons — the spawned `opencode serve` and the turns that run
+// through it — and neither had any way to say anything. A run that failed inside opencode left
+// `[opencode: "Streaming response failed"]` in the transcript and nothing anywhere else.
+describe('the OpenCode backend', () => {
+  const SHIM = join(process.cwd(), 'test', 'fixtures', 'fake-opencode-serve.mjs');
+  const savedUrl = process.env.VIBEBOARD_OPENCODE_URL;
+  const savedBin = process.env.VIBEBOARD_OPENCODE_BIN;
+  let http: Server | undefined;
+
+  afterEach(async () => {
+    stopOpencodeServer();
+    await new Promise<void>((r) => (http ? http.close(() => r()) : r()));
+    http = undefined;
+    // Restored, not just unset: process.env survives into the next test FILE in the same worker.
+    for (const [key, value] of [
+      ['VIBEBOARD_OPENCODE_URL', savedUrl],
+      ['VIBEBOARD_OPENCODE_BIN', savedBin],
+    ] as const) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  });
+
+  // Builds the app only for its side effect: the composition root is where the OpenCode singletons
+  // are handed the logger, so a real pino child with the real component tag is what gets tested.
+  function wiredSink(): Record<string, unknown>[] {
+    const { lines, stream } = sink();
+    session = new ProjectSession();
+    buildApp(session, { logger: { level: 'debug', stream } });
+    return lines;
+  }
+
+  // Stands in for `opencode serve` over HTTP, answering every message with one payload.
+  async function fakeOpencode(payload: unknown): Promise<void> {
+    http = createServer((req, res) => {
+      req.on('data', () => {});
+      req.on('end', () => {
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end(JSON.stringify((req.url ?? '').includes('/message') ? payload : { id: 'ses_fake' }));
+      });
+    });
+    await new Promise<void>((r) => http!.listen(0, '127.0.0.1', r));
+    const { port } = http!.address() as { port: number };
+    process.env.VIBEBOARD_OPENCODE_URL = `http://127.0.0.1:${port}`;
+  }
+
+  it('logs the whole error object when a turn fails, keeping the transcript line short', async () => {
+    // Everything except `data.message` used to be dropped on the floor, which is why the real
+    // failure could not be diagnosed at all: no provider, no status, no kind of fault.
+    const error = {
+      name: 'ProviderStreamError',
+      data: { message: 'Streaming response failed', providerID: 'opencode', status: 502 },
+      retryable: true,
+    };
+    const lines = wiredSink();
+    await fakeOpencode({ info: { sessionID: 'ses_1', error }, parts: [] });
+    const events: CopilotEvent[] = [];
+
+    await opencodeTurn({ cwd: '/tmp', text: 'hi', onEvent: (e) => events.push(e) });
+
+    const failure = await waitForLine(lines, 'opencode turn failed');
+    expect(failure?.component).toBe('opencode');
+    expect(failure?.level).toBe(50); // error: the turn produced nothing and nobody else will say why
+    expect(failure?.err).toEqual(error);
+    // The session the turn was POSTed to, so the failure can be looked up in opencode's own store.
+    expect(failure?.sessionId).toBe('ses_fake');
+    // The transcript still gets one readable line — with the NAME, which is what "Streaming response
+    // failed" on its own was missing.
+    expect(events).toContainEqual({
+      kind: 'text',
+      text: '\n[opencode: ProviderStreamError: Streaming response failed]',
+    });
+  });
+
+  it('says nothing when the turn worked', async () => {
+    const lines = wiredSink();
+    await fakeOpencode({ info: { sessionID: 'ses_2' }, parts: [{ type: 'text', text: 'ok' }] });
+
+    await opencodeTurn({ cwd: '/tmp', text: 'hi', onEvent: () => {} });
+
+    expect(lines.filter((l) => l.msg === 'opencode turn failed')).toEqual([]);
+  });
+
+  it('forwards the spawned server’s output to the log once it is up', async () => {
+    // Before this, everything the child said after the listening line went nowhere — including the
+    // provider errors that explain a failed turn.
+    const lines = wiredSink();
+    delete process.env.VIBEBOARD_OPENCODE_URL; // so a server really is spawned
+    process.env.VIBEBOARD_OPENCODE_BIN = SHIM;
+
+    expect(await opencodeBaseUrl()).toMatch(/^http:\/\/127\.0\.0\.1:\d+$/);
+
+    const provider = await waitForLine(lines, 'provider error: no credentials for anthropic');
+    expect(provider?.component).toBe('opencode');
+    expect(provider?.level).toBe(40); // warn: worth reading, but the server is still serving
+    expect(provider?.stream).toBe('stderr');
+
+    const routine = await waitForLine(lines, 'GET /session 200');
+    expect(routine?.level).toBe(20); // debug: per-request chatter would bury the file at info
+    expect(routine?.stream).toBe('stdout');
+
+    // The banner arrived before the promise settled, so it was matched for the URL, not logged.
+    expect(lines.some((l) => String(l.msg).includes('listening on'))).toBe(false);
+    // A chunk that is only a newline must not become a blank line in the file.
+    expect(lines.filter((l) => l.component === 'opencode' && l.msg === '')).toEqual([]);
+  });
+
+  it('stops growing the startup buffer once it holds enough to diagnose a startup failure', () => {
+    // The leak is invisible from outside — memory, not output — so the cap is tested where it lives.
+    const capped = capStartupLog('', 'x'.repeat(20_000));
+    expect(capped.length).toBe(8192);
+    expect(capStartupLog(capped, 'and more').length).toBe(8192);
+    // The HEAD survives: the listening banner and any startup failure both come first, and the URL
+    // is matched in this same string.
+    expect(capStartupLog('listening on http://127.0.0.1:1234', 'y'.repeat(20_000))).toMatch(
+      /^listening on http:\/\/127\.0\.0\.1:1234y+$/,
+    );
   });
 });

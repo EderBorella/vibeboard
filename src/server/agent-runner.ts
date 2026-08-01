@@ -74,7 +74,9 @@ function usageFromStats(stats: ResultStats | undefined): RunUsage | undefined {
   return {
     costUsd: stats.costUsd,
     durationMs: stats.durationMs,
-    turns: stats.turns,
+    // Left out of the record entirely when the backend reported none — RunUsage treats absence and
+    // zero as different facts, and a `turns:` key with nothing behind it is neither.
+    ...(stats.turns !== undefined ? { turns: stats.turns } : {}),
     contextTokens: stats.contextTokens,
     outputTokens: stats.outputTokens,
   };

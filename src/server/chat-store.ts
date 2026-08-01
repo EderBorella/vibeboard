@@ -266,7 +266,8 @@ export class ChatStore {
         if (event.sessionId) c.cliSessionId = event.sessionId;
         if (event.stats) {
           c.stats.costUsd += event.stats.costUsd;
-          c.stats.turns += event.stats.turns;
+          // A backend that reports no turn count adds nothing to the running total rather than NaN.
+          c.stats.turns += event.stats.turns ?? 0;
           c.stats.lastDurationMs = event.stats.durationMs;
         }
         break;

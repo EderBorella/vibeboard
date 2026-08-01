@@ -129,6 +129,14 @@ describe('useCopilot stats', () => {
     event({ kind: 'result' });
     expect(result.current.stats).toMatchObject({ costUsd: 0, turns: 0 });
   });
+
+  it('keeps the turn count a number when the backend reports none', () => {
+    // OpenCode has no turn count to give, so its result event omits `turns` rather than claiming 1.
+    // Added to the running total unguarded, that put NaN in the footer readout.
+    const { result } = renderHook(() => useCopilot(0));
+    event({ kind: 'result', stats: { costUsd: 0.5, durationMs: 2011, contextTokens: 12_354 } });
+    expect(result.current.stats).toMatchObject({ costUsd: 0.5, turns: 0, lastDurationMs: 2011 });
+  });
 });
 
 describe('useCopilot socket messages', () => {

@@ -48,7 +48,9 @@ interface CopilotEvent {
   sessionId?: string;
   model?: string;
   contextTokens?: number;
-  stats?: { costUsd: number; durationMs: number; turns: number; contextTokens: number };
+  // `turns` is absent on backends that report no turn count (OpenCode), so it is optional here too —
+  // adding undefined to the running total would put NaN in the footer readout.
+  stats?: { costUsd: number; durationMs: number; turns?: number; contextTokens: number };
 }
 
 const ZERO: CopilotStats = { costUsd: 0, turns: 0, lastDurationMs: 0, contextTokens: 0 };
@@ -127,7 +129,7 @@ export function useCopilot(bump: number) {
       setStats((s) => ({
         ...s,
         costUsd: s.costUsd + turnStats.costUsd,
-        turns: s.turns + turnStats.turns,
+        turns: s.turns + (turnStats.turns ?? 0),
         lastDurationMs: turnStats.durationMs,
       }));
     }

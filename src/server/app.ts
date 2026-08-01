@@ -5,6 +5,7 @@ import { ChatStore } from './chat-store.js';
 import { CopilotSession } from './copilot.js';
 import { createCopilotTurns } from './copilot-turns.js';
 import { type Log, serverLogger } from './logging.js';
+import { attachOpencodeLogger } from './opencode-server.js';
 import type { AppCtx } from './route-context.js';
 import { registerCardRoutes } from './routes/cards.js';
 import { registerConfigRoutes } from './routes/config.js';
@@ -35,6 +36,9 @@ export function buildApp(
   // The watcher and the debounced snapshot broadcast happen with no request in flight, and the
   // session is constructed before the app — so the composition root hands it the logger.
   session.attachLogger(log.child({ component: 'watcher' }));
+  // Same reason for the OpenCode backend: the spawned `opencode serve` and the turns that run
+  // through it are module singletons, and both only speak with no request in flight.
+  attachOpencodeLogger(log.child({ component: 'opencode' }));
   const { clients, broadcast } = createBroadcaster();
   // A run does real work — implementing a card, not answering a question — so its patience is its
   // own, an order of magnitude beyond the chat's per-turn timeout.

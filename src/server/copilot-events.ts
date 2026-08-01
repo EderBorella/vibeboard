@@ -9,7 +9,9 @@ export interface ResultStats {
   text: string;
   costUsd: number;
   durationMs: number;
-  turns: number;
+  // Optional because not every backend reports one: Claude Code has num_turns, OpenCode's message
+  // response has no equivalent, and inventing a 1 there made every OpenCode run claim "1 turn".
+  turns?: number;
   contextTokens: number; // prompt tokens in play: input + cache read + cache creation
   outputTokens: number;
 }

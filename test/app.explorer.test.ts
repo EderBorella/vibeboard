@@ -259,6 +259,76 @@ describe('POST /api/explorer/rename and /move', () => {
   });
 });
 
+describe('DELETE /api/explorer/entry and /tree', () => {
+  it('deletes a file, and an empty folder', async () => {
+    const { app, root } = await openTestProject({ name: 'E' });
+    await writeFile(join(root, 'a.md'), 'a', 'utf8');
+    await mkdir(join(root, 'empty'), { recursive: true });
+
+    for (const path of ['a.md', 'empty']) {
+      const res = await app.inject({
+        method: 'DELETE',
+        url: `/api/explorer/entry?path=${encodeURIComponent(path)}`,
+      });
+      expect(res.statusCode).toBe(200);
+      expect(res.json()).toEqual({ ok: true });
+    }
+    // Names, not objects: `toContain(expect.objectContaining(...))` compares by equality and would
+    // have passed whether or not anything was deleted.
+    const listing = await app.inject({ method: 'GET', url: '/api/explorer/list' });
+    const names = (listing.json() as DirListing).entries.map((e) => e.name);
+    expect(names).not.toContain('a.md');
+    expect(names).not.toContain('empty');
+  });
+
+  it('409s on a folder with contents — the cue to ask the harder question', async () => {
+    const { app, root } = await openTestProject({ name: 'E' });
+    await mkdir(join(root, 'full'), { recursive: true });
+    await writeFile(join(root, 'full', 'x.md'), 'x', 'utf8');
+    const res = await app.inject({ method: 'DELETE', url: '/api/explorer/entry?path=full' });
+    expect(res.statusCode).toBe(409);
+    expect(res.json()).toEqual({ error: 'This folder is not empty' });
+    expect(await readFile(join(root, 'full', 'x.md'), 'utf8')).toBe('x');
+  });
+
+  it('deletes a whole folder when the typed name matches', async () => {
+    const { app, root } = await openTestProject({ name: 'E' });
+    await mkdir(join(root, 'attic', 'deep'), { recursive: true });
+    await writeFile(join(root, 'attic', 'deep', 'x.md'), 'x', 'utf8');
+    const res = await app.inject({
+      method: 'DELETE',
+      url: '/api/explorer/tree?path=attic&confirm=attic',
+    });
+    expect(res.statusCode).toBe(200);
+    expect((await app.inject({ method: 'GET', url: '/api/explorer/list?path=attic' })).statusCode).toBe(400); // no longer a directory in this project
+  });
+
+  it('400s on the wrong typed name, and keeps the folder', async () => {
+    const { app, root } = await openTestProject({ name: 'E' });
+    await mkdir(join(root, 'attic'), { recursive: true });
+    await writeFile(join(root, 'attic', 'x.md'), 'x', 'utf8');
+    const res = await app.inject({
+      method: 'DELETE',
+      url: '/api/explorer/tree?path=attic&confirm=Attic',
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json()).toEqual({ error: 'That is not the name of this folder' });
+    expect(await readFile(join(root, 'attic', 'x.md'), 'utf8')).toBe('x');
+  });
+
+  it('400s on the project root, whichever route is asked', async () => {
+    const { app, root } = await openTestProject({ name: 'E' });
+    for (const url of ['/api/explorer/entry?path=', '/api/explorer/tree?path=&confirm=']) {
+      const res = await app.inject({ method: 'DELETE', url });
+      expect(res.statusCode).toBe(400);
+    }
+    // Still a project: the instruction files are where they were.
+    const listing = await app.inject({ method: 'GET', url: '/api/explorer/list' });
+    expect((listing.json() as DirListing).entries.map((e) => e.name)).toContain('INSTRUCTIONS.md');
+    expect(await readFile(join(root, 'INSTRUCTIONS.md'), 'utf8')).not.toBe('');
+  });
+});
+
 describe('explorer routes with no project open', () => {
   const routes = [
     { method: 'GET' as const, url: '/api/explorer/list' },
@@ -275,6 +345,8 @@ describe('explorer routes with no project open', () => {
       payload: { path: 'a.md', name: 'b.md' },
     },
     { method: 'POST' as const, url: '/api/explorer/move', payload: { path: 'a.md', to: 'docs' } },
+    { method: 'DELETE' as const, url: '/api/explorer/entry?path=a.md' },
+    { method: 'DELETE' as const, url: '/api/explorer/tree?path=docs&confirm=docs' },
   ];
 
   it.each(routes)('409s on $method $url', async ({ method, url, payload }) => {

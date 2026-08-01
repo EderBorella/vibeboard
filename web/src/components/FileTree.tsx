@@ -4,7 +4,8 @@ import type { TreeRow } from '../explorer/useTree';
 
 interface Props {
   rows: TreeRow[];
-  selected: string | null;
+  // The whole node, not just its path: the delete button names what it will delete.
+  selected: FsNode | null;
   busy: boolean;
   error: string | null;
   // Where a new file or folder would land. '' is the project root; shown in the buttons' titles, so
@@ -19,6 +20,7 @@ interface Props {
   onActivate: (node: FsNode) => void;
   onRefresh: () => void;
   onNew: (kind: 'file' | 'dir') => void;
+  onDelete: () => void;
   onStartRename: (node: FsNode) => void;
   onRenameDraft: (value: string) => void;
   onCommitRename: () => void;
@@ -138,6 +140,14 @@ export function FileTree(props: Props) {
           <button className="control-new" title={`New folder in ${where}`} onClick={() => props.onNew('dir')}>
             📁＋
           </button>
+          <button
+            className="control-new"
+            title={selected ? `Delete ${selected.name}` : 'Select something to delete'}
+            disabled={!selected}
+            onClick={props.onDelete}
+          >
+            ✕
+          </button>
           <button className="control-new" title="Re-read the project from disk" onClick={props.onRefresh}>
             ⟳
           </button>
@@ -169,7 +179,7 @@ export function FileTree(props: Props) {
             node={row.node}
             depth={row.depth}
             expanded={row.expanded}
-            active={selected === row.node.path}
+            active={selected?.path === row.node.path}
             onActivate={props.onActivate}
             onStartRename={props.onStartRename}
           />

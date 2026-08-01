@@ -316,6 +316,23 @@ export function moveFsNode(path: string, to: string): Promise<FsNode> {
   return post<FsNode>('/api/explorer/move', { path, to });
 }
 
+// One entry: a file, a link, or an empty folder. 'not-empty' is a normal answer rather than an error —
+// the caller has a harder question to ask in that case.
+export async function deleteFsEntry(path: string): Promise<'ok' | 'not-empty'> {
+  const res = await fetch(`/api/explorer/entry?path=${encodeURIComponent(path)}`, { method: 'DELETE' });
+  if (res.status === 409) return 'not-empty';
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Failed to delete');
+  return 'ok';
+}
+
+// A folder and everything in it. `confirm` is the folder's own name as the user typed it; the server
+// checks it again, so this is not the only thing standing in the way.
+export async function deleteFsTree(path: string, confirm: string): Promise<void> {
+  const url = `/api/explorer/tree?path=${encodeURIComponent(path)}&confirm=${encodeURIComponent(confirm)}`;
+  const res = await fetch(url, { method: 'DELETE' });
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Failed to delete folder');
+}
+
 // --- Skills ---------------------------------------------------------------
 // Mirrors src/core/skills.ts. A skill carries no backend, model, effort or mode — those are
 // chosen per dispatch, so every skill works on every backend.

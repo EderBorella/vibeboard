@@ -4,6 +4,8 @@ import { describe, expect, it } from 'vitest';
 import { listDir, MAX_EDIT_BYTES } from '../src/server/explorer-list.js';
 import {
   createNode,
+  deleteNode,
+  deleteTree,
   moveIntoDir,
   renameNode,
   validName,
@@ -340,5 +342,124 @@ describe('moveIntoDir', () => {
     const root = await tempDir();
     await mkdir(join(root, 'docs'));
     expect(await moveIntoDir(root, '', 'docs')).toBe('invalid');
+  });
+});
+
+describe('deleteNode', () => {
+  it('deletes a file', async () => {
+    const root = await tempDir();
+    await writeFile(join(root, 'a.md'), 'a', 'utf8');
+    expect(await deleteNode(root, 'a.md')).toBe('ok');
+    expect(await gone(join(root, 'a.md'))).toBe(true);
+  });
+
+  it('deletes an empty folder — the case this whole tab was built for', async () => {
+    // A skill folder left behind with no SKILL.md was invisible in Project Control and therefore
+    // unremovable. This is the line that clears it.
+    const root = await tempDir();
+    await mkdir(join(root, '.claude', 'skills', 'new-skill'), { recursive: true });
+    expect(await deleteNode(root, '.claude/skills/new-skill')).toBe('ok');
+    expect(await names(root, '.claude/skills')).toEqual([]);
+  });
+
+  it('refuses a folder with contents rather than emptying it', async () => {
+    const root = await tempDir();
+    await mkdir(join(root, 'docs'));
+    await writeFile(join(root, 'docs', 'keep.md'), 'keep', 'utf8');
+    expect(await deleteNode(root, 'docs')).toBe('not-empty');
+    expect(await read(root, 'docs/keep.md')).toBe('keep');
+  });
+
+  it('deletes a symlink and leaves its target alone, even outside the project', async () => {
+    // follow:false again: unlinking the link is the whole point. Following it would delete somebody
+    // else's file, or refuse and leave the row unremovable.
+    const root = await tempDir();
+    const outside = await tempDir();
+    await writeFile(join(outside, 'real.txt'), 'theirs', 'utf8');
+    await symlink(outside, join(root, 'escape'));
+    await symlink(join(outside, 'real.txt'), join(root, 'escape.txt'));
+
+    expect(await deleteNode(root, 'escape')).toBe('ok');
+    expect(await deleteNode(root, 'escape.txt')).toBe('ok');
+    expect(await read(outside, 'real.txt')).toBe('theirs');
+    expect(await names(outside)).toEqual(['real.txt']);
+  });
+
+  it('treats something already gone as done', async () => {
+    // The client's tree is a snapshot. Reporting a race as a failure would leave a row that nothing
+    // could clear — the exact shape of the bug this tab exists to fix.
+    const root = await tempDir();
+    expect(await deleteNode(root, 'never-existed.md')).toBe('ok');
+  });
+
+  it('refuses the project root and anything outside it', async () => {
+    const root = await tempDir();
+    await writeFile(join(root, 'a.md'), 'a', 'utf8');
+    expect(await deleteNode(root, '')).toBe('invalid');
+    expect(await deleteNode(root, '.')).toBe('invalid');
+    expect(await deleteNode(root, '../..')).toBe('invalid');
+    expect(await read(root, 'a.md')).toBe('a');
+  });
+});
+
+describe('deleteTree', () => {
+  it('deletes a folder and everything under it when the name is typed correctly', async () => {
+    const root = await tempDir();
+    await mkdir(join(root, 'attic', 'deep', 'deeper'), { recursive: true });
+    await writeFile(join(root, 'attic', 'deep', 'x.md'), 'x', 'utf8');
+    expect(await deleteTree(root, 'attic', 'attic')).toBe('ok');
+    expect(await gone(join(root, 'attic'))).toBe(true);
+  });
+
+  it('refuses the wrong name, and keeps everything', async () => {
+    // The server checks it too. A guard that lives only in the dialog is a guard the server does not
+    // have — and this route is reachable without the dialog.
+    const root = await tempDir();
+    await mkdir(join(root, 'attic'));
+    await writeFile(join(root, 'attic', 'x.md'), 'x', 'utf8');
+    for (const wrong of ['Attic', 'attic/', 'atti', '', 'x.md', undefined, null, 42]) {
+      expect(await deleteTree(root, 'attic', wrong)).toBe('wrong-name');
+    }
+    expect(await read(root, 'attic/x.md')).toBe('x');
+  });
+
+  it('accepts the name with stray whitespace around it', async () => {
+    const root = await tempDir();
+    await mkdir(join(root, 'attic'));
+    expect(await deleteTree(root, 'attic', '  attic  ')).toBe('ok');
+  });
+
+  it('checks the name of the folder itself, not of its parent', async () => {
+    const root = await tempDir();
+    await mkdir(join(root, 'a', 'b'), { recursive: true });
+    expect(await deleteTree(root, 'a/b', 'a')).toBe('wrong-name');
+    expect(await deleteTree(root, 'a/b', 'b')).toBe('ok');
+    expect(await names(root, 'a')).toEqual([]);
+  });
+
+  it('refuses a symlink, so recursion can never leave the project', async () => {
+    // rm -r through a link to a directory would delete the target's contents. A link is one entry
+    // whatever it points at, and belongs to deleteNode.
+    const root = await tempDir();
+    const outside = await tempDir();
+    await writeFile(join(outside, 'real.txt'), 'theirs', 'utf8');
+    await symlink(outside, join(root, 'escape'));
+
+    expect(await deleteTree(root, 'escape', 'escape')).toBe('invalid');
+    expect(await read(outside, 'real.txt')).toBe('theirs');
+  });
+
+  it('refuses a file, the project root, and anything outside it', async () => {
+    const root = await tempDir();
+    await writeFile(join(root, 'a.md'), 'a', 'utf8');
+    expect(await deleteTree(root, 'a.md', 'a.md')).toBe('invalid');
+    expect(await deleteTree(root, '', '')).toBe('invalid');
+    expect(await deleteTree(root, '..', '..')).toBe('invalid');
+    expect(await read(root, 'a.md')).toBe('a');
+  });
+
+  it('treats a folder already gone as done', async () => {
+    const root = await tempDir();
+    expect(await deleteTree(root, 'never', 'never')).toBe('ok');
   });
 });

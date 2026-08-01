@@ -1,6 +1,16 @@
 import { useState } from 'react';
-import { createFsNode, type FileRead, type FsNode, renameFsNode } from '../api';
+import {
+  createFsNode,
+  deleteFsEntry,
+  deleteFsTree,
+  type FileRead,
+  type FsNode,
+  listDir,
+  renameFsNode,
+} from '../api';
+import { useConfirm } from '../confirm/useConfirm';
 import { formatBytes } from '../explorer/format';
+import { deleteEmptyFolderRequest, deleteEntryRequest, deleteFolderRequest } from '../explorer/requests';
 import { useOpenFile } from '../explorer/useOpenFile';
 import { useTree } from '../explorer/useTree';
 import type { ProjectSnapshot } from '../shared';
@@ -42,6 +52,7 @@ function unopenable(read: FileRead): string {
 export function ExplorerView({ snapshot }: Props) {
   const tree = useTree(snapshot);
   const open = useOpenFile(snapshot);
+  const { confirm, dialog } = useConfirm();
   const [selected, setSelected] = useState<FsNode | null>(null);
   // The row being renamed and the text in it. Set right after a create, so a new file lands with its
   // name selected and ready to type over — no browser prompt, which can be suppressed.
@@ -78,6 +89,54 @@ export function ExplorerView({ snapshot }: Props) {
     }
   }
 
+  // Delete, in four steps so that no one of them is doing two jobs: pick the question, ask it, act,
+  // then put the tab back in a consistent state.
+  async function remove(): Promise<void> {
+    const node = selected;
+    if (!node) return;
+    setError(null);
+    try {
+      // A symlink is ONE entry however it behaves, so it is never the recursive question — even a link
+      // to a folder inside the project, where deleting the link must leave the folder alone.
+      const folder = node.kind === 'dir' && !node.symlink;
+      if (folder ? await removeFolder(node) : await removeEntry(node)) await afterDelete(node);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  async function removeEntry(node: FsNode): Promise<boolean> {
+    if (!(await confirm(deleteEntryRequest(node)))) return false;
+    if ((await deleteFsEntry(node.path)) === 'not-empty') {
+      // Only reachable through a race: something landed in the folder between the count and the click.
+      setError('That folder is no longer empty. Refresh and try again.');
+      return false;
+    }
+    return true;
+  }
+
+  // An empty folder goes with one click; a folder with contents asks for its name to be typed. Which
+  // question to ask is decided by counting first, so the user is never asked twice for one delete.
+  async function removeFolder(node: FsNode): Promise<boolean> {
+    const listing = await listDir(node.path).catch(() => null);
+    const count = listing ? listing.entries.length + (listing.truncated ?? 0) : 0;
+    if (count === 0) {
+      if (!(await confirm(deleteEmptyFolderRequest(node)))) return false;
+      return (await deleteFsEntry(node.path)) === 'ok';
+    }
+    if (!(await confirm(deleteFolderRequest(node, count)))) return false;
+    await deleteFsTree(node.path, node.name);
+    return true;
+  }
+
+  async function afterDelete(node: FsNode): Promise<void> {
+    setSelected(null);
+    // The editor may be showing the file just deleted, or one that was inside a deleted folder.
+    const shown = open.file?.path;
+    if (shown === node.path || shown?.startsWith(`${node.path}/`)) open.close();
+    await tree.reload(parentOf(node.path));
+  }
+
   function startRename(node: FsNode): void {
     setRenaming(node.path);
     setRenameDraft(node.name);
@@ -106,7 +165,7 @@ export function ExplorerView({ snapshot }: Props) {
     <section className="control explorer">
       <FileTree
         rows={tree.rows}
-        selected={selected?.path ?? null}
+        selected={selected}
         busy={tree.busy}
         error={tree.error}
         newIn={newInFor(selected)}
@@ -115,6 +174,7 @@ export function ExplorerView({ snapshot }: Props) {
         onActivate={activate}
         onRefresh={() => void tree.refresh()}
         onNew={(kind) => void newNode(kind)}
+        onDelete={() => void remove()}
         onStartRename={startRename}
         onRenameDraft={setRenameDraft}
         onCommitRename={() => void commitRename()}
@@ -152,6 +212,8 @@ export function ExplorerView({ snapshot }: Props) {
         )}
         {(error ?? open.error) && <div className="control-error">{error ?? open.error}</div>}
       </div>
+
+      {dialog}
     </section>
   );
 }

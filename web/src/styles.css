@@ -807,6 +807,19 @@ body {
    listing is simply not all of it. */
 .explorer-more { color: var(--muted); font-size: 0.68rem; font-style: italic; padding: 0.2rem 0.5rem; }
 .explorer-actions { display: flex; gap: 0.1rem; }
+.explorer-actions button:disabled { opacity: 0.3; cursor: not-allowed; }
+
+/* Typed confirmation: for the actions that destroy more than the one thing they name. */
+.confirm-require {
+  display: flex; flex-direction: column; gap: 0.3rem;
+  font-size: 0.78rem; color: var(--muted); margin-bottom: 0.9rem;
+}
+.confirm-input {
+  background: var(--bg); color: var(--text); border: 1px solid var(--border);
+  border-radius: 6px; padding: 0.4rem 0.6rem; font-family: var(--font-mono); font-size: 0.8rem;
+}
+.confirm-input:focus { outline: none; border-color: var(--accent); }
+.confirm-go:disabled { opacity: 0.45; cursor: not-allowed; }
 /* Inline rename: sits exactly where the list row was, so the row appears to become editable. */
 .control-rename {
   width: 100%; background: var(--bg); color: var(--text);

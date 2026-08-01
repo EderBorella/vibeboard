@@ -10,6 +10,8 @@ const api = vi.hoisted(() => ({
   putFsFile: vi.fn(),
   createFsNode: vi.fn(),
   renameFsNode: vi.fn(),
+  deleteFsEntry: vi.fn(),
+  deleteFsTree: vi.fn(),
 }));
 vi.mock('../web/src/api.js', () => api);
 vi.mock('../web/src/api', () => api);
@@ -24,6 +26,8 @@ beforeEach(() => {
   api.putFsFile.mockReset();
   api.createFsNode.mockReset();
   api.renameFsNode.mockReset();
+  api.deleteFsEntry.mockReset();
+  api.deleteFsTree.mockReset();
 });
 
 const dir = (path: string): FsNode => ({ path, name: path.split('/').pop() ?? path, kind: 'dir' });
@@ -345,5 +349,172 @@ describe('ExplorerView — creating and renaming', () => {
 
     fireEvent.click(screen.getByTitle('New file in the project root'));
     await waitFor(() => expect(screen.getByText('Cannot create that here')).toBeTruthy());
+  });
+});
+
+describe('ExplorerView — deleting', () => {
+  const del = (): HTMLButtonElement =>
+    screen.getByTitle(/^Delete |^Select something to delete$/) as HTMLButtonElement;
+
+  it('offers nothing to delete until something is selected', async () => {
+    api.listDir.mockResolvedValue(listing('', [file('a.md')]));
+    render(<ExplorerView snapshot={snapshot} />);
+    await waitFor(() => expect(screen.getByText('a.md')).toBeTruthy());
+    expect((screen.getByTitle('Select something to delete') as HTMLButtonElement).disabled).toBe(true);
+
+    fireEvent.click(row('a.md'));
+    await waitFor(() => expect(screen.getByTitle('Delete a.md')).toBeTruthy());
+  });
+
+  it('deletes a file after one confirmation, and closes the editor showing it', async () => {
+    api.listDir.mockResolvedValue(listing('', [file('a.md')]));
+    api.readFsFile.mockResolvedValue(text('a.md', 'body'));
+    api.deleteFsEntry.mockResolvedValue('ok');
+    render(<ExplorerView snapshot={snapshot} />);
+    await waitFor(() => expect(screen.getByText('a.md')).toBeTruthy());
+    fireEvent.click(row('a.md'));
+    await waitFor(() => expect(screen.getByRole('textbox')).toBeTruthy());
+
+    fireEvent.click(del());
+    await waitFor(() => expect(screen.getByRole('dialog')).toBeTruthy());
+    // A file is one thing, so it asks once and asks for no typing.
+    expect(screen.getByText('a.md is removed from disk. This cannot be undone.')).toBeTruthy();
+    // Scoped to the dialog: the editor's own textarea is a textbox too, and an unscoped query here
+    // would be asserting about the wrong element entirely.
+    expect(within(screen.getByRole('dialog')).queryByRole('textbox')).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete file' }));
+    await waitFor(() => expect(api.deleteFsEntry.mock.calls).toEqual([['a.md']]));
+    // The editor was showing the file that no longer exists.
+    await waitFor(() => expect(screen.getByText('Select a file to view or edit it.')).toBeTruthy());
+  });
+
+  it('deletes nothing when the confirmation is cancelled', async () => {
+    api.listDir.mockResolvedValue(listing('', [file('a.md')]));
+    api.readFsFile.mockResolvedValue(text('a.md', 'body'));
+    render(<ExplorerView snapshot={snapshot} />);
+    await waitFor(() => expect(screen.getByText('a.md')).toBeTruthy());
+    fireEvent.click(row('a.md'));
+    await waitFor(() => expect(screen.getByRole('textbox')).toBeTruthy());
+
+    fireEvent.click(del());
+    await waitFor(() => expect(screen.getByRole('dialog')).toBeTruthy());
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(api.deleteFsEntry).not.toHaveBeenCalled();
+    expect(screen.getByRole('textbox')).toBeTruthy(); // editor untouched
+  });
+
+  it('deletes an empty folder with one click and no typing — the case that started this', async () => {
+    // A skill folder with no SKILL.md: invisible in Project Control, and therefore unclearable.
+    api.listDir.mockImplementation((path: string) =>
+      Promise.resolve(path === '' ? listing('', [dir('new-skill')]) : listing('new-skill', [])),
+    );
+    api.deleteFsEntry.mockResolvedValue('ok');
+    render(<ExplorerView snapshot={snapshot} />);
+    await waitFor(() => expect(screen.getByText('new-skill')).toBeTruthy());
+    fireEvent.click(row('new-skill'));
+
+    await waitFor(() => expect(screen.getByTitle('Delete new-skill')).toBeTruthy());
+    fireEvent.click(del());
+    await waitFor(() => expect(screen.getByText('new-skill is empty, and will be removed.')).toBeTruthy());
+    // No typed confirmation for an empty folder — nothing is lost that the dialog has not named.
+    expect(within(screen.getByRole('dialog')).queryByRole('textbox')).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete folder' }));
+    await waitFor(() => expect(api.deleteFsEntry.mock.calls).toEqual([['new-skill']]));
+    expect(api.deleteFsTree).not.toHaveBeenCalled();
+  });
+
+  it('makes a folder with contents be typed out, and says how much is in it', async () => {
+    api.listDir.mockImplementation((path: string) =>
+      Promise.resolve(
+        path === ''
+          ? listing('', [dir('attic')])
+          : listing('attic', [file('attic/a.md'), file('attic/b.md')], 10),
+      ),
+    );
+    api.deleteFsTree.mockResolvedValue(undefined);
+    render(<ExplorerView snapshot={snapshot} />);
+    await waitFor(() => expect(screen.getByText('attic')).toBeTruthy());
+    fireEvent.click(row('attic'));
+    await waitFor(() => expect(screen.getByTitle('Delete attic')).toBeTruthy());
+
+    fireEvent.click(del());
+    // 12, not 2: the count includes what the listing was capped at, or the dialog would understate
+    // what is about to be destroyed.
+    await waitFor(() => expect(screen.getByText(/attic holds 12 entries/)).toBeTruthy());
+    const go = () => screen.getByRole('button', { name: 'Delete folder' }) as HTMLButtonElement;
+    expect(go().disabled).toBe(true);
+
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'attic' } });
+    fireEvent.click(go());
+    await waitFor(() => expect(api.deleteFsTree.mock.calls).toEqual([['attic', 'attic']]));
+    expect(api.deleteFsEntry).not.toHaveBeenCalled();
+  });
+
+  it('closes the editor when the deleted folder held the open file', async () => {
+    api.listDir.mockImplementation((path: string) =>
+      Promise.resolve(path === '' ? listing('', [dir('docs')]) : listing('docs', [file('docs/a.md')])),
+    );
+    api.readFsFile.mockImplementation((p: string) => Promise.resolve(text(p, 'body')));
+    api.deleteFsTree.mockResolvedValue(undefined);
+    render(<ExplorerView snapshot={snapshot} />);
+    await waitFor(() => expect(screen.getByText('docs')).toBeTruthy());
+    fireEvent.click(row('docs'));
+    await waitFor(() => expect(screen.getByText('a.md')).toBeTruthy());
+    fireEvent.click(row('a.md'));
+    await waitFor(() => expect(screen.getByRole('textbox')).toBeTruthy());
+
+    fireEvent.click(row('docs')); // select the folder again
+    await waitFor(() => expect(screen.getByTitle('Delete docs')).toBeTruthy());
+    fireEvent.click(del());
+    await waitFor(() => expect(screen.getByText(/docs holds 1 entry/)).toBeTruthy());
+    const dialog = within(screen.getByRole('dialog'));
+    fireEvent.change(dialog.getByRole('textbox'), { target: { value: 'docs' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Delete folder' }));
+
+    await waitFor(() => expect(api.deleteFsTree.mock.calls).toEqual([['docs', 'docs']]));
+    // The open file was inside it: leaving the editor on a path that no longer exists would let a
+    // Save recreate a file in a folder the user just destroyed.
+    await waitFor(() => expect(screen.getByText('Select a file to view or edit it.')).toBeTruthy());
+  });
+
+  it('warns that deleting a link leaves its target alone', async () => {
+    // The opposite of what most people assume, and the reason this dialog has its own wording.
+    // A link to a folder INSIDE the project: it behaves as a directory, so nothing but the symlink
+    // flag distinguishes it from the recursive case.
+    api.listDir.mockImplementation((path: string) =>
+      Promise.resolve(
+        path === ''
+          ? listing('', [{ path: 'ref', name: 'ref', kind: 'dir', symlink: true, target: '/data/reference' }])
+          : listing('ref', [file('ref/inside.md')]),
+      ),
+    );
+    api.deleteFsEntry.mockResolvedValue('ok');
+    render(<ExplorerView snapshot={snapshot} />);
+    await waitFor(() => expect(screen.getByText('ref')).toBeTruthy());
+    fireEvent.click(row('ref'));
+    await waitFor(() => expect(screen.getByTitle('Delete ref')).toBeTruthy());
+
+    fireEvent.click(del());
+    await waitFor(() => expect(screen.getByText('Delete the link ref?')).toBeTruthy());
+    expect(screen.getByText('Only the link is removed. /data/reference is left alone.')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Delete link' }));
+    await waitFor(() => expect(api.deleteFsEntry.mock.calls).toEqual([['ref']]));
+  });
+
+  it('surfaces a refused delete', async () => {
+    api.listDir.mockResolvedValue(listing('', [file('a.md')]));
+    api.deleteFsEntry.mockRejectedValueOnce(new Error('Path not allowed'));
+    render(<ExplorerView snapshot={snapshot} />);
+    await waitFor(() => expect(screen.getByText('a.md')).toBeTruthy());
+    fireEvent.click(row('a.md'));
+    await waitFor(() => expect(screen.getByTitle('Delete a.md')).toBeTruthy());
+
+    fireEvent.click(del());
+    await waitFor(() => expect(screen.getByRole('dialog')).toBeTruthy());
+    fireEvent.click(screen.getByRole('button', { name: 'Delete file' }));
+    await waitFor(() => expect(screen.getByText('Path not allowed')).toBeTruthy());
   });
 });

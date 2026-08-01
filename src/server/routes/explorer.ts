@@ -1,6 +1,14 @@
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { listDir, readFileNode } from '../explorer-list.js';
-import { createNode, type MoveResult, moveIntoDir, renameNode, writeFileNode } from '../explorer-mutate.js';
+import {
+  createNode,
+  deleteNode,
+  deleteTree,
+  type MoveResult,
+  moveIntoDir,
+  renameNode,
+  writeFileNode,
+} from '../explorer-mutate.js';
 import { type AppCtx, ensureOpen } from '../route-context.js';
 
 // Rename and move differ only in what the client supplies; both fail the same three ways.
@@ -64,5 +72,29 @@ export async function registerExplorerRoutes(api: FastifyInstance, ctx: AppCtx):
     if (!ensureOpen(ctx.session, reply)) return;
     const { path, to } = req.body as { path?: string; to?: string };
     return sendMove(reply, await moveIntoDir(ctx.session.root, path, to));
+  });
+
+  // One entry: a file, a symlink, or an empty folder. 409 on a folder with contents, which is the
+  // client's cue to ask the typed question and come back to /explorer/tree.
+  api.delete('/explorer/entry', async (req, reply) => {
+    if (!ensureOpen(ctx.session, reply)) return;
+    const { path } = req.query as { path?: string };
+    const result = await deleteNode(ctx.session.root, path);
+    if (result === 'not-empty') return reply.code(409).send({ error: 'This folder is not empty' });
+    if (result !== 'ok') return reply.code(400).send({ error: 'Path not allowed' });
+    return { ok: true };
+  });
+
+  // A folder and everything in it. `confirm` is the folder's own name as the user typed it, checked
+  // again here: a guard that lives only in the dialog is a guard the server does not have.
+  api.delete('/explorer/tree', async (req, reply) => {
+    if (!ensureOpen(ctx.session, reply)) return;
+    const { path, confirm } = req.query as { path?: string; confirm?: string };
+    const result = await deleteTree(ctx.session.root, path, confirm);
+    if (result === 'wrong-name') {
+      return reply.code(400).send({ error: 'That is not the name of this folder' });
+    }
+    if (result !== 'ok') return reply.code(400).send({ error: 'Path not allowed' });
+    return { ok: true };
   });
 }

@@ -21,6 +21,11 @@ export interface ConfirmRequest {
   // Irreversible. Colours the button as destructive — the difference between "gone from disk" and
   // "restorable from the archive".
   danger?: boolean;
+  // For the small class of actions that destroy more than the one thing named: the user must type
+  // this exactly before the button becomes usable. Deleting a folder with contents is the case it
+  // exists for — the board project is usually not a git repo, so there is nothing to recover from.
+  // Compared after trimming: this guards against answering on autopilot, not against an attacker.
+  requireText?: string;
 }
 
 interface Pending {
@@ -35,6 +40,9 @@ export interface Confirmer {
 
 export function useConfirm(): Confirmer {
   const [request, setRequest] = useState<ConfirmRequest | null>(null);
+  // What the user has typed into a requireText dialog. Reset on every new question, or the previous
+  // answer would unlock the next one.
+  const [typed, setTyped] = useState('');
   // The resolver lives in a ref, not in state: settling from inside a state updater would be a side
   // effect in a function React is allowed to call twice.
   const pending = useRef<Pending | null>(null);
@@ -44,6 +52,7 @@ export function useConfirm(): Confirmer {
     pending.current?.settle(confirmed);
     pending.current = null;
     setRequest(null);
+    setTyped('');
   }, []);
 
   const confirm = useCallback(
@@ -54,6 +63,7 @@ export function useConfirm(): Confirmer {
         pending.current?.settle(false);
         pending.current = { request: next, settle: resolve };
         setRequest(next);
+        setTyped('');
       }),
     [],
   );
@@ -71,10 +81,15 @@ export function useConfirm(): Confirmer {
   }, [request, settle]);
 
   // Focus lands on Cancel, not on the destructive button: a stray Enter or Space arriving right after
-  // the dialog opens must not be what confirms it.
+  // the dialog opens must not be what confirms it. A requireText dialog focuses its input instead —
+  // there is nothing to type into otherwise, and its button is disabled until the text matches, so a
+  // stray keypress still cannot confirm it.
   useEffect(() => {
-    if (request) cancelButton.current?.focus();
+    if (request && !request.requireText) cancelButton.current?.focus();
   }, [request]);
+
+  // Whether the confirming button is usable at all. A dialog with no requireText is always unlocked.
+  const unlocked = !request?.requireText || typed.trim() === request.requireText;
 
   const dialog = request ? (
     <div
@@ -93,6 +108,20 @@ export function useConfirm(): Confirmer {
         </div>
         <div className="modal-body">
           {request.body && <p className="confirm-body">{request.body}</p>}
+          {request.requireText && (
+            <label className="confirm-require">
+              Type <strong>{request.requireText}</strong> to confirm
+              <input
+                className="confirm-input"
+                value={typed}
+                autoFocus
+                onChange={(e) => setTyped(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && unlocked) settle(true);
+                }}
+              />
+            </label>
+          )}
           <div className="confirm-actions">
             <button type="button" className="confirm-cancel" ref={cancelButton} onClick={() => settle(false)}>
               Cancel
@@ -100,6 +129,7 @@ export function useConfirm(): Confirmer {
             <button
               type="button"
               className={request.danger ? 'confirm-go danger' : 'confirm-go'}
+              disabled={!unlocked}
               onClick={() => settle(true)}
             >
               {request.action}

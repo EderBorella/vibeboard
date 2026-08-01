@@ -1,4 +1,4 @@
-import { lstat, mkdir, rename, stat, writeFile } from 'node:fs/promises';
+import { lstat, mkdir, rename, rm, rmdir, stat, unlink, writeFile } from 'node:fs/promises';
 import { basename, dirname, join } from 'node:path';
 import { type FsNode, readFileNode } from './explorer-list.js';
 import { normaliseRel, resolveInRoot } from './fs-sandbox.js';
@@ -177,4 +177,70 @@ async function describe(root: string, rel: string): Promise<FsNode> {
     /* moved and then removed by something else; the client re-lists anyway */
   }
   return node;
+}
+
+// --- Deleting ---------------------------------------------------------------
+
+export type DeleteResult = 'ok' | 'not-empty' | 'wrong-name' | 'invalid';
+
+// Delete one entry: a file, a symlink, or an empty folder. Resolved with follow:false so deleting a
+// symlink removes the link rather than what it points at — including one pointing out of the project,
+// which is listed precisely so it can be removed.
+//
+// Already gone counts as done. The client's tree is a snapshot, and re-reporting a race as a failure
+// would leave a row nothing could clear.
+export async function deleteNode(root: string, rel: unknown): Promise<DeleteResult> {
+  const r = await resolveInRoot(root, rel, { follow: false });
+  if (!r) return 'invalid';
+  let info: Awaited<ReturnType<typeof lstat>>;
+  try {
+    info = await lstat(r.abs);
+  } catch {
+    return 'ok'; // already gone
+  }
+  // isDirectory() is false for a symlink under lstat, so a link to a folder is unlinked here rather
+  // than being treated as the folder itself.
+  if (info.isDirectory()) {
+    try {
+      await rmdir(r.abs);
+    } catch {
+      return 'not-empty'; // the client then asks the harder question
+    }
+    return 'ok';
+  }
+  try {
+    await unlink(r.abs);
+  } catch {
+    return 'invalid';
+  }
+  return 'ok';
+}
+
+// Delete a folder and everything in it. `confirm` must be the folder's own name, typed by the user —
+// re-checked here rather than trusted from the dialog, so the guard does not depend on the client.
+//
+// The project root can never be the target: resolveInRoot refuses '' without allowRoot.
+export async function deleteTree(root: string, rel: unknown, confirm: unknown): Promise<DeleteResult> {
+  const r = await resolveInRoot(root, rel, { follow: false });
+  if (!r) return 'invalid';
+  let info: Awaited<ReturnType<typeof lstat>>;
+  try {
+    info = await lstat(r.abs);
+  } catch {
+    return 'ok'; // already gone
+  }
+  // Only a real directory. A symlink is one entry whatever it points at, and belongs to deleteNode —
+  // recursing through it would delete somebody else's files.
+  //
+  // lstat is what makes this sufficient: it reports a link to a directory as isDirectory() === false,
+  // so no separate isSymbolicLink() check is needed. An explicit one was here and proved to be dead
+  // code — a plant that removed it changed nothing.
+  if (!info.isDirectory()) return 'invalid';
+  if (typeof confirm !== 'string' || confirm.trim() !== basename(r.rel)) return 'wrong-name';
+  try {
+    await rm(r.abs, { recursive: true, force: true });
+  } catch {
+    return 'invalid';
+  }
+  return 'ok';
 }

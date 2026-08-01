@@ -188,3 +188,86 @@ describe('the shared questions', () => {
     expect(req.danger).toBeUndefined();
   });
 });
+
+describe('useConfirm with a typed confirmation', () => {
+  const folder: ConfirmRequest = {
+    title: 'Delete attic and everything in it?',
+    body: 'attic holds 12 entries.',
+    action: 'Delete folder',
+    danger: true,
+    requireText: 'attic',
+  };
+  const go = (): HTMLButtonElement =>
+    screen.getByRole('button', { name: 'Delete folder' }) as HTMLButtonElement;
+  const field = (): HTMLInputElement => screen.getByRole('textbox') as HTMLInputElement;
+
+  it('keeps the destructive button unusable until the name is typed exactly', async () => {
+    render(<Host request={folder} />);
+    ask();
+    expect(go().disabled).toBe(true);
+
+    fireEvent.change(field(), { target: { value: 'att' } });
+    expect(go().disabled).toBe(true);
+    fireEvent.change(field(), { target: { value: 'Attic' } }); // case matters
+    expect(go().disabled).toBe(true);
+    fireEvent.change(field(), { target: { value: 'attic' } });
+    expect(go().disabled).toBe(false);
+
+    fireEvent.click(go());
+    await screen.findByText('true');
+  });
+
+  it('forgives whitespace around the name, which a paste often brings', () => {
+    render(<Host request={folder} />);
+    ask();
+    fireEvent.change(field(), { target: { value: '  attic\n' } });
+    expect(go().disabled).toBe(false);
+  });
+
+  it('confirms on Enter in the field, but only once it matches', async () => {
+    render(<Host request={folder} />);
+    ask();
+    fireEvent.change(field(), { target: { value: 'att' } });
+    fireEvent.keyDown(field(), { key: 'Enter' });
+    expect(answer()).toBe('unanswered');
+
+    fireEvent.change(field(), { target: { value: 'attic' } });
+    fireEvent.keyDown(field(), { key: 'Enter' });
+    await screen.findByText('true');
+  });
+
+  it('starts every question with an empty field, so the last answer cannot unlock the next', async () => {
+    // Two folders of the same name in a row would otherwise be one keystroke away from a delete the
+    // user never typed.
+    render(<Host request={folder} />);
+    ask();
+    fireEvent.change(field(), { target: { value: 'attic' } });
+    fireEvent.click(go());
+    await screen.findByText('true');
+
+    ask();
+    expect(field().value).toBe('');
+    expect(go().disabled).toBe(true);
+  });
+
+  it('focuses the field, since there is nothing else to do first', () => {
+    render(<Host request={folder} />);
+    ask();
+    expect(document.activeElement).toBe(field());
+  });
+
+  it('still cancels on Escape while the field is unmatched', async () => {
+    render(<Host request={folder} />);
+    ask();
+    fireEvent.change(field(), { target: { value: 'att' } });
+    fireEvent.keyDown(window, { key: 'Escape' });
+    await screen.findByText('false');
+  });
+
+  it('asks for no text, and unlocks immediately, when none is required', () => {
+    render(<Host request={request} />);
+    ask();
+    expect(screen.queryByRole('textbox')).toBeNull();
+    expect((screen.getByText('Delete chat') as HTMLButtonElement).disabled).toBe(false);
+  });
+});

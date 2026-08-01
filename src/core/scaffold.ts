@@ -15,7 +15,7 @@ import {
 import { setCardLinks } from './links.js';
 import { createCard } from './mutations.js';
 import { seedSkills } from './seed-skills.js';
-import { BOARDS, type ProjectConfig } from './types.js';
+import { BOARDS, type BoardName, type ProjectConfig } from './types.js';
 
 export type ScaffoldMode = 'greenfield' | 'brownfield';
 
@@ -69,13 +69,19 @@ async function ensureFolders(projectRoot: string, config: ProjectConfig): Promis
   }
 }
 
+// Never name a column literally here. A literal that the defaults have moved past writes into a
+// folder no column maps to — and because column = folder, the write CREATES that folder rather than
+// failing. Engineering's Todo became Backlog while all three samples still said 'todo', so the
+// engineering card landed where readBoard does not look, taking its id and its links with it.
+const firstColumn = (config: ProjectConfig, board: BoardName): string => boardColumnSlugs(config, board)[0];
+
 async function writeSampleCards(projectRoot: string, config: ProjectConfig, today: string): Promise<void> {
   const feature = await createCard(
     projectRoot,
     config,
     {
       board: 'features',
-      columnSlug: 'todo',
+      columnSlug: firstColumn(config, 'features'),
       title: 'Sample feature',
       description: 'A high-level capability. Delete me once you get going.',
       body: 'Describe the capability and its goal here.',
@@ -87,7 +93,7 @@ async function writeSampleCards(projectRoot: string, config: ProjectConfig, toda
     config,
     {
       board: 'product',
-      columnSlug: 'todo',
+      columnSlug: firstColumn(config, 'product'),
       title: 'Sample product card',
       description: 'A product outcome. Delete me once you get going.',
       body: 'Describe the what/why here.',
@@ -99,7 +105,7 @@ async function writeSampleCards(projectRoot: string, config: ProjectConfig, toda
     config,
     {
       board: 'engineering',
-      columnSlug: 'todo',
+      columnSlug: firstColumn(config, 'engineering'),
       title: 'Sample engineering card',
       description: 'An implementation task. Delete me once you get going.',
       body: 'Describe the how here.',

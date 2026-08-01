@@ -16,14 +16,17 @@ describe('readBoard', () => {
   it('reads cards from column folders, sorted by order, excluding archive', async () => {
     const root = await tempDir();
     const config = defaultConfig('T');
+    // Taken from the config rather than typed in: readBoard only reads the folders the config
+    // names, so a fixture in any other folder would prove nothing about the sort.
+    const [column] = boardColumnSlugs(config, 'engineering');
     await writeCard(
       root,
-      boardRel('engineering', 'todo', 'E-002.md'),
+      boardRel('engineering', column, 'E-002.md'),
       '---\nid: E-002\ntitle: second\norder: 20\ncreated: 2026-07-23\n---\nbody',
     );
     await writeCard(
       root,
-      boardRel('engineering', 'todo', 'E-001.md'),
+      boardRel('engineering', column, 'E-001.md'),
       '---\nid: E-001\ntitle: first\norder: 10\ncreated: 2026-07-23\n---\nbody',
     );
     await writeCard(
@@ -35,7 +38,7 @@ describe('readBoard', () => {
     const cards = await readBoard(root, 'engineering', config);
     expect(cards.map((c) => c.id)).toEqual(['E-001', 'E-002']);
     expect(cards[0].board).toBe('engineering');
-    expect(cards[0].columnSlug).toBe('todo');
+    expect(cards[0].columnSlug).toBe(column);
   });
 
   it('returns [] for a board with no folders yet', async () => {

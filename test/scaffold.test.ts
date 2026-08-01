@@ -1,7 +1,7 @@
 import { access, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { readBoard } from '../src/core/board.js';
+import { boardColumnSlugs, readBoard } from '../src/core/board.js';
 import { readConfig } from '../src/core/config.js';
 import { ARCHIVE_SLUG, boardRel, CONVENTIONS_FILE, POINTER_FILES } from '../src/core/layout.js';
 import { scaffoldProject } from '../src/core/scaffold.js';
@@ -61,7 +61,10 @@ describe('scaffoldProject', () => {
       expect(cards[0].title, board).toBe(expected[board].title);
       expect(cards[0].description, board).toBe(expected[board].description);
       expect(cards[0].body?.trim(), board).toBe(expected[board].body);
-      expect(cards[0].columnSlug, board).toBe('todo');
+      // The board's own first column, not a named one: `toHaveLength(1)` above already proves the
+      // card is in a column the board reads at all, so what is left to pin is which. Naming 'todo'
+      // here is what let the scaffolder drift past engineering's defaults unnoticed.
+      expect(cards[0].columnSlug, board).toBe(boardColumnSlugs(config, board)[0]);
     }
   });
 

@@ -1,6 +1,7 @@
 import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
+import { boardColumnSlugs } from '../src/core/board.js';
 import {
   boardRel,
   CHAT_DIR,
@@ -59,7 +60,11 @@ describe('ProjectSession', () => {
     });
 
     const cfg = (await session.snapshot()).config;
-    await createCard(root, cfg, { board: 'engineering', columnSlug: 'todo', title: 'Watched task' }, TODAY);
+    // The column comes from the config the session just handed back: a card written to a folder no
+    // column maps to is not on the board, so the broadcast would never carry it and the only
+    // symptom would be this test timing out.
+    const [column] = boardColumnSlugs(cfg, 'engineering');
+    await createCard(root, cfg, { board: 'engineering', columnSlug: column, title: 'Watched task' }, TODAY);
 
     const snap = await received;
     expect(snap.boards.engineering.some((c) => c.title === 'Watched task')).toBe(true);

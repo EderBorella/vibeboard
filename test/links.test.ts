@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { readBoard } from '../src/core/board.js';
+import { boardColumnSlugs, readBoard } from '../src/core/board.js';
 import { readConfig } from '../src/core/config.js';
 import { findCard } from '../src/core/find.js';
 import { boardOfId, setCardLinks } from '../src/core/links.js';
@@ -10,11 +10,14 @@ import { tempDir } from './helpers.js';
 
 const TODAY = '2026-07-23';
 
-async function fixture(): Promise<{ root: string; config: ProjectConfig }> {
+// `engColumn` is engineering's first column, read off the project's own config: a card created in
+// a folder no column maps to is not on the board, so setCardLinks could not resolve it and every
+// link assertion would be about a card that isn't there.
+async function fixture(): Promise<{ root: string; config: ProjectConfig; engColumn: string }> {
   const root = await tempDir();
   await scaffoldProject(root, { name: 'links', mode: 'greenfield', today: TODAY });
   const config = await readConfig(root);
-  return { root, config };
+  return { root, config, engColumn: boardColumnSlugs(config, 'engineering')[0] };
 }
 
 describe('boardOfId', () => {
@@ -39,8 +42,13 @@ describe('setCardLinks (symmetric)', () => {
   });
 
   it('links across boards (engineering <-> product) both ways', async () => {
-    const { root, config } = await fixture();
-    const e = await createCard(root, config, { board: 'engineering', columnSlug: 'todo', title: 'E' }, TODAY);
+    const { root, config, engColumn } = await fixture();
+    const e = await createCard(
+      root,
+      config,
+      { board: 'engineering', columnSlug: engColumn, title: 'E' },
+      TODAY,
+    );
     const p = await createCard(root, config, { board: 'product', columnSlug: 'todo', title: 'P' }, TODAY);
 
     await setCardLinks(root, config, p, [e.id]); // link initiated from the product side
@@ -52,9 +60,19 @@ describe('setCardLinks (symmetric)', () => {
   });
 
   it('removes a link from both sides when it is no longer desired', async () => {
-    const { root, config } = await fixture();
-    const a = await createCard(root, config, { board: 'engineering', columnSlug: 'todo', title: 'A' }, TODAY);
-    const b = await createCard(root, config, { board: 'engineering', columnSlug: 'todo', title: 'B' }, TODAY);
+    const { root, config, engColumn } = await fixture();
+    const a = await createCard(
+      root,
+      config,
+      { board: 'engineering', columnSlug: engColumn, title: 'A' },
+      TODAY,
+    );
+    const b = await createCard(
+      root,
+      config,
+      { board: 'engineering', columnSlug: engColumn, title: 'B' },
+      TODAY,
+    );
     await setCardLinks(root, config, a, [b.id]);
 
     // now clear A's links
@@ -107,13 +125,13 @@ describe('setCardLinks (symmetric)', () => {
   // link, dropping the single id and dropping everything look identical — so the shared target
   // here deliberately holds two.
   it('removes only this card own back-reference, leaving the target other links', async () => {
-    const { root, config } = await fixture();
+    const { root, config, engColumn } = await fixture();
     const a = await createCard(root, config, { board: 'product', columnSlug: 'todo', title: 'A' }, TODAY);
     const b = await createCard(root, config, { board: 'product', columnSlug: 'todo', title: 'B' }, TODAY);
     const shared = await createCard(
       root,
       config,
-      { board: 'engineering', columnSlug: 'todo', title: 'shared' },
+      { board: 'engineering', columnSlug: engColumn, title: 'shared' },
       TODAY,
     );
 

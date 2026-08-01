@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { boardColumnSlugs } from '../src/core/board.js';
 import { buildApp } from '../src/server/app.js';
 import { ProjectSession } from '../src/server/session.js';
 import { openTestProject, wsClient } from './helpers.js';
@@ -74,17 +75,23 @@ describe('PATCH /api/config — column reconciliation', () => {
   it('renames the folder so the column keeps its cards', async () => {
     const { app } = await openTestProject({ name: 'Cols' });
 
-    // The scaffold puts a sample card in product/todo.
+    // Rename whichever column the scaffold actually seeded, rather than naming one. Hardcoding
+    // 'todo' here stopped exercising the rename the moment the samples moved to the first column:
+    // the filter went empty and the test renamed a column with nothing in it to keep.
     const before = await app.inject({ method: 'GET', url: '/api/state' });
-    const seeded = before
-      .json()
-      .snapshot.boards.product.filter((c: { columnSlug: string }) => c.columnSlug === 'todo');
+    const beforeCards = before.json().snapshot.boards.product as { id: string; columnSlug: string }[];
+    const seededColumn = beforeCards[0]?.columnSlug;
+    const seeded = beforeCards.filter((c) => c.columnSlug === seededColumn);
     expect(seeded.length).toBeGreaterThan(0);
+
+    const cfg = (await app.inject({ method: 'GET', url: '/api/config' })).json();
+    const columns = [...cfg.boards.product.columns];
+    columns[boardColumnSlugs(cfg, 'product').indexOf(seededColumn)] = 'Next';
 
     const res = await app.inject({
       method: 'PATCH',
       url: '/api/config',
-      payload: { boards: { product: { columns: ['Backlog', 'Next', 'In Progress', 'Done'] } } },
+      payload: { boards: { product: { columns } } },
     });
     expect(res.statusCode).toBe(200);
 
@@ -102,16 +109,27 @@ describe('PATCH /api/config — column reconciliation', () => {
   it('refuses to remove a column that still holds cards, and saves nothing', async () => {
     const { app } = await openTestProject({ name: 'Cols' });
 
+    // Drop the column the scaffold actually seeded. Naming a column outright made this pass for the
+    // wrong reason once the samples moved: it removed an empty column and got a 200, and the
+    // refusal it claims to test never ran.
+    const state = await app.inject({ method: 'GET', url: '/api/state' });
+    const [seeded] = state.json().snapshot.boards.product as { columnSlug: string }[];
+    const before = (await app.inject({ method: 'GET', url: '/api/config' })).json();
+    const slugs = boardColumnSlugs(before, 'product');
+    const dropped = before.boards.product.columns[slugs.indexOf(seeded.columnSlug)];
+
     const res = await app.inject({
       method: 'PATCH',
       url: '/api/config',
-      payload: { boards: { product: { columns: ['Backlog', 'In Progress', 'Done'] } } }, // drops Todo
+      payload: {
+        boards: { product: { columns: before.boards.product.columns.filter((c: string) => c !== dropped) } },
+      },
     });
     expect(res.statusCode).toBe(409);
-    expect(res.json().error).toMatch(/Todo/);
+    expect(res.json().error).toMatch(dropped);
 
     const cfg = await app.inject({ method: 'GET', url: '/api/config' });
-    expect(cfg.json().boards.product.columns).toContain('Todo'); // unchanged
+    expect(cfg.json().boards.product.columns).toContain(dropped); // unchanged
   });
 
   // Regression: `{...config, ...patch}` replaced `boards` wholesale, so a patch naming one
@@ -121,11 +139,13 @@ describe('PATCH /api/config — column reconciliation', () => {
     await app.inject({
       method: 'PATCH',
       url: '/api/config',
-      payload: { boards: { engineering: { columns: ['Todo', 'Shipped'] } } },
+      // Backlog is kept because the scaffold's engineering sample card is in it, and removing a
+      // column that holds cards is refused — which would leave nothing for this test to observe.
+      payload: { boards: { engineering: { columns: ['Backlog', 'Shipped'] } } },
     });
 
     const cfg = (await app.inject({ method: 'GET', url: '/api/config' })).json();
-    expect(cfg.boards.engineering.columns).toEqual(['Todo', 'Shipped']);
+    expect(cfg.boards.engineering.columns).toEqual(['Backlog', 'Shipped']);
     expect(cfg.boards.product.columns).toEqual(['Backlog', 'Todo', 'In Progress', 'Done']);
     expect(cfg.boards.features.columns).toEqual(['Backlog', 'Todo', 'In Progress', 'Done']);
   });

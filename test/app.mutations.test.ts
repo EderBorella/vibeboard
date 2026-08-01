@@ -1,7 +1,13 @@
 import { afterEach, describe, expect, it } from 'vitest';
+import { boardColumnSlugs } from '../src/core/board.js';
+import { defaultConfig } from '../src/core/config.js';
 import { buildApp } from '../src/server/app.js';
 import { ProjectSession } from '../src/server/session.js';
 import { openTestProject } from './helpers.js';
+
+// The scaffold writes the default config, so this is the column the board reads. A card created in
+// any other folder is not on the board, and the patch and place steps below would 404 on it.
+const [ENG_COLUMN] = boardColumnSlugs(defaultConfig('Mut'), 'engineering');
 
 // Only the "no project open" test builds a session by hand — it must NOT have a project.
 let bare: ProjectSession | undefined;
@@ -18,7 +24,7 @@ describe('app mutation routes', () => {
     const created = await app.inject({
       method: 'POST',
       url: '/api/cards',
-      payload: { board: 'engineering', columnSlug: 'todo', title: 'Via API' },
+      payload: { board: 'engineering', columnSlug: ENG_COLUMN, title: 'Via API' },
     });
     expect(created.statusCode).toBe(200);
     const id = created.json().id;

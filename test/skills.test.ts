@@ -206,12 +206,15 @@ describe('skillsForCard', () => {
 });
 
 describe('serializeSkill', () => {
+  // Two columns, both configured on the board this skill claims: parseSkill validates `columns:`
+  // against that board's config, so a scope naming a column engineering does not have would come
+  // back invalid and test the rejection path instead of the round trip.
   it('round-trips through parseSkill', () => {
     const text = serializeSkill({
       name: 'Execute',
       description: 'Implement the card',
       boards: ['engineering'],
-      columns: ['todo', 'in-progress'],
+      columns: ['in-progress', 'review'],
       prompt: 'Do the work.\n\nCarefully.',
     });
     const parsed = parseSkill('execute', text, config);
@@ -223,7 +226,7 @@ describe('serializeSkill', () => {
       name: 'Execute',
       description: 'Implement the card',
       boards: ['engineering'],
-      columns: ['todo', 'in-progress'],
+      columns: ['in-progress', 'review'],
       prompt: 'Do the work.\n\nCarefully.',
     });
   });

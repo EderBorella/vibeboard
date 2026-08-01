@@ -192,10 +192,14 @@ describe('ensureMaxRuns', () => {
 });
 
 describe('ensureBoards', () => {
+  // Spelled out rather than derived: these literals ARE the defaults under test. Engineering must
+  // open with a Backlog — it was the one board without one, so an agent asked to break a card down
+  // "into the right column" reached for `backlog`, created the folder, and wrote four cards where
+  // the board does not read.
   it('reports no change when every board is present', () => {
     const config = defaultConfig('T');
     expect(ensureBoards(config)).toBe(false);
-    expect(config.boards.engineering.columns).toEqual(['Todo', 'In Progress', 'Review', 'Done']);
+    expect(config.boards.engineering.columns).toEqual(['Backlog', 'In Progress', 'Review', 'Done']);
   });
 
   it('backfills a board missing from an older config with its own default columns', () => {
@@ -205,7 +209,7 @@ describe('ensureBoards', () => {
 
     expect(ensureBoards(config)).toBe(true);
     // Engineering's defaults differ from the other two boards — a shared list would be wrong.
-    expect(config.boards.engineering.columns).toEqual(['Todo', 'In Progress', 'Review', 'Done']);
+    expect(config.boards.engineering.columns).toEqual(['Backlog', 'In Progress', 'Review', 'Done']);
     expect(config.boards.features.columns).toEqual(['Kept']);
   });
 });

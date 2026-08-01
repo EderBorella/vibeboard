@@ -69,7 +69,9 @@ describe('PUT /api/skills/:slug', () => {
         name: 'Execute',
         description: 'Implement it',
         boards: ['engineering'],
-        columns: ['todo'],
+        // 'review' is configured on engineering — the scope has to validate, or this lands in
+        // `invalid` and the test below is the one being exercised instead.
+        columns: ['review'],
         prompt: 'Do the work.',
       },
     });
@@ -77,7 +79,7 @@ describe('PUT /api/skills/:slug', () => {
     const body = res.json() as { skills: { slug: string; description: string; columns: string[] }[] };
     const written = body.skills.find((s) => s.slug === 'execute');
     expect(written?.description).toBe('Implement it');
-    expect(written?.columns).toEqual(['todo']);
+    expect(written?.columns).toEqual(['review']);
   });
 
   it('creates a skill that did not exist', async () => {

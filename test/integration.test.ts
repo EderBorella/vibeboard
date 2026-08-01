@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { archiveCard, createCard, moveCard, readBoard, readConfig, scaffoldProject } from '../src/index.js';
+import {
+  archiveCard,
+  boardColumnSlugs,
+  createCard,
+  moveCard,
+  readBoard,
+  readConfig,
+  scaffoldProject,
+} from '../src/index.js';
 import { tempDir } from './helpers.js';
 
 const TODAY = '2026-07-23';
@@ -11,11 +19,13 @@ describe('end-to-end: scaffold → create → move → archive', () => {
     await scaffoldProject(root, { name: 'E2E', mode: 'greenfield', today: TODAY });
     const config = await readConfig(root);
 
-    // create an engineering card
+    // Create an engineering card in a column the board actually has: one written elsewhere is not
+    // on the board, so the move and archive steps below would both be about nothing.
+    const [column] = boardColumnSlugs(config, 'engineering');
     let eng = await createCard(
       root,
       config,
-      { board: 'engineering', columnSlug: 'todo', title: 'Build the thing' },
+      { board: 'engineering', columnSlug: column, title: 'Build the thing' },
       TODAY,
     );
     expect(eng.id).toBe('E-002'); // E-001 is the sample card

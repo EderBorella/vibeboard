@@ -1,6 +1,8 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
+import { boardColumnSlugs } from '../src/core/board.js';
+import { readConfig } from '../src/core/config.js';
 import { boardRel, CONFIG_DIR, INSTRUCTIONS_FILE, POINTER_FILES, SKILLS_DIR } from '../src/core/layout.js';
 import { buildApp } from '../src/server/app.js';
 import type { DirListing, FileRead } from '../src/server/explorer-list.js';
@@ -121,9 +123,12 @@ describe('PUT /api/explorer/file', () => {
     // The point of the tab: the board's own markdown is part of the project, and the watcher pushes
     // a snapshot when it changes, so an edit here shows up on the board.
     const { app, root } = await openTestProject({ name: 'E' });
+    // The column the scaffold seeded, not a named one: 'todo' left this listing empty and the
+    // `toBeDefined` below was the only thing that noticed.
+    const [column] = boardColumnSlugs(await readConfig(root), 'features');
     const listing = await app.inject({
       method: 'GET',
-      url: `/api/explorer/list?path=${encodeURIComponent(boardRel('features', 'todo'))}`,
+      url: `/api/explorer/list?path=${encodeURIComponent(boardRel('features', column))}`,
     });
     const card = (listing.json() as DirListing).entries.find((e) => e.name.endsWith('.md'));
     expect(card).toBeDefined();

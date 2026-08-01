@@ -15,10 +15,13 @@ export const DEFAULT_CONTEXT_BUDGET = 200_000;
 export const DEFAULT_MAX_RUNS = 3;
 
 // Default columns per board. Features (highest level) mirrors Product for familiarity.
+// Every board opens with a Backlog. Engineering used to start at Todo, which made it the one board
+// an agent could not guess: asked to break a card down "into the right column" it reached for
+// Backlog, found none, and created the folder — putting four cards somewhere the board does not read.
 const DEFAULT_COLUMNS: Record<BoardName, string[]> = {
   features: ['Backlog', 'Todo', 'In Progress', 'Done'],
   product: ['Backlog', 'Todo', 'In Progress', 'Done'],
-  engineering: ['Todo', 'In Progress', 'Review', 'Done'],
+  engineering: ['Backlog', 'In Progress', 'Review', 'Done'],
 };
 
 export function configPath(projectRoot: string): string {

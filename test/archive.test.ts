@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
-import { countArchived, readArchive, readBoard } from '../src/core/board.js';
+import { boardColumnSlugs, countArchived, readArchive, readBoard } from '../src/core/board.js';
 import { defaultConfig } from '../src/core/config.js';
 import { ARCHIVE_SLUG } from '../src/core/layout.js';
 import { archiveCard, createCard, moveCard, restoreCard, restoreTarget } from '../src/core/mutations.js';
@@ -10,6 +10,10 @@ import { tempDir } from './helpers.js';
 const config = defaultConfig('T');
 const TODAY = '2026-07-23';
 const at = (hhmm: string): string => `2026-07-23T${hhmm}:00.000Z`;
+// Engineering's first column, read off the config the tests share. A card created in a folder no
+// column maps to never reaches the board at all, so every assertion below about what readBoard
+// returns would pass on an empty list instead.
+const [FIRST] = boardColumnSlugs(config, 'engineering');
 
 const make = (root: string, columnSlug: string, title: string): Promise<Card> =>
   createCard(root, config, { board: 'engineering', columnSlug, title }, TODAY);
@@ -31,7 +35,7 @@ describe('archiveCard', () => {
 
   it('leaves a live card free of archive frontmatter', async () => {
     const root = await tempDir();
-    const card = await make(root, 'todo', 'Still live');
+    const card = await make(root, FIRST, 'Still live');
     const raw = await readFile(card.filePath, 'utf8');
     expect(raw).not.toContain('archived');
   });
@@ -40,9 +44,9 @@ describe('archiveCard', () => {
 describe('readArchive', () => {
   it('lists newest first, with untimestamped cards last', async () => {
     const root = await tempDir();
-    const a = await make(root, 'todo', 'A');
-    const b = await make(root, 'todo', 'B');
-    const c = await make(root, 'todo', 'C');
+    const a = await make(root, FIRST, 'A');
+    const b = await make(root, FIRST, 'B');
+    const c = await make(root, FIRST, 'C');
     await archiveCard(root, a, at('09:00'));
     await archiveCard(root, b, at('11:00'));
     // A card archived before this feature existed: in the folder, no stamp in its frontmatter.
@@ -54,8 +58,8 @@ describe('readArchive', () => {
   it('counts without reading the files', async () => {
     const root = await tempDir();
     expect(await countArchived(root, 'engineering')).toBe(0);
-    await archiveCard(root, await make(root, 'todo', 'A'), at('09:00'));
-    await archiveCard(root, await make(root, 'todo', 'B'), at('09:01'));
+    await archiveCard(root, await make(root, FIRST, 'A'), at('09:00'));
+    await archiveCard(root, await make(root, FIRST, 'B'), at('09:01'));
     expect(await countArchived(root, 'engineering')).toBe(2);
     expect(await countArchived(root, 'features')).toBe(0);
   });
@@ -100,25 +104,27 @@ describe('restoreCard', () => {
 
   it('lands at the end of the target column', async () => {
     const root = await tempDir();
-    const first = await make(root, 'todo', 'first');
-    await make(root, 'todo', 'second'); // stays put; only its position relative to `first` matters
+    const first = await make(root, FIRST, 'first');
+    await make(root, FIRST, 'second'); // stays put; only its position relative to `first` matters
     const archived = await archiveCard(root, first, at('10:00'));
 
     await restoreCard(root, config, archived);
 
-    const todo = (await readBoard(root, 'engineering', config)).filter((c) => c.columnSlug === 'todo');
-    expect(todo.map((c) => c.title)).toEqual(['second', 'first']);
+    const column = (await readBoard(root, 'engineering', config)).filter((c) => c.columnSlug === FIRST);
+    expect(column.map((c) => c.title)).toEqual(['second', 'first']);
     // placeCard renumbers, so the restored card can't collide with `second`.
-    expect(todo.map((c) => c.order)).toEqual([10, 20]);
+    expect(column.map((c) => c.order)).toEqual([10, 20]);
   });
 
   it('honours an explicit target column', async () => {
     const root = await tempDir();
     const archived = await archiveCard(root, await make(root, 'in-progress', 'Elsewhere'), at('10:00'));
 
-    const restored = await restoreCard(root, config, archived, 'todo');
+    // Explicitly asking for a column other than the one it was archived from is what makes the
+    // argument observable — restoreTarget would have sent it back to 'in-progress'.
+    const restored = await restoreCard(root, config, archived, FIRST);
 
-    expect((restored as Card).columnSlug).toBe('todo');
+    expect((restored as Card).columnSlug).toBe(FIRST);
   });
 
   it('refuses a column the board does not have', async () => {

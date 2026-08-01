@@ -1,6 +1,6 @@
 import { access, readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
-import { readArchive, readBoard } from '../src/core/board.js';
+import { boardColumnSlugs, readArchive, readBoard } from '../src/core/board.js';
 import { defaultConfig } from '../src/core/config.js';
 import { ARCHIVE_SLUG } from '../src/core/layout.js';
 import { archiveCard, createCard, moveCard, updateCard } from '../src/core/mutations.js';
@@ -9,6 +9,10 @@ import { tempDir } from './helpers.js';
 const config = defaultConfig('T');
 const TODAY = '2026-07-23';
 const NOW = '2026-07-23T10:00:00.000Z';
+// Engineering's first column, from the config these tests pass in. The next id counts what
+// readBoard returns, so a card created in an unconfigured folder is not counted — and the second
+// card then gets the first one's id.
+const [ENG_FIRST] = boardColumnSlugs(config, 'engineering');
 
 describe('mutations', () => {
   it('creates a card with the next id and a file on disk', async () => {
@@ -16,7 +20,7 @@ describe('mutations', () => {
     const card = await createCard(
       root,
       config,
-      { board: 'engineering', columnSlug: 'todo', title: 'First', links: ['P-001'] },
+      { board: 'engineering', columnSlug: ENG_FIRST, title: 'First', links: ['P-001'] },
       TODAY,
     );
     expect(card.id).toBe('E-001');
@@ -27,7 +31,7 @@ describe('mutations', () => {
     const second = await createCard(
       root,
       config,
-      { board: 'engineering', columnSlug: 'todo', title: 'Second' },
+      { board: 'engineering', columnSlug: ENG_FIRST, title: 'Second' },
       TODAY,
     );
     expect(second.id).toBe('E-002');
@@ -67,9 +71,13 @@ describe('mutations', () => {
     const card = await createCard(
       root,
       config,
-      { board: 'engineering', columnSlug: 'todo', title: 'A' },
+      { board: 'engineering', columnSlug: ENG_FIRST, title: 'A' },
       TODAY,
     );
+    // "Leaves the board" is only observable if it was on the board to begin with: created in a
+    // folder no column maps to, it never was, and the empty list below would prove nothing.
+    expect((await readBoard(root, 'engineering', config)).map((c) => c.id)).toEqual([card.id]);
+
     const archived = await archiveCard(root, card, NOW);
     expect(archived.columnSlug).toBe(ARCHIVE_SLUG);
     expect((await readBoard(root, 'engineering', config)).length).toBe(0);

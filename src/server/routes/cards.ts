@@ -3,7 +3,7 @@ import type { FastifyInstance, FastifyReply } from 'fastify';
 import { type CardProblem, readArchive, readBoard } from '../../core/board.js';
 import { pickCardPatch } from '../../core/card.js';
 import { findCard } from '../../core/find.js';
-import { secondParentProblem } from '../../core/hierarchy.js';
+import { oneParentProblem } from '../../core/hierarchy.js';
 import { ARCHIVE_SLUG } from '../../core/layout.js';
 import { setCardLinks } from '../../core/links.js';
 import {
@@ -118,7 +118,9 @@ export async function registerCardRoutes(api: FastifyInstance, ctx: AppCtx): Pro
       // closure below.
       const { root, config } = ctx.session;
       const everyCard = (await Promise.all(BOARDS.map((b) => readBoard(root, b, config)))).flat();
-      const problem = secondParentProblem(card, links, everyCard);
+      // Both directions: the payload writes the back-reference onto every target too, so checking
+      // only the card in the URL left the parent side open.
+      const problem = oneParentProblem(card, links, everyCard);
       if (problem) return reply.code(400).send({ error: problem });
     }
 

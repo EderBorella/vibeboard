@@ -1,7 +1,9 @@
-import { writeFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import { describe, expect, it, onTestFinished } from 'vitest';
+import { parse, stringify } from 'yaml';
+import { configPath } from '../src/core/config.js';
 import { FOUNDATION_DIR, skillRel } from '../src/core/layout.js';
 import { buildApp } from '../src/server/app.js';
 import { CredentialStore } from '../src/server/credentials.js';
@@ -160,5 +162,26 @@ describe('readiness is not an agent’s business', () => {
       });
       expect(res.statusCode, scope).toBe(403);
     }
+  });
+});
+
+// A hand-edited config.yaml reaches the endpoint unnormalised — readConfig is a bare YAML parse, and
+// only defaultConfig clones the defaults. The validator already computes the shape problems; the
+// endpoint's job is to hand them over rather than crash on the way.
+describe('readiness on a malformed autopilot block', () => {
+  it('reports the shape problems instead of failing with a 500', async () => {
+    const { app, root, session } = await openTestProject({ name: 'A', mode: 'brownfield' });
+    const config = parse(await readFile(configPath(root), 'utf8')) as Record<string, unknown>;
+    config.autopilot = { maxIterations: 10 };
+    await writeFile(configPath(root), stringify(config), 'utf8');
+    await session.reloadConfig();
+
+    const res = await app.inject({ method: 'GET', url: '/api/autopilot/readiness' });
+    expect(res.statusCode).toBe(200);
+    const r = res.json() as Readiness;
+    expect(r.ok).toBe(false);
+    expect(r.routes.problems).toContain('autopilot.routes must be a list of routes.');
+    expect(r.routes.count).toBe(0);
+    expect(r.blockers).toEqual(expect.arrayContaining(r.routes.problems));
   });
 });

@@ -273,6 +273,37 @@ describe('the API boundary', () => {
       expect(res.json().error).toContain('two parents on the features board');
     });
 
+    // The evasion this endpoint had until 2026-08-02: links are symmetric, so writing P-002's list
+    // writes the back-reference onto E-001. P-002 gains no parent, the child-side check passes, and
+    // E-001 ends up with two — the rule satisfied on one card and violated on the other.
+    it('cannot adopt a child that already has a parent, from the parent side', async () => {
+      const { app, mint } = await open();
+      // A second product card for the run to own. E-001 already links P-001 (sample cards).
+      const p2 = (
+        await app.inject({
+          method: 'POST',
+          url: '/api/cards',
+          headers: admin,
+          payload: { board: 'product', columnSlug: 'todo', title: 'Second product' },
+        })
+      ).json().id;
+
+      const cred = mint('work', 'run-p', p2);
+      const res = await app.inject({
+        method: 'PUT',
+        url: `/api/cards/product/${p2}/links`,
+        headers: bearer(cred.token),
+        payload: { links: ['E-001'] },
+      });
+      expect(res.statusCode).toBe(400);
+      expect(res.json().error).toContain('already has a parent on the product board');
+
+      // And the far side was not written: a refusal that still moved the link would be worse than none.
+      const state = (await app.inject({ method: 'GET', url: '/api/state', headers: admin })).json();
+      const e1 = state.snapshot.boards.engineering.find((c: { id: string }) => c.id === 'E-001');
+      expect(e1.links).toEqual(['P-001']);
+    });
+
     it('is not confined when the scope is checkup', async () => {
       // The checkup is a supervisor, not a worker: editing any card is the job.
       const { app, mint } = await open();

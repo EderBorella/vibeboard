@@ -40,8 +40,14 @@ export interface Readiness {
 // catalogue is part of the lifecycle's completeness rather than a separate concern.
 function routeProblemsFor(config: ProjectConfig, skillSlugs: string[]): string[] {
   const problems = coverageProblems(config);
-  if (!config.autopilot) return problems; // coverageProblems has already said the only useful thing
-  return [...problems, ...skillProblems(config.autopilot, skillSlugs)];
+  const ap = config.autopilot;
+  // SHAPE, not presence. `coverageProblems` returns early on `shapeProblems` precisely so nothing
+  // indexes into a malformed block — and then this guard asked whether the block EXISTS and handed a
+  // hand-edited `autopilot:\n  maxIterations: 10` to `skillProblems`, which does `ap.routes.filter`.
+  // A 500 in place of the list of shape problems already computed and sitting in `problems`: the exact
+  // crash autopilot-cover.ts has a comment about, reintroduced one layer up.
+  if (!ap || !Array.isArray(ap.routes)) return problems;
+  return [...problems, ...skillProblems(ap, skillSlugs)];
 }
 
 interface Read {
@@ -83,7 +89,11 @@ export function composeReadiness(config: ProjectConfig, skillSlugs: string[], re
       count: gates.ok ? gates.gates.length : 0,
     },
     smoke: { ok: smoke.ok, ...(smoke.ok ? {} : { reason: smoke.reason }) },
-    routes: { problems: routeProblems, count: config.autopilot?.routes.length ?? 0 },
+    // `?.` guards the block, not `routes` — the same defect as above, on the same input.
+    routes: {
+      problems: routeProblems,
+      count: Array.isArray(config.autopilot?.routes) ? config.autopilot.routes.length : 0,
+    },
   };
 }
 

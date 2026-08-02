@@ -34,3 +34,36 @@ export function secondParentProblem(card: Card, links: string[], cards: Card[]):
   if (parents.length < 2) return null;
   return `${card.id} would have two parents on the ${parentBoard} board: ${parents.slice(0, 2).join(' and ')}. The hierarchy auto-pilot rolls up is derived from links, so a card has one.`;
 }
+
+// The other direction, and the one that made the rule above advisory. Links are SYMMETRIC: writing
+// this card's list also writes the back-reference onto every target (`setCardLinks` → `updateCard`,
+// which checks nothing). So checking only the card in the URL leaves the parent side wide open —
+// a run whose own card is P-002 links to E-001, P-002 gains no parent so the check passes, and
+// E-001 ends up with two. Reproduced with a real `work` credential before this existed.
+//
+// It is also the whole of the features→product case: `parentBoardOf('features')` is undefined, so the
+// child-side check returns early and a feature could adopt any number of product cards that already
+// had parents.
+export function farSideParentProblem(card: Card, links: string[], cards: Card[]): string | null {
+  const desired = new Set(links);
+  for (const target of cards) {
+    // Only targets this card would be the PARENT of — the direction the back-reference creates.
+    if (parentBoardOf(target.board) !== card.board) continue;
+    if (!desired.has(target.id)) continue;
+    // Its existing parents on this board, excluding us: re-linking a child we already own is not a
+    // second parent, or every idempotent write would be refused.
+    const existing = target.links
+      .filter((id) => id !== card.id)
+      .filter((id) => cards.find((c) => c.id === id)?.board === card.board);
+    if (existing.length === 0) continue;
+    return `${target.id} already has a parent on the ${card.board} board (${existing[0]}), so linking it to ${card.id} would give it two. The hierarchy auto-pilot rolls up is derived from links, so a card has one.`;
+  }
+  return null;
+}
+
+// Both directions, for the one caller that writes links. Separate functions above because each is a
+// distinct claim worth testing on its own; one entry point here because a caller that checked only
+// half of it is exactly the bug this fixes.
+export function oneParentProblem(card: Card, links: string[], cards: Card[]): string | null {
+  return secondParentProblem(card, links, cards) ?? farSideParentProblem(card, links, cards);
+}

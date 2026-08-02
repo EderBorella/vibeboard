@@ -353,6 +353,33 @@ describe('AgentRunner.dispatch', () => {
     await settled(root, first.run);
   });
 
+  // A spawned agent is an ordinary child process: it does NOT die with the server that started it.
+  // Left running on shutdown it keeps working, and keeps spending, against a board nobody is
+  // watching — and the same shape left fourteen test shims alive for a week.
+  it('cancels every run, running and queued, in one call', async () => {
+    const root = await tempDir();
+    const shim = behaving('hang');
+    // Distinct suffixes: the fixture pins the clock AND the suffix for deterministic ids, so two
+    // dispatches would otherwise collide on one id.
+    let n = 0;
+    const { instance } = runner(root, { suffix: () => `s${++n}`, maxConcurrent: () => 1 });
+    const running = await instance.dispatch(input(root, shim));
+    const queued = await instance.dispatch(input(root, shim));
+    expect([running.status, queued.status]).toEqual(['running', 'queued']);
+
+    // One of each, and only one spawned process: with nothing queued, "cancel the active ones" and
+    // "cancel everything" are the same call and neither would be tested.
+    expect(instance.cancelAll()).toBe(2);
+
+    expect((await settled(root, running.run)).status).toBe('cancelled');
+    expect((await settled(root, queued.run)).status).toBe('cancelled');
+    expect(instance.activeIds).toHaveLength(0);
+  });
+
+  it('reports nothing to cancel when nothing is in flight', async () => {
+    expect(runner(await tempDir()).instance.cancelAll()).toBe(0);
+  });
+
   it('cancels a run that never started, without spawning anything', async () => {
     const shim = behaving('hang');
     const root = await tempDir();

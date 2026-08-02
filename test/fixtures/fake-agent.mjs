@@ -89,7 +89,14 @@ if (behaviour === 'chatty') {
   });
   process.exit(0);
 } else if (behaviour === 'hang') {
-  setInterval(() => {}, 1000); // never exits; the test cancels or times it out
+  // Never exits on its own — the test cancels it or times it out. But if the test RUNNER dies first
+  // (a SIGKILLed vitest, an interrupted pre-commit hook), nothing ever does, and the shim outlives
+  // the suite that spawned it: fourteen were found still running a week after the fact. Watching
+  // ppid costs nothing and covers the kills a process cannot catch.
+  const parent = process.ppid;
+  setInterval(() => {
+    if (process.ppid !== parent) process.exit(0);
+  }, 250);
 } else {
   const body = REPORTS[behaviour];
   if (body && match) {

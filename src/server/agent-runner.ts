@@ -127,6 +127,19 @@ export class AgentRunner {
   // turn's own completion path, not here — the child has to actually die before the run is over, and
   // pretending otherwise would leave a finished record with a live process behind it. A queued one
   // has no process, so it ends immediately.
+  // Every run, for shutdown. A spawned agent does NOT die with the server that started it — it is an
+  // ordinary child process, and on the way out we are the only thing that will stop it. Left
+  // running it keeps working, and keeps spending, against a board nobody is watching.
+  //
+  // Synchronous on purpose: this is called from a signal handler and from `process.once('exit')`,
+  // where nothing asynchronous gets a turn. Killing the child is the part that must happen; the
+  // record it settles into is a bonus we may not live long enough to write.
+  cancelAll(): number {
+    const ids = [...this.#active.keys(), ...this.#queue.map((q) => q.record.run)];
+    for (const id of ids) this.cancel(id);
+    return ids.length;
+  }
+
   cancel(run: string): boolean {
     const active = this.#active.get(run);
     if (active) {

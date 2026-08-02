@@ -63,7 +63,13 @@ const RESULT = {
 };
 
 if (behaviour === 'hang') {
-  setInterval(() => {}, 1000);
+  // Never exits on its own — the test cancels it or times it out. But if the test RUNNER dies first
+  // (a SIGKILLed vitest, an interrupted pre-commit hook), nothing ever does, and the shim outlives
+  // the suite that spawned it. Watching ppid covers the kills a process cannot catch.
+  const parent = process.ppid;
+  setInterval(() => {
+    if (process.ppid !== parent) process.exit(0);
+  }, 250);
 } else if (behaviour === 'split') {
   // One line, two writes: the reader must not emit until the newline arrives.
   const whole = line(INIT);

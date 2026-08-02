@@ -41,11 +41,18 @@ installCrashHandlers(app.log);
 // what covers that, and every other way the process can die without reaching this line.
 for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) {
   process.once(sig, () => {
+    // Runs first: these are real agent processes, and once this one exits nothing else will stop
+    // them. They would go on working, and spending, on a board nobody is watching.
+    const stopped = app.runner.cancelAll();
+    if (stopped > 0) console.log(`\n  stopped ${stopped} run${stopped === 1 ? '' : 's'} still in flight`);
     stopOpencodeServer();
     process.exit(0);
   });
 }
-process.once('exit', stopOpencodeServer);
+process.once('exit', () => {
+  app.runner.cancelAll();
+  stopOpencodeServer();
+});
 
 function lanAddress(): string | undefined {
   for (const iface of Object.values(networkInterfaces())) {

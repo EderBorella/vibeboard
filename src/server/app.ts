@@ -26,6 +26,7 @@ declare module 'fastify' {
     // Set by registerStatic when a built UI exists, so the one not-found handler below can serve
     // the SPA without this module having to know whether there is a build.
     spaFallback: ((reply: import('fastify').FastifyReply) => unknown) | null;
+    runner: AgentRunner;
   }
 }
 
@@ -109,6 +110,10 @@ export function buildApp(
     if (isApp && app.spaFallback) return app.spaFallback(reply);
     return reply.code(404).send({ error: 'Not found' });
   });
+
+  // Exposed for main.ts's shutdown handlers: a spawned agent outlives the server unless something
+  // stops it, and the composition root is the only place that holds the runner.
+  app.decorate('runner', runner);
 
   return app;
 }

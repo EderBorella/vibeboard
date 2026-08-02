@@ -41,6 +41,14 @@ export function CardTile({
     >
       <div className="tile-head">
         <span className="tile-id">{card.id}</span>
+        {card.setup && (
+          // The project-level barrier. Worth a badge because its effect is invisible from the card
+          // it is on: nothing outside this feature's subtree runs until it is finished, so a board
+          // that looks stuck is explained by a tile somewhere else.
+          <span className="tile-setup" title="The setup feature — nothing outside it runs until it is done">
+            setup
+          </span>
+        )}
         {openSuggestions > 0 && (
           <span
             className="tile-suggestions"

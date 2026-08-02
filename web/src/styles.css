@@ -1089,6 +1089,14 @@ body {
 .sandbox-hint { font-size: 0.76rem; color: var(--muted); line-height: 1.5; }
 .sandbox-action > .btn-secondary { align-self: flex-start; }
 
+/* The project-level barrier. The accent rather than ochre: this is not a warning, it is the card the
+   whole board is waiting on, and it should read as structure rather than as a problem. */
+.tile-setup {
+  font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.08em; white-space: nowrap;
+  color: var(--accent); border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  border-radius: 3px; padding: 0 0.25rem;
+}
+
 /* Work an agent found and deliberately did not do. Ochre, not the accent: a card carrying this is
    not failing, but it is not plainly done either, and those two must not look the same. */
 .tile-suggestions {

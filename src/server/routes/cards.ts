@@ -1,6 +1,7 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { type CardProblem, readArchive } from '../../core/board.js';
+import { pickCardPatch } from '../../core/card.js';
 import { findCard } from '../../core/find.js';
 import { ARCHIVE_SLUG } from '../../core/layout.js';
 import { setCardLinks } from '../../core/links.js';
@@ -14,7 +15,7 @@ import {
   updateCard,
 } from '../../core/mutations.js';
 import { slugify } from '../../core/slug.js';
-import { BOARDS, type BoardName, type CardFrontmatter, type ProjectConfig } from '../../core/types.js';
+import { BOARDS, type BoardName, type ProjectConfig } from '../../core/types.js';
 import { type AppCtx, ensureOpen, nowIso, today } from '../route-context.js';
 import { resolveCardRuns } from '../run-store.js';
 
@@ -73,7 +74,8 @@ export async function registerCardRoutes(api: FastifyInstance, ctx: AppCtx): Pro
     const { board, id } = req.params as { board: BoardName; id: string };
     const card = await findCard(ctx.session.root, board, id, ctx.session.config);
     if (!card) return reply.code(404).send({ error: 'Card not found' });
-    return updateCard(ctx.session.root, card, req.body as Partial<CardFrontmatter> & { body?: string });
+    // Filtered, not cast: the cast said what the body ought to be and let through whatever it was.
+    return updateCard(ctx.session.root, card, pickCardPatch(req.body));
   });
 
   api.get('/cards/:board/:id/raw', async (req, reply) => {

@@ -81,3 +81,18 @@ describe('CardTile open suggestions', () => {
     expect(screen.queryByTitle(/open suggestion/)).toBeNull();
   });
 });
+
+// The barrier's effect is invisible from the card it sits on: nothing outside this feature's subtree
+// runs until it is finished, so a board that looks stuck is explained by a tile somewhere else.
+describe('CardTile setup badge', () => {
+  it('marks the setup feature', () => {
+    render(<CardTile card={card({ id: 'F-001', board: 'features', setup: true })} miniatureChars={40} />);
+    expect(screen.getByText('setup')).toBeTruthy();
+    expect(screen.getByTitle(/nothing outside it runs until it is done/i)).toBeTruthy();
+  });
+
+  it('says nothing on an ordinary card', () => {
+    render(<CardTile card={card()} miniatureChars={40} />);
+    expect(screen.queryByText('setup')).toBeNull();
+  });
+});

@@ -103,6 +103,8 @@ export interface Card {
   links: string[];
   group?: string;
   created: string;
+  // The project-level barrier: while this feature is unfinished nothing outside its subtree runs.
+  setup?: boolean;
   // Present only while the card sits in the archive.
   archived?: string; // ISO timestamp
   archivedFrom?: string; // column slug it left

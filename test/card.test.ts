@@ -82,3 +82,28 @@ describe('card parse/serialize', () => {
     expect(body).toBe('The body.');
   });
 });
+
+// The flag that marks the project-level barrier. A frontmatter key rather than a reserved id,
+// because ids are derived and a recreated card would silently take the barrier with it.
+describe('the setup flag', () => {
+  it('round-trips when true, and is written only then', () => {
+    expect(parse('---\nid: F-001\ntitle: Setup\nsetup: true\n---\nbody\n').data.setup).toBe(true);
+    expect(parse('---\nid: F-002\ntitle: Other\n---\nbody\n').data.setup).toBeUndefined();
+    // `setup: false` on every card in the project would be noise on every file in git.
+    expect(serializeCard(fm, 'b')).not.toContain('setup');
+    expect(serializeCard({ ...fm, setup: true }, 'b')).toContain('setup: true');
+    expect(serializeCard({ ...fm, setup: undefined }, 'b')).not.toContain('setup');
+  });
+
+  // Anything but a real `true` is not the barrier. A card whose author wrote "no" must not become
+  // the one thing the whole project waits on.
+  it.each(['setup: false', 'setup: "true"', 'setup: no', 'setup: 1', 'setup:'])('ignores %s', (line) => {
+    expect(parse(`---\nid: F-001\ntitle: Setup\n${line}\n---\nbody\n`).data.setup).toBeUndefined();
+  });
+
+  it('survives a parse and re-serialise, so an edit elsewhere does not drop it', () => {
+    const first = serializeCard({ ...fm, id: 'F-001', setup: true }, 'The body.');
+    const parsed = parse(first);
+    expect(serializeCard({ ...parsed.data, title: 'Renamed' }, parsed.body)).toContain('setup: true');
+  });
+});

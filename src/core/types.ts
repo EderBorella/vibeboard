@@ -22,6 +22,13 @@ export interface CardFrontmatter {
   links: string[]; // ids of related cards on either board (symmetric)
   group?: string; // optional visual grouping label
   created: string; // ISO date "YYYY-MM-DD"
+  // The setup feature: a project-level barrier. While it is unfinished, no card outside its subtree
+  // is eligible, so the shared architectural decisions are made once rather than per feature.
+  //
+  // A FLAG, never a reserved id: `nextId` derives ids and never accepts one (ids.ts), so a recreated
+  // F-001 would silently remove the barrier. Not accepted by the card PATCH endpoint either — a work
+  // agent able to flag its own card would make its own subtree the only work in the project.
+  setup?: boolean;
   // Set only while a card sits in archive/, cleared on restore. `archived` is a full
   // timestamp (not a date like `created`) so the drawer can order by what was thrown away
   // most recently; `archivedFrom` is the column slug to put it back into.

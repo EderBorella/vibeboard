@@ -1,4 +1,7 @@
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
+import { boardRel } from '../src/core/layout.js';
 import { ProjectSession } from '../src/server/session.js';
 import { openTestProject, testApp } from './helpers.js';
 
@@ -86,5 +89,48 @@ describe('restore refusals', () => {
     });
     expect(res.statusCode).toBe(400);
     expect(res.json()).toEqual({ error: 'Unknown column' });
+  });
+});
+
+// PATCH used to spread the request body straight onto the card, so anything with a matching key
+// landed. The fields below are each governed by something else, and `setup` is authority: a work
+// agent able to flag its own card would make its own subtree the only eligible work in the project.
+describe('PATCH /api/cards accepts only the fields it is for', () => {
+  it('ignores setup, id, order, archived and links', async () => {
+    const { app, root, session } = await openTestProject({ name: 'G' });
+    const state = (await app.inject({ method: 'GET', url: '/api/state' })).json();
+    const before = state.snapshot.boards.engineering[0];
+
+    const res = await app.inject({
+      method: 'PATCH',
+      url: `/api/cards/engineering/${before.id}`,
+      payload: {
+        title: 'A new title',
+        setup: true,
+        id: 'E-999',
+        order: 9999,
+        archived: '2026-08-02T00:00:00Z',
+        archivedFrom: 'backlog',
+        links: ['P-404'],
+      },
+    });
+    expect(res.statusCode).toBe(200);
+
+    const after = res.json();
+    expect(after.title).toBe('A new title'); // the field it IS for still works
+    expect(after.setup).toBeUndefined();
+    expect(after.id).toBe(before.id);
+    expect(after.order).toBe(before.order);
+    expect(after.archived).toBeUndefined();
+    expect(after.links).toEqual(before.links);
+
+    // And on disk, not merely in the reply.
+    await session.reloadConfig();
+    const raw = await readFile(
+      join(root, boardRel('engineering', after.columnSlug, `${before.id}.md`)),
+      'utf8',
+    );
+    expect(raw).not.toContain('setup');
+    expect(raw).not.toContain('E-999');
   });
 });

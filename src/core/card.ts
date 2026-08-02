@@ -26,6 +26,9 @@ export function parseCardContent(content: string): { data: CardFrontmatter; body
       links: Array.isArray(d.links) ? d.links : [],
       group: d.group,
       created: d.created ?? '',
+      // `=== true`, not truthy: `setup: "no"` is a string, and a card whose author meant the opposite
+      // must not become the project's barrier.
+      setup: d.setup === true ? true : undefined,
       archived: d.archived,
       archivedFrom: d.archivedFrom,
     },
@@ -34,8 +37,8 @@ export function parseCardContent(content: string): { data: CardFrontmatter; body
 }
 
 export function toFrontmatter(card: Card): CardFrontmatter {
-  const { id, title, description, order, tags, links, group, created, archived, archivedFrom } = card;
-  return { id, title, description, order, tags, links, group, created, archived, archivedFrom };
+  const { id, title, description, order, tags, links, group, created, setup, archived, archivedFrom } = card;
+  return { id, title, description, order, tags, links, group, created, setup, archived, archivedFrom };
 }
 
 export function serializeCard(fm: CardFrontmatter, body: string): string {
@@ -46,8 +49,34 @@ export function serializeCard(fm: CardFrontmatter, body: string): string {
   data.links = fm.links;
   if (fm.group !== undefined) data.group = fm.group;
   data.created = fm.created;
+  // Only when true: `setup: false` on every card in the project would be noise on every file.
+  if (fm.setup === true) data.setup = true;
   // Emitted only while archived, so a live card's file is unchanged by this feature.
   if (fm.archived !== undefined) data.archived = fm.archived;
   if (fm.archivedFrom !== undefined) data.archivedFrom = fm.archivedFrom;
   return matter.stringify(`${body}\n`, data);
+}
+
+// The only fields a PATCH may set. `updateCard` spreads whatever it is handed — which is right for
+// the internal callers that set `order` during a placement — so the filtering belongs where
+// untrusted input arrives.
+//
+// What is deliberately NOT here, and why each one matters:
+//   id           a card's id is its identity; the board, its links and its run records are keyed on it
+//   order        placement is a drag, decided by a person looking at the board (/place)
+//   archived     archiving is a scope of its own; setting the key by hand strands the card
+//   links        symmetric, so they go through the links endpoint that writes the far side too
+//   setup        the project-level barrier — a work agent able to flag its own card would make its
+//                own subtree the only eligible work in the project
+export type CardPatch = Pick<CardFrontmatter, 'title' | 'description' | 'tags' | 'group'> & { body?: string };
+
+export function pickCardPatch(body: unknown): Partial<CardPatch> {
+  const o = (body ?? {}) as Record<string, unknown>;
+  const patch: Partial<CardPatch> = {};
+  if (typeof o.title === 'string') patch.title = o.title;
+  if (typeof o.description === 'string') patch.description = o.description;
+  if (typeof o.group === 'string') patch.group = o.group;
+  if (typeof o.body === 'string') patch.body = o.body;
+  if (Array.isArray(o.tags)) patch.tags = o.tags.map((t) => String(t));
+  return patch;
 }

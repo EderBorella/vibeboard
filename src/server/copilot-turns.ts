@@ -1,6 +1,8 @@
 import { resolveCopilotSelection } from '../core/copilot-choice.js';
 import type { Backend, CopilotMode, EffortLevel } from './copilot.js';
+import { attachedOpencodeUrl } from './opencode-server.js';
 import type { AppCtx, WsClient } from './route-context.js';
+import { agentRefusal } from './sandbox.js';
 
 // Per-turn options are the dock's SESSION OVERRIDE. The project config holds the defaults
 // and is the only persisted source; anything omitted here falls back to it. Precedence
@@ -50,6 +52,12 @@ export function createCopilotTurns(ctx: AppCtx): {
       return;
     }
     if (!text.trim()) return;
+    // The chat is an agent too, and it auto-approves its own tool calls. Same gate, same reason.
+    const refusal = agentRefusal(ctx.sandbox, attachedOpencodeUrl());
+    if (refusal) {
+      broadcast({ type: 'copilot:error', error: refusal });
+      return;
+    }
     try {
       await chats.recordUser(text);
       copilotState(); // running flips true only once send starts; announce optimistically

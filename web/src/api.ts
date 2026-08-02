@@ -488,15 +488,16 @@ export function putSkill(
   return put<SkillCatalogue>(`/api/skills/${encodeURIComponent(slug)}`, fields);
 }
 
-// What the OS enforces on agents, and the two ways to change it. `autopilotRefusal` is computed on
-// the server so the UI never re-derives the rule and drifts from the loop that acts on it.
+// What the OS enforces on agents, and the two ways to change it. `agentRefusal` is computed on the
+// server, by the SAME function the dispatch gate calls — so the panel cannot describe a rule the
+// gate does not apply. Two of those diverged once already.
 export interface SandboxState {
   ok: boolean;
   profile?: string;
   reason?: string;
   backend: 'managed' | 'attached';
   attachedUrl?: string;
-  autopilotRefusal: string | null;
+  agentRefusal: string | null;
 }
 
 export async function getSandbox(): Promise<SandboxState> {

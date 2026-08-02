@@ -4,7 +4,7 @@ import { buildApp } from '../src/server/app.js';
 import { CredentialStore } from '../src/server/credentials.js';
 import { NOT_REQUESTED, SANDBOX_PROFILE, type SandboxStatus } from '../src/server/sandbox.js';
 import { ProjectSession } from '../src/server/session.js';
-import { tempDir } from './helpers.js';
+import { TEST_SANDBOX, tempDir } from './helpers.js';
 
 const ADMIN = 'admin-token-for-sandbox-routes';
 const admin = { authorization: `Bearer ${ADMIN}` };
@@ -43,7 +43,7 @@ describe('GET /api/sandbox', () => {
     expect(body).toMatchObject({ ok: true, profile: SANDBOX_PROFILE, backend: 'managed' });
     expect(body.reason).toBeUndefined();
     // Nothing to refuse: sandboxed, and managing its own server.
-    expect(body.autopilotRefusal).toBeNull();
+    expect(body.agentRefusal).toBeNull();
   });
 
   it('carries the reason and the refusal when there is no sandbox', async () => {
@@ -53,7 +53,7 @@ describe('GET /api/sandbox', () => {
     expect(body.reason).toContain('sandbox:install');
     // The refusal repeats the reason rather than saying a bare no. This is the string the UI shows,
     // and a dead end here is worse than the condition it describes.
-    expect(body.autopilotRefusal).toContain('sandbox:install');
+    expect(body.agentRefusal).toContain('sandbox:install');
   });
 
   it('refuses auto-pilot while attached to an external server, sandbox or not', async () => {
@@ -61,7 +61,49 @@ describe('GET /api/sandbox', () => {
     const { app } = await open({ ok: true, profile: SANDBOX_PROFILE });
     const body = (await app.inject({ method: 'GET', url: '/api/sandbox', headers: admin })).json();
     expect(body).toMatchObject({ ok: true, backend: 'attached', attachedUrl: 'http://127.0.0.1:9999' });
-    expect(body.autopilotRefusal).toContain('VIBEBOARD_OPENCODE_URL');
+    expect(body.agentRefusal).toContain('VIBEBOARD_OPENCODE_URL');
+  });
+});
+
+describe('one path: no agent runs without a sandbox', () => {
+  it('refuses to dispatch a run, and says which condition failed', async () => {
+    const { app } = await open({ ok: false, reason: 'profile not loaded — run `npm run sandbox:install`' });
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/runs',
+      headers: admin,
+      payload: { board: 'engineering', card: 'E-001', skill: 'execute' },
+    });
+    // 412, not 403: the request is fine, the machine is not in a state to serve it.
+    expect(res.statusCode).toBe(412);
+    expect(res.json().error).toContain('sandbox:install');
+  });
+
+  it('refuses BEFORE resolving the request, so a bad payload still reports the sandbox', async () => {
+    // Otherwise the first thing a user with no sandbox sees is "unknown skill", and they go and
+    // fix the wrong thing.
+    const { app } = await open({ ok: false, reason: 'profile not loaded' });
+    const res = await app.inject({ method: 'POST', url: '/api/runs', headers: admin, payload: {} });
+    expect(res.statusCode).toBe(412);
+  });
+
+  it('still serves the board, so the app is usable while it says what to run', async () => {
+    const { app } = await open({ ok: false, reason: 'profile not loaded' });
+    expect((await app.inject({ method: 'GET', url: '/api/state', headers: admin })).statusCode).toBe(200);
+    expect((await app.inject({ method: 'GET', url: '/api/config', headers: admin })).statusCode).toBe(200);
+  });
+
+  it('dispatches once there is one', async () => {
+    // The other half. A gate that refuses everything is not a gate, it is an outage.
+    const { app } = await open(TEST_SANDBOX);
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/runs',
+      headers: admin,
+      payload: { board: 'engineering', card: 'nope-not-a-card', skill: 'execute' },
+    });
+    // 400 for the unknown card — it got PAST the sandbox gate, which is what this asserts.
+    expect(res.statusCode).not.toBe(412);
   });
 });
 

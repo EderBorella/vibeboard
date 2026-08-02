@@ -36,14 +36,29 @@ function enforcing() {
   return (probe.stdout ?? '').startsWith(`${PROFILE_NAME} (enforce)`);
 }
 
+// The compiled RULES, not the file's bytes. A comment or a blank line changes the text and changes
+// nothing the kernel enforces, and asking someone to sudo for a reworded comment is how a prompt
+// becomes something people click through without reading.
+function rulesOf(path) {
+  const out = spawnSync('apparmor_parser', ['-Q', '--skip-cache', '-D', 'rule-exprs', path], { encoding: 'utf8' });
+  return `${out.stdout ?? ''}${out.stderr ?? ''}`
+    .split('\n')
+    .filter((line) => line.startsWith('rule:'))
+    .join('\n');
+}
+
 // Installed but stale is its own state, and a silent one: the agent stays confined by whatever was
 // loaded last, which may be missing a deny added since.
 function drifted() {
   if (!existsSync(INSTALLED)) return false;
   try {
-    return readFileSync(INSTALLED, 'utf8') !== readFileSync(SOURCE, 'utf8');
+    const installed = rulesOf(INSTALLED);
+    // Empty means the installed file did not parse. That is the case where guessing is expensive —
+    // the loaded policy may be missing a deny added since — so it counts AS drift and prompts a
+    // reinstall, rather than printing a tick because we could not tell.
+    return installed === '' || installed !== rulesOf(SOURCE);
   } catch {
-    return false; // unreadable without root — say nothing rather than guess
+    return true; // same reasoning: cannot verify is not the same as fine
   }
 }
 
@@ -90,9 +105,10 @@ if (enforcing() && !drifted()) {
   say([
     `✓ ${PROFILE_NAME} is loaded and enforcing.`,
     '',
+    // A copy of the profile's own list. tools/apparmor/vibeboard-agent is the source of truth.
     'Agents can build your project. They cannot write the files that govern it: cards and run',
     'records, config.yaml, skills, the instructions injected into every turn, the project log,',
-    "or VibeBoard's own credential.",
+    "suggestions, chat transcripts, git hooks and config, or VibeBoard's own credential.",
     '',
     existsSync(INSTALLED)
       ? `Installed at ${INSTALLED}, so it survives a reboot.`
@@ -102,7 +118,7 @@ if (enforcing() && !drifted()) {
 }
 
 const why = drifted()
-  ? `The loaded profile is OLDER than ${SOURCE}. Re-install to pick up the changes.`
+  ? `The loaded profile does not match ${SOURCE} — older, or unparseable. Re-install to be sure.`
   : 'VibeBoard confines every agent it runs with an AppArmor profile. It is not installed yet.';
 
 say([

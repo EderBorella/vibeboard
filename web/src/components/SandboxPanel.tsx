@@ -39,14 +39,20 @@ export function SandboxPanel({ state, backend, onChanged }: Props) {
       <div className="field">
         {state.ok ? (
           <p className="sandbox-state sandbox-ok">
+            {/* This list is a copy. The profile is the source of truth — tools/apparmor/vibeboard-agent —
+                and it has drifted from this text twice. Change one, change both. */}
             <strong>Enforced by the OS.</strong> Agents can build your project and cannot write the files that
             govern it — cards and run records, <code>config.yaml</code>, skills, the instructions injected
-            into every turn, the project log, or VibeBoard's own credential.
+            into every turn, the project log, suggestions, chat transcripts, <code>.git/hooks</code>, or
+            VibeBoard's own credential.
           </p>
         ) : (
           <p className="sandbox-state sandbox-off">
-            <strong>Not enforced.</strong> {state.reason} Manual runs and chat still work; auto-pilot will
-            refuse to start.
+            {/* Said plainly, because it is the whole product on this machine: after the one-path
+                ruling there is no degraded mode to fall back to. */}
+            <strong>Agents are disabled.</strong> {state.reason} The board, the explorer and these settings
+            work normally — but dispatching a run or sending a chat message will be refused until the sandbox
+            is installed.
           </p>
         )}
         {/* Shown whenever it is set, not only when the sandbox is missing: a loaded profile is not

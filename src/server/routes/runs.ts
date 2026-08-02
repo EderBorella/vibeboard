@@ -7,9 +7,11 @@ import { BOARDS, type BoardName, type ProjectConfig } from '../../core/types.js'
 import type { DispatchInput } from '../agent-runner.js';
 import type { Backend } from '../agent-turn.js';
 import { readResources } from '../control-files.js';
+import { attachedOpencodeUrl } from '../opencode-server.js';
 import { type AppCtx, ensureOpen, nowIso } from '../route-context.js';
 import type { BoardColumns } from '../run-prompt.js';
 import { listCardRuns, listRuns, readRun, resolveRun } from '../run-store.js';
+import { agentRefusal } from '../sandbox.js';
 import { readSkills } from '../skill-catalogue.js';
 
 // Dispatching and reading runs.
@@ -138,6 +140,10 @@ export async function registerRunRoutes(api: FastifyInstance, ctx: AppCtx): Prom
 
   api.post('/runs', async (req, reply) => {
     if (!ensureOpen(ctx.session, reply)) return;
+    // Before anything is resolved or written: a run that cannot be confined is a run that does not
+    // start. 412 rather than 403 — the request is fine, the machine is not in a state to serve it.
+    const refusal = agentRefusal(ctx.sandbox, attachedOpencodeUrl());
+    if (refusal) return reply.code(412).send({ error: refusal });
     const resolved = await resolveDispatch(ctx, req.body as DispatchBody);
     if ('error' in resolved) return reply.code(resolved.code).send({ error: resolved.error });
     try {

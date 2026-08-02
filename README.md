@@ -83,6 +83,11 @@ repository's own root untouched.
 
 ### Prerequisites
 
+- **Linux, with AppArmor** — Debian, Ubuntu or SUSE. VibeBoard runs every agent inside an OS
+  sandbox, and AppArmor is what enforces it. The board, the explorer and the settings work
+  anywhere Node does; **dispatching a run or a chat turn refuses** without the sandbox, and says
+  so. Fedora and Arch (SELinux, or nothing) and native Windows are not supported for agents —
+  Windows compatibility is planned as a feature of its own once auto-pilot lands.
 - **Node.js >= 20**
 - **At least one AI CLI**, installed and already authenticated:
   - [Claude Code](https://claude.com/claude-code) (`claude`), and/or
@@ -96,6 +101,7 @@ repository's own root untouched.
 
 ```bash
 npm install
+npm run sandbox:install   # once per machine — asks before it sudoes, and shows you what it runs
 npm run build
 npm start            # → http://localhost:4610
 ```
@@ -139,11 +145,37 @@ folder — every request, and any error a route throws, with its stack. It is
 gitignored, pruned to the last two weeks, and the path is printed at startup;
 `tail -f` it, or pipe it through `jq` when something misbehaves.
 
+### The agent sandbox
+
+Agents build your project; they must not be able to rewrite the things that govern them. That is
+enforced by the operating system, not by asking nicely in a prompt:
+
+```
+npm run sandbox:install   # copies an AppArmor profile to /etc/apparmor.d and loads it
+npm run sandbox:check     # verifies it is in force, and never escalates
+```
+
+One command, once per machine — the rules are globs, so every project you open afterwards is
+covered, and it survives a reboot. The script prints the profile and the exact two `sudo` commands
+before asking; without a terminal (CI, a Docker build) it refuses to escalate and prints them
+instead.
+
+With it loaded, an agent can read anything, build anything, and write anywhere in your project
+**except**: cards and run records, `config.yaml`, skills, `foundation/`, the instructions injected
+into every turn, the project log, agent suggestions, chat transcripts, `.git/hooks`, `.git/config`,
+and VibeBoard's own credential in `~/.vibeboard`. It changes the board by calling the API, with a
+per-run credential scoped to the one card it was given.
+
+The profile is `tools/apparmor/vibeboard-agent`, and it is short enough to read.
+
 ### ⚠️ Security
 
-**VibeBoard has no authentication, and the copilot it spawns auto-approves tool
-calls** — it can read and write any file in the open project. It therefore binds
-to `127.0.0.1` (this machine only) by default.
+**The copilot VibeBoard spawns auto-approves its own tool calls** — it can read
+and write anywhere in the open project, which is why it runs inside the sandbox
+described above. The API requires a credential (the token in the URL printed at
+startup), and agents get narrower, per-run ones. It still binds to `127.0.0.1`
+(this machine only) by default: an agent can reach loopback too, so the sandbox
+and the credential are what separate them, not the network.
 
 Setting `VIBEBOARD_HOST=0.0.0.0` makes the board reachable from other devices,
 and *anyone who can reach that port* can drive an agent with filesystem write

@@ -119,3 +119,40 @@ describe('copilot session override', () => {
     expect(args[args.indexOf('--model') + 1]).toBe('opus');
   });
 });
+
+describe('the chat is an agent too', () => {
+  it('refuses a turn when there is no sandbox, and says why over the socket', async () => {
+    // The WS half of the one-path gate. It reports through a broadcast rather than a status code,
+    // which makes it the easier of the two to get wrong — and it had no test until this one.
+    const { app } = await openTestProject({
+      name: 'NoBox',
+      sandbox: { ok: false, reason: 'profile not loaded' },
+    });
+    const address = await app.listen({ port: 0, host: '127.0.0.1' });
+    const client = wsClient<Msg>(address);
+    await client.open;
+    client.send({ type: 'copilot:send', text: 'hi', mode: 'plan' });
+
+    const err = await client.waitFor((m) => m.type === 'copilot:error');
+    expect((err as { error?: string }).error).toContain('profile not loaded');
+    // And nothing was spawned: no turn means no events at all.
+    expect(client.messages.filter((m) => m.type === 'copilot:event')).toEqual([]);
+    client.close();
+  });
+
+  it('refuses while attached to a server VibeBoard did not start, sandbox or not', async () => {
+    process.env.VIBEBOARD_OPENCODE_URL = 'http://127.0.0.1:9999';
+    try {
+      const { app } = await openTestProject({ name: 'Attached' });
+      const address = await app.listen({ port: 0, host: '127.0.0.1' });
+      const client = wsClient<Msg>(address);
+      await client.open;
+      client.send({ type: 'copilot:send', text: 'hi', mode: 'plan' });
+      const err = await client.waitFor((m) => m.type === 'copilot:error');
+      expect((err as { error?: string }).error).toContain('VIBEBOARD_OPENCODE_URL');
+      client.close();
+    } finally {
+      delete process.env.VIBEBOARD_OPENCODE_URL;
+    }
+  });
+});

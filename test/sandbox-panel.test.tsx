@@ -21,7 +21,7 @@ const state = (over: Partial<SandboxState> = {}): SandboxState => ({
   ok: true,
   profile: 'vibeboard-agent',
   backend: 'managed',
-  autopilotRefusal: null,
+  agentRefusal: null,
   ...over,
 });
 
@@ -34,14 +34,21 @@ describe('what it says is enforced', () => {
     // "Sandbox: enabled" would be a claim nobody can check. The panel has to say what it means.
     expect(screen.getByText(/cannot write the files that govern it/i)).toBeTruthy();
     expect(screen.getByText(/config\.yaml/)).toBeTruthy();
+    // The list drifted from the profile twice. These are the two that were missing.
+    expect(screen.getByText(/chat transcripts/i)).toBeTruthy();
+    expect(screen.getByText(/\.git\/hooks/)).toBeTruthy();
   });
 
   it('carries the reason and the consequence when there is no sandbox', () => {
     show({ ok: false, profile: undefined, reason: 'profile not loaded — run `npm run sandbox:install`' });
     expect(screen.getByText(/sandbox:install/)).toBeTruthy();
     // Both halves: what still works, and what will not. Either alone misleads.
-    expect(screen.getByText(/Manual runs and chat still work/i)).toBeTruthy();
-    expect(screen.getByText(/auto-pilot will refuse to start/i)).toBeTruthy();
+    // The panel used to say manual runs and chat "still work". After the one-path ruling they are
+    // refused, and an affirmative false statement about the security posture is worse than a stale
+    // list — so this pins the correction.
+    expect(screen.getByText(/Agents are disabled/i)).toBeTruthy();
+    expect(screen.getByText(/will be refused until the sandbox is installed/i)).toBeTruthy();
+    expect(screen.queryByText(/still work;/i)).toBeNull();
   });
 
   it('warns about an attached server even when the profile is loaded', () => {

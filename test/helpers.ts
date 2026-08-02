@@ -9,7 +9,7 @@ import WebSocket from 'ws';
 import type { Card } from '../src/core/types.js';
 import { buildApp } from '../src/server/app.js';
 import { CredentialStore } from '../src/server/credentials.js';
-import { type SandboxStatus, wrapCommand } from '../src/server/sandbox.js';
+import { probeProfile, type SandboxStatus, wrapCommand } from '../src/server/sandbox.js';
 import { ProjectSession } from '../src/server/session.js';
 
 export async function tempDir(): Promise<string> {
@@ -52,6 +52,17 @@ export function shimArgsLog(): string {
 
 export const TEST_ADMIN_TOKEN = 'test-admin-token';
 
+// Every agent now needs a sandbox, so every test that dispatches one needs a real profile. This is
+// `unprivileged_userns`, which ships with the distribution's own apparmor package and any
+// unprivileged process may transition into — so the suite exercises the real gate and the real
+// `aa-exec` path, and NO bypass exists in the codebase for anyone to reach for later.
+//
+// It is not our profile and enforces none of our denies; it is a stand-in for "confined". The
+// tests that check what is actually denied load `vibeboard-agent` and are in test/sandbox.test.ts.
+// Where AppArmor is absent this is a refusal, and the suites that dispatch will fail rather than
+// quietly pass unsandboxed — the cost of one path, paid by contributors off Debian/Ubuntu/SUSE.
+export const TEST_SANDBOX: SandboxStatus = await probeProfile('unprivileged_userns');
+
 export interface TestAppOpts {
   runBin?: string;
   logger?: FastifyServerOptions['logger'];
@@ -66,7 +77,14 @@ export interface TestAppOpts {
 // the boundary still runs on every one of them — and test/auth.test.ts builds its app with
 // buildApp directly, which is what keeps the boundary itself under test.
 export function testApp(session: ProjectSession, opts: TestAppOpts = {}): FastifyInstance {
-  const app = buildApp(session, { ...opts, credentials: new CredentialStore(TEST_ADMIN_TOKEN) });
+  // `?? TEST_SANDBOX`, not a spread default: openTestProject forwards `sandbox: opts.sandbox`,
+  // which is an explicit `undefined` when the caller named none — and an explicit undefined wins
+  // over a spread default. That silently disabled every dispatch in the suite.
+  const app = buildApp(session, {
+    ...opts,
+    sandbox: opts.sandbox ?? TEST_SANDBOX,
+    credentials: new CredentialStore(TEST_ADMIN_TOKEN),
+  });
   app.addHook('onRequest', async (req) => {
     req.headers.authorization ??= `Bearer ${TEST_ADMIN_TOKEN}`;
   });

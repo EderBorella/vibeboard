@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { attachedOpencodeUrl, restartOpencodeServer, takeOverOpencodeServer } from '../opencode-server.js';
 import type { AppCtx } from '../route-context.js';
-import { sandboxRefusal } from '../sandbox.js';
+import { agentRefusal } from '../sandbox.js';
 
 // What is enforced, and the two ways to change it. Its own module rather than a corner of
 // control.ts, which is the file controller for documents that steer the models — a different
@@ -23,7 +23,8 @@ export async function registerSandboxRoutes(api: FastifyInstance, ctx: AppCtx): 
       backend: attached ? ('attached' as const) : ('managed' as const),
       attachedUrl: attached,
       // Computed here, once, so the UI never has to re-derive the rule and drift from the loop.
-      autopilotRefusal: sandboxRefusal(ctx.sandbox, attached),
+      // The same gate dispatch uses, not a second opinion about it.
+      agentRefusal: agentRefusal(ctx.sandbox, attached),
     };
   });
 

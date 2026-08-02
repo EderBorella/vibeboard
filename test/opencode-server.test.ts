@@ -11,7 +11,7 @@ import {
   restartOpencodeServer,
   stopOpencodeServer,
 } from '../src/server/opencode-server.js';
-import { NOT_REQUESTED, probeSandbox, SANDBOX_PROFILE, sandboxRefusal } from '../src/server/sandbox.js';
+import { agentRefusal, NOT_REQUESTED, probeSandbox, SANDBOX_PROFILE } from '../src/server/sandbox.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const SHIM = join(here, 'fixtures', 'fake-opencode.mjs');
@@ -132,13 +132,13 @@ describe('restarting', () => {
   });
 });
 
-describe('the auto-pilot gate', () => {
-  it('allows auto-pilot when sandboxed and managing its own server', () => {
-    expect(sandboxRefusal({ ok: true, profile: SANDBOX_PROFILE }, undefined)).toBeNull();
+describe('the agent gate', () => {
+  it('allows an agent when sandboxed and managing its own server', () => {
+    expect(agentRefusal({ ok: true, profile: SANDBOX_PROFILE }, undefined)).toBeNull();
   });
 
   it('refuses when there is no sandbox, and repeats the reason', () => {
-    const reason = sandboxRefusal({ ok: false, reason: 'profile not loaded' }, undefined);
+    const reason = agentRefusal({ ok: false, reason: 'profile not loaded' }, undefined);
     // The reason travels: a refusal that says "no" without saying which condition failed leaves the
     // user with nothing to act on, and this string reaches the UI verbatim.
     expect(reason).toContain('profile not loaded');
@@ -146,7 +146,7 @@ describe('the auto-pilot gate', () => {
 
   it('refuses when attached to a server VibeBoard did not start, even with a sandbox', () => {
     // A loaded profile is not enough. We did not spawn that process, so nothing wrapped it.
-    const reason = sandboxRefusal({ ok: true, profile: SANDBOX_PROFILE }, 'http://127.0.0.1:9999');
+    const reason = agentRefusal({ ok: true, profile: SANDBOX_PROFILE }, 'http://127.0.0.1:9999');
     expect(reason).toContain('VIBEBOARD_OPENCODE_URL');
     expect(reason).toContain('Take over with a managed server');
   });
@@ -165,6 +165,6 @@ describe('attachedOpencodeUrl', () => {
     // `VIBEBOARD_OPENCODE_URL=` in a .env is a user turning it OFF, not attaching to "".
     process.env.VIBEBOARD_OPENCODE_URL = '';
     expect(attachedOpencodeUrl()).toBeUndefined();
-    expect(sandboxRefusal({ ok: true, profile: SANDBOX_PROFILE }, attachedOpencodeUrl())).toBeNull();
+    expect(agentRefusal({ ok: true, profile: SANDBOX_PROFILE }, attachedOpencodeUrl())).toBeNull();
   });
 });

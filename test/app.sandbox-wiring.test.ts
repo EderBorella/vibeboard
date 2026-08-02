@@ -19,7 +19,7 @@ vi.mock('../src/server/sandbox.js', async (importOriginal) => {
 });
 
 import type { SandboxStatus } from '../src/server/sandbox.js';
-import { openTestProject, shimArgsLog, wsClient } from './helpers.js';
+import { openTestProject, shimArgsLog, TEST_SANDBOX, wsClient } from './helpers.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const RUN_SHIM = join(here, 'fixtures', 'fake-agent.mjs');
@@ -34,11 +34,11 @@ beforeAll(() => {
   process.env.VIBEBOARD_CLAUDE_BIN = CHAT_SHIM;
 });
 
-// Deliberately NOT ok. What is under test is that this exact object travels from buildApp to the
-// spawn site, and its identity proves that on its own — while an `ok: true` sentinel would make
-// wrapCommand invoke `aa-exec -p <profile-that-does-not-exist>`, so every turn would die and the
-// test would be about the failure rather than the wiring. It also keeps this suite portable.
-const STATUS: SandboxStatus = { ok: false, reason: 'wiring-probe-sentinel' };
+// The suite's own status — a real, loaded profile. It has to be `ok`, because a dispatch with
+// anything else is now refused before a spawn happens at all; and it has to be REAL, because
+// wrapCommand runs `aa-exec -p <profile>` for anything ok. Identity is what proves the wiring:
+// this exact object has to arrive at the spawn site.
+const STATUS: SandboxStatus = TEST_SANDBOX;
 
 afterEach(() => {
   spy.statuses.length = 0;

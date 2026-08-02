@@ -131,6 +131,7 @@ describe('/api/control/create', () => {
       category: 'docs',
       managed: false,
       deletable: true,
+      renameable: true,
     });
 
     // Clicking + again must not collide: "New doc" -> "New doc 2".

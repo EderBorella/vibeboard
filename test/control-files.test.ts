@@ -8,6 +8,7 @@ import {
   CONFIG_FILE,
   CONVENTIONS_FILE,
   DOCS_DIR,
+  FOUNDATION_DIR,
   INSTRUCTIONS_FILE,
   POINTER_FILES,
   RESOURCES_DIR,
@@ -409,15 +410,18 @@ describe('control-files listing', () => {
     expect(skills[0].path).toBe(skillRel('zeta', 'SKILL.md'));
   });
 
-  it('returns four labelled groups, all empty, for a bare directory', async () => {
+  it('returns five labelled groups for a bare directory, empty but for the fixed foundation set', async () => {
     const groups = await listControlFiles(await tempDir());
     expect(groups.map((g) => [g.key, g.label])).toEqual([
       ['instructions', 'Instructions'],
+      ['foundation', 'Foundation'],
       ['skills', 'Skills'],
       ['docs', 'Docs'],
       ['resources', 'Resources'],
     ]);
-    expect(groups.every((g) => g.files.length === 0)).toBe(true);
+    // Foundation is the one group listed before its files exist, so that a missing document is
+    // something a person can click. Everything else appears only once there is a file.
+    expect(groups.filter((g) => g.files.length > 0).map((g) => g.key)).toEqual(['foundation']);
   });
 
   it('marks only the VibeBoard-managed instruction files as managed', async () => {
@@ -647,5 +651,49 @@ describe('control-files resources persistence', () => {
     const root = await tempDir();
     await writeResources(root, undefined as unknown as unknown[]);
     expect(await readFile(join(root, RESOURCES_YAML), 'utf8')).toBe('links: []\n');
+  });
+});
+
+// The five documents that bind every run. The OS denies them to every agent — the copilot included,
+// since it runs under the same profile — so this editor is the only way they get written until
+// pre-flight writes them through the server on approval.
+describe('foundation documents in Project Control', () => {
+  it('lists all five before any of them exists, so a missing one can be clicked and written', async () => {
+    const root = await tempDir();
+    const groups = await listControlFiles(root);
+    const foundation = groups.find((g) => g.key === 'foundation');
+    expect(foundation?.files.map((f) => f.name)).toEqual([
+      'STACK.md',
+      'CODE-QUALITY.md',
+      'TESTING.md',
+      'UX.md',
+      'DESIGN.md',
+    ]);
+    // Managed: they are authority, so the copilot is soft-blocked and the user edits behind the
+    // disclaimer. Fixed: deleting or renaming one re-opens the hole the gate reader exists to close.
+    expect(foundation?.files.every((f) => f.managed && !f.deletable && !f.renameable)).toBe(true);
+    expect(foundation?.creatable).toBe(false);
+  });
+
+  it('creates the file on save and reads it back', async () => {
+    const root = await tempDir();
+    const rel = `${FOUNDATION_DIR}/STACK.md`;
+    // Empty for a file that is not there yet, rather than null — the editor opens on nothing and
+    // saving is what creates it.
+    expect((await readControlFile(root, rel))?.content).toBe('');
+    expect(await writeControlFile(root, rel, '# Stack\n\nNode 22.\n')).toBe(true);
+    expect((await readControlFile(root, rel))?.content).toBe('# Stack\n\nNode 22.\n');
+  });
+
+  it('refuses to delete or rename one, and refuses a path outside the five', async () => {
+    const root = await tempDir();
+    const rel = `${FOUNDATION_DIR}/STACK.md`;
+    await writeControlFile(root, rel, 'x');
+    expect(await deleteControlFile(root, rel)).toBe('not-allowed');
+    expect(await renameControlFile(root, rel, 'Other')).toBeNull();
+    // Not one of the five, and inside the folder: still refused, because the set is enumerated
+    // rather than "anything under foundation/".
+    expect(await writeControlFile(root, `${FOUNDATION_DIR}/NOTES.md`, 'x')).toBe(false);
+    expect(await writeControlFile(root, `${FOUNDATION_DIR}/nested/STACK.md`, 'x')).toBe(false);
   });
 });

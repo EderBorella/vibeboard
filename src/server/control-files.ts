@@ -6,6 +6,8 @@ import {
   CONFIG_DIR,
   CONVENTIONS_FILE,
   DOCS_DIR,
+  FOUNDATION_FILES,
+  foundationRel,
   INSTRUCTIONS_FILE,
   POINTER_FILES,
   RESOURCES_DIR,
@@ -20,20 +22,25 @@ import { resolveInRoot } from './fs-sandbox.js';
 // models — instructions, skills, docs, resources — behind a hard path sandbox + allow-list so
 // a client can never read or write cards, machine state, or anything outside root.
 
-export type ControlCategory = 'instructions' | 'skills' | 'docs' | 'resources';
+export type ControlCategory = 'instructions' | 'foundation' | 'skills' | 'docs' | 'resources';
 
 export interface ControlFile {
   path: string; // project-root-relative, POSIX
   name: string; // basename for display
   category: ControlCategory;
   managed: boolean; // VibeBoard-managed (copilot-blocked; user edits behind a disclaimer)
-  deletable: boolean; // instruction files are never deletable
+  deletable: boolean; // a fixed-name file is never deletable
+  renameable: boolean; // nor renameable — the server owns the name, so the UI must not offer to change it
 }
 
 export interface ControlGroup {
   key: ControlCategory;
   label: string;
   files: ControlFile[];
+  // Whether "+ new" belongs on this group. From the server, because the server is what decides
+  // where a new file of each kind goes — the UI used to hardcode `key !== 'instructions'`, which
+  // silently offered a + on the next fixed-name category anyone added.
+  creatable: boolean;
 }
 
 export interface ResourceLink {
@@ -47,10 +54,21 @@ export interface ResourceLink {
 // the other three are VibeBoard-managed (soft-blocked for the copilot, user-editable behind a
 // disclaimer).
 const INSTRUCTION_FILES: string[] = [INSTRUCTIONS_FILE, ...POINTER_FILES, CONVENTIONS_FILE];
-const MANAGED = new Set<string>([...POINTER_FILES, CONVENTIONS_FILE]);
+
+// The five documents a run is bound by (core/layout.ts). A fixed set like the instruction files, and
+// unlike them they are listed whether or not they exist: a missing foundation document is exactly
+// what a person needs to click on, and the OS denies this folder to every agent — the chat copilot
+// included — so this editor is the only way one gets written by hand.
+const FOUNDATION_PATHS: string[] = FOUNDATION_FILES.map((f) => foundationRel(f.name));
+
+// Managed means the copilot is soft-blocked and the user edits behind a disclaimer. The foundation
+// documents qualify twice over: they hold the gates a run is judged against, so a model able to
+// amend one could lower the bar until its own work passed.
+const MANAGED = new Set<string>([...POINTER_FILES, CONVENTIONS_FILE, ...FOUNDATION_PATHS]);
 
 const GROUP_LABELS: Record<ControlCategory, string> = {
   instructions: 'Instructions',
+  foundation: 'Foundation',
   skills: 'Skills',
   docs: 'Docs',
   resources: 'Resources',
@@ -62,6 +80,9 @@ const GROUP_LABELS: Record<ControlCategory, string> = {
 // project — falls through to null.
 function categoryOf(rel: string): ControlCategory | null {
   if (INSTRUCTION_FILES.includes(rel)) return 'instructions';
+  // Enumerated, not `startsWith(FOUNDATION_DIR)`: the set is fixed, so a stray file someone drops in
+  // that folder is not a foundation document and must not become editable by being in the right place.
+  if (FOUNDATION_PATHS.includes(rel)) return 'foundation';
   if (rel === RESOURCES_YAML) return 'resources';
   if (rel.startsWith(`${SKILLS_DIR}/`)) return 'skills';
   if (rel.startsWith(`${RESOURCES_DIR}/`)) return 'resources';
@@ -91,7 +112,10 @@ function descriptor(rel: string): ControlFile | null {
     name: displayName(rel, category),
     category,
     managed: MANAGED.has(rel),
-    deletable: category !== 'instructions',
+    // Both from the same predicate: a category whose paths the server owns has no user-chosen name
+    // to change and no file the user may remove.
+    deletable: isCreatable(category),
+    renameable: isCreatable(category),
   };
 }
 
@@ -148,15 +172,25 @@ export async function listControlFiles(root: string): Promise<ControlGroup[]> {
   const toFiles = (rels: string[]): ControlFile[] =>
     rels.map(descriptor).filter((f): f is ControlFile => f !== null);
 
+  // Every one of the five, existing or not — see FOUNDATION_PATHS above.
+  const foundation = toFiles(FOUNDATION_PATHS);
+
   const skills = toFiles(await walk(root, SKILLS_DIR));
   const docs = toFiles(await walk(root, DOCS_DIR));
   const resources = toFiles(await walk(root, RESOURCES_DIR)); // resources.yaml handled separately
 
+  const group = (key: ControlCategory, files: ControlFile[]): ControlGroup => ({
+    key,
+    label: GROUP_LABELS[key],
+    files,
+    creatable: isCreatable(key),
+  });
   return [
-    { key: 'instructions', label: GROUP_LABELS.instructions, files: instructions },
-    { key: 'skills', label: GROUP_LABELS.skills, files: skills },
-    { key: 'docs', label: GROUP_LABELS.docs, files: docs },
-    { key: 'resources', label: GROUP_LABELS.resources, files: resources },
+    group('instructions', instructions),
+    group('foundation', foundation),
+    group('skills', skills),
+    group('docs', docs),
+    group('resources', resources),
   ];
 }
 
@@ -179,7 +213,10 @@ export async function readControlFile(
 // The client never builds paths: it asks for "a new skill" or "rename this to X" and the server
 // owns slugging, collision handling, and the per-category layout.
 
-const NEW_NAMES: Record<Exclude<ControlCategory, 'instructions'>, string> = {
+// Keyed by the categories a client may create in, so `isCreatable` derives from this table rather
+// than from a second list that could drift. Both fixed-name categories are excluded here, and the
+// compiler is what says so: adding one to ControlCategory fails this line until its answer is given.
+const NEW_NAMES: Record<Exclude<ControlCategory, 'instructions' | 'foundation'>, string> = {
   skills: 'New skill',
   docs: 'New doc',
   resources: 'New resource',

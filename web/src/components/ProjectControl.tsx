@@ -111,9 +111,11 @@ export function ProjectControl({ snapshot }: Props) {
   }
 
   function startRename(f: ControlFile): void {
-    // Fixed names: the two pointer files the CLIs discover at the project root, plus the two
-    // documents inside .vibeboard/ that VibeBoard reads by name.
-    if (f.category === 'instructions') return;
+    // Fixed names: the two pointer files the CLIs discover at the project root, the two documents
+    // inside .vibeboard/ that VibeBoard reads by name, and the five foundation documents. The server
+    // says which — it refuses the rename either way, and a button that always fails is worse than
+    // no button.
+    if (!f.renameable) return;
     setRenaming(f.path);
     setRenameDraft(editableName(f.name));
   }

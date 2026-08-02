@@ -41,7 +41,7 @@ export function ControlFileList({
         <div key={g.key} className="control-group">
           <div className="control-group-head">
             <span>{g.label}</span>
-            {g.key !== 'instructions' && (
+            {g.creatable && (
               <button
                 className="control-new"
                 title={`New ${g.label.toLowerCase().replace(/s$/, '')}`}

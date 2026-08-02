@@ -187,7 +187,7 @@ export function restoreCard(board: BoardName, id: string, toColumnSlug?: string)
 
 // ---- Project Control -------------------------------------------------------
 
-export type ControlCategory = 'instructions' | 'skills' | 'docs' | 'resources';
+export type ControlCategory = 'instructions' | 'foundation' | 'skills' | 'docs' | 'resources';
 
 export interface ControlFile {
   path: string;
@@ -195,12 +195,15 @@ export interface ControlFile {
   category: ControlCategory;
   managed: boolean;
   deletable: boolean;
+  renameable: boolean;
 }
 
 export interface ControlGroup {
   key: ControlCategory;
   label: string;
   files: ControlFile[];
+  // Whether this group offers "+ new". From the server: it owns where a new file of each kind goes.
+  creatable: boolean;
 }
 
 export interface ResourceLink {

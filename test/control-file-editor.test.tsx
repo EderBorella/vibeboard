@@ -21,6 +21,7 @@ const file = (over: Partial<OpenFile> = {}): OpenFile => ({
   category: 'docs',
   managed: false,
   deletable: true,
+  renameable: true,
   content: '# Design\n',
   ...over,
 });

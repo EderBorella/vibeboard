@@ -145,7 +145,7 @@ describe('POST /api/runs', () => {
       [
         '- **features**: Backlog (backlog), Todo (todo), In Progress (in-progress), Done (done)',
         '- **product**: Backlog (backlog), Todo (todo), In Progress (in-progress), Done (done)',
-        '- **engineering**: Backlog (backlog), In Progress (in-progress), Review (review), Done (done)',
+        '- **engineering**: Backlog (backlog), In Progress (in-progress), Review (review), Blocked (blocked), Done (done)',
       ].join('\n'),
     );
     expect(prompt).toContain('Do NOT create a new column');
@@ -157,10 +157,17 @@ describe('POST /api/runs', () => {
     // what distinguishes "read this project's config" from "printed what the defaults happen to say".
     const argsLog = await recordingShimArgs();
     const project = await projectWithCard();
+    // Renamed one-for-one, derived from what the project actually has. A literal list of names also
+    // fixes a COUNT, and dropping a column that still holds a card is refused with a 409 — so a
+    // change to the defaults broke this test for a reason that had nothing to do with what it tests.
+    const current = (await project.app.inject({ method: 'GET', url: '/api/config' })).json() as {
+      boards: { engineering: { columns: string[] } };
+    };
+    const renamed = current.boards.engineering.columns.map((_, i) => `Stage ${i + 1}`);
     const patched = await project.app.inject({
       method: 'PATCH',
       url: '/api/config',
-      payload: { boards: { engineering: { columns: ['Icebox', 'On Deck', 'Shipping', 'Landed'] } } },
+      payload: { boards: { engineering: { columns: renamed } } },
     });
     expect(patched.statusCode).toBe(200);
 
@@ -176,10 +183,10 @@ describe('POST /api/runs', () => {
 
     const prompt = await promptFrom(argsLog);
     expect(prompt).toContain(
-      '- **engineering**: Icebox (icebox), On Deck (on-deck), Shipping (shipping), Landed (landed)',
+      `- **engineering**: ${renamed.map((name, i) => `${name} (stage-${i + 1})`).join(', ')}`,
     );
-    // Review is engineering's alone among the defaults, so its absence — not merely Icebox's presence
-    // — is what rules out a hardcoded list.
+    // Review is engineering's alone among the defaults, so its absence — not merely the new names'
+    // presence — is what rules out a hardcoded list.
     expect(prompt).not.toContain('Review (review)');
     // The boards that were not patched are still there, and still their own columns.
     expect(prompt).toContain(

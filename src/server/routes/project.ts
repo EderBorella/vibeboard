@@ -19,7 +19,7 @@ export async function registerProjectRoutes(api: FastifyInstance, ctx: AppCtx): 
   api.post('/project/open', async (req, reply) => {
     const { path } = req.body as { path: string };
     try {
-      const snapshot = await ctx.session.open(path);
+      const snapshot = await ctx.session.open(path, ctx.runner.activeIds);
       await rememberProject(path); // reopened automatically on the next start
       return { snapshot };
     } catch {
@@ -30,7 +30,7 @@ export async function registerProjectRoutes(api: FastifyInstance, ctx: AppCtx): 
   api.post('/project/scaffold', async (req) => {
     const { path, name, mode } = req.body as { path: string; name: string; mode: ScaffoldMode };
     await scaffoldProject(path, { name, mode, today: today() });
-    const snapshot = await ctx.session.open(path);
+    const snapshot = await ctx.session.open(path, ctx.runner.activeIds);
     await rememberProject(path);
     return { snapshot };
   });

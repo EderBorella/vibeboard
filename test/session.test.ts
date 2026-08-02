@@ -9,6 +9,7 @@ import {
   CONFIG_FILE,
   DOCS_DIR,
   POINTER_FILES,
+  PROJECT_LOG_FILE,
   RESULTS_DIR,
   RUNS_DIR,
 } from '../src/core/layout.js';
@@ -82,6 +83,7 @@ describe('isIgnored', () => {
     `/p/${CHAT_DIR}/abc.json`,
     `/p/${CHAT_DIR}`,
     `/p/${RUNS_DIR}/r1.log.jsonl`,
+    `/p/${PROJECT_LOG_FILE}`,
   ])('ignores %s', (p) => {
     expect(isIgnored(p)).toBe(true);
   });
@@ -93,6 +95,8 @@ describe('isIgnored', () => {
     `/p/${DOCS_DIR}/notes.md`,
     `/p/${POINTER_FILES[0]}`,
     '/p/my-node_modules-notes.md',
+    // Same filename, a real file of the user's, one level down: the diary is one exact path.
+    `/p/docs/${PROJECT_LOG_FILE.split('/').pop()}`,
   ])('watches %s', (p) => {
     expect(isIgnored(p)).toBe(false);
   });

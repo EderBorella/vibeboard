@@ -8,7 +8,7 @@ import {
   writeConfig,
 } from '../core/config.js';
 import { ensureControlFiles } from '../core/control.js';
-import { CHAT_DIR, RUNS_DIR } from '../core/layout.js';
+import { CHAT_DIR, PROJECT_LOG_FILE, RUNS_DIR } from '../core/layout.js';
 import type { ProjectConfig } from '../core/types.js';
 import type { Log } from './logging.js';
 import { markInterrupted } from './run-store.js';
@@ -31,7 +31,10 @@ export function isIgnored(p: string): boolean {
     p.includes('/node_modules/') ||
     p.includes('/.git/') ||
     p.includes(`/${CHAT_DIR}`) ||
-    p.includes(`/${RUNS_DIR}`)
+    p.includes(`/${RUNS_DIR}`) ||
+    // The diary changes nothing on the board, and it is appended through an endpoint — which can
+    // broadcast the new line itself. Watching it would rebuild the whole snapshot once per line.
+    p.endsWith(`/${PROJECT_LOG_FILE}`)
   );
 }
 
@@ -53,7 +56,9 @@ export class ProjectSession {
     return this.#config;
   }
 
-  async open(projectRoot: string): Promise<ProjectSnapshot> {
+  // `liveRuns` is what the runner still has in flight. Passed in rather than reached for: the
+  // session is constructed before the runner and knows nothing about it.
+  async open(projectRoot: string, liveRuns: string[] = []): Promise<ProjectSnapshot> {
     const config = await readConfig(projectRoot); // throws if not a VibeBoard project
     // Upgrade older projects: backfill missing boards, and a real copilot model/effort for
     // configs written when those could be blank.
@@ -69,10 +74,12 @@ export class ProjectSession {
     await ensureControlFiles(projectRoot);
     this.#config = config;
     this.#root = projectRoot;
-    // Any run still claiming to be in flight belongs to a previous process: its child died with the
-    // server that spawned it. Done here rather than at each caller so both paths — opening a project
+    // Any run still claiming to be in flight belongs to a previous process — its child died with the
+    // server that spawned it — UNLESS this process is still running it. Reopening the project you
+    // already have open is an ordinary thing to do from the picker, and it must not rewrite a live
+    // run to `interrupted`. Done here rather than at each caller so both paths — opening a project
     // and reopening the last one on boot — are covered by one call.
-    await markInterrupted(projectRoot, new Date().toISOString());
+    await markInterrupted(projectRoot, new Date().toISOString(), liveRuns);
     await this.close(true);
 
     const watcher = chokidar.watch(projectRoot, {

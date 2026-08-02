@@ -18,10 +18,14 @@ export const DEFAULT_MAX_RUNS = 3;
 // Every board opens with a Backlog. Engineering used to start at Todo, which made it the one board
 // an agent could not guess: asked to break a card down "into the right column" it reached for
 // Backlog, found none, and created the folder — putting four cards somewhere the board does not read.
+// Blocked is engineering's alone, and it is NOT last: the closing column is defined as the final one
+// (routes/cards.ts isClosingColumn), so appending Blocked would make blocking a card resolve its
+// runs and leave Done closing nothing. A card that has exhausted its attempts lands here instead of
+// stopping the whole board, which only makes sense one level down from the work being described.
 const DEFAULT_COLUMNS: Record<BoardName, string[]> = {
   features: ['Backlog', 'Todo', 'In Progress', 'Done'],
   product: ['Backlog', 'Todo', 'In Progress', 'Done'],
-  engineering: ['Backlog', 'In Progress', 'Review', 'Done'],
+  engineering: ['Backlog', 'In Progress', 'Review', 'Blocked', 'Done'],
 };
 
 export function configPath(projectRoot: string): string {

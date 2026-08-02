@@ -220,6 +220,22 @@ describe('markInterrupted', () => {
     expect(await markInterrupted(await tempDir(), 'T')).toBe(0);
   });
 
+  // Reopening the project you already have open is an ordinary thing to do from the picker. Without
+  // this, it rewrites the run in flight to `interrupted` — a status the record keeps even as the
+  // agent finishes and writes its report, and one that burns no attempt against the cap.
+  it('leaves a run this process is still running alone', async () => {
+    const root = await tempDir();
+    // Two in flight, one of them live: with a single record, "skip the live one" and "skip
+    // everything" produce the same count.
+    await writeRun(root, record({ run: 'r-live', status: 'running' }));
+    await writeRun(root, record({ run: 'r-stale', status: 'running' }));
+
+    expect(await markInterrupted(root, 'T', ['r-live'])).toBe(1);
+    const byId = new Map((await listCardRuns(root, 'engineering', 'E-010')).map((r) => [r.run, r]));
+    expect(byId.get('r-live')?.status).toBe('running');
+    expect(byId.get('r-stale')?.status).toBe('interrupted');
+  });
+
   it('leaves a finished record byte-identical', async () => {
     const root = await tempDir();
     const done = record({ status: 'success', outcome: 'success', finished: 'T0', report: 'ok' });

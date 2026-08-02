@@ -199,7 +199,13 @@ describe('ensureBoards', () => {
   it('reports no change when every board is present', () => {
     const config = defaultConfig('T');
     expect(ensureBoards(config)).toBe(false);
-    expect(config.boards.engineering.columns).toEqual(['Backlog', 'In Progress', 'Review', 'Done']);
+    expect(config.boards.engineering.columns).toEqual([
+      'Backlog',
+      'In Progress',
+      'Review',
+      'Blocked',
+      'Done',
+    ]);
   });
 
   it('backfills a board missing from an older config with its own default columns', () => {
@@ -209,7 +215,13 @@ describe('ensureBoards', () => {
 
     expect(ensureBoards(config)).toBe(true);
     // Engineering's defaults differ from the other two boards — a shared list would be wrong.
-    expect(config.boards.engineering.columns).toEqual(['Backlog', 'In Progress', 'Review', 'Done']);
+    expect(config.boards.engineering.columns).toEqual([
+      'Backlog',
+      'In Progress',
+      'Review',
+      'Blocked',
+      'Done',
+    ]);
     expect(config.boards.features.columns).toEqual(['Kept']);
   });
 });

@@ -35,8 +35,11 @@ const app = buildApp(session, { logger: logging.options, credentials: new Creden
 // on both of these by default, so this only adds the record of why.
 installCrashHandlers(app.log);
 
-// Don't leave the managed `opencode serve` orphaned when VibeBoard stops.
-for (const sig of ['SIGINT', 'SIGTERM'] as const) {
+// Don't leave the managed `opencode serve` orphaned when VibeBoard stops. SIGHUP is here because a
+// server started from a terminal gets it when that terminal closes, which is one of the ordinary
+// ways this process dies. SIGKILL cannot be caught at all — the pid file in opencode-server.ts is
+// what covers that, and every other way the process can die without reaching this line.
+for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) {
   process.once(sig, () => {
     stopOpencodeServer();
     process.exit(0);

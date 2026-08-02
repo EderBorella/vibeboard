@@ -138,8 +138,12 @@ export function reportContract(run: string): string {
 // Records still claiming to be queued or running when the project opens: their child processes died
 // with the server that spawned them, so they are stale, not live. Marked interrupted so the
 // dashboard never shows a run that will never finish.
-export async function markInterrupted(root: string, at: string): Promise<number> {
-  const stale = (await listRuns(root)).filter((r) => isInFlight(r.status));
+// `live` is the runs this process still has in flight, and they are skipped. Without it, reopening
+// a project while a run is going rewrites that run to `interrupted` — a status the record then keeps
+// even as the agent finishes and writes its report, and one that burns no attempt.
+export async function markInterrupted(root: string, at: string, live: string[] = []): Promise<number> {
+  const running = new Set(live);
+  const stale = (await listRuns(root)).filter((r) => isInFlight(r.status) && !running.has(r.run));
   for (const record of stale) {
     await writeRun(
       root,

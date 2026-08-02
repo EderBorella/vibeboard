@@ -1,4 +1,7 @@
 import { type ChildProcess, spawn } from 'node:child_process';
+import { mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { dirname, join } from 'node:path';
 import { isolationEnabled, opencodeConfigHome } from './copilot-env.js';
 import type { Log } from './logging.js';
 
@@ -28,6 +31,50 @@ export function opencodeLog(): Log | undefined {
   return log;
 }
 
+// Where the managed server's pid is recorded, outside any project. The shutdown handlers in main.ts
+// cover the signals a process can catch; SIGKILL, an OOM kill and a crashed host are not among them,
+// and each one leaves `opencode serve` running for as long as the machine is up. Two were found
+// alive on the development machine, the older of them seven days old.
+export function opencodePidFile(): string {
+  return process.env.VIBEBOARD_OPENCODE_PID_FILE ?? join(homedir(), '.vibeboard', 'opencode.pid');
+}
+
+// Kill a server left behind by a previous VibeBoard, before starting one of our own.
+//
+// The command-line check is not optional. Pids are reused, so by the time we read this file the
+// number may belong to something else entirely, and killing a stranger's process because it
+// inherited a pid would be far worse than the orphan we are cleaning up. Anything unreadable — no
+// /proc, no permission, no such process — is left alone.
+export function reapOrphanServer(): void {
+  const file = opencodePidFile();
+  try {
+    const pid = Number(readFileSync(file, 'utf8').trim());
+    if (!Number.isInteger(pid) || pid <= 1) return;
+    // NUL-separated argv. `opencode` has to appear in it for this to be the process we recorded.
+    if (!readFileSync(`/proc/${pid}/cmdline`, 'utf8').includes('opencode')) return;
+    process.kill(pid, 'SIGTERM');
+    log?.warn({ pid }, 'killed an opencode server left running by a previous VibeBoard');
+  } catch {
+    /* no record, already gone, or nothing we can safely identify */
+  }
+  try {
+    unlinkSync(file);
+  } catch {
+    /* nothing recorded */
+  }
+}
+
+function recordPid(pid: number | undefined): void {
+  if (pid === undefined) return;
+  try {
+    const file = opencodePidFile();
+    mkdirSync(dirname(file), { recursive: true });
+    writeFileSync(file, `${pid}\n`, 'utf8');
+  } catch {
+    /* the reaper is a safety net, not a dependency — failing to record must not fail the start */
+  }
+}
+
 // The startup buffer only has to hold enough for the exit diagnostic below, and the child then talks
 // for the whole life of the app: before this cap it grew without limit. The HEAD is what is kept —
 // the listening banner and a failure both come first, and it is the head the URL is matched in.
@@ -48,8 +95,10 @@ function startServer(): Promise<string> {
   // opencode finds no ~/.config/opencode AGENTS.md/config/plugins. Auth + db stay in the
   // default XDG_DATA_HOME (~/.local/share/opencode), so login is preserved.
   const env = isolationEnabled() ? { ...process.env, XDG_CONFIG_HOME: opencodeConfigHome() } : process.env;
+  reapOrphanServer();
   const proc = spawn(opencodeBin(), args, { env });
   child = proc;
+  recordPid(proc.pid);
 
   return new Promise<string>((resolve, reject) => {
     let out = '';
@@ -114,5 +163,12 @@ export function stopOpencodeServer(): void {
     child.kill('SIGTERM');
     child = undefined;
     urlPromise = undefined;
+    // Cleared here rather than on the child's exit event: this runs from a signal handler and from
+    // `process.once('exit')`, where nothing asynchronous gets a turn.
+    try {
+      unlinkSync(opencodePidFile());
+    } catch {
+      /* never recorded, or already reaped */
+    }
   }
 }

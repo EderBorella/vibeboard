@@ -41,6 +41,9 @@ export const RESOURCES_DIR = `${CONFIG_DIR}/resources`;
 export const RESOURCES_YAML = `${CONFIG_DIR}/resources.yaml`;
 export const CHAT_DIR = `${CONFIG_DIR}/chat`;
 export const RUNS_DIR = `${CONFIG_DIR}/runs`;
+// The implementation diary: one line per event, appended through an endpoint rather than written
+// by an agent.
+export const PROJECT_LOG_FILE = `${CONFIG_DIR}/PROJECT-LOG.md`;
 
 // The two documents that moved inside. Their names are unchanged, so the pointer files' imports read
 // `@.vibeboard/VIBEBOARD.md` — an import may carry a path, which is what makes the move possible.

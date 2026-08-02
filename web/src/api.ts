@@ -7,8 +7,16 @@ import type {
   ProjectSnapshot,
 } from './shared';
 
+import { authHeader } from './token';
+
+// Every call in this module goes through here, so the browser's credential is attached in one
+// place rather than at twenty-five call sites — and a new endpoint cannot forget it.
+function request(url: string, init: RequestInit = {}): Promise<Response> {
+  return fetch(url, { ...init, headers: { ...(init.headers as Record<string, string>), ...authHeader() } });
+}
+
 async function post<T>(url: string, body: unknown): Promise<T> {
-  const res = await fetch(url, {
+  const res = await request(url, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(body),
@@ -18,7 +26,7 @@ async function post<T>(url: string, body: unknown): Promise<T> {
 }
 
 async function put<T>(url: string, body: unknown): Promise<T> {
-  const res = await fetch(url, {
+  const res = await request(url, {
     method: 'PUT',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(body),
@@ -28,7 +36,7 @@ async function put<T>(url: string, body: unknown): Promise<T> {
 }
 
 async function patch<T>(url: string, body: unknown): Promise<T> {
-  const res = await fetch(url, {
+  const res = await request(url, {
     method: 'PATCH',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(body),
@@ -43,7 +51,7 @@ export interface ProjectRef {
 }
 
 export async function getState(): Promise<{ open: boolean; snapshot?: ProjectSnapshot }> {
-  return (await fetch('/api/state')).json();
+  return (await request('/api/state')).json();
 }
 
 export function patchConfig(body: Partial<ProjectConfig>): Promise<ProjectConfig> {
@@ -75,16 +83,16 @@ export interface ModelStatus {
 }
 
 export async function listModels(backend: string): Promise<ModelOption[]> {
-  return (await fetch(`/api/models?backend=${encodeURIComponent(backend)}`)).json();
+  return (await request(`/api/models?backend=${encodeURIComponent(backend)}`)).json();
 }
 
 export async function getModelStatus(id: string): Promise<ModelStatus | null> {
-  return (await fetch(`/api/model-status?id=${encodeURIComponent(id)}`)).json().then((r) => r.status);
+  return (await request(`/api/model-status?id=${encodeURIComponent(id)}`)).json().then((r) => r.status);
 }
 
 export async function listProjects(root?: string): Promise<ProjectRef[]> {
   const q = root ? `?root=${encodeURIComponent(root)}` : '';
-  return (await fetch(`/api/projects${q}`)).json();
+  return (await request(`/api/projects${q}`)).json();
 }
 
 export function openProject(path: string): Promise<{ snapshot: ProjectSnapshot }> {
@@ -124,13 +132,13 @@ export function patchCard(board: BoardName, id: string, patchBody: CardFrontmatt
 }
 
 export async function getRaw(board: BoardName, id: string): Promise<string> {
-  const res = await fetch(`/api/cards/${board}/${id}/raw`);
+  const res = await request(`/api/cards/${board}/${id}/raw`);
   if (!res.ok) throw new Error('Failed to load card file');
   return (await res.json()).raw as string;
 }
 
 export async function putRaw(board: BoardName, id: string, raw: string): Promise<void> {
-  const res = await fetch(`/api/cards/${board}/${id}/raw`, {
+  const res = await request(`/api/cards/${board}/${id}/raw`, {
     method: 'PUT',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ raw }),
@@ -140,7 +148,7 @@ export async function putRaw(board: BoardName, id: string, raw: string): Promise
 
 // Symmetric link reconcile — updates both sides. The single path for link changes.
 export async function setLinks(board: BoardName, id: string, links: string[]): Promise<void> {
-  const res = await fetch(`/api/cards/${board}/${id}/links`, {
+  const res = await request(`/api/cards/${board}/${id}/links`, {
     method: 'PUT',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ links }),
@@ -166,7 +174,7 @@ export function archiveCard(board: BoardName, id: string): Promise<unknown> {
 // Fetched on demand: the archive only grows, so it rides outside the snapshot. The snapshot's
 // archivedCounts tell the UI when this is worth calling again.
 export async function listArchive(board: BoardName): Promise<ArchivedCard[]> {
-  const res = await fetch(`/api/archive/${board}`);
+  const res = await request(`/api/archive/${board}`);
   if (!res.ok) throw new Error('Failed to load the archive');
   return (await res.json()).cards as ArchivedCard[];
 }
@@ -202,19 +210,19 @@ export interface ResourceLink {
 }
 
 export async function listControlFiles(): Promise<ControlGroup[]> {
-  const res = await fetch('/api/control/files');
+  const res = await request('/api/control/files');
   if (!res.ok) throw new Error('Failed to load control files');
   return (await res.json()).groups as ControlGroup[];
 }
 
 export async function getControlFile(path: string): Promise<ControlFile & { content: string }> {
-  const res = await fetch(`/api/control/file?path=${encodeURIComponent(path)}`);
+  const res = await request(`/api/control/file?path=${encodeURIComponent(path)}`);
   if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Failed to load file');
   return res.json();
 }
 
 export async function putControlFile(path: string, content: string): Promise<void> {
-  const res = await fetch('/api/control/file', {
+  const res = await request('/api/control/file', {
     method: 'PUT',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ path, content }),
@@ -233,18 +241,18 @@ export function renameControlFile(path: string, name: string): Promise<ControlFi
 }
 
 export async function deleteControlFile(path: string): Promise<void> {
-  const res = await fetch(`/api/control/file?path=${encodeURIComponent(path)}`, { method: 'DELETE' });
+  const res = await request(`/api/control/file?path=${encodeURIComponent(path)}`, { method: 'DELETE' });
   if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Failed to delete file');
 }
 
 export async function getResources(): Promise<ResourceLink[]> {
-  const res = await fetch('/api/control/resources');
+  const res = await request('/api/control/resources');
   if (!res.ok) throw new Error('Failed to load resources');
   return (await res.json()).links as ResourceLink[];
 }
 
 export async function putResources(links: ResourceLink[]): Promise<void> {
-  const res = await fetch('/api/control/resources', {
+  const res = await request('/api/control/resources', {
     method: 'PUT',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ links }),
@@ -280,19 +288,19 @@ export type FileRead =
   | { kind: 'too-large'; path: string; name: string; size: number };
 
 export async function listDir(path: string): Promise<DirListing> {
-  const res = await fetch(`/api/explorer/list?path=${encodeURIComponent(path)}`);
+  const res = await request(`/api/explorer/list?path=${encodeURIComponent(path)}`);
   if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Failed to list folder');
   return res.json();
 }
 
 export async function readFsFile(path: string): Promise<FileRead> {
-  const res = await fetch(`/api/explorer/file?path=${encodeURIComponent(path)}`);
+  const res = await request(`/api/explorer/file?path=${encodeURIComponent(path)}`);
   if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Failed to load file');
   return res.json();
 }
 
 export async function putFsFile(path: string, content: string): Promise<void> {
-  const res = await fetch('/api/explorer/file', {
+  const res = await request('/api/explorer/file', {
     method: 'PUT',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ path, content }),
@@ -319,7 +327,7 @@ export function moveFsNode(path: string, to: string): Promise<FsNode> {
 // One entry: a file, a link, or an empty folder. 'not-empty' is a normal answer rather than an error —
 // the caller has a harder question to ask in that case.
 export async function deleteFsEntry(path: string): Promise<'ok' | 'not-empty'> {
-  const res = await fetch(`/api/explorer/entry?path=${encodeURIComponent(path)}`, { method: 'DELETE' });
+  const res = await request(`/api/explorer/entry?path=${encodeURIComponent(path)}`, { method: 'DELETE' });
   if (res.status === 409) return 'not-empty';
   if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Failed to delete');
   return 'ok';
@@ -329,7 +337,7 @@ export async function deleteFsEntry(path: string): Promise<'ok' | 'not-empty'> {
 // checks it again, so this is not the only thing standing in the way.
 export async function deleteFsTree(path: string, confirm: string): Promise<void> {
   const url = `/api/explorer/tree?path=${encodeURIComponent(path)}&confirm=${encodeURIComponent(confirm)}`;
-  const res = await fetch(url, { method: 'DELETE' });
+  const res = await request(url, { method: 'DELETE' });
   if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Failed to delete folder');
 }
 
@@ -361,7 +369,7 @@ export interface SkillCatalogue {
 }
 
 export async function listSkills(): Promise<SkillCatalogue> {
-  const res = await fetch('/api/skills');
+  const res = await request('/api/skills');
   if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? res.statusText);
   return res.json() as Promise<SkillCatalogue>;
 }
@@ -438,13 +446,13 @@ export interface RunList {
 }
 
 export async function listRuns(): Promise<RunList> {
-  const res = await fetch('/api/runs');
+  const res = await request('/api/runs');
   if (!res.ok) throw new Error('Failed to load runs');
   return res.json() as Promise<RunList>;
 }
 
 export async function listCardRuns(board: BoardName, card: string): Promise<RunRecord[]> {
-  const res = await fetch(`/api/runs/${board}/${encodeURIComponent(card)}`);
+  const res = await request(`/api/runs/${board}/${encodeURIComponent(card)}`);
   if (!res.ok) throw new Error('Failed to load this card’s runs');
   return (await res.json()).runs as RunRecord[];
 }

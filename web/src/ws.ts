@@ -1,4 +1,5 @@
 import { useEffect, useMemo } from 'react';
+import { authToken } from './token';
 
 export type ConnState = 'connecting' | 'open' | 'closed';
 type Listener = (msg: Record<string, unknown>) => void;
@@ -44,7 +45,9 @@ export class SharedSocket {
   #connect(): void {
     this.#closing = false;
     this.#setConn('connecting');
-    const socket = new WebSocket(`ws://${location.host}/ws`);
+    // The credential goes in the query string because a browser cannot set headers on a WebSocket
+    // handshake. The server refuses the upgrade without it.
+    const socket = new WebSocket(`ws://${location.host}/ws?token=${encodeURIComponent(authToken())}`);
     this.#socket = socket;
     // Every handler ignores a socket we have already replaced. close() is asynchronous, so a
     // released socket's events can land AFTER a new one is connecting — the StrictMode

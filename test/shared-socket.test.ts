@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ConnState } from '../web/src/ws.js';
 import { SharedSocket } from '../web/src/ws.js';
+import { STUB_TOKEN, stubBrowser } from './browser-stubs.js';
 
 // The client's shared socket is the one piece of the two-sockets-into-one change that the
 // server-side tests cannot reach: each of those opens a single client, so none of them
@@ -43,7 +44,7 @@ const live = (): FakeSocket[] => FakeSocket.instances.filter((s) => !s.closed);
 beforeEach(() => {
   FakeSocket.instances = [];
   vi.stubGlobal('WebSocket', FakeSocket);
-  vi.stubGlobal('location', { host: 'localhost:4610' });
+  stubBrowser();
 });
 
 describe('SharedSocket', () => {
@@ -156,7 +157,9 @@ describe('SharedSocket reconnect and teardown', () => {
   it('connects to the /ws endpoint on the current host', () => {
     const s = new SharedSocket();
     s.acquire();
-    expect(FakeSocket.instances[0].url).toBe('ws://localhost:4610/ws');
+    // With the credential: the server refuses the upgrade without one, so a socket URL that
+    // carried only the path would connect to nothing.
+    expect(FakeSocket.instances[0].url).toBe(`ws://localhost:4610/ws?token=${STUB_TOKEN}`);
   });
 
   it('reconnects a second later when the socket drops while still in use', () => {

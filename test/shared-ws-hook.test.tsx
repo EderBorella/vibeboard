@@ -2,6 +2,7 @@
 import { renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useSharedWs } from '../web/src/ws.js';
+import { stubBrowser } from './browser-stubs.js';
 
 // The module keeps ONE socket per `bump`, so the board and the copilot share it and switching
 // project forces a genuinely new one — the server pushes the newly-open project's snapshot on
@@ -31,7 +32,7 @@ const freshBump = (): number => ++nextBump;
 beforeEach(() => {
   FakeSocket.instances = [];
   vi.stubGlobal('WebSocket', FakeSocket);
-  vi.stubGlobal('location', { host: 'localhost:4610' });
+  stubBrowser();
 });
 
 describe('useSharedWs', () => {

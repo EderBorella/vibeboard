@@ -50,6 +50,28 @@ export const SUGGESTIONS_DIR = `${CONFIG_DIR}/suggestions`;
 // by an agent.
 export const PROJECT_LOG_FILE = `${CONFIG_DIR}/PROJECT-LOG.md`;
 
+// The documents a run is bound by: the stack, the gates, the test strategy, the UX and the visual
+// language. A FIXED, enumerated set so an agent goes straight to it rather than exploring, and so a
+// missing one is a name rather than a guess.
+//
+// Deliberately not inside `docs/`, which is for freeform notes — mixing binding contracts with
+// arbitrary notes means an agent cannot tell which is which. Read-only to agents at the OS level
+// (tools/apparmor/vibeboard-agent): a file that sets the bar must not be writable by the thing being
+// judged against it.
+export const FOUNDATION_DIR = `${CONFIG_DIR}/foundation`;
+
+export const FOUNDATION_FILES = [
+  { name: 'STACK.md', purpose: 'languages, frameworks, libraries, pinned versions' },
+  { name: 'CODE-QUALITY.md', purpose: 'the gates: lint, types, tests — commands that must pass' },
+  { name: 'TESTING.md', purpose: 'test strategy; what a smoke test means here' },
+  { name: 'UX.md', purpose: 'flows, interaction principles' },
+  { name: 'DESIGN.md', purpose: 'visual language, tokens, components' },
+] as const;
+
+export function foundationRel(name: string): string {
+  return `${FOUNDATION_DIR}/${name}`;
+}
+
 // The two documents that moved inside. Their names are unchanged, so the pointer files' imports read
 // `@.vibeboard/VIBEBOARD.md` — an import may carry a path, which is what makes the move possible.
 export const CONVENTIONS_FILE = `${CONFIG_DIR}/VIBEBOARD.md`;

@@ -25,8 +25,9 @@ async function readCardsFromFolder(
   for (const name of entries) {
     if (!name.endsWith('.md')) continue;
     const filePath = join(dir, name);
-    const { data, body } = parseCardContent(await readFile(filePath, 'utf8'));
-    cards.push({ ...data, board, columnSlug, body, filePath });
+    const parsed = parseCardContent(await readFile(filePath, 'utf8'));
+    if (!parsed) continue;
+    cards.push({ ...parsed.data, board, columnSlug, body: parsed.body, filePath });
   }
   return cards;
 }

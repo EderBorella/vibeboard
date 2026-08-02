@@ -1,8 +1,16 @@
 import matter from 'gray-matter';
 import type { Card, CardFrontmatter } from './types.js';
 
-export function parseCardContent(content: string): { data: CardFrontmatter; body: string } {
-  const parsed = matter(content);
+// Returns null for frontmatter that will not parse. A card file is hand-editable, so one bad
+// quote is one card missing from its column — not a dead board. parseRun has taken this
+// position since it was written; cards never did, and readBoard threw all the way to the UI.
+export function parseCardContent(content: string): { data: CardFrontmatter; body: string } | null {
+  let parsed: matter.GrayMatterFile<string>;
+  try {
+    parsed = matter(content);
+  } catch {
+    return null;
+  }
   const d = parsed.data as Partial<CardFrontmatter>;
   return {
     data: {

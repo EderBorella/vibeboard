@@ -79,6 +79,23 @@ describe('readBoard', () => {
     expect(cards.map((c) => c.id)).toEqual(['P-001']);
   });
 
+  // One hand-edited file used to take the whole board down, and with it the snapshot, every
+  // mutation and dispatch. Unterminated quote: gray-matter throws here, it does not return {}.
+  it('skips a card whose frontmatter will not parse, and reads the rest', async () => {
+    const root = await tempDir();
+    const config = defaultConfig('T');
+    const [column] = boardColumnSlugs(config, 'engineering');
+    await writeCard(
+      root,
+      boardRel('engineering', column, 'E-001.md'),
+      '---\nid: E-001\ntitle: good\norder: 10\ncreated: 2026-07-23\n---\nbody',
+    );
+    await writeCard(root, boardRel('engineering', column, 'E-999.md'), '---\ntitle: "oops\n---\nbody\n');
+
+    const cards = await readBoard(root, 'engineering', config);
+    expect(cards.map((c) => c.id)).toEqual(['E-001']);
+  });
+
   it('sorts the archive newest first, leaving undated cards at the bottom', async () => {
     const root = await tempDir();
     const card = (id: string, archived?: string): string =>

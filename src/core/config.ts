@@ -1,6 +1,7 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { parse, stringify } from 'yaml';
+import { DEFAULT_AUTOPILOT } from './autopilot.js';
 import { BACKEND_DEFAULTS, DEFAULT_BACKEND, defaultBackendMap } from './backends.js';
 import { CONFIG_DIR, CONFIG_FILE } from './layout.js';
 import { BOARDS, type BoardConfig, type BoardName, type CopilotConfig, type ProjectConfig } from './types.js';
@@ -43,6 +44,10 @@ export function defaultConfig(name: string): ProjectConfig {
     keepChats: 20,
     contextBudget: DEFAULT_CONTEXT_BUDGET,
     maxConcurrentRuns: DEFAULT_MAX_RUNS,
+    // A clone, not the constant: config objects are mutated in place by the ensure* helpers and
+    // written back, so a shared reference would let one project's edit reach the next project's
+    // defaults inside the same process.
+    autopilot: structuredClone(DEFAULT_AUTOPILOT),
     copilot: { backend: DEFAULT_BACKEND, backends: defaultBackendMap() },
   };
 }

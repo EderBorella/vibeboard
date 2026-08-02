@@ -132,6 +132,35 @@ export interface BoardConfig {
   columns: string[];
 }
 
+// Mirrors src/core/autopilot.ts. The UI renders the table read-only: config.yaml is where it is
+// edited, and the server refuses a change that leaves a column with nothing to do.
+export type VerifyMode = 'gates' | 'critic' | 'smoke';
+export interface Route {
+  board: BoardName;
+  column: string; // slug
+  skill: string;
+  verify: VerifyMode;
+  next: string; // slug
+}
+export interface Rollup {
+  board: BoardName;
+  when: 'all-children-terminal';
+  action: 'advance' | 'eligible';
+}
+export interface AutopilotConfig {
+  maxIterations: number;
+  budgetUsd: number;
+  runTimeoutMs: number;
+  attemptCap: number;
+  checkupEvery: number;
+  autoPilotConcurrency: number;
+  routes: Route[];
+  rollup: Rollup[];
+  terminal: string[];
+  blockedColumn: string;
+  setupFeatureFlag: string;
+}
+
 export interface ProjectConfig {
   name: string;
   boards: Record<BoardName, BoardConfig>;
@@ -140,6 +169,7 @@ export interface ProjectConfig {
   keepChats: number;
   contextBudget: number;
   maxConcurrentRuns: number;
+  autopilot?: AutopilotConfig; // absent on a project created before the lifecycle existed
   copilot: CopilotConfig;
 }
 

@@ -1,3 +1,5 @@
+import type { AutopilotConfig } from './autopilot.js';
+
 // The ordered set of boards, highest level of project management first. Adding a board
 // here (plus its id prefix in ids.ts and default columns in config.ts) rolls it out
 // everywhere — snapshot, scaffold, links, and the UI all derive from this list.
@@ -66,5 +68,10 @@ export interface ProjectConfig {
   // How many skill runs may be in flight at once. Past it, a dispatch queues rather than being
   // refused — a run is minutes of work, so "come back and click again" is the wrong answer.
   maxConcurrentRuns: number;
+  // The lifecycle spine (core/autopilot.ts). Optional because migration of pre-existing projects is
+  // deliberately deferred until the auto-pilot slices are all in: a project written before this
+  // block fails auto-pilot's readiness check, which names what is missing. An honest refusal beats a
+  // silent half-upgrade against a shape still moving.
+  autopilot?: AutopilotConfig;
   copilot: CopilotConfig;
 }

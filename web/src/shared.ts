@@ -158,7 +158,7 @@ export interface AutopilotConfig {
   autoPilotConcurrency: number;
   routes: Route[];
   rollup: Rollup[];
-  terminal: string[];
+  terminal: Record<BoardName, string[]>; // per board: a column belongs to one
   blockedColumn: string;
   setupFeatureFlag: string;
 }

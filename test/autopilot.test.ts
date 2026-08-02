@@ -23,8 +23,8 @@ describe('the autopilot routing table', () => {
   });
 
   it('treats terminal and blocked as explicit facts, never as the absence of a route', () => {
-    expect(isTerminalColumn(DEFAULT_AUTOPILOT, 'done')).toBe(true);
-    expect(isTerminalColumn(DEFAULT_AUTOPILOT, 'review')).toBe(false);
+    expect(isTerminalColumn(DEFAULT_AUTOPILOT, 'engineering', 'done')).toBe(true);
+    expect(isTerminalColumn(DEFAULT_AUTOPILOT, 'engineering', 'review')).toBe(false);
     // Blocked is engineering's alone — a product card at its attempt cap stops the run instead.
     expect(isBlockedColumn(DEFAULT_AUTOPILOT, 'engineering', 'blocked')).toBe(true);
     expect(isBlockedColumn(DEFAULT_AUTOPILOT, 'product', 'blocked')).toBe(false);
@@ -53,16 +53,26 @@ describe('the autopilot routing table', () => {
     expect(routeFor(renamed, 'product', 'backlog')?.next).toBe('todo');
   });
 
-  it('renames the terminal and blocked columns too, since neither is board-scoped', () => {
+  it('renames the terminal and blocked columns of the board being renamed, and only that board', () => {
     const renamed = applyRouteRenames(DEFAULT_AUTOPILOT, 'engineering', [
       { from: 'done', to: 'shipped' },
       { from: 'blocked', to: 'stuck' },
     ]);
-    expect(renamed.terminal).toEqual(['shipped']);
+    expect(renamed.terminal.engineering).toEqual(['shipped']);
     expect(renamed.blockedColumn).toBe('stuck');
-    expect(isTerminalColumn(renamed, 'done')).toBe(false);
+    expect(isTerminalColumn(renamed, 'engineering', 'done')).toBe(false);
     // The routes that advanced into `done` advance into its new name.
     expect(routeFor(renamed, 'engineering', 'review')?.next).toBe('shipped');
+    // The other boards still have a Done column of their own, and it is still where a card finishes.
+    // A single flat list of slugs got this wrong: renaming engineering's Done un-terminalled theirs.
+    expect(renamed.terminal.product).toEqual(['done']);
+    expect(isTerminalColumn(renamed, 'features', 'done')).toBe(true);
+  });
+
+  it('does not touch the blocked column when some other board is renamed', () => {
+    const renamed = applyRouteRenames(DEFAULT_AUTOPILOT, 'product', [{ from: 'todo', to: 'blocked' }]);
+    expect(renamed.blockedColumn).toBe('blocked');
+    expect(renamed.terminal.engineering).toEqual(['done']);
   });
 
   it('renames the columns a rollup rule names, on both of its sides', () => {

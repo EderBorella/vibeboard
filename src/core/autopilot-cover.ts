@@ -84,7 +84,9 @@ function checkCover(ap: AutopilotConfig, columns: Record<BoardName, string[]>, o
       const rolledUp = ap.rollup.some(
         (r) => r.board === board && r.column === slug && r.action === 'advance',
       );
-      if (routed || rolledUp || isTerminalColumn(ap, slug) || isBlockedColumn(ap, board, slug)) continue;
+      if (routed || rolledUp || isTerminalColumn(ap, board, slug) || isBlockedColumn(ap, board, slug)) {
+        continue;
+      }
       out.push(
         `${board}: the column "${slug}" is neither routed, terminal nor blocked — cards there would never become eligible.`,
       );
@@ -92,23 +94,30 @@ function checkCover(ap: AutopilotConfig, columns: Record<BoardName, string[]>, o
   }
 }
 
-function checkNamedColumns(ap: AutopilotConfig, columns: Record<BoardName, string[]>, out: string[]): void {
-  if (ap.terminal.length === 0) out.push('terminal is empty, so no card could ever finish.');
-  const everywhere = new Set(BOARDS.flatMap((b) => columns[b]));
-  for (const slug of ap.terminal) {
-    if (!everywhere.has(slug)) {
+function checkTerminal(ap: AutopilotConfig, columns: Record<BoardName, string[]>, out: string[]): void {
+  for (const board of BOARDS) {
+    const slugs = ap.terminal[board] ?? [];
+    if (slugs.length === 0) {
+      out.push(`terminal names no column for ${board}, so no card on that board could ever finish.`);
+    }
+    for (const slug of slugs) {
+      if (columns[board].includes(slug)) continue;
       out.push(
-        `terminal names "${slug}", which is not a column on any board — a mistyped terminal column silently makes nothing terminal.`,
+        `terminal names "${slug}" for ${board}, which is not a column on that board — a mistyped terminal column silently makes nothing terminal.`,
       );
     }
   }
+}
+
+function checkNamedColumns(ap: AutopilotConfig, columns: Record<BoardName, string[]>, out: string[]): void {
+  checkTerminal(ap, columns, out);
   if (!columns.engineering.includes(ap.blockedColumn)) {
     out.push(`blockedColumn is "${ap.blockedColumn}", which is not a column on the engineering board.`);
   }
   if (ap.routes.some((r) => r.board === 'engineering' && r.column === ap.blockedColumn)) {
     out.push(`blockedColumn "${ap.blockedColumn}" is also routed; a blocked card must stay put.`);
   }
-  if (isTerminalColumn(ap, ap.blockedColumn)) {
+  if (isTerminalColumn(ap, 'engineering', ap.blockedColumn)) {
     out.push(
       `blockedColumn "${ap.blockedColumn}" is listed as terminal, which would report blocked work as done.`,
     );
@@ -132,7 +141,7 @@ function checkAdvanceTarget(
     out.push(`The rollup rule on ${where} advances to "${rule.next}", which is not a column on that board.`);
     return;
   }
-  if (!isTerminalColumn(ap, rule.next)) {
+  if (!isTerminalColumn(ap, rule.board, rule.next)) {
     out.push(`The rollup rule on ${where} advances to "${rule.next}", which is not terminal.`);
   }
 }

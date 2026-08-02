@@ -47,9 +47,17 @@ describe('routing-table coverage', () => {
 
   it('refuses a terminal column that exists on no board', () => {
     const config = fresh();
-    ap(config).terminal = ['done', 'finished'];
+    ap(config).terminal.product = ['done', 'finished'];
     expect(coverageProblems(config)).toContain(
-      'terminal names "finished", which is not a column on any board — a mistyped terminal column silently makes nothing terminal.',
+      'terminal names "finished" for product, which is not a column on that board — a mistyped terminal column silently makes nothing terminal.',
+    );
+  });
+
+  it('refuses a board with no terminal column, since nothing on it could ever finish', () => {
+    const config = fresh();
+    ap(config).terminal.features = [];
+    expect(coverageProblems(config)).toContain(
+      'terminal names no column for features, so no card on that board could ever finish.',
     );
   });
 
@@ -78,7 +86,7 @@ describe('routing-table coverage', () => {
     );
 
     const terminal = fresh();
-    ap(terminal).terminal = ['done', 'blocked'];
+    ap(terminal).terminal.engineering = ['done', 'blocked'];
     expect(coverageProblems(terminal)).toContain(
       'blockedColumn "blocked" is listed as terminal, which would report blocked work as done.',
     );

@@ -53,7 +53,12 @@ export interface AutopilotConfig {
   rollup: Rollup[];
   // Explicit, never inferred from the absence of a route: a mistyped column must fail loudly rather
   // than silently making its cards terminal.
-  terminal: string[];
+  //
+  // Per BOARD, not one flat list of slugs. A column belongs to a board, and a flat list cannot say
+  // so: renaming engineering's Done to Stage 5 rewrote the single entry `done` and thereby
+  // un-terminalled features and product, whose Done columns had not been touched. Every board must
+  // name at least one, or nothing on it could ever finish.
+  terminal: Record<BoardName, string[]>;
   blockedColumn: string; // engineering only
   // The setup feature is identified by a frontmatter flag, never a reserved id: `nextId` derives ids
   // and never accepts one (ids.ts), so a recreated F-001 would silently remove the barrier.
@@ -96,7 +101,7 @@ export const DEFAULT_AUTOPILOT: AutopilotConfig = {
     // exercises it end to end. Done means "this works", not "its cards were ticked".
     { board: 'features', column: 'in-progress', when: 'all-children-terminal', action: 'eligible' },
   ],
-  terminal: ['done'],
+  terminal: { features: ['done'], product: ['done'], engineering: ['done'] },
   blockedColumn: 'blocked',
   setupFeatureFlag: 'setup',
 };
@@ -105,8 +110,8 @@ export function routeFor(ap: AutopilotConfig, board: BoardName, columnSlug: stri
   return ap.routes.find((r) => r.board === board && r.column === columnSlug);
 }
 
-export function isTerminalColumn(ap: AutopilotConfig, columnSlug: string): boolean {
-  return ap.terminal.includes(columnSlug);
+export function isTerminalColumn(ap: AutopilotConfig, board: BoardName, columnSlug: string): boolean {
+  return (ap.terminal[board] ?? []).includes(columnSlug);
 }
 
 // Engineering's alone. A product or feature card that cannot be designed after three tries is a
@@ -136,8 +141,10 @@ export function applyRouteRenames(
         ? { ...r, column: to(r.column), ...(r.next === undefined ? {} : { next: to(r.next) }) }
         : r,
     ),
-    // `terminal` and `blockedColumn` are not board-scoped, so a rename on any board updates them.
-    terminal: ap.terminal.map(to),
-    blockedColumn: to(ap.blockedColumn),
+    // Only this board's entry: the others' Done columns were not renamed and must stay terminal.
+    terminal: { ...ap.terminal, [board]: (ap.terminal[board] ?? []).map(to) },
+    // Engineering's alone, so a rename anywhere else cannot be about it — and applying one would
+    // point the blocked column at a slug on a board that does not have it.
+    blockedColumn: board === 'engineering' ? to(ap.blockedColumn) : ap.blockedColumn,
   };
 }

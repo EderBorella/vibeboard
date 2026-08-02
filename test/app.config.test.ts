@@ -138,13 +138,15 @@ describe('PATCH /api/config — column reconciliation', () => {
     await app.inject({
       method: 'PATCH',
       url: '/api/config',
-      // Backlog is kept because the scaffold's engineering sample card is in it, and removing a
-      // column that holds cards is refused — which would leave nothing for this test to observe.
-      payload: { boards: { engineering: { columns: ['Backlog', 'Shipped'] } } },
+      // A rename rather than the removal this test used to make. Dropping Review, Blocked and Done
+      // now leaves the routing table pointing at columns that are gone, which is refused — so the
+      // edit had to become one the lifecycle survives, or the test would be asserting the merge
+      // behaviour of a request that never reached the merge.
+      payload: { boards: { engineering: { columns: ['Backlog', 'In Progress', 'QA', 'Blocked', 'Done'] } } },
     });
 
     const cfg = (await app.inject({ method: 'GET', url: '/api/config' })).json();
-    expect(cfg.boards.engineering.columns).toEqual(['Backlog', 'Shipped']);
+    expect(cfg.boards.engineering.columns).toEqual(['Backlog', 'In Progress', 'QA', 'Blocked', 'Done']);
     expect(cfg.boards.product.columns).toEqual(['Backlog', 'Todo', 'In Progress', 'Done']);
     expect(cfg.boards.features.columns).toEqual(['Backlog', 'Todo', 'In Progress', 'Done']);
   });

@@ -111,6 +111,27 @@ describe.skipIf(!live.ok)('the profile denies what it claims to', () => {
     expect(commit.code, commit.stderr).toBe(0);
   });
 
+  it('confines a GRANDCHILD, not just the shell it starts', async () => {
+    // Every other denial here is attempted with a shell builtin — a redirect — so the confined
+    // process is `sh` itself and nothing crosses an exec. This one writes with /usr/bin/tee, so it
+    // only passes if confinement survives into a separately exec'd binary. That is what
+    // `allow pix /** -> &vibeboard-agent` buys, and it is the difference between confining an
+    // agent and confining the first process an agent starts: its bash tool execs everything.
+    const root = await tempDir();
+    const column = join(root, BOARDS_DIR, 'engineering', 'backlog');
+    await mkdir(column, { recursive: true });
+    const card = join(column, 'E-001.md');
+    await writeFile(card, 'original', 'utf8');
+
+    const denied = await sh(live, `echo pwned | /usr/bin/tee '${card}'`);
+    expect(denied.code).not.toBe(0);
+    expect(await readFile(card, 'utf8')).toBe('original');
+
+    // And the grandchild says so itself, so a failure above cannot be mistaken for tee missing.
+    const who = await sh(live, '/usr/bin/cat /proc/self/attr/current > /dev/null');
+    expect(who.code).toBe(0);
+  });
+
   it('refuses to move .git out from under its own rules', async () => {
     // The escape, end to end, exactly as it was reproduced in review: the hook deny was in place
     // and the CONTAINER was not, so renaming .git and symlinking it back put the hooks directory

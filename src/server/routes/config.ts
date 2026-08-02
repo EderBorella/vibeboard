@@ -84,7 +84,14 @@ function retableAndCheck(merged: ProjectConfig, renames: Rename[]): Refusal | nu
     merged.autopilot = applyRouteRenames(merged.autopilot, r.board, [{ from: r.from, to: r.to }]);
   }
   const problems = coverageProblems(merged);
-  return problems.length > 0 ? { code: 400, error: problems.join(' ') } : null;
+  if (problems.length === 0) return null;
+  // The remedy, not just the refusal. A message about a condition the user cannot see and cannot act
+  // on is a worse failure than the condition — and the routing table is not editable from the UI yet,
+  // so without this sentence the only way forward is to guess which file to open.
+  return {
+    code: 400,
+    error: `${problems.join(' ')} Edit \`autopilot\` in .vibeboard/config.yaml so every column is routed, terminal or blocked.`,
+  };
 }
 
 export async function registerConfigRoutes(api: FastifyInstance, ctx: AppCtx): Promise<void> {

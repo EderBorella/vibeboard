@@ -193,6 +193,18 @@ export function SettingsModal({ config, onClose, onSaved }: Props) {
             it. A column that still holds cards can't be removed, and renaming and reordering in the same save
             is refused — do those one at a time.
           </div>
+          {config.autopilot && (
+            // Only when there is a routing table to break. The refusal below is deliberate — a column
+            // nothing routes to is one whose cards are never picked up, and auto-pilot reporting
+            // "nothing left to do" over them is the failure the whole lifecycle is built against — but
+            // being refused at Save with no warning beforehand is a dead end, so it is said up front.
+            <div className="settings-warn">
+              <strong>Auto-pilot routes cards by column.</strong> Renaming one is carried across the routing
+              table for you. <strong>Adding or removing a column will be refused</strong> until its route
+              exists: edit <code>routes</code> and <code>terminal</code> in{' '}
+              <code>.vibeboard/config.yaml</code> in the same change.
+            </div>
+          )}
           {BOARDS.map((b) => (
             <label key={b} className="field">
               <span>{BOARD_LABELS[b]} columns</span>

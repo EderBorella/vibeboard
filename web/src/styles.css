@@ -385,6 +385,27 @@ body {
   border-radius: 6px; padding: 0.5rem 0.7rem;
 }
 .settings-warn code { font-family: var(--font-mono); font-size: 0.72rem; }
+/* The routing table. Scrolls inside its own box: five columns of slugs is wider than the modal on a
+   narrow window, and the modal itself must never scroll sideways. */
+.routes-wrap { overflow-x: auto; }
+.routes { border-collapse: collapse; font-size: 0.74rem; width: 100%; }
+.routes th {
+  text-align: left; font-weight: 600; color: var(--muted); text-transform: uppercase;
+  letter-spacing: 0.06em; font-size: 0.64rem; padding: 0.2rem 0.6rem 0.2rem 0; white-space: nowrap;
+}
+.routes td {
+  padding: 0.2rem 0.6rem 0.2rem 0; color: var(--text); white-space: nowrap;
+  font-family: var(--font-mono); font-size: 0.72rem;
+}
+.routes tbody tr + tr td { border-top: 1px solid var(--border); }
+
+/* Each blocker is a sentence naming what to change, so they are set as prose rather than as status
+   chips — there is nothing to scan, only something to read and do. */
+.blockers { list-style: none; display: flex; flex-direction: column; gap: 0.3rem; font-size: 0.76rem; }
+.blockers li { padding-left: 0.9rem; position: relative; color: var(--text); line-height: 1.5; }
+.blockers li::before { content: "→"; position: absolute; left: 0; color: var(--warn, var(--danger)); }
+.ready-ok { font-size: 0.76rem; color: var(--accent); }
+
 .settings-row { display: flex; gap: 0.75rem; }
 .settings-row .field { flex: 1; }
 .field select { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 0.45rem 0.5rem; color: var(--text); font-size: 0.85rem; }

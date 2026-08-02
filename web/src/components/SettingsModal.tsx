@@ -11,6 +11,7 @@ import {
   DEFAULT_CONTEXT_BUDGET,
   type ProjectConfig,
 } from '../shared';
+import { AutopilotPanel } from './AutopilotPanel';
 import { ModelPicker } from './ModelPicker';
 import { SandboxPanel } from './SandboxPanel';
 
@@ -230,6 +231,8 @@ export function SettingsModal({ config, onClose, onSaved }: Props) {
             because linking a card to two places is legitimate when you mean it. Agent runs are held to this
             rule either way: it is the hierarchy auto-pilot rolls up, and an agent cannot mean “see also”.
           </div>
+
+          <AutopilotPanel config={config} />
 
           <div className="settings-section">Cards</div>
           <div className="settings-row">

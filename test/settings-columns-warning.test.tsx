@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_AUTOPILOT } from '../src/core/autopilot.js';
 import { defaultConfig } from '../src/core/config.js';
@@ -8,6 +8,10 @@ const api = vi.hoisted(() => ({
   getSandbox: vi.fn().mockRejectedValue(new Error('no sandbox in this test')),
   listModels: vi.fn().mockResolvedValue([]),
   patchConfig: vi.fn().mockResolvedValue({}),
+  // The modal now mounts the auto-pilot panel, which asks for readiness. Rejected rather than
+  // stubbed with a fixture: this file is about the warning, and a panel reporting "could not read"
+  // is the honest thing for it to say when nothing answered.
+  getReadiness: vi.fn().mockRejectedValue(new Error('not what this test is about')),
 }));
 vi.mock('../web/src/api.js', () => api);
 
@@ -33,11 +37,15 @@ const show = (autopilot: boolean) =>
 describe('the columns warning', () => {
   it('warns that adding or removing a column will be refused, and names where to change it', () => {
     show(true);
-    expect(screen.getByText(/Adding or removing a column will be refused/i)).toBeTruthy();
-    expect(screen.getByText('.vibeboard/config.yaml')).toBeTruthy();
+    // Scoped to the warning itself: the auto-pilot panel below it also names config.yaml, and an
+    // assertion satisfied by either one would survive the warning being deleted.
+    const warning = screen.getByText(/Adding or removing a column will be refused/i).closest('.settings-warn');
+    expect(warning).not.toBeNull();
+    const inWarning = within(warning as HTMLElement);
+    expect(inWarning.getByText('.vibeboard/config.yaml')).toBeTruthy();
     // The remedy is two keys, and naming only one of them sends the user back for a second refusal.
-    expect(screen.getByText('routes')).toBeTruthy();
-    expect(screen.getByText('terminal')).toBeTruthy();
+    expect(inWarning.getByText('routes')).toBeTruthy();
+    expect(inWarning.getByText('terminal')).toBeTruthy();
   });
 
   it('says nothing on a project with no routing table, where the edit is not refused', () => {

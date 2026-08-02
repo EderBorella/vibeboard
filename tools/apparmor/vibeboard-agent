@@ -93,6 +93,42 @@ profile vibeboard-agent flags=(attach_disconnected) {
   # directly would be a second path to the same fact, and an unattributable one.
   deny /**/.vibeboard/PROJECT-LOG.md wl,
 
+  # The container, for the same reason `.vibeboard` has one above — and this deny was MISSING when
+  # the two below were added, which made them decorative. Reproduced end to end:
+  #
+  #     mv .git /tmp/x && ln -s /tmp/x .git && printf '#!/bin/sh\necho pwned' > .git/hooks/pre-commit
+  #
+  # then VibeBoard's own `git commit` ran it, unconfined, as the server. Denying the contents of a
+  # directory says nothing about the directory, and AppArmor mediates the RESOLVED path.
+  deny /**/.git{,/} wl,
+
+  # Git hooks are CODE THAT VIBEBOARD LATER RUNS, as itself, outside this profile — so a writable
+  # `pre-commit` turns the first `git commit` on an agent's behalf into an escape. `config` is here
+  # for the same reason: `core.hooksPath` points the hook lookup somewhere else. The repository
+  # itself stays writable, because an agent that cannot commit cannot do its job.
+  #
+  # The cost, measured rather than assumed: `git init` and `git config` both write `.git/config`,
+  # so an agent can run neither. That is the right trade — VibeBoard creates the repo itself, in
+  # scaffoldProject, before any agent exists — but it means an agent cannot set up a NESTED repo.
+  # Measured inside the profile: commit, branch, checkout, stash, tag, merge, rebase (including -i),
+  # amend and gc all work. What does not: `git init`, `git config`, `git remote add` and
+  # `--set-upstream-to` — so an agent cannot push or pull, which is the consequence someone will
+  # actually hit. VibeBoard commits on its behalf; publishing is a human's decision anyway.
+  # At ANY depth under .git, not just the top: `.git/modules/<sub>/hooks/` is a submodule's hook
+  # directory and `.git/config.worktree` is the per-worktree config, and both were writable while
+  # the top-level pair was denied. Reaching them needs a submodule or a worktree to exist, which is
+  # ordinary rather than exotic.
+  deny /**/.git/{,**/}hooks{,/**} wl,
+  deny /**/.git/{,**/}config{,.worktree} wl,
+
+  # Written through endpoints, which stamp the run and the card from the credential. Direct file
+  # access would let a run file an unvalidated suggestion, or quietly dismiss one of its own —
+  # the read problem decision 11 exists to prevent, arriving through the write side.
+  deny /**/.vibeboard/suggestions{,/**} wl,
+  # The copilot's transcripts: an agent should not be able to edit the record of the conversation
+  # that dispatched it.
+  deny /**/.vibeboard/chat{,/**} wl,
+
   # The admin credential. This is the pairing the whole auth model rests on: scopes fail if the
   # agent can read the browser's token off disk and call the API as the browser.
   #
@@ -103,6 +139,13 @@ profile vibeboard-agent flags=(attach_disconnected) {
   #
   # The folder gets its own deny for the reason above: `mv ~/.vibeboard ~/.vb2 && cat ~/.vb2/token`
   # read the credential straight through, because only paths beginning `token` were named.
+  # Git's GLOBAL config, which is the same escape with no rename at all:
+  # `git config --global core.hooksPath /tmp/evil` made every later commit VibeBoard performs — in
+  # ANY repository on the machine — run the agent's script as the server. Denying only the
+  # repo-local `.git/config` closed one of the two files git reads.
+  deny @{HOME}/.gitconfig wl,
+  deny @{HOME}/.config/git{,/**} wl,
+
   deny @{HOME}/.vibeboard{,/} wl,
   deny @{HOME}/.vibeboard/token* rwl,
 

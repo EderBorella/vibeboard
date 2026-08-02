@@ -1,5 +1,8 @@
-import { access, readFile, writeFile } from 'node:fs/promises';
+import { execFile } from 'node:child_process';
+import { existsSync, statSync } from 'node:fs';
+import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { promisify } from 'node:util';
 import { describe, expect, it } from 'vitest';
 import { boardColumnSlugs, readBoard } from '../src/core/board.js';
 import { readConfig } from '../src/core/config.js';
@@ -10,7 +13,50 @@ import { tempDir } from './helpers.js';
 const TODAY = '2026-07-23';
 const [CLAUDE_MD] = POINTER_FILES;
 
+async function git(root: string, ...args: string[]): Promise<string> {
+  return (await promisify(execFile)('git', args, { cwd: root })).stdout;
+}
+
 describe('scaffoldProject', () => {
+  it('greenfield: initialises a git repository', async () => {
+    const root = await tempDir();
+    await scaffoldProject(root, { name: 'Demo', mode: 'greenfield', today: TODAY });
+    await expect(access(join(root, '.git'))).resolves.toBeUndefined();
+  });
+
+  it('brownfield: initialises one too, because everything downstream commits', async () => {
+    const root = await tempDir();
+    await scaffoldProject(root, { name: 'Demo', mode: 'brownfield', today: TODAY });
+    await expect(access(join(root, '.git'))).resolves.toBeUndefined();
+  });
+
+  it('does not create a nested repo inside one it is already part of', async () => {
+    // Adopting /monorepo/packages/app is ordinary. Its own .git would shadow the parent, which
+    // then sees an embedded repository and stops tracking the subtree's history.
+    const outer = await tempDir();
+    await git(outer, 'init');
+    const inner = join(outer, 'packages', 'app');
+    await mkdir(inner, { recursive: true });
+    await scaffoldProject(inner, { name: 'Inner', mode: 'brownfield', today: TODAY });
+    expect(existsSync(join(inner, '.git'))).toBe(false);
+  });
+
+  it('leaves an existing repository alone', async () => {
+    const root = await tempDir();
+    await git(root, 'init');
+    await git(root, 'config', 'vibeboard.marker', 'original');
+    // The mtime of .git/config, NOT a config value: re-running `git init` on a repo preserves
+    // config values and history, so a marker assertion passes whether the guard is there or not.
+    // Measured, after review pointed out the first version of this test could not fail. What
+    // re-init does change is the file — it rewrites it.
+    const before = statSync(join(root, '.git', 'config')).mtimeMs;
+    await new Promise((r) => setTimeout(r, 20)); // coarse filesystem timestamps
+    await scaffoldProject(root, { name: 'Demo', mode: 'brownfield', today: TODAY });
+
+    expect(statSync(join(root, '.git', 'config')).mtimeMs).toBe(before);
+    expect((await git(root, 'config', '--get', 'vibeboard.marker')).trim()).toBe('original');
+  });
+
   it('greenfield: writes config, folders, docs, sample cards, and a fresh CLAUDE.md', async () => {
     const root = await tempDir();
     await scaffoldProject(root, { name: 'Demo', mode: 'greenfield', today: TODAY });

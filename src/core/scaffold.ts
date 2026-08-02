@@ -1,5 +1,7 @@
+import { execFile } from 'node:child_process';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { promisify } from 'node:util';
 import { boardColumnSlugs } from './board.js';
 import { defaultConfig, writeConfig } from './config.js';
 import { ensurePointerFile, INSTRUCTIONS_DOC } from './control.js';
@@ -143,6 +145,34 @@ async function writeSampleCards(projectRoot: string, config: ProjectConfig, toda
   await setCardLinks(projectRoot, config, product, [feature.id, engineering.id]);
 }
 
+const run = promisify(execFile);
+
+// Both modes: adopting a folder that is not yet a repo should still get one, because everything
+// downstream assumes commits exist — commit-before-dispatch, the checkup's own commits, rollback.
+// An existing repo is never re-initialised: `git init` on one is mostly harmless, and "mostly" is
+// how someone's config gets eaten.
+//
+// Failure is logged by its absence rather than thrown. A project without git still works as a
+// board; it is auto-pilot's pre-flight that turns this into a refusal, and doing it here would
+// mean a missing `git` binary broke project creation.
+async function ensureRepo(projectRoot: string): Promise<void> {
+  try {
+    // `is-inside-work-tree`, not `existsSync('.git')`. The latter answers "is this the ROOT of a
+    // repo", so adopting /monorepo/packages/app — an ordinary thing to do — gave it its own .git
+    // shadowing the parent, and the parent then saw an embedded repository whose history it had
+    // stopped tracking.
+    await run('git', ['rev-parse', '--is-inside-work-tree'], { cwd: projectRoot });
+    return;
+  } catch {
+    /* not in a work tree — or no git at all, which the init below will discover */
+  }
+  try {
+    await run('git', ['init'], { cwd: projectRoot });
+  } catch {
+    /* no git on PATH, or a filesystem that will not take a repo */
+  }
+}
+
 export async function scaffoldProject(
   projectRoot: string,
   opts: { name: string; mode: ScaffoldMode; today: string },
@@ -166,4 +196,5 @@ export async function scaffoldProject(
   // should add the cockpit and nothing else — three "delete me" cards would just be noise in
   // someone's real project (and in their git status).
   if (greenfield) await writeSampleCards(projectRoot, config, opts.today);
+  await ensureRepo(projectRoot);
 }

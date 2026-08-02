@@ -1,12 +1,14 @@
-import { spawnSync } from 'node:child_process';
+import { execFile, spawnSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { promisify } from 'node:util';
 import { describe, expect, it } from 'vitest';
 import { BOARDS_DIR } from '../src/core/layout.js';
+import { scaffoldProject } from '../src/core/scaffold.js';
 import { copilotHome } from '../src/server/copilot-env.js';
 import { NOT_REQUESTED, probeSandbox, SANDBOX_PROFILE, wrapCommand } from '../src/server/sandbox.js';
 import { sh, tempDir } from './helpers.js';
@@ -30,6 +32,7 @@ describe('wrapCommand', () => {
 // contributor on a Mac must still be able to run the suite — but the suite must say so out loud
 // rather than reporting a silent green.
 const here = dirname(fileURLToPath(import.meta.url));
+const run = promisify(execFile);
 const live = await probeSandbox();
 // Sampled before anything runs: the credential test asserts this suite does not bring the real
 // token into existence, and it can only do that if it knows the answer from before.
@@ -82,6 +85,62 @@ describe.skipIf(!live.ok)('the profile denies what it claims to', () => {
     expect((await sh(live, `mv '${join(root, '.vibeboard')}' '${join(root, 'vb2')}'`)).code).not.toBe(0);
     // Still where it was, under the name the rules know.
     expect(existsSync(join(root, BOARDS_DIR))).toBe(true);
+  });
+
+  it('refuses to write a git hook or repoint hooksPath, and still allows a commit', async () => {
+    // The repo is created UNCONFINED, because that is what happens: scaffoldProject runs `git init`
+    // as VibeBoard, before any agent exists. Doing it inside the sandbox would test a sequence that
+    // never occurs — and it fails there, since `git init` writes `.git/config`, which is denied.
+    const root = await tempDir();
+    await scaffoldProject(root, { name: 'G', mode: 'brownfield', today: '2026-08-02' });
+    await run('git', ['config', 'user.email', 't@t'], { cwd: root });
+    await run('git', ['config', 'user.name', 't'], { cwd: root });
+
+    // A hook is code VibeBoard later runs as itself, outside the profile.
+    expect((await sh(live, `printf x > '${join(root, '.git', 'hooks', 'pre-commit')}'`)).code).not.toBe(0);
+    // And the other way to the same place. Denying only `hooks/` would leave this open.
+    expect((await sh(live, `cd '${root}' && git config core.hooksPath /tmp/evil`)).code).not.toBe(0);
+
+    // The half that matters just as much: a profile that also blocked committing would have broken
+    // the feature it is protecting. Branch and second commit included — a first commit into an
+    // empty repo touches fewer paths than everyday work does.
+    const commit = await sh(
+      live,
+      `cd '${root}' && printf hi > a.md && git add -A && git commit -qm first && git checkout -q -b feat && printf more >> a.md && git commit -qam second`,
+    );
+    expect(commit.code, commit.stderr).toBe(0);
+  });
+
+  it('refuses to move .git out from under its own rules', async () => {
+    // The escape, end to end, exactly as it was reproduced in review: the hook deny was in place
+    // and the CONTAINER was not, so renaming .git and symlinking it back put the hooks directory
+    // at a path no rule matched — and VibeBoard's own commit then ran the agent's script,
+    // unconfined, as the server.
+    const root = await tempDir();
+    await scaffoldProject(root, { name: 'E', mode: 'brownfield', today: '2026-08-02' });
+    const stolen = join(await tempDir(), 'stolen-git');
+    expect((await sh(live, `mv '${join(root, '.git')}' '${stolen}'`)).code).not.toBe(0);
+    expect(existsSync(join(root, '.git', 'hooks'))).toBe(true);
+  });
+
+  it("refuses to write git's global config, which needs no rename at all", async () => {
+    // `git config --global core.hooksPath /tmp/evil` made every later commit VibeBoard performs,
+    // in ANY repository, run the agent's script. Probed on a path matching the deny, never the
+    // real file — a test that writes ~/.gitconfig to prove it cannot is a test that broke your git.
+    const probe = join(homedir(), '.gitconfig');
+    expect((await sh(live, `printf '[core]\n' >> '${probe}'`)).code).not.toBe(0);
+    expect((await sh(live, `printf x > '${join(homedir(), '.config', 'git', 'config')}'`)).code).not.toBe(0);
+  });
+
+  it('refuses to file a suggestion by writing the file', async () => {
+    // The endpoint stamps the run and the card from the credential; the file path would skip that,
+    // and would also let a run mark its own finding dismissed.
+    const root = await tempDir();
+    await mkdir(join(root, '.vibeboard', 'suggestions'), { recursive: true });
+    expect(
+      (await sh(live, `printf 'state: dismissed' > '${join(root, '.vibeboard', 'suggestions', 's1.md')}'`))
+        .code,
+    ).not.toBe(0);
   });
 
   it('refuses to read the admin credential', async () => {
@@ -159,6 +218,17 @@ describe.skipIf(!parserPresent)('the compiled policy, not the globs', () => {
     ['the instructions injected into every turn', '/w/proj/.vibeboard/INSTRUCTIONS.md'],
     ['the card conventions both pointer files import', '/w/proj/.vibeboard/VIBEBOARD.md'],
     ['the diary', '/w/proj/.vibeboard/PROJECT-LOG.md'],
+    ['a suggestion', '/w/proj/.vibeboard/suggestions/s1.md'],
+    ['the suggestions folder itself', '/w/proj/.vibeboard/suggestions'],
+    ['a chat transcript', '/w/proj/.vibeboard/chat/c1.json'],
+    ['a git hook', '/w/proj/.git/hooks/pre-commit'],
+    ['the git config', '/w/proj/.git/config'],
+    ['the .git folder itself, which was renameable', '/w/proj/.git'],
+    ["a submodule's hooks", '/w/proj/.git/modules/sub/hooks/pre-commit'],
+    ["a submodule's config", '/w/proj/.git/modules/sub/config'],
+    ['the per-worktree config', '/w/proj/.git/config.worktree'],
+    ["git's global config", '/home/someone/.gitconfig'],
+    ["git's XDG config", '/home/someone/.config/git/config'],
     ['the admin token', '/home/someone/.vibeboard/token'],
     ['the folder holding the admin token', '/home/someone/.vibeboard'],
   ])('covers %s', (_what, path) => {
@@ -169,6 +239,9 @@ describe.skipIf(!parserPresent)('the compiled policy, not the globs', () => {
     ['project source', '/w/proj/src/index.ts'],
     ['a new top-level file', '/w/proj/package.json'],
     ['the run staging area', '/w/proj/.vibeboard/runs/r1.report.md'],
+    ['the repository itself', '/w/proj/.git/objects/ab/cdef'],
+    ['the git index', '/w/proj/.git/index'],
+    ['a ref, so a commit can move a branch', '/w/proj/.git/refs/heads/main'],
     ["the CLIs' own config home", '/home/someone/.vibeboard/copilot/claude/settings.json'],
   ])('leaves %s alone', (_what, path) => {
     // The other half, and the one a careless hardening breaks: `runs/` is deliberately writable, and

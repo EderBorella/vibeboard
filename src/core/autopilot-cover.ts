@@ -152,6 +152,27 @@ function checkOneRoutePerPhase(ap: AutopilotConfig, out: string[]): void {
   }
 }
 
+// The same rule for rollups, plus the pairing that must not happen. `eligible` and a route belong
+// together — that IS the close-out shape, where the rollup gates the route rather than replacing it.
+// `advance` and a route on one column contradict each other: the card would be dispatched for its
+// skill and simultaneously moved to done for free, and which happened would depend on tick order.
+function checkOneRollupPerPhase(ap: AutopilotConfig, out: string[]): void {
+  const seen = new Set<string>();
+  for (const rule of ap.rollup) {
+    const key = `${rule.board}/${rule.column}`;
+    if (seen.has(key)) {
+      out.push(`${key} has more than one rollup rule; a column rolls up exactly one way.`);
+    }
+    seen.add(key);
+    if (rule.action !== 'advance') continue;
+    if (ap.routes.some((r) => r.board === rule.board && r.column === rule.column)) {
+      out.push(
+        `${key} both advances by rollup and runs a skill, so whether the card is dispatched or moved to done would depend on tick order.`,
+      );
+    }
+  }
+}
+
 // The four ways a card in a column can be acted on. `advance` is the fourth: a product card in
 // In Progress is moved by the rollup and by no route, so without this it reads as unreachable.
 // `eligible` deliberately does NOT count — it gates a route rather than replacing one, and a column
@@ -293,6 +314,7 @@ export function coverageProblems(config: ProjectConfig): string[] {
     checkAdvanceIntoBlocked(ap, route, out);
   }
   checkOneRoutePerPhase(ap, out);
+  checkOneRollupPerPhase(ap, out);
   checkCover(ap, columns, out);
   checkNamedColumns(ap, columns, out);
   checkReachesTerminal(ap, columns, out);

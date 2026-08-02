@@ -73,7 +73,18 @@ const renamesOf = (plans: BoardPlan[]): Rename[] =>
 // user having to keep two places in step. Everything else that would leave a column unreachable is
 // refused. A project with no autopilot block is untouched: migration of projects written before the
 // lifecycle is one deliberate pass later, not a silent half-upgrade here.
-function retableAndCheck(merged: ProjectConfig, renames: Rename[]): Refusal | null {
+function retableAndCheck(current: ProjectConfig, merged: ProjectConfig, renames: Rename[]): Refusal | null {
+  // Removing the block is removing the gate. `mergeConfig` is a spread, so `{"autopilot": null}` was
+  // a 200 that wrote `autopilot: null` to disk and turned every check below off for good — the one
+  // request a caller could make to be rid of the validator entirely. A project that has a lifecycle
+  // keeps it; one that never had it is untouched, which is the deferred-migration case.
+  if (current.autopilot && !merged.autopilot) {
+    return {
+      code: 400,
+      error:
+        'That would remove the autopilot block, and with it every check that keeps a card from being stranded in a column nothing routes to. Edit `autopilot` in .vibeboard/config.yaml if you mean to change the lifecycle.',
+    };
+  }
   if (!merged.autopilot) return null;
   // Before the renames, not after: applyRouteRenames indexes into `routes` and `terminal`, so a
   // hand-edited block missing either threw a TypeError and the request became a 500 with no
@@ -107,7 +118,7 @@ export async function registerConfigRoutes(api: FastifyInstance, ctx: AppCtx): P
 
     const planned = await planColumnEdits(ctx.session.root, ctx.session.config, patch.boards);
     if (isRefusal(planned)) return reply.code(planned.code).send({ error: planned.error });
-    const uncovered = retableAndCheck(merged, renamesOf(planned.plans));
+    const uncovered = retableAndCheck(ctx.session.config, merged, renamesOf(planned.plans));
     if (uncovered) return reply.code(uncovered.code).send({ error: uncovered.error });
 
     // Nothing above this line has touched the filesystem. From here the request cannot be refused,

@@ -256,3 +256,37 @@ describe('routing-table coverage — holes found in review', () => {
     );
   });
 });
+
+describe('rollup rules that contradict each other', () => {
+  it('refuses two rollup rules on one column', () => {
+    const config = fresh();
+    ap(config).rollup.push({ ...ap(config).rollup[0], next: 'todo' });
+    expect(coverageProblems(config)).toContain(
+      'product/in-progress has more than one rollup rule; a column rolls up exactly one way.',
+    );
+  });
+
+  it('refuses a column that both advances by rollup and runs a skill', () => {
+    const config = fresh();
+    ap(config).routes.push({
+      board: 'product',
+      column: 'in-progress',
+      skill: 'design',
+      verify: 'critic',
+      next: 'done',
+    });
+    expect(coverageProblems(config)).toContain(
+      'product/in-progress both advances by rollup and runs a skill, so whether the card is dispatched or moved to done would depend on tick order.',
+    );
+  });
+
+  // The pairing that MUST stay legal: a feature in in-progress has a close-out route, and the
+  // eligibility rule gates it rather than replacing it. Refusing this would break the default table.
+  it('allows an eligibility rule on a column that has a route — that is the close-out shape', () => {
+    const config = fresh();
+    const features = ap(config).rollup.find((r) => r.board === 'features');
+    expect(features?.action).toBe('eligible');
+    expect(ap(config).routes.some((r) => r.board === 'features' && r.column === features?.column)).toBe(true);
+    expect(coverageProblems(config)).toEqual([]);
+  });
+});

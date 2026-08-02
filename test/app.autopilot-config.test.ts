@@ -150,3 +150,27 @@ describe('PATCH /api/config and the routing table', () => {
     expect(res.json().autopilot).toBeUndefined();
   });
 });
+
+// Removing the block is removing the gate, and `mergeConfig` is a spread — so one request could
+// switch off every check that keeps a card from being stranded.
+describe('PATCH /api/config cannot delete the lifecycle', () => {
+  it('refuses a patch that would remove the autopilot block', async () => {
+    const { app, root } = await openTestProject({ name: 'A', mode: 'brownfield' });
+    const res = await app.inject({ method: 'PATCH', url: '/api/config', payload: { autopilot: null } });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().error).toContain('would remove the autopilot block');
+    // Still on disk, not merely still in memory.
+    expect((await readDisk(root)).autopilot?.routes.length).toBeGreaterThan(0);
+  });
+
+  it('still refuses when the block is invalid — the way out is to fix it, not to delete it', async () => {
+    const { app, root, session } = await openTestProject({ name: 'A', mode: 'brownfield' });
+    const config = await readDisk(root);
+    // biome-ignore lint/suspicious/noExplicitAny: a hand-edited file can hold any shape
+    (config as any).autopilot = { maxIterations: 10 };
+    await writeFile(configPath(root), stringify(config), 'utf8');
+    await session.reloadConfig();
+    const res = await app.inject({ method: 'PATCH', url: '/api/config', payload: { autopilot: null } });
+    expect(res.statusCode).toBe(400);
+  });
+});

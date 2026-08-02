@@ -132,8 +132,9 @@ export interface BoardConfig {
   columns: string[];
 }
 
-// Mirrors src/core/autopilot.ts. The UI renders the table read-only: config.yaml is where it is
-// edited, and the server refuses a change that leaves a column with nothing to do.
+// Mirrors src/core/autopilot.ts. Nothing renders the table yet — the auto-pilot settings tab is a
+// later task; today the UI only asks whether the block EXISTS, to decide whether a column edit is
+// about to be refused. config.yaml is where the table is edited.
 export type VerifyMode = 'gates' | 'critic' | 'smoke';
 export interface Route {
   board: BoardName;

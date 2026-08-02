@@ -1,4 +1,9 @@
+import { writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { boardColumnSlugs } from '../src/core/board.js';
+import { defaultConfig } from '../src/core/config.js';
+import { boardRel } from '../src/core/layout.js';
 import { openTestProject } from './helpers.js';
 
 describe('PUT /cards/:board/:id/links', () => {
@@ -34,5 +39,40 @@ describe('PUT /cards/:board/:id/links', () => {
       payload: { links: [] },
     });
     expect(res.statusCode).toBe(404);
+  });
+});
+
+// Answering 200 here tells an agent its child is attached when the child is an orphan. break-down
+// derives the whole hierarchy from these links, so a false success is a hole in the tree the loop
+// then walks.
+describe('a link target whose file cannot be read', () => {
+  it('is refused rather than answered 200 with the link missing', async () => {
+    const { app, root } = await openTestProject({ name: 'L' });
+    const [column] = boardColumnSlugs(defaultConfig('L'), 'engineering');
+    await writeFile(
+      join(root, boardRel('engineering', column, 'E-050.md')),
+      '---\ntitle: "broken\n---\nx\n',
+      'utf8',
+    );
+
+    const res = await app.inject({
+      method: 'PUT',
+      url: '/api/cards/product/P-001/links',
+      payload: { links: ['E-050'] },
+    });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.json().error).toContain('E-050');
+  });
+
+  it('still ignores an id that names no file, which is the documented contract', async () => {
+    const { app } = await openTestProject({ name: 'L' });
+    const res = await app.inject({
+      method: 'PUT',
+      url: '/api/cards/product/P-001/links',
+      payload: { links: ['E-999'] },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().links).toEqual([]);
   });
 });

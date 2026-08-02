@@ -1,4 +1,4 @@
-import { readBoard } from './board.js';
+import { readBoard, spentIds } from './board.js';
 import { updateCard } from './mutations.js';
 import { BOARDS, type BoardName, type Card, type ProjectConfig } from './types.js';
 
@@ -18,6 +18,11 @@ export async function setCardLinks(
   config: ProjectConfig,
   card: Card,
   desired: string[],
+  // Ids that were asked for, exist as a file, and could not be read. Dropping an id that names no
+  // card at all is the documented contract; dropping one whose file is sitting right there is a
+  // different fact, and it used to be indistinguishable — `break-down` could link a child, be told
+  // it succeeded, and leave an orphan.
+  unreadable?: string[],
 ): Promise<Card> {
   const self = card.id;
   const desiredSet = new Set(desired.filter((id) => id !== self));
@@ -25,6 +30,17 @@ export async function setCardLinks(
   const perBoard = await Promise.all(BOARDS.map((board) => readBoard(projectRoot, board, config)));
   const all = perBoard.flat();
   const liveIds = new Set(all.map((c) => c.id));
+
+  if (unreadable) {
+    const missing = [...desiredSet].filter((id) => !liveIds.has(id));
+    if (missing.length > 0) {
+      // Only pay for the directory listing when something is actually missing.
+      const onDisk = new Set(
+        (await Promise.all(BOARDS.map((board) => spentIds(projectRoot, board, config)))).flat(),
+      );
+      unreadable.push(...missing.filter((id) => onDisk.has(id)));
+    }
+  }
 
   // Reconcile every other live card's back-reference to `self`.
   for (const other of all) {

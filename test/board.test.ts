@@ -185,3 +185,19 @@ describe('reporting what could not be read', () => {
     expect(problems).toEqual([]);
   });
 });
+
+// The badge counts FILES and the drawer lists CARDS, which are the same number until one will not
+// parse. They used to disagree in silence: a badge reading 1 opened an empty drawer.
+describe('the archive badge and the archive list', () => {
+  it('reports the file the list cannot show, so the two account for each other', async () => {
+    const root = await tempDir();
+    await writeCard(root, boardRel('engineering', ARCHIVE_SLUG, 'E-001.md'), '---\ntitle: "oops\n---\nx\n');
+
+    const problems: CardProblem[] = [];
+    const cards = await readArchive(root, 'engineering', problems);
+
+    expect(await countArchived(root, 'engineering')).toBe(1);
+    expect(cards).toEqual([]);
+    expect(problems.map((p) => p.path.endsWith('E-001.md'))).toEqual([true]);
+  });
+});

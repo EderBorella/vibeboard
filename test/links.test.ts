@@ -1,7 +1,10 @@
+import { writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { boardColumnSlugs, readBoard } from '../src/core/board.js';
 import { readConfig } from '../src/core/config.js';
 import { findCard } from '../src/core/find.js';
+import { boardRel } from '../src/core/layout.js';
 import { boardOfId, setCardLinks } from '../src/core/links.js';
 import { type CreateCardInput, createCard } from '../src/core/mutations.js';
 import { scaffoldProject } from '../src/core/scaffold.js';
@@ -129,5 +132,37 @@ describe('setCardLinks (symmetric)', () => {
     const freshA = await findCard(root, 'product', a.id, config);
     await setCardLinks(root, config, freshA!, []);
     expect((await findCard(root, 'engineering', shared.id, config))!.links).toEqual([b.id]);
+  });
+});
+
+// Dropping an id that names no card is the documented contract. Dropping one whose FILE is sitting
+// right there is a different fact, and the two were indistinguishable — break-down could link a
+// child, be told it succeeded, and leave an orphan.
+describe('a link target that exists but cannot be read', () => {
+  it('is reported, not silently dropped', async () => {
+    const { root, config, engColumn } = await fixture();
+    const a = await create(root, config, { board: 'product', columnSlug: 'todo', title: 'A' });
+    await writeFile(
+      join(root, boardRel('engineering', engColumn, 'E-050.md')),
+      '---\ntitle: "broken\n---\nx\n',
+      'utf8',
+    );
+
+    const unreadable: string[] = [];
+    const updated = await setCardLinks(root, config, a, ['E-050'], unreadable);
+
+    expect(unreadable).toEqual(['E-050']);
+    expect(updated.links).toEqual([]); // still not linked — the report is the point
+  });
+
+  it('says nothing about an id that names no file at all', async () => {
+    // The existing contract: a genuinely unknown id is ignored, and must not start reporting.
+    const { root, config } = await fixture();
+    const a = await create(root, config, { board: 'product', columnSlug: 'todo', title: 'A' });
+
+    const unreadable: string[] = [];
+    await setCardLinks(root, config, a, ['E-999'], unreadable);
+
+    expect(unreadable).toEqual([]);
   });
 });

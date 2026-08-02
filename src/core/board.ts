@@ -83,13 +83,22 @@ export async function readBoard(
 
 // Newest first: the drawer's job is answering "what did I just throw away". Cards archived
 // before this was recorded have no timestamp and sort to the bottom.
-export async function readArchive(projectRoot: string, board: BoardName): Promise<Card[]> {
-  const cards = await readCardsFromFolder(projectRoot, board, ARCHIVE_SLUG);
+export async function readArchive(
+  projectRoot: string,
+  board: BoardName,
+  problems?: CardProblem[],
+): Promise<Card[]> {
+  const cards = await readCardsFromFolder(projectRoot, board, ARCHIVE_SLUG, problems);
   return cards.sort((a, b) => (b.archived ?? '').localeCompare(a.archived ?? '') || b.id.localeCompare(a.id));
 }
 
-// Counted rather than read, so it can ride along on every snapshot without opening files —
-// the archive is the one folder that only ever grows.
+// Counted rather than read, so it can ride along on every snapshot without opening files — the
+// archive is the one folder that only ever grows.
+//
+// This counts FILES, which is deliberately not the same as the number of cards readArchive returns:
+// a file it cannot parse is in the drawer but not in the list. They used to disagree in silence, so
+// a badge reading 1 opened an empty drawer. readArchive now reports what it could not read, and the
+// drawer says so — the count stays cheap and the gap stops being invisible.
 export async function countArchived(projectRoot: string, board: BoardName): Promise<number> {
   try {
     const entries = await readdir(join(projectRoot, boardRel(board, ARCHIVE_SLUG)));

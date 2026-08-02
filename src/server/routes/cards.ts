@@ -1,6 +1,6 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import type { FastifyInstance, FastifyReply } from 'fastify';
-import { readArchive } from '../../core/board.js';
+import { type CardProblem, readArchive } from '../../core/board.js';
 import { findCard } from '../../core/find.js';
 import { ARCHIVE_SLUG } from '../../core/layout.js';
 import { setCardLinks } from '../../core/links.js';
@@ -103,7 +103,15 @@ export async function registerCardRoutes(api: FastifyInstance, ctx: AppCtx): Pro
     if (!Array.isArray(links)) return reply.code(400).send({ error: 'links must be an array' });
     const card = await findCard(ctx.session.root, board, id, ctx.session.config);
     if (!card) return reply.code(404).send({ error: 'Card not found' });
-    return setCardLinks(ctx.session.root, ctx.session.config, card, links);
+    // A target whose file exists but cannot be read is refused rather than silently dropped: the
+    // caller asked for a link to a card that IS there, and answering 200 would tell an agent its
+    // child is attached when it is an orphan.
+    const unreadable: string[] = [];
+    const updated = await setCardLinks(ctx.session.root, ctx.session.config, card, links, unreadable);
+    if (unreadable.length > 0) {
+      return reply.code(409).send({ error: `cannot link to unreadable ${unreadable.join(', ')}` });
+    }
+    return updated;
   });
 
   // Position a card: within its column (reorder) or into another one, in a single call.
@@ -137,10 +145,13 @@ export async function registerCardRoutes(api: FastifyInstance, ctx: AppCtx): Pro
   api.get('/archive/:board', async (req, reply) => {
     if (!ensureOpen(ctx.session, reply)) return;
     const { board } = req.params as { board: BoardName };
-    const cards = await readArchive(ctx.session.root, board);
+    const problems: CardProblem[] = [];
+    const cards = await readArchive(ctx.session.root, board, problems);
     // Hoisted: narrowing from ensureOpen does not reach inside the callback.
     const config = ctx.session.config;
-    return { cards: cards.map((c) => ({ ...c, restoreTo: restoreTarget(config, c) })) };
+    // `problems` is what the badge counts and this list cannot show. Sent so the drawer can account
+    // for the difference rather than looking like it lost something.
+    return { cards: cards.map((c) => ({ ...c, restoreTo: restoreTarget(config, c) })), problems };
   });
 
   api.post('/cards/:board/:id/restore', async (req, reply) => {

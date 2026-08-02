@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { describe, expect, it, onTestFinished } from 'vitest';
 import { buildApp } from '../src/server/app.js';
-import { bearerToken } from '../src/server/auth.js';
+import { allows, bearerToken } from '../src/server/auth.js';
 import { type Credential, CredentialStore, type Scope } from '../src/server/credentials.js';
 import { ProjectSession } from '../src/server/session.js';
 import { tempDir } from './helpers.js';
@@ -58,6 +58,51 @@ describe('bearerToken', () => {
     expect(bearerToken('')).toBe('');
     expect(bearerToken('Bearer')).toBe('');
     expect(bearerToken('Bearer ')).toBe('');
+  });
+});
+
+// The scope table, row by row, without a server in the way. auth.ts exports `allows` saying "a row
+// nobody exercises is a row that does not work" — and then no test imported it. The table IS well
+// covered through the app, but only where a route happens to be convenient to call; this is the
+// whole grid, including the rows that say no.
+describe('the scope table', () => {
+  const PROJECT = '/p/A';
+  const cred = (scope: Scope, card?: string): Credential => ({
+    token: 't',
+    scope,
+    ...(scope === 'admin' ? {} : { run: 'r', project: PROJECT, card }),
+  });
+
+  it.each([
+    // route,                                     method,  work,  checkup, service
+    ['/api/state', 'GET', true, true, true],
+    ['/api/config', 'GET', true, true, true],
+    ['/api/archive/:board', 'GET', true, true, true],
+    ['/api/cards/:board/:id/raw', 'GET', true, true, true],
+    ['/api/cards', 'POST', true, true, false],
+    ['/api/cards/:board/:id', 'PATCH', true, true, false],
+    ['/api/cards/:board/:id/links', 'PUT', true, true, false],
+    ['/api/cards/:board/:id/move', 'POST', false, true, true],
+    ['/api/cards/:board/:id/archive', 'POST', false, true, false],
+    // Named here to pin that they are refused, not merely absent from the table by oversight.
+    ['/api/cards/:board/:id/raw', 'PUT', false, false, false],
+    ['/api/cards/:board/:id/place', 'POST', false, false, false],
+    ['/api/runs', 'POST', false, false, false],
+    ['/api/config', 'PATCH', false, false, false],
+    ['/api/explorer/file', 'PUT', false, false, false],
+    ['/api/project/open', 'POST', false, false, false],
+    ['/api/skills/:slug', 'PUT', false, false, false],
+  ])('%s %s', (route, method, work, checkup, service) => {
+    // `card` matches the :id row's own-card rule, so this grid measures scope and not confinement.
+    expect(allows(cred('work', 'E-001'), method, route, PROJECT, 'E-001'), 'work').toBe(work);
+    expect(allows(cred('checkup'), method, route, PROJECT, 'E-001'), 'checkup').toBe(checkup);
+    expect(allows(cred('service'), method, route, PROJECT, 'E-001'), 'service').toBe(service);
+    // Admin reaches everything, on every row.
+    expect(allows(cred('admin'), method, route, PROJECT, 'E-001'), 'admin').toBe(true);
+  });
+
+  it('denies a route it has never heard of', () => {
+    expect(allows(cred('service'), 'POST', '/api/something-new', PROJECT)).toBe(false);
   });
 });
 

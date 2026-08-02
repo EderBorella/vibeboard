@@ -33,7 +33,11 @@ const RULES: Record<string, Rule> = {
   // derived from those links, so without it every card it creates is an orphan.
   'POST /api/cards': { scopes: ['work', 'checkup'] },
   'PATCH /api/cards/:board/:id': { scopes: ['work', 'checkup'], ownCard: ['work'] },
-  'PUT /api/cards/:board/:id/links': { scopes: ['work', 'checkup'] },
+  // Own card for `work`, like PATCH: the payload is the COMPLETE list, and links are symmetric, so
+  // an unconfined PUT lets a run erase the links of any card on any board — including the
+  // feature→product→engineering trace the whole hierarchy is derived from. It costs break-down
+  // nothing: it links children to their parent, and the parent IS the run's own card.
+  'PUT /api/cards/:board/:id/links': { scopes: ['work', 'checkup'], ownCard: ['work'] },
 
   // Moving is supervision, not work: a work agent must not be able to put its own card in done and
   // declare itself finished. `/place` is absent deliberately — it is the drag-and-drop verb, and

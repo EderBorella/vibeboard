@@ -177,6 +177,34 @@ describe('the API boundary', () => {
       expect(res.statusCode).toBe(403);
     });
 
+    it('may not rewrite another card’s links', async () => {
+      // The payload is the complete list and links are symmetric, so an unconfined PUT lets a run
+      // erase a hierarchy it has nothing to do with — including the trace auto-pilot walks.
+      const { app, mint } = await open();
+      const cred = mint('work', 'run-1', 'E-001');
+      const res = await app.inject({
+        method: 'PUT',
+        url: '/api/cards/product/P-001/links',
+        headers: bearer(cred.token),
+        payload: { links: [] },
+      });
+      expect(res.statusCode).toBe(403);
+    });
+
+    it('may still link its own card, which is all break-down needs', async () => {
+      // break-down attaches children to their parent, and the parent is the card the run was
+      // dispatched for. The far side is written for it, so confinement costs it nothing.
+      const { app, mint } = await open();
+      const cred = mint('work', 'run-1', 'E-001');
+      const res = await app.inject({
+        method: 'PUT',
+        url: '/api/cards/engineering/E-001/links',
+        headers: bearer(cred.token),
+        payload: { links: ['P-001'] },
+      });
+      expect(res.statusCode).toBe(200);
+    });
+
     it('is not confined when the scope is checkup', async () => {
       // The checkup is a supervisor, not a worker: editing any card is the job.
       const { app, mint } = await open();

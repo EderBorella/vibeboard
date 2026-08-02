@@ -3,7 +3,7 @@ import type { Skill } from '../core/skills.js';
 import type { BoardName, Card } from '../core/types.js';
 import { type Backend, type RunningTurn, runAgentTurn } from './agent-turn.js';
 import type { ResultStats } from './copilot-events.js';
-import type { CredentialStore } from './credentials.js';
+import type { Credential, CredentialStore } from './credentials.js';
 import type { Log } from './logging.js';
 import { type BoardColumns, buildRunPrompt } from './run-prompt.js';
 import { appendTranscript, foldReport, reportContract, transcriptTail, writeRun } from './run-store.js';
@@ -195,6 +195,19 @@ export class AgentRunner {
     // run actually starts. `work`, confined to its own card: a run that could move cards could put
     // its own into done and declare itself finished.
     const minted = this.#opts.credentials?.mintRun('work', run, root, record.card);
+    // Everything from here to the handover to #settle is inside the try: once a credential exists,
+    // the only thing that revokes it is #settle's `finally`, so a throw on the way there would
+    // leave a working key alive for the life of the process with no run behind it.
+    try {
+      this.#spawn(root, record, input, minted);
+    } catch (err) {
+      this.#opts.credentials?.expireRun(run);
+      throw err;
+    }
+  }
+
+  #spawn(root: string, record: RunRecord, input: DispatchInput, minted: Credential | undefined): void {
+    const run = record.run;
     const credential = minted ? { token: minted.token, apiBase: this.#opts.apiBase?.() ?? '' } : undefined;
     const prompt = buildRunPrompt({
       skill: input.skill,

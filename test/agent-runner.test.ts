@@ -601,6 +601,23 @@ describe('the run credential', () => {
     expect(final.report).toContain('[credential redacted]');
   });
 
+  it('revokes the credential when the spawn itself throws', async () => {
+    // The mint happens before the prompt is built and the process spawned, and #settle — which owns
+    // the only revoke — never runs if either throws. Nothing reproduced that in normal operation,
+    // but a mint outside a try is the wrong shape whether or not today's inputs can reach it.
+    const root = await tempDir();
+    const store = new RecordingStore('admin');
+    const runPrompt = await import('../src/server/run-prompt.js');
+    vi.spyOn(runPrompt, 'buildRunPrompt').mockImplementation(() => {
+      throw new Error('prompt could not be built');
+    });
+
+    const { instance } = runner(root, { credentials: store });
+    await expect(instance.dispatch(input(root))).rejects.toThrow('prompt could not be built');
+    expect(store.minted).toHaveLength(1);
+    expect(store.verify(store.minted[0].token)).toBeNull();
+  });
+
   it('says nothing about a credential when the runner has no store', async () => {
     const root = await tempDir();
     const argsLog = join(await tempDir(), 'args.log');

@@ -312,3 +312,52 @@ describe('the run credential', () => {
     expect(text).toContain('E-010');
   });
 });
+
+// The documents a run is bound by. Four as paths — the agent has a Read tool, and inlining one it may
+// not need is tokens spent on nothing — and the gates in full, because an agent asked to go and
+// fetch the bar will sometimes not bother.
+describe('the foundation section', () => {
+  const foundation = {
+    paths: ['.vibeboard/foundation/STACK.md', '.vibeboard/foundation/CODE-QUALITY.md'],
+    codeQuality: '---\ngates:\n  - name: tests\n    command: npm test\n---\nThe bar.',
+  };
+
+  it('lists the documents by path and inlines the gates', () => {
+    const text = buildRunPrompt(inputs({ foundation }));
+    expect(text).toContain("## The project's foundation");
+    expect(text).toContain('- .vibeboard/foundation/STACK.md');
+    expect(text).toContain('command: npm test');
+  });
+
+  it('says they are binding and read-only, not background reading', () => {
+    const text = buildRunPrompt(inputs({ foundation }));
+    expect(text).toContain('These decisions are already made for this project.');
+    // An agent that does not know the denial is coming reads a permission error as a broken tool.
+    expect(text).toContain('read-only to you at the operating-system level');
+  });
+
+  it('says nothing at all when the project has no foundation yet', () => {
+    expect(buildRunPrompt(inputs())).not.toContain('foundation');
+    // An empty list is the same lie as a heading over nothing.
+    expect(buildRunPrompt(inputs({ foundation: { paths: [] } }))).not.toContain('foundation');
+  });
+
+  it('omits the gates block when CODE-QUALITY.md is not among them', () => {
+    const text = buildRunPrompt(inputs({ foundation: { paths: ['.vibeboard/foundation/UX.md'] } }));
+    expect(text).toContain('- .vibeboard/foundation/UX.md');
+    expect(text).not.toContain('The gates your work must pass');
+  });
+
+  // Before the card's links and everything after them: the stack and the gates are the frame the
+  // work is read inside, and a constraint met after the task has been described is one the agent has
+  // already reasoned past.
+  it('comes after the columns and before the linked cards', () => {
+    const text = buildRunPrompt(
+      inputs({ foundation, linked: [card({ id: 'P-001', board: 'product', title: 'Why' })] }),
+    );
+    expect(text.indexOf("## The project's columns")).toBeLessThan(
+      text.indexOf("## The project's foundation"),
+    );
+    expect(text.indexOf("## The project's foundation")).toBeLessThan(text.indexOf('## Linked cards'));
+  });
+});

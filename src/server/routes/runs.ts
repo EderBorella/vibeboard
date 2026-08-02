@@ -1,8 +1,11 @@
 import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import { boardColumnSlugs, readBoard } from '../../core/board.js';
 import { resolveCopilotSelection } from '../../core/copilot-choice.js';
 import { findCard } from '../../core/find.js';
+import { foundationStatus } from '../../core/foundation.js';
+import { foundationRel } from '../../core/layout.js';
 import { BOARDS, type BoardName, type ProjectConfig } from '../../core/types.js';
 import type { DispatchInput } from '../agent-runner.js';
 import type { Backend } from '../agent-turn.js';
@@ -100,6 +103,13 @@ async function resolveDispatch(
     ? ((await readRun(root, body.board, card.id, body.previous)) ?? undefined)
     : undefined;
 
+  // Only the documents that exist. A path list naming a file that is not there teaches an agent that
+  // the paths in this prompt are approximate, and the next one it cannot find it will not look for.
+  const foundation = await foundationStatus(root);
+  const codeQuality = foundation.present.includes('CODE-QUALITY.md')
+    ? await readFile(join(root, foundationRel('CODE-QUALITY.md')), 'utf8')
+    : undefined;
+
   return {
     input: {
       skill,
@@ -111,6 +121,10 @@ async function resolveDispatch(
       links: await readResources(root),
       previous,
       userPrompt: body.prompt,
+      foundation: {
+        paths: foundation.present.map(foundationRel),
+        ...(codeQuality ? { codeQuality } : {}),
+      },
       backend: choice.backend as Backend,
       model: choice.model,
       effort: choice.effort,

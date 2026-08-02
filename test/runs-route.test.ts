@@ -2,7 +2,7 @@ import { chmodSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { boardRel, RESULTS_DIR, RUNS_DIR } from '../src/core/layout.js';
+import { boardRel, FOUNDATION_DIR, RESULTS_DIR, RUNS_DIR } from '../src/core/layout.js';
 import type { RunRecord } from '../src/core/runs.js';
 import { readRun, writeRun } from '../src/server/run-store.js';
 import { ProjectSession } from '../src/server/session.js';
@@ -581,4 +581,53 @@ describe('runs interrupted by a restart', () => {
     await expect(session.open(project.root)).resolves.toBeTruthy();
     await session.close();
   });
+});
+
+// The documents a run is bound by have to reach the agent, and only the ones that exist: a path list
+// naming a file that is not there teaches an agent that these paths are approximate.
+describe('POST /api/runs — the foundation', () => {
+  const dispatch = async (project: TestProject & { card: string }): Promise<void> => {
+    const { run } = (
+      await project.app.inject({
+        method: 'POST',
+        url: '/api/runs',
+        payload: { board: 'engineering', card: project.card, skill: 'execute' },
+      })
+    ).json() as { run: RunRecord };
+    await settled(project, project.card, run.run);
+    delete process.env.VIBEBOARD_SHIM_ARGS;
+  };
+
+  it('says nothing about a foundation the project does not have', async () => {
+    const argsLog = await recordingShimArgs();
+    const project = await projectWithCard();
+    await dispatch(project);
+    // An empty heading is the same lie as a wrong path.
+    expect(await promptFrom(argsLog)).not.toContain('foundation');
+  }, 30000);
+
+  it('sends the documents that exist, with the gates in full and the missing ones absent', async () => {
+    const argsLog = await recordingShimArgs();
+    const project = await projectWithCard();
+    // Written through the editor endpoint, which is the only write path — the OS denies this folder
+    // to every agent, the run about to be dispatched included.
+    const put = (name: string, content: string) =>
+      project.app.inject({
+        method: 'PUT',
+        url: '/api/control/file',
+        payload: { path: `${FOUNDATION_DIR}/${name}`, content },
+      });
+    await put('STACK.md', 'Node 22.\n');
+    await put('CODE-QUALITY.md', '---\ngates:\n  - name: tests\n    command: npm test\n---\nThe bar.\n');
+
+    await dispatch(project);
+
+    const prompt = await promptFrom(argsLog);
+    expect(prompt).toContain(`- ${FOUNDATION_DIR}/STACK.md`);
+    expect(prompt).toContain(`- ${FOUNDATION_DIR}/CODE-QUALITY.md`);
+    expect(prompt).toContain('command: npm test'); // in full, not by reference
+    // The three nobody wrote are not listed: these paths are exact or they are useless.
+    expect(prompt).not.toContain('DESIGN.md');
+    expect(prompt).not.toContain('TESTING.md');
+  }, 30000);
 });

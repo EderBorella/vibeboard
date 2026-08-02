@@ -38,6 +38,12 @@ export interface PromptInputs {
   previousReport?: string;
   // The user's own words for this dispatch.
   userPrompt?: string;
+  // The documents this run is bound by. Four as paths — the agent has a Read tool, and inlining a
+  // document it may not need is tokens spent on nothing — and CODE-QUALITY.md inlined, because its
+  // gates bind every run and an agent that has to go and fetch them will sometimes not bother.
+  // Absent when the project has no foundation yet, and then the section is left out entirely rather
+  // than promising a folder with nothing in it.
+  foundation?: { paths: string[]; codeQuality?: string };
   // Where the agent must write its report, project-root-relative.
   reportPath: string;
   projectRoot: string;
@@ -87,6 +93,29 @@ function linkedSection(linked: Card[], projectRoot: string): string {
     .filter((c) => c.board === 'product' && c.body.trim() !== '')
     .map((c) => `### ${c.id} — ${c.title}\n\n${c.body.trim()}`);
   return [lines.join('\n'), ...intent].join('\n\n');
+}
+
+// Named as binding rather than as background reading, and as read-only rather than as a request:
+// the OS denies these paths to every agent, so an agent that tries to "fix" one gets a permission
+// error it would otherwise read as a broken tool.
+function foundationSection(foundation: NonNullable<PromptInputs['foundation']>): string {
+  const lines = [
+    'These decisions are already made for this project. Follow them, do not re-open them, and do not',
+    'edit these files — they are read-only to you at the operating-system level.',
+    '',
+    ...foundation.paths.map((p) => `- ${p}`),
+  ];
+  if (foundation.codeQuality?.trim()) {
+    lines.push(
+      '',
+      'The gates your work must pass, in full:',
+      '',
+      '```markdown',
+      foundation.codeQuality.trim(),
+      '```',
+    );
+  }
+  return lines.join('\n');
 }
 
 const CONTRACT_LINES = [
@@ -160,6 +189,12 @@ export function buildRunPrompt(input: PromptInputs): string {
   // it. Omitted when empty — a heading promising "every column" above nothing would be a lie.
   if (input.boardColumns.length > 0) {
     parts.push(section("The project's columns", columnsSection(input.boardColumns)));
+  }
+  // Immediately after the columns and before the card's own links: the stack and the gates are the
+  // frame everything else is read inside, and a decision an agent meets after the work is described
+  // is one it has already reasoned past.
+  if (input.foundation && input.foundation.paths.length > 0) {
+    parts.push(section("The project's foundation", foundationSection(input.foundation)));
   }
   if (input.linked.length > 0) {
     parts.push(section('Linked cards', linkedSection(input.linked, input.projectRoot)));

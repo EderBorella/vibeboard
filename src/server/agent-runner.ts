@@ -39,6 +39,9 @@ export interface DispatchInput {
   links: { title: string; url: string }[];
   previous?: RunRecord;
   userPrompt?: string;
+  // Read at dispatch, like boardColumns and for the same reason: a queued run must be bound by the
+  // documents the project had when it was resolved, not by whatever they say when it finally starts.
+  foundation?: { paths: string[]; codeQuality?: string };
   backend: Backend;
   model: string;
   effort: string;
@@ -244,6 +247,7 @@ export class AgentRunner {
       links: input.links,
       previousReport: input.previous?.report,
       userPrompt: input.userPrompt,
+      foundation: input.foundation,
       reportPath: reportContract(run),
       projectRoot: root,
       credential,

@@ -41,6 +41,11 @@ export const RESOURCES_DIR = `${CONFIG_DIR}/resources`;
 export const RESOURCES_YAML = `${CONFIG_DIR}/resources.yaml`;
 export const CHAT_DIR = `${CONFIG_DIR}/chat`;
 export const RUNS_DIR = `${CONFIG_DIR}/runs`;
+
+// Agent Suggestions: what an agent found but must not act on. Machine state like chat/ and runs/,
+// written only through the endpoint — the profile denies the agent this path, so the file layer is
+// not a second way in.
+export const SUGGESTIONS_DIR = `${CONFIG_DIR}/suggestions`;
 // The implementation diary: one line per event, appended through an endpoint rather than written
 // by an agent.
 export const PROJECT_LOG_FILE = `${CONFIG_DIR}/PROJECT-LOG.md`;

@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { buildApp } from '../src/server/app.js';
 import { ProjectSession } from '../src/server/session.js';
-import { openTestProject } from './helpers.js';
+import { openTestProject, testApp } from './helpers.js';
 
 // The guard rails on the card routes: every handler checks that a project is open and that the
 // card exists, and every refusal carries a specific message the UI shows. Those were executed
@@ -47,7 +46,7 @@ describe('card routes with no project open', () => {
 
   it.each(routes)('409s on $method $url', async ({ method, url, payload }) => {
     bare = new ProjectSession();
-    const app = buildApp(bare);
+    const app = testApp(bare);
     const res = await app.inject({ method, url, ...(payload ? { payload } : {}) });
     expect(res.statusCode).toBe(409);
     expect(res.json()).toEqual({ error: 'No project open' });

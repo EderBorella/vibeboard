@@ -1,5 +1,6 @@
 import websocket from '@fastify/websocket';
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, preValidationHookHandler } from 'fastify';
+import { bearerToken } from './auth.js';
 import type { AppCtx, WsClient } from './route-context.js';
 
 // Fan-out to every connected browser. A send on a closed socket is swallowed: a client that
@@ -36,7 +37,21 @@ export function registerWs(
   const log = ctx.log.child({ component: 'ws' });
 
   app.register(async (root) => {
-    root.get('/ws', { websocket: true }, (socket) => {
+    // Admin only, and refused at the handshake rather than closed after it, so an unauthorised
+    // client never holds an open socket at all. Checked here rather than by the /api preHandler,
+    // which Fastify's encapsulation deliberately keeps out of this scope — and it has to be
+    // checked somewhere, because this socket carries the copilot channel, whose tools write files
+    // with no approval step. Locking the HTTP surface while leaving it open would secure nothing.
+    //
+    // The token arrives as a query parameter because a browser cannot set headers on a WebSocket
+    // handshake.
+    const authenticate: preValidationHookHandler = async (req, reply) => {
+      const { token } = req.query as { token?: string };
+      const cred = ctx.credentials.verify(token ?? bearerToken(req.headers.authorization));
+      if (cred?.scope !== 'admin') return reply.code(401).send({ error: 'Unauthorized' });
+    };
+
+    root.get('/ws', { websocket: true, preValidation: authenticate }, (socket) => {
       clients.add(socket);
       const send = (snapshot: unknown): void => {
         try {

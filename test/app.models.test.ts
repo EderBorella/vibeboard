@@ -8,9 +8,9 @@ vi.mock('../src/server/models.js', () => ({
   modelStatus: vi.fn(async () => ({ up: true, uptime: 99, endpoints: 2 })),
 }));
 
-import { buildApp } from '../src/server/app.js';
 import { listBackendModels, modelStatus } from '../src/server/models.js';
 import { ProjectSession } from '../src/server/session.js';
+import { testApp } from './helpers.js';
 
 // These routes need no project open, so a bare session is enough.
 let session: ProjectSession | undefined;
@@ -21,9 +21,9 @@ afterEach(async () => {
   vi.clearAllMocks();
 });
 
-function app(): ReturnType<typeof buildApp> {
+function app(): ReturnType<typeof testApp> {
   session = new ProjectSession();
-  return buildApp(session);
+  return testApp(session);
 }
 
 describe('GET /api/models', () => {

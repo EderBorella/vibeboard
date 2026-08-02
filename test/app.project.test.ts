@@ -2,9 +2,8 @@ import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { scaffoldProject } from '../src/core/scaffold.js';
-import { buildApp } from '../src/server/app.js';
 import { ProjectSession } from '../src/server/session.js';
-import { openTestProject, tempDir } from './helpers.js';
+import { openTestProject, tempDir, testApp } from './helpers.js';
 
 let bare: ProjectSession | undefined;
 const originalRoot = process.env.VIBEBOARD_ROOT;
@@ -16,9 +15,9 @@ afterEach(async () => {
   else process.env.VIBEBOARD_ROOT = originalRoot;
 });
 
-async function app(): Promise<ReturnType<typeof buildApp>> {
+async function app(): Promise<ReturnType<typeof testApp>> {
   bare = new ProjectSession();
-  return buildApp(bare);
+  return testApp(bare);
 }
 
 // A folder holding one scaffolded project, for the browse endpoint to find.

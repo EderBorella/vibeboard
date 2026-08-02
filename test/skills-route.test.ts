@@ -2,9 +2,8 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { skillRel } from '../src/core/layout.js';
-import { buildApp } from '../src/server/app.js';
 import { ProjectSession } from '../src/server/session.js';
-import { openTestProject } from './helpers.js';
+import { openTestProject, testApp } from './helpers.js';
 
 describe('GET /api/skills', () => {
   it('serves the seeded skills of an open project', async () => {
@@ -51,7 +50,7 @@ describe('GET /api/skills', () => {
   });
 
   it('refuses with 409 when no project is open', async () => {
-    const app = buildApp(new ProjectSession());
+    const app = testApp(new ProjectSession());
     const res = await app.inject({ method: 'GET', url: '/api/skills' });
     expect(res.statusCode).toBe(409);
     expect(res.json()).toEqual({ error: 'No project open' });
@@ -141,7 +140,7 @@ describe('PUT /api/skills/:slug', () => {
   });
 
   it('refuses with 409 when no project is open', async () => {
-    const app = buildApp(new ProjectSession());
+    const app = testApp(new ProjectSession());
     const res = await app.inject({ method: 'PUT', url: '/api/skills/x', payload: {} });
     expect(res.statusCode).toBe(409);
     await app.close();

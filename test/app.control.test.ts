@@ -8,9 +8,8 @@ import {
   POINTER_FILES,
   skillRel,
 } from '../src/core/layout.js';
-import { buildApp } from '../src/server/app.js';
 import { ProjectSession } from '../src/server/session.js';
-import { openTestProject } from './helpers.js';
+import { openTestProject, testApp } from './helpers.js';
 
 const [CLAUDE_MD, AGENTS_MD] = POINTER_FILES;
 
@@ -283,7 +282,7 @@ describe('control routes with no project open', () => {
 
   it.each(routes)('409s on $method $url', async ({ method, url, payload }) => {
     bare = new ProjectSession();
-    const app = buildApp(bare);
+    const app = testApp(bare);
     const res = await app.inject({ method, url, ...(payload ? { payload } : {}) });
     expect(res.statusCode).toBe(409);
     expect(res.json()).toEqual({ error: 'No project open' });

@@ -7,6 +7,7 @@ import { onTestFinished } from 'vitest';
 import WebSocket from 'ws';
 import type { Card } from '../src/core/types.js';
 import { buildApp } from '../src/server/app.js';
+import { CredentialStore } from '../src/server/credentials.js';
 import { ProjectSession } from '../src/server/session.js';
 
 export async function tempDir(): Promise<string> {
@@ -27,6 +28,26 @@ export function cardFrom(result: Card | 'unknown-column'): Card {
 // across its parallel workers.
 export function shimArgsLog(): string {
   return join(mkdtempSync(join(tmpdir(), 'vibeboard-shim-')), 'args.log');
+}
+
+export const TEST_ADMIN_TOKEN = 'test-admin-token';
+
+export interface TestAppOpts {
+  runBin?: string;
+  logger?: FastifyServerOptions['logger'];
+}
+
+// buildApp, plus the browser's credential on every request that does not bring its own. Auth is not
+// what these suites are about, and threading a header through several hundred inject() calls would
+// bury the assertions in ceremony. The hook fills the header in rather than bypassing the check, so
+// the boundary still runs on every one of them — and test/auth.test.ts builds its app with
+// buildApp directly, which is what keeps the boundary itself under test.
+export function testApp(session: ProjectSession, opts: TestAppOpts = {}): FastifyInstance {
+  const app = buildApp(session, { ...opts, credentials: new CredentialStore(TEST_ADMIN_TOKEN) });
+  app.addHook('onRequest', async (req) => {
+    req.headers.authorization ??= `Bearer ${TEST_ADMIN_TOKEN}`;
+  });
+  return app;
 }
 
 export interface TestProject {
@@ -52,7 +73,7 @@ export async function openTestProject(
   } = {},
 ): Promise<TestProject> {
   const session = new ProjectSession();
-  const app = buildApp(session, { runBin: opts.runBin, logger: opts.logger });
+  const app = testApp(session, { runBin: opts.runBin, logger: opts.logger });
   const root = await tempDir();
   await app.inject({
     method: 'POST',

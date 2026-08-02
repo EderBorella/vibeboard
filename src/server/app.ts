@@ -1,9 +1,12 @@
+import { randomUUID } from 'node:crypto';
 import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastify';
 import { DEFAULT_MAX_RUNS } from '../core/config.js';
 import { AgentRunner } from './agent-runner.js';
+import { registerAuth } from './auth.js';
 import { ChatStore } from './chat-store.js';
 import { CopilotSession } from './copilot.js';
 import { createCopilotTurns } from './copilot-turns.js';
+import { CredentialStore } from './credentials.js';
 import { type Log, serverLogger } from './logging.js';
 import { attachOpencodeLogger } from './opencode-server.js';
 import type { AppCtx } from './route-context.js';
@@ -25,9 +28,17 @@ export function buildApp(
   // `logger` overrides what the environment asks for. main.ts passes one so the log file is opened
   // exactly once and it can name the file in the startup banner; test/logging.test.ts passes a
   // stream to read the lines back, which is the only way to prove the logger is really wired.
-  opts: { runBin?: string; logger?: FastifyServerOptions['logger'] } = {},
+  // `credentials` defaults to a store whose admin token nobody knows, so an app built without one
+  // is locked rather than open. main.ts passes the persisted token; tests pass their own store so
+  // they can mint run credentials against the same one the app verifies with.
+  opts: {
+    runBin?: string;
+    logger?: FastifyServerOptions['logger'];
+    credentials?: CredentialStore;
+  } = {},
 ): FastifyInstance {
   const app = Fastify({ logger: opts.logger ?? serverLogger().options });
+  const credentials = opts.credentials ?? new CredentialStore(randomUUID());
   // Each subsystem logs under its own `component`, so the file can be filtered by area:
   //   jq 'select(.component == "watcher")' logs/vibeboard-*.log
   const log: Log = app.log;
@@ -54,13 +65,15 @@ export function buildApp(
     onUpdate: (record) => broadcast({ type: 'run:update', record }),
     log: log.child({ component: 'runner' }),
   });
-  const ctx: AppCtx = { session, copilot, chats, runner, broadcast, log };
+  const ctx: AppCtx = { session, copilot, chats, runner, credentials, broadcast, log };
   const turns = createCopilotTurns(ctx);
 
   registerWs(app, ctx, clients, turns.handleMessage, turns.sendHistory);
 
   app.register(
     async (api) => {
+      // First inside the scope, so it runs for every route below it and for nothing outside.
+      registerAuth(api, credentials);
       await registerProjectRoutes(api, ctx);
       await registerConfigRoutes(api, ctx);
       await registerModelRoutes(api, ctx);

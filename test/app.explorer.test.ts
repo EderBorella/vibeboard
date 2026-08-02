@@ -4,10 +4,9 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { boardColumnSlugs } from '../src/core/board.js';
 import { readConfig } from '../src/core/config.js';
 import { boardRel, CONFIG_DIR, INSTRUCTIONS_FILE, POINTER_FILES, SKILLS_DIR } from '../src/core/layout.js';
-import { buildApp } from '../src/server/app.js';
 import type { DirListing, FileRead } from '../src/server/explorer-list.js';
 import { ProjectSession } from '../src/server/session.js';
-import { openTestProject } from './helpers.js';
+import { openTestProject, testApp } from './helpers.js';
 
 const [CLAUDE_MD] = POINTER_FILES;
 
@@ -371,7 +370,7 @@ describe('explorer routes with no project open', () => {
 
   it.each(routes)('409s on $method $url', async ({ method, url, payload }) => {
     bare = new ProjectSession();
-    const app = buildApp(bare);
+    const app = testApp(bare);
     const res = await app.inject({ method, url, ...(payload ? { payload } : {}) });
     expect(res.statusCode).toBe(409);
     expect(res.json()).toEqual({ error: 'No project open' });

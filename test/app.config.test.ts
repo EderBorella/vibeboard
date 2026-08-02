@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { boardColumnSlugs } from '../src/core/board.js';
-import { buildApp } from '../src/server/app.js';
 import { ProjectSession } from '../src/server/session.js';
-import { openTestProject, wsClient } from './helpers.js';
+import { openTestProject, testApp, wsClient } from './helpers.js';
 
 interface WsMessage {
   type: string;
@@ -193,7 +192,7 @@ describe('/api/config with no project open', () => {
     '409s on $method /api/config',
     async ({ method }) => {
       const session = new ProjectSession();
-      const app = buildApp(session);
+      const app = testApp(session);
       const res = await app.inject({
         method,
         url: '/api/config',

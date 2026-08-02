@@ -2,7 +2,6 @@ import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Writable } from 'node:stream';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { buildApp } from '../src/server/app.js';
 import {
   DEFAULT_LOG_KEEP,
   DEFAULT_LOG_LEVEL,
@@ -15,7 +14,7 @@ import {
   serverLogger,
 } from '../src/server/logging.js';
 import { ProjectSession } from '../src/server/session.js';
-import { tempDir } from './helpers.js';
+import { tempDir, testApp } from './helpers.js';
 
 describe('resolveLevel', () => {
   it('accepts every level it advertises', () => {
@@ -138,7 +137,7 @@ describe('serverLogger', () => {
     expect(file).toBe(join(dir, 'vibeboard-2026-07-31.log'));
 
     session = new ProjectSession();
-    const app = buildApp(session, { logger: options });
+    const app = testApp(session, { logger: options });
     await app.inject({ method: 'GET', url: '/api/state' });
     const text = await contents(file as string, '/api/state');
     await app.close();
@@ -162,7 +161,7 @@ describe('serverLogger', () => {
 
     const { options, file } = serverLogger(env, at);
     session = new ProjectSession();
-    const app = buildApp(session, { logger: options });
+    const app = testApp(session, { logger: options });
     await app.inject({ method: 'GET', url: '/api/state' });
     const text = await contents(file as string, '/api/state');
     await app.close();
@@ -239,7 +238,7 @@ describe('the server logger', () => {
   it('records every request with its method, url and status', async () => {
     const { lines, stream } = sink();
     session = new ProjectSession();
-    const app = buildApp(session, { logger: { level: 'info', stream } });
+    const app = testApp(session, { logger: { level: 'info', stream } });
 
     await app.inject({ method: 'GET', url: '/api/state' });
     await settle(() => lines.some((l) => l.res !== undefined));
@@ -255,7 +254,7 @@ describe('the server logger', () => {
     // nothing behind on the server: no message, no stack, nowhere to look afterwards.
     const { lines, stream } = sink();
     session = new ProjectSession();
-    const app = buildApp(session, { logger: { level: 'info', stream } });
+    const app = testApp(session, { logger: { level: 'info', stream } });
     app.get('/boom', () => {
       throw new Error('kaboom');
     });
@@ -276,7 +275,7 @@ describe('the server logger', () => {
     // What the suite itself runs with, so it has to mean silence and not merely a quieter level.
     const { lines, stream } = sink();
     session = new ProjectSession();
-    const app = buildApp(session, { logger: { level: 'silent', stream } });
+    const app = testApp(session, { logger: { level: 'silent', stream } });
     app.get('/boom', () => {
       throw new Error('kaboom');
     });
@@ -291,13 +290,13 @@ describe('the server logger', () => {
   });
 
   it('takes its level from the environment when no logger is passed', async () => {
-    // The wiring main.ts relies on: buildApp() with no options must still be logging. Asserted
+    // The wiring main.ts relies on: testApp() with no options must still be logging. Asserted
     // through process.env because that is the only path production takes.
     const before = process.env.VIBEBOARD_LOG_LEVEL;
     process.env.VIBEBOARD_LOG_LEVEL = 'warn';
     try {
       session = new ProjectSession();
-      const app = buildApp(session);
+      const app = testApp(session);
       expect(app.log.level).toBe('warn');
       await app.close();
     } finally {

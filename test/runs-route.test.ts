@@ -4,10 +4,9 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { boardRel, RESULTS_DIR, RUNS_DIR } from '../src/core/layout.js';
 import type { RunRecord } from '../src/core/runs.js';
-import { buildApp } from '../src/server/app.js';
 import { readRun, writeRun } from '../src/server/run-store.js';
 import { ProjectSession } from '../src/server/session.js';
-import { openTestProject, shimArgsLog, type TestProject, wsClient } from './helpers.js';
+import { openTestProject, shimArgsLog, type TestProject, testApp, wsClient } from './helpers.js';
 
 const SHIM = join(process.cwd(), 'test', 'fixtures', 'fake-agent.mjs');
 // Stryker runs the suite from a sandbox COPY of the repo, and the copy does not carry the executable
@@ -317,7 +316,7 @@ describe('POST /api/runs', () => {
   });
 
   it('refuses with 409 when no project is open', async () => {
-    const app = buildApp(new ProjectSession());
+    const app = testApp(new ProjectSession());
     const res = await app.inject({ method: 'POST', url: '/api/runs', payload: {} });
     expect(res.statusCode).toBe(409);
     expect(res.json()).toEqual({ error: 'No project open' });
@@ -444,7 +443,7 @@ describe('every run route refuses when no project is open', () => {
     ['POST', '/api/runs/engineering/E-001/r1/resolve'],
     ['POST', '/api/runs/r1/cancel'],
   ])('%s %s', async (method, url) => {
-    const app = buildApp(new ProjectSession());
+    const app = testApp(new ProjectSession());
     const res = await app.inject({ method: method as 'GET' | 'POST', url, payload: {} });
     expect([res.statusCode, res.json()]).toEqual([409, { error: 'No project open' }]);
     await app.close();
@@ -513,7 +512,7 @@ describe('POST /api/runs/:board/:card/:run/resolve', () => {
   });
 
   it('refuses with 409 when no project is open', async () => {
-    const app = buildApp(new ProjectSession());
+    const app = testApp(new ProjectSession());
     const res = await app.inject({ method: 'POST', url: '/api/runs/engineering/E-001/r/resolve' });
     expect(res.statusCode).toBe(409);
     await app.close();

@@ -4,7 +4,6 @@ import { join } from 'node:path';
 import { Writable } from 'node:stream';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CONFIG_DIR, CONFIG_FILE } from '../src/core/layout.js';
-import { buildApp } from '../src/server/app.js';
 import { ChatStore } from '../src/server/chat-store.js';
 import type { CopilotEvent } from '../src/server/copilot-events.js';
 import { installCrashHandlers, type Log } from '../src/server/logging.js';
@@ -12,7 +11,7 @@ import { modelStatus } from '../src/server/models.js';
 import { opencodeTurn } from '../src/server/opencode-client.js';
 import { capStartupLog, opencodeBaseUrl, stopOpencodeServer } from '../src/server/opencode-server.js';
 import { ProjectSession } from '../src/server/session.js';
-import { openTestProject, tempDir, wsClient } from './helpers.js';
+import { openTestProject, tempDir, testApp, wsClient } from './helpers.js';
 
 // Everything here is about failures that used to happen in silence: they are all deliberately
 // non-fatal, so the ONLY way to know they happened is the line they now write.
@@ -129,7 +128,7 @@ describe('models', () => {
 });
 
 // Reads the lines the whole app produces, so the `component` tags can be checked as pino really
-// emits them rather than as buildApp intends them.
+// emits them rather than as testApp intends them.
 function sink(): { lines: Record<string, unknown>[]; stream: Writable } {
   const lines: Record<string, unknown>[] = [];
   const stream = new Writable({
@@ -163,13 +162,13 @@ afterEach(async () => {
   session = undefined;
 });
 
-describe('buildApp wiring', () => {
+describe('testApp wiring', () => {
   it('hands the session a logger, which it has no other way to get', () => {
     // The session is constructed before the app that logs for it, so the composition root is the
     // only place this can happen.
     session = new ProjectSession();
     const attachLogger = vi.spyOn(session, 'attachLogger');
-    buildApp(session, { logger: { level: 'silent' } });
+    testApp(session, { logger: { level: 'silent' } });
     expect(attachLogger).toHaveBeenCalledOnce();
   });
 
@@ -235,7 +234,7 @@ describe('the OpenCode backend', () => {
   function wiredSink(): Record<string, unknown>[] {
     const { lines, stream } = sink();
     session = new ProjectSession();
-    buildApp(session, { logger: { level: 'debug', stream } });
+    testApp(session, { logger: { level: 'debug', stream } });
     return lines;
   }
 

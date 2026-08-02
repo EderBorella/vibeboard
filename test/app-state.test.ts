@@ -4,7 +4,6 @@ import { join } from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { CONFIG_DIR } from '../src/core/layout.js';
-import { buildApp } from '../src/server/app.js';
 import {
   readState,
   rememberProject,
@@ -13,7 +12,7 @@ import {
   writeState,
 } from '../src/server/app-state.js';
 import { ProjectSession } from '../src/server/session.js';
-import { tempDir } from './helpers.js';
+import { tempDir, testApp } from './helpers.js';
 
 let session: ProjectSession | undefined;
 let app: FastifyInstance | undefined;
@@ -35,7 +34,7 @@ afterEach(async () => {
 async function scaffolded(name = 'Remembered'): Promise<string> {
   const root = await tempDir();
   const s = new ProjectSession();
-  const a = buildApp(s);
+  const a = testApp(s);
   await a.inject({
     method: 'POST',
     url: '/api/project/scaffold',
@@ -114,7 +113,7 @@ describe('the server records what you open', () => {
   it('remembers a project opened over HTTP', async () => {
     const root = await scaffolded('Opened');
     session = new ProjectSession();
-    app = buildApp(session);
+    app = testApp(session);
     await app.inject({ method: 'POST', url: '/api/project/open', payload: { path: root } });
     expect((await readState()).lastProject).toBe(root);
   });
@@ -122,7 +121,7 @@ describe('the server records what you open', () => {
   it('does not remember a failed open', async () => {
     const notAProject = await tempDir();
     session = new ProjectSession();
-    app = buildApp(session);
+    app = testApp(session);
     const res = await app.inject({
       method: 'POST',
       url: '/api/project/open',

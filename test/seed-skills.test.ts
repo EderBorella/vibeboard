@@ -92,3 +92,51 @@ describe('the two entry points', () => {
     expect(skills.map((s) => s.slug)).toEqual([...SEED_SKILLS.map((s) => s.slug)].sort());
   });
 });
+
+// The routing table names skills by slug, and the seeds are where those skills come from. Nothing
+// else ties the two together: rename a folder and the route points at nothing, so the phase silently
+// never runs — under auto-pilot, where nobody is watching it not happen.
+describe('the phase skills the routing table names', () => {
+  it('provides a skill for every route in the default table', async () => {
+    const { DEFAULT_AUTOPILOT } = await import('../src/core/autopilot.js');
+    const slugs = new Set(SEED_SKILLS.map((s) => s.slug));
+    for (const route of DEFAULT_AUTOPILOT.routes) {
+      expect(slugs, `${route.board}/${route.column}`).toContain(route.skill);
+    }
+  });
+
+  it('scopes each phase skill to the board its route is on', async () => {
+    const root = await tempDir();
+    await seedSkills(root);
+    const { skills } = await readSkills(root, config);
+    const boardsOf = (slug: string): string[] => skills.find((s) => s.slug === slug)?.boards ?? ['MISSING'];
+    expect(boardsOf('derive-features')).toEqual(['features']);
+    expect(boardsOf('close-out')).toEqual(['features']);
+    expect(boardsOf('design')).toEqual(['product']);
+    expect(boardsOf('implement')).toEqual(['engineering']);
+    expect(boardsOf('test')).toEqual(['engineering']);
+    expect(boardsOf('break-down')).toEqual(['features', 'product']);
+  });
+
+  // What keeps a proof of concept from becoming a product. Both halves have to be in the prompt, or
+  // the rule exists only in the design document.
+  it('tells break-down to size by acceptance criterion and to file what will not fit', () => {
+    const content = SEED_SKILLS.find((s) => s.slug === 'break-down')?.content ?? '';
+    expect(content).toContain('One acceptance criterion per card');
+    expect(content).toContain('POST /api/suggestions');
+    // Links are what the hierarchy is derived from; a card created without one is an orphan.
+    expect(content).toContain('PUT /api/cards/:board/:id/links');
+  });
+
+  it('tells implement to file what it finds rather than widen the card', () => {
+    const content = SEED_SKILLS.find((s) => s.slug === 'implement')?.content ?? '';
+    expect(content).toContain('POST /api/suggestions');
+    expect(content).toContain('CODE-QUALITY.md');
+  });
+
+  it('keeps the manual skills a person already had', () => {
+    expect(SEED_SKILLS.map((s) => s.slug)).toEqual(
+      expect.arrayContaining(['execute', 'research', 'review', 'summarise']),
+    );
+  });
+});

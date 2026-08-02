@@ -62,19 +62,133 @@ Do not fix what you find unless the card asks you to; report it.
 `,
   },
   {
+    slug: 'derive-features',
+    content: `---
+name: Derive features
+description: Turn the README into the feature list
+boards: [features]
+---
+Read the project's README and derive the features this project needs.
+
+The README is the brief. Work out what capabilities the thing described actually
+requires, and create one feature card per capability, in the order they must be
+built — earlier cards must not depend on later ones.
+
+Create them with \`POST /api/cards\`; do not write card files. Keep each feature
+to a capability a person would name, not a task: "accounts and sign-in", not
+"add a users table".
+
+If the README is too thin to derive features from, say so in your report and
+name what is missing rather than inventing a product.
+`,
+  },
+  {
     slug: 'break-down',
     content: `---
 name: Break down
-description: Split the card into smaller cards
+description: Split the card into smaller cards, one criterion each
 boards: [features, product]
 ---
-Break the card below into smaller cards.
+Break the card below into smaller cards on the board one level down.
 
-Each new card should be independently deliverable and small enough to review in
-one sitting. Write them as real cards in the right board and column, link them
-to this card, and keep this card as the parent.
+**One acceptance criterion per card.** A card is the right size when exactly one
+test can express whether it is done. Two criteria means two cards. This is the
+rule that keeps the project a proof of concept rather than a product.
 
-List every card you created in your report, by id, so the result is checkable.
+- Create each card with \`POST /api/cards\` and link it to this card with
+  \`PUT /api/cards/:board/:id/links\` — the parent is your own card, so the link
+  is yours to write and the far side is written for you.
+- Everything the hierarchy knows comes from those links. An unlinked card is an
+  orphan and nothing will ever roll it up.
+- Anything you notice that is real work but does not belong to this card goes to
+  \`POST /api/suggestions\`, not into a bigger card and not into an extra one.
+  Nothing is blocked and nothing is lost.
+
+List every card you created in your report, by id.
+`,
+  },
+  {
+    slug: 'design',
+    content: `---
+name: Design
+description: Decide what this product card is and why, before anyone builds it
+boards: [product]
+---
+Decide what the card below is, and why.
+
+Write the intent: what a person can do afterwards that they could not do before,
+and how anyone would know it works. An engineering card usually carries only the
+mechanics — this card is where the reason lives, and the run that implements it
+is given this card's body in full.
+
+Follow the project's foundation documents. The stack, the gates and the design
+language are already decided and are not yours to revisit.
+
+Edit this card with \`PATCH /api/cards/:board/:id\`. Do not create engineering
+cards here — breaking down is its own phase.
+`,
+  },
+  {
+    slug: 'implement',
+    content: `---
+name: Implement
+description: Build what the card describes, and make the gates pass
+boards: [engineering]
+---
+Implement the card below.
+
+Read the linked product card first: it carries the intent, while an engineering
+card often carries only the mechanics.
+
+The gates in the project's CODE-QUALITY.md are the bar, and they are quoted in
+this prompt. Run them yourself before you finish — a run that leaves them failing
+has not delivered, and it will be verified against them either way.
+
+Do the one thing the card asks. Anything else you find — an unrelated bug, a
+missing dependency, work the card implies but does not say — goes to
+\`POST /api/suggestions\`. Do the part you can, file the rest, and stop.
+`,
+  },
+  {
+    slug: 'test',
+    content: `---
+name: Test
+description: Prove the card's behaviour is actually held in place
+boards: [engineering]
+---
+Write the tests that hold the card below in place.
+
+A passing test proves the code ran, not that anything constrains it. For each
+test you write, break the behaviour it names on purpose and watch it fail, then
+restore it. A test that passes against deleted code is not a test.
+
+Assert the behaviour the card describes, not the implementation that happens to
+provide it. If the card's premise turns out to be wrong, say which — the code or
+the card — in your report rather than widening an assertion to make it pass.
+
+Run the project's gates before you finish.
+`,
+  },
+  {
+    slug: 'close-out',
+    content: `---
+name: Close out
+description: Exercise the whole feature end to end
+boards: [features]
+---
+Exercise the feature below end to end.
+
+Its cards have each passed their own tests. That is not the same as the feature
+working: three correct parts compose into something broken often enough that this
+phase exists. Run the smoke test declared in the project's TESTING.md and use the
+feature the way a person would.
+
+Report what works and what does not, specifically. If it does not work, say which
+card's assumption was wrong — that is what the next run needs, and "it fails" is
+not it.
+
+Change as little as possible: this is a verification phase, not a second chance
+to implement.
 `,
   },
   {

@@ -514,3 +514,21 @@ export function restartOpencodeServer(): Promise<{ ok: true; url: string }> {
 export function takeOverOpencodeServer(): Promise<{ ok: true; url: string }> {
   return post<{ ok: true; url: string }>('/api/opencode/takeover', {});
 }
+
+// ---- Auto-pilot ------------------------------------------------------------
+
+// One answer to "could auto-pilot start here, and if not, why not?", so the settings panel and
+// everything after it read the same list rather than each deciding for themselves.
+export interface Readiness {
+  ok: boolean;
+  blockers: string[];
+  readme: { ok: boolean; path?: string; reason?: string };
+  foundation: { present: string[]; missing: string[]; ok: boolean };
+  gates: { ok: boolean; reason?: string; count: number };
+  smoke: { ok: boolean; reason?: string };
+  routes: { problems: string[]; count: number };
+}
+
+export async function getReadiness(): Promise<Readiness> {
+  return (await request('/api/autopilot/readiness')).json();
+}

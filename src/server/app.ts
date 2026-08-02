@@ -10,6 +10,7 @@ import { CredentialStore } from './credentials.js';
 import { type Log, serverLogger, stripSecrets, withRedaction } from './logging.js';
 import { attachOpencodeLogger, attachSandbox } from './opencode-server.js';
 import type { AppCtx } from './route-context.js';
+import { registerAutopilotRoutes } from './routes/autopilot.js';
 import { registerCardRoutes } from './routes/cards.js';
 import { registerConfigRoutes } from './routes/config.js';
 import { registerControlRoutes } from './routes/control.js';
@@ -110,6 +111,7 @@ export function buildApp(
       await registerModelRoutes(api, ctx);
       await registerControlRoutes(api, ctx);
       await registerSandboxRoutes(api, ctx);
+      await registerAutopilotRoutes(api, ctx);
       await registerSuggestionRoutes(api, ctx);
       await registerExplorerRoutes(api, ctx);
       await registerSkillRoutes(api, ctx);

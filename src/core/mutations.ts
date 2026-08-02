@@ -23,12 +23,23 @@ async function writeCardFile(card: Card): Promise<void> {
   await writeFile(card.filePath, serializeCard(toFrontmatter(card), card.body), 'utf8');
 }
 
+// Because a column IS a folder, an unconfigured slug never failed — it created a folder no column
+// maps to, leaving the card invisible to readBoard while still holding its id. Every write that
+// names a column asks here first, so there is one answer to "is this a real column" rather than
+// one per call site: restoreCard checked, create and move did not, and that gap has produced
+// invisible cards twice (see the comments at config.ts:19 and run-prompt.ts:56).
+function knownColumn(config: ProjectConfig, board: BoardName, columnSlug: string): boolean {
+  return boardColumnSlugs(config, board).includes(columnSlug);
+}
+
+// `'unknown-column'` when the slug is not configured for this board.
 export async function createCard(
   projectRoot: string,
   config: ProjectConfig,
   input: CreateCardInput,
   today: string,
-): Promise<Card> {
+): Promise<Card | 'unknown-column'> {
+  if (!knownColumn(config, input.board, input.columnSlug)) return 'unknown-column';
   const [live, archived] = await Promise.all([
     readBoard(projectRoot, input.board, config),
     readArchive(projectRoot, input.board),
@@ -73,12 +84,27 @@ export async function updateCard(
   return updated;
 }
 
-export async function moveCard(projectRoot: string, card: Card, toColumnSlug: string): Promise<Card> {
+// Unvalidated on purpose, and private: the archive is a real destination that no column maps to,
+// so archiveCard cannot go through the guard the public movers use.
+async function moveCardFile(projectRoot: string, card: Card, toColumnSlug: string): Promise<Card> {
   const dir = join(projectRoot, boardRel(card.board, toColumnSlug));
   await mkdir(dir, { recursive: true });
   const newPath = join(dir, basename(card.filePath));
   await rename(card.filePath, newPath);
   return { ...card, columnSlug: toColumnSlug, filePath: newPath };
+}
+
+// `'unknown-column'` when the slug is not configured for this board. Use archiveCard to reach the
+// archive; this refuses it, because a card put there without its `archived` stamp has no record of
+// where it came from and sorts to the bottom of the drawer forever.
+export async function moveCard(
+  projectRoot: string,
+  config: ProjectConfig,
+  card: Card,
+  toColumnSlug: string,
+): Promise<Card | 'unknown-column'> {
+  if (!knownColumn(config, card.board, toColumnSlug)) return 'unknown-column';
+  return moveCardFile(projectRoot, card, toColumnSlug);
 }
 
 // Put a card in a column at a specific position: move the file if the column changed, then
@@ -94,13 +120,15 @@ export async function placeCard(
   card: Card,
   toColumnSlug: string,
   beforeId: string | null,
-): Promise<Card> {
+): Promise<Card | 'unknown-column'> {
+  if (!knownColumn(config, card.board, toColumnSlug)) return 'unknown-column';
+
   // "Before itself" means stay put. Worth handling here rather than trusting the caller: the
   // card is excluded from the sequence below, so its own id would look like an unknown
   // beforeId and send it to the end of the column instead.
   if (beforeId === card.id && card.columnSlug === toColumnSlug) return card;
 
-  const moved = card.columnSlug === toColumnSlug ? card : await moveCard(projectRoot, card, toColumnSlug);
+  const moved = card.columnSlug === toColumnSlug ? card : await moveCardFile(projectRoot, card, toColumnSlug);
 
   // Re-read so we sequence against what is actually on disk, not a stale snapshot.
   const live = await readBoard(projectRoot, moved.board, config);
@@ -123,7 +151,7 @@ export async function placeCard(
 // once the file is in archive/ its path no longer says.
 export async function archiveCard(projectRoot: string, card: Card, now: string): Promise<Card> {
   const stamped = await updateCard(projectRoot, card, { archived: now, archivedFrom: card.columnSlug });
-  return moveCard(projectRoot, stamped, ARCHIVE_SLUG);
+  return moveCardFile(projectRoot, stamped, ARCHIVE_SLUG);
 }
 
 // Where a restore would land: the column it left, or the board's first column if that one has
@@ -142,7 +170,7 @@ export async function restoreCard(
   card: Card,
   toColumnSlug?: string,
 ): Promise<Card | 'unknown-column'> {
-  if (toColumnSlug !== undefined && !boardColumnSlugs(config, card.board).includes(toColumnSlug)) {
+  if (toColumnSlug !== undefined && !knownColumn(config, card.board, toColumnSlug)) {
     return 'unknown-column';
   }
   const target = toColumnSlug ?? restoreTarget(config, card);

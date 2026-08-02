@@ -30,7 +30,9 @@ export async function registerCardRoutes(api: FastifyInstance, ctx: AppCtx): Pro
   api.post('/cards', async (req, reply) => {
     if (!ensureOpen(ctx.session, reply)) return;
     const input = req.body as CreateCardInput;
-    return createCard(ctx.session.root, ctx.session.config, input, today());
+    const card = await createCard(ctx.session.root, ctx.session.config, input, today());
+    if (card === 'unknown-column') return reply.code(400).send({ error: 'Unknown column' });
+    return card;
   });
 
   api.patch('/cards/:board/:id', async (req, reply) => {
@@ -78,6 +80,7 @@ export async function registerCardRoutes(api: FastifyInstance, ctx: AppCtx): Pro
     const card = await findCard(root, board, id, config);
     if (!card) return reply.code(404).send({ error: 'Card not found' });
     const placed = await placeCard(root, config, card, toColumnSlug, beforeId ?? null);
+    if (placed === 'unknown-column') return reply.code(400).send({ error: 'Unknown column' });
     // Closing a card resolves its runs. Done on the move rather than in the watcher: writing run
     // records in response to filesystem events, inside the folder the watcher watches, is a loop —
     // so a card moved by an agent editing files directly still needs Dismiss.

@@ -8,7 +8,7 @@ import {
   readConfig,
   scaffoldProject,
 } from '../src/index.js';
-import { tempDir } from './helpers.js';
+import { cardFrom, tempDir } from './helpers.js';
 
 const TODAY = '2026-07-23';
 const NOW = '2026-07-23T10:00:00.000Z';
@@ -22,16 +22,18 @@ describe('end-to-end: scaffold → create → move → archive', () => {
     // Create an engineering card in a column the board actually has: one written elsewhere is not
     // on the board, so the move and archive steps below would both be about nothing.
     const [column] = boardColumnSlugs(config, 'engineering');
-    let eng = await createCard(
-      root,
-      config,
-      { board: 'engineering', columnSlug: column, title: 'Build the thing' },
-      TODAY,
+    let eng = cardFrom(
+      await createCard(
+        root,
+        config,
+        { board: 'engineering', columnSlug: column, title: 'Build the thing' },
+        TODAY,
+      ),
     );
     expect(eng.id).toBe('E-002'); // E-001 is the sample card
 
     // move it across the board
-    eng = await moveCard(root, eng, 'in-progress');
+    eng = cardFrom(await moveCard(root, config, eng, 'in-progress'));
     let board = await readBoard(root, 'engineering', config);
     expect(board.find((c) => c.id === eng.id)?.columnSlug).toBe('in-progress');
 

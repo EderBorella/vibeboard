@@ -1,11 +1,12 @@
-import { readFile } from 'node:fs/promises';
+import { mkdir, readFile, rename } from 'node:fs/promises';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { boardColumnSlugs, countArchived, readArchive, readBoard } from '../src/core/board.js';
 import { defaultConfig } from '../src/core/config.js';
-import { ARCHIVE_SLUG } from '../src/core/layout.js';
-import { archiveCard, createCard, moveCard, restoreCard, restoreTarget } from '../src/core/mutations.js';
+import { ARCHIVE_SLUG, boardRel } from '../src/core/layout.js';
+import { archiveCard, createCard, restoreCard, restoreTarget } from '../src/core/mutations.js';
 import type { Card, ProjectConfig } from '../src/core/types.js';
-import { tempDir } from './helpers.js';
+import { cardFrom, tempDir } from './helpers.js';
 
 const config = defaultConfig('T');
 const TODAY = '2026-07-23';
@@ -15,8 +16,8 @@ const at = (hhmm: string): string => `2026-07-23T${hhmm}:00.000Z`;
 // returns would pass on an empty list instead.
 const [FIRST] = boardColumnSlugs(config, 'engineering');
 
-const make = (root: string, columnSlug: string, title: string): Promise<Card> =>
-  createCard(root, config, { board: 'engineering', columnSlug, title }, TODAY);
+const make = async (root: string, columnSlug: string, title: string): Promise<Card> =>
+  cardFrom(await createCard(root, config, { board: 'engineering', columnSlug, title }, TODAY));
 
 describe('archiveCard', () => {
   it('records when it was archived and which column it left', async () => {
@@ -50,7 +51,11 @@ describe('readArchive', () => {
     await archiveCard(root, a, at('09:00'));
     await archiveCard(root, b, at('11:00'));
     // A card archived before this feature existed: in the folder, no stamp in its frontmatter.
-    await moveCard(root, c, ARCHIVE_SLUG);
+    // Moved by hand, because moveCard now refuses the archive — landing there unstamped is the
+    // state archiveCard exists to prevent, so only an older version or a person could produce it.
+    const archiveDir = join(root, boardRel('engineering', ARCHIVE_SLUG));
+    await mkdir(archiveDir, { recursive: true });
+    await rename(c.filePath, join(archiveDir, `${c.id}.md`));
 
     expect((await readArchive(root, 'engineering')).map((x) => x.title)).toEqual(['B', 'A', 'C']);
   });

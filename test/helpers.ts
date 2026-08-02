@@ -5,11 +5,20 @@ import { join } from 'node:path';
 import type { FastifyInstance, FastifyServerOptions } from 'fastify';
 import { onTestFinished } from 'vitest';
 import WebSocket from 'ws';
+import type { Card } from '../src/core/types.js';
 import { buildApp } from '../src/server/app.js';
 import { ProjectSession } from '../src/server/session.js';
 
 export async function tempDir(): Promise<string> {
   return mkdtemp(join(tmpdir(), 'vibeboard-'));
+}
+
+// The mutation layer returns `'unknown-column'` rather than throwing. Fixtures that name a
+// configured column have to say so somewhere, and one narrowing helper beats a non-null cast at
+// every use site: a sentinel here means the fixture is wrong, and it says which.
+export function cardFrom(result: Card | 'unknown-column'): Card {
+  if (result === 'unknown-column') throw new Error('fixture named a column the board does not have');
+  return result;
 }
 
 // Where fake-claude.mjs records the args it was spawned with. One log per process, outside the

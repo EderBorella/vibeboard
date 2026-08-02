@@ -13,9 +13,9 @@ import {
   POINTER_FILES,
 } from './layout.js';
 import { setCardLinks } from './links.js';
-import { createCard } from './mutations.js';
+import { type CreateCardInput, createCard } from './mutations.js';
 import { seedSkills } from './seed-skills.js';
-import { BOARDS, type BoardName, type ProjectConfig } from './types.js';
+import { BOARDS, type BoardName, type Card, type ProjectConfig } from './types.js';
 
 export type ScaffoldMode = 'greenfield' | 'brownfield';
 
@@ -75,8 +75,22 @@ async function ensureFolders(projectRoot: string, config: ProjectConfig): Promis
 // engineering card landed where readBoard does not look, taking its id and its links with it.
 const firstColumn = (config: ProjectConfig, board: BoardName): string => boardColumnSlugs(config, board)[0];
 
+// The columns above are derived from the same config createCard validates against, so the sentinel
+// is unreachable unless a board has no columns at all. That is a broken config, and a new project
+// half-scaffolded in silence is worse than one that refuses to scaffold.
+async function sampleCard(
+  projectRoot: string,
+  config: ProjectConfig,
+  input: CreateCardInput,
+  today: string,
+): Promise<Card> {
+  const card = await createCard(projectRoot, config, input, today);
+  if (card === 'unknown-column') throw new Error(`board '${input.board}' has no columns to scaffold into`);
+  return card;
+}
+
 async function writeSampleCards(projectRoot: string, config: ProjectConfig, today: string): Promise<void> {
-  const feature = await createCard(
+  const feature = await sampleCard(
     projectRoot,
     config,
     {
@@ -88,7 +102,7 @@ async function writeSampleCards(projectRoot: string, config: ProjectConfig, toda
     },
     today,
   );
-  const product = await createCard(
+  const product = await sampleCard(
     projectRoot,
     config,
     {
@@ -100,7 +114,7 @@ async function writeSampleCards(projectRoot: string, config: ProjectConfig, toda
     },
     today,
   );
-  const engineering = await createCard(
+  const engineering = await sampleCard(
     projectRoot,
     config,
     {

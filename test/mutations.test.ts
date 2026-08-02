@@ -1,10 +1,19 @@
 import { access, readFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { boardColumnSlugs, readArchive, readBoard } from '../src/core/board.js';
 import { defaultConfig } from '../src/core/config.js';
-import { ARCHIVE_SLUG } from '../src/core/layout.js';
-import { archiveCard, createCard, moveCard, updateCard } from '../src/core/mutations.js';
-import { tempDir } from './helpers.js';
+import { ARCHIVE_SLUG, boardRel } from '../src/core/layout.js';
+import {
+  archiveCard,
+  type CreateCardInput,
+  createCard,
+  moveCard,
+  placeCard,
+  updateCard,
+} from '../src/core/mutations.js';
+import type { Card } from '../src/core/types.js';
+import { cardFrom, tempDir } from './helpers.js';
 
 const config = defaultConfig('T');
 const TODAY = '2026-07-23';
@@ -14,41 +23,40 @@ const NOW = '2026-07-23T10:00:00.000Z';
 // card then gets the first one's id.
 const [ENG_FIRST] = boardColumnSlugs(config, 'engineering');
 
+// Setup for tests about something else, where the column is always a configured one.
+const create = async (root: string, input: CreateCardInput): Promise<Card> =>
+  cardFrom(await createCard(root, config, input, TODAY));
+
 describe('mutations', () => {
   it('creates a card with the next id and a file on disk', async () => {
     const root = await tempDir();
-    const card = await createCard(
-      root,
-      config,
-      { board: 'engineering', columnSlug: ENG_FIRST, title: 'First', links: ['P-001'] },
-      TODAY,
-    );
+    const card = await create(root, {
+      board: 'engineering',
+      columnSlug: ENG_FIRST,
+      title: 'First',
+      links: ['P-001'],
+    });
     expect(card.id).toBe('E-001');
     expect(card.created).toBe(TODAY);
     expect(card.links).toEqual(['P-001']);
     await expect(access(card.filePath)).resolves.toBeUndefined();
 
-    const second = await createCard(
-      root,
-      config,
-      { board: 'engineering', columnSlug: ENG_FIRST, title: 'Second' },
-      TODAY,
-    );
+    const second = await create(root, { board: 'engineering', columnSlug: ENG_FIRST, title: 'Second' });
     expect(second.id).toBe('E-002');
     expect(second.order).toBeGreaterThan(card.order);
   });
 
   it('does not reuse an archived id', async () => {
     const root = await tempDir();
-    const c1 = await createCard(root, config, { board: 'product', columnSlug: 'todo', title: 'A' }, TODAY);
+    const c1 = await create(root, { board: 'product', columnSlug: 'todo', title: 'A' });
     await archiveCard(root, c1, NOW);
-    const c2 = await createCard(root, config, { board: 'product', columnSlug: 'todo', title: 'B' }, TODAY);
+    const c2 = await create(root, { board: 'product', columnSlug: 'todo', title: 'B' });
     expect(c2.id).toBe('P-002');
   });
 
   it('updates fields and rewrites the file', async () => {
     const root = await tempDir();
-    const card = await createCard(root, config, { board: 'product', columnSlug: 'todo', title: 'A' }, TODAY);
+    const card = await create(root, { board: 'product', columnSlug: 'todo', title: 'A' });
     const updated = await updateCard(root, card, { title: 'Renamed', tags: ['x'] });
     expect(updated.title).toBe('Renamed');
     const onDisk = await readFile(card.filePath, 'utf8');
@@ -58,22 +66,48 @@ describe('mutations', () => {
 
   it('moves a card to another column (file relocates, id unchanged)', async () => {
     const root = await tempDir();
-    const card = await createCard(root, config, { board: 'product', columnSlug: 'todo', title: 'A' }, TODAY);
-    const moved = await moveCard(root, card, 'in-progress');
+    const card = await create(root, { board: 'product', columnSlug: 'todo', title: 'A' });
+    const moved = cardFrom(await moveCard(root, config, card, 'in-progress'));
     expect(moved.columnSlug).toBe('in-progress');
     expect(moved.id).toBe(card.id);
     const board = await readBoard(root, 'product', config);
     expect(board.find((c) => c.id === card.id)?.columnSlug).toBe('in-progress');
   });
 
-  it('archives a card (moves it out of the board into archive)', async () => {
+  // A column is a folder, so an unconfigured slug never failed — it created a folder no column
+  // maps to, and the card in it was invisible to readBoard while still holding its id.
+  it('refuses to create a card in a column the board does not have', async () => {
     const root = await tempDir();
-    const card = await createCard(
+    // Deliberately not the `create` helper: this test wants the sentinel, not a thrown fixture.
+    const result = await createCard(
       root,
       config,
-      { board: 'engineering', columnSlug: ENG_FIRST, title: 'A' },
+      { board: 'engineering', columnSlug: 'not-a-column', title: 'Phantom' },
       TODAY,
     );
+    expect(result).toBe('unknown-column');
+    // Creating the folder is the bug, not a side effect of it: the next card would then be
+    // numbered against a board that cannot see this one.
+    await expect(access(join(root, boardRel('engineering', 'not-a-column')))).rejects.toThrow();
+  });
+
+  it('refuses to move a card into a column the board does not have', async () => {
+    const root = await tempDir();
+    const card = await create(root, { board: 'product', columnSlug: 'todo', title: 'A' });
+    expect(await moveCard(root, config, card, 'not-a-column')).toBe('unknown-column');
+    // Still where it was, and still readable there.
+    expect((await readBoard(root, 'product', config)).map((c) => c.columnSlug)).toEqual(['todo']);
+  });
+
+  it('refuses to place a card into a column the board does not have', async () => {
+    const root = await tempDir();
+    const card = await create(root, { board: 'product', columnSlug: 'todo', title: 'A' });
+    expect(await placeCard(root, config, card, 'not-a-column', null)).toBe('unknown-column');
+  });
+
+  it('archives a card (moves it out of the board into archive)', async () => {
+    const root = await tempDir();
+    const card = await create(root, { board: 'engineering', columnSlug: ENG_FIRST, title: 'A' });
     // "Leaves the board" is only observable if it was on the board to begin with: created in a
     // folder no column maps to, it never was, and the empty list below would prove nothing.
     expect((await readBoard(root, 'engineering', config)).map((c) => c.id)).toEqual([card.id]);

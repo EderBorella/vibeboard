@@ -1079,3 +1079,9 @@ body {
    server somebody has work in flight on is not enough to decide with. */
 .sandbox-hint { font-size: 0.76rem; color: var(--muted); line-height: 1.5; }
 .sandbox-action > .btn-secondary { align-self: flex-start; }
+
+/* Work an agent found and deliberately did not do. Ochre, not the accent: a card carrying this is
+   not failing, but it is not plainly done either, and those two must not look the same. */
+.tile-suggestions {
+  font-size: 0.7rem; color: var(--warn, #b8860b); white-space: nowrap;
+}

@@ -1,4 +1,11 @@
-import { type RunRecord, type RunUsage, runId, withoutReport, withUsage } from '../core/runs.js';
+import {
+  type RunRecord,
+  type RunUsage,
+  runId,
+  withoutReport,
+  withSuggestions,
+  withUsage,
+} from '../core/runs.js';
 import type { Skill } from '../core/skills.js';
 import type { BoardName, Card } from '../core/types.js';
 import { type Backend, type RunningTurn, runAgentTurn } from './agent-turn.js';
@@ -8,6 +15,7 @@ import type { Log } from './logging.js';
 import { type BoardColumns, buildRunPrompt } from './run-prompt.js';
 import { appendTranscript, foldReport, reportContract, transcriptTail, writeRun } from './run-store.js';
 import type { SandboxStatus } from './sandbox.js';
+import { countRunSuggestions } from './suggestion-store.js';
 
 // Runs skills as agents.
 //
@@ -289,6 +297,21 @@ export class AgentRunner {
     }
   }
 
+  // How many suggestions this run filed, from the STORE. The agent's report is not asked: a run
+  // that finds seventeen things and reports three is exactly the case the count exists to surface.
+  //
+  // A failure here must not fail the run — the number is a diagnostic, the report is the outcome —
+  // but it returns `undefined` rather than 0, so the record says "not counted" instead of claiming
+  // the run found nothing.
+  async #filed(root: string, run: string): Promise<number | undefined> {
+    try {
+      return await countRunSuggestions(root, run);
+    } catch (err) {
+      this.#opts.log?.warn({ err, run }, 'could not count the suggestions this run filed');
+      return undefined;
+    }
+  }
+
   async #settle(
     root: string,
     run: string,
@@ -305,7 +328,10 @@ export class AgentRunner {
       await this.#transcripts.get(run);
       // Attached here, once, so BOTH endings carry it: a run that failed or was cancelled still
       // spent tokens, and that is exactly when you want to know how many.
-      const spent = withUsage(record, usageFromStats(result.stats));
+      const spent = withSuggestions(
+        withUsage(record, usageFromStats(result.stats)),
+        await this.#filed(root, run),
+      );
       const folded = await foldReport(root, spent, finishedAt, secret);
       final = folded ?? (await this.#endWithoutReport(root, spent, result, cancelled, finishedAt));
     } catch (err) {

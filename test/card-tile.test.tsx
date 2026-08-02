@@ -59,3 +59,25 @@ describe('CardTile tags', () => {
     expect(container.querySelector('.tile-tags')).toBeNull();
   });
 });
+
+describe('CardTile open suggestions', () => {
+  it('marks a card that has work left behind', () => {
+    render(<CardTile card={card()} miniatureChars={40} openSuggestions={2} />);
+    // Plural, and a count — "has suggestions" would not tell you whether to look now.
+    expect(screen.getByTitle('2 open suggestions')).toBeTruthy();
+  });
+
+  it('says suggestion, singular, when there is one', () => {
+    render(<CardTile card={card()} miniatureChars={40} openSuggestions={1} />);
+    expect(screen.getByTitle('1 open suggestion')).toBeTruthy();
+  });
+
+  it('marks nothing when there are none, and nothing when it is absent', () => {
+    render(<CardTile card={card()} miniatureChars={40} openSuggestions={0} />);
+    expect(screen.queryByTitle(/open suggestion/)).toBeNull();
+    cleanup();
+    // Absent, not zero: a snapshot from an older server carries no field at all.
+    render(<CardTile card={card()} miniatureChars={40} />);
+    expect(screen.queryByTitle(/open suggestion/)).toBeNull();
+  });
+});

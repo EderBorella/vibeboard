@@ -3,12 +3,13 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { boardRel, DOCS_DIR, skillRel } from '../src/core/layout.js';
-import type { RunRecord } from '../src/core/runs.js';
+import { type RunRecord, withSuggestions } from '../src/core/runs.js';
 import type { Skill } from '../src/core/skills.js';
 import type { Card } from '../src/core/types.js';
 import { AgentRunner, type DispatchInput, type RunnerOptions } from '../src/server/agent-runner.js';
 import { type Credential, CredentialStore, type Scope } from '../src/server/credentials.js';
 import { listCardRuns, readRun, reportPath, transcriptTail } from '../src/server/run-store.js';
+import { countRunSuggestions, writeSuggestion } from '../src/server/suggestion-store.js';
 import { tempDir } from './helpers.js';
 
 const SHIM = join(process.cwd(), 'test', 'fixtures', 'fake-agent.mjs');
@@ -681,5 +682,82 @@ describe('the run credential', () => {
     const { readFile } = await import('node:fs/promises');
     const text: string = JSON.parse((await readFile(argsLog, 'utf8')).trim().split('\n')[0]).prompt;
     expect(text).not.toContain('Your credential');
+  });
+});
+
+describe('the suggestion count', () => {
+  it('records how many the run filed, and nothing when it filed none', async () => {
+    const root = await tempDir();
+    // Two, so the assertion can tell "counted them" from "noticed there was one".
+    await writeSuggestion(root, {
+      id: 's1',
+      state: 'active',
+      created: 'now',
+      title: 'one',
+      body: '',
+      run: 'run-x',
+    });
+    await writeSuggestion(root, {
+      id: 's2',
+      state: 'active',
+      created: 'now',
+      title: 'two',
+      body: '',
+      run: 'run-x',
+    });
+    // A third from a different run, which must not be counted.
+    await writeSuggestion(root, {
+      id: 's3',
+      state: 'active',
+      created: 'now',
+      title: 'three',
+      body: '',
+      run: 'run-y',
+    });
+    expect(await countRunSuggestions(root, 'run-x')).toBe(2);
+  });
+
+  it('is recorded on the run itself, from the store — the whole point of the field', async () => {
+    // The gap this closes: everything else here tests countRunSuggestions and withSuggestions in
+    // isolation, so removing the `withSuggestions(...)` call in #settle left the suite green while
+    // the field silently stopped being written and slice C's checkup would read nothing.
+    const root = await tempDir();
+    const { instance } = runner(root);
+    // `hang`, so the run is still in flight while the suggestions are filed against its real id —
+    // which is only knowable after dispatch returns.
+    const started = await instance.dispatch(input(root, behaving('hang')));
+    for (const id of ['s1', 's2']) {
+      await writeSuggestion(root, {
+        id,
+        state: 'active',
+        created: 'now',
+        title: id,
+        body: '',
+        run: started.run,
+      });
+    }
+    // A third from another run, so the assertion distinguishes "counted this run's" from "counted".
+    await writeSuggestion(root, {
+      id: 's3',
+      state: 'active',
+      created: 'now',
+      title: 's3',
+      body: '',
+      run: 'other',
+    });
+
+    instance.cancel(started.run);
+    const final = await settled(root, started.run);
+    expect(final.suggestions).toBe(2);
+  });
+
+  it('distinguishes "filed none" from "could not count"', () => {
+    // Three facts, not two. An earlier version omitted zero to keep records tidy, which made a
+    // clean run and an unreadable store look identical — and the checkup reads this to decide
+    // whether a card was scoped wrongly, where "no findings" and "we did not look" differ.
+    const record = { run: 'r' } as RunRecord;
+    expect(withSuggestions(record, 3).suggestions).toBe(3);
+    expect(withSuggestions(record, 0).suggestions).toBe(0);
+    expect(withSuggestions(record, undefined)).not.toHaveProperty('suggestions');
   });
 });

@@ -168,4 +168,7 @@ export interface ProjectSnapshot {
   // Counts only — the archive list is fetched on demand. A change here is the UI's cue to
   // refetch an open drawer.
   archivedCounts: Record<BoardName, number>;
+  // Open suggestions per card id. Optional here because a snapshot from an older server has none,
+  // and the tile treats absent as zero rather than rendering NaN.
+  openSuggestions?: Record<string, number>;
 }

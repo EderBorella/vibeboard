@@ -10,9 +10,21 @@ interface Props {
   // Clicking a tag on the tile toggles it in the board filter. Omitted where filtering makes no
   // sense (the archive drawer), which leaves the tags as plain labels.
   onTag?: (tag: string) => void;
+  // Work the agent found and deliberately did not do. Nothing blocks on a suggestion, so a card can
+  // pass every gate and advance with things left behind — the tile has to say so, because the
+  // blocker belongs in the artefact a human reviews rather than in a log.
+  openSuggestions?: number;
 }
 
-export function CardTile({ card, miniatureChars, onOpen, onArchive, onDragStart, onTag }: Props) {
+export function CardTile({
+  card,
+  miniatureChars,
+  onOpen,
+  onArchive,
+  onDragStart,
+  onTag,
+  openSuggestions = 0,
+}: Props) {
   const summary = miniature(card, miniatureChars);
   return (
     <div
@@ -29,6 +41,14 @@ export function CardTile({ card, miniatureChars, onOpen, onArchive, onDragStart,
     >
       <div className="tile-head">
         <span className="tile-id">{card.id}</span>
+        {openSuggestions > 0 && (
+          <span
+            className="tile-suggestions"
+            title={`${openSuggestions} open ${openSuggestions === 1 ? 'suggestion' : 'suggestions'}`}
+          >
+            ⚑ {openSuggestions}
+          </span>
+        )}
         {card.links.length > 0 && (
           <span className="tile-link" title={card.links.join(', ')}>
             🔗 {card.links.length}

@@ -64,6 +64,14 @@ export interface RunRecord {
   created?: string[]; // card ids the run created
   note?: string; // VibeBoard's own explanation when there is no report to speak for the run
   usage?: RunUsage; // what it cost, when the backend said
+  // How many suggestions this run filed. A first-class diagnostic, not a footnote: an agent with
+  // seventeen findings is telling you its card was scoped wrongly, and the checkup reads this.
+  // Counted from the store at settle, never taken from the agent's report — a self-reported number
+  // is one the agent can be wrong about.
+  //
+  // Absent and zero are different facts, as with RunUsage: zero means it filed none, absent means
+  // the count could not be taken.
+  suggestions?: number;
   report: string; // the body: the agent's report, verbatim
 }
 
@@ -145,10 +153,21 @@ export function serializeRun(record: RunRecord): string {
     'created',
     'note',
     'usage',
+    'suggestions',
   ] as const) {
     if (front[key] !== undefined) data[key] = front[key];
   }
   return matter.stringify(`${report}\n`, data);
+}
+
+// Written whenever the count SUCCEEDED, zero included; absent only when it could not be taken.
+//
+// The earlier version omitted zero to keep records tidy, which collapsed three facts into one:
+// "filed none", "filed none as far as we know" and "the store was unreadable" all looked
+// identical. The checkup reads this to decide whether a card was scoped wrongly, and "no findings"
+// is a very different input from "we did not look".
+export function withSuggestions(record: RunRecord, count: number | undefined): RunRecord {
+  return count === undefined ? record : { ...record, suggestions: count };
 }
 
 // Fields that are simply absent when unset, rather than present and empty. Gathered in loops
@@ -159,6 +178,10 @@ const LIST_OPTIONALS = ['attached', 'options', 'created'] as const;
 
 function optionalFields(d: Record<string, unknown>): Partial<RunRecord> {
   const out: Partial<RunRecord> = {};
+  // Same rule as RunUsage: zero is a fact worth keeping, NaN and negatives are not facts at all.
+  if (typeof d.suggestions === 'number' && Number.isFinite(d.suggestions) && d.suggestions >= 0) {
+    out.suggestions = d.suggestions;
+  }
   if (isOutcome(d.outcome)) out.outcome = d.outcome;
   const usage = asUsage(d.usage);
   if (usage !== undefined) out.usage = usage;

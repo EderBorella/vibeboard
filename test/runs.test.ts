@@ -317,3 +317,26 @@ describe('withResolution', () => {
     expect(parseRun(serializeRun(resolved))?.resolved).toBe('2026-07-26T21:30:00.000Z');
   });
 });
+
+describe('the suggestion count on a run record', () => {
+  it('survives a round trip through the file', () => {
+    const withCount = { ...record(), suggestions: 3 };
+    expect(parseRun(serializeRun(withCount))?.suggestions).toBe(3);
+  });
+
+  it('is absent, not zero, when the run filed none', () => {
+    expect(parseRun(serializeRun(record()))).not.toHaveProperty('suggestions');
+  });
+
+  it('drops a value that is not a count', () => {
+    // A hand-edited or half-written file can put anything here, and a NaN reaching the checkup's
+    // arithmetic is worse than no number at all.
+    for (const bad of ['-1', 'many', 'null']) {
+      const text = serializeRun(record()).replace('---\n', `---\nsuggestions: ${bad}\n`);
+      expect(parseRun(text), bad).not.toHaveProperty('suggestions');
+    }
+    // Zero IS a count, and is kept when written by hand.
+    const zero = serializeRun(record()).replace('---\n', '---\nsuggestions: 0\n');
+    expect(parseRun(zero)?.suggestions).toBe(0);
+  });
+});

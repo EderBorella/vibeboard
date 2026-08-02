@@ -159,6 +159,93 @@ describe('the API boundary', () => {
     });
   });
 
+  // The five verbs an agent can reach, as a matrix. A row nobody exercises is a row that does not
+  // work, and the interesting part is the gap between the two scopes: a work agent must not be able
+  // to move its own card into done and declare itself finished.
+  describe('the five card verbs', () => {
+    const verbs = (id: string) =>
+      ({
+        create: {
+          method: 'POST' as const,
+          url: '/api/cards',
+          payload: { board: 'engineering', columnSlug: 'backlog', title: 'x' },
+        },
+        edit: { method: 'PATCH' as const, url: `/api/cards/engineering/${id}`, payload: { title: 'x' } },
+        link: { method: 'PUT' as const, url: `/api/cards/engineering/${id}/links`, payload: { links: [] } },
+        move: {
+          method: 'POST' as const,
+          url: `/api/cards/engineering/${id}/move`,
+          payload: { toColumnSlug: 'in-progress' },
+        },
+        archive: { method: 'POST' as const, url: `/api/cards/engineering/${id}/archive`, payload: {} },
+      }) satisfies Record<string, { method: 'POST' | 'PATCH' | 'PUT'; url: string; payload: object }>;
+
+    it('lets a work credential create, edit its own card and link — and nothing else', async () => {
+      const { app, store } = await open();
+      const cred = store.mintRun('work', 'run-1', 'E-001');
+      const v = verbs('E-001');
+      for (const name of ['create', 'edit', 'link'] as const) {
+        const res = await app.inject({ ...v[name], headers: bearer(cred.token) });
+        expect(res.statusCode, name).toBe(200);
+      }
+      for (const name of ['move', 'archive'] as const) {
+        const res = await app.inject({ ...v[name], headers: bearer(cred.token) });
+        expect(res.statusCode, name).toBe(403);
+      }
+    });
+
+    it('lets a checkup credential do all five', async () => {
+      const { app, store } = await open();
+      const cred = store.mintRun('checkup', 'run-1');
+      const v = verbs('E-001');
+      for (const name of ['create', 'edit', 'link', 'move', 'archive'] as const) {
+        const res = await app.inject({ ...v[name], headers: bearer(cred.token) });
+        expect(res.statusCode, name).toBe(200);
+      }
+    });
+
+    it('refuses a run of any scope on /place, which is the drag-and-drop verb', async () => {
+      // Position is a person's judgement about a board they are looking at. An agent moves a card
+      // to a column; where in that column is not a question it has any basis to answer.
+      const { app, store } = await open();
+      for (const scope of ['work', 'checkup', 'service'] as const) {
+        const cred = store.mintRun(scope, `run-${scope}`, 'E-001');
+        const res = await app.inject({
+          method: 'POST',
+          url: '/api/cards/engineering/E-001/place',
+          headers: bearer(cred.token),
+          payload: { toColumnSlug: 'in-progress', beforeId: null },
+        });
+        expect(res.statusCode, scope).toBe(403);
+      }
+    });
+
+    it('appends a moved card to the end of its new column', async () => {
+      const { app, store } = await open();
+      const cred = store.mintRun('checkup', 'run-1');
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/cards/engineering/E-001/move',
+        headers: bearer(cred.token),
+        payload: { toColumnSlug: 'in-progress' },
+      });
+      expect(res.statusCode).toBe(200);
+      expect(res.json().columnSlug).toBe('in-progress');
+    });
+
+    it('refuses a move to a column the board does not have', async () => {
+      const { app, store } = await open();
+      const cred = store.mintRun('checkup', 'run-1');
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/cards/engineering/E-001/move',
+        headers: bearer(cred.token),
+        payload: { toColumnSlug: 'not-a-column' },
+      });
+      expect(res.statusCode).toBe(400);
+    });
+  });
+
   // The socket carries the copilot channel, and the copilot writes files with tools that
   // auto-approve. Locking /api while leaving this open would secure nothing.
   it('refuses a websocket that presents no credential', async () => {

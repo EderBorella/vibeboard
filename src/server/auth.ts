@@ -35,9 +35,10 @@ const RULES: Record<string, Rule> = {
   'PATCH /api/cards/:board/:id': { scopes: ['work', 'checkup'], ownCard: ['work'] },
   'PUT /api/cards/:board/:id/links': { scopes: ['work', 'checkup'] },
 
-  // Placement is supervision, not work. The checkup may reorganise the board; a work agent may not
-  // move its own card into done and declare itself finished.
-  'POST /api/cards/:board/:id/place': { scopes: ['checkup', 'service'] },
+  // Moving is supervision, not work: a work agent must not be able to put its own card in done and
+  // declare itself finished. `/place` is absent deliberately — it is the drag-and-drop verb, and
+  // where in a column a card belongs is a person's judgement about a board they can see.
+  'POST /api/cards/:board/:id/move': { scopes: ['checkup', 'service'] },
   'POST /api/cards/:board/:id/archive': { scopes: ['checkup'] },
 };
 

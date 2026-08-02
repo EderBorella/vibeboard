@@ -1,5 +1,5 @@
 import { readFile, writeFile } from 'node:fs/promises';
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyReply } from 'fastify';
 import { readArchive } from '../../core/board.js';
 import { findCard } from '../../core/find.js';
 import { ARCHIVE_SLUG } from '../../core/layout.js';
@@ -24,6 +24,34 @@ import { resolveCardRuns } from '../run-store.js';
 function isClosingColumn(config: ProjectConfig, board: BoardName, columnSlug: string): boolean {
   const last = config.boards[board].columns.at(-1);
   return last !== undefined && slugify(last) === columnSlug;
+}
+
+interface CardRef {
+  board: BoardName;
+  id: string;
+}
+
+// Shared by /place and /move, so the resolve-on-close rule has one home. Two copies would drift
+// the moment one of them gained a condition.
+async function place(
+  ctx: AppCtx,
+  { board, id }: CardRef,
+  toColumnSlug: string,
+  beforeId: string | null,
+  reply: FastifyReply,
+): Promise<unknown> {
+  const { root, config } = ctx.session as { root: string; config: ProjectConfig };
+  const card = await findCard(root, board, id, config);
+  if (!card) return reply.code(404).send({ error: 'Card not found' });
+  const placed = await placeCard(root, config, card, toColumnSlug, beforeId);
+  if (placed === 'unknown-column') return reply.code(400).send({ error: 'Unknown column' });
+  // Closing a card resolves its runs. Done on the move rather than in the watcher: writing run
+  // records in response to filesystem events, inside the folder the watcher watches, is a loop —
+  // so a card moved by an agent editing files directly still needs Dismiss.
+  if (isClosingColumn(config, board, placed.columnSlug)) {
+    await resolveCardRuns(root, board, placed.id, nowIso());
+  }
+  return placed;
 }
 
 export async function registerCardRoutes(api: FastifyInstance, ctx: AppCtx): Promise<void> {
@@ -71,23 +99,21 @@ export async function registerCardRoutes(api: FastifyInstance, ctx: AppCtx): Pro
   });
 
   // Position a card: within its column (reorder) or into another one, in a single call.
-  // `beforeId: null` means the end of the column.
+  // `beforeId: null` means the end of the column. Admin only — see /move below.
   api.post('/cards/:board/:id/place', async (req, reply) => {
     if (!ensureOpen(ctx.session, reply)) return;
-    const { board, id } = req.params as { board: BoardName; id: string };
     const { toColumnSlug, beforeId } = req.body as { toColumnSlug: string; beforeId?: string | null };
-    const { root, config } = ctx.session;
-    const card = await findCard(root, board, id, config);
-    if (!card) return reply.code(404).send({ error: 'Card not found' });
-    const placed = await placeCard(root, config, card, toColumnSlug, beforeId ?? null);
-    if (placed === 'unknown-column') return reply.code(400).send({ error: 'Unknown column' });
-    // Closing a card resolves its runs. Done on the move rather than in the watcher: writing run
-    // records in response to filesystem events, inside the folder the watcher watches, is a loop —
-    // so a card moved by an agent editing files directly still needs Dismiss.
-    if (isClosingColumn(config, board, placed.columnSlug)) {
-      await resolveCardRuns(root, board, placed.id, nowIso());
-    }
-    return placed;
+    return place(ctx, req.params as CardRef, toColumnSlug, beforeId ?? null, reply);
+  });
+
+  // Move a card to another column, appended at the end. A separate door onto the same function
+  // rather than a second implementation: /place exists for a person dragging a tile, and its
+  // `beforeId` is a judgement about a board they can see. An agent has no basis for answering it,
+  // and an endpoint that demands an answer invites an invented one.
+  api.post('/cards/:board/:id/move', async (req, reply) => {
+    if (!ensureOpen(ctx.session, reply)) return;
+    const { toColumnSlug } = req.body as { toColumnSlug: string };
+    return place(ctx, req.params as CardRef, toColumnSlug, null, reply);
   });
 
   api.post('/cards/:board/:id/archive', async (req, reply) => {

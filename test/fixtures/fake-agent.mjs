@@ -10,6 +10,7 @@
 //   crash     — exits non-zero without a report
 //   hang      — never exits, for cancel and timeout
 //   free      — like success, but reports a cost of exactly 0 (a free model)
+//   echo      — quotes its own credential back in its narration, then exits 0
 //
 // The report path is read from the prompt it was given, exactly as a real agent would: that means
 // these tests fail if the prompt stops naming the path.
@@ -61,6 +62,16 @@ if (behaviour === 'chatty') {
       session_id: 'shim-run',
     });
   }
+  process.exit(0);
+} else if (behaviour === 'echo') {
+  // How a credential really leaks: the agent narrates the command it is about to run, or quotes the
+  // prompt back at itself. The transcript is a file every other agent can read.
+  const cred = (prompt.match(/Your credential: `([^`]+)`/) ?? [])[1] ?? '(none)';
+  say({
+    type: 'assistant',
+    message: { content: [{ type: 'text', text: `about to run: curl -H 'Authorization: Bearer ${cred}'` }] },
+    session_id: 'shim-run',
+  });
   process.exit(0);
 } else if (behaviour === 'hang') {
   setInterval(() => {}, 1000); // never exits; the test cancels or times it out

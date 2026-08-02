@@ -61,6 +61,10 @@ export function buildApp(
     // Read per dispatch from the open project's config, so changing it in Settings takes effect
     // without a restart.
     maxConcurrent: () => session.config?.maxConcurrentRuns ?? DEFAULT_MAX_RUNS,
+    credentials,
+    // Read at dispatch rather than captured, so a port set after buildApp still lands. Taken from
+    // the same variable main.ts listens on — the app is not told the port it was bound to.
+    apiBase: () => `http://127.0.0.1:${process.env.VIBEBOARD_PORT ?? 4610}`,
     bin: opts.runBin,
     onUpdate: (record) => broadcast({ type: 'run:update', record }),
     log: log.child({ component: 'runner' }),

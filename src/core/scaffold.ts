@@ -50,14 +50,27 @@ Markdown body.
 \`\`\`
 
 ## Rules for agents
-- To create a card, pick the next id = highest existing of that prefix + 1.
-- To move a card, move its file to another column folder — do not change its id.
-- Board and column come from the file path, never from frontmatter.
-- Archiving a card by hand: move it to \`archive/\` **and** set \`archived\` + \`archivedFrom\`,
-  or it cannot be put back where it came from. Restoring: move it out and delete both keys —
-  a live card never carries them.
-- Links are symmetric: relating two cards records each other's id in both \`links\` lists.
-  Any pairing is allowed — product↔product, engineering↔engineering, or across boards.
+- **Board and column come from the file path**, never from frontmatter.
+- **Never name a column that is not configured.** Because a column is a folder, a path naming one
+  that does not exist does not fail — it CREATES the folder, and the card inside it is invisible to
+  the board while still holding its id. The configured columns are in \`${CONFIG_DIR}/config.yaml\`.
+- **If your instructions gave you a credential, change cards through the API rather than by writing
+  files.** Every skill run gets one. Send it as \`Authorization: Bearer <credential>\`:
+  - \`POST /api/cards\` — \`{ board, columnSlug, title, description?, body?, links? }\`. The id is
+    assigned for you; never choose one.
+  - \`PATCH /api/cards/:board/:id\` — title, description, tags, group, body.
+  - \`PUT /api/cards/:board/:id/links\` — \`{ links: [id, ...] }\`, the complete list. The far side is
+    written for you.
+  - Moving and archiving are not yours. A \`403\` means the action is outside your authority, not
+    that the tool is broken.
+- **Without a credential** (the chat copilot, driven by a person), edit the files directly:
+  - Create: next id = highest existing of that prefix + 1, inside a configured column's folder.
+  - Move: move the file to another column folder — do not change its id.
+  - Archive: move it to \`${ARCHIVE_SLUG}/\` **and** set \`archived\` + \`archivedFrom\`, or it cannot be put
+    back where it came from. Restore: move it out and delete both keys — a live card never carries
+    them.
+  - Link: relating two cards records each other's id in both \`links\` lists. Any pairing is allowed
+    — product↔product, engineering↔engineering, or across boards.
 `;
 
 async function ensureFolders(projectRoot: string, config: ProjectConfig): Promise<void> {

@@ -41,6 +41,11 @@ export interface PromptInputs {
   // Where the agent must write its report, project-root-relative.
   reportPath: string;
   projectRoot: string;
+  // What this run presents to the API, and where to send it. In the prompt rather than the
+  // environment because the OpenCode backend is one long-lived `opencode serve` spawned before any
+  // run exists — its environment is fixed, so a per-run value cannot reach it that way.
+  // Absent for a runner with no credential store, and then the section is left out entirely.
+  credential?: { token: string; apiBase: string };
 }
 
 function section(heading: string, body: string): string {
@@ -112,6 +117,34 @@ const CONTRACT_LINES = [
   'Write ONLY that file for your report; the run record itself belongs to VibeBoard.',
 ];
 
+// The board is changed through the API, not by writing card files. Stated as the mechanism rather
+// than as a preference: a column is a folder, so a file written to the wrong one does not fail — it
+// creates a folder no column maps to, and the card inside it is invisible to the board while still
+// holding its id. The endpoint refuses that; a file write cannot.
+//
+// The confinement is named on purpose. It is enforced server-side either way, but an agent that
+// does not know about it reads a 403 as a broken tool and falls back to editing files.
+function credentialSection(apiBase: string, token: string, cardId: string): string {
+  return [
+    `Your credential: \`${token}\`. Send it as \`Authorization: Bearer <credential>\` to \`${apiBase}\`.`,
+    'It stops working the moment this run ends, and it is yours alone — do not put it in a card, a',
+    'report or a file.',
+    '',
+    'Use these rather than writing card files. A card is a file in a column folder, so a file written',
+    'to a column that does not exist does not fail — it creates one, and the card in it vanishes from',
+    'the board while keeping its id. These endpoints refuse that:',
+    '',
+    '- `POST /api/cards` — `{ board, columnSlug, title, description?, body?, links? }`. The id is',
+    '  assigned for you; never choose one.',
+    `- \`PATCH /api/cards/:board/:id\` — edit title, description, tags, group or body. You may edit **${cardId}** and no other card.`,
+    '- `PUT /api/cards/:board/:id/links` — `{ links: [id, ...] }`, the complete list. Links are',
+    '  symmetric and the far side is written for you.',
+    '',
+    'Reading is unrestricted: `GET /api/state` is the whole board, and the files are yours to read.',
+    'Moving and archiving cards are not yours — say so in your report instead.',
+  ].join('\n');
+}
+
 export function buildRunPrompt(input: PromptInputs): string {
   // Every part is joined by exactly one blank line, so no part carries its own leading or trailing
   // blank — otherwise the heading and the skill body end up four newlines apart.
@@ -154,6 +187,14 @@ export function buildRunPrompt(input: PromptInputs): string {
   // specific instruction in the prompt and must not be buried above the card.
   if (input.userPrompt?.trim()) {
     parts.push(section('What the user asked for on top of the skill', input.userPrompt.trim()));
+  }
+  if (input.credential) {
+    parts.push(
+      section(
+        'Changing the board (required)',
+        credentialSection(input.credential.apiBase, input.credential.token, input.card.id),
+      ),
+    );
   }
   parts.push(
     section('Reporting (required)', CONTRACT_LINES.join('\n').replace('<REPORT_PATH>', input.reportPath)),

@@ -3,6 +3,7 @@ import type { Skill } from '../core/skills.js';
 import type { BoardName, Card } from '../core/types.js';
 import { type Backend, type RunningTurn, runAgentTurn } from './agent-turn.js';
 import type { ResultStats } from './copilot-events.js';
+import type { CredentialStore } from './credentials.js';
 import type { Log } from './logging.js';
 import { type BoardColumns, buildRunPrompt } from './run-prompt.js';
 import { appendTranscript, foldReport, reportContract, transcriptTail, writeRun } from './run-store.js';
@@ -49,6 +50,14 @@ export interface RunnerOptions {
   // Overrides the executable a run spawns. Tests pass their shim here rather than through the
   // environment, which is shared with every other test file in the process.
   bin?: string;
+  // Mints each run a credential when it starts and revokes it when it settles. Optional: a runner
+  // without one spawns agents that are told nothing about the API, which is what every test that is
+  // about something else wants — and `work` is the only scope a run ever gets, so there is nothing
+  // to configure here.
+  credentials?: CredentialStore;
+  // Where the agent should send that credential. A function because the port is known to whoever
+  // started the server, not to whoever built the runner.
+  apiBase?: () => string;
   // Called whenever a record changes on disk, so the WS layer can push it without polling.
   onUpdate?: (record: RunRecord) => void;
   // A run outlives the request that dispatched it, so there is no request logger to reach for when
@@ -84,6 +93,12 @@ function usageFromStats(stats: ResultStats | undefined): RunUsage | undefined {
     outputTokens: stats.outputTokens,
   };
 }
+
+// Transcripts live under `.vibeboard/` where every agent can read them, and a run's credential is
+// only its own while it stays out of them. An agent that echoes the token — quoting the prompt back,
+// pasting a failed curl — would otherwise hand a concurrent run a working key.
+const redact = (line: string, token?: string): string =>
+  token ? line.replaceAll(token, '[credential redacted]') : line;
 
 export class AgentRunner {
   #opts: RunnerOptions;
@@ -176,6 +191,11 @@ export class AgentRunner {
   // this later, with the same record it was written with.
   #start(root: string, record: RunRecord, input: DispatchInput): void {
     const run = record.run;
+    // Minted here rather than in dispatch, so a queued run's credential begins its life when the
+    // run actually starts. `work`, confined to its own card: a run that could move cards could put
+    // its own into done and declare itself finished.
+    const minted = this.#opts.credentials?.mintRun('work', run, record.card);
+    const credential = minted ? { token: minted.token, apiBase: this.#opts.apiBase?.() ?? '' } : undefined;
     const prompt = buildRunPrompt({
       skill: input.skill,
       card: input.card,
@@ -188,6 +208,7 @@ export class AgentRunner {
       userPrompt: input.userPrompt,
       reportPath: reportContract(run),
       projectRoot: root,
+      credential,
     });
 
     const turn = runAgentTurn({
@@ -207,7 +228,7 @@ export class AgentRunner {
         this.#transcripts.set(
           run,
           (this.#transcripts.get(run) ?? Promise.resolve())
-            .then(() => appendTranscript(root, run, JSON.stringify(event)))
+            .then(() => appendTranscript(root, run, redact(JSON.stringify(event), minted?.token)))
             // A lost transcript line must never fail the run — but the transcript is the fallback
             // the report is built from when the agent writes none, so a gap in it explains an
             // otherwise inexplicable empty report.
@@ -261,6 +282,10 @@ export class AgentRunner {
     } finally {
       this.#active.delete(run);
       this.#transcripts.delete(run);
+      // In the `finally`, so every ending revokes it — success, failure, cancellation and timeout
+      // alike. A credential that outlived one of them would be a live key to the board held by a
+      // process nothing is watching any more.
+      this.#opts.credentials?.expireRun(run);
     }
     this.#opts.onUpdate?.(final);
     // A slot just freed, so whatever was waiting starts now. After the update, so the dashboard sees

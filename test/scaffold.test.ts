@@ -87,7 +87,7 @@ describe('scaffoldProject', () => {
     await scaffoldProject(root, { name: 'Demo', mode: 'greenfield', today: TODAY });
     const doc = await readFile(join(root, CONVENTIONS_FILE), 'utf8');
     expect(doc).toContain('# VibeBoard card conventions');
-    expect(doc).toContain('Board and column come from the file path, never from frontmatter.');
+    expect(doc).toContain('**Board and column come from the file path**, never from frontmatter.');
   });
 
   it('brownfield: preserves an existing CLAUDE.md, appending only a pointer', async () => {

@@ -7,6 +7,7 @@ import type { RunRecord } from '../src/core/runs.js';
 import type { Skill } from '../src/core/skills.js';
 import type { Card } from '../src/core/types.js';
 import { AgentRunner, type DispatchInput, type RunnerOptions } from '../src/server/agent-runner.js';
+import { type Credential, CredentialStore, type Scope } from '../src/server/credentials.js';
 import { listCardRuns, readRun, reportPath, transcriptTail } from '../src/server/run-store.js';
 import { tempDir } from './helpers.js';
 
@@ -493,5 +494,87 @@ describe('AgentRunner.dispatch', () => {
     const { instance } = runner(root);
     const { run } = await instance.dispatch(input(root));
     expect((await settled(root, run)).status).toBe('success');
+  });
+});
+
+// A run's credential is the only way it can change the board once the sandbox lands, and it cannot
+// arrive by environment variable: the OpenCode backend is one long-lived `opencode serve` spawned
+// before any run exists. So it travels in the prompt, and its lifetime is the run's.
+describe('the run credential', () => {
+  // Recorded at mint time rather than verified afterwards: the shim finishes in milliseconds, so by
+  // the time the prompt can be read off disk the run has settled and the credential is already
+  // revoked — correctly. What this pins is what was minted, and that the prompt carried it.
+  class RecordingStore extends CredentialStore {
+    minted: Credential[] = [];
+    override mintRun(scope: Exclude<Scope, 'admin'>, run: string, card?: string): Credential {
+      const cred = super.mintRun(scope, run, card);
+      this.minted.push(cred);
+      return cred;
+    }
+  }
+
+  it('mints a work credential confined to the run and its card, and puts it in the prompt', async () => {
+    const root = await tempDir();
+    const store = new RecordingStore('admin');
+    const argsLog = join(await tempDir(), 'args.log');
+    process.env.VIBEBOARD_SHIM_ARGS = argsLog;
+    const { instance } = runner(root, { credentials: store, apiBase: () => 'http://127.0.0.1:4610' });
+
+    const { run } = await instance.dispatch(input(root));
+    await settled(root, run);
+    delete process.env.VIBEBOARD_SHIM_ARGS;
+
+    expect(store.minted).toHaveLength(1);
+    expect(store.minted[0]).toMatchObject({ scope: 'work', run, card: 'E-010' });
+
+    const { readFile } = await import('node:fs/promises');
+    const text: string = JSON.parse((await readFile(argsLog, 'utf8')).trim().split('\n')[0]).at(-1);
+    expect(text).toContain(store.minted[0].token);
+    expect(text).toContain('http://127.0.0.1:4610');
+  });
+
+  it('revokes the credential however the run ends', async () => {
+    // Every ending, not just success: a credential outliving a cancelled or failed run is a live key
+    // to the board held by a process nobody is watching. The token asserted on is the one the RUNNER
+    // minted — an earlier version of this test minted its own and expired it by hand, so it passed
+    // with the runner's revoke deleted.
+    for (const behaviour of ['success', 'attention', 'crash'] as const) {
+      const root = await tempDir();
+      const store = new RecordingStore('admin');
+      const { instance } = runner(root, { credentials: store });
+      const { run } = await instance.dispatch(input(root, behaving(behaviour)));
+      await settled(root, run);
+      expect(store.minted[0].run, behaviour).toBe(run);
+      expect(store.verify(store.minted[0].token), behaviour).toBeNull();
+    }
+  });
+
+  it('keeps the token out of the transcript even when the agent echoes it', async () => {
+    // Transcripts live under .vibeboard/ where every agent can read them, so a run that quotes its
+    // own credential would hand a concurrent run a working key.
+    const root = await tempDir();
+    const store = new RecordingStore('admin');
+    const { instance } = runner(root, { credentials: store, apiBase: () => 'http://127.0.0.1:4610' });
+    const { run } = await instance.dispatch(input(root, behaving('echo')));
+    await settled(root, run);
+
+    const tail = await transcriptTail(root, run);
+    expect(tail).toContain('Authorization: Bearer'); // the shim really did echo
+    expect(tail).not.toContain(store.minted[0].token);
+    expect(tail).toContain('[credential redacted]');
+  });
+
+  it('says nothing about a credential when the runner has no store', async () => {
+    const root = await tempDir();
+    const argsLog = join(await tempDir(), 'args.log');
+    process.env.VIBEBOARD_SHIM_ARGS = argsLog;
+    const { instance } = runner(root);
+    const { run } = await instance.dispatch(input(root));
+    await settled(root, run);
+    delete process.env.VIBEBOARD_SHIM_ARGS;
+
+    const { readFile } = await import('node:fs/promises');
+    const text: string = JSON.parse((await readFile(argsLog, 'utf8')).trim().split('\n')[0]).at(-1);
+    expect(text).not.toContain('Your credential');
   });
 });

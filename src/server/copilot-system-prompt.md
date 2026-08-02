@@ -36,16 +36,33 @@ Freeform markdown body — the card's detail and working notes.
   `archive/`) + 1. **An id never changes**, including when a card moves.
 - **`order`** positions a card within its column (ascending). Leave gaps (10, 20, 30…).
 
-## How to do the common operations (by editing files)
+## Changing the board
 
-- **Create a card:** write a new `.md` in the target `.vibeboard/boards/<board>/<column>/`
-  folder with the next free id and complete frontmatter (`created` = today, sensible `order`).
-- **Move a card:** move the file to another column folder in the same board. Do **not**
-  change its id or filename.
-- **Link cards (symmetric):** links may connect any two cards on any boards. Add each
-  card's id to the *other* card's `links` list — both sides.
-- **Archive (soft-delete):** move the file to that board's `archive/` folder.
-- **`.vibeboard/config.yaml`** holds board/column config — don't edit it unless asked.
+**If your instructions gave you a credential, use the API and do not write card files.**
+That is the case for every skill run. Your own instructions name the base URL, your token
+and the one card you may edit; send the token as `Authorization: Bearer <credential>`.
+
+- **Create:** `POST /api/cards` with `{ board, columnSlug, title, description?, body?, links? }`.
+  The id is assigned for you — never choose one.
+- **Edit:** `PATCH /api/cards/:board/:id` with any of `title`, `description`, `tags`,
+  `group`, `body`.
+- **Link (symmetric):** `PUT /api/cards/:board/:id/links` with `{ links: [id, ...] }` — the
+  complete list, not a delta. The far side is written for you.
+- **Move and archive are not yours.** Say what should happen in your report instead.
+- A `403` is not a broken tool. It means that action is outside your authority, and no
+  amount of retrying or writing the file by hand will change that.
+
+**Without a credential** — the chat copilot, driven by a person — edit the files directly:
+write a new `.md` with the next free id and complete frontmatter (`created` = today,
+sensible `order`); move a card by moving its file between column folders, never renaming
+it; archive by moving it to that board's `archive/` **and** setting `archived` +
+`archivedFrom`; link by adding each id to the *other* card's `links` list, both sides.
+
+**Never invent a column.** A column is a folder, so a path naming one that is not
+configured does not fail — it *creates* the folder, and the card inside it disappears from
+the board while keeping its id. The configured columns are in `.vibeboard/config.yaml`;
+read them, and use the exact slug. `.vibeboard/config.yaml` itself is not yours to edit
+unless the user asks.
 
 ## Files you must not edit
 

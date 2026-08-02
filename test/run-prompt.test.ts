@@ -286,3 +286,29 @@ describe('buildRunPrompt', () => {
     expect(text).not.toContain('INSTRUCTIONS.md');
   });
 });
+
+// The credential is the only way an agent can change the board once the sandbox lands, and it
+// cannot arrive by environment variable: the OpenCode backend is one long-lived `opencode serve`
+// spawned before any run exists, so its environment is fixed. It travels in the prompt instead.
+describe('the run credential', () => {
+  it('names the token and the base URL when the run has one', () => {
+    const text = buildRunPrompt(
+      inputs({ credential: { token: 'tok-123', apiBase: 'http://127.0.0.1:4610' } }),
+    );
+    expect(text).toContain('tok-123');
+    expect(text).toContain('http://127.0.0.1:4610');
+  });
+
+  it('says nothing about credentials when the run has none', () => {
+    // A heading promising a credential above no token would send the agent looking for one.
+    const text = buildRunPrompt(inputs());
+    expect(text.toLowerCase()).not.toContain('credential');
+  });
+
+  it('tells the agent which card its credential is confined to', () => {
+    // Confinement is enforced server-side, but an agent that does not know about it reads a 403 as
+    // a broken tool and starts writing files instead.
+    const text = buildRunPrompt(inputs({ credential: { token: 'tok', apiBase: 'http://x' } }));
+    expect(text).toContain('E-010');
+  });
+});

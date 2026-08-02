@@ -4,6 +4,7 @@ import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { isolationEnabled, opencodeConfigHome } from './copilot-env.js';
 import type { Log } from './logging.js';
+import { NOT_REQUESTED, type SandboxStatus, wrapCommand } from './sandbox.js';
 
 // A single managed `opencode serve` process, started lazily and reused for every turn.
 // We talk to it over HTTP (see opencode-client) — `opencode run` per turn hangs at init on
@@ -17,6 +18,17 @@ function opencodeBin(): string {
 let child: ChildProcess | undefined;
 let urlPromise: Promise<string> | undefined;
 let log: Log | undefined;
+let sandbox: SandboxStatus = NOT_REQUESTED;
+
+// Set by buildApp, alongside the logger and for the same reason: this server is a process-wide
+// singleton started lazily, long after the app was built.
+//
+// One confinement covers every run in every project it serves, and the chat with it — the profile
+// is globs over `**/.vibeboard/**`, not paths, so switching projects needs no restart. That is the
+// simplification AppArmor bought over the per-project ruleset the design originally called for.
+export function attachSandbox(status: SandboxStatus): void {
+  sandbox = status;
+}
 
 // Set by buildApp, for the same reason as ProjectSession.attachLogger: this is a process-wide
 // singleton started on first use, and everything it has to say happens with no request in flight.
@@ -96,7 +108,10 @@ function startServer(): Promise<string> {
   // default XDG_DATA_HOME (~/.local/share/opencode), so login is preserved.
   const env = isolationEnabled() ? { ...process.env, XDG_CONFIG_HOME: opencodeConfigHome() } : process.env;
   reapOrphanServer();
-  const proc = spawn(opencodeBin(), args, { env });
+  // Confined here, at the one place the managed server is created. A server VibeBoard did not spawn
+  // was never wrapped, which is exactly why VIBEBOARD_OPENCODE_URL refuses auto-pilot below.
+  const spawned = wrapCommand(opencodeBin(), args, sandbox);
+  const proc = spawn(spawned.bin, spawned.args, { env });
   child = proc;
   recordPid(proc.pid);
 
@@ -134,8 +149,16 @@ function startServer(): Promise<string> {
     proc.stdout?.on('data', onData('stdout'));
     proc.stderr?.on('data', onData('stderr'));
     proc.on('exit', (code) => {
-      child = undefined;
-      urlPromise = undefined;
+      // Only if THIS process is still the one we are tracking. The handler closes over module
+      // state, and exit arrives a tick after the kill — so a restart, which stops the old server
+      // and registers the new one synchronously, had its new registration wiped by the old
+      // server's exit. The next turn then spawned a third server, on a different OS-assigned port,
+      // with nothing recording its pid: an orphan surviving shutdown, which is the exact leak
+      // 976d710 was written to fix.
+      if (child === proc) {
+        child = undefined;
+        urlPromise = undefined;
+      }
       if (!settled) {
         settled = true;
         clearTimeout(timer);
@@ -151,11 +174,35 @@ function startServer(): Promise<string> {
   });
 }
 
+// The server VibeBoard was told to attach to, if any. Read per call rather than captured: the
+// take-over action clears it at runtime, and a captured value would keep refusing afterwards.
+export function attachedOpencodeUrl(): string | undefined {
+  return process.env.VIBEBOARD_OPENCODE_URL || undefined;
+}
+
 export function opencodeBaseUrl(): Promise<string> {
-  const attach = process.env.VIBEBOARD_OPENCODE_URL;
+  const attach = attachedOpencodeUrl();
   if (attach) return Promise.resolve(attach.replace(/\/$/, ''));
   if (!urlPromise) urlPromise = startServer();
   return urlPromise;
+}
+
+// Stop the managed server and start a fresh one, confined by whatever is in force now. Its everyday
+// justification is a hung or stale server; it also covers one started before the profile was
+// installed, which would otherwise keep serving unconfined until the app restarted.
+export async function restartOpencodeServer(): Promise<string> {
+  stopOpencodeServer();
+  urlPromise = startServer();
+  return urlPromise;
+}
+
+// Stop attaching to somebody else's server and manage one of our own. An explicit user action,
+// never something auto-pilot does silently: that variable was set deliberately, most likely for
+// debugging, and a loop quietly overriding it would be the same class of surprise this whole slice
+// exists to remove.
+export async function takeOverOpencodeServer(): Promise<string> {
+  delete process.env.VIBEBOARD_OPENCODE_URL;
+  return restartOpencodeServer();
 }
 
 export function stopOpencodeServer(): void {

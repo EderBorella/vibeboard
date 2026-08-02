@@ -8,7 +8,7 @@ import { CopilotSession } from './copilot.js';
 import { createCopilotTurns } from './copilot-turns.js';
 import { CredentialStore } from './credentials.js';
 import { type Log, serverLogger, stripSecrets, withRedaction } from './logging.js';
-import { attachOpencodeLogger } from './opencode-server.js';
+import { attachOpencodeLogger, attachSandbox } from './opencode-server.js';
 import type { AppCtx } from './route-context.js';
 import { registerCardRoutes } from './routes/cards.js';
 import { registerConfigRoutes } from './routes/config.js';
@@ -18,7 +18,7 @@ import { registerModelRoutes } from './routes/models.js';
 import { registerProjectRoutes } from './routes/project.js';
 import { registerRunRoutes } from './routes/runs.js';
 import { registerSkillRoutes } from './routes/skills.js';
-import type { SandboxStatus } from './sandbox.js';
+import { NOT_REQUESTED, type SandboxStatus } from './sandbox.js';
 import type { ProjectSession } from './session.js';
 import { createBroadcaster, registerWs } from './ws.js';
 
@@ -63,6 +63,8 @@ export function buildApp(
   // Same reason for the OpenCode backend: the spawned `opencode serve` and the turns that run
   // through it are module singletons, and both only speak with no request in flight.
   attachOpencodeLogger(log.child({ component: 'opencode' }));
+  // Same singleton, same reason: the managed server is spawned lazily, long after this runs.
+  attachSandbox(opts.sandbox ?? NOT_REQUESTED);
   const { clients, broadcast } = createBroadcaster();
   // A run does real work — implementing a card, not answering a question — so its patience is its
   // own, an order of magnitude beyond the chat's per-turn timeout.

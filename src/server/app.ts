@@ -19,6 +19,7 @@ import { registerProjectRoutes } from './routes/project.js';
 import { registerRunRoutes } from './routes/runs.js';
 import { registerSandboxRoutes } from './routes/sandbox.js';
 import { registerSkillRoutes } from './routes/skills.js';
+import { registerSuggestionRoutes } from './routes/suggestions.js';
 import { NOT_REQUESTED, type SandboxStatus } from './sandbox.js';
 import type { ProjectSession } from './session.js';
 import { createBroadcaster, registerWs } from './ws.js';
@@ -109,6 +110,7 @@ export function buildApp(
       await registerModelRoutes(api, ctx);
       await registerControlRoutes(api, ctx);
       await registerSandboxRoutes(api, ctx);
+      await registerSuggestionRoutes(api, ctx);
       await registerExplorerRoutes(api, ctx);
       await registerSkillRoutes(api, ctx);
       await registerRunRoutes(api, ctx);

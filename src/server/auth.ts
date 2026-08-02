@@ -44,6 +44,15 @@ const RULES: Record<string, Rule> = {
   // where in a column a card belongs is a person's judgement about a board they can see.
   'POST /api/cards/:board/:id/move': { scopes: ['checkup', 'service'] },
   'POST /api/cards/:board/:id/archive': { scopes: ['checkup'] },
+
+  // Filing is uncapped and open to both working scopes; READING the list is not. A work agent that
+  // can see every open problem in the project is a work agent scoped to one card talking itself
+  // into five, which is the scope spiral decision 5 exists to prevent. The service reads them to
+  // feed the checkup and files none — it dispatches work, it does not discover it.
+  'POST /api/suggestions': { scopes: ['work', 'checkup'] },
+  'GET /api/suggestions': { scopes: ['checkup', 'service'] },
+  // PATCH is absent on purpose: triage is the human's, and the checkup's in slice C through its own
+  // path. A run marking its own finding `dismissed` would close the channel from the inside.
 };
 
 export function bearerToken(header: string | undefined): string {

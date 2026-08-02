@@ -55,6 +55,9 @@ export const TEST_ADMIN_TOKEN = 'test-admin-token';
 export interface TestAppOpts {
   runBin?: string;
   logger?: FastifyServerOptions['logger'];
+  // Confinement, as the composition root would pass it. Absent means unsandboxed, which is what
+  // every suite that is about something else wants.
+  sandbox?: SandboxStatus;
 }
 
 // buildApp, plus the browser's credential on every request that does not bring its own. Auth is not
@@ -88,12 +91,13 @@ export async function openTestProject(
     name?: string;
     mode?: 'greenfield' | 'brownfield';
     runBin?: string;
+    sandbox?: SandboxStatus;
     // Silent unless a test asks otherwise; pass a stream to read back what the subsystems logged.
     logger?: FastifyServerOptions['logger'];
   } = {},
 ): Promise<TestProject> {
   const session = new ProjectSession();
-  const app = testApp(session, { runBin: opts.runBin, logger: opts.logger });
+  const app = testApp(session, { runBin: opts.runBin, logger: opts.logger, sandbox: opts.sandbox });
   const root = await tempDir();
   await app.inject({
     method: 'POST',

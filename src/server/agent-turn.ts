@@ -6,6 +6,7 @@ import { INSTRUCTIONS_FILE } from '../core/layout.js';
 import { claudeConfigDir, isolationEnabled } from './copilot-env.js';
 import { type CopilotEvent, parseCopilotLine, type ResultStats } from './copilot-events.js';
 import { opencodeTurn } from './opencode-client.js';
+import { NOT_REQUESTED, type SandboxStatus, wrapCommand } from './sandbox.js';
 
 // ONE agent turn: build the command, run it, stream its events, report how it ended.
 //
@@ -36,6 +37,10 @@ export interface AgentTurnOptions {
   // state: a test setting VIBEBOARD_CLAUDE_BIN in a beforeEach races any sibling test file sharing
   // the process, which is how Stryker's dry run started failing where `npm test` passed.
   bin?: string;
+  // Whether to confine this turn, and to what. Absent means unconfined — the same shape as `bin`,
+  // and for the same reason: a test must be able to state it rather than inherit process state.
+  // Probed once per server, not per turn: it cannot change while the process runs.
+  sandbox?: SandboxStatus;
   onEvent: (event: CopilotEvent) => void;
 }
 
@@ -195,7 +200,10 @@ function startClaude(opts: AgentTurnOptions): RunningTurn {
   const { bin, args } = claudeCommand(opts);
   // Isolated config dir so the personal ~/.claude/CLAUDE.md, plugins, and hooks don't load.
   const env = isolationEnabled() ? { ...process.env, CLAUDE_CONFIG_DIR: claudeConfigDir() } : process.env;
-  const child: ChildProcess = spawn(bin, args, { cwd: opts.cwd, env });
+  // Confinement is applied here because one Claude turn is one process. Best-effort by design: with
+  // no sandbox this returns the command unchanged, and auto-pilot's own gate is what fails closed.
+  const spawned = wrapCommand(bin, args, opts.sandbox ?? NOT_REQUESTED);
+  const child: ChildProcess = spawn(spawned.bin, spawned.args, { cwd: opts.cwd, env });
   // Written and closed immediately: `claude -p` waits for EOF before it begins, so leaving the pipe
   // open hangs the turn until the timeout.
   child.stdin?.end(opts.text, 'utf8');

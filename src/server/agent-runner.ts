@@ -7,6 +7,7 @@ import type { Credential, CredentialStore } from './credentials.js';
 import type { Log } from './logging.js';
 import { type BoardColumns, buildRunPrompt } from './run-prompt.js';
 import { appendTranscript, foldReport, reportContract, transcriptTail, writeRun } from './run-store.js';
+import type { SandboxStatus } from './sandbox.js';
 
 // Runs skills as agents.
 //
@@ -50,6 +51,9 @@ export interface RunnerOptions {
   // Overrides the executable a run spawns. Tests pass their shim here rather than through the
   // environment, which is shared with every other test file in the process.
   bin?: string;
+  // Confines every run this runner dispatches. Absent means unconfined, which is what a test about
+  // something else wants; the composition root passes the probe's answer.
+  sandbox?: SandboxStatus;
   // Mints each run a credential when it starts and revokes it when it settles. Optional: a runner
   // without one spawns agents that are told nothing about the API, which is what every test that is
   // about something else wants — and `work` is the only scope a run ever gets, so there is nothing
@@ -246,6 +250,7 @@ export class AgentRunner {
       effort: input.effort,
       timeoutMs: this.#opts.timeoutMs,
       bin: this.#opts.bin,
+      sandbox: this.#opts.sandbox,
       onEvent: (event) => {
         // Chained, not fired and forgotten. Two reasons, both real: concurrent appends of one line
         // each can interleave mid-line, and #settle reads the tail as soon as the process closes —

@@ -14,6 +14,11 @@ const { runAgentTurn } = await import('../src/server/agent-turn.js');
 import { INSTRUCTIONS_FILE } from '../src/core/layout.js';
 import type { AgentTurnOptions, AgentTurnResult } from '../src/server/agent-turn.js';
 import type { CopilotEvent } from '../src/server/copilot-events.js';
+import { probeSandbox, SANDBOX_PROFILE } from '../src/server/sandbox.js';
+
+// Probed once, at module level: `describe` callbacks are synchronous.
+const live = await probeSandbox();
+if (!live.ok) console.warn(`\n  ⚠ agent-turn sandbox test SKIPPED: ${live.reason}\n`);
 
 const here = dirname(fileURLToPath(import.meta.url));
 const SHIM = join(here, 'fixtures', 'fake-cli.mjs');
@@ -62,8 +67,25 @@ async function claudeTurn(over: Partial<AgentTurnOptions> = {}, marks = ''): Pro
   return { result, events, argv: argvFromLog() };
 }
 
-function lastInvocation(): { argv: string[]; cwd: string; prompt: string } {
-  return JSON.parse(readFileSync(log, 'utf8').trim().split('\n').at(-1) as string);
+interface Invocation {
+  argv: string[];
+  cwd: string;
+  prompt: string;
+  confinement: string;
+}
+
+// Every spawn recorded for this test, in order. Counting them is how a test tells "the second turn
+// ran and matched" from "the second turn never started and I re-read the first".
+function invocations(): Invocation[] {
+  return readFileSync(log, 'utf8')
+    .trim()
+    .split('\n')
+    .filter(Boolean)
+    .map((line) => JSON.parse(line) as Invocation);
+}
+
+function lastInvocation(): Invocation {
+  return invocations().at(-1) as Invocation;
 }
 
 function argvFromLog(): string[] {
@@ -537,5 +559,32 @@ describe('runAgentTurn', () => {
     await claudeTurn({ backend: 'nonsense' as AgentTurnOptions['backend'] });
     expect(client.opencodeTurn).not.toHaveBeenCalled();
     expect(argvFromLog()).toContain('-p');
+  });
+});
+
+describe('the sandbox', () => {
+  it('spawns the CLI directly when there is none', async () => {
+    const { result } = await claudeTurn({ sandbox: { ok: false, reason: 'not linux' } });
+    expect(result.exitCode).toBe(0);
+    // NOT `toBe('unconfined')`: on macOS the fixture records 'unknown' and under SELinux it records
+    // an unconfined_u:… label, and this test is deliberately not skipped anywhere. What it means is
+    // "the profile did not apply", and that is what it should say.
+    expect(lastInvocation().confinement).not.toBe(`${SANDBOX_PROFILE} (enforce)`);
+  });
+
+  // Skipped without a loaded profile, and it must be. `aa-exec` exits 1 when the profile is
+  // missing, so the shim never runs and never appends — an earlier version of this test compared
+  // two turns by reading the LAST log line twice and was asserting `x === x`. It passed against a
+  // wrapper that dropped every argument.
+  it.skipIf(!live.ok)('really confines the process, without editing the command', async () => {
+    const plain = await claudeTurn();
+    const confined = await claudeTurn({ sandbox: live });
+
+    // Two separate spawns, or the comparison below is a tautology.
+    expect(invocations()).toHaveLength(2);
+    expect(confined.result.exitCode).toBe(0);
+    expect(lastInvocation().confinement).toBe(`${SANDBOX_PROFILE} (enforce)`);
+    // The wrapper wraps; it does not edit what it wraps.
+    expect(confined.argv).toEqual(plain.argv);
   });
 });

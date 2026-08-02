@@ -18,6 +18,7 @@ import { registerModelRoutes } from './routes/models.js';
 import { registerProjectRoutes } from './routes/project.js';
 import { registerRunRoutes } from './routes/runs.js';
 import { registerSkillRoutes } from './routes/skills.js';
+import type { SandboxStatus } from './sandbox.js';
 import type { ProjectSession } from './session.js';
 import { createBroadcaster, registerWs } from './ws.js';
 
@@ -44,6 +45,9 @@ export function buildApp(
     runBin?: string;
     logger?: FastifyServerOptions['logger'];
     credentials?: CredentialStore;
+    // Probed once, by main.ts, before the app exists — every agent this app starts is confined the
+    // same way, and re-probing per turn would put a process spawn in front of every dispatch.
+    sandbox?: SandboxStatus;
   } = {},
 ): FastifyInstance {
   const app = Fastify({ logger: withRedaction(opts.logger ?? serverLogger().options) });
@@ -51,7 +55,7 @@ export function buildApp(
   // Each subsystem logs under its own `component`, so the file can be filtered by area:
   //   jq 'select(.component == "watcher")' logs/vibeboard-*.log
   const log: Log = app.log;
-  const copilot = new CopilotSession();
+  const copilot = new CopilotSession({ sandbox: opts.sandbox });
   const chats = new ChatStore(session, log.child({ component: 'chat' }));
   // The watcher and the debounced snapshot broadcast happen with no request in flight, and the
   // session is constructed before the app — so the composition root hands it the logger.
@@ -75,10 +79,19 @@ export function buildApp(
     // the same variable main.ts listens on — the app is not told the port it was bound to.
     apiBase: () => `http://127.0.0.1:${process.env.VIBEBOARD_PORT ?? 4610}`,
     bin: opts.runBin,
+    sandbox: opts.sandbox,
     onUpdate: (record) => broadcast({ type: 'run:update', record }),
     log: log.child({ component: 'runner' }),
   });
-  const ctx: AppCtx = { session, copilot, chats, runner, credentials, broadcast, log };
+  const ctx: AppCtx = {
+    session,
+    copilot,
+    chats,
+    runner,
+    credentials,
+    broadcast,
+    log,
+  };
   const turns = createCopilotTurns(ctx);
 
   registerWs(app, ctx, clients, turns.handleMessage, turns.sendHistory);

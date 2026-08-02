@@ -28,9 +28,20 @@ try {
   /* no stdin attached */
 }
 const log = (prompt.match(/\[\[log:([^\]]+)\]\]/) ?? [])[1];
+
+// What is confining THIS process. Recorded rather than inferred from argv, because the sandbox
+// wrapper `exec`s the CLI — so by the time this runs, aa-exec is gone and its arguments with it.
+// argv can only ever show the shape of the command; this shows whether the kernel agreed.
+let confinement = 'unknown';
+try {
+  confinement = readFileSync('/proc/self/attr/current', 'utf8').trim();
+} catch {
+  /* no AppArmor, or not Linux — 'unknown' is the honest answer */
+}
+
 // The prompt is recorded alongside argv so a test can assert BOTH what was said and that argv did
 // not say it.
-if (log) appendFileSync(log, `${JSON.stringify({ argv: args, cwd: process.cwd(), prompt })}\n`);
+if (log) appendFileSync(log, `${JSON.stringify({ argv: args, cwd: process.cwd(), prompt, confinement })}\n`);
 
 const behaviour = (prompt.match(/\[\[behaviour:(\w+)\]\]/) ?? [])[1] ?? 'ok';
 const write = (s) => process.stdout.write(s);

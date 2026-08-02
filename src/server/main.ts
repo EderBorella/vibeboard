@@ -4,6 +4,7 @@ import { restoreLastProject } from './app-state.js';
 import { adminToken, CredentialStore } from './credentials.js';
 import { installCrashHandlers, serverLogger } from './logging.js';
 import { stopOpencodeServer } from './opencode-server.js';
+import { probeSandbox } from './sandbox.js';
 import { ProjectSession } from './session.js';
 import { registerStatic } from './static.js';
 
@@ -30,7 +31,15 @@ const logging = serverLogger();
 // page through the URL printed below and nowhere else: serving it over HTTP would hand it to any
 // agent that can reach loopback, which is all of them.
 const admin = await adminToken();
-const app = buildApp(session, { logger: logging.options, credentials: new CredentialStore(admin) });
+// Probed once, here, because the answer cannot change while the process runs and every agent this
+// server starts is confined identically. The banner says which mode we are in: a sandbox nobody can
+// see the state of is a sandbox nobody trusts.
+const sandbox = await probeSandbox();
+const app = buildApp(session, {
+  logger: logging.options,
+  credentials: new CredentialStore(admin),
+  sandbox,
+});
 // Anything that rejects or throws outside a request used to end the process in silence. Node exits
 // on both of these by default, so this only adds the record of why.
 installCrashHandlers(app.log);
@@ -72,14 +81,23 @@ async function start(): Promise<void> {
   // The token is in the link on purpose: the browser trades it for a stored credential on first
   // visit, and the terminal is the one channel an agent has no way to read.
   //
-  // That is the intended separation, not the current one. Until the sandbox lands, the token file
-  // is readable by any agent — and the token is only kept out of the log because the request
-  // serializer strips it (logging.ts). It was not, and it was found sitting in a log file.
+  // The separation holds only where the sandbox does. With the profile loaded the token file is
+  // unreadable by any agent (`deny @{HOME}/.vibeboard/token* rwl`); without it — a Mac, or a Linux
+  // box where `npm run sandbox:install` has not been run — manual runs are unconfined and this is
+  // once more a plan rather than a protection, which is what the line below says out loud. Either
+  // way the token stays out of the log only because the request serializer strips it (logging.ts):
+  // it was found sitting in one.
   const q = `?token=${admin}`;
   console.log(`\n  VibeBoard running`);
   console.log(`  → http://localhost:${port}/${q}${lan ? `\n  → http://${lan}:${port}/${q}  (LAN)` : ''}`);
   if (reopened) console.log(`  → reopened ${reopened}`);
   if (logging.file) console.log(`  → logging to ${logging.file}`);
+  // Stated either way. Silence about an absent sandbox is how "best-effort" quietly becomes "none".
+  console.log(
+    sandbox.ok
+      ? `  → agents sandboxed (${sandbox.profile}): they cannot write cards, config, skills or instructions`
+      : `  → agents NOT sandboxed — ${sandbox.reason}`,
+  );
   if (isLoopback) {
     console.log(`\n  This machine only. To reach it from other devices: VIBEBOARD_HOST=0.0.0.0`);
   }

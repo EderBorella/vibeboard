@@ -144,8 +144,10 @@ export interface Route {
 }
 export interface Rollup {
   board: BoardName;
+  column: string; // slug
   when: 'all-children-terminal';
   action: 'advance' | 'eligible';
+  next?: string; // `advance` only
 }
 export interface AutopilotConfig {
   maxIterations: number;

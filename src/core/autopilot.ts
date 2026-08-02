@@ -29,10 +29,17 @@ export interface Route {
 export const ROLLUP_ACTIONS = ['advance', 'eligible'] as const;
 export type RollupAction = (typeof ROLLUP_ACTIONS)[number];
 
+// A rollup names the COLUMN it acts on, not just the board. Without that, `product/in-progress` — a
+// column whose cards advance by rollup and never by a route — was covered by nothing the validator
+// could see, and it would have been reported as the same unreachable-column bug the validator exists
+// to catch. Naming the column also makes the rule checkable: `advance` must have somewhere terminal
+// to advance TO, and `eligible` is meaningless on a column that has no route to become eligible for.
 export interface Rollup {
   board: BoardName;
+  column: string; // slug the rule acts on
   when: 'all-children-terminal';
   action: RollupAction;
+  next?: string; // `advance` only: the terminal column the card moves to
 }
 
 export interface AutopilotConfig {
@@ -67,11 +74,27 @@ export const DEFAULT_AUTOPILOT: AutopilotConfig = {
     { board: 'product', column: 'backlog', skill: 'design', verify: 'critic', next: 'todo' },
     { board: 'product', column: 'todo', skill: 'break-down', verify: 'critic', next: 'in-progress' },
     { board: 'engineering', column: 'backlog', skill: 'implement', verify: 'gates', next: 'review' },
+    // In Progress is engineering's human column: nothing auto-pilot does puts a card there, but a
+    // person drags one, the copilot moves one, or a restore puts one back. It routes to the same
+    // phase as Backlog rather than being left uncovered — which is exactly the hole that once turned
+    // "nothing eligible" into a reported success.
+    { board: 'engineering', column: 'in-progress', skill: 'implement', verify: 'gates', next: 'review' },
     { board: 'engineering', column: 'review', skill: 'test', verify: 'gates', next: 'done' },
   ],
   rollup: [
-    { board: 'product', when: 'all-children-terminal', action: 'advance' },
-    { board: 'features', when: 'all-children-terminal', action: 'eligible' },
+    // A product card in In Progress has been broken down; it advances when its engineering children
+    // are all terminal. No dispatch, no cost, no self-assessment — each child was verified on its
+    // way there.
+    {
+      board: 'product',
+      column: 'in-progress',
+      when: 'all-children-terminal',
+      action: 'advance',
+      next: 'done',
+    },
+    // A feature does NOT advance for free: it becomes eligible for the close-out route above, which
+    // exercises it end to end. Done means "this works", not "its cards were ticked".
+    { board: 'features', column: 'in-progress', when: 'all-children-terminal', action: 'eligible' },
   ],
   terminal: ['done'],
   blockedColumn: 'blocked',
@@ -106,6 +129,13 @@ export function applyRouteRenames(
   return {
     ...ap,
     routes: ap.routes.map((r) => (r.board === board ? { ...r, column: to(r.column), next: to(r.next) } : r)),
+    // Rollup rules name a column on both sides too, and a rule left pointing at a renamed-away column
+    // is a card that quietly never completes.
+    rollup: ap.rollup.map((r) =>
+      r.board === board
+        ? { ...r, column: to(r.column), ...(r.next === undefined ? {} : { next: to(r.next) }) }
+        : r,
+    ),
     // `terminal` and `blockedColumn` are not board-scoped, so a rename on any board updates them.
     terminal: ap.terminal.map(to),
     blockedColumn: to(ap.blockedColumn),

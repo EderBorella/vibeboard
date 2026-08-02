@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 // Test shim standing in for the `claude` CLI, for agent-turn's own tests.
 //
-// Everything it needs comes from the PROMPT (the last argv entry), never the environment: env is
-// shared with every other test file in the worker, and a sibling rewriting it mid-run is what made
-// Stryker's dry run fail where `npm test` passed.
+// Everything it needs comes from the PROMPT, which arrives on STDIN — never the environment (shared
+// with every other test file in the worker, and a sibling rewriting it mid-run is what made
+// Stryker's dry run fail where `npm test` passed) and no longer argv, because the prompt carries the
+// run's credential and a command line is world readable through /proc.
 //
 //   [[log:/path/to/file]]  append {argv, cwd} for this invocation to that file, as one JSON line
 //   [[behaviour:X]]        how to behave:
@@ -16,12 +17,20 @@
 //     failquiet  exits 3 with NOTHING on stderr
 //     notail  init + text then exits 0 with no result line, so the last event carries no session id
 //     hang    never exits, for cancel and timeout
-import { appendFileSync } from 'node:fs';
+import { appendFileSync, readFileSync } from 'node:fs';
 
 const args = process.argv.slice(2);
-const prompt = args[args.length - 1] ?? '';
+// Synchronously from fd 0, like `claude -p`, which waits for EOF before it starts.
+let prompt = '';
+try {
+  prompt = readFileSync(0, 'utf8');
+} catch {
+  /* no stdin attached */
+}
 const log = (prompt.match(/\[\[log:([^\]]+)\]\]/) ?? [])[1];
-if (log) appendFileSync(log, `${JSON.stringify({ argv: args, cwd: process.cwd() })}\n`);
+// The prompt is recorded alongside argv so a test can assert BOTH what was said and that argv did
+// not say it.
+if (log) appendFileSync(log, `${JSON.stringify({ argv: args, cwd: process.cwd(), prompt })}\n`);
 
 const behaviour = (prompt.match(/\[\[behaviour:(\w+)\]\]/) ?? [])[1] ?? 'ok';
 const write = (s) => process.stdout.write(s);

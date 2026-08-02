@@ -32,7 +32,9 @@ async function projectWithCard(): Promise<TestProject & { card: string }> {
 // The prompt the shim was spawned with: the last line of the args log, last argument of the call.
 async function promptFrom(argsLog: string): Promise<string> {
   const line = (await readFile(argsLog, 'utf8')).trim().split('\n').at(-1) as string;
-  return (JSON.parse(line) as string[]).at(-1) as string;
+  // `.prompt`, not the last argv entry: the prompt reaches the agent on stdin, because it carries
+  // the run's credential and a command line is world readable through /proc.
+  return (JSON.parse(line) as { prompt: string }).prompt;
 }
 
 // Records what the shim is spawned with, for a test that asserts on the prompt. Per-process path from

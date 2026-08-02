@@ -133,7 +133,10 @@ function claudeCommand(opts: AgentTurnOptions): { bin: string; args: string[] } 
   if (opts.model) args.push('--model', opts.model);
   if (opts.effort) args.push('--effort', opts.effort);
   if (opts.sessionId) args.push('--resume', opts.sessionId);
-  args.push(opts.text);
+  // The prompt is NOT an argument. It carries the run's credential, and a command line is world
+  // readable through /proc/<pid>/cmdline for as long as the process lives — so any other agent on
+  // the machine, or the chat copilot, could lift another run's token with `ps`. It goes in on
+  // stdin instead, which nothing outside this process can see. `claude -p` reads it from there.
   return { bin: claudeBin(opts.bin), args };
 }
 
@@ -193,6 +196,9 @@ function startClaude(opts: AgentTurnOptions): RunningTurn {
   // Isolated config dir so the personal ~/.claude/CLAUDE.md, plugins, and hooks don't load.
   const env = isolationEnabled() ? { ...process.env, CLAUDE_CONFIG_DIR: claudeConfigDir() } : process.env;
   const child: ChildProcess = spawn(bin, args, { cwd: opts.cwd, env });
+  // Written and closed immediately: `claude -p` waits for EOF before it begins, so leaving the pipe
+  // open hangs the turn until the timeout.
+  child.stdin?.end(opts.text, 'utf8');
 
   let sessionId = opts.sessionId;
   let model: string | undefined;

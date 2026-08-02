@@ -15,15 +15,25 @@
 //
 // The report path is read from the prompt it was given, exactly as a real agent would: that means
 // these tests fail if the prompt stops naming the path.
-import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs';
+import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
 const args = process.argv.slice(2);
-if (process.env.VIBEBOARD_SHIM_ARGS) {
-  appendFileSync(process.env.VIBEBOARD_SHIM_ARGS, `${JSON.stringify(args)}\n`);
+
+// The prompt arrives on STDIN, not in argv — it carries the run's credential, and a command line is
+// world readable through /proc. Read synchronously from fd 0 so this shim behaves like `claude -p`,
+// which waits for EOF before it starts.
+let prompt = '';
+try {
+  prompt = readFileSync(0, 'utf8');
+} catch {
+  /* no stdin attached */
 }
 
-const prompt = args[args.length - 1] ?? '';
+// Both halves recorded, so a test can assert what the prompt said AND that argv did not say it.
+if (process.env.VIBEBOARD_SHIM_ARGS) {
+  appendFileSync(process.env.VIBEBOARD_SHIM_ARGS, `${JSON.stringify({ argv: args, prompt })}\n`);
+}
 // The contract puts the path on a line of its own inside a fenced block, so match a whole line
 // rather than a folder this shim would otherwise have to keep in step with core/layout.ts.
 const match = prompt.match(/^[\w./-]+\.report\.md$/m);

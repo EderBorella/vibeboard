@@ -62,7 +62,7 @@ async function claudeTurn(over: Partial<AgentTurnOptions> = {}, marks = ''): Pro
   return { result, events, argv: argvFromLog() };
 }
 
-function lastInvocation(): { argv: string[]; cwd: string } {
+function lastInvocation(): { argv: string[]; cwd: string; prompt: string } {
   return JSON.parse(readFileSync(log, 'utf8').trim().split('\n').at(-1) as string);
 }
 
@@ -77,10 +77,10 @@ function appended(argv: string[]): string {
 }
 
 describe('the claude command', () => {
-  it('is built in full, in order, with the prompt last', async () => {
+  it('is built in full, in order, and carries no prompt at all', async () => {
     // The EXACT flags: every one of them is a string a mutant can quietly change, and the CLI fails
-    // silently on a wrong flag rather than loudly. The prompt must be last — an arg pushed after it
-    // becomes part of the message.
+    // silently on a wrong flag rather than loudly. The prompt is NOT among them — it goes in on
+    // stdin, because it carries the run's credential and argv is world readable through /proc.
     const { argv } = await claudeTurn();
     const withoutPrompt = argv.filter((a) => a !== appended(argv));
     expect(withoutPrompt).toEqual([
@@ -96,9 +96,12 @@ describe('the claude command', () => {
       'opus',
       '--effort',
       'high',
-      argv.at(-1),
     ]);
-    expect(argv.at(-1)).toContain('hello');
+    // And it really did arrive — on stdin. Asserting only its absence from argv would pass if the
+    // prompt were never delivered at all.
+    const { prompt } = lastInvocation();
+    expect(prompt).toContain('hello');
+    expect(argv.join(' ')).not.toContain('hello');
   });
 
   it.each([

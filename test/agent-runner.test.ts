@@ -1,5 +1,5 @@
 import { chmodSync } from 'node:fs';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { boardRel, DOCS_DIR, skillRel } from '../src/core/layout.js';
@@ -429,7 +429,7 @@ describe('AgentRunner.dispatch', () => {
 
     expect(final.previous).toBe('20260726-141000-9f3e');
     const { readFile } = await import('node:fs/promises');
-    const prompt = JSON.parse((await readFile(argsLog, 'utf8')).trim().split('\n')[0]).at(-1);
+    const prompt: string = JSON.parse((await readFile(argsLog, 'utf8')).trim().split('\n')[0]).prompt;
     expect(prompt).toContain('## The previous run on this card');
     expect(prompt).toContain('Needs splitting.');
   });
@@ -533,7 +533,7 @@ describe('the run credential', () => {
     expect(store.minted[0]).toMatchObject({ scope: 'work', run, project: root, card: 'E-010' });
 
     const { readFile } = await import('node:fs/promises');
-    const text: string = JSON.parse((await readFile(argsLog, 'utf8')).trim().split('\n')[0]).at(-1);
+    const text: string = JSON.parse((await readFile(argsLog, 'utf8')).trim().split('\n')[0]).prompt;
     expect(text).toContain(store.minted[0].token);
     expect(text).toContain('http://127.0.0.1:4610');
   });
@@ -569,6 +569,30 @@ describe('the run credential', () => {
     // The record still settles — the catch writes a `failed` one — so the usual wait applies.
     expect((await settled(root, run)).status).toBe('failed');
     expect(store.verify(store.minted[0].token)).toBeNull();
+  });
+
+  // /proc/<pid>/cmdline is world readable — this machine's /proc has no hidepid — so a prompt passed
+  // as an argument let any process on the box, including a concurrent run or the chat copilot, read
+  // another run's credential with `ps` for as long as it lasted. Landlock does not close that: it
+  // restricts the filesystem, and this is the filesystem-shaped hole.
+  it('keeps the token out of the command line', async () => {
+    const root = await tempDir();
+    const store = new RecordingStore('admin');
+    const argsLog = join(await tempDir(), 'args.log');
+    process.env.VIBEBOARD_SHIM_ARGS = argsLog;
+    const { instance } = runner(root, { credentials: store, apiBase: () => 'http://127.0.0.1:4610' });
+    const { run } = await instance.dispatch(input(root));
+    await settled(root, run);
+    delete process.env.VIBEBOARD_SHIM_ARGS;
+
+    const { argv, prompt } = JSON.parse((await readFile(argsLog, 'utf8')).trim().split('\n')[0]) as {
+      argv: string[];
+      prompt: string;
+    };
+    // Both halves: the token must be in the prompt the agent received AND absent from argv. The
+    // absence alone would pass on a prompt that was never delivered.
+    expect(prompt).toContain(store.minted[0].token);
+    expect(argv.join(' ')).not.toContain(store.minted[0].token);
   });
 
   it('keeps the token out of the transcript even when the agent echoes it', async () => {
@@ -628,7 +652,7 @@ describe('the run credential', () => {
     delete process.env.VIBEBOARD_SHIM_ARGS;
 
     const { readFile } = await import('node:fs/promises');
-    const text: string = JSON.parse((await readFile(argsLog, 'utf8')).trim().split('\n')[0]).at(-1);
+    const text: string = JSON.parse((await readFile(argsLog, 'utf8')).trim().split('\n')[0]).prompt;
     expect(text).not.toContain('Your credential');
   });
 });

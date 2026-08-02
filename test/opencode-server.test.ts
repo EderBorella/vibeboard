@@ -1,6 +1,5 @@
 import { readFileSync } from 'node:fs';
 import { mkdtemp } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -12,6 +11,7 @@ import {
   stopOpencodeServer,
 } from '../src/server/opencode-server.js';
 import { agentRefusal, NOT_REQUESTED, probeSandbox, SANDBOX_PROFILE } from '../src/server/sandbox.js';
+import { testTmp } from './helpers.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const SHIM = join(here, 'fixtures', 'fake-opencode.mjs');
@@ -58,7 +58,7 @@ function spawns(): Spawned[] {
 }
 
 async function startWithShim(): Promise<Spawned> {
-  const dir = await mkdtemp(join(tmpdir(), 'vibeboard-oc-'));
+  const dir = await mkdtemp(join(testTmp(), 'vibeboard-oc-'));
   shimLog = join(dir, 'server.jsonl');
   process.env.VIBEBOARD_OPENCODE_BIN = SHIM;
   process.env.VIBEBOARD_OPENCODE_PID_FILE = join(dir, 'opencode.pid');

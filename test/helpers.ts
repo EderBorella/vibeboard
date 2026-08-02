@@ -12,8 +12,19 @@ import { CredentialStore } from '../src/server/credentials.js';
 import { probeProfile, type SandboxStatus, wrapCommand } from '../src/server/sandbox.js';
 import { ProjectSession } from '../src/server/session.js';
 
+// Every temp directory the suite makes goes inside the run's own root (vitest.config.ts), which is
+// removed when the run ends. Before that, each of these leaked forever: 440,653 of them accumulated
+// over four weeks and filled the filesystem's inode table, after which an arbitrary single test would
+// fail with ENOSPC while the rest passed.
+//
+// Falls back to the system temp dir so a file run outside the vitest config still works, rather than
+// failing on a missing variable.
+export function testTmp(): string {
+  return process.env.VIBEBOARD_TEST_TMP ?? tmpdir();
+}
+
 export async function tempDir(): Promise<string> {
-  return mkdtemp(join(tmpdir(), 'vibeboard-'));
+  return mkdtemp(join(testTmp(), 'vibeboard-'));
 }
 
 // Run a shell command the way an agent turn is run — through the sandbox wrapper, so what the test
@@ -47,7 +58,7 @@ export function cardFrom(result: Card | 'unknown-column'): Card {
 // interleaves other processes' args — which is what made Stryker's verdicts non-deterministic
 // across its parallel workers.
 export function shimArgsLog(): string {
-  return join(mkdtempSync(join(tmpdir(), 'vibeboard-shim-')), 'args.log');
+  return join(mkdtempSync(join(testTmp(), 'vibeboard-shim-')), 'args.log');
 }
 
 export const TEST_ADMIN_TOKEN = 'test-admin-token';

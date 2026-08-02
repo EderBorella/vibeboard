@@ -1,5 +1,4 @@
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -15,6 +14,7 @@ import { INSTRUCTIONS_FILE } from '../src/core/layout.js';
 import type { AgentTurnOptions, AgentTurnResult } from '../src/server/agent-turn.js';
 import type { CopilotEvent } from '../src/server/copilot-events.js';
 import { probeSandbox, SANDBOX_PROFILE } from '../src/server/sandbox.js';
+import { testTmp } from './helpers.js';
 
 // Probed once, at module level: `describe` callbacks are synchronous.
 const live = await probeSandbox();
@@ -31,7 +31,7 @@ chmodSync(SHIM, 0o755);
 let dir: string;
 let log: string;
 beforeEach(() => {
-  dir = mkdtempSync(join(tmpdir(), 'vibeboard-turn-'));
+  dir = mkdtempSync(join(testTmp(), 'vibeboard-turn-'));
   log = join(dir, 'args.log');
   client.opencodeTurn.mockReset();
 });

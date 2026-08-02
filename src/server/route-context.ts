@@ -5,6 +5,7 @@ import type { ChatStore } from './chat-store.js';
 import type { CopilotSession } from './copilot.js';
 import type { CredentialStore } from './credentials.js';
 import type { Log } from './logging.js';
+import type { SandboxStatus } from './sandbox.js';
 import type { ProjectSession } from './session.js';
 
 // The shared surface every route group and the WS layer needs. Passed explicitly rather
@@ -25,6 +26,9 @@ export interface AppCtx {
   // websocket need to verify against the same store, and a run's credential is minted here when
   // it is dispatched and revoked when it settles.
   credentials: CredentialStore;
+  // Whether agents are confined, and to what. Probed once by main.ts: it cannot change while the
+  // process runs, so a function would only invite callers to wonder whether it might.
+  sandbox: SandboxStatus;
   broadcast: (msg: unknown) => void;
   // Route handlers already have `request.log`. This is for everything that happens with no request to
   // hang off: the watcher, the WS channel, a run settling long after its dispatch was answered.

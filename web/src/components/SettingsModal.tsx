@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { listModels, type ModelOption, patchConfig } from '../api';
+import { useCallback, useEffect, useState } from 'react';
+import { getSandbox, listModels, type ModelOption, patchConfig, type SandboxState } from '../api';
 import { clampToCaps, resolveChoice } from '../copilot/choice';
 import {
   BOARD_LABELS,
@@ -12,6 +12,7 @@ import {
   type ProjectConfig,
 } from '../shared';
 import { ModelPicker } from './ModelPicker';
+import { SandboxPanel } from './SandboxPanel';
 
 const BACKENDS: { value: string; label: string }[] = [
   { value: 'claude-code', label: 'Claude Code' },
@@ -55,6 +56,7 @@ export function SettingsModal({ config, onClose, onSaved }: Props) {
   const [keepChats, setKeepChats] = useState(config.keepChats ?? 20);
   const [contextBudget, setContextBudget] = useState(config.contextBudget ?? DEFAULT_CONTEXT_BUDGET);
   const [models, setModels] = useState<ModelOption[]>([]);
+  const [sandbox, setSandbox] = useState<SandboxState | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const caps = backendCaps(backend);
@@ -73,6 +75,16 @@ export function SettingsModal({ config, onClose, onSaved }: Props) {
       live = false;
     };
   }, [backend]);
+
+  // Refetched on demand as well as on open: restarting the server or taking one over changes what
+  // this panel is reporting, and a stale "attached" line would keep offering an action that already
+  // happened.
+  const loadSandbox = useCallback(() => {
+    getSandbox()
+      .then(setSandbox)
+      .catch(() => setSandbox(null));
+  }, []);
+  useEffect(loadSandbox, [loadSandbox]);
 
   async function save(): Promise<void> {
     setBusy(true);
@@ -172,6 +184,8 @@ export function SettingsModal({ config, onClose, onSaved }: Props) {
             {DEFAULT_CONTEXT_BUDGET.toLocaleString()} over-reports occupancy several times over on a
             million-token model.
           </div>
+
+          {sandbox && <SandboxPanel state={sandbox} backend={backend} onChanged={loadSandbox} />}
 
           <div className="settings-section">Boards</div>
           <div className="settings-hint">

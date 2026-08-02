@@ -17,6 +17,7 @@ import { registerExplorerRoutes } from './routes/explorer.js';
 import { registerModelRoutes } from './routes/models.js';
 import { registerProjectRoutes } from './routes/project.js';
 import { registerRunRoutes } from './routes/runs.js';
+import { registerSandboxRoutes } from './routes/sandbox.js';
 import { registerSkillRoutes } from './routes/skills.js';
 import { NOT_REQUESTED, type SandboxStatus } from './sandbox.js';
 import type { ProjectSession } from './session.js';
@@ -93,6 +94,7 @@ export function buildApp(
     credentials,
     broadcast,
     log,
+    sandbox: opts.sandbox ?? NOT_REQUESTED,
   };
   const turns = createCopilotTurns(ctx);
 
@@ -106,6 +108,7 @@ export function buildApp(
       await registerConfigRoutes(api, ctx);
       await registerModelRoutes(api, ctx);
       await registerControlRoutes(api, ctx);
+      await registerSandboxRoutes(api, ctx);
       await registerExplorerRoutes(api, ctx);
       await registerSkillRoutes(api, ctx);
       await registerRunRoutes(api, ctx);

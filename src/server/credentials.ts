@@ -33,9 +33,13 @@ export function adminTokenFile(): string {
 // because a token stored inside the project is readable by anything that can read a card — which is
 // every agent, by design.
 //
-// Being outside is necessary, not sufficient: NOTHING denies an agent read access to
-// `~/.vibeboard/token` today. The sandbox that will is slice B, and until it lands the separation
-// this file describes is a plan rather than a protection.
+// Being outside is necessary, not sufficient: what denies an agent read access is the AppArmor
+// profile (`tools/apparmor/vibeboard-agent`), and only where it is installed. Without it — a Mac,
+// or a Linux box that has not run `npm run sandbox:install` — the separation this file describes is
+// a plan rather than a protection, which is why auto-pilot refuses to start there.
+//
+// VIBEBOARD_TOKEN_FILE moves the token somewhere the profile has never heard of, and nothing
+// detects that: `probeSandbox` still answers "ok". If you relocate it, deny the new path too.
 export async function adminToken(): Promise<string> {
   const file = adminTokenFile();
   try {

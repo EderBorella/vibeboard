@@ -600,8 +600,8 @@ describe('the run credential', () => {
 
   // /proc/<pid>/cmdline is world readable — this machine's /proc has no hidepid — so a prompt passed
   // as an argument let any process on the box, including a concurrent run or the chat copilot, read
-  // another run's credential with `ps` for as long as it lasted. Landlock does not close that: it
-  // restricts the filesystem, and this is the filesystem-shaped hole.
+  // another run's credential with `ps` for as long as it lasted. The sandbox does not close that:
+  // it restricts the filesystem, and a command line is not a file.
   it('keeps the token out of the command line', async () => {
     const root = await tempDir();
     const store = new RecordingStore('admin');

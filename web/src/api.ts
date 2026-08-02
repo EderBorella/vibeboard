@@ -487,3 +487,26 @@ export function putSkill(
 ): Promise<SkillCatalogue> {
   return put<SkillCatalogue>(`/api/skills/${encodeURIComponent(slug)}`, fields);
 }
+
+// What the OS enforces on agents, and the two ways to change it. `autopilotRefusal` is computed on
+// the server so the UI never re-derives the rule and drifts from the loop that acts on it.
+export interface SandboxState {
+  ok: boolean;
+  profile?: string;
+  reason?: string;
+  backend: 'managed' | 'attached';
+  attachedUrl?: string;
+  autopilotRefusal: string | null;
+}
+
+export async function getSandbox(): Promise<SandboxState> {
+  return (await request('/api/sandbox')).json();
+}
+
+export function restartOpencodeServer(): Promise<{ ok: true; url: string }> {
+  return post<{ ok: true; url: string }>('/api/opencode/restart', {});
+}
+
+export function takeOverOpencodeServer(): Promise<{ ok: true; url: string }> {
+  return post<{ ok: true; url: string }>('/api/opencode/takeover', {});
+}

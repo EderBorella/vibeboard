@@ -1057,3 +1057,25 @@ body {
 .skill-hint { margin: 0 0 0.3rem; font-size: 0.7rem; color: var(--muted); font-style: italic; }
 .skill-foot { display: flex; justify-content: flex-end; }
 .skill-invalid { padding: 1rem 1.1rem; color: var(--danger); font-size: 0.85rem; line-height: 1.5; }
+
+/* The agent sandbox panel in Settings. Two states, and they must not read alike: "enforced" is a
+   claim the user is trusting, "not enforced" is a condition they can act on. */
+.sandbox-state {
+  font-size: 0.82rem; line-height: 1.5; border-radius: 6px; padding: 0.55rem 0.7rem;
+  border: 1px solid transparent;
+}
+.sandbox-ok {
+  color: var(--text);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 30%, transparent);
+}
+.sandbox-off {
+  color: var(--text);
+  background: color-mix(in srgb, var(--warn, var(--danger)) 10%, transparent);
+  border-color: color-mix(in srgb, var(--warn, var(--danger)) 32%, transparent);
+}
+.sandbox-state + .sandbox-state { margin-top: 0.4rem; }
+/* Each action says what it does to the running session. A bare verb on a button that restarts a
+   server somebody has work in flight on is not enough to decide with. */
+.sandbox-hint { font-size: 0.76rem; color: var(--muted); line-height: 1.5; }
+.sandbox-action > .btn-secondary { align-self: flex-start; }

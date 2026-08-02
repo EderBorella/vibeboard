@@ -70,13 +70,40 @@ export function serializeCard(fm: CardFrontmatter, body: string): string {
 //                own subtree the only eligible work in the project
 export type CardPatch = Pick<CardFrontmatter, 'title' | 'description' | 'tags' | 'group'> & { body?: string };
 
-export function pickCardPatch(body: unknown): Partial<CardPatch> {
+// Rejected fields come back rather than being dropped, so the route can refuse instead of answering
+// 200 over a card it did not change. An agent that sends `tags: "urgent"` — a plausible mistake, since
+// the prose says "tags" and the frontmatter key is a list — was told it succeeded and had no reason to
+// retry. The doctrine here is that a 403 is informative and a silent success is not.
+export interface PickedPatch {
+  patch: Partial<CardPatch>;
+  rejected: string[];
+}
+
+// `String(t)` used to coerce, which is the wrong tool: `tags: [1, {x:2}, null]` became
+// `["1", "[object Object]", "null"]` and those went into the card's frontmatter and onto the board.
+// Non-strings are dropped and reported.
+function pickTags(value: unknown, rejected: string[]): string[] | undefined {
+  if (!Array.isArray(value)) {
+    rejected.push('tags');
+    return undefined;
+  }
+  const strings = value.filter((t): t is string => typeof t === 'string');
+  if (strings.length !== value.length) rejected.push('tags');
+  return strings;
+}
+
+export function pickCardPatch(body: unknown): PickedPatch {
   const o = (body ?? {}) as Record<string, unknown>;
   const patch: Partial<CardPatch> = {};
-  if (typeof o.title === 'string') patch.title = o.title;
-  if (typeof o.description === 'string') patch.description = o.description;
-  if (typeof o.group === 'string') patch.group = o.group;
-  if (typeof o.body === 'string') patch.body = o.body;
-  if (Array.isArray(o.tags)) patch.tags = o.tags.map((t) => String(t));
-  return patch;
+  const rejected: string[] = [];
+  for (const key of ['title', 'description', 'group', 'body'] as const) {
+    if (o[key] === undefined) continue;
+    if (typeof o[key] === 'string') patch[key] = o[key] as string;
+    else rejected.push(key);
+  }
+  if (o.tags !== undefined) {
+    const tags = pickTags(o.tags, rejected);
+    if (tags) patch.tags = tags;
+  }
+  return { patch, rejected };
 }

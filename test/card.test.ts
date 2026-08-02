@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseCardContent, serializeCard } from '../src/core/card.js';
+import { parseCardContent, pickCardPatch, serializeCard } from '../src/core/card.js';
 import type { CardFrontmatter } from '../src/core/types.js';
 
 const fm: CardFrontmatter = {
@@ -105,5 +105,59 @@ describe('the setup flag', () => {
     const first = serializeCard({ ...fm, id: 'F-001', setup: true }, 'The body.');
     const parsed = parse(first);
     expect(serializeCard({ ...parsed.data, title: 'Renamed' }, parsed.body)).toContain('setup: true');
+  });
+});
+
+// PATCH takes only the five fields it is for, and a field with the right name and the wrong type is
+// REFUSED rather than dropped — a 200 over an unchanged card tells the caller it worked.
+describe('pickCardPatch', () => {
+  it('takes the five fields it is for', () => {
+    expect(pickCardPatch({ title: 'T', description: 'D', group: 'G', body: 'B', tags: ['a', 'b'] })).toEqual({
+      patch: { title: 'T', description: 'D', group: 'G', body: 'B', tags: ['a', 'b'] },
+      rejected: [],
+    });
+  });
+
+  it('ignores the fields governed by something else, without calling them rejected', () => {
+    // Not an error: these are legitimate frontmatter keys, just not this endpoint's business. `order`
+    // is a drag, `links` are symmetric, `archived` has its own scope, `id` is identity, `setup` is
+    // authority. Nothing to report — they simply are not part of a patch.
+    const { patch, rejected } = pickCardPatch({
+      title: 'T',
+      id: 'E-999',
+      order: 9999,
+      links: ['P-404'],
+      archived: '2026-08-02T00:00:00Z',
+      setup: true,
+    });
+    expect(patch).toEqual({ title: 'T' });
+    expect(rejected).toEqual([]);
+  });
+
+  it('rejects a field with the right name and the wrong type', () => {
+    const { patch, rejected } = pickCardPatch({ title: 123, description: null, group: 7, body: { a: 1 } });
+    expect(patch).toEqual({});
+    expect(rejected).toEqual(['title', 'description', 'group', 'body']);
+  });
+
+  it('rejects tags that are not a list of strings, instead of coercing them', () => {
+    // `String(t)` put "[object Object]" and "null" into card frontmatter and onto the board.
+    expect(pickCardPatch({ tags: 'urgent' })).toEqual({ patch: {}, rejected: ['tags'] });
+    const mixed = pickCardPatch({ tags: [1, { x: 2 }, null, 'real'] });
+    expect(mixed.patch.tags).toEqual(['real']);
+    expect(mixed.rejected).toEqual(['tags']);
+  });
+
+  it('treats an absent field as absent rather than as wrong', () => {
+    expect(pickCardPatch({})).toEqual({ patch: {}, rejected: [] });
+    expect(pickCardPatch(null)).toEqual({ patch: {}, rejected: [] });
+    expect(pickCardPatch({ title: undefined })).toEqual({ patch: {}, rejected: [] });
+  });
+
+  it('allows clearing a field with an empty string', () => {
+    expect(pickCardPatch({ description: '', tags: [] })).toEqual({
+      patch: { description: '', tags: [] },
+      rejected: [],
+    });
   });
 });

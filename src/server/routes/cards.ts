@@ -76,7 +76,15 @@ export async function registerCardRoutes(api: FastifyInstance, ctx: AppCtx): Pro
     const card = await findCard(ctx.session.root, board, id, ctx.session.config);
     if (!card) return reply.code(404).send({ error: 'Card not found' });
     // Filtered, not cast: the cast said what the body ought to be and let through whatever it was.
-    return updateCard(ctx.session.root, card, pickCardPatch(req.body));
+    const { patch, rejected } = pickCardPatch(req.body);
+    // A wrong-typed field is refused, not dropped. Answering 200 over a card that did not change tells
+    // the caller — very often an agent — that it succeeded, so it never tries the other spelling.
+    if (rejected.length > 0) {
+      return reply.code(400).send({
+        error: `Cannot set ${rejected.join(', ')}: expected a string, or a list of strings for tags`,
+      });
+    }
+    return updateCard(ctx.session.root, card, patch);
   });
 
   api.get('/cards/:board/:id/raw', async (req, reply) => {

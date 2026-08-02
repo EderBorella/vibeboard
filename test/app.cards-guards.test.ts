@@ -107,6 +107,8 @@ describe('PATCH /api/cards accepts only the fields it is for', () => {
       payload: {
         title: 'A new title',
         setup: true,
+        // Correctly typed throughout: these are refused for AUTHORITY, not for shape, and mixing a
+        // type error in would let the 400-on-wrong-type path answer for the authority test.
         id: 'E-999',
         order: 9999,
         archived: '2026-08-02T00:00:00Z',
@@ -132,5 +134,29 @@ describe('PATCH /api/cards accepts only the fields it is for', () => {
     );
     expect(raw).not.toContain('setup');
     expect(raw).not.toContain('E-999');
+  });
+});
+
+// The other half: a field this endpoint DOES take, with the wrong type. Refused, because answering
+// 200 over a card that did not change tells an agent it succeeded and it will not try again.
+describe('PATCH /api/cards refuses a wrong-typed field', () => {
+  it('400s and names the fields, leaving the card alone', async () => {
+    const { app } = await openTestProject({ name: 'G' });
+    const state = (await app.inject({ method: 'GET', url: '/api/state' })).json();
+    const before = state.snapshot.boards.engineering[0];
+
+    const res = await app.inject({
+      method: 'PATCH',
+      url: `/api/cards/engineering/${before.id}`,
+      // `tags: "urgent"` is the plausible agent mistake: the prose says tags, the key is a list.
+      payload: { title: 'Fine', tags: 'urgent' },
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().error).toContain('tags');
+
+    // Nothing applied — not even the field that WAS valid. A partial write on a refused request is
+    // the worst of both answers.
+    const after = (await app.inject({ method: 'GET', url: '/api/state' })).json();
+    expect(after.snapshot.boards.engineering[0].title).toBe(before.title);
   });
 });

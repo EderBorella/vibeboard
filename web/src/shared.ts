@@ -175,6 +175,7 @@ export interface ProjectConfig {
   contextBudget: number;
   maxConcurrentRuns: number;
   autopilot?: AutopilotConfig; // absent on a project created before the lifecycle existed
+  enforceOneParent?: boolean; // one parent per card, applied to the copilot and the browser too
   copilot: CopilotConfig;
 }
 

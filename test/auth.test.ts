@@ -250,6 +250,29 @@ describe('the API boundary', () => {
       expect(res.statusCode).toBe(200);
     });
 
+    // The switch below is off by default and is the human's choice; a run is held to the rule either
+    // way. Rollup reads the hierarchy off these links, and an agent has no way to mean "see also".
+    it('is refused a second parent even with the project switch off', async () => {
+      const { app, mint } = await open();
+      // A second feature to be the second parent. Created as admin: a work run may create cards, but
+      // this is fixture, not the thing under test.
+      await app.inject({
+        method: 'POST',
+        url: '/api/cards',
+        headers: admin,
+        payload: { board: 'features', columnSlug: 'todo', title: 'Second feature' },
+      });
+      const cred = mint('work', 'run-1', 'P-001');
+      const res = await app.inject({
+        method: 'PUT',
+        url: '/api/cards/product/P-001/links',
+        headers: bearer(cred.token),
+        payload: { links: ['F-001', 'F-002'] },
+      });
+      expect(res.statusCode).toBe(400);
+      expect(res.json().error).toContain('two parents on the features board');
+    });
+
     it('is not confined when the scope is checkup', async () => {
       // The checkup is a supervisor, not a worker: editing any card is the job.
       const { app, mint } = await open();

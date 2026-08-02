@@ -80,5 +80,9 @@ export interface ProjectConfig {
   // block fails auto-pilot's readiness check, which names what is missing. An honest refusal beats a
   // silent half-upgrade against a shape still moving.
   autopilot?: AutopilotConfig;
+  // "Enforce 1-to-many relations on boards". Off by default: many-to-many linking is legitimate when
+  // a person means it. Run credentials are held to it regardless (core/hierarchy.ts), because rollup
+  // reads the hierarchy off these links and an agent cannot mean "see also".
+  enforceOneParent?: boolean;
   copilot: CopilotConfig;
 }

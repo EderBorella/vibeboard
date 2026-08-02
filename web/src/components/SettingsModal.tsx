@@ -51,6 +51,7 @@ export function SettingsModal({ config, onClose, onSaved }: Props) {
     for (const b of BOARDS) o[b] = (config.boards[b]?.columns ?? []).join(', ');
     return o;
   });
+  const [enforceOneParent, setEnforceOneParent] = useState(config.enforceOneParent === true);
   const [miniatureChars, setMiniatureChars] = useState(config.miniatureChars);
   const [idPadding, setIdPadding] = useState(config.idPadding);
   const [keepChats, setKeepChats] = useState(config.keepChats ?? 20);
@@ -96,6 +97,7 @@ export function SettingsModal({ config, onClose, onSaved }: Props) {
         // Every backend's slot, not just the active one — the modal can edit both.
         copilot: { backend, backends: slots },
         boards,
+        enforceOneParent,
         miniatureChars: Number(miniatureChars) || config.miniatureChars,
         idPadding: Number(idPadding) || config.idPadding,
         keepChats: Number(keepChats) || (config.keepChats ?? 20),
@@ -214,6 +216,20 @@ export function SettingsModal({ config, onClose, onSaved }: Props) {
               />
             </label>
           ))}
+
+          <label className="field field-check">
+            <input
+              type="checkbox"
+              checked={enforceOneParent}
+              onChange={(e) => setEnforceOneParent(e.target.checked)}
+            />
+            <span>Enforce 1-to-many relations on boards</span>
+          </label>
+          <div className="settings-hint">
+            A card gets one parent on the board above it — features → product → engineering. Off by default,
+            because linking a card to two places is legitimate when you mean it. Agent runs are held to this
+            rule either way: it is the hierarchy auto-pilot rolls up, and an agent cannot mean “see also”.
+          </div>
 
           <div className="settings-section">Cards</div>
           <div className="settings-row">

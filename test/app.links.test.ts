@@ -76,3 +76,53 @@ describe('a link target whose file cannot be read', () => {
     expect(res.json().links).toEqual([]);
   });
 });
+
+// Rollup advances a parent when all its children are terminal, and the hierarchy it reads is these
+// links. Two parents means a "see also" can finish an unrelated card.
+describe('one parent per card', () => {
+  // A second feature to be the second parent, and a product card to hang them off.
+  async function twoFeatures(): Promise<{
+    app: Awaited<ReturnType<typeof openTestProject>>['app'];
+    p2: string;
+  }> {
+    const project = await openTestProject({ name: 'L' });
+    const create = async (board: string, columnSlug: string, title: string): Promise<string> =>
+      (
+        await project.app.inject({ method: 'POST', url: '/api/cards', payload: { board, columnSlug, title } })
+      ).json().id;
+    await create('features', 'todo', 'Second feature'); // F-002
+    const p2 = await create('product', 'todo', 'Second product');
+    return { app: project.app, p2 };
+  }
+
+  it('lets the browser link a product card to two features by default', async () => {
+    const { app, p2 } = await twoFeatures();
+    const res = await app.inject({
+      method: 'PUT',
+      url: `/api/cards/product/${p2}/links`,
+      payload: { links: ['F-001', 'F-002'] },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().links).toEqual(expect.arrayContaining(['F-001', 'F-002']));
+  });
+
+  it('refuses it once the project asks for the discipline', async () => {
+    const { app, p2 } = await twoFeatures();
+    await app.inject({ method: 'PATCH', url: '/api/config', payload: { enforceOneParent: true } });
+    const res = await app.inject({
+      method: 'PUT',
+      url: `/api/cards/product/${p2}/links`,
+      payload: { links: ['F-001', 'F-002'] },
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().error).toContain('two parents on the features board');
+
+    // One is still fine, switch or no switch.
+    const one = await app.inject({
+      method: 'PUT',
+      url: `/api/cards/product/${p2}/links`,
+      payload: { links: ['F-001'] },
+    });
+    expect(one.statusCode).toBe(200);
+  });
+});

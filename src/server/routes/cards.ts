@@ -1,8 +1,9 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import type { FastifyInstance, FastifyReply } from 'fastify';
-import { type CardProblem, readArchive } from '../../core/board.js';
+import { type CardProblem, readArchive, readBoard } from '../../core/board.js';
 import { pickCardPatch } from '../../core/card.js';
 import { findCard } from '../../core/find.js';
+import { secondParentProblem } from '../../core/hierarchy.js';
 import { ARCHIVE_SLUG } from '../../core/layout.js';
 import { setCardLinks } from '../../core/links.js';
 import {
@@ -105,6 +106,22 @@ export async function registerCardRoutes(api: FastifyInstance, ctx: AppCtx): Pro
     if (!Array.isArray(links)) return reply.code(400).send({ error: 'links must be an array' });
     const card = await findCard(ctx.session.root, board, id, ctx.session.config);
     if (!card) return reply.code(404).send({ error: 'Card not found' });
+
+    // Always for a run credential: rollup derives the hierarchy from links, and an agent has no way
+    // to know which of two links a person meant as "see also". For the browser and the copilot it is
+    // the project's choice — many-to-many is legitimate when someone means it, and only rollup cannot
+    // survive it.
+    const enforceOneParent =
+      req.credential?.scope !== 'admin' || ctx.session.config.enforceOneParent === true;
+    if (enforceOneParent) {
+      // Hoisted: `ensureOpen` narrows the session, and that narrowing does not survive into the
+      // closure below.
+      const { root, config } = ctx.session;
+      const everyCard = (await Promise.all(BOARDS.map((b) => readBoard(root, b, config)))).flat();
+      const problem = secondParentProblem(card, links, everyCard);
+      if (problem) return reply.code(400).send({ error: problem });
+    }
+
     // A target whose file exists but cannot be read is refused rather than silently dropped: the
     // caller asked for a link to a card that IS there, and answering 200 would tell an agent its
     // child is attached when it is an orphan.

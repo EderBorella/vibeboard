@@ -372,6 +372,10 @@ body {
 .settings-section { font-family: var(--font-display); text-transform: uppercase; letter-spacing: 0.12em; font-size: 0.78rem; color: var(--accent); margin-top: 0.4rem; border-bottom: 1px solid var(--border); padding-bottom: 0.25rem; }
 .settings-section:first-child { margin-top: 0; }
 .settings-hint { font-size: 0.74rem; color: var(--muted); font-style: italic; }
+/* A checkbox reads left-to-right: the control, then what it does. The other fields are label-above
+   because they hold a value; this one holds a decision. */
+.field-check { flex-direction: row; align-items: center; gap: 0.5rem; }
+.field-check input { width: auto; }
 /* A hint says how something works; this says what will be refused. Ochre rather than danger: nothing
    is broken yet, and a save that is about to be rejected must not look like one that already failed. */
 .settings-warn {

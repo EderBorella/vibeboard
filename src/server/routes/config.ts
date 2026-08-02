@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { applyRouteRenames } from '../../core/autopilot.js';
-import { coverageProblems } from '../../core/autopilot-cover.js';
-import { isRefused, reconcileColumns, validateColumns } from '../../core/columns.js';
+import { coverageProblems, shapeProblems } from '../../core/autopilot-cover.js';
+import { applyColumnPlan, isRefused, planColumnChanges, validateColumns } from '../../core/columns.js';
 import { writeConfig } from '../../core/config.js';
 import type { BoardName, ProjectConfig } from '../../core/types.js';
 import { BOARD_LABELS, BOARDS } from '../../core/types.js';
@@ -29,40 +29,45 @@ interface Refusal {
   error: string;
 }
 type Rename = { board: BoardName; from: string; to: string };
+type BoardPlan = { board: BoardName; renamed: { from: string; to: string }[] };
 
-function isRefusal(r: Refusal | { renames: Rename[] }): r is Refusal {
+function isRefusal(r: Refusal | { plans: BoardPlan[] }): r is Refusal {
   return 'error' in r;
 }
 
 // A column is a folder, so a column edit has to move folders too — otherwise the renamed column's
-// cards stay in the old folder and silently vanish from the board. Every board is validated before
-// any folder moves, so a bad name in one board cannot leave another half-reconciled.
+// cards stay in the old folder and silently vanish from the board.
 //
-// Returns the reply to send on refusal, or the renames it performed. The renames are the caller's
-// business: a column is a folder AND a slug in the routing table, and moving the folder without
-// rewriting the table deletes a route in silence.
-async function applyColumnEdits(
+// PLANS the moves; it does not make them. Nothing on disk may change until every reason to refuse
+// has been considered, and one of those reasons — the routing table — lives outside this function.
+// The Settings modal sends all three boards on every save, so renaming one board's columns and then
+// refusing the request over another board's left the cards in a folder no column mapped to, invisible
+// to the board and with their ids released for reuse. Reproduced before this was split.
+async function planColumnEdits(
   root: string,
   current: ProjectConfig,
   boards: Partial<ProjectConfig>['boards'],
-): Promise<Refusal | { renames: Rename[] }> {
-  if (!boards) return { renames: [] };
+): Promise<Refusal | { plans: BoardPlan[] }> {
+  if (!boards) return { plans: [] };
   for (const board of BOARDS) {
     const next = boards[board]?.columns;
     if (!next) continue;
     const invalid = validateColumns(next);
     if (invalid) return { code: 400, error: `${BOARD_LABELS[board]}: ${invalid}` };
   }
-  const renames: Rename[] = [];
+  const plans: BoardPlan[] = [];
   for (const board of BOARDS) {
     const next = boards[board]?.columns;
     if (!next) continue;
-    const result = await reconcileColumns(root, board, current.boards[board].columns, next);
+    const result = await planColumnChanges(root, board, current.boards[board].columns, next);
     if (isRefused(result)) return { code: 409, error: `${BOARD_LABELS[board]}: ${result.error}` };
-    for (const r of result.renamed) renames.push({ board, ...r });
+    plans.push({ board, renamed: result.renamed });
   }
-  return { renames };
+  return { plans };
 }
+
+const renamesOf = (plans: BoardPlan[]): Rename[] =>
+  plans.flatMap((p) => p.renamed.map((r) => ({ board: p.board, ...r })));
 
 // A rename is unambiguous — both slugs are known — so the table follows the folder rather than the
 // user having to keep two places in step. Everything else that would leave a column unreachable is
@@ -70,6 +75,11 @@ async function applyColumnEdits(
 // lifecycle is one deliberate pass later, not a silent half-upgrade here.
 function retableAndCheck(merged: ProjectConfig, renames: Rename[]): Refusal | null {
   if (!merged.autopilot) return null;
+  // Before the renames, not after: applyRouteRenames indexes into `routes` and `terminal`, so a
+  // hand-edited block missing either threw a TypeError and the request became a 500 with no
+  // explanation. The shape has to be answerable before anything reads it.
+  const malformed = shapeProblems(merged.autopilot);
+  if (malformed.length > 0) return { code: 400, error: malformed.join(' ') };
   for (const r of renames) {
     merged.autopilot = applyRouteRenames(merged.autopilot, r.board, [{ from: r.from, to: r.to }]);
   }
@@ -88,12 +98,14 @@ export async function registerConfigRoutes(api: FastifyInstance, ctx: AppCtx): P
     const patch = req.body as Partial<ProjectConfig>;
     const merged = mergeConfig(ctx.session.config, patch);
 
-    const edits = await applyColumnEdits(ctx.session.root, ctx.session.config, patch.boards);
-    if (isRefusal(edits)) return reply.code(edits.code).send({ error: edits.error });
-
-    const uncovered = retableAndCheck(merged, edits.renames);
+    const planned = await planColumnEdits(ctx.session.root, ctx.session.config, patch.boards);
+    if (isRefusal(planned)) return reply.code(planned.code).send({ error: planned.error });
+    const uncovered = retableAndCheck(merged, renamesOf(planned.plans));
     if (uncovered) return reply.code(uncovered.code).send({ error: uncovered.error });
 
+    // Nothing above this line has touched the filesystem. From here the request cannot be refused,
+    // so the folders and the config move together.
+    for (const plan of planned.plans) await applyColumnPlan(ctx.session.root, plan.board, plan);
     await writeConfig(ctx.session.root, merged);
     await ctx.session.reloadConfig();
     // Push the updated snapshot so all clients reflect the new config immediately (the

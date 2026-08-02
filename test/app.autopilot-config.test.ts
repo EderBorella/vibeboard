@@ -1,8 +1,10 @@
-import { readFile, writeFile } from 'node:fs/promises';
+import { readdir, readFile, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { parse, stringify } from 'yaml';
 import type { Route } from '../src/core/autopilot.js';
 import { configPath } from '../src/core/config.js';
+import { boardRel } from '../src/core/layout.js';
 import type { ProjectConfig } from '../src/core/types.js';
 import { openTestProject } from './helpers.js';
 
@@ -52,6 +54,67 @@ describe('PATCH /api/config and the routing table', () => {
     // Not half-applied: the config still has the old columns.
     const config = (await app.inject({ method: 'GET', url: '/api/config' })).json();
     expect(config.boards.engineering.columns).toEqual(ENGINEERING);
+  });
+
+  // The Settings modal sends all three boards on every save, so a refusal has to be able to arrive
+  // AFTER another board's folders would have been renamed. Reading config.yaml cannot see this —
+  // it is written last, so it is always unchanged on a refusal — which is why this asserts on the
+  // folders. Before the plan/apply split it found `features/planned/` on disk holding F-001, a card
+  // invisible to the board with its id released for reuse.
+  it('moves no folder when a later board in the same patch is refused', async () => {
+    const { app, root } = await openTestProject({ name: 'A' });
+    const before = (await readdir(join(root, boardRel('features')))).sort();
+
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/api/config',
+      payload: {
+        boards: {
+          features: { columns: ['Backlog', 'Planned', 'In Progress', 'Done'] }, // Todo -> Planned
+          engineering: { columns: [...ENGINEERING.slice(0, 4), 'Staging', 'Done'] }, // unroutable
+        },
+      },
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect((await readdir(join(root, boardRel('features')))).sort()).toEqual(before);
+    expect(before).not.toContain('planned');
+    // And the cards are still where the board looks for them.
+    const state = (await app.inject({ method: 'GET', url: '/api/state' })).json();
+    expect(state.snapshot.boards.features.length).toBeGreaterThan(0);
+  });
+
+  // Same shape, refused by the folders themselves rather than by the routing table.
+  it('moves no folder when a later board is refused for holding cards', async () => {
+    const { app, root } = await openTestProject({ name: 'A' });
+    const before = (await readdir(join(root, boardRel('features')))).sort();
+
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/api/config',
+      payload: {
+        boards: {
+          features: { columns: ['Backlog', 'Planned', 'In Progress', 'Done'] },
+          // Backlog holds the scaffold's engineering sample card, so removing it is refused by the
+          // folders — before the routing table gets a say, which is the ordering under test.
+          engineering: { columns: ['In Progress', 'Review', 'Blocked', 'Done'] },
+        },
+      },
+    });
+
+    expect(res.statusCode).toBe(409);
+    expect((await readdir(join(root, boardRel('features')))).sort()).toEqual(before);
+  });
+
+  it('reports a hand-edited block that is not shaped like one, rather than failing with a 500', async () => {
+    const { app } = await openTestProject({ name: 'A', mode: 'brownfield' });
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/api/config',
+      payload: { autopilot: { maxIterations: 10 } },
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().error).toContain('autopilot.routes must be a list of routes.');
   });
 
   it('refuses a hand-edited routing table that names a column the board does not have', async () => {

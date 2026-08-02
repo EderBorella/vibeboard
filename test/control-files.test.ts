@@ -697,3 +697,19 @@ describe('foundation documents in Project Control', () => {
     expect(await writeControlFile(root, `${FOUNDATION_DIR}/nested/STACK.md`, 'x')).toBe(false);
   });
 });
+
+// The links registry is a `resources` file by category, and that category is otherwise renameable
+// and deletable — but renaming resources.yaml moves it to resources/<slug>.md and the registry is
+// gone. No button offers it today; the flags must not say it is available.
+describe('the links registry is not an ordinary resource', () => {
+  it('is neither renameable nor deletable', async () => {
+    const root = await tempDir();
+    await writeControlFile(root, RESOURCES_YAML, 'links: []\n');
+    const file = await readControlFile(root, RESOURCES_YAML);
+    expect(file?.renameable).toBe(false);
+    expect(file?.deletable).toBe(false);
+    expect(await renameControlFile(root, RESOURCES_YAML, 'My links')).toBeNull();
+    expect(await deleteControlFile(root, RESOURCES_YAML)).toBe('not-allowed');
+    expect((await readControlFile(root, RESOURCES_YAML))?.content).toBe('links: []\n');
+  });
+});

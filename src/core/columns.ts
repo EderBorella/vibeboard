@@ -19,6 +19,11 @@ import type { BoardName } from './types.js';
 // Anything that mixes a rename with a reorder is ambiguous, so we refuse rather than guess and
 // risk moving cards into the wrong column.
 
+// Planning and applying are separate because a caller may need to know what an edit WOULD do before
+// any folder moves. A column edit can be refused by something the folders know nothing about — the
+// routing table, in routes/config.ts — and a patch carrying several boards renamed one board's
+// folders before the next board's check rejected the request, leaving the cards in a folder no
+// column mapped to and the config still describing the old one. Plan every board, decide, then move.
 interface ColumnsChanged {
   renamed: { from: string; to: string }[];
 }
@@ -123,7 +128,8 @@ async function refuseOccupiedTarget(
   return null;
 }
 
-export async function reconcileColumns(
+// What this edit would do, and every reason it cannot be done — without touching the filesystem.
+export async function planColumnChanges(
   projectRoot: string,
   board: BoardName,
   oldNames: string[],
@@ -147,8 +153,31 @@ export async function reconcileColumns(
   const occupied = await refuseOccupiedTarget(dir, renamed, newNames, newSlugs);
   if (occupied) return occupied;
 
-  for (const r of renamed) {
+  return { renamed };
+}
+
+// Move the folders a plan named. Separate from planning so a caller can refuse in between; call it
+// only with a plan made against the state on disk now.
+export async function applyColumnPlan(
+  projectRoot: string,
+  board: BoardName,
+  plan: ColumnsChanged,
+): Promise<void> {
+  const dir: DirOf = (slug) => join(projectRoot, boardRel(board, slug));
+  for (const r of plan.renamed) {
     if (await folderExists(dir(r.from))) await rename(dir(r.from), dir(r.to));
   }
-  return { renamed };
+}
+
+// Plan and apply in one step, for callers with nothing to decide in between.
+export async function reconcileColumns(
+  projectRoot: string,
+  board: BoardName,
+  oldNames: string[],
+  newNames: string[],
+): Promise<ReconcileResult> {
+  const plan = await planColumnChanges(projectRoot, board, oldNames, newNames);
+  if (isRefused(plan)) return plan;
+  await applyColumnPlan(projectRoot, board, plan);
+  return plan;
 }

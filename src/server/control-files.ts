@@ -114,8 +114,14 @@ function descriptor(rel: string): ControlFile | null {
     managed: MANAGED.has(rel),
     // Both from the same predicate: a category whose paths the server owns has no user-chosen name
     // to change and no file the user may remove.
-    deletable: isCreatable(category),
-    renameable: isCreatable(category),
+    //
+    // resources.yaml is the exception that proves the categories are not the whole story. It sits in
+    // the `resources` category, whose files ARE renameable — but it is the links registry itself, and
+    // renaming it moves it to `resources/<slug>.md` and the registry is gone. No button offers it
+    // today (it is not in the group listing), which is precisely why publishing the flag needed a
+    // second look.
+    deletable: isCreatable(category) && rel !== RESOURCES_YAML,
+    renameable: isCreatable(category) && rel !== RESOURCES_YAML,
   };
 }
 
@@ -298,7 +304,10 @@ export async function renameControlFile(
   const current = await resolveControlPath(root, rel);
   if (!current) return null;
   const category = current.file.category;
-  if (!isCreatable(category)) return null; // instruction files are not renameable
+  // The descriptor's own flag, not the category's: resources.yaml is a `resources` file and that
+  // category renames fine, but renaming the registry itself moves it to resources/<slug>.md and the
+  // links are gone.
+  if (!current.file.renameable || !isCreatable(category)) return null;
   if (typeof newName !== 'string' || !slugify(newName.replace(/\.md$/i, ''))) return null;
 
   const targetRel = pathForName(category, newName);

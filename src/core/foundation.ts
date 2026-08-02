@@ -50,9 +50,17 @@ export async function foundationStatus(root: string): Promise<FoundationStatus> 
 
 // gray-matter is called with an options object on purpose: with one argument it caches by input
 // string and caches an EMPTY result after a throw, so the second read of the same broken file
-// "succeeds" as {} (see core/card.ts). Unparseable frontmatter is treated as none at all, which the
-// callers below turn into a refusal rather than a pass.
-async function frontmatter(root: string, name: string): Promise<Record<string, unknown> | null> {
+// "succeeds" as {} (see core/card.ts).
+//
+// Three outcomes, not two: absent, unparseable, and parsed. Folding "will not parse" into "says
+// nothing" told a user whose YAML had one bad quote that they had declared no gates — and it made
+// the cache mitigation untestable, because both worlds then produced the same message.
+const UNPARSEABLE = Symbol('unparseable frontmatter');
+
+async function frontmatter(
+  root: string,
+  name: string,
+): Promise<Record<string, unknown> | null | typeof UNPARSEABLE> {
   let raw: string;
   try {
     raw = await readFile(join(root, foundationRel(name)), 'utf8');
@@ -62,7 +70,7 @@ async function frontmatter(root: string, name: string): Promise<Record<string, u
   try {
     return matter(raw, { language: 'yaml' }).data as Record<string, unknown>;
   } catch {
-    return {}; // there, but says nothing a machine can read
+    return UNPARSEABLE;
   }
 }
 
@@ -77,8 +85,14 @@ function readGate(entry: unknown): Gate | string {
 
 export async function readGates(root: string): Promise<GatesResult> {
   const data = await frontmatter(root, 'CODE-QUALITY.md');
-  if (!data)
+  if (data === null)
     return { ok: false, reason: 'foundation/CODE-QUALITY.md does not exist, so there are no gates to run.' };
+  if (data === UNPARSEABLE) {
+    return {
+      ok: false,
+      reason: 'foundation/CODE-QUALITY.md has frontmatter that will not parse, so its gates cannot be read.',
+    };
+  }
   const raw = Array.isArray(data.gates) ? data.gates : [];
   if (raw.length === 0) {
     return {
@@ -98,10 +112,17 @@ export async function readGates(root: string): Promise<GatesResult> {
 
 export async function readSmokeCommand(root: string): Promise<SmokeResult> {
   const data = await frontmatter(root, 'TESTING.md');
-  if (!data) {
+  if (data === null) {
     return {
       ok: false,
       reason: 'foundation/TESTING.md does not exist, so there is no smoke test to close a feature.',
+    };
+  }
+  if (data === UNPARSEABLE) {
+    return {
+      ok: false,
+      reason:
+        'foundation/TESTING.md has frontmatter that will not parse, so its smoke command cannot be read.',
     };
   }
   const command = typeof data.smoke === 'string' ? data.smoke.trim() : '';

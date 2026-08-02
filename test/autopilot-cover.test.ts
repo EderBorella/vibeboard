@@ -147,7 +147,7 @@ describe('routing-table coverage', () => {
     expect(problems).toContain(
       'features: the route on "backlog" verifies with "vibes" — expected gates, critic, smoke.',
     );
-    expect(problems).toContain('attemptCap must be a positive number; it is 0.');
+    expect(problems).toContain('attemptCap must be a positive whole number; it is 0.');
   });
 
   // Zero is a real budget: for a subscription-backed or local model the figure is zero or not what
@@ -176,5 +176,83 @@ describe('routing-table coverage', () => {
     );
     const all = DEFAULT_AUTOPILOT.routes.map((r) => r.skill);
     expect(skillProblems(DEFAULT_AUTOPILOT, all)).toEqual([]);
+  });
+});
+
+// Findings from the slice A review. Each of these returned [] before the fix, and each of them ends
+// in the same place the whole validator exists to prevent: a run that reports success, or one that
+// cannot finish and does not say why.
+describe('routing-table coverage — holes found in review', () => {
+  it('refuses a cycle: every column routed, and no card can ever reach a terminal one', () => {
+    const config = fresh();
+    const review = ap(config).routes.find((r) => r.board === 'engineering' && r.column === 'review');
+    if (!review) throw new Error('the default table routes engineering/review');
+    review.next = 'in-progress';
+    expect(coverageProblems(config)).toContain(
+      'engineering: the columns in-progress, review advance into each other and never reach a terminal column.',
+    );
+  });
+
+  it('names a cycle once, not once per column that leads into it', () => {
+    const config = fresh();
+    const review = ap(config).routes.find((r) => r.board === 'engineering' && r.column === 'review');
+    if (!review) throw new Error('the default table routes engineering/review');
+    review.next = 'in-progress';
+    // backlog and in-progress both feed review, so the naive version reported the same loop twice.
+    expect(coverageProblems(config).filter((p) => p.includes('advance into each other'))).toHaveLength(1);
+  });
+
+  it('refuses a column that is both routed and terminal', () => {
+    const config = fresh();
+    ap(config).terminal.engineering = ['done', 'review'];
+    expect(coverageProblems(config)).toContain(
+      'engineering: the column "review" is both routed and terminal, so a card that never passes there would still be reported as finished.',
+    );
+  });
+
+  it('refuses a route that advances a passing card into the blocked column', () => {
+    const config = fresh();
+    const review = ap(config).routes.find((r) => r.board === 'engineering' && r.column === 'review');
+    if (!review) throw new Error('the default table routes engineering/review');
+    review.next = 'blocked';
+    expect(coverageProblems(config)).toContain(
+      'engineering: the route on "review" advances a PASSING card into "blocked", which is where exhausted cards go and is never routed onward.',
+    );
+  });
+
+  it('reports a malformed block instead of throwing on it', () => {
+    const config = fresh();
+    config.autopilot = { maxIterations: 10 } as unknown as AutopilotConfig;
+    const problems = coverageProblems(config);
+    expect(problems).toContain('autopilot.routes must be a list of routes.');
+    expect(problems).toContain('autopilot.rollup must be a list of rules.');
+    expect(problems).toContain('autopilot.terminal must name the terminal columns of each board.');
+    // Shape problems come back ALONE: the checks below them all index into the block.
+    expect(problems.every((p) => p.startsWith('autopilot.'))).toBe(true);
+  });
+
+  it('names the pre-per-board terminal shape specifically, since a flat list looks right', () => {
+    const config = fresh();
+    ap(config).terminal = ['done'] as unknown as AutopilotConfig['terminal'];
+    expect(coverageProblems(config)).toContain(
+      'autopilot.terminal is a flat list; it must name the terminal columns per board.',
+    );
+  });
+
+  it('refuses a fractional cap, which no integer counter ever equals', () => {
+    const config = fresh();
+    ap(config).attemptCap = 0.5;
+    ap(config).checkupEvery = 2.5;
+    const problems = coverageProblems(config);
+    expect(problems).toContain('attemptCap must be a positive whole number; it is 0.5.');
+    expect(problems).toContain('checkupEvery must be a positive whole number; it is 2.5.');
+  });
+
+  it('refuses an empty setup-feature flag, which would mark every card or none', () => {
+    const config = fresh();
+    ap(config).setupFeatureFlag = '  ';
+    expect(coverageProblems(config)).toContain(
+      'autopilot.setupFeatureFlag must name the frontmatter flag that marks the setup feature.',
+    );
   });
 });

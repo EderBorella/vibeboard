@@ -108,15 +108,36 @@ describe('the foundation documents', () => {
     expect(status.ok).toBe(true);
   });
 
-  // gray-matter caches by input string and caches an EMPTY result after a throw, so two documents
-  // with the same broken frontmatter must not have the second one parse "successfully" as {}.
-  it('fails the same way twice on identical broken frontmatter', async () => {
+  // gray-matter caches by input string and caches an EMPTY result AFTER A THROW, so the second read
+  // of the same broken file "succeeds" as {} — which is why the options object at the call site is
+  // not optional. The two outcomes must stay distinguishable for this to pin anything: unparseable
+  // says so, and says it BOTH times. Drop the options object and the second read reports
+  // "declares no gates" instead.
+  it('says the frontmatter will not parse, and says it again on a second identical read', async () => {
     const root = await tempDir();
     const broken = '---\ngates: [unclosed\n---\nbody\n';
+    const unparseable = {
+      ok: false,
+      reason: 'foundation/CODE-QUALITY.md has frontmatter that will not parse, so its gates cannot be read.',
+    };
     await write(root, 'CODE-QUALITY.md', broken);
-    const first = await readGates(root);
+    expect(await readGates(root)).toEqual(unparseable);
     await write(root, 'CODE-QUALITY.md', broken);
-    expect(await readGates(root)).toEqual(first);
-    expect(first.ok).toBe(false);
+    expect(await readGates(root)).toEqual(unparseable);
+  });
+
+  it('distinguishes broken frontmatter from a file that simply declares nothing', async () => {
+    const root = await tempDir();
+    await write(root, 'TESTING.md', '---\nsmoke: [unclosed\n---\n');
+    expect(await readSmokeCommand(root)).toEqual({
+      ok: false,
+      reason:
+        'foundation/TESTING.md has frontmatter that will not parse, so its smoke command cannot be read.',
+    });
+    await write(root, 'TESTING.md', '# How we test\n');
+    expect(await readSmokeCommand(root)).toEqual({
+      ok: false,
+      reason: 'foundation/TESTING.md declares no `smoke:` command.',
+    });
   });
 });

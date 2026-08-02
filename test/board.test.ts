@@ -1,7 +1,13 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { boardColumnSlugs, countArchived, readArchive, readBoard } from '../src/core/board.js';
+import {
+  boardColumnSlugs,
+  type CardProblem,
+  countArchived,
+  readArchive,
+  readBoard,
+} from '../src/core/board.js';
 import { defaultConfig } from '../src/core/config.js';
 import { ARCHIVE_SLUG, boardRel } from '../src/core/layout.js';
 import { tempDir } from './helpers.js';
@@ -143,5 +149,39 @@ describe('countArchived', () => {
     );
     await writeCard(root, boardRel('product', ARCHIVE_SLUG, '.DS_Store'), '');
     expect(await countArchived(root, 'product')).toBe(2);
+  });
+});
+
+// The plan asked for "skip an unparseable card WITH A REASON", and the first implementation gave
+// only the skip. A card that vanishes with no explanation is indistinguishable from one the user
+// only thinks they wrote, and they will go looking in the wrong place.
+describe('reporting what could not be read', () => {
+  it('reports the path and a reason for a card whose frontmatter will not parse', async () => {
+    const root = await tempDir();
+    const config = defaultConfig('T');
+    const [column] = boardColumnSlugs(config, 'engineering');
+    await writeCard(root, boardRel('engineering', column, 'E-001.md'), '---\ntitle: "oops\n---\nbody\n');
+
+    const problems: CardProblem[] = [];
+    await readBoard(root, 'engineering', config, problems);
+
+    expect(problems).toHaveLength(1);
+    expect(problems[0].path).toContain('E-001.md');
+    expect(problems[0].reason).toBeTruthy();
+  });
+
+  it('reports nothing for a board it could read in full', async () => {
+    const root = await tempDir();
+    const config = defaultConfig('T');
+    const [column] = boardColumnSlugs(config, 'engineering');
+    await writeCard(
+      root,
+      boardRel('engineering', column, 'E-001.md'),
+      '---\nid: E-001\ntitle: fine\norder: 10\n---\nbody',
+    );
+
+    const problems: CardProblem[] = [];
+    expect((await readBoard(root, 'engineering', config, problems)).map((c) => c.id)).toEqual(['E-001']);
+    expect(problems).toEqual([]);
   });
 });

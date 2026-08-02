@@ -1,6 +1,6 @@
 import { mkdir, rename, writeFile } from 'node:fs/promises';
 import { basename, join } from 'node:path';
-import { boardColumnSlugs, readArchive, readBoard } from './board.js';
+import { boardColumnSlugs, readBoard, spentIds } from './board.js';
 import { serializeCard, toFrontmatter } from './card.js';
 import { nextId } from './ids.js';
 import { ARCHIVE_SLUG, boardRel } from './layout.js';
@@ -19,8 +19,12 @@ export interface CreateCardInput {
   body?: string;
 }
 
-async function writeCardFile(card: Card): Promise<void> {
-  await writeFile(card.filePath, serializeCard(toFrontmatter(card), card.body), 'utf8');
+// `exclusive` is for the create path: `wx` fails with EEXIST rather than replacing a file that is
+// already there. Belt and braces behind the id allocator — if a new card's path is ever occupied,
+// something upstream is wrong, and a loud error is worth more than a silently overwritten card.
+async function writeCardFile(card: Card, exclusive = false): Promise<void> {
+  const body = serializeCard(toFrontmatter(card), card.body);
+  await writeFile(card.filePath, body, exclusive ? { encoding: 'utf8', flag: 'wx' } : 'utf8');
 }
 
 // Because a column IS a folder, an unconfigured slug never failed — it created a folder no column
@@ -40,15 +44,11 @@ export async function createCard(
   today: string,
 ): Promise<Card | 'unknown-column'> {
   if (!knownColumn(config, input.board, input.columnSlug)) return 'unknown-column';
-  const [live, archived] = await Promise.all([
+  const [live, spent] = await Promise.all([
     readBoard(projectRoot, input.board, config),
-    readArchive(projectRoot, input.board),
+    spentIds(projectRoot, input.board, config),
   ]);
-  const id = nextId(
-    input.board,
-    [...live, ...archived].map((c) => c.id),
-    config.idPadding,
-  );
+  const id = nextId(input.board, spent, config.idPadding);
   const maxOrder = live
     .filter((c) => c.columnSlug === input.columnSlug)
     .reduce((m, c) => Math.max(m, c.order), 0);
@@ -68,7 +68,7 @@ export async function createCard(
     body: input.body ?? '',
     filePath: join(dir, `${id}.md`),
   };
-  await writeCardFile(card);
+  await writeCardFile(card, true);
   return card;
 }
 

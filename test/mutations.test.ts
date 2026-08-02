@@ -1,4 +1,4 @@
-import { access, readFile } from 'node:fs/promises';
+import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { boardColumnSlugs, readArchive, readBoard } from '../src/core/board.js';
@@ -103,6 +103,36 @@ describe('mutations', () => {
     const root = await tempDir();
     const card = await create(root, { board: 'product', columnSlug: 'todo', title: 'A' });
     expect(await placeCard(root, config, card, 'not-a-column', null)).toBe('unknown-column');
+  });
+
+  // The id allocator must see FILENAMES, not parsed cards. Deriving it from readBoard meant an
+  // unparseable card released its id, and the next create overwrote the file — the loud failure
+  // this codebase deliberately traded away came back as silent data loss instead.
+  it('does not reuse the id of a card whose frontmatter will not parse', async () => {
+    const root = await tempDir();
+    const dir = join(root, boardRel('engineering', ENG_FIRST));
+    await mkdir(dir, { recursive: true });
+    const victim = join(dir, 'E-001.md');
+    await writeFile(victim, '---\nid: E-001\ntitle: "oops\n---\nIRREPLACEABLE\n', 'utf8');
+    // The premise: it really is invisible to the board. Without this the test could pass because
+    // the card parsed fine after all.
+    expect(await readBoard(root, 'engineering', config)).toEqual([]);
+
+    const made = await create(root, { board: 'engineering', columnSlug: ENG_FIRST, title: 'New' });
+
+    expect(made.id).toBe('E-002');
+    expect(await readFile(victim, 'utf8')).toContain('IRREPLACEABLE');
+  });
+
+  it('counts an archived card that will not parse as spent too', async () => {
+    // Same hazard, the folder readBoard never looks in.
+    const root = await tempDir();
+    const dir = join(root, boardRel('engineering', ARCHIVE_SLUG));
+    await mkdir(dir, { recursive: true });
+    await writeFile(join(dir, 'E-001.md'), '---\ntitle: "oops\n---\n', 'utf8');
+
+    const made = await create(root, { board: 'engineering', columnSlug: ENG_FIRST, title: 'New' });
+    expect(made.id).toBe('E-002');
   });
 
   it('archives a card (moves it out of the board into archive)', async () => {

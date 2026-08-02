@@ -65,6 +65,16 @@ describe('card parse/serialize', () => {
     expect(parseCardContent('---\nfoo: *undefined-alias\n---\n')).toBeNull();
   });
 
+  // Called with one argument, gray-matter caches by input string — and after a throw it caches an
+  // EMPTY result. So the second card with the same broken content parsed "successfully" as `{}`
+  // and reached the board as a card with no id. Two copies of one bad template is all it takes.
+  it('returns null every time for the same unparseable content, not just the first', () => {
+    const broken = '---\ntitle: "oops\n---\nbody\n';
+    expect(parseCardContent(broken)).toBeNull();
+    expect(parseCardContent(broken)).toBeNull();
+    expect(parseCardContent(broken)).toBeNull();
+  });
+
   it('round-trips a full card through serialize then parse', () => {
     const out = serializeCard(fm, 'The body.');
     const { data, body } = parse(out);

@@ -7,7 +7,11 @@ import type { Card, CardFrontmatter } from './types.js';
 export function parseCardContent(content: string): { data: CardFrontmatter; body: string } | null {
   let parsed: matter.GrayMatterFile<string>;
   try {
-    parsed = matter(content);
+    // The options object is not optional, however empty it looks: called with one argument
+    // gray-matter caches by input string, and after a throw it caches an EMPTY result — so the
+    // second card with the same broken content parses "successfully" as `{}` and becomes a card
+    // with no id at all. Passing options bypasses the cache. Verified both ways.
+    parsed = matter(content, { language: 'yaml' });
   } catch {
     return null;
   }

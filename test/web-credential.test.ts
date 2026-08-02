@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { getState } from '../web/src/api.js';
-import { authToken } from '../web/src/token.js';
+import { createControlFile, getState, patchConfig, putSkill } from '../web/src/api.js';
 import { STUB_TOKEN, stubBrowser } from './browser-stubs.js';
 
 // The client half of the boundary. Every call in web/src/api.ts goes through one wrapper, so this
@@ -47,7 +46,40 @@ describe('the browser attaches its credential', () => {
     });
   });
 
-  it('falls back to the stored token when the URL carries none', () => {
-    expect(authToken()).toBe(STUB_TOKEN);
+  // Through a fresh module registry: token.ts memoises, and the first test in this file already
+  // populated the memo — so read through the module-scope import this was asserting the cache, not
+  // the fallback it is named for.
+  it('falls back to the stored token when the URL carries none', async () => {
+    vi.resetModules();
+    stubBrowser(); // search: '' — nothing in the URL to read
+    const { authToken: fresh } = await import('../web/src/token.js');
+    expect(fresh()).toBe(STUB_TOKEN);
+  });
+
+  // One call site out of twenty-five was exercised, and the file's own comment claimed all of them.
+  // Testing one more proved nothing either: the twenty-five reach the network through four helpers,
+  // so it is the four that have to be held, not four of the twenty-five. Breaking any one of them
+  // now fails here.
+  it.each([
+    ['post', () => createControlFile('docs')],
+    ['put', () => putSkill('execute', { name: 'x', description: 'd', boards: [], columns: [], prompt: 'p' })],
+    ['patch', () => patchConfig({ name: 'renamed' })],
+    ['a bare read', () => getState()],
+  ])('sends the credential through %s', async (_shape, call) => {
+    const fetchMock = vi.fn(async () => new Response('{}', { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await call();
+
+    const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect((init.headers as Record<string, string>).authorization).toBe(`Bearer ${STUB_TOKEN}`);
+  });
+
+  it('does not eat the caller’s own headers on the way past', async () => {
+    const fetchMock = vi.fn(async () => new Response('{}', { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    await patchConfig({ name: 'renamed' });
+    const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect((init.headers as Record<string, string>)['content-type']).toBe('application/json');
   });
 });

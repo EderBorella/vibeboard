@@ -47,7 +47,9 @@ export function registerWs(
     // handshake.
     const authenticate: preValidationHookHandler = async (req, reply) => {
       const { token } = req.query as { token?: string };
-      const cred = ctx.credentials.verify(token ?? bearerToken(req.headers.authorization));
+      // `||`, not `??`: an empty `?token=` is a missing token, not a supplied one, and with `??`
+      // it shadowed a perfectly good Authorization header.
+      const cred = ctx.credentials.verify(token || bearerToken(req.headers.authorization));
       if (cred?.scope !== 'admin') return reply.code(401).send({ error: 'Unauthorized' });
     };
 

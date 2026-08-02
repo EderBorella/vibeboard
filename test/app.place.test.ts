@@ -117,6 +117,34 @@ describe('closing a card resolves the runs on it', () => {
     expect((await readRun(root, 'product', ids[0], 'r-two'))?.resolved).toBeTruthy();
   });
 
+  // /move is the door agents use, and it was untested here: reimplementing its handler without the
+  // shared helper left the suite green. The extraction's whole stated purpose is that this rule has
+  // ONE home, and a rule only one caller is held to has two.
+  it('resolves them when the card reaches the last column through /move', async () => {
+    const { app, ids, root } = await setup();
+    await writeRun(root, asking(ids[0], 'r-one'));
+
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/cards/product/${ids[0]}/move`,
+      payload: { toColumnSlug: 'done' },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect((await readRun(root, 'product', ids[0], 'r-one'))?.resolved).toBeTruthy();
+  });
+
+  it('leaves them asking when /move lands anywhere else', async () => {
+    const { app, ids, root } = await setup();
+    await writeRun(root, asking(ids[0], 'r-one'));
+    await app.inject({
+      method: 'POST',
+      url: `/api/cards/product/${ids[0]}/move`,
+      payload: { toColumnSlug: 'in-progress' },
+    });
+    expect((await readRun(root, 'product', ids[0], 'r-one'))?.resolved).toBeUndefined();
+  });
+
   it('leaves them asking for any other column — only the last one closes a card', async () => {
     // 'In Progress' is not the end of the board, so a card passing through it has decided nothing.
     const { app, ids, root } = await setup();

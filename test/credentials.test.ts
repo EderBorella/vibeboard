@@ -9,9 +9,14 @@ const ADMIN = 'admin-token-for-tests';
 describe('CredentialStore', () => {
   it('mints a credential that verifies, and stops verifying once the run settles', () => {
     const store = new CredentialStore(ADMIN);
-    const cred = store.mintRun('work', 'run-1', 'E-001');
+    const cred = store.mintRun('work', 'run-1', '/p/A', 'E-001');
 
-    expect(store.verify(cred.token)).toMatchObject({ scope: 'work', run: 'run-1', card: 'E-001' });
+    expect(store.verify(cred.token)).toMatchObject({
+      scope: 'work',
+      run: 'run-1',
+      project: '/p/A',
+      card: 'E-001',
+    });
     store.expireRun('run-1');
     expect(store.verify(cred.token)).toBeNull();
   });
@@ -31,13 +36,21 @@ describe('CredentialStore', () => {
   // produce the same observable result, so a single-run fixture would test neither.
   it('expires only the run that settled', () => {
     const store = new CredentialStore(ADMIN);
-    const a = store.mintRun('work', 'run-a', 'E-001');
-    const b = store.mintRun('checkup', 'run-b', 'E-002');
+    const a = store.mintRun('work', 'run-a', '/p/A', 'E-001');
+    const b = store.mintRun('checkup', 'run-b', '/p/A', 'E-002');
 
     store.expireRun('run-a');
 
     expect(store.verify(a.token)).toBeNull();
     expect(store.verify(b.token)).toMatchObject({ scope: 'checkup', run: 'run-b' });
+  });
+
+  // A store built with an empty admin token must not turn every credential-less request into an
+  // admin one. The file side of this hazard was guarded; the store side was not.
+  it('never treats an empty token as the admin token', () => {
+    const store = new CredentialStore('');
+    expect(store.verify('')).toBeNull();
+    expect(store.verify('anything')).toBeNull();
   });
 
   it('verifies the admin token as admin, carrying no run or card', () => {

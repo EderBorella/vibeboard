@@ -8,7 +8,6 @@ import {
   archiveCard,
   type CreateCardInput,
   createCard,
-  moveCard,
   placeCard,
   updateCard,
 } from '../src/core/mutations.js';
@@ -67,7 +66,7 @@ describe('mutations', () => {
   it('moves a card to another column (file relocates, id unchanged)', async () => {
     const root = await tempDir();
     const card = await create(root, { board: 'product', columnSlug: 'todo', title: 'A' });
-    const moved = cardFrom(await moveCard(root, config, card, 'in-progress'));
+    const moved = cardFrom(await placeCard(root, config, card, 'in-progress', null));
     expect(moved.columnSlug).toBe('in-progress');
     expect(moved.id).toBe(card.id);
     const board = await readBoard(root, 'product', config);
@@ -89,14 +88,6 @@ describe('mutations', () => {
     // Creating the folder is the bug, not a side effect of it: the next card would then be
     // numbered against a board that cannot see this one.
     await expect(access(join(root, boardRel('engineering', 'not-a-column')))).rejects.toThrow();
-  });
-
-  it('refuses to move a card into a column the board does not have', async () => {
-    const root = await tempDir();
-    const card = await create(root, { board: 'product', columnSlug: 'todo', title: 'A' });
-    expect(await moveCard(root, config, card, 'not-a-column')).toBe('unknown-column');
-    // Still where it was, and still readable there.
-    expect((await readBoard(root, 'product', config)).map((c) => c.columnSlug)).toEqual(['todo']);
   });
 
   it('refuses to place a card into a column the board does not have', async () => {

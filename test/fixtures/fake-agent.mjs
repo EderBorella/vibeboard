@@ -11,6 +11,7 @@
 //   hang      — never exits, for cancel and timeout
 //   free      — like success, but reports a cost of exactly 0 (a free model)
 //   echo      — quotes its own credential back in its narration, then exits 0
+//   leaky     — writes a REPORT that quotes its own credential, then exits 0
 //
 // The report path is read from the prompt it was given, exactly as a real agent would: that means
 // these tests fail if the prompt stops naming the path.
@@ -51,6 +52,10 @@ const REPORTS = {
 };
 // A free run still succeeds; only its cost differs.
 REPORTS.free = REPORTS.success;
+// A report that quotes the credential: the other half of the same leak, through the file that is
+// folded into the run record and pushed to every connected browser.
+const leakedCred = (prompt.match(/Your credential: `([^`]+)`/) ?? [])[1] ?? '(none)';
+REPORTS.leaky = `---\noutcome: success\nsummary: called the API\n---\n## What I did\n\nRan: curl -H 'Authorization: Bearer ${leakedCred}'\n`;
 
 if (behaviour === 'chatty') {
   // Many events then an immediate exit with no report. The point is the race: every line must be on

@@ -194,7 +194,7 @@ export class AgentRunner {
     // Minted here rather than in dispatch, so a queued run's credential begins its life when the
     // run actually starts. `work`, confined to its own card: a run that could move cards could put
     // its own into done and declare itself finished.
-    const minted = this.#opts.credentials?.mintRun('work', run, record.card);
+    const minted = this.#opts.credentials?.mintRun('work', run, root, record.card);
     const credential = minted ? { token: minted.token, apiBase: this.#opts.apiBase?.() ?? '' } : undefined;
     const prompt = buildRunPrompt({
       skill: input.skill,
@@ -240,7 +240,7 @@ export class AgentRunner {
 
     // Not awaited: the caller was answered when the record was written, and the ending arrives
     // through onUpdate. Errors are folded into the record rather than thrown into nowhere.
-    void this.#settle(root, run, record, turn);
+    void this.#settle(root, run, record, turn, minted?.token);
   }
 
   // A slot freed. Take the oldest waiting run, mark it running on disk, and spawn it.
@@ -258,7 +258,13 @@ export class AgentRunner {
     }
   }
 
-  async #settle(root: string, run: string, record: RunRecord, turn: RunningTurn): Promise<void> {
+  async #settle(
+    root: string,
+    run: string,
+    record: RunRecord,
+    turn: RunningTurn,
+    secret?: string,
+  ): Promise<void> {
     let final: RunRecord;
     try {
       const result = await turn.done;
@@ -269,7 +275,7 @@ export class AgentRunner {
       // Attached here, once, so BOTH endings carry it: a run that failed or was cancelled still
       // spent tokens, and that is exactly when you want to know how many.
       const spent = withUsage(record, usageFromStats(result.stats));
-      const folded = await foldReport(root, spent, finishedAt);
+      const folded = await foldReport(root, spent, finishedAt, secret);
       final = folded ?? (await this.#endWithoutReport(root, spent, result, cancelled, finishedAt));
     } catch (err) {
       final = withoutReport(

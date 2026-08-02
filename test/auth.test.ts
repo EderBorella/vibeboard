@@ -1,7 +1,8 @@
 import type { FastifyInstance } from 'fastify';
 import { describe, expect, it, onTestFinished } from 'vitest';
 import { buildApp } from '../src/server/app.js';
-import { CredentialStore } from '../src/server/credentials.js';
+import { bearerToken } from '../src/server/auth.js';
+import { type Credential, CredentialStore, type Scope } from '../src/server/credentials.js';
 import { ProjectSession } from '../src/server/session.js';
 import { tempDir } from './helpers.js';
 
@@ -11,7 +12,12 @@ const bearer = (token: string): Record<string, string> => ({ authorization: `Bea
 
 // A real app with no auth-injecting wrapper: every request here presents exactly the credential
 // the test gives it, which is the whole point of this file.
-async function open(): Promise<{ app: FastifyInstance; store: CredentialStore }> {
+// `mint` carries the project root, because a run's authority is over the project it was dispatched
+// into. Handed back from here so no test can accidentally mint against a different one and pass for
+// the wrong reason.
+type Mint = (scope: Exclude<Scope, 'admin'>, run: string, card?: string) => Credential;
+
+async function open(): Promise<{ app: FastifyInstance; store: CredentialStore; root: string; mint: Mint }> {
   const session = new ProjectSession();
   const store = new CredentialStore(ADMIN);
   const app = buildApp(session, { credentials: store, logger: false });
@@ -26,8 +32,34 @@ async function open(): Promise<{ app: FastifyInstance; store: CredentialStore }>
     headers: admin,
     payload: { path: root, name: 'A', mode: 'greenfield' },
   });
-  return { app, store };
+  // The project is supplied here, not by the caller: a run's authority is over the project it was
+  // dispatched into, and a test that could pick a different one would pass for the wrong reason.
+  const mint: Mint = (scope, run, card) => store.mintRun(scope, run, root, card);
+  return { app, store, root, mint };
 }
+
+// Neither of these was imported by any test, which made auth.ts's own comment — "exported so the
+// table can be tested directly" — false. The table is well covered through the app; the header
+// parser was not covered at all.
+describe('bearerToken', () => {
+  it('reads the token out of a well-formed header', () => {
+    expect(bearerToken('Bearer abc123')).toBe('abc123');
+    expect(bearerToken('Bearer   spaced  ')).toBe('spaced');
+  });
+
+  it('is anchored, so a token cannot be smuggled inside another scheme', () => {
+    // Unanchored, `Basic Bearer <token>` authenticates — the regex matches anywhere in the string.
+    expect(bearerToken('Basic Bearer abc123')).toBe('');
+    expect(bearerToken('Basic abc123')).toBe('');
+  });
+
+  it('is empty for a missing or malformed header', () => {
+    expect(bearerToken(undefined)).toBe('');
+    expect(bearerToken('')).toBe('');
+    expect(bearerToken('Bearer')).toBe('');
+    expect(bearerToken('Bearer ')).toBe('');
+  });
+});
 
 describe('the API boundary', () => {
   it('refuses a request with no credential', async () => {
@@ -43,8 +75,8 @@ describe('the API boundary', () => {
   });
 
   it('refuses an expired run credential everywhere', async () => {
-    const { app, store } = await open();
-    const cred = store.mintRun('work', 'run-1', 'E-001');
+    const { app, store, mint } = await open();
+    const cred = mint('work', 'run-1', 'E-001');
     store.expireRun('run-1');
     const res = await app.inject({ method: 'GET', url: '/api/state', headers: bearer(cred.token) });
     expect(res.statusCode).toBe(401);
@@ -56,8 +88,8 @@ describe('the API boundary', () => {
   });
 
   it('lets a run read the board', async () => {
-    const { app, store } = await open();
-    const cred = store.mintRun('work', 'run-1', 'E-001');
+    const { app, mint } = await open();
+    const cred = mint('work', 'run-1', 'E-001');
     const res = await app.inject({ method: 'GET', url: '/api/state', headers: bearer(cred.token) });
     expect(res.statusCode).toBe(200);
   });
@@ -65,8 +97,8 @@ describe('the API boundary', () => {
   // The most dangerous endpoint in the app: a run that can dispatch runs escapes the loop's
   // iteration counter, its budget and its concurrency cap in one move.
   it('refuses a work credential on POST /api/runs', async () => {
-    const { app, store } = await open();
-    const cred = store.mintRun('work', 'run-1', 'E-001');
+    const { app, mint } = await open();
+    const cred = mint('work', 'run-1', 'E-001');
     const res = await app.inject({
       method: 'POST',
       url: '/api/runs',
@@ -77,10 +109,10 @@ describe('the API boundary', () => {
   });
 
   it('refuses a run credential on PUT /raw, whatever its scope', async () => {
-    const { app, store } = await open();
+    const { app, mint } = await open();
     // Raw bytes bypass every validation in the mutation layer — id, column and frontmatter all.
     for (const scope of ['work', 'checkup', 'service'] as const) {
-      const cred = store.mintRun(scope, `run-${scope}`, 'E-001');
+      const cred = mint(scope, `run-${scope}`, 'E-001');
       const res = await app.inject({
         method: 'PUT',
         url: '/api/cards/engineering/E-001/raw',
@@ -94,8 +126,8 @@ describe('the API boundary', () => {
   it('refuses a run credential on PATCH /api/config', async () => {
     // Config holds the columns, the caps and the routing table. An agent that can edit it can
     // rewrite the rules it is judged by.
-    const { app, store } = await open();
-    const cred = store.mintRun('service', 'run-1');
+    const { app, mint } = await open();
+    const cred = mint('service', 'run-1');
     const res = await app.inject({
       method: 'PATCH',
       url: '/api/config',
@@ -109,8 +141,8 @@ describe('the API boundary', () => {
   // somebody opens it deliberately. Explorer writes are the widest reach in the app: any path
   // in the project, card or not.
   it('refuses a run credential on an endpoint the table never mentions', async () => {
-    const { app, store } = await open();
-    const cred = store.mintRun('checkup', 'run-1');
+    const { app, mint } = await open();
+    const cred = mint('checkup', 'run-1');
     const res = await app.inject({
       method: 'PUT',
       url: '/api/explorer/file',
@@ -122,8 +154,8 @@ describe('the API boundary', () => {
 
   describe('a work credential is confined to its own card', () => {
     it('may edit the card it was minted for', async () => {
-      const { app, store } = await open();
-      const cred = store.mintRun('work', 'run-1', 'E-001');
+      const { app, mint } = await open();
+      const cred = mint('work', 'run-1', 'E-001');
       const res = await app.inject({
         method: 'PATCH',
         url: '/api/cards/engineering/E-001',
@@ -134,8 +166,8 @@ describe('the API boundary', () => {
     });
 
     it('may not edit another', async () => {
-      const { app, store } = await open();
-      const cred = store.mintRun('work', 'run-1', 'E-001');
+      const { app, mint } = await open();
+      const cred = mint('work', 'run-1', 'E-001');
       const res = await app.inject({
         method: 'PATCH',
         url: '/api/cards/engineering/E-002',
@@ -147,8 +179,8 @@ describe('the API boundary', () => {
 
     it('is not confined when the scope is checkup', async () => {
       // The checkup is a supervisor, not a worker: editing any card is the job.
-      const { app, store } = await open();
-      const cred = store.mintRun('checkup', 'run-1');
+      const { app, mint } = await open();
+      const cred = mint('checkup', 'run-1');
       const res = await app.inject({
         method: 'PATCH',
         url: '/api/cards/engineering/E-001',
@@ -157,6 +189,46 @@ describe('the API boundary', () => {
       });
       expect(res.statusCode).toBe(200);
     });
+  });
+
+  // Card ids are unique within a project, never across them — every project has an E-001. Nothing
+  // cancels a live run when the user opens another project, so a credential checked on the id alone
+  // went on working, against the wrong project's card, for the rest of the run.
+  it('refuses a credential minted against a project that is no longer the open one', async () => {
+    const { app, store, root } = await open();
+    const cred = store.mintRun('work', 'run-in-A', root, 'E-001');
+    // Still fine while A is open.
+    expect(
+      (
+        await app.inject({
+          method: 'PATCH',
+          url: '/api/cards/engineering/E-001',
+          headers: bearer(cred.token),
+          payload: { title: 'while A is open' },
+        })
+      ).statusCode,
+    ).toBe(200);
+
+    // Open a second project. The run in A is not cancelled by this.
+    const other = await tempDir();
+    await app.inject({
+      method: 'POST',
+      url: '/api/project/scaffold',
+      headers: admin,
+      payload: { path: other, name: 'B', mode: 'greenfield' },
+    });
+
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/api/cards/engineering/E-001',
+      headers: bearer(cred.token),
+      payload: { title: 'edited across the project switch' },
+    });
+    expect(res.statusCode).toBe(403);
+    // And project B's card is untouched.
+    const state = (await app.inject({ method: 'GET', url: '/api/state', headers: admin })).json();
+    const card = state.snapshot.boards.engineering.find((c: { id: string }) => c.id === 'E-001');
+    expect(card.title).not.toBe('edited across the project switch');
   });
 
   // The five verbs an agent can reach, as a matrix. A row nobody exercises is a row that does not
@@ -181,8 +253,8 @@ describe('the API boundary', () => {
       }) satisfies Record<string, { method: 'POST' | 'PATCH' | 'PUT'; url: string; payload: object }>;
 
     it('lets a work credential create, edit its own card and link — and nothing else', async () => {
-      const { app, store } = await open();
-      const cred = store.mintRun('work', 'run-1', 'E-001');
+      const { app, mint } = await open();
+      const cred = mint('work', 'run-1', 'E-001');
       const v = verbs('E-001');
       for (const name of ['create', 'edit', 'link'] as const) {
         const res = await app.inject({ ...v[name], headers: bearer(cred.token) });
@@ -195,8 +267,8 @@ describe('the API boundary', () => {
     });
 
     it('lets a checkup credential do all five', async () => {
-      const { app, store } = await open();
-      const cred = store.mintRun('checkup', 'run-1');
+      const { app, mint } = await open();
+      const cred = mint('checkup', 'run-1');
       const v = verbs('E-001');
       for (const name of ['create', 'edit', 'link', 'move', 'archive'] as const) {
         const res = await app.inject({ ...v[name], headers: bearer(cred.token) });
@@ -207,9 +279,9 @@ describe('the API boundary', () => {
     it('refuses a run of any scope on /place, which is the drag-and-drop verb', async () => {
       // Position is a person's judgement about a board they are looking at. An agent moves a card
       // to a column; where in that column is not a question it has any basis to answer.
-      const { app, store } = await open();
+      const { app, mint } = await open();
       for (const scope of ['work', 'checkup', 'service'] as const) {
-        const cred = store.mintRun(scope, `run-${scope}`, 'E-001');
+        const cred = mint(scope, `run-${scope}`, 'E-001');
         const res = await app.inject({
           method: 'POST',
           url: '/api/cards/engineering/E-001/place',
@@ -221,8 +293,8 @@ describe('the API boundary', () => {
     });
 
     it('appends a moved card to the end of its new column', async () => {
-      const { app, store } = await open();
-      const cred = store.mintRun('checkup', 'run-1');
+      const { app, mint } = await open();
+      const cred = mint('checkup', 'run-1');
       const res = await app.inject({
         method: 'POST',
         url: '/api/cards/engineering/E-001/move',
@@ -234,8 +306,8 @@ describe('the API boundary', () => {
     });
 
     it('refuses a move to a column the board does not have', async () => {
-      const { app, store } = await open();
-      const cred = store.mintRun('checkup', 'run-1');
+      const { app, mint } = await open();
+      const cred = mint('checkup', 'run-1');
       const res = await app.inject({
         method: 'POST',
         url: '/api/cards/engineering/E-001/move',
@@ -244,6 +316,54 @@ describe('the API boundary', () => {
       });
       expect(res.statusCode).toBe(400);
     });
+  });
+
+  // A malformed body from an agent used to be a 500 and a stack trace — from the caller class least
+  // able to interpret one, and with nothing in its instructions to suggest a 500 was even possible.
+  describe('a bad request is answered, not crashed on', () => {
+    it('refuses a board the project does not have', async () => {
+      const { app, mint } = await open();
+      const cred = mint('work', 'run-1', 'E-001');
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/cards',
+        headers: bearer(cred.token),
+        payload: { board: 'eng', columnSlug: 'backlog', title: 'x' },
+      });
+      expect(res.statusCode).toBe(400);
+    });
+
+    it('refuses a links payload that is not a list', async () => {
+      const { app, mint } = await open();
+      const cred = mint('work', 'run-1', 'E-001');
+      const res = await app.inject({
+        method: 'PUT',
+        url: '/api/cards/engineering/E-001/links',
+        headers: bearer(cred.token),
+        payload: {},
+      });
+      expect(res.statusCode).toBe(400);
+    });
+  });
+
+  // Fastify registers HEAD alongside every GET. Keyed on the literal method, a run probing an
+  // endpoint it is allowed to read got a 403 for asking the cheap way.
+  it('lets a run HEAD what it may GET', async () => {
+    const { app, mint } = await open();
+    const cred = mint('work', 'run-1', 'E-001');
+    expect(
+      (await app.inject({ method: 'HEAD', url: '/api/state', headers: bearer(cred.token) })).statusCode,
+    ).toBe(200);
+    // And HEAD does not become a way around the table.
+    expect(
+      (
+        await app.inject({
+          method: 'HEAD',
+          url: '/api/cards/engineering/E-001/raw',
+          headers: bearer(cred.token),
+        })
+      ).statusCode,
+    ).toBe(200);
   });
 
   // The socket carries the copilot channel, and the copilot writes files with tools that
@@ -264,6 +384,45 @@ describe('the API boundary', () => {
     });
     ws.close();
     expect(outcome).toBe('refused');
+  });
+
+  // The middle case, and the only interesting one: the two ends — no credential and the admin
+  // token — both passed with the scope check reduced to a mere presence check, so nothing held the
+  // socket to ADMIN. A run that can open it drives the copilot channel, whose tools write files
+  // with no approval step.
+  it('refuses a websocket presenting a run credential, at every scope', async () => {
+    const { app, mint } = await open();
+    await app.listen({ port: 0, host: '127.0.0.1' });
+    const { default: WebSocket } = await import('ws');
+    const address = app.addresses()[0];
+    for (const scope of ['work', 'checkup', 'service'] as const) {
+      const cred = mint(scope, `run-${scope}`, 'E-001');
+      const ws = new WebSocket(`ws://127.0.0.1:${address.port}/ws?token=${cred.token}`);
+      const outcome = await new Promise<string>((resolve) => {
+        ws.on('open', () => resolve('opened'));
+        ws.on('error', () => resolve('refused'));
+        setTimeout(() => resolve('nothing happened'), 2000);
+      });
+      ws.close();
+      expect(outcome, scope).toBe('refused');
+    }
+  });
+
+  // `??` treats an empty `?token=` as a supplied value, so it shadowed a perfectly good header. A
+  // browser cannot set one, but nothing else connecting here is a browser.
+  it('falls back to the Authorization header when the query token is empty', async () => {
+    const { app } = await open();
+    await app.listen({ port: 0, host: '127.0.0.1' });
+    const { default: WebSocket } = await import('ws');
+    const address = app.addresses()[0];
+    const ws = new WebSocket(`ws://127.0.0.1:${address.port}/ws?token=`, { headers: admin });
+    const outcome = await new Promise<string>((resolve) => {
+      ws.on('open', () => resolve('opened'));
+      ws.on('error', () => resolve('refused'));
+      setTimeout(() => resolve('nothing happened'), 2000);
+    });
+    ws.close();
+    expect(outcome).toBe('opened');
   });
 
   it('accepts a websocket presenting the admin token', async () => {

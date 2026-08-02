@@ -36,7 +36,6 @@ function knownColumn(config: ProjectConfig, board: BoardName, columnSlug: string
   return boardColumnSlugs(config, board).includes(columnSlug);
 }
 
-// `'unknown-column'` when the slug is not configured for this board.
 export async function createCard(
   projectRoot: string,
   config: ProjectConfig,
@@ -94,19 +93,6 @@ async function moveCardFile(projectRoot: string, card: Card, toColumnSlug: strin
   return { ...card, columnSlug: toColumnSlug, filePath: newPath };
 }
 
-// `'unknown-column'` when the slug is not configured for this board. Use archiveCard to reach the
-// archive; this refuses it, because a card put there without its `archived` stamp has no record of
-// where it came from and sorts to the bottom of the drawer forever.
-export async function moveCard(
-  projectRoot: string,
-  config: ProjectConfig,
-  card: Card,
-  toColumnSlug: string,
-): Promise<Card | 'unknown-column'> {
-  if (!knownColumn(config, card.board, toColumnSlug)) return 'unknown-column';
-  return moveCardFile(projectRoot, card, toColumnSlug);
-}
-
 // Put a card in a column at a specific position: move the file if the column changed, then
 // renumber that column's `order` fields to even multiples of ORDER_STEP.
 //
@@ -162,8 +148,7 @@ export function restoreTarget(config: ProjectConfig, card: Card): string {
   return card.archivedFrom && slugs.includes(card.archivedFrom) ? card.archivedFrom : slugs[0];
 }
 
-// Put an archived card back on the board, at the end of the target column. `'unknown-column'`
-// when an explicitly requested column isn't configured for this board.
+// Put an archived card back on the board, at the end of the target column.
 export async function restoreCard(
   projectRoot: string,
   config: ProjectConfig,

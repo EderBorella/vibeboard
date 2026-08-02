@@ -14,7 +14,7 @@ import {
   updateCard,
 } from '../../core/mutations.js';
 import { slugify } from '../../core/slug.js';
-import type { BoardName, CardFrontmatter, ProjectConfig } from '../../core/types.js';
+import { BOARDS, type BoardName, type CardFrontmatter, type ProjectConfig } from '../../core/types.js';
 import { type AppCtx, ensureOpen, nowIso, today } from '../route-context.js';
 import { resolveCardRuns } from '../run-store.js';
 
@@ -58,6 +58,11 @@ export async function registerCardRoutes(api: FastifyInstance, ctx: AppCtx): Pro
   api.post('/cards', async (req, reply) => {
     if (!ensureOpen(ctx.session, reply)) return;
     const input = req.body as CreateCardInput;
+    // The board is checked before the mutation layer sees it, because everything downstream indexes
+    // `config.boards[board]` and an unknown name dereferences undefined — a stack trace and a 500,
+    // handed to the caller least able to interpret one. Decision 10 says the board is validated;
+    // it was not.
+    if (!BOARDS.includes(input?.board)) return reply.code(400).send({ error: 'Unknown board' });
     const card = await createCard(ctx.session.root, ctx.session.config, input, today());
     if (card === 'unknown-column') return reply.code(400).send({ error: 'Unknown column' });
     return card;
@@ -92,7 +97,10 @@ export async function registerCardRoutes(api: FastifyInstance, ctx: AppCtx): Pro
   api.put('/cards/:board/:id/links', async (req, reply) => {
     if (!ensureOpen(ctx.session, reply)) return;
     const { board, id } = req.params as { board: BoardName; id: string };
-    const { links } = req.body as { links: string[] };
+    const { links } = (req.body ?? {}) as { links?: string[] };
+    // The complete list, so a missing one is a request to clear — but only when it is deliberate.
+    // `undefined` reaching setCardLinks was a 500.
+    if (!Array.isArray(links)) return reply.code(400).send({ error: 'links must be an array' });
     const card = await findCard(ctx.session.root, board, id, ctx.session.config);
     if (!card) return reply.code(404).send({ error: 'Card not found' });
     return setCardLinks(ctx.session.root, ctx.session.config, card, links);

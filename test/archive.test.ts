@@ -51,8 +51,8 @@ describe('readArchive', () => {
     await archiveCard(root, a, at('09:00'));
     await archiveCard(root, b, at('11:00'));
     // A card archived before this feature existed: in the folder, no stamp in its frontmatter.
-    // Moved by hand, because moveCard now refuses the archive — landing there unstamped is the
-    // state archiveCard exists to prevent, so only an older version or a person could produce it.
+    // Moved by hand: no public mutation reaches the archive without stamping, because landing
+    // there unstamped is the state archiveCard exists to prevent.
     const archiveDir = join(root, boardRel('engineering', ARCHIVE_SLUG));
     await mkdir(archiveDir, { recursive: true });
     await rename(c.filePath, join(archiveDir, `${c.id}.md`));

@@ -13,9 +13,15 @@ export type Scope = 'work' | 'checkup' | 'service' | 'admin';
 export interface Credential {
   token: string;
   scope: Scope;
-  // The run this credential was minted for, and the one card a `work` scope may edit. Both absent
-  // for admin: the browser is a person, not a run, and is not confined to one card.
+  // The run this credential was minted for, the project it was minted against, and the one card a
+  // `work` scope may edit. All absent for admin: the browser is a person, not a run, and is
+  // confined to neither a card nor whichever project happens to be open.
+  //
+  // `project` is not decoration. Card ids are unique within a project, not across them, and every
+  // project has an E-001 — so a credential checked on the id alone still matched after the user
+  // opened a different project under a live run, and edited the wrong project's card.
   run?: string;
+  project?: string;
   card?: string;
 }
 
@@ -58,8 +64,8 @@ export class CredentialStore {
 
   constructor(private readonly admin: string) {}
 
-  mintRun(scope: Exclude<Scope, 'admin'>, run: string, card?: string): Credential {
-    const cred: Credential = { token: randomUUID(), scope, run, card };
+  mintRun(scope: Exclude<Scope, 'admin'>, run: string, project?: string, card?: string): Credential {
+    const cred: Credential = { token: randomUUID(), scope, run, project, card };
     this.#byToken.set(cred.token, cred);
     return cred;
   }

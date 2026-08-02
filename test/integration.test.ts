@@ -3,7 +3,7 @@ import {
   archiveCard,
   boardColumnSlugs,
   createCard,
-  moveCard,
+  placeCard,
   readBoard,
   readConfig,
   scaffoldProject,
@@ -33,7 +33,9 @@ describe('end-to-end: scaffold → create → move → archive', () => {
     expect(eng.id).toBe('E-002'); // E-001 is the sample card
 
     // move it across the board
-    eng = cardFrom(await moveCard(root, config, eng, 'in-progress'));
+    // placeCard, because that is what both HTTP movers call — moveCard was library surface with
+    // no caller, and an end-to-end test should exercise the path the app takes.
+    eng = cardFrom(await placeCard(root, config, eng, 'in-progress', null));
     let board = await readBoard(root, 'engineering', config);
     expect(board.find((c) => c.id === eng.id)?.columnSlug).toBe('in-progress');
 

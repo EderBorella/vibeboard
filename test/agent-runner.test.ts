@@ -506,8 +506,13 @@ describe('the run credential', () => {
   // revoked — correctly. What this pins is what was minted, and that the prompt carried it.
   class RecordingStore extends CredentialStore {
     minted: Credential[] = [];
-    override mintRun(scope: Exclude<Scope, 'admin'>, run: string, card?: string): Credential {
-      const cred = super.mintRun(scope, run, card);
+    override mintRun(
+      scope: Exclude<Scope, 'admin'>,
+      run: string,
+      project?: string,
+      card?: string,
+    ): Credential {
+      const cred = super.mintRun(scope, run, project, card);
       this.minted.push(cred);
       return cred;
     }
@@ -525,7 +530,7 @@ describe('the run credential', () => {
     delete process.env.VIBEBOARD_SHIM_ARGS;
 
     expect(store.minted).toHaveLength(1);
-    expect(store.minted[0]).toMatchObject({ scope: 'work', run, card: 'E-010' });
+    expect(store.minted[0]).toMatchObject({ scope: 'work', run, project: root, card: 'E-010' });
 
     const { readFile } = await import('node:fs/promises');
     const text: string = JSON.parse((await readFile(argsLog, 'utf8')).trim().split('\n')[0]).at(-1);
@@ -549,6 +554,23 @@ describe('the run credential', () => {
     }
   });
 
+  // The three behaviours above all resolve turn.done normally and take the same path out, so they
+  // never reach the `finally` at all — moving expireRun onto the try-block's normal completion line
+  // left the suite green. The only ending the `finally` uniquely covers is a throw mid-settle, and
+  // that is what this forces.
+  it('revokes the credential when settling itself throws', async () => {
+    const root = await tempDir();
+    const store = new RecordingStore('admin');
+    const runStore = await import('../src/server/run-store.js');
+    vi.spyOn(runStore, 'foldReport').mockRejectedValue(new Error('disk went away mid-settle'));
+
+    const { instance } = runner(root, { credentials: store });
+    const { run } = await instance.dispatch(input(root));
+    // The record still settles — the catch writes a `failed` one — so the usual wait applies.
+    expect((await settled(root, run)).status).toBe('failed');
+    expect(store.verify(store.minted[0].token)).toBeNull();
+  });
+
   it('keeps the token out of the transcript even when the agent echoes it', async () => {
     // Transcripts live under .vibeboard/ where every agent can read them, so a run that quotes its
     // own credential would hand a concurrent run a working key.
@@ -562,6 +584,21 @@ describe('the run credential', () => {
     expect(tail).toContain('Authorization: Bearer'); // the shim really did echo
     expect(tail).not.toContain(store.minted[0].token);
     expect(tail).toContain('[credential redacted]');
+  });
+
+  it('keeps the token out of the report, which is persisted and broadcast', async () => {
+    // The transcript was covered; the report was not. It is folded into the run record, written to
+    // disk and pushed over the websocket — and the credential is still live at the moment it is
+    // written, because expireRun fires afterwards.
+    const root = await tempDir();
+    const store = new RecordingStore('admin');
+    const { instance } = runner(root, { credentials: store, apiBase: () => 'http://127.0.0.1:4610' });
+    const { run } = await instance.dispatch(input(root, behaving('leaky')));
+    const final = await settled(root, run);
+
+    expect(final.report).toContain('Authorization: Bearer'); // the shim really did quote it
+    expect(final.report).not.toContain(store.minted[0].token);
+    expect(final.report).toContain('[credential redacted]');
   });
 
   it('says nothing about a credential when the runner has no store', async () => {

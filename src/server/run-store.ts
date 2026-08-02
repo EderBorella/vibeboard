@@ -186,13 +186,20 @@ export async function resolveCardRuns(
 
 // Fold a finished agent report into the record. Returns the updated record, or null when the agent
 // wrote nothing — the caller decides what a report-less run means.
+// `secret` is the run's credential, redacted out of the report before it is folded in. The report
+// becomes part of the run record, which is written to disk and broadcast over the websocket — so an
+// agent that quotes its own token there was persisting it, and `expireRun` fires after this, so the
+// value is live at the moment it is written and dead but permanent afterwards. The transcript was
+// already covered; this is the same leak through the other channel.
 export async function foldReport(
   root: string,
   record: RunRecord,
   finished: string,
+  secret?: string,
 ): Promise<RunRecord | null> {
-  const content = await takeAgentReport(root, record.run);
-  if (content === null) return null;
+  const raw = await takeAgentReport(root, record.run);
+  if (raw === null) return null;
+  const content = secret ? raw.replaceAll(secret, '[credential redacted]') : raw;
   const folded = withReport(record, parseAgentReport(content), finished);
   await writeRun(root, folded);
   return folded;

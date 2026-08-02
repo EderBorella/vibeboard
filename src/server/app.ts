@@ -85,7 +85,7 @@ export function buildApp(
   app.register(
     async (api) => {
       // First inside the scope, so it runs for every route below it and for nothing outside.
-      registerAuth(api, credentials);
+      registerAuth(api, credentials, () => session.root);
       await registerProjectRoutes(api, ctx);
       await registerConfigRoutes(api, ctx);
       await registerModelRoutes(api, ctx);

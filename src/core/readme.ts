@@ -28,19 +28,29 @@ export async function readmeGate(root: string): Promise<ReadmeGate> {
   }
   // Sorted, so a project holding both `README` and `README.md` resolves the same way every time
   // rather than by readdir order, which differs between filesystems.
-  const name = entries.filter((e) => README.test(e)).sort()[0];
-  if (!name) {
+  const candidates = entries.filter((e) => README.test(e)).sort();
+  if (candidates.length === 0) {
     return {
       ok: false,
       reason: 'This project has no README. Auto-pilot derives the whole feature list from it.',
     };
   }
-  let content: string;
-  try {
-    content = await readFile(join(root, name), 'utf8');
-  } catch {
-    // Matched by name and unreadable: a directory called README, or a permission problem. Either way
-    // there is nothing to derive from, and saying which file is what makes it fixable.
+  // Every candidate in turn, not just the first. `README` sorts before `README.md` ('' before '.'),
+  // so a repo with a `README/` DIRECTORY beside a real `README.md` failed the gate without ever
+  // opening the good file — the deterministic pick was committing to a name before knowing it read.
+  let name = candidates[0];
+  let content: string | undefined;
+  for (const candidate of candidates) {
+    try {
+      content = await readFile(join(root, candidate), 'utf8');
+      name = candidate;
+      break;
+    } catch {
+      /* a directory of that name, or a permission problem — try the next spelling */
+    }
+  }
+  if (content === undefined) {
+    // Named like a README and not one of them readable. Says which was tried first, so it is fixable.
     return { ok: false, reason: `${name} could not be read.` };
   }
   const size = content.replace(/\s+/g, '').length;

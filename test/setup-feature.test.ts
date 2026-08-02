@@ -75,9 +75,10 @@ describe('the setup feature barrier', () => {
 
   // Terminal is per board, so a subtree spanning three boards has to ask each card's own board.
   it('asks each board for its own terminal columns', () => {
-    const allDone = cards().map((c) =>
-      setupSubtreeIds(cards()).has(c.id) ? { ...c, columnSlug: 'done' } : c,
-    );
+    // The ids written out rather than computed by setupSubtreeIds, which is what the test above is
+    // separately verifying. A fixture built by the function under test can only constrain by accident.
+    const inSubtree = ['F-001', 'P-001', 'E-001', 'E-002'];
+    const allDone = cards().map((c) => (inSubtree.includes(c.id) ? { ...c, columnSlug: 'done' } : c));
     expect(setupState(allDone, TERMINAL)).toBe('finished');
     // Engineering finishes somewhere else now, and the engineering children are no longer terminal.
     expect(setupState(allDone, { ...TERMINAL, engineering: ['shipped'] })).toBe('unfinished');
@@ -135,9 +136,8 @@ describe('an unreadable card means unknown, not finished', () => {
   it('answers unknown even when the visible subtree looks complete', () => {
     // The unreadable file could be a child that extends the subtree, or a descendant sitting outside
     // a terminal column.
-    const allDone = cards().map((c) =>
-      setupSubtreeIds(cards()).has(c.id) ? { ...c, columnSlug: 'done' } : c,
-    );
+    const inSubtree = ['F-001', 'P-001', 'E-001', 'E-002'];
+    const allDone = cards().map((c) => (inSubtree.includes(c.id) ? { ...c, columnSlug: 'done' } : c));
     expect(setupState(allDone, TERMINAL)).toBe('finished');
     expect(setupState(allDone, TERMINAL, problems)).toBe('unknown');
   });

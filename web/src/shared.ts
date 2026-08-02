@@ -121,11 +121,15 @@ export interface ArchivedCard extends Card {
 }
 
 // Fields the PATCH /cards endpoint accepts (frontmatter subset + optional body).
+//
+// `links` is NOT among them: links are symmetric, so they go through PUT /cards/:board/:id/links,
+// which writes the far side and enforces one parent per card. Sending it here is ignored — and this
+// interface used to say otherwise, which is the kind of false contract that earns someone a silent
+// success.
 export interface CardFrontmatterPatch {
   title?: string;
   description?: string;
   tags?: string[];
-  links?: string[];
   group?: string;
   body?: string;
 }

@@ -4,7 +4,7 @@ import type { FastifyInstance } from 'fastify';
 import { boardColumnSlugs, readBoard } from '../../core/board.js';
 import { resolveCopilotSelection } from '../../core/copilot-choice.js';
 import { findCard } from '../../core/find.js';
-import { foundationStatus } from '../../core/foundation.js';
+import { foundationStatus, readGates } from '../../core/foundation.js';
 import { foundationRel } from '../../core/layout.js';
 import { BOARDS, type BoardName, type ProjectConfig } from '../../core/types.js';
 import type { DispatchInput } from '../agent-runner.js';
@@ -106,7 +106,12 @@ async function resolveDispatch(
   // Only the documents that exist. A path list naming a file that is not there teaches an agent that
   // the paths in this prompt are approximate, and the next one it cannot find it will not look for.
   const foundation = await foundationStatus(root);
-  const codeQuality = foundation.present.includes('CODE-QUALITY.md')
+  // Inlined under "the gates your work must pass, in full" only if it actually declares gates.
+  // `present` means the file exists and is non-empty — so a CODE-QUALITY.md of prose with no `gates:`
+  // frontmatter, or frontmatter that will not parse, was handed to the agent under a heading
+  // asserting it contained the bar, containing no bar. Readiness would refuse such a project, but
+  // nothing on the dispatch path consults readiness.
+  const codeQuality = (await readGates(root)).ok
     ? await readFile(join(root, foundationRel('CODE-QUALITY.md')), 'utf8')
     : undefined;
 

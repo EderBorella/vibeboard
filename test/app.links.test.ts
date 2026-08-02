@@ -95,6 +95,10 @@ describe('one parent per card', () => {
     return { app: project.app, p2 };
   }
 
+  // These two drive the ADMIN path deliberately — they are about the settings switch. Agent
+  // enforcement is pinned in test/auth.test.ts, which mints a work credential and expects a refusal
+  // with the switch off; deleting the agent half here would leave both of these passing. Noted because
+  // the coverage for this feature lives in two files and the split is not obvious from either.
   it('lets the browser link a product card to two features by default', async () => {
     const { app, p2 } = await twoFeatures();
     const res = await app.inject({

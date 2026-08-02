@@ -630,4 +630,24 @@ describe('POST /api/runs — the foundation', () => {
     expect(prompt).not.toContain('DESIGN.md');
     expect(prompt).not.toContain('TESTING.md');
   }, 30000);
+
+  it('does not claim to carry gates when the document declares none', async () => {
+    const argsLog = await recordingShimArgs();
+    const project = await projectWithCard();
+    // Exists and is non-empty, so `foundation.present` includes it — but there is no bar in it.
+    await project.app.inject({
+      method: 'PUT',
+      url: '/api/control/file',
+      payload: { path: `${FOUNDATION_DIR}/CODE-QUALITY.md`, content: '# Quality\n\nBe careful out there.\n' },
+    });
+
+    await dispatch(project);
+
+    const prompt = await promptFrom(argsLog);
+    // Still listed as a document to read — it is real, and the agent should see it.
+    expect(prompt).toContain(`- ${FOUNDATION_DIR}/CODE-QUALITY.md`);
+    // But not under a heading promising the gates it does not contain.
+    expect(prompt).not.toContain('The gates your work must pass');
+    expect(prompt).not.toContain('Be careful out there');
+  }, 30000);
 });

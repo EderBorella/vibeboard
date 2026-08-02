@@ -67,3 +67,33 @@ describe('the README gate', () => {
     expect(await readmeGate(root)).toEqual({ ok: false, reason: 'README could not be read.' });
   });
 });
+
+// `README` sorts before `README.md`, so committing to the first candidate meant a directory of that
+// name hid a perfectly good file behind it. Docs repos with a `README/` folder are uncommon, not
+// invented.
+describe('when more than one thing is named like a README', () => {
+  it('falls through a README directory to the real file', async () => {
+    const root = await tempDir();
+    await mkdir(join(root, 'README'));
+    await writeFile(join(root, 'README.md'), `# Thing\n\n${PROSE}\n`, 'utf8');
+    expect(await readmeGate(root)).toEqual({ ok: true, path: 'README.md' });
+  });
+
+  it('still refuses when every candidate is unreadable, naming the first', async () => {
+    const root = await tempDir();
+    await mkdir(join(root, 'README'));
+    await mkdir(join(root, 'readme.txt'));
+    expect(await readmeGate(root)).toEqual({ ok: false, reason: 'README could not be read.' });
+  });
+
+  // The thin one is still judged on its own content — falling through must not mean "keep looking
+  // until something passes", or a stub beside a directory would sneak through on the wrong file.
+  it('judges the first readable candidate rather than the best one', async () => {
+    const root = await tempDir();
+    await writeFile(join(root, 'README'), '# Thing\n', 'utf8');
+    await writeFile(join(root, 'README.md'), `# Thing\n\n${PROSE}\n`, 'utf8');
+    const gate = await readmeGate(root);
+    expect(gate.ok).toBe(false);
+    expect(gate.ok === false && gate.reason).toContain('README is 6 characters');
+  });
+});

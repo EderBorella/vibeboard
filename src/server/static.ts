@@ -17,13 +17,11 @@ export async function registerStatic(app: FastifyInstance): Promise<boolean> {
 
   await app.register(fastifyStatic, { root });
 
-  // SPA fallback: any non-API/WS route that isn't a real file returns index.html.
-  app.setNotFoundHandler((req, reply) => {
-    if (req.url.startsWith('/api') || req.url.startsWith('/ws')) {
-      return reply.code(404).send({ error: 'Not found' });
-    }
-    return reply.sendFile('index.html');
-  });
+  // SPA fallback: any non-API/WS route that isn't a real file returns index.html. Installed onto
+  // buildApp's single not-found handler rather than registering a second one — that handler exists
+  // to keep the credential in the launch URL out of the log, and it has to run in every mode,
+  // including the dev server that has no build for this function to reach.
+  app.spaFallback = (reply) => reply.sendFile('index.html');
 
   return true;
 }

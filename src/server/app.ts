@@ -7,7 +7,7 @@ import { ChatStore } from './chat-store.js';
 import { CopilotSession } from './copilot.js';
 import { createCopilotTurns } from './copilot-turns.js';
 import { CredentialStore } from './credentials.js';
-import { type Log, serverLogger } from './logging.js';
+import { type Log, serverLogger, stripSecrets, withRedaction } from './logging.js';
 import { attachOpencodeLogger } from './opencode-server.js';
 import type { AppCtx } from './route-context.js';
 import { registerCardRoutes } from './routes/cards.js';
@@ -20,6 +20,14 @@ import { registerRunRoutes } from './routes/runs.js';
 import { registerSkillRoutes } from './routes/skills.js';
 import type { ProjectSession } from './session.js';
 import { createBroadcaster, registerWs } from './ws.js';
+
+declare module 'fastify' {
+  interface FastifyInstance {
+    // Set by registerStatic when a built UI exists, so the one not-found handler below can serve
+    // the SPA without this module having to know whether there is a build.
+    spaFallback: ((reply: import('fastify').FastifyReply) => unknown) | null;
+  }
+}
 
 // Composition root: wire the session, copilot and chat store into one context, register the
 // WS channel, then mount each route group under /api. Route bodies live in ./routes.
@@ -37,7 +45,7 @@ export function buildApp(
     credentials?: CredentialStore;
   } = {},
 ): FastifyInstance {
-  const app = Fastify({ logger: opts.logger ?? serverLogger().options });
+  const app = Fastify({ logger: withRedaction(opts.logger ?? serverLogger().options) });
   const credentials = opts.credentials ?? new CredentialStore(randomUUID());
   // Each subsystem logs under its own `component`, so the file can be filtered by area:
   //   jq 'select(.component == "watcher")' logs/vibeboard-*.log
@@ -89,6 +97,18 @@ export function buildApp(
     },
     { prefix: '/api' },
   );
+
+  // Fastify's own 404 handler logs `Route GET:<url> not found` — the one line the request
+  // serializer cannot reach, and the launch URL carries a credential. Registered here rather than
+  // only in registerStatic, which runs solely when a UI build exists: `npm run dev` has no build,
+  // and a redaction that holds in production but not in development is not a redaction.
+  app.decorate('spaFallback', null);
+  app.setNotFoundHandler((req, reply) => {
+    req.log.info({ url: stripSecrets(req.url) }, 'route not found');
+    const isApp = !req.url.startsWith('/api') && !req.url.startsWith('/ws');
+    if (isApp && app.spaFallback) return app.spaFallback(reply);
+    return reply.code(404).send({ error: 'Not found' });
+  });
 
   return app;
 }

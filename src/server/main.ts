@@ -62,9 +62,12 @@ async function start(): Promise<void> {
   const reopened = await restoreLastProject(session);
   await app.listen({ port, host });
   const lan = isLoopback ? undefined : lanAddress();
-  // The token is in the link on purpose. The browser trades it for a stored credential on first
-  // visit; an agent that cannot read ~/.vibeboard/token and cannot read this terminal has no way
-  // to obtain it, which is the whole separation.
+  // The token is in the link on purpose: the browser trades it for a stored credential on first
+  // visit, and the terminal is the one channel an agent has no way to read.
+  //
+  // That is the intended separation, not the current one. Until the sandbox lands, the token file
+  // is readable by any agent — and the token is only kept out of the log because the request
+  // serializer strips it (logging.ts). It was not, and it was found sitting in a log file.
   const q = `?token=${admin}`;
   console.log(`\n  VibeBoard running`);
   console.log(`  → http://localhost:${port}/${q}${lan ? `\n  → http://${lan}:${port}/${q}  (LAN)` : ''}`);

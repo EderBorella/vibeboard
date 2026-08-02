@@ -2,7 +2,7 @@ import { mkdirSync, openSync, readdirSync, rmSync, writeSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { Writable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
-import type { FastifyServerOptions } from 'fastify';
+import type { FastifyRequest, FastifyServerOptions } from 'fastify';
 
 // Fastify's own default is `logger: false`, and that silence was the whole problem: a route that
 // threw answered 500 with nothing written anywhere, so a failure in the field left nothing to read
@@ -73,6 +73,35 @@ export interface ServerLogger {
   options: FastifyServerOptions['logger'];
   /** Where the lines are going, when that is a file. Reported in the startup banner. */
   file?: string;
+}
+
+// The admin credential travels in a query string — in the launch URL, and on the websocket
+// handshake, which cannot carry a header. Fastify's default serializer logs `req.url` verbatim, so
+// both were being written to a file in plaintext: a credential with no expiry, in the file the
+// README tells people to tail and paste when something misbehaves, inside the directory a sandboxed
+// agent is granted read access to. Stripped in one place so no future query parameter can be
+// forgotten here.
+export function stripSecrets(url: string): string {
+  const q = url.indexOf('?');
+  if (q === -1) return url;
+  const params = new URLSearchParams(url.slice(q + 1));
+  if (!params.has('token')) return url;
+  params.set('token', '[redacted]');
+  return `${url.slice(0, q)}?${params.toString()}`;
+}
+
+const serializers = {
+  req(req: FastifyRequest) {
+    return { method: req.method, url: stripSecrets(req.url), host: req.headers.host };
+  },
+};
+
+// Applied by the composition root to WHATEVER logger options it ends up with, not only the ones
+// built here. main.ts and the tests both pass their own, and a redaction that a caller can bypass
+// by supplying a logger is a redaction that will be bypassed.
+export function withRedaction(options: FastifyServerOptions['logger']): FastifyServerOptions['logger'] {
+  if (options === undefined || options === false || options === true) return options;
+  return { ...options, serializers: { ...serializers, ...options.serializers } };
 }
 
 // Building this OPENS the file and prunes old ones, so it is called once per process. `silent`

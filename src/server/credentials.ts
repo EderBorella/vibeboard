@@ -23,9 +23,13 @@ export function adminTokenFile(): string {
   return process.env.VIBEBOARD_TOKEN_FILE ?? join(homedir(), '.vibeboard', 'token');
 }
 
-// Read the browser's token, creating it on first use. Deliberately outside every project tree: the
-// sandbox denies agents read access to `~/.vibeboard`, and a token stored inside the project would
-// be readable by anything that can read a card — which is every agent, by design.
+// Read the browser's token, creating it on first use. Deliberately outside every project tree,
+// because a token stored inside the project is readable by anything that can read a card — which is
+// every agent, by design.
+//
+// Being outside is necessary, not sufficient: NOTHING denies an agent read access to
+// `~/.vibeboard/token` today. The sandbox that will is slice B, and until it lands the separation
+// this file describes is a plan rather than a protection.
 export async function adminToken(): Promise<string> {
   const file = adminTokenFile();
   try {

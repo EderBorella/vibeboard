@@ -11,7 +11,9 @@ import { join } from 'node:path';
 //  - Claude: CLAUDE_CONFIG_DIR → a dir with ONLY a symlink to the real credentials.
 //  - OpenCode: XDG_CONFIG_HOME → an empty dir (auth/db live in XDG_DATA_HOME, untouched).
 
-function copilotHome(): string {
+// Exported so the sandbox suite can assert this stays writable: the profile denies the admin token
+// by name rather than denying `~/.vibeboard/`, because both CLIs write their config in here.
+export function copilotHome(): string {
   return process.env.VIBEBOARD_COPILOT_HOME ?? join(homedir(), '.vibeboard', 'copilot');
 }
 

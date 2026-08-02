@@ -1,3 +1,4 @@
+import { spawn } from 'node:child_process';
 import { mkdtempSync } from 'node:fs';
 import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -8,10 +9,29 @@ import WebSocket from 'ws';
 import type { Card } from '../src/core/types.js';
 import { buildApp } from '../src/server/app.js';
 import { CredentialStore } from '../src/server/credentials.js';
+import { type SandboxStatus, wrapCommand } from '../src/server/sandbox.js';
 import { ProjectSession } from '../src/server/session.js';
 
 export async function tempDir(): Promise<string> {
   return mkdtemp(join(tmpdir(), 'vibeboard-'));
+}
+
+// Run a shell command the way an agent turn is run — through the sandbox wrapper, so what the test
+// observes is what a real run would hit. The exit code IS the assertion: a denial surfaces as a
+// non-zero exit and a message on stderr, never as a thrown error here.
+export function sh(status: SandboxStatus, script: string): Promise<{ code: number | null; stderr: string }> {
+  const { bin, args } = wrapCommand('/bin/sh', ['-c', script], status);
+  return new Promise((resolve) => {
+    const child = spawn(bin, args, { stdio: ['ignore', 'ignore', 'pipe'] });
+    let stderr = '';
+    // A missing `aa-exec` emits 'error', not a non-zero exit, and an unhandled one kills the worker
+    // rather than failing the test. Resolved like any other refusal, which is what the caller means.
+    child.on('error', (err) => resolve({ code: -1, stderr: String(err) }));
+    child.stderr?.on('data', (chunk: Buffer) => {
+      stderr += chunk.toString('utf8');
+    });
+    child.on('close', (code) => resolve({ code, stderr }));
+  });
 }
 
 // The mutation layer returns `'unknown-column'` rather than throwing. Fixtures that name a

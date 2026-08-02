@@ -1,0 +1,117 @@
+# VibeBoard's agent sandbox.
+#
+# An agent may build the project freely and may not touch what governs it. Written as allow-all
+# plus denies, because AppArmor evaluates denies first and an allow cannot override them — which is
+# precisely a read-only hole inside a writable hierarchy, and `.vibeboard/` lives inside the repo
+# the agent is here to write.
+#
+# Landlock was specified for this job and cannot do it: its rules union along a path rather than
+# override, so `rw <repo>` plus `ro <repo>/.vibeboard/boards` leaves the cards writable. Measured,
+# not assumed. `man 7 landlock`: "One policy layer grants access to a file path if at least one of
+# its rules encountered on the path grants the access."
+#
+# Globs, not paths: one profile serves every project, so opening a new one needs no reload and no
+# second sudo. Install with `npm run sandbox:install`, which prints the command rather than running
+# it.
+abi <abi/4.0>,
+include <tunables/global>
+
+profile vibeboard-agent flags=(attach_disconnected) {
+  # The base. Everything a real toolchain needs — node, npm, cargo, pip, git, the agent's own
+  # binary — without enumerating any of it. The denies below are the policy; this is its ground.
+  allow file rwlkm /**,
+  allow network,
+  allow unix,
+  allow mqueue,
+
+  # User namespaces, so the project's own tooling still works: Playwright and Puppeteer, rootless
+  # podman, and anything Chromium-based need one, and under
+  # `kernel.apparmor_restrict_unprivileged_userns=1` a confined process cannot create one unless its
+  # profile says so. Safe here only because `mount` is not granted — so the namespace cannot be used
+  # to bind-mount something else over `.vibeboard` and walk around every deny below.
+  allow userns,
+
+  # Scoped to this profile's own processes, not `allow ptrace` outright. An agent that can attach to
+  # the unconfined VibeBoard server can read the admin token out of its memory, and the only thing
+  # standing in the way today is a sysctl (`kernel.yama.ptrace_scope`) this profile does not set and
+  # must not depend on.
+  allow ptrace peer=vibeboard-agent,
+
+  # Signals: freely among the agent's own processes, and RECEIVE from unconfined. The receive half
+  # is not optional — VibeBoard is unconfined, and cancelling a run and enforcing the run timeout
+  # are both SIGTERM from it, so `peer=vibeboard-agent` alone would make a run uncancellable. What
+  # is withheld is the other direction: the agent cannot signal the server supervising it.
+  allow signal peer=vibeboard-agent,
+  allow signal (receive) peer=unconfined,
+
+  # No `allow dbus`. `systemd-run --user touch <anything>` asks the user's systemd over the session
+  # bus to start a process — a child of the UNCONFINED manager, so no deny here applies to it. That
+  # is a one-command escape, and few build toolchains need the session bus. A project that genuinely
+  # does can add it through the local include at the end.
+
+  # EVERY deny below names the container as well as its contents — `{,/**}`, not `/**`.
+  #
+  # This is not defensive punctuation. `/**` compiles to `[^/\x00][^\x00]*`, which requires at
+  # least one character, so `deny .../boards/** w` says nothing about the path `.../boards`
+  # itself. The directory was therefore renameable, and AppArmor mediates the RESOLVED path:
+  #
+  #     mv .vibeboard/boards /tmp/x && ln -s /tmp/x .vibeboard/boards
+  #
+  # left every card writable under a name no rule matched. Two commands, whole policy gone. Found
+  # in review by dumping `apparmor_parser -D rule-exprs` rather than reading the globs — which is
+  # also the only way to check this kind of change, because a wrong glob denies nothing and says
+  # nothing.
+  #
+  # `wl` rather than `w`: `l` is link, and a hard link into a denied hierarchy is the same bypass
+  # without the rename.
+
+  # The folder itself, so it cannot be moved out from under every rule below it. Denying the PATH
+  # does not deny creating things inside it — those are mediated on their own paths — so
+  # `runs/` stays writable, which the suite pins.
+  deny /**/.vibeboard{,/} wl,
+
+  # Cards AND run records. An agent that can rewrite results can reset its own attempt count, which
+  # turns a three-strike cap into no cap at all.
+  deny /**/.vibeboard/boards{,/**} wl,
+
+  # Authority: "any file that grants permission, defines a skill, sets a budget, or bounds a run
+  # must not be writable by the agent it governs."
+  deny /**/.vibeboard/config.yaml wl,
+  deny /**/.vibeboard/skills{,/**} wl,
+  deny /**/.vibeboard/foundation{,/**} wl,
+
+  # The two documents that shape every prompt. INSTRUCTIONS.md is injected into EVERY turn
+  # (agent-turn.ts reads it fresh each time) and VIBEBOARD.md is imported by both pointer files at
+  # the project root — so an agent that can write either one is editing the instructions of every
+  # subsequent turn, its own and the checkup's. That is squarely "bounds a run", and both were
+  # missing while `foundation/` above — which does not exist yet, and arrives with slice A — was
+  # already denied.
+  deny /**/.vibeboard/INSTRUCTIONS.md wl,
+  deny /**/.vibeboard/VIBEBOARD.md wl,
+
+  # The diary is appended through an endpoint by the auto-pilot service. An agent writing it
+  # directly would be a second path to the same fact, and an unattributable one.
+  deny /**/.vibeboard/PROJECT-LOG.md wl,
+
+  # The admin credential. This is the pairing the whole auth model rests on: scopes fail if the
+  # agent can read the browser's token off disk and call the API as the browser.
+  #
+  # The token deny names the FILE, not the folder: `~/.vibeboard/copilot` is the CLIs' own isolated
+  # config home (src/server/copilot-env.ts) and both backends must write it — and because a deny
+  # cannot be narrowed by a later allow, `deny @{HOME}/.vibeboard/** rw` would break every run on
+  # both backends. Every future secret therefore belongs in a token-prefixed path, never loose here.
+  #
+  # The folder gets its own deny for the reason above: `mv ~/.vibeboard ~/.vb2 && cat ~/.vb2/token`
+  # read the credential straight through, because only paths beginning `token` were named.
+  deny @{HOME}/.vibeboard{,/} wl,
+  deny @{HOME}/.vibeboard/token* rwl,
+
+  # Children stay confined. Without this the profile ends at the first exec and the agent's own
+  # bash tool walks straight out of it — which is the whole capability we are trying to bound.
+  allow pix /** -> &vibeboard-agent,
+
+  # Site-specific ADDITIONS, for a user who needs one more deny — or the D-Bus access withheld
+  # above. Not overrides: a later allow cannot narrow a deny, and that asymmetry is the property
+  # this entire profile rests on.
+  include if exists <local/vibeboard-agent>
+}

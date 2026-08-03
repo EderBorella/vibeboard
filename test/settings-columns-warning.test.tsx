@@ -13,6 +13,13 @@ const api = vi.hoisted(() => ({
   // is the honest thing for it to say when nothing answered.
   getReadiness: vi.fn().mockRejectedValue(new Error('not what this test is about')),
   getAccounting: vi.fn().mockRejectedValue(new Error('not what this test is about')),
+  // The panel also carries the stop controls, which read auto-pilot's state. Idle here: this file is
+  // about the columns warning and the caps, and an idle project is the state with nothing to stop.
+  getAutopilotState: vi
+    .fn()
+    .mockResolvedValue({ state: 'idle', iteration: 0, dispatchesSinceCheckup: 0, needsCheckup: false }),
+  softStopAutopilot: vi.fn(),
+  killAutopilot: vi.fn(),
 }));
 vi.mock('../web/src/api.js', () => api);
 

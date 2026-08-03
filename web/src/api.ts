@@ -498,6 +498,57 @@ export interface Accounting {
   cap: { cap: 'budget' | 'iterations'; why: string };
 }
 
+// --- Auto-pilot state and the three stops ----------------------------------
+// Mirrors src/core/autopilot-state.ts. Persisted on the server, because if `running` survives a
+// reload then `halted` must too — otherwise a refresh would bypass the overlay that explains it.
+
+export type AutopilotStateName = 'idle' | 'running' | 'stopped' | 'halted';
+
+// Every stop resolves to a named reason, and exactly ONE of them is a success. An exhausted budget
+// and a reached cap both end tidily and neither means the work is done.
+export type StopReason =
+  | 'stopped'
+  | 'killed'
+  | 'exhausted'
+  | 'capped'
+  | 'stalled'
+  | 'complete'
+  | 'interrupted'
+  | 'unreadable';
+
+export interface AutopilotState {
+  state: AutopilotStateName;
+  iteration: number;
+  dispatchesSinceCheckup: number;
+  needsCheckup: boolean;
+  reason?: StopReason;
+  detail?: string;
+  at?: string;
+  servicePgid?: number;
+  servicePgstart?: number;
+}
+
+export async function getAutopilotState(): Promise<AutopilotState> {
+  const res = await request('/api/autopilot/state');
+  if (!res.ok) throw new Error('Failed to read auto-pilot’s state');
+  return (await res.json()).state as AutopilotState;
+}
+
+// Stops dispatching. The app is untouched: chat, manual runs and the board all carry on.
+export function softStopAutopilot(detail?: string): Promise<{ state: AutopilotState }> {
+  return post('/api/autopilot/stop', detail ? { detail } : {});
+}
+
+// Kills everything in the project and halts it. A separate call from the soft stop rather than a flag
+// on it: one is reversible and the other kills work in flight.
+export function killAutopilot(detail?: string): Promise<{ state: AutopilotState }> {
+  return post('/api/autopilot/kill', detail ? { detail } : {});
+}
+
+export function restartAutopilot(): Promise<{ state: AutopilotState }> {
+  return post('/api/autopilot/restart', {});
+}
+
 export async function getAccounting(): Promise<Accounting> {
   const res = await request('/api/accounting');
   if (!res.ok) throw new Error('Failed to load this project’s usage');

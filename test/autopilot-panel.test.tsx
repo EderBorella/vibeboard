@@ -1,12 +1,20 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_AUTOPILOT } from '../src/core/autopilot.js';
 import { defaultConfig } from '../src/core/config.js';
 
 // The panel also asks for the ledger, to name the cap that will actually stop the run.
-const api = vi.hoisted(() => ({ getReadiness: vi.fn(), getAccounting: vi.fn() }));
+const api = vi.hoisted(() => ({
+  getReadiness: vi.fn(),
+  getAccounting: vi.fn(),
+  // The panel carries the stop controls, which read the state and act on it.
+  getAutopilotState: vi.fn(),
+  softStopAutopilot: vi.fn(),
+  killAutopilot: vi.fn(),
+}));
 vi.mock('../web/src/api.js', () => api);
+vi.mock('../web/src/api', () => api);
 
 const { AutopilotPanel } = await import('../web/src/components/AutopilotPanel.js');
 import type { Readiness } from '../web/src/api.js';
@@ -22,6 +30,12 @@ afterEach(() => {
 // Rejected by default: this file is about the routes and the blockers, and a panel that says it could
 // not read the ledger is the honest thing when nothing answered.
 api.getAccounting.mockRejectedValue(new Error('no ledger in this test'));
+api.getAutopilotState.mockResolvedValue({
+  state: 'idle',
+  iteration: 0,
+  dispatchesSinceCheckup: 0,
+  needsCheckup: false,
+});
 
 const readiness = (over: Partial<Readiness> = {}): Readiness => ({
   ok: true,
@@ -154,5 +168,68 @@ describe('the caps', () => {
     api.getReadiness.mockResolvedValue(readiness());
     render(<AutopilotPanel config={configWith(true)} />);
     expect(await screen.findByText(/Whichever of these is reached first/)).toBeTruthy();
+  });
+});
+
+// Two buttons rather than one with a modifier: one of these is reversible and the other kills work in
+// flight, and that difference should not live in a checkbox.
+describe('the stop controls', () => {
+  const button = (label: string): HTMLButtonElement =>
+    screen.getByText(label).closest('button') as HTMLButtonElement;
+
+  const withState = async (state: string) => {
+    api.getReadiness.mockResolvedValue(readiness());
+    api.getAutopilotState.mockResolvedValue({
+      state,
+      iteration: 0,
+      dispatchesSinceCheckup: 0,
+      needsCheckup: false,
+    });
+    render(<AutopilotPanel config={configWith(true)} />);
+    await screen.findAllByRole('row');
+    // The state arrives from its own fetch, a tick after the routes.
+    await waitFor(() => expect(api.getAutopilotState).toHaveBeenCalled());
+  };
+
+  it('offers no soft stop when there is nothing to stop', async () => {
+    await withState('idle');
+    await waitFor(() => expect(button('Soft stop').disabled).toBe(true));
+  });
+
+  it('offers the soft stop while auto-pilot is running', async () => {
+    await withState('running');
+    await waitFor(() => expect(button('Soft stop').disabled).toBe(false));
+    fireEvent.click(button('Soft stop'));
+    await waitFor(() => expect(api.softStopAutopilot).toHaveBeenCalled());
+  });
+
+  // Already halted: there is nothing left to kill, and the way back is the overlay's button.
+  it('offers no emergency stop on a halted project', async () => {
+    await withState('halted');
+    await waitFor(() => expect(button('Emergency stop').disabled).toBe(true));
+  });
+
+  // It kills every agent in the project. Asking first is the point, and nothing may happen before the
+  // question is answered.
+  it('asks before the emergency stop, and kills nothing while the question is open', async () => {
+    await withState('running');
+    fireEvent.click(button('Emergency stop'));
+    expect(await screen.findByText(/Kill everything in this project\?/)).toBeTruthy();
+    expect(api.killAutopilot).not.toHaveBeenCalled();
+  });
+
+  it('kills once the question is answered', async () => {
+    api.killAutopilot.mockResolvedValue({ state: { state: 'halted' } });
+    await withState('running');
+    fireEvent.click(button('Emergency stop'));
+    fireEvent.click(await screen.findByText('Kill everything'));
+    await waitFor(() => expect(api.killAutopilot).toHaveBeenCalled());
+  });
+
+  it('shows a refusal rather than swallowing it', async () => {
+    api.softStopAutopilot.mockRejectedValue(new Error('This project is halted. Restart it first.'));
+    await withState('running');
+    fireEvent.click(button('Soft stop'));
+    expect(await screen.findByText(/Restart it first/)).toBeTruthy();
   });
 });

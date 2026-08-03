@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, cleanup, screen } from '@testing-library/react';
+import type { AutopilotState, StopReason } from '../web/src/api.js';
 import { TopBar } from '../web/src/components/TopBar.js';
 
 afterEach(cleanup);
@@ -170,5 +171,64 @@ describe('TopBar visibility and labels', () => {
     render(<TopBar {...withProps({ conn: 'closed' })} />);
     const dot = screen.getByTitle('WebSocket closed');
     expect(dot.className).toContain('conn-closed');
+  });
+});
+
+// One word for what auto-pilot is doing. The load-bearing part is which stops read as a success:
+// "an error or an exhausted budget never counts as success", so `complete` is styled apart from the
+// rest rather than every ended run looking equally finished.
+describe('the auto-pilot chip', () => {
+  const state = (over: Partial<AutopilotState>): AutopilotState => ({
+    state: 'stopped',
+    iteration: 0,
+    dispatchesSinceCheckup: 0,
+    needsCheckup: false,
+    ...over,
+  });
+
+  const chip = (): HTMLElement | null => document.querySelector('.ap-chip');
+
+  it('says nothing at all while the project is idle', () => {
+    render(<TopBar {...props} autopilot={state({ state: 'idle' })} />);
+    expect(chip()).toBeNull();
+  });
+
+  it('says nothing before the first answer', () => {
+    render(<TopBar {...props} autopilot={null} />);
+    expect(chip()).toBeNull();
+  });
+
+  it('says when auto-pilot is running', () => {
+    render(<TopBar {...props} autopilot={state({ state: 'running' })} />);
+    expect(chip()?.textContent).toBe('auto-pilot running');
+    expect(chip()?.className).toContain('ap-running');
+  });
+
+  it('says halted, whatever the reason was', () => {
+    render(<TopBar {...props} autopilot={state({ state: 'halted', reason: 'killed' })} />);
+    expect(chip()?.textContent).toBe('halted');
+    expect(chip()?.className).toContain('ap-halted');
+  });
+
+  it('names the reason it stopped', () => {
+    render(<TopBar {...props} autopilot={state({ state: 'stopped', reason: 'exhausted' })} />);
+    expect(chip()?.textContent).toBe('exhausted');
+  });
+
+  // The line the study draws, on screen: only one of these ended with the work done.
+  it('styles only `complete` as a success', () => {
+    const reasons: StopReason[] = ['complete', 'exhausted', 'capped', 'stalled', 'stopped', 'interrupted'];
+    for (const reason of reasons) {
+      cleanup();
+      render(<TopBar {...props} autopilot={state({ state: 'stopped', reason })} />);
+      const success = chip()?.className.includes('ap-complete');
+      expect(success, reason).toBe(reason === 'complete');
+    }
+  });
+
+  // A halt carries the sentence that explains it; the chip is one word, so the sentence is the tooltip.
+  it('carries the detail as its tooltip', () => {
+    render(<TopBar {...props} autopilot={state({ state: 'halted', detail: 'You stopped everything.' })} />);
+    expect(chip()?.getAttribute('title')).toBe('You stopped everything.');
   });
 });

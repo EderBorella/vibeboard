@@ -1,3 +1,5 @@
+import type { AutopilotState } from '../api';
+
 // Add a theme here after adding its [data-theme] block in themes.css.
 const THEMES: { value: string; label: string }[] = [
   { value: 'cyberpunk', label: 'Cyberpunk' },
@@ -5,6 +7,17 @@ const THEMES: { value: string; label: string }[] = [
 ];
 
 export type MainTab = 'boards' | 'execution' | 'control' | 'explorer';
+
+// What auto-pilot is doing, in one word. `complete` is the ONLY stop styled as a success: an exhausted
+// budget, a reached cap and a stalled board all end tidily and none of them means the work is done —
+// "an error or an exhausted budget never counts as success".
+function chipFor(state: AutopilotState): { label: string; tone: string } | null {
+  if (state.state === 'idle') return null; // nothing to say, and a chip per tab would be noise
+  if (state.state === 'running') return { label: 'auto-pilot running', tone: 'running' };
+  if (state.state === 'halted') return { label: 'halted', tone: 'halted' };
+  const reason = state.reason ?? 'stopped';
+  return { label: reason, tone: reason === 'complete' ? 'complete' : 'stopped' };
+}
 
 interface Props {
   // False while loading, on the project gate, or with no project open — everything except the
@@ -22,6 +35,8 @@ interface Props {
   onToggleCopilot: () => void;
   onSettings: () => void;
   onSwitchProject: () => void;
+  // Absent until the first answer, and absent for a project with nothing to say.
+  autopilot?: AutopilotState | null;
   conn: string;
 }
 
@@ -37,12 +52,19 @@ export function TopBar({
   onToggleCopilot,
   onSettings,
   onSwitchProject,
+  autopilot,
   conn,
 }: Props) {
+  const chip = autopilot ? chipFor(autopilot) : null;
   return (
     <header className="topbar">
       <span className="brand">VibeBoard</span>
       {showProject && <span className="project-name">{projectName}</span>}
+      {showProject && chip && (
+        <span className={`ap-chip ap-${chip.tone}`} title={autopilot?.detail ?? chip.label}>
+          {chip.label}
+        </span>
+      )}
       {showProject && (
         <div className="topbar-tabs" role="group" aria-label="View">
           <button className={`tab-btn${tab === 'boards' ? ' active' : ''}`} onClick={() => onTab('boards')}>

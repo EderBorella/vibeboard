@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react';
-import { getReadiness, type Readiness } from '../api';
+import { getReadiness, killAutopilot, type Readiness, softStopAutopilot } from '../api';
+import { killProjectRequest } from '../confirm/requests';
+import { useConfirm } from '../confirm/useConfirm';
 import { useAccounting } from '../runs/useAccounting';
 import { type AutopilotConfig, BOARD_LABELS, type ProjectConfig } from '../shared';
+import { useAutopilot } from '../useAutopilot';
 
 // The lifecycle as it will actually be executed, plus what is stopping it.
 //
@@ -176,6 +179,8 @@ export function AutopilotPanel({
         · blocked cards go to {ap.blockedColumn} on engineering.
       </div>
 
+      <StopControls />
+
       <div className="settings-hint" style={{ marginTop: '0.6rem' }}>
         Before auto-pilot can start:
       </div>
@@ -189,6 +194,64 @@ export function AutopilotPanel({
           ))}
         </ul>
       )}
+    </>
+  );
+}
+
+// Soft stop and emergency stop. The way BACK from a halt is on the overlay rather than here, because a
+// halted project is not one you can reach Settings through.
+//
+// Two buttons rather than one with a modifier: one of these is reversible and the other kills work in
+// flight, and that difference should not live in a checkbox.
+function StopControls() {
+  const { state, refresh } = useAutopilot(0);
+  const { confirm, dialog } = useConfirm();
+  const [error, setError] = useState<string | null>(null);
+  const running = state?.state === 'running';
+  const halted = state?.state === 'halted';
+
+  const act = async (fn: () => Promise<unknown>): Promise<void> => {
+    setError(null);
+    try {
+      await fn();
+      refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  return (
+    <>
+      <div className="settings-section">Stopping</div>
+      <div className="settings-hint">
+        A soft stop leaves the app alone: chat, manual runs and the board carry on, and only dispatching
+        stops. An emergency stop kills every agent in this project and halts it until you restart it.
+      </div>
+      <div className="ap-controls">
+        <button
+          type="button"
+          className="btn-secondary"
+          // Nothing to stop when it is not running, and refused outright while halted.
+          disabled={!running}
+          onClick={() => void act(() => softStopAutopilot('You stopped it from Settings.'))}
+        >
+          Soft stop
+        </button>
+        <button
+          type="button"
+          className="btn-danger"
+          disabled={halted}
+          onClick={() => {
+            void confirm(killProjectRequest()).then((ok) => {
+              if (ok) void act(() => killAutopilot('You stopped everything from Settings.'));
+            });
+          }}
+        >
+          Emergency stop
+        </button>
+      </div>
+      {error && <div className="settings-error">{error}</div>}
+      {dialog}
     </>
   );
 }

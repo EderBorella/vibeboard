@@ -9,6 +9,7 @@ import {
   resolveRunRecord,
   setLinks,
 } from './api';
+import { HaltOverlay } from './components/HaltOverlay';
 import { ProjectGate } from './components/ProjectGate';
 import { SettingsModal } from './components/SettingsModal';
 import { type MainTab, TopBar } from './components/TopBar';
@@ -23,6 +24,7 @@ import { useRuns } from './runs/useRuns';
 import { needsAttention } from './runs/viewmodel';
 import { BOARDS, type BoardName, type Card, type CardFrontmatterPatch } from './shared';
 import { useSkills } from './skills/useSkills';
+import { useAutopilot } from './useAutopilot';
 import { useCopilotChoice } from './useCopilotChoice';
 import { useCollapsedBoards, useTheme } from './useLocalPrefs';
 import { useSnapshot } from './useSnapshot';
@@ -47,6 +49,9 @@ export function App() {
   const dock = useDock();
   const dragged = useRef<Card | null>(null);
   const { snapshot, conn } = useSnapshot(bump);
+  // Auto-pilot's state: the chip in the bar, and the overlay when the project is halted. From the
+  // endpoint on mount and from the socket after that, so a kill in another tab raises the overlay here.
+  const autopilot = useAutopilot(bump);
 
   // Copilot state lives here (not in the panel) so the transcript + socket survive
   // closing/reopening the dock. The server-side session persists regardless.
@@ -220,6 +225,7 @@ export function App() {
         onToggleCopilot={() => setCopilotOpen((v) => !v)}
         onSettings={() => setSettingsOpen(true)}
         onSwitchProject={() => setShowGate(true)}
+        autopilot={autopilot.state}
         conn={conn}
       />
 
@@ -231,6 +237,13 @@ export function App() {
           onClose={() => setSettingsOpen(false)}
           onSaved={() => setSettingsOpen(false)}
         />
+      )}
+
+      {/* Last in the shell and above everything, like the confirm dialog: a halted project is not a
+          state anything else in here should be reachable through. Only once a project is open — the
+          gate has nothing to halt. */}
+      {autopilot.state?.state === 'halted' && !showGate && (
+        <HaltOverlay state={autopilot.state} onRestarted={autopilot.refresh} />
       )}
 
       {dialog}

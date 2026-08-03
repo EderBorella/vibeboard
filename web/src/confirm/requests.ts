@@ -26,3 +26,15 @@ export function archiveCardRequest(card: Card): ConfirmRequest {
     action: 'Archive',
   };
 }
+
+// The emergency stop. Everything in the project dies — every agent, the backend server, and the loop
+// itself — and the project stays halted until someone restarts it, so the chat and manual runs stop
+// working too. That last part is the half people do not expect, which is why it is in the body.
+export function killProjectRequest(): ConfirmRequest {
+  return {
+    title: 'Kill everything in this project?',
+    body: 'Every agent working on this project is killed, and anything not already written to a report is lost. The project is then halted: the chat and manual runs will not work either until you restart it.',
+    action: 'Kill everything',
+    danger: true,
+  };
+}

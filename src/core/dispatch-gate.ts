@@ -23,6 +23,10 @@ export const STOP_REASONS = [
   'stalled', // work remains and nothing can move it
   'complete', // nothing eligible and nothing unfinished anywhere — the only success
   'interrupted', // the server died under it; a checkup is owed before it resumes
+  // Not a stop the loop chose: the state file itself could not be read, so the project is halted
+  // until a person says otherwise (S13). Named here so a halt always has a reason with a sentence
+  // behind it, rather than an overlay that can only say something went wrong.
+  'unreadable',
 ] as const;
 export type StopReason = (typeof STOP_REASONS)[number];
 
@@ -41,6 +45,8 @@ const SENTENCES: Record<StopReason, string> = {
   stalled: 'Auto-pilot stopped because work remains and nothing it can do would move it.',
   complete: 'Auto-pilot finished: nothing is eligible and nothing is unfinished.',
   interrupted: 'Auto-pilot was interrupted by a restart, so it owes this project a checkup.',
+  unreadable:
+    'This project is halted because VibeBoard could not read its auto-pilot state. Restart it to start again from idle.',
 };
 
 // The sentence a person reads, with the specifics appended. A reason on its own is a code; a code is

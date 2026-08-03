@@ -8,7 +8,7 @@ import {
   writeConfig,
 } from '../core/config.js';
 import { ensureControlFiles } from '../core/control.js';
-import { CHAT_DIR, PROJECT_LOG_FILE, RUNS_DIR } from '../core/layout.js';
+import { AUTOPILOT_STATE_FILE, CHAT_DIR, PROJECT_LOG_FILE, RUNS_DIR } from '../core/layout.js';
 import type { ProjectConfig } from '../core/types.js';
 import type { Log } from './logging.js';
 import { markInterrupted } from './run-store.js';
@@ -34,7 +34,11 @@ export function isIgnored(p: string): boolean {
     p.includes(`/${RUNS_DIR}`) ||
     // The diary changes nothing on the board, and it is appended through an endpoint — which can
     // broadcast the new line itself. Watching it would rebuild the whole snapshot once per line.
-    p.endsWith(`/${PROJECT_LOG_FILE}`)
+    p.endsWith(`/${PROJECT_LOG_FILE}`) ||
+    // Auto-pilot's counters change on every tick and nothing on the board depends on them. Watched,
+    // this would rebuild the whole snapshot once per dispatch; state changes are pushed over the
+    // websocket by whoever wrote them instead.
+    p.endsWith(`/${AUTOPILOT_STATE_FILE}`)
   );
 }
 

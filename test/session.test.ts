@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { boardColumnSlugs } from '../src/core/board.js';
 import {
+  AUTOPILOT_STATE_FILE,
   boardRel,
   CHAT_DIR,
   CONFIG_DIR,
@@ -84,6 +85,7 @@ describe('isIgnored', () => {
     `/p/${CHAT_DIR}`,
     `/p/${RUNS_DIR}/r1.log.jsonl`,
     `/p/${PROJECT_LOG_FILE}`,
+    `/p/${AUTOPILOT_STATE_FILE}`,
   ])('ignores %s', (p) => {
     expect(isIgnored(p)).toBe(true);
   });
@@ -97,6 +99,8 @@ describe('isIgnored', () => {
     '/p/my-node_modules-notes.md',
     // Same filename, a real file of the user's, one level down: the diary is one exact path.
     `/p/docs/${PROJECT_LOG_FILE.split('/').pop()}`,
+    // Same again for the state file: one exact path, not a filename anywhere in the tree.
+    `/p/docs/${AUTOPILOT_STATE_FILE.split('/').pop()}`,
   ])('watches %s', (p) => {
     expect(isIgnored(p)).toBe(false);
   });

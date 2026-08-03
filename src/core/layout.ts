@@ -50,6 +50,12 @@ export const RUNS_DIR = `${CONFIG_DIR}/runs`;
 // not be recorded at all: `parseRun` refuses a record with no card and no board.
 export const PROJECT_RUNS_DIR = `${CONFIG_DIR}/project-runs`;
 
+// Auto-pilot's own state: which state it is in, its counters, and why it stopped. JSON rather than
+// markdown because nothing reads it by hand, and written DIRECTLY by the auto-pilot service rather
+// than through the API — decision 20's one deliberate carve-out, since routing an iteration counter
+// through HTTP on every tick would be chatty for no gain.
+export const AUTOPILOT_STATE_FILE = `${CONFIG_DIR}/autopilot-state.json`;
+
 // Agent Suggestions: what an agent found but must not act on. Machine state like chat/ and runs/,
 // written only through the endpoint — the profile denies the agent this path, so the file layer is
 // not a second way in.

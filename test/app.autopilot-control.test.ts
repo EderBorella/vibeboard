@@ -1,6 +1,9 @@
+import { spawn } from 'node:child_process';
 import { describe, expect, it } from 'vitest';
 import { IDLE_STATE } from '../src/core/autopilot-state.js';
 import { readAutopilotState, writeAutopilotState } from '../src/server/autopilot-store.js';
+import { groupStartTime } from '../src/server/process-group.js';
+import { writeRun } from '../src/server/run-store.js';
 import { openTestProject } from './helpers.js';
 
 // Decision 12: three levels of stopping, and an explicit way back. Each one is a state on disk, so it
@@ -94,6 +97,37 @@ describe('the auto-pilot controls', () => {
       dispatchesSinceCheckup: 3,
     });
   });
+
+  // Decision 13's blast radius. `cancelAll` covers what this process holds handles for; the records
+  // cover what a PREVIOUS server left behind, and a halt that left those running would be a halt in
+  // name only.
+  it('kills a process group left behind by a previous server', async () => {
+    const { app, root } = await openTestProject();
+    const child = spawn('/bin/sh', ['-c', 'sleep 30'], { detached: true, stdio: 'ignore' });
+    const pgid = child.pid as number;
+    const closed = new Promise<void>((resolve) => child.on('close', () => resolve()));
+    await new Promise((r) => setTimeout(r, 100));
+    const pgstart = groupStartTime(pgid) as number;
+    await writeRun(root, {
+      run: '20260803-090000-zzzz',
+      card: 'E-001',
+      board: 'engineering',
+      skill: 'implement',
+      status: 'success', // ENDED, and its group still leaked: exactly the case cancelAll cannot see
+      started: '2026-08-03T09:00:00.000Z',
+      backend: 'claude-code',
+      model: 'opus',
+      effort: 'high',
+      mode: 'bypassPermissions',
+      pgid,
+      pgstart,
+      report: '',
+    });
+
+    await app.inject({ method: 'POST', url: '/api/autopilot/kill', payload: {} });
+    await closed;
+    expect(child.signalCode).toBe('SIGTERM');
+  }, 15_000);
 
   // Persistence is the whole point of the file: a reload must not be a way out of a halt.
   it('is still halted after the project is reopened', async () => {

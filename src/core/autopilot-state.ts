@@ -6,7 +6,7 @@ import { STOP_REASONS } from './dispatch-gate.js';
 // API, which is the one deliberate carve-out in decision 20.
 //
 // WHO OWNS WHAT, because two processes touch this file:
-//   the auto-pilot service  →  iteration, dispatchesSinceCheckup, needsCheckup, servicePgid
+//   the auto-pilot service  →  iteration, dispatchesSinceCheckup, needsCheckup, servicePgid/-start
 //   the main server         →  state, reason, detail, at  (the stops, and the startup reconcile)
 // Both go through a read-modify-write (server/autopilot-store.ts), so neither clobbers the other's
 // fields. When the service is dead — which is every case the main server cares about — there is only
@@ -29,7 +29,13 @@ export interface AutopilotState {
   // The auto-pilot service's own process group, recorded by the service when it starts. Read here so
   // an emergency stop can take the service down with everything else, and preserved by the reconcile
   // because the reaper runs straight after it.
+  //
+  // `servicePgstart` is the same pid-reuse guard the run records carry, and slice C should record both.
+  // Where it is absent the reaper falls back to requiring the pid to still BE a group leader — weaker,
+  // and allowed only here, because this group is killed by the server that spawned it rather than by
+  // one reading a file written long ago.
   servicePgid?: number;
+  servicePgstart?: number;
 }
 
 export const IDLE_STATE: AutopilotState = {
@@ -86,6 +92,9 @@ export function parseState(content: string): AutopilotState | 'unreadable' {
     ...(text(d.detail) ? { detail: text(d.detail) } : {}),
     ...(text(d.at) ? { at: text(d.at) } : {}),
     ...(typeof pgid === 'number' && Number.isInteger(pgid) && pgid > 1 ? { servicePgid: pgid } : {}),
+    ...(typeof d.servicePgstart === 'number' && Number.isInteger(d.servicePgstart) && d.servicePgstart > 0
+      ? { servicePgstart: d.servicePgstart }
+      : {}),
   };
 }
 

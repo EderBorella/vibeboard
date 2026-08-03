@@ -29,7 +29,7 @@ export interface AutopilotRuntimeOptions {
   // Everything an emergency stop must take down: the runner's agents, the managed OpenCode server,
   // and the recorded process groups. Injected rather than imported, so this class does not reach into
   // the runner and can be tested without one.
-  onKill?: () => void | Promise<void>;
+  onKill?: (state: AutopilotState) => void | Promise<void>;
   log?: Log;
 }
 
@@ -115,7 +115,7 @@ export class AutopilotRuntime {
     // some of the processes but recorded nothing would leave the app looking fine over a project whose
     // agents are gone — the worst of both.
     try {
-      await this.#opts.onKill?.();
+      await this.#opts.onKill?.(this.#mirror);
     } catch (err) {
       this.#opts.log?.error({ err }, 'emergency stop could not finish killing this project');
     }

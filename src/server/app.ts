@@ -15,6 +15,7 @@ import {
   attachSandbox,
   stopOpencodeServer,
 } from './opencode-server.js';
+import { groupsOf, reapGroups } from './reaper.js';
 import type { AppCtx } from './route-context.js';
 import { registerAutopilotRoutes } from './routes/autopilot.js';
 import { registerCardRoutes } from './routes/cards.js';
@@ -27,6 +28,7 @@ import { registerRunRoutes } from './routes/runs.js';
 import { registerSandboxRoutes } from './routes/sandbox.js';
 import { registerSkillRoutes } from './routes/skills.js';
 import { registerSuggestionRoutes } from './routes/suggestions.js';
+import { listRuns } from './run-store.js';
 import { NOT_REQUESTED, type SandboxStatus } from './sandbox.js';
 import type { ProjectSession } from './session.js';
 import { createBroadcaster, registerWs } from './ws.js';
@@ -109,10 +111,32 @@ export function buildApp(
     root: () => session.root,
     now: () => new Date(),
     onChange: (state) => broadcast({ type: 'autopilot:state', state }),
-    onKill: () => {
+    onKill: async (state) => {
+      // In this order, and the order is the point: stop the runner first so nothing new is spawned into
+      // the group we are about to reap, then the managed server, then everything recorded on disk.
       const stopped = runner.cancelAll();
       stopOpencodeServer();
-      log.warn({ stopped }, 'emergency stop: killed every run and the managed OpenCode server');
+      const root = session.root;
+      // Decision 13's full blast radius. `cancelAll` covers what THIS process holds handles for; the
+      // records cover what a previous one left behind, and the service is a project-related child like
+      // any other — Restart exists to bring it back.
+      const targets = [
+        ...(root ? groupsOf(await listRuns(root)) : []),
+        ...(state.servicePgid === undefined
+          ? []
+          : [
+              {
+                pgid: state.servicePgid,
+                ...(state.servicePgstart === undefined ? {} : { pgstart: state.servicePgstart }),
+                what: 'the auto-pilot service',
+              },
+            ]),
+      ];
+      const { reaped, skipped } = reapGroups(targets, { log });
+      log.warn(
+        { stopped, reaped, skipped },
+        'emergency stop: killed every run, the managed OpenCode server, and every process group still identifiable',
+      );
     },
     log: log.child({ component: 'autopilot' }),
   });

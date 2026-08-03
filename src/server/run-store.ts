@@ -14,6 +14,7 @@ import {
   withResolution,
 } from '../core/runs.js';
 import { BOARDS, type BoardName } from '../core/types.js';
+import { groupsOf, reapGroups } from './reaper.js';
 
 // Run records on disk.
 //
@@ -189,6 +190,11 @@ export function reportContract(run: string): string {
 export async function markInterrupted(root: string, at: string, live: string[] = []): Promise<number> {
   const running = new Set(live);
   const stale = (await listRuns(root)).filter((r) => isInFlight(r.status) && !running.has(r.run));
+  // Decision 13: reaping belongs on this path, because this is where "the server that spawned it is
+  // gone" is already established. A record's children USUALLY died with that server; when they did
+  // not, this record is the only account of what to kill, and each group is identified before it is
+  // signalled — see reaper.ts.
+  reapGroups(groupsOf(stale));
   for (const record of stale) {
     await writeRun(
       root,

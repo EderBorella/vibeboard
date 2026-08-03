@@ -86,6 +86,13 @@ export interface RunRecord {
   // Absent for OpenCode runs, which are HTTP requests to a managed server rather than processes.
   pgid?: number;
   pgstart?: number;
+  // How many files this run changed, measured from git around the dispatch (S11). A diagnostic the
+  // checkup reads beside turns, duration and cost: high cost with few turns and no files changed is
+  // an agent struggling, and that signature is only computable if the number is here.
+  //
+  // Absent when there was no answer — no repository, or no git — never 0. A project without git has
+  // not changed no files.
+  filesChanged?: number;
   report: string; // the body: the agent's report, verbatim
 }
 
@@ -177,6 +184,7 @@ export function serializeRun(record: RunRecord): string {
     'suggestions',
     'pgid',
     'pgstart',
+    'filesChanged',
   ] as const) {
     if (front[key] !== undefined) data[key] = front[key];
   }
@@ -193,24 +201,39 @@ export function withSuggestions(record: RunRecord, count: number | undefined): R
   return count === undefined ? record : { ...record, suggestions: count };
 }
 
+// Same shape and same reason as withSuggestions: zero is a real answer — a run that changed nothing —
+// and absence means there was no repository to ask. A `filesChanged: 0` invented for a project without
+// git would read as a run that did nothing, which is the opposite of what it would mean.
+export function withFilesChanged(record: RunRecord, count: number | undefined): RunRecord {
+  return count === undefined ? record : { ...record, filesChanged: count };
+}
+
 // Fields that are simply absent when unset, rather than present and empty. Gathered in loops
 // rather than a chain of conditional spreads: same behaviour, and a dozen ternaries in one
 // expression is what pushed parseRun past the complexity gate.
 const TEXT_OPTIONALS = ['finished', 'resolved', 'previous', 'prompt', 'summary', 'note'] as const;
 const LIST_OPTIONALS = ['attached', 'options', 'created'] as const;
 
+// Whole-number fields, each with the smallest value it may legitimately hold. One table rather than a
+// guard apiece: the floors are the only thing that differs, and three near-identical blocks pushed
+// parseRun past the complexity gate.
+//
+// The two counts may be genuinely zero — a run that filed no suggestions, a run that changed no files.
+// A pgid may not: 0 is our own process group and 1 is init, and signalling either would be
+// catastrophic, so the floor is 2 here as well as at the kill — a hand-edited record must not be able
+// to aim the reaper. A start time of 0 is not one either.
+const COUNT_OPTIONALS = [
+  { key: 'suggestions', min: 0 },
+  { key: 'filesChanged', min: 0 },
+  { key: 'pgid', min: 2 },
+  { key: 'pgstart', min: 1 },
+] as const;
+
 function optionalFields(d: Record<string, unknown>): Partial<RunRecord> {
   const out: Partial<RunRecord> = {};
-  // Same rule as RunUsage: zero is a fact worth keeping, NaN and negatives are not facts at all.
-  if (typeof d.suggestions === 'number' && Number.isFinite(d.suggestions) && d.suggestions >= 0) {
-    out.suggestions = d.suggestions;
-  }
-  // A pgid of 0 or 1 is not a run's group — 0 is our own and 1 is init — and either would be
-  // catastrophic to signal. Dropped here as well as guarded at the kill, because a hand-edited record
-  // must not be able to aim the reaper.
-  for (const key of ['pgid', 'pgstart'] as const) {
+  for (const { key, min } of COUNT_OPTIONALS) {
     const n = d[key];
-    if (typeof n === 'number' && Number.isInteger(n) && n > 1) out[key] = n;
+    if (typeof n === 'number' && Number.isInteger(n) && n >= min) out[key] = n;
   }
   if (isOutcome(d.outcome)) out.outcome = d.outcome;
   const usage = asUsage(d.usage);

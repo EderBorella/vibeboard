@@ -8,6 +8,7 @@ import { ChatStore } from './chat-store.js';
 import { CopilotSession } from './copilot.js';
 import { createCopilotTurns } from './copilot-turns.js';
 import { CredentialStore } from './credentials.js';
+import { REAL_GIT } from './git-measure.js';
 import { type Log, serverLogger, stripSecrets, withRedaction } from './logging.js';
 import {
   attachHaltGate,
@@ -101,6 +102,9 @@ export function buildApp(
     apiBase: () => `http://127.0.0.1:${process.env.VIBEBOARD_PORT ?? 4610}`,
     bin: opts.runBin,
     sandbox: opts.sandbox,
+    // S11's files-changed. Real git here; tests that are about something else pass none and the field
+    // is absent, which is what it means when there is no repository to ask.
+    git: REAL_GIT,
     onUpdate: (record) => broadcast({ type: 'run:update', record }),
     log: log.child({ component: 'runner' }),
   });

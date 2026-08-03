@@ -297,6 +297,72 @@ describe('AgentRunner.dispatch', () => {
     expect(alive(grandchild)).toBe(false);
   }, 20_000);
 
+  // S11. The measurement itself is tested in git-measure.test.ts; what this pins is the WIRING — that
+  // the point is taken before the agent runs and the count reaches the record on both endings, since a
+  // failed run's wreckage is exactly when you want to know what it touched.
+  describe('how many files a run changed', () => {
+    const fakeGit = (count: number | undefined) => ({
+      point: async () => ({ dirty: {} }),
+      changedSince: async () => count,
+    });
+
+    it('is recorded on a run that succeeded', async () => {
+      const root = await tempDir();
+      const { instance } = runner(root, { git: fakeGit(7) });
+      const { run } = await instance.dispatch(input(root));
+      expect((await settled(root, run)).filesChanged).toBe(7);
+    });
+
+    it('is recorded on a run that failed', async () => {
+      const root = await tempDir();
+      const { instance } = runner(root, { git: fakeGit(2) });
+      const { run } = await instance.dispatch(input(root, behaving('crash')));
+      const final = await settled(root, run);
+      expect(final.status).toBe('failed');
+      expect(final.filesChanged).toBe(2);
+    });
+
+    // Zero is a real answer: the run changed nothing.
+    it('records a genuine zero', async () => {
+      const root = await tempDir();
+      const { instance } = runner(root, { git: fakeGit(0) });
+      const { run } = await instance.dispatch(input(root));
+      expect((await settled(root, run)).filesChanged).toBe(0);
+    });
+
+    // No repository to ask, or no git. The record must not claim the run touched nothing.
+    it('is absent when there was no answer', async () => {
+      const root = await tempDir();
+      const { instance } = runner(root, { git: fakeGit(undefined) });
+      const { run } = await instance.dispatch(input(root));
+      expect((await settled(root, run)).filesChanged).toBeUndefined();
+    });
+
+    it('is absent when nothing measures it at all', async () => {
+      const root = await tempDir();
+      const { instance } = runner(root);
+      const { run } = await instance.dispatch(input(root));
+      expect((await settled(root, run)).filesChanged).toBeUndefined();
+    });
+
+    // A diagnostic must never fail the run it describes.
+    it('survives a measurement that throws', async () => {
+      const root = await tempDir();
+      const { instance } = runner(root, {
+        git: {
+          point: async () => ({ dirty: {} }),
+          changedSince: async () => {
+            throw new Error('git exploded');
+          },
+        },
+      });
+      const { run } = await instance.dispatch(input(root));
+      const final = await settled(root, run);
+      expect(final.status).toBe('success');
+      expect(final.filesChanged).toBeUndefined();
+    });
+  });
+
   // S1, and Principle 3: absence and zero are different facts, and so are "the agent says it worked"
   // and "the agent got to finish". foldReport took `status` from the report's own `outcome`, so a
   // runaway that declared success and then hung was recorded as a SUCCESS — breaking the

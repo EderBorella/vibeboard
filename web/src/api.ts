@@ -426,6 +426,8 @@ export interface RunRecord {
   // VibeBoard's explanation when there is no report to speak for the run.
   note?: string;
   usage?: RunUsage; // what it cost, when the backend said
+  suggestions?: number; // how many findings it filed; absent means the count could not be taken
+  filesChanged?: number; // measured from git; absent means there was no answer, never zero
   report: string;
 }
 

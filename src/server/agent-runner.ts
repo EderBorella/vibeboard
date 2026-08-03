@@ -3,6 +3,7 @@ import {
   type RunRecord,
   type RunUsage,
   runId,
+  withFilesChanged,
   withoutReport,
   withSuggestions,
   withUsage,
@@ -12,6 +13,7 @@ import type { BoardName, Card } from '../core/types.js';
 import { type Backend, type RunningTurn, runAgentTurn } from './agent-turn.js';
 import type { ResultStats } from './copilot-events.js';
 import type { Credential, CredentialStore } from './credentials.js';
+import type { GitMeasure, GitPoint } from './git-measure.js';
 import type { Log } from './logging.js';
 import { type BoardColumns, buildRunPrompt } from './run-prompt.js';
 import {
@@ -87,6 +89,10 @@ export interface RunnerOptions {
   apiBase?: () => string;
   // Called whenever a record changes on disk, so the WS layer can push it without polling.
   onUpdate?: (record: RunRecord) => void;
+  // How files-changed is measured (S11). Injected so a test about something else neither needs git nor
+  // pays for it: without one the field is simply absent, which is exactly what it means when there is
+  // no repository to ask.
+  git?: GitMeasure;
   // A run outlives the request that dispatched it, so there is no request logger to reach for when
   // one of its background writes fails. Optional: a runner without one behaves exactly as before.
   log?: Log;
@@ -99,6 +105,10 @@ interface Active {
   // "still running after Ns" quote a limit this run was never held to, because Settings may have
   // changed while it ran.
   timeoutMs: number;
+  // The working tree as it was when this run started. A PROMISE rather than a value: the point is
+  // taken when the turn is spawned, which is a synchronous path, and a run can finish before git has
+  // answered. Awaited at settle, so there is no race to lose.
+  gitAt: Promise<GitPoint | undefined>;
 }
 
 // A dispatch that arrived while every slot was taken. Held in memory only: a queued record is on
@@ -296,7 +306,8 @@ export class AgentRunner {
         );
       },
     });
-    this.#active.set(run, { turn, cancelled: false, timeoutMs });
+    const gitAt = this.#opts.git?.point(root) ?? Promise.resolve(undefined);
+    this.#active.set(run, { turn, cancelled: false, timeoutMs, gitAt });
 
     // The group, recorded on the run. A second write rather than part of the dispatch record, because
     // the pgid only exists once the process does — the same shape as the queued→running transition.
@@ -352,6 +363,19 @@ export class AgentRunner {
     }
   }
 
+  // How many files this run changed. Like the suggestion count, a failure here must not fail the run —
+  // it is a diagnostic, not the outcome — and it returns `undefined` rather than 0, so the record says
+  // "no answer" instead of claiming the run touched nothing.
+  async #measured(root: string, at: Promise<GitPoint | undefined> | undefined): Promise<number | undefined> {
+    if (!at || !this.#opts.git) return undefined;
+    try {
+      return await this.#opts.git.changedSince(root, await at);
+    } catch (err) {
+      this.#opts.log?.warn({ err }, 'could not measure how many files this run changed');
+      return undefined;
+    }
+  }
+
   async #settle(
     root: string,
     run: string,
@@ -369,9 +393,9 @@ export class AgentRunner {
       await this.#transcripts.get(run);
       // Attached here, once, so BOTH endings carry it: a run that failed or was cancelled still
       // spent tokens, and that is exactly when you want to know how many.
-      const spent = withSuggestions(
-        withUsage(record, usageFromStats(result.stats)),
-        await this.#filed(root, run),
+      const spent = withFilesChanged(
+        withSuggestions(withUsage(record, usageFromStats(result.stats)), await this.#filed(root, run)),
+        await this.#measured(root, active?.gitAt),
       );
       // S1: a run the USER stopped, or one the clock killed, does not get to decide its own verdict.
       // `foldReport` takes `status` from the agent's own `outcome`, so a runaway that wrote

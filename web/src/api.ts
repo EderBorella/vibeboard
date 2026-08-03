@@ -458,10 +458,50 @@ export async function listRuns(): Promise<RunList> {
   return res.json() as Promise<RunList>;
 }
 
-export async function listCardRuns(board: BoardName, card: string): Promise<RunRecord[]> {
+// What a project or a card has spent. Mirrors Spend in src/core/accounting.ts: `costUsd` is ABSENT
+// when not one run reported a cost, which is not the same as zero and must not render the same way.
+export interface Spend {
+  runs: number;
+  withCost: number;
+  withoutCost: number;
+  costUsd?: number;
+  outputTokens?: number;
+  durationMs?: number;
+}
+
+// One card's line in the ledger: what it cost, and how many attempts each skill has used against the
+// cap. Per skill because that is how the cap is counted — a critic run must not inflate the tally of
+// the skill doing the work.
+export interface CardAccount {
+  spend: Spend;
+  attempts: Record<string, number>;
+  attemptCap: number;
+}
+
+export interface CardRuns {
+  runs: RunRecord[];
+  account: CardAccount;
+}
+
+export async function listCardRuns(board: BoardName, card: string): Promise<CardRuns> {
   const res = await request(`/api/runs/${board}/${encodeURIComponent(card)}`);
   if (!res.ok) throw new Error('Failed to load this card’s runs');
-  return (await res.json()).runs as RunRecord[];
+  return (await res.json()) as CardRuns;
+}
+
+export interface Accounting {
+  project: Spend;
+  cards: { board: BoardName; card: string; spend: Spend; attempts: Record<string, number> }[];
+  attemptCap: number;
+  // Which cap is actually bounding this project (S10). A dollar dial that can never trip tells the
+  // user the opposite of the truth about what will stop the run.
+  cap: { cap: 'budget' | 'iterations'; why: string };
+}
+
+export async function getAccounting(): Promise<Accounting> {
+  const res = await request('/api/accounting');
+  if (!res.ok) throw new Error('Failed to load this project’s usage');
+  return (await res.json()) as Accounting;
 }
 
 export function dispatchRun(body: DispatchRequest): Promise<{ run: RunRecord }> {

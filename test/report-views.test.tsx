@@ -2,7 +2,7 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DOCS_DIR, RESOURCES_DIR, skillRel } from '../src/core/layout.js';
-import type { RunRecord } from '../web/src/api.js';
+import type { CardAccount, RunRecord } from '../web/src/api.js';
 import { ActiveReport } from '../web/src/components/ActiveReport.js';
 import { CardReports } from '../web/src/components/CardReports.js';
 import { ReportPane } from '../web/src/components/ReportPane.js';
@@ -58,7 +58,7 @@ const run = (over: Partial<RunRecord> = {}): RunRecord => ({
 
 describe('CardReports', () => {
   it('renders nothing at all for a card that has never been run', () => {
-    const { container } = render(<CardReports runs={[]} onOpen={vi.fn()} onCancel={vi.fn()} />);
+    const { container } = render(<CardReports runs={[]} account={null} onOpen={vi.fn()} onCancel={vi.fn()} />);
     expect(container.innerHTML).toBe('');
   });
 
@@ -67,6 +67,7 @@ describe('CardReports', () => {
     render(
       <CardReports
         runs={[run({ run: 'a', skill: 'research' }), run({ run: 'b', skill: 'execute' })]}
+        account={null}
         onOpen={vi.fn()}
         onCancel={vi.fn()}
       />,
@@ -86,6 +87,7 @@ describe('CardReports', () => {
           run({ run: 'a', status: 'attention' }),
           run({ run: 'b', status: 'attention', resolved: '2026-07-26T21:30:00.000Z' }),
         ]}
+        account={null}
         onOpen={vi.fn()}
         onCancel={vi.fn()}
       />,
@@ -103,6 +105,7 @@ describe('CardReports', () => {
     render(
       <CardReports
         runs={[run({ started: '2026-07-26T14:30:12.000Z', finished: '2026-07-26T14:41:55.000Z' })]}
+        account={null}
         onOpen={vi.fn()}
         onCancel={vi.fn()}
       />,
@@ -114,6 +117,7 @@ describe('CardReports', () => {
     render(
       <CardReports
         runs={[run({ status: 'running', started: '2026-07-26T14:30:12.000Z', finished: undefined })]}
+        account={null}
         onOpen={vi.fn()}
         onCancel={vi.fn()}
       />,
@@ -125,6 +129,7 @@ describe('CardReports', () => {
     render(
       <CardReports
         runs={[run({ usage: { costUsd: 0.0421 } }), run({ run: 'r2', usage: undefined })]}
+        account={null}
         onOpen={vi.fn()}
         onCancel={vi.fn()}
       />,
@@ -137,7 +142,7 @@ describe('CardReports', () => {
 
   it('shows a free run as $0 rather than as unknown', () => {
     render(
-      <CardReports runs={[run({ usage: { costUsd: 0 } })]} onOpen={vi.fn()} onCancel={vi.fn()} />,
+      <CardReports runs={[run({ usage: { costUsd: 0 } })]} account={null} onOpen={vi.fn()} onCancel={vi.fn()} />,
     );
     expect(document.querySelector('.report-cost')?.textContent).toBe('$0');
   });
@@ -146,6 +151,7 @@ describe('CardReports', () => {
     render(
       <CardReports
         runs={[run({ summary: undefined, note: undefined })]}
+        account={null}
         onOpen={vi.fn()}
         onCancel={vi.fn()}
       />,
@@ -160,6 +166,7 @@ describe('CardReports', () => {
           run({ run: 'a', summary: 'did the thing', note: 'ignored' }),
           run({ run: 'b', summary: undefined, note: 'The agent finished without writing a report.' }),
         ]}
+        account={null}
         onOpen={vi.fn()}
         onCancel={vi.fn()}
       />,
@@ -183,6 +190,7 @@ describe('CardReports', () => {
     render(
       <CardReports
         runs={[run({ status: status as RunRecord['status'] })]}
+        account={null}
         onOpen={vi.fn()}
         onCancel={vi.fn()}
       />,
@@ -194,6 +202,7 @@ describe('CardReports', () => {
     render(
       <CardReports
         runs={[run({ status: 'running', skill: 'research' })]}
+        account={null}
         onOpen={vi.fn()}
         onCancel={vi.fn()}
       />,
@@ -211,6 +220,7 @@ describe('CardReports', () => {
           run({ run: 'c', status: 'failed' }),
           run({ run: 'd', status: 'interrupted' }),
         ]}
+        account={null}
         onOpen={vi.fn()}
         onCancel={vi.fn()}
       />,
@@ -230,6 +240,7 @@ describe('CardReports', () => {
           run({ run: 'a', summary: 'did the thing' }),
           run({ run: 'b', summary: undefined, note: 'The agent finished without writing a report.' }),
         ]}
+        account={null}
         onOpen={vi.fn()}
         onCancel={vi.fn()}
       />,
@@ -241,7 +252,7 @@ describe('CardReports', () => {
   it('opens the report it was clicked on', () => {
     const onOpen = vi.fn();
     const first = run({ run: 'a' });
-    render(<CardReports runs={[first, run({ run: 'b' })]} onOpen={onOpen} onCancel={vi.fn()} />);
+    render(<CardReports runs={[first, run({ run: 'b' })]} account={null} onOpen={onOpen} onCancel={vi.fn()} />);
     fireEvent.click(document.querySelectorAll<HTMLElement>('.report-open')[1]);
     expect(onOpen.mock.calls).toEqual([[first]]);
   });
@@ -250,6 +261,7 @@ describe('CardReports', () => {
     render(
       <CardReports
         runs={[run({ run: 'a', status: 'running' }), run({ run: 'b', status: 'success' })]}
+        account={null}
         onOpen={vi.fn()}
         onCancel={vi.fn()}
       />,
@@ -260,7 +272,7 @@ describe('CardReports', () => {
   it('stops the run it was asked to stop', () => {
     const onCancel = vi.fn();
     const live = run({ run: 'a', status: 'running' });
-    render(<CardReports runs={[live]} onOpen={vi.fn()} onCancel={onCancel} />);
+    render(<CardReports runs={[live]} account={null} onOpen={vi.fn()} onCancel={onCancel} />);
     fireEvent.click(screen.getByText('Stop'));
     expect(onCancel.mock.calls).toEqual([[live]]);
   });
@@ -591,5 +603,56 @@ describe('ActiveReport', () => {
       />,
     );
     expect((screen.getByText('Split it') as HTMLButtonElement).disabled).toBe(true);
+  });
+});
+
+// A card's own line in the ledger. The attempt count is the number that decides whether auto-pilot
+// will try again, so it is shown against the cap rather than as a bare tally.
+describe('a card’s ledger line', () => {
+  const account = (over: Partial<CardAccount> = {}): CardAccount => ({
+    spend: { runs: 2, withCost: 2, withoutCost: 0, costUsd: 0.42 },
+    attempts: { implement: 2 },
+    attemptCap: 3,
+    ...over,
+  });
+
+  it('shows what the card cost and how close a skill is to its cap', () => {
+    render(<CardReports runs={[run()]} account={account()} onOpen={vi.fn()} onCancel={vi.fn()} />);
+    const line = document.querySelector('.reports-ledger')?.textContent ?? '';
+    expect(line).toContain('$0.420 usage');
+    expect(line).toContain('implement 2 of 3');
+  });
+
+  // A skill with no burned attempts is not news, and listing every skill that ever ran would bury the
+  // one approaching its cap.
+  it('leaves out a skill that has burned nothing', () => {
+    render(
+      <CardReports
+        runs={[run()]}
+        account={account({ attempts: { implement: 2, critic: 0 } })}
+        onOpen={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+    const line = document.querySelector('.reports-ledger')?.textContent ?? '';
+    expect(line).toContain('implement 2 of 3');
+    expect(line).not.toContain('critic');
+  });
+
+  it('says the backend reported nothing rather than showing zero', () => {
+    render(
+      <CardReports
+        runs={[run()]}
+        account={account({ spend: { runs: 1, withCost: 0, withoutCost: 1 } })}
+        onOpen={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+    expect(document.querySelector('.reports-ledger')?.textContent).toContain('not reported');
+  });
+
+  it('renders no line at all before the ledger has arrived', () => {
+    render(<CardReports runs={[run()]} account={null} onOpen={vi.fn()} onCancel={vi.fn()} />);
+    expect(document.querySelector('.reports-ledger')).toBeNull();
   });
 });

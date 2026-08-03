@@ -8,8 +8,10 @@ vi.mock('../web/src/api', () => api);
 
 const { useCardRuns } = await import('../web/src/runs/useCardRuns.js');
 
-const runs = (...ids: string[]) =>
-  ids.map((run) => ({
+// The endpoint answers with the runs AND that card's ledger line, so the mock has to as well: a mock
+// keyed differently from the real thing tests a shape nothing serves.
+const body = (...ids: string[]) => ({
+  runs: ids.map((run) => ({
     run,
     card: 'E-001',
     board: 'engineering' as const,
@@ -21,61 +23,63 @@ const runs = (...ids: string[]) =>
     effort: 'medium',
     mode: 'build',
     report: '',
-  }));
+  })),
+  account: { spend: { runs: ids.length, withCost: 0, withoutCost: ids.length }, attempts: {}, attemptCap: 3 },
+});
 
 beforeEach(() => api.listCardRuns.mockReset());
 
 describe('useCardRuns', () => {
   it('asks for the card in front of you, by board and id', async () => {
-    api.listCardRuns.mockResolvedValue(runs('r1'));
+    api.listCardRuns.mockResolvedValue(body('r1'));
     const { result } = renderHook(() => useCardRuns('product', 'P-007', 0));
-    await waitFor(() => expect(result.current.map((r) => r.run)).toEqual(['r1']));
+    await waitFor(() => expect(result.current.runs.map((r) => r.run)).toEqual(['r1']));
     expect(api.listCardRuns).toHaveBeenCalledWith('product', 'P-007');
   });
 
   it('fetches nothing when there is no card open', () => {
     // The dock renders with no card selected; a request for `undefined` would 404 on every mount.
-    api.listCardRuns.mockResolvedValue(runs('r1'));
+    api.listCardRuns.mockResolvedValue(body('r1'));
     const { result } = renderHook(() => useCardRuns(undefined, undefined, 0));
-    expect(result.current).toEqual([]);
+    expect(result.current.runs).toEqual([]);
     expect(api.listCardRuns).not.toHaveBeenCalled();
   });
 
   it('clears the previous card’s runs when the card closes', async () => {
     // Not merely "does not fetch": the runs of the card you just closed must not linger under the
     // next thing you open.
-    api.listCardRuns.mockResolvedValue(runs('r1'));
+    api.listCardRuns.mockResolvedValue(body('r1'));
     const { result, rerender } = renderHook(
       ({ card }: { card: string | undefined }) => useCardRuns('engineering', card, 0),
       { initialProps: { card: 'E-001' as string | undefined } },
     );
-    await waitFor(() => expect(result.current.map((r) => r.run)).toEqual(['r1']));
+    await waitFor(() => expect(result.current.runs.map((r) => r.run)).toEqual(['r1']));
     rerender({ card: undefined });
-    expect(result.current).toEqual([]);
+    expect(result.current.runs).toEqual([]);
   });
 
   it('refetches when the card changes', async () => {
-    api.listCardRuns.mockResolvedValueOnce(runs('r1')).mockResolvedValueOnce(runs('r2'));
+    api.listCardRuns.mockResolvedValueOnce(body('r1')).mockResolvedValueOnce(body('r2'));
     const { result, rerender } = renderHook(({ card }) => useCardRuns('engineering', card, 0), {
       initialProps: { card: 'E-001' },
     });
-    await waitFor(() => expect(result.current.map((r) => r.run)).toEqual(['r1']));
+    await waitFor(() => expect(result.current.runs.map((r) => r.run)).toEqual(['r1']));
     rerender({ card: 'E-002' });
-    await waitFor(() => expect(result.current.map((r) => r.run)).toEqual(['r2']));
+    await waitFor(() => expect(result.current.runs.map((r) => r.run)).toEqual(['r2']));
   });
 
   it('refetches when the trigger changes, so a finishing run appears without a reload', async () => {
-    api.listCardRuns.mockResolvedValueOnce(runs('r1')).mockResolvedValueOnce(runs('r1', 'r2'));
+    api.listCardRuns.mockResolvedValueOnce(body('r1')).mockResolvedValueOnce(body('r1', 'r2'));
     const { result, rerender } = renderHook(({ t }) => useCardRuns('engineering', 'E-001', t), {
       initialProps: { t: 0 },
     });
-    await waitFor(() => expect(result.current.map((r) => r.run)).toEqual(['r1']));
+    await waitFor(() => expect(result.current.runs.map((r) => r.run)).toEqual(['r1']));
     rerender({ t: 1 });
-    await waitFor(() => expect(result.current.map((r) => r.run)).toEqual(['r1', 'r2']));
+    await waitFor(() => expect(result.current.runs.map((r) => r.run)).toEqual(['r1', 'r2']));
   });
 
   it('does not refetch when nothing changed', async () => {
-    api.listCardRuns.mockResolvedValue(runs('r1'));
+    api.listCardRuns.mockResolvedValue(body('r1'));
     const { rerender } = renderHook(({ t }) => useCardRuns('engineering', 'E-001', t), {
       initialProps: { t: 0 },
     });
@@ -85,14 +89,14 @@ describe('useCardRuns', () => {
   });
 
   it('keeps what it had when a refetch fails, rather than blanking the section', async () => {
-    api.listCardRuns.mockResolvedValueOnce(runs('r1')).mockRejectedValueOnce(new Error('offline'));
+    api.listCardRuns.mockResolvedValueOnce(body('r1')).mockRejectedValueOnce(new Error('offline'));
     const { result, rerender } = renderHook(({ t }) => useCardRuns('engineering', 'E-001', t), {
       initialProps: { t: 0 },
     });
-    await waitFor(() => expect(result.current.map((r) => r.run)).toEqual(['r1']));
+    await waitFor(() => expect(result.current.runs.map((r) => r.run)).toEqual(['r1']));
     rerender({ t: 1 });
     await waitFor(() => expect(api.listCardRuns).toHaveBeenCalledTimes(2));
-    expect(result.current.map((r) => r.run)).toEqual(['r1']);
+    expect(result.current.runs.map((r) => r.run)).toEqual(['r1']);
   });
 
   it('ignores a slow response for a card you have already left', async () => {
@@ -104,17 +108,17 @@ describe('useCardRuns', () => {
             landFirst = resolve;
           }),
       )
-      .mockResolvedValueOnce(runs('r2'));
+      .mockResolvedValueOnce(body('r2'));
 
     const { result, rerender } = renderHook(({ card }) => useCardRuns('engineering', card, 0), {
       initialProps: { card: 'E-001' },
     });
     rerender({ card: 'E-002' });
-    await waitFor(() => expect(result.current.map((r) => r.run)).toEqual(['r2']));
+    await waitFor(() => expect(result.current.runs.map((r) => r.run)).toEqual(['r2']));
 
     await act(async () => {
-      landFirst(runs('r1'));
+      landFirst(body('r1'));
     });
-    expect(result.current.map((r) => r.run)).toEqual(['r2']);
+    expect(result.current.runs.map((r) => r.run)).toEqual(['r2']);
   });
 });

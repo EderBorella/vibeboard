@@ -5,7 +5,9 @@ import { skillRel } from '../src/core/layout.js';
 const api = vi.hoisted(() => ({
   getRaw: vi.fn(async () => 'file of the active card'),
   putRaw: vi.fn(async () => undefined),
-  listCardRuns: vi.fn(async () => [] as unknown[]),
+  // Keyed like the real endpoint: runs AND that card's ledger line. A mock shaped differently from the
+  // thing it stands in for tests a response nothing serves.
+  listCardRuns: vi.fn(async () => cardRuns()),
   cancelRun: vi.fn(async () => ({ ok: true })),
   resolveRun: vi.fn(async () => ({ run: {} })),
 }));
@@ -71,6 +73,12 @@ const props = {
   trigger: 0,
   onMove: vi.fn(),
 };
+
+// The endpoint's shape, so a test naming runs does not have to restate the ledger every time.
+const cardRuns = (...runs: unknown[]) => ({
+  runs,
+  account: { spend: { runs: runs.length, withCost: 0, withoutCost: runs.length }, attempts: {}, attemptCap: 3 },
+});
 
 describe('CardsPane', () => {
   // The title shows twice by design — once labelling the tab, once heading the view — so body
@@ -415,7 +423,7 @@ describe('CardsPane', () => {
   });
 
   it('lists the card’s runs, and opens one in place of the card', async () => {
-    api.listCardRuns.mockResolvedValueOnce([
+    api.listCardRuns.mockResolvedValueOnce(cardRuns(
       {
         run: '20260726-143012-a1b2',
         card: 'E-001',
@@ -431,7 +439,7 @@ describe('CardsPane', () => {
         summary: 'did the thing',
         report: '## What I did',
       },
-    ]);
+    ));
     const { container } = render(
       <CardsPane {...props} tabs={[ref('E-001')]} activeId="E-001" live={[card('E-001')]} />,
     );
@@ -461,7 +469,7 @@ describe('CardsPane', () => {
 
   const openCardWithRunningRun = async (): Promise<void> => {
     api.cancelRun.mockClear();
-    api.listCardRuns.mockResolvedValueOnce([runningRun]);
+    api.listCardRuns.mockResolvedValueOnce(cardRuns(runningRun));
     render(<CardsPane {...props} tabs={[ref('E-001')]} activeId="E-001" live={[card('E-001')]} />);
     await waitFor(() => expect(screen.getByText('Stop')).toBeTruthy());
     await act(async () => {
@@ -518,7 +526,7 @@ describe('CardsPane', () => {
         prompt: 'p',
       },
     ];
-    api.listCardRuns.mockResolvedValueOnce([
+    api.listCardRuns.mockResolvedValueOnce(cardRuns(
       {
         run: '20260726-141000-9f3e',
         card: 'E-001',
@@ -536,7 +544,7 @@ describe('CardsPane', () => {
         options: ['Split it in two'],
         report: '## What I found',
       },
-    ]);
+    ));
     const onRun = vi.fn(async () => {});
     render(
       <CardsPane
@@ -569,7 +577,7 @@ describe('CardsPane', () => {
   it('resolves the run as well as moving the card when you ignore and close', async () => {
     // The bug this fixes: closing the card left the run sitting under "Requires attention" for ever,
     // because a status is written once and nothing said "answered". Both calls, or it comes back.
-    api.listCardRuns.mockResolvedValueOnce([
+    api.listCardRuns.mockResolvedValueOnce(cardRuns(
       {
         run: '20260726-141000-9f3e',
         card: 'E-001',
@@ -584,7 +592,7 @@ describe('CardsPane', () => {
         summary: 'bigger than one card',
         report: 'x',
       },
-    ]);
+    ));
     const onMove = vi.fn();
     render(
       <CardsPane
@@ -612,7 +620,7 @@ describe('CardsPane', () => {
   it('still moves the card when resolving the run fails', async () => {
     // The move is the user's instruction; a failed write of our own bookkeeping must not swallow it.
     api.resolveRun.mockRejectedValueOnce(new Error('offline'));
-    api.listCardRuns.mockResolvedValueOnce([
+    api.listCardRuns.mockResolvedValueOnce(cardRuns(
       {
         run: '20260726-141000-9f3e',
         card: 'E-001',
@@ -627,7 +635,7 @@ describe('CardsPane', () => {
         summary: 'bigger than one card',
         report: 'x',
       },
-    ]);
+    ));
     const onMove = vi.fn();
     render(
       <CardsPane
@@ -651,7 +659,7 @@ describe('CardsPane', () => {
   it('refuses to continue a run whose skill has been deleted, and says so', async () => {
     // Without this the options would be live and the click would silently do nothing, since the
     // pane cannot build a dispatch without the skill.
-    api.listCardRuns.mockResolvedValueOnce([
+    api.listCardRuns.mockResolvedValueOnce(cardRuns(
       {
         run: '20260726-141000-9f3e',
         card: 'E-001',
@@ -667,7 +675,7 @@ describe('CardsPane', () => {
         options: ['Do the other thing'],
         report: 'x',
       },
-    ]);
+    ));
     render(
       <CardsPane {...props} skills={[]} tabs={[ref('E-001')]} activeId="E-001" live={[card('E-001')]} />,
     );

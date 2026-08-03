@@ -78,7 +78,7 @@ export function CardsPane({
   const card = activeRef ? resolveTab(activeRef, live) : null;
   // An archived card is not in the snapshot, so a patch would land on disk with nothing to show it.
   const editable = card !== null && !card.archived;
-  const runs = useCardRuns(card?.board, card?.id, trigger);
+  const { runs, account } = useCardRuns(card?.board, card?.id, trigger);
   // Resolved by id rather than held as an object: the record changes on disk while the pane is open,
   // and a captured copy would keep showing 'running' after the run finished.
   const shown = view.kind === 'report' ? runs.find((r) => r.run === view.run) : undefined;
@@ -115,6 +115,7 @@ export function CardsPane({
             config={config}
             live={live}
             runs={runs}
+            account={account}
             shown={shown}
             skills={skills}
             editable={editable}

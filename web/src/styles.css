@@ -1127,3 +1127,35 @@ body {
 .tile-suggestions {
   font-size: 0.7rem; color: var(--warn, #b8860b); white-space: nowrap;
 }
+
+
+/* The ledger lines: what a project or a card has spent, and which cap will stop it. Quiet by
+   default — a number you only look at when you are asking — and tabular so digits line up. */
+.exec-ledger {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem 0.9rem;
+  margin: 0 0 0.6rem;
+  font-size: 0.78rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.exec-ledger-total {
+  color: var(--text);
+}
+.exec-ledger-cap {
+  opacity: 0.85;
+}
+.reports-ledger {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem 0.8rem;
+  margin: 0.45rem 0 0;
+  font-size: 0.74rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.reports-attempts {
+  opacity: 0.85;
+}

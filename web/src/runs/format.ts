@@ -43,6 +43,30 @@ export function usageLine(usage: RunUsage | undefined): string {
   return parts.join(' · ');
 }
 
+// A total across runs, as a person reads it. The honesty is the point: `costUsd` is absent when NOT
+// ONE run reported a cost, and a total of "$0" there would be a lie about a project that has spent
+// real money on a subscription. So the sentence says what is missing instead.
+//
+// "usage", never "cost": for Claude Code on a Max or Pro plan the figure is API-equivalent rather than
+// what you were billed, which is why RunUsage is named as it is.
+export function usageTotal(spend: {
+  runs: number;
+  withCost: number;
+  withoutCost: number;
+  costUsd?: number;
+  durationMs?: number;
+}): string {
+  const runs = `${spend.runs} ${spend.runs === 1 ? 'run' : 'runs'}`;
+  if (spend.costUsd === undefined) {
+    return `${runs} · usage not reported by this backend`;
+  }
+  const parts = [runs, `${formatCost(spend.costUsd)} usage`];
+  if (spend.durationMs !== undefined) parts.push(formatDuration(spend.durationMs));
+  // Only when some runs are missing from the total: otherwise the caveat is noise on every screen.
+  if (spend.withoutCost > 0) parts.push(`${spend.withoutCost} reported none`);
+  return parts.join(' · ');
+}
+
 // Just the money, for the places that have room for one number: a card's report row and a dashboard
 // line. Empty when the backend never said, so nothing renders rather than a misleading zero.
 export function costLabel(usage: RunUsage | undefined): string {

@@ -1,6 +1,8 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { FastifyInstance } from 'fastify';
+import { attemptsUsed, sumSpend } from '../../core/accounting.js';
+import { DEFAULT_AUTOPILOT } from '../../core/autopilot.js';
 import type { AutopilotState } from '../../core/autopilot-state.js';
 import { boardColumnSlugs, readBoard } from '../../core/board.js';
 import { resolveCopilotSelection } from '../../core/copilot-choice.js';
@@ -163,12 +165,25 @@ export async function registerRunRoutes(api: FastifyInstance, ctx: AppCtx): Prom
     };
   });
 
-  // One card's history, oldest first: the Reports section on the card.
+  // One card's history, oldest first: the Reports section on the card — with that card's own ledger
+  // line beside it. Computed here rather than in the browser because it is the same arithmetic the
+  // budget is enforced with, and one statement of it is the whole point (see routes/autopilot.ts).
+  // Carried on this response rather than fetched separately, so the card pane makes one request.
   api.get('/runs/:board/:card', async (req, reply) => {
     if (!ensureOpen(ctx.session, reply)) return;
     const { board, card } = req.params as { board: string; card: string };
     if (!isBoard(board)) return reply.code(400).send({ error: 'Unknown board' });
-    return { runs: await listCardRuns(ctx.session.root, board, card) };
+    const runs = await listCardRuns(ctx.session.root, board, card);
+    const attempts: Record<string, number> = {};
+    for (const skill of new Set(runs.map((r) => r.skill))) attempts[skill] = attemptsUsed(runs, card, skill);
+    return {
+      runs,
+      account: {
+        spend: sumSpend(runs),
+        attempts,
+        attemptCap: (ctx.session.config.autopilot ?? DEFAULT_AUTOPILOT).attemptCap,
+      },
+    };
   });
 
   api.post('/runs', async (req, reply) => {

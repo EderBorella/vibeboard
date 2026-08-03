@@ -6,7 +6,15 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 // that is what this file is about: WorkArea's job is choosing WHICH view renders.
 const api = vi.hoisted(() => ({
   listControlFiles: vi.fn(async () => []),
-  listCardRuns: vi.fn(async () => []),
+  // Keyed like the real endpoint: runs AND that card's ledger line. A mock shaped differently from
+  // the thing it stands in for tests a response nothing serves.
+  listCardRuns: vi.fn(async () => ({
+    runs: [],
+    account: { spend: { runs: 0, withCost: 0, withoutCost: 0 }, attempts: {}, attemptCap: 3 },
+  })),
+  getAccounting: vi.fn(async () => {
+    throw new Error('no ledger in this test');
+  }),
   listResources: vi.fn(async () => []),
   listSkills: vi.fn(async () => ({ skills: [], invalid: [] })),
   listModels: vi.fn(async () => []),

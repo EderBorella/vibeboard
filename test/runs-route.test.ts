@@ -438,7 +438,15 @@ describe('GET /api/runs/:board/:card', () => {
   it('is empty for a card that has never been run', async () => {
     const project = await projectWithCard();
     const res = await project.app.inject({ method: 'GET', url: '/api/runs/features/F-001' });
-    expect([res.statusCode, res.json()]).toEqual([200, { runs: [] }]);
+    // The ledger line comes back even for a card with no history: the answer to "what has this cost"
+    // is "nothing yet", and a missing key would make the pane guess.
+    expect([res.statusCode, res.json()]).toEqual([
+      200,
+      {
+        runs: [],
+        account: { spend: { runs: 0, withCost: 0, withoutCost: 0 }, attempts: {}, attemptCap: 3 },
+      },
+    ]);
   });
 });
 

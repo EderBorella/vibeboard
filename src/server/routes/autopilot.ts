@@ -1,4 +1,13 @@
 import type { FastifyInstance } from 'fastify';
+import {
+  attemptsUsed,
+  type CapName,
+  governingCap,
+  type Spend,
+  spendByCard,
+  sumSpend,
+} from '../../core/accounting.js';
+import { type AutopilotConfig, DEFAULT_AUTOPILOT } from '../../core/autopilot.js';
 import { coverageProblems, skillProblems } from '../../core/autopilot-cover.js';
 import {
   type FoundationStatus,
@@ -9,8 +18,10 @@ import {
   type SmokeResult,
 } from '../../core/foundation.js';
 import { type ReadmeGate, readmeGate } from '../../core/readme.js';
-import type { ProjectConfig } from '../../core/types.js';
+import type { RunRecord } from '../../core/runs.js';
+import type { BoardName, ProjectConfig } from '../../core/types.js';
 import { type AppCtx, ensureOpen } from '../route-context.js';
+import { listRuns } from '../run-store.js';
 import { readSkills } from '../skill-catalogue.js';
 
 // "Could auto-pilot start here, and if not, why not?" — answered in ONE place, so the settings tab,
@@ -138,7 +149,55 @@ async function registerControls(api: FastifyInstance, ctx: AppCtx): Promise<void
   });
 }
 
+// What this project and each of its cards have spent, and which cap is actually bounding the run.
+//
+// Computed on the server rather than in the browser, so there is ONE statement of the arithmetic: the
+// UI renders it, and the auto-pilot service reads the same numbers over the same endpoint to decide
+// whether it may dispatch. Two copies of "what has this cost" would eventually disagree, and the one
+// that enforces the budget is the one that must be right.
+export interface CardAccount {
+  board: BoardName;
+  card: string;
+  spend: Spend;
+  // Attempts that BURNED, per skill. Per skill because that is how the cap is counted — a critic or
+  // checkup run on the same card must not inflate the tally of the skill doing the work.
+  attempts: Record<string, number>;
+}
+
+export interface Accounting {
+  project: Spend; // every run, card and project runs alike: everything a model did counts
+  cards: CardAccount[];
+  attemptCap: number;
+  cap: { cap: CapName; why: string };
+}
+
+export function composeAccounting(runs: RunRecord[], ap: AutopilotConfig | undefined): Accounting {
+  const project = sumSpend(runs);
+  const cards: CardAccount[] = [];
+  for (const [key, spend] of spendByCard(runs)) {
+    const [board, card] = key.split('/') as [BoardName, string];
+    const skills = new Set(runs.filter((r) => r.card === card && r.board === board).map((r) => r.skill));
+    const attempts: Record<string, number> = {};
+    for (const skill of skills) attempts[skill] = attemptsUsed(runs, card, skill);
+    cards.push({ board, card, spend, attempts });
+  }
+  // A project with no lifecycle block has no caps to be governed by, and saying "iterations" would
+  // name a number that does not exist. DEFAULT_AUTOPILOT's values are what such a project would get
+  // if it were upgraded, which is the honest thing to show beside a total.
+  const caps = ap ?? DEFAULT_AUTOPILOT;
+  return { project, cards, attemptCap: caps.attemptCap, cap: governingCap(caps, project) };
+}
+
 export async function registerAutopilotRoutes(api: FastifyInstance, ctx: AppCtx): Promise<void> {
+  // Readable by the SERVICE as well as the browser: slice C's loop compares this spend against the
+  // budget between dispatches, and it is a separate process reaching the board over HTTP like anything
+  // else. Not readable by `work` or `checkup`: an agent that can see how much room is left in the
+  // budget is an agent reasoning about its own leash, which is not its business.
+  api.get('/accounting', async (_req, reply) => {
+    if (!ensureOpen(ctx.session, reply)) return;
+    return composeAccounting(await listRuns(ctx.session.root), ctx.session.config.autopilot);
+  });
+
   await registerControls(api, ctx);
 
   api.get('/autopilot/readiness', async (_req, reply) => {

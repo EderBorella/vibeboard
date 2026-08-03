@@ -1,7 +1,19 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { RunRecord } from '../web/src/api.js';
+import type { Accounting, RunRecord } from '../web/src/api.js';
+
+// The dashboard fetches the project's ledger on mount. Mocked here for two reasons: the arithmetic has
+// its own tests (accounting.test.ts) and does not need proving twice, and an unmocked fetch in jsdom
+// fails silently — which would leave every assertion below passing over a ledger that never rendered.
+const accounting = vi.hoisted(() => ({ current: null as Accounting | null }));
+vi.mock('../web/src/api.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../web/src/api.js')>()),
+  getAccounting: async () => {
+    if (!accounting.current) throw new Error('no ledger in this test');
+    return accounting.current;
+  },
+}));
 import { ExecutionView } from '../web/src/components/ExecutionView.js';
 import type { Card } from '../web/src/shared.js';
 
@@ -195,5 +207,62 @@ describe('ExecutionView', () => {
     );
     expect(screen.getByText('did the thing')).toBeTruthy();
     expect(screen.getByText('The agent exited with code 2.')).toBeTruthy();
+  });
+});
+
+// The README's admitted gap, on screen. The wording matters as much as the number: for a
+// subscription-backed model the figure the backend reports is API-equivalent rather than what you were
+// billed, and a project whose backend reports nothing has not spent nothing.
+describe('the project ledger on the dashboard', () => {
+  afterEach(() => {
+    accounting.current = null;
+  });
+
+  const ledger = (over: Partial<Accounting> = {}): Accounting => ({
+    project: { runs: 3, withCost: 3, withoutCost: 0, costUsd: 1.25 },
+    cards: [],
+    attemptCap: 3,
+    cap: { cap: 'budget', why: "Auto-pilot stops when this project's runs have cost $20." },
+    ...over,
+  });
+
+  it('shows the total and which cap will stop the run', async () => {
+    accounting.current = ledger();
+    render(<ExecutionView {...props} />);
+    expect(await screen.findByText(/\$1\.25 usage/)).toBeTruthy();
+    expect(screen.getByText(/3 runs/)).toBeTruthy();
+    expect(screen.getByText(/cost \$20/)).toBeTruthy();
+  });
+
+  // Absence and zero are different facts. "$0" here would be a lie about a project that has spent real
+  // money on a subscription plan.
+  it('says the backend reported nothing rather than showing zero', async () => {
+    accounting.current = ledger({ project: { runs: 2, withCost: 0, withoutCost: 2 } });
+    render(<ExecutionView {...props} />);
+    expect(await screen.findByText(/usage not reported by this backend/)).toBeTruthy();
+    expect(screen.queryByText(/\$0/)).toBeNull();
+  });
+
+  // The caveat only when it applies: on every screen it would be noise.
+  it('says how many runs are missing from a partial total', async () => {
+    accounting.current = ledger({ project: { runs: 3, withCost: 2, withoutCost: 1, costUsd: 0.5 } });
+    render(<ExecutionView {...props} />);
+    expect(await screen.findByText(/1 reported none/)).toBeTruthy();
+  });
+
+  it('renders nothing at all when the ledger cannot be read', async () => {
+    accounting.current = null;
+    render(<ExecutionView {...props} />);
+    await new Promise((r) => setTimeout(r, 10));
+    expect(screen.queryByText(/usage/)).toBeNull();
+  });
+
+  // S10: a project bounded by iterations must not be shown a dollar figure as its limit.
+  it('names iterations when that is the cap that binds', async () => {
+    accounting.current = ledger({
+      cap: { cap: 'iterations', why: 'This project has no dollar budget, so auto-pilot stops after 250 iterations.' },
+    });
+    render(<ExecutionView {...props} />);
+    expect(await screen.findByText(/250 iterations/)).toBeTruthy();
   });
 });

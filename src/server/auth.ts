@@ -53,6 +53,12 @@ const RULES: Record<string, Rule> = {
   'GET /api/suggestions': { scopes: ['checkup', 'service'] },
   // PATCH is absent on purpose: triage is the human's, and the checkup's in slice C through its own
   // path. A run marking its own finding `dismissed` would close the channel from the inside.
+
+  // The ledger: what the project has spent and how many attempts each card has used. The SERVICE
+  // needs it — the budget is compared between dispatches and the loop is a separate process reaching
+  // the board over HTTP like anything else. `work` and `checkup` do not: an agent that can see how
+  // much room is left in the budget is an agent reasoning about its own leash.
+  'GET /api/accounting': { scopes: ['service'] },
 };
 
 export function bearerToken(header: string | undefined): string {

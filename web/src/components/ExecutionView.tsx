@@ -1,5 +1,6 @@
 import type { RunRecord } from '../api';
-import { costLabel } from '../runs/format';
+import { costLabel, usageTotal } from '../runs/format';
+import { useAccounting } from '../runs/useAccounting';
 import { elapsed, groupRuns, runSubject } from '../runs/viewmodel';
 import type { Card } from '../shared';
 
@@ -39,9 +40,19 @@ function openTitle(record: RunRecord, card: Card | undefined): string {
 // "Done" — burying a broken run under successes is how it goes unnoticed for a week.
 export function ExecutionView({ runs, active, queued, cards, now, onOpenCard, onCancel, onResolve }: Props) {
   const grouped = groupRuns(runs);
+  // Refetched whenever the run list changes: usage arrives when a run settles, which is a new list.
+  const accounting = useAccounting(runs);
 
   return (
     <main className="execution">
+      {accounting && (
+        <p className="exec-ledger">
+          <span className="exec-ledger-total">{usageTotal(accounting.project)}</span>
+          {/* S10: which cap will actually stop this project. A dollar figure beside a budget that can
+              never trip would tell the reader the opposite of the truth. */}
+          <span className="exec-ledger-cap">{accounting.cap.why}</span>
+        </p>
+      )}
       {COLUMNS.map((column) => {
         const group = grouped[column.key];
         return (

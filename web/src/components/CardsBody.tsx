@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { cancelRun, type RunRecord, resolveRun, type Skill } from '../api';
+import { type CardAccount, cancelRun, type RunRecord, resolveRun, type Skill } from '../api';
 import { stopRunRequest } from '../confirm/requests';
 import { useConfirm } from '../confirm/useConfirm';
 import type { CardRef } from '../dock/tabs';
@@ -19,6 +19,8 @@ interface Props {
   config: ProjectConfig;
   live: Card[];
   runs: RunRecord[];
+  // This card's ledger line, from the same response as its runs. Null until it arrives.
+  account: CardAccount | null;
   // The record the report view is showing, resolved live by the pane.
   shown: RunRecord | undefined;
   skills: Skill[];
@@ -45,6 +47,7 @@ export function CardsBody({
   config,
   live,
   runs,
+  account,
   shown,
   skills,
   editable,
@@ -125,6 +128,7 @@ export function CardsBody({
         />
         <CardReports
           runs={runs}
+          account={account}
           onOpen={(r) => setView({ kind: 'report', run: r.run })}
           onCancel={(r) => {
             void confirm(stopRunRequest(r)).then((ok) => {

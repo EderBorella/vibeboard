@@ -1,4 +1,4 @@
-import { chmodSync } from 'node:fs';
+import { chmodSync, existsSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -296,6 +296,44 @@ describe('AgentRunner.dispatch', () => {
     for (let i = 0; i < 60 && alive(grandchild); i++) await new Promise((r) => setTimeout(r, 50));
     expect(alive(grandchild)).toBe(false);
   }, 20_000);
+
+  // S1, and Principle 3: absence and zero are different facts, and so are "the agent says it worked"
+  // and "the agent got to finish". foldReport took `status` from the report's own `outcome`, so a
+  // runaway that declared success and then hung was recorded as a SUCCESS — breaking the
+  // timeout→failed mapping in exactly the case the timeout exists for.
+  describe('a run stopped after it had already claimed success', () => {
+    it('is cancelled when the user stopped it, and keeps the report as evidence', async () => {
+      const root = await tempDir();
+      const { instance } = runner(root);
+      const { run } = await instance.dispatch(input(root, behaving('reporthang')));
+      // Wait for the report to be on disk: the race is the whole point, so the test must lose it.
+      for (let i = 0; i < 100 && !existsSync(reportPath(root, run)); i++) {
+        await new Promise((r) => setTimeout(r, 50));
+      }
+      expect(existsSync(reportPath(root, run))).toBe(true);
+
+      instance.cancel(run);
+      const final = await settled(root, run);
+      expect(final.status).toBe('cancelled');
+      expect(final.outcome).toBeUndefined();
+      expect(final.note).toBe('You stopped this run.');
+      // Decision 18: the verdict is ours, the reasoning is still worth reading.
+      expect(final.report).toContain('All of it.');
+      // Consumed, so it cannot outlive the run that wrote it.
+      expect(existsSync(reportPath(root, run))).toBe(false);
+    }, 20_000);
+
+    it('is failed when the clock stopped it', async () => {
+      const root = await tempDir();
+      const { instance } = runner(root, { timeoutMs: () => 1_000 });
+      const { run } = await instance.dispatch(input(root, behaving('reporthang')));
+      const final = await settled(root, run);
+      expect(final.status).toBe('failed');
+      expect(final.outcome).toBeUndefined();
+      expect(final.note).toContain('still running after 1s');
+      expect(final.report).toContain('All of it.');
+    }, 20_000);
+  });
 
   it('records a cancelled run as cancelled, not failed', async () => {
     const shim = behaving('hang');

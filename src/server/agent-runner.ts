@@ -1,4 +1,5 @@
 import {
+  parseAgentReport,
   type RunRecord,
   type RunUsage,
   runId,
@@ -13,7 +14,14 @@ import type { ResultStats } from './copilot-events.js';
 import type { Credential, CredentialStore } from './credentials.js';
 import type { Log } from './logging.js';
 import { type BoardColumns, buildRunPrompt } from './run-prompt.js';
-import { appendTranscript, foldReport, reportContract, transcriptTail, writeRun } from './run-store.js';
+import {
+  appendTranscript,
+  foldReport,
+  reportContract,
+  takeAgentReport,
+  transcriptTail,
+  writeRun,
+} from './run-store.js';
 import type { SandboxStatus } from './sandbox.js';
 import { countRunSuggestions } from './suggestion-store.js';
 
@@ -365,10 +373,28 @@ export class AgentRunner {
         withUsage(record, usageFromStats(result.stats)),
         await this.#filed(root, run),
       );
-      const folded = await foldReport(root, spent, finishedAt, secret);
+      // S1: a run the USER stopped, or one the clock killed, does not get to decide its own verdict.
+      // `foldReport` takes `status` from the agent's own `outcome`, so a runaway that wrote
+      // "outcome: success" and then hung was recorded as a SUCCESS — which also broke the
+      // timeout→failed mapping the attempt table calls load-bearing, in exactly the case the timeout
+      // exists for.
+      //
+      // The report is still consumed, and still kept as EVIDENCE (decision 18): the verdict is ours,
+      // the reasoning is worth reading, and a file left behind would sit in runs/ unread for ever.
+      const stopped = cancelled || result.timedOut;
+      const evidence = stopped ? await this.#takeEvidence(root, run, secret) : undefined;
+      const folded = stopped ? null : await foldReport(root, spent, finishedAt, secret);
       final =
         folded ??
-        (await this.#endWithoutReport(root, spent, result, cancelled, finishedAt, active?.timeoutMs));
+        (await this.#endWithoutReport(
+          root,
+          spent,
+          result,
+          cancelled,
+          finishedAt,
+          active?.timeoutMs,
+          evidence,
+        ));
     } catch (err) {
       final = withoutReport(
         record,
@@ -391,8 +417,20 @@ export class AgentRunner {
     this.#drain();
   }
 
-  // No report file. Which of the four endings it was decides the status, and the note is what the
-  // UI shows in place of a report — with the transcript tail, so "it did nothing" is checkable.
+  // What a stopped run wrote, if anything, with its own verdict discarded. Consumed either way so it
+  // cannot outlive the run that wrote it.
+  async #takeEvidence(root: string, run: string, secret?: string): Promise<string | undefined> {
+    const raw = await takeAgentReport(root, run);
+    if (raw === null) return undefined;
+    const text = secret ? raw.replaceAll(secret, '[credential redacted]') : raw;
+    // The prose only. `outcome` is deliberately ignored — that is the whole point — and its
+    // frontmatter would be noise in a pane showing why a run was stopped.
+    return parseAgentReport(text).body;
+  }
+
+  // No verdict of the agent's to use. Which of the four endings it was decides the status, and the
+  // note is what the UI shows in place of a report — with the report's own prose if it wrote one, and
+  // the transcript tail otherwise, so "it did nothing" is checkable.
   async #endWithoutReport(
     root: string,
     record: RunRecord,
@@ -402,9 +440,12 @@ export class AgentRunner {
     // Absent only if the run never got as far as being spawned, in which case it did not time out
     // either and the sentence below is not reached.
     carriedTimeoutMs = 0,
+    // What a stopped run had already written. Falls back to the transcript when it wrote nothing
+    // usable, which is the case the tail exists for.
+    evidence?: string,
   ): Promise<RunRecord> {
     const timeoutMs = carriedTimeoutMs;
-    const tail = await transcriptTail(root, record.run);
+    const tail = evidence?.trim() ? evidence : await transcriptTail(root, record.run);
     let status: RunRecord['status'] = 'attention';
     let note = 'The agent finished without writing a report.';
     if (cancelled) {

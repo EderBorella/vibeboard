@@ -66,11 +66,16 @@ export function transcriptPath(root: string, run: string): string {
 // that second write and an immediate read came back as "not a run at all".
 //
 // The temporary name deliberately does not end in `.md`: the listers filter on that extension, so an
-// interrupted write leaves something that is ignored rather than something that half-parses.
+// interrupted write leaves something that is ignored rather than something that half-parses. It is also
+// unique per WRITE, not per record — two writes of the same record do overlap in practice (the queue
+// marking a run `running` and the spawn recording its process group, moments apart and neither awaited
+// by the other), and a shared temp name made them race for it: one rename found the file already gone,
+// so that write silently did nothing. It cost a missing `running` update in the dashboard.
+let writeSeq = 0;
 export async function writeRun(root: string, record: RunRecord): Promise<void> {
   const path = pathFor(root, record);
   await mkdir(join(path, '..'), { recursive: true });
-  const temp = `${path}.${process.pid}.tmp`;
+  const temp = `${path}.${process.pid}.${++writeSeq}.tmp`;
   await writeFile(temp, serializeRun(record), 'utf8');
   await rename(temp, path);
 }

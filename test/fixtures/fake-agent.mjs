@@ -13,6 +13,7 @@
 //   echo      — quotes its own credential back in its narration, then exits 0
 //   leaky     — writes a REPORT that quotes its own credential, then exits 0
 //   spawner   — starts a child of its own, narrates its pid, then hangs: the grandchild case
+//   reporthang— writes a SUCCESS report and then hangs: a run stopped after it claimed victory
 //
 // The report path is read from the prompt it was given, exactly as a real agent would: that means
 // these tests fail if the prompt stops naming the path.
@@ -90,6 +91,18 @@ if (behaviour === 'chatty') {
     session_id: 'shim-run',
   });
   process.exit(0);
+} else if (behaviour === 'reporthang') {
+  // The case S1 is about: the agent declares success in its report and then never exits, so the run
+  // ends by cancel or timeout with a report already on disk claiming it worked.
+  if (match) {
+    const path = join(process.cwd(), match[0]);
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, REPORTS.success, 'utf8');
+  }
+  const startedUnder = process.ppid;
+  setInterval(() => {
+    if (process.ppid !== startedUnder) process.exit(0);
+  }, 250);
 } else if (behaviour === 'spawner') {
   // What a real agent does constantly: start a compiler, a test runner, a dev server. The child is in
   // THIS process's group and is not detached, so killing the shim alone leaves it running and

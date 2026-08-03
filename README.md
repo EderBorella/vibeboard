@@ -224,9 +224,17 @@ expose it to the public internet.
 - **Managed chat history**: transcripts persist per project, survive reloads,
   and are browsable in a switcher with configurable retention
 - **What each run cost**, recorded on the run itself: money, wall time, model
-  round-trips, context and output tokens — for runs that failed as well as ones
-  that worked, since those spent tokens too. Shown in full on the report, and as
-  a single figure on the card and the Execution dashboard
+  round-trips, context and output tokens, and how many files it changed — for runs
+  that failed as well as ones that worked, since those spent tokens too. Shown in
+  full on the report, and as a single figure on the card and the Execution dashboard
+- **Totals across runs**, per card and per project, summed from the records on
+  disk. Usage that no backend reported is shown as unreported rather than as zero:
+  on a subscription plan the figure is API-equivalent, not what you were billed.
+  A card also shows how many attempts each skill has used against its cap
+- **Stopping, in three levels**: a soft stop that only stops dispatching, an
+  emergency stop that kills every agent in the project and halts it, and a restart
+  that brings it back. A halted project starts nothing — not even from the chat —
+  and says so in an overlay that carries the reason, the time and the way back
 - **Project Control tab**: view and edit the documents that steer the models —
   `.vibeboard/INSTRUCTIONS.md`, skills, project docs, and a resources registry
 - Config isolation, so your personal `CLAUDE.md`, plugins and hooks do not leak
@@ -240,8 +248,6 @@ expose it to the public internet.
 - **External resources** — attach reference *folders* and PDFs to a project.
   Markdown notes and a link registry are already in Project Control; what is
   missing is anything that is not a single markdown file
-- **Cost across runs** — a per-card and per-project total. Each run now records
-  its own; nothing yet adds them up
 
 ## Design principles
 

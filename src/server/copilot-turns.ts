@@ -58,6 +58,17 @@ export function createCopilotTurns(ctx: AppCtx): {
       broadcast({ type: 'copilot:error', error: refusal });
       return;
     }
+    // Decision 12: while halted the chat "says plainly that the project is halted". Refused HERE, in
+    // front of the spawn, rather than left to the lazy-respawn gate deeper down: that one produces a
+    // failed turn with a technical message, and this is a state the user themselves chose.
+    if ((await ctx.autopilot.current()).state === 'halted') {
+      broadcast({
+        type: 'copilot:error',
+        error:
+          'This project is halted, so nothing will be started for it. Restart it from the auto-pilot panel to use the copilot again.',
+      });
+      return;
+    }
     try {
       await chats.recordUser(text);
       copilotState(); // running flips true only once send starts; announce optimistically

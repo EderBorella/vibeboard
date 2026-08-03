@@ -3,12 +3,18 @@ import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastif
 import { DEFAULT_MAX_RUNS } from '../core/config.js';
 import { AgentRunner } from './agent-runner.js';
 import { registerAuth } from './auth.js';
+import { AutopilotRuntime } from './autopilot-runtime.js';
 import { ChatStore } from './chat-store.js';
 import { CopilotSession } from './copilot.js';
 import { createCopilotTurns } from './copilot-turns.js';
 import { CredentialStore } from './credentials.js';
 import { type Log, serverLogger, stripSecrets, withRedaction } from './logging.js';
-import { attachOpencodeLogger, attachSandbox } from './opencode-server.js';
+import {
+  attachHaltGate,
+  attachOpencodeLogger,
+  attachSandbox,
+  stopOpencodeServer,
+} from './opencode-server.js';
 import type { AppCtx } from './route-context.js';
 import { registerAutopilotRoutes } from './routes/autopilot.js';
 import { registerCardRoutes } from './routes/cards.js';
@@ -31,6 +37,9 @@ declare module 'fastify' {
     // the SPA without this module having to know whether there is a build.
     spaFallback: ((reply: import('fastify').FastifyReply) => unknown) | null;
     runner: AgentRunner;
+    // Auto-pilot's live state. Exposed for main.ts, which reopens the last project on boot and has to
+    // reconcile a `running` state left behind by the process that died.
+    autopilot: AutopilotRuntime;
   }
 }
 
@@ -93,11 +102,28 @@ export function buildApp(
     onUpdate: (record) => broadcast({ type: 'run:update', record }),
     log: log.child({ component: 'runner' }),
   });
+  // Everything an emergency stop takes down. Decision 13's blast radius: every agent this server
+  // spawned, and the managed OpenCode server — which is a project-related child like any other, and
+  // the thing that would otherwise respawn on the next chat message.
+  const autopilot = new AutopilotRuntime({
+    root: () => session.root,
+    now: () => new Date(),
+    onChange: (state) => broadcast({ type: 'autopilot:state', state }),
+    onKill: () => {
+      const stopped = runner.cancelAll();
+      stopOpencodeServer();
+      log.warn({ stopped }, 'emergency stop: killed every run and the managed OpenCode server');
+    },
+    log: log.child({ component: 'autopilot' }),
+  });
+  // The sync gate for the one caller that cannot await — see autopilot-runtime.ts.
+  attachHaltGate(() => autopilot.isHalted());
   const ctx: AppCtx = {
     session,
     copilot,
     chats,
     runner,
+    autopilot,
     credentials,
     broadcast,
     log,
@@ -141,6 +167,7 @@ export function buildApp(
   // Exposed for main.ts's shutdown handlers: a spawned agent outlives the server unless something
   // stops it, and the composition root is the only place that holds the runner.
   app.decorate('runner', runner);
+  app.decorate('autopilot', autopilot);
 
   return app;
 }

@@ -97,7 +97,50 @@ export function composeReadiness(config: ProjectConfig, skillSlugs: string[], re
   };
 }
 
+// The state, and the three ways to stop (decision 12). Every one of them is admin-only by absence
+// from the scope table in auth.ts, and that is load-bearing rather than incidental: a run able to
+// restart its own project could undo the emergency stop that was aimed at it, and the whole point of
+// `halted` is that it is a decision only a person takes back.
+async function registerControls(api: FastifyInstance, ctx: AppCtx): Promise<void> {
+  api.get('/autopilot/state', async (_req, reply) => {
+    if (!ensureOpen(ctx.session, reply)) return;
+    // The file, not the mirror: the auto-pilot service writes its own counters and this process does
+    // not see those writes.
+    return { state: await ctx.autopilot.current() };
+  });
+
+  // Stop dispatching. The app is untouched: chat, manual runs and the board all carry on.
+  api.post('/autopilot/stop', async (req, reply) => {
+    if (!ensureOpen(ctx.session, reply)) return;
+    const { detail } = (req.body ?? {}) as { detail?: string };
+    const result = await ctx.autopilot.softStop(detail);
+    if (!result.ok) return reply.code(409).send({ error: result.error });
+    return { state: result.state };
+  });
+
+  // Everything project-related dies. Deliberately a separate endpoint from the soft stop rather than a
+  // flag on it: one of these is reversible and the other kills work in flight, and a boolean in a body
+  // is a poor place for that difference to live.
+  api.post('/autopilot/kill', async (req, reply) => {
+    if (!ensureOpen(ctx.session, reply)) return;
+    const { detail } = (req.body ?? {}) as { detail?: string };
+    const result = await ctx.autopilot.emergencyStop(detail);
+    if (!result.ok) return reply.code(409).send({ error: result.error });
+    return { state: result.state };
+  });
+
+  // The way back to idle. Auto-pilot stays off until it is started separately.
+  api.post('/autopilot/restart', async (_req, reply) => {
+    if (!ensureOpen(ctx.session, reply)) return;
+    const result = await ctx.autopilot.restart();
+    if (!result.ok) return reply.code(409).send({ error: result.error });
+    return { state: result.state };
+  });
+}
+
 export async function registerAutopilotRoutes(api: FastifyInstance, ctx: AppCtx): Promise<void> {
+  await registerControls(api, ctx);
+
   api.get('/autopilot/readiness', async (_req, reply) => {
     if (!ensureOpen(ctx.session, reply)) return;
     const { root, config } = ctx.session;

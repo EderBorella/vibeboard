@@ -76,6 +76,10 @@ async function start(): Promise<void> {
   const served = await registerStatic(app);
   // Reopen whatever was open last, so a restart doesn't dump you back at the project gate.
   const reopened = await restoreLastProject(session);
+  // A `running` state on disk belongs to the process that died: its children went with it, so
+  // auto-pilot comes back owing this project a checkup rather than resuming dispatch. `halted`
+  // survives, which is why the state is persisted at all.
+  if (reopened) await app.autopilot.load();
   await app.listen({ port, host });
   const lan = isLoopback ? undefined : lanAddress();
   // The token is in the link on purpose: the browser trades it for a stored credential on first

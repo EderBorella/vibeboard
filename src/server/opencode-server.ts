@@ -19,6 +19,9 @@ let child: ChildProcess | undefined;
 let urlPromise: Promise<string> | undefined;
 let log: Log | undefined;
 let sandbox: SandboxStatus = NOT_REQUESTED;
+// Whether the open project is halted. A FUNCTION, set by the composition root: this module is a
+// process-wide singleton and the answer changes while it runs.
+let halted: () => boolean = () => false;
 
 // Set by buildApp, alongside the logger and for the same reason: this server is a process-wide
 // singleton started lazily, long after the app was built.
@@ -28,6 +31,13 @@ let sandbox: SandboxStatus = NOT_REQUESTED;
 // simplification AppArmor bought over the per-project ruleset the design originally called for.
 export function attachSandbox(status: SandboxStatus): void {
   sandbox = status;
+}
+
+// The lazy respawn is what makes a halt real. Decision 12: while halted "nothing dispatches, NOTHING
+// RESPAWNS LAZILY, and the chat says plainly that the project is halted" — without this the Restart
+// button would be decorative, since the next chat message would quietly bring `opencode serve` back.
+export function attachHaltGate(gate: () => boolean): void {
+  halted = gate;
 }
 
 // Set by buildApp, for the same reason as ProjectSession.attachLogger: this is a process-wide
@@ -183,6 +193,14 @@ export function attachedOpencodeUrl(): string | undefined {
 export function opencodeBaseUrl(): Promise<string> {
   const attach = attachedOpencodeUrl();
   if (attach) return Promise.resolve(attach.replace(/\/$/, ''));
+  // Before the spawn, and after the attach check: a server somebody else started is not ours to
+  // refuse. An already-running managed server is left alone too — the emergency stop killed it, so
+  // reaching here with one alive means it belongs to a project that is not halted.
+  if (!urlPromise && halted()) {
+    return Promise.reject(
+      new Error('This project is halted, so VibeBoard will not start an OpenCode server for it.'),
+    );
+  }
   if (!urlPromise) urlPromise = startServer();
   return urlPromise;
 }

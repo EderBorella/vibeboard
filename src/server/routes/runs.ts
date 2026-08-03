@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { FastifyInstance } from 'fastify';
+import type { AutopilotState } from '../../core/autopilot-state.js';
 import { boardColumnSlugs, readBoard } from '../../core/board.js';
 import { resolveCopilotSelection } from '../../core/copilot-choice.js';
 import { findCard } from '../../core/find.js';
@@ -22,6 +23,19 @@ import { readSkills } from '../skill-catalogue.js';
 // The route layer resolves everything the runner should not have to know: which card, which skill,
 // which cards it links to, and which backend/model/effort a bare request means. The runner takes
 // facts and produces a record.
+
+// Why a manual dispatch cannot happen right now, or nothing. Separated from the handler because it
+// is a rule rather than plumbing, and because both sentences have to offer a way forward: a refusal
+// about a state the user cannot see and cannot act on is worse than the state itself.
+function dispatchLock(state: AutopilotState): string | undefined {
+  if (state.state === 'halted') {
+    return 'This project is halted, so nothing can be dispatched. Restart it from the auto-pilot panel first.';
+  }
+  if (state.state === 'running') {
+    return 'Auto-pilot is running this project, so it owns the runner. Soft-stop it first if you want to dispatch a run by hand.';
+  }
+  return undefined;
+}
 
 function isBoard(value: unknown): value is BoardName {
   return typeof value === 'string' && (BOARDS as readonly string[]).includes(value);
@@ -163,6 +177,12 @@ export async function registerRunRoutes(api: FastifyInstance, ctx: AppCtx): Prom
     // start. 412 rather than 403 — the request is fine, the machine is not in a state to serve it.
     const refusal = agentRefusal(ctx.sandbox, attachedOpencodeUrl());
     if (refusal) return reply.code(412).send({ error: refusal });
+    // Then the project's own state. Halted means nothing dispatches at all; running means auto-pilot
+    // owns this project, and S6 is the reason — the runner, the concurrency cap and the queue are
+    // shared, so a manual dispatch would queue ahead of the loop's next one and make
+    // `autoPilotConcurrency: 1` aspirational rather than true. Both refusals say what to do instead.
+    const locked = dispatchLock(await ctx.autopilot.current());
+    if (locked) return reply.code(409).send({ error: locked });
     const resolved = await resolveDispatch(ctx, req.body as DispatchBody);
     if ('error' in resolved) return reply.code(resolved.code).send({ error: resolved.error });
     try {

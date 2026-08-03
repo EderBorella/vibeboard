@@ -1,6 +1,7 @@
 import type { FastifyReply } from 'fastify';
 import type { ProjectConfig } from '../core/types.js';
 import type { AgentRunner } from './agent-runner.js';
+import type { AutopilotRuntime } from './autopilot-runtime.js';
 import type { ChatStore } from './chat-store.js';
 import type { CopilotSession } from './copilot.js';
 import type { CredentialStore } from './credentials.js';
@@ -22,6 +23,9 @@ export interface AppCtx {
   // Skill runs. Separate from `copilot` deliberately: the chat is one conversation at a time, a run
   // is one prompt in and one report out, and neither should be able to block the other.
   runner: AgentRunner;
+  // Auto-pilot's state and the three stops. Everything that refuses an action while a project is
+  // halted or under auto-pilot asks this rather than reading the file itself.
+  autopilot: AutopilotRuntime;
   // Who is allowed to call what. Held on the context because both the HTTP boundary and the
   // websocket need to verify against the same store, and a run's credential is minted here when
   // it is dispatched and revoked when it settles.

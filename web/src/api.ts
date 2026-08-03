@@ -402,8 +402,10 @@ export interface RunUsage {
 
 export interface RunRecord {
   run: string;
-  card: string;
-  board: BoardName;
+  // Absent together for a run about the PROJECT rather than a card — a checkup or a pre-flight.
+  // Both or neither: the server refuses a record carrying one half of the pair.
+  card?: string;
+  board?: BoardName;
   skill: string;
   status: RunStatus;
   started: string;
@@ -474,6 +476,15 @@ export function resolveRun(board: BoardName, card: string, run: string): Promise
     `/api/runs/${board}/${encodeURIComponent(card)}/${encodeURIComponent(run)}/resolve`,
     {},
   );
+}
+
+// The same decision for either kind of run. A project run has no card in its path, so it has its own
+// endpoint — and every caller holds the record rather than the three parts, so the choice belongs
+// here instead of at each button.
+export function resolveRunRecord(record: RunRecord): Promise<{ run: RunRecord }> {
+  return record.board && record.card
+    ? resolveRun(record.board, record.card, record.run)
+    : post<{ run: RunRecord }>(`/api/project-runs/${encodeURIComponent(record.run)}/resolve`, {});
 }
 
 // Write a skill from its fields; the server serialises the YAML and answers with the catalogue as it

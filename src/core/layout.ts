@@ -42,6 +42,14 @@ export const RESOURCES_YAML = `${CONFIG_DIR}/resources.yaml`;
 export const CHAT_DIR = `${CONFIG_DIR}/chat`;
 export const RUNS_DIR = `${CONFIG_DIR}/runs`;
 
+// Run records for runs that are about the PROJECT rather than a card — the checkup and pre-flight.
+// One level up from `boards/<board>/results/<card>/`, mirroring it, because that is what they are
+// about: a card's history travels with the card in git, and a project's belongs to the project.
+//
+// Without this the two runs the design insists must count against every cap were the two that could
+// not be recorded at all: `parseRun` refuses a record with no card and no board.
+export const PROJECT_RUNS_DIR = `${CONFIG_DIR}/project-runs`;
+
 // Agent Suggestions: what an agent found but must not act on. Machine state like chat/ and runs/,
 // written only through the endpoint — the profile denies the agent this path, so the file layer is
 // not a second way in.

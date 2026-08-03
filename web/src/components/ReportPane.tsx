@@ -49,13 +49,13 @@ export function ReportPane({
   const [column, setColumn] = useState(review ? slugify(review) : '');
 
   return (
-    <article className="report" aria-label={`Report from ${record.skill} on ${record.card}`}>
+    <article className="report" aria-label={`Report from ${record.skill} on ${card.id}`}>
       <header className="report-head">
         <button type="button" className="dispatch-back" onClick={onBack} title="Back to the card">
           ←
         </button>
         <h3 className="report-title">
-          {record.skill} <span className="dispatch-on">on {record.card}</span>
+          {record.skill} <span className="dispatch-on">on {card.id}</span>
         </h3>
         <span className={`report-chip chip-${record.status}`}>{record.status}</span>
       </header>
@@ -139,7 +139,7 @@ export function ReportPane({
       {needsAttention(record) && (
         <ReportOptions
           options={record.options ?? []}
-          cardId={record.card}
+          cardId={card.id}
           columns={columns.map((name) => ({ slug: slugify(name), name }))}
           currentColumn={card.columnSlug}
           onContinue={onContinue}

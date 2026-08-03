@@ -31,6 +31,12 @@ export function groupFor(record: RunRecord): RunGroup {
   return record.resolved && group !== 'active' ? 'done' : group;
 }
 
+// What the run was about, for a label. A checkup and a pre-flight are about the project itself and
+// carry no card, so every place that used to print `record.card` would print nothing at all.
+export function runSubject(record: RunRecord): string {
+  return record.card ?? 'the project';
+}
+
 // Worth a badge: ended in a state only a person can resolve, and nobody has.
 export function needsAttention(record: RunRecord): boolean {
   return groupFor(record) === 'attention';

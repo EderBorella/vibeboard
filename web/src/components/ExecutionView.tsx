@@ -1,6 +1,6 @@
 import type { RunRecord } from '../api';
 import { costLabel } from '../runs/format';
-import { elapsed, groupRuns } from '../runs/viewmodel';
+import { elapsed, groupRuns, runSubject } from '../runs/viewmodel';
 import type { Card } from '../shared';
 
 interface Props {
@@ -25,6 +25,15 @@ const COLUMNS = [
   { key: 'done', label: 'Done' },
 ] as const;
 
+// What the open button says. Three cases, and a nested ternary inside the JSX pushed the row past
+// the complexity ceiling — which is the rule doing its job: this is a decision, not a label.
+function openTitle(record: RunRecord, card: Card | undefined): string {
+  const subject = runSubject(record);
+  if (card) return `Open ${subject}`;
+  if (record.card) return `${subject} is no longer on the board`;
+  return 'This run is about the project, not a card';
+}
+
 // Every run in the project, in three columns: what is happening, what is waiting for a decision,
 // and what came back. Failed and interrupted runs sit under "Requires attention" rather than
 // "Done" — burying a broken run under successes is how it goes unnoticed for a week.
@@ -44,6 +53,7 @@ export function ExecutionView({ runs, active, queued, cards, now, onOpenCard, on
             {group.length === 0 && <p className="exec-empty">Nothing here.</p>}
             {group.map((record) => {
               const card = cards.find((c) => c.id === record.card);
+              const subject = runSubject(record);
               const stoppable = active.includes(record.run) || queued.includes(record.run);
               return (
                 <div key={record.run} className="exec-run">
@@ -60,11 +70,11 @@ export function ExecutionView({ runs, active, queued, cards, now, onOpenCard, on
                     className="exec-card"
                     // A run whose card has gone can still be read; there is just nothing to open.
                     disabled={card === undefined}
-                    title={card ? `Open ${record.card}` : `${record.card} is no longer on the board`}
+                    title={openTitle(record, card)}
                     onClick={() => card && onOpenCard(card, record)}
                   >
-                    <span className="link-id">{record.card}</span>{' '}
-                    <span className="link-title">{card?.title ?? '(gone)'}</span>
+                    <span className="link-id">{subject}</span>{' '}
+                    <span className="link-title">{card?.title ?? (record.card ? '(gone)' : '')}</span>
                   </button>
                   {(record.summary || record.note) && (
                     <p className="exec-summary">{record.summary ?? record.note}</p>
@@ -73,7 +83,7 @@ export function ExecutionView({ runs, active, queued, cards, now, onOpenCard, on
                     <button
                       type="button"
                       className="report-stop"
-                      title={`Stop the ${record.skill} run on ${record.card}`}
+                      title={`Stop the ${record.skill} run on ${subject}`}
                       onClick={() => onCancel(record)}
                     >
                       Stop
@@ -83,7 +93,7 @@ export function ExecutionView({ runs, active, queued, cards, now, onOpenCard, on
                     <button
                       type="button"
                       className="report-dismiss"
-                      title={`Mark the ${record.skill} run on ${record.card} dealt with`}
+                      title={`Mark the ${record.skill} run on ${subject} dealt with`}
                       onClick={() => onResolve(record)}
                     >
                       Dismiss

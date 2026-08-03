@@ -13,7 +13,7 @@ import { readResources } from '../control-files.js';
 import { attachedOpencodeUrl } from '../opencode-server.js';
 import { type AppCtx, ensureOpen, nowIso } from '../route-context.js';
 import type { BoardColumns } from '../run-prompt.js';
-import { listCardRuns, listRuns, readRun, resolveRun } from '../run-store.js';
+import { listCardRuns, listRuns, readRun, resolveProjectRun, resolveRun } from '../run-store.js';
 import { agentRefusal } from '../sandbox.js';
 import { readSkills } from '../skill-catalogue.js';
 
@@ -180,6 +180,17 @@ export async function registerRunRoutes(api: FastifyInstance, ctx: AppCtx): Prom
     const { board, card, run } = req.params as { board: string; card: string; run: string };
     if (!isBoard(board)) return reply.code(400).send({ error: 'Unknown board' });
     const record = await resolveRun(ctx.session.root, board, card, run, nowIso());
+    if (!record) return reply.code(404).send({ error: 'No such run' });
+    return { run: record };
+  });
+
+  // The same decision, for a run with no card in its path to find it by: the checkup and pre-flight
+  // are about the project. A separate route rather than an optional segment, so the card route keeps
+  // refusing a request that forgot which board it meant.
+  api.post('/project-runs/:run/resolve', async (req, reply) => {
+    if (!ensureOpen(ctx.session, reply)) return;
+    const { run } = req.params as { run: string };
+    const record = await resolveProjectRun(ctx.session.root, run, nowIso());
     if (!record) return reply.code(404).send({ error: 'No such run' });
     return { run: record };
   });

@@ -1,8 +1,9 @@
 import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { boardRel, RESULTS_DIR, RUNS_DIR } from '../core/layout.js';
+import { boardRel, PROJECT_RUNS_DIR, RESULTS_DIR, RUNS_DIR } from '../core/layout.js';
 import {
   isInFlight,
+  isProjectRun,
   needsResolution,
   parseAgentReport,
   parseRun,
@@ -33,6 +34,20 @@ export function recordPath(root: string, board: BoardName, card: string, run: st
   return join(cardDir(root, board, card), `${run}.md`);
 }
 
+// A project run's home. One level up from the card store and named for what it holds, so a checkup's
+// record is somewhere a person would think to look.
+export function projectRunPath(root: string, run: string): string {
+  return join(root, PROJECT_RUNS_DIR, `${run}.md`);
+}
+
+// Which of the two stores this record belongs in. Derived from the record rather than passed in, so
+// there is no way for a caller to file one in the wrong place.
+function pathFor(root: string, record: RunRecord): string {
+  return isProjectRun(record)
+    ? projectRunPath(root, record.run)
+    : recordPath(root, record.board as BoardName, record.card as string, record.run);
+}
+
 // Where the agent is told to write. Under the runs folder so a chatty agent does not churn the
 // board watcher, and so a half-written report never sits in a card's folder.
 export function reportPath(root: string, run: string): string {
@@ -44,7 +59,7 @@ export function transcriptPath(root: string, run: string): string {
 }
 
 export async function writeRun(root: string, record: RunRecord): Promise<void> {
-  const path = recordPath(root, record.board, record.card, record.run);
+  const path = pathFor(root, record);
   await mkdir(join(path, '..'), { recursive: true });
   await writeFile(path, serializeRun(record), 'utf8');
 }
@@ -62,19 +77,20 @@ export async function readRun(
   }
 }
 
-// Every run for one card, oldest first. Ids are sortable stamps, so the filename order IS
-// chronological order and no file needs opening to sort.
-export async function listCardRuns(root: string, board: BoardName, card: string): Promise<RunRecord[]> {
+// Every run file in one folder, oldest first. Ids are sortable stamps, so the filename order IS
+// chronological order and no file needs opening to sort. Anything that does not parse as a run is
+// skipped: a results folder is ordinary disk, and a stray note must not become a phantom run.
+async function runsInDir(dir: string): Promise<RunRecord[]> {
   let files: string[];
   try {
-    files = (await readdir(cardDir(root, board, card))).filter((f) => f.endsWith('.md')).sort();
+    files = (await readdir(dir)).filter((f) => f.endsWith('.md')).sort();
   } catch {
     return [];
   }
   const runs: RunRecord[] = [];
   for (const file of files) {
     try {
-      const record = parseRun(await readFile(join(cardDir(root, board, card), file), 'utf8'));
+      const record = parseRun(await readFile(join(dir, file), 'utf8'));
       if (record) runs.push(record);
     } catch {
       /* vanished between readdir and read */
@@ -83,10 +99,29 @@ export async function listCardRuns(root: string, board: BoardName, card: string)
   return runs;
 }
 
-// Every run in the project, newest first — the Execution dashboard's list. Walks each board's
-// results folder; a project with no runs has no such folder and yields nothing.
+// Every run for one card, oldest first.
+export async function listCardRuns(root: string, board: BoardName, card: string): Promise<RunRecord[]> {
+  return runsInDir(cardDir(root, board, card));
+}
+
+// Every project-level run — the checkups and pre-flights — oldest first.
+export async function listProjectRuns(root: string): Promise<RunRecord[]> {
+  return runsInDir(join(root, PROJECT_RUNS_DIR));
+}
+
+export async function readProjectRun(root: string, run: string): Promise<RunRecord | null> {
+  try {
+    return parseRun(await readFile(projectRunPath(root, run), 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+// Every run in the project, newest first — the Execution dashboard's list, and what spend is summed
+// from. Reads BOTH stores: each board's results folders and the project-level one. That is the whole
+// cost of giving project runs a home of their own.
 export async function listRuns(root: string): Promise<RunRecord[]> {
-  const all: RunRecord[] = [];
+  const all: RunRecord[] = await listProjectRuns(root);
   for (const board of BOARDS) {
     let cards: string[];
     try {
@@ -164,6 +199,18 @@ export async function resolveRun(
   at: string,
 ): Promise<RunRecord | null> {
   const record = await readRun(root, board, card, run);
+  if (!record) return null;
+  if (!needsResolution(record)) return record;
+  const resolved = withResolution(record, at);
+  await writeRun(root, resolved);
+  return resolved;
+}
+
+// The same, for a run with no card in its path to find it by. A failed checkup would otherwise sit
+// in the dashboard's attention group forever: the card route needs a board and a card, and this run
+// has neither.
+export async function resolveProjectRun(root: string, run: string, at: string): Promise<RunRecord | null> {
+  const record = await readProjectRun(root, run);
   if (!record) return null;
   if (!needsResolution(record)) return record;
   const resolved = withResolution(record, at);

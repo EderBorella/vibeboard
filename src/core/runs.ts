@@ -41,8 +41,13 @@ export interface RunUsage {
 
 export interface RunRecord {
   run: string; // sortable id, also the filename
-  card: string;
-  board: BoardName;
+  // Absent together for a PROJECT run — the checkup and pre-flight are about the project, not a
+  // card, so they have neither. Both or neither, never one: `card` alone cannot say which board's
+  // results folder holds it, and `board` alone names a folder with no card in it. A record whose
+  // home cannot be computed would be written to the project store while living beside a card, and
+  // then counted twice by everything that sums.
+  card?: string;
+  board?: BoardName;
   skill: string; // skill slug
   status: RunStatus;
   started: string; // ISO timestamp
@@ -130,6 +135,13 @@ export function runId(at: Date, suffix: string): string {
   return `${stamp}-${suffix}`;
 }
 
+// About the project, not a card. One predicate rather than two `undefined` checks at every call
+// site: the store dispatches on it, the accounting excludes these from per-card totals, and the
+// dashboard labels them.
+export function isProjectRun(record: RunRecord): boolean {
+  return record.card === undefined && record.board === undefined;
+}
+
 export function serializeRun(record: RunRecord): string {
   const { report, ...front } = record;
   const data: Record<string, unknown> = {};
@@ -210,12 +222,13 @@ export function parseRun(content: string): RunRecord | null {
   const card = asText(d.card);
   const skill = asText(d.skill);
   const board = asText(d.board);
-  if (!run || !card || !skill || !board || !isStatus(d.status)) return null;
+  if (!run || !skill || !isStatus(d.status)) return null;
+  // Both or neither — see RunRecord. One without the other is not a run we could ever write back.
+  if (!card !== !board) return null;
 
   return {
     run,
-    card,
-    board: board as BoardName,
+    ...(card && board ? { card, board: board as BoardName } : {}),
     skill,
     status: d.status,
     started: asText(d.started) ?? '',

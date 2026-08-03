@@ -6,7 +6,7 @@ import {
   getState,
   patchCard,
   placeCard,
-  resolveRun,
+  resolveRunRecord,
   setLinks,
 } from './api';
 import { ProjectGate } from './components/ProjectGate';
@@ -201,7 +201,7 @@ export function App() {
           });
         }}
         onResolveRun={(record) => {
-          void resolveRun(record.board, record.card, record.run).catch(() => {});
+          void resolveRunRecord(record).catch(() => {});
         }}
       />
     );

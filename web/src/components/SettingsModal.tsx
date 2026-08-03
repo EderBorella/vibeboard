@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { getSandbox, listModels, type ModelOption, patchConfig, type SandboxState } from '../api';
 import { clampToCaps, resolveChoice } from '../copilot/choice';
 import {
+  type AutopilotConfig,
   BOARD_LABELS,
   BOARDS,
   type BoardName,
@@ -35,6 +36,12 @@ function parseCsv(text: string): string[] {
 
 export function SettingsModal({ config, onClose, onSaved }: Props) {
   const [backend, setBackend] = useState(resolveChoice(config.copilot, {}).backend);
+  // The auto-pilot caps, edited in the panel below and saved with everything else — one Save button,
+  // and one place for the server's refusal to appear (which may be about the routing table rather than
+  // the number that was touched).
+  // Named apart from `caps` below, which is the BACKEND's capabilities — two different meanings of a
+  // short word in one component is how the wrong one gets read.
+  const [apCaps, setApCaps] = useState<Partial<AutopilotConfig>>({});
   // One editable slot per backend, so editing OpenCode's model cannot disturb Claude's. The
   // two are separate settings that happen to share one pair of controls; keeping a single slot
   // meant switching connector overwrote the model saved for the one you left.
@@ -103,6 +110,10 @@ export function SettingsModal({ config, onClose, onSaved }: Props) {
         idPadding: Number(idPadding) || config.idPadding,
         keepChats: Number(keepChats) || (config.keepChats ?? 20),
         contextBudget: Number(contextBudget) || DEFAULT_CONTEXT_BUDGET,
+        // Only when this project HAS a lifecycle, and always the whole block: the server validates the
+        // routing table on any patch that touches `autopilot`, and sending a partial one would ask it
+        // to check a lifecycle with no routes in it.
+        ...(config.autopilot ? { autopilot: { ...config.autopilot, ...apCaps } } : {}),
       });
       onSaved();
     } catch (e) {
@@ -232,7 +243,7 @@ export function SettingsModal({ config, onClose, onSaved }: Props) {
             rule either way: it is the hierarchy auto-pilot rolls up, and an agent cannot mean “see also”.
           </div>
 
-          <AutopilotPanel config={config} />
+          <AutopilotPanel config={config} onCaps={setApCaps} />
 
           <div className="settings-section">Cards</div>
           <div className="settings-row">

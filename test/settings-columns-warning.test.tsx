@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, within } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_AUTOPILOT } from '../src/core/autopilot.js';
 import { defaultConfig } from '../src/core/config.js';
 
@@ -12,6 +12,7 @@ const api = vi.hoisted(() => ({
   // stubbed with a fixture: this file is about the warning, and a panel reporting "could not read"
   // is the honest thing for it to say when nothing answered.
   getReadiness: vi.fn().mockRejectedValue(new Error('not what this test is about')),
+  getAccounting: vi.fn().mockRejectedValue(new Error('not what this test is about')),
 }));
 vi.mock('../web/src/api.js', () => api);
 
@@ -60,5 +61,61 @@ describe('the columns warning', () => {
     // would be refused on its first column edit for a hole it was scaffolded with.
     const config = defaultConfig('T');
     expect(config.autopilot).toEqual(DEFAULT_AUTOPILOT);
+  });
+});
+
+// The caps are edited in the auto-pilot panel and saved with everything else: one Save button, and one
+// place for the server's refusal to appear — which may be about the routing table rather than the
+// number that was touched.
+describe('saving the caps', () => {
+  // Cleared per test: the mock is module-level, so `calls[0]` would otherwise be whichever test in this
+  // file clicked Save first — which is how an assertion passes while measuring the wrong thing.
+  //
+  // The braces are load-bearing. `beforeEach(() => api.patchConfig.mockClear())` returns the mock, and
+  // vitest treats a function returned from a hook as TEARDOWN — so it called `patchConfig()` after every
+  // test, and the one that mocks a rejection produced an unhandled rejection attributed to a test that
+  // passed in isolation.
+  beforeEach(() => {
+    api.patchConfig.mockClear();
+  });
+
+  const field = (label: string): HTMLInputElement =>
+    screen.getByText(label).closest('label')?.querySelector('input') as HTMLInputElement;
+  const save = (): void => {
+    fireEvent.click(screen.getByText('Save'));
+  };
+
+  it('sends the WHOLE autopilot block, not just the edited number', async () => {
+    api.patchConfig.mockResolvedValue({});
+    show(true);
+    fireEvent.change(field('Budget (USD)'), { target: { value: '5' } });
+    save();
+    await waitFor(() => expect(api.patchConfig).toHaveBeenCalled());
+    const patch = api.patchConfig.mock.calls[0][0];
+    expect(patch.autopilot.budgetUsd).toBe(5);
+    // The routing table travels with it: the server validates the lifecycle on any patch that touches
+    // `autopilot`, and a partial block would ask it to check a lifecycle with no routes in it.
+    expect(patch.autopilot.routes).toEqual(DEFAULT_AUTOPILOT.routes);
+    expect(patch.autopilot.terminal).toEqual(DEFAULT_AUTOPILOT.terminal);
+  });
+
+  it('sends no autopilot block at all for a project that has none', async () => {
+    api.patchConfig.mockResolvedValue({});
+    show(false);
+    save();
+    await waitFor(() => expect(api.patchConfig).toHaveBeenCalled());
+    expect('autopilot' in api.patchConfig.mock.calls[0][0]).toBe(false);
+  });
+
+  // The refusal is a sentence naming what to change. Swallowing it would leave the user staring at a
+  // dial that silently did nothing.
+  it('shows the server’s refusal rather than swallowing it', async () => {
+    api.patchConfig.mockRejectedValue(
+      new Error('engineering: the column "review" is not routed. Edit `autopilot` in .vibeboard/config.yaml.'),
+    );
+    show(true);
+    fireEvent.change(field('Max dispatches'), { target: { value: '3' } });
+    save();
+    expect(await screen.findByText(/is not routed/)).toBeTruthy();
   });
 });

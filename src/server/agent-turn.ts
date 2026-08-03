@@ -6,6 +6,7 @@ import { INSTRUCTIONS_FILE } from '../core/layout.js';
 import { claudeConfigDir, isolationEnabled } from './copilot-env.js';
 import { type CopilotEvent, parseCopilotLine, type ResultStats } from './copilot-events.js';
 import { opencodeTurn } from './opencode-client.js';
+import { groupStartTime, terminateGroup } from './process-group.js';
 import { NOT_REQUESTED, type SandboxStatus, wrapCommand } from './sandbox.js';
 
 // ONE agent turn: build the command, run it, stream its events, report how it ended.
@@ -59,6 +60,13 @@ export interface AgentTurnResult {
 export interface RunningTurn {
   done: Promise<AgentTurnResult>;
   cancel: () => void;
+  // The turn's own process group, and when its leader started. Recorded on the run so a LATER server
+  // can reap what this one leaves behind, and paired because pids are reused — see process-group.ts.
+  //
+  // Absent for OpenCode: that backend is an HTTP request to a managed server, so a turn has no process
+  // of its own. The server itself is covered by its pid file.
+  pgid?: number;
+  pgstart?: number;
 }
 
 const RESEARCH_PERSONA = [
@@ -203,7 +211,12 @@ function startClaude(opts: AgentTurnOptions): RunningTurn {
   // Confinement is applied here because one Claude turn is one process. Best-effort by design: with
   // no sandbox this returns the command unchanged, and auto-pilot's own gate is what fails closed.
   const spawned = wrapCommand(bin, args, opts.sandbox ?? NOT_REQUESTED);
-  const child: ChildProcess = spawn(spawned.bin, spawned.args, { cwd: opts.cwd, env });
+  // `detached` makes this child a process-group LEADER, so everything it starts — compilers, test
+  // runners, servers — belongs to one group we can signal as a unit. Without it a stop reached the
+  // direct child only and its grandchildren were reparented to init, still working and still spending.
+  // Deliberately NOT `unref`ed: we keep the handle, and the stdio pipes below are how the turn is read.
+  const child: ChildProcess = spawn(spawned.bin, spawned.args, { cwd: opts.cwd, env, detached: true });
+  const pgid = child.pid;
   // Written and closed immediately: `claude -p` waits for EOF before it begins, so leaving the pipe
   // open hangs the turn until the timeout.
   child.stdin?.end(opts.text, 'utf8');
@@ -238,6 +251,13 @@ function startClaude(opts: AgentTurnOptions): RunningTurn {
     stderr += chunk.toString('utf8');
   });
 
+  // One way to stop this turn, used by both the timeout and an explicit cancel. Falls back to the
+  // child alone when the spawn produced no pid, which means it never started.
+  const stop = (): void => {
+    if (pgid === undefined) child.kill('SIGTERM');
+    else terminateGroup(pgid);
+  };
+
   let timedOut = false;
   const timer = setTimeout(() => {
     timedOut = true;
@@ -245,7 +265,7 @@ function startClaude(opts: AgentTurnOptions): RunningTurn {
       kind: 'text',
       text: `\n[No response after ${Math.round(opts.timeoutMs / 1000)}s — stopping. The model/provider may be slow or rate-limited; try a different model.]`,
     });
-    child.kill('SIGTERM');
+    stop();
   }, opts.timeoutMs);
 
   const done = new Promise<AgentTurnResult>((settle) => {
@@ -268,7 +288,13 @@ function startClaude(opts: AgentTurnOptions): RunningTurn {
     });
   });
 
-  return { done, cancel: () => child.kill('SIGTERM') };
+  // Read immediately rather than at cancel time: by then the process may be gone, and the pair is
+  // recorded on the run for a future server to identify the group with.
+  return {
+    done,
+    cancel: stop,
+    ...(pgid === undefined ? {} : { pgid, pgstart: groupStartTime(pgid) }),
+  };
 }
 
 // Start a turn. Returns immediately with a handle: await `done` for how it ended, call `cancel` to

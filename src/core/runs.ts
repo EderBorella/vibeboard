@@ -77,6 +77,15 @@ export interface RunRecord {
   // Absent and zero are different facts, as with RunUsage: zero means it filed none, absent means
   // the count could not be taken.
   suggestions?: number;
+  // The run's process group, and when its leader started. Persisted so a LATER server can reap what
+  // this one left behind: a run still marked in flight at startup had its children die with the server
+  // that spawned it — usually. When it did not, this is the only record of what to kill.
+  //
+  // Both, never one: pids are reused, so a bare pgid read minutes later may belong to something else
+  // entirely, and killing a stranger's process group is far worse than the orphan being cleaned up.
+  // Absent for OpenCode runs, which are HTTP requests to a managed server rather than processes.
+  pgid?: number;
+  pgstart?: number;
   report: string; // the body: the agent's report, verbatim
 }
 
@@ -166,6 +175,8 @@ export function serializeRun(record: RunRecord): string {
     'note',
     'usage',
     'suggestions',
+    'pgid',
+    'pgstart',
   ] as const) {
     if (front[key] !== undefined) data[key] = front[key];
   }
@@ -193,6 +204,13 @@ function optionalFields(d: Record<string, unknown>): Partial<RunRecord> {
   // Same rule as RunUsage: zero is a fact worth keeping, NaN and negatives are not facts at all.
   if (typeof d.suggestions === 'number' && Number.isFinite(d.suggestions) && d.suggestions >= 0) {
     out.suggestions = d.suggestions;
+  }
+  // A pgid of 0 or 1 is not a run's group — 0 is our own and 1 is init — and either would be
+  // catastrophic to signal. Dropped here as well as guarded at the kill, because a hand-edited record
+  // must not be able to aim the reaper.
+  for (const key of ['pgid', 'pgstart'] as const) {
+    const n = d[key];
+    if (typeof n === 'number' && Number.isInteger(n) && n > 1) out[key] = n;
   }
   if (isOutcome(d.outcome)) out.outcome = d.outcome;
   const usage = asUsage(d.usage);

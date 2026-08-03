@@ -109,6 +109,16 @@ afterEach(() => vi.restoreAllMocks());
 // is what made Stryker's dry run fail where `npm test` passed.
 const behaving = (behaviour: string) => ({ userPrompt: `[[behaviour:${behaviour}]]` });
 
+// Signal 0 asks "may I signal this?" and kills nothing.
+const alive = (pid: number): boolean => {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 describe('AgentRunner.dispatch', () => {
   it('writes a running record straight away and answers with it', async () => {
     const root = await tempDir();
@@ -255,6 +265,37 @@ describe('AgentRunner.dispatch', () => {
     expect(final.status).toBe('failed');
     expect(final.note).toBe('The agent exited with code 2 and wrote no report.');
   });
+
+  // Decision 13, and the reason process groups exist at all. A CLI agent starts compilers, test
+  // runners and servers; `child.kill()` reached the agent and left those running, reparented to init,
+  // still working and still spending. 16 such processes were measured on the development machine.
+  //
+  // This test fails against `child.kill('SIGTERM')`, which is what the code did before.
+  it('kills what the agent started, not just the agent', async () => {
+    const root = await tempDir();
+    const { instance } = runner(root);
+    const { run } = await instance.dispatch(input(root, behaving('spawner')));
+
+    // The pid arrives through the transcript, which the runner writes as events stream in.
+    let grandchild = 0;
+    for (let i = 0; i < 100 && grandchild === 0; i++) {
+      const seen = (await transcriptTail(root, run)).match(/child (\d+)/);
+      if (seen) grandchild = Number(seen[1]);
+      else await new Promise((r) => setTimeout(r, 50));
+    }
+    expect(grandchild).toBeGreaterThan(0);
+    expect(alive(grandchild)).toBe(true);
+    // Recorded on the run, so a LATER server could reap this group even without the handle.
+    const during = await readRun(root, 'engineering', 'E-010', run);
+    expect(during?.pgid).toBeGreaterThan(1);
+    expect(during?.pgstart).toBeGreaterThan(0);
+
+    expect(instance.cancel(run)).toBe(true);
+    expect((await settled(root, run)).status).toBe('cancelled');
+    // The group gets SIGTERM and then SIGKILL after the grace period; `sleep` dies on the first.
+    for (let i = 0; i < 60 && alive(grandchild); i++) await new Promise((r) => setTimeout(r, 50));
+    expect(alive(grandchild)).toBe(false);
+  }, 20_000);
 
   it('records a cancelled run as cancelled, not failed', async () => {
     const shim = behaving('hang');

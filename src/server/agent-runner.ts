@@ -290,6 +290,25 @@ export class AgentRunner {
     });
     this.#active.set(run, { turn, cancelled: false, timeoutMs });
 
+    // The group, recorded on the run. A second write rather than part of the dispatch record, because
+    // the pgid only exists once the process does — the same shape as the queued→running transition.
+    // Its purpose is entirely for a LATER server: this one holds the handle, but a run still marked in
+    // flight at the next startup is one whose group may have outlived the process that spawned it.
+    if (turn.pgid !== undefined) {
+      const withGroup: RunRecord = {
+        ...record,
+        pgid: turn.pgid,
+        ...(turn.pgstart === undefined ? {} : { pgstart: turn.pgstart }),
+      };
+      // No `onUpdate`: nothing in the UI shows a pgid, so broadcasting a record that differs only by
+      // one invisible field would be noise on every client for every dispatch.
+      void writeRun(root, withGroup)
+        // Survivable: the run is on disk and still running. What is lost is the ability of a future
+        // server to reap this group, which is exactly the leak this field exists to close — so it is
+        // recorded rather than swallowed.
+        .catch((err) => this.#opts.log?.warn({ err, run }, 'could not record this run’s process group'));
+    }
+
     // Not awaited: the caller was answered when the record was written, and the ending arrives
     // through onUpdate. Errors are folded into the record rather than thrown into nowhere.
     void this.#settle(root, run, record, turn, minted?.token);

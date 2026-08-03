@@ -1,4 +1,4 @@
-import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { boardRel, PROJECT_RUNS_DIR, RESULTS_DIR, RUNS_DIR } from '../core/layout.js';
 import {
@@ -58,10 +58,20 @@ export function transcriptPath(root: string, run: string): string {
   return join(root, RUNS_DIR, `${run}.log.jsonl`);
 }
 
+// Written through a rename, which is atomic within a directory, so a reader sees either the previous
+// record or the new one and never a half-written file. `writeFile` truncates before it writes, and
+// these files are read constantly while they are being written — by the watcher, by GET /runs, and by
+// a second write to the same record moments later. Found when recording a run's process group added
+// that second write and an immediate read came back as "not a run at all".
+//
+// The temporary name deliberately does not end in `.md`: the listers filter on that extension, so an
+// interrupted write leaves something that is ignored rather than something that half-parses.
 export async function writeRun(root: string, record: RunRecord): Promise<void> {
   const path = pathFor(root, record);
   await mkdir(join(path, '..'), { recursive: true });
-  await writeFile(path, serializeRun(record), 'utf8');
+  const temp = `${path}.${process.pid}.tmp`;
+  await writeFile(temp, serializeRun(record), 'utf8');
+  await rename(temp, path);
 }
 
 export async function readRun(

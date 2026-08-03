@@ -12,9 +12,11 @@
 //   free      — like success, but reports a cost of exactly 0 (a free model)
 //   echo      — quotes its own credential back in its narration, then exits 0
 //   leaky     — writes a REPORT that quotes its own credential, then exits 0
+//   spawner   — starts a child of its own, narrates its pid, then hangs: the grandchild case
 //
 // The report path is read from the prompt it was given, exactly as a real agent would: that means
 // these tests fail if the prompt stops naming the path.
+import { spawn } from 'node:child_process';
 import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
@@ -88,6 +90,24 @@ if (behaviour === 'chatty') {
     session_id: 'shim-run',
   });
   process.exit(0);
+} else if (behaviour === 'spawner') {
+  // What a real agent does constantly: start a compiler, a test runner, a dev server. The child is in
+  // THIS process's group and is not detached, so killing the shim alone leaves it running and
+  // reparented to init — which is what 15 of the 16 leaked processes on the development machine were.
+  //
+  // Its pid is narrated rather than written to a file: every event reaches the run's transcript, which
+  // is per-run and needs no environment variable shared with the rest of the suite.
+  const child = spawn('/bin/sh', ['-c', 'sleep 30'], { stdio: 'ignore' });
+  say({
+    type: 'assistant',
+    message: { content: [{ type: 'text', text: `child ${child.pid}` }] },
+    session_id: 'shim-run',
+  });
+  // Then hang, exactly as `hang` does, so the test can cancel it.
+  const started = process.ppid;
+  setInterval(() => {
+    if (process.ppid !== started) process.exit(0);
+  }, 250);
 } else if (behaviour === 'hang') {
   // Never exits on its own — the test cancels it or times it out. But if the test RUNNER dies first
   // (a SIGKILLed vitest, an interrupted pre-commit hook), nothing ever does, and the shim outlives

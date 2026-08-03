@@ -118,8 +118,18 @@ export async function registerConfigRoutes(api: FastifyInstance, ctx: AppCtx): P
 
     const planned = await planColumnEdits(ctx.session.root, ctx.session.config, patch.boards);
     if (isRefusal(planned)) return reply.code(planned.code).send({ error: planned.error });
-    const uncovered = retableAndCheck(ctx.session.config, merged, renamesOf(planned.plans));
-    if (uncovered) return reply.code(uncovered.code).send({ error: uncovered.error });
+
+    // Only when the patch actually touches the lifecycle. The cover check ran on EVERY patch, so a
+    // project whose `autopilot` block was invalid for any reason — a hand edit, a config from a newer
+    // version — could not save a single setting: the Settings modal sends `boards` on every save, and
+    // the refusal spoke about columns while the user was changing their model. A pre-existing problem
+    // is not this request's fault, and a save that changes nothing about the lifecycle cannot make it
+    // worse. `in`, not a truthiness test, so an explicit `autopilot: null` still reaches the removal
+    // guard rather than slipping past as absent.
+    if (patch.boards !== undefined || 'autopilot' in patch) {
+      const uncovered = retableAndCheck(ctx.session.config, merged, renamesOf(planned.plans));
+      if (uncovered) return reply.code(uncovered.code).send({ error: uncovered.error });
+    }
 
     // Nothing above this line has touched the filesystem. From here the request cannot be refused,
     // so the folders and the config move together.

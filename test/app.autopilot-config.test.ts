@@ -174,3 +174,52 @@ describe('PATCH /api/config cannot delete the lifecycle', () => {
     expect(res.statusCode).toBe(400);
   });
 });
+
+// A pre-existing problem in the lifecycle is not the fault of a request that does not touch it. The
+// cover check ran on every patch, and Settings sends `boards` on every save — so an invalid block
+// meant no setting could be saved at all, and the refusal talked about columns while the user was
+// changing their model.
+describe('an invalid lifecycle does not lock the rest of Settings', () => {
+  const breakBlock = async (root: string, session: { reloadConfig: () => Promise<unknown> }) => {
+    const config = await readDisk(root);
+    // Through `unknown`: a hand-edited file can hold any shape, which is the whole point of the test.
+    (config as unknown as Record<string, unknown>).autopilot = { maxIterations: 10 };
+    await writeFile(configPath(root), stringify(config), 'utf8');
+    await session.reloadConfig();
+  };
+
+  it('saves a setting that has nothing to do with the lifecycle', async () => {
+    const { app, root, session } = await openTestProject({ name: 'A', mode: 'brownfield' });
+    await breakBlock(root, session);
+
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/api/config',
+      payload: { copilot: { backend: 'opencode', backends: {} }, keepChats: 7 },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().keepChats).toBe(7);
+    // Persisted, and the broken block is left exactly as it was rather than quietly normalised.
+    const onDisk = await readDisk(root);
+    expect(onDisk.keepChats).toBe(7);
+    expect(onDisk.autopilot).toEqual({ maxIterations: 10 });
+  });
+
+  it('still refuses the moment the patch touches columns', async () => {
+    const { app, root, session } = await openTestProject({ name: 'A', mode: 'brownfield' });
+    await breakBlock(root, session);
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/api/config',
+      payload: { boards: { engineering: { columns: [...ENGINEERING, 'Staging'] } } },
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().error).toContain('autopilot.routes must be a list of routes.');
+  });
+
+  it('still refuses a patch that would remove the block, which touches it by definition', async () => {
+    const { app } = await openTestProject({ name: 'A', mode: 'brownfield' });
+    const res = await app.inject({ method: 'PATCH', url: '/api/config', payload: { autopilot: null } });
+    expect(res.statusCode).toBe(400);
+  });
+});

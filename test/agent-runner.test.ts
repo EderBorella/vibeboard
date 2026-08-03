@@ -81,7 +81,7 @@ function runner(root: string, over: Partial<RunnerOptions> = {}) {
     // workers at once. At 5s the spawn itself lost the race under that load and the run was recorded
     // as timed out — which failed Stryker's DRY RUN and so blocked mutation testing for the whole
     // project. The one test that wants a timeout sets its own.
-    timeoutMs: 20_000,
+    timeoutMs: () => 20_000,
     maxConcurrent: () => 1,
     onUpdate: (r) => updates.push(r),
     ...over,
@@ -271,12 +271,39 @@ describe('AgentRunner.dispatch', () => {
   it('fails a run that outlives its timeout', async () => {
     const shim = behaving('hang');
     const root = await tempDir();
-    const { instance } = runner(root, { timeoutMs: 300 });
+    const { instance } = runner(root, { timeoutMs: () => 300 });
     const { run } = await instance.dispatch(input(root, shim));
     const final = await settled(root, run);
 
     expect(final.status).toBe('failed');
     expect(final.note).toBe('The agent was still running after 0s and was stopped.');
+  });
+
+  // Decision 8: the enforceable per-run bound is wall-clock, and it has to be the number the user can
+  // see. Two properties, and they pull in opposite directions: it is read PER DISPATCH so a change in
+  // Settings needs no restart, and it is CARRIED for the life of that run so the sentence a timed-out
+  // run leaves behind quotes the limit that run was actually held to.
+  it('takes its patience from the project on every dispatch, and holds each run to its own', async () => {
+    const shim = behaving('hang');
+    const root = await tempDir();
+    let limit = 1_000;
+    let n = 0;
+    // Two dispatches from one runner, so they need distinct ids — the pinned clock alone would give
+    // both the same one and the second would overwrite the first's record.
+    const { instance } = runner(root, { timeoutMs: () => limit, suffix: () => `t${++n}` });
+
+    const first = await instance.dispatch(input(root, shim));
+    // Changed while that run is still in flight. Re-read at settle, this would say 9s.
+    limit = 9_000;
+    expect((await settled(root, first.run)).note).toBe(
+      'The agent was still running after 1s and was stopped.',
+    );
+
+    limit = 2_000;
+    const second = await instance.dispatch(input(root, shim));
+    expect((await settled(root, second.run)).note).toBe(
+      'The agent was still running after 2s and was stopped.',
+    );
   });
 
   it('queues a run past the cap instead of refusing it', async () => {
@@ -490,7 +517,7 @@ describe('AgentRunner.dispatch', () => {
       bin: SHIM,
       now: () => new Date('2026-07-26T15:00:00.000Z'),
       suffix: () => 'c3d4',
-      timeoutMs: 20_000,
+      timeoutMs: () => 20_000,
       maxConcurrent: () => 1,
     });
     const next = await second.dispatch(input(root));

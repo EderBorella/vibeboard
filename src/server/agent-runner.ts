@@ -55,7 +55,11 @@ export interface RunnerOptions {
   // Injected so a test can pin both. Nothing here reads the clock or the RNG directly.
   now: () => Date;
   suffix: () => string;
-  timeoutMs: number;
+  // A function, like maxConcurrent and for the same reason: it comes from the open project's
+  // config (autopilot.runTimeoutMs), and changing it in Settings must take effect on the next
+  // dispatch rather than at the next restart. Decision 8 — the enforceable per-run bound is
+  // wall-clock, because usage is only known after a run has finished spending it.
+  timeoutMs: () => number;
   // How many may run at once. A function, because it comes from the open project's config and the
   // open project changes.
   maxConcurrent: () => number;
@@ -83,6 +87,10 @@ export interface RunnerOptions {
 interface Active {
   turn: RunningTurn;
   cancelled: boolean;
+  // Resolved once, when the turn was spawned. Re-reading it at settle would let the sentence
+  // "still running after Ns" quote a limit this run was never held to, because Settings may have
+  // changed while it ran.
+  timeoutMs: number;
 }
 
 // A dispatch that arrived while every slot was taken. Held in memory only: a queued record is on
@@ -253,6 +261,7 @@ export class AgentRunner {
       credential,
     });
 
+    const timeoutMs = this.#opts.timeoutMs();
     const turn = runAgentTurn({
       cwd: root,
       text: prompt,
@@ -260,7 +269,7 @@ export class AgentRunner {
       backend: input.backend,
       model: input.model,
       effort: input.effort,
-      timeoutMs: this.#opts.timeoutMs,
+      timeoutMs,
       bin: this.#opts.bin,
       sandbox: this.#opts.sandbox,
       onEvent: (event) => {
@@ -279,7 +288,7 @@ export class AgentRunner {
         );
       },
     });
-    this.#active.set(run, { turn, cancelled: false });
+    this.#active.set(run, { turn, cancelled: false, timeoutMs });
 
     // Not awaited: the caller was answered when the record was written, and the ending arrives
     // through onUpdate. Errors are folded into the record rather than thrown into nowhere.
@@ -326,7 +335,8 @@ export class AgentRunner {
     let final: RunRecord;
     try {
       const result = await turn.done;
-      const cancelled = this.#active.get(run)?.cancelled === true;
+      const active = this.#active.get(run);
+      const cancelled = active?.cancelled === true;
       const finishedAt = this.#opts.now().toISOString();
       // Every transcript line on disk before anything reads the tail.
       await this.#transcripts.get(run);
@@ -337,7 +347,9 @@ export class AgentRunner {
         await this.#filed(root, run),
       );
       const folded = await foldReport(root, spent, finishedAt, secret);
-      final = folded ?? (await this.#endWithoutReport(root, spent, result, cancelled, finishedAt));
+      final =
+        folded ??
+        (await this.#endWithoutReport(root, spent, result, cancelled, finishedAt, active?.timeoutMs));
     } catch (err) {
       final = withoutReport(
         record,
@@ -368,8 +380,11 @@ export class AgentRunner {
     result: { exitCode: number | null; timedOut: boolean },
     cancelled: boolean,
     finishedAt: string,
+    // Absent only if the run never got as far as being spawned, in which case it did not time out
+    // either and the sentence below is not reached.
+    carriedTimeoutMs = 0,
   ): Promise<RunRecord> {
-    const { timeoutMs } = this.#opts;
+    const timeoutMs = carriedTimeoutMs;
     const tail = await transcriptTail(root, record.run);
     let status: RunRecord['status'] = 'attention';
     let note = 'The agent finished without writing a report.';

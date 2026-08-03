@@ -75,7 +75,12 @@ export function buildApp(
     root: () => session.root ?? '',
     now: () => new Date(),
     suffix: () => Math.random().toString(36).slice(2, 6),
-    timeoutMs: Number(process.env.VIBEBOARD_RUN_TIMEOUT_MS ?? 1_800_000),
+    // The project's own setting wins, so the number a person can see and change is the number a run
+    // is actually held to (decision 8: it "must be surfaced in the auto-pilot settings tab rather
+    // than remaining a buried env var"). The env var stays as the fallback for a project with no
+    // lifecycle block, which is every project created before it existed.
+    timeoutMs: () =>
+      session.config?.autopilot?.runTimeoutMs ?? Number(process.env.VIBEBOARD_RUN_TIMEOUT_MS ?? 1_800_000),
     // Read per dispatch from the open project's config, so changing it in Settings takes effect
     // without a restart.
     maxConcurrent: () => session.config?.maxConcurrentRuns ?? DEFAULT_MAX_RUNS,

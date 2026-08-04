@@ -1,10 +1,10 @@
-import type { CardAccount, RunRecord, RunStatus } from '../api';
+import type { CardLedgerData, RunRecord, RunStatus } from '../api';
 import { costLabel, usageTotal } from '../runs/format';
 
 interface Props {
   runs: RunRecord[];
   // What this card has cost and how many attempts each skill has used. Null until it arrives.
-  account: CardAccount | null;
+  account: CardLedgerData | null;
   onOpen: (run: RunRecord) => void;
   onCancel: (run: RunRecord) => void;
 }
@@ -77,7 +77,7 @@ export function CardReports({ runs, account, onOpen, onCancel }: Props) {
 //
 // Says "usage" rather than "cost": for a subscription-backed model the figure the backend reports is
 // API-equivalent, not what you were billed.
-function CardLedger({ account }: { account: CardAccount }) {
+function CardLedger({ account }: { account: CardLedgerData }) {
   const { spend, attempts, attemptCap } = account;
   const used = Object.entries(attempts).filter(([, n]) => n > 0);
   if (spend.runs === 0) return null;

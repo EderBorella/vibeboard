@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, cleanup, screen } from '@testing-library/react';
-import type { AutopilotState, StopReason } from '../web/src/api.js';
+import { STOP_REASONS } from '../src/core/dispatch-gate.js';
+import type { AutopilotState } from '../web/src/api.js';
 import { TopBar } from '../web/src/components/TopBar.js';
 
 afterEach(cleanup);
@@ -216,9 +217,11 @@ describe('the auto-pilot chip', () => {
   });
 
   // The line the study draws, on screen: only one of these ended with the work done.
+  // Over STOP_REASONS, not a hand-written list. The list here omitted `killed` and `unreadable` — both
+  // added during the slice that wrote it — so the UI half lacked the property the core test has: a reason
+  // added later fails this until someone decides which side of the line it is on.
   it('styles only `complete` as a success', () => {
-    const reasons: StopReason[] = ['complete', 'exhausted', 'capped', 'stalled', 'stopped', 'interrupted'];
-    for (const reason of reasons) {
+    for (const reason of STOP_REASONS) {
       cleanup();
       render(<TopBar {...props} autopilot={state({ state: 'stopped', reason })} />);
       const success = chip()?.className.includes('ap-complete');

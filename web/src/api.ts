@@ -472,7 +472,7 @@ export interface Spend {
 // One card's line in the ledger: what it cost, and how many attempts each skill has used against the
 // cap. Per skill because that is how the cap is counted — a critic run must not inflate the tally of
 // the skill doing the work.
-export interface CardAccount {
+export interface CardLedgerData {
   spend: Spend;
   attempts: Record<string, number>;
   attemptCap: number;
@@ -480,7 +480,7 @@ export interface CardAccount {
 
 export interface CardRuns {
   runs: RunRecord[];
-  account: CardAccount;
+  account: CardLedgerData;
 }
 
 export async function listCardRuns(board: BoardName, card: string): Promise<CardRuns> {
@@ -495,26 +495,39 @@ export interface Accounting {
   attemptCap: number;
   // Which cap is actually bounding this project (S10). A dollar dial that can never trip tells the
   // user the opposite of the truth about what will stop the run.
-  cap: { cap: 'budget' | 'iterations'; why: string };
+  // Absent for a project with no auto-pilot block — it has no caps, so there is no cap to name.
+  cap?: { cap: 'budget' | 'iterations'; why: string };
 }
 
 // --- Auto-pilot state and the three stops ----------------------------------
 // Mirrors src/core/autopilot-state.ts. Persisted on the server, because if `running` survives a
 // reload then `halted` must too — otherwise a refresh would bypass the overlay that explains it.
 
-export type AutopilotStateName = 'idle' | 'running' | 'stopped' | 'halted';
+// Arrays, not bare unions, and that is the point: a type alias is erased at build time, so nothing could
+// assert this mirror against the server's. `test/mirror.test.ts` now does, in both directions.
+export const AUTOPILOT_STATES = ['idle', 'running', 'stopped', 'halted'] as const;
+export type AutopilotStateName = (typeof AUTOPILOT_STATES)[number];
 
 // Every stop resolves to a named reason, and exactly ONE of them is a success. An exhausted budget
 // and a reached cap both end tidily and neither means the work is done.
-export type StopReason =
-  | 'stopped'
-  | 'killed'
-  | 'exhausted'
-  | 'capped'
-  | 'stalled'
-  | 'complete'
-  | 'interrupted'
-  | 'unreadable';
+export const STOP_REASONS = [
+  'stopped',
+  'killed',
+  'exhausted',
+  'capped',
+  'stalled',
+  'complete',
+  'interrupted',
+  'unreadable',
+] as const;
+export type StopReason = (typeof STOP_REASONS)[number];
+
+// The one rule about reasons the UI needs, mirrored rather than re-derived. `TopBar` used to spell it as
+// `reason === 'complete' ? …` inline while the server's `isSuccessReason` had no caller at all — two
+// statements of one rule, and the next reason added to the success side would have been added to one.
+export function isSuccessReason(reason: StopReason): boolean {
+  return reason === 'complete';
+}
 
 export interface AutopilotState {
   state: AutopilotStateName;

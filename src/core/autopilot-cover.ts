@@ -296,6 +296,15 @@ function checkRollupRule(
   }
 }
 
+// The number checks alone. Exported so a refusal can tell a bad number from an unroutable board and
+// offer the right remedy: appending "edit the routing table so every column is routed" to "budgetUsd is
+// null" sent a user who had cleared a box in Settings to hand-edit YAML about columns.
+export function numberProblems(ap: AutopilotConfig): string[] {
+  const out: string[] = [];
+  checkNumbers(ap, out);
+  return out;
+}
+
 export function coverageProblems(config: ProjectConfig): string[] {
   const ap = config.autopilot;
   // Absence is the loudest problem, and the only one worth reporting on its own: every check below

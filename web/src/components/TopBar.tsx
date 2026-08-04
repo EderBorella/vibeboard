@@ -1,4 +1,4 @@
-import type { AutopilotState } from '../api';
+import { type AutopilotState, isSuccessReason } from '../api';
 
 // Add a theme here after adding its [data-theme] block in themes.css.
 const THEMES: { value: string; label: string }[] = [
@@ -16,7 +16,7 @@ function chipFor(state: AutopilotState): { label: string; tone: string } | null 
   if (state.state === 'running') return { label: 'auto-pilot running', tone: 'running' };
   if (state.state === 'halted') return { label: 'halted', tone: 'halted' };
   const reason = state.reason ?? 'stopped';
-  return { label: reason, tone: reason === 'complete' ? 'complete' : 'stopped' };
+  return { label: reason, tone: isSuccessReason(reason) ? 'complete' : 'stopped' };
 }
 
 interface Props {

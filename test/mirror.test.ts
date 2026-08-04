@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
+import * as coreState from '../src/core/autopilot-state.js';
 import * as coreBackends from '../src/core/backends.js';
+import * as coreGate from '../src/core/dispatch-gate.js';
 import { skillRel } from '../src/core/layout.js';
 import * as coreRuns from '../src/core/runs.js';
 import * as coreSkills from '../src/core/skills.js';
 import * as core from '../src/core/types.js';
+import * as webApi from '../web/src/api.js';
 import * as webRuns from '../web/src/runs/viewmodel.js';
 import * as web from '../web/src/shared.js';
 import * as webSkills from '../web/src/skills/filter.js';
@@ -15,6 +18,22 @@ describe('web/shared mirrors src/core', () => {
   it('mirrors the board list and labels', () => {
     expect([...web.BOARDS]).toEqual([...core.BOARDS]);
     expect(web.BOARD_LABELS).toEqual(core.BOARD_LABELS);
+  });
+
+  // Slice D hand-mirrored six types into web/src/api.ts and extended nothing here. `STOP_REASONS` gained
+  // `unreadable` DURING that slice, which is precisely the change this guard exists to catch: the TopBar
+  // renders an unknown reason as a raw word with neutral styling, so drift is silent on screen too.
+  it('mirrors the auto-pilot state names and stop reasons', () => {
+    expect([...webApi.AUTOPILOT_STATES]).toEqual([...coreState.AUTOPILOT_STATES]);
+    expect([...webApi.STOP_REASONS]).toEqual([...coreGate.STOP_REASONS]);
+  });
+
+  // The rule, not just the list. It had two statements — the server's predicate with no caller, and the
+  // TopBar spelling it inline — so the next reason added to the success side would have reached one.
+  it('agrees which reasons are a success', () => {
+    for (const reason of coreGate.STOP_REASONS) {
+      expect(webApi.isSuccessReason(reason), reason).toBe(coreGate.isSuccessReason(reason));
+    }
   });
 
   it('mirrors the backend defaults', () => {

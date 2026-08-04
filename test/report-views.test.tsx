@@ -2,7 +2,7 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DOCS_DIR, RESOURCES_DIR, skillRel } from '../src/core/layout.js';
-import type { CardAccount, RunRecord } from '../web/src/api.js';
+import type { CardLedgerData, RunRecord } from '../web/src/api.js';
 import { ActiveReport } from '../web/src/components/ActiveReport.js';
 import { CardReports } from '../web/src/components/CardReports.js';
 import { ReportPane } from '../web/src/components/ReportPane.js';
@@ -609,7 +609,7 @@ describe('ActiveReport', () => {
 // A card's own line in the ledger. The attempt count is the number that decides whether auto-pilot
 // will try again, so it is shown against the cap rather than as a bare tally.
 describe('a card’s ledger line', () => {
-  const account = (over: Partial<CardAccount> = {}): CardAccount => ({
+  const account = (over: Partial<CardLedgerData> = {}): CardLedgerData => ({
     spend: { runs: 2, withCost: 2, withoutCost: 0, costUsd: 0.42 },
     attempts: { implement: 2 },
     attemptCap: 3,

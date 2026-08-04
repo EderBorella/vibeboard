@@ -92,6 +92,18 @@ describe('the scope table', () => {
     ['/api/explorer/file', 'PUT', false, false, false],
     ['/api/project/open', 'POST', false, false, false],
     ['/api/skills/:slug', 'PUT', false, false, false],
+    // Slice D's routes. The ledger is the one grant: the auto-pilot service enforces the budget between
+    // dispatches and reaches the board over HTTP like anything else. An AGENT that could read it would be
+    // an agent reasoning about its own leash.
+    ['/api/accounting', 'GET', false, false, true],
+    // The three controls, and the project-run resolve, are admin-only BY ABSENCE from the table — which
+    // task 6 calls load-bearing, and load-bearing behaviour with no row is one refactor from silent.
+    ['/api/autopilot/state', 'GET', false, false, false],
+    ['/api/autopilot/stop', 'POST', false, false, false],
+    ['/api/autopilot/kill', 'POST', false, false, false],
+    ['/api/autopilot/restart', 'POST', false, false, false],
+    ['/api/project-runs/:run/resolve', 'POST', false, false, false],
+    ['/api/project/scaffold', 'POST', false, false, false],
   ])('%s %s', (route, method, work, checkup, service) => {
     // `card` matches the :id row's own-card rule, so this grid measures scope and not confinement.
     expect(allows(cred('work', 'E-001'), method, route, PROJECT, 'E-001'), 'work').toBe(work);

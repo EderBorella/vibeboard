@@ -27,7 +27,9 @@ const body = (...ids: string[]) => ({
   account: { spend: { runs: ids.length, withCost: 0, withoutCost: ids.length }, attempts: {}, attemptCap: 3 },
 });
 
-beforeEach(() => api.listCardRuns.mockReset());
+beforeEach(() => {
+  api.listCardRuns.mockReset();
+});
 
 describe('useCardRuns', () => {
   it('asks for the card in front of you, by board and id', async () => {

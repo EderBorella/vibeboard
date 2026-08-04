@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { type CardAccount, cancelRun, type RunRecord, resolveRun, type Skill } from '../api';
+import { type CardLedgerData, cancelRun, type RunRecord, resolveRun, type Skill } from '../api';
 import { stopRunRequest } from '../confirm/requests';
 import { useConfirm } from '../confirm/useConfirm';
 import type { CardRef } from '../dock/tabs';
@@ -20,7 +20,7 @@ interface Props {
   live: Card[];
   runs: RunRecord[];
   // This card's ledger line, from the same response as its runs. Null until it arrives.
-  account: CardAccount | null;
+  account: CardLedgerData | null;
   // The record the report view is showing, resolved live by the pane.
   shown: RunRecord | undefined;
   skills: Skill[];

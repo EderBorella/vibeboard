@@ -1,10 +1,9 @@
 import { useEffect, useState } from 'react';
-import { getReadiness, killAutopilot, type Readiness, softStopAutopilot } from '../api';
+import { type AutopilotState, getReadiness, killAutopilot, type Readiness, softStopAutopilot } from '../api';
 import { killProjectRequest } from '../confirm/requests';
 import { useConfirm } from '../confirm/useConfirm';
 import { useAccounting } from '../runs/useAccounting';
 import { type AutopilotConfig, BOARD_LABELS, type ProjectConfig } from '../shared';
-import { useAutopilot } from '../useAutopilot';
 
 // The lifecycle as it will actually be executed, plus what is stopping it.
 //
@@ -56,11 +55,17 @@ const CAPS = [
 export function AutopilotPanel({
   config,
   onCaps,
+  autopilot,
+  onAutopilotChanged,
 }: {
   config: ProjectConfig;
   // Called with the whole set of edited caps on every change. The modal merges them into the config's
   // autopilot block and saves once, with everything else.
   onCaps?: (caps: Partial<AutopilotConfig>) => void;
+  // The one copy of the state, owned by App. See the note on SettingsModal's props for why the panel
+  // must not open its own.
+  autopilot: AutopilotState | null;
+  onAutopilotChanged: () => void;
 }) {
   const [readiness, setReadiness] = useState<Readiness | null>(null);
   const [failed, setFailed] = useState(false);
@@ -83,8 +88,12 @@ export function AutopilotPanel({
   // below, because a hook after a conditional return is a different bug.
   const [caps, setCaps] = useState<Partial<AutopilotConfig>>({});
   const accounting = useAccounting(config);
-  const edit = (key: keyof AutopilotConfig, value: number): void => {
-    const next = { ...caps, [key]: value };
+  // Clamped here, not merely validated on the server. An emptied number box gives `Number('') === NaN`,
+  // which `JSON.stringify` puts on the wire as `null`, and `min={0}` on the input does not stop a typed
+  // `-5` — so the user cleared a box and got a 400 about column routing. A box that cannot express an
+  // invalid value needs no refusal.
+  const edit = (key: keyof AutopilotConfig, value: number, min: number): void => {
+    const next = { ...caps, [key]: Number.isFinite(value) ? Math.max(min, value) : min };
     setCaps(next);
     onCaps?.(next);
   };
@@ -138,7 +147,7 @@ export function AutopilotPanel({
       <div className="settings-hint">
         {/* S10: the number that will actually stop this project, in words. A dollar dial beside a
             budget that can never trip tells the reader the opposite of the truth. */}
-        {accounting?.cap.why ?? 'Whichever of these is reached first stops the run.'}
+        {accounting?.cap?.why ?? 'Whichever of these is reached first will stop the run.'}
       </div>
       {CAPS.map((cap) => (
         <label className="field" key={cap.key}>
@@ -148,7 +157,7 @@ export function AutopilotPanel({
             min={cap.min}
             step={cap.step}
             value={caps[cap.key] ?? ap[cap.key]}
-            onChange={(e) => edit(cap.key, Number(e.target.value))}
+            onChange={(e) => edit(cap.key, Number(e.target.value), cap.min)}
           />
           <span className="field-hint">{cap.hint}</span>
         </label>
@@ -163,7 +172,7 @@ export function AutopilotPanel({
           min={1}
           step={5}
           value={Math.round((caps.runTimeoutMs ?? ap.runTimeoutMs) / 60_000)}
-          onChange={(e) => edit('runTimeoutMs', Math.max(1, Number(e.target.value)) * 60_000)}
+          onChange={(e) => edit('runTimeoutMs', Number(e.target.value) * 60_000, 60_000)}
         />
         <span className="field-hint">
           One run is abandoned after this long and recorded as failed, which burns an attempt — a card that
@@ -179,7 +188,7 @@ export function AutopilotPanel({
         · blocked cards go to {ap.blockedColumn} on engineering.
       </div>
 
-      <StopControls />
+      <StopControls state={autopilot} refresh={onAutopilotChanged} />
 
       <div className="settings-hint" style={{ marginTop: '0.6rem' }}>
         Before auto-pilot can start:
@@ -203,8 +212,7 @@ export function AutopilotPanel({
 //
 // Two buttons rather than one with a modifier: one of these is reversible and the other kills work in
 // flight, and that difference should not live in a checkbox.
-function StopControls() {
-  const { state, refresh } = useAutopilot(0);
+function StopControls({ state, refresh }: { state: AutopilotState | null; refresh: () => void }) {
   const { confirm, dialog } = useConfirm();
   const [error, setError] = useState<string | null>(null);
   const running = state?.state === 'running';

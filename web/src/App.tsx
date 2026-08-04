@@ -236,6 +236,8 @@ export function App() {
           config={snapshot.config}
           onClose={() => setSettingsOpen(false)}
           onSaved={() => setSettingsOpen(false)}
+          autopilot={autopilot.state}
+          onAutopilotChanged={autopilot.refresh}
         />
       )}
 

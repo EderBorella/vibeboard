@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import type { RunUsage } from '../web/src/api.js';
-import { costLabel, formatCost, formatDuration, formatTokens, usageLine } from '../web/src/runs/format.js';
+import {
+  costLabel,
+  formatCost,
+  formatDuration,
+  formatTokens,
+  usageLine,
+  usageTotal,
+} from '../web/src/runs/format.js';
 
 describe('formatCost', () => {
   it('keeps four decimals for sub-cent runs, which is most of them', () => {
@@ -99,5 +106,29 @@ describe('costLabel', () => {
     expect(costLabel(undefined)).toBe('');
     expect(costLabel({ turns: 3 })).toBe('');
     expect(costLabel({ costUsd: 0 })).toBe('$0');
+  });
+});
+
+// JSON has no Infinity, so a total that overflows arrives as `null`. The web mirror declares
+// `costUsd?: number` and every guard here tested `=== undefined`, which `null` passes — then `.toFixed`
+// threw inside render and took the dashboard with it. The trigger is absurd ($3×10³⁰⁸); what the finding
+// is really about is the web layer trusting the wire completely.
+describe('a cost the wire could not carry', () => {
+  const spend = (costUsd: unknown) =>
+    ({ runs: 2, withCost: 2, withoutCost: 0, costUsd }) as Parameters<typeof usageTotal>[0];
+
+  it.each([null, undefined, Number.NaN, Number.POSITIVE_INFINITY])('renders %s as no figure', (bad) => {
+    expect(() => usageTotal(spend(bad))).not.toThrow();
+    expect(usageTotal(spend(bad))).toContain('not reported');
+  });
+
+  it.each([null, Number.NaN, Number.POSITIVE_INFINITY])('never formats %s as an amount', (bad) => {
+    expect(() => formatCost(bad as number)).not.toThrow();
+    expect(formatCost(bad as number)).not.toContain('$');
+  });
+
+  it('still renders a real zero as a real zero', () => {
+    expect(formatCost(0)).toBe('$0');
+    expect(usageTotal(spend(0))).toContain('$0');
   });
 });

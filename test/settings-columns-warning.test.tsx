@@ -37,7 +37,15 @@ const configFor = (autopilot: boolean): ProjectConfig => {
 };
 
 const show = (autopilot: boolean) =>
-  render(<SettingsModal config={configFor(autopilot)} onClose={() => {}} onSaved={() => {}} />);
+  render(
+    <SettingsModal
+      config={configFor(autopilot)}
+      onClose={() => {}}
+      onSaved={() => {}}
+      autopilot={null}
+      onAutopilotChanged={() => {}}
+    />,
+  );
 
 // Adding or removing a column is refused while a routing table exists, and the routing table is not
 // editable from the UI yet. Being told that at Save, with no way forward in the message, is a dead
@@ -91,6 +99,19 @@ describe('saving the caps', () => {
   const save = (): void => {
     fireEvent.click(screen.getByText('Save'));
   };
+
+  // The property the commit immediately before this slice existed to create, and which sending the block
+  // unconditionally undid: a save that does not touch the lifecycle must not make the server re-validate
+  // it. Asserted on what is SENT, because that is what decides whether the server checks.
+  it('sends no autopilot block when no cap was touched, so an invalid lifecycle cannot lock the modal', async () => {
+    api.patchConfig.mockResolvedValue({});
+    show(true);
+    // A save of something else entirely — the shape of every ordinary save.
+    fireEvent.change(field('Keep last N chats'), { target: { value: '9' } });
+    save();
+    await waitFor(() => expect(api.patchConfig).toHaveBeenCalled());
+    expect('autopilot' in api.patchConfig.mock.calls[0][0]).toBe(false);
+  });
 
   it('sends the WHOLE autopilot block, not just the edited number', async () => {
     api.patchConfig.mockResolvedValue({});

@@ -24,7 +24,9 @@ const catalogue = (slug: string) => ({
   invalid: [],
 });
 
-beforeEach(() => api.listSkills.mockReset());
+beforeEach(() => {
+  api.listSkills.mockReset();
+});
 
 describe('useSkills', () => {
   it('starts empty, so the rail renders before the fetch lands', () => {

@@ -213,6 +213,31 @@ describe('ExecutionView', () => {
 // The README's admitted gap, on screen. The wording matters as much as the number: for a
 // subscription-backed model the figure the backend reports is API-equivalent rather than what you were
 // billed, and a project whose backend reports nothing has not spent nothing.
+// The one screen a checkup or pre-flight run can appear on, and it was never rendered with one. Those
+// runs carry no card and no board, so every place that printed `record.card` printed nothing at all.
+describe('a run that is about the project, not a card', () => {
+  const projectRun = (over: Partial<RunRecord> = {}) =>
+    run({ card: undefined, board: undefined, skill: 'checkup', ...over });
+
+  it('names the project rather than an empty card', () => {
+    render(<ExecutionView {...props} runs={[projectRun({ status: 'attention' })]} />);
+    expect(screen.getByText(/the project/)).toBeTruthy();
+  });
+
+  // The open button has three cases and this is the third: there is nothing to open, and the reason has
+  // to distinguish "about the project" from "that card is gone".
+  it('offers nothing to open, and says which of the two reasons applies', () => {
+    render(<ExecutionView {...props} runs={[projectRun({ status: 'attention' })]} />);
+    const button = screen.getByTitle('This run is about the project, not a card');
+    expect((button as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it('says the card is gone for a card run whose card left the board', () => {
+    render(<ExecutionView {...props} runs={[run({ card: 'E-999', status: 'attention' })]} />);
+    expect(screen.getByTitle('E-999 is no longer on the board')).toBeTruthy();
+  });
+});
+
 describe('the project ledger on the dashboard', () => {
   afterEach(() => {
     accounting.current = null;

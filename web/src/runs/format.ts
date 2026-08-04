@@ -8,7 +8,19 @@ import type { RunUsage } from '../api';
 
 // Sub-cent runs are the normal case, and $0.00 for four different runs tells you nothing — so small
 // amounts keep four decimals. Above a dollar the cents are what matter.
+// A predicate, not a boolean check: `Number.isFinite` narrows nothing, and the alternative is a non-null
+// assertion at every use site — the same mistake repeated rather than one guard written correctly.
+export function isMoney(n: number | undefined): n is number {
+  return Number.isFinite(n);
+}
+
 export function formatCost(usd: number): string {
+  // `null`, not `undefined`, is what an overflowing total becomes on the wire: JSON cannot carry
+  // Infinity. The web mirror declares `costUsd?: number` and every guard tests `=== undefined`, which
+  // `null` sails through — and `null.toFixed` throws inside render, taking the dashboard with it. What
+  // makes this worth a guard rather than a shrug is that it is the web layer trusting the wire
+  // completely; the trigger being absurd does not make the trust sound.
+  if (!isMoney(usd)) return 'not a number';
   if (usd === 0) return '$0';
   if (usd < 0.01) return `$${usd.toFixed(4)}`;
   if (usd < 1) return `$${usd.toFixed(3)}`;
@@ -35,7 +47,7 @@ export function formatDuration(ms: number): string {
 export function usageLine(usage: RunUsage | undefined): string {
   if (!usage) return '';
   const parts: string[] = [];
-  if (usage.costUsd !== undefined) parts.push(formatCost(usage.costUsd));
+  if (isMoney(usage.costUsd)) parts.push(formatCost(usage.costUsd));
   if (usage.durationMs !== undefined) parts.push(formatDuration(usage.durationMs));
   if (usage.turns !== undefined) parts.push(`${usage.turns} ${usage.turns === 1 ? 'turn' : 'turns'}`);
   if (usage.contextTokens !== undefined) parts.push(`${formatTokens(usage.contextTokens)} ctx`);
@@ -57,10 +69,13 @@ export function usageTotal(spend: {
   durationMs?: number;
 }): string {
   const runs = `${spend.runs} ${spend.runs === 1 ? 'run' : 'runs'}`;
-  if (spend.costUsd === undefined) {
+  // `isMoney` rather than `=== undefined`: see formatCost. An absent cost and an unusable one read the
+  // same to a person — neither is a figure — and the alternative is throwing during render.
+  const costUsd = spend.costUsd;
+  if (!isMoney(costUsd)) {
     return `${runs} · usage not reported by this backend`;
   }
-  const parts = [runs, `${formatCost(spend.costUsd)} usage`];
+  const parts = [runs, `${formatCost(costUsd)} usage`];
   if (spend.durationMs !== undefined) parts.push(formatDuration(spend.durationMs));
   // Only when some runs are missing from the total: otherwise the caveat is noise on every screen.
   if (spend.withoutCost > 0) parts.push(`${spend.withoutCost} reported none`);
@@ -70,5 +85,5 @@ export function usageTotal(spend: {
 // Just the money, for the places that have room for one number: a card's report row and a dashboard
 // line. Empty when the backend never said, so nothing renders rather than a misleading zero.
 export function costLabel(usage: RunUsage | undefined): string {
-  return usage?.costUsd === undefined ? '' : formatCost(usage.costUsd);
+  return isMoney(usage?.costUsd) ? formatCost(usage.costUsd) : '';
 }

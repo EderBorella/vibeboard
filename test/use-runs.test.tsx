@@ -26,7 +26,9 @@ const list = (...ids: string[]) => ({
   queued: [],
 });
 
-beforeEach(() => api.listRuns.mockReset());
+beforeEach(() => {
+  api.listRuns.mockReset();
+});
 
 describe('useRuns', () => {
   it('starts empty on all three lists, so the dashboard renders before the fetch lands', () => {

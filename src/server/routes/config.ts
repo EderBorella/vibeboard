@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { applyRouteRenames } from '../../core/autopilot.js';
-import { coverageProblems, shapeProblems } from '../../core/autopilot-cover.js';
+import { coverageProblems, numberProblems, shapeProblems } from '../../core/autopilot-cover.js';
 import { applyColumnPlan, isRefused, planColumnChanges, validateColumns } from '../../core/columns.js';
 import { writeConfig } from '../../core/config.js';
 import type { BoardName, ProjectConfig } from '../../core/types.js';
@@ -99,6 +99,15 @@ function retableAndCheck(current: ProjectConfig, merged: ProjectConfig, renames:
   // The remedy, not just the refusal. A message about a condition the user cannot see and cannot act
   // on is a worse failure than the condition — and the routing table is not editable from the UI yet,
   // so without this sentence the only way forward is to guess which file to open.
+  //
+  // But it is the remedy for a ROUTING problem, and it used to be appended to every problem including
+  // the pure numbers: a cleared cap box was answered with `budgetUsd must be zero or more; it is null.`
+  // followed by an instruction about column routing. Same shape as the bug this file already records as
+  // fixed — the refusal spoke about columns while the user was changing something else.
+  const numeric = new Set(merged.autopilot ? numberProblems(merged.autopilot) : []);
+  if (problems.every((p) => numeric.has(p))) {
+    return { code: 400, error: `${problems.join(' ')} Correct it in Settings.` };
+  }
   return {
     code: 400,
     error: `${problems.join(' ')} Edit \`autopilot\` in .vibeboard/config.yaml so every column is routed, terminal or blocked.`,

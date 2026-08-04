@@ -55,10 +55,18 @@ const configWith = (autopilot: boolean): ProjectConfig => {
   return config;
 };
 
+// The panel no longer opens its own copy of the state: App owns it and passes it down, so every render
+// here supplies it. `getAutopilotState` is still mocked because other components in the tree use it.
+const panel = (config: ProjectConfig, over: Partial<PanelProps> = {}) => (
+  <AutopilotPanel config={config} autopilot={null} onAutopilotChanged={() => {}} {...over} />
+);
+type PanelProps = Parameters<typeof AutopilotPanel>[0];
+
 describe('the auto-pilot panel', () => {
+
   it('renders every route, so the lifecycle can be read off the screen', async () => {
     api.getReadiness.mockResolvedValue(readiness());
-    render(<AutopilotPanel config={configWith(true)} />);
+    render(panel(configWith(true)));
     // A row per route plus the header: a table showing SOME of the lifecycle would be worse than
     // none, because the missing phase is the one nobody would think to look for.
     expect(await screen.findAllByRole('row')).toHaveLength(DEFAULT_AUTOPILOT.routes.length + 1);
@@ -76,14 +84,14 @@ describe('the auto-pilot panel', () => {
         ],
       }),
     );
-    render(<AutopilotPanel config={configWith(true)} />);
+    render(panel(configWith(true)));
     expect(await screen.findByText(/has no README/)).toBeTruthy();
     expect(screen.getByText(/CODE-QUALITY\.md has not been written yet/)).toBeTruthy();
   });
 
   it('says so plainly when there is nothing in the way', async () => {
     api.getReadiness.mockResolvedValue(readiness());
-    render(<AutopilotPanel config={configWith(true)} />);
+    render(panel(configWith(true)));
     expect(await screen.findByText(/Everything auto-pilot needs is in place/)).toBeTruthy();
   });
 
@@ -91,13 +99,13 @@ describe('the auto-pilot panel', () => {
   // the fail-open the rest of this slice is built to avoid.
   it('does not claim readiness when it could not ask', async () => {
     api.getReadiness.mockRejectedValue(new Error('nope'));
-    render(<AutopilotPanel config={configWith(true)} />);
+    render(panel(configWith(true)));
     expect(await screen.findByText(/Could not read this project’s readiness/)).toBeTruthy();
     expect(screen.queryByText(/Everything auto-pilot needs is in place/)).toBeNull();
   });
 
   it('says the project predates the lifecycle, and asks nothing of the server', async () => {
-    render(<AutopilotPanel config={configWith(false)} />);
+    render(panel(configWith(false)));
     expect(await screen.findByText(/no autopilot block/)).toBeTruthy();
     expect(screen.queryByRole('table')).toBeNull();
   });
@@ -113,7 +121,7 @@ describe('the caps', () => {
     api.getReadiness.mockResolvedValue(readiness());
     const config = configWith(true);
     config.autopilot = { ...DEFAULT_AUTOPILOT, budgetUsd: 42, maxIterations: 7, attemptCap: 2 };
-    render(<AutopilotPanel config={config} />);
+    render(panel(config));
     await screen.findAllByRole('row');
     expect(field('Budget (USD)').value).toBe('42');
     expect(field('Max dispatches').value).toBe('7');
@@ -124,17 +132,36 @@ describe('the caps', () => {
   it('show the run timeout in minutes and report it in milliseconds', async () => {
     api.getReadiness.mockResolvedValue(readiness());
     const onCaps = vi.fn();
-    render(<AutopilotPanel config={configWith(true)} onCaps={onCaps} />);
+    render(panel(configWith(true), { onCaps: onCaps }));
     await screen.findAllByRole('row');
     expect(field('Run timeout (minutes)').value).toBe('30');
     fireEvent.change(field('Run timeout (minutes)'), { target: { value: '5' } });
     expect(onCaps).toHaveBeenCalledWith(expect.objectContaining({ runTimeoutMs: 300_000 }));
   });
 
+  // A box that cannot express an invalid value needs no refusal. `Number('')` is NaN, JSON has no NaN,
+  // so an emptied box reached the server as `null` — and `min={0}` on the input does not stop a typed
+  // `-5`. Asserted on what the panel REPORTS, because that is what gets sent.
+  it.each([
+    ['Budget (USD)', '', 'budgetUsd', 0],
+    ['Budget (USD)', '-5', 'budgetUsd', 0],
+    ['Max dispatches', '', 'maxIterations', 1],
+    ['Max dispatches', '-3', 'maxIterations', 1],
+    ['Attempts per card', '', 'attemptCap', 1],
+    ['Run timeout (minutes)', '', 'runTimeoutMs', 60_000],
+  ])('clamps %s of "%s" to the lowest value it allows', async (label, typed, key, expected) => {
+    api.getReadiness.mockResolvedValue(readiness());
+    const onCaps = vi.fn();
+    render(panel(configWith(true), { onCaps: onCaps }));
+    await screen.findAllByRole('row');
+    fireEvent.change(field(label), { target: { value: typed } });
+    expect(onCaps).toHaveBeenLastCalledWith(expect.objectContaining({ [key]: expected }));
+  });
+
   it('report every edited cap together, so one save carries them all', async () => {
     api.getReadiness.mockResolvedValue(readiness());
     const onCaps = vi.fn();
-    render(<AutopilotPanel config={configWith(true)} onCaps={onCaps} />);
+    render(panel(configWith(true), { onCaps: onCaps }));
     await screen.findAllByRole('row');
     fireEvent.change(field('Budget (USD)'), { target: { value: '9' } });
     fireEvent.change(field('Attempts per card'), { target: { value: '4' } });
@@ -145,7 +172,7 @@ describe('the caps', () => {
   it('accept a budget of zero', async () => {
     api.getReadiness.mockResolvedValue(readiness());
     const onCaps = vi.fn();
-    render(<AutopilotPanel config={configWith(true)} onCaps={onCaps} />);
+    render(panel(configWith(true), { onCaps: onCaps }));
     await screen.findAllByRole('row');
     fireEvent.change(field('Budget (USD)'), { target: { value: '0' } });
     expect(onCaps).toHaveBeenLastCalledWith(expect.objectContaining({ budgetUsd: 0 }));
@@ -160,13 +187,13 @@ describe('the caps', () => {
       attemptCap: 3,
       cap: { cap: 'iterations', why: 'No run has reported a cost yet, so the dollar budget cannot bind.' },
     });
-    render(<AutopilotPanel config={configWith(true)} />);
+    render(panel(configWith(true)));
     expect(await screen.findByText(/dollar budget cannot bind/)).toBeTruthy();
   });
 
   it('fall back to a plain sentence when the ledger cannot be read', async () => {
     api.getReadiness.mockResolvedValue(readiness());
-    render(<AutopilotPanel config={configWith(true)} />);
+    render(panel(configWith(true)));
     expect(await screen.findByText(/Whichever of these is reached first/)).toBeTruthy();
   });
 });
@@ -177,19 +204,27 @@ describe('the stop controls', () => {
   const button = (label: string): HTMLButtonElement =>
     screen.getByText(label).closest('button') as HTMLButtonElement;
 
+  // The state is PASSED IN now, not fetched here: the panel used to call `useAutopilot(0)`, which
+  // hard-coded App's project counter and opened a second socket for the tab. That the panel makes no
+  // such call is asserted below, because a prop that is merely also supplied would hide a regression.
   const withState = async (state: string) => {
     api.getReadiness.mockResolvedValue(readiness());
-    api.getAutopilotState.mockResolvedValue({
-      state,
-      iteration: 0,
-      dispatchesSinceCheckup: 0,
-      needsCheckup: false,
-    });
-    render(<AutopilotPanel config={configWith(true)} />);
+    render(
+      panel(configWith(true), {
+        autopilot: { state, iteration: 0, dispatchesSinceCheckup: 0, needsCheckup: false } as never,
+      }),
+    );
     await screen.findAllByRole('row');
-    // The state arrives from its own fetch, a tick after the routes.
-    await waitFor(() => expect(api.getAutopilotState).toHaveBeenCalled());
   };
+
+  // The regression this fix exists to prevent, asserted rather than assumed. `socketFor` is a
+  // single-entry last-write-wins cache keyed on App's project counter, so a second `useAutopilot` call
+  // inside Settings replaced the tab's socket with a new one — the exact invariant ws.ts's header says
+  // it exists to hold. A panel that fetches nothing cannot do that.
+  it('opens no state of its own, so the tab keeps one socket', async () => {
+    await withState('running');
+    expect(api.getAutopilotState).not.toHaveBeenCalled();
+  });
 
   it('offers no soft stop when there is nothing to stop', async () => {
     await withState('idle');

@@ -50,7 +50,7 @@ export function ExecutionView({ runs, active, queued, cards, now, onOpenCard, on
           <span className="exec-ledger-total">{usageTotal(accounting.project)}</span>
           {/* S10: which cap will actually stop this project. A dollar figure beside a budget that can
               never trip would tell the reader the opposite of the truth. */}
-          <span className="exec-ledger-cap">{accounting.cap.why}</span>
+          {accounting.cap && <span className="exec-ledger-cap">{accounting.cap.why}</span>}
         </p>
       )}
       {COLUMNS.map((column) => {

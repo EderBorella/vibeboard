@@ -92,7 +92,9 @@ describe('flatten', () => {
 });
 
 afterEach(cleanup);
-beforeEach(() => api.listDir.mockReset());
+beforeEach(() => {
+  api.listDir.mockReset();
+});
 
 // A rejecting mock must be `...Once`. On vitest 2.1.9, a standing rejection — mockRejectedValue, or
 // a mockImplementation that rejects or throws — reports an unhandled rejection however carefully the

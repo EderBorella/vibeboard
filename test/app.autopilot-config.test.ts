@@ -223,3 +223,42 @@ describe('an invalid lifecycle does not lock the rest of Settings', () => {
     expect(res.statusCode).toBe(400);
   });
 });
+
+// The caps became editable from Settings in slice D, which made this class of refusal reachable from the
+// UI for the first time: before it, the numbers were read-only and only a hand-edited YAML could be
+// wrong. A refusal that talks about column routing to someone who cleared a cap box is the dead-end
+// message the project's own rule forbids — and the same shape as the bug already recorded as fixed.
+describe('refusing a cap, and saying the right thing about it', () => {
+  // The whole block, with one cap replaced — which is what Settings sends: `{...config.autopilot,
+  // ...editedCaps}`. Patching the caps alone would drop `routes` and be refused for a different reason,
+  // and the test would then pass while proving nothing about the remedy.
+  const patchCap = async (payload: Record<string, unknown>) => {
+    const { app, session } = await openTestProject({ name: 'A', mode: 'brownfield' });
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/api/config',
+      payload: { autopilot: { ...session.config?.autopilot, ...payload } },
+    });
+    expect(res.statusCode).toBe(400);
+    return res.json().error as string;
+  };
+
+  // `null` is what an emptied number box becomes on the wire: `Number('')` is NaN and JSON has no NaN.
+  it.each([
+    ['a cleared budget', { budgetUsd: null }],
+    ['a cleared iteration cap', { maxIterations: null }],
+    ['a negative budget', { budgetUsd: -5 }],
+    ['a zero iteration cap', { maxIterations: 0 }],
+  ])('answers %s without sending the user to the routing table', async (_label, payload) => {
+    const error = await patchCap(payload);
+    expect(error).not.toContain('every column is routed');
+    expect(error).toContain('Settings');
+  });
+
+  // The other half: a real routing problem must still carry the remedy that names the file, because the
+  // routing table genuinely is not editable from the UI.
+  it('still names config.yaml when the problem really is the routing table', async () => {
+    const error = await patchCap({ routes: [] });
+    expect(error).toContain('.vibeboard/config.yaml');
+  });
+});

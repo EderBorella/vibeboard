@@ -1,5 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
-import { getSandbox, listModels, type ModelOption, patchConfig, type SandboxState } from '../api';
+import {
+  type AutopilotState,
+  getSandbox,
+  listModels,
+  type ModelOption,
+  patchConfig,
+  type SandboxState,
+} from '../api';
 import { clampToCaps, resolveChoice } from '../copilot/choice';
 import {
   type AutopilotConfig,
@@ -25,7 +32,16 @@ interface Props {
   config: ProjectConfig;
   onClose: () => void;
   onSaved: () => void;
+  // Passed down rather than fetched again. `useAutopilot(0)` inside the panel hard-coded App's project
+  // counter to 0, and `socketFor` is a single-entry last-write-wins cache — so opening Settings after a
+  // project switch replaced the tab's socket with a second one, which is the invariant ws.ts exists to
+  // hold. It also meant the buttons read the PREVIOUS project's state across a switch.
+  autopilot: AutopilotState | null;
+  onAutopilotChanged: () => void;
 }
+
+// A number box left blank, or holding something that is not a number, means "leave this as it was".
+const orKeep = (text: string | number, current: number): number => Number(text) || current;
 
 function parseCsv(text: string): string[] {
   return text
@@ -34,7 +50,7 @@ function parseCsv(text: string): string[] {
     .filter(Boolean);
 }
 
-export function SettingsModal({ config, onClose, onSaved }: Props) {
+export function SettingsModal({ config, onClose, onSaved, autopilot, onAutopilotChanged }: Props) {
   const [backend, setBackend] = useState(resolveChoice(config.copilot, {}).backend);
   // The auto-pilot caps, edited in the panel below and saved with everything else — one Save button,
   // and one place for the server's refusal to appear (which may be about the routing table rather than
@@ -106,14 +122,21 @@ export function SettingsModal({ config, onClose, onSaved }: Props) {
         copilot: { backend, backends: slots },
         boards,
         enforceOneParent,
-        miniatureChars: Number(miniatureChars) || config.miniatureChars,
-        idPadding: Number(idPadding) || config.idPadding,
-        keepChats: Number(keepChats) || (config.keepChats ?? 20),
-        contextBudget: Number(contextBudget) || DEFAULT_CONTEXT_BUDGET,
-        // Only when this project HAS a lifecycle, and always the whole block: the server validates the
-        // routing table on any patch that touches `autopilot`, and sending a partial one would ask it
-        // to check a lifecycle with no routes in it.
-        ...(config.autopilot ? { autopilot: { ...config.autopilot, ...apCaps } } : {}),
+        miniatureChars: orKeep(miniatureChars, config.miniatureChars),
+        idPadding: orKeep(idPadding, config.idPadding),
+        keepChats: orKeep(keepChats, config.keepChats ?? 20),
+        contextBudget: orKeep(contextBudget, DEFAULT_CONTEXT_BUDGET),
+        // Only when a cap was actually EDITED, and then the whole block.
+        //
+        // Both halves matter. The whole block, because the server validates the routing table on any
+        // patch touching `autopilot` and a partial one would ask it to check a lifecycle with no routes
+        // in it. Only when edited, because the check runs on any patch that touches the key at all —
+        // so sending it unconditionally undid the fix of the commit immediately before this slice
+        // (a project whose lifecycle is invalid could once again save no setting at all, and the
+        // refusal spoke about columns while the user was changing their model).
+        ...(config.autopilot && Object.keys(apCaps).length > 0
+          ? { autopilot: { ...config.autopilot, ...apCaps } }
+          : {}),
       });
       onSaved();
     } catch (e) {
@@ -243,7 +266,12 @@ export function SettingsModal({ config, onClose, onSaved }: Props) {
             rule either way: it is the hierarchy auto-pilot rolls up, and an agent cannot mean “see also”.
           </div>
 
-          <AutopilotPanel config={config} onCaps={setApCaps} />
+          <AutopilotPanel
+            config={config}
+            onCaps={setApCaps}
+            autopilot={autopilot}
+            onAutopilotChanged={onAutopilotChanged}
+          />
 
           <div className="settings-section">Cards</div>
           <div className="settings-row">

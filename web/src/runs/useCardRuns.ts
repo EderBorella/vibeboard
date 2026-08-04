@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { type CardAccount, listCardRuns, type RunRecord } from '../api';
+import { type CardLedgerData, listCardRuns, type RunRecord } from '../api';
 import type { BoardName } from '../shared';
 
 // One card's runs, oldest first, with that card's ledger line — refetched whenever `trigger` changes.
@@ -11,11 +11,11 @@ export function useCardRuns(
   board: BoardName | undefined,
   card: string | undefined,
   trigger: unknown,
-): { runs: RunRecord[]; account: CardAccount | null } {
+): { runs: RunRecord[]; account: CardLedgerData | null } {
   const [runs, setRuns] = useState<RunRecord[]>([]);
   // Null until the first answer, and kept through a failure: a total that flickers to zero and back
   // reads as money having disappeared.
-  const [account, setAccount] = useState<CardAccount | null>(null);
+  const [account, setAccount] = useState<CardLedgerData | null>(null);
   // biome-ignore lint/correctness/useExhaustiveDependencies: deliberate trigger
   useEffect(() => {
     if (!board || !card) {

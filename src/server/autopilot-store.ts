@@ -63,7 +63,21 @@ export async function updateAutopilotState(
   at: string,
   change: (current: AutopilotState) => AutopilotState,
 ): Promise<AutopilotState> {
-  const next = change(await readAutopilotState(root, at));
+  const current = await readAutopilotState(root, at);
+  const next = change(current);
+  // A merge may never take a project OUT of `halted`.
+  //
+  // The only writer that legitimately does is `restart`, and it writes the whole state rather than
+  // merging — precisely because it is dropping everything, deliberately. Every other writer is adding
+  // to what is there, and `halted` means every agent in this project has been killed: a counter update
+  // that carried a stale `state: running` alongside it would silently lift the overlay, re-open
+  // dispatch, and let the lazy backend respawn, with nobody having decided any of that.
+  //
+  // Fail closed, like the unreadable case above and for the same reason: this is the one state whose
+  // accidental loss cannot be noticed by the person it was protecting.
+  if (current.state === 'halted' && next.state !== 'halted') {
+    return { ...next, state: 'halted', reason: current.reason, detail: current.detail, at: current.at };
+  }
   await writeAutopilotState(root, next);
   return next;
 }

@@ -193,10 +193,14 @@ export function attachedOpencodeUrl(): string | undefined {
 export function opencodeBaseUrl(): Promise<string> {
   const attach = attachedOpencodeUrl();
   if (attach) return Promise.resolve(attach.replace(/\/$/, ''));
-  // Before the spawn, and after the attach check: a server somebody else started is not ours to
-  // refuse. An already-running managed server is left alone too — the emergency stop killed it, so
-  // reaching here with one alive means it belongs to a project that is not halted.
-  if (!urlPromise && halted()) {
+  // Before the spawn, and after the attach check: a server somebody else started is not ours to refuse.
+  //
+  // The halt check is NOT conditional on there being no managed server yet. It was, on the reasoning
+  // that the emergency stop had killed any live one — true only when this process performed the halt.
+  // Open a project whose state file already says `halted` while a server spawned for the previous
+  // project is still alive and `urlPromise` is set, so the gate was skipped and `GET /api/models`
+  // would talk to that server on behalf of a halted project.
+  if (halted()) {
     return Promise.reject(
       new Error('This project is halted, so VibeBoard will not start an OpenCode server for it.'),
     );

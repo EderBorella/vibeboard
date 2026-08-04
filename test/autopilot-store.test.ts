@@ -83,6 +83,41 @@ describe('auto-pilot state on disk', () => {
       expect(await readAutopilotState(root, AT)).toEqual(next);
     });
 
+    // The only writer that may leave `halted` is `restart`, and it writes the whole state because it is
+    // dropping everything deliberately. A merge is always ADDING to what is there, and a counter update
+    // carrying a stale `state: running` would silently lift the overlay, re-open dispatch and let the
+    // backend respawn — with nobody having decided any of it.
+    it('refuses to lift a halt, however the change is written', async () => {
+      const root = await tempDir();
+      await writeAutopilotState(root, {
+        ...IDLE_STATE,
+        state: 'halted',
+        reason: 'killed',
+        detail: 'You stopped everything.',
+        at: '2026-08-03T09:00:00.000Z',
+      });
+      const next = await updateAutopilotState(root, AT, (current) => ({
+        ...current,
+        state: 'running',
+        iteration: 42,
+      }));
+      expect(next).toMatchObject({
+        state: 'halted',
+        reason: 'killed',
+        detail: 'You stopped everything.',
+        at: '2026-08-03T09:00:00.000Z',
+      });
+      // And nothing was written: the refusal leaves the halt exactly as it was found.
+      expect(await readAutopilotState(root, AT)).toMatchObject({ state: 'halted', iteration: 0 });
+    });
+
+    it('still allows a merge that keeps the halt, so counters can be recorded', async () => {
+      const root = await tempDir();
+      await writeAutopilotState(root, { ...IDLE_STATE, state: 'halted', reason: 'killed' });
+      const next = await updateAutopilotState(root, AT, (current) => ({ ...current, iteration: 9 }));
+      expect(next).toMatchObject({ state: 'halted', iteration: 9 });
+    });
+
     it('starts from idle when there is no file yet', async () => {
       const root = await tempDir();
       const next = await updateAutopilotState(root, AT, (current) => ({ ...current, iteration: 1 }));

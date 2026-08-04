@@ -75,10 +75,20 @@ export function killGroup(pgid: number, signal: NodeJS.Signals): boolean {
 // Ask, then insist. A CLI given SIGTERM writes what it has and exits; one that ignores it — or whose
 // children do — is killed after the grace period.
 export function terminateGroup(pgid: number, graceMs = GROUP_GRACE_MS): boolean {
+  // Sampled BEFORE the TERM, because it is the only moment the group is known to be the right one. The
+  // escalation two seconds later is exactly the situation this module exists for: the group may have
+  // exited inside the grace period and a new leader may have inherited its pid, in which case the
+  // SIGKILL would land on a stranger — the mistake `groupStartTime` was written to prevent, made by
+  // the function that owns the timer rather than by a stale record.
+  const started = groupStartTime(pgid);
   const signalled = killGroup(pgid, 'SIGTERM');
   if (!signalled) return false;
   // `unref`ed, so a pending kill never holds the process open. Without it a server shutting down — or
   // a test worker finishing — would wait out the grace period of every run it stopped.
-  setTimeout(() => killGroup(pgid, 'SIGKILL'), graceMs).unref();
+  setTimeout(() => {
+    // No start time means we could not identify the group even at TERM time; escalating blind is the
+    // one thing worse than leaving it, since by now the pid may be anyone's.
+    if (started !== undefined && isSameGroup(pgid, started)) killGroup(pgid, 'SIGKILL');
+  }, graceMs).unref();
   return true;
 }

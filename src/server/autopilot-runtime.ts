@@ -1,6 +1,6 @@
 import { type AutopilotState, IDLE_STATE, reconcile } from '../core/autopilot-state.js';
 import { type StopReason, stopSentence } from '../core/dispatch-gate.js';
-import { readAutopilotState, writeAutopilotState } from './autopilot-store.js';
+import { readAutopilotState, updateAutopilotState, writeAutopilotState } from './autopilot-store.js';
 import type { Log } from './logging.js';
 
 // The three levels of stopping (decision 12), and the live answer to "is this project halted?".
@@ -86,12 +86,12 @@ export class AutopilotRuntime {
   }
 
   // Synchronous, and only for callers that cannot await — see the note at the top of this file.
+  //
+  // There is deliberately no `forget()` for a closed project: every path that opens or switches one
+  // calls `load()`, which replaces the mirror from the new project's file, and with no project open
+  // `current()` answers `IDLE_STATE`. A method nothing calls would be one more thing to keep true.
   isHalted(): boolean {
     return this.#mirror.state === 'halted';
-  }
-
-  state(): AutopilotState {
-    return this.#mirror;
   }
 
   // Auto-pilot stops dispatching. Nothing dies, nothing is killed, and the app carries on.
@@ -133,12 +133,18 @@ export class AutopilotRuntime {
         error: 'Auto-pilot is running. Soft-stop it first, or use the emergency stop.',
       };
     }
+    // A no-op on a project already idle, as the plan asked. It was not one: resetting `iteration` from
+    // idle meant a soft stop AT `maxIterations` followed by Restart bought a fresh cap without anyone
+    // raising it — a control that quietly undoes a cap is worse than no control. Nothing to drop and
+    // nothing to reset, so the state is returned as it stands.
+    if (state.state === 'idle') return { ok: true, state };
     const root = this.#opts.root();
     if (!root) return { ok: false, error: 'No project open' };
-    // Written whole rather than merged, because everything the previous state held is deliberately
-    // dropped: `reason` and `detail` described a stop that is over, and `servicePgid` named a process
-    // the emergency stop already killed — kept, it would point the next reaper at a pid that by then
-    // belongs to something else.
+    // Written whole rather than merged — the one place that is right, and deliberately unlike `#stop`
+    // above. Everything the previous state held is being DROPPED, not preserved: `reason` and `detail`
+    // described a stop that is over, the counters belong to a run that has ended, and `servicePgid`
+    // named a process the emergency stop already killed — kept, it would point the next reaper at a pid
+    // that by then belongs to something else. A merge here would be the bug, not the fix.
     const next: AutopilotState = {
       state: 'idle',
       iteration: 0,
@@ -152,28 +158,27 @@ export class AutopilotRuntime {
     return { ok: true, state: next };
   }
 
-  // A project closed. The mirror must not keep answering for it — the next project's first read is
-  // async, and until it lands `isHalted()` would be speaking about a project nobody has open.
-  forget(): void {
-    this.#mirror = IDLE_STATE;
-  }
-
+  // Through a READ-MODIFY-WRITE, merging only the four fields this process owns.
+  //
+  // The module comment in autopilot-store.ts has always said both writers go this way; they did not,
+  // and the window is real rather than theoretical. `emergencyStop` reads the state, then awaits the
+  // kill — `cancelAll`, `stopOpencodeServer`, `listRuns` over every results folder in the project, and
+  // the reaper — which is tens of milliseconds at best and unbounded on a long history. The service is
+  // not dead until its group is reaped, so it can tick and record an iteration in that window. Writing
+  // a snapshot taken beforehand rolled that counter back, and took any `servicePgid` recorded with it —
+  // including, at the worst moment, the pgid the reaper was about to need.
   async #stop(reason: StopReason, detail: string | undefined, state: 'stopped' | 'halted' = 'stopped') {
     const root = this.#opts.root();
     const at = this.#at();
-    const next: AutopilotState = {
-      ...this.#mirror,
-      state,
-      reason,
-      detail: stopSentence(reason, detail),
-      at,
-    };
-    // Best effort on the write, never on the mirror: a project whose state file cannot be written is
+    const decided = { state, reason, detail: stopSentence(reason, detail), at } as const;
+    // The mirror moves FIRST and unconditionally: a project whose state file cannot be written is
     // exactly the project that must still behave as halted for the rest of this process's life.
-    this.#mirror = next;
+    this.#mirror = { ...this.#mirror, ...decided };
+    let next: AutopilotState = this.#mirror;
     if (root) {
       try {
-        await writeAutopilotState(root, next);
+        next = await updateAutopilotState(root, at, (current) => ({ ...current, ...decided }));
+        this.#mirror = next;
       } catch (err) {
         this.#opts.log?.error({ err }, 'could not record the auto-pilot stop on disk');
       }

@@ -105,6 +105,9 @@ export function buildApp(
     // S11's files-changed. Real git here; tests that are about something else pass none and the field
     // is absent, which is what it means when there is no repository to ask.
     git: REAL_GIT,
+    // The last word on whether a dispatch may start, checked after every await the route layer does.
+    // Assigned below, because the runtime is built after the runner and this closes over it.
+    halted: () => autopilot.isHalted(),
     onUpdate: (record) => broadcast({ type: 'run:update', record }),
     log: log.child({ component: 'runner' }),
   });
@@ -117,8 +120,15 @@ export function buildApp(
     onChange: (state) => broadcast({ type: 'autopilot:state', state }),
     onKill: async (state) => {
       // In this order, and the order is the point: stop the runner first so nothing new is spawned into
-      // the group we are about to reap, then the managed server, then everything recorded on disk.
+      // the group we are about to reap, then the CHAT, then the managed server, then everything
+      // recorded on disk.
       const stopped = runner.cancelAll();
+      // The chat is an agent too, and it was the one this missed. It holds no run record, so it has no
+      // pgid on disk and neither `cancelAll` nor the reaper can see it — its turn is spawned by
+      // CopilotSession and reachable only through this call. Without it the confirm dialog's "every
+      // agent working on this project is killed" was false for the default backend, and a chat turn's
+      // grandchild outlived the halt. Its turn is spawned detached, so this reaches the whole group.
+      copilot.cancel();
       stopOpencodeServer();
       const root = session.root;
       // Decision 13's full blast radius. `cancelAll` covers what THIS process holds handles for; the

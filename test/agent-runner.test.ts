@@ -266,6 +266,44 @@ describe('AgentRunner.dispatch', () => {
     expect(final.note).toBe('The agent exited with code 2 and wrote no report.');
   });
 
+  // The invariant that replaced a race: the moment a queued run's record says `running` on disk it
+  // already carries its process group, because ONE write put both there.
+  //
+  // Be clear about what this does and does not catch. It fails deterministically if the two facts are
+  // ever split across separate writes again in the obvious direction (a plain `running` write with the
+  // group left to follow). It does NOT reliably reproduce the bug it was written for: `#drain` and
+  // `#spawn` each wrote the same path unordered, and the pgid was lost in 8 of 300 queued runs — about
+  // 3% — so restoring that code passes this test most of the time. The measurement lives in the review
+  // (2026-08-03), and the reason it is safe to rely on an invariant here rather than a stress loop is
+  // that the invariant is now structural: there is one write, so there is nothing left to order.
+  it('records the group of a run that started from the queue', async () => {
+    const shim = behaving('hang');
+    const root = await tempDir();
+    let n = 0;
+    const { instance } = runner(root, { suffix: () => `d${++n}`, maxConcurrent: () => 1 });
+    const first = await instance.dispatch(input(root, shim));
+    const queued = await instance.dispatch(input(root, shim));
+    expect(queued.status).toBe('queued');
+
+    // Free the slot so the drain starts the waiting run.
+    instance.cancel(first.run);
+    await settled(root, first.run);
+
+    // Poll for the transition, then assert the group is there IN THE SAME RECORD. Before the fix this
+    // was two writes and the pgid could arrive first and be overwritten by the plain `running`.
+    let seen: Awaited<ReturnType<typeof readRun>> = null;
+    for (let i = 0; i < 100; i++) {
+      seen = await readRun(root, 'engineering', 'E-010', queued.run);
+      if (seen?.status === 'running') break;
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    expect(seen?.status).toBe('running');
+    expect(seen?.pgid).toBeGreaterThan(1);
+    expect(seen?.pgstart).toBeGreaterThan(0);
+    instance.cancel(queued.run);
+    await settled(root, queued.run);
+  }, 20_000);
+
   // Decision 13, and the reason process groups exist at all. A CLI agent starts compilers, test
   // runners and servers; `child.kill()` reached the agent and left those running, reparented to init,
   // still working and still spending. 16 such processes were measured on the development machine.
@@ -296,6 +334,62 @@ describe('AgentRunner.dispatch', () => {
     for (let i = 0; i < 60 && alive(grandchild); i++) await new Promise((r) => setTimeout(r, 50));
     expect(alive(grandchild)).toBe(false);
   }, 20_000);
+
+  // The route layer checks the halt too, but it cannot close the window: `resolveDispatch` reads a
+  // card, the skills, the board three times and two foundation documents between that check and this
+  // call, and a kill landing in the gap left the run starting 3ms after the project was recorded halted
+  // and settling `success` — reproduced 4 times out of 4 in review. This check is the one that sits on
+  // the far side of every await.
+  describe('a halted project', () => {
+    it('refuses the dispatch, and writes no record to explain', async () => {
+      const root = await tempDir();
+      const { instance, updates } = runner(root, { halted: () => true });
+      await expect(instance.dispatch(input(root))).rejects.toThrow(/halted/);
+      // Nothing on disk and nothing broadcast: a refused dispatch is not a run that happened.
+      expect(await listCardRuns(root, 'engineering', 'E-010')).toEqual([]);
+      expect(updates).toEqual([]);
+      expect(instance.activeIds).toEqual([]);
+    });
+
+    // The gate is read per dispatch, so a halt part-way through a session stops the next one without
+    // the runner being rebuilt.
+    it('stops dispatching from the moment it is halted', async () => {
+      const root = await tempDir();
+      let halted = false;
+      let n = 0;
+      const { instance } = runner(root, { halted: () => halted, suffix: () => `h${++n}` });
+      const first = await instance.dispatch(input(root));
+      expect((await settled(root, first.run)).status).toBe('success');
+      halted = true;
+      await expect(instance.dispatch(input(root))).rejects.toThrow(/halted/);
+    });
+
+    // A run queued before the halt. `cancelAll` clears the queue on the way into `halted`; this is the
+    // second line, for whatever is still waiting when a slot frees.
+    it('does not start a run that was already waiting', async () => {
+      const shim = behaving('hang');
+      const root = await tempDir();
+      let halted = false;
+      let n = 0;
+      const { instance } = runner(root, {
+        halted: () => halted,
+        suffix: () => `q${++n}`,
+        maxConcurrent: () => 1,
+      });
+      const first = await instance.dispatch(input(root, shim));
+      const queued = await instance.dispatch(input(root, shim));
+      expect(queued.status).toBe('queued');
+
+      halted = true;
+      // End the first run so a slot frees and the drain runs.
+      instance.cancel(first.run);
+      await settled(root, first.run);
+      await new Promise((r) => setTimeout(r, 300));
+      // Still queued on disk, and never spawned: the drain saw the halt.
+      expect((await readRun(root, 'engineering', 'E-010', queued.run))?.status).toBe('queued');
+      expect(instance.activeIds).toEqual([]);
+    }, 20_000);
+  });
 
   // S11. The measurement itself is tested in git-measure.test.ts; what this pins is the WIRING — that
   // the point is taken before the agent runs and the count reaches the record on both endings, since a

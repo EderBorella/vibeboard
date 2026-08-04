@@ -15,6 +15,11 @@ afterEach(() => {
   delete process.env.VIBEBOARD_OPENCODE_URL;
 });
 
+// The gate used to read `!urlPromise && halted()`, which skipped it whenever a managed server was
+// already alive — true when the halt was loaded from disk while a server spawned for the PREVIOUS
+// project still ran. There is now no such branch: `halted()` is asked unconditionally, so this one test
+// covers the whole behaviour. Setting `urlPromise` from a test would mean spawning a real
+// `opencode serve`, which is why the branch was removed rather than covered.
 describe('the lazy OpenCode spawn', () => {
   it('refuses to start a server for a halted project', async () => {
     attachHaltGate(() => true);

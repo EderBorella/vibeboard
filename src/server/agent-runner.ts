@@ -93,6 +93,13 @@ export interface RunnerOptions {
   // pays for it: without one the field is simply absent, which is exactly what it means when there is
   // no repository to ask.
   git?: GitMeasure;
+  // Whether the open project is halted. Checked HERE, on the far side of every await the route layer
+  // does, because the route's own check cannot close the window: `resolveDispatch` reads a card, the
+  // skills, the board three times and two foundation documents between the lock and the dispatch, and
+  // a kill landing in that gap left the run to start 3ms after the project was recorded halted and run
+  // to `success` — reproduced 4 times out of 4. One synchronous check at the moment of spawning is the
+  // only place that gap does not exist.
+  halted?: () => boolean;
   // A run outlives the request that dispatched it, so there is no request logger to reach for when
   // one of its background writes fails. Optional: a runner without one behaves exactly as before.
   log?: Log;
@@ -209,6 +216,12 @@ export class AgentRunner {
   // Start a run, or queue it when every slot is taken. Returns the record as written at dispatch, so
   // the caller can answer immediately; the outcome lands later through onUpdate.
   async dispatch(input: DispatchInput): Promise<RunRecord> {
+    // Before the record exists, so a refused dispatch leaves nothing behind on disk to explain.
+    if (this.#opts.halted?.()) {
+      throw new Error(
+        'This project is halted, so nothing can be dispatched. Restart it from the auto-pilot panel first.',
+      );
+    }
     const { now, suffix } = this.#opts;
     const root = this.#opts.root();
     const startedAt = now();
@@ -243,7 +256,9 @@ export class AgentRunner {
 
   // Spawn the turn for a record already on disk. Separate from dispatch because a queued run reaches
   // this later, with the same record it was written with.
-  #start(root: string, record: RunRecord, input: DispatchInput): void {
+  // `announce` marks a run arriving from the QUEUE: its record is still `queued` on disk, so the write
+  // in #spawn is what makes it `running`, and that write is the one the dashboard needs to hear about.
+  #start(root: string, record: RunRecord, input: DispatchInput, announce = false): void {
     const run = record.run;
     // Minted here rather than in dispatch, so a queued run's credential begins its life when the
     // run actually starts. `work`, confined to its own card: a run that could move cards could put
@@ -253,14 +268,20 @@ export class AgentRunner {
     // the only thing that revokes it is #settle's `finally`, so a throw on the way there would
     // leave a working key alive for the life of the process with no run behind it.
     try {
-      this.#spawn(root, record, input, minted);
+      this.#spawn(root, record, input, minted, announce);
     } catch (err) {
       this.#opts.credentials?.expireRun(run);
       throw err;
     }
   }
 
-  #spawn(root: string, record: RunRecord, input: DispatchInput, minted: Credential | undefined): void {
+  #spawn(
+    root: string,
+    record: RunRecord,
+    input: DispatchInput,
+    minted: Credential | undefined,
+    announce = false,
+  ): void {
     const run = record.run;
     const credential = minted ? { token: minted.token, apiBase: this.#opts.apiBase?.() ?? '' } : undefined;
     const prompt = buildRunPrompt({
@@ -309,22 +330,30 @@ export class AgentRunner {
     const gitAt = this.#opts.git?.point(root) ?? Promise.resolve(undefined);
     this.#active.set(run, { turn, cancelled: false, timeoutMs, gitAt });
 
-    // The group, recorded on the run. A second write rather than part of the dispatch record, because
-    // the pgid only exists once the process does — the same shape as the queued→running transition.
-    // Its purpose is entirely for a LATER server: this one holds the handle, but a run still marked in
-    // flight at the next startup is one whose group may have outlived the process that spawned it.
-    if (turn.pgid !== undefined) {
-      const withGroup: RunRecord = {
-        ...record,
-        pgid: turn.pgid,
-        ...(turn.pgstart === undefined ? {} : { pgstart: turn.pgstart }),
-      };
-      // No `onUpdate`: nothing in the UI shows a pgid, so broadcasting a record that differs only by
-      // one invisible field would be noise on every client for every dispatch.
+    // ONE write, carrying the group and — for a run off the queue — the `running` transition with it.
+    // The pgid exists only once the process does, which is why this cannot be part of the dispatch
+    // record; but it must not be a SECOND write racing another, which is what it was.
+    //
+    // Its purpose is entirely for a LATER server: this one holds the handle, while a run still marked
+    // in flight at the next startup is one whose group may have outlived the process that spawned it.
+    const withGroup: RunRecord = {
+      ...record,
+      ...(turn.pgid === undefined ? {} : { pgid: turn.pgid }),
+      ...(turn.pgstart === undefined ? {} : { pgstart: turn.pgstart }),
+    };
+    // Skipped only when there is nothing new to say: a dispatch already wrote this record, and an
+    // OpenCode turn has no group. `onUpdate` fires only for the queue transition — nothing in the UI
+    // shows a pgid, so broadcasting a record that differs by one invisible field would be noise on
+    // every client for every dispatch.
+    if (turn.pgid !== undefined || announce) {
       void writeRun(root, withGroup)
-        // Survivable: the run is on disk and still running. What is lost is the ability of a future
-        // server to reap this group, which is exactly the leak this field exists to close — so it is
-        // recorded rather than swallowed.
+        .then(() => {
+          if (announce) this.#opts.onUpdate?.(withGroup);
+        })
+        // Survivable in the dispatch case: the run is on disk and still running, and what is lost is a
+        // future server's ability to reap this group. For a queued run it also leaves the record saying
+        // `queued` while the agent works, which reads as a stuck queue — so it is recorded, never
+        // swallowed.
         .catch((err) => this.#opts.log?.warn({ err, run }, 'could not record this run’s process group'));
     }
 
@@ -334,17 +363,25 @@ export class AgentRunner {
   }
 
   // A slot freed. Take the oldest waiting run, mark it running on disk, and spawn it.
+  // A slot freed. Take the oldest waiting run and spawn it.
+  //
+  // It does NOT write the record here. It used to — `void writeRun(running)` immediately followed by
+  // `#start`, whose spawn fires a second write of the same path with the pgid attached — and nothing
+  // ordered the two. Measured in review: the pgid was lost in 8 of 300 queued runs, and a record with
+  // no pgid can never be reaped, which is the orphan leak the field exists to close, failing silently
+  // on about one queued run in forty. The unique temp name fixed the truncation, not the ordering.
+  //
+  // So there is one write per transition, and `#spawn` makes it: by the time the record says `running`
+  // on disk it already carries the group. Until then it still says `queued`, which is true.
   #drain(): void {
+    // A halt between a run being queued and a slot freeing. `cancelAll` clears the queue on the way
+    // into `halted`, so this is the second line: whatever is still waiting stays waiting rather than
+    // being spawned into a project that is supposed to have nothing running in it.
+    if (this.#opts.halted?.()) return;
     while (!this.isBusy()) {
       const next = this.#queue.shift();
       if (!next) return;
-      const running: RunRecord = { ...next.record, status: 'running' };
-      void writeRun(next.root, running)
-        .then(() => this.#opts.onUpdate?.(running))
-        // The record is already on disk as queued and the run still starts, so this is survivable —
-        // but it leaves a running run displayed as queued, which looks like a stuck queue.
-        .catch((err) => this.#opts.log?.warn({ err, run: running.run }, 'queued run write failed'));
-      this.#start(next.root, running, next.input);
+      this.#start(next.root, { ...next.record, status: 'running' }, next.input, true);
     }
   }
 

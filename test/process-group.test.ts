@@ -61,6 +61,59 @@ describe('killing a process group', () => {
     expect(terminateGroup(pgid, 50)).toBe(false);
   }, 10_000);
 
+  // The escalation, against a leader that ignores SIGTERM — which is the case it exists for.
+  //
+  // What this test does NOT catch, stated plainly because the reverse claim was made once already in
+  // this file's history: it does not exercise the identity re-check the escalation now performs. That
+  // needs the group to exit inside the grace period AND its pid to be reused by a new leader, which
+  // cannot be forced from a test. What it does catch is the regression that re-check could introduce —
+  // a guard that refuses to escalate at all, leaving a run that ignores TERM alive for ever.
+  it('kills a leader that ignores the polite signal', async () => {
+    // `echo` AFTER the trap, and waited for: signalling before the shell has run its `trap` builtin
+    // kills the leader with the TERM itself, and the test then passes with the escalation disabled —
+    // which is what it did on the first attempt.
+    const child = spawn('/bin/sh', ['-c', 'trap "" TERM; echo ready; while true; do sleep 0.2; done'], {
+      detached: true,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+    const pgid = child.pid as number;
+    const done = new Promise<void>((resolve) => child.on('close', () => resolve()));
+    await new Promise<void>((resolve) => {
+      child.stdout?.on('data', (chunk: Buffer) => {
+        if (chunk.toString('utf8').includes('ready')) resolve();
+      });
+    });
+
+    expect(terminateGroup(pgid, 100)).toBe(true);
+    await new Promise((r) => setTimeout(r, 400));
+    expect(alive(pgid), 'a leader that ignored TERM survived the grace period').toBe(false);
+    await done;
+  }, 10_000);
+
+  // The plan asked for this and nothing asserted it. `hasRef()` is the observable: an un-unref'd timer
+  // keeps the event loop alive, so a server shutting down — or a test worker finishing — would wait out
+  // the grace period of every run it stopped before it could exit.
+  it('does not hold the process open while the grace period runs', async () => {
+    const { pgid, done } = await group();
+    const timers: { hasRef: () => boolean }[] = [];
+    const real = globalThis.setTimeout;
+    // Spied rather than inspected globally: `process.getActiveResourcesInfo()` cannot tell OUR timer from
+    // vitest's own, and this file runs beside a runner that is full of them.
+    globalThis.setTimeout = ((fn: () => void, ms?: number) => {
+      const timer = real(fn, ms);
+      timers.push(timer as unknown as { hasRef: () => boolean });
+      return timer;
+    }) as typeof globalThis.setTimeout;
+    try {
+      terminateGroup(pgid, 50);
+    } finally {
+      globalThis.setTimeout = real;
+    }
+    expect(timers).toHaveLength(1);
+    expect(timers[0]?.hasRef()).toBe(false);
+    await done;
+  }, 10_000);
+
   // `kill(0, ...)` signals our OWN process group and pid 1 is init. Neither can be a run we spawned,
   // and a typo that reached either would be catastrophic in a way no test could undo.
   it('refuses pgids that could never be a run', () => {

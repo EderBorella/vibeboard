@@ -128,11 +128,21 @@ export async function openTestProject(
   const session = new ProjectSession();
   const app = testApp(session, { runBin: opts.runBin, logger: opts.logger, sandbox: opts.sandbox });
   const root = await tempDir();
-  await app.inject({
+  const scaffolded = await app.inject({
     method: 'POST',
     url: '/api/project/scaffold',
     payload: { path: root, name: opts.name ?? 'T', mode: opts.mode ?? 'greenfield' },
   });
+  // The fixture asserts its own premise, because a silent failure here DISARMS the test that follows
+  // rather than failing it: with no project open `session.root` is undefined, and every guard that
+  // reads it short-circuits to the permissive branch — `autopilot.current()` to `IDLE_STATE`, so an
+  // S7 refusal test sees 400 instead of 409 and blames the guard. Found by a reviewer chasing exactly
+  // that symptom.
+  if (scaffolded.statusCode !== 200) {
+    throw new Error(
+      `openTestProject could not scaffold ${root}: ${scaffolded.statusCode} ${scaffolded.body}`,
+    );
+  }
   onTestFinished(async () => {
     await app.close();
     await session.close();

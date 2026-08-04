@@ -9,6 +9,7 @@ import { resolveCopilotSelection } from '../../core/copilot-choice.js';
 import { findCard } from '../../core/find.js';
 import { foundationStatus, readGates } from '../../core/foundation.js';
 import { foundationRel } from '../../core/layout.js';
+import { isRunId } from '../../core/runs.js';
 import { BOARDS, type BoardName, type ProjectConfig } from '../../core/types.js';
 import type { DispatchInput } from '../agent-runner.js';
 import type { Backend } from '../agent-turn.js';
@@ -25,6 +26,11 @@ import { readSkills } from '../skill-catalogue.js';
 // The route layer resolves everything the runner should not have to know: which card, which skill,
 // which cards it links to, and which backend/model/effort a bare request means. The runner takes
 // facts and produces a record.
+
+// A run id reaches these routes as a URL segment and ends up inside a filesystem path, so the shape is
+// checked before the store is touched. The store refuses it too — this is the half that gives the
+// caller a 400 and a sentence instead of a 500.
+const NOT_A_RUN_ID = 'That is not a run id.';
 
 // Why a manual dispatch cannot happen right now, or nothing. Separated from the handler because it
 // is a rule rather than plumbing, and because both sentences have to offer a way forward: a refusal
@@ -214,6 +220,7 @@ export async function registerRunRoutes(api: FastifyInstance, ctx: AppCtx): Prom
     if (!ensureOpen(ctx.session, reply)) return;
     const { board, card, run } = req.params as { board: string; card: string; run: string };
     if (!isBoard(board)) return reply.code(400).send({ error: 'Unknown board' });
+    if (!isRunId(run)) return reply.code(400).send({ error: NOT_A_RUN_ID });
     const record = await resolveRun(ctx.session.root, board, card, run, nowIso());
     if (!record) return reply.code(404).send({ error: 'No such run' });
     return { run: record };
@@ -225,6 +232,7 @@ export async function registerRunRoutes(api: FastifyInstance, ctx: AppCtx): Prom
   api.post('/project-runs/:run/resolve', async (req, reply) => {
     if (!ensureOpen(ctx.session, reply)) return;
     const { run } = req.params as { run: string };
+    if (!isRunId(run)) return reply.code(400).send({ error: NOT_A_RUN_ID });
     const record = await resolveProjectRun(ctx.session.root, run, nowIso());
     if (!record) return reply.code(404).send({ error: 'No such run' });
     return { run: record };

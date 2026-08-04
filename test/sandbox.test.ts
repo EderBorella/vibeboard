@@ -164,6 +164,28 @@ describe.skipIf(!live.ok)('the profile denies what it claims to', () => {
     ).not.toBe(0);
   });
 
+  // Slice D added two authority files under `.vibeboard/` and neither was denied until review. Both
+  // are live probes rather than policy assertions, because the compiled-policy check below cannot see
+  // whether the kernel actually refuses.
+  it('refuses to forge a project-run record, which would aim the reaper', async () => {
+    // `markInterrupted` reaps the pgid/pgstart of every stale in-flight record, and both can be read
+    // out of /proc for any group on the machine — so this file is a way to make the unconfined server
+    // kill a process it never spawned.
+    const root = await tempDir();
+    await mkdir(join(root, '.vibeboard', 'project-runs'), { recursive: true });
+    const forged = join(root, '.vibeboard', 'project-runs', '20260803-120000-aaaa.md');
+    expect((await sh(live, `printf 'status: running' > '${forged}'`)).code).not.toBe(0);
+  });
+
+  it('refuses to write auto-pilot’s state, which would un-halt the project', async () => {
+    // Every refusal in the server reads the halt back out of this file. An agent that can write it can
+    // undo the emergency stop that was aimed at it, and zero the iteration counter with it.
+    const root = await tempDir();
+    await mkdir(join(root, '.vibeboard'), { recursive: true });
+    const state = join(root, '.vibeboard', 'autopilot-state.json');
+    expect((await sh(live, `printf '{"state":"idle"}' > '${state}'`)).code).not.toBe(0);
+  });
+
   it('refuses to read the admin credential', async () => {
     // A PROBE file, never `~/.vibeboard/token` itself. The deny is `token*`, so this path is covered
     // by exactly the same rule — but an earlier version wrote to the real path, and on a machine
@@ -239,6 +261,9 @@ describe.skipIf(!parserPresent)('the compiled policy, not the globs', () => {
     ['the instructions injected into every turn', '/w/proj/.vibeboard/INSTRUCTIONS.md'],
     ['the card conventions both pointer files import', '/w/proj/.vibeboard/VIBEBOARD.md'],
     ['the diary', '/w/proj/.vibeboard/PROJECT-LOG.md'],
+    ['a project run record', '/w/proj/.vibeboard/project-runs/20260803-120000-aaaa.md'],
+    ['the project-runs folder itself', '/w/proj/.vibeboard/project-runs'],
+    ['auto-pilot’s state', '/w/proj/.vibeboard/autopilot-state.json'],
     ['a suggestion', '/w/proj/.vibeboard/suggestions/s1.md'],
     ['the suggestions folder itself', '/w/proj/.vibeboard/suggestions'],
     ['a chat transcript', '/w/proj/.vibeboard/chat/c1.json'],

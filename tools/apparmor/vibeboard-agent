@@ -74,6 +74,15 @@ profile vibeboard-agent flags=(attach_disconnected) {
   # turns a three-strike cap into no cap at all.
   deny /**/.vibeboard/boards{,/**} wl,
 
+  # The SECOND run store, added by slice D for runs that are about the project rather than a card —
+  # the checkup and pre-flight. It sits outside `boards/`, so the deny above never covered it, and a
+  # forged record here is not merely a wrong number in the ledger: `markInterrupted` reaps the
+  # `pgid`/`pgstart` on every stale in-flight record, and both values can be read out of `/proc` for
+  # any group on the machine. Reproduced in review — a detached process group VibeBoard never spawned
+  # was killed by naming it in a file. That hands the agent the unconfined server's signal privilege,
+  # which `allow signal peer=vibeboard-agent` below exists to withhold.
+  deny /**/.vibeboard/project-runs{,/**} wl,
+
   # Authority: "any file that grants permission, defines a skill, sets a budget, or bounds a run
   # must not be writable by the agent it governs."
   deny /**/.vibeboard/config.yaml wl,
@@ -92,6 +101,17 @@ profile vibeboard-agent flags=(attach_disconnected) {
   # The diary is appended through an endpoint by the auto-pilot service. An agent writing it
   # directly would be a second path to the same fact, and an unattributable one.
   deny /**/.vibeboard/PROJECT-LOG.md wl,
+
+  # Auto-pilot's own state (slice D). Squarely "bounds a run": every refusal in the server reads the
+  # halt back out of this file, so an agent that can write it can un-halt the project that was just
+  # stopped to contain it — and can zero `iteration`, which for a subscription-backed project
+  # (budgetUsd: 0) is the only cap left standing. Reproduced in review. The three control endpoints
+  # are admin-only precisely "because a run able to un-halt its own project would make the halt
+  # decorative"; without this line, the file behind them was the way round that.
+  #
+  # The auto-pilot SERVICE writes it directly and is not confined by this profile — it is VibeBoard's
+  # own child, not an agent, and is never spawned through the wrapper.
+  deny /**/.vibeboard/autopilot-state.json wl,
 
   # The container, for the same reason `.vibeboard` has one above — and this deny was MISSING when
   # the two below were added, which made them decorative. Reproduced end to end:

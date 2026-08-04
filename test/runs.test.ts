@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { DOCS_DIR } from '../src/core/layout.js';
 import {
   isInFlight,
+  isRunId,
   needsResolution,
   parseAgentReport,
   parseRun,
@@ -33,6 +34,27 @@ const record = (over: Partial<RunRecord> = {}): RunRecord => ({
 describe('runId', () => {
   it('is a sortable stamp plus the caller-supplied suffix', () => {
     expect(runId(new Date('2026-07-26T14:30:12.345Z'), 'a1b2')).toBe('20260726-143012-a1b2');
+  });
+
+  // The boundary, not a format check: this id becomes a filename, and it arrives from a URL segment
+  // that Fastify decodes only AFTER the route has matched — so `%2F` was a `/` by the time the store
+  // saw it. Every rejected case below is a separator or a parent reference.
+  it('recognises what may become a filename, and refuses what could leave the folder', () => {
+    expect(isRunId(runId(new Date('2026-07-26T14:30:12Z'), 'a1b2'))).toBe(true);
+    expect(isRunId('r-asking')).toBe(true); // the fixtures' readable shape
+    for (const bad of [
+      '../../secret',
+      '..',
+      '.',
+      'a/b',
+      'a\\b',
+      'a.md',
+      '',
+      'a b',
+      '20260726-143012-a1b2/../x',
+    ]) {
+      expect(isRunId(bad), bad).toBe(false);
+    }
   });
 
   it('sorts chronologically as a plain string, which is how the store orders a card history', () => {

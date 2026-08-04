@@ -151,6 +151,21 @@ export function runId(at: Date, suffix: string): string {
   return `${stamp}-${suffix}`;
 }
 
+// What may be interpolated into a path as a run id. It exists because the id arrives from a URL
+// segment: Fastify decodes `%2F` AFTER matching the route, so `..%2F..%2Fsecret` reached the store as
+// `../../secret` and read a file outside it.
+//
+// A character class rather than the timestamp shape `runId` produces, and the distinction is the whole
+// point: what closes the traversal is the absence of `.`, `/` and `\`, not the presence of a
+// timestamp. Demanding the exact shape would additionally reject any id written by an older version —
+// and would have meant rewriting a hundred fixtures whose readable names are why the suites are
+// legible, buying nothing for the boundary.
+const RUN_ID = /^[A-Za-z0-9_-]+$/;
+
+export function isRunId(run: string): boolean {
+  return RUN_ID.test(run);
+}
+
 // About the project, not a card. One predicate rather than two `undefined` checks at every call
 // site: the store dispatches on it, the accounting excludes these from per-card totals, and the
 // dashboard labels them.

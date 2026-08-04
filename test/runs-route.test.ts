@@ -499,6 +499,56 @@ describe('POST /api/runs/:board/:card/:run/resolve', () => {
     expect((await readRun(project.root, 'engineering', project.card, 'r-asking'))?.resolved).toBeTruthy();
   });
 
+  // The route for a run with no card in its path to find it by: a checkup or a pre-flight. `grep -rn
+  // "project-runs" test/` returned nothing before this — the store function was well covered, the route
+  // that reaches it was not.
+  it('resolves a run that is about the project, idempotently, and 404s an unknown one', async () => {
+    const project = await projectWithCard();
+    const checkup: RunRecord = {
+      run: '20260803-120000-cc11',
+      skill: 'checkup',
+      status: 'attention',
+      started: '2026-08-03T12:00:00.000Z',
+      backend: 'claude-code',
+      model: 'opus',
+      effort: 'high',
+      mode: 'plan',
+      report: 'the board is circling',
+    };
+    await writeRun(project.root, checkup);
+    const url = `/api/project-runs/${checkup.run}/resolve`;
+
+    const first = await project.app.inject({ method: 'POST', url });
+    expect(first.statusCode).toBe(200);
+    const stamp = (first.json() as { run: RunRecord }).run.resolved;
+    expect(stamp).toBeTruthy();
+    // Two clicks are one decision, here as on the card route.
+    const second = await project.app.inject({ method: 'POST', url });
+    expect((second.json() as { run: RunRecord }).run.resolved).toBe(stamp);
+    // And the status is untouched: how it ended is not what the user decided about it.
+    expect((second.json() as { run: RunRecord }).run.status).toBe('attention');
+
+    const missing = await project.app.inject({
+      method: 'POST',
+      url: '/api/project-runs/20260803-999999-zzzz/resolve',
+    });
+    expect(missing.statusCode).toBe(404);
+  });
+
+  // Fastify matches the route FIRST and decodes the segment after, so `%2F` is a real separator by the
+  // time a handler reads it. Written as an encoded request rather than a call to the validator, because
+  // the validator being right is not the same fact as the route reaching it.
+  it.each([
+    ['POST', '/api/runs/engineering/E-001/..%2F..%2F..%2Fsecret/resolve'],
+    ['POST', '/api/project-runs/..%2F..%2Fsecret/resolve'],
+    ['POST', '/api/project-runs/%2e%2e%2f%2e%2e%2fetc%2fpasswd/resolve'],
+  ])('refuses %s %s rather than reading a file outside the store', async (method, url) => {
+    const project = await projectWithCard();
+    const res = await project.app.inject({ method: method as 'POST', url });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().error).toContain('run id');
+  });
+
   it('is idempotent — two clicks are one decision', async () => {
     const project = await projectWithCard();
     await writeRun(project.root, asking(project.card));

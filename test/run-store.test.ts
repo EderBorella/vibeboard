@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { boardRel, CONFIG_DIR, CONFIG_FILE, DOCS_DIR, RESULTS_DIR, RUNS_DIR } from '../src/core/layout.js';
@@ -9,6 +9,7 @@ import {
   listCardRuns,
   listRuns,
   markInterrupted,
+  projectRunPath,
   readRun,
   recordPath,
   reportContract,
@@ -321,5 +322,42 @@ describe('resolveCardRuns', () => {
 
   it('says nothing was waiting for a card with no runs', async () => {
     expect(await resolveCardRuns(await tempDir(), 'engineering', 'E-010', 'T')).toBe(0);
+  });
+});
+
+// A crash between the write and the rename used to leave `<run>.md.<pid>.<n>.tmp` behind for ever, in a
+// directory that is committed to git. The listers filter on `.md`, so by design nothing lists it and
+// nobody notices — which is why this is worth an assertion rather than a shrug.
+describe('a write that fails', () => {
+  it('leaves no temporary file behind', async () => {
+    const root = await tempDir();
+    const dir = join(root, boardRel('engineering', RESULTS_DIR, 'E-010'));
+    // The failure has to land BETWEEN the write and the rename, or there is no temp file to leak: a
+    // record that fails to serialise throws before one exists, and that version of this test passed with
+    // the cleanup removed. A directory sitting where the record belongs makes the RENAME fail instead.
+    await mkdir(join(dir, 'r-doomed.md'), { recursive: true });
+    await writeFile(join(dir, 'r-doomed.md', 'occupied'), 'x', 'utf8');
+    await expect(writeRun(root, record({ run: 'r-doomed' }))).rejects.toThrow();
+    const left = await readdir(dir).catch(() => [] as string[]);
+    expect(left.filter((f) => f.includes('.tmp'))).toEqual([]);
+  });
+});
+
+// The backstop under the route's 400. Both stores interpolate a run id into a path, and the hole the
+// reviewer found was in the one route that forgot to check — so the check also lives where the path is
+// built, for the next route whose author does not know this.
+describe('a run id that is not one', () => {
+  it('cannot be built into a path, in either store', () => {
+    const root = '/tmp/project';
+    expect(() => projectRunPath(root, '../../secret')).toThrow('not a run id');
+    expect(() => recordPath(root, 'engineering', 'E-001', '../../secret')).toThrow('not a run id');
+    // The card segment is not this guard's business, but the run segment is — and it is the one that
+    // reaches here straight from a URL.
+    expect(() => projectRunPath(root, 'a/b')).toThrow('not a run id');
+  });
+
+  it('still builds the path for an id the generator produced', () => {
+    const id = runId(new Date('2026-08-04T10:00:00Z'), 'ab12');
+    expect(projectRunPath('/tmp/project', id)).toContain(`${id}.md`);
   });
 });

@@ -1,5 +1,6 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import { CONFIG_DIR } from '../core/layout.js';
 
 const run = promisify(execFile);
 
@@ -28,19 +29,34 @@ async function git(root: string, args: string[]): Promise<string | undefined> {
   }
 }
 
-// `XY path` per line. The status pair matters as well as the path: a file that goes from modified to
-// staged has changed since the point was taken, and comparing paths alone would miss it.
-function parseStatus(stdout: string): Record<string, string> {
+// `XY path`, NUL-terminated. The status pair matters as well as the path: a file that goes from
+// modified to staged has changed since the point was taken, and comparing paths alone would miss it.
+//
+// `-z` rather than lines, because the line format QUOTES a path containing a space (`?? "has
+// space.txt"`) while `git diff --name-only` does not — so the same file arrived under two spellings
+// and was counted twice. NUL-separated output is never quoted, on either side.
+export function parseStatus(stdout: string): Record<string, string> {
   const dirty: Record<string, string> = {};
-  for (const line of stdout.split('\n')) {
-    if (line.length < 4) continue;
-    dirty[line.slice(3)] = line.slice(0, 2);
+  const fields = stdout.split('\0');
+  for (let i = 0; i < fields.length; i += 1) {
+    const entry = fields[i];
+    if (entry === undefined || entry.length < 4) continue;
+    const status = entry.slice(0, 2);
+    dirty[entry.slice(3)] = status;
+    // A rename or copy spends a SECOND field on the original path — `R  new\0old\0`, verified against
+    // git rather than assumed. Recording only the new name is what makes this agree with
+    // `git diff --name-only`, which reports the new name alone: keying the pair as one `old -> new`
+    // string made a committed rename two different keys and counted one file as two.
+    if (status.includes('R') || status.includes('C')) i += 1;
   }
   return dirty;
 }
 
 export async function gitPoint(root: string): Promise<GitPoint | undefined> {
-  const status = await git(root, ['status', '--porcelain']);
+  // `-uall`, because the default collapses an untracked DIRECTORY to one entry (`?? src/`). A run
+  // that scaffolds two hundred files scored 1 — the exact opposite of the signal this field exists
+  // to carry, and in the direction that hides a busy run rather than an idle one.
+  const status = await git(root, ['status', '--porcelain', '-z', '-uall']);
   if (status === undefined) return undefined;
   const head = await git(root, ['rev-parse', 'HEAD']);
   return {
@@ -49,14 +65,27 @@ export async function gitPoint(root: string): Promise<GitPoint | undefined> {
   };
 }
 
+// VibeBoard's own writes are not the agent's work. The run record, its transcript and the auto-pilot
+// state file all land under `.vibeboard/` BETWEEN the two points — the starting point is taken before
+// the record is written (agent-runner.ts) — and nothing writes a `.gitignore`, so every measured run
+// counted at least the bookkeeping VibeBoard did about it. With auto-pilot committing before each
+// dispatch the tree starts clean, so a run that changed nothing scored 1 and the checkup's "high cost,
+// nothing changed" signal could never fire.
+function isOwnBookkeeping(path: string): boolean {
+  return path === CONFIG_DIR || path.startsWith(`${CONFIG_DIR}/`);
+}
+
 // Every path that differs between the two points, plus everything committed in between.
 //
 // The commits matter as much as the working tree: auto-pilot commits before every dispatch (loop step
 // 10) and agents commit their own work, so by the time a run settles its changes are often already in
 // a commit and a working-tree-only measure would report 0 for the most productive runs.
 //
-// Pure, so the comparison is testable without a repository. A rename appears once, as the single
-// `old -> new` entry git reports — counting it as two files would overstate the work.
+// Pure, so the comparison is testable without a repository. A rename appears once, under its new name
+// on both sides — see parseStatus for why that is what makes the two sources agree.
+//
+// The exclusion is applied HERE, to the finished set, rather than at each of the three sources: one
+// statement, and `GitPoint` stays a faithful record of what git actually said.
 export function changedPaths(before: GitPoint, after: GitPoint, committed: string[] = []): string[] {
   const paths = new Set<string>(committed.filter((p) => p !== ''));
   for (const [path, status] of Object.entries(after.dirty)) {
@@ -66,7 +95,7 @@ export function changedPaths(before: GitPoint, after: GitPoint, committed: strin
   for (const path of Object.keys(before.dirty)) {
     if (after.dirty[path] === undefined) paths.add(path);
   }
-  return [...paths];
+  return [...paths].filter((path) => !isOwnBookkeeping(path));
 }
 
 // `undefined` when there is nothing to compare: no starting point was taken, or the repository has
@@ -80,8 +109,12 @@ export async function filesChangedSince(
   if (!after) return undefined;
   let committed: string[] = [];
   if (before.head && after.head && before.head !== after.head) {
-    const diff = await git(root, ['diff', '--name-only', before.head, after.head]);
-    committed = (diff ?? '').split('\n').map((p) => p.trim());
+    const diff = await git(root, ['diff', '--name-only', '-z', before.head, after.head]);
+    // The one place a failure here used to produce a WRONG number rather than no number: a diff too
+    // large for the buffer, or a commit that has since gone away, left `committed` empty and the run
+    // was reported as having changed only its working tree. No answer is the honest answer.
+    if (diff === undefined) return undefined;
+    committed = diff.split('\0');
   }
   return changedPaths(before, after, committed).length;
 }

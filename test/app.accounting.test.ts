@@ -1,4 +1,7 @@
+import { readFile, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { describe, expect, it, onTestFinished } from 'vitest';
+import { CONFIG_DIR, CONFIG_FILE } from '../src/core/layout.js';
 import type { RunRecord } from '../src/core/runs.js';
 import { writeRun } from '../src/server/run-store.js';
 import { openTestProject, tempDir } from './helpers.js';
@@ -74,6 +77,25 @@ describe('the project ledger', () => {
     const { app, root } = await openTestProject();
     await writeRun(root, run({ usage: { costUsd: 1 } }));
     expect((await accounting(app)).cap.cap).toBe('budget');
+  });
+
+  // A pre-slice-A project: no `autopilot` block, so auto-pilot cannot start at all. It used to be told
+  // "Auto-pilot will stop when this project's runs have cost $20" — a budget nobody set, taken from
+  // DEFAULT_AUTOPILOT and rendered in the indicative about this project.
+  it('names no cap for a project that has no auto-pilot', async () => {
+    const { app, root } = await openTestProject();
+    const config = join(root, CONFIG_DIR, CONFIG_FILE);
+    const yaml = await readFile(config, 'utf8');
+    // Removes the block and everything indented under it, leaving the rest of the config intact.
+    const stripped = yaml.replace(/^autopilot:\n(?: +.*\n|\n)*/m, '');
+    expect(stripped).not.toContain('autopilot:');
+    await writeFile(config, stripped, 'utf8');
+    await app.inject({ method: 'POST', url: '/api/project/open', payload: { path: root } });
+
+    const body = await accounting(app);
+    expect('cap' in body).toBe(false);
+    // The attempt cap still comes from the default, because the card pane always shows one.
+    expect(body.attemptCap).toBe(3);
   });
 
   // S10: for a subscription-backed or local model the figure is zero or not what you are billed, so a

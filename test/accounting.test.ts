@@ -5,6 +5,7 @@ import {
   cardKey,
   governingCap,
   spendByCard,
+  splitCardKey,
   sumSpend,
 } from '../src/core/accounting.js';
 import { DEFAULT_AUTOPILOT } from '../src/core/autopilot.js';
@@ -133,28 +134,73 @@ describe('which endings burn an attempt', () => {
   });
 });
 
+// The pair, asserted as a pair: the composer splits the key to build its response, and splitting on
+// every separator instead of the first dropped everything after a second slash.
+describe('the card key', () => {
+  it('round-trips a board and a card', () => {
+    expect(splitCardKey(cardKey('engineering', 'E-001'))).toEqual({
+      board: 'engineering',
+      card: 'E-001',
+    });
+  });
+
+  it('keeps a card id that contains a separator whole', () => {
+    expect(splitCardKey(cardKey('product', 'P-001/sub'))).toEqual({
+      board: 'product',
+      card: 'P-001/sub',
+    });
+  });
+});
+
 describe('which cap is actually bounding this project', () => {
   const spent = (costUsd?: number): ReturnType<typeof sumSpend> =>
     sumSpend(costUsd === undefined ? [run()] : [run(withCost(costUsd))]);
 
   it('is the budget when there is one and the backend reports cost', () => {
-    expect(governingCap({ ...DEFAULT_AUTOPILOT, budgetUsd: 20 }, spent(1)).cap).toBe('budget');
+    expect(governingCap({ ...DEFAULT_AUTOPILOT, budgetUsd: 20 }, spent(1), 0).cap).toBe('budget');
   });
 
   // S10: for a subscription-backed or local model the figure is zero or not what you are billed, so
   // a dollar dial would never trip and the settings tab must say which cap really applies.
   it('is iterations when the project has no dollar budget', () => {
-    expect(governingCap({ ...DEFAULT_AUTOPILOT, budgetUsd: 0 }, spent(1)).cap).toBe('iterations');
+    expect(governingCap({ ...DEFAULT_AUTOPILOT, budgetUsd: 0 }, spent(1), 0).cap).toBe('iterations');
   });
 
   it('is iterations when no run has reported a cost', () => {
-    const answer = governingCap({ ...DEFAULT_AUTOPILOT, budgetUsd: 20 }, spent(undefined));
+    const answer = governingCap({ ...DEFAULT_AUTOPILOT, budgetUsd: 20 }, spent(undefined), 0);
     expect(answer.cap).toBe('iterations');
     expect(answer.why).toContain('reported a cost');
   });
 
   it('explains itself in a sentence naming the number', () => {
-    const answer = governingCap({ ...DEFAULT_AUTOPILOT, budgetUsd: 20, maxIterations: 250 }, spent(1));
+    const answer = governingCap({ ...DEFAULT_AUTOPILOT, budgetUsd: 20, maxIterations: 250 }, spent(1), 0);
     expect(answer.why).toContain('20');
+  });
+
+  // The finding this argument exists for: naming the budget whenever one exists told a project ONE
+  // dispatch from its iteration cap, with a cent spent, that money would stop it. The claim the
+  // sentence makes is "which cap is bounding this project", and that has to be the nearer one.
+  it('is iterations when the iteration cap is nearer than the budget', () => {
+    const ap = { ...DEFAULT_AUTOPILOT, budgetUsd: 20, maxIterations: 250 };
+    const answer = governingCap(ap, spent(0.01), 249);
+    expect(answer.cap).toBe('iterations');
+    expect(answer.why).toContain('250');
+    expect(answer.why).toContain('249');
+  });
+
+  it('is the budget when the budget is nearer than the iteration cap', () => {
+    const ap = { ...DEFAULT_AUTOPILOT, budgetUsd: 20, maxIterations: 250 };
+    expect(governingCap(ap, spent(19.5), 3).cap).toBe('budget');
+  });
+
+  // Future tense, because slice D builds the gate and slice C is what calls it. A dial described in the
+  // present indicative about behaviour that does not exist yet is the exact shape of the two projects
+  // the spec cites as prior art.
+  it('describes what will happen, never what already does', () => {
+    const ap = { ...DEFAULT_AUTOPILOT, budgetUsd: 20 };
+    for (const answer of [governingCap(ap, spent(1), 0), governingCap(ap, spent(undefined), 0)]) {
+      expect(answer.why).toContain('will stop');
+      expect(answer.why).not.toContain('stops when');
+    }
   });
 });

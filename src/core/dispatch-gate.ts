@@ -55,6 +55,19 @@ export function stopSentence(reason: StopReason, detail?: string): string {
   return detail ? `${SENTENCES[reason]} ${detail}` : SENTENCES[reason];
 }
 
+// Which cap is unusable, as a sentence, or `undefined` when both are fine. A missing field reaches
+// here as `undefined` despite the type: `AutopilotConfig` describes a parsed YAML file, and YAML is
+// not typed.
+function invalidCap(ap: AutopilotConfig): string | undefined {
+  if (!Number.isInteger(ap.maxIterations) || ap.maxIterations <= 0) {
+    return `maxIterations is ${JSON.stringify(ap.maxIterations)}, which is not a whole number above zero, so no iteration cap can bind. Set it in Settings.`;
+  }
+  if (!Number.isFinite(ap.budgetUsd) || ap.budgetUsd < 0) {
+    return `budgetUsd is ${JSON.stringify(ap.budgetUsd)}, which is not a number of dollars, so no budget can bind. Set it in Settings.`;
+  }
+  return undefined;
+}
+
 export interface GateInput {
   ap: AutopilotConfig;
   iteration: number; // dispatches so far this run
@@ -71,6 +84,17 @@ export type Gate = { ok: true } | { ok: false; reason: StopReason; message: stri
 // `spend >= budget` comparison would have made it. `costUsd !== undefined` guards the other half of
 // the same idea: a backend that reported nothing has not spent everything.
 export function mayDispatch({ ap, iteration, spend }: GateInput): Gate {
+  // Before either comparison, because a comparison against a non-number SILENTLY PASSES: `iteration >=
+  // NaN` is false, so a hand-written `maxIterations: .nan` removed the only cap a project with no
+  // dollar budget has — the S10 case — and the loop became unbounded. `checkNumbers` catches this on
+  // the way in, but that is a different module which this gate does not call, and Principle 1 puts the
+  // refusal where the decision is made rather than trusting a guard somewhere upstream.
+  //
+  // `stalled` because its sentence is already "work remains and nothing it can do would move it",
+  // which is exactly true of a project whose own caps are unusable; the detail names the real cause,
+  // since a reason alone would send the reader looking at their board instead of their config.
+  const invalid = invalidCap(ap);
+  if (invalid) return { ok: false, reason: 'stalled', message: invalid };
   if (ap.budgetUsd > 0 && spend.costUsd !== undefined && spend.costUsd >= ap.budgetUsd) {
     return {
       ok: false,

@@ -5,6 +5,7 @@ import {
   governingCap,
   type Spend,
   spendByCard,
+  splitCardKey,
   sumSpend,
 } from '../../core/accounting.js';
 import { type AutopilotConfig, DEFAULT_AUTOPILOT } from '../../core/autopilot.js';
@@ -168,24 +169,39 @@ export interface Accounting {
   project: Spend; // every run, card and project runs alike: everything a model did counts
   cards: CardAccount[];
   attemptCap: number;
-  cap: { cap: CapName; why: string };
+  // Absent for a project with no auto-pilot block: there is no cap, so there is no cap to name. The UI
+  // renders nothing rather than a number nobody set.
+  cap?: { cap: CapName; why: string };
 }
 
-export function composeAccounting(runs: RunRecord[], ap: AutopilotConfig | undefined): Accounting {
+export function composeAccounting(
+  runs: RunRecord[],
+  ap: AutopilotConfig | undefined,
+  iteration = 0,
+): Accounting {
   const project = sumSpend(runs);
   const cards: CardAccount[] = [];
   for (const [key, spend] of spendByCard(runs)) {
-    const [board, card] = key.split('/') as [BoardName, string];
+    // The board is a BoardName by construction — `spendByCard` keys on a record's own `board`, which
+    // was validated when the record was written. Asserted here rather than re-validated because the
+    // alternative is dropping a card's ledger over a type the data cannot actually have.
+    const { board, card } = splitCardKey(key) as { board: BoardName; card: string };
     const skills = new Set(runs.filter((r) => r.card === card && r.board === board).map((r) => r.skill));
     const attempts: Record<string, number> = {};
     for (const skill of skills) attempts[skill] = attemptsUsed(runs, card, skill);
     cards.push({ board, card, spend, attempts });
   }
-  // A project with no lifecycle block has no caps to be governed by, and saying "iterations" would
-  // name a number that does not exist. DEFAULT_AUTOPILOT's values are what such a project would get
-  // if it were upgraded, which is the honest thing to show beside a total.
-  const caps = ap ?? DEFAULT_AUTOPILOT;
-  return { project, cards, attemptCap: caps.attemptCap, cap: governingCap(caps, project) };
+  // A project with no lifecycle block has no caps to be governed by. It used to be shown
+  // DEFAULT_AUTOPILOT's values on the grounds that they are what it would get if upgraded — but the
+  // sentence is rendered in the indicative about THIS project, so a project where auto-pilot cannot
+  // start at all was told "auto-pilot stops when this project's runs have cost $20". No cap, no
+  // sentence; the attempt cap still comes from the default because the card pane always shows one.
+  return {
+    project,
+    cards,
+    attemptCap: (ap ?? DEFAULT_AUTOPILOT).attemptCap,
+    ...(ap ? { cap: governingCap(ap, project, iteration) } : {}),
+  };
 }
 
 export async function registerAutopilotRoutes(api: FastifyInstance, ctx: AppCtx): Promise<void> {
@@ -195,7 +211,10 @@ export async function registerAutopilotRoutes(api: FastifyInstance, ctx: AppCtx)
   // budget is an agent reasoning about its own leash, which is not its business.
   api.get('/accounting', async (_req, reply) => {
     if (!ensureOpen(ctx.session, reply)) return;
-    return composeAccounting(await listRuns(ctx.session.root), ctx.session.config.autopilot);
+    // The iteration comes from the live state, not from the run count: the two differ after a restart,
+    // and it is the counter the gate compares that decides which cap is nearer.
+    const [runs, state] = await Promise.all([listRuns(ctx.session.root), ctx.autopilot.current()]);
+    return composeAccounting(runs, ctx.session.config.autopilot, state.iteration);
   });
 
   await registerControls(api, ctx);

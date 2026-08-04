@@ -97,6 +97,47 @@ describe('when both caps are reached', () => {
   });
 });
 
+// Principle 1, at the one place the spec singles out for planted-defect treatment: a missing or
+// invalid precondition BLOCKS rather than passes. The direction is what matters — every one of these
+// used to return `{ok: true}` at a million iterations and a billion dollars spent, because a
+// comparison against a non-number is false rather than an error.
+describe('a cap that is not a usable number', () => {
+  const huge = { iteration: 1_000_000, spend: spent(1e9) };
+
+  // `budgetUsd: 0` is the S10 case — a subscription or local model, where iterations are the ONLY cap.
+  // A `.nan` in the YAML therefore removed the last thing bounding the run.
+  it.each([
+    ['not a number', { budgetUsd: 0, maxIterations: Number.NaN }],
+    ['missing', { budgetUsd: 0, maxIterations: undefined }],
+    ['a string', { budgetUsd: 0, maxIterations: 'abc' }],
+    ['zero', { budgetUsd: 0, maxIterations: 0 }],
+    ['negative', { budgetUsd: 0, maxIterations: -1 }],
+    ['fractional', { budgetUsd: 0, maxIterations: 2.5 }],
+  ])('refuses to dispatch when maxIterations is %s', (_label, over) => {
+    const gate = mayDispatch({ ...huge, ap: ap(over as Partial<typeof DEFAULT_AUTOPILOT>) });
+    expect(gate.ok).toBe(false);
+    expect(gate.ok === false && gate.reason).toBe('stalled');
+    // The sentence has to send the reader to the cap, not to their board.
+    expect(gate.ok === false && gate.message).toContain('maxIterations');
+  });
+
+  // Less severe — a valid iteration cap still bounds the run — but a silently skipped budget branch is
+  // still a control that does nothing, which is the shape this whole module exists to refuse.
+  it.each([
+    ['not a number', Number.NaN],
+    ['infinite', Number.POSITIVE_INFINITY],
+    ['negative', -5],
+  ])('refuses to dispatch when budgetUsd is %s', (_label, budgetUsd) => {
+    const gate = mayDispatch({ ...huge, ap: ap({ budgetUsd }) });
+    expect(gate.ok).toBe(false);
+    expect(gate.ok === false && gate.message).toContain('budgetUsd');
+  });
+
+  it('still dispatches when both caps are usable and neither is reached', () => {
+    expect(mayDispatch({ ap: ap({ budgetUsd: 0 }), iteration: 0, spend: spent() }).ok).toBe(true);
+  });
+});
+
 describe('the terminal reasons', () => {
   // "An error or an exhausted budget never counts as success." Asserted over the whole list rather
   // than one reason at a time, so a reason added later fails this test until someone decides which

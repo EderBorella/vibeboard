@@ -59,6 +59,15 @@ export function cardKey(board: string, card: string): string {
   return `${board}/${card}`;
 }
 
+// The inverse, and it splits on the FIRST separator only. `key.split('/')` at the call site dropped
+// everything after a second slash, so a card id containing one was silently attributed to a truncated
+// card that does not exist. Ids are slugs today, which is why this was a low finding rather than a bug
+// anyone had seen — but the pair belongs together, so a change to one is a change to both.
+export function splitCardKey(key: string): { board: string; card: string } {
+  const at = key.indexOf('/');
+  return at < 0 ? { board: key, card: '' } : { board: key.slice(0, at), card: key.slice(at + 1) };
+}
+
 // Per card, project runs excluded. A checkup is about the project; attributing its cost to a card
 // would make one card look expensive for work that was not about it.
 export function spendByCard(runs: RunRecord[]): Map<string, Spend> {
@@ -111,16 +120,45 @@ export type CapName = 'budget' | 'iterations';
 // Which cap is actually bounding this project — S10. A settings tab showing a dollar dial that can
 // never trip is worse than showing no dial: it tells the user the opposite of the truth about what
 // will stop the run.
-export function governingCap(ap: AutopilotConfig, spend: Spend): { cap: CapName; why: string } {
-  if (ap.budgetUsd > 0 && spend.costUsd !== undefined) {
+//
+// `iteration` is what makes the answer honest rather than merely possible. Naming the budget whenever
+// one exists said "auto-pilot stops when this project's runs have cost $20" to a project one dispatch
+// from its iteration cap with a cent spent — true of the dial, false of the run. Whichever cap is
+// PROPORTIONALLY nearer is the one that will actually trip, so that is the one named.
+//
+// Future tense throughout, deliberately: slice D builds the gate and slice C is what calls it, so the
+// present indicative would describe behaviour that does not exist yet — which is the AutoGPT/AgentGPT
+// shape this design is written against.
+export function governingCap(
+  ap: AutopilotConfig,
+  spend: Spend,
+  iteration: number,
+): { cap: CapName; why: string } {
+  const iterations = {
+    cap: 'iterations' as const,
+    why: `Auto-pilot will stop after ${ap.maxIterations} dispatches; it has used ${iteration}.`,
+  };
+  // The other half of S10: a subscription-backed or local backend reports nothing, or nothing yet, so a
+  // dollar budget cannot bind however large it is.
+  if (!(ap.budgetUsd > 0)) {
+    return { ...iterations, why: `This project has no dollar budget, so ${lower(iterations.why)}` };
+  }
+  if (spend.costUsd === undefined) {
     return {
-      cap: 'budget',
-      why: `Auto-pilot stops when this project's runs have cost $${ap.budgetUsd}.`,
+      ...iterations,
+      why: `No run has reported a cost, so the dollar budget cannot bind. ${iterations.why}`,
     };
   }
-  const why =
-    ap.budgetUsd > 0
-      ? `No run has reported a cost yet, so the dollar budget cannot bind. Auto-pilot stops after ${ap.maxIterations} iterations.`
-      : `This project has no dollar budget, so auto-pilot stops after ${ap.maxIterations} iterations.`;
-  return { cap: 'iterations', why };
+  const budget = {
+    cap: 'budget' as const,
+    why: `Auto-pilot will stop when this project's runs have cost $${ap.budgetUsd}; they have cost $${spend.costUsd}.`,
+  };
+  // Both can bind, so the nearer one wins. A guard rather than a bare ratio because `maxIterations` is
+  // validated in the gate, not here, and dividing by a zero that reached us anyway would answer NaN —
+  // which loses to everything and would silently always name the budget.
+  const spentShare = spend.costUsd / ap.budgetUsd;
+  const usedShare = ap.maxIterations > 0 ? iteration / ap.maxIterations : Number.POSITIVE_INFINITY;
+  return usedShare > spentShare ? iterations : budget;
 }
+
+const lower = (sentence: string): string => sentence.charAt(0).toLowerCase() + sentence.slice(1);

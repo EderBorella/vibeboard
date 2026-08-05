@@ -135,6 +135,27 @@ describe('an appended entry', () => {
     client.close();
   });
 
+  // The review's false gate: nothing pinned what the SOCKET carries. Planting an unbounded `text` on the
+  // broadcast while the file kept the bounded one left all 2,516 tests green — so the posting tab and
+  // every reload showed 2,000 characters while a second tab showed 3,000, and the two disagreed about
+  // what happened. Asserted against the file rather than against a literal, because the file is what the
+  // narrative IS.
+  it('pushes exactly what went on disk, not what was asked for', async () => {
+    const { app, root } = await openTestProject();
+    const address = await app.listen({ port: 0, host: '127.0.0.1' });
+    const client = wsClient<{ type: string; entry?: DiaryEntry }>(address);
+    await client.open;
+
+    const long = `start ${'y'.repeat(3000)} end`;
+    const res = await post(app, { kind: 'note', text: long });
+    const pushed = await client.waitFor((m) => m.type === 'diary:entry');
+    const onDisk = (await readDiary(root)).at(-1);
+    expect(pushed.entry).toEqual(onDisk);
+    // And the reply is the same object again, so all three agree rather than two out of three.
+    expect((res.json() as { entry: DiaryEntry }).entry).toEqual(onDisk);
+    client.close();
+  });
+
   // The negative, and it is the half that pins the ORDERING: announcing before the write means a tab can be
   // told about an entry that never reached disk. Forced by making the diary itself read-only — the FILE,
   // not its folder, because appending to a file that already exists needs no permission on the directory,

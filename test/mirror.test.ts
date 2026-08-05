@@ -47,6 +47,16 @@ describe('web/shared mirrors src/core', () => {
     );
   });
 
+  // The drift this slice shipped and nothing caught: the server's RunRecord gained `verification`,
+  // `score` and `overshoot`, and the hand-mirror gained none — so the verdict decision 18 wants
+  // reviewable existed on disk and in no UI type. Exact rather than "web ⊆ core": a field the UI
+  // deliberately does not carry has to SAY so, or the next one slips through as deliberate too.
+  it('mirrors every run-record field, or declares why not', () => {
+    expect([...webApi.RUN_RECORD_KEYS, ...webApi.RUN_RECORD_NOT_MIRRORED].sort()).toEqual(
+      [...coreRuns.RUN_RECORD_KEYS].sort(),
+    );
+  });
+
   it('mirrors the verify modes', () => {
     expect([...web.VERIFY_MODES]).toEqual([...coreAutopilot.VERIFY_MODES]);
   });

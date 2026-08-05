@@ -5,6 +5,7 @@ import type {
   CardFrontmatterPatch,
   ProjectConfig,
   ProjectSnapshot,
+  VerifyMode,
 } from './shared';
 
 import { authHeader } from './token';
@@ -428,8 +429,78 @@ export interface RunRecord {
   usage?: RunUsage; // what it cost, when the backend said
   suggestions?: number; // how many findings it filed; absent means the count could not be taken
   filesChanged?: number; // measured from git; absent means there was no answer, never zero
+  // What a critic run itself answered, and what was decided about THIS run (decision 18). The verdict
+  // is meant to be reviewable, and a field the UI cannot see is a verdict that only exists on disk.
+  score?: number;
+  overshoot?: string;
+  verification?: Verification;
   report: string;
 }
+
+// Mirrors src/core/verify.ts. A verdict and the evidence behind it: the failing command and its output
+// for `gates`/`smoke`, or the score AND the threshold it was judged against for `critic` — a score with
+// no threshold beside it means nothing to a reader later.
+export interface Verification {
+  mode: VerifyMode;
+  passed: boolean;
+  at: string;
+  command?: string;
+  output?: string;
+  score?: number;
+  threshold?: number;
+  reason?: string;
+  by?: string; // the critic run that judged this one
+  overshoot?: string;
+}
+
+// What the UI carries, as data. Compared against the server's own list in test/mirror.test.ts, because a
+// hand-mirrored interface has no runtime keys and drift is otherwise silent — this slice added three
+// fields on the server and none here, and nothing noticed.
+export const RUN_RECORD_KEYS = [
+  'run',
+  'card',
+  'board',
+  'skill',
+  'status',
+  'started',
+  'backend',
+  'model',
+  'effort',
+  'mode',
+  'outcome',
+  'finished',
+  'resolved',
+  'previous',
+  'prompt',
+  'attached',
+  'summary',
+  'options',
+  'created',
+  'note',
+  'usage',
+  'suggestions',
+  'filesChanged',
+  'score',
+  'overshoot',
+  'verification',
+  'report',
+] as const;
+
+// Fields the server writes that the UI deliberately does NOT carry, with the reason. Kept as a list so
+// the guard can be exact: a new server field then forces a decision — mirror it, or say here why not —
+// rather than passing unnoticed because the two sides were only ever compared loosely.
+export const RUN_RECORD_NOT_MIRRORED = [
+  // The run's process group and its leader's start time. Persisted so a later server can reap what this
+  // one left behind; nothing on screen shows either, and a pid in the UI would invite acting on it.
+  'pgid',
+  'pgstart',
+] as const;
+
+// A field on the interface above that `RUN_RECORD_KEYS` does not name. `never` when every one is there;
+// otherwise this line fails to compile and names the field the guard would have missed.
+type UnlistedRunField = Exclude<keyof RunRecord, (typeof RUN_RECORD_KEYS)[number]>;
+const _everyRunFieldIsListed: UnlistedRunField extends never ? true : UnlistedRunField = true;
+void _everyRunFieldIsListed;
 
 export interface DispatchRequest {
   board: BoardName;

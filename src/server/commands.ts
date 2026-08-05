@@ -24,6 +24,10 @@ export const COMMAND_TIMEOUT_MS = 600_000;
 // Four times what is kept, so the tail is a tail of the output rather than of the last chunk that
 // happened to arrive. Bounded as it streams, because a runaway `while true; do echo` would otherwise be
 // held whole in memory on its way to being thrown away.
+// UNGUARDED, deliberately, and this is the note rather than a test that pretends otherwise: because it
+// is larger than `MAX_OUTPUT`, the final `tail` always dominates, so deleting this bound changes no
+// observable result and no test can distinguish it. What it does is bound MEMORY while output streams —
+// a runaway `while true; do echo` would otherwise be held whole on its way to being thrown away.
 const MAX_HELD = 16_000;
 
 // How long to let a pipe flush after the process has already exited. Long enough for output that is

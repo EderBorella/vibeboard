@@ -401,6 +401,14 @@ describe('a judging run’s report', () => {
     expect(folded).toMatchObject({ score: 0.7, overshoot: 'extra' });
   });
 
+  // The review's false gate. The folding test above uses 0.7, and the zero-score tests build the record
+  // literal directly — so the guard on the one path that WRITES a critic's answer was unconstrained, and
+  // a critic reporting 0 lost it exactly where Principle 3 matters most.
+  it('folds a score of ZERO, which is a critic that judged the work worthless', () => {
+    const folded = withReport(record(), parseAgentReport('---\noutcome: success\nscore: 0\n---\nx'), 'AT');
+    expect(folded.score).toBe(0);
+  });
+
   it('leaves an ordinary report with neither', () => {
     const folded = withReport(record(), parseAgentReport('---\noutcome: success\n---\nx'), 'AT');
     expect(folded.score).toBeUndefined();

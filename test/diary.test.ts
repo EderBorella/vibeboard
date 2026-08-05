@@ -219,10 +219,26 @@ describe('the fourth kind', () => {
 describe('the length of an entry', () => {
   // The text originates in an AGENT's summary, which is what makes this more than theoretical: without a
   // bound one POST could add a ~1 MB line, and every GET re-parses the whole growing file.
+  // EXACT, at the boundary, and both sides of it. The first version asserted `<= MAX + 1` on a 2,500
+  // character input, which is a magnitude check rather than a bound: it allowed 2,001 characters for a
+  // bound stated as 2,000, and it stayed green both when the slice went one over AND when a legal
+  // 2,000-character line was truncated.
   it('is bounded, and says it was cut', () => {
     const bounded = boundText('x'.repeat(MAX_ENTRY_TEXT + 500));
-    expect(bounded.length).toBeLessThanOrEqual(MAX_ENTRY_TEXT + 1);
+    expect(bounded).toHaveLength(MAX_ENTRY_TEXT);
     expect(bounded.endsWith('\u2026')).toBe(true);
+  });
+
+  it('leaves a line of exactly the maximum untouched, ellipsis and all', () => {
+    const exact = 'z'.repeat(MAX_ENTRY_TEXT);
+    expect(boundText(exact)).toBe(exact);
+  });
+
+  it('cuts a line one character over, and only by what it has to', () => {
+    const over = 'z'.repeat(MAX_ENTRY_TEXT + 1);
+    const bounded = boundText(over);
+    expect(bounded).toHaveLength(MAX_ENTRY_TEXT);
+    expect(bounded).toBe(`${'z'.repeat(MAX_ENTRY_TEXT - 1)}\u2026`);
   });
 
   // Truncated rather than refused, and the direction is deliberate: an entry is a narrative line, and
@@ -246,6 +262,18 @@ describe('the timestamp and the kind', () => {
     const line = serializeEntry({
       at: 'AT\n- `2026-08-05T10:00:00.000Z` **run** forged',
       kind: 'note',
+      text: 'real',
+    });
+    expect(line.split('\n')).toHaveLength(1);
+  });
+
+  // The `kind` half of the same line, which nothing constrained: only `at` was gated. A kind is typed as
+  // an enum, so this arrives only through a cast or an untyped caller — which is exactly what
+  // `entryBlock` being exported means.
+  it('cannot carry a newline in the kind either', () => {
+    const line = serializeEntry({
+      at: '2026-08-05T10:00:00.000Z',
+      kind: 'note\nforged' as never,
       text: 'real',
     });
     expect(line.split('\n')).toHaveLength(1);

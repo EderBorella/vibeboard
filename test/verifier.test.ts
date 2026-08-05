@@ -74,6 +74,22 @@ describe('verifying by gates', () => {
     expect(v.reason).toMatch(/still running/i);
   });
 
+  // A killed gate stops the run of gates, and `code` is not what says so. The verifier had its own copy
+  // of "did this fail", whose `timedOut` half nothing constrained: narrowed to `code !== 0` it stayed
+  // green, because the only timeout fixture used `code: null`. A command killed after printing something
+  // can exit 0 and still have timed out, so this fixture uses exactly that shape.
+  it('stops at a gate that timed out even though its code is zero', async () => {
+    const root = await withFoundation({ 'CODE-QUALITY.md': GATES });
+    const asked: string[] = [];
+    const run = async (command: string): Promise<CommandResult> => {
+      asked.push(command);
+      return { command, code: 0, output: '', timedOut: command === 'npm run check' };
+    };
+    const v = await verifyGates(root, 'AT', { run });
+    expect(v.passed).toBe(false);
+    expect(asked).toEqual(['npm run lint', 'npm run check']);
+  });
+
   it('carries the timeout it was given through to the runner', async () => {
     const root = await withFoundation({ 'CODE-QUALITY.md': GATES });
     const seen: (number | undefined)[] = [];
@@ -135,6 +151,35 @@ describe('verifying by gates', () => {
     const root = await withFoundation({ 'CODE-QUALITY.md': GATES });
     const v = await verifyGates(root, '2026-08-05T12:00:00.000Z', { run: fakeRunner({}).run });
     expect(v.at).toBe('2026-08-05T12:00:00.000Z');
+  });
+});
+
+// The review's HIGH: every test above injects `run`, so the PRODUCTION default — the line connecting the
+// verifier to the thing that actually spawns — was exercised by nothing. Replacing it with a stub that
+// passed everything left the whole suite green, which is the spec's "prove the verification gate rejects"
+// proved only against a fake. These two use real commands and no injection.
+describe('with the real runner', () => {
+  it('passes a project whose gates really exit zero', async () => {
+    const root = await withFoundation({
+      'CODE-QUALITY.md': '---\ngates:\n  - { name: t, command: "exit 0" }\n---\nx\n',
+    });
+    expect(await verifyGates(root, 'AT')).toMatchObject({ mode: 'gates', passed: true });
+  });
+
+  it('fails one whose gate really exits non-zero, and keeps what it printed', async () => {
+    const root = await withFoundation({
+      'CODE-QUALITY.md': '---\ngates:\n  - { name: t, command: "echo the failure 1>&2; exit 1" }\n---\nx\n',
+    });
+    const v = await verifyGates(root, 'AT');
+    expect(v).toMatchObject({ mode: 'gates', passed: false, command: 'echo the failure 1>&2; exit 1' });
+    expect(v.output).toContain('the failure');
+  });
+
+  it('runs a real smoke command in the project root', async () => {
+    const root = await withFoundation({
+      'TESTING.md': '---\nsmoke: test -f .vibeboard/foundation/TESTING.md\n---\nx\n',
+    });
+    expect(await verifySmoke(root, 'AT')).toMatchObject({ mode: 'smoke', passed: true });
   });
 });
 

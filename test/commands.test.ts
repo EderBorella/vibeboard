@@ -64,6 +64,32 @@ describe('running a declared command', () => {
     await expect(stat(marker)).rejects.toThrow();
   });
 
+  // The review's HIGH, and the case that makes `verify: smoke` work at all. Resolving on `close` waits
+  // for the process to end AND every inherited pipe to be released — so a gate that exits 0 while leaving
+  // a background child (a server a smoke test started) waited out the entire timeout and came back as
+  // `{code: 0, timedOut: true}`: ten minutes of wall clock, and a verdict reading "was still running when
+  // it was stopped" about a command that exited immediately, burning an attempt on a PASSING gate.
+  it('answers as soon as the command exits, even if it left something running', async () => {
+    const cwd = await tempDir();
+    const started = Date.now();
+    const result = await runCommand('echo done; (sleep 20 &) ; exit 0', { cwd, timeoutMs: 4000 });
+    expect(result.code).toBe(0);
+    expect(result.timedOut).toBe(false);
+    expect(result.output).toContain('done');
+    // Well inside the timeout it was given: the point is that it did not wait for it.
+    expect(Date.now() - started).toBeLessThan(2000);
+  });
+
+  // `{code: 0, timedOut: true}` must not be a shape this can produce, because `failed()` treats
+  // `timedOut` as a failure on its own and would contradict the exit code it is carrying.
+  it('never reports a clean exit and a timeout at once', async () => {
+    const cwd = await tempDir();
+    for (const ms of [40, 60, 80]) {
+      const result = await runCommand('echo quick', { cwd, timeoutMs: ms });
+      if (result.code === 0) expect(result.timedOut).toBe(false);
+    }
+  });
+
   // A command that cannot start at all is a failure with a reason, never a throw: the caller is a loop,
   // and an exception here would end the run rather than the verification.
   it('does not throw when the command does not exist', async () => {

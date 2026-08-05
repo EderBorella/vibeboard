@@ -51,12 +51,14 @@ export function tail(text: string, max = MAX_OUTPUT): string {
   return `[earlier output omitted]\n${text.slice(-max)}`;
 }
 
-const failed = (result: CommandResult): boolean => result.code !== 0 || result.timedOut;
+// Exported because the verifier needs the same question to decide whether to keep going, and it had its
+// own copy — whose `timedOut` half nothing constrained. One statement, so the two cannot drift.
+export const commandFailed = (result: CommandResult): boolean => result.code !== 0 || result.timedOut;
 
 // The FIRST failure, not the last: the later ones usually fail because of it, and the reader is owed
 // the cause rather than its consequences.
 export function firstFailure(results: CommandResult[]): CommandResult | undefined {
-  return results.find(failed);
+  return results.find(commandFailed);
 }
 
 // A score at or above the threshold. `undefined` is not a low score — it is a critic that did not

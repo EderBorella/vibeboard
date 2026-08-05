@@ -1,6 +1,7 @@
 import { readGates, readSmokeCommand } from '../core/foundation.js';
 import {
   type CommandResult,
+  commandFailed,
   commandVerification,
   failedVerification,
   type Verification,
@@ -27,8 +28,6 @@ interface Opts {
   run?: RunOne;
 }
 
-const failedResult = (result: CommandResult): boolean => result.code !== 0 || result.timedOut;
-
 export async function verifyGates(root: string, at: string, opts: Opts = {}): Promise<Verification> {
   const declared = await readGates(root);
   // The reader's reason, verbatim: it already says which file and which of the four ways it was wrong,
@@ -42,7 +41,7 @@ export async function verifyGates(root: string, at: string, opts: Opts = {}): Pr
       ...(opts.timeoutMs === undefined ? {} : { timeoutMs: opts.timeoutMs }),
     });
     results.push(result);
-    if (failedResult(result)) break;
+    if (commandFailed(result)) break;
   }
   return commandVerification('gates', at, results);
 }

@@ -217,6 +217,27 @@ function credentialSection(apiBase: string, token: string, cardId: string): stri
   ].join('\n');
 }
 
+// A JUDGING run's credential, which grants it nothing on the board.
+//
+// It exists because the alternative was worse in both directions. Handing a judge the section above gave
+// it two contradictory REQUIRED contracts — "edit this card with PATCH" immediately followed by "do not
+// edit the card" — and saying nothing at all leaves an agent to find a live token in its prompt with no
+// explanation, which is an agent that will experiment with it.
+//
+// The scope itself is still `work` today, because a critic is dispatched down the ordinary run path.
+// Narrowing that is C2's, where the critic is actually dispatched; this is the half that can be true now.
+function judgeCredentialSection(apiBase: string, token: string): string {
+  return [
+    `Your credential: \`${token}\`. Send it as \`Authorization: Bearer <credential>\` to \`${apiBase}\`.`,
+    'It stops working the moment this run ends, and it is yours alone — do not put it in a card, a',
+    'report or a file.',
+    '',
+    'It is for READING. `GET /api/state` is the whole board, and the files are yours to read. Nothing',
+    'about the board is yours to change: not this card, not another one, not where any of them sit.',
+    'Your report is the verdict, and it is the only thing this run produces.',
+  ].join('\n');
+}
+
 export function buildRunPrompt(input: PromptInputs): string {
   // Every part is joined by exactly one blank line, so no part carries its own leading or trailing
   // blank — otherwise the heading and the skill body end up four newlines apart.
@@ -266,12 +287,17 @@ export function buildRunPrompt(input: PromptInputs): string {
   if (input.userPrompt?.trim()) {
     parts.push(section('What the user asked for on top of the skill', input.userPrompt.trim()));
   }
+  // Which credential section, and it is not a style choice: a judging run given the board-changing one
+  // was told to PATCH its card and, three lines later, not to. Both sections are `(required)`, so there
+  // was no reading of the prompt that satisfied it.
   if (input.credential) {
     parts.push(
-      section(
-        'Changing the board (required)',
-        credentialSection(input.credential.apiBase, input.credential.token, input.card.id),
-      ),
+      input.verdict
+        ? section('Your credential', judgeCredentialSection(input.credential.apiBase, input.credential.token))
+        : section(
+            'Changing the board (required)',
+            credentialSection(input.credential.apiBase, input.credential.token, input.card.id),
+          ),
     );
   }
   // One or the other, never both — see verdictLines.

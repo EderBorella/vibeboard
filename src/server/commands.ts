@@ -26,6 +26,10 @@ export const COMMAND_TIMEOUT_MS = 600_000;
 // held whole in memory on its way to being thrown away.
 const MAX_HELD = 16_000;
 
+// How long to let a pipe flush after the process has already exited. Long enough for output that is
+// sitting unread, short enough that a command leaving a background child is not waited on.
+const FLUSH_MS = 50;
+
 export function runCommand(
   command: string,
   opts: { cwd: string; timeoutMs?: number; env?: NodeJS.ProcessEnv },
@@ -34,6 +38,7 @@ export function runCommand(
   return new Promise((resolve) => {
     let output = '';
     let timedOut = false;
+    let settled = false;
     let child: ChildProcess;
     try {
       child = spawn('/bin/sh', ['-c', command], {
@@ -59,6 +64,10 @@ export function runCommand(
     child.stderr?.on('data', capture);
 
     const timer = setTimeout(() => {
+      // Nothing to time out once the command has ended. Without this guard a process that exited at
+      // t-1ms could still be recorded as `timedOut`, and `failed()` treats that as a failure on its
+      // own — a verdict contradicting the exit code it is carrying.
+      if (settled) return;
       timedOut = true;
       try {
         // Negative pid: the group. A pid of 0 or 1 would be our own group or init, and `detached: true`
@@ -72,12 +81,30 @@ export function runCommand(
     timer.unref();
 
     const done = (code: number | null): void => {
+      if (settled) return;
+      settled = true;
       clearTimeout(timer);
+      // Released explicitly. A background child the command left behind holds the read end open, and
+      // without this the streams would sit there for as long as it lives.
+      child.stdout?.destroy();
+      child.stderr?.destroy();
       resolve({ command, code, output: tail(output), timedOut });
     };
     child.on('error', (err) => {
       output += String(err);
       done(-1);
+    });
+    // `exit`, not only `close`. `close` waits for the process to end AND every inherited pipe to be
+    // released — so a gate that exits 0 while leaving a background child (a server its smoke test
+    // started, which is the designed use of `verify: smoke`) sat here until the timeout and came back
+    // `{code: 0, timedOut: true}`: ten minutes of wall clock, an attempt burned, and a verdict saying it
+    // was still running about a command that had exited immediately.
+    //
+    // The short grace before resolving is for the ordinary case: `exit` can arrive with output still
+    // unread in the pipe, and `close` is what says there is none left. Whichever comes first wins, so a
+    // command that closes its pipes cleanly is not delayed and one that does not is not waited on.
+    child.on('exit', (code) => {
+      setTimeout(() => done(code), FLUSH_MS).unref();
     });
     child.on('close', (code) => done(code));
   });

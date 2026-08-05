@@ -395,6 +395,36 @@ describe('the judging contract', () => {
     expect(judging()).toContain(`${RUNS_DIR}/r1.report.md`);
   });
 
+  // The review's HIGH. A judging run was handed BOTH required contracts: "Changing the board" granting
+  // PATCH and POST on cards, then "Judging" saying do not edit the card. The exclusivity that was
+  // claimed held only between the two REPORTING contracts, and the judging test supplied no credential,
+  // so nothing noticed. A judge needs no write endpoint at all — it reads the work and reports a score.
+  it('is not also told how to change the board', () => {
+    const text = buildRunPrompt(
+      inputs({ verdict: { threshold: 0.6 }, credential: { token: 'T', apiBase: 'http://127.0.0.1:4610' } }),
+    );
+    expect(text).not.toContain('## Changing the board (required)');
+    expect(text).not.toContain('POST /api/cards');
+    expect(text).not.toContain('PATCH /api/cards');
+  });
+
+  // The token is still named, because the run has one and an agent that finds a credential in its
+  // environment with no explanation is an agent that will experiment with it.
+  it('says what its credential is for, and that changing the board is not it', () => {
+    const text = buildRunPrompt(
+      inputs({ verdict: { threshold: 0.6 }, credential: { token: 'T', apiBase: 'http://127.0.0.1:4610' } }),
+    );
+    expect(text).toContain('## Your credential');
+    expect(text).toMatch(/read/i);
+  });
+
+  // An ordinary run is unaffected: it still gets the endpoints it needs to do its job.
+  it('leaves a working run’s board instructions alone', () => {
+    const text = buildRunPrompt(inputs({ credential: { token: 'T', apiBase: 'http://127.0.0.1:4610' } }));
+    expect(text).toContain('## Changing the board (required)');
+    expect(text).toContain('POST /api/cards');
+  });
+
   // A score of 0 is the answer to "this does not meet the card", and the contract has to ask for it
   // explicitly: a judge that stays silent when the work is bad produces an absent score, which fails
   // closed but says nothing anyone can act on.

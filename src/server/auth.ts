@@ -67,6 +67,15 @@ const RULES: Record<string, Rule> = {
   // suggestion — because nothing an agent does needs the project's narrative, and an agent reading how
   // the last ten runs went is an agent reasoning about the loop that is running it.
   'POST /api/log': { scopes: ['service'] },
+
+  // Dispatching. THE SERVICE ONLY, and the two working scopes are refused for the reason decision 21
+  // gives: a run that can dispatch escapes every counter the loop keeps. Its iteration, its budget and
+  // its attempt cap are all compared between dispatches by the loop — an agent that starts a run from
+  // inside a run adds work nothing counted, and the caps stop bounding anything.
+  //
+  // This row is what makes the loop possible at all: without it `POST /api/runs` is admin-only, because
+  // a route absent from this table grants nothing.
+  'POST /api/runs': { scopes: ['service'] },
 };
 
 export function bearerToken(header: string | undefined): string {

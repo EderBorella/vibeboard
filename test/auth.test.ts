@@ -87,7 +87,11 @@ describe('the scope table', () => {
     // Named here to pin that they are refused, not merely absent from the table by oversight.
     ['/api/cards/:board/:id/raw', 'PUT', false, false, false],
     ['/api/cards/:board/:id/place', 'POST', false, false, false],
-    ['/api/runs', 'POST', false, false, false],
+    // C2's one new grant, and the row the loop cannot exist without: absent from this table,
+    // `POST /api/runs` is admin-only and the service cannot dispatch at all. Both WORKING scopes stay
+    // refused — decision 21 — because a run that can dispatch escapes the iteration counter, the budget
+    // and the attempt cap in one move.
+    ['/api/runs', 'POST', false, false, true],
     ['/api/config', 'PATCH', false, false, false],
     ['/api/explorer/file', 'PUT', false, false, false],
     ['/api/project/open', 'POST', false, false, false],
@@ -159,6 +163,36 @@ describe('the API boundary', () => {
   it('refuses a work credential on POST /api/runs', async () => {
     const { app, mint } = await open();
     const cred = mint('work', 'run-1', 'E-001');
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/runs',
+      headers: bearer(cred.token),
+      payload: {},
+    });
+    expect(res.statusCode).toBe(403);
+  });
+
+  it('lets a service credential dispatch, which is the whole loop', async () => {
+    const { app, mint } = await open();
+    const cred = mint('service', 'run-svc');
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/runs',
+      headers: bearer(cred.token),
+      payload: {},
+    });
+    // NOT 403 is the claim — a 403 here would mean the loop can never dispatch. What it actually hits is
+    // the sandbox pre-condition (412), and that ordering is deliberate: auto-pilot is the one caller for
+    // which a missing sandbox is mandatory to refuse, so it is checked before anything is resolved.
+    expect(res.statusCode).not.toBe(403);
+    expect(res.statusCode).toBe(412);
+  });
+
+  it('refuses a checkup credential on POST /api/runs too', async () => {
+    // The supervisor has authority over CARDS, not over what runs. Dispatching from inside a checkup
+    // would add work the loop never counted, same as from inside a work run.
+    const { app, mint } = await open();
+    const cred = mint('checkup', 'run-chk');
     const res = await app.inject({
       method: 'POST',
       url: '/api/runs',

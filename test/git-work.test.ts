@@ -312,6 +312,42 @@ describe('committing before every dispatch', () => {
 });
 
 // A project's hooks are its own gate, and `git commit` runs them. Everything here is about that.
+// Two failure paths that had no test, found by planting: a `git add` that fails, and a commit made from
+// a branch the caller did not put us on.
+describe('refusing to commit the wrong thing', () => {
+  it('reports a staging failure with git’s own reason', async () => {
+    // A nested checkout with nothing checked out: `add -A` refuses it, and the message is git's.
+    const dir = await committed(await repo());
+    await mkdir(join(dir, 'vendor'), { recursive: true });
+    await git(join(dir, 'vendor'), ['init', '-q', '-b', 'main']);
+    await git(dir, ['add', 'vendor']).catch(() => undefined);
+    const result = await commitAll(dir, 'autopilot: E-001');
+    expect(result.committed).toBe(false);
+    expect(result.reason).toMatch(/Could not stage the tree/);
+  });
+
+  it('refuses when it is not on the branch it was told to be on', async () => {
+    // The caller ignored an `ensureBranch` refusal. Committing here would put a person's uncommitted work
+    // on their own branch under a message saying an agent wrote it.
+    const dir = await committed(await repo());
+    await writeFile(join(dir, 'mine.txt'), 'work in progress\n');
+    const result = await commitAll(dir, 'autopilot: E-001', { branch: 'autopilot/run-1' });
+    expect(result.committed).toBe(false);
+    expect(result.reason).toContain('autopilot/run-1');
+    expect(result.reason).toContain('main');
+    expect(await count(dir)).toBe(1);
+  });
+
+  it('commits when it is', async () => {
+    const dir = await committed(await repo());
+    await ensureBranch(dir, 'autopilot/run-1');
+    await writeFile(join(dir, 'new.txt'), 'new\n');
+    expect(await commitAll(dir, 'autopilot: E-001', { branch: 'autopilot/run-1' })).toEqual({
+      committed: true,
+    });
+  });
+});
+
 describe('a project’s own pre-commit hook', () => {
   it('reports the hook’s refusal as the reason', async () => {
     const dir = await committed(await repo());

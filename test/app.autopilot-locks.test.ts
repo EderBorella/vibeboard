@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { IDLE_STATE } from '../src/core/autopilot-state.js';
 import { writeAutopilotState } from '../src/server/autopilot-store.js';
+import { dispatchLock } from '../src/server/routes/runs.js';
 import { readRun } from '../src/server/run-store.js';
 import { openTestProject, shimArgsLog, tempDir, wsClient } from './helpers.js';
 
@@ -69,6 +70,53 @@ describe('while a project is halted', () => {
   }, 8000);
 });
 
+// The rule on its own, with no app in the way. Through the app, TWO layers refuse a halted project —
+// this lock and agent-runner.ts on the far side of every await — so an end-to-end test cannot tell which
+// one did it, and planting proved the lock's halted branch was held by nothing.
+describe('the dispatch lock itself', () => {
+  const at = (state: 'idle' | 'running' | 'stopped' | 'halted') => ({ ...IDLE_STATE, state });
+
+  it.each([
+    // state,      admin,  service
+    ['idle', false, false],
+    ['stopped', false, false],
+    ['running', true, false],
+    ['halted', true, true],
+  ] as const)('%s', (state, locksAdmin, locksService) => {
+    expect(dispatchLock(at(state), 'admin') !== undefined, 'admin').toBe(locksAdmin);
+    expect(dispatchLock(at(state), 'service') !== undefined, 'service').toBe(locksService);
+  });
+
+  it('names the way forward in both refusals', () => {
+    expect(dispatchLock(at('running'), 'admin')).toContain('Soft-stop');
+    expect(dispatchLock(at('halted'), 'service')).toContain('Restart');
+  });
+
+  // A credential with no scope at all is the browser before the header is filled in, and a missing scope
+  // must not read as the service's exemption.
+  it('treats an unknown caller as a by-hand one', () => {
+    expect(dispatchLock(at('running'), undefined)).toContain('Soft-stop');
+  });
+});
+
+describe('while a project is halted, nothing dispatches at all', () => {
+  // Not even the loop. Halted is the state a person has to leave deliberately (decision 12), and a
+  // service that could still dispatch inside it would make the emergency stop a suggestion.
+  it('refuses the service too, not only the browser', async () => {
+    const { app, root, mint } = await openTestProject();
+    await writeAutopilotState(root, { ...IDLE_STATE, state: 'halted', reason: 'killed' });
+    const service = mint('service', 'run-svc');
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/runs',
+      headers: { authorization: `Bearer ${service.token}` },
+      payload: dispatch,
+    });
+    expect(res.statusCode).toBe(409);
+    expect(res.json().error).toContain('halted');
+  });
+});
+
 describe('while auto-pilot is running', () => {
   it('refuses a manual dispatch, offering the soft stop', async () => {
     const { app, root } = await openTestProject();
@@ -76,6 +124,28 @@ describe('while auto-pilot is running', () => {
     const res = await app.inject({ method: 'POST', url: '/api/runs', payload: dispatch });
     expect(res.statusCode).toBe(409);
     expect(res.json().error).toContain('Soft-stop');
+  });
+
+  // THE LOCK C2 CHANGED, and the only state in which the loop ever dispatches. Refusing the service here
+  // would refuse auto-pilot itself; refusing a by-hand dispatch is S6, because the runner, the
+  // concurrency cap and the queue are shared and a manual run would queue ahead of the loop's next one.
+  it('lets the SERVICE dispatch while running, and still refuses a by-hand one', async () => {
+    const { app, root, mint } = await openTestProject();
+    await writeAutopilotState(root, { ...IDLE_STATE, state: 'running' });
+
+    const byHand = await app.inject({ method: 'POST', url: '/api/runs', payload: dispatch });
+    expect(byHand.statusCode).toBe(409);
+
+    const service = mint('service', 'run-svc');
+    const loop = await app.inject({
+      method: 'POST',
+      url: '/api/runs',
+      headers: { authorization: `Bearer ${service.token}` },
+      payload: dispatch,
+    });
+    // Past the lock. It gets a real run, which is the point — the same payload the admin was refused.
+    expect(loop.statusCode).toBe(200);
+    expect(loop.json().run).toBeTruthy();
   });
 
   it('dispatches by hand again after a soft stop', async () => {

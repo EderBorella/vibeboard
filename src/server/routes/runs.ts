@@ -14,6 +14,7 @@ import { BOARDS, type BoardName, type ProjectConfig } from '../../core/types.js'
 import type { DispatchInput } from '../agent-runner.js';
 import type { Backend } from '../agent-turn.js';
 import { readResources } from '../control-files.js';
+import type { Scope } from '../credentials.js';
 import { attachedOpencodeUrl } from '../opencode-server.js';
 import { type AppCtx, ensureOpen, nowIso } from '../route-context.js';
 import type { BoardColumns } from '../run-prompt.js';
@@ -32,14 +33,29 @@ import { readSkills } from '../skill-catalogue.js';
 // caller a 400 and a sentence instead of a 500.
 const NOT_A_RUN_ID = 'That is not a run id.';
 
-// Why a manual dispatch cannot happen right now, or nothing. Separated from the handler because it
-// is a rule rather than plumbing, and because both sentences have to offer a way forward: a refusal
-// about a state the user cannot see and cannot act on is worse than the state itself.
-function dispatchLock(state: AutopilotState): string | undefined {
+// Why this dispatch cannot happen right now, or nothing. Separated from the handler because it is a
+// rule rather than plumbing, and because every sentence has to offer a way forward: a refusal about a
+// state the user cannot see and cannot act on is worse than the state itself.
+//
+// The SCOPE matters, and it is the whole of C2's change here. `running` means auto-pilot owns this
+// project's runner, so a by-hand dispatch is refused (S6: the runner, the concurrency cap and the queue
+// are shared, so a manual run would queue ahead of the loop's next one and make `autoPilotConcurrency: 1`
+// aspirational). The service dispatching while `running` is not a competing caller — it IS the loop, and
+// refusing it would refuse the only state in which it ever works.
+//
+// `halted` stays absolute. Nothing dispatches, the service included: halted is the state a person has to
+// leave deliberately, and a loop that could still dispatch inside it would make the emergency stop a
+// suggestion.
+// Exported so the rule can be tested directly, for the same reason `allows` is: planting showed the
+// halted branch here was held by NOTHING through the app, because agent-runner.ts refuses a halted
+// project again on the far side of every await and produces the same sentence. That second guard is
+// deliberate defence in depth — but a branch whose removal changes no test is a branch that does not
+// work, whatever else happens to catch it.
+export function dispatchLock(state: AutopilotState, scope: Scope | undefined): string | undefined {
   if (state.state === 'halted') {
     return 'This project is halted, so nothing can be dispatched. Restart it from the auto-pilot panel first.';
   }
-  if (state.state === 'running') {
+  if (state.state === 'running' && scope !== 'service') {
     return 'Auto-pilot is running this project, so it owns the runner. Soft-stop it first if you want to dispatch a run by hand.';
   }
   return undefined;
@@ -215,7 +231,7 @@ export async function registerRunRoutes(api: FastifyInstance, ctx: AppCtx): Prom
     // owns this project, and S6 is the reason — the runner, the concurrency cap and the queue are
     // shared, so a manual dispatch would queue ahead of the loop's next one and make
     // `autoPilotConcurrency: 1` aspirational rather than true. Both refusals say what to do instead.
-    const locked = dispatchLock(await ctx.autopilot.current());
+    const locked = dispatchLock(await ctx.autopilot.current(), req.credential?.scope);
     if (locked) return reply.code(409).send({ error: locked });
     const resolved = await resolveDispatch(ctx, req.body as DispatchBody);
     if ('error' in resolved) return reply.code(resolved.code).send({ error: resolved.error });

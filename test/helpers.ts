@@ -8,7 +8,7 @@ import { onTestFinished } from 'vitest';
 import WebSocket from 'ws';
 import type { Card } from '../src/core/types.js';
 import { buildApp } from '../src/server/app.js';
-import { CredentialStore } from '../src/server/credentials.js';
+import { type Credential, CredentialStore } from '../src/server/credentials.js';
 import { probeProfile, type SandboxStatus, wrapCommand } from '../src/server/sandbox.js';
 import { ProjectSession } from '../src/server/session.js';
 
@@ -77,6 +77,9 @@ export const TEST_SANDBOX: SandboxStatus = await probeProfile('unprivileged_user
 export interface TestAppOpts {
   runBin?: string;
   logger?: FastifyServerOptions['logger'];
+  // Passed in when a test needs to mint a run credential of its own — the service loop reaches the board
+  // over HTTP with a `service` token, so testing it means holding the same store the app checks against.
+  credentials?: CredentialStore;
   // Confinement, as the composition root would pass it. Absent means unsandboxed, which is what
   // every suite that is about something else wants.
   sandbox?: SandboxStatus;
@@ -94,7 +97,7 @@ export function testApp(session: ProjectSession, opts: TestAppOpts = {}): Fastif
   const app = buildApp(session, {
     ...opts,
     sandbox: opts.sandbox ?? TEST_SANDBOX,
-    credentials: new CredentialStore(TEST_ADMIN_TOKEN),
+    credentials: opts.credentials ?? new CredentialStore(TEST_ADMIN_TOKEN),
   });
   app.addHook('onRequest', async (req) => {
     req.headers.authorization ??= `Bearer ${TEST_ADMIN_TOKEN}`;
@@ -106,6 +109,11 @@ export interface TestProject {
   app: FastifyInstance;
   session: ProjectSession;
   root: string;
+  credentials: CredentialStore;
+  // A run credential for this project, for tests about what an agent or the service may do. The admin
+  // header is filled in automatically for every other request, so this is only needed when the SCOPE is
+  // the point.
+  mint: (scope: 'work' | 'checkup' | 'service', run: string, card?: string) => Credential;
 }
 
 // The setup most route tests re-typed by hand: a temp folder, scaffolded and opened, with an
@@ -126,7 +134,13 @@ export async function openTestProject(
   } = {},
 ): Promise<TestProject> {
   const session = new ProjectSession();
-  const app = testApp(session, { runBin: opts.runBin, logger: opts.logger, sandbox: opts.sandbox });
+  const credentials = new CredentialStore(TEST_ADMIN_TOKEN);
+  const app = testApp(session, {
+    runBin: opts.runBin,
+    logger: opts.logger,
+    sandbox: opts.sandbox,
+    credentials,
+  });
   const root = await tempDir();
   const scaffolded = await app.inject({
     method: 'POST',
@@ -147,7 +161,13 @@ export async function openTestProject(
     await app.close();
     await session.close();
   });
-  return { app, session, root };
+  return {
+    app,
+    session,
+    root,
+    credentials,
+    mint: (scope, run, card) => credentials.mintRun(scope, run, root, card),
+  };
 }
 
 export interface WsTestClient<M> {

@@ -6,8 +6,16 @@ import { promisify } from 'node:util';
 import { describe, expect, it } from 'vitest';
 import { boardColumnSlugs, readBoard } from '../src/core/board.js';
 import { readConfig } from '../src/core/config.js';
-import { ARCHIVE_SLUG, boardRel, CONVENTIONS_FILE, POINTER_FILES } from '../src/core/layout.js';
+import { parseDiary } from '../src/core/diary.js';
+import {
+  ARCHIVE_SLUG,
+  boardRel,
+  CONVENTIONS_FILE,
+  POINTER_FILES,
+  PROJECT_LOG_FILE,
+} from '../src/core/layout.js';
 import { scaffoldProject } from '../src/core/scaffold.js';
+import { appendEntry, readDiary } from '../src/server/diary-store.js';
 import { tempDir } from './helpers.js';
 
 const TODAY = '2026-07-23';
@@ -168,5 +176,59 @@ describe('scaffoldProject', () => {
     await scaffoldProject(root, { name: 'A', mode: 'brownfield', today: TODAY });
     const claude = await readFile(join(root, CLAUDE_MD), 'utf8');
     expect(claude.split(`@${CONVENTIONS_FILE}`).length - 1).toBe(1);
+  });
+});
+
+// The diary. Load-bearing rather than decorative: it is the checkup's primary input, and unlike every
+// other file here its contents cannot be re-derived — the board comes from its folders, a run's cost from
+// its record, what changed from git, but a narrative comes from nowhere else.
+describe('the project log', () => {
+  it('starts with one lifecycle entry, whichever mode the project was created in', async () => {
+    for (const mode of ['greenfield', 'brownfield'] as const) {
+      const root = await tempDir();
+      await scaffoldProject(root, { name: 'A', mode, today: TODAY });
+      const entries = parseDiary(await readFile(join(root, PROJECT_LOG_FILE), 'utf8'));
+      expect(entries, mode).toHaveLength(1);
+      expect(entries[0]?.kind, mode).toBe('lifecycle');
+      expect(entries[0]?.text, mode).toContain('created');
+    }
+  });
+
+  it('names the project it is about, so a diary read on its own says whose it is', async () => {
+    const root = await tempDir();
+    await scaffoldProject(root, { name: 'Arcane Scroll', mode: 'brownfield', today: TODAY });
+    expect((await readDiary(root))[0]?.text).toContain('Arcane Scroll');
+  });
+
+  it('has a heading, so the file reads as a document when opened directly', async () => {
+    const root = await tempDir();
+    await scaffoldProject(root, { name: 'A', mode: 'brownfield', today: TODAY });
+    expect(await readFile(join(root, PROJECT_LOG_FILE), 'utf8')).toMatch(/^# /);
+  });
+
+  // Scaffolding is idempotent everywhere else here, and this is the one file where getting that wrong is
+  // unrecoverable: re-scaffolding an adopted project would erase its whole history.
+  it('leaves an existing diary alone', async () => {
+    const root = await tempDir();
+    await scaffoldProject(root, { name: 'A', mode: 'greenfield', today: TODAY });
+    await appendEntry(root, {
+      at: '2026-08-05T12:00:00.000Z',
+      kind: 'run',
+      text: 'something that happened',
+    });
+    await scaffoldProject(root, { name: 'A', mode: 'greenfield', today: '2026-08-06' });
+
+    const texts = (await readDiary(root)).map((e) => e.text);
+    expect(texts).toContain('something that happened');
+    // And no second "created" line: the project was created once.
+    expect(texts.filter((t) => t.includes('created'))).toHaveLength(1);
+  });
+
+  // The next append must start a new line rather than continuing the one scaffold wrote.
+  it('is left ready for the next append', async () => {
+    const root = await tempDir();
+    await scaffoldProject(root, { name: 'A', mode: 'brownfield', today: TODAY });
+    await appendEntry(root, { at: '2026-08-05T12:00:00.000Z', kind: 'run', text: 'next' });
+    expect((await readDiary(root)).map((e) => e.text)).toEqual([expect.stringContaining('created'), 'next']);
   });
 });

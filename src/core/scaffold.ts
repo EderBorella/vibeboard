@@ -1,10 +1,11 @@
 import { execFile } from 'node:child_process';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { boardColumnSlugs } from './board.js';
 import { defaultConfig, writeConfig } from './config.js';
 import { ensurePointerFile, INSTRUCTIONS_DOC } from './control.js';
+import { entryBlock } from './diary.js';
 import {
   ARCHIVE_SLUG,
   BOARDS_DIR,
@@ -13,6 +14,7 @@ import {
   CONVENTIONS_FILE,
   INSTRUCTIONS_FILE,
   POINTER_FILES,
+  PROJECT_LOG_FILE,
 } from './layout.js';
 import { setCardLinks } from './links.js';
 import { type CreateCardInput, createCard } from './mutations.js';
@@ -173,6 +175,30 @@ async function ensureRepo(projectRoot: string): Promise<void> {
   }
 }
 
+// The diary's first line. Both modes get one — it is the project's narrative, not sample content — and
+// an existing diary is left completely alone: scaffolding is idempotent everywhere else here, and this is
+// the one file where a mistake cannot be undone from the board, the run records or git.
+//
+// Midnight on the day the project was created, because the day is the granularity scaffold is given.
+// `today` is injected rather than read from a clock so that scaffolding is deterministic, and reaching for
+// `new Date()` here to gain three decimal places would give that up for nothing anyone will read.
+async function ensureDiary(projectRoot: string, name: string, today: string): Promise<void> {
+  const path = join(projectRoot, PROJECT_LOG_FILE);
+  // `readFile` and a catch, which is the idiom the rest of core uses for this (see control.ts) — and it
+  // answers the question that matters: is there already a narrative here to protect.
+  try {
+    await readFile(path, 'utf8');
+    return;
+  } catch {
+    // No diary yet, which is the only case that writes one.
+  }
+  const first = entryBlock(
+    { at: `${today}T00:00:00.000Z`, kind: 'lifecycle', text: `Project ${name} created.` },
+    true,
+  );
+  await writeFile(path, first, 'utf8');
+}
+
 export async function scaffoldProject(
   projectRoot: string,
   opts: { name: string; mode: ScaffoldMode; today: string },
@@ -196,5 +222,6 @@ export async function scaffoldProject(
   // should add the cockpit and nothing else — three "delete me" cards would just be noise in
   // someone's real project (and in their git status).
   if (greenfield) await writeSampleCards(projectRoot, config, opts.today);
+  await ensureDiary(projectRoot, opts.name, opts.today);
   await ensureRepo(projectRoot);
 }

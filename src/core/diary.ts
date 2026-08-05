@@ -68,6 +68,13 @@ export function serializeEntry(entry: DiaryEntry): string {
   return `- \`${entry.at}\` **${entry.kind}**${middle}${text === '' ? '' : ` — ${text}`}`;
 }
 
+// How an entry is committed to the file. One home for it, because two writers create lines here — the
+// store appending, and scaffold creating the file with its first — and a heading written by one and not
+// the other, or a newline forgotten by either, is a corrupt diary.
+export function entryBlock(entry: DiaryEntry, withHeader: boolean): string {
+  return `${withHeader ? DIARY_HEADER : ''}${serializeEntry(entry)}\n`;
+}
+
 // Anchored at the start of the line and on an ISO-shaped timestamp: the file is ordinary markdown that a
 // person may add prose to, and a note that happens to start with a dash must not become an event.
 const LINE = /^- `(\d{4}-\d{2}-\d{2}T[\d:.]+Z)` \*\*([a-z]+)\*\*(.*)$/;

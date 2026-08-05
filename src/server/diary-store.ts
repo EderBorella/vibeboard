@@ -1,6 +1,6 @@
 import { appendFile, mkdir, readFile, stat } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
-import { DIARY_HEADER, type DiaryEntry, parseDiary, serializeEntry } from '../core/diary.js';
+import { type DiaryEntry, entryBlock, parseDiary } from '../core/diary.js';
 import { PROJECT_LOG_FILE } from '../core/layout.js';
 
 // The diary on disk. Append-only, and the only module allowed to write it.
@@ -42,11 +42,9 @@ export async function appendEntry(root: string, entry: DiaryEntry): Promise<void
 async function write(path: string, entry: DiaryEntry): Promise<void> {
   await mkdir(dirname(path), { recursive: true });
   // The heading belongs to creating the file, not to appending to it. Size rather than existence, so a
-  // zero-byte file somebody made by hand still gets one.
-  const head = (await size(path)) > 0 ? '' : DIARY_HEADER;
-  // A trailing newline every time: without one the NEXT append continues this line, and two events
-  // become one unparseable one.
-  await appendFile(path, `${head}${serializeEntry(entry)}\n`, 'utf8');
+  // zero-byte file somebody made by hand still gets one. The trailing newline is in `entryBlock`, with
+  // the heading, because forgetting either corrupts the file in the same way.
+  await appendFile(path, entryBlock(entry, (await size(path)) === 0), 'utf8');
 }
 
 async function size(path: string): Promise<number> {

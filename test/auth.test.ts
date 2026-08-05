@@ -104,6 +104,9 @@ describe('the scope table', () => {
     ['/api/autopilot/restart', 'POST', false, false, false],
     ['/api/project-runs/:run/resolve', 'POST', false, false, false],
     ['/api/project/scaffold', 'POST', false, false, false],
+    // The diary: the service writes it, nobody else, and nobody reads it but admin.
+    ['/api/log', 'POST', false, false, true],
+    ['/api/log', 'GET', false, false, false],
   ])('%s %s', (route, method, work, checkup, service) => {
     // `card` matches the :id row's own-card rule, so this grid measures scope and not confinement.
     expect(allows(cred('work', 'E-001'), method, route, PROJECT, 'E-001'), 'work').toBe(work);

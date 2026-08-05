@@ -22,6 +22,7 @@ import { registerAutopilotRoutes } from './routes/autopilot.js';
 import { registerCardRoutes } from './routes/cards.js';
 import { registerConfigRoutes } from './routes/config.js';
 import { registerControlRoutes } from './routes/control.js';
+import { registerDiaryRoutes } from './routes/diary.js';
 import { registerExplorerRoutes } from './routes/explorer.js';
 import { registerModelRoutes } from './routes/models.js';
 import { registerProjectRoutes } from './routes/project.js';
@@ -182,6 +183,7 @@ export function buildApp(
       await registerSandboxRoutes(api, ctx);
       await registerAutopilotRoutes(api, ctx);
       await registerSuggestionRoutes(api, ctx);
+      await registerDiaryRoutes(api, ctx);
       await registerExplorerRoutes(api, ctx);
       await registerSkillRoutes(api, ctx);
       await registerRunRoutes(api, ctx);

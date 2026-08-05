@@ -59,6 +59,14 @@ const RULES: Record<string, Rule> = {
   // the board over HTTP like anything else. `work` and `checkup` do not: an agent that can see how
   // much room is left in the budget is an agent reasoning about its own leash.
   'GET /api/accounting': { scopes: ['service'] },
+
+  // The diary. The SERVICE writes it — loop step 12 appends a run's summary after every dispatch, and
+  // the service is a separate process reaching the board over HTTP like anything else. Both working
+  // scopes are absent deliberately: a run already reports that summary, so an agent writing here would
+  // be a second path to one fact. Reading is absent for every scope — admin-only, like triaging a
+  // suggestion — because nothing an agent does needs the project's narrative, and an agent reading how
+  // the last ten runs went is an agent reasoning about the loop that is running it.
+  'POST /api/log': { scopes: ['service'] },
 };
 
 export function bearerToken(header: string | undefined): string {

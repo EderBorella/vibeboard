@@ -1,5 +1,6 @@
 import matter from 'gray-matter';
 import type { BoardName } from './types.js';
+import { isVerifyMode, type Verification } from './verify.js';
 
 // A run is a file: `<board>/results/<CARD-ID>/<runId>.md` inside the boards folder (core/layout.ts).
 // Its frontmatter is VibeBoard's record of what was dispatched and how it ended; its body is the
@@ -93,6 +94,18 @@ export interface RunRecord {
   // Absent when there was no answer — no repository, or no git — never 0. A project without git has
   // not changed no files.
   filesChanged?: number;
+  // What was decided about this run, and on the strength of what (decision 18). Written after the run
+  // settled, by whatever verified it — so it is ABSENT on every record until something has judged it,
+  // which is not the same fact as failing.
+  verification?: Verification;
+  // What a CRITIC run itself answered: its score, and any over-delivery it noticed. Distinct from
+  // `verification` above, which is what was decided about the run being judged — the critic's own
+  // record holds what it said, the judged run holds what came of it.
+  //
+  // Absent on every other kind of run, and absent rather than 0 when a critic did not answer: zero is
+  // a critic that judged the work worthless, which is a verdict rather than a gap.
+  score?: number;
+  overshoot?: string;
   report: string; // the body: the agent's report, verbatim
 }
 
@@ -127,6 +140,38 @@ function asUsage(value: unknown): RunUsage | undefined {
     if (typeof n === 'number' && Number.isFinite(n) && n >= 0) usage[key] = n;
   }
   return Object.keys(usage).length > 0 ? usage : undefined;
+}
+
+// A score is a fraction of one, and zero is a real answer — a critic that judged the work worthless.
+// Anything outside that range is not a judgement at all: a 4 would clear every threshold, which is the
+// direction that turns a broken critic into a pass.
+function asFraction(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 1 ? value : undefined;
+}
+
+// Fields of a verdict that are plain sentences. A table rather than five near-identical guards: the
+// only thing that differs is the key, and flattening keeps this under the complexity ceiling.
+const VERIFICATION_TEXT = ['command', 'output', 'reason', 'by', 'overshoot'] as const;
+
+// A verdict read back off disk, or nothing. Field by field, because a run file is something a person
+// may edit and one bad key must not cost the record — but `mode`, `passed` and `at` are REQUIRED and a
+// verdict missing any of them is dropped whole rather than defaulted. Defaulting `passed` either way
+// invents a decision nobody made, and the direction that invents a pass is how work advances on
+// nothing at all; a verdict with no timestamp is one nobody can place in the sequence.
+function asVerification(value: unknown): Verification | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  const d = value as Record<string, unknown>;
+  const at = asText(d.at);
+  if (!isVerifyMode(d.mode) || typeof d.passed !== 'boolean' || at === undefined) return undefined;
+  const out: Verification = { mode: d.mode, passed: d.passed, at };
+  for (const key of VERIFICATION_TEXT) {
+    const text = asText(d[key]);
+    if (text !== undefined) out[key] = text;
+  }
+  const score = asFraction(d.score);
+  if (score !== undefined) out.score = score;
+  if (typeof d.threshold === 'number' && Number.isFinite(d.threshold)) out.threshold = d.threshold;
+  return out;
 }
 
 function asText(value: unknown): string | undefined {
@@ -200,6 +245,11 @@ export function serializeRun(record: RunRecord): string {
     'pgid',
     'pgstart',
     'filesChanged',
+    // Last, and in this order: what the run answered, then what was decided about it. A run file is
+    // read in a diff, and the verdict is the thing you look for at the bottom.
+    'score',
+    'overshoot',
+    'verification',
   ] as const) {
     if (front[key] !== undefined) data[key] = front[key];
   }
@@ -226,7 +276,15 @@ export function withFilesChanged(record: RunRecord, count: number | undefined): 
 // Fields that are simply absent when unset, rather than present and empty. Gathered in loops
 // rather than a chain of conditional spreads: same behaviour, and a dozen ternaries in one
 // expression is what pushed parseRun past the complexity gate.
-const TEXT_OPTIONALS = ['finished', 'resolved', 'previous', 'prompt', 'summary', 'note'] as const;
+const TEXT_OPTIONALS = [
+  'finished',
+  'resolved',
+  'previous',
+  'prompt',
+  'summary',
+  'note',
+  'overshoot',
+] as const;
 const LIST_OPTIONALS = ['attached', 'options', 'created'] as const;
 
 // Whole-number fields, each with the smallest value it may legitimately hold. One table rather than a
@@ -253,6 +311,10 @@ function optionalFields(d: Record<string, unknown>): Partial<RunRecord> {
   if (isOutcome(d.outcome)) out.outcome = d.outcome;
   const usage = asUsage(d.usage);
   if (usage !== undefined) out.usage = usage;
+  const verification = asVerification(d.verification);
+  if (verification !== undefined) out.verification = verification;
+  const score = asFraction(d.score);
+  if (score !== undefined) out.score = score;
   for (const key of TEXT_OPTIONALS) {
     const value = asText(d[key]);
     if (value !== undefined) out[key] = value;
@@ -350,6 +412,13 @@ export function withoutReport(
 // untouched rather than writing an empty `usage: {}`.
 export function withUsage(record: RunRecord, usage: RunUsage | undefined): RunRecord {
   return usage === undefined ? record : { ...record, usage };
+}
+
+// The verdict, attached after the run settled and after whatever verified it has answered. Its own
+// function rather than a spread at the call site, so there is ONE statement of what "this run was
+// judged" writes — and so a loop cannot half-write it.
+export function withVerification(record: RunRecord, verification: Verification): RunRecord {
+  return { ...record, verification };
 }
 
 // In-flight statuses cannot survive a restart: the child process is gone with the server that

@@ -1,4 +1,5 @@
-import type { BoardName, Card } from './types.js';
+import { ARCHIVE_SLUG } from './layout.js';
+import { BOARDS, type BoardName, type Card } from './types.js';
 
 // Which board sits above which. Links are symmetric and the conventions allow any pairing, so
 // direction cannot come from a link itself — it comes from the fixed board order, and that is what
@@ -16,6 +17,39 @@ const PARENT: Record<BoardName, BoardName | undefined> = {
 
 export function parentBoardOf(board: BoardName): BoardName | undefined {
   return PARENT[board];
+}
+
+// The other direction, DERIVED from the table above rather than written out a second time: two
+// hand-kept tables are two places for the hierarchy to disagree with itself, and a rollup reading one
+// while the link check reads the other would advance a card from children nobody calls its children.
+export function childBoardOf(board: BoardName): BoardName | undefined {
+  return BOARDS.find((b) => PARENT[b] === board);
+}
+
+// A card auto-pilot can see. An ARCHIVED card neither blocks nor satisfies anything — it is excluded
+// from the tree entirely, so a parent whose children were all archived is the CHILDLESS case, which
+// rolls up to nothing. Both halves are checked because they are written by different paths: the folder
+// is what the board reads a card's state from, and the field is what a restore puts it back with.
+//
+// One home, because three readers need the same answer (the setup barrier, rollup, eligibility) and a
+// second copy is how a card ends up live for one of them and gone for another.
+export function isLive(card: Card): boolean {
+  return card.columnSlug !== ARCHIVE_SLUG && card.archived === undefined;
+}
+
+export function liveCards(cards: Card[]): Card[] {
+  return cards.filter(isLive);
+}
+
+// The cards below this one, by board rather than by link direction. Silent about ids that name no
+// card: a dangling link is no child, and it has its own report at the endpoint that wrote it.
+export function childrenOf(card: Card, cards: Card[]): Card[] {
+  const board = childBoardOf(card.board);
+  if (!board) return [];
+  const live = liveCards(cards);
+  return card.links
+    .map((id) => live.find((c) => c.id === id))
+    .filter((c): c is Card => c !== undefined && c.board === board);
 }
 
 // Judges the WHOLE list, because the endpoint receives the complete set rather than one added edge:

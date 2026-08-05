@@ -1,5 +1,5 @@
 import type { CardProblem } from './board.js';
-import { ARCHIVE_SLUG } from './layout.js';
+import { childrenOf, liveCards } from './hierarchy.js';
 import type { BoardName, Card } from './types.js';
 
 // The setup feature and the cards it covers. It establishes the stack, the tooling, the logging, the
@@ -12,11 +12,10 @@ import type { BoardName, Card } from './types.js';
 // its linked cards on engineering.
 //
 // An ARCHIVED card is excluded entirely — it neither blocks nor satisfies. A subtree whose children
-// were all archived is the childless case, and a childless card does not roll up.
+// were all archived is the childless case, and a childless card does not roll up. Both that rule and
+// the direction of the walk come from hierarchy.ts, which rollup and eligibility read too.
 
-const isLive = (card: Card): boolean => card.columnSlug !== ARCHIVE_SLUG && card.archived === undefined;
-
-const live = (cards: Card[]): Card[] => cards.filter(isLive);
+const live = liveCards;
 
 // First in document order, which is the order the board itself reads in. Two flagged features is a
 // mistake in the files rather than a tie to break, and taking the first is at least deterministic.
@@ -29,15 +28,10 @@ export function setupFeature(cards: Card[]): Card | undefined {
 export function setupSubtreeIds(cards: Card[]): Set<string> {
   const feature = setupFeature(cards);
   if (!feature) return new Set();
-  const alive = live(cards);
-  const byId = new Map(alive.map((c) => [c.id, c]));
-  const childrenOf = (card: Card, board: BoardName): Card[] =>
-    card.links.map((id) => byId.get(id)).filter((c): c is Card => c !== undefined && c.board === board);
-
   const ids = new Set<string>([feature.id]);
-  for (const product of childrenOf(feature, 'product')) {
+  for (const product of childrenOf(feature, cards)) {
     ids.add(product.id);
-    for (const engineering of childrenOf(product, 'engineering')) ids.add(engineering.id);
+    for (const engineering of childrenOf(product, cards)) ids.add(engineering.id);
   }
   return ids;
 }

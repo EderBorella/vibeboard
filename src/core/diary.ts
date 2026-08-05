@@ -10,9 +10,14 @@ import { BOARDS, type BoardName } from './types.js';
 // per event serves both, and this module is the whole statement of the format — pure, so it can be
 // tested without a filesystem, and so the store has nothing to decide.
 
-// The three classes of event the spec names. `run` carries what the run was; `checkup` is the mandatory
-// accountability entry; `lifecycle` is pre-flight, approval and every stop with its reason.
-export const DIARY_KINDS = ['run', 'checkup', 'lifecycle'] as const;
+// Four classes of event. `run` carries what the run was; `checkup` is the mandatory accountability
+// entry; `lifecycle` is pre-flight, approval and every stop with its reason.
+//
+// `note` was added on 2026-08-05, when slice C was planned. The spec named three, and a hand-typed entry
+// was being written as `lifecycle` — the class the loop reads to learn why a run stopped. A line somebody
+// typed is none of those things, and one class for both put human prose in the machine's input. Extending
+// an enumeration a later slice consumes was the owner's call rather than a tidy-up, so it was asked.
+export const DIARY_KINDS = ['run', 'checkup', 'lifecycle', 'note'] as const;
 export type DiaryKind = (typeof DIARY_KINDS)[number];
 
 export interface DiaryEntry {
@@ -40,6 +45,23 @@ function oneLine(text: string): string {
     .replace(/[\r\n\t]+/g, ' ')
     .replace(/ {2,}/g, ' ')
     .trim();
+}
+
+// A narrative line, not a document. The text arrives from an agent's summary, so without this the only
+// bound is Fastify's 1 MB body limit — and `GET /api/log` re-parses the whole growing file on every read.
+//
+// TRUNCATED rather than refused: an entry is one event in a sequence, and losing the event to save its
+// last 1,900 characters is the wrong way round. Same reasoning as `oneLine` collapsing a newline instead
+// of dropping the summary that contained it.
+//
+// Applied by the CALLER that builds the entry, not by `serializeEntry`: applied there, the endpoint's
+// reply and its broadcast would carry the full text while the file held the short line, and the two
+// would disagree about what happened.
+export const MAX_ENTRY_TEXT = 2000;
+
+export function boundText(text: string): string {
+  const line = oneLine(text);
+  return line.length <= MAX_ENTRY_TEXT ? line : `${line.slice(0, MAX_ENTRY_TEXT - 1).trimEnd()}…`;
 }
 
 // A field value, escaped so it cannot be read as structure. Backslash first, or the escapes we add below
@@ -85,7 +107,11 @@ export function serializeEntry(entry: DiaryEntry): string {
   }
   const middle = parts.length > 0 ? ` ${parts.join(' · ')}` : '';
   const text = oneLine(entry.text);
-  return `- \`${entry.at}\` **${entry.kind}**${middle}${text === '' ? '' : ` — ${text}`}`;
+  // `at` and `kind` go through the collapse too. Only `text` did, and `entryBlock` is exported: an `at`
+  // containing a newline forges an event AND destroys the real one by splitting the line in half. Not
+  // reachable through either caller today — both pass a server clock — which is why this is a guard
+  // rather than a fix, and why the trigger recorded for it was the first caller that is not that clock.
+  return `- \`${oneLine(entry.at)}\` **${oneLine(entry.kind)}**${middle}${text === '' ? '' : ` — ${text}`}`;
 }
 
 // How an entry is committed to the file. One home for it, because two writers create lines here — the

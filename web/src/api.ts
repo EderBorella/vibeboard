@@ -565,7 +565,7 @@ export function restartAutopilot(): Promise<{ state: AutopilotState }> {
 // --- The diary ---------------------------------------------------------------------------------------
 // Mirrors src/core/diary.ts. An array rather than a bare union so test/mirror.test.ts can assert it: slice
 // D shipped six hand-mirrored types with no guard, and one of them gained a member mid-slice.
-export const DIARY_KINDS = ['run', 'checkup', 'lifecycle'] as const;
+export const DIARY_KINDS = ['run', 'checkup', 'lifecycle', 'note'] as const;
 export type DiaryKind = (typeof DIARY_KINDS)[number];
 
 export interface DiaryEntry {

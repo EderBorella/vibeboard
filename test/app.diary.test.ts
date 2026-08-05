@@ -215,3 +215,25 @@ describe('who may write the diary', () => {
     }
   });
 });
+
+describe('what the endpoint will accept', () => {
+  it('accepts a note, and still refuses a kind that is not one', async () => {
+    const { app } = await openTestProject();
+    expect((await post(app, { kind: 'note', text: 'I rebased the branch.' })).statusCode).toBe(200);
+    expect((await post(app, { kind: 'memo', text: 'x' })).statusCode).toBe(400);
+  });
+
+  // Bounded where the RETURNED entry is built, not inside the serializer: applied there, the reply and
+  // the broadcast would carry the full megabyte while the file held the short line, and the two would
+  // disagree about what happened. This is also the coverage gap slice E's review recorded — nothing
+  // pinned the payload against what is on disk.
+  it('bounds what it writes and what it answers, identically', async () => {
+    const { app, root } = await openTestProject();
+    const long = `start ${'y'.repeat(3000)} end`;
+    const res = await post(app, { kind: 'note', text: long });
+    expect(res.statusCode).toBe(200);
+    const returned = (res.json() as { entry: DiaryEntry }).entry.text;
+    expect(returned.length).toBeLessThan(long.length);
+    expect((await readDiary(root)).at(-1)?.text).toBe(returned);
+  });
+});

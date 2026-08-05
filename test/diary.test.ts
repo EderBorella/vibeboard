@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
+  boundText,
   DIARY_HEADER,
   DIARY_KINDS,
   type DiaryEntry,
+  entryBlock,
+  MAX_ENTRY_TEXT,
   parseDiary,
   parseEntry,
   serializeEntry,
@@ -95,10 +98,11 @@ describe('a diary line', () => {
     expect(parseDiary(DIARY_HEADER)).toEqual([]);
   });
 
-  // The three the spec names, asserted as a list so a fourth added later has to be decided rather than
-  // appearing. Same property the stop reasons have.
-  it('names three kinds and no more', () => {
-    expect([...DIARY_KINDS]).toEqual(['run', 'checkup', 'lifecycle']);
+  // Asserted as an exact list so a new kind has to be DECIDED rather than appear. It worked: `note` was
+  // added on 2026-08-05 by the owner's ruling when slice C was planned, and this line is what made that a
+  // decision instead of a drive-by. The property is unchanged — a fifth still has to come through here.
+  it('names four kinds and no more', () => {
+    expect([...DIARY_KINDS]).toEqual(['run', 'checkup', 'lifecycle', 'note']);
   });
 
   // A summary is prose an agent wrote, so it will contain the characters this format uses. They must
@@ -196,5 +200,59 @@ describe('a diary line', () => {
   it('keeps an iteration of zero', () => {
     const back = parseEntry(serializeEntry(entry({ kind: 'lifecycle', iteration: 0 })));
     expect(back?.iteration).toBe(0);
+  });
+});
+
+// Three items the spec parked with slice C as their trigger. C1 is that trigger: C2 is what starts
+// writing entries from agent output, and all three are about what may reach the file.
+describe('the fourth kind', () => {
+  // Decided 2026-08-05, when C was planned. `lifecycle` is the spec's class for "pre-flight, approval,
+  // every stop with its reason" — the class C2 reads to learn why a run stopped — and a note somebody
+  // typed is none of those. One class for both put human prose in the machine's input.
+  it('is a kind of its own, and round-trips', () => {
+    expect([...DIARY_KINDS]).toContain('note');
+    const line = serializeEntry({ at: '2026-08-05T10:00:00.000Z', kind: 'note', text: 'I rebased.' });
+    expect(parseEntry(line)).toEqual({ at: '2026-08-05T10:00:00.000Z', kind: 'note', text: 'I rebased.' });
+  });
+});
+
+describe('the length of an entry', () => {
+  // The text originates in an AGENT's summary, which is what makes this more than theoretical: without a
+  // bound one POST could add a ~1 MB line, and every GET re-parses the whole growing file.
+  it('is bounded, and says it was cut', () => {
+    const bounded = boundText('x'.repeat(MAX_ENTRY_TEXT + 500));
+    expect(bounded.length).toBeLessThanOrEqual(MAX_ENTRY_TEXT + 1);
+    expect(bounded.endsWith('\u2026')).toBe(true);
+  });
+
+  // Truncated rather than refused, and the direction is deliberate: an entry is a narrative line, and
+  // losing the whole event to save its last 1,900 characters is the wrong way round. Same reasoning as
+  // `oneLine` collapsing a newline instead of dropping the summary.
+  it('leaves anything shorter exactly as it was', () => {
+    expect(boundText('a normal summary')).toBe('a normal summary');
+  });
+
+  // It is the same one line either way: a bounded value must still be a single event.
+  it('collapses before it counts, so a bound cannot be spent on whitespace', () => {
+    expect(boundText('two\nlines')).toBe('two lines');
+  });
+});
+
+describe('the timestamp and the kind', () => {
+  // `entryBlock` is exported and an `at` carrying a newline forges an event AND destroys the real one.
+  // Not reachable through either caller today — both pass a server clock — so this is a guard rather
+  // than a fix, and the trigger the spec recorded was "the first caller that is not nowIso()".
+  it('cannot carry a newline into the file', () => {
+    const line = serializeEntry({
+      at: 'AT\n- `2026-08-05T10:00:00.000Z` **run** forged',
+      kind: 'note',
+      text: 'real',
+    });
+    expect(line.split('\n')).toHaveLength(1);
+  });
+
+  it('cannot carry one through entryBlock either', () => {
+    const block = entryBlock({ at: 'AT\nforged', kind: 'note', text: 'real' }, false);
+    expect(block.split('\n').filter((l) => l !== '')).toHaveLength(1);
   });
 });

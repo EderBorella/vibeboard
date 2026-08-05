@@ -189,7 +189,9 @@ describe('adding to the log by hand', () => {
     fireEvent.change(compose(), { target: { value: 'I rebased the branch.' } });
     fireEvent.click(screen.getByText('Add entry'));
     await waitFor(() =>
-      expect(api.addDiaryEntry).toHaveBeenCalledWith({ kind: 'lifecycle', text: 'I rebased the branch.' }),
+      // `note`, not `lifecycle`: that class is the spec's own for pre-flight, approval and every stop
+      // with its reason, and it is the class the loop reads. A line somebody typed is none of those.
+      expect(api.addDiaryEntry).toHaveBeenCalledWith({ kind: 'note', text: 'I rebased the branch.' }),
     );
     await waitFor(() => expect(compose().value).toBe(''));
   });

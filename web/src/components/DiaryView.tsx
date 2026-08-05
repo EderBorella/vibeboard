@@ -78,7 +78,9 @@ export function DiaryView({ bump }: { bump: number }) {
     try {
       // The server's copy, not the draft: it carries the timestamp and whatever the server made of the rest,
       // so showing our own guess would put a different entry on screen from the one on disk.
-      const written = await addDiaryEntry({ kind: 'lifecycle', text });
+      // `note`, not `lifecycle`. That class is the spec's own for pre-flight, approval and every stop with
+      // its reason — the class auto-pilot's loop reads — and a line somebody typed by hand is none of them.
+      const written = await addDiaryEntry({ kind: 'note', text });
       onWritten(written);
       // Cleared only AFTER the write lands. Clearing first loses whatever was typed the moment the post
       // fails, and a paragraph somebody wrote about why they did something is not recoverable from anywhere.

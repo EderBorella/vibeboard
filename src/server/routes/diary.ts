@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { DIARY_KINDS, type DiaryEntry, type DiaryKind } from '../../core/diary.js';
+import { boundText, DIARY_KINDS, type DiaryEntry, type DiaryKind } from '../../core/diary.js';
 import { BOARDS, type BoardName } from '../../core/types.js';
 import { appendEntry, readDiary } from '../diary-store.js';
 import { type AppCtx, ensureOpen, nowIso } from '../route-context.js';
@@ -77,7 +77,10 @@ export async function registerDiaryRoutes(api: FastifyInstance, ctx: AppCtx): Pr
       // reads to decide whether the project is circling.
       at: nowIso(),
       kind: body.kind,
-      text,
+      // Bounded HERE, where the entry that is written, returned and broadcast is built — one object, so
+      // the three cannot disagree. Bounding inside the serializer would put the short line on disk and
+      // the long one in the reply.
+      text: boundText(text),
       ...details(body),
     };
     await appendEntry(ctx.session.root, entry);

@@ -6,10 +6,17 @@ import { type CommandResult, tail } from '../core/verify.js';
 // Three decisions, all deliberate:
 //
 // 1. THROUGH A SHELL, because a gate is written by a person as a line they would type
-//    (`npm test -- --run`), not as an argv array. That is only defensible because of where the command
-//    comes from: `foundation/CODE-QUALITY.md` and `foundation/TESTING.md`, which the AppArmor profile
-//    denies every agent write access to (`tools/apparmor/vibeboard-agent`). A command read from a card,
-//    a report or a run's output would be an agent choosing what this process executes — never do that.
+//    (`npm test -- --run`), not as an argv array. What makes that acceptable is where the command comes
+//    from: `foundation/CODE-QUALITY.md` and `foundation/TESTING.md`, which the AppArmor profile denies
+//    every agent write access to (`tools/apparmor/vibeboard-agent`). A command read from a card, a
+//    report or a run's output would be an agent choosing what this process executes — never do that.
+//
+//    Stated exactly, because the OS deny is not the whole chain: pre-flight AUTHORS those documents
+//    (decision 7), so the real sequence is agent-proposed text → explicit human approval → this shell,
+//    unsandboxed, as the server user, inheriting the server's environment. The approval gate is what
+//    carries the weight, and it is C4's to build. `opts.env` exists so a caller can narrow that
+//    environment; nothing passes it yet, and `RunOne` in verifier.ts does not offer it — worth closing
+//    when C4 makes the gate real rather than pretending it is closed now.
 //
 // 2. IT NEVER THROWS. The caller is a loop, and an exception here would end the run rather than the
 //    verification. A command that cannot start is a failure carrying the reason.
@@ -57,8 +64,10 @@ export function runCommand(
         stdio: ['ignore', 'pipe', 'pipe'],
       });
     } catch (err) {
-      // A cwd that does not exist throws here on some platforms and emits 'error' on others, so both
-      // paths end the same way: a failure with the reason in the output.
+      // Belt and braces, and honestly unreached on Linux: a missing cwd and an unspawnable `/bin/sh`
+      // both arrive as an 'error' EVENT, which the handler below turns into the same failure. Kept
+      // because `spawn` is documented to throw on invalid options and the cost of being wrong here is a
+      // rejected promise inside a loop, but it is NOT covered by a test — nothing observed it firing.
       resolve({ command, code: -1, output: String(err), timedOut: false });
       return;
     }

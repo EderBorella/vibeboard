@@ -21,9 +21,9 @@ import { type CommandResult, tail } from '../core/verify.js';
 
 export const COMMAND_TIMEOUT_MS = 600_000;
 
-// Four times what is kept, so the tail is a tail of the output rather than of the last chunk that
-// happened to arrive. Bounded as it streams, because a runaway `while true; do echo` would otherwise be
-// held whole in memory on its way to being thrown away.
+// Four times what `tail` keeps, so the tail is a tail of the output rather than of the last chunk that
+// happened to arrive.
+//
 // UNGUARDED, deliberately, and this is the note rather than a test that pretends otherwise: because it
 // is larger than `MAX_OUTPUT`, the final `tail` always dominates, so deleting this bound changes no
 // observable result and no test can distinguish it. What it does is bound MEMORY while output streams —
@@ -33,6 +33,10 @@ const MAX_HELD = 16_000;
 // How long to let a pipe flush after the process has already exited. Long enough for output that is
 // sitting unread, short enough that a command leaving a background child is not waited on.
 const FLUSH_MS = 50;
+
+// How long a timed-out command has to clean up after SIGTERM before SIGKILL. Long enough for a test
+// runner to remove its temp directories, short enough that a hung one is not waited on.
+const GRACE_MS = 2000;
 
 export function runCommand(
   command: string,
@@ -67,19 +71,29 @@ export function runCommand(
     child.stdout?.on('data', capture);
     child.stderr?.on('data', capture);
 
-    const timer = setTimeout(() => {
-      // Nothing to time out once the command has ended. Without this guard a process that exited at
-      // t-1ms could still be recorded as `timedOut`, and `failed()` treats that as a failure on its
-      // own — a verdict contradicting the exit code it is carrying.
-      if (settled) return;
-      timedOut = true;
+    // TERM first, KILL after a grace — decision 13's shape, and it is not ceremony here either: a test
+    // runner killed outright leaves its temp directories behind, and this project has already lost four
+    // weeks of runs to a filesystem whose inode table filled with exactly that kind of litter.
+    const signalGroup = (signal: 'SIGTERM' | 'SIGKILL'): void => {
       try {
         // Negative pid: the group. A pid of 0 or 1 would be our own group or init, and `detached: true`
         // means the child IS the leader — but the guard costs nothing and the mistake is unrecoverable.
-        if (child.pid !== undefined && child.pid > 1) process.kill(-child.pid, 'SIGKILL');
+        if (child.pid !== undefined && child.pid > 1) process.kill(-child.pid, signal);
       } catch {
         /* already gone, which is the ending we wanted anyway */
       }
+    };
+    const timer = setTimeout(() => {
+      // Nothing to time out once the command has ended. Without this guard a process that exited at
+      // t-1ms could still be recorded as `timedOut`, and `commandFailed` treats that as a failure on its
+      // own — a verdict contradicting the exit code it is carrying.
+      if (settled) return;
+      timedOut = true;
+      signalGroup('SIGTERM');
+      // Unref'd: a command that took the hint must not hold the process open waiting to be shot.
+      setTimeout(() => {
+        if (!settled) signalGroup('SIGKILL');
+      }, GRACE_MS).unref();
     }, timeoutMs);
     // Unref'd so a pending timer cannot hold the process open after everything else has finished.
     timer.unref();

@@ -127,6 +127,27 @@ describe('verification on a run record', () => {
   });
 });
 
+describe('the captured output', () => {
+  // Bytes, not a sentence: `asText` trimmed it, so what a gate printed did not survive the round trip.
+  it('round-trips exactly, whitespace and all', () => {
+    const v: Verification = {
+      mode: 'gates',
+      passed: false,
+      at: 'AT',
+      command: 'npm test',
+      output: '\n  FAIL  two spaces and a trailing newline\n',
+    };
+    expect(parseRun(serializeRun(withVerification(base, v)))?.verification?.output).toBe(v.output);
+  });
+
+  // A failure that printed NOTHING is a real and informative outcome — a silent non-zero exit — and it
+  // used to vanish, leaving a reader unable to tell it from a verdict where nobody captured anything.
+  it('survives being empty', () => {
+    const v: Verification = { mode: 'gates', passed: false, at: 'AT', command: 'exit 1', output: '' };
+    expect(parseRun(serializeRun(withVerification(base, v)))?.verification?.output).toBe('');
+  });
+});
+
 describe('a verdict that contradicts its own evidence', () => {
   // Every field was validated on its own and nothing checked them against each other, so a hand-edited
   // file could carry a PASS whose score is below its own threshold — and `passed` is the field the loop

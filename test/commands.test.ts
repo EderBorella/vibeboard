@@ -1,11 +1,20 @@
 import { mkdir, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { runCommand } from '../src/server/commands.js';
+import { COMMAND_TIMEOUT_MS, runCommand } from '../src/server/commands.js';
 import { tempDir } from './helpers.js';
 
 // The only part of verification that spawns anything, and the only part that can hang. Every claim here
 // is about an ending: a zero, a non-zero, a kill, or a command that could not start at all.
+
+describe('the default timeout', () => {
+  // Pinned because the spec names the figure and records the trigger for making it configurable — the
+  // first project whose own suite legitimately runs longer. Unpinned, inflating it a hundredfold left
+  // every test green, so the number nobody could see was also the number nothing held.
+  it('is ten minutes', () => {
+    expect(COMMAND_TIMEOUT_MS).toBe(600_000);
+  });
+});
 
 describe('running a declared command', () => {
   it('reports a zero exit and the output', async () => {
@@ -59,8 +68,10 @@ describe('running a declared command', () => {
   it('kills the whole group, not just the shell it spawned', async () => {
     const cwd = await tempDir();
     const marker = join(cwd, 'survivor');
-    await runCommand(`(sleep 1; touch ${marker}) & sleep 30`, { cwd, timeoutMs: 300 });
-    await new Promise((resolve) => setTimeout(resolve, 1600));
+    // 3s before the marker, killed at 300ms, and checked at 1.5s: an event-loop stall of nearly three
+    // seconds would be needed to make this lie, rather than the ~700ms the first version tolerated.
+    await runCommand(`(sleep 3; touch ${marker}) & sleep 30`, { cwd, timeoutMs: 300 });
+    await new Promise((resolve) => setTimeout(resolve, 1500));
     await expect(stat(marker)).rejects.toThrow();
   });
 
@@ -88,6 +99,33 @@ describe('running a declared command', () => {
       const result = await runCommand('echo quick', { cwd, timeoutMs: ms });
       if (result.code === 0) expect(result.timedOut).toBe(false);
     }
+  });
+
+  // TERM before KILL, so a runner can remove what it created. Asserted through the SHELL's own trap
+  // rather than by watching for litter: a shell that reports its trap fired is a shell that was given the
+  // chance to run one, which is the whole claim. `echo ready` first, because signalling before the trap is
+  // installed proves nothing — the mistake that made an earlier version of this suite's escalation test
+  // pass with SIGKILL disabled.
+  it('asks a command to stop before killing it', async () => {
+    const cwd = await tempDir();
+    const marker = join(cwd, 'cleaned-up');
+    const result = await runCommand(`trap 'touch ${marker}; exit 0' TERM; echo ready; sleep 30`, {
+      cwd,
+      timeoutMs: 700,
+    });
+    expect(result.timedOut).toBe(true);
+    // The trap ran, so the command was asked rather than shot.
+    await expect(stat(marker)).resolves.toBeDefined();
+  });
+
+  // And a command that ignores the ask is still killed, or a hung gate would hold the loop for ever.
+  it('kills a command that ignores being asked', async () => {
+    const cwd = await tempDir();
+    const started = Date.now();
+    const result = await runCommand("trap '' TERM; echo ready; sleep 30", { cwd, timeoutMs: 400 });
+    expect(result.timedOut).toBe(true);
+    // Killed after the grace rather than left running: well inside `sleep 30`.
+    expect(Date.now() - started).toBeLessThan(10_000);
   });
 
   // A command that cannot start at all is a failure with a reason, never a throw: the caller is a loop,

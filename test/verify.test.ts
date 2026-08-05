@@ -146,6 +146,42 @@ describe('the recorded output', () => {
   });
 });
 
+describe('the sentence a failure carries', () => {
+  // Three endings, not two. `exited with -1` describes a command that never started as though it had run
+  // and returned a code, which sends the reader looking for something that does not exist.
+  it('says a command could not be run, rather than inventing an exit code for it', () => {
+    const v = commandVerification('gates', 'AT', [
+      { command: 'npm test', code: -1, output: 'spawn ENOENT', timedOut: false },
+    ]);
+    expect(v.reason).toMatch(/could not be run at all/);
+    expect(v.reason).not.toMatch(/-1/);
+  });
+
+  // A failing critic verdict must read like a failing gate: with a reason. The fallback used to fire only
+  // when the score was ABSENT, so a low score with no summary produced a failure with nothing to read.
+  it('says why a low score failed, even when the critic wrote no words', () => {
+    const v = criticVerification('AT', { score: 0.2, threshold: 0.6, by: 'R1' });
+    expect(v.passed).toBe(false);
+    expect(v.reason).toContain('0.2');
+    expect(v.reason).toContain('0.6');
+  });
+
+  it('prefers the critic’s own words when it wrote any', () => {
+    const v = criticVerification('AT', {
+      score: 0.2,
+      threshold: 0.6,
+      by: 'R1',
+      reason: 'Missed the criterion.',
+    });
+    expect(v.reason).toBe('Missed the criterion.');
+  });
+
+  // A pass needs no sentence: the score and the threshold beside it already say everything.
+  it('says nothing extra about a verdict that passed', () => {
+    expect(criticVerification('AT', { score: 0.9, threshold: 0.6, by: 'R1' }).reason).toBeUndefined();
+  });
+});
+
 describe('a mode that could not run at all', () => {
   it('is a failure carrying the reason the reader has to act on', () => {
     const v: Verification = failedVerification(

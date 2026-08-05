@@ -85,16 +85,42 @@ export function commandVerification(mode: VerifyMode, at: string, results: Comma
     output: tail(failure.output),
     // "Stopped" and "exited" are different endings, and a run that hung is the case the timeout exists
     // for — saying it exited would hide the one thing worth knowing about it.
-    reason: failure.timedOut
-      ? `\`${failure.command}\` was still running when it was stopped.`
-      : `\`${failure.command}\` exited with ${failure.code ?? 'no code'}.`,
+    reason: commandReason(failure),
   };
 }
 
-export function criticVerification(
-  at: string,
-  input: { score?: number; threshold: number; reason?: string; by: string; overshoot?: string },
-): Verification {
+// Why this command counts as a failure, in a sentence a person can act on. Three endings, not two: a
+// command that never STARTED reported `exited with -1`, which is not what happened and sends the reader
+// looking for an exit code that does not exist. `code: -1` is this module's own marker for "could not be
+// spawned", set where the spawn fails (server/commands.ts).
+function commandReason(failure: CommandResult): string {
+  if (failure.timedOut) return `\`${failure.command}\` was still running when it was stopped.`;
+  if (failure.code === -1) return `\`${failure.command}\` could not be run at all.`;
+  return `\`${failure.command}\` exited with ${failure.code ?? 'no code'}.`;
+}
+
+interface CriticInput {
+  score?: number;
+  threshold: number;
+  reason?: string;
+  by: string;
+  overshoot?: string;
+}
+
+// The critic's own words where it wrote any, and otherwise a sentence saying what the numbers mean. A
+// passing verdict needs neither, so it gets nothing rather than a sentence stating the obvious.
+function reasonFor(input: CriticInput): { reason?: string } {
+  if (input.reason) return { reason: input.reason };
+  if (input.score === undefined) {
+    return { reason: 'The critic did not report a score, so it cannot have judged the work.' };
+  }
+  if (criticPassed(input.score, input.threshold)) return {};
+  return {
+    reason: `The critic scored this ${input.score} against a threshold of ${input.threshold}, and reported no reason.`,
+  };
+}
+
+export function criticVerification(at: string, input: CriticInput): Verification {
   return {
     mode: 'critic',
     passed: criticPassed(input.score, input.threshold),
@@ -105,11 +131,10 @@ export function criticVerification(
     // Always, even with no score: 0.55 is a pass or a failure depending on a number that has to be
     // recorded beside it rather than looked up from config months later.
     threshold: input.threshold,
-    ...(input.reason
-      ? { reason: input.reason }
-      : input.score === undefined
-        ? { reason: 'The critic did not report a score, so it cannot have judged the work.' }
-        : {}),
+    // A failing verdict always carries a sentence, like every gates failure does. The fallback used to
+    // fire only when the score was ABSENT, so a critic that scored 0.2 against 0.6 and wrote no summary
+    // produced a failure with nothing to read — the silence this design exists to remove.
+    ...reasonFor(input),
     by: input.by,
     ...(input.overshoot ? { overshoot: input.overshoot } : {}),
   };

@@ -155,7 +155,7 @@ function asFraction(value: unknown): number | undefined {
 
 // Fields of a verdict that are plain sentences. A table rather than five near-identical guards: the
 // only thing that differs is the key, and flattening keeps this under the complexity ceiling.
-const VERIFICATION_TEXT = ['command', 'output', 'reason', 'by', 'overshoot'] as const;
+const VERIFICATION_TEXT = ['command', 'reason', 'by', 'overshoot'] as const;
 
 // A verdict read back off disk, or nothing. Field by field, because a run file is something a person
 // may edit and one bad key must not cost the record — but `mode`, `passed` and `at` are REQUIRED and a
@@ -172,6 +172,11 @@ function asVerification(value: unknown): Verification | undefined {
     const text = asText(d[key]);
     if (text !== undefined) out[key] = text;
   }
+  // `output` is captured bytes, not a sentence, so it is kept EXACTLY — `asText` trims, which means a
+  // gate's output did not round-trip, and an output that was empty disappeared from a failing verdict
+  // entirely. "The command printed nothing" is evidence about a failure, and losing it leaves a reader
+  // wondering whether it printed nothing or nobody looked.
+  if (typeof d.output === 'string') out.output = d.output;
   const numbers = criticNumbers(d, out.passed);
   if (numbers === DAMAGED) return undefined;
   return { ...out, ...numbers };

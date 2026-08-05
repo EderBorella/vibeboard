@@ -5,11 +5,30 @@
 // lose data without it, differently — appends arrive out of order, and an update overwrites one it never
 // read.
 //
-// Deliberately NOT a lock on disk. This serialises the writers inside ONE process, which is what both
-// callers need today: every write to either file goes through the server, including the ones slice C's
-// service makes, because it reaches the board over HTTP like anything else. A separate process writing
-// either file directly would need a real lock, and that is a decision for the slice that introduces one
-// rather than a mechanism built here for nobody.
+// Deliberately NOT a lock on disk, and this paragraph used to be wrong about why.
+//
+// It claimed every write to either file goes through the server "including the ones slice C's service
+// makes, because it reaches the board over HTTP like anything else". True of the diary — that is an
+// endpoint — and FALSE of the auto-pilot state, which is decision 20's one deliberate carve-out: the
+// service writes `autopilot-state.json` directly, because routing an iteration counter through HTTP on
+// every tick would be chatty for no gain.
+//
+// So from slice C2 the state file has two writers in two processes, and this queue orders only the ones
+// inside each. **Ruled 2026-08-05: accepted and documented rather than locked.** What that costs is
+// bounded, and it is worth being exact about:
+//
+//   - Corruption is not reachable. Every write is a temp file plus a rename, so a reader sees the old
+//     state or the new one, never half of one.
+//   - The two processes write DISJOINT fields — the service owns the counters and its pgid, the server
+//     owns `state`/`reason`/`detail`/`at` — and each goes through a read-modify-write, so an ordinary
+//     write preserves the other's fields.
+//   - What can be lost is one counter increment, in one window: the server reads, the service ticks and
+//     writes, the server writes back what it read. The window is the emergency-stop path, which is
+//     exactly when the service is about to be killed, and the value at risk is an iteration count for a
+//     run that is being abandoned. A lockfile would remove that and add a failure mode of its own — a
+//     stale lock left by a killed process is worse than a counter off by one.
+//
+// If a future slice ever needs the counters to be exact across processes, that is the trigger to revisit.
 
 const chains = new Map<string, Promise<unknown>>();
 

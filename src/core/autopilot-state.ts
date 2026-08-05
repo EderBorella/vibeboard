@@ -9,8 +9,14 @@ import { STOP_REASONS } from './dispatch-gate.js';
 //   the auto-pilot service  →  iteration, dispatchesSinceCheckup, needsCheckup, servicePgid/-start
 //   the main server         →  state, reason, detail, at  (the stops, and the startup reconcile)
 // Both go through a read-modify-write (server/autopilot-store.ts), so neither clobbers the other's
-// fields. When the service is dead — which is every case the main server cares about — there is only
-// one writer anyway.
+// fields, and every write is a rename — so a reader sees one whole state or the other, never half.
+//
+// The two processes are NOT serialised against each other, and that was ruled rather than overlooked
+// (2026-08-05): accepted and documented, not locked. The residual cost is one lost counter increment in
+// one window — the server reads the state, the service ticks and writes, the server writes back what it
+// read — and that window is the emergency-stop path, where the service is about to be killed and the
+// value at risk is the iteration count of a run being abandoned. A lockfile would trade that for a stale
+// lock left behind by a killed process, which is the worse failure. See server/write-queue.ts.
 
 export const AUTOPILOT_STATES = ['idle', 'running', 'stopped', 'halted'] as const;
 export type AutopilotStateName = (typeof AUTOPILOT_STATES)[number];

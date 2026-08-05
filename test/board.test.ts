@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
@@ -168,6 +168,44 @@ describe('reporting what could not be read', () => {
     expect(problems).toHaveLength(1);
     expect(problems[0].path).toContain('E-001.md');
     expect(problems[0].reason).toBeTruthy();
+  });
+
+  // A folder that is ABSENT is ordinary — a column's folder is created by the first card written into
+  // it. A folder that cannot be READ is not, and both used to answer with an empty list. Auto-pilot's
+  // one success reason is "no non-terminal card exists anywhere", so a permission error, a bad mount or
+  // an interrupted rename silently became a finished project.
+  it('reports a column folder it cannot read, and says nothing about one that is merely absent', async () => {
+    const root = await tempDir();
+    const config = defaultConfig('T');
+    const [column] = boardColumnSlugs(config, 'engineering');
+    await writeCard(
+      root,
+      boardRel('engineering', column, 'E-001.md'),
+      '---\nid: E-001\ntitle: real work\norder: 10\n---\nbody',
+    );
+    const dir = join(root, boardRel('engineering', column));
+
+    // Proof the card is genuinely there first, so the assertion below is about readability rather than
+    // about a fixture that was never written.
+    expect((await readBoard(root, 'engineering', config, [])).map((c) => c.id)).toEqual(['E-001']);
+
+    await chmod(dir, 0o000);
+    try {
+      const problems: CardProblem[] = [];
+      expect(await readBoard(root, 'engineering', config, problems)).toEqual([]);
+      expect(problems).toHaveLength(1);
+      expect(problems[0].path).toBe(dir);
+      expect(problems[0].reason).toMatch(/could not be read/);
+    } finally {
+      // Restored whatever happens, or the run's temp root cannot be removed at the end — and this suite
+      // has already exhausted a filesystem's inode table once by leaving things behind.
+      await chmod(dir, 0o755);
+    }
+
+    // The other columns have no folders at all, and none of them is a problem.
+    const absent: CardProblem[] = [];
+    await readBoard(root, 'product', config, absent);
+    expect(absent).toEqual([]);
   });
 
   it('reports nothing for a board it could read in full', async () => {

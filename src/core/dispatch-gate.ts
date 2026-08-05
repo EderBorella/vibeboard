@@ -22,6 +22,12 @@ export const STOP_REASONS = [
   'capped', // iteration reached maxIterations
   'stalled', // work remains and nothing can move it
   'complete', // nothing eligible and nothing unfinished anywhere — the only success
+  // There was nothing to do in the first place: no live card on any board. Named separately from
+  // `complete` because the absence of unfinished work is not the presence of finished work — a board
+  // that is empty, or whose every card was archived, or that a fetch returned nothing for, would
+  // otherwise report the project's only success. The loop study the design cites names this apart from
+  // success for the same reason.
+  'no-op',
   'interrupted', // the server died under it; a checkup is owed before it resumes
   // Not a stop the loop chose: the state file itself could not be read, so the project is halted
   // until a person says otherwise (S13). Named here so a halt always has a reason with a sentence
@@ -44,6 +50,7 @@ const SENTENCES: Record<StopReason, string> = {
   capped: 'Auto-pilot stopped at its iteration cap. The work is not finished.',
   stalled: 'Auto-pilot stopped because work remains and nothing it can do would move it.',
   complete: 'Auto-pilot finished: nothing is eligible and nothing is unfinished.',
+  'no-op': 'Auto-pilot had nothing to work on, which is not the same as being finished.',
   interrupted: 'Auto-pilot was interrupted by a restart, so it owes this project a checkup.',
   unreadable:
     'This project is halted because VibeBoard could not read its auto-pilot state. Restart it to start again from idle.',

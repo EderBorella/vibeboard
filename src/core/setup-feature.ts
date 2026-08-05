@@ -56,7 +56,12 @@ export function setupState(
   // Whatever `readBoard` could not parse. ANY unreadable card makes this unknown, not just one on the
   // features board: the broken file could be the barrier, a child that would extend the subtree, or a
   // descendant sitting outside a terminal column.
-  problems: CardProblem[] = [],
+  //
+  // REQUIRED, and it used to default to `[]`. That default made the ABSENCE OF THE ARGUMENT read as the
+  // absence of problems, so the whole three-valued answer below hung on every caller remembering an
+  // optional parameter — and the one thing known about this parameter is that most callers did not pass
+  // it. An empty array is still fine; it just has to be written by someone who meant it.
+  problems: CardProblem[],
 ): SetupState {
   if (problems.length > 0) return 'unknown';
   const ids = setupSubtreeIds(cards);

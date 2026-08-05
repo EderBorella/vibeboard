@@ -1,9 +1,15 @@
 import type { Spend } from './accounting.js';
-import { type AutopilotConfig, isTerminalColumn, type Route } from './autopilot.js';
+import { type AutopilotConfig, isBlockedColumn, isTerminalColumn, type Route } from './autopilot.js';
 import type { AutopilotState } from './autopilot-state.js';
 import type { CardProblem } from './board.js';
 import { mayDispatch, type StopReason } from './dispatch-gate.js';
-import { type EligibilitySet, type Eligible, eligibility, pickNext } from './eligibility.js';
+import {
+  type EligibilitySet,
+  type Eligible,
+  eligibility,
+  hasUnfinishedChildren,
+  pickNext,
+} from './eligibility.js';
 import { liveCards } from './hierarchy.js';
 import { type RollupAdvance, rollupOutcomes } from './rollup.js';
 import type { RunRecord } from './runs.js';
@@ -38,7 +44,7 @@ export interface TickInput {
   runs: RunRecord[];
   spend: Spend;
   inFlight: number; // runs queued or running right now
-  problems?: CardProblem[]; // whatever `readBoard` could not parse
+  problems: CardProblem[]; // whatever `readBoard` could not parse — required, see EligibilityInput
 }
 
 // How many unfinished cards a stalled stop names before it stops listing them. Long enough to be
@@ -119,22 +125,102 @@ function outOfAttempts(ap: AutopilotConfig, el: EligibilitySet): TickAction | un
   return undefined;
 }
 
-// The only success, and the stop most easily mistaken for it. `complete` requires that NO non-terminal
-// card exists anywhere — not merely that none is eligible.
-function nothingEligible(ap: AutopilotConfig, cards: Card[]): TickAction {
-  const unfinished = liveCards(cards).filter((c) => !isTerminalColumn(ap, c.board, c.columnSlug));
-  if (unfinished.length === 0) return { kind: 'stop', reason: 'complete' };
-  const named = unfinished.slice(0, NAMED).map((c) => c.id);
-  const more = unfinished.length > NAMED ? ` and ${unfinished.length - NAMED} more` : '';
-  return {
-    kind: 'stop',
-    reason: 'stalled',
-    detail: `Nothing is eligible, but ${unfinished.length} card${unfinished.length === 1 ? '' : 's'} ${unfinished.length === 1 ? 'is' : 'are'} unfinished: ${named.join(', ')}${more}. Check that every column is routed, terminal or blocked.`,
-  };
+const names = (cards: Card[]): string => {
+  const shown = cards
+    .slice(0, NAMED)
+    .map((c) => c.id)
+    .join(', ');
+  return cards.length > NAMED ? `${shown} (and ${cards.length - NAMED} more)` : shown;
+};
+
+const isAre = (cards: Card[]): string => (cards.length === 1 ? 'is' : 'are');
+
+// Each unfinished card in exactly one bucket, most specific first: a card the loop itself blocked is
+// blocked whatever else is true of it.
+function partitionStuck(
+  ap: AutopilotConfig,
+  cards: Card[],
+  unfinished: Card[],
+  el: EligibilitySet,
+): { blocked: Card[]; barred: Card[]; waiting: Card[]; rest: Card[] } {
+  const blocked: Card[] = [];
+  const barred: Card[] = [];
+  const waiting: Card[] = [];
+  const rest: Card[] = [];
+  for (const card of unfinished) {
+    if (isBlockedColumn(ap, card.board, card.columnSlug)) blocked.push(card);
+    else if (el.barrier === 'unfinished' && !el.setupIds.has(card.id)) barred.push(card);
+    // The same rule that excluded it from eligibility, read back as a reason. A parent stuck behind one
+    // blocked grandchild is the ordinary shape of a stalled board, and calling it unroutable — which is
+    // what the first version of this message did — sends the reader to edit a routing table that is fine.
+    else if (hasUnfinishedChildren(ap, card, cards)) waiting.push(card);
+    else rest.push(card);
+  }
+  return { blocked, barred, waiting, rest };
+}
+
+// Why the remaining work is stuck, per KIND of stuck. One list of ids with one piece of advice named
+// cards barred by the setup barrier and cards the loop had itself blocked, and then told the reader to
+// check their routing table — advice that is wrong for both. A message about a condition the reader
+// cannot act on is a worse failure than the condition.
+function whyStuck(ap: AutopilotConfig, cards: Card[], unfinished: Card[], el: EligibilitySet): string {
+  const { blocked, barred, waiting, rest } = partitionStuck(ap, cards, unfinished, el);
+  const parts: string[] = [];
+  if (rest.length > 0) {
+    parts.push(
+      `Nothing can move ${names(rest)} — check that every column that holds a card is routed, terminal or blocked`,
+    );
+  }
+  // Deliberate, and stated because it is surprising: one blocked card means this project can never
+  // report `complete` again, since `complete` requires that nothing non-terminal exists anywhere. That
+  // is the honest reading — the work is not done — but the reader has to be told why.
+  if (blocked.length > 0) {
+    parts.push(
+      `${names(blocked)} ran out of attempts and ${isAre(blocked)} in ${ap.blockedColumn}, so this project cannot report itself finished until ${blocked.length === 1 ? 'it is' : 'they are'} dealt with`,
+    );
+  }
+  if (barred.length > 0) {
+    parts.push(`${names(barred)} ${isAre(barred)} waiting for the setup feature, which is not finished yet`);
+  }
+  if (waiting.length > 0) {
+    parts.push(
+      `${names(waiting)} ${isAre(waiting)} waiting for ${waiting.length === 1 ? 'its' : 'their'} own cards further down to finish`,
+    );
+  }
+  return `${parts.join('. ')}.`;
+}
+
+// The only success, and the two stops most easily mistaken for it.
+//
+// `complete` requires that no non-terminal card exists anywhere — and, since the review, POSITIVE
+// EVIDENCE that finished work exists. Absence of unfinished work is not presence of finished work: an
+// empty board, a board whose every card was archived, and a fetch that returned nothing all produce an
+// empty list, and all three used to answer with the project's only success.
+function nothingEligible(ap: AutopilotConfig, cards: Card[], el: EligibilitySet): TickAction {
+  const live = liveCards(cards);
+  const unfinished = live.filter((c) => !isTerminalColumn(ap, c.board, c.columnSlug));
+  if (unfinished.length > 0) {
+    return {
+      kind: 'stop',
+      reason: 'stalled',
+      detail: `Nothing is eligible. ${whyStuck(ap, cards, unfinished, el)}`,
+    };
+  }
+  if (live.length === 0) {
+    return {
+      kind: 'stop',
+      reason: 'no-op',
+      detail:
+        cards.length === 0
+          ? 'There is no card on any board.'
+          : `Every one of the ${cards.length} cards on this project is archived.`,
+    };
+  }
+  return { kind: 'stop', reason: 'complete' };
 }
 
 export function decideTick(input: TickInput): TickAction {
-  const { ap, state, cards, runs, spend, inFlight, columns, problems = [] } = input;
+  const { ap, state, cards, runs, spend, inFlight, columns, problems } = input;
   if (state.state !== 'running') return notRunning(state);
 
   const gate = mayDispatch({ ap, iteration: state.iteration, spend });
@@ -155,7 +241,7 @@ export function decideTick(input: TickInput): TickAction {
   const capped = outOfAttempts(ap, el);
   if (capped) return capped;
 
-  if (el.eligible.length === 0) return nothingEligible(ap, cards);
+  if (el.eligible.length === 0) return nothingEligible(ap, cards, el);
   if (inFlight >= ap.autoPilotConcurrency) return { kind: 'wait' };
 
   const pick = pickNext(el.eligible, eligibilityInput);

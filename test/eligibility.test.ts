@@ -60,6 +60,7 @@ const input = (over: Partial<EligibilityInput> = {}): EligibilityInput => ({
   runs: [],
   columns: COLUMNS,
   rollupEligible: [],
+  problems: [],
   ...over,
 });
 

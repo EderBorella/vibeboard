@@ -588,6 +588,9 @@ export const STOP_REASONS = [
   'capped',
   'stalled',
   'complete',
+  // Nothing to do in the first place — no live card on any board. Apart from `complete` because the
+  // absence of unfinished work is not the presence of finished work.
+  'no-op',
   'interrupted',
   'unreadable',
 ] as const;

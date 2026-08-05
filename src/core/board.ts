@@ -50,14 +50,31 @@ async function readCardsFromFolder(
   let entries: string[];
   try {
     entries = await readdir(dir);
-  } catch {
+  } catch (err) {
+    // ABSENT is ordinary: a column's folder is created by the first card written into it, so an empty
+    // column has no folder and never did. UNREADABLE is not — and returning `[]` for both made a column
+    // nobody can read indistinguishable from a column with nothing in it. Auto-pilot's `complete` is
+    // "no non-terminal card exists anywhere", so a permission error, a bad mount or an interrupted
+    // rename silently became the project's only success reason.
+    if ((err as NodeJS.ErrnoException).code !== 'ENOENT') {
+      problems?.push({ path: dir, reason: `the folder could not be read (${String(err)})` });
+    }
     return [];
   }
   const cards: Card[] = [];
   for (const name of entries) {
     if (!name.endsWith('.md')) continue;
     const filePath = join(dir, name);
-    const parsed = parseCardContent(await readFile(filePath, 'utf8'));
+    let content: string;
+    try {
+      content = await readFile(filePath, 'utf8');
+    } catch (err) {
+      // The same reasoning one level down, and it also stops a card deleted between the `readdir` and
+      // this line from throwing out of every caller that reads a board.
+      problems?.push({ path: filePath, reason: `the file could not be read (${String(err)})` });
+      continue;
+    }
+    const parsed = parseCardContent(content);
     if (!parsed) {
       problems?.push({ path: filePath, reason: 'the YAML frontmatter could not be parsed' });
       continue;

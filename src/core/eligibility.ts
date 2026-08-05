@@ -29,7 +29,10 @@ export interface EligibilityInput {
   // break a tie — the routing table is what says a column is workable.
   columns: Record<BoardName, string[]>;
   rollupEligible: string[]; // card ids `rollupOutcomes` admitted to their route
-  problems?: CardProblem[]; // whatever `readBoard` could not parse
+  // Whatever `readBoard` could not parse. REQUIRED rather than optional: an optional list defaulting
+  // to `[]` makes the absence of the argument read as the absence of problems, which is the fail-open
+  // default the `unknown` barrier exists to prevent. Pass an empty array and mean it.
+  problems: CardProblem[];
 }
 
 export interface EligibilitySet {
@@ -47,7 +50,7 @@ export interface EligibilitySet {
 // A universal quantifier, so it passes vacuously for a childless card — deliberately: a product card
 // nobody has broken down yet is exactly what the break-down route is for. What holds the vacuous case
 // shut for a CLOSE-OUT is the rollup, which requires at least one live child.
-function hasUnfinishedChildren(ap: AutopilotConfig, card: Card, cards: Card[]): boolean {
+export function hasUnfinishedChildren(ap: AutopilotConfig, card: Card, cards: Card[]): boolean {
   const children = childrenOf(card, cards);
   return children.some((child) => !isTerminalColumn(ap, child.board, child.columnSlug));
 }
@@ -93,7 +96,7 @@ function workableRoute(
 }
 
 export function eligibility(input: EligibilityInput): EligibilitySet {
-  const { ap, cards, runs, problems = [] } = input;
+  const { ap, cards, runs, problems } = input;
   const setupIds = setupSubtreeIds(cards);
   const barrier = setupState(cards, ap.terminal, problems);
   const nothing = { eligible: [], blockedByAttempts: [], barrier, setupIds };

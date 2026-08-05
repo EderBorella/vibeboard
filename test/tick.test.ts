@@ -69,6 +69,7 @@ const input = (over: Partial<TickInput> = {}): TickInput => ({
   runs: [],
   spend: NO_SPEND,
   inFlight: 0,
+  problems: [],
   ...over,
 });
 
@@ -208,6 +209,33 @@ describe('nothing eligible is not the same as nothing left', () => {
     expect(decideTick(input({ cards }))).toMatchObject({ kind: 'stop', reason: 'complete' });
   });
 
+  // One list of ids with one piece of advice told the reader to check their routing table about cards
+  // the loop itself had blocked and cards the setup barrier was holding back — advice that is wrong for
+  // both. Each kind of stuck now carries its own remedy.
+  it('says why each kind of stuck card is stuck, rather than blaming the routing table for all of them', () => {
+    const cards = [
+      { ...card('F-001', 'features', 'in-progress', 10, ['P-001']), setup: true },
+      card('P-001', 'product', 'in-progress', 10, ['F-001', 'E-001']),
+      card('E-001', 'engineering', 'blocked', 10, ['P-001']),
+      card('F-002', 'features', 'todo', 20, ['P-002']),
+      card('P-002', 'product', 'backlog', 10, ['F-002']),
+    ];
+    const action = decideTick(input({ cards }));
+    expect(action).toMatchObject({ kind: 'stop', reason: 'stalled' });
+    const detail = action.kind === 'stop' ? (action.detail ?? '') : '';
+    // E-001 is in the blocked column: the message must say that is why, and that it is what stops this
+    // project ever reporting itself finished.
+    expect(detail).toMatch(/E-001 ran out of attempts/);
+    expect(detail).toMatch(/cannot report itself finished/);
+    // F-002 and P-002 are outside the setup subtree, so the barrier is holding them, not the routing.
+    expect(detail).toMatch(/F-002, P-002 are waiting for the setup feature/);
+    // F-001 and P-001 are parents whose own children are unfinished — the ordinary shape of a stalled
+    // board, and the category the first version of this message had no word for.
+    expect(detail).toMatch(/F-001, P-001 are waiting for their own cards further down/);
+    // And nothing in this fixture is unroutable, so the routing advice must not appear at all.
+    expect(detail).not.toMatch(/routed, terminal or blocked/);
+  });
+
   it('stops stalled, naming the cards, when unfinished work remains that nothing can move', () => {
     // E-009 sits in a column with no route — the B3 shape. Reporting this as success is the failure
     // the whole design is written against.
@@ -219,6 +247,30 @@ describe('nothing eligible is not the same as nothing left', () => {
     const action = decideTick(input({ cards }));
     expect(action).toMatchObject({ kind: 'stop', reason: 'stalled' });
     expect(action).toHaveProperty('detail', expect.stringContaining('E-009'));
+  });
+
+  // The absence of unfinished work is not the presence of finished work, and all three of these produce
+  // the same empty list: an empty project, a project archived down to nothing, and — the one that will
+  // actually happen — a board fetch that returned nothing because something upstream went wrong.
+  it('stops no-op, never complete, when there is no live card at all', () => {
+    const empty = decideTick(input({ cards: [] }));
+    expect(empty).toMatchObject({ kind: 'stop', reason: 'no-op' });
+    expect(empty).toHaveProperty('detail', expect.stringContaining('no card on any board'));
+
+    const archived = [
+      { ...card('F-001', 'features', 'archive', 10, []), archived: '2026-08-05T10:00:00Z' },
+      { ...card('P-001', 'product', 'archive', 10, []), archived: '2026-08-05T10:00:00Z' },
+    ];
+    const gone = decideTick(input({ cards: archived }));
+    expect(gone).toMatchObject({ kind: 'stop', reason: 'no-op' });
+    expect(gone).toHaveProperty('detail', expect.stringContaining('archived'));
+  });
+
+  it('still reports complete when finished work is actually there', () => {
+    // The other half of the rule above: `complete` needs at least one live card in a terminal column, so
+    // this test is what stops the no-op check from swallowing the success case.
+    const cards = [card('F-001', 'features', 'done', 10, [])];
+    expect(decideTick(input({ cards }))).toMatchObject({ kind: 'stop', reason: 'complete' });
   });
 
   it('counts an archived card as neither eligible nor unfinished', () => {

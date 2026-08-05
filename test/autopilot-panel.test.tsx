@@ -268,3 +268,36 @@ describe('the stop controls', () => {
     expect(await screen.findByText(/Restart it first/)).toBeTruthy();
   });
 });
+
+// The critic's bar, on screen. It decides every card that has nothing runnable to check — the weaker
+// half of this design by its own admission — so a number hidden in code would be a decision nobody
+// could argue with.
+describe('the critic threshold field', () => {
+  const field = (label: string): HTMLInputElement =>
+    screen.getByText(label).closest('label')?.querySelector('input') as HTMLInputElement;
+
+  it('shows the project’s value and reports an edit up', async () => {
+    const onCaps = vi.fn();
+    api.getReadiness.mockResolvedValue(readiness());
+    render(panel(configWith(true), { onCaps }));
+    await screen.findAllByRole('row');
+    const box = field('Critic passes at');
+    expect(box.value).toBe('0.6');
+    fireEvent.change(box, { target: { value: '0.8' } });
+    expect(onCaps).toHaveBeenCalledWith(expect.objectContaining({ criticThreshold: 0.8 }));
+  });
+
+  // A fraction, so `min` alone is not enough: a typed 5 is a bar no score can clear, which blocks every
+  // critic-verified card. Clamped in the box rather than refused by the server, like every other cap.
+  it('cannot express a threshold above one, or an empty box', async () => {
+    const onCaps = vi.fn();
+    api.getReadiness.mockResolvedValue(readiness());
+    render(panel(configWith(true), { onCaps }));
+    await screen.findAllByRole('row');
+    const box = field('Critic passes at');
+    fireEvent.change(box, { target: { value: '5' } });
+    expect(onCaps).toHaveBeenLastCalledWith(expect.objectContaining({ criticThreshold: 1 }));
+    fireEvent.change(box, { target: { value: '' } });
+    expect(onCaps).toHaveBeenLastCalledWith(expect.objectContaining({ criticThreshold: 0.05 }));
+  });
+});

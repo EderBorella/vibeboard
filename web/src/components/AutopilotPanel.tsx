@@ -92,8 +92,12 @@ export function AutopilotPanel({
   // which `JSON.stringify` puts on the wire as `null`, and `min={0}` on the input does not stop a typed
   // `-5` — so the user cleared a box and got a 400 about column routing. A box that cannot express an
   // invalid value needs no refusal.
-  const edit = (key: keyof AutopilotConfig, value: number, min: number): void => {
-    const next = { ...caps, [key]: Number.isFinite(value) ? Math.max(min, value) : min };
+  // `max` is for the critic threshold, which is a FRACTION rather than a count: `min` alone would let a
+  // typed 5 reach the server, and a bar no score can clear blocks every critic-verified card. Absent
+  // for every other field, where there is no upper bound to express.
+  const edit = (key: keyof AutopilotConfig, value: number, min: number, max?: number): void => {
+    const clamped = Number.isFinite(value) ? Math.max(min, value) : min;
+    const next = { ...caps, [key]: max === undefined ? clamped : Math.min(max, clamped) };
     setCaps(next);
     onCaps?.(next);
   };
@@ -177,6 +181,24 @@ export function AutopilotPanel({
         <span className="field-hint">
           One run is abandoned after this long and recorded as failed, which burns an attempt — a card that
           hangs every time must not retry for ever.
+        </span>
+      </label>
+      <label className="field">
+        <span>Critic passes at</span>
+        {/* A fraction, not a count, so it gets its own field rather than a row in the table above.
+            Visible because it decides every card that has nothing runnable to check: a threshold hidden
+            in code is a decision nobody can argue with. */}
+        <input
+          type="number"
+          min={0.05}
+          max={1}
+          step={0.05}
+          value={caps.criticThreshold ?? ap.criticThreshold}
+          onChange={(e) => edit('criticThreshold', Number(e.target.value), 0.05, 1)}
+        />
+        <span className="field-hint">
+          How good a critic’s score has to be for a card to advance. Cards with nothing runnable to check
+          advance on one model’s opinion, judged by another — this is the number that decides it.
         </span>
       </label>
 

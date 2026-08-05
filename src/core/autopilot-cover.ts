@@ -1,5 +1,6 @@
 import {
   type AutopilotConfig,
+  CRITIC_SKILL,
   isBlockedColumn,
   isTerminalColumn,
   ROLLUP_ACTIONS,
@@ -62,6 +63,14 @@ function checkNumbers(ap: AutopilotConfig, out: string[]): void {
   // what you are billed, and then maxIterations is the cap actually bounding the project.
   if (typeof ap.budgetUsd !== 'number' || !Number.isFinite(ap.budgetUsd) || ap.budgetUsd < 0) {
     out.push(`budgetUsd must be zero or more; it is ${JSON.stringify(ap.budgetUsd)}.`);
+  }
+  // A fraction above zero. Zero would pass a critic that judged the work worthless — a gate wired to
+  // nothing — and above one is a bar no score can clear, which blocks every critic-verified card.
+  const threshold = ap.criticThreshold;
+  if (typeof threshold !== 'number' || !Number.isFinite(threshold) || threshold <= 0 || threshold > 1) {
+    out.push(
+      `criticThreshold must be a fraction above 0 and no more than 1; it is ${JSON.stringify(threshold)}.`,
+    );
   }
 }
 
@@ -336,10 +345,19 @@ export function coverageProblems(config: ProjectConfig): string[] {
 // something to add without a reason.
 export function skillProblems(ap: AutopilotConfig, skillSlugs: string[]): string[] {
   const have = new Set(skillSlugs);
-  return ap.routes
+  const problems = ap.routes
     .filter((r) => !have.has(r.skill))
     .map(
       (r) =>
         `The route on ${r.board}/${r.column} needs a skill called "${r.skill}", and this project has none.`,
     );
+  // A route's VERIFIER has to exist too. `verify: critic` dispatches a skill by that name, so without
+  // one the phase is picked up, the run happens, and nothing can ever advance the card — the
+  // unreachable-column failure one level in. Asked only of a project that actually uses the mode.
+  if (ap.routes.some((r) => r.verify === 'critic') && !have.has(CRITIC_SKILL)) {
+    problems.push(
+      `A route is verified by a critic, but this project has no "${CRITIC_SKILL}" skill for it to dispatch.`,
+    );
+  }
+  return problems;
 }

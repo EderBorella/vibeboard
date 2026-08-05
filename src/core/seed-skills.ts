@@ -1,5 +1,6 @@
 import { mkdir, readdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { CRITIC_SKILL } from './autopilot.js';
 import { SKILLS_DIR } from './layout.js';
 
 // The skills a project starts with. They are ordinary files: the user edits or deletes them like
@@ -189,6 +190,34 @@ not it.
 
 Change as little as possible: this is a verification phase, not a second chance
 to implement.
+`,
+  },
+  {
+    // The verifier a `critic` route dispatches. No `boards:` — it judges cards on all three, and a
+    // route on any of them may name it. Its prompt says nothing about the threshold: that number comes
+    // from the project's config and is stated in the dispatch prompt, so a project that changes it does
+    // not have to remember to edit a skill file too.
+    slug: CRITIC_SKILL,
+    content: `---
+name: Critic
+description: Judge finished work against the card that asked for it
+---
+Judge the work described below against its card, and score it.
+
+You are not building anything. Do not edit the code, do not edit the card and do
+not move it: your report is the verdict, and a judge that fixes what it is
+judging is grading its own work.
+
+Read the card first, then the work as it stands now. Ask one question: does this
+meet the acceptance criterion the card states? Not "is it good", not "is it what
+I would have built" — does it do what was asked.
+
+Work that does MORE than the card asked still passes. Note it as an overshoot
+instead: failing a card for over-delivery throws away working code and spends one
+of the card's attempts rebuilding it.
+
+Say what you checked and where the work and the card differ, specifically enough
+that someone can disagree with you.
 `,
   },
   {

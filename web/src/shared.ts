@@ -141,7 +141,10 @@ export interface BoardConfig {
 // Mirrors src/core/autopilot.ts. Nothing renders the table yet — the auto-pilot settings tab is a
 // later task; today the UI only asks whether the block EXISTS, to decide whether a column edit is
 // about to be refused. config.yaml is where the table is edited.
-export type VerifyMode = 'gates' | 'critic' | 'smoke';
+// A runtime array as well as a type, so test/mirror.test.ts can compare it with the core list. A hand
+// written union drifts silently; a list can be asserted.
+export const VERIFY_MODES = ['gates', 'critic', 'smoke'] as const;
+export type VerifyMode = (typeof VERIFY_MODES)[number];
 export interface Route {
   board: BoardName;
   column: string; // slug
@@ -163,12 +166,31 @@ export interface AutopilotConfig {
   attemptCap: number;
   checkupEvery: number;
   autoPilotConcurrency: number;
+  criticThreshold: number; // what a critic's score must reach for a card to advance
   routes: Route[];
   rollup: Rollup[];
   terminal: Record<BoardName, string[]>; // per board: a column belongs to one
   blockedColumn: string;
   setupFeatureFlag: string;
 }
+
+// The field set, as data. An interface has no runtime keys, so nothing could compare the two sides and
+// a key added on one and not the other was a setting the UI silently could not show or save — the gap
+// slice D's review found in `DiaryEntry`, one level in. Asserted in test/mirror.test.ts.
+export const AUTOPILOT_CONFIG_KEYS = [
+  'maxIterations',
+  'budgetUsd',
+  'runTimeoutMs',
+  'attemptCap',
+  'checkupEvery',
+  'autoPilotConcurrency',
+  'criticThreshold',
+  'routes',
+  'rollup',
+  'terminal',
+  'blockedColumn',
+  'setupFeatureFlag',
+] as const;
 
 export interface ProjectConfig {
   name: string;

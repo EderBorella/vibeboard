@@ -14,6 +14,11 @@ import type { BoardName } from './types.js';
 export const VERIFY_MODES = ['gates', 'critic', 'smoke'] as const;
 export type VerifyMode = (typeof VERIFY_MODES)[number];
 
+// The skill a `critic` route dispatches to do its judging. Named once here rather than spelled in the
+// seed, the readiness check and the loop: three copies of a slug is three places for it to drift, and a
+// route whose verifier cannot be found is a card nothing can ever advance.
+export const CRITIC_SKILL = 'critic';
+
 export interface Route {
   board: BoardName;
   column: string; // slug
@@ -49,6 +54,11 @@ export interface AutopilotConfig {
   attemptCap: number;
   checkupEvery: number;
   autoPilotConcurrency: number;
+  // What a critic's score must reach for a card to advance. A THRESHOLD rather than a boolean verdict
+  // (S9): a binary pass yields no distribution, and the critic is this design's weakest link — level 4
+  // on the study's verification ladder, judgeable only from data collected later. 0.6 is what OpenHands
+  // ships for the same mechanism, which is the only prior art there is for the number.
+  criticThreshold: number;
   routes: Route[];
   rollup: Rollup[];
   // Explicit, never inferred from the absence of a route: a mistyped column must fail loudly rather
@@ -72,6 +82,7 @@ export const DEFAULT_AUTOPILOT: AutopilotConfig = {
   attemptCap: 3,
   checkupEvery: 10,
   autoPilotConcurrency: 1,
+  criticThreshold: 0.6,
   routes: [
     { board: 'features', column: 'backlog', skill: 'derive-features', verify: 'critic', next: 'todo' },
     { board: 'features', column: 'todo', skill: 'break-down', verify: 'critic', next: 'in-progress' },

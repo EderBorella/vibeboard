@@ -174,7 +174,10 @@ describe('routing-table coverage', () => {
     expect(skillProblems(DEFAULT_AUTOPILOT, ['implement', 'test'])).toContain(
       'The route on features/backlog needs a skill called "derive-features", and this project has none.',
     );
-    const all = DEFAULT_AUTOPILOT.routes.map((r) => r.skill);
+    // The critic is in the list because a route's VERIFIER is part of its cover too (slice C1): the
+    // default table has critic-verified routes, so a catalogue holding only the routed skills is
+    // genuinely missing one. The premise of this line changed, not the behaviour it asserts.
+    const all = [...DEFAULT_AUTOPILOT.routes.map((r) => r.skill), 'critic'];
     expect(skillProblems(DEFAULT_AUTOPILOT, all)).toEqual([]);
   });
 });
@@ -288,5 +291,50 @@ describe('rollup rules that contradict each other', () => {
     expect(features?.action).toBe('eligible');
     expect(ap(config).routes.some((r) => r.board === 'features' && r.column === features?.column)).toBe(true);
     expect(coverageProblems(config)).toEqual([]);
+  });
+});
+
+// The critic's bar, and the skill that answers it. Both are new in slice C1: `verify: critic` was a
+// mode nothing executed until then, so neither the number nor the skill had to exist.
+describe('the critic threshold', () => {
+  // A fraction, and NOT zero: a threshold of 0 passes a critic that scored the work worthless, which
+  // is a gate wired to nothing — the AutoGPT shape this whole design is written against. Above one is
+  // a bar no score can clear, which blocks every critic-verified card instead.
+  it.each([0, -1, 1.5, Number.NaN, 'high', undefined])('refuses %s', (value) => {
+    const config = fresh();
+    ap(config).criticThreshold = value as number;
+    expect(coverageProblems(config).join(' ')).toMatch(/criticThreshold/);
+  });
+
+  it('accepts a fraction above zero and up to one', () => {
+    for (const value of [0.01, 0.6, 1]) {
+      const config = fresh();
+      ap(config).criticThreshold = value;
+      expect(coverageProblems(config).join(' ')).not.toMatch(/criticThreshold/);
+    }
+  });
+});
+
+describe('a route verified by a critic', () => {
+  // A phase whose VERIFIER does not exist can never pass: the card is picked up, the run happens, and
+  // nothing can advance it — the unreachable-column failure one level in. The default table has three
+  // critic-verified routes, so this is the ordinary case rather than an exotic one.
+  it('is refused when the project has no critic skill', () => {
+    const routed = DEFAULT_AUTOPILOT.routes.map((r) => r.skill);
+    expect(skillProblems(DEFAULT_AUTOPILOT, routed).join(' ')).toMatch(/critic/);
+  });
+
+  it('is satisfied by the critic skill being there', () => {
+    const routed = DEFAULT_AUTOPILOT.routes.map((r) => r.skill);
+    expect(skillProblems(DEFAULT_AUTOPILOT, [...routed, 'critic'])).toEqual([]);
+  });
+
+  it('is not asked of a project whose routes are all verified another way', () => {
+    const noCritic = {
+      ...DEFAULT_AUTOPILOT,
+      routes: DEFAULT_AUTOPILOT.routes.filter((r) => r.verify !== 'critic'),
+    };
+    const routed = noCritic.routes.map((r) => r.skill);
+    expect(skillProblems(noCritic, routed)).toEqual([]);
   });
 });

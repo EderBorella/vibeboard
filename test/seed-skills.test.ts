@@ -140,3 +140,14 @@ describe('the phase skills the routing table names', () => {
     );
   });
 });
+
+describe('the critic seed', () => {
+  // Shipped as an ordinary skill file, because that is what the loop dispatches. Without it every
+  // critic-verified route is a phase that can never pass — which readiness now refuses to start on.
+  it('is there, is told to score, and is told not to touch', () => {
+    const critic = SEED_SKILLS.find((s) => s.slug === 'critic');
+    expect(critic).toBeDefined();
+    expect(critic?.content).toMatch(/score/i);
+    expect(critic?.content).toMatch(/do not (change|edit|fix)/i);
+  });
+});

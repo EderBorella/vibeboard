@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import * as coreAutopilot from '../src/core/autopilot.js';
 import * as coreState from '../src/core/autopilot-state.js';
 import * as coreBackends from '../src/core/backends.js';
 import * as coreDiary from '../src/core/diary.js';
@@ -35,6 +36,19 @@ describe('web/shared mirrors src/core', () => {
     for (const reason of coreGate.STOP_REASONS) {
       expect(webApi.isSuccessReason(reason), reason).toBe(coreGate.isSuccessReason(reason));
     }
+  });
+
+  // The gap slice D's review found, one level in: `AutopilotConfig` is hand-mirrored and nothing
+  // guarded its FIELD SET, so a key added on one side is a setting the UI silently cannot show or
+  // save. An interface has no runtime keys, so the web side exports the list explicitly.
+  it('mirrors the autopilot config keys', () => {
+    expect([...web.AUTOPILOT_CONFIG_KEYS].sort()).toEqual(
+      Object.keys(coreAutopilot.DEFAULT_AUTOPILOT).sort(),
+    );
+  });
+
+  it('mirrors the verify modes', () => {
+    expect([...web.VERIFY_MODES]).toEqual([...coreAutopilot.VERIFY_MODES]);
   });
 
   it('mirrors the diary kinds', () => {

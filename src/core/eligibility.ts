@@ -126,9 +126,17 @@ export function eligibility(input: EligibilityInput): EligibilitySet {
 //      new work begins
 //   d. the card's own `order`, then its id, so nothing is left to chance
 
-// Beyond any real feature's rank, and finite: `Infinity - Infinity` is NaN, and a NaN in a comparator
-// is silently falsy — it would fall through to the next tie-break instead of tying, which is a
-// different rule than the one written above.
+// Beyond any real feature's rank, and finite.
+//
+// This comment used to claim `Infinity` would be a BUG, because `Infinity - Infinity` is NaN and a NaN
+// falls through to the next tie-break. The premise is right and the conclusion was wrong: falling
+// through is exactly what tying does, so `Infinity` behaves identically here and the two orphan cards
+// would compare the same way either round. A wrong reason is worse than no reason, because it tells the
+// next reader the comparator is fragile in a way it is not.
+//
+// The finite sentinel stays as a choice, not a fix: a comparator that never produces NaN is one whose
+// behaviour survives being rewritten in a style where NaN does not happen to be harmless — `Math.sign`,
+// or a sort that reads the sign of the raw difference.
 const NO_FEATURE = Number.MAX_SAFE_INTEGER;
 
 // Up the hierarchy to the feature this card serves, one step at a time through `parentOf` — which reads

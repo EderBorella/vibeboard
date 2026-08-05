@@ -2,6 +2,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { DiaryEntry } from '../web/src/api.js';
+import { MAX_ENTRY_TEXT } from '../src/core/diary.js';
 
 const api = vi.hoisted(() => ({ listDiary: vi.fn(), addDiaryEntry: vi.fn() }));
 vi.mock('../web/src/api.js', () => api);
@@ -250,5 +251,18 @@ describe('adding to the log by hand', () => {
     fireEvent.click(screen.getByText('Add entry'));
     expect(await screen.findByText(/needs something to say/)).toBeTruthy();
     expect(compose().value).toBe('why I did it');
+  });
+});
+
+// The bound is the server's, and it truncates quietly — right for an agent's summary, wrong for a
+// paragraph somebody typed, which this component argues elsewhere is not recoverable from anywhere. So
+// the box refuses what would not survive rather than losing the tail on save.
+describe('the composer and the entry bound', () => {
+  it('will not accept more text than the server will keep', async () => {
+    api.listDiary.mockResolvedValue([]);
+    render(<DiaryView bump={0} />);
+    await screen.findByText(/Nothing has happened/);
+    const box = screen.getByLabelText('Add to the log') as HTMLTextAreaElement;
+    expect(box.maxLength).toBe(MAX_ENTRY_TEXT);
   });
 });

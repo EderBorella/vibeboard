@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import { attemptsUsed, sumSpend } from '../../core/accounting.js';
-import { DEFAULT_AUTOPILOT } from '../../core/autopilot.js';
+import { CRITIC_SKILL, DEFAULT_AUTOPILOT } from '../../core/autopilot.js';
 import type { AutopilotState } from '../../core/autopilot-state.js';
 import { boardColumnSlugs, readBoard } from '../../core/board.js';
 import { resolveCopilotSelection } from '../../core/copilot-choice.js';
@@ -79,6 +79,18 @@ function everyBoardColumns(config: ProjectConfig): BoardColumns[] {
   });
 }
 
+// A critic JUDGES rather than builds, so it gets the judging contract — including when a person
+// dispatches one by hand from the card. Without this the seeded skill said "score it" while the prompt
+// asked for an ordinary report: no `score:` field, no scale, and a verdict nothing could compare with a
+// bar. The threshold is the project's own rather than the skill file's, so changing it in Settings does
+// not mean remembering to edit a prompt.
+//
+// Absent for a project with no lifecycle block: there is no bar to quote, so the run is an ordinary one.
+function verdictFor(slug: string, config: ProjectConfig): { verdict?: { threshold: number } } {
+  const threshold = slug === CRITIC_SKILL ? config.autopilot?.criticThreshold : undefined;
+  return threshold === undefined ? {} : { verdict: { threshold } };
+}
+
 // Turn a request into everything the runner needs, or into the refusal to send back. Separated from
 // the route so the handler is dispatch-and-report while the gathering — six ways to be wrong, three
 // reads from disk — lives on its own.
@@ -141,6 +153,7 @@ async function resolveDispatch(
     input: {
       skill,
       card,
+      ...verdictFor(skill.slug, config),
       boardColumns: everyBoardColumns(config),
       cardFile,
       linked,

@@ -324,6 +324,17 @@ describe('a route verified by a critic', () => {
     expect(skillProblems(DEFAULT_AUTOPILOT, routed).join(' ')).toMatch(/critic/);
   });
 
+  // Every refusal that reaches a person has to say what to do next. `seedSkills` only writes into a
+  // project with NO skills folder, so an existing project cannot get the shipped critic back by
+  // reopening — which makes "you have no critic skill" a dead end unless it says where to make one.
+  it('names the routes it is about, and the way out', () => {
+    const routed = DEFAULT_AUTOPILOT.routes.map((r) => r.skill);
+    const said = skillProblems(DEFAULT_AUTOPILOT, routed).join(' ');
+    expect(said).toContain('features/backlog');
+    expect(said).toContain('product/backlog');
+    expect(said).toMatch(/Skills tab/);
+  });
+
   it('is satisfied by the critic skill being there', () => {
     const routed = DEFAULT_AUTOPILOT.routes.map((r) => r.skill);
     expect(skillProblems(DEFAULT_AUTOPILOT, [...routed, 'critic'])).toEqual([]);

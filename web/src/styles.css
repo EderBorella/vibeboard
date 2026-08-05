@@ -1276,14 +1276,15 @@ body {
   padding: 0.6rem 0 0.6rem 0.75rem;
   border-left: 2px solid var(--border);
 }
-/* The kind, encoded in the rail as well as the word: a run, a checkup and a lifecycle event are read at
-   different times for different reasons, and colour is how a long file stays scannable. All three are named,
-   including `run` — the comment used to promise three and the rules gave two, so the commonest kind was the
-   one left undistinguished. The default above covers a kind from a future version rather than rendering it
-   railless. */
+/* The kind, encoded in the rail as well as the word: a run, a checkup, a lifecycle event and a human's own
+   note are read at different times for different reasons, and colour is how a long file stays scannable.
+   All FOUR are named — `note` was added with the kind itself and inherited `run`'s token, so the one class
+   that exists to separate human prose from the machine's looked exactly like the machine's commonest
+   entry. The default above covers a kind from a future version rather than rendering it railless. */
 .diary-entry[data-kind='run'] { border-left-color: var(--border); }
 .diary-entry[data-kind='checkup'] { border-left-color: var(--accent); }
 .diary-entry[data-kind='lifecycle'] { border-left-color: var(--muted); }
+.diary-entry[data-kind='note'] { border-left-color: var(--accent-2); }
 
 .diary-meta {
   display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.5rem;

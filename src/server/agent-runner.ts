@@ -52,6 +52,10 @@ export interface DispatchInput {
   // Read at dispatch, like boardColumns and for the same reason: a queued run must be bound by the
   // documents the project had when it was resolved, not by whatever they say when it finally starts.
   foundation?: { paths: string[]; codeQuality?: string };
+  // Present when this run JUDGES rather than builds — a critic. Carried like `foundation`, and for the
+  // same reason: the threshold is the project's as it was when the dispatch was resolved, not whatever
+  // Settings says when a queued run finally starts.
+  verdict?: { threshold: number };
   backend: Backend;
   model: string;
   effort: string;
@@ -295,6 +299,7 @@ export class AgentRunner {
       previousReport: input.previous?.report,
       userPrompt: input.userPrompt,
       foundation: input.foundation,
+      verdict: input.verdict,
       reportPath: reportContract(run),
       projectRoot: root,
       credential,

@@ -1,6 +1,7 @@
 import { memo, useMemo, useState } from 'react';
 import { addDiaryEntry, type DiaryEntry } from '../api';
 import { useDiary } from '../diary/useDiary';
+import { MAX_ENTRY_TEXT } from '../shared';
 
 // The diary, and the permanent way to add to it.
 //
@@ -114,6 +115,11 @@ export function DiaryView({ bump }: { bump: number }) {
           placeholder="What happened?"
           value={draft}
           rows={2}
+          // The server bounds an entry at this length and truncates quietly, which is right for an
+          // agent's summary and wrong for a paragraph somebody typed — this file argues two screens down
+          // that such a paragraph is not recoverable from anywhere. So the box will not accept more than
+          // will survive, rather than accepting it and losing the tail on save.
+          maxLength={MAX_ENTRY_TEXT}
           onChange={(e) => setDraft(e.target.value)}
         />
         <button

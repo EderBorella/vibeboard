@@ -172,10 +172,40 @@ function asVerification(value: unknown): Verification | undefined {
     const text = asText(d[key]);
     if (text !== undefined) out[key] = text;
   }
+  const numbers = criticNumbers(d, out.passed);
+  if (numbers === DAMAGED) return undefined;
+  return { ...out, ...numbers };
+}
+
+const DAMAGED = Symbol('a verdict contradicting its own evidence');
+
+// A critic verdict's two numbers, or `DAMAGED`.
+//
+// For a critic these ARE the verdict rather than decoration around it, so a present-but-invalid one
+// damages the whole thing: a score of 4 clears every bar there is, and a threshold of 99 is one the
+// config validator could never have produced. A malformed `command` or `output` is different and is
+// dropped field by field — those are evidence a verdict can lack and still mean something.
+//
+// And the two are checked against the VERDICT. Every field used to be validated on its own with nothing
+// comparing them, so a file could carry a pass whose score sat below its own bar — and `passed` is the
+// field the loop acts on. Dropped rather than recomputed: recomputing would quietly overwrite what the
+// file says, and inventing a decision is the failure this whole guard exists to prevent.
+//
+// Extracted from `asVerification` rather than inlined: the same checks nested there put it past the
+// complexity ceiling, and the metric is measuring depth — as is the reader.
+function criticNumbers(
+  d: Record<string, unknown>,
+  passed: boolean,
+): { score?: number; threshold?: number } | typeof DAMAGED {
   const score = asFraction(d.score);
-  if (score !== undefined) out.score = score;
-  if (typeof d.threshold === 'number' && Number.isFinite(d.threshold)) out.threshold = d.threshold;
-  return out;
+  const threshold = asFraction(d.threshold);
+  if (d.score !== undefined && score === undefined) return DAMAGED;
+  if (d.threshold !== undefined && threshold === undefined) return DAMAGED;
+  if (score !== undefined && threshold !== undefined && passed !== score >= threshold) return DAMAGED;
+  return {
+    ...(score === undefined ? {} : { score }),
+    ...(threshold === undefined ? {} : { threshold }),
+  };
 }
 
 function asText(value: unknown): string | undefined {

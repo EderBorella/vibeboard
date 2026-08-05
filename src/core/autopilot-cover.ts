@@ -354,9 +354,15 @@ export function skillProblems(ap: AutopilotConfig, skillSlugs: string[]): string
   // A route's VERIFIER has to exist too. `verify: critic` dispatches a skill by that name, so without
   // one the phase is picked up, the run happens, and nothing can ever advance the card — the
   // unreachable-column failure one level in. Asked only of a project that actually uses the mode.
-  if (ap.routes.some((r) => r.verify === 'critic') && !have.has(CRITIC_SKILL)) {
+  const criticRoutes = ap.routes.filter((r) => r.verify === 'critic');
+  if (criticRoutes.length > 0 && !have.has(CRITIC_SKILL)) {
+    // Names the routes and the remedy, like its sibling above. `seedSkills` writes only into a project
+    // whose skills folder is ABSENT — which is what makes deleting a skill permanent — so an existing
+    // project, or one where somebody removed this skill, cannot get it back by reopening. Without the
+    // second sentence the refusal is a dead end about a file the reader has no reason to know the shape of.
+    const where = criticRoutes.map((r) => `${r.board}/${r.column}`).join(', ');
     problems.push(
-      `A route is verified by a critic, but this project has no "${CRITIC_SKILL}" skill for it to dispatch.`,
+      `The routes on ${where} are verified by a critic, and this project has no "${CRITIC_SKILL}" skill for them to dispatch. Add one in the Skills tab — a judging skill needs no boards or columns, and the score it must report is stated in the prompt at dispatch.`,
     );
   }
   return problems;

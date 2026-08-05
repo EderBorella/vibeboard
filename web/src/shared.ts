@@ -177,6 +177,12 @@ export interface AutopilotConfig {
 // The field set, as data. An interface has no runtime keys, so nothing could compare the two sides and
 // a key added on one and not the other was a setting the UI silently could not show or save — the gap
 // slice D's review found in `DiaryEntry`, one level in. Asserted in test/mirror.test.ts.
+// Mirrors MAX_ENTRY_TEXT in src/core/diary.ts. The server truncates an entry past this; the composer
+// refuses to accept more, so a person never watches their own paragraph shortened on save. Here rather
+// than in api.ts because it is a mirrored CONSTANT like the lists around it — and because api.ts is
+// mocked wholesale by several component tests, which would each have to fake it.
+export const MAX_ENTRY_TEXT = 2000;
+
 export const AUTOPILOT_CONFIG_KEYS = [
   'maxIterations',
   'budgetUsd',

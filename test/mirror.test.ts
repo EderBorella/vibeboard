@@ -57,6 +57,10 @@ describe('web/shared mirrors src/core', () => {
     );
   });
 
+  it('mirrors the diary entry bound', () => {
+    expect(web.MAX_ENTRY_TEXT).toBe(coreDiary.MAX_ENTRY_TEXT);
+  });
+
   it('mirrors the verify modes', () => {
     expect([...web.VERIFY_MODES]).toEqual([...coreAutopilot.VERIFY_MODES]);
   });

@@ -102,7 +102,11 @@ describe('verification on a run record', () => {
     expect(parseRun(serializeRun(withVerification(base, judged)))?.verification?.score).toBe(0);
   });
 
-  it('drops a score outside 0..1 from the verdict but keeps the verdict', () => {
+  // The whole verdict, not just the number. For a critic the score and the threshold ARE the verdict —
+  // a 4 clears every bar there is — so a verdict carrying one is damaged rather than merely incomplete.
+  // A malformed `command` or `output` is different: those are evidence a verdict can lack and still mean
+  // something, and they are dropped field by field.
+  it('drops the whole verdict when its score is not a fraction', () => {
     const judged = {
       mode: 'critic',
       passed: true,
@@ -111,9 +115,54 @@ describe('verification on a run record', () => {
       threshold: 0.6,
       by: 'R',
     } as Verification;
-    const back = parseRun(serializeRun(withVerification(base, judged)))?.verification;
-    expect(back?.passed).toBe(true);
-    expect(back?.score).toBeUndefined();
+    expect(parseRun(serializeRun(withVerification(base, judged)))?.verification).toBeUndefined();
+  });
+
+  it('still drops a malformed detail field on its own, keeping the verdict', () => {
+    const v = parseRun(
+      withFrontmatter('verification:\n  mode: gates\n  passed: false\n  at: AT\n  command: 42'),
+    )?.verification;
+    expect(v).toMatchObject({ mode: 'gates', passed: false, at: 'AT' });
+    expect(v?.command).toBeUndefined();
+  });
+});
+
+describe('a verdict that contradicts its own evidence', () => {
+  // Every field was validated on its own and nothing checked them against each other, so a hand-edited
+  // file could carry a PASS whose score is below its own threshold — and `passed` is the field the loop
+  // will act on. Dropped whole rather than recomputed: recomputing would quietly overwrite what the file
+  // says, and this is the one field where inventing a decision is the failure being guarded against.
+  it('is dropped, rather than believed', () => {
+    const lying = { mode: 'critic', passed: true, at: 'AT', score: 0.1, threshold: 0.9 } as Verification;
+    expect(parseRun(serializeRun(withVerification(base, lying)))?.verification).toBeUndefined();
+  });
+
+  it('is dropped the other way round too — a failure that cleared its own bar', () => {
+    const lying = { mode: 'critic', passed: false, at: 'AT', score: 0.95, threshold: 0.6 } as Verification;
+    expect(parseRun(serializeRun(withVerification(base, lying)))?.verification).toBeUndefined();
+  });
+
+  it('keeps one whose score and threshold agree with its verdict', () => {
+    for (const v of [
+      { mode: 'critic', passed: true, at: 'AT', score: 0.6, threshold: 0.6 },
+      { mode: 'critic', passed: false, at: 'AT', score: 0.59, threshold: 0.6 },
+    ] as Verification[]) {
+      expect(parseRun(serializeRun(withVerification(base, v)))?.verification).toEqual(v);
+    }
+  });
+
+  // Only checkable when BOTH numbers are there. A verdict with one of them is the ordinary case for the
+  // two command modes, and for a critic that never answered.
+  it('is left alone when there is nothing to check it against', () => {
+    const v: Verification = { mode: 'critic', passed: false, at: 'AT', threshold: 0.6, reason: 'no score' };
+    expect(parseRun(serializeRun(withVerification(base, v)))?.verification).toEqual(v);
+  });
+
+  // A threshold outside the window config enforces is not a bar at all, and it is what the consistency
+  // check above compares against — so it is range-checked like the score.
+  it('drops a threshold config could never have produced', () => {
+    const v = { mode: 'critic', passed: true, at: 'AT', score: 0.5, threshold: 99 } as Verification;
+    expect(parseRun(serializeRun(withVerification(base, v)))?.verification).toBeUndefined();
   });
 });
 

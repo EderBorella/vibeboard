@@ -38,6 +38,7 @@ vi.mock('../web/src/api.js', () => api);
 vi.mock('../web/src/api', () => api);
 
 const { WorkArea } = await import('../web/src/components/WorkArea.js');
+import type { MainTab } from '../web/src/components/TopBar.js';
 import type { BoardName, Card, ProjectConfig, ProjectSnapshot } from '../web/src/shared.js';
 
 afterEach(cleanup);
@@ -101,7 +102,8 @@ const copilotState = {
 
 const props = {
   snapshot,
-  tab: 'boards' as 'boards' | 'execution' | 'control' | 'explorer',
+  tab: 'boards' as MainTab,
+  bump: 0,
   allCards: [] as Card[],
   runs: { runs: [], active: [], queued: [] },
   skills: { skills: [], invalid: [] },

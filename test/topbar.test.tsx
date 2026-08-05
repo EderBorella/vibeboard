@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { render, cleanup, screen } from '@testing-library/react';
+import { render, cleanup, fireEvent, screen } from '@testing-library/react';
 import { STOP_REASONS } from '../src/core/dispatch-gate.js';
 import type { AutopilotState } from '../web/src/api.js';
 import { TopBar } from '../web/src/components/TopBar.js';
@@ -178,6 +178,22 @@ describe('TopBar visibility and labels', () => {
 // One word for what auto-pilot is doing. The load-bearing part is which stops read as a success:
 // "an error or an exhausted budget never counts as success", so `complete` is styled apart from the
 // rest rather than every ended run looking equally finished.
+// The permanent way to add a log entry by hand is this tab existing at all.
+describe('the tabs', () => {
+  it('offers the project log, and reports the switch', () => {
+    const onTab = vi.fn();
+    render(<TopBar {...props} onTab={onTab} />);
+    fireEvent.click(screen.getByText('Project Log'));
+    expect(onTab).toHaveBeenCalledWith('diary');
+  });
+
+  it('marks only the open tab as active', () => {
+    render(<TopBar {...props} tab="diary" />);
+    expect(screen.getByText('Project Log').closest('button')?.className).toContain('active');
+    expect(screen.getByText('Boards').closest('button')?.className).not.toContain('active');
+  });
+});
+
 describe('the auto-pilot chip', () => {
   const state = (over: Partial<AutopilotState>): AutopilotState => ({
     state: 'stopped',

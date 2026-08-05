@@ -6,7 +6,21 @@ const THEMES: { value: string; label: string }[] = [
   { value: 'classic-dark', label: 'Classic Dark' },
 ];
 
-export type MainTab = 'boards' | 'execution' | 'control' | 'explorer';
+// The tabs, in the order they are read. A table rather than five near-identical buttons: adding the fifth
+// took this component past the complexity ceiling, which is the rule pointing at the duplication rather
+// than at the size — and the type is now derived from the list, so the two cannot disagree.
+//
+// `diary` IS the permanent button the spec asks for. A hand-driven session's log should read like an
+// auto-pilot one, so adding an entry has to be reachable from wherever the person is working.
+const TABS = [
+  { value: 'boards', label: 'Boards' },
+  { value: 'execution', label: 'Execution' },
+  { value: 'diary', label: 'Project Log' },
+  { value: 'control', label: 'Project Control' },
+  { value: 'explorer', label: 'Explorer' },
+] as const;
+
+export type MainTab = (typeof TABS)[number]['value'];
 
 // What auto-pilot is doing, in one word. `complete` is the ONLY stop styled as a success: an exhausted
 // budget, a reached cap and a stalled board all end tidily and none of them means the work is done —
@@ -67,25 +81,19 @@ export function TopBar({
       )}
       {showProject && (
         <div className="topbar-tabs" role="group" aria-label="View">
-          <button className={`tab-btn${tab === 'boards' ? ' active' : ''}`} onClick={() => onTab('boards')}>
-            Boards
-          </button>
-          <button
-            className={`tab-btn${tab === 'execution' ? ' active' : ''}`}
-            onClick={() => onTab('execution')}
-          >
-            Execution
-            {attentionCount > 0 && <span className="tab-badge">{attentionCount}</span>}
-          </button>
-          <button className={`tab-btn${tab === 'control' ? ' active' : ''}`} onClick={() => onTab('control')}>
-            Project Control
-          </button>
-          <button
-            className={`tab-btn${tab === 'explorer' ? ' active' : ''}`}
-            onClick={() => onTab('explorer')}
-          >
-            Explorer
-          </button>
+          {TABS.map(({ value, label }) => (
+            <button
+              type="button"
+              key={value}
+              className={`tab-btn${tab === value ? ' active' : ''}`}
+              onClick={() => onTab(value)}
+            >
+              {label}
+              {value === 'execution' && attentionCount > 0 && (
+                <span className="tab-badge">{attentionCount}</span>
+              )}
+            </button>
+          ))}
         </div>
       )}
       <div className="topbar-right">

@@ -9,6 +9,7 @@ import { DEFAULT_CONTEXT_BUDGET } from '../shared';
 import type { TagCount } from '../viewmodel';
 import { BoardsView } from './BoardsView';
 import { CardsPane } from './CardsPane';
+import { DiaryView } from './DiaryView';
 import { ExecutionView } from './ExecutionView';
 import { ExplorerView } from './ExplorerView';
 import { ProjectControl } from './ProjectControl';
@@ -20,6 +21,9 @@ import { UtilityDock } from './UtilityDock';
 export interface WorkAreaProps {
   snapshot: ProjectSnapshot;
   tab: MainTab;
+  // App's project counter. Threaded rather than defaulted, so the diary refetches on a project switch —
+  // and so nothing here opens a second socket, which is what a hard-coded 0 did in slice D's Settings panel.
+  bump: number;
   allCards: Card[];
   runs: RunList;
   skills: { skills: Skill[]; invalid: InvalidSkill[] };
@@ -144,6 +148,7 @@ export function WorkArea(props: WorkAreaProps) {
             onResolve={props.onResolveRun}
           />
         )}
+        {tab === 'diary' && <DiaryView bump={props.bump} />}
         {tab === 'control' && <ProjectControl snapshot={snapshot} />}
         {tab === 'explorer' && <ExplorerView snapshot={snapshot} />}
         <UtilityDock

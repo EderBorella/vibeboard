@@ -165,6 +165,7 @@ export function App() {
       <WorkArea
         snapshot={snapshot}
         tab={tab}
+        bump={bump}
         allCards={allCards}
         runs={allRuns}
         skills={catalogue}

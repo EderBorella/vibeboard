@@ -1240,3 +1240,59 @@ body {
   gap: 0.5rem;
   margin: 0.4rem 0 0.2rem;
 }
+
+/* The project log. A reading surface rather than a dashboard: one column, generous line height, and the
+   structure kept quiet so the prose is what the eye lands on. */
+.diary {
+  flex: 1; min-width: 0; overflow-y: auto; background: var(--wash);
+  padding: 1.25rem 1.5rem; display: flex; flex-direction: column; gap: 1rem;
+}
+.diary-head { display: flex; flex-direction: column; gap: 0.3rem; max-width: 68ch; }
+.diary-head h2 {
+  font-family: var(--font-display); text-transform: uppercase; letter-spacing: 0.1em;
+  font-size: 0.95rem; color: var(--text);
+}
+.diary-lede { color: var(--muted); font-size: 0.85rem; line-height: 1.5; }
+
+.diary-compose { display: flex; gap: 0.6rem; align-items: flex-start; max-width: 68ch; }
+.diary-compose textarea {
+  flex: 1; resize: vertical; min-height: 2.6rem; padding: 0.5rem 0.6rem;
+  background: var(--panel-2); color: var(--text);
+  border: 1px solid var(--border); border-radius: 6px;
+  font: inherit; line-height: 1.45;
+}
+.diary-error { color: var(--danger, #d66); font-size: 0.85rem; max-width: 68ch; }
+
+.diary-empty {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 0.6rem;
+  color: var(--muted); font-size: 0.9rem; padding: 1.5rem 0;
+}
+
+.diary-list {
+  list-style: none; display: flex; flex-direction: column; gap: 0.1rem; max-width: 68ch;
+}
+.diary-entry {
+  display: flex; flex-direction: column; gap: 0.2rem;
+  padding: 0.6rem 0 0.6rem 0.75rem;
+  border-left: 2px solid var(--border);
+}
+/* The kind, encoded in the rail as well as the word: a run, a checkup and a lifecycle event are read at
+   different times for different reasons, and colour is how a long file stays scannable. */
+.diary-entry[data-kind='checkup'] { border-left-color: var(--accent); }
+.diary-entry[data-kind='lifecycle'] { border-left-color: var(--muted); }
+
+.diary-meta {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.5rem;
+  font-size: 0.72rem; color: var(--muted);
+}
+.diary-kind {
+  font-family: var(--font-display); text-transform: uppercase; letter-spacing: 0.1em;
+  font-size: 0.66rem; color: var(--text);
+}
+.diary-about { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.diary-chip {
+  padding: 0.05rem 0.35rem; border: 1px solid var(--border); border-radius: 999px;
+  font-variant-numeric: tabular-nums;
+}
+.diary-outcome { color: var(--text); }
+.diary-text { line-height: 1.55; font-size: 0.92rem; }

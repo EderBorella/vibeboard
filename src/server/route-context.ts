@@ -7,6 +7,7 @@ import type { CopilotSession } from './copilot.js';
 import type { CredentialStore } from './credentials.js';
 import type { Log } from './logging.js';
 import type { SandboxStatus } from './sandbox.js';
+import type { ServiceProcess } from './service-process.js';
 import type { ProjectSession } from './session.js';
 
 // The shared surface every route group and the WS layer needs. Passed explicitly rather
@@ -26,6 +27,10 @@ export interface AppCtx {
   // Auto-pilot's state and the three stops. Everything that refuses an action while a project is
   // halted or under auto-pilot asks this rather than reading the file itself.
   autopilot: AutopilotRuntime;
+  // The loop's own process. Separate from `autopilot` above because they own different halves of one
+  // file: the runtime writes the state and the stops, this spawns and supervises the process that
+  // writes the counters (decision 20).
+  service: ServiceProcess;
   // Who is allowed to call what. Held on the context because both the HTTP boundary and the
   // websocket need to verify against the same store, and a run's credential is minted here when
   // it is dispatched and revoked when it settles.

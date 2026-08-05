@@ -21,8 +21,10 @@ import {
 import { type ReadmeGate, readmeGate } from '../../core/readme.js';
 import type { RunRecord } from '../../core/runs.js';
 import type { BoardName, ProjectConfig } from '../../core/types.js';
+import { attachedOpencodeUrl } from '../opencode-server.js';
 import { type AppCtx, ensureOpen } from '../route-context.js';
 import { listRuns } from '../run-store.js';
+import { agentRefusal } from '../sandbox.js';
 import { readSkills } from '../skill-catalogue.js';
 
 // "Could auto-pilot start here, and if not, why not?" — answered in ONE place, so the settings tab,
@@ -109,6 +111,28 @@ export function composeReadiness(config: ProjectConfig, skillSlugs: string[], re
   };
 }
 
+// Read from disk, in one place. The readiness endpoint and the START endpoint must not each decide
+// whether a project is ready: two components disagreeing about that is how one of them starts a run the
+// other would have refused.
+//
+// Takes the root and config rather than the context: `ensureOpen` is a type predicate over the SESSION,
+// and its narrowing does not survive being passed through a function boundary. Asking for what it needs
+// keeps the check at the call site where the 409 is sent.
+async function readReadiness(root: string, config: ProjectConfig): Promise<Readiness> {
+  const [readme, foundation, gates, smoke, catalogue] = await Promise.all([
+    readmeGate(root),
+    foundationStatus(root),
+    readGates(root),
+    readSmokeCommand(root),
+    readSkills(root, config),
+  ]);
+  return composeReadiness(
+    config,
+    catalogue.skills.map((s) => s.slug),
+    { readme, foundation, gates, smoke },
+  );
+}
+
 // The state, and the three ways to stop (decision 12). Every one of them is admin-only by absence
 // from the scope table in auth.ts, and that is load-bearing rather than incidental: a run able to
 // restart its own project could undo the emergency stop that was aimed at it, and the whole point of
@@ -139,6 +163,46 @@ async function registerControls(api: FastifyInstance, ctx: AppCtx): Promise<void
     const result = await ctx.autopilot.emergencyStop(detail);
     if (!result.ok) return reply.code(409).send({ error: result.error });
     return { state: result.state };
+  });
+
+  // Press start. The refusals are in the order a person would fix them, and every one names the way
+  // forward — the whole point of a control that can refuse is that it says why.
+  api.post('/autopilot/start', async (_req, reply) => {
+    if (!ensureOpen(ctx.session, reply)) return;
+
+    // THE SANDBOX FIRST, and 412 rather than 403: the request is fine, the machine is not in a state to
+    // serve it. Auto-pilot is the one caller for which this is mandatory rather than advisable — it
+    // dispatches unattended, so the confinement cannot be something a person decides to skip this once.
+    const refusal = agentRefusal(ctx.sandbox, attachedOpencodeUrl());
+    if (refusal) return reply.code(412).send({ error: refusal });
+
+    // Then the project. A run whose routing table has a hole, or whose foundation documents are not
+    // written, would dispatch into a lifecycle that cannot finish — and the gate commands ARE those
+    // documents, so a missing one is a verification that fails closed on every card.
+    const readiness = await readReadiness(ctx.session.root, ctx.session.config);
+    if (!readiness.ok) {
+      return reply.code(412).send({
+        error: `Auto-pilot is not ready to start here: ${readiness.blockers.join(' ')}`,
+        blockers: readiness.blockers,
+      });
+    }
+
+    // Then the state. `halted` needs a person (decision 12) and `running` means it is already going —
+    // 409 for both, because the request conflicts with the project rather than with the machine.
+    const state = await ctx.autopilot.current();
+    if (state.state === 'halted') {
+      return reply.code(409).send({
+        error: 'This project is halted. Restart it from the auto-pilot panel before starting auto-pilot.',
+      });
+    }
+    if (state.state === 'running') {
+      return reply.code(409).send({ error: 'Auto-pilot is already running this project.' });
+    }
+
+    const started = await ctx.service.start();
+    if (!started.ok) return reply.code(409).send({ error: started.error });
+    ctx.broadcast({ type: 'autopilot:state', state: started.state });
+    return { state: started.state };
   });
 
   // The way back to idle. Auto-pilot stays off until it is started separately.
@@ -221,18 +285,6 @@ export async function registerAutopilotRoutes(api: FastifyInstance, ctx: AppCtx)
 
   api.get('/autopilot/readiness', async (_req, reply) => {
     if (!ensureOpen(ctx.session, reply)) return;
-    const { root, config } = ctx.session;
-    const [readme, foundation, gates, smoke, catalogue] = await Promise.all([
-      readmeGate(root),
-      foundationStatus(root),
-      readGates(root),
-      readSmokeCommand(root),
-      readSkills(root, config),
-    ]);
-    return composeReadiness(
-      config,
-      catalogue.skills.map((s) => s.slug),
-      { readme, foundation, gates, smoke },
-    );
+    return readReadiness(ctx.session.root, ctx.session.config);
   });
 }

@@ -2,8 +2,10 @@ import { chmodSync, existsSync, rmSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { beforeAll, describe, expect, it } from 'vitest';
+import type { AutopilotState } from '../src/core/autopilot-state.js';
 import { IDLE_STATE } from '../src/core/autopilot-state.js';
 import { writeAutopilotState } from '../src/server/autopilot-store.js';
+import type { Scope } from '../src/server/credentials.js';
 import { dispatchLock } from '../src/server/routes/runs.js';
 import { readRun } from '../src/server/run-store.js';
 import { openTestProject, shimArgsLog, tempDir, wsClient } from './helpers.js';
@@ -75,45 +77,96 @@ describe('while a project is halted', () => {
 // one did it, and planting proved the lock's halted branch was held by nothing.
 describe('the dispatch lock itself', () => {
   const at = (state: 'idle' | 'running' | 'stopped' | 'halted') => ({ ...IDLE_STATE, state });
+  const locked = (state: AutopilotState, scope: Scope | undefined): boolean =>
+    dispatchLock(state, scope) !== undefined;
 
+  // Every state against every scope. `work` and `checkup` never reach this rule in production — the scope
+  // table 403s them first — but the predicate is still wrong if it exempts them, and planting showed that
+  // exempting `work` was caught by nothing at all with only two columns here.
+  //
+  // The service's authority is CO-TERMINOUS WITH `running`, which is the whole point of the rule: written
+  // as "not a by-hand caller while running", it admitted the loop while idle and while stopped — and
+  // `stopped` is the state a soft stop produces, so the soft stop was enforced by nothing on the server.
   it.each([
-    // state,      admin,  service
-    ['idle', false, false],
-    ['stopped', false, false],
-    ['running', true, false],
-    ['halted', true, true],
-  ] as const)('%s', (state, locksAdmin, locksService) => {
-    expect(dispatchLock(at(state), 'admin') !== undefined, 'admin').toBe(locksAdmin);
-    expect(dispatchLock(at(state), 'service') !== undefined, 'service').toBe(locksService);
+    // state,      admin, work,  checkup, service
+    ['idle', false, false, false, true],
+    ['stopped', false, false, false, true],
+    ['running', true, true, true, false],
+    ['halted', true, true, true, true],
+  ] as const)('%s', (state, admin, work, checkup, service) => {
+    expect(locked(at(state), 'admin'), 'admin').toBe(admin);
+    expect(locked(at(state), 'work'), 'work').toBe(work);
+    expect(locked(at(state), 'checkup'), 'checkup').toBe(checkup);
+    expect(locked(at(state), 'service'), 'service').toBe(service);
   });
 
-  it('names the way forward in both refusals', () => {
-    expect(dispatchLock(at('running'), 'admin')).toContain('Soft-stop');
-    expect(dispatchLock(at('halted'), 'service')).toContain('Restart');
+  it('names the way forward in every refusal', () => {
+    // Asserted as whole sentences, not substrings: these reach a person, and a refusal that has lost the
+    // half telling them what to do is the dead end this design will not ship. A `toBeDefined` first, so a
+    // missing sentence fails as a missing sentence rather than as an argument-type error inside chai.
+    const byHand = dispatchLock(at('running'), 'admin');
+    expect(byHand).toBeDefined();
+    expect(byHand).toContain('Soft-stop it first');
+
+    const halted = dispatchLock(at('halted'), 'service');
+    expect(halted).toBeDefined();
+    expect(halted).toContain('Restart it from the auto-pilot panel');
+
+    const idle = dispatchLock(at('idle'), 'service');
+    expect(idle).toBeDefined();
+    expect(idle).toContain('no authority to dispatch');
+    // The state itself, so the reader knows which of the four they are in.
+    expect(idle).toContain('idle');
   });
 
   // A credential with no scope at all is the browser before the header is filled in, and a missing scope
   // must not read as the service's exemption.
   it('treats an unknown caller as a by-hand one', () => {
     expect(dispatchLock(at('running'), undefined)).toContain('Soft-stop');
+    expect(dispatchLock(at('idle'), undefined)).toBeUndefined();
   });
 });
 
-describe('while a project is halted, nothing dispatches at all', () => {
-  // Not even the loop. Halted is the state a person has to leave deliberately (decision 12), and a
-  // service that could still dispatch inside it would make the emergency stop a suggestion.
-  it('refuses the service too, not only the browser', async () => {
+describe('the loop’s authority is exactly the running state', () => {
+  // ONE token, four states, and nothing else changing. The earlier version of this asserted only that a
+  // halted project refuses a service dispatch — which the browser is refused for too, with the same 409
+  // and the same sentence, so deleting the whole halted branch left it green. A pair is the fix: the same
+  // credential must be admitted in one state and refused in the others.
+  it('is admitted while running and refused while idle, stopped and halted', async () => {
     const { app, root, mint } = await openTestProject();
-    await writeAutopilotState(root, { ...IDLE_STATE, state: 'halted', reason: 'killed' });
     const service = mint('service', 'run-svc');
-    const res = await app.inject({
-      method: 'POST',
-      url: '/api/runs',
-      headers: { authorization: `Bearer ${service.token}` },
-      payload: dispatch,
-    });
-    expect(res.statusCode).toBe(409);
-    expect(res.json().error).toContain('halted');
+    const headers = { authorization: `Bearer ${service.token}` };
+
+    await writeAutopilotState(root, { ...IDLE_STATE, state: 'running' });
+    const allowed = await app.inject({ method: 'POST', url: '/api/runs', headers, payload: dispatch });
+    expect(allowed.statusCode).toBe(200);
+
+    // `idle` and `stopped` matter as much as `halted`: `stopped` is what a SOFT STOP produces, and the
+    // runtime writes it without killing anything — so if the loop keeps its authority there, the soft stop
+    // is enforced by the loop choosing to notice and by nothing else.
+    for (const state of ['idle', 'stopped', 'halted'] as const) {
+      await writeAutopilotState(root, { ...IDLE_STATE, state });
+      const res = await app.inject({ method: 'POST', url: '/api/runs', headers, payload: dispatch });
+      expect(res.statusCode, state).toBe(409);
+    }
+  });
+
+  it('and its credential is revoked the moment a stop takes that authority away', async () => {
+    // The token belongs to no run record, so nothing else ever expires it: before this it stayed valid for
+    // the life of the server, across a soft stop and a restart, and came back to life when the project was
+    // reopened. 401 rather than 409 — the credential is gone, not merely out of state.
+    const { app, root, mint } = await openTestProject();
+    const service = mint('service', 'run-svc');
+    const headers = { authorization: `Bearer ${service.token}` };
+    await writeAutopilotState(root, { ...IDLE_STATE, state: 'running' });
+    expect(
+      (await app.inject({ method: 'POST', url: '/api/runs', headers, payload: dispatch })).statusCode,
+    ).toBe(200);
+
+    await app.inject({ method: 'POST', url: '/api/autopilot/stop', payload: {} });
+    await writeAutopilotState(root, { ...IDLE_STATE, state: 'running' });
+    const after = await app.inject({ method: 'POST', url: '/api/runs', headers, payload: dispatch });
+    expect(after.statusCode).toBe(401);
   });
 });
 

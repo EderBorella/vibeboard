@@ -52,10 +52,21 @@ const NOT_A_RUN_ID = 'That is not a run id.';
 // deliberate defence in depth — but a branch whose removal changes no test is a branch that does not
 // work, whatever else happens to catch it.
 export function dispatchLock(state: AutopilotState, scope: Scope | undefined): string | undefined {
+  // First, and for everyone. Halted is the state a person has to leave deliberately (decision 12); a loop
+  // that could still dispatch inside it would make the emergency stop a suggestion.
   if (state.state === 'halted') {
     return 'This project is halted, so nothing can be dispatched. Restart it from the auto-pilot panel first.';
   }
-  if (state.state === 'running' && scope !== 'service') {
+  // The service's authority is CO-TERMINOUS WITH `running`, stated as what is allowed rather than as what
+  // is refused. Written the other way round — "not a by-hand caller while running" — it admitted the loop
+  // while `idle` and while `stopped`, and `stopped` is what a soft stop produces: the runtime writes it
+  // and kills nothing, so the soft stop was enforced by the loop's own cooperation and by no layer at
+  // all. A stale token was then a dispatching one for the life of the server.
+  if (scope === 'service') {
+    if (state.state === 'running') return undefined;
+    return `Auto-pilot is ${state.state}, so its loop has no authority to dispatch. Start it from the auto-pilot panel.`;
+  }
+  if (state.state === 'running') {
     return 'Auto-pilot is running this project, so it owns the runner. Soft-stop it first if you want to dispatch a run by hand.';
   }
   return undefined;

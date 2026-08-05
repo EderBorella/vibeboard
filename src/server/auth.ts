@@ -76,6 +76,14 @@ const RULES: Record<string, Rule> = {
   // This row is what makes the loop possible at all: without it `POST /api/runs` is admin-only, because
   // a route absent from this table grants nothing.
   'POST /api/runs': { scopes: ['service'] },
+
+  // And the reads that dispatch depends on. `decideTick` counts attempts from the run records and needs
+  // to know which runs are in flight, so a loop that could dispatch but not read them would have to be
+  // handed the ADMIN token instead — which is decisions 10 and 21 collapsing in one step. Same reasoning
+  // as `GET /api/accounting`, and the working scopes are refused for the same reason: an agent that can
+  // see every run in the project is an agent reasoning about its own leash.
+  'GET /api/runs': { scopes: ['service'] },
+  'GET /api/runs/:board/:card': { scopes: ['service'] },
 };
 
 export function bearerToken(header: string | undefined): string {

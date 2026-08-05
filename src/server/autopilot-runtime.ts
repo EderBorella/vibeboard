@@ -30,6 +30,10 @@ export interface AutopilotRuntimeOptions {
   // and the recorded process groups. Injected rather than imported, so this class does not reach into
   // the runner and can be tested without one.
   onKill?: (state: AutopilotState) => void | Promise<void>;
+  // Called whenever this project stops being `running`, by any of the three stops. Wired to revoking the
+  // service's credential: it belongs to no run record, so nothing else would ever expire it, and a token
+  // that outlives the state justifying it is a token that can still dispatch (see `dispatchLock`).
+  onDispatchingEnded?: () => void;
   log?: Log;
 }
 
@@ -140,20 +144,32 @@ export class AutopilotRuntime {
     if (state.state === 'idle') return { ok: true, state };
     const root = this.#opts.root();
     if (!root) return { ok: false, error: 'No project open' };
-    // Written whole rather than merged — the one place that is right, and deliberately unlike `#stop`
-    // above. Everything the previous state held is being DROPPED, not preserved: `reason` and `detail`
-    // described a stop that is over, the counters belong to a run that has ended, and `servicePgid`
-    // named a process the emergency stop already killed — kept, it would point the next reaper at a pid
-    // that by then belongs to something else. A merge here would be the bug, not the fix.
+    // Written whole rather than merged, with ONE exception. `reason` and `detail` described a stop that is
+    // over and the counters belong to a run that has ended, so all four are dropped deliberately.
+    //
+    // The process group is kept ONLY when restarting from a soft stop, and the distinction is the whole of
+    // it. From `halted` the emergency stop has already killed that group, and keeping a dead pgid would
+    // point a later reaper at whatever inherited the number — the risk this comment originally named, and
+    // real precisely because a `servicePgid` written without a `servicePgstart` is reaped on the weaker
+    // "is it still a group leader" test. From `stopped` the opposite holds: a soft stop kills nothing, so
+    // the loop may still be alive and mid-tick, and dropping its pgid left the next emergency stop with no
+    // target for it at all — the orphan class decision 13 exists for.
+    const previous = this.#mirror;
+    const keepGroup = previous.state === 'stopped';
     const next: AutopilotState = {
       state: 'idle',
       iteration: 0,
       dispatchesSinceCheckup: 0,
       needsCheckup: true,
       at: this.#at(),
+      ...(keepGroup && previous.servicePgid !== undefined ? { servicePgid: previous.servicePgid } : {}),
+      ...(keepGroup && previous.servicePgstart !== undefined
+        ? { servicePgstart: previous.servicePgstart }
+        : {}),
     };
     await writeAutopilotState(root, next);
     this.#mirror = next;
+    this.#opts.onDispatchingEnded?.();
     this.#opts.onChange?.(next);
     return { ok: true, state: next };
   }
@@ -183,6 +199,7 @@ export class AutopilotRuntime {
         this.#opts.log?.error({ err }, 'could not record the auto-pilot stop on disk');
       }
     }
+    this.#opts.onDispatchingEnded?.();
     this.#opts.onChange?.(next);
     return next;
   }

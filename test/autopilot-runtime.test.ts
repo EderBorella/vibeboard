@@ -97,6 +97,33 @@ describe('recording a stop', () => {
 
 // The Restart button is the way back from a halt. It is not a way to raise a cap.
 describe('restarting', () => {
+  // The other direction, and it is not symmetrical. A soft stop kills NOTHING, so the loop may still be
+  // alive and mid-tick when Restart is pressed — dropping its group left the next emergency stop with no
+  // target for it, which is the orphan class decision 13 exists for. From `halted` the group is already
+  // dead and keeping the pgid would aim a later reaper at whatever inherited the number.
+  it('keeps the service group when restarting from a soft stop, since nothing killed it', async () => {
+    const root = await tempDir();
+    await writeAutopilotState(root, {
+      ...IDLE_STATE,
+      state: 'stopped',
+      reason: 'stopped',
+      iteration: 12,
+      servicePgid: 4242,
+      servicePgstart: 987,
+    });
+    const { runtime } = build(root);
+    expect((await runtime.restart()).ok).toBe(true);
+    expect(await readAutopilotState(root, AT)).toEqual({
+      state: 'idle',
+      iteration: 0,
+      dispatchesSinceCheckup: 0,
+      needsCheckup: true,
+      at: AT,
+      servicePgid: 4242,
+      servicePgstart: 987,
+    });
+  });
+
   it('drops everything the halt held', async () => {
     const root = await tempDir();
     await writeAutopilotState(root, {

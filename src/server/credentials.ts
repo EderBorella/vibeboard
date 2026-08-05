@@ -87,4 +87,15 @@ export class CredentialStore {
       if (cred.run === run) this.#byToken.delete(token);
     }
   }
+
+  // Everything held by one scope. Exists for the auto-pilot service, whose credential belongs to no run
+  // record and therefore never settled — so nothing revoked it, and it stayed valid for the life of the
+  // server across a soft stop, a restart, and (because authority is compared against the OPEN project) it
+  // came back to life when the original project was reopened. Called from every path that takes the loop's
+  // authority away, so the token cannot outlive the state that justifies it.
+  expireScope(scope: Scope): void {
+    for (const [token, cred] of this.#byToken) {
+      if (cred.scope === scope) this.#byToken.delete(token);
+    }
+  }
 }

@@ -168,7 +168,7 @@ describe('putting the run on its own branch', () => {
 
   // `execFile` validates its arguments synchronously and THROWS on a NUL byte, inside the promise
   // executor — so this used to reject rather than refuse, breaking the module's one contract. A card's
-  // frontmatter can carry one: a YAML double-quoted scalar accepts ` `.
+  // frontmatter can carry one: a YAML double-quoted scalar accepts `\0`.
   it('refuses a name containing a NUL byte instead of throwing', async () => {
     const dir = await committed(await repo());
     const result = await ensureBranch(dir, 'autopilot/\u0000run');
@@ -323,7 +323,11 @@ describe('refusing to commit the wrong thing', () => {
     await git(dir, ['add', 'vendor']).catch(() => undefined);
     const result = await commitAll(dir, 'autopilot: E-001');
     expect(result.committed).toBe(false);
+    // GIT'S OWN WORDS, not just our prefix. Asserting the prefix alone left the interpolation unheld, and
+    // `committed: false` is no gate here either — with the staging refusal deleted, the later
+    // unrecordable-changes guard answers `false` too. The reason is the only thing that tells them apart.
     expect(result.reason).toMatch(/Could not stage the tree/);
+    expect(result.reason).toMatch(/does not have a commit checked out/);
   });
 
   it('refuses when it is not on the branch it was told to be on', async () => {
@@ -333,9 +337,35 @@ describe('refusing to commit the wrong thing', () => {
     await writeFile(join(dir, 'mine.txt'), 'work in progress\n');
     const result = await commitAll(dir, 'autopilot: E-001', { branch: 'autopilot/run-1' });
     expect(result.committed).toBe(false);
-    expect(result.reason).toContain('autopilot/run-1');
-    expect(result.reason).toContain('main');
+    // The WHOLE sentence. The two branch names alone left the half that says why unheld, and here the
+    // sentence is the behaviour: a refusal a reader cannot act on is the dead end this design will not ship.
+    expect(result.reason).toBe(
+      'Auto-pilot is on branch main rather than autopilot/run-1, so it will not commit: the tree may hold work that is not its own.',
+    );
     expect(await count(dir)).toBe(1);
+  });
+
+  it('says so plainly when there is no branch at all', async () => {
+    // A detached HEAD. `currentBranch` answers `undefined` rather than `''` precisely so this case cannot
+    // be confused with "no name given", and the sentence has to survive that — an interpolated `undefined`
+    // is exactly the dead end the fallback exists to prevent.
+    const dir = await committed(await repo());
+    await git(dir, ['checkout', '-q', '--detach']);
+    await writeFile(join(dir, 'mine.txt'), 'work in progress\n');
+    const result = await commitAll(dir, 'autopilot: E-001', { branch: 'autopilot/run-1' });
+    expect(result.committed).toBe(false);
+    expect(result.reason).toContain('(a detached HEAD)');
+    expect(result.reason).not.toContain('undefined');
+  });
+
+  it('treats an empty branch name as a check that was asked for, not one to skip', async () => {
+    // `!== undefined` rather than truthiness: `branch: ''` is a caller that got an empty answer from
+    // somewhere, and skipping the guard for it would be the fail-open reading.
+    const dir = await committed(await repo());
+    await writeFile(join(dir, 'mine.txt'), 'work in progress\n');
+    const result = await commitAll(dir, 'autopilot: E-001', { branch: '' });
+    expect(result.committed).toBe(false);
+    expect(result.reason).toContain('rather than');
   });
 
   it('commits when it is', async () => {

@@ -92,6 +92,11 @@ describe('the scope table', () => {
     // refused — decision 21 — because a run that can dispatch escapes the iteration counter, the budget
     // and the attempt cap in one move.
     ['/api/runs', 'POST', false, false, true],
+    // The reads dispatch depends on: `decideTick` counts attempts from the run records and has to know
+    // which runs are in flight. A loop that could dispatch but not read would have to be handed the ADMIN
+    // token, which is decisions 10 and 21 collapsing in one step.
+    ['/api/runs', 'GET', false, false, true],
+    ['/api/runs/:board/:card', 'GET', false, false, true],
     ['/api/config', 'PATCH', false, false, false],
     ['/api/explorer/file', 'PUT', false, false, false],
     ['/api/project/open', 'POST', false, false, false],
@@ -181,11 +186,13 @@ describe('the API boundary', () => {
       headers: bearer(cred.token),
       payload: {},
     });
-    // NOT 403 is the claim — a 403 here would mean the loop can never dispatch. What it actually hits is
-    // the sandbox pre-condition (412), and that ordering is deliberate: auto-pilot is the one caller for
-    // which a missing sandbox is mandatory to refuse, so it is checked before anything is resolved.
+    // NOT 403 is the claim, and the only claim: a 403 would mean the loop can never dispatch. What it
+    // actually hits is the sandbox pre-condition, because this file's fixture builds an app with no
+    // sandbox — so asserting the NUMBER here pinned an accident of the fixture rather than any ordering.
+    // Proved by adding a sandbox to `open()`: the status became 400, and this line would have failed for
+    // a reason that had nothing to do with authorisation. The refusal's own words are the honest anchor.
     expect(res.statusCode).not.toBe(403);
-    expect(res.statusCode).toBe(412);
+    expect(res.json().error).toMatch(/sandbox/i);
   });
 
   it('refuses a checkup credential on POST /api/runs too', async () => {

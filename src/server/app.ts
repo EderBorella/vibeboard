@@ -32,6 +32,7 @@ import { registerSkillRoutes } from './routes/skills.js';
 import { registerSuggestionRoutes } from './routes/suggestions.js';
 import { listRuns } from './run-store.js';
 import { NOT_REQUESTED, type SandboxStatus } from './sandbox.js';
+import { type ServiceCommand, ServiceProcess } from './service-process.js';
 import type { ProjectSession } from './session.js';
 import { createBroadcaster, registerWs } from './ws.js';
 
@@ -64,6 +65,9 @@ export function buildApp(
     // Probed once, by main.ts, before the app exists — every agent this app starts is confined the
     // same way, and re-probing per turn would put a process spawn in front of every dispatch.
     sandbox?: SandboxStatus;
+    // What to spawn for the auto-pilot loop. Tests put a shim here and read back what the process was
+    // actually given; production resolves the loop's entry point beside this module.
+    serviceCommand?: () => ServiceCommand;
   } = {},
 ): FastifyInstance {
   const app = Fastify({ logger: withRedaction(opts.logger ?? serverLogger().options) });
@@ -119,6 +123,11 @@ export function buildApp(
     root: () => session.root,
     now: () => new Date(),
     onChange: (state) => broadcast({ type: 'autopilot:state', state }),
+    // Every stop takes the loop's authority away, so every stop revokes its credential. The service's
+    // token belongs to no run record, so nothing else would ever expire it — and `dispatchLock` now
+    // admits a `service` caller only while `running`, which makes this the second of two independent
+    // reasons a stale token cannot dispatch.
+    onDispatchingEnded: () => credentials.expireScope('service'),
     onKill: async (state) => {
       // In this order, and the order is the point: stop the runner first so nothing new is spawned into
       // the group we are about to reap, then the CHAT, then the managed server, then everything
@@ -157,12 +166,27 @@ export function buildApp(
   });
   // The sync gate for the one caller that cannot await — see autopilot-runtime.ts.
   attachHaltGate(() => autopilot.isHalted());
+  // The loop's process. It shares one file with the runtime above and owns the other half of it: the
+  // runtime writes the state and the stops, this writes the pgid and supervises the child.
+  const service = new ServiceProcess({
+    root: () => session.root,
+    now: () => new Date(),
+    credentials,
+    // The same expression the runner uses, for the same reason: read at start rather than captured, so a
+    // port set after buildApp still lands.
+    apiBase: () => `http://127.0.0.1:${process.env.VIBEBOARD_PORT ?? 4610}`,
+    ...(opts.serviceCommand ? { command: opts.serviceCommand } : {}),
+    // A loop that died without saying why still has to raise the overlay in every open tab.
+    onStopped: (state) => broadcast({ type: 'autopilot:state', state }),
+    log: log.child({ component: 'autopilot-service' }),
+  });
   const ctx: AppCtx = {
     session,
     copilot,
     chats,
     runner,
     autopilot,
+    service,
     credentials,
     broadcast,
     log,

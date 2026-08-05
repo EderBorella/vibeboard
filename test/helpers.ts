@@ -10,6 +10,7 @@ import type { Card } from '../src/core/types.js';
 import { buildApp } from '../src/server/app.js';
 import { type Credential, CredentialStore } from '../src/server/credentials.js';
 import { probeProfile, type SandboxStatus, wrapCommand } from '../src/server/sandbox.js';
+import type { ServiceCommand } from '../src/server/service-process.js';
 import { ProjectSession } from '../src/server/session.js';
 
 // Every temp directory the suite makes goes inside the run's own root (vitest.config.ts), which is
@@ -76,6 +77,7 @@ export const TEST_SANDBOX: SandboxStatus = await probeProfile('unprivileged_user
 
 export interface TestAppOpts {
   runBin?: string;
+  serviceCommand?: () => ServiceCommand;
   logger?: FastifyServerOptions['logger'];
   // Passed in when a test needs to mint a run credential of its own — the service loop reaches the board
   // over HTTP with a `service` token, so testing it means holding the same store the app checks against.
@@ -109,10 +111,10 @@ export interface TestProject {
   app: FastifyInstance;
   session: ProjectSession;
   root: string;
-  credentials: CredentialStore;
   // A run credential for this project, for tests about what an agent or the service may do. The admin
   // header is filled in automatically for every other request, so this is only needed when the SCOPE is
-  // the point.
+  // the point. The store itself is deliberately NOT returned: nothing destructured it, and a field no test
+  // exercises is one more thing to keep true for no one.
   mint: (scope: 'work' | 'checkup' | 'service', run: string, card?: string) => Credential;
 }
 
@@ -129,6 +131,9 @@ export async function openTestProject(
     mode?: 'greenfield' | 'brownfield';
     runBin?: string;
     sandbox?: SandboxStatus;
+    // What to spawn for the auto-pilot loop. Tests put a shim here and read back what the process was
+    // actually given.
+    serviceCommand?: () => ServiceCommand;
     // Silent unless a test asks otherwise; pass a stream to read back what the subsystems logged.
     logger?: FastifyServerOptions['logger'];
   } = {},
@@ -140,6 +145,7 @@ export async function openTestProject(
     logger: opts.logger,
     sandbox: opts.sandbox,
     credentials,
+    ...(opts.serviceCommand ? { serviceCommand: opts.serviceCommand } : {}),
   });
   const root = await tempDir();
   const scaffolded = await app.inject({
@@ -165,7 +171,6 @@ export async function openTestProject(
     app,
     session,
     root,
-    credentials,
     mint: (scope, run, card) => credentials.mintRun(scope, run, root, card),
   };
 }

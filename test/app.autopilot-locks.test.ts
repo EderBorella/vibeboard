@@ -151,22 +151,77 @@ describe('the loop’s authority is exactly the running state', () => {
     }
   });
 
-  it('and its credential is revoked the moment a stop takes that authority away', async () => {
-    // The token belongs to no run record, so nothing else ever expires it: before this it stayed valid for
-    // the life of the server, across a soft stop and a restart, and came back to life when the project was
-    // reopened. 401 rather than 409 — the credential is gone, not merely out of state.
+  // A SOFT STOP keeps the credential, and that is the Stops table's promise rather than an oversight: it
+  // says in-flight work finishes, and the loop needs its token to finish — to wait for the run record, move
+  // the card it has just verified, record the verdict and write the diary line. Revoking there produced a
+  // loop that died of a 401 mid-dispatch and abandoned the very work the soft stop let it keep. Nothing NEW
+  // can start, because `dispatchLock` refuses a service caller outside `running`.
+  it('keeps its credential through a soft stop, so in-flight work can be finished', async () => {
     const { app, root, mint } = await openTestProject();
     const service = mint('service', 'run-svc');
     const headers = { authorization: `Bearer ${service.token}` };
     await writeAutopilotState(root, { ...IDLE_STATE, state: 'running' });
-    expect(
-      (await app.inject({ method: 'POST', url: '/api/runs', headers, payload: dispatch })).statusCode,
-    ).toBe(200);
 
     await app.inject({ method: 'POST', url: '/api/autopilot/stop', payload: {} });
+    // Still a valid credential: 200 on the reads and writes finishing a dispatch needs.
+    expect((await app.inject({ method: 'GET', url: '/api/runs', headers })).statusCode).toBe(200);
+    expect((await app.inject({ method: 'GET', url: '/api/accounting', headers })).statusCode).toBe(200);
+    // And still no new dispatch, which is what the soft stop was for. 409, not 401.
+    const dispatched = await app.inject({ method: 'POST', url: '/api/runs', headers, payload: dispatch });
+    expect(dispatched.statusCode).toBe(409);
+  });
+
+  // An emergency stop and a restart are the two that genuinely take the authority away, so they take the
+  // token with it. 401 rather than 409 — the credential is gone, not merely out of state. Without this the
+  // token lived for the whole life of the server: it belongs to no run record, so nothing else expires it.
+  it.each([
+    ['an emergency stop', '/api/autopilot/kill'],
+    ['a restart', '/api/autopilot/restart'],
+  ])('revokes its credential on %s, and only its own', async (_name, url) => {
+    const { app, root, mint } = await openTestProject();
+    const service = mint('service', 'run-svc');
+    const headers = { authorization: `Bearer ${service.token}` };
+    // A WORK credential beside it, because with one credential in the store a blanket purge is
+    // indistinguishable from targeted revocation — and a blanket purge would 401 an agent mid-turn, which
+    // is the opposite of what a stop is allowed to do to work already in flight.
+    const work = mint('work', 'run-work', 'E-001');
+    const workHeaders = { authorization: `Bearer ${work.token}` };
     await writeAutopilotState(root, { ...IDLE_STATE, state: 'running' });
-    const after = await app.inject({ method: 'POST', url: '/api/runs', headers, payload: dispatch });
-    expect(after.statusCode).toBe(401);
+    expect((await app.inject({ method: 'GET', url: '/api/runs', headers })).statusCode).toBe(200);
+    expect((await app.inject({ method: 'GET', url: '/api/state', headers: workHeaders })).statusCode).toBe(
+      200,
+    );
+
+    // A restart is refused while `running`, so it needs the soft stop first — which is the documented
+    // sequence and the one that used to leave a live token behind.
+    if (url.endsWith('restart')) {
+      await app.inject({ method: 'POST', url: '/api/autopilot/stop', payload: {} });
+    }
+    expect((await app.inject({ method: 'POST', url, payload: {} })).statusCode).toBe(200);
+    expect((await app.inject({ method: 'GET', url: '/api/runs', headers })).statusCode).toBe(401);
+    // The agent's credential is untouched. Its run is a separate thing with a separate lifetime, and only
+    // an emergency stop kills a run — through the runner, not through the credential store.
+    const still = await app.inject({ method: 'GET', url: '/api/state', headers: workHeaders });
+    expect(still.statusCode, 'a work credential must survive a stop aimed at the loop').toBe(200);
+  });
+});
+
+describe('the two revocations that do not go through a stop control', () => {
+  it('revokes it when a reconcile decides the loop is gone', async () => {
+    // Reopening the OPEN project is deliberately allowed while `running`, because the reconcile that clears
+    // a stale `running` only happens on open. That reconcile took the loop's authority away and left its
+    // credential valid.
+    const { app, root, mint } = await openTestProject();
+    const service = mint('service', 'run-svc');
+    const headers = { authorization: `Bearer ${service.token}` };
+    // `running` with no recorded group: nothing to be alive, so the reconcile decides it is gone.
+    await writeAutopilotState(root, { ...IDLE_STATE, state: 'running' });
+    expect((await app.inject({ method: 'GET', url: '/api/runs', headers })).statusCode).toBe(200);
+
+    expect(
+      (await app.inject({ method: 'POST', url: '/api/project/open', payload: { path: root } })).statusCode,
+    ).toBe(200);
+    expect((await app.inject({ method: 'GET', url: '/api/runs', headers })).statusCode).toBe(401);
   });
 });
 

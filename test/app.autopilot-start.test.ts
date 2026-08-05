@@ -1,8 +1,8 @@
-import { chmodSync } from 'node:fs';
+import { chmodSync, existsSync, readFileSync } from 'node:fs';
 import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it, onTestFinished } from 'vitest';
 import { IDLE_STATE } from '../src/core/autopilot-state.js';
 import { foundationRel } from '../src/core/layout.js';
 import { writeAutopilotState } from '../src/server/autopilot-store.js';
@@ -69,19 +69,41 @@ async function ready(opts: { behaviour?: string } = {}) {
   if (!readiness.json().ok) {
     throw new Error(`the fixture is not ready: ${JSON.stringify(readiness.json().blockers)}`);
   }
+  // The loop is spawned detached, so closing the app does not touch it. `openTestProject`'s own teardown
+  // closes the app and the session and neither reaches a child in its own session — which is how this file
+  // leaked four processes per run.
+  onTestFinished(() => {
+    project.app.service.stop();
+  });
   return { ...project, log };
 }
 
 const start = (app: Awaited<ReturnType<typeof ready>>['app']) =>
   app.inject({ method: 'POST', url: '/api/autopilot/start', payload: {} });
 
+// The shim writes its record and then stays alive, so the file appears a moment after `start` resolves.
+async function recorded(path: string): Promise<Record<string, unknown>> {
+  for (let i = 0; i < 100; i += 1) {
+    if (existsSync(path)) return JSON.parse(readFileSync(path, 'utf8'));
+    await new Promise((r) => setTimeout(r, 20));
+  }
+  throw new Error(`the service shim never wrote ${path}`);
+}
+
 describe('pressing start', () => {
   it('starts the loop and reports the running state', async () => {
-    const { app } = await ready();
+    const { app, root, log } = await ready();
     const res = await start(app);
     expect(res.statusCode).toBe(200);
     expect(res.json().state.state).toBe('running');
     expect(res.json().state.servicePgid).toBeGreaterThan(1);
+
+    // What the loop was actually handed. Nothing asserted this, so the app could have pointed it at a dead
+    // host and every test would have passed — and the loop would 401 on its first call with no clue why.
+    const got = await recorded(log);
+    expect(got.apiBase).toMatch(/^http:\/\/127\.0\.0\.1:\d+$/);
+    expect(got.projectRoot).toBe(root);
+    expect(got.stateAtStart).toBe('running');
   });
 
   it('tells every open tab, so a second window does not show a stopped project', async () => {
@@ -136,22 +158,66 @@ describe('pressing start', () => {
     expect(again.json().error).toBe('Auto-pilot is already running this project.');
   });
 
-  it('and refuses again because THIS server is holding a loop, whatever the file says', async () => {
-    // The state file rewritten behind the endpoint's back — which is what a second server, or a
-    // hand-edit, looks like. The process this server started is still alive, and starting a second would
-    // leak it: two loops dispatching into one project, each counting only its own iterations.
+  it('starts a fresh loop when the state says it may, replacing one this server still held', async () => {
+    // The state rewritten behind the endpoint's back is what a soft stop plus Restart looks like from
+    // here: `stopped` on disk, the old loop still alive because a soft stop kills nothing. Refusing left
+    // the project unable to start for as long as the old loop took to notice; replacing is safe because
+    // outside `running` that loop can neither dispatch nor keep its credential.
     const { app, root } = await ready();
     expect((await start(app)).statusCode).toBe(200);
+    const first = (await app.inject({ method: 'GET', url: '/api/autopilot/state' })).json().state.servicePgid;
     await writeAutopilotState(root, { ...IDLE_STATE, state: 'stopped' });
+
     const again = await start(app);
-    expect(again.statusCode).toBe(409);
-    expect(again.json().error).toBe('Auto-pilot is already running in this server.');
+    expect(again.statusCode).toBe(200);
+    expect(again.json().state.servicePgid).not.toBe(first);
   });
 
   it('refuses with no project open', async () => {
     const { app, session } = await ready();
     await session.close();
     expect((await start(app)).statusCode).toBe(409);
+  });
+});
+
+describe('when the loop dies on its own', () => {
+  it('raises the overlay in every open tab', async () => {
+    const { app } = await ready({ behaviour: 'exit:7' });
+    await app.listen({ port: 0 });
+    const ws = wsClient<{ type: string; state?: { state?: string; reason?: string } }>(
+      `http://127.0.0.1:${(app.server.address() as { port: number }).port}`,
+    );
+    await ws.open;
+    await start(app);
+    // Two messages arrive here: `running` from the start, then the supervisor's stop. It is the SECOND that
+    // matters, and the start path's broadcast was held by a test while this one was held by nothing.
+    const stopped = await ws.waitFor((m) => m.type === 'autopilot:state' && m.state?.state === 'stopped');
+    expect(stopped.state?.reason).toBe('interrupted');
+    ws.ws.close();
+  });
+});
+
+describe('a loop that crashed keeps nothing', () => {
+  it('loses the credential it was started with', async () => {
+    // The supervisor writes the state directly rather than through `AutopilotRuntime`, so this was one of
+    // three paths out of `running` that left a live `service` token behind — and a live token can still move
+    // cards and write diary lines, neither of which is behind the dispatch lock.
+    //
+    // The LOOP'S OWN token, read back from what the process was handed: a token the test minted itself would
+    // prove nothing about the one the server issued. An earlier version of this test called `stop()` first,
+    // which marks the exit deliberate — so the supervisor never ran and the assertion passed on a different
+    // revocation entirely.
+    const { app, log } = await ready({ behaviour: 'exit:7' });
+    await start(app);
+    const token = (await recorded(log)).token as string;
+    const headers = { authorization: `Bearer ${token}` };
+
+    for (let i = 0; i < 100; i += 1) {
+      const res = await app.inject({ method: 'GET', url: '/api/runs', headers });
+      if (res.statusCode === 401) return;
+      await new Promise((r) => setTimeout(r, 20));
+    }
+    expect.fail('the crashed loop kept a working credential');
   });
 });
 

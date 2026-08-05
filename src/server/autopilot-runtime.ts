@@ -2,6 +2,7 @@ import { type AutopilotState, IDLE_STATE, reconcile } from '../core/autopilot-st
 import { type StopReason, stopSentence } from '../core/dispatch-gate.js';
 import { readAutopilotState, updateAutopilotState, writeAutopilotState } from './autopilot-store.js';
 import type { Log } from './logging.js';
+import { isSameGroup } from './process-group.js';
 
 // The three levels of stopping (decision 12), and the live answer to "is this project halted?".
 //
@@ -68,7 +69,7 @@ export class AutopilotRuntime {
     }
     const at = this.#at();
     const found = await readAutopilotState(root, at);
-    const next = reconcile(found, at);
+    const next = reconcile(found, at, isSameGroup);
     if (next !== found) {
       await writeAutopilotState(root, next);
       this.#opts.log?.warn(
@@ -76,6 +77,10 @@ export class AutopilotRuntime {
         'auto-pilot was running when this server stopped; it owes this project a checkup',
       );
     }
+    // A reconcile that changed anything took the loop's authority away, so its credential goes too — the
+    // service's token belongs to no run record, so nothing else would ever expire it, and this path was
+    // one of three that left a live one behind.
+    if (next !== found) this.#opts.onDispatchingEnded?.();
     this.#mirror = next;
     return next;
   }
@@ -199,7 +204,12 @@ export class AutopilotRuntime {
         this.#opts.log?.error({ err }, 'could not record the auto-pilot stop on disk');
       }
     }
-    this.#opts.onDispatchingEnded?.();
+    // NOT on a soft stop. The Stops table promises a soft stop lets in-flight work finish, and the loop
+    // needs its credential to do that: to wait for the run record, move the card it has just verified,
+    // record the verdict and write the diary line. Revoking there produced a loop that died of a 401
+    // mid-dispatch and abandoned exactly the work the soft stop had promised to let it complete.
+    // `dispatchLock` already refuses a `service` caller outside `running`, so nothing NEW can start.
+    if (state === 'halted') this.#opts.onDispatchingEnded?.();
     this.#opts.onChange?.(next);
     return next;
   }

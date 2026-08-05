@@ -94,6 +94,32 @@ describe('reconciling a state found on disk at startup', () => {
     });
   });
 
+  // The half that was NOT true, and the comment claiming it was is now corrected in the source: the loop is
+  // spawned detached, in its own session, so it survives a terminal's Ctrl-C, a SIGHUP and its parent's
+  // death. 275 orphans accumulated on one machine before the shutdown path took it down. So `running` with a
+  // group that is genuinely still alive is TRUE, and declaring it stopped is what put a live loop and a
+  // panel showing `stopped` in the same project — reachable just by reopening the project that is open.
+  it('leaves a running project alone when its loop is genuinely still alive', () => {
+    const running = { ...IDLE_STATE, state: 'running' as const, servicePgid: 4242, servicePgstart: 99 };
+    expect(reconcile(running, at, () => true)).toEqual(running);
+  });
+
+  it('and stops it when the recorded group is not the one recorded', () => {
+    const running = { ...IDLE_STATE, state: 'running' as const, servicePgid: 4242, servicePgstart: 99 };
+    expect(reconcile(running, at, () => false)).toMatchObject({ state: 'stopped', reason: 'interrupted' });
+  });
+
+  // FAIL CLOSED, which is why the parameter has a default at all: a caller that cannot tell whether the
+  // group is alive gets the conservative answer rather than a project left claiming to be running.
+  it('stops it when nothing can say whether the loop is alive', () => {
+    const running = { ...IDLE_STATE, state: 'running' as const, servicePgid: 4242, servicePgstart: 99 };
+    expect(reconcile(running, at)).toMatchObject({ state: 'stopped' });
+    // And a recorded pgid with no start time is not identifiable, so it cannot be trusted either — the same
+    // rule the reaper follows for a run record.
+    const noStart = { ...IDLE_STATE, state: 'running' as const, servicePgid: 4242 };
+    expect(reconcile(noStart, at, () => true)).toMatchObject({ state: 'stopped' });
+  });
+
   // The reason persistence exists. A restart must not be a way out of `halted`.
   it('leaves a halted project halted, with its reason and timestamp intact', () => {
     const halted = {

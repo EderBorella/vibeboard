@@ -6,8 +6,16 @@ import { STOP_REASONS } from './dispatch-gate.js';
 // API, which is the one deliberate carve-out in decision 20.
 //
 // WHO OWNS WHAT, because two processes touch this file:
-//   the auto-pilot service  →  iteration, dispatchesSinceCheckup, needsCheckup, servicePgid/-start
-//   the main server         →  state, reason, detail, at  (the stops, and the startup reconcile)
+//   the auto-pilot service  →  iteration, dispatchesSinceCheckup
+//   the main server         →  state, reason, detail, at, servicePgid, servicePgstart
+//   both, in one direction each  →  needsCheckup: SET by the server (the reconcile, a halt, a crashed
+//                                   loop), CLEARED by the service once the checkup has run
+//
+// The pgid pair moved to the server's row in C2, and this table said the service owned it. Writing it from
+// the server is the better choice — the alternative leaves a window in which an emergency stop has no group
+// to reap, because the service cannot record a pid before it exists — but the ruling's safety argument is
+// "the fields are disjoint and each write is a read-modify-write", so the split has to be written down
+// correctly or the next writer will honour the wrong half.
 // Both go through a read-modify-write (server/autopilot-store.ts), so neither clobbers the other's
 // fields, and every write is a rename — so a reader sees one whole state or the other, never half.
 //
@@ -32,14 +40,14 @@ export interface AutopilotState {
   reason?: StopReason; // why it stopped, or why it is halted
   detail?: string; // the sentence a person reads — the specifics the reason cannot carry
   at?: string; // when this state was entered; the overlay's timestamp
-  // The auto-pilot service's own process group, recorded by the service when it starts. Read here so
-  // an emergency stop can take the service down with everything else, and preserved by the reconcile
-  // because the reaper runs straight after it.
+  // The loop's process group, recorded by THE SERVER when it spawns it — see the table above. Read back so
+  // an emergency stop, in this server process or a later one, can take the loop down with everything it
+  // started.
   //
-  // `servicePgstart` is the same pid-reuse guard the run records carry, and slice C should record both.
-  // Where it is absent the reaper falls back to requiring the pid to still BE a group leader — weaker,
-  // and allowed only here, because this group is killed by the server that spawned it rather than by
-  // one reading a file written long ago.
+  // `servicePgstart` is the same pid-reuse guard the run records carry, and both are always written
+  // together. The reaper's weaker fallback — requiring the pid to still BE a group leader — is therefore
+  // unreachable for this target, and `reconcile` refuses to treat a pgid without a start time as
+  // identifiable at all.
   servicePgid?: number;
   servicePgstart?: number;
 }
@@ -110,14 +118,35 @@ export function serializeState(state: AutopilotState): string {
 
 // What a state found on disk means once the process that wrote it is gone.
 //
-// `running` cannot be true: the service and every agent were this server's children and died with
-// it. It becomes `stopped`, and it owes the project a checkup — resuming dispatch would be acting on
-// the assumption that runs nobody is watching are still going.
+// `running` USUALLY cannot be true, and this comment used to say it never could: "the service and every
+// agent were this server's children and died with it". That was false. The loop is spawned detached, in
+// its own session, so it survives a terminal's Ctrl-C, a SIGHUP and its parent's death — measured, not
+// argued: 275 orphaned processes accumulated on one machine before the shutdown path took it down. The
+// server now kills it on the way out, which makes the old claim true again on the ordinary path — and
+// `alive` is the guard for every other path, including a second server opening the same project.
+//
+// So: `running` with a group that is STILL ALIVE is left alone, because it is true. `running` with no
+// live group becomes `stopped`, and it owes the project a checkup — resuming dispatch would be acting on
+// the assumption that runs nobody is watching went fine.
 //
 // `halted` is returned untouched. That is the whole reason this file is persisted: a restart must not
 // be a way out of it.
-export function reconcile(state: AutopilotState, at: string): AutopilotState {
+export function reconcile(
+  state: AutopilotState,
+  at: string,
+  // Whether the recorded process group is the one recorded and still running. Injected because this
+  // module is pure — /proc belongs to the server side — and DEFAULTS TO FALSE, which is the fail-closed
+  // reading: a caller that cannot tell gets the conservative answer rather than a project left `running`.
+  alive: (pgid: number, pgstart: number) => boolean = () => false,
+): AutopilotState {
   if (state.state !== 'running') return state;
+  if (
+    state.servicePgid !== undefined &&
+    state.servicePgstart !== undefined &&
+    alive(state.servicePgid, state.servicePgstart)
+  ) {
+    return state;
+  }
   return {
     ...state,
     state: 'stopped',

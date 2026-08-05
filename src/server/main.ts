@@ -54,12 +54,18 @@ for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) {
     // them. They would go on working, and spending, on a board nobody is watching.
     const stopped = app.runner.cancelAll();
     if (stopped > 0) console.log(`\n  stopped ${stopped} run${stopped === 1 ? '' : 's'} still in flight`);
+    // And the auto-pilot loop. It is spawned DETACHED, so it is in its own session: a terminal's Ctrl-C
+    // never reaches it, SIGHUP never reaches it, and losing its parent only reparents it to init. Without
+    // this line it goes on ticking against a port nothing is listening on, and the next server finds a
+    // state file naming a live group it does not own.
+    if (app.service.stop()) console.log('  stopped the auto-pilot loop');
     stopOpencodeServer();
     process.exit(0);
   });
 }
 process.once('exit', () => {
   app.runner.cancelAll();
+  app.service.stop();
   stopOpencodeServer();
 });
 

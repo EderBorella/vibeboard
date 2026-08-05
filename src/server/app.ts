@@ -45,6 +45,9 @@ declare module 'fastify' {
     // Auto-pilot's live state. Exposed for main.ts, which reopens the last project on boot and has to
     // reconcile a `running` state left behind by the process that died.
     autopilot: AutopilotRuntime;
+    // The auto-pilot loop's process, so main.ts can take it down on the way out. A detached child
+    // survives its parent, so nothing else would.
+    service: ServiceProcess;
   }
 }
 
@@ -178,6 +181,7 @@ export function buildApp(
     ...(opts.serviceCommand ? { command: opts.serviceCommand } : {}),
     // A loop that died without saying why still has to raise the overlay in every open tab.
     onStopped: (state) => broadcast({ type: 'autopilot:state', state }),
+    onDispatchingEnded: () => credentials.expireScope('service'),
     log: log.child({ component: 'autopilot-service' }),
   });
   const ctx: AppCtx = {
@@ -232,6 +236,7 @@ export function buildApp(
   // stops it, and the composition root is the only place that holds the runner.
   app.decorate('runner', runner);
   app.decorate('autopilot', autopilot);
+  app.decorate('service', service);
 
   return app;
 }

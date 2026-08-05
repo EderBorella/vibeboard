@@ -2,10 +2,11 @@ import { chmodSync, existsSync, readFileSync } from 'node:fs';
 import { mkdtemp } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it, onTestFinished } from 'vitest';
 import { IDLE_STATE } from '../src/core/autopilot-state.js';
 import { readAutopilotState, writeAutopilotState } from '../src/server/autopilot-store.js';
 import { CredentialStore } from '../src/server/credentials.js';
+import type { Log } from '../src/server/logging.js';
 import { isSameGroup } from '../src/server/process-group.js';
 import { defaultServiceCommand, ServiceProcess } from '../src/server/service-process.js';
 import { tempDir, testTmp } from './helpers.js';
@@ -25,9 +26,12 @@ interface Recorded {
   cwd: string;
   pid: number;
   argv0: string;
+  apparmor: string;
+  stateAtStart: string | null;
   token: string | null;
   apiBase: string | null;
   projectRoot: string | null;
+  hasPath: boolean;
   isGroupLeader: boolean;
 }
 
@@ -35,6 +39,21 @@ interface Recorded {
 // cannot read each other's record.
 async function logPath(): Promise<string> {
   return join(await mkdtemp(join(testTmp(), 'svc-')), 'record.json');
+}
+
+function recordingLog(lines: string[]): Log {
+  const write = (_obj: object, msg?: string): void => {
+    if (msg) lines.push(msg);
+  };
+  const log: Log = {
+    debug: write,
+    info: write,
+    warn: write,
+    error: write,
+    fatal: write,
+    child: () => log,
+  };
+  return log;
 }
 
 async function harness(opts: { behaviour?: string; log?: string } = {}) {
@@ -51,6 +70,13 @@ async function harness(opts: { behaviour?: string; log?: string } = {}) {
       bin: process.execPath,
       args: [SHIM, log, opts.behaviour ?? 'sleep'],
     }),
+  });
+  // EVERY harness kills what it started. Twelve sleeping children leaked per run of this file and its
+  // sibling before this existed, reparented to init and holding ~48 MB each; 275 of them accumulated on
+  // one machine. Registered with the runner rather than in an afterEach, so it runs even when an
+  // assertion throws half way through a test.
+  onTestFinished(() => {
+    service.stop();
   });
   return { root, service, credentials, log };
 }
@@ -105,14 +131,49 @@ describe('starting the loop', () => {
   // NOT a nice-to-have, and not an oversight: every agent runs inside the AppArmor profile, and the
   // service must not, because it WRITES `autopilot-state.json` — the counters are its own — and the
   // profile denies that to every confined process. What confines the loop is the scope table.
+  //
+  // Asserted from `/proc/self/attr/current`, because the obvious probe does not work: this test used to
+  // check that `argv0` did not contain `aa-exec`, and a reviewer wrapped the real spawn in `aa-exec` and
+  // watched it stay green. `aa-exec` EXECS its target, so a confined child sees `node` in `argv0` exactly
+  // as an unconfined one does. The label is the thing that actually differs.
   it('spawns the loop unsandboxed, because it writes the state file the profile denies', async () => {
     const { service, log } = await harness();
     await service.start();
     const got = await recorded(log);
-    // A confined process would have been `aa-exec -p vibeboard-agent -- node …`, so the binary itself is
-    // the evidence. `wrapCommand` is what would have changed it, and nothing here calls it.
-    expect(got.argv0).not.toContain('aa-exec');
-    expect(got.argv[0]).toBe(log);
+    expect(got.apparmor).toBe('unconfined');
+    // And it inherits the environment, without which the real loop has no PATH and no HOME.
+    expect(got.hasPath).toBe(true);
+  });
+
+  // The ordering the module argues for at greatest length: under the positive authority rule, a loop that
+  // starts while the file still says `idle` has its own first dispatch refused.
+  //
+  // Observed through the COMMAND FACTORY, which is resolved between the write and the spawn. The child's own
+  // reading cannot prove it — node takes tens of milliseconds to start and the write takes one, so planting
+  // the two writes into a single one AFTER the spawn left the child still seeing `running`. The factory runs
+  // at a point in the server's own control flow, so it either sees `running` or the ordering is wrong.
+  it('has already recorded running before the loop is even spawned', async () => {
+    const root = await tempDir();
+    await writeAutopilotState(root, { ...IDLE_STATE, state: 'stopped', reason: 'capped' });
+    const seen: string[] = [];
+    const log = await logPath();
+    const service = new ServiceProcess({
+      root: () => root,
+      now: () => new Date(),
+      credentials: new CredentialStore('admin-token'),
+      apiBase: () => 'http://127.0.0.1:4610',
+      command: () => {
+        seen.push(JSON.parse(readFileSync(join(root, '.vibeboard', 'autopilot-state.json'), 'utf8')).state);
+        return { bin: process.execPath, args: [SHIM, log, 'sleep'] };
+      },
+    });
+    onTestFinished(() => {
+      service.stop();
+    });
+    await service.start();
+    expect(seen).toEqual(['running']);
+    // And the child agrees, which is the thing that actually matters to the loop.
+    expect((await recorded(log)).stateAtStart).toBe('running');
   });
 
   it('spawns it as its own process group leader, which is what an emergency stop needs', async () => {
@@ -154,31 +215,91 @@ describe('starting the loop', () => {
     expect(state.dispatchesSinceCheckup).toBe(3);
   });
 
-  it('refuses a second loop rather than leaking the first', async () => {
+  // REPLACES rather than refuses, and the difference is a dead end the panel could not explain: press
+  // Start, soft-stop, Restart, and the state says `idle` while the old loop is still alive — a soft stop
+  // kills nothing. Refusing there meant Start answered "already running" over a project that said idle for
+  // as long as the old loop took to notice. Killing it is safe because outside `running` it cannot
+  // dispatch and its credential is gone.
+  it('replaces a loop this server was still holding, rather than refusing for ever', async () => {
     const { service } = await harness();
     expect((await service.start()).ok).toBe(true);
+    const first = service.pgid();
+    expect(first).toBeGreaterThan(1);
+
     const again = await service.start();
-    expect(again.ok).toBe(false);
-    expect(again.ok === false && again.error).toMatch(/already running/i);
+    expect(again.ok).toBe(true);
+    expect(service.pgid()).not.toBe(first);
+    // And the one it replaced is gone, not leaked.
+    for (let i = 0; i < 100; i += 1) {
+      try {
+        process.kill(first ?? 0, 0);
+      } catch {
+        return;
+      }
+      await new Promise((r) => setTimeout(r, 20));
+    }
+    expect.fail(`the replaced loop ${first} is still alive`);
+  });
+
+  // The interaction the replacement created: killing the old child fires its own exit handler, and that
+  // handler must not write `stopped` over the `running` the replacement has just recorded.
+  it('does not let a deliberate stop report itself as a crash', async () => {
+    const { root, service } = await harness();
+    await service.start();
+    await service.start();
+    await new Promise((r) => setTimeout(r, 300));
+    expect((await readAutopilotState(root, '2026-08-05T10:00:00Z')).state).toBe('running');
+  });
+
+  it('spawns nothing into a project that was halted while it was starting', async () => {
+    // The endpoint checks `halted` two awaits and five disk reads before the spawn, so this is the last
+    // word — the same shape agent-runner.ts uses for a dispatch.
+    const { root, service } = await harness();
+    const started = service.start();
+    await writeAutopilotState(root, { ...IDLE_STATE, state: 'halted', reason: 'killed' });
+    const result = await started;
+    if (result.ok) {
+      // The write landed before the halt: the other ordering, and still correct. Nothing to assert but
+      // that the loop is running and the state agrees.
+      expect((await readAutopilotState(root, 'x')).state).toBe('running');
+      return;
+    }
+    expect(result.error).toMatch(/halted by the time/);
+    expect(service.running()).toBe(false);
   });
 
   it('refuses with a reason when the command cannot be run at all', async () => {
     const { root } = await harness();
+    const logged: string[] = [];
     const service = new ServiceProcess({
       root: () => root,
       now: () => new Date(),
       credentials: new CredentialStore('admin-token'),
       apiBase: () => 'http://127.0.0.1:4610',
       command: () => ({ bin: '/nonexistent/loop', args: [] }),
+      log: recordingLog(logged),
     });
     const result = await service.start();
-    // Never a throw AND never an unhandled rejection: `spawn` reports a missing binary on the next tick,
-    // not by throwing, so an app with no `error` listener would take the SERVER down rather than refuse a
-    // request. Vitest fails a run on an unhandled error even when every assertion passes, which is how
-    // this was found — so this test's real subject is that the run stays clean.
     expect(result.ok).toBe(false);
+    // The REFUSAL'S WORDS, not merely its falsity. Nothing read them, so `reason: 'complete'` could have
+    // been written here — a failed start leaving the project wearing a success verdict, which is exactly
+    // what the neighbouring test about clearing a stale reason exists to prevent.
+    // The SYNCHRONOUS answer, which is the one the caller gets: it names the program that could not be
+    // run, because "the process had no pid" is true and tells a reader nothing. Node's own words arrive a
+    // tick later on the `error` event and race this, so they belong in the log and are asserted there.
+    expect(result.ok === false && result.error).toBe(
+      'Auto-pilot could not be started: /nonexistent/loop could not be run — check that it exists.',
+    );
     const state = await readAutopilotState(root, '2026-08-05T10:00:00Z');
-    expect(state.state).not.toBe('running');
+    expect(state.state).toBe('stopped');
+    expect(state.reason).toBe('stalled');
+    expect(state.detail).toContain('could not be started');
+
+    // AND the run stays free of unhandled errors, which is the other half and cannot be asserted from
+    // here: `spawn` reports a missing binary on the next tick, so an app with no `error` listener takes
+    // the SERVER down. Vitest fails the run on that, but as an error count with no test name attached —
+    // so the logged message below is what fails as a named test instead.
+    expect(logged.some((line) => line.includes('could not be started'))).toBe(true);
   });
 });
 
@@ -193,7 +314,11 @@ describe('when the loop dies without stopping first', () => {
     const state = await readAutopilotState(root, '2026-08-05T10:00:00Z');
     expect(state.state).toBe('stopped');
     expect(state.reason).toBe('interrupted');
-    expect(state.detail).toContain('code 3');
+    // The WHOLE sentence, including the reason's own prefix from `stopSentence`. `toContain('code 3')`
+    // left that composition unheld, and this is a string a person reads in an overlay.
+    expect(state.detail).toBe(
+      'Auto-pilot was interrupted by a restart, so it owes this project a checkup. The auto-pilot service exited with code 3 without stopping first, so this project owes a checkup before it resumes.',
+    );
     // The same reasoning as the startup reconcile: dispatches nobody was watching may be in flight, so
     // resuming without a supervisor pass would assume they went fine.
     expect(state.needsCheckup).toBe(true);
@@ -219,6 +344,9 @@ describe('when the loop dies without stopping first', () => {
   it('stops reporting itself as running once the child is gone', async () => {
     const { service } = await harness({ behaviour: 'exit:0' });
     await service.start();
+    // The premise, asserted: without this the test passes on a machine where the child never started at
+    // all — proved by planting, which made `running()` permanently false and left this green in 12ms.
+    expect(service.running()).toBe(true);
     for (let i = 0; i < 100 && service.running(); i += 1) await new Promise((r) => setTimeout(r, 20));
     expect(service.running()).toBe(false);
   });

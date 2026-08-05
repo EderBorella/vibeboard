@@ -57,6 +57,7 @@ your-project/
     ├── skills/                   # <slug>/SKILL.md — the skill rail beside a card
     ├── docs/                     # project docs, editable from Project Control
     ├── resources/                # reference files you attach to a run
+    ├── PROJECT-LOG.md            # the project log — append-only, one line per event
     ├── VIBEBOARD.md              # card conventions (also read by AI agents)
     ├── INSTRUCTIONS.md           # your own standing instructions for the copilot
     ├── config.yaml               # columns, ordering, settings
@@ -235,6 +236,10 @@ expose it to the public internet.
   emergency stop that kills every agent in the project and halts it, and a restart
   that brings it back. A halted project starts nothing — not even from the chat —
   and says so in an overlay that carries the reason, the time and the way back
+- **Project Log tab**: the narrative of what happened to the project, one line per
+  event, oldest at the bottom. Append-only and written through an endpoint rather
+  than edited — so the record cannot be quietly rewritten — with a box for adding
+  your own entry for anything you did by hand
 - **Project Control tab**: view and edit the documents that steer the models —
   `.vibeboard/INSTRUCTIONS.md`, skills, project docs, and a resources registry
 - Config isolation, so your personal `CLAUDE.md`, plugins and hooks do not leak

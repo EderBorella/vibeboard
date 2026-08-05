@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import * as coreState from '../src/core/autopilot-state.js';
 import * as coreBackends from '../src/core/backends.js';
+import * as coreDiary from '../src/core/diary.js';
 import * as coreGate from '../src/core/dispatch-gate.js';
 import { skillRel } from '../src/core/layout.js';
 import * as coreRuns from '../src/core/runs.js';
@@ -34,6 +35,10 @@ describe('web/shared mirrors src/core', () => {
     for (const reason of coreGate.STOP_REASONS) {
       expect(webApi.isSuccessReason(reason), reason).toBe(coreGate.isSuccessReason(reason));
     }
+  });
+
+  it('mirrors the diary kinds', () => {
+    expect([...webApi.DIARY_KINDS]).toEqual([...coreDiary.DIARY_KINDS]);
   });
 
   it('mirrors the backend defaults', () => {

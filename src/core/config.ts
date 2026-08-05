@@ -121,6 +121,34 @@ export function ensureMaxRuns(config: ProjectConfig): boolean {
   return true;
 }
 
+// Backfill any key an existing autopilot block is missing, because the project was created before that
+// key existed. Slice C1 added `criticThreshold` and thereby made every previously-valid config INVALID:
+// the Settings modal always sends `boards`, the cover check runs whenever it does, and so a project that
+// predated the key could no longer save any setting at all — the refusal talking about the lifecycle
+// while the user was changing something else. That class was fixed once already, on 2026-08-03, for a
+// different key; generalised here so C2, C3 and C4 cannot each reintroduce it.
+//
+// ABSENCE only. A key that is present and invalid is left exactly as it is, for the validator to name:
+// backfilling over it would silently replace somebody's hand-edit with our own number.
+//
+// A project with NO block stays without one. That refusal is deliberate — auto-pilot will not start
+// there and says what is missing, rather than a half-upgrade nobody asked for.
+export function ensureAutopilotKeys(config: ProjectConfig): boolean {
+  const ap = config.autopilot;
+  if (!ap) return false;
+  const block = ap as unknown as Record<string, unknown>;
+  let changed = false;
+  for (const [key, value] of Object.entries(DEFAULT_AUTOPILOT)) {
+    if (block[key] !== undefined) continue;
+    // A clone, like defaultConfig takes: `routes`, `rollup` and `terminal` are mutated in place by the
+    // column helpers, so a shared reference would let one project's edit reach the next project's
+    // defaults inside the same process.
+    block[key] = structuredClone(value);
+    changed = true;
+  }
+  return changed;
+}
+
 // Backfill any board missing from an older project's config with its default columns.
 // Returns whether anything changed, so callers can persist only when needed.
 export function ensureBoards(config: ProjectConfig): boolean {

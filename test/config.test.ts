@@ -1,10 +1,12 @@
 import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { DEFAULT_AUTOPILOT } from '../src/core/autopilot.js';
 import {
   DEFAULT_CONTEXT_BUDGET,
   DEFAULT_MAX_RUNS,
   defaultConfig,
+  ensureAutopilotKeys,
   ensureBoards,
   ensureContextBudget,
   ensureCopilotDefaults,
@@ -223,5 +225,71 @@ describe('ensureBoards', () => {
       'Done',
     ]);
     expect(config.boards.features.columns).toEqual(['Kept']);
+  });
+});
+
+// A project written before a key existed. Slice C1 added `criticThreshold` to the autopilot block, and
+// without this backfill EVERY previously-valid config became invalid — so the Settings modal, which
+// always sends `boards`, could no longer save any setting at all. That is the class the 2026-08-03 fix
+// addressed for a different key ("the refusal spoke about columns while the user was changing their
+// model"), reintroduced through a new one.
+describe('ensureAutopilotKeys', () => {
+  it('fills a key the project predates, and says it changed something', () => {
+    const config = defaultConfig('T');
+    const ap = config.autopilot as unknown as Record<string, unknown>;
+    delete ap.criticThreshold;
+    expect(ensureAutopilotKeys(config)).toBe(true);
+    expect(config.autopilot?.criticThreshold).toBe(DEFAULT_AUTOPILOT.criticThreshold);
+  });
+
+  it('is a no-op on a config that already has every key', () => {
+    const config = defaultConfig('T');
+    expect(ensureAutopilotKeys(config)).toBe(false);
+  });
+
+  // A project with no block stays without one. The spec's position is deliberate: auto-pilot refuses
+  // to start there and says what is missing, rather than a half-upgrade nobody asked for.
+  it('does not give a lifecycle to a project that has none', () => {
+    const config = defaultConfig('T');
+    config.autopilot = undefined;
+    expect(ensureAutopilotKeys(config)).toBe(false);
+    expect(config.autopilot).toBeUndefined();
+  });
+
+  // ABSENCE gets a default; a value that is present and wrong is left for the validator to refuse.
+  // Backfilling over it would silently overwrite a hand-edit with our own number.
+  it('leaves a key that is present and invalid alone, for the validator to name', () => {
+    const config = defaultConfig('T');
+    (config.autopilot as unknown as Record<string, unknown>).criticThreshold = 5;
+    expect(ensureAutopilotKeys(config)).toBe(false);
+    expect(config.autopilot?.criticThreshold).toBe(5);
+  });
+
+  // Generalised on purpose: C2, C3 and C4 each add keys, and this is what stops each of them breaking
+  // Settings for every project created before it.
+  it('fills any missing key, not just the newest one', () => {
+    const config = defaultConfig('T');
+    const ap = config.autopilot as unknown as Record<string, unknown>;
+    delete ap.checkupEvery;
+    delete ap.routes;
+    expect(ensureAutopilotKeys(config)).toBe(true);
+    expect(config.autopilot?.checkupEvery).toBe(DEFAULT_AUTOPILOT.checkupEvery);
+    expect(config.autopilot?.routes).toEqual(DEFAULT_AUTOPILOT.routes);
+  });
+
+  // A clone, like `defaultConfig` takes: a shared reference would let one project's edit reach the
+  // next project's defaults inside the same process.
+  it('gives each project its own copy of a filled list', () => {
+    const config = defaultConfig('T');
+    delete (config.autopilot as unknown as Record<string, unknown>).routes;
+    ensureAutopilotKeys(config);
+    config.autopilot?.routes.push({
+      board: 'features',
+      column: 'x',
+      skill: 'y',
+      verify: 'critic',
+      next: 'z',
+    });
+    expect(DEFAULT_AUTOPILOT.routes).toHaveLength(8);
   });
 });

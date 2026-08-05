@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { parse, stringify } from 'yaml';
 import type { Route } from '../src/core/autopilot.js';
-import { configPath } from '../src/core/config.js';
+import { configPath, readConfig, writeConfig } from '../src/core/config.js';
 import { boardRel } from '../src/core/layout.js';
 import type { ProjectConfig } from '../src/core/types.js';
 import { openTestProject } from './helpers.js';
@@ -260,5 +260,54 @@ describe('refusing a cap, and saying the right thing about it', () => {
   it('still names config.yaml when the problem really is the routing table', async () => {
     const error = await patchCap({ routes: [] });
     expect(error).toContain('.vibeboard/config.yaml');
+  });
+});
+
+// The regression slice C1's review found. Adding a required key to the autopilot block made every
+// previously-valid config invalid, and the Settings modal always sends `boards` — so the cover check ran
+// on every save and a project that predated the key could not change its miniature size, its model, or
+// anything else. Exactly the class fixed on 2026-08-03 for a different key, through a new one.
+describe('a project created before a key existed', () => {
+  it('can still save an unrelated setting', async () => {
+    const { app, root } = await openTestProject();
+    const config = await readConfig(root);
+    delete (config.autopilot as unknown as Record<string, unknown>).criticThreshold;
+    await writeConfig(root, config);
+    // Reopening is what upgrades it — the same path that backfills missing boards.
+    const opened = await app.inject({ method: 'POST', url: '/api/project/open', payload: { path: root } });
+    expect(opened.statusCode).toBe(200);
+
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/api/config',
+      payload: { boards: config.boards, miniatureChars: 99 },
+    });
+    expect(res.statusCode).toBe(200);
+    expect((await readConfig(root)).miniatureChars).toBe(99);
+  });
+
+  it('has the key on disk afterwards, so the upgrade is durable rather than per-request', async () => {
+    const { app, root } = await openTestProject();
+    const config = await readConfig(root);
+    delete (config.autopilot as unknown as Record<string, unknown>).criticThreshold;
+    await writeConfig(root, config);
+    await app.inject({ method: 'POST', url: '/api/project/open', payload: { path: root } });
+    expect((await readConfig(root)).autopilot?.criticThreshold).toBe(0.6);
+  });
+
+  // The refusal still fires for a value that IS there and is wrong — the backfill covers absence only.
+  it('is still refused when the key is present and invalid', async () => {
+    const { app, root } = await openTestProject();
+    const config = await readConfig(root);
+    (config.autopilot as unknown as Record<string, unknown>).criticThreshold = 5;
+    await writeConfig(root, config);
+    await app.inject({ method: 'POST', url: '/api/project/open', payload: { path: root } });
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/api/config',
+      payload: { boards: config.boards, miniatureChars: 99 },
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().error).toMatch(/criticThreshold/);
   });
 });

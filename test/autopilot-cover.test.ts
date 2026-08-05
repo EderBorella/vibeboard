@@ -262,13 +262,44 @@ describe('routing-table coverage — holes found in review', () => {
     expect(problems).toContain('attemptCap must be a positive whole number; it is 0.5.');
     expect(problems).toContain('checkupEvery must be a positive whole number; it is 2.5.');
   });
+});
 
-  it('refuses an empty setup-feature flag, which would mark every card or none', () => {
+// The shape checks run first and alone, because every later check indexes into the block. Each of them
+// needs its own case: removing the `blockedColumn` one changed no test at all, which was found by
+// planting while the tick was made to depend on this function.
+describe('a block that is not the shape it claims', () => {
+  const malformed = (patch: Record<string, unknown>): string[] => {
     const config = fresh();
-    ap(config).setupFeatureFlag = '  ';
-    expect(coverageProblems(config)).toContain(
-      'autopilot.setupFeatureFlag must name the frontmatter flag that marks the setup feature.',
-    );
+    Object.assign(ap(config), patch);
+    return coverageProblems(config);
+  };
+
+  it('refuses a blocked column that is not even a string', () => {
+    expect(malformed({ blockedColumn: 42 })).toEqual(['autopilot.blockedColumn must be a column slug.']);
+  });
+
+  it('refuses routes and rollup that are not lists', () => {
+    expect(malformed({ routes: 'implement' })).toEqual(['autopilot.routes must be a list of routes.']);
+    expect(malformed({ rollup: null })).toEqual(['autopilot.rollup must be a list of rules.']);
+  });
+
+  it('refuses a terminal block that is absent, or the flat list it used to be', () => {
+    const gone = fresh();
+    delete (ap(gone) as { terminal?: unknown }).terminal;
+    expect(coverageProblems(gone)).toEqual([
+      'autopilot.terminal must name the terminal columns of each board.',
+    ]);
+    expect(malformed({ terminal: ['done'] })).toEqual([
+      'autopilot.terminal is a flat list; it must name the terminal columns per board.',
+    ]);
+  });
+
+  // Alone, and that is the claim: a malformed shape returns before anything indexes into the block, so a
+  // reader is not handed "routes is not a list" next to a dozen consequences of it.
+  it('reports the shape and nothing else, even when the rest is also wrong', () => {
+    expect(malformed({ routes: 'implement', attemptCap: 0 })).toEqual([
+      'autopilot.routes must be a list of routes.',
+    ]);
   });
 });
 

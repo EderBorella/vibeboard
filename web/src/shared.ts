@@ -171,7 +171,6 @@ export interface AutopilotConfig {
   rollup: Rollup[];
   terminal: Record<BoardName, string[]>; // per board: a column belongs to one
   blockedColumn: string;
-  setupFeatureFlag: string;
 }
 
 // The field set, as data. An interface has no runtime keys, so nothing could compare the two sides and
@@ -195,7 +194,6 @@ export const AUTOPILOT_CONFIG_KEYS = [
   'rollup',
   'terminal',
   'blockedColumn',
-  'setupFeatureFlag',
 ] as const;
 
 export interface ProjectConfig {

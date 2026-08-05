@@ -39,9 +39,6 @@ export function shapeProblems(ap: AutopilotConfig): string[] {
     out.push('autopilot.terminal is a flat list; it must name the terminal columns per board.');
   }
   if (typeof ap.blockedColumn !== 'string') out.push('autopilot.blockedColumn must be a column slug.');
-  if (typeof ap.setupFeatureFlag !== 'string' || ap.setupFeatureFlag.trim() === '') {
-    out.push('autopilot.setupFeatureFlag must name the frontmatter flag that marks the setup feature.');
-  }
   return out;
 }
 

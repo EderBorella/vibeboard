@@ -288,6 +288,22 @@ describe('picking one', () => {
     expect(pick(cards)).toBe('E-001');
   });
 
+  // Links are symmetric when written through the endpoint, and a hand-edited board can break that. The
+  // rollup and the parent rule read the PARENT's links, so they saw Z-001 as A-002's child; the pick used
+  // to read the CHILD's links, found no parent, ranked it as belonging to no feature, and dispatched a
+  // later feature's work first. Two readings of one relation.
+  it('finds a card’s feature even when only the parent side of the link was written', () => {
+    const cards = [
+      card('F-001', 'features', 'in-progress', 10, ['A-002']),
+      card('A-002', 'product', 'in-progress', 10, ['F-001', 'Z-001']),
+      card('Z-001', 'engineering', 'backlog', 10, []), // does not link back
+      card('F-002', 'features', 'todo', 99, ['P-002']),
+      card('P-002', 'product', 'backlog', 10, ['F-002']),
+    ];
+    // F-001 has the lower order, so its subtree goes first — which only holds if Z-001 is known to be in it.
+    expect(pick(cards)).toBe('Z-001');
+  });
+
   it('answers nothing when nothing is eligible', () => {
     const inp = input({ cards: [] });
     expect(pickNext([], inp)).toBeUndefined();

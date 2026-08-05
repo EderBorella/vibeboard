@@ -1,5 +1,6 @@
 import type { Spend } from './accounting.js';
 import { type AutopilotConfig, isBlockedColumn, isTerminalColumn, type Route } from './autopilot.js';
+import { shapeProblems } from './autopilot-cover.js';
 import type { AutopilotState } from './autopilot-state.js';
 import type { CardProblem } from './board.js';
 import { mayDispatch, type StopReason } from './dispatch-gate.js';
@@ -43,7 +44,14 @@ export interface TickInput {
   columns: Record<BoardName, string[]>; // ordered slugs per board, for the pick's tie-breaks
   runs: RunRecord[];
   spend: Spend;
-  inFlight: number; // runs queued or running right now
+  // The runs queued or running right now, WITH their identities. A bare count was enough for
+  // `autoPilotConcurrency: 1` and wrong for anything above it: `attemptsUsed` deliberately does not
+  // count an unfinished run, so the card being worked stays eligible, the pick is a total order and
+  // therefore deterministic, and the second tick dispatched the same card again — two agents editing one
+  // card's work in one repository, which is the collision decision 4 exists to prevent.
+  //
+  // `card` is absent for a project run (a checkup), which counts towards the limit and belongs to no card.
+  inFlight: { card?: string; skill: string }[];
   problems: CardProblem[]; // whatever `readBoard` could not parse — required, see EligibilityInput
 }
 
@@ -100,7 +108,7 @@ function checkupOwed(ap: AutopilotConfig, state: AutopilotState): string | undef
 // A card that has used every attempt. Engineering has somewhere to put it; nothing else does, and a
 // card in the setup subtree has nowhere either — blocking that one would leave the barrier unfinished
 // for ever, which stalls the whole project without ever saying so.
-function outOfAttempts(ap: AutopilotConfig, el: EligibilitySet): TickAction | undefined {
+function outOfAttempts(ap: AutopilotConfig, el: EligibilitySet, columns: string[]): TickAction | undefined {
   const detail = (e: Eligible, why: string): TickAction => ({
     kind: 'stop',
     reason: 'stalled',
@@ -121,8 +129,20 @@ function outOfAttempts(ap: AutopilotConfig, el: EligibilitySet): TickAction | un
     );
   }
   const engineering = el.blockedByAttempts[0];
-  if (engineering) return { kind: 'block', card: engineering.card, to: ap.blockedColumn };
-  return undefined;
+  if (!engineering) return undefined;
+  // Checked HERE because this is where it is emitted, not compared — the same split rule as the numbers.
+  // `coverageProblems` refuses a bad blocked column when the config is saved, but config.yaml is a file a
+  // person can edit while the loop is running, and a `block` action carrying `to: undefined` would either
+  // move a card into a folder named after nothing or be refused by the endpoint — and since a block
+  // consumes no iteration and no budget, neither of the loop's two backstops would ever end the retry.
+  if (!columns.includes(ap.blockedColumn)) {
+    return {
+      kind: 'stop',
+      reason: 'stalled',
+      detail: `${engineering.card.id} has used all ${ap.attemptCap} attempts at ${engineering.route.skill} and should move to the blocked column, but blockedColumn is ${JSON.stringify(ap.blockedColumn)}, which is not a column on the engineering board. Set it in Settings.`,
+    };
+  }
+  return { kind: 'block', card: engineering.card, to: ap.blockedColumn };
 }
 
 const names = (cards: Card[]): string => {
@@ -223,6 +243,16 @@ export function decideTick(input: TickInput): TickAction {
   const { ap, state, cards, runs, spend, inFlight, columns, problems } = input;
   if (state.state !== 'running') return notRunning(state);
 
+  // The keys the tick INDEXES rather than compares — `terminal`, `routes`, `rollup`, `blockedColumn`.
+  // Same reason as the numbers below, and the failure was worse: with `terminal` absent, a board of
+  // childless cards never reached `isTerminalColumn` and DISPATCHED — into a project where nothing could
+  // ever finish — while the same config threw a TypeError out of `decideTick` as soon as one card had a
+  // child, ending the run rather than the tick. `shapeProblems` is already pure and already exported.
+  const shape = shapeProblems(ap);
+  if (shape.length > 0) {
+    return { kind: 'stop', reason: 'stalled', detail: shape.join(' ') };
+  }
+
   const gate = mayDispatch({ ap, iteration: state.iteration, spend });
   if (!gate.ok) return { kind: 'stop', reason: gate.reason, detail: gate.message };
   const unusable = unusableNumber(ap);
@@ -238,13 +268,20 @@ export function decideTick(input: TickInput): TickAction {
   const el = eligibility(eligibilityInput);
   if (el.problem) return { kind: 'stop', reason: 'stalled', detail: el.problem };
 
-  const capped = outOfAttempts(ap, el);
+  const capped = outOfAttempts(ap, el, columns.engineering ?? []);
   if (capped) return capped;
 
   if (el.eligible.length === 0) return nothingEligible(ap, cards, el);
-  if (inFlight >= ap.autoPilotConcurrency) return { kind: 'wait' };
 
-  const pick = pickNext(el.eligible, eligibilityInput);
+  // BOTH waits come after the empty check and before the pick, and that order is load-bearing. A card
+  // with a run in flight is still eligible — on purpose, because `attemptsUsed` does not count an
+  // unfinished run — so filtering it out of eligibility instead would make a healthy loop at
+  // concurrency 1 report `stalled` over the very work it was waiting for.
+  if (inFlight.length >= ap.autoPilotConcurrency) return { kind: 'wait' };
+  const free = el.eligible.filter((e) => !inFlight.some((f) => f.card === e.card.id));
+  if (free.length === 0) return { kind: 'wait' };
+
+  const pick = pickNext(free, eligibilityInput);
   // Unreachable: the list is not empty and the pick is a total order over it. Fail closed rather than
   // assert, because an exception here would end the run instead of the tick.
   if (!pick)

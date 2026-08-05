@@ -70,9 +70,10 @@ export interface AutopilotConfig {
   // name at least one, or nothing on it could ever finish.
   terminal: Record<BoardName, string[]>;
   blockedColumn: string; // engineering only
-  // The setup feature is identified by a frontmatter flag, never a reserved id: `nextId` derives ids
-  // and never accepts one (ids.ts), so a recreated F-001 would silently remove the barrier.
-  setupFeatureFlag: string;
+  // NO `setupFeatureFlag`. The barrier is the `setup` frontmatter flag (types.ts), fixed rather than
+  // configurable — this key existed, was defaulted, validated and mirrored to the UI, and was read by
+  // nothing. Renaming it therefore validated cleanly and lifted the barrier in silence, which is the
+  // exact failure S5 was written against, reached through the key meant to prevent it.
 }
 
 export const DEFAULT_AUTOPILOT: AutopilotConfig = {
@@ -114,7 +115,6 @@ export const DEFAULT_AUTOPILOT: AutopilotConfig = {
   ],
   terminal: { features: ['done'], product: ['done'], engineering: ['done'] },
   blockedColumn: 'blocked',
-  setupFeatureFlag: 'setup',
 };
 
 export function routeFor(ap: AutopilotConfig, board: BoardName, columnSlug: string): Route | undefined {

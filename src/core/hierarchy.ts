@@ -41,6 +41,18 @@ export function liveCards(cards: Card[]): Card[] {
   return cards.filter(isLive);
 }
 
+// The card above this one. Derived from THE PARENT'S links, which is the same side `childrenOf` reads —
+// deliberately, because the two used to disagree. Links are symmetric when written through the endpoint,
+// so a hand-edited board where P-001 lists E-001 but E-001 does not list P-001 back had the rollup
+// treating E-001 as a child while the pick could not find its feature, ranking it last and dispatching a
+// later feature's work first. One reading of one relation, or the two drift apart under exactly the
+// conditions nobody tests.
+export function parentOf(card: Card, cards: Card[]): Card | undefined {
+  const board = parentBoardOf(card.board);
+  if (!board) return undefined;
+  return liveCards(cards).find((c) => c.board === board && c.links.includes(card.id));
+}
+
 // The cards below this one, by board rather than by link direction. Silent about ids that name no
 // card: a dangling link is no child, and it has its own report at the endpoint that wrote it.
 export function childrenOf(card: Card, cards: Card[]): Card[] {

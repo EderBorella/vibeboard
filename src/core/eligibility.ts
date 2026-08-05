@@ -1,7 +1,7 @@
 import { attemptsUsed } from './accounting.js';
 import { type AutopilotConfig, isTerminalColumn, type Route, routeFor } from './autopilot.js';
 import type { CardProblem } from './board.js';
-import { childrenOf, isLive, liveCards, parentBoardOf } from './hierarchy.js';
+import { childrenOf, isLive, liveCards, parentOf } from './hierarchy.js';
 import type { RunRecord } from './runs.js';
 import { type SetupState, setupState, setupSubtreeIds } from './setup-feature.js';
 import { BOARDS, type BoardName, type Card } from './types.js';
@@ -131,19 +131,14 @@ export function eligibility(input: EligibilityInput): EligibilitySet {
 // different rule than the one written above.
 const NO_FEATURE = Number.MAX_SAFE_INTEGER;
 
-// Up the hierarchy to the feature this card serves. Links are symmetric, so direction comes from the
-// board: each step looks only for a link on the board directly above, which also makes the walk
-// terminate — the board index strictly decreases.
+// Up the hierarchy to the feature this card serves, one step at a time through `parentOf` — which reads
+// the same side of the relation `childrenOf` does. This used to search the CHILD's links instead, so on a
+// hand-edited board the rollup and the pick disagreed about who a card's parent was. The walk terminates
+// because each step moves strictly up the board order.
 function featureOf(card: Card, cards: Card[]): Card | undefined {
-  const live = liveCards(cards);
   let current: Card | undefined = card;
   while (current && current.board !== 'features') {
-    const parentBoard = parentBoardOf(current.board);
-    if (!parentBoard) return undefined;
-    // Annotated because `current` is assigned from an expression that reads it, which tsc cannot
-    // infer its way out of.
-    const child: Card = current;
-    current = live.find((c) => c.board === parentBoard && child.links.includes(c.id));
+    current = parentOf(current, cards);
   }
   return current;
 }

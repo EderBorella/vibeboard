@@ -68,7 +68,7 @@ const input = (over: Partial<TickInput> = {}): TickInput => ({
   columns: COLUMNS,
   runs: [],
   spend: NO_SPEND,
-  inFlight: 0,
+  inFlight: [],
   problems: [],
   ...over,
 });
@@ -131,6 +131,42 @@ describe('the caps come first', () => {
     // project at its iteration cap would report `capped` and lose the fact that someone killed it.
     const halted = state({ state: 'halted', reason: 'killed', iteration: 250 });
     expect(decideTick(input({ state: halted }))).toMatchObject({ kind: 'stop', reason: 'killed' });
+  });
+});
+
+// The keys the tick INDEXES rather than compares. Every scalar it compares is validated because
+// `AutopilotConfig` describes parsed YAML — and these were not, which produced two different failures
+// from one config: with `terminal` absent, a board of childless cards never reached `isTerminalColumn`
+// and DISPATCHED into a project where nothing could ever finish, while the same config threw a TypeError
+// as soon as one card had a child, ending the run rather than the tick.
+describe('the shape of the config, not just its numbers', () => {
+  const withoutTerminal = (): TickInput['ap'] => {
+    const ap = { ...DEFAULT_AUTOPILOT };
+    // The shape a hand-edited file delivers: the key simply is not there. Cast because the type says it
+    // must be, which is exactly the assumption under test.
+    delete (ap as { terminal?: unknown }).terminal;
+    return ap as TickInput['ap'];
+  };
+
+  it('stops stalled and names the key, for a board that would have dispatched', () => {
+    const action = decideTick(
+      input({ ap: withoutTerminal(), cards: [card('P-009', 'product', 'backlog', 10, [])] }),
+    );
+    expect(action).toMatchObject({ kind: 'stop', reason: 'stalled' });
+    expect(action).toHaveProperty('detail', expect.stringContaining('autopilot.terminal'));
+  });
+
+  it('and for the board that would have thrown', () => {
+    // Same config, one child added. This used to be a TypeError out of `decideTick`, which by the file's
+    // own contract would end the run instead of the tick.
+    const cards = [
+      card('P-009', 'product', 'backlog', 10, ['E-009']),
+      card('E-009', 'engineering', 'backlog', 10, ['P-009']),
+    ];
+    expect(decideTick(input({ ap: withoutTerminal(), cards }))).toMatchObject({
+      kind: 'stop',
+      reason: 'stalled',
+    });
   });
 });
 
@@ -213,11 +249,32 @@ describe('a card that has run out of attempts', () => {
     // string — and a user who renames the column would have had cards moved to a folder that does not
     // exist. rollup.test.ts already reads terminal columns from config for the same reason.
     const ap = { ...DEFAULT_AUTOPILOT, blockedColumn: 'parked' };
-    const action = decideTick(input({ ap, cards, runs }));
+    // The column list is renamed with it, because a column IS a folder: renaming one rewrites the config
+    // and the routing table together. Renaming only the setting is the next test.
+    const columns = { ...COLUMNS, engineering: ['backlog', 'in-progress', 'review', 'parked', 'done'] };
+    const action = decideTick(input({ ap, cards, columns, runs }));
     // Before the dispatch P-002 was also entitled to: tidying the board first is what keeps a card at
     // its cap from sitting in a routed column for ever.
     expect(action).toMatchObject({ kind: 'block', to: 'parked' });
     expect(action.kind === 'block' && action.card.id).toBe('E-001');
+  });
+
+  // A `block` carrying a column that does not exist would move a card into a folder named after nothing,
+  // or be refused by the endpoint — and since a block consumes no iteration and no budget, neither of the
+  // loop's two backstops would ever end the retry. `coverageProblems` refuses this when the config is
+  // SAVED; config.yaml is a file a person can edit while the loop is running.
+  it('stops rather than blocking when the blocked column is not a column at all', () => {
+    const cards = [
+      card('F-001', 'features', 'todo', 10, ['P-001']),
+      card('P-001', 'product', 'in-progress', 10, ['F-001', 'E-001']),
+      card('E-001', 'engineering', 'backlog', 10, ['P-001']),
+    ];
+    const runs = failures(3, 'E-001', 'engineering', 'implement');
+    const ap = { ...DEFAULT_AUTOPILOT, blockedColumn: 'nowhere' };
+    const action = decideTick(input({ ap, cards, runs }));
+    expect(action).toMatchObject({ kind: 'stop', reason: 'stalled' });
+    expect(action).toHaveProperty('detail', expect.stringContaining('blockedColumn'));
+    expect(action).toHaveProperty('detail', expect.stringContaining('E-001'));
   });
 
   it('stops instead of blocking when the exhausted card is inside the setup feature', () => {
@@ -355,7 +412,31 @@ describe('nothing eligible is not the same as nothing left', () => {
 
 describe('and otherwise it dispatches', () => {
   it('waits while as many runs are in flight as the config allows', () => {
-    expect(decideTick(input({ inFlight: 1 }))).toEqual({ kind: 'wait' });
+    expect(decideTick(input({ inFlight: [{ card: 'P-009', skill: 'design' }] }))).toEqual({ kind: 'wait' });
+    // A project run — a checkup — has no card and counts towards the limit just the same.
+    expect(decideTick(input({ inFlight: [{ skill: 'checkup' }] }))).toEqual({ kind: 'wait' });
+  });
+
+  // Above a concurrency of one, a count was not enough. `attemptsUsed` deliberately does not count an
+  // unfinished run, so the card being worked stays eligible and the pick is deterministic — and the next
+  // tick dispatched the SAME card again: two agents editing one card's work in one repository.
+  it('never dispatches a card that already has a run in flight', () => {
+    const ap = { ...DEFAULT_AUTOPILOT, autoPilotConcurrency: 2 };
+    const first = decideTick(input({ ap }));
+    expect(first.kind === 'dispatch' && first.card.id).toBe('P-001');
+
+    const busy = [{ card: 'P-001', skill: 'design' }];
+    // One slot free, but the only eligible card is the one being worked.
+    expect(decideTick(input({ ap, inFlight: busy }))).toEqual({ kind: 'wait' });
+
+    // With another card eligible it takes that one instead of waiting.
+    const two = [
+      ...base(),
+      card('F-002', 'features', 'todo', 20, ['P-002']),
+      card('P-002', 'product', 'backlog', 10, ['F-002']),
+    ];
+    const next = decideTick(input({ ap, cards: two, inFlight: busy }));
+    expect(next.kind === 'dispatch' && next.card.id).toBe('P-002');
   });
 
   it('dispatches the picked card and its route', () => {

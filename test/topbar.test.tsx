@@ -2,6 +2,7 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, cleanup, fireEvent, screen } from '@testing-library/react';
 import { STOP_REASONS } from '../src/core/dispatch-gate.js';
+import type { MainTab } from '../web/src/components/TopBar.js';
 import type { AutopilotState } from '../web/src/api.js';
 import { TopBar } from '../web/src/components/TopBar.js';
 
@@ -10,7 +11,7 @@ afterEach(cleanup);
 const props = {
   showProject: true,
   projectName: 'Demo',
-  tab: 'boards' as 'boards' | 'execution' | 'control' | 'explorer',
+  tab: 'boards' as MainTab,
   onTab: vi.fn(),
   theme: 'cyberpunk',
   onTheme: vi.fn(),

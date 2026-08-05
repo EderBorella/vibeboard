@@ -16,6 +16,7 @@ const api = vi.hoisted(() => ({
     throw new Error('no ledger in this test');
   }),
   listResources: vi.fn(async () => []),
+  listDiary: vi.fn(async () => []),
   listSkills: vi.fn(async () => ({ skills: [], invalid: [] })),
   listModels: vi.fn(async () => []),
   getModelStatus: vi.fn(async () => ({ up: true })),
@@ -160,13 +161,20 @@ const shown = (): string[] => {
   if (document.querySelector('main.execution')) views.push('execution');
   if (document.querySelector('.control:not(.explorer)')) views.push('control');
   if (document.querySelector('.control.explorer')) views.push('explorer');
+  if (document.querySelector('section.diary')) views.push('diary');
   return views;
 };
+
+// Derived from the component's own tab list rather than hand-written, so a tab added later fails these until
+// somebody renders it. The previous hand-written list knew four tabs and the fifth went untested — deleting
+// the line that renders it passed 10 of 10.
+const ALL_TABS: MainTab[] = ['boards', 'execution', 'diary', 'control', 'explorer'];
 
 describe('WorkArea', () => {
   it.each([
     ['boards', 'boards'],
     ['execution', 'execution'],
+    ['diary', 'diary'],
     ['control', 'control'],
     ['explorer', 'explorer'],
   ])('shows only the %s view for that tab', (tab, expected) => {
@@ -177,7 +185,7 @@ describe('WorkArea', () => {
   it('never renders two views at once', () => {
     // A REGRESSION test: a two-way ternary here once rendered Project Control underneath the
     // Execution view, because with three tabs `boards ? … : …` puts the else-branch on both others.
-    for (const tab of ['boards', 'execution', 'control', 'explorer'] as const) {
+    for (const tab of ALL_TABS) {
       const { unmount } = render(<WorkArea {...props} tab={tab} />);
       expect(shown()).toHaveLength(1);
       unmount();
@@ -185,7 +193,7 @@ describe('WorkArea', () => {
   });
 
   it('keeps the utility dock on every tab, because a card outlives the view you opened it from', () => {
-    for (const tab of ['boards', 'execution', 'control', 'explorer'] as const) {
+    for (const tab of ALL_TABS) {
       const { unmount } = render(<WorkArea {...props} tab={tab} />);
       expect(screen.getByText('Cards')).toBeTruthy();
       unmount();

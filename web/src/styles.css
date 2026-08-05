@@ -1277,7 +1277,11 @@ body {
   border-left: 2px solid var(--border);
 }
 /* The kind, encoded in the rail as well as the word: a run, a checkup and a lifecycle event are read at
-   different times for different reasons, and colour is how a long file stays scannable. */
+   different times for different reasons, and colour is how a long file stays scannable. All three are named,
+   including `run` — the comment used to promise three and the rules gave two, so the commonest kind was the
+   one left undistinguished. The default above covers a kind from a future version rather than rendering it
+   railless. */
+.diary-entry[data-kind='run'] { border-left-color: var(--border); }
 .diary-entry[data-kind='checkup'] { border-left-color: var(--accent); }
 .diary-entry[data-kind='lifecycle'] { border-left-color: var(--muted); }
 

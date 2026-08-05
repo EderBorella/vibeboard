@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process';
 import { existsSync, statSync } from 'node:fs';
-import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { access, chmod, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { describe, expect, it } from 'vitest';
@@ -196,8 +196,11 @@ describe('the project log', () => {
 
   it('names the project it is about, so a diary read on its own says whose it is', async () => {
     const root = await tempDir();
-    await scaffoldProject(root, { name: 'Arcane Scroll', mode: 'brownfield', today: TODAY });
-    expect((await readDiary(root))[0]?.text).toContain('Arcane Scroll');
+    // Two words with a space, because a single-token name cannot tell "the name was used" from "some other
+    // string happened to match". Deliberately not a real project's name: nothing in this repo's committed
+    // files names anything outside it.
+    await scaffoldProject(root, { name: 'Second Project', mode: 'brownfield', today: TODAY });
+    expect((await readDiary(root))[0]?.text).toContain('Second Project');
   });
 
   it('has a heading, so the file reads as a document when opened directly', async () => {
@@ -222,6 +225,20 @@ describe('the project log', () => {
     expect(texts).toContain('something that happened');
     // And no second "created" line: the project was created once.
     expect(texts.filter((t) => t.includes('created'))).toHaveLength(1);
+  });
+
+  // The guard must not conflate "nothing here" with "something here I may not read": a write-only diary was
+  // silently overwritten, which is the single loss this guard exists to prevent.
+  it('leaves a diary it cannot read alone, rather than overwriting it', async () => {
+    const root = await tempDir();
+    await scaffoldProject(root, { name: 'A', mode: 'brownfield', today: TODAY });
+    await appendEntry(root, { at: '2026-08-05T12:00:00.000Z', kind: 'run', text: 'history worth keeping' });
+    const diary = join(root, PROJECT_LOG_FILE);
+    await chmod(diary, 0o200); // writable, not readable
+
+    await scaffoldProject(root, { name: 'A', mode: 'brownfield', today: '2026-08-06' });
+    await chmod(diary, 0o600);
+    expect((await readDiary(root)).map((e) => e.text)).toContain('history worth keeping');
   });
 
   // The next append must start a new line rather than continuing the one scaffold wrote.

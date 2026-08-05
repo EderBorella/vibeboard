@@ -4,7 +4,9 @@ import { DIARY_HEADER, type DiaryEntry, entryBlock, parseDiary } from '../core/d
 import { PROJECT_LOG_FILE } from '../core/layout.js';
 import { serialise } from './write-queue.js';
 
-// The diary on disk. Append-only, and the only module allowed to write it.
+// The diary on disk. Append-only, and the only module that APPENDS to it — `core/scaffold.ts` creates it with
+// its first entry, which is the one other write and cannot live here (core must not import from server). Both
+// go through `entryBlock` so the file's shape has one statement.
 //
 // Append-only is the property worth defending rather than asserting once: everything else in a project
 // can be re-derived — the board from its folders, a run's cost from its record, what changed from git —

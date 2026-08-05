@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { memo, useMemo, useState } from 'react';
 import { addDiaryEntry, type DiaryEntry } from '../api';
 import { useDiary } from '../diary/useDiary';
 
@@ -9,9 +9,13 @@ import { useDiary } from '../diary/useDiary';
 // happens to be working. The Control tab was the obvious home and is the wrong one — that is a file editor
 // for files a person edits, and this file is append-only and written only through an endpoint.
 
-// Newest first here, oldest first everywhere else. A file is read forwards; a feed is read backwards.
-function newestFirst(entries: DiaryEntry[]): DiaryEntry[] {
-  return [...entries].reverse();
+// Newest first here, oldest first everywhere else. A file is read forwards; a feed is read backwards. Copied,
+// never reversed in place — `entries` belongs to the hook.
+//
+// Paired with the index it had in the file, which is what gives each row a stable React key. Content is not an
+// identity: two identical events in the same millisecond are possible, and duplicate keys make React drop one.
+function newestFirst(entries: DiaryEntry[]): { entry: DiaryEntry; at: number }[] {
+  return entries.map((entry, at) => ({ entry, at })).reverse();
 }
 
 function when(at: string): string {
@@ -38,8 +42,30 @@ function About({ entry }: { entry: DiaryEntry }) {
   );
 }
 
+// Its own memoised component, because the composer sits above it: without this, every keystroke re-rendered
+// every row — measured at 143ms per character with 3,000 entries, which is unusable on a project that has had
+// a long night. `entries` only changes when the log does.
+const DiaryList = memo(function DiaryList({ entries }: { entries: DiaryEntry[] }) {
+  const ordered = useMemo(() => newestFirst(entries), [entries]);
+  return (
+    <ol className="diary-list">
+      {ordered.map(({ entry, at }) => (
+        <li className="diary-entry" data-kind={entry.kind} key={`${at}-${entry.at}`}>
+          <div className="diary-meta">
+            <span className="diary-kind">{entry.kind}</span>
+            <time dateTime={entry.at}>{when(entry.at)}</time>
+            <About entry={entry} />
+            {entry.outcome && <span className="diary-outcome">{entry.outcome}</span>}
+          </div>
+          <p className="diary-text">{entry.text}</p>
+        </li>
+      ))}
+    </ol>
+  );
+});
+
 export function DiaryView({ bump }: { bump: number }) {
-  const { entries, failed, refresh } = useDiary(bump);
+  const { entries, failed, refresh, add: onWritten } = useDiary(bump);
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -50,7 +76,10 @@ export function DiaryView({ bump }: { bump: number }) {
     setBusy(true);
     setError(null);
     try {
-      await addDiaryEntry({ kind: 'lifecycle', text });
+      // The server's copy, not the draft: it carries the timestamp and whatever the server made of the rest,
+      // so showing our own guess would put a different entry on screen from the one on disk.
+      const written = await addDiaryEntry({ kind: 'lifecycle', text });
+      onWritten(written);
       // Cleared only AFTER the write lands. Clearing first loses whatever was typed the moment the post
       // fails, and a paragraph somebody wrote about why they did something is not recoverable from anywhere.
       setDraft('');
@@ -66,9 +95,15 @@ export function DiaryView({ bump }: { bump: number }) {
       <div className="diary-head">
         <h2>Project log</h2>
         <p className="diary-lede">
-          One line per event — what happened to this project, in order. Auto-pilot writes here after every
+          One line per event — what happened to this project, in order. Auto-pilot will write here after every
           dispatch and whenever it stops; add your own for anything you did by hand.
         </p>
+        {/* Always reachable, not only after a failed read. New entries arrive over the socket, and a dropped
+            socket is invisible: reconnecting does not change `bump`, and the server replays only the board
+            snapshot on connect — so without this the log can sit silently stale with no way to ask again. */}
+        <button type="button" className="btn-secondary diary-refresh" onClick={refresh}>
+          Refresh
+        </button>
       </div>
 
       <div className="diary-compose">
@@ -88,7 +123,8 @@ export function DiaryView({ bump }: { bump: number }) {
           {busy ? 'Adding…' : 'Add entry'}
         </button>
       </div>
-      {error && <p className="diary-error">{error}</p>}
+      {/* `assertive`, not `polite`: the entry was NOT written, and the box still holds what was typed. */}
+      <div aria-live="assertive">{error && <p className="diary-error">{error}</p>}</div>
 
       {failed ? (
         <div className="diary-empty">
@@ -104,19 +140,7 @@ export function DiaryView({ bump }: { bump: number }) {
           <p>Nothing has happened in this project yet.</p>
         </div>
       ) : (
-        <ol className="diary-list">
-          {newestFirst(entries).map((entry) => (
-            <li className="diary-entry" data-kind={entry.kind} key={`${entry.at}-${entry.text}`}>
-              <div className="diary-meta">
-                <span className="diary-kind">{entry.kind}</span>
-                <time dateTime={entry.at}>{when(entry.at)}</time>
-                <About entry={entry} />
-                {entry.outcome && <span className="diary-outcome">{entry.outcome}</span>}
-              </div>
-              <p className="diary-text">{entry.text}</p>
-            </li>
-          ))}
-        </ol>
+        <DiaryList entries={entries} />
       )}
     </section>
   );

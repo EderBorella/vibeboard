@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { boardColumnSlugs } from './board.js';
@@ -184,13 +184,16 @@ async function ensureRepo(projectRoot: string): Promise<void> {
 // `new Date()` here to gain three decimal places would give that up for nothing anyone will read.
 async function ensureDiary(projectRoot: string, name: string, today: string): Promise<void> {
   const path = join(projectRoot, PROJECT_LOG_FILE);
-  // `readFile` and a catch, which is the idiom the rest of core uses for this (see control.ts) — and it
-  // answers the question that matters: is there already a narrative here to protect.
+  // `stat`, not `readFile`. Reading conflates "there is nothing here" with "there is something here I may not
+  // read": a write-only diary was silently OVERWRITTEN, which is the one loss this guard exists to prevent.
+  // Existence is the question, and a file we cannot read still exists.
   try {
-    await readFile(path, 'utf8');
+    await stat(path);
     return;
-  } catch {
-    // No diary yet, which is the only case that writes one.
+  } catch (err) {
+    // Only a missing file may be created. Anything else — a directory of that name, a permission problem — is
+    // raised, because scaffolding over something we could not identify is how a narrative disappears.
+    if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
   }
   const first = entryBlock(
     { at: `${today}T00:00:00.000Z`, kind: 'lifecycle', text: `Project ${name} created.` },

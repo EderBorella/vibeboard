@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { type DiaryEntry, listDiary } from '../api';
 import { useSharedWs } from './../ws';
 
@@ -16,10 +16,17 @@ export function useDiary(bump: number): {
   entries: DiaryEntry[];
   failed: boolean;
   refresh: () => void;
+  // For the tab that just wrote one. The socket carries an append to the OTHER tabs; this tab is the one that
+  // posted it, and without this its own entry appeared only on the next fetch.
+  add: (entry: DiaryEntry) => void;
 } {
   const [entries, setEntries] = useState<DiaryEntry[]>([]);
   const [failed, setFailed] = useState(false);
   const [asked, setAsked] = useState(0);
+  // Set by the socket handler, read when a fetch resolves. A push arriving while the first fetch is in flight
+  // used to be overwritten by that fetch's answer and lost for good — reachable, because the route broadcasts
+  // AFTER the append, so the entry may not be in the response already on its way back.
+  const pushedMidFetch = useRef(false);
   const ws = useSharedWs(bump);
 
   // `bump` is a new project and `asked` is an explicit refresh; neither is read inside the effect, and
@@ -27,11 +34,20 @@ export function useDiary(bump: number): {
   // biome-ignore lint/correctness/useExhaustiveDependencies: deliberate triggers
   useEffect(() => {
     let live = true;
+    pushedMidFetch.current = false;
     listDiary()
       .then((next) => {
         if (!live) return;
-        setEntries(next);
         setFailed(false);
+        // One more read rather than a merge. Merging needs an identity for an entry, and the only candidate is
+        // its content — so two genuinely identical events would collapse into one. Asking again is cheap,
+        // cannot lose anything, and terminates: it only repeats if another push lands during the retry.
+        if (pushedMidFetch.current) {
+          pushedMidFetch.current = false;
+          setAsked((n) => n + 1);
+          return;
+        }
+        setEntries(next);
       })
       .catch(() => {
         // Said out loud rather than shown as an empty diary. "Nothing has happened in this project" and
@@ -51,11 +67,14 @@ export function useDiary(bump: number): {
         const entry = (msg as { entry?: DiaryEntry }).entry;
         // Appended rather than refetched: the server pushes the entry itself, and asking for the whole
         // file again on every dispatch would re-read a monotonically growing document to learn one line.
-        if (entry) setEntries((current) => [...current, entry]);
+        if (!entry) return;
+        pushedMidFetch.current = true;
+        setEntries((current) => [...current, entry]);
       }),
     [ws],
   );
 
   const refresh = useCallback(() => setAsked((n) => n + 1), []);
-  return { entries, failed, refresh };
+  const add = useCallback((entry: DiaryEntry) => setEntries((current) => [...current, entry]), []);
+  return { entries, failed, refresh, add };
 }

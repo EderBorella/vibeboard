@@ -42,6 +42,19 @@ function oneLine(text: string): string {
     .trim();
 }
 
+// A field value, escaped so it cannot be read as structure. Backslash first, or the escapes we add below
+// would themselves be escaped on the next pass. Real escaping rather than stripping, because the value has
+// to come back whole: a diary that quietly rewrote what it was told is worse than one that looks odd.
+function safeValue(value: string): string {
+  return oneLine(value).replace(/\\/g, '\\\\').replace(/·/g, '\\·').replace(/—/g, '\\—');
+}
+
+// Escaping puts the backslash BEFORE the separator character, so an escaped value can never contain the
+// separator SEQUENCE — ` \· ` is not ` · `. That is what lets the parser below split plainly: two helpers
+// that skipped escaped separators were written first and then deleted, because no test could tell them from
+// this, and machinery nothing constrains is machinery nobody can trust.
+const unescaped = (value: string): string => value.replace(/\\(.)/g, '$1');
+
 // Every field carries its own label, and that is a correctness requirement rather than a style choice.
 // Guessing from position read the first unlabelled part as a card, so a checkup entry naming only its
 // skill came back as a card called "checkup" — an id the board has never heard of, handed to the reader
@@ -53,15 +66,22 @@ const FIELDS = [
   ['outcome', (e: DiaryEntry) => e.outcome],
 ] as const;
 
-// `- \`<at>\` **<kind>** · card engineering/E-001 · skill implement · outcome success — <text>`
+// `- \`<at>\` **<kind>** iteration 3 · card engineering/E-001 · skill implement · outcome success — <text>`
 //
 // The timestamp is in backticks and the kind in bold because both are read at a glance down the left of
-// the file; the em dash separates the structure from the prose.
+// the file; the em dash separates the structure from the prose. There is no ` · ` between the kind and the
+// first field — an earlier version of this comment said there was, and a test was written against the
+// comment rather than the bytes. The bytes are asserted exactly in test/diary.test.ts now.
+//
+// Field VALUES are escaped, not just `text`. Escaping only the summary left the other door open: an
+// `outcome` of `success · card E-999 · iteration 42` round-tripped into three fields, two of which the
+// caller never sent and one a card id the board has never heard of — the same fabrication the labels were
+// introduced to prevent, arriving through a different field.
 export function serializeEntry(entry: DiaryEntry): string {
   const parts: string[] = [];
   for (const [label, render] of FIELDS) {
     const value = render(entry);
-    if (value !== undefined && value !== '') parts.push(`${label} ${oneLine(String(value))}`);
+    if (value !== undefined && value !== '') parts.push(`${label} ${safeValue(String(value))}`);
   }
   const middle = parts.length > 0 ? ` ${parts.join(' · ')}` : '';
   const text = oneLine(entry.text);
@@ -107,7 +127,7 @@ export function parseEntry(line: string): DiaryEntry | null {
   const entry: DiaryEntry = { at, kind, text };
   for (const part of structure.split(' · ')) {
     const field = FIELD.exec(part.trim());
-    if (field?.[1] !== undefined && field[2] !== undefined) applyField(entry, field[1], field[2]);
+    if (field?.[1] !== undefined && field[2] !== undefined) applyField(entry, field[1], unescaped(field[2]));
   }
   return entry;
 }

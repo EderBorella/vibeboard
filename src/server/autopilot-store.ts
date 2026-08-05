@@ -1,13 +1,26 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { type AutopilotState, IDLE_STATE, parseState, serializeState } from '../core/autopilot-state.js';
 import { stopSentence } from '../core/dispatch-gate.js';
 import { AUTOPILOT_STATE_FILE } from '../core/layout.js';
 import { serialise } from './write-queue.js';
 
-// Auto-pilot's state on disk. One file per project, written by the service for its counters and by
-// the main server for the stops — both through `updateAutopilotState`, so neither clobbers the
-// other's fields (the ownership split is in core/autopilot-state.ts).
+// Auto-pilot's state on disk. One file per project, written by the service for its counters and by the
+// main server for the stops (the ownership split is in core/autopilot-state.ts).
+//
+// This comment used to say both writers go through `updateAutopilotState`. That was FALSE — `load()` and
+// `restart()` call `writeAutopilotState` directly — and believing it is why the serialisation added for the
+// lost-update race stopped one path short. Two whole-file writes at once truncated and interleaved, leaving
+// bytes that do not parse, so S13 fail-closed the project to `halted / unreadable`: VibeBoard corrupting
+// the file and then blaming the file, with both calls reporting success. `load()` needs no user action to
+// reach it — it writes precisely when it found `running` on disk, which is when a service is ticking
+// counters through the other path.
+//
+// Two defences now, deliberately both:
+//   1. every write goes through ONE queue key, so nothing in this process overlaps;
+//   2. the write itself is atomic — temp file plus `rename` — so a reader never sees a half-written file
+//      and a writer outside this process cannot corrupt it either. The queue cannot promise that; only the
+//      rename can. Same reasoning, and the same mechanism, as the run store.
 
 export function autopilotStatePath(root: string): string {
   return join(root, AUTOPILOT_STATE_FILE);
@@ -51,10 +64,30 @@ export async function readAutopilotState(root: string, at: string): Promise<Auto
   return parsed === 'unreadable' ? unreadable(at) : parsed;
 }
 
-export async function writeAutopilotState(root: string, state: AutopilotState): Promise<void> {
+export function writeAutopilotState(root: string, state: AutopilotState): Promise<void> {
+  return serialise(queueKey(root), () => write(root, state));
+}
+
+// The queue key, shared by every writer of this file. One statement of it, because two keys would be two
+// queues and the whole point is that there is one.
+const queueKey = (root: string): string => `autopilot:${root}`;
+
+// Unserialised, and private for that reason: `merge` runs INSIDE the critical section already, so calling
+// the public wrapper from there would wait on a chain that cannot finish until it returns — a deadlock.
+let writeSeq = 0;
+async function write(root: string, state: AutopilotState): Promise<void> {
   const path = autopilotStatePath(root);
   await mkdir(dirname(path), { recursive: true });
-  await writeFile(path, serializeState(state), 'utf8');
+  // Unique per WRITE, not per project: two overlapping writes sharing one temp name race for it, and the
+  // loser's rename finds the file already gone. The run store learned this the same way.
+  const temp = `${path}.${process.pid}.${++writeSeq}.tmp`;
+  try {
+    await writeFile(temp, serializeState(state), 'utf8');
+    await rename(temp, path);
+  } catch (err) {
+    await rm(temp, { force: true }).catch(() => {});
+    throw err;
+  }
 }
 
 // Read-modify-write, so a caller that owns `state` cannot clobber the `iteration` the service owns.
@@ -92,6 +125,7 @@ async function merge(
   if (current.state === 'halted' && next.state !== 'halted') {
     return { ...next, state: 'halted', reason: current.reason, detail: current.detail, at: current.at };
   }
-  await writeAutopilotState(root, next);
+  // The unserialised write: we are already inside the critical section this key protects.
+  await write(root, next);
   return next;
 }

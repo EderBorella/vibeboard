@@ -1,4 +1,4 @@
-import { appendFile, readFile } from 'node:fs/promises';
+import { appendFile, chmod, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { DIARY_HEADER, type DiaryEntry } from '../src/core/diary.js';
@@ -80,12 +80,41 @@ describe('the diary on disk', () => {
     expect(await readFile(diaryPath(root), 'utf8')).toContain('Some thoughts I typed here.');
   });
 
-  // A diary written without a trailing newline would make the next append continue the previous line,
-  // turning two events into one unparseable one.
+  // A diary without a trailing newline makes the next append continue the previous line, turning two events
+  // into one that parses as neither — written, acknowledged with a 200, pushed over the socket, and then
+  // unreadable for ever. Our OWN writes always end in a newline, which is why the first version of this test
+  // passed while the failure mode it names was wide open: the missing newline comes from a person annotating
+  // the file, which the store explicitly supports.
   it('ends every line, so the next append starts a new one', async () => {
     const root = await tempDir();
     await appendEntry(root, entry({ text: 'one' }));
     expect((await readFile(diaryPath(root), 'utf8')).endsWith('\n')).toBe(true);
+  });
+
+  it('starts a new line even when the file does not end in one', async () => {
+    const root = await tempDir();
+    await appendEntry(root, entry({ text: 'one' }));
+    // A hand annotation with no trailing newline, which is how a person leaves a file.
+    await appendFile(diaryPath(root), 'a note I typed', 'utf8');
+    await appendEntry(root, entry({ text: 'two' }));
+    expect((await readDiary(root)).map((e) => e.text)).toEqual(['one', 'two']);
+    expect(await readFile(diaryPath(root), 'utf8')).toContain('a note I typed');
+  });
+
+  // Absence and damage are different facts, and this file is the checkup's primary input. Answering `[]` for
+  // an unreadable diary tells the reader that nothing has happened in a project that may have done hundreds
+  // of things — fail-OPEN on the one input the supervisor reasons from. The state store 40 lines away gets
+  // this right: only ENOENT means absent.
+  it('refuses to report an unreadable diary as an empty one', async () => {
+    const root = await tempDir();
+    await appendEntry(root, entry({ text: 'real history' }));
+    await chmod(diaryPath(root), 0o000);
+    await expect(readDiary(root)).rejects.toThrow();
+    await chmod(diaryPath(root), 0o600); // so the suite's own teardown can remove it
+  });
+
+  it('still reports no diary at all as empty', async () => {
+    expect(await readDiary(await tempDir())).toEqual([]);
   });
 
   it('writes inside the project and nowhere else', () => {

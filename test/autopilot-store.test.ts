@@ -1,6 +1,6 @@
-import { chmod, mkdir, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
-import { IDLE_STATE } from '../src/core/autopilot-state.js';
+import { type AutopilotState, IDLE_STATE } from '../src/core/autopilot-state.js';
 import {
   autopilotStatePath,
   readAutopilotState,
@@ -146,6 +146,66 @@ describe('auto-pilot state on disk', () => {
     });
 
     it('starts from idle when there is no file yet', async () => {
+      const root = await tempDir();
+      const next = await updateAutopilotState(root, AT, (current) => ({ ...current, iteration: 1 }));
+      expect(next).toMatchObject({ state: 'idle', iteration: 1 });
+    });
+  });
+
+  // Whole-file writes, which `load()` and `restart()` both make. `writeFile` TRUNCATES and then writes, so
+  // two of them at once leave the longer one's tail past the shorter one's end — and the result does not
+  // parse, so S13 fail-closes the project to `halted / unreadable`, blaming a corrupt file that VibeBoard
+  // corrupted itself. Both calls report success while it happens.
+  //
+  // `load()` needs no user action to reach this: it writes precisely when it found `running` on disk, which
+  // is exactly when a service is ticking counters through the other path.
+  describe('writing the whole state', () => {
+    it('never leaves a file that cannot be read', async () => {
+      const root = await tempDir();
+      // Long and short, so a surviving tail is detectable rather than coincidentally identical.
+      const long: AutopilotState = {
+        ...IDLE_STATE,
+        state: 'halted',
+        reason: 'killed',
+        detail: 'A detail long enough that its tail would survive a shorter write over the top of it.',
+        at: AT,
+      };
+      const short: AutopilotState = { ...IDLE_STATE, at: AT };
+
+      // What this constrains, stated exactly: corruption needs BOTH defences gone. Planted separately,
+      // each one alone keeps the file parseable — the rename because concurrent writes each land whole, the
+      // queue because they never overlap. So this test goes red only when both are removed, which is the
+      // honest description of a belt-and-braces pair. The queue's own unique property (ordering, and the
+      // atomicity of read-modify-write) is pinned by the two tests above; the rename's is cross-process
+      // safety, which no same-process test can show.
+      for (let i = 0; i < 20; i += 1) {
+        const dir = await tempDir();
+        await Promise.all([writeAutopilotState(dir, long), writeAutopilotState(dir, short)]);
+        const raw = await readFile(autopilotStatePath(dir), 'utf8');
+        // The bytes, not the parsed result: `readAutopilotState` turns damage into a HALT, so asserting on
+        // its answer would report the symptom the fail-closed rule produces rather than the corruption.
+        expect(() => JSON.parse(raw), raw).not.toThrow();
+        expect(await readAutopilotState(dir, AT), raw).not.toMatchObject({ reason: 'unreadable' });
+      }
+      expect(root).toBeTruthy();
+    });
+
+    // The two paths share one file, so they must share one queue. A whole-file write landing inside another
+    // writer's read-modify-write is the same corruption by a different route.
+    it('does not interleave with a read-modify-write', async () => {
+      const root = await tempDir();
+      await writeAutopilotState(root, { ...IDLE_STATE, state: 'running', iteration: 5 });
+      await Promise.all([
+        writeAutopilotState(root, { ...IDLE_STATE, state: 'halted', reason: 'killed', at: AT }),
+        updateAutopilotState(root, AT, (current) => ({ ...current, iteration: 6 })),
+      ]);
+      const raw = await readFile(autopilotStatePath(root), 'utf8');
+      expect(() => JSON.parse(raw), raw).not.toThrow();
+    });
+  });
+
+  describe('the idle fallback', () => {
+    it('starts from idle when there is no file yet, again', async () => {
       const root = await tempDir();
       const next = await updateAutopilotState(root, AT, (current) => ({ ...current, iteration: 1 }));
       expect(next).toMatchObject({ state: 'idle', iteration: 1 });

@@ -137,6 +137,60 @@ describe('a diary line', () => {
     expect(parseEntry(serializeEntry(e))).toEqual(e);
   });
 
+  // A field VALUE must not be able to fabricate other fields. Only `text` was escaped, so an `outcome` of
+  // `success · card E-999 · iteration 42` round-tripped into three fields — two the caller never sent, one a
+  // card id the board has never heard of, handed to the reader that decides whether the project is circling.
+  // Exactly the class the labels were introduced to kill, arriving through the other door.
+  it('does not let one field invent another', () => {
+    const e = entry({ kind: 'run', outcome: 'success · card E-999 · iteration 42', text: 'real summary' });
+    const back = parseEntry(serializeEntry(e));
+    expect(back?.card).toBeUndefined();
+    expect(back?.iteration).toBeUndefined();
+    expect(back?.text).toBe('real summary');
+  });
+
+  it('does not let a field value steal the summary', () => {
+    const e = entry({ kind: 'run', outcome: 'success — really', text: 'the real one' });
+    expect(parseEntry(serializeEntry(e))?.text).toBe('the real one');
+  });
+
+  it('keeps a card id containing the field separator whole', () => {
+    const e = entry({ kind: 'run', card: 'E-001 · E-002' });
+    const back = parseEntry(serializeEntry(e));
+    expect(back?.card).toBe('E-001 · E-002');
+    expect(back?.skill).toBeUndefined();
+  });
+
+  // The bytes, not a round-trip. Every other test here goes through this module's own pair of separators, so
+  // swapping BOTH length-preservingly left 53 tests green while every diary written by an older version
+  // became zero entries on read. A format two readers depend on has to be pinned as bytes somewhere.
+  it('writes exactly these bytes', () => {
+    expect(
+      serializeEntry({
+        at: '2026-08-05T10:04:00.000Z',
+        kind: 'run',
+        iteration: 3,
+        card: 'E-001',
+        board: 'engineering',
+        skill: 'implement',
+        outcome: 'success',
+        text: 'Added the token store.',
+      }),
+    ).toBe(
+      '- `2026-08-05T10:04:00.000Z` **run** iteration 3 · card engineering/E-001 · skill implement · outcome success — Added the token store.',
+    );
+  });
+
+  it('reads exactly those bytes back', () => {
+    const line = '- `2026-08-05T10:04:00.000Z` **checkup** iteration 10 — Archived two stale cards.';
+    expect(parseEntry(line)).toEqual({
+      at: '2026-08-05T10:04:00.000Z',
+      kind: 'checkup',
+      iteration: 10,
+      text: 'Archived two stale cards.',
+    });
+  });
+
   // Zero is a real iteration — the pre-flight entry is written before anything has been dispatched —
   // and it must not read the same as "no iteration recorded".
   it('keeps an iteration of zero', () => {

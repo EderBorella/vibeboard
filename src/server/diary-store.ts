@@ -2,6 +2,7 @@ import { appendFile, mkdir, readFile, stat } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { type DiaryEntry, entryBlock, parseDiary } from '../core/diary.js';
 import { PROJECT_LOG_FILE } from '../core/layout.js';
+import { serialise } from './write-queue.js';
 
 // The diary on disk. Append-only, and the only module allowed to write it.
 //
@@ -18,25 +19,11 @@ export function diaryPath(root: string): string {
   return join(root, PROJECT_LOG_FILE);
 }
 
-// One promise chain per project, and that is the whole concurrency mechanism. Both writers reach this
-// file through this process — the browser directly and slice C's service over HTTP — so serialising here
-// is sufficient. Without it, fifty appends started together can interleave inside a line, which corrupts
-// an event, or drop one, which loses it.
-//
-// Keyed by root so two projects cannot block each other. Nothing removes the entries: each holds one
-// settled promise, and the count is bounded by how many distinct projects one server process ever opens.
-const queues = new Map<string, Promise<unknown>>();
-
+// Serialised per project. `O_APPEND` already makes each write land whole, so nothing is lost or torn
+// without this — what it buys is ORDER, and the diary IS the sequence: a checkup reading it out of order
+// would see a project circling that was not, or miss one that was.
 export async function appendEntry(root: string, entry: DiaryEntry): Promise<void> {
-  const previous = queues.get(root) ?? Promise.resolve();
-  const mine = previous.then(() => write(diaryPath(root), entry));
-  // The stored link never rejects, so one failed append does not poison every append queued behind it.
-  // The caller still sees its own failure, through the promise returned below.
-  queues.set(
-    root,
-    mine.catch(() => undefined),
-  );
-  await mine;
+  await serialise(`diary:${root}`, () => write(diaryPath(root), entry));
 }
 
 async function write(path: string, entry: DiaryEntry): Promise<void> {

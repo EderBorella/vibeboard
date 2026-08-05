@@ -118,6 +118,33 @@ describe('auto-pilot state on disk', () => {
       expect(next).toMatchObject({ state: 'halted', iteration: 9 });
     });
 
+    // Two writers, one file, and read-modify-write is not atomic. The halt guard above is evaluated
+    // against the value read at the START of the update, so a halt written between that read and the
+    // write was simply overwritten — the guard never saw it. Whichever order these two run in, both
+    // changes must survive: the halt because losing it re-opens dispatch on a project whose agents are
+    // dead, and the counter because rolling it back re-runs work already paid for.
+    //
+    // Found by a load-sensitive failure in the HTTP-level test for the same pair, which passed on a quiet
+    // machine and failed inside a full 151-file run. This is that race, stated so it cannot depend on
+    // timing.
+    it('loses neither change when two writers update it at once', async () => {
+      const root = await tempDir();
+      await writeAutopilotState(root, { ...IDLE_STATE, state: 'running', iteration: 41 });
+      await Promise.all([
+        updateAutopilotState(root, AT, (current) => ({
+          ...current,
+          state: 'halted',
+          reason: 'killed',
+        })),
+        updateAutopilotState(root, AT, (current) => ({ ...current, iteration: 42 })),
+      ]);
+      expect(await readAutopilotState(root, AT)).toMatchObject({
+        state: 'halted',
+        reason: 'killed',
+        iteration: 42,
+      });
+    });
+
     it('starts from idle when there is no file yet', async () => {
       const root = await tempDir();
       const next = await updateAutopilotState(root, AT, (current) => ({ ...current, iteration: 1 }));

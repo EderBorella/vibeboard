@@ -3,6 +3,7 @@ import { dirname, join } from 'node:path';
 import { type AutopilotState, IDLE_STATE, parseState, serializeState } from '../core/autopilot-state.js';
 import { stopSentence } from '../core/dispatch-gate.js';
 import { AUTOPILOT_STATE_FILE } from '../core/layout.js';
+import { serialise } from './write-queue.js';
 
 // Auto-pilot's state on disk. One file per project, written by the service for its counters and by
 // the main server for the stops — both through `updateAutopilotState`, so neither clobbers the
@@ -58,7 +59,20 @@ export async function writeAutopilotState(root: string, state: AutopilotState): 
 
 // Read-modify-write, so a caller that owns `state` cannot clobber the `iteration` the service owns.
 // Returns what was written, which is what every caller wants to broadcast.
-export async function updateAutopilotState(
+export function updateAutopilotState(
+  root: string,
+  at: string,
+  change: (current: AutopilotState) => AutopilotState,
+): Promise<AutopilotState> {
+  // The READ is inside the critical section, not just the write, and that is the whole point. Two writers
+  // own different halves of this file — the service the counters, this process the state — and with the
+  // read outside, a halt written between another writer's read and its write was simply overwritten: the
+  // guard below never saw it, because `current` was already stale. Measured as a load-sensitive failure of
+  // the HTTP-level test for this pair, and pinned deterministically in test/autopilot-store.test.ts.
+  return serialise(`autopilot:${root}`, () => merge(root, at, change));
+}
+
+async function merge(
   root: string,
   at: string,
   change: (current: AutopilotState) => AutopilotState,

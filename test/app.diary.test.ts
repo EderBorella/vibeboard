@@ -1,7 +1,10 @@
+import { chmod } from 'node:fs/promises';
+import { join } from 'node:path';
 import { describe, expect, it, onTestFinished } from 'vitest';
 import type { DiaryEntry } from '../src/core/diary.js';
+import { PROJECT_LOG_FILE } from '../src/core/layout.js';
 import { readDiary } from '../src/server/diary-store.js';
-import { openTestProject, tempDir } from './helpers.js';
+import { openTestProject, tempDir, wsClient } from './helpers.js';
 
 // The diary over HTTP. Written through an endpoint and never by an agent writing the file: a run already
 // reports a one-line summary that auto-pilot appends, so an agent with a pen here would be a second path
@@ -111,6 +114,46 @@ describe('the diary endpoint', () => {
     for (const method of ['DELETE', 'PUT', 'PATCH'] as const) {
       expect((await app.inject({ method, url: '/api/log' })).statusCode, method).toBe(404);
     }
+  });
+});
+
+// `PROJECT-LOG.md` is in `isIgnored` on purpose, so a chatty diary cannot churn the board — which also
+// means there is no snapshot rebuild for this to ride on, the way filing a suggestion does. Without a push
+// of its own, a second tab and the whole diary screen during an auto-pilot run show a stale narrative
+// until somebody reloads.
+describe('an appended entry', () => {
+  it('reaches the other tabs', async () => {
+    const { app } = await openTestProject();
+    const address = await app.listen({ port: 0, host: '127.0.0.1' });
+    const client = wsClient<{ type: string; entry?: DiaryEntry }>(address);
+    await client.open;
+
+    await post(app, { kind: 'lifecycle', text: 'hello' });
+    const pushed = await client.waitFor((m) => m.type === 'diary:entry');
+    expect(pushed.entry?.text).toBe('hello');
+    expect(pushed.entry?.kind).toBe('lifecycle');
+    client.close();
+  });
+
+  // The negative, and it is the half that pins the ORDERING: announcing before the write means a tab can be
+  // told about an entry that never reached disk. Forced by making the diary itself read-only — the FILE,
+  // not its folder, because appending to a file that already exists needs no permission on the directory,
+  // and the first version of this test passed with a 200 for exactly that reason.
+  it('is not announced when the write fails', async () => {
+    const { app, root } = await openTestProject();
+    const address = await app.listen({ port: 0, host: '127.0.0.1' });
+    const client = wsClient<{ type: string; entry?: DiaryEntry }>(address);
+    await client.open;
+
+    const diary = join(root, PROJECT_LOG_FILE);
+    await chmod(diary, 0o400); // readable, not writable
+    const res = await post(app, { kind: 'lifecycle', text: 'never written' });
+    await chmod(diary, 0o600); // so the suite's own teardown can remove it
+
+    expect(res.statusCode).toBe(500);
+    expect(client.messages.some((m) => m.type === 'diary:entry')).toBe(false);
+    expect((await readDiary(root)).map((e) => e.text)).not.toContain('never written');
+    client.close();
   });
 });
 

@@ -81,6 +81,11 @@ export async function registerDiaryRoutes(api: FastifyInstance, ctx: AppCtx): Pr
       ...details(body),
     };
     await appendEntry(ctx.session.root, entry);
+    // AFTER the write, never before. `PROJECT-LOG.md` is in `isIgnored`, so a chatty diary cannot churn the
+    // board — which also means there is no snapshot rebuild for this to ride on the way filing a suggestion
+    // does, and without a push of its own a second tab shows a stale narrative until it is reloaded. Before
+    // the write, a failed append would announce an entry that is not on disk.
+    ctx.broadcast({ type: 'diary:entry', entry });
     return { entry };
   });
 

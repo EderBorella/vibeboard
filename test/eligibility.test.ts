@@ -82,10 +82,12 @@ describe('which cards are eligible', () => {
     expect(found?.route.next).toBe('todo');
   });
 
+  // The fixture used to move the card to `archive/` as well, and that made the test a false gate: there
+  // is no route for `archive`, so the card was refused for the wrong reason and deleting the liveness
+  // check changed nothing. The half-archived state is also the real one — `scaffold.ts` tells agents to
+  // move the file AND set the field, so a half-done archive by hand or by an agent is exactly this.
   it('excludes an archived card even when its column has a route', () => {
-    const archived = base().map((c) =>
-      c.id === 'P-001' ? { ...c, columnSlug: 'archive', archived: '2026-08-05T10:00:00Z' } : c,
-    );
+    const archived = base().map((c) => (c.id === 'P-001' ? { ...c, archived: '2026-08-05T10:00:00Z' } : c));
     const el = ids(eligibility(input({ cards: archived })).eligible);
     expect(el).not.toContain('P-001');
     // F-001 becomes eligible, which is right and worth saying out loud: its only child was thrown
@@ -235,17 +237,22 @@ describe('picking one', () => {
     expect(pick(finished)).toBe('P-002');
   });
 
+  // SYNTHETIC IDS, and they have to be: with the conventional prefixes (`E-`, `F-`, `P-`) the id
+  // tie-break always agrees with the depth one, because 'E' < 'F' < 'P' happens to run in the same
+  // direction as engineering-before-product-before-features. The first version of this test used real
+  // prefixes and therefore held nothing — deleting the depth level left it green. Ids are frontmatter
+  // strings, so a hand-written board can carry anything; these disagree on purpose.
   it('then takes the card furthest down the pipeline', () => {
-    // One feature, two branches. Same column index, same card order, and P-001 has the lower id — so
-    // only the board's depth can choose E-001.
     const cards = [
-      card('F-001', 'features', 'in-progress', 10, ['P-001', 'P-002']),
-      card('P-001', 'product', 'backlog', 10, ['F-001']),
-      card('P-002', 'product', 'todo', 10, ['F-001', 'E-001']),
-      card('E-001', 'engineering', 'backlog', 10, ['P-002']),
+      card('F-001', 'features', 'in-progress', 10, ['A-001', 'A-002']),
+      card('A-001', 'product', 'backlog', 10, ['F-001']),
+      card('A-002', 'product', 'todo', 10, ['F-001', 'Z-001']),
+      card('Z-001', 'engineering', 'backlog', 10, ['A-002']),
     ];
-    expect(ids(eligibility(input({ cards })).eligible)).toEqual(['E-001', 'P-001']);
-    expect(pick(cards)).toBe('E-001');
+    expect(ids(eligibility(input({ cards })).eligible)).toEqual(['A-001', 'Z-001']);
+    // The id level would choose A-001 and the depth level chooses Z-001. Nothing else can decide:
+    // same feature, same column index, same card order.
+    expect(pick(cards)).toBe('Z-001');
   });
 
   it('then the later column, because started work finishes before new work starts', () => {
@@ -269,11 +276,14 @@ describe('picking one', () => {
   });
 
   it('and finally the id, so the pick is never arbitrary', () => {
+    // E-002 is listed FIRST. With the id level deleted the comparator returns 0, `Array.sort` is stable,
+    // and the answer becomes whatever order the cards arrived in — which is directory read order, the
+    // very thing this test's name denies. Listing the wanted answer second is what makes it a gate.
     const cards = [
       card('F-001', 'features', 'in-progress', 10, ['P-001']),
       card('P-001', 'product', 'in-progress', 10, ['F-001', 'E-001', 'E-002']),
-      card('E-001', 'engineering', 'backlog', 10, ['P-001']),
       card('E-002', 'engineering', 'backlog', 10, ['P-001']),
+      card('E-001', 'engineering', 'backlog', 10, ['P-001']),
     ];
     expect(pick(cards)).toBe('E-001');
   });

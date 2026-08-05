@@ -109,6 +109,18 @@ describe('routing-table coverage', () => {
     );
   });
 
+  // Changing `action:` from advance to eligible and leaving `next:` behind. `rollupOutcomes` ignores it
+  // — the card is made eligible and never advanced — so the config would state something the loop does
+  // not do, and the next reader would have to guess which of the two was meant.
+  it('refuses an eligibility rule that still names a next column', () => {
+    const config = fresh();
+    expect(coverageProblems(config)).toEqual([]);
+    ap(config).rollup = ap(config).rollup.map((r) => (r.board === 'features' ? { ...r, next: 'done' } : r));
+    expect(coverageProblems(config)).toContain(
+      'The rollup rule on features/in-progress makes a card eligible AND names next: "done". An eligible rule admits the card to its route rather than moving it, so remove next — or change the action to advance if moving it is what you meant.',
+    );
+  });
+
   it('refuses an advancing rollup with nowhere terminal to advance to', () => {
     const missing = fresh();
     ap(missing).rollup[0] = { ...ap(missing).rollup[0], next: undefined };

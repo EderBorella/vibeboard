@@ -81,6 +81,16 @@ describe('what a rollup does', () => {
     expect(rollupOutcomes(ap, board).advance.map((a) => a.card.id)).toEqual(['P-001']);
   });
 
+  // The FOLDER half of the liveness rule, on its own. Every archived fixture in this slice set both the
+  // folder and the field, so the folder check was held by nothing — and `scaffold.ts` asks agents to move
+  // the file AND set the field, which makes a half-done archive the real case rather than an invented one.
+  // It has to be the MIXED case: an archived-only child sits in `archive/`, which is not terminal either,
+  // so a fixture where it is the only child fails the terminal test whichever rule is in force.
+  it('excludes a child sitting in the archive folder even with no archived timestamp', () => {
+    const board = change(cards(), 'E-001', { columnSlug: ARCHIVE_SLUG });
+    expect(rollupOutcomes(ap, board).advance.map((a) => a.card.id)).toEqual(['P-001']);
+  });
+
   it('makes a features card eligible and never advances it — a feature earns its close-out', () => {
     // P-001 in done: the product rule no longer matches its column, and F-001's only child is terminal.
     const { advance, eligible } = rollupOutcomes(ap, change(cards(), 'P-001', { columnSlug: 'done' }));
@@ -98,6 +108,29 @@ describe('what a rollup does', () => {
     // produces — but rolling one up would advance a card out of the archive.
     const board = change(cards(), 'P-001', { archived: '2026-08-05T10:00:00Z' });
     expect(rollupOutcomes(ap, board).advance).toEqual([]);
+  });
+
+  // The rule that made the "never advances it" test above a false gate: what actually stopped the
+  // advance in that fixture was the missing `next`, not the action. Editing `action:` in config.yaml and
+  // leaving `next:` behind is the obvious way to reach this, and it used to both admit the card AND
+  // advance it to done — the close-out dispatch skipped, which is the whole point of an `eligible` rule.
+  it('makes an eligible rule eligible only, even when it still carries a next column', () => {
+    const stale: AutopilotConfig = {
+      ...ap,
+      rollup: [
+        {
+          board: 'features',
+          column: 'in-progress',
+          when: 'all-children-terminal',
+          action: 'eligible',
+          next: 'done',
+        },
+      ],
+    };
+    const board = change(cards(), 'P-001', { columnSlug: 'done' });
+    const { advance, eligible } = rollupOutcomes(stale, board);
+    expect(eligible).toEqual(['F-001']);
+    expect(advance).toEqual([]);
   });
 
   // Fail closed (Principle 1): the cover check refuses this config on the way in, but a rule that

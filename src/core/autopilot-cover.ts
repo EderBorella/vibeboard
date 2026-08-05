@@ -303,6 +303,15 @@ function checkRollupRule(
       `The rollup rule on ${where} makes a card eligible, but that column has no route to become eligible for.`,
     );
   }
+  // A `next` left behind after changing `action:` from advance to eligible. The reading of the rules
+  // ignores it — a card is made eligible and never advanced — so this is a config that says something
+  // the loop will not do, and the two readings of one rule would eventually be reconciled by someone
+  // guessing which was meant.
+  if (rule.action === 'eligible' && rule.next !== undefined) {
+    out.push(
+      `The rollup rule on ${where} makes a card eligible AND names next: "${rule.next}". An eligible rule admits the card to its route rather than moving it, so remove next — or change the action to advance if moving it is what you meant.`,
+    );
+  }
 }
 
 // The number checks alone. Exported so a refusal can tell a bad number from an unroutable board and

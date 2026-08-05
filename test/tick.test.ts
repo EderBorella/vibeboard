@@ -102,6 +102,36 @@ describe('the caps come first', () => {
     expect(action).toMatchObject({ kind: 'stop', reason: 'stalled' });
     expect(action).toHaveProperty('detail', expect.stringContaining('maxIterations'));
   });
+
+  it('stops stalled and names the field when the concurrency limit is unusable', () => {
+    // The third of the three NaN twins, and the only one nothing held: an unusable limit does not queue,
+    // it lets everything through.
+    const ap = { ...DEFAULT_AUTOPILOT, autoPilotConcurrency: Number.NaN };
+    const action = decideTick(input({ ap }));
+    expect(action).toMatchObject({ kind: 'stop', reason: 'stalled' });
+    expect(action).toHaveProperty('detail', expect.stringContaining('autoPilotConcurrency'));
+  });
+
+  // BOTH BRANCHES ARMED, which is what makes this about the order rather than about either branch. The
+  // whole describe block passed with the rollup moved ahead of the caps, because no fixture had a rollup
+  // to do while it was over budget.
+  it('refuses to spend a tick rolling up when the project is already over budget', () => {
+    const spend: Spend = { runs: 1, withCost: 1, withoutCost: 0, costUsd: 25 };
+    const cards = [
+      card('F-001', 'features', 'todo', 10, ['P-001']),
+      card('P-001', 'product', 'in-progress', 10, ['F-001', 'E-001']),
+      card('E-001', 'engineering', 'done', 10, ['P-001']),
+    ];
+    // Without the caps first this answers `rollup`.
+    expect(decideTick(input({ cards, spend }))).toMatchObject({ kind: 'stop', reason: 'exhausted' });
+  });
+
+  it('keeps a halted project’s own reason rather than reporting the cap it also happens to have hit', () => {
+    // Same shape one step earlier: the state guard has to come before the caps, or an emergency-stopped
+    // project at its iteration cap would report `capped` and lose the fact that someone killed it.
+    const halted = state({ state: 'halted', reason: 'killed', iteration: 250 });
+    expect(decideTick(input({ state: halted }))).toMatchObject({ kind: 'stop', reason: 'killed' });
+  });
 });
 
 describe('the rollup settles the board before anything dispatches', () => {
@@ -133,13 +163,17 @@ describe('the checkup is owed, and C2 cannot run it', () => {
   it('stops when the state says a checkup is needed', () => {
     const action = decideTick(input({ state: state({ needsCheckup: true }) }));
     expect(action).toMatchObject({ kind: 'stop', reason: 'stalled' });
-    expect(action).toHaveProperty('detail', expect.stringContaining('checkup'));
+    expect(action).toHaveProperty('detail', expect.stringContaining('owes a supervisor checkup'));
+    // The clause that says C2 CANNOT run it — the whole reason this branch is a stop and not a dispatch.
+    // Asserting on the word "checkup" held nothing: it already appears in the sentence before this one.
+    expect(action).toHaveProperty('detail', expect.stringContaining('not built yet'));
   });
 
   it('stops when enough dispatches have passed since the last one', () => {
     const action = decideTick(input({ state: state({ dispatchesSinceCheckup: 10 }) }));
     expect(action).toMatchObject({ kind: 'stop', reason: 'stalled' });
-    expect(action).toHaveProperty('detail', expect.stringContaining('checkup'));
+    expect(action).toHaveProperty('detail', expect.stringContaining('10 dispatches since'));
+    expect(action).toHaveProperty('detail', expect.stringContaining('not built yet'));
   });
 
   it('does not stop while the count is below the interval', () => {
@@ -175,10 +209,14 @@ describe('a card that has run out of attempts', () => {
       card('P-002', 'product', 'backlog', 10, ['F-002']),
     ];
     const runs = failures(3, 'E-001', 'engineering', 'implement');
-    const action = decideTick(input({ cards, runs }));
+    // Renamed, because with the default config `to: 'blocked'` passes just as well against a hardcoded
+    // string — and a user who renames the column would have had cards moved to a folder that does not
+    // exist. rollup.test.ts already reads terminal columns from config for the same reason.
+    const ap = { ...DEFAULT_AUTOPILOT, blockedColumn: 'parked' };
+    const action = decideTick(input({ ap, cards, runs }));
     // Before the dispatch P-002 was also entitled to: tidying the board first is what keeps a card at
     // its cap from sitting in a routed column for ever.
-    expect(action).toMatchObject({ kind: 'block', to: 'blocked' });
+    expect(action).toMatchObject({ kind: 'block', to: 'parked' });
     expect(action.kind === 'block' && action.card.id).toBe('E-001');
   });
 
@@ -236,9 +274,24 @@ describe('nothing eligible is not the same as nothing left', () => {
     expect(detail).not.toMatch(/routed, terminal or blocked/);
   });
 
-  it('stops stalled, naming the cards, when unfinished work remains that nothing can move', () => {
-    // E-009 sits in a column with no route — the B3 shape. Reporting this as success is the failure
-    // the whole design is written against.
+  // THE B3 SHAPE, and the fixture has to be a column that is neither routed, terminal NOR blocked. The
+  // first version of this test used `engineering/blocked`, which is unrouted BY DESIGN and validated as
+  // such — so it never exercised the case that once turned "nothing eligible" into a reported success.
+  // `triage` is a folder somebody made, or a column removed from the config with cards still in it.
+  it('stops stalled, naming the cards, when a card sits in a column nothing covers', () => {
+    const cards = [
+      card('F-001', 'features', 'done', 10, ['P-001']),
+      card('P-001', 'product', 'done', 10, ['F-001']),
+      card('E-009', 'engineering', 'triage', 10, []),
+    ];
+    const action = decideTick(input({ cards }));
+    expect(action).toMatchObject({ kind: 'stop', reason: 'stalled' });
+    expect(action).toHaveProperty('detail', expect.stringContaining('E-009'));
+    // And this is the one case where the routing advice is the right advice.
+    expect(action).toHaveProperty('detail', expect.stringContaining('routed, terminal or blocked'));
+  });
+
+  it('stops stalled for a card the loop itself blocked, and says that is what happened', () => {
     const cards = [
       card('F-001', 'features', 'done', 10, ['P-001']),
       card('P-001', 'product', 'done', 10, ['F-001']),
@@ -246,7 +299,17 @@ describe('nothing eligible is not the same as nothing left', () => {
     ];
     const action = decideTick(input({ cards }));
     expect(action).toMatchObject({ kind: 'stop', reason: 'stalled' });
-    expect(action).toHaveProperty('detail', expect.stringContaining('E-009'));
+    expect(action).toHaveProperty('detail', expect.stringContaining('E-009 ran out of attempts'));
+  });
+
+  // The ordinary resume path, and the one stop reason with no test: `reconcile` writes exactly this
+  // state when a server dies under a running loop.
+  it('re-states an interrupted restart rather than deciding anything for it', () => {
+    const interrupted = state({ state: 'stopped', reason: 'interrupted', needsCheckup: true });
+    expect(decideTick(input({ state: interrupted }))).toMatchObject({
+      kind: 'stop',
+      reason: 'interrupted',
+    });
   });
 
   // The absence of unfinished work is not the presence of finished work, and all three of these produce

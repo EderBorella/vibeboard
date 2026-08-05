@@ -44,6 +44,10 @@ export interface PromptInputs {
   // Absent when the project has no foundation yet, and then the section is left out entirely rather
   // than promising a folder with nothing in it.
   foundation?: { paths: string[]; codeQuality?: string };
+  // Present when this run is JUDGING finished work rather than doing it — the critic. It replaces the
+  // reporting contract with one that asks for a score, and states the threshold that score will be
+  // compared against. Absent for every other run, and then nothing about judging appears at all.
+  verdict?: { threshold: number };
   // Where the agent must write its report, project-root-relative.
   reportPath: string;
   projectRoot: string;
@@ -146,6 +150,45 @@ const CONTRACT_LINES = [
   'Write ONLY that file for your report; the run record itself belongs to VibeBoard.',
 ];
 
+// A judging run reports a SCORE, not a pass. A binary verdict yields no distribution, and the promise
+// to judge the critic itself from data later needs the numbers to have been written down (S9).
+//
+// The threshold is stated in the prompt deliberately: a judge that does not know the bar cannot
+// calibrate to it, and a bar nobody can see is one nobody can argue with afterwards.
+//
+// It is an ALTERNATIVE to CONTRACT_LINES, never an addition. Both present, the run would be told to
+// report an outcome and to score, and whichever heading it read first would decide what it wrote.
+function verdictLines(threshold: number): string[] {
+  return [
+    'You are judging work that is already done. Change nothing: do not edit the code, do not edit the',
+    'card, and do not move it. Your report IS the verdict, and a judge that fixes what it is judging is',
+    'grading its own work.',
+    '',
+    'Write your report to:',
+    '',
+    '```',
+    '<REPORT_PATH>',
+    '```',
+    '',
+    '```markdown',
+    '---',
+    'outcome: success        # or: attention, if you could not judge it at all',
+    `score: 0.0              # 0 to 1. At or above ${threshold} passes this card.`,
+    'summary: one line saying why it scored that',
+    'overshoot: one line     # only if the work did MORE than the card asked for',
+    '---',
+    '## What I judged',
+    '',
+    'The reasoning: what the card asked for, what the work does, and where they differ.',
+    '```',
+    '',
+    'Score the work against the CARD, not against what you would have built. Work that does more than',
+    'the card asked still passes — note it under `overshoot` rather than marking it down, because',
+    'failing a card for over-delivery throws away working code and spends an attempt rebuilding it.',
+    'A report with no `score` cannot pass anything, so answer even when the answer is 0.',
+  ];
+}
+
 // The board is changed through the API, not by writing card files. Stated as the mechanism rather
 // than as a preference: a column is a folder, so a file written to the wrong one does not fail — it
 // creates a folder no column maps to, and the card inside it is invisible to the board while still
@@ -231,9 +274,11 @@ export function buildRunPrompt(input: PromptInputs): string {
       ),
     );
   }
-  parts.push(
-    section('Reporting (required)', CONTRACT_LINES.join('\n').replace('<REPORT_PATH>', input.reportPath)),
-  );
+  // One or the other, never both — see verdictLines.
+  const contract = input.verdict
+    ? { heading: 'Judging (required)', lines: verdictLines(input.verdict.threshold) }
+    : { heading: 'Reporting (required)', lines: CONTRACT_LINES };
+  parts.push(section(contract.heading, contract.lines.join('\n').replace('<REPORT_PATH>', input.reportPath)));
 
   return `${parts.join('\n\n')}\n`;
 }

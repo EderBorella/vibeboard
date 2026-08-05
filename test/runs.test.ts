@@ -362,3 +362,48 @@ describe('the suggestion count on a run record', () => {
     expect(parseRun(zero)?.suggestions).toBe(0);
   });
 });
+
+// A judging run's report — the critic's. It carries a SCORE rather than a bare verdict (S9): a binary
+// pass yields no distribution, and the promise to judge the critic itself from data later needs the
+// numbers to have been written down.
+describe('a judging run’s report', () => {
+  it('carries a score and any overshoot it noticed', () => {
+    const report = parseAgentReport(
+      [
+        '---',
+        'outcome: success',
+        'summary: Meets the criterion.',
+        'score: 0.8',
+        'overshoot: Also built a settings screen.',
+        '---',
+        'Body.',
+      ].join('\n'),
+    );
+    expect(report.score).toBe(0.8);
+    expect(report.overshoot).toBe('Also built a settings screen.');
+  });
+
+  // Zero is a judgement: the critic read the work and thought it worthless. Absence is not, and
+  // neither is 4 — which would clear every threshold there is.
+  it('keeps a zero score and drops one that is not a fraction', () => {
+    expect(parseAgentReport('---\nscore: 0\n---\nx').score).toBe(0);
+    expect(parseAgentReport('---\nscore: 4\n---\nx').score).toBeUndefined();
+    expect(parseAgentReport('---\nscore: high\n---\nx').score).toBeUndefined();
+    expect(parseAgentReport('---\noutcome: success\n---\nx').score).toBeUndefined();
+  });
+
+  it('folds both onto the record, so the critic’s own run keeps what it answered', () => {
+    const folded = withReport(
+      record(),
+      parseAgentReport('---\noutcome: success\nscore: 0.7\novershoot: extra\n---\nx'),
+      'AT',
+    );
+    expect(folded).toMatchObject({ score: 0.7, overshoot: 'extra' });
+  });
+
+  it('leaves an ordinary report with neither', () => {
+    const folded = withReport(record(), parseAgentReport('---\noutcome: success\n---\nx'), 'AT');
+    expect(folded.score).toBeUndefined();
+    expect(folded.overshoot).toBeUndefined();
+  });
+});

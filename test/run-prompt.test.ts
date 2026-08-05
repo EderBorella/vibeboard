@@ -361,3 +361,44 @@ describe('the foundation section', () => {
     expect(text.indexOf("## The project's foundation")).toBeLessThan(text.indexOf('## Linked cards'));
   });
 });
+
+// A run asked to JUDGE rather than to build. `inputs(over)` above is this file's fixture function.
+describe('the judging contract', () => {
+  const judging = () => buildRunPrompt(inputs({ verdict: { threshold: 0.6 } }));
+
+  it('is told to report a score, and what it will be compared against', () => {
+    const text = judging();
+    expect(text).toContain('score:');
+    // The bar is stated because a judge that does not know it cannot calibrate to it — and a bar
+    // nobody can see is one nobody can argue with afterwards.
+    expect(text).toMatch(/at or above 0\.6/i);
+  });
+
+  it('asks an ordinary run for no score at all', () => {
+    expect(buildRunPrompt(inputs())).not.toContain('score:');
+  });
+
+  // The judge must not fix what it is judging, or the verdict becomes an opinion about its own work.
+  it('tells a judging run to change nothing', () => {
+    expect(judging()).toMatch(/change nothing/i);
+  });
+
+  // The two contracts are ALTERNATIVES. Both present, a judging run would be told to report an
+  // outcome and to score, and whichever heading it read first would decide what it wrote.
+  it('replaces the ordinary reporting contract rather than adding to it', () => {
+    const text = judging();
+    expect(text).toContain('## Judging (required)');
+    expect(text).not.toContain('## Reporting (required)');
+  });
+
+  it('still tells it where to write, in the one place that is not the run record', () => {
+    expect(judging()).toContain(`${RUNS_DIR}/r1.report.md`);
+  });
+
+  // A score of 0 is the answer to "this does not meet the card", and the contract has to ask for it
+  // explicitly: a judge that stays silent when the work is bad produces an absent score, which fails
+  // closed but says nothing anyone can act on.
+  it('asks for an answer even when the answer is zero', () => {
+    expect(judging()).toMatch(/even when the answer is 0/);
+  });
+});

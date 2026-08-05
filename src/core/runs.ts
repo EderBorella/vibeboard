@@ -117,6 +117,10 @@ export interface AgentReport {
   summary?: string;
   options?: string[];
   created?: string[];
+  // A JUDGING run only — the critic. Its score, and any over-delivery it noticed in the work it was
+  // judging. Absent from every other report, and absent rather than 0 when the critic did not answer.
+  score?: number;
+  overshoot?: string;
   body: string;
 }
 
@@ -369,11 +373,16 @@ export function parseAgentReport(content: string): AgentReport {
     return { outcome: 'attention', body: content.trim() };
   }
   const d = parsed.data as Record<string, unknown>;
+  const score = asFraction(d.score);
   return {
     outcome: isOutcome(d.outcome) ? d.outcome : 'attention',
     ...(asText(d.summary) ? { summary: asText(d.summary) } : {}),
     ...(asStrings(d.options) ? { options: asStrings(d.options) } : {}),
     ...(asStrings(d.created) ? { created: asStrings(d.created) } : {}),
+    // A judging run's two extra fields. Absent everywhere else, and a score outside 0..1 is dropped
+    // rather than clamped: a 4 is not a judgement, and clamping it to 1 would invent a pass.
+    ...(score === undefined ? {} : { score }),
+    ...(asText(d.overshoot) ? { overshoot: asText(d.overshoot) } : {}),
     body: parsed.content.trim(),
   };
 }
@@ -390,6 +399,10 @@ export function withReport(record: RunRecord, report: AgentReport, finished: str
     ...(report.summary ? { summary: report.summary } : {}),
     ...(report.options ? { options: report.options } : {}),
     ...(report.created ? { created: report.created } : {}),
+    // A critic's own answer, kept on the critic's own record. What came OF it is written to the run
+    // being judged, as `verification` — one fact, one home, on each side.
+    ...(report.score === undefined ? {} : { score: report.score }),
+    ...(report.overshoot ? { overshoot: report.overshoot } : {}),
     report: report.body,
   };
 }

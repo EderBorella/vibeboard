@@ -151,6 +151,63 @@ describe('the vertical a run’s new card belongs to', () => {
     expect(task.json().group).toBe('F-001');
   });
 
+  // THE SECOND THING THE FIRST HAND-RUN GOT WRONG, and it was worse than a wrong label. `break-down` created
+  // its three user stories in `product/in-progress` — a column with no route, whose only way out is a rollup,
+  // and a childless card never rolls up. Three real stories, correctly written and correctly linked, parked
+  // where nothing could ever move them; the loop's next honest answer would have been to stop `stalled`.
+  it('enters the target board at its first column, whatever column the agent asked for', async () => {
+    const { app, store, root } = await open();
+    const run = store.mintRun('work', 'run-9', root, 'F-001', { board: 'features', skill: 'break-down' });
+    const res = await create(app, bearer(run.token), {
+      board: 'product',
+      columnSlug: 'in-progress',
+      title: 'As a user I can ask for JSON',
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().columnSlug).toBe('backlog');
+  });
+
+  // Stamped rather than refused: the work is real, the link is right, and only the column was a guess.
+  // Refusing would throw away a good card and one of three attempts — so the stamp runs BEFORE the loop
+  // refusal, and the refusal judges the column that will actually be written.
+  it('is not refused for guessing a column that dispatches its own skill on another board', async () => {
+    const { app, store, root } = await open();
+    // `product/todo` dispatches break-down. A break-down run naming it would hit the loop rule if the stamp
+    // did not correct the column first.
+    const run = store.mintRun('work', 'run-10', root, 'F-001', { board: 'features', skill: 'break-down' });
+    const res = await create(app, bearer(run.token), {
+      board: 'product',
+      columnSlug: 'todo',
+      title: 'As a user I can ask for JSON',
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().columnSlug).toBe('backlog');
+  });
+
+  it('leaves the column alone for a card created on the run’s own board', async () => {
+    const { app, store, root } = await open();
+    const run = store.mintRun('work', 'run-11', root, 'F-001', {
+      board: 'features',
+      skill: 'derive-features',
+    });
+    const res = await create(app, bearer(run.token), {
+      board: 'features',
+      columnSlug: 'todo',
+      title: 'Emit JSON output',
+    });
+    expect(res.json().columnSlug).toBe('todo');
+  });
+
+  it('does not move a person’s card to the entry column', async () => {
+    const { app } = await open();
+    const res = await create(app, admin, {
+      board: 'product',
+      columnSlug: 'in-progress',
+      title: 'I know where I want this',
+    });
+    expect(res.json().columnSlug).toBe('in-progress');
+  });
+
   it('overrides a group the agent sent, because the server knows which vertical this is', async () => {
     const { app, store, root } = await open();
     const run = store.mintRun('work', 'run-6', root, 'F-001', { board: 'features', skill: 'break-down' });

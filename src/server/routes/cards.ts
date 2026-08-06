@@ -1,6 +1,6 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import type { FastifyInstance, FastifyReply } from 'fastify';
-import { type CardProblem, readArchive, readBoard } from '../../core/board.js';
+import { boardColumnSlugs, type CardProblem, readArchive, readBoard } from '../../core/board.js';
 import { pickCardPatch } from '../../core/card.js';
 import { findCard } from '../../core/find.js';
 import { oneParentProblem } from '../../core/hierarchy.js';
@@ -96,17 +96,36 @@ function wrongColumnForRun(
 // the parent's id when the parent IS the feature. A card created on the SAME board is a sibling, not a child:
 // that is `derive-features` making features, and a feature is the root of its own vertical rather than part of
 // another one.
-async function verticalFor(
+// AND THE COLUMN IT ENTERS AT, which is the second thing the first hand-run got wrong. `break-down` created
+// its three user stories in `product/in-progress` — a column with no route, whose only way out is a rollup,
+// and a childless card never rolls up. Three real stories, correctly written and correctly linked, parked
+// where nothing could ever move them; the loop's next honest answer would have been to stop `stalled`.
+//
+// So a card a run creates ON ANOTHER BOARD enters that board's FIRST column, whatever the caller asked for.
+// A level down means entering the pipeline at the top: any other column skips the phases before it. The
+// scaffolder already relies on the same fact — "every board opens with a Backlog" — because an agent told to
+// use "the right column" and given none reached for `backlog` and created a folder no column mapped to.
+//
+// Stamped rather than refused, because unlike the loop above there is nothing wrong with the CARD: the work
+// is real, the link is right, and only the column was a guess. Refusing would throw away a good card and one
+// of three attempts.
+async function stampForRun(
   ctx: AppCtx,
   cred: { board?: BoardName; card?: string },
   input: CreateCardInput,
-): Promise<string | undefined> {
+): Promise<Partial<CreateCardInput>> {
   const { root, config } = ctx.session as { root: string; config: ProjectConfig };
-  if (!cred.board || !cred.card || cred.board === input.board) return undefined;
+  // Same board is a sibling, not a child: `derive-features` making features. Nothing to stamp — where it may
+  // go is the loop rule's business, and a feature is the root of its own vertical.
+  if (!cred.board || !cred.card || cred.board === input.board) return {};
+  const [entry] = boardColumnSlugs(config, input.board);
   const parent = await findCard(root, cred.board, cred.card, config);
-  // No parent found is not an error here: the run's card may have been archived under it. The card is still
-  // created — refusing real work over a missing label would be the wrong trade — it simply has no group.
-  return parent ? (parent.group ?? parent.id) : undefined;
+  return {
+    ...(entry ? { columnSlug: entry } : {}),
+    // No parent found is not an error: the run's card may have been archived under it. The card is still
+    // created — refusing real work over a missing label would be the wrong trade — it simply has no group.
+    ...(parent ? { group: parent.group ?? parent.id } : {}),
+  };
 }
 
 export async function registerCardRoutes(api: FastifyInstance, ctx: AppCtx): Promise<void> {
@@ -118,21 +137,21 @@ export async function registerCardRoutes(api: FastifyInstance, ctx: AppCtx): Pro
     // handed to the caller least able to interpret one. Decision 10 says the board is validated;
     // it was not.
     if (!BOARDS.includes(input?.board)) return reply.code(400).send({ error: 'Unknown board' });
-    // A run is held to the lifecycle; a person at the browser is not. 409 rather than 400: the request is
-    // well formed, and it is the project's state that makes it wrong.
+    // A run is held to the lifecycle; a person at the browser is not. The stamp comes FIRST and the refusal
+    // judges what will actually be written: a cross-board card's column is decided here, so refusing on the
+    // column the agent guessed would refuse a card this endpoint was about to correct.
+    //
+    // The stamp wins over anything the caller sent, like every other field the server knows better than the
+    // agent does.
+    const effective = req.credential?.run
+      ? { ...input, ...(await stampForRun(ctx, req.credential, input)) }
+      : input;
     if (req.credential?.run) {
-      const wrong = wrongColumnForRun(ctx.session.config, req.credential, input);
+      // 409 rather than 400: the request is well formed, and it is the project's lifecycle that makes it wrong.
+      const wrong = wrongColumnForRun(ctx.session.config, req.credential, effective);
       if (wrong) return reply.code(409).send({ error: wrong });
     }
-    const group = req.credential?.run ? await verticalFor(ctx, req.credential, input) : undefined;
-    const card = await createCard(
-      ctx.session.root,
-      ctx.session.config,
-      // The stamp wins over anything the caller sent, like every other field the server knows better than
-      // the agent does.
-      group === undefined ? input : { ...input, group },
-      today(),
-    );
+    const card = await createCard(ctx.session.root, ctx.session.config, effective, today());
     if (card === 'unknown-column') return reply.code(400).send({ error: 'Unknown column' });
     return card;
   });

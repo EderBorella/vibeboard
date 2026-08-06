@@ -4,6 +4,7 @@ import type { RunRecord, RunStatus } from '../src/core/runs.js';
 import type { BoardName, Card } from '../src/core/types.js';
 import type { Verification } from '../src/core/verify.js';
 import { type ActDeps, performAction } from '../src/service/act.js';
+import type { DispatchRequest } from '../src/service/board-client.js';
 
 // One dispatch, end to end, and this is where C1's verification finally has a caller.
 //
@@ -76,6 +77,9 @@ function recorder(
   const moves: { card: string; to: string }[] = [];
   const diary: { kind: string; text: string }[] = [];
   const dispatched: string[] = [];
+  // The requests themselves, not only the skill names: `previous` — which run a critic is judging — is
+  // carried on the request and nowhere else, so a test can only hold it here.
+  const requests: DispatchRequest[] = [];
   // The real sequence: `POST /runs` answers with the record it just created, and the same record — same id —
   // is what `GET /runs/:board/:card` shows once it has settled. An earlier version of this fixture invented a
   // fresh id per call, so nothing the loop dispatched could ever be found again and every test failed on a
@@ -83,9 +87,10 @@ function recorder(
   let dispatchIndex = 0;
   const live: RunRecord[] = [];
   const client = {
-    dispatch: async (input: { board: BoardName; card: string; skill: string }) => {
+    dispatch: async (input: DispatchRequest) => {
       calls.push(`dispatch:${input.skill}`);
       dispatched.push(input.skill);
+      requests.push(input);
       if (opts.dispatch) return opts.dispatch;
       // ONE TEMPLATE PER DISPATCH, asserted rather than clamped. `Math.min` here meant that with fewer
       // templates than dispatches both records shared a run id, `settle`'s `find` returned the first, and a
@@ -119,7 +124,7 @@ function recorder(
       return { ok: true as const, value: {} };
     },
   };
-  return { client, calls, verdicts, moves, diary, dispatched };
+  return { client, calls, verdicts, moves, diary, dispatched, requests };
 }
 
 const commits: { root: string; message: string; branch?: string }[] = [];
@@ -459,6 +464,28 @@ describe('a critic route', () => {
     const r = recorder({ settle: [record(), judge] });
     await performAction(deps(r.client), { kind: 'dispatch', card: CARD(), route: CRITIC_ROUTE }, context);
     expect(r.verdicts[0].by).toBe(judge.run);
+  });
+
+  // THE FIRST HAND-RUN (2026-08-06). The critic scored 0 and wrote "No feature cards were created from the
+  // README, so the card's acceptance criterion is unmet." The diary said the critic "reported no reason" —
+  // because this producer passed the score and dropped the sentence, and `criticVerification`'s fallback
+  // fires only when it gets no words. The evidence was computed and thrown away.
+  // The other half of the same hand-run finding: the prompt has a slot for the run under judgement
+  // (run-prompt.ts), and it is worth nothing unless the dispatch fills it. Asserted on the REQUEST, because
+  // that is the only place this module can be held to it.
+  it('tells the critic which run it is judging', async () => {
+    const judged = record();
+    const r = recorder({ settle: [judged, record({ skill: CRITIC_SKILL, score: 0.9 })] });
+    await performAction(deps(r.client), { kind: 'dispatch', card: CARD(), route: CRITIC_ROUTE }, context);
+    expect(r.requests[1]).toMatchObject({ skill: CRITIC_SKILL, previous: judged.run });
+  });
+
+  it('carries the critic’s own sentence onto the verdict', async () => {
+    const judge = record({ skill: CRITIC_SKILL, score: 0, summary: 'No feature cards were created.' });
+    const r = recorder({ settle: [record(), judge] });
+    await performAction(deps(r.client), { kind: 'dispatch', card: CARD(), route: CRITIC_ROUTE }, context);
+    expect(r.verdicts[0].passed).toBe(false);
+    expect(r.verdicts[0].reason).toBe('No feature cards were created.');
   });
 
   it('records the real threshold even when the critic never ran', async () => {

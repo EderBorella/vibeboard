@@ -161,7 +161,7 @@ async function dispatch(deps: ActDeps, card: Card, route: Route, context: TickCo
     return { dispatches: 1 };
   }
 
-  const { verification, dispatches } = await verify(deps, card, route);
+  const { verification, dispatches } = await verify(deps, card, route, settled.run);
   // RULE 4: onto the run it judged, before the card moves. A card that advanced with no verdict recorded
   // beside it is a card nobody can explain afterwards.
   const spent = 1 + dispatches;
@@ -204,12 +204,15 @@ async function verify(
   deps: ActDeps,
   card: Card,
   route: Route,
+  // The run whose work is being verified. `gates` and `smoke` do not need it — they run commands over the
+  // tree — but a critic must be TOLD which run it is judging, or it judges whatever else it can find.
+  judged: string,
 ): Promise<{ verification: Verification; dispatches: number }> {
   const at = deps.now().toISOString();
   const verifier = deps.verify ?? { gates: verifyGates, smoke: verifySmoke };
   if (route.verify === 'gates') return { verification: await verifier.gates(deps.root, at), dispatches: 0 };
   if (route.verify === 'smoke') return { verification: await verifier.smoke(deps.root, at), dispatches: 0 };
-  return await critique(deps, card, at);
+  return await critique(deps, card, at, judged);
 }
 
 // A judging run on the same card. Its own record carries `skill: 'critic'`, which is what keeps it out of the
@@ -219,8 +222,16 @@ async function critique(
   deps: ActDeps,
   card: Card,
   at: string,
+  judged: string,
 ): Promise<{ verification: Verification; dispatches: number }> {
-  const started = await deps.client.dispatch({ board: card.board, card: card.id, skill: CRITIC_SKILL });
+  // `previous` is the run under judgement, and it is what makes this a judgement of THAT run rather than of
+  // the card. The first hand-run passed a card whose run had died, because the judge was never told.
+  const started = await deps.client.dispatch({
+    board: card.board,
+    card: card.id,
+    skill: CRITIC_SKILL,
+    previous: judged,
+  });
   if (!started.ok) {
     // Fail closed: a critic that could not be dispatched has not judged anything, and absence is never a pass.
     return {
@@ -254,6 +265,12 @@ async function critique(
       by: judge,
       ...(settled.score === undefined ? {} : { score: settled.score }),
       ...(settled.overshoot === undefined ? {} : { overshoot: settled.overshoot }),
+      // THE CRITIC'S OWN SENTENCE, which this producer used to drop. `criticVerification` is built to prefer
+      // it ("prefers the critic's own words when it wrote any") and fell back to "…and reported no reason" —
+      // so the first hand-run produced a card held back with that fallback in the diary while the critic's
+      // record, one lookup away, said exactly why: "No feature cards were created from the README". A verdict
+      // carries its evidence (decision 18), and the evidence was being computed and thrown away.
+      ...(settled.summary === undefined ? {} : { reason: settled.summary }),
     }),
     dispatches: 1,
   };

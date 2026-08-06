@@ -34,8 +34,24 @@ export interface PromptInputs {
   attachments: string[];
   // External reference links from the resources registry.
   links: { title: string; url: string }[];
-  // The previous run's report, when this run continues one.
-  previousReport?: string;
+  // The run before this one on the same card: the work this run CONTINUES, or — when `verdict` is set —
+  // the work it is JUDGING. One field for both because it is one fact; which of the two it means is
+  // decided by `verdict` at the point of rendering, so the two readings cannot drift apart.
+  //
+  // More than the report, because a run that produced no report is exactly the case that matters. A
+  // judge handed only a report saw nothing at all where a run had failed, and judged whatever else it
+  // could find on the card — see the section builder.
+  previous?: {
+    run: string;
+    skill: string;
+    // VibeBoard's own word for how it ended (`success`, `attention`, `failed`, `cancelled`…), not the
+    // agent's claim about its work.
+    status: string;
+    report?: string;
+    // What VibeBoard recorded when there was no report — an exit code, a timeout, an empty answer.
+    note?: string;
+    filesChanged?: number;
+  };
   // The user's own words for this dispatch.
   userPrompt?: string;
   // The documents this run is bound by. Four as paths — the agent has a Read tool, and inlining a
@@ -158,12 +174,34 @@ const CONTRACT_LINES = [
 //
 // It is an ALTERNATIVE to CONTRACT_LINES, never an addition. Both present, the run would be told to
 // report an outcome and to score, and whichever heading it read first would decide what it wrote.
-function verdictLines(threshold: number): string[] {
+// WHICH RUN, and this is the first hand-run's finding (2026-08-06). Told only "judge work that is already
+// done", a critic dispatched after a `break-down` run that had died with `[opencode failed: fetch failed]`
+// went looking for work to judge, found the PREVIOUS run's five derived cards, scored them 1 and said so in
+// as many words: "I did not mark down the later, separate break-down run … that is a different card's task."
+// The card advanced on a run that exited 1, wrote no report and changed no files — the failure decision 3
+// exists to prevent, arriving through the judge rather than through the agent.
+//
+// Absent for a critic a person dispatches from the card, where there is no run under judgement and the
+// subject really is the card's current state. Named as `undefined` rather than defaulted, because a
+// sentence naming a run that was never passed would be worse than the general one.
+function judgedLines(judged: NonNullable<PromptInputs['previous']>): string[] {
+  return [
+    `You are judging ONE run: **${judged.run}** (skill \`${judged.skill}\`), described above. Judge what THAT`,
+    'run did, and nothing else.',
+    '',
+    'An earlier run on this card may have succeeded; its work is not this run’s work and does not count for',
+    'it. If the run you are judging produced nothing — it failed, it wrote no report, or it changed no',
+    'files — then the score is 0, however good the card looks otherwise.',
+  ];
+}
+
+function verdictLines(threshold: number, judged: PromptInputs['previous']): string[] {
   return [
     'You are judging work that is already done. Change nothing: do not edit the code, do not edit the',
     'card, and do not move it. Your report IS the verdict, and a judge that fixes what it is judging is',
     'grading its own work.',
     '',
+    ...(judged ? [...judgedLines(judged), ''] : []),
     'Write your report to:',
     '',
     '```',
@@ -187,6 +225,30 @@ function verdictLines(threshold: number): string[] {
     'failing a card for over-delivery throws away working code and spends an attempt rebuilding it.',
     'A report with no `score` cannot pass anything, so answer even when the answer is 0.',
   ];
+}
+
+// The run before this one, under whichever heading fits what this run is for. The same record is a
+// hand-over when the run continues it and the SUBJECT when the run is judging it, and the two must not be
+// worded the same: "this continues earlier work" invites a judge to treat that work as its own.
+//
+// A run that produced no report is the case this exists for. What it left behind — how it ended, what
+// VibeBoard noted about it, how many files it changed — IS the evidence when there is no report, and a
+// judge shown nothing simply looked elsewhere.
+function previousSection(previous: NonNullable<PromptInputs['previous']>, judging: boolean): string {
+  const facts = [
+    `Run **${previous.run}**, skill \`${previous.skill}\`, which VibeBoard recorded as \`${previous.status}\`.`,
+    ...(previous.filesChanged === undefined
+      ? []
+      : [`It changed ${previous.filesChanged} file${previous.filesChanged === 1 ? '' : 's'}.`]),
+    ...(previous.note ? [`VibeBoard noted: ${previous.note}`] : []),
+  ];
+  const report = previous.report?.trim()
+    ? `What it reported:\n\n${previous.report.trim()}`
+    : 'It wrote no report.';
+  return section(
+    judging ? 'The run you are judging' : 'The previous run on this card',
+    `${judging ? '' : 'This continues earlier work.\n\n'}${facts.join('\n')}\n\n${report}`,
+  );
 }
 
 // The board is changed through the API, not by writing card files. Stated as the mechanism rather
@@ -274,14 +336,7 @@ export function buildRunPrompt(input: PromptInputs): string {
   if (input.links.length > 0) {
     parts.push(section('Reference links', input.links.map((l) => `- [${l.title}](${l.url})`).join('\n')));
   }
-  if (input.previousReport?.trim()) {
-    parts.push(
-      section(
-        'The previous run on this card',
-        `This continues earlier work. What that run reported:\n\n${input.previousReport.trim()}`,
-      ),
-    );
-  }
+  if (input.previous) parts.push(previousSection(input.previous, input.verdict !== undefined));
   // Last of the context and immediately before the contract: the user's words are the most
   // specific instruction in the prompt and must not be buried above the card.
   if (input.userPrompt?.trim()) {
@@ -302,7 +357,7 @@ export function buildRunPrompt(input: PromptInputs): string {
   }
   // One or the other, never both — see verdictLines.
   const contract = input.verdict
-    ? { heading: 'Judging (required)', lines: verdictLines(input.verdict.threshold) }
+    ? { heading: 'Judging (required)', lines: verdictLines(input.verdict.threshold, input.previous) }
     : { heading: 'Reporting (required)', lines: CONTRACT_LINES };
   parts.push(section(contract.heading, contract.lines.join('\n').replace('<REPORT_PATH>', input.reportPath)));
 

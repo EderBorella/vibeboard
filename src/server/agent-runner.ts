@@ -296,7 +296,22 @@ export class AgentRunner {
       linked: input.linked,
       attachments: input.attachments,
       links: input.links,
-      previousReport: input.previous?.report,
+      // The whole record, narrowed — not just its report. A run that failed HAS no report, and that is
+      // exactly the run a judge must be able to see (see run-prompt.ts).
+      ...(input.previous
+        ? {
+            previous: {
+              run: input.previous.run,
+              skill: input.previous.skill,
+              status: input.previous.status,
+              ...(input.previous.report ? { report: input.previous.report } : {}),
+              ...(input.previous.note ? { note: input.previous.note } : {}),
+              ...(input.previous.filesChanged === undefined
+                ? {}
+                : { filesChanged: input.previous.filesChanged }),
+            },
+          }
+        : {}),
       userPrompt: input.userPrompt,
       foundation: input.foundation,
       verdict: input.verdict,

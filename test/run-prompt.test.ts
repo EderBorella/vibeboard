@@ -239,15 +239,35 @@ describe('buildRunPrompt', () => {
   });
 
   it('carries the previous run report so an iteration does not start cold', () => {
-    const text = buildRunPrompt(inputs({ previousReport: '## What I found\n\nThree cards, not one.' }));
+    const text = buildRunPrompt(
+      inputs({
+        previous: {
+          run: 'R-EARLIER',
+          skill: 'implement',
+          status: 'success',
+          report: '## What I found\n\nThree cards, not one.',
+        },
+      }),
+    );
     expect(text).toContain('## The previous run on this card');
+    expect(text).toContain('This continues earlier work.');
     expect(text).toContain('Three cards, not one.');
   });
 
-  it('ignores a blank previous report rather than adding an empty section', () => {
-    expect(buildRunPrompt(inputs({ previousReport: '   \n  ' }))).not.toContain(
-      '## The previous run on this card',
+  // PREMISE CHANGED, deliberately (2026-08-06). This used to assert that a previous run with no report got no
+  // section at all — the guard was against an empty heading. A run that produced NO report is now the case the
+  // section exists for, so the property is restated rather than dropped: the section is never empty, because
+  // how the run ended is itself the evidence.
+  it('says a previous run wrote no report, rather than saying nothing about it', () => {
+    const text = buildRunPrompt(
+      inputs({
+        previous: { run: 'R-EARLIER', skill: 'implement', status: 'failed', report: '   \n  ' },
+      }),
     );
+    expect(text).toContain('## The previous run on this card');
+    expect(text).toContain('R-EARLIER');
+    expect(text).toContain('`failed`');
+    expect(text).toContain('It wrote no report.');
   });
 
   it('puts the user prompt last of the context, immediately before the contract', () => {
@@ -258,7 +278,7 @@ describe('buildRunPrompt', () => {
         userPrompt: 'only the token store',
         linked: [card({ id: 'P-001', board: 'product' })],
         attachments: [`${DOCS_DIR}/a.md`],
-        previousReport: 'earlier',
+        previous: { run: 'R-EARLIER', skill: 'implement', status: 'success', report: 'earlier' },
       }),
     );
     const at = (needle: string): number => text.indexOf(needle);
@@ -393,6 +413,52 @@ describe('the judging contract', () => {
 
   it('still tells it where to write, in the one place that is not the run record', () => {
     expect(judging()).toContain(`${RUNS_DIR}/r1.report.md`);
+  });
+
+  // THE FIRST HAND-RUN (2026-08-06). A critic dispatched after a `break-down` run that died with
+  // `[opencode failed: fetch failed]` scored the card 1 — and said in its own report: "I did not mark down
+  // the later, separate break-down run … that is a different card's task." It had never been told which run
+  // it was judging, so it judged the PREVIOUS, successful one, and a card advanced on a run that exited 1.
+  const judgingRun = (over: Partial<NonNullable<PromptInputs['previous']>> = {}) =>
+    buildRunPrompt(
+      inputs({
+        verdict: { threshold: 0.6 },
+        previous: { run: 'R-JUDGED', skill: 'break-down', status: 'failed', ...over },
+      }),
+    );
+
+  it('names the one run it is judging', () => {
+    const text = judgingRun();
+    expect(text).toContain('## The run you are judging');
+    expect(text).toContain('R-JUDGED');
+    // Not the hand-over wording: "this continues earlier work" invites a judge to treat that work as its own.
+    expect(text).not.toContain('This continues earlier work.');
+  });
+
+  it('tells it that an earlier run’s success is not this run’s', () => {
+    expect(judgingRun()).toMatch(/is not this run’s work/i);
+  });
+
+  // The rule that would have caught the hand-run: nothing produced means zero, however good the card looks.
+  it('tells it to score nothing at all as zero', () => {
+    expect(judgingRun()).toMatch(/the score is 0/i);
+  });
+
+  // The evidence, when there is no report to read: how it ended, what VibeBoard noted, what it changed.
+  it('shows how a failed run ended when it left no report behind', () => {
+    const text = judgingRun({ note: 'The agent exited with code 1 and wrote no report.', filesChanged: 0 });
+    expect(text).toContain('`failed`');
+    expect(text).toContain('It changed 0 files.');
+    expect(text).toContain('The agent exited with code 1 and wrote no report.');
+    expect(text).toContain('It wrote no report.');
+  });
+
+  // A critic a person dispatches from the card has no run under judgement, and the general wording is right
+  // for it. A sentence naming a run that was never passed would be worse than no sentence.
+  it('names no run when there is none, rather than inventing one', () => {
+    const text = judging();
+    expect(text).not.toContain('## The run you are judging');
+    expect(text).toMatch(/change nothing/i);
   });
 
   // The review's HIGH. A judging run was handed BOTH required contracts: "Changing the board" granting

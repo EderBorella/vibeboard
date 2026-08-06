@@ -50,6 +50,10 @@ export interface DispatchRequest {
   board: BoardName;
   card: string;
   skill: string;
+  // The run this one follows: for a critic, the run it is judging. Without it the judge was told to score
+  // "work that is already done" and had to guess which — and on the first hand-run it guessed the previous,
+  // successful run and passed a card whose actual run had died (run-prompt.ts).
+  previous?: string;
 }
 
 export interface ClientOptions {

@@ -437,16 +437,38 @@ describe('and otherwise it dispatches', () => {
   it('keeps a card with a run in flight eligible, and waits rather than stalling', () => {
     const busy = [{ card: 'P-001', skill: 'design' }];
     expect(decideTick(input({ inFlight: busy }))).toEqual({ kind: 'wait' });
-    // Not `stalled`, and not `complete`: the card is unfinished and known to be in hand.
+
+    // MORE UNFINISHED RUNS THAN THE ATTEMPT CAP, which is what makes this test about its subject. It passed
+    // `runs: []` — no runs at all — so `attemptsUsed` was trivially 0 and the property "an unfinished run does
+    // not burn an attempt" was never exercised: a review showed `burnsAttempt` could be made to count
+    // `running` with this file green. With `attemptCap` runs of the same skill IN FLIGHT, counting any of them
+    // would put the card at its cap and drop it out of eligibility entirely — after which the loop reports
+    // `stalled` over the very work it is waiting for.
+    const inFlightRuns = Array.from({ length: DEFAULT_AUTOPILOT.attemptCap }, () =>
+      run('P-001', 'product', 'design', 'running'),
+    );
     const el = eligibility({
       ap: DEFAULT_AUTOPILOT,
       cards: base(),
-      runs: [],
+      runs: inFlightRuns,
       columns: COLUMNS,
       rollupEligible: [],
       problems: [],
     });
     expect(el.eligible.map((e) => e.card.id)).toContain('P-001');
+
+    // And the same card WOULD drop out once those runs really have ended, which is what says the fixture is
+    // strong enough to tell the two apart.
+    const finished = inFlightRuns.map((r) => ({ ...r, status: 'failed' as const }));
+    const after = eligibility({
+      ap: DEFAULT_AUTOPILOT,
+      cards: base(),
+      runs: finished,
+      columns: COLUMNS,
+      rollupEligible: [],
+      problems: [],
+    });
+    expect(after.eligible.map((e) => e.card.id)).not.toContain('P-001');
   });
 
   it('dispatches the picked card and its route', () => {

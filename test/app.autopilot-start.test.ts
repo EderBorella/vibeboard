@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { beforeAll, describe, expect, it, onTestFinished } from 'vitest';
 import { IDLE_STATE } from '../src/core/autopilot-state.js';
 import { foundationRel } from '../src/core/layout.js';
-import { writeAutopilotState } from '../src/server/autopilot-store.js';
+import { readAutopilotState, writeAutopilotState } from '../src/server/autopilot-store.js';
 import { openTestProject, testTmp, wsClient } from './helpers.js';
 
 // Pressing start, and every way it refuses. Each refusal has to name the way forward — a control whose
@@ -90,13 +90,22 @@ async function recorded(path: string): Promise<Record<string, unknown>> {
   throw new Error(`the service shim never wrote ${path}`);
 }
 
+// THE PROCESS GROUP, read from the STATE FILE rather than off a response. A review found the strip applied to
+// `GET /autopilot/state` alone while `start`, `stop`, `kill` and `restart` all still answered with it — and
+// these tests were reading it from those replies, so one of them PINNED the leak as correct. The file is where
+// the server records it (decision 20) and where the reaper reads it; no client ever needs it.
+const recordedPgid = async (root: string): Promise<number | undefined> =>
+  (await readAutopilotState(root, 'T')).servicePgid;
+
 describe('pressing start', () => {
   it('starts the loop and reports the running state', async () => {
     const { app, root, log } = await ready();
     const res = await start(app);
     expect(res.statusCode).toBe(200);
     expect(res.json().state.state).toBe('running');
-    expect(res.json().state.servicePgid).toBeGreaterThan(1);
+    // On disk, not in the reply.
+    expect(await recordedPgid(root)).toBeGreaterThan(1);
+    expect(res.json().state.servicePgid).toBeUndefined();
 
     // What the loop was actually handed. Nothing asserted this, so the app could have pointed it at a dead
     // host and every test would have passed — and the loop would 401 on its first call with no clue why.
@@ -165,12 +174,13 @@ describe('pressing start', () => {
     // outside `running` that loop can neither dispatch nor keep its credential.
     const { app, root } = await ready();
     expect((await start(app)).statusCode).toBe(200);
-    const first = (await app.inject({ method: 'GET', url: '/api/autopilot/state' })).json().state.servicePgid;
+    const first = await recordedPgid(root);
+    expect(first).toBeGreaterThan(1);
     await writeAutopilotState(root, { ...IDLE_STATE, state: 'stopped' });
 
     const again = await start(app);
     expect(again.statusCode).toBe(200);
-    expect(again.json().state.servicePgid).not.toBe(first);
+    expect(await recordedPgid(root)).not.toBe(first);
   });
 
   it('refuses with no project open', async () => {
@@ -186,15 +196,28 @@ describe('pressing start', () => {
 // stopped on its first pass, and Restart zeroed the counters and set the flag straight back. Hand-editing the
 // state file was the only exit, and no part of the UI offers it.
 describe('what the browser is told', () => {
-  it('is not told the loop’s process group', async () => {
+  it('is not told the loop’s process group, by ANY route or broadcast', async () => {
     // The pgid and its start time are the reaper's business. Nothing in the browser reads them, and sending a
     // pid to a web page is a detail of this machine leaving the machine for no one's benefit.
-    const { app } = await ready();
-    expect((await start(app)).json().state.servicePgid).toBeGreaterThan(1);
-    const shown = (await app.inject({ method: 'GET', url: '/api/autopilot/state' })).json().state;
-    expect(shown.state).toBe('running');
-    expect(shown.servicePgid).toBeUndefined();
-    expect(shown.servicePgstart).toBeUndefined();
+    //
+    // EVERY reply, not just the read: a review found four control replies and both socket broadcasts still
+    // carrying it while this test watched the one route that did not.
+    const { app, root } = await ready();
+    const started = await start(app);
+    expect(await recordedPgid(root)).toBeGreaterThan(1); // recorded where the reaper needs it
+    for (const [what, state] of [
+      ['start', started.json().state],
+      ['state', (await app.inject({ method: 'GET', url: '/api/autopilot/state' })).json().state],
+      ['stop', (await app.inject({ method: 'POST', url: '/api/autopilot/stop', payload: {} })).json().state],
+      [
+        'restart',
+        (await app.inject({ method: 'POST', url: '/api/autopilot/restart', payload: {} })).json().state,
+      ],
+      ['kill', (await app.inject({ method: 'POST', url: '/api/autopilot/kill', payload: {} })).json().state],
+    ] as [string, Record<string, unknown>][]) {
+      expect(state.servicePgid, what).toBeUndefined();
+      expect(state.servicePgstart, what).toBeUndefined();
+    }
   });
 });
 
@@ -277,9 +300,9 @@ describe('a loop that crashed keeps nothing', () => {
 
 describe('and an emergency stop takes it down with everything else', () => {
   it('signals the process group the start recorded', async () => {
-    const { app } = await ready();
-    const started = await start(app);
-    const pgid = started.json().state.servicePgid as number;
+    const { app, root } = await ready();
+    await start(app);
+    const pgid = (await recordedPgid(root)) as number;
     expect(pgid).toBeGreaterThan(1);
 
     const killed = await app.inject({ method: 'POST', url: '/api/autopilot/kill', payload: {} });

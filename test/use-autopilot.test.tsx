@@ -98,4 +98,61 @@ describe('useAutopilot', () => {
     act(() => result.current.refresh());
     await waitFor(() => expect(result.current.state?.reason).toBe('complete'));
   });
+
+  // THE COUNTERS, which arrive by no other route. The loop writes `iteration` and `dispatchesSinceCheckup`
+  // straight to the state file — decision 20's carve-out — and nothing watches that file, so no broadcast
+  // accompanies them: without this poll the panel says "0 dispatches" for a whole run while the ledger beside
+  // it, computed server-side from the same file, says seven. A review found the entire effect deletable with
+  // the full suite green.
+  //
+  // Fake timers here rather than four real seconds, and they are safe because what is being observed is the
+  // TIMER firing — not a write landing on a disk, which a faked clock cannot flush.
+  it('polls the counters while the loop is running', async () => {
+    vi.useFakeTimers();
+    try {
+      api.getAutopilotState.mockResolvedValue({ ...idle, state: 'running', iteration: 2 });
+      renderHook(() => useAutopilot(bump));
+      // Flush the first fetch so `state` is `running` and the effect has installed its interval. `waitFor`
+      // cannot do this job under fake timers — it schedules its own.
+      await act(async () => {});
+      expect(api.getAutopilotState).toHaveBeenCalledTimes(1);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(4_000);
+      });
+      expect(api.getAutopilotState).toHaveBeenCalledTimes(2);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(4_000);
+      });
+      expect(api.getAutopilotState).toHaveBeenCalledTimes(3);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  // And it STOPS with the run: a tab left open on a finished project must not poll for ever. The effect keys on
+  // the state name, so the interval goes the moment the loop reports anything else.
+  it('stops polling once the loop is no longer running', async () => {
+    vi.useFakeTimers();
+    try {
+      api.getAutopilotState.mockResolvedValue({ ...idle, state: 'running' });
+      renderHook(() => useAutopilot(bump));
+      await act(async () => {});
+      expect(api.getAutopilotState).toHaveBeenCalledTimes(1);
+
+      // The next poll answers `stopped`, which must take the interval down with it.
+      api.getAutopilotState.mockResolvedValue({ ...idle, state: 'stopped', reason: 'complete' });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(4_000);
+      });
+      const afterStop = api.getAutopilotState.mock.calls.length;
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(60_000);
+      });
+      expect(api.getAutopilotState).toHaveBeenCalledTimes(afterStop);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

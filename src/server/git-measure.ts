@@ -71,8 +71,22 @@ export async function gitPoint(root: string): Promise<GitPoint | undefined> {
 // counted at least the bookkeeping VibeBoard did about it. With auto-pilot committing before each
 // dispatch the tree starts clean, so a run that changed nothing scored 1 and the checkup's "high cost,
 // nothing changed" signal could never fire.
+//
+// MATCHED AT ANY DEPTH, not only at the start, and that is the correction a review had to make (2026-08-06).
+// Git prints paths relative to the REPOSITORY TOPLEVEL whatever directory it ran in, while these two clauses
+// were written against a project-root-relative path — the same string only while a project IS the toplevel,
+// which was guaranteed until the repo-root requirement was dropped. In a subdirectory project every path
+// arrives as `packages/proj/.vibeboard/...`, so the exclusion matched nothing: EVERY run then counted the run
+// record and the transcript VibeBoard wrote about it, `filesChanged` was never 0, and both things that read it
+// went quiet — the empty-run refusal (which requires 0) and the checkup's "high cost, nothing changed" signal.
+// Reproduced with a real monorepo before it was believed.
 function isOwnBookkeeping(path: string): boolean {
-  return path === CONFIG_DIR || path.startsWith(`${CONFIG_DIR}/`);
+  return (
+    path === CONFIG_DIR ||
+    path.startsWith(`${CONFIG_DIR}/`) ||
+    path.endsWith(`/${CONFIG_DIR}`) ||
+    path.includes(`/${CONFIG_DIR}/`)
+  );
 }
 
 // Every path that differs between the two points, plus everything committed in between.

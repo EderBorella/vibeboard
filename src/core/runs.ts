@@ -521,16 +521,20 @@ export function withResolution(record: RunRecord, at: string): RunRecord {
 //
 // Each clause earns its place:
 // - `failed` only. `attention` is a run that finished and SAID it could not do the work — it has a report and
-//   a verdict is exactly what should judge it.
+//   a verdict is exactly what should judge it. A run whose report claimed success and which was then killed by
+//   the clock is `failed` WITH an `outcome`, and the clause below keeps it verifiable.
+// - `outcome === undefined` is "the agent never delivered a report", and it is the whole of that question.
+//   `withReport` is the only producer of `outcome`, so its absence means no report was ever folded in.
 // - `filesChanged === 0` and never `!filesChanged`: absent means the measurement could not be taken, which is
-//   not evidence that nothing changed.
-// - `created` because a run's product need not be a file at all. `derive-features` writes cards through the
-//   API and legitimately changes no files, so files alone would call a successful derivation empty.
+//   not evidence that nothing changed. And files alone are never enough — `derive-features` writes cards
+//   through the API and legitimately changes no files, so a files-only test would call a real derivation empty.
+//
+// NOT `record.report`, and this is the correction a review had to make (2026-08-06): `withoutReport` puts the
+// TRANSCRIPT TAIL in that field precisely when there is no agent report, so `!record.report?.trim()` was false
+// for exactly the dead run this predicate exists to catch — `{"kind":"text","text":"[opencode failed: fetch
+// failed]"}` is a non-empty `report`. The refusal was dead in production, and the tests did not notice because
+// they hand-built `report: ''`, a shape the runner never writes. Compose the real functions in a test, or a
+// field's NAME will keep standing in for what actually goes in it.
 export function producedNothing(record: RunRecord): boolean {
-  return (
-    record.status === 'failed' &&
-    record.filesChanged === 0 &&
-    !record.report?.trim() &&
-    (record.created?.length ?? 0) === 0
-  );
+  return record.status === 'failed' && record.outcome === undefined && record.filesChanged === 0;
 }

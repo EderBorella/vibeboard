@@ -295,6 +295,23 @@ export async function commitAll(
     }
   }
 
+  // A MERGE IN PROGRESS IS REFUSED BY NAME. `PROJECT_ONLY` makes every commit here a PARTIAL commit, and git
+  // refuses a partial commit during a merge outright — so without this the loop stopped on every tick quoting
+  // "cannot do a partial commit during a merge", a phrase about a git mode nobody chose. Stopping is the right
+  // answer (a run's commit must hold the run's work, and a merge commit would carry someone else's conflict
+  // resolution under an agent's message); saying why is what was missing. Found in review (2026-08-06).
+  const merging = await git(root, ['rev-parse', '--verify', '--quiet', 'MERGE_HEAD'], {
+    ...opts,
+    timeoutMs: PROBE_TIMEOUT_MS,
+  });
+  if (merging.ok) {
+    return {
+      committed: false,
+      reason:
+        "This repository is in the middle of a merge, so auto-pilot will not commit: a run's commit must contain only that run's work, and committing now would carry someone else's merge resolution under an agent's message. Finish or abort the merge first.",
+    };
+  }
+
   const work = { ...opts, timeoutMs: opts.timeoutMs ?? WORK_TIMEOUT_MS };
   const staged = await git(root, ['add', '-A', ...PROJECT_ONLY], work);
   if (!staged.ok) return { committed: false, reason: `Could not stage the tree: ${staged.problem}` };

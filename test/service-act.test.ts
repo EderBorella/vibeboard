@@ -307,6 +307,18 @@ describe('one dispatch, end to end', () => {
     );
     expect(r.dispatched).toEqual(['implement']);
     expect(result.dispatches).toBe(1);
+    // AND IT STOPS THERE, which the count alone cannot show — a review found the whole refusal block deletable
+    // with this test green. Rule 4 is that the verdict is recorded BEFORE the card moves, so a card that moved
+    // without one is a card nobody can explain: no move, and the diary says what was refused instead of
+    // narrating a run that was never accounted for.
+    expect(r.moves).toEqual([]);
+    // Not the run id, which the shared fixture counter makes order-dependent: the SHAPE, which is what says
+    // nothing else happened between the verdict and the report of its refusal.
+    expect(r.calls).toHaveLength(3);
+    expect(r.calls[0]).toBe('dispatch:implement');
+    expect(r.calls[1]).toMatch(/^verdict:/);
+    expect(r.calls[2]).toBe('log:note');
+    expect(r.diary[0].text).toMatch(/could not record the verdict/i);
   });
 
   it('still counts the dispatch when the card cannot be moved', async () => {
@@ -467,7 +479,11 @@ describe('a run that produced nothing', () => {
     const r = recorder({ settle: [record(EMPTY)] });
     await performAction(deps(r.client), { kind: 'dispatch', card: CARD(), route: ROUTE }, context);
     expect(r.verdicts[0]).toMatchObject({ mode: 'gates', passed: false });
-    expect(r.verdicts[0].reason).toMatch(/produced nothing to verify/i);
+    // "nothing this server can see" rather than "nothing": a run killed by the clock may really have created
+    // cards, and its report is deliberately not folded — so what is absent is the evidence, not necessarily the
+    // work. The verdict fails either way; the sentence must not overclaim.
+    expect(r.verdicts[0].reason).toMatch(/left nothing this server can see/i);
+    expect(r.verdicts[0].reason).toMatch(/check was not run/i);
     // No command and no output: naming one would claim a gate ran and failed.
     expect(r.verdicts[0].command).toBeUndefined();
     expect(r.verdicts[0].output).toBeUndefined();
@@ -485,6 +501,23 @@ describe('a run that produced nothing', () => {
     expect(result.dispatches).toBe(1);
   });
 
+  it('stops at a refused verdict rather than moving the card anyway', async () => {
+    // The twin of the main path's refusal, and equally unheld until a review looked: the block can be deleted
+    // and only the absence of a move gives it away.
+    const r = recorder({
+      settle: [record(EMPTY)],
+      verdict: { ok: false, reason: 'refused with 500', fatal: false },
+    });
+    const result = await performAction(
+      deps(r.client),
+      { kind: 'dispatch', card: CARD(), route: ROUTE },
+      context,
+    );
+    expect(result.dispatches).toBe(1);
+    expect(r.moves).toEqual([]);
+    expect(r.diary[0].text).toMatch(/could not record the verdict/i);
+  });
+
   it('says in the diary that the check did not run, rather than that it failed', async () => {
     const r = recorder({ settle: [record(EMPTY)] });
     await performAction(deps(r.client), { kind: 'dispatch', card: CARD(), route: ROUTE }, context);
@@ -500,11 +533,23 @@ describe('a run that produced nothing', () => {
     expect(r.moves).toEqual([{ card: 'E-001', to: 'review' }]);
   });
 
-  it('verifies a failed run that created cards, which change no files', async () => {
-    // `derive-features` writes cards through the API and legitimately changes nothing on disk, so a
-    // files-only test would call a real derivation empty.
+  // PREMISE CORRECTED by a review (2026-08-06). This used to build `created: ['F-002']` on a record with no
+  // `outcome`, which the runner cannot produce: `withReport` is the only writer of either field, so a run that
+  // reported cards always has an outcome too. The intent it was reaching for is real and is kept — a run whose
+  // product is CARDS rather than files must still be verified, because `derive-features` writes through the API
+  // and legitimately changes nothing on disk — so it is now asserted on the shape production actually writes:
+  // a report claiming success, `created` ids, zero files, and a `failed` status stamped by the clock afterwards.
+  it('verifies a run whose product was cards rather than files', async () => {
     const r = recorder({
-      settle: [record({ status: 'failed', filesChanged: 0, report: '', created: ['F-002'] })],
+      settle: [
+        record({
+          status: 'failed',
+          outcome: 'success',
+          filesChanged: 0,
+          created: ['F-002'],
+          report: '## Did it',
+        }),
+      ],
     });
     await performAction(deps(r.client), { kind: 'dispatch', card: CARD(), route: ROUTE }, context);
     expect(r.moves).toEqual([{ card: 'E-001', to: 'review' }]);

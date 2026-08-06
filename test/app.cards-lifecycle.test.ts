@@ -3,7 +3,7 @@ import { describe, expect, it, onTestFinished } from 'vitest';
 import { buildApp } from '../src/server/app.js';
 import { CredentialStore } from '../src/server/credentials.js';
 import { ProjectSession } from '../src/server/session.js';
-import { tempDir } from './helpers.js';
+import { TEST_SANDBOX, tempDir } from './helpers.js';
 
 // Where a RUN may create a card, and what vertical the card belongs to — both enforced at the endpoint,
 // because decision 10 makes endpoints the only write path and a prompt is a request rather than a rule.
@@ -18,7 +18,9 @@ const bearer = (token: string): Record<string, string> => ({ authorization: `Bea
 async function open(): Promise<{ app: FastifyInstance; store: CredentialStore; root: string }> {
   const session = new ProjectSession();
   const store = new CredentialStore(ADMIN);
-  const app = buildApp(session, { credentials: store, logger: false });
+  // The sandbox gate refuses every dispatch before the request is even resolved, so a test about what a
+  // DISPATCH does has to satisfy it first — otherwise the answer is 412 about the machine, not about the rule.
+  const app = buildApp(session, { credentials: store, logger: false, sandbox: TEST_SANDBOX });
   const root = await tempDir();
   onTestFinished(async () => {
     await app.close();
@@ -95,6 +97,56 @@ describe('a run creating a card in the column that dispatches its own skill', ()
     expect(res.json().error).toContain('break-down');
   });
 
+  // THE ADVICE, which a review showed was wrong for four of the five routes it could fire on. `route.next` is
+  // where the run's OWN card goes when it passes, not where a new card belongs: `test` refused in
+  // engineering/review was told engineering/done — TERMINAL, and `complete`'s positive evidence is a live card
+  // in a terminal column, so a compliant agent could manufacture a false success.
+  it('never advises a terminal column, because a live card there is what a false success is made of', async () => {
+    const { app, store, root } = await open();
+    const run = store.mintRun('work', 'run-adv-1', root, 'E-001', { board: 'engineering', skill: 'test' });
+    const res = await create(app, bearer(run.token), {
+      board: 'engineering',
+      columnSlug: 'review',
+      title: 'Something new',
+    });
+    expect(res.statusCode).toBe(409);
+    expect(res.json().error).not.toContain('engineering/done');
+    // A refusal still has to say what to do instead.
+    expect(res.json().error).toContain('next board down');
+  });
+
+  it('advises the next column only when a new card could actually continue from it', async () => {
+    const { app, store, root } = await open();
+    const run = store.mintRun('work', 'run-adv-2', root, 'F-001', {
+      board: 'features',
+      skill: 'derive-features',
+    });
+    const res = await create(app, bearer(run.token), {
+      board: 'features',
+      columnSlug: 'backlog',
+      title: 'A feature',
+    });
+    // features/todo is routed (break-down) and not terminal, so naming it is right here.
+    expect(res.json().error).toContain('features/todo');
+  });
+
+  // A route table whose level below dispatches the same skill is a CONFIG defect, and refusing the agent for
+  // it deadlocked a legal config: the stamp put the card in the entry column and this refusal then rejected
+  // it, with a message the agent could not act on. Cross-board creates are the stamp's business alone.
+  it('does not refuse a cross-board create, whose column the stamp decides', async () => {
+    const { app, store, root } = await open();
+    // `break-down` is routed on features/todo AND product/todo. A break-down run creating on product would
+    // have been refused under the old rule if the stamp landed it in a column its own skill dispatches.
+    const run = store.mintRun('work', 'run-adv-3', root, 'F-001', { board: 'features', skill: 'break-down' });
+    const res = await create(app, bearer(run.token), {
+      board: 'product',
+      columnSlug: 'todo',
+      title: 'A story',
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().columnSlug).toBe('backlog');
+  });
+
   // A person at the browser is not a run: they may put a card anywhere, and dragging one into a routed column
   // is exactly how a human hands work to auto-pilot.
   it('does not constrain a person at the browser', async () => {
@@ -105,6 +157,25 @@ describe('a run creating a card in the column that dispatches its own skill', ()
       title: 'A rough idea I had',
     });
     expect(res.statusCode).toBe(200);
+  });
+});
+
+// A DISPATCH THAT NAMES A RUN IT CANNOT READ IS REFUSED. `readRun` swallows every failure and answers null, and
+// mapping that to "no previous run" failed open exactly where it hurts: a critic dispatch whose subject went
+// missing gets the GENERAL judging contract, with no run named — verbatim the state that let a judge score a
+// dead run 1 and advance the card over it. The loop could not notice, because the dispatch answered 200.
+describe('a dispatch naming a previous run', () => {
+  it('is refused when that run cannot be read, rather than quietly losing its subject', async () => {
+    const { app } = await open();
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/runs',
+      headers: admin,
+      payload: { board: 'features', card: 'F-001', skill: 'critic', previous: '20260806-000000-nope' },
+    });
+    expect(res.statusCode).toBe(409);
+    expect(res.json().error).toContain('20260806-000000-nope');
+    expect(res.json().error).toMatch(/nothing for this run to continue or to judge/i);
   });
 });
 
@@ -184,6 +255,36 @@ describe('the vertical a run’s new card belongs to', () => {
     expect(res.json().columnSlug).toBe('backlog');
   });
 
+  // NOT THE FIRST COLUMN POSITIONALLY. "Every board opens with a Backlog" is a scaffolder default rather than
+  // an invariant — columns are renameable and reorderable — and on a board whose first column is terminal this
+  // stamp would have put every child card into it: a live card in a terminal column is exactly the positive
+  // evidence `complete` reads, so the stamp would have been manufacturing false successes.
+  it('enters at the first column that is routed and not terminal, not merely the first one', async () => {
+    const { app, store, root } = await open();
+    // Product's columns reordered so the terminal one comes first, which a project may legitimately do.
+    const config = await app.inject({ method: 'GET', url: '/api/config', headers: admin });
+    const ap = config.json().autopilot;
+    await app.inject({
+      method: 'PATCH',
+      url: '/api/config',
+      headers: admin,
+      payload: {
+        boards: { ...config.json().boards, product: { columns: ['Done', 'Backlog', 'Todo', 'In Progress'] } },
+        autopilot: ap,
+      },
+    });
+
+    const run = store.mintRun('work', 'run-entry', root, 'F-001', { board: 'features', skill: 'break-down' });
+    const res = await create(app, bearer(run.token), {
+      board: 'product',
+      columnSlug: 'in-progress',
+      title: 'A story',
+    });
+    expect(res.statusCode).toBe(200);
+    // `done` is first now, and is terminal; `backlog` is the first that a card can actually continue from.
+    expect(res.json().columnSlug).toBe('backlog');
+  });
+
   it('leaves the column alone for a card created on the run’s own board', async () => {
     const { app, store, root } = await open();
     const run = store.mintRun('work', 'run-11', root, 'F-001', {
@@ -245,6 +346,10 @@ describe('the vertical a run’s new card belongs to', () => {
       board: 'product',
       columnSlug: 'backlog',
       title: 'An orphan story',
+      // SENT BY THE AGENT, and it must not survive. A review found this value coming through when the parent
+      // could not be found, which is exactly the guess the stamp exists to replace — and the comment beside
+      // the code claimed the opposite. No group is honest; a wrong one splits a vertical silently.
+      group: 'whatever-the-agent-felt-like',
     });
     expect(res.statusCode).toBe(200);
     expect(res.json().group).toBeUndefined();

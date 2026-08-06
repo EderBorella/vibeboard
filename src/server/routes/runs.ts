@@ -9,7 +9,7 @@ import { resolveCopilotSelection } from '../../core/copilot-choice.js';
 import { findCard } from '../../core/find.js';
 import { foundationStatus, readGates } from '../../core/foundation.js';
 import { foundationRel } from '../../core/layout.js';
-import { asVerification, isRunId, withVerification } from '../../core/runs.js';
+import { asVerification, isRunId, type RunRecord, withVerification } from '../../core/runs.js';
 import { BOARDS, type BoardName, type ProjectConfig } from '../../core/types.js';
 import type { DispatchInput } from '../agent-runner.js';
 import type { Backend } from '../agent-turn.js';
@@ -121,6 +121,30 @@ function verdictFor(slug: string, config: ProjectConfig): { verdict?: { threshol
 // Turn a request into everything the runner needs, or into the refusal to send back. Separated from
 // the route so the handler is dispatch-and-report while the gathering — six ways to be wrong, three
 // reads from disk — lives on its own.
+// The run this one follows, or the refusal to send back.
+//
+// A NAMED `previous` THAT CANNOT BE READ IS A REFUSAL, not an absence. `readRun` swallows every failure and
+// answers null, and mapping that to `undefined` failed OPEN in the worst place: a critic dispatch whose subject
+// went missing renders the GENERAL judging contract — "you are judging work that is already done", with no run
+// named — which is verbatim the state that let a judge score a dead run 1 and advance the card over it. The
+// loop could not detect it either, because the dispatch answered 200. Found in review (2026-08-06).
+//
+// Its own function because `resolveDispatch` is already at the complexity the gate allows, and this is a
+// self-contained question: which run, or why not.
+async function resolvePrevious(
+  root: string,
+  body: DispatchBody,
+  card: string,
+): Promise<{ run: RunRecord } | { code: number; error: string } | undefined> {
+  if (!body.previous || !isBoard(body.board)) return undefined;
+  const found = await readRun(root, body.board, card, body.previous);
+  if (found) return { run: found };
+  return {
+    code: 409,
+    error: `There is no run ${body.previous} on ${card}, so there is nothing for this run to continue or to judge.`,
+  };
+}
+
 async function resolveDispatch(
   ctx: AppCtx,
   body: DispatchBody,
@@ -160,9 +184,8 @@ async function resolveDispatch(
     .map((id) => everyCard.find((c) => c.id === id))
     .filter((c): c is NonNullable<typeof c> => c !== undefined);
 
-  const previous = body.previous
-    ? ((await readRun(root, body.board, card.id, body.previous)) ?? undefined)
-    : undefined;
+  const previous = await resolvePrevious(root, body, card.id);
+  if (previous && 'error' in previous) return previous;
 
   // Only the documents that exist. A path list naming a file that is not there teaches an agent that
   // the paths in this prompt are approximate, and the next one it cannot find it will not look for.
@@ -186,7 +209,7 @@ async function resolveDispatch(
       linked,
       attachments: Array.isArray(body.attachments) ? body.attachments.map(String) : [],
       links: await readResources(root),
-      previous,
+      ...(previous ? { previous: previous.run } : {}),
       userPrompt: body.prompt,
       foundation: {
         paths: foundation.present.map(foundationRel),

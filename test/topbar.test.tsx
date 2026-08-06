@@ -205,7 +205,9 @@ describe('the auto-pilot chip', () => {
   });
 
   const chip = (): HTMLElement | null => document.querySelector('.ap-chip');
-  const detail = (): HTMLElement | null => document.querySelector('.ap-detail');
+  // BY TEST ID, which is the stable contract the component states. The queries used the CSS class, so the
+  // `data-testid` was referenced by nothing and a rename of either could have gone unnoticed.
+  const detail = (): HTMLElement | null => document.querySelector('[data-testid="ap-stop-detail"]');
 
   // `whyStuck` works hard to name WHICH cards are stuck and why, and all of it used to live in a `title`
   // attribute: unreachable on a touch device, and invisible to anyone who does not know to hover.
@@ -227,7 +229,12 @@ describe('the auto-pilot chip', () => {
   });
 
   it('and nothing at all while it is running', () => {
-    render(<TopBar {...props} autopilot={state({ state: 'running' })} />);
+    // WITH a detail in the fixture, deliberately. Without one the `state === 'stopped'` clause was deletable —
+    // a running state with no detail renders nothing either way — so a review could remove it with the suite
+    // green. A stale sentence from the previous run is exactly what this clause is here to withhold.
+    render(
+      <TopBar {...props} autopilot={state({ state: 'running', reason: 'stalled', detail: 'From last time.' })} />,
+    );
     expect(detail()).toBeNull();
   });
 

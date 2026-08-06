@@ -11,6 +11,7 @@ import {
   type RunRecord,
   runId,
   serializeRun,
+  withFilesChanged,
   withoutReport,
   withReport,
   withResolution,
@@ -344,22 +345,49 @@ describe('withResolution', () => {
 // Asked before a card's work is verified: verifying nothing is how a card advances over work that never
 // happened. Every clause must hold, so the tests below are mostly the ways it must answer NO.
 describe('a run that produced nothing', () => {
-  const empty = { status: 'failed' as const, filesChanged: 0, report: '' };
+  const empty = { status: 'failed' as const, filesChanged: 0 };
 
-  it('is a failed run with no report, no files and no cards', () => {
+  it('is a failed run that delivered no report and changed no files', () => {
     expect(producedNothing(record(empty))).toBe(true);
+  });
+
+  // THE REAL COMPOSITION, and the reason this test exists rather than only the hand-built ones below. A review
+  // found the predicate reading `record.report` — which `withoutReport` fills with the TRANSCRIPT TAIL exactly
+  // when there is no agent report, so the answer was false for the one run it must catch. Every hand-built
+  // fixture said `report: ''`, a shape the runner never writes, and all of them passed. Build the record the
+  // way production builds it.
+  it('is true for the record `withoutReport` actually writes for a dead run', () => {
+    const dead = withFilesChanged(
+      withoutReport(
+        record({ status: 'running' }),
+        'failed',
+        'The agent exited with code 1 and wrote no report.',
+        'T',
+        '{"kind":"text","text":"\\n[opencode failed: fetch failed]"}',
+      ),
+      0,
+    );
+    // The transcript really is sitting in `report` — the premise of the bug, asserted so this test cannot
+    // quietly stop being about it.
+    expect(dead.report).not.toBe('');
+    expect(producedNothing(dead)).toBe(true);
+  });
+
+  // And the other half of the same composition: a run that DID deliver a report is verifiable, whatever the
+  // clock did to it afterwards. `withReport` is the only producer of `outcome`, which is what the predicate reads.
+  it('is false for a run that delivered a report and was then failed by the clock', () => {
+    const claimed = withReport(
+      record({ status: 'running' }),
+      { outcome: 'success', summary: 'did the work', body: '## What I did' },
+      'T',
+    );
+    const killed = withFilesChanged({ ...claimed, status: 'failed' }, 0);
+    expect(killed.outcome).toBe('success');
+    expect(producedNothing(killed)).toBe(false);
   });
 
   it('is not a run that changed files, however it ended', () => {
     expect(producedNothing(record({ ...empty, filesChanged: 1 }))).toBe(false);
-  });
-
-  it('is not a run that created cards, which change no files', () => {
-    expect(producedNothing(record({ ...empty, created: ['F-002'] }))).toBe(false);
-  });
-
-  it('is not a run that wrote a report', () => {
-    expect(producedNothing(record({ ...empty, report: '## What I did\n\nnot much' }))).toBe(false);
   });
 
   // Absent is not zero. A measurement that could not be taken says nothing about what changed, and reading it

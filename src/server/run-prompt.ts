@@ -190,8 +190,12 @@ function judgedLines(judged: NonNullable<PromptInputs['previous']>): string[] {
     'run did, and nothing else.',
     '',
     'An earlier run on this card may have succeeded; its work is not this run’s work and does not count for',
-    'it. If the run you are judging produced nothing — it failed, it wrote no report, or it changed no',
-    'files — then the score is 0, however good the card looks otherwise.',
+    'it. If the run you are judging left nothing behind at all — it failed AND wrote no report AND produced',
+    'nothing — then the score is 0, however good the card looks otherwise.',
+    '',
+    'A run that changed no FILES has not necessarily done nothing: cards are created through the API, so a',
+    'run whose whole product is cards changes nothing on disk and may be perfectly complete. Judge what it',
+    'produced, never how many files it touched.',
   ];
 }
 

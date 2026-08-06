@@ -435,13 +435,40 @@ describe('the judging contract', () => {
     expect(text).not.toContain('This continues earlier work.');
   });
 
+  // THE CONTRACT SENTENCE, asserted separately from the section above it. A review found that every assertion
+  // here was satisfied by strings `previousSection` renders — the run id, the heading — so the whole of
+  // `judgedLines` could be deleted with the full suite green. The instruction and the evidence are two
+  // different things and need two different tests.
+  it('tells the judge to judge that one run and nothing else', () => {
+    expect(judgingRun()).toMatch(/judging ONE run: \*\*R-JUDGED\*\*/);
+    expect(judgingRun()).toMatch(/Judge what THAT\nrun did, and nothing else/);
+  });
+
   it('tells it that an earlier run’s success is not this run’s', () => {
     expect(judgingRun()).toMatch(/is not this run’s work/i);
   });
 
-  // The rule that would have caught the hand-run: nothing produced means zero, however good the card looks.
-  it('tells it to score nothing at all as zero', () => {
-    expect(judgingRun()).toMatch(/the score is 0/i);
+  // The rule that would have caught the hand-run — but as a CONJUNCTION. Written as "it failed, it wrote no
+  // report, or it changed no files", it told a judge to score 0 whenever the judged run changed no files, and
+  // zero files is the SUCCESSFUL shape of every card-producing skill: cards go through the API, so
+  // derive-features, break-down and design all legitimately touch nothing on disk. Five of the seven default
+  // routes, and every critic-verified one, would have had to score 0. Caught in review; the exact bytes are
+  // asserted, because this is a rule whose meaning turns on one word.
+  it('tells it to score nothing at all as zero, and only nothing at all', () => {
+    const text = judgingRun();
+    expect(text).toContain(
+      'it failed AND wrote no report AND produced\nnothing — then the score is 0, however good the card looks otherwise.',
+    );
+    expect(text).not.toMatch(/or it changed no/i);
+  });
+
+  // The other half of the same correction, stated positively so a future edit cannot quietly reinstate a
+  // files-based rule: the prompt has to say that zero files is not zero work.
+  it('tells it that a run which changed no files may still have produced something', () => {
+    const text = judgingRun({ status: 'success', filesChanged: 0 });
+    expect(text).toContain('It changed 0 files.');
+    expect(text).toMatch(/has not necessarily done nothing/i);
+    expect(text).toMatch(/never how many files it touched/i);
   });
 
   // The evidence, when there is no report to read: how it ended, what VibeBoard noted, what it changed.

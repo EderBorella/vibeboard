@@ -152,6 +152,42 @@ describe('the auto-pilot panel', () => {
     expect(screen.getByText('becomes eligible for its skill')).toBeTruthy();
   });
 
+  // EVERY CELL of a rollup row, which a review found unasserted — Board, Column and When could all have been
+  // wrong, or blank, with this file green. The When cell was worse than unasserted: it held a literal sentence
+  // translating the only condition there is, so a second condition would have been shown as the first.
+  it('reads a rollup rule across, cell by cell', async () => {
+    api.getReadiness.mockResolvedValue(readiness());
+    render(panel(configWith(true)));
+    const advance = DEFAULT_AUTOPILOT.rollup.find((r) => r.action === 'advance');
+    if (!advance) throw new Error('the default table has no advancing rollup rule to read');
+
+    const row = (await screen.findByText('advance to done')).closest('tr');
+    if (!row) throw new Error('the rendered cell is not in a row');
+    const cells = [...row.querySelectorAll('td')].map((c) => c.textContent);
+    expect(cells).toEqual([
+      'Product',
+      advance.column,
+      'every card under it is finished',
+      `advance to ${advance.next}`,
+    ]);
+    expect(advance.when).toBe('all-children-terminal');
+  });
+
+  // THE CELL MUST BE DERIVED, and only a condition the panel does NOT know can prove it. Asserting the sentence
+  // for the one `when` that exists passes just as well against a hardcoded literal — my own first version of the
+  // test above did exactly that, and the plant proving the lookup live found nothing. So: a rollup rule carrying
+  // an unknown condition, which is what a hand-edited config or a newer VibeBoard produces.
+  it('shows a rollup condition it does not recognise rather than the one it does', async () => {
+    api.getReadiness.mockResolvedValue(readiness());
+    const config = configWith(true);
+    const ap = config.autopilot as unknown as { rollup: { when: string }[] };
+    ap.rollup = [{ ...ap.rollup[0], when: 'every-child-was-smoke-tested' }];
+    render(panel(config));
+
+    expect(await screen.findByText('every-child-was-smoke-tested')).toBeTruthy();
+    expect(screen.queryByText('every card under it is finished')).toBeNull();
+  });
+
   it('states what is blocking auto-pilot in words, not as a red dot', async () => {
     api.getReadiness.mockResolvedValue(
       readiness({

@@ -148,10 +148,15 @@ describe('the phase skills the routing table names', () => {
     expect(content).toMatch(/own .?group.? if it has one, and otherwise this card's id/i);
   });
 
-  it('tells break-down what the level below is called at each level', () => {
+  // THE DIRECTION of the spine, not merely its vocabulary. These were dotAll `.+` regexes, which a review
+  // showed pass just as well when the two levels are stated backwards — "a user story breaks into features" —
+  // because both words appear somewhere in the document. The exact sentence, then: this is a prompt, so the
+  // wording IS the behaviour.
+  it('tells break-down what the level below is called, and in which direction', () => {
     const content = SEED_SKILLS.find((s) => s.slug === 'break-down')?.content ?? '';
-    expect(content).toMatch(/user stories.+product board/is);
-    expect(content).toMatch(/tasks.+engineering/is);
+    expect(content).toContain(
+      'A **feature** breaks into **user stories** on the\nproduct board; a **user story** breaks into **tasks** on engineering.',
+    );
   });
 
   it('tells implement to file what it finds rather than widen the card', () => {

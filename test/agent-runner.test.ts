@@ -728,6 +728,46 @@ describe('AgentRunner.dispatch', () => {
     expect(prompt).toContain('Needs splitting.');
   });
 
+  // WHAT A JUDGE IS SHOWN, through the real runner and read off the real prompt. A review found every field of
+  // this forwarding deletable with the full suite green — `status` could be hardcoded `'success'` and `note`
+  // and `filesChanged` dropped — which re-arms the exact failure the judging slot was built to stop: a critic
+  // that cannot see its subject died, and scores the previous run's work instead.
+  it('shows a judging run how the run it is judging actually ended', async () => {
+    const root = await tempDir();
+    const previous: RunRecord = {
+      run: '20260726-141000-dead',
+      card: 'E-010',
+      board: 'engineering',
+      skill: 'break-down',
+      status: 'failed',
+      started: '2026-07-26T14:10:00.000Z',
+      backend: 'claude-code',
+      model: 'opus',
+      effort: 'high',
+      mode: 'bypassPermissions',
+      // What the runner really writes for a run with no agent report: the TRANSCRIPT lands in `report`, and
+      // `note` is VibeBoard's own sentence about it (see withoutReport).
+      report: '{"kind":"text","text":"[opencode failed: fetch failed]"}',
+      note: 'The agent exited with code 1 and wrote no report.',
+      filesChanged: 0,
+    };
+    const argsLog = join(await tempDir(), 'args.log');
+    process.env.VIBEBOARD_SHIM_ARGS = argsLog;
+    const { instance } = runner(root);
+    const { run } = await instance.dispatch(input(root, { previous, verdict: { threshold: 0.6 } }));
+    await settled(root, run);
+    delete process.env.VIBEBOARD_SHIM_ARGS;
+
+    const { readFile } = await import('node:fs/promises');
+    const prompt: string = JSON.parse((await readFile(argsLog, 'utf8')).trim().split('\n')[0]).prompt;
+    expect(prompt).toContain('## The run you are judging');
+    expect(prompt).toContain('20260726-141000-dead');
+    // The three facts a judge needs when there is no report to read, each carried from the record.
+    expect(prompt).toContain('recorded as `failed`');
+    expect(prompt).toContain('It changed 0 files.');
+    expect(prompt).toContain('The agent exited with code 1 and wrote no report.');
+  });
+
   it('writes a transcript of the run', async () => {
     const root = await tempDir();
     const { instance } = runner(root);

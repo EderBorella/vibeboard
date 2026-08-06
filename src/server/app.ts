@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastify';
+import { forClient } from '../core/autopilot-state.js';
 import { DEFAULT_MAX_RUNS } from '../core/config.js';
 import { AgentRunner } from './agent-runner.js';
 import { registerAuth } from './auth.js';
@@ -125,7 +126,7 @@ export function buildApp(
   const autopilot = new AutopilotRuntime({
     root: () => session.root,
     now: () => new Date(),
-    onChange: (state) => broadcast({ type: 'autopilot:state', state }),
+    onChange: (state) => broadcast({ type: 'autopilot:state', state: forClient(state) }),
     // Every stop takes the loop's authority away, so every stop revokes its credential. The service's
     // token belongs to no run record, so nothing else would ever expire it — and `dispatchLock` now
     // admits a `service` caller only while `running`, which makes this the second of two independent
@@ -180,7 +181,7 @@ export function buildApp(
     apiBase: () => `http://127.0.0.1:${process.env.VIBEBOARD_PORT ?? 4610}`,
     ...(opts.serviceCommand ? { command: opts.serviceCommand } : {}),
     // A loop that died without saying why still has to raise the overlay in every open tab.
-    onStopped: (state) => broadcast({ type: 'autopilot:state', state }),
+    onStopped: (state) => broadcast({ type: 'autopilot:state', state: forClient(state) }),
     onDispatchingEnded: () => credentials.expireScope('service'),
     log: log.child({ component: 'autopilot-service' }),
   });

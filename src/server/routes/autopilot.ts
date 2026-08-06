@@ -11,6 +11,7 @@ import {
 import { type AutopilotConfig, DEFAULT_AUTOPILOT } from '../../core/autopilot.js';
 import { coverageProblems, skillProblems } from '../../core/autopilot-cover.js';
 import type { AutopilotState } from '../../core/autopilot-state.js';
+import { forClient } from '../../core/autopilot-state.js';
 import { STOP_REASONS, type StopReason } from '../../core/dispatch-gate.js';
 import {
   type FoundationStatus,
@@ -163,8 +164,7 @@ async function registerControls(api: FastifyInstance, ctx: AppCtx): Promise<void
     // WITHOUT the process group. `servicePgid` and `servicePgstart` are the reaper's business and nothing in
     // the browser reads them — sending a pid to a web page is a detail of this machine leaving the machine
     // for no one's benefit.
-    const { servicePgid, servicePgstart, ...state } = await ctx.autopilot.current();
-    return { state };
+    return { state: forClient(await ctx.autopilot.current()) };
   });
 
   // Stop dispatching. The app is untouched: chat, manual runs and the board all carry on.
@@ -173,7 +173,7 @@ async function registerControls(api: FastifyInstance, ctx: AppCtx): Promise<void
     const { detail } = (req.body ?? {}) as { detail?: string };
     const result = await ctx.autopilot.softStop(detail);
     if (!result.ok) return reply.code(409).send({ error: result.error });
-    return { state: result.state };
+    return { state: forClient(result.state) };
   });
 
   // Everything project-related dies. Deliberately a separate endpoint from the soft stop rather than a
@@ -184,7 +184,7 @@ async function registerControls(api: FastifyInstance, ctx: AppCtx): Promise<void
     const { detail } = (req.body ?? {}) as { detail?: string };
     const result = await ctx.autopilot.emergencyStop(detail);
     if (!result.ok) return reply.code(409).send({ error: result.error });
-    return { state: result.state };
+    return { state: forClient(result.state) };
   });
 
   // Press start. The refusals are in the order a person would fix them, and every one names the way
@@ -216,8 +216,8 @@ async function registerControls(api: FastifyInstance, ctx: AppCtx): Promise<void
 
     const started = await ctx.service.start();
     if (!started.ok) return reply.code(409).send({ error: started.error });
-    ctx.broadcast({ type: 'autopilot:state', state: started.state });
-    return { state: started.state };
+    ctx.broadcast({ type: 'autopilot:state', state: forClient(started.state) });
+    return { state: forClient(started.state) };
   });
 
   // The loop reporting its own ending. The ONLY control on this file a run credential may call, and it is
@@ -244,7 +244,7 @@ async function registerControls(api: FastifyInstance, ctx: AppCtx): Promise<void
       typeof detail === 'string' ? detail : undefined,
     );
     if (!result.ok) return reply.code(409).send({ error: result.error });
-    return { state: result.state };
+    return { state: forClient(result.state) };
   });
 
   // The way back to idle. Auto-pilot stays off until it is started separately.
@@ -252,7 +252,7 @@ async function registerControls(api: FastifyInstance, ctx: AppCtx): Promise<void
     if (!ensureOpen(ctx.session, reply)) return;
     const result = await ctx.autopilot.restart();
     if (!result.ok) return reply.code(409).send({ error: result.error });
-    return { state: result.state };
+    return { state: forClient(result.state) };
   });
 }
 

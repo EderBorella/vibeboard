@@ -79,6 +79,33 @@ describe('comparing two points in a working tree', () => {
   it('counts the .vibeboard directory itself not at all', () => {
     expect(changedPaths(point({}), point({ '.vibeboard': '??' }))).toEqual([]);
   });
+
+  // A PROJECT BELOW THE REPOSITORY TOPLEVEL, which is the topology the repo-root requirement's removal
+  // allowed — and which broke this exclusion silently. Git prints every path relative to the toplevel, so the
+  // bookkeeping arrives with the project's own prefix on it. Nothing here exercised that until a review found
+  // it: `filesChanged` was never 0 in a monorepo, which killed the empty-run refusal AND the checkup signal.
+  it('counts none of VibeBoard’s own writes when the project is a subdirectory of the repository', () => {
+    const after = point({
+      'packages/proj/.vibeboard/boards/features/results/F-001/r.md': '??',
+      'packages/proj/.vibeboard/autopilot-state.json': ' M',
+      'packages/proj/src/a.ts': ' M',
+    });
+    expect(changedPaths(point({}), after, ['packages/proj/.vibeboard/runs/r.jsonl'])).toEqual([
+      'packages/proj/src/a.ts',
+    ]);
+  });
+
+  it('counts a subdirectory project’s .vibeboard directory itself not at all', () => {
+    expect(changedPaths(point({}), point({ 'packages/proj/.vibeboard': '??' }))).toEqual([]);
+  });
+
+  // The exclusion must not swallow a real path that merely starts the same way: `.vibeboardish/` is somebody's
+  // code, and a prefix test without the separator would have eaten it.
+  it('counts a path that only begins like the cockpit folder', () => {
+    expect(
+      changedPaths(point({}), point({ '.vibeboardish/a.ts': ' M', 'a/.vibeboardish/b.ts': ' M' })),
+    ).toEqual(['.vibeboardish/a.ts', 'a/.vibeboardish/b.ts']);
+  });
 });
 
 // Parsed from git's NUL format rather than its line format, and the rename shape is the reason.

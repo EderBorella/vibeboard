@@ -59,6 +59,15 @@ const CAPS = [
   },
 ];
 
+// The condition, in words, keyed by the value it renders. A LOOKUP rather than the sentence written straight
+// into the cell: the cell held a literal translation of the only `when` there is today, so a second condition
+// would have been shown as the first one — a routing table nobody can see is this panel's whole subject, and a
+// table that shows the wrong rule is worse than one that shows none. Unknown values fall through to the raw
+// string rather than rendering blank.
+const WHEN_LABELS: Record<string, string> = {
+  'all-children-terminal': 'every card under it is finished',
+};
+
 export function AutopilotPanel({
   config,
   onCaps,
@@ -190,7 +199,7 @@ export function AutopilotPanel({
                   <tr key={`${r.board}/${r.column}`}>
                     <td>{BOARD_LABELS[r.board]}</td>
                     <td>{r.column}</td>
-                    <td>every card under it is finished</td>
+                    <td>{WHEN_LABELS[r.when] ?? r.when}</td>
                     <td>
                       {r.action === 'advance' ? `advance to ${r.next}` : 'becomes eligible for its skill'}
                     </td>

@@ -170,7 +170,11 @@ async function dispatch(deps: ActDeps, card: Card, route: Route, context: TickCo
     const verification = unverified(
       route.verify,
       deps.now().toISOString(),
-      `The ${route.skill} run produced nothing to verify — it failed, changed no files and wrote no report — so its ${route.verify} check was not run.`,
+      // "nothing this server can see", not "nothing": a run killed by the clock may really have created cards
+      // through the API, and its report is deliberately not folded (S1), so what is absent here is the evidence
+      // rather than necessarily the work. The verdict fails either way — held card, burnt attempt — and the
+      // sentence should not overclaim.
+      `The ${route.skill} run left nothing this server can see — it failed, changed no files and delivered no report — so its ${route.verify} check was not run.`,
     );
     const recorded = await deps.client.verdict(card.board, card.id, settled.run, verification);
     if (!recorded.ok) {

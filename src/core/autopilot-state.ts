@@ -112,6 +112,19 @@ export function parseState(content: string): AutopilotState | 'unreadable' {
   };
 }
 
+// THE STATE AS A CLIENT MAY SEE IT. The process group is the reaper's business and nothing outside this server
+// has any use for it: a pid is an instrument for signalling, and handing one to every open tab — and to the
+// browser's console, and to anything that can read a WebSocket frame — publishes the one value
+// `markInterrupted` uses to decide what to kill.
+//
+// ONE HOME, because a review found the strip applied to `GET /autopilot/state` alone while `start`, `stop`,
+// `kill` and `restart` all answered with the raw state and both socket broadcasts carried it. Five leaks behind
+// one plugged hole, and a test pinned one of them as correct.
+export function forClient(state: AutopilotState): AutopilotState {
+  const { servicePgid, servicePgstart, ...rest } = state;
+  return rest;
+}
+
 export function serializeState(state: AutopilotState): string {
   return `${JSON.stringify(state, null, 2)}\n`;
 }

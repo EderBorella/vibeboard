@@ -66,6 +66,12 @@ const message = async (dir: string): Promise<string> =>
 const tracked = async (dir: string): Promise<string[]> =>
   (await git(dir, ['ls-files'])).stdout.trim().split('\n').filter(Boolean).sort();
 
+// What the last COMMIT holds, which is a different question from what the index holds: `ls-files` lists staged
+// paths too, so a colleague's staged-but-uncommitted file reads as "tracked" and an assertion about a commit
+// built on it answers about the wrong thing.
+const committedFiles = async (dir: string): Promise<string[]> =>
+  (await git(dir, ['ls-tree', '-r', '--name-only', 'HEAD'])).stdout.trim().split('\n').filter(Boolean).sort();
+
 // Numbers rather than behaviour, deliberately: the honest test is a hook that really takes 13 seconds,
 // and that would double the suite's runtime to hold one constant. This is the constant nobody could see —
 // the ten-second bound applied to `git commit` as well as to the probes, so auto-pilot could not have
@@ -243,6 +249,22 @@ describe('putting the run on its own branch', () => {
     expect(await branch(dir)).toBe('autopilot/run-1');
   });
 
+  // THE TWO NEW CAPABILITIES TOGETHER, which is the combination nothing exercised: a subdirectory project AND
+  // the state-file exclusion. The pathspec resolves against the git CWD, so this is what would break if it were
+  // ever anchored with `:/` or written toplevel-relative — and it would break silently, in the topology that is
+  // hardest to notice.
+  it('switches in a subdirectory project when only its own state file is dirty', async () => {
+    const outer = await committed(await repo());
+    const inner = join(outer, 'packages', 'thing');
+    await mkdir(join(inner, '.vibeboard'), { recursive: true });
+    await writeFile(join(inner, 'kept.txt'), 'the project\n');
+    await git(inner, ['add', '-A']);
+    await git(inner, ['commit', '-q', '-m', 'the project']);
+
+    await writeFile(join(inner, AUTOPILOT_STATE_FILE), '{"state":"running"}\n');
+    expect(await ensureBranch(inner, 'autopilot/run-1')).toMatchObject({ ok: true, created: true });
+  });
+
   // The other direction, and the reason the exclusion is safe: git collapses an untracked directory to a
   // single entry and reports that entry whenever anything inside it is NOT excluded. So a freshly
   // scaffolded project — whose whole `.vibeboard/` is untracked, state file included — still refuses, and
@@ -335,6 +357,28 @@ describe('committing before every dispatch', () => {
     expect((await git(outer, ['status', '--porcelain'])).stdout).toContain('theirs.txt');
   });
 
+  // THE PATHSPEC ON `git commit` ITSELF, which nothing held: every test staged only project files, so the
+  // commit's own scoping was unexercised and removing it changed no result. Somebody else's work staged
+  // elsewhere in the monorepo must stay staged rather than being swept into a run's commit under an agent's
+  // message. Found in review (2026-08-06).
+  it('leaves work somebody else staged outside the project out of the run’s commit', async () => {
+    const outer = await committed(await repo());
+    const inner = join(outer, 'packages', 'thing');
+    await mkdir(inner, { recursive: true });
+    await writeFile(join(inner, 'ours.txt'), 'the project\n');
+
+    // Staged, not merely dirty: `git commit` with no pathspec commits the INDEX, so this is the case where
+    // the scoping is the only thing standing between a colleague's work and an agent's commit.
+    await writeFile(join(outer, 'theirs.txt'), 'somebody else\n');
+    await git(outer, ['add', 'theirs.txt']);
+
+    expect(await commitAll(inner, 'autopilot: E-001')).toEqual({ committed: true });
+    // The COMMIT, not the index: theirs.txt is staged, so `ls-files` would list it either way.
+    expect(await committedFiles(outer)).toEqual(['packages/thing/ours.txt', 'seed.txt']);
+    // Still staged, still theirs, still uncommitted.
+    expect((await git(outer, ['diff', '--cached', '--name-only'])).stdout.trim()).toBe('theirs.txt');
+  });
+
   it('reports nothing to commit when the only changes are outside the project', async () => {
     const outer = await committed(await repo());
     const inner = join(outer, 'packages', 'thing');
@@ -374,6 +418,55 @@ describe('committing before every dispatch', () => {
     expect(result).toEqual({ committed: false });
     expect(result.reason).toBeUndefined();
     expect(await count(dir)).toBe(before);
+  });
+
+  // REAL MERGE, real conflict. `PROJECT_ONLY` makes every commit a PARTIAL commit and git refuses one during a
+  // merge, so before this the loop stopped on every tick quoting "cannot do a partial commit during a merge" —
+  // a phrase about a git mode nobody chose. Stopping is right; the sentence is the fix.
+  it('refuses to commit during a merge, and says that is what is happening', async () => {
+    const dir = await committed(await repo());
+    await git(dir, ['checkout', '-q', '-b', 'theirs']);
+    await writeFile(join(dir, 'seed.txt'), 'theirs\n');
+    await git(dir, ['commit', '-qam', 'theirs']);
+    await git(dir, ['checkout', '-q', 'main']);
+    await writeFile(join(dir, 'seed.txt'), 'ours\n');
+    await git(dir, ['commit', '-qam', 'ours']);
+    // Conflicts, so the merge stops and MERGE_HEAD is left behind.
+    await git(dir, ['merge', 'theirs']).catch(() => undefined);
+    await writeFile(join(dir, 'seed.txt'), 'resolved\n');
+    await git(dir, ['add', '-A']);
+
+    const before = await count(dir);
+    const result = await commitAll(dir, 'autopilot: before E-001');
+    expect(result.committed).toBe(false);
+    expect(result.reason).toMatch(/middle of a merge/i);
+    // NOT git's own words about a mode nobody chose.
+    expect(result.reason).not.toMatch(/partial commit/i);
+    expect(await count(dir)).toBe(before);
+  });
+
+  // THE FOURTH PATHSPEC — the one on `diff --cached` — and the case that makes it load-bearing. A review
+  // planted its removal and the whole suite stayed green, because `add -A` carries the same pathspec so nothing
+  // it could see gets staged BY US. But a colleague can stage something outside the project themselves: then an
+  // unscoped `diff --cached` sees their file, concludes this project has changes, and runs a `commit` whose own
+  // pathspec matches nothing — which exits non-zero and is reported as "Could not commit" on a project where
+  // there was simply nothing to do.
+  it('reports nothing to commit when the only STAGED change is outside the project', async () => {
+    const outer = await committed(await repo());
+    const inner = join(outer, 'packages', 'thing');
+    await mkdir(inner, { recursive: true });
+    await writeFile(join(inner, 'ours.txt'), 'the project\n');
+    await commitAll(inner, 'autopilot: first');
+
+    await writeFile(join(outer, 'theirs.txt'), 'somebody else\n');
+    await git(outer, ['add', 'theirs.txt']);
+
+    const before = await count(outer);
+    const result = await commitAll(inner, 'autopilot: E-002');
+    // Nothing to commit is ordinary and carries NO reason; a reason here would stop the loop.
+    expect(result).toEqual({ committed: false });
+    expect(result.reason).toBeUndefined();
+    expect(await count(outer)).toBe(before);
   });
 
   it('refuses a message containing a NUL byte instead of throwing', async () => {

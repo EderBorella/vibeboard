@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { chmod, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
+import type { BoardName } from '../core/types.js';
 
 // Who a request is allowed to be. Widening order, and each scope is a superset of the one before:
 // `work` is what an ordinary skill run gets, `checkup` adds the board surgery a health check needs,
@@ -23,6 +24,14 @@ export interface Credential {
   run?: string;
   project?: string;
   card?: string;
+  // WHAT DISPATCHED THIS RUN: the board its card is on, and the skill it was given. Carried here so the
+  // endpoints can enforce where a run may create a card without going and reading its run record — the
+  // credential is already the place the server states what it knows about a caller, and stamping from it is
+  // how `POST /api/runs` and the suggestion store already work.
+  //
+  // Absent for admin (a person is not a run) and for the service credential, which belongs to no card.
+  board?: BoardName;
+  skill?: string;
 }
 
 export function adminTokenFile(): string {
@@ -68,8 +77,16 @@ export class CredentialStore {
 
   constructor(private readonly admin: string) {}
 
-  mintRun(scope: Exclude<Scope, 'admin'>, run: string, project?: string, card?: string): Credential {
-    const cred: Credential = { token: randomUUID(), scope, run, project, card };
+  mintRun(
+    scope: Exclude<Scope, 'admin'>,
+    run: string,
+    project?: string,
+    card?: string,
+    // An object rather than two more positionals: five was already the limit of what reads at a call site,
+    // and only the dispatcher has these to give.
+    dispatched?: { board: BoardName; skill: string },
+  ): Credential {
+    const cred: Credential = { token: randomUUID(), scope, run, project, card, ...dispatched };
     this.#byToken.set(cred.token, cred);
     return cred;
   }

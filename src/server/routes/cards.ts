@@ -56,6 +56,59 @@ async function place(
   return placed;
 }
 
+// WHERE A RUN MAY CREATE A CARD, and what vertical the card belongs to. Both answered here, in the endpoint,
+// because decision 10 makes endpoints the only write path — so this is the one place that cannot be talked
+// out of by a prompt.
+//
+// THE LOOP THIS CLOSES, from the first hand-run: `derive-features` created five feature cards in
+// `features/backlog` — the column whose own route dispatches `derive-features`. Each was then dispatched
+// `derive-features` in turn, reported "nothing needed to be created", was passed by the critic, and ADVANCED
+// FOR DOING NOTHING. Two iterations per card, for ever, on a board that grows as it goes. The skill was told
+// where to put them; a skill instruction is a request, and this is the rule.
+//
+// Stated as a general property rather than as a special case for one skill: **a run may not create a card in
+// a column that dispatches the skill the run is doing.** Any such card is work the phase makes for itself.
+//
+// It fires for a hand dispatch too, and deliberately: the loop is the same one whoever pressed the button.
+function wrongColumnForRun(
+  config: ProjectConfig,
+  cred: { board?: BoardName; skill?: string },
+  input: CreateCardInput,
+): string | undefined {
+  const routes = config.autopilot?.routes;
+  // A project with no lifecycle has no phases to make work for themselves. `Array.isArray` because
+  // `autopilot` is parsed YAML, and a hand-edited block reaches here as whatever was in the file.
+  if (!Array.isArray(routes) || !cred.skill) return undefined;
+  const loop = routes.find(
+    (r) => r.board === input.board && r.column === input.columnSlug && r.skill === cred.skill,
+  );
+  if (!loop) return undefined;
+  return `A ${cred.skill} run may not create a card in ${input.board}/${input.columnSlug}: that column dispatches ${cred.skill}, so the card you just made would be sent straight back through the phase that made it. Create it in ${input.board}/${loop.next} instead — that is where such a card goes next.`;
+}
+
+// The vertical a run's new card belongs to: the id of the feature at the top of it. Stamped by the server
+// rather than asked of the agent, for the reason every other field on a run record is stamped — a value the
+// caller supplies is a value the caller can get wrong, and one mistyped group silently splits a vertical in
+// two.
+//
+// The rule reads off the boards: a card created on a DIFFERENT board from the run's own card is a level down
+// (a feature's user story, a story's task), so it inherits its parent's vertical — the parent's own group, or
+// the parent's id when the parent IS the feature. A card created on the SAME board is a sibling, not a child:
+// that is `derive-features` making features, and a feature is the root of its own vertical rather than part of
+// another one.
+async function verticalFor(
+  ctx: AppCtx,
+  cred: { board?: BoardName; card?: string },
+  input: CreateCardInput,
+): Promise<string | undefined> {
+  const { root, config } = ctx.session as { root: string; config: ProjectConfig };
+  if (!cred.board || !cred.card || cred.board === input.board) return undefined;
+  const parent = await findCard(root, cred.board, cred.card, config);
+  // No parent found is not an error here: the run's card may have been archived under it. The card is still
+  // created — refusing real work over a missing label would be the wrong trade — it simply has no group.
+  return parent ? (parent.group ?? parent.id) : undefined;
+}
+
 export async function registerCardRoutes(api: FastifyInstance, ctx: AppCtx): Promise<void> {
   api.post('/cards', async (req, reply) => {
     if (!ensureOpen(ctx.session, reply)) return;
@@ -65,7 +118,21 @@ export async function registerCardRoutes(api: FastifyInstance, ctx: AppCtx): Pro
     // handed to the caller least able to interpret one. Decision 10 says the board is validated;
     // it was not.
     if (!BOARDS.includes(input?.board)) return reply.code(400).send({ error: 'Unknown board' });
-    const card = await createCard(ctx.session.root, ctx.session.config, input, today());
+    // A run is held to the lifecycle; a person at the browser is not. 409 rather than 400: the request is
+    // well formed, and it is the project's state that makes it wrong.
+    if (req.credential?.run) {
+      const wrong = wrongColumnForRun(ctx.session.config, req.credential, input);
+      if (wrong) return reply.code(409).send({ error: wrong });
+    }
+    const group = req.credential?.run ? await verticalFor(ctx, req.credential, input) : undefined;
+    const card = await createCard(
+      ctx.session.root,
+      ctx.session.config,
+      // The stamp wins over anything the caller sent, like every other field the server knows better than
+      // the agent does.
+      group === undefined ? input : { ...input, group },
+      today(),
+    );
     if (card === 'unknown-column') return reply.code(400).send({ error: 'Unknown column' });
     return card;
   });

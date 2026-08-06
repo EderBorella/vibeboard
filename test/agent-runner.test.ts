@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { boardRel, DOCS_DIR, skillRel } from '../src/core/layout.js';
 import { type RunRecord, withSuggestions } from '../src/core/runs.js';
 import type { Skill } from '../src/core/skills.js';
-import type { Card } from '../src/core/types.js';
+import type { BoardName, Card } from '../src/core/types.js';
 import { AgentRunner, type DispatchInput, type RunnerOptions } from '../src/server/agent-runner.js';
 import { type Credential, CredentialStore, type Scope } from '../src/server/credentials.js';
 import { listCardRuns, readRun, reportPath, transcriptTail } from '../src/server/run-store.js';
@@ -800,13 +800,17 @@ describe('the run credential', () => {
   // revoked — correctly. What this pins is what was minted, and that the prompt carried it.
   class RecordingStore extends CredentialStore {
     minted: Credential[] = [];
+    // EVERY argument forwarded. This spy used to stop at `card`, so the `dispatched` argument added later —
+    // the board and skill the card endpoint enforces the lifecycle with — was swallowed here and by nothing
+    // else: the enforcement was dead in production while every test passed.
     override mintRun(
       scope: Exclude<Scope, 'admin'>,
       run: string,
       project?: string,
       card?: string,
+      dispatched?: { board: BoardName; skill: string },
     ): Credential {
-      const cred = super.mintRun(scope, run, project, card);
+      const cred = super.mintRun(scope, run, project, card, dispatched);
       this.minted.push(cred);
       return cred;
     }
@@ -825,6 +829,9 @@ describe('the run credential', () => {
 
     expect(store.minted).toHaveLength(1);
     expect(store.minted[0]).toMatchObject({ scope: 'work', run, project: root, card: 'E-010' });
+    // The board and skill too: `POST /api/cards` refuses a run creating work for itself and stamps the
+    // vertical, and both answers come off this credential rather than out of a run record.
+    expect(store.minted[0]).toMatchObject({ board: 'engineering', skill: 'execute' });
 
     const { readFile } = await import('node:fs/promises');
     const text: string = JSON.parse((await readFile(argsLog, 'utf8')).trim().split('\n')[0]).prompt;

@@ -267,7 +267,17 @@ export class AgentRunner {
     // Minted here rather than in dispatch, so a queued run's credential begins its life when the
     // run actually starts. `work`, confined to its own card: a run that could move cards could put
     // its own into done and declare itself finished.
-    const minted = this.#opts.credentials?.mintRun('work', run, root, record.card);
+    // The board and skill go on the credential so the card endpoint can refuse a run creating work for
+    // itself — see `runMayCreate` in routes/cards.ts.
+    // Conditional because `board` is optional on a run record: a PROJECT run (the checkup, pre-flight) has no
+    // card and no board, and a credential claiming one would be a fact invented here.
+    const minted = this.#opts.credentials?.mintRun(
+      'work',
+      run,
+      root,
+      record.card,
+      record.board ? { board: record.board, skill: record.skill } : undefined,
+    );
     // Everything from here to the handover to #settle is inside the try: once a credential exists,
     // the only thing that revokes it is #settle's `finally`, so a throw on the way there would
     // leave a working key alive for the life of the process with no run behind it.

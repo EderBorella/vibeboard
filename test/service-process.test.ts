@@ -362,6 +362,10 @@ describe('the default command', () => {
     const entry = command.args.at(-1) ?? '';
     expect(entry).toMatch(/[\\/]service[\\/]main\.(ts|js)$/);
     expect(entry.startsWith('/')).toBe(true);
+    // AND IT IS THERE. The resolution is a string rewrite, so a renamed file or a moved directory would
+    // otherwise be found by the first hand-run rather than by the suite — and the failure it produces is a
+    // spawn error with no obvious cause.
+    expect(existsSync(entry), `${entry} does not exist`).toBe(true);
     for (const flag of process.execArgv) expect(command.args).toContain(flag);
   });
 });

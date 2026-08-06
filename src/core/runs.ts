@@ -162,7 +162,10 @@ const VERIFICATION_TEXT = ['command', 'reason', 'by', 'overshoot'] as const;
 // verdict missing any of them is dropped whole rather than defaulted. Defaulting `passed` either way
 // invents a decision nobody made, and the direction that invents a pass is how work advances on
 // nothing at all; a verdict with no timestamp is one nobody can place in the sequence.
-function asVerification(value: unknown): Verification | undefined {
+// Exported for the endpoint that writes a verdict onto a run. Reused rather than re-derived, deliberately:
+// it is the check that refuses a critic score which does not agree with the threshold it claims to have been
+// judged against, and a second validator would eventually disagree with this one.
+export function asVerification(value: unknown): Verification | undefined {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
   const d = value as Record<string, unknown>;
   const at = asText(d.at);

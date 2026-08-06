@@ -131,6 +131,16 @@ export class AutopilotRuntime {
     return { ok: true, state: await this.#stop('killed', detail, 'halted') };
   }
 
+  // The loop's own ending, recorded through the same path as the buttons. A loop that has decided it is
+  // `complete`, `capped`, `exhausted`, `stalled` or `no-op` is not asking permission — it has already
+  // stopped dispatching — so this records rather than refuses, with one exception: a project that has been
+  // HALTED under it keeps the halt, because an emergency stop is not something a loop may overwrite.
+  async recordLoopStop(reason: StopReason, detail?: string): Promise<ControlResult> {
+    const state = await this.current();
+    if (state.state === 'halted') return { ok: false, error: HALTED_FIRST };
+    return { ok: true, state: await this.#stop(reason, detail) };
+  }
+
   // The way back. Counters reset because the next start is a new run, and `needsCheckup` is SET
   // rather than cleared: after an emergency stop the board is in a state nobody has looked at, and
   // the checkup is mandatory on resume anyway (decision 15).

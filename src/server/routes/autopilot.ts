@@ -10,6 +10,7 @@ import {
 } from '../../core/accounting.js';
 import { type AutopilotConfig, DEFAULT_AUTOPILOT } from '../../core/autopilot.js';
 import { coverageProblems, skillProblems } from '../../core/autopilot-cover.js';
+import { STOP_REASONS, type StopReason } from '../../core/dispatch-gate.js';
 import {
   type FoundationStatus,
   foundationStatus,
@@ -203,6 +204,33 @@ async function registerControls(api: FastifyInstance, ctx: AppCtx): Promise<void
     if (!started.ok) return reply.code(409).send({ error: started.error });
     ctx.broadcast({ type: 'autopilot:state', state: started.state });
     return { state: started.state };
+  });
+
+  // The loop reporting its own ending. The ONLY control on this file a run credential may call, and it is
+  // scoped to `service` alone: a work agent that could stop auto-pilot could stop the thing supervising it.
+  //
+  // It is a stop, not a state write: it goes through the same `AutopilotRuntime` the buttons use, so the
+  // mirror moves, every open tab gets the overlay, and the loop's credential is revoked on the way out.
+  // The loop writing `autopilot-state.json` itself would silently skip all three.
+  api.post('/autopilot/stopped', async (req, reply) => {
+    if (!ensureOpen(ctx.session, reply)) return;
+    const { reason, detail } = (req.body ?? {}) as { reason?: unknown; detail?: unknown };
+    // Validated against the shared list rather than trusted: this is agent-reachable input, and an
+    // unrecognised reason would render in the overlay as a raw word with no sentence behind it.
+    if (typeof reason !== 'string' || !(STOP_REASONS as readonly string[]).includes(reason)) {
+      return reply.code(400).send({ error: `reason must be one of ${STOP_REASONS.join(', ')}` });
+    }
+    // The two a LOOP cannot claim about itself. `killed` belongs to the emergency stop and `stopped` to
+    // the person who pressed it; a loop reporting either would put someone else's words in the overlay.
+    if (reason === 'killed' || reason === 'stopped') {
+      return reply.code(400).send({ error: `${reason} is not a reason the loop may report for itself.` });
+    }
+    const result = await ctx.autopilot.recordLoopStop(
+      reason as StopReason,
+      typeof detail === 'string' ? detail : undefined,
+    );
+    if (!result.ok) return reply.code(409).send({ error: result.error });
+    return { state: result.state };
   });
 
   // The way back to idle. Auto-pilot stays off until it is started separately.

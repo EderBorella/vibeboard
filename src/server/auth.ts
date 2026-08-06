@@ -84,6 +84,16 @@ const RULES: Record<string, Rule> = {
   // see every run in the project is an agent reasoning about its own leash.
   'GET /api/runs': { scopes: ['service'] },
   'GET /api/runs/:board/:card': { scopes: ['service'] },
+
+  // The verdict on a run, written by the loop that judged it (decision 18). Neither working scope may reach
+  // it: a run that could write its own verification would be a run advancing itself on self-assessment,
+  // which is decision 3's whole subject.
+  'POST /api/runs/:board/:card/:run/verification': { scopes: ['service'] },
+
+  // The loop saying why it stopped. The service alone: the other three controls are admin-only because a
+  // run that could restart its own project could undo the emergency stop aimed at it, and this one is
+  // narrower still — it cannot claim `killed` or `stopped`, which are a person's words.
+  'POST /api/autopilot/stopped': { scopes: ['service'] },
 };
 
 export function bearerToken(header: string | undefined): string {

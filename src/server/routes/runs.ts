@@ -9,7 +9,7 @@ import { resolveCopilotSelection } from '../../core/copilot-choice.js';
 import { findCard } from '../../core/find.js';
 import { foundationStatus, readGates } from '../../core/foundation.js';
 import { foundationRel } from '../../core/layout.js';
-import { isRunId } from '../../core/runs.js';
+import { asVerification, isRunId, withVerification } from '../../core/runs.js';
 import { BOARDS, type BoardName, type ProjectConfig } from '../../core/types.js';
 import type { DispatchInput } from '../agent-runner.js';
 import type { Backend } from '../agent-turn.js';
@@ -18,7 +18,7 @@ import type { Scope } from '../credentials.js';
 import { attachedOpencodeUrl } from '../opencode-server.js';
 import { type AppCtx, ensureOpen, nowIso } from '../route-context.js';
 import type { BoardColumns } from '../run-prompt.js';
-import { listCardRuns, listRuns, readRun, resolveProjectRun, resolveRun } from '../run-store.js';
+import { listCardRuns, listRuns, readRun, resolveProjectRun, resolveRun, writeRun } from '../run-store.js';
 import { agentRefusal } from '../sandbox.js';
 import { readSkills } from '../skill-catalogue.js';
 
@@ -252,6 +252,32 @@ export async function registerRunRoutes(api: FastifyInstance, ctx: AppCtx): Prom
       // The cap, today. Phase 5 replaces it with a queue, at which point this stops being a refusal.
       return reply.code(409).send({ error: err instanceof Error ? err.message : String(err) });
     }
+  });
+
+  // The VERDICT on a run, written by the loop that judged it. Decision 18: a verdict carries its evidence,
+  // and it belongs to the record of the run it judged — so "why did this card advance?" is answerable from
+  // disk months later.
+  //
+  // Service-scoped. Neither working scope may reach it, and that is the whole of decision 3: a run that
+  // could write its own verification would be a run advancing itself on self-assessment, which is the one
+  // thing this design exists to prevent. The verdict is validated on the way in by `asVerification`, which
+  // drops a critic score that does not agree with its own threshold.
+  api.post('/runs/:board/:card/:run/verification', async (req, reply) => {
+    if (!ensureOpen(ctx.session, reply)) return;
+    const { board, card, run } = req.params as { board: string; card: string; run: string };
+    if (!isBoard(board)) return reply.code(400).send({ error: 'Unknown board' });
+    if (!isRunId(run)) return reply.code(400).send({ error: NOT_A_RUN_ID });
+    const verification = asVerification((req.body ?? {}) as Record<string, unknown>);
+    if (!verification) {
+      return reply
+        .code(400)
+        .send({ error: 'That is not a verification: it needs a mode, a passed and an at.' });
+    }
+    const record = await readRun(ctx.session.root, board, card, run);
+    if (!record) return reply.code(404).send({ error: 'No such run' });
+    const judged = withVerification(record, verification);
+    await writeRun(ctx.session.root, judged);
+    return { run: judged };
   });
 
   // "I have dealt with this." Board and card in the path, like the list above: a run id is unique,

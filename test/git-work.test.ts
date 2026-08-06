@@ -3,6 +3,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { describe, expect, it } from 'vitest';
+import { AUTOPILOT_STATE_FILE } from '../src/core/layout.js';
 import { COMMAND_TIMEOUT_MS } from '../src/server/commands.js';
 import { commitAll, ensureBranch, PROBE_TIMEOUT_MS, WORK_TIMEOUT_MS } from '../src/server/git-work.js';
 import { tempDir } from './helpers.js';
@@ -229,6 +230,34 @@ describe('putting the run on its own branch', () => {
     await writeFile(join(outer, 'theirs.txt'), 'not ours\n');
     expect(await ensureBranch(inner, 'autopilot/run-1')).toMatchObject({ ok: true });
   });
+
+  // THE FIRST HAND-RUN'S FINDING (2026-08-06), and it stopped auto-pilot starting on any project at all.
+  // `POST /autopilot/start` writes the state file to record `running` and the service's process group
+  // before spawning the loop — so the loop's own `ensureBranch` always found a dirty tree, and the reason
+  // it gave named a file the user had been told to commit by hand moments earlier.
+  it('switches when the only uncommitted file is auto-pilot’s own state', async () => {
+    const dir = await committed(await repo());
+    await mkdir(join(dir, '.vibeboard'), { recursive: true });
+    await writeFile(join(dir, AUTOPILOT_STATE_FILE), '{"state":"running"}\n');
+    expect(await ensureBranch(dir, 'autopilot/run-1')).toMatchObject({ ok: true, created: true });
+    expect(await branch(dir)).toBe('autopilot/run-1');
+  });
+
+  // The other direction, and the reason the exclusion is safe: git collapses an untracked directory to a
+  // single entry and reports that entry whenever anything inside it is NOT excluded. So a freshly
+  // scaffolded project — whose whole `.vibeboard/` is untracked, state file included — still refuses, and
+  // the by-hand first commit is still required.
+  it('still refuses a freshly scaffolded project, whose whole cockpit is untracked', async () => {
+    const dir = await committed(await repo());
+    await mkdir(join(dir, '.vibeboard', 'boards'), { recursive: true });
+    await writeFile(join(dir, '.vibeboard', 'config.yaml'), 'name: thing\n');
+    await writeFile(join(dir, AUTOPILOT_STATE_FILE), '{"state":"running"}\n');
+    expect(await ensureBranch(dir, 'autopilot/run-1')).toMatchObject({
+      ok: false,
+      reason: expect.stringContaining('.vibeboard'),
+    });
+    expect(await branch(dir)).toBe('main');
+  });
 });
 
 describe('committing before every dispatch', () => {
@@ -317,6 +346,34 @@ describe('committing before every dispatch', () => {
     const before = await count(outer);
     expect(await commitAll(inner, 'autopilot: E-002')).toEqual({ committed: false });
     expect(await count(outer)).toBe(before);
+  });
+
+  // Machine state, not work. It is rewritten every tick and it holds a process group id that means
+  // nothing on another machine, so committing it would put one machine's pids in another's checkout —
+  // and reverting a run would restore a stale process group.
+  it('never commits auto-pilot’s own state file', async () => {
+    const dir = await committed(await repo());
+    await mkdir(join(dir, '.vibeboard'), { recursive: true });
+    await writeFile(join(dir, AUTOPILOT_STATE_FILE), '{"state":"running","servicePgid":1234}\n');
+    await writeFile(join(dir, 'work.txt'), 'what the agent did\n');
+
+    expect(await commitAll(dir, 'autopilot: E-001')).toEqual({ committed: true });
+    expect(await tracked(dir)).toEqual(['seed.txt', 'work.txt']);
+  });
+
+  // And the state file alone is ORDINARY — "there was nothing to save". Without the exclusion on `status`
+  // as well, this path staged nothing, found no staged diff, and then reported "the tree has changes git
+  // will not record": the submodule sentence, delivered on every quiet tick.
+  it('reports nothing to commit — with no reason — when only its own state changed', async () => {
+    const dir = await committed(await repo());
+    await mkdir(join(dir, '.vibeboard'), { recursive: true });
+    await writeFile(join(dir, AUTOPILOT_STATE_FILE), '{"state":"running"}\n');
+    const before = await count(dir);
+
+    const result = await commitAll(dir, 'autopilot: E-002');
+    expect(result).toEqual({ committed: false });
+    expect(result.reason).toBeUndefined();
+    expect(await count(dir)).toBe(before);
   });
 
   it('refuses a message containing a NUL byte instead of throwing', async () => {

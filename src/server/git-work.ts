@@ -1,4 +1,5 @@
 import { execFile } from 'node:child_process';
+import { AUTOPILOT_STATE_FILE } from '../core/layout.js';
 import { COMMAND_TIMEOUT_MS } from './commands.js';
 
 // The only module that writes history, and step 10 of the tick is why it exists: committing before
@@ -36,6 +37,30 @@ export const WORK_TIMEOUT_MS = COMMAND_TIMEOUT_MS;
 
 // Plenty for `status --porcelain` on a large tree, and a bound rather than an unbounded buffer.
 const MAX_OUTPUT_BYTES = 4 * 1024 * 1024;
+
+// THIS PROJECT, MINUS THE ONE FILE THAT IS NOT ITS WORK. Every command below takes this pathspec, so
+// "what git sees of a project" is stated once.
+//
+// The `.` half is the monorepo scoping (ruled 2026-08-06): without it a project inside a larger
+// repository reports someone else's edits as its own dirty tree, and then commits them.
+//
+// The exclusion is the FIRST HAND-RUN'S finding (2026-08-06), and it is not a policy about what belongs
+// in a project. `POST /autopilot/start` writes the state file to record `running` and the service's
+// process group BEFORE the loop is spawned — so by the time the loop's own `ensureBranch` read the tree,
+// the tree was dirty, on every project, always. Auto-pilot could not start ANYWHERE, and the refusal it
+// produced named a file the user had just been told to commit. Committing it is not the answer either:
+// it is rewritten on every tick and it carries a pgid that means nothing on another machine. Reverting a
+// run must not restore a stale process group.
+//
+// Excluded from ALL FOUR commands rather than the dirty check alone. Leave `status` unscoped and a tick
+// whose only change was the state file stages nothing, finds no staged diff, and then reports "the tree
+// has changes git will not record" — the submodule sentence, delivered over the ordinary case.
+//
+// What it does NOT hide: git collapses an untracked directory to one entry, and it reports that entry
+// whenever anything inside it is not excluded. A freshly scaffolded project — whose whole `.vibeboard/`
+// is untracked — therefore still refuses, which is the case the comment on `ensureBranch` describes.
+// Verified in both directions rather than assumed.
+const PROJECT_ONLY = ['--', '.', `:(exclude)${AUTOPILOT_STATE_FILE}`];
 
 // How much of a dirty tree to quote back at the reader. Enough to recognise the files, short enough to
 // stay a sentence.
@@ -174,11 +199,9 @@ async function currentBranch(root: string, opts: GitOptions): Promise<string | u
   return name === '' ? undefined : name;
 }
 
-// SCOPED TO THIS PROJECT with a `.` pathspec, and every other command here is scoped the same way. Without
-// it, a project inside a larger repository would report someone else's edits as its own dirty tree — and
-// then commit them.
+// Scoped by `PROJECT_ONLY`, like every other command here.
 async function porcelain(root: string, opts: GitOptions): Promise<string> {
-  const result = await git(root, ['status', '--porcelain', '--', '.'], {
+  const result = await git(root, ['status', '--porcelain', ...PROJECT_ONLY], {
     ...opts,
     timeoutMs: PROBE_TIMEOUT_MS,
   });
@@ -273,7 +296,7 @@ export async function commitAll(
   }
 
   const work = { ...opts, timeoutMs: opts.timeoutMs ?? WORK_TIMEOUT_MS };
-  const staged = await git(root, ['add', '-A', '--', '.'], work);
+  const staged = await git(root, ['add', '-A', ...PROJECT_ONLY], work);
   if (!staged.ok) return { committed: false, reason: `Could not stage the tree: ${staged.problem}` };
 
   // Asked BEFORE committing rather than by interpreting a failure afterwards: `git commit` on a clean
@@ -281,7 +304,7 @@ export async function commitAll(
   // the run on it would stop every time there was nothing to save.
   //
   // `--cached` because everything is staged by now; `--quiet --exit-code` answers in the exit status.
-  const changes = await git(root, ['diff', '--cached', '--quiet', '--exit-code', '--', '.'], {
+  const changes = await git(root, ['diff', '--cached', '--quiet', '--exit-code', ...PROJECT_ONLY], {
     ...opts,
     timeoutMs: PROBE_TIMEOUT_MS,
   });
@@ -307,9 +330,10 @@ export async function commitAll(
   // `-m` and never `--allow-empty`. One commit per tick on an unchanged tree would bury the ones that
   // matter, and then "which commit was this run?" has no answer. The guard that actually holds that is
   // the `diff --cached` check above — proved by planting, where `--allow-empty` alone changes nothing.
-  // `-- .` on the commit as well: with a pathspec, `git commit` records only what matches it, so anything
-  // staged outside this project by someone else stays staged rather than being swept into a run's commit.
-  const done = await git(root, ['commit', '-q', '-m', message, '--', '.'], work);
+  // `PROJECT_ONLY` on the commit as well: with a pathspec, `git commit` records only what matches it, so
+  // anything staged outside this project by someone else stays staged rather than being swept into a run's
+  // commit — and the state file stays out of history even if a previous version of this code tracked it.
+  const done = await git(root, ['commit', '-q', '-m', message, ...PROJECT_ONLY], work);
   if (!done.ok) return { committed: false, reason: `Could not commit: ${done.problem}` };
   return { committed: true };
 }

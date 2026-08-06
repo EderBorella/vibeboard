@@ -128,6 +128,32 @@ describe('the phase skills the routing table names', () => {
     expect(content).toContain('PUT /api/cards/:board/:id/links');
   });
 
+  // THE FIRST HAND-RUN. F-002 — itself a card `derive-features` had just created in features/backlog — was
+  // dispatched `derive-features`, reported "nothing needed to be created", was PASSED by the critic and
+  // advanced. A card advanced for doing nothing, and two iterations went with it. The output column is the
+  // fix: todo is where a feature waits to be broken down, which is what actually comes next for it.
+  it('tells derive-features to put its features where they will be broken down, not back in its own column', () => {
+    const content = SEED_SKILLS.find((s) => s.slug === 'derive-features')?.content ?? '';
+    expect(content).toContain('features/todo');
+    // The reason, not only the instruction: an agent that knows WHY does not reason its way out of it.
+    expect(content).toMatch(/never in the column this card is in/i);
+  });
+
+  // One group is one vertical: a feature, its user stories, their tasks. The rule has to be evaluable from
+  // the card in front of the agent, which is why it is "this card's group, or else this card's id" — that
+  // yields the feature's id at every level without the agent needing to walk the link graph.
+  it('tells break-down to carry the vertical’s group down to every card it creates', () => {
+    const content = SEED_SKILLS.find((s) => s.slug === 'break-down')?.content ?? '';
+    expect(content).toContain('`group`');
+    expect(content).toMatch(/own .?group.? if it has one, and otherwise this card's id/i);
+  });
+
+  it('tells break-down what the level below is called at each level', () => {
+    const content = SEED_SKILLS.find((s) => s.slug === 'break-down')?.content ?? '';
+    expect(content).toMatch(/user stories.+product board/is);
+    expect(content).toMatch(/tasks.+engineering/is);
+  });
+
   it('tells implement to file what it finds rather than widen the card', () => {
     const content = SEED_SKILLS.find((s) => s.slug === 'implement')?.content ?? '';
     expect(content).toContain('POST /api/suggestions');

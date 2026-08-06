@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import { afterEach, describe, expect, it } from 'vitest';
 import { boardColumnSlugs } from '../src/core/board.js';
 import { defaultConfig } from '../src/core/config.js';
@@ -48,6 +49,28 @@ describe('app mutation routes', () => {
     await app.inject({ method: 'POST', url: `/api/cards/engineering/${id}/archive` });
     const state = await app.inject({ method: 'GET', url: '/api/state' });
     expect(state.json().snapshot.boards.engineering.find((c: { id: string }) => c.id === id)).toBeUndefined();
+  });
+
+  // `break-down` is now told to set `group` on every card it creates, so that one group is one vertical —
+  // a feature, its user stories and their tasks. That instruction is worth nothing unless the create path
+  // actually keeps the value, and nothing exercised it: `group` was tested at the frontmatter and patch
+  // layers only, so a create that silently dropped it would have left every spine unlabelled.
+  it('keeps the group a card is created with, so a vertical stays labelled', async () => {
+    const { app } = await openTestProject({ name: 'Mut' });
+    const created = await app.inject({
+      method: 'POST',
+      url: '/api/cards',
+      payload: { board: 'engineering', columnSlug: ENG_COLUMN, title: 'Add --json', group: 'F-002' },
+    });
+    expect(created.json().group).toBe('F-002');
+
+    // On disk as well as in the answer: the board is read back from these files, so a group the response
+    // carried and the file did not would vanish on the next reload.
+    expect(await readFile(created.json().filePath, 'utf8')).toContain('group: F-002');
+
+    const state = await app.inject({ method: 'GET', url: '/api/state' });
+    const card = state.json().snapshot.boards.engineering.find((c: { id: string }) => c.id === 'E-002');
+    expect(card.group).toBe('F-002');
   });
 
   it('returns 404 for a missing card', async () => {

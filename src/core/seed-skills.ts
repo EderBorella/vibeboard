@@ -75,9 +75,14 @@ The README is the brief. Work out what capabilities the thing described actually
 requires, and create one feature card per capability, in the order they must be
 built — earlier cards must not depend on later ones.
 
-Create them with \`POST /api/cards\`; do not write card files. Keep each feature
-to a capability a person would name, not a task: "accounts and sign-in", not
-"add a users table".
+Create them with \`POST /api/cards\` **in features/todo**; do not write card files.
+Never in the column this card is in: a card in features/backlog is one that still
+needs deriving, so a feature left there is sent back through this same phase — a
+run that finds nothing to do, and a card that advances for doing nothing. Todo is
+where a feature waits to be broken down, which is what comes next for it.
+
+Keep each feature to a capability a person would name, not a task: "accounts and
+sign-in", not "add a users table".
 
 If the README is too thin to derive features from, say so in your report and
 name what is missing rather than inventing a product.
@@ -92,6 +97,11 @@ boards: [features, product]
 ---
 Break the card below into smaller cards on the board one level down.
 
+The level below has a name. A **feature** breaks into **user stories** on the
+product board; a **user story** breaks into **tasks** on engineering. One feature,
+its stories and their tasks are a single vertical, and the whole point of breaking
+down is that the vertical can be built one card at a time.
+
 **One acceptance criterion per card.** A card is the right size when exactly one
 test can express whether it is done. Two criteria means two cards. This is the
 rule that keeps the project a proof of concept rather than a product.
@@ -101,6 +111,10 @@ rule that keeps the project a proof of concept rather than a product.
   is yours to write and the far side is written for you.
 - Everything the hierarchy knows comes from those links. An unlinked card is an
   orphan and nothing will ever roll it up.
+- Set \`group\` on every card you create to the vertical it belongs to: this card's
+  own \`group\` if it has one, and otherwise this card's id. That makes one group
+  exactly one feature — from the feature, down through its user stories, to their
+  tasks — so a person can see a whole vertical across three boards at once.
 - Anything you notice that is real work but does not belong to this card goes to
   \`POST /api/suggestions\`, not into a bigger card and not into an extra one.
   Nothing is blocked and nothing is lost.

@@ -30,6 +30,17 @@ import type { ActResult, TickContext } from './loop.js';
 // 4. THE VERDICT IS WRITTEN TO THE RUN IT JUDGED (decision 18), so "why did this card advance?" is
 //    answerable from disk long after the loop has gone.
 
+// Committing whatever the last dispatch left behind. Called once when the loop ends, and it is what makes a
+// SECOND session possible: commits happen before each dispatch, so the final agent's edits are uncommitted by
+// construction — and the next day `ensureBranch` refuses a dirty tree, while the same day is worse, because the
+// branch name matches and run two's first commit sweeps run one's tail in under another card's message.
+export async function commitTail(deps: ActDeps, reason: string): Promise<void> {
+  const done = await (deps.commit ?? commitAll)(deps.root, `autopilot: ${reason} — the last run's work`, {
+    branch: deps.branch,
+  });
+  if (done.reason !== undefined) deps.log?.(`could not commit what the last run left: ${done.reason}`);
+}
+
 export interface ActDeps {
   client: BoardClient;
   // The project root, for the two things that are not HTTP: git, and the gate commands.
@@ -57,6 +68,19 @@ export interface ActDeps {
 
 const SETTLE_TIMEOUT_MS = 3_600_000; // an hour: a run's own timeout is half that by default
 const SETTLE_POLL_MS = 2_000;
+
+// Ceilings, so no configured or injected number can turn the wait into an unbounded one. A day is longer than
+// any run this design contemplates, and 100,000 polls is well past what a sane interval needs — both exist to
+// make the loop terminate on absurd input rather than to express a preference.
+const MAX_SETTLE_TIMEOUT_MS = 86_400_000;
+const MAX_SETTLE_POLLS = 100_000;
+
+// A number, or the default, clamped. `Number.isFinite` refuses NaN and both infinities in one test — which is
+// the whole point: those are the three values that turn arithmetic into a loop that never ends or never runs.
+function usable(value: number | undefined, fallback: number, low: number, high: number): number {
+  const n = value === undefined || !Number.isFinite(value) ? fallback : value;
+  return Math.min(high, Math.max(low, n));
+}
 
 export async function performAction(
   deps: ActDeps,
@@ -140,9 +164,16 @@ async function dispatch(deps: ActDeps, card: Card, route: Route, context: TickCo
   const { verification, dispatches } = await verify(deps, card, route);
   // RULE 4: onto the run it judged, before the card moves. A card that advanced with no verdict recorded
   // beside it is a card nobody can explain afterwards.
+  const spent = 1 + dispatches;
   const recorded = await deps.client.verdict(card.board, card.id, settled.run, verification);
   if (!recorded.ok) {
-    return refused(deps, `could not record the verdict on ${settled.run}`, recorded.reason, recorded.fatal);
+    return refused(
+      deps,
+      `could not record the verdict on ${settled.run}`,
+      recorded.reason,
+      recorded.fatal,
+      spent,
+    );
   }
 
   // RULE 2. `verification.passed`, and nothing else — never `settled.outcome`, which is what the agent said
@@ -150,11 +181,20 @@ async function dispatch(deps: ActDeps, card: Card, route: Route, context: TickCo
   if (verification.passed) {
     const moved = await deps.client.move(card.board, card.id, route.next);
     if (!moved.ok) {
-      return refused(deps, `could not advance ${card.id} to ${route.next}`, moved.reason, moved.fatal);
+      return refused(deps, `could not advance ${card.id} to ${route.next}`, moved.reason, moved.fatal, spent);
     }
   }
-  await deps.client.log('run', diaryLine(card, route, verification, context));
-  return { dispatches: 1 + dispatches };
+  // The STRUCTURED fields as well as the sentence. `DiaryEntry` carries `iteration`, `card`, `board`, `skill`
+  // and `outcome` precisely so the checkup — the diary's one reader — does not have to regex prose, and
+  // nothing was writing any of them.
+  await deps.client.log('run', diaryLine(card, route, verification, settled, context), {
+    iteration: context.iteration + 1,
+    card: card.id,
+    board: card.board,
+    skill: route.skill,
+    outcome: settled.status,
+  });
+  return { dispatches: spent };
 }
 
 // How a run's work is judged. `gates` and `smoke` run commands declared in `foundation/`, in this process.
@@ -184,16 +224,23 @@ async function critique(
   if (!started.ok) {
     // Fail closed: a critic that could not be dispatched has not judged anything, and absence is never a pass.
     return {
-      verification: criticVerification(at, { threshold: 0, by: CRITIC_SKILL, reason: started.reason }),
+      // THE REAL THRESHOLD even here, because `threshold` is evidence: it records the bar this card was
+      // measured against, and a 0 said the work was judged against a bar this project's own validator refuses
+      // — the one value that would have passed anything.
+      verification: criticVerification(at, { threshold: deps.threshold, reason: started.reason }),
       dispatches: 0,
     };
   }
-  const settled = await settle(deps, card.board, card.id, started.value.run.run);
+  const judge = started.value.run.run;
+  const settled = await settle(deps, card.board, card.id, judge);
   if (!settled) {
     return {
       verification: criticVerification(at, {
-        threshold: 0,
-        by: CRITIC_SKILL,
+        threshold: deps.threshold,
+        // THE RUN'S ID, not the skill name. `by` is documented as "the critic run's id, so its reasoning is one
+        // lookup away rather than a correlation by timestamp" — and every producer passed the string `critic`,
+        // which makes "which run judged this card?" unanswerable from the record it is written on.
+        by: judge,
         reason: 'the critic run did not finish within the time auto-pilot waits for one',
       }),
       dispatches: 1,
@@ -204,7 +251,7 @@ async function critique(
   return {
     verification: criticVerification(at, {
       threshold: deps.threshold,
-      by: CRITIC_SKILL,
+      by: judge,
       ...(settled.score === undefined ? {} : { score: settled.score }),
       ...(settled.overshoot === undefined ? {} : { overshoot: settled.overshoot }),
     }),
@@ -227,8 +274,13 @@ async function settle(
   // `waited += poll` it spun for ever the moment a caller passed a poll interval of zero — `waited` never
   // advanced — which a test did within minutes of this being written. A loop whose bound depends on its
   // arguments being sensible is not bounded.
-  const poll = Math.max(1, deps.settlePollMs ?? SETTLE_POLL_MS);
-  const attempts = Math.max(1, Math.floor(Math.max(0, timeout) / poll) + 1);
+  // BOTH AXES, because fixing one left the other: an earlier version floored the poll and computed
+  // `timeout / poll`, which is `Infinity` attempts for `settleTimeoutMs: Infinity` and `NaN` — so zero
+  // iterations, a dispatch nobody ever looked at — for a `NaN` poll. Every input is now clamped to a finite
+  // range before it can reach the arithmetic, and the attempt count has a hard ceiling of its own.
+  const poll = usable(deps.settlePollMs, SETTLE_POLL_MS, 1, SETTLE_TIMEOUT_MS);
+  const patience = usable(timeout, SETTLE_TIMEOUT_MS, 0, MAX_SETTLE_TIMEOUT_MS);
+  const attempts = Math.min(MAX_SETTLE_POLLS, Math.max(1, Math.floor(patience / poll) + 1));
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     const answer = await deps.client.cardRuns(board, card);
     if (answer.ok) {
@@ -248,19 +300,41 @@ function commitMessage(card: Card, route: Route, context: TickContext): string {
 
 // What a person reads afterwards. The verdict and its evidence, in one line, because the diary is the record
 // of what happened rather than a log of what was attempted.
-function diaryLine(card: Card, route: Route, verification: Verification, context: TickContext): string {
+function diaryLine(
+  card: Card,
+  route: Route,
+  verification: Verification,
+  judged: RunRecord,
+  context: TickContext,
+): string {
   const outcome = verification.passed ? `advanced to ${route.next}` : 'stayed where it is';
   const because = verification.reason ? ` ${verification.reason}` : '';
-  return `Iteration ${context.iteration + 1}: ${card.id} ran ${route.skill}, ${route.verify} ${verification.passed ? 'passed' : 'failed'}, so it ${outcome}.${because}`;
+  // THE AGENT'S OWN SUMMARY, which nothing was appending. Loop step 12 says "append the run's summary to the
+  // diary", and decision 10 justifies denying agents diary access on the grounds that auto-pilot appends it for
+  // them — so without this the narrative contained no agent voice at all and that justification was unearned.
+  const said = judged.summary ? ` It reported: ${judged.summary}` : '';
+  return `Iteration ${context.iteration + 1}: ${card.id} ran ${route.skill}, ${route.verify} ${verification.passed ? 'passed' : 'failed'}, so it ${outcome}.${because}${said}`;
 }
 
 // A refusal from the board. Reported to the diary where it can be, and fatal refusals end the loop: a loop
 // that cannot move a card cannot make progress, and one whose credential is gone cannot do anything at all.
-async function refused(deps: ActDeps, what: string, reason: string, fatal: boolean): Promise<ActResult> {
+//
+// `dispatches` is carried through it, and that is not tidiness: a dispatch that HAPPENED and then failed to
+// record its verdict or move its card was reported as no dispatch at all, so neither cap was told about a real
+// agent run, the tick counted as idle, and the next tick re-picked the same card and dispatched over work that
+// had already passed — three times over, until the attempt cap caught it. Decision 8 says everything a model
+// does counts against every cap, and it has to count even when what came after it broke.
+async function refused(
+  deps: ActDeps,
+  what: string,
+  reason: string,
+  fatal: boolean,
+  dispatches = 0,
+): Promise<ActResult> {
   deps.log?.(`${what}: ${reason}`);
-  if (fatal) return { dispatches: 0, stop: { reason: 'stalled', detail: `${what}: ${reason}` } };
+  if (fatal) return { dispatches, stop: { reason: 'stalled', detail: `${what}: ${reason}` } };
   await deps.client.log('note', `Auto-pilot ${what}: ${reason}`);
-  return { dispatches: 0 };
+  return { dispatches };
 }
 
 async function stop(deps: ActDeps, reason: StopReason, detail: string): Promise<ActResult> {

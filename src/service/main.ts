@@ -1,7 +1,7 @@
 import { DEFAULT_AUTOPILOT } from '../core/autopilot.js';
 import { readAutopilotState, updateAutopilotState } from '../server/autopilot-store.js';
 import { ensureBranch } from '../server/git-work.js';
-import { performAction } from './act.js';
+import { commitTail, performAction } from './act.js';
 import { BoardClient } from './board-client.js';
 import { runLoop } from './loop.js';
 
@@ -56,20 +56,29 @@ if (!branch.ok) {
   process.exit(2);
 }
 
+const actDeps = {
+  client,
+  log,
+  root,
+  branch: branch.branch,
+  now: () => new Date(),
+  threshold: ap.criticThreshold,
+};
+
 const ended = await runLoop({
   client,
   // Decision 20's carve-out: the state file directly, not over HTTP. `GET /autopilot/state` is admin-only,
   // and the counters below are the loop's own.
   readState: () => readAutopilotState(root, new Date().toISOString()),
-  writeCounters: async (change) => {
-    await updateAutopilotState(root, new Date().toISOString(), (current) => ({ ...current, ...change }));
+  addToCounters: async (dispatches) => {
+    await updateAutopilotState(root, new Date().toISOString(), (current) => ({
+      ...current,
+      iteration: current.iteration + dispatches,
+      dispatchesSinceCheckup: current.dispatchesSinceCheckup + dispatches,
+    }));
   },
-  act: (action, context) =>
-    performAction(
-      { client, log, root, branch: branch.branch, now: () => new Date(), threshold: ap.criticThreshold },
-      action,
-      context,
-    ),
+  commitTail: (reason) => commitTail(actDeps, reason),
+  act: (action, context) => performAction(actDeps, action, context),
   wait: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
   log,
 });

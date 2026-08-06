@@ -38,6 +38,14 @@ export interface BoardView {
   problems: { path: string; reason: string }[];
 }
 
+export interface DiaryDetails {
+  iteration?: number;
+  card?: string;
+  board?: BoardName;
+  skill?: string;
+  outcome?: string;
+}
+
 export interface DispatchRequest {
   board: BoardName;
   card: string;
@@ -159,8 +167,11 @@ export class BoardClient {
     return this.#call('POST', `/runs/${board}/${card}/${run}/verification`, verification);
   }
 
-  log(kind: DiaryKind, text: string): Promise<Answer<unknown>> {
-    return this.#call('POST', '/log', { kind, text });
+  // A diary entry, prose AND the fields the checkup reads. `DiaryEntry` carries `iteration`, `card`, `board`,
+  // `skill` and `outcome` so its one reader does not have to regex a sentence — and this signature used to
+  // accept only `(kind, text)`, so none of them was ever written by anything.
+  log(kind: DiaryKind, text: string, details: DiaryDetails = {}): Promise<Answer<unknown>> {
+    return this.#call('POST', '/log', { kind, text, ...details });
   }
 
   // How the loop says why it stopped. THROUGH THE SERVER, not by writing the state file: decision 20 gives

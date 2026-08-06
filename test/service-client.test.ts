@@ -229,7 +229,7 @@ describe('the loop’s sequencing', () => {
     over: Partial<LoopDeps> & { states?: import('../src/core/autopilot-state.js').AutopilotState[] } = {},
   ) {
     const acted: TickAction[] = [];
-    const written: Partial<import('../src/core/autopilot-state.js').AutopilotState>[] = [];
+    const added: number[] = [];
     const reads: number[] = [];
     const states = over.states ?? [];
     let read = 0;
@@ -238,6 +238,7 @@ describe('the loop’s sequencing', () => {
         board: async () => ({ ok: true, value: board() }),
         runs: async () => ({ ok: true, value: { runs: [] } }),
         stopped: async () => ({ ok: true, value: {} }),
+        log: async () => ({ ok: true, value: {} }),
       } as unknown as LoopDeps['client'],
       readState: async () => {
         reads.push(read);
@@ -245,17 +246,22 @@ describe('the loop’s sequencing', () => {
         read += 1;
         return state;
       },
-      writeCounters: async (change) => {
-        written.push(change);
+      addToCounters: async (dispatches) => {
+        added.push(dispatches);
       },
       act: async (action): Promise<ActResult> => {
         acted.push(action);
         return { dispatches: action.kind === 'dispatch' ? 1 : 0 };
       },
-      wait: async () => undefined,
+      // A REAL MACROTASK, not `async () => undefined`. A microtask-only wait starves the timer queue, so a
+      // loop that lost its bound span 30 million times in four seconds while vitest's own timeout — itself a
+      // `setTimeout` — could never fire: the suite hung instead of failing, orphaned a worker at 90% CPU and
+      // leaked the run's temp root. `expect(tried).toBeLessThan(1000)` below cannot execute at all if the
+      // bound goes, which makes it a gate that only works while the code is already correct.
+      wait: () => new Promise((resolve) => setTimeout(resolve, 0)),
       ...over,
     };
-    return { deps, acted, written, reads };
+    return { deps, acted, added, reads };
   }
 
   const running = { ...IDLE_STATE, state: 'running' as const };
@@ -285,8 +291,8 @@ describe('the loop’s sequencing', () => {
     expect(acted).toEqual([]);
   });
 
-  it('writes its own counters and nothing else', async () => {
-    const { deps, written } = harness({
+  it('adds to its own counters relatively, never writing an absolute it computed earlier', async () => {
+    const { deps, added } = harness({
       states: [
         { ...running, iteration: 4, dispatchesSinceCheckup: 2 },
         { ...IDLE_STATE, state: 'stopped' },
@@ -294,16 +300,18 @@ describe('the loop’s sequencing', () => {
       act: async (): Promise<ActResult> => ({ dispatches: 1 }),
     });
     await runLoop(deps);
-    // Decision 20's split, asserted as an exact object: `state`, `reason` and `detail` are the server's, and
-    // a loop that wrote them would clobber a stop it had not seen yet.
-    expect(written).toEqual([{ iteration: 5, dispatchesSinceCheckup: 3 }]);
+    // RELATIVE, and that is the whole assertion. Computed as absolutes from the state read at the top of the
+    // tick, a Restart landing mid-dispatch was undone: the reset wrote 0, this merged 4+1 over it, and the
+    // project came back `idle` with 5 — instantly capped on something the user had just cleared. Decision 20's
+    // split still holds: the loop touches the counters and nothing else.
+    expect(added).toEqual([1]);
   });
 
   it('counts a tick that dispatched twice as two, because a critic costs an iteration of its own', async () => {
     // Decision 8: everything a model does counts against every cap. A `critic` route dispatches the work and
     // then a judge, so a boolean here would have made every critic-verified card cost one iteration instead
     // of two — and the cap is the thing standing between an unattended loop and an unbounded bill.
-    const { deps, written } = harness({
+    const { deps, added } = harness({
       states: [
         { ...running, iteration: 10, dispatchesSinceCheckup: 1 },
         { ...IDLE_STATE, state: 'stopped' },
@@ -311,19 +319,19 @@ describe('the loop’s sequencing', () => {
       act: async (): Promise<ActResult> => ({ dispatches: 2 }),
     });
     const ended = await runLoop(deps);
-    expect(written).toEqual([{ iteration: 12, dispatchesSinceCheckup: 3 }]);
+    expect(added).toEqual([2]);
     expect(ended.iterations).toBe(2);
   });
 
   it('counts every dispatch against the caps, whatever it dispatched', async () => {
     // Decision 8: a critic and a checkup cost the same as work. `act` reports `dispatched`, and the loop does
     // not ask what kind of run it was.
-    const { deps, written } = harness({
+    const { deps, added } = harness({
       states: [running, running, { ...IDLE_STATE, state: 'stopped' }],
       act: async (): Promise<ActResult> => ({ dispatches: 1 }),
     });
     await runLoop(deps);
-    expect(written.length).toBe(2);
+    expect(added).toEqual([1, 1]);
   });
 
   it('stops when acting on a tick reveals a reason to', async () => {
@@ -345,6 +353,7 @@ describe('the loop’s sequencing', () => {
       client: {
         board: async () => ({ ok: false, reason: 'refused with 401', fatal: true }),
         stopped: async () => ({ ok: true, value: {} }),
+        log: async () => ({ ok: true, value: {} }),
       } as unknown as LoopDeps['client'],
     });
     expect((await runLoop(fatal.deps)).reason).toBe('stalled');
@@ -362,6 +371,7 @@ describe('the loop’s sequencing', () => {
         },
         runs: async () => ({ ok: true, value: { runs: [] } }),
         stopped: async () => ({ ok: true, value: {} }),
+        log: async () => ({ ok: true, value: {} }),
       } as unknown as LoopDeps['client'],
     });
     const ended = await runLoop(flaky.deps);
@@ -378,6 +388,7 @@ describe('the loop’s sequencing', () => {
       client: {
         board: async () => ({ ok: false, reason: 'refused with 401', fatal: true }),
         stopped: async () => ({ ok: false, reason: 'could not reach the board', fatal: false }),
+        log: async () => ({ ok: false, reason: 'could not reach the board', fatal: false }),
       } as unknown as LoopDeps['client'],
       log: (message) => said.push(message),
     });

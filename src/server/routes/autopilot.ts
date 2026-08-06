@@ -10,6 +10,7 @@ import {
 } from '../../core/accounting.js';
 import { type AutopilotConfig, DEFAULT_AUTOPILOT } from '../../core/autopilot.js';
 import { coverageProblems, skillProblems } from '../../core/autopilot-cover.js';
+import type { AutopilotState } from '../../core/autopilot-state.js';
 import { STOP_REASONS, type StopReason } from '../../core/dispatch-gate.js';
 import {
   type FoundationStatus,
@@ -134,6 +135,21 @@ async function readReadiness(root: string, config: ProjectConfig): Promise<Readi
   );
 }
 
+// Why this project cannot be started right now, or nothing. `halted` needs a person (decision 12); `running`
+// means it is already going; and an owed checkup is one this slice cannot run — the tick would stop for it on
+// its first pass, so refusing here puts the reason in the panel instead of delivering it as a stop nobody
+// asked for. Each names the control that clears it, because a refusal without a way forward is a dead end.
+function stateConflict(state: AutopilotState, ap: AutopilotConfig): string | undefined {
+  if (state.state === 'halted') {
+    return 'This project is halted. Restart it from the auto-pilot panel before starting auto-pilot.';
+  }
+  if (state.state === 'running') return 'Auto-pilot is already running this project.';
+  if (state.needsCheckup || state.dispatchesSinceCheckup >= ap.checkupEvery) {
+    return 'This project owes a supervisor checkup, which auto-pilot cannot run yet. Restart it from the auto-pilot panel to clear that and start again from zero.';
+  }
+  return undefined;
+}
+
 // The state, and the three ways to stop (decision 12). Every one of them is admin-only by absence
 // from the scope table in auth.ts, and that is load-bearing rather than incidental: a run able to
 // restart its own project could undo the emergency stop that was aimed at it, and the whole point of
@@ -188,17 +204,10 @@ async function registerControls(api: FastifyInstance, ctx: AppCtx): Promise<void
       });
     }
 
-    // Then the state. `halted` needs a person (decision 12) and `running` means it is already going —
-    // 409 for both, because the request conflicts with the project rather than with the machine.
+    // Then the state, which is the project's own business rather than the machine's — 409 for each.
     const state = await ctx.autopilot.current();
-    if (state.state === 'halted') {
-      return reply.code(409).send({
-        error: 'This project is halted. Restart it from the auto-pilot panel before starting auto-pilot.',
-      });
-    }
-    if (state.state === 'running') {
-      return reply.code(409).send({ error: 'Auto-pilot is already running this project.' });
-    }
+    const conflict = stateConflict(state, ctx.session.config.autopilot ?? DEFAULT_AUTOPILOT);
+    if (conflict) return reply.code(409).send({ error: conflict });
 
     const started = await ctx.service.start();
     if (!started.ok) return reply.code(409).send({ error: started.error });

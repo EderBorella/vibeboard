@@ -12,6 +12,7 @@ import {
   pickNext,
 } from './eligibility.js';
 import { liveCards } from './hierarchy.js';
+import { ARCHIVE_SLUG } from './layout.js';
 import { type RollupAdvance, rollupOutcomes } from './rollup.js';
 import type { RunRecord } from './runs.js';
 import type { BoardName, Card } from './types.js';
@@ -218,6 +219,20 @@ function whyStuck(ap: AutopilotConfig, cards: Card[], unfinished: Card[], el: El
 // empty list, and all three used to answer with the project's only success.
 function nothingEligible(ap: AutopilotConfig, cards: Card[], el: EligibilitySet): TickAction {
   const live = liveCards(cards);
+  // A card that is NOT live and NOT in the archive is a half-finished archive, and it was invisible to all
+  // three sets `complete` is decided from — eligible, unfinished, and problems. `archiveCard` stamps the
+  // frontmatter and THEN moves the file, so a server killed between those two writes leaves exactly this; so
+  // does a hand-edit through `PUT /raw`. The board still renders the card, and auto-pilot called the project
+  // finished over work the user can see sitting in Backlog. The fourth route to the failure this design exists
+  // to prevent, and the same shape as the other three: an absence read as evidence.
+  const halfArchived = cards.filter((c) => !liveCards([c]).length && c.columnSlug !== ARCHIVE_SLUG);
+  if (halfArchived.length > 0) {
+    return {
+      kind: 'stop',
+      reason: 'stalled',
+      detail: `${names(halfArchived)} ${isAre(halfArchived)} marked archived but still in a live column, so auto-pilot cannot tell whether ${halfArchived.length === 1 ? 'it is' : 'they are'} work or not. Archive ${halfArchived.length === 1 ? 'it' : 'them'} properly, or clear the archived field.`,
+    };
+  }
   const unfinished = live.filter((c) => !isTerminalColumn(ap, c.board, c.columnSlug));
   if (unfinished.length > 0) {
     return {

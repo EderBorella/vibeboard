@@ -103,7 +103,9 @@ interface CriticInput {
   score?: number;
   threshold: number;
   reason?: string;
-  by: string;
+  // The critic run's id. OPTIONAL, because there is a real case with no run to name: a critic that could not
+  // be dispatched at all has judged nothing, and inventing an id for it would be worse than the absence.
+  by?: string;
   overshoot?: string;
 }
 

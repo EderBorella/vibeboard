@@ -117,7 +117,10 @@ describe('restarting', () => {
       state: 'idle',
       iteration: 0,
       dispatchesSinceCheckup: 0,
-      needsCheckup: true,
+      // CLEARED, and in C2 that is what makes a second run possible at all: the flag is set by the reconcile,
+      // by a crashed loop and by a halt, and until C3's checkup exists nothing else can clear it. A person
+      // pressing Restart on a board they are looking at is the supervisor pass decision 15 asks for.
+      needsCheckup: false,
       at: AT,
       servicePgid: 4242,
       servicePgstart: 987,
@@ -137,12 +140,13 @@ describe('restarting', () => {
     const { runtime } = build(root);
     const result = await runtime.restart();
     expect(result.ok).toBe(true);
-    // `needsCheckup` is SET, not cleared: after a halt the board is in a state nobody has looked at.
+    // Everything the halt held is dropped, `needsCheckup` included — see the note in `restart()`. Until C3
+    // there is no checkup to owe, and leaving the flag set made a halted project unstartable for ever.
     expect(await readAutopilotState(root, AT)).toEqual({
       state: 'idle',
       iteration: 0,
       dispatchesSinceCheckup: 0,
-      needsCheckup: true,
+      needsCheckup: false,
       at: AT,
     });
   });

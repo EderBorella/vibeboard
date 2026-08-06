@@ -26,11 +26,16 @@ import type { BoardClient, Failed } from './board-client.js';
 // test without a filesystem, a clock or a process.
 export interface LoopDeps {
   client: BoardClient;
+  // Called once when the loop ends, to commit whatever the last dispatch left behind — commits happen BEFORE
+  // each dispatch, so the final agent's edits are uncommitted by construction and the next session's
+  // `ensureBranch` would refuse the dirty tree.
+  commitTail?: (reason: string) => Promise<void>;
   // The auto-pilot state, read from the file: decision 20's carve-out. Not over HTTP, because
   // `GET /autopilot/state` is admin-only and the counters are the loop's own.
   readState: () => Promise<AutopilotState>;
-  // Read-modify-write over the loop's OWN fields. Given the current state, returns the fields to change.
-  writeCounters: (change: Partial<AutopilotState>) => Promise<void>;
+  // Add to the loop's OWN counters, inside a read-modify-write. RELATIVE rather than absolute so a value the
+  // server has just reset cannot be resurrected from a state this tick read before the reset.
+  addToCounters: (dispatches: number) => Promise<void>;
   // Carrying out one action. Task 8's `act.ts`; injected so this file's sequencing is testable on its own,
   // and so the loop cannot quietly grow a second place where work happens.
   act: (action: TickAction, context: TickContext) => Promise<ActResult>;
@@ -147,10 +152,11 @@ async function carryOut(
     progress.idle = 0;
     // RULE 2: the loop's own fields, and only those. Read-modify-write, so the server's concurrent write of
     // `state` is preserved rather than clobbered.
-    await deps.writeCounters({
-      iteration: state.iteration + result.dispatches,
-      dispatchesSinceCheckup: state.dispatchesSinceCheckup + result.dispatches,
-    });
+    // RELATIVE, not computed from the state read at the top of this tick. Written as absolutes, a Restart
+    // landing mid-dispatch was undone: the reset wrote `iteration: 0`, then this merged `250 + 1` over it from
+    // a value read before the reset, and the project came back `idle` with 251 — instantly capped on something
+    // the user had just cleared. It also closes the documented lost-increment window in the other direction.
+    await deps.addToCounters(result.dispatches);
   } else {
     progress.idle += 1;
     if (progress.idle >= MAX_IDLE_TICKS) {
@@ -161,7 +167,10 @@ async function carryOut(
         progress.iterations,
       );
     }
-    if (action.kind === 'wait') await deps.wait(IDLE_WAIT_MS);
+    // EVERY non-dispatching tick, not only a `wait`. A rollup or block whose move is refused non-fatally came
+    // straight back round, so the backstop below was reached in seconds rather than the interval it implies —
+    // and each pass wrote another `note`, flooding the diary the checkup has to read.
+    await deps.wait(IDLE_WAIT_MS);
   }
   if (result.stop) {
     return await finish(deps, result.stop.reason, result.stop.detail, progress.iterations);
@@ -213,6 +222,16 @@ async function finish(
   detail: string | undefined,
   iterations: number,
 ): Promise<LoopEnded> {
+  // What the last dispatch left, before anything else: a tree left dirty is a project whose next session is
+  // refused, and by then nobody remembers why.
+  await deps.commitTail?.(reason);
+  // EVERY STOP IN THE DIARY, with its reason. The spec's diary section lists `lifecycle` as "pre-flight,
+  // approval, every stop with its reason", and nothing was writing any of them — so the checkup, whose primary
+  // input this is, could not see that the previous session had ended at all, let alone why.
+  await deps.client.log('lifecycle', `Auto-pilot stopped: ${stopSentence(reason, detail)}`, {
+    outcome: reason,
+    iteration: iterations,
+  });
   const said = await deps.client.stopped(reason, detail);
   if (!said.ok) deps.log?.(`could not record the stop: ${said.reason}`);
   deps.log?.(stopSentence(reason, detail));

@@ -87,9 +87,18 @@ function recorder(
       calls.push(`dispatch:${input.skill}`);
       dispatched.push(input.skill);
       if (opts.dispatch) return opts.dispatch;
-      const template = opts.settle?.[Math.min(dispatchIndex, (opts.settle?.length ?? 1) - 1)] ?? record();
+      // ONE TEMPLATE PER DISPATCH, asserted rather than clamped. `Math.min` here meant that with fewer
+      // templates than dispatches both records shared a run id, `settle`'s `find` returned the first, and a
+      // critic's verdict was computed from the WORK run's score — a fixture quietly answering a different
+      // question than the test asked.
+      const template = opts.settle?.[dispatchIndex];
+      if (opts.settle && !template) {
+        throw new Error(
+          `the fixture has ${opts.settle.length} settle templates and this is dispatch ${dispatchIndex + 1}`,
+        );
+      }
       dispatchIndex += 1;
-      const started = { ...template, skill: input.skill };
+      const started = { ...(template ?? record()), skill: input.skill };
       live.push(started);
       return { ok: true as const, value: { run: started } };
     },
@@ -113,17 +122,30 @@ function recorder(
   return { client, calls, verdicts, moves, diary, dispatched };
 }
 
-function deps(client: ReturnType<typeof recorder>['client'], over: Partial<ActDeps> = {}): ActDeps {
+const commits: { root: string; message: string; branch?: string }[] = [];
+
+function deps(
+  client: ReturnType<typeof recorder>['client'] | ActDeps['client'],
+  over: Partial<ActDeps> = {},
+): ActDeps {
   return {
     client: client as unknown as ActDeps['client'],
     root: '/tmp/project',
     branch: 'autopilot/2026-08-06',
     now: () => new Date('2026-08-06T10:05:00Z'),
     threshold: DEFAULT_AUTOPILOT.criticThreshold,
-    commit: async () => ({ committed: true }),
+    // Records what it was asked to commit. Ignoring the arguments meant `deps.root` and `deps.branch` could
+    // both be wrong and the whole suite still passed — so the promise that a commit cannot land on someone
+    // else's branch under an agent's message was held by nothing.
+    commit: async (root: string, message: string, opts?: { branch?: string }) => {
+      commits.push({ root, message, branch: opts?.branch });
+      return { committed: true };
+    },
+    // DISTINCT, because they were the same function and so `route.verify` was never actually read: calling
+    // `smoke` for a `gates` route changed no test.
     verify: {
       gates: async () => PASSED,
-      smoke: async () => PASSED,
+      smoke: async () => ({ ...PASSED, mode: 'smoke' as const }),
     },
     // One check, no waiting: the record is already settled in these fixtures. `settle`'s own bound is tested
     // where it belongs, and a poll of zero used to make it spin for ever — which is how that was found.
@@ -158,6 +180,35 @@ describe('one dispatch, end to end', () => {
       context,
     );
     expect(order).toEqual(['commit', 'dispatch']);
+  });
+
+  it('uses the verifier the route names', async () => {
+    // `gates` and `smoke` were the same fake, so `route.verify` was never read: a smoke route verified by the
+    // gate runner, or the other way round, changed nothing. The mode lands on the verdict, so it is visible.
+    const r = recorder({ settle: [record()] });
+    await performAction(
+      deps(r.client),
+      { kind: 'dispatch', card: CARD(), route: { ...ROUTE, verify: 'smoke' } },
+      context,
+    );
+    expect(r.verdicts[0].mode).toBe('smoke');
+  });
+
+  it('commits the run’s own tree, on the run’s own branch', async () => {
+    // The commit fake used to ignore its arguments, so `deps.root` and `deps.branch` could both be wrong and
+    // the whole suite still passed — the promise that a commit cannot land on someone else's branch under an
+    // agent's message was held by nothing.
+    commits.length = 0;
+    const r = recorder({ settle: [record()] });
+    await performAction(deps(r.client), { kind: 'dispatch', card: CARD(), route: ROUTE }, context);
+    expect(commits).toEqual([
+      {
+        root: '/tmp/project',
+        branch: 'autopilot/2026-08-06',
+        // Whole, not by substring: this is the line a person reads in a log months later.
+        message: 'autopilot: before E-001 implement (iteration 4)',
+      },
+    ]);
   });
 
   it('advances the card on a passing verdict, through the endpoint', async () => {
@@ -235,6 +286,44 @@ describe('one dispatch, end to end', () => {
     }
   });
 
+  // A dispatch that HAPPENED and then failed to record its verdict or move its card was reported as no dispatch
+  // at all: neither cap was told about a real agent run, the tick counted as idle, and the next tick re-picked
+  // the same card and dispatched over work that had already passed — three times over, until the attempt cap
+  // caught it. Decision 8 says everything a model does counts, even when what came after it broke.
+  it('still counts the dispatch when the verdict cannot be recorded', async () => {
+    const r = recorder({
+      settle: [record()],
+      verdict: { ok: false, reason: 'refused with 500', fatal: false },
+    });
+    const result = await performAction(
+      deps(r.client),
+      { kind: 'dispatch', card: CARD(), route: ROUTE },
+      context,
+    );
+    expect(r.dispatched).toEqual(['implement']);
+    expect(result.dispatches).toBe(1);
+  });
+
+  it('still counts the dispatch when the card cannot be moved', async () => {
+    const r = recorder({ settle: [record()], move: { ok: false, reason: 'refused with 409', fatal: false } });
+    const result = await performAction(
+      deps(r.client),
+      { kind: 'dispatch', card: CARD(), route: ROUTE },
+      context,
+    );
+    expect(result.dispatches).toBe(1);
+  });
+
+  it('appends what the agent said about its own work', async () => {
+    // Loop step 12 says to append the run's summary, and decision 10 justifies denying agents diary access on
+    // the grounds that auto-pilot appends it for them — so without this the narrative had no agent voice at all.
+    const r = recorder({
+      settle: [record({ summary: 'added the middleware; the token store is still a stub' })],
+    });
+    await performAction(deps(r.client), { kind: 'dispatch', card: CARD(), route: ROUTE }, context);
+    expect(r.diary.find((d) => d.kind === 'run')?.text).toContain('the token store is still a stub');
+  });
+
   it('stops the loop when the commit fails, rather than dispatching into a tree it cannot undo', async () => {
     const r = recorder({ settle: [record()] });
     const result = await performAction(
@@ -263,6 +352,81 @@ describe('one dispatch, end to end', () => {
   });
 });
 
+// The bound, on both axes. An unbounded `settle` is not a slow test — it is a loop that never returns, and in
+// this suite that HANGS rather than fails, because vitest's own timeout is a `setTimeout` the spin starves.
+describe('waiting for a run to settle', () => {
+  const never = (polls: { n: number }) =>
+    ({
+      dispatch: async () => ({ ok: true as const, value: { run: record() } }),
+      cardRuns: async () => {
+        polls.n += 1;
+        return { ok: true as const, value: { runs: [] } };
+      },
+      log: async () => ({ ok: true as const, value: {} }),
+    }) as unknown as ActDeps['client'];
+
+  // The poll interval is large in the first two cases on purpose: an infinite patience is clamped to a day, so
+  // with a one-millisecond interval the bound is a hundred thousand polls — correct, and far too slow to watch.
+  // A large interval makes the same clamp observable in four.
+  it.each([
+    ['an infinite patience', { settleTimeoutMs: Number.POSITIVE_INFINITY, settlePollMs: 1_000_000 }],
+    ['a patience that is not a number', { settleTimeoutMs: Number.NaN, settlePollMs: 1_000_000 }],
+    ['a poll interval that is not a number', { settleTimeoutMs: 10, settlePollMs: Number.NaN }],
+    ['a poll interval of zero', { settleTimeoutMs: 10, settlePollMs: 0 }],
+    ['a negative patience', { settleTimeoutMs: -1, settlePollMs: 1 }],
+  ])('gives up rather than spinning, given %s', async (_name, timing) => {
+    const polls = { n: 0 };
+    const result = await performAction(
+      // A real macrotask, so a bound that has gone fails on vitest's timeout instead of starving it: a
+      // microtask-only sleep spins without ever letting a `setTimeout` fire, and the suite hangs.
+      deps(never(polls), { ...timing, sleep: () => new Promise((r) => setTimeout(r, 0)) }),
+      { kind: 'dispatch', card: CARD(), route: ROUTE },
+      context,
+    );
+    // It ends, it says why, and it looked at least once — a bound that answers zero polls is a dispatch
+    // nobody ever checked on.
+    expect(result.stop?.reason).toBe('stalled');
+    expect(result.stop?.detail).toContain('did not finish');
+    expect(polls.n).toBeGreaterThan(0);
+    // Small, because every one of these is an absurd input clamped to something sane — not merely finite.
+    expect(polls.n).toBeLessThanOrEqual(20);
+  });
+
+  it('keeps asking while the run is still going', async () => {
+    // The polling half was unreached: the fixture always answered already-settled, so accepting a `running`
+    // record as finished changed no test — and a verdict would then be computed over work still in progress.
+    const settledRun = record({ status: 'success' });
+    let look = 0;
+    const client = {
+      dispatch: async () => ({ ok: true as const, value: { run: settledRun } }),
+      cardRuns: async () => {
+        look += 1;
+        return {
+          ok: true as const,
+          value: {
+            runs: [{ ...settledRun, status: look < 3 ? ('running' as const) : ('success' as const) }],
+          },
+        };
+      },
+      verdict: async () => ({ ok: true as const, value: {} }),
+      move: async () => ({ ok: true as const, value: {} }),
+      log: async () => ({ ok: true as const, value: {} }),
+    } as unknown as ActDeps['client'];
+    const result = await performAction(
+      deps(client, {
+        settlePollMs: 1,
+        settleTimeoutMs: 1000,
+        sleep: () => new Promise((r) => setTimeout(r, 0)),
+      }),
+      { kind: 'dispatch', card: CARD(), route: ROUTE },
+      context,
+    );
+    expect(look).toBe(3);
+    expect(result.stop).toBeUndefined();
+    expect(result.dispatches).toBe(1);
+  });
+});
+
 describe('a critic route', () => {
   const CRITIC_ROUTE: Route = { ...ROUTE, verify: 'critic' };
 
@@ -285,6 +449,32 @@ describe('a critic route', () => {
     const r = recorder({ settle: [record(), record({ skill: CRITIC_SKILL, score: 0.9 })] });
     await performAction(deps(r.client), { kind: 'dispatch', card: CARD(), route: CRITIC_ROUTE }, context);
     expect(r.dispatched[1]).toBe(CRITIC_SKILL);
+  });
+
+  it('records WHICH run judged the card, not merely that a critic did', async () => {
+    // `by` is documented as the critic run's id, "so its reasoning is one lookup away rather than a correlation
+    // by timestamp" — and every producer was passing the string `critic`, which makes the question unanswerable
+    // from the record the verdict is written on. Residual risk 1's plan to judge the critic reads these.
+    const judge = record({ skill: CRITIC_SKILL, score: 0.9 });
+    const r = recorder({ settle: [record(), judge] });
+    await performAction(deps(r.client), { kind: 'dispatch', card: CARD(), route: CRITIC_ROUTE }, context);
+    expect(r.verdicts[0].by).toBe(judge.run);
+  });
+
+  it('records the real threshold even when the critic never ran', async () => {
+    // The bar is EVIDENCE: it says what this card was measured against. A 0 claimed the work was judged against
+    // a bar this project's own validator refuses — the one value that would have passed anything.
+    const r = recorder({ settle: [record()] });
+    let call = 0;
+    const original = r.client.dispatch;
+    r.client.dispatch = async (input) => {
+      call += 1;
+      if (call === 2) return { ok: false as const, reason: 'refused with 409', fatal: false };
+      return original(input);
+    };
+    await performAction(deps(r.client), { kind: 'dispatch', card: CARD(), route: CRITIC_ROUTE }, context);
+    expect(r.verdicts[0].threshold).toBe(0.6);
+    expect(r.verdicts[0].passed).toBe(false);
   });
 
   it('turns the score into the verdict, against the project’s threshold', async () => {

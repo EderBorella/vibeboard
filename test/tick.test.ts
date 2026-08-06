@@ -393,6 +393,24 @@ describe('nothing eligible is not the same as nothing left', () => {
     expect(decideTick(input({ cards }))).toMatchObject({ kind: 'stop', reason: 'complete' });
   });
 
+  // THE FOURTH ROUTE to this failure, after the unreadable folder, the empty board and the optional problems
+  // list. `archiveCard` stamps the frontmatter and THEN moves the file, so a server killed between those two
+  // writes leaves a card marked archived while still sitting in a live column — invisible to eligible, to
+  // unfinished and to problems, which are the three sets `complete` is decided from. The board still shows it.
+  it('refuses to call a project finished while a card is half-archived', () => {
+    const cards = [
+      card('F-001', 'features', 'done', 10, []),
+      { ...card('E-009', 'engineering', 'backlog', 10, []), archived: '2026-08-06T10:00:00Z' },
+    ];
+    const action = decideTick(input({ cards }));
+    expect(action).toMatchObject({ kind: 'stop', reason: 'stalled' });
+    expect(action).toHaveProperty('detail', expect.stringContaining('E-009'));
+    expect(action).toHaveProperty(
+      'detail',
+      expect.stringContaining('marked archived but still in a live column'),
+    );
+  });
+
   it('counts an archived card as neither eligible nor unfinished', () => {
     const cards = [
       card('F-001', 'features', 'done', 10, ['P-001']),

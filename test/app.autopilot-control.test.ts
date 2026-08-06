@@ -72,8 +72,10 @@ describe('the auto-pilot controls', () => {
     expect(after.state).toBe('idle');
     expect(after.reason).toBeUndefined();
     expect(after.detail).toBeUndefined();
-    // The checkup is mandatory on resume, and after a kill the board is in a state nobody has looked at.
-    expect(after.needsCheckup).toBe(true);
+    // And the owed checkup is cleared with it. Decision 15 asks for a supervisor pass before resuming, and in
+    // C2 the person pressing Restart on a board they are looking at IS that pass — nothing else can clear the
+    // flag until C3's checkup exists, so leaving it set made a killed project unstartable for ever.
+    expect(after.needsCheckup).toBe(false);
   });
 
   it('refuses a restart while auto-pilot is running', async () => {

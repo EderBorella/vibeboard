@@ -138,12 +138,31 @@ export class AutopilotRuntime {
   async recordLoopStop(reason: StopReason, detail?: string): Promise<ControlResult> {
     const state = await this.current();
     if (state.state === 'halted') return { ok: false, error: HALTED_FIRST };
-    return { ok: true, state: await this.#stop(reason, detail) };
+    const next = await this.#stop(reason, detail);
+    // The credential goes with it. `#stop` revokes only on a halt — deliberately, because a SOFT stop must
+    // leave the loop able to finish what is in flight — but a loop reporting its own ending has nothing left
+    // to finish, and `expireScope` is documented as running from every path that takes its authority away.
+    // This was the one that did not.
+    this.#opts.onDispatchingEnded?.();
+    return { ok: true, state: next };
   }
 
-  // The way back. Counters reset because the next start is a new run, and `needsCheckup` is SET
-  // rather than cleared: after an emergency stop the board is in a state nobody has looked at, and
-  // the checkup is mandatory on resume anyway (decision 15).
+  // The way back, and in C2 it is also the CHECKUP'S STAND-IN.
+  //
+  // `needsCheckup` is set by the startup reconcile, by a crashed loop and by an emergency stop, and until C3
+  // exists nothing can clear it — so a project that reached `checkupEvery` once, or survived one crash, could
+  // never dispatch again: Start refused, Restart zeroed the counters and set the flag straight back. The only
+  // way out was hand-editing `autopilot-state.json`, which no part of the UI offers.
+  //
+  // So Restart clears it, and the reasoning is that decision 15 asks for a SUPERVISOR PASS before resuming —
+  // a person pressing Restart on a board they are looking at is exactly that, and it is the only supervisor
+  // this slice has. C3 replaces this with the real checkup, at which point the flag goes back to being the
+  // service's to clear.
+  //
+  // The counters are reset with it, and that is deliberate rather than incidental: Restart is a person
+  // deciding to go again, so it is the one place a cap may legitimately be reset. An earlier comment here
+  // claimed the `idle` no-op below closed that loophole — it does not, and never did for `stopped`; what it
+  // actually prevents is a Restart on an untouched project silently buying a fresh cap.
   async restart(): Promise<ControlResult> {
     const state = await this.current();
     if (state.state === 'running') {
@@ -175,7 +194,8 @@ export class AutopilotRuntime {
       state: 'idle',
       iteration: 0,
       dispatchesSinceCheckup: 0,
-      needsCheckup: true,
+      // Cleared, not set — see the note above. The person pressing this is the supervisor pass.
+      needsCheckup: false,
       at: this.#at(),
       ...(keepGroup && previous.servicePgid !== undefined ? { servicePgid: previous.servicePgid } : {}),
       ...(keepGroup && previous.servicePgstart !== undefined

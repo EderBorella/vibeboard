@@ -478,6 +478,118 @@ describe('GET /api/runs/:board/:card', () => {
   });
 });
 
+// THE VERDICT ENDPOINT, which nothing exercised at all: a gate prover deleted its auth row, its validation,
+// its 404 and even the write itself, and all 2,764 tests passed each time. Decision 18 says a verdict belongs
+// on the record of the run it judged so "why did this card advance?" is answerable from disk — and none of
+// that was held by anything.
+describe('POST /api/runs/:board/:card/:run/verification', () => {
+  const RUN = '20260806-100000-a';
+  const verdict = { mode: 'gates', passed: true, at: '2026-08-06T10:05:00Z' };
+
+  async function judged(): Promise<TestProject & { card: string }> {
+    const project = await projectWithCard();
+    await writeRun(project.root, {
+      run: RUN,
+      card: project.card,
+      board: 'engineering',
+      skill: 'implement',
+      status: 'success',
+      started: 'T',
+      backend: 'claude-code',
+      model: 'opus',
+      effort: 'high',
+      mode: 'bypassPermissions',
+      report: '',
+    });
+    return project;
+  }
+
+  const url = (project: TestProject & { card: string }, run = RUN) =>
+    `/api/runs/engineering/${project.card}/${run}/verification`;
+
+  it('writes the verdict onto the run it judged, on disk', async () => {
+    const project = await judged();
+    const res = await project.app.inject({ method: 'POST', url: url(project), payload: verdict });
+    expect(res.statusCode).toBe(200);
+    // FROM DISK, not from the reply: the reply could be assembled and never written, which is exactly what a
+    // plant proved — deleting the `writeRun` call changed no test.
+    const stored = await readRun(project.root, 'engineering', project.card, RUN);
+    expect(stored?.verification).toEqual(verdict);
+  });
+
+  it('is reachable by the service and by nobody else who runs', async () => {
+    // Decision 3's whole subject: a run that could write its own verification is a run advancing itself on
+    // self-assessment. Widening the row to the working scopes changed no test before this.
+    const project = await judged();
+    const service = project.mint('service', 'run-svc');
+    const asService = await project.app.inject({
+      method: 'POST',
+      url: url(project),
+      headers: { authorization: `Bearer ${service.token}` },
+      payload: verdict,
+    });
+    expect(asService.statusCode).toBe(200);
+
+    for (const scope of ['work', 'checkup'] as const) {
+      const cred = project.mint(scope, `run-${scope}`, project.card);
+      const refused = await project.app.inject({
+        method: 'POST',
+        url: url(project),
+        headers: { authorization: `Bearer ${cred.token}` },
+        payload: verdict,
+      });
+      expect(refused.statusCode, scope).toBe(403);
+    }
+  });
+
+  it('refuses a body that is not a verification', async () => {
+    const project = await judged();
+    const res = await project.app.inject({ method: 'POST', url: url(project), payload: { passed: true } });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().error).toContain('not a verification');
+  });
+
+  // `asVerification` is reused precisely so this cannot get through: a critic score that does not agree with
+  // the threshold it claims to have been judged against is a verdict nobody can trust.
+  it('refuses a critic score that disagrees with its own threshold', async () => {
+    const project = await judged();
+    const res = await project.app.inject({
+      method: 'POST',
+      url: url(project),
+      payload: { mode: 'critic', passed: true, at: 'T', score: 0.2, threshold: 0.6 },
+    });
+    expect(res.statusCode).toBe(400);
+  });
+
+  it('refuses an unknown board, a malformed run id, and a run that does not exist', async () => {
+    const project = await judged();
+    const wrongBoard = await project.app.inject({
+      method: 'POST',
+      url: `/api/runs/nonsense/${project.card}/${RUN}/verification`,
+      payload: verdict,
+    });
+    expect([wrongBoard.statusCode, wrongBoard.json()]).toEqual([400, { error: 'Unknown board' }]);
+
+    // A TRAVERSAL guard rather than a shape check — `isRunId` allows any `[A-Za-z0-9_-]+`, deliberately, so
+    // that readable fixture ids stay legal. What it excludes is the three characters that could turn a run id
+    // into a path: `.`, `/` and `\`. A dot routes fine as a path segment and is refused here, which is the
+    // boundary; `..` never reaches the handler because the router does not match it at all.
+    const badId = await project.app.inject({
+      method: 'POST',
+      url: url(project, 'run.id'),
+      payload: verdict,
+    });
+    expect([badId.statusCode, badId.json()]).toEqual([400, { error: 'That is not a run id.' }]);
+
+    const missing = await project.app.inject({
+      method: 'POST',
+      url: url(project, '20260806-999999-z'),
+      payload: verdict,
+    });
+    expect([missing.statusCode, missing.json()]).toEqual([404, { error: 'No such run' }]);
+  });
+});
+
 describe('every run route refuses when no project is open', () => {
   // One test per route rather than one for the group: each handler carries its own guard, and a
   // missing one answers 500 from a null root instead of saying what is wrong.

@@ -97,6 +97,11 @@ describe('the scope table', () => {
     // token, which is decisions 10 and 21 collapsing in one step.
     ['/api/runs', 'GET', false, false, true],
     ['/api/runs/:board/:card', 'GET', false, false, true],
+    // The verdict on a run, and the loop reporting its own ending. Service-only: a run that could write its own
+    // verification would advance itself on self-assessment, and one that could stop auto-pilot could stop the
+    // thing supervising it.
+    ['/api/runs/:board/:card/:run/verification', 'POST', false, false, true],
+    ['/api/autopilot/stopped', 'POST', false, false, true],
     ['/api/config', 'PATCH', false, false, false],
     ['/api/explorer/file', 'PUT', false, false, false],
     ['/api/project/open', 'POST', false, false, false],

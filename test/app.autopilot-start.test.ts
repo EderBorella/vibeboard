@@ -180,6 +180,47 @@ describe('pressing start', () => {
   });
 });
 
+// THE DEAD END THIS SLICE ALMOST SHIPPED. `needsCheckup` is set by the startup reconcile, by a crashed loop
+// and by a halt, and `dispatchesSinceCheckup` reaches `checkupEvery` in the ordinary course of a run — so a
+// project that ran ten times, or crashed once, could never dispatch again: Start was accepted and the tick
+// stopped on its first pass, and Restart zeroed the counters and set the flag straight back. Hand-editing the
+// state file was the only exit, and no part of the UI offers it.
+describe('a project that owes a checkup', () => {
+  it('is refused before the loop is spawned, with the way forward named', async () => {
+    const { app, root } = await ready();
+    await writeAutopilotState(root, { ...IDLE_STATE, needsCheckup: true });
+    const refused = await start(app);
+    expect(refused.statusCode).toBe(409);
+    expect(refused.json().error).toContain('owes a supervisor checkup');
+    // Named, because a refusal a person cannot act on is worse than the condition.
+    expect(refused.json().error).toContain('Restart');
+  });
+
+  it('is refused the same way once enough dispatches have passed', async () => {
+    const { app, root } = await ready();
+    await writeAutopilotState(root, { ...IDLE_STATE, dispatchesSinceCheckup: 10 });
+    expect((await start(app)).statusCode).toBe(409);
+  });
+
+  it('and Restart is genuinely the way out', async () => {
+    const { app, root } = await ready();
+    await writeAutopilotState(root, {
+      ...IDLE_STATE,
+      state: 'stopped',
+      reason: 'stalled',
+      needsCheckup: true,
+      dispatchesSinceCheckup: 10,
+      iteration: 250,
+    });
+    expect(
+      (await app.inject({ method: 'POST', url: '/api/autopilot/restart', payload: {} })).statusCode,
+    ).toBe(200);
+    const started = await start(app);
+    expect(started.statusCode).toBe(200);
+    expect(started.json().state.state).toBe('running');
+  });
+});
+
 describe('when the loop dies on its own', () => {
   it('raises the overlay in every open tab', async () => {
     const { app } = await ready({ behaviour: 'exit:7' });

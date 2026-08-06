@@ -204,15 +204,30 @@ describe('putting the run on its own branch', () => {
     expect(result.ok === false && result.reason).toContain(outer);
   });
 
-  // `git add -A` stages the whole repository, not the directory it is run from. Committing from a
-  // subdirectory of someone else's repository would sweep their unrelated work into a run's commit.
-  it('refuses when the project is a subdirectory of a repository rather than its root', async () => {
+  // A project inside a larger repository is an ordinary thing to adopt, and `scaffold.ts` deliberately does
+  // not give one its own `.git` — that would shadow the parent. Refusing it here meant a working board
+  // auto-pilot would always refuse (ruled 2026-08-06).
+  it('works when the project is a subdirectory of a repository', async () => {
     const outer = await committed(await repo());
     const inner = join(outer, 'packages', 'thing');
     await mkdir(inner, { recursive: true });
-    const result = await ensureBranch(inner, 'autopilot/run-1');
-    expect(result.ok).toBe(false);
-    expect(result.ok === false && result.reason).toContain(outer);
+    expect(await ensureBranch(inner, 'autopilot/run-1')).toMatchObject({ ok: true, created: true });
+  });
+
+  // What replaces the refusal: every command is scoped to the project directory, so somebody else's edit
+  // elsewhere in the repository is not this project's dirty tree — and is therefore not something a run
+  // would commit.
+  it('ignores changes outside the project when deciding the tree is dirty', async () => {
+    const outer = await committed(await repo());
+    const inner = join(outer, 'packages', 'thing');
+    await mkdir(inner, { recursive: true });
+    await writeFile(join(inner, 'kept.txt'), 'the project\n');
+    await git(inner, ['add', '-A']);
+    await git(inner, ['commit', '-q', '-m', 'the project']);
+
+    // Someone editing the monorepo outside this project.
+    await writeFile(join(outer, 'theirs.txt'), 'not ours\n');
+    expect(await ensureBranch(inner, 'autopilot/run-1')).toMatchObject({ ok: true });
   });
 });
 
@@ -275,18 +290,32 @@ describe('committing before every dispatch', () => {
     expect(result.reason).toMatch(/not a git repository/i);
   });
 
-  // The guard that stops a run committing a stranger's whole checkout. `ensureBranch` had a test for it
-  // and this did not — and the no-repository test above cannot stand in for it, because git's own
-  // "not a git repository" from `add -A` matches the same assertion.
-  it('refuses to commit from a subdirectory of someone else’s repository', async () => {
+  // THE SCOPING, which is what replaced the repo-root refusal. A run commits everything under its own
+  // project directory and nothing outside it: an agent is expected to touch only what its card is about, and
+  // an unrelated edit elsewhere in the repository must not end up in a run's commit either way.
+  it('commits what is inside the project and leaves what is outside alone', async () => {
     const outer = await committed(await repo());
     const inner = join(outer, 'packages', 'thing');
     await mkdir(inner, { recursive: true });
-    await writeFile(join(inner, 'new.txt'), 'new\n');
+    await writeFile(join(inner, 'ours.txt'), 'the project\n');
+    await writeFile(join(outer, 'theirs.txt'), 'somebody else\n');
+
+    expect(await commitAll(inner, 'autopilot: E-001')).toEqual({ committed: true });
+    // Ours is in; theirs is still sitting there uncommitted.
+    expect(await tracked(outer)).toEqual(['packages/thing/ours.txt', 'seed.txt']);
+    expect((await git(outer, ['status', '--porcelain'])).stdout).toContain('theirs.txt');
+  });
+
+  it('reports nothing to commit when the only changes are outside the project', async () => {
+    const outer = await committed(await repo());
+    const inner = join(outer, 'packages', 'thing');
+    await mkdir(inner, { recursive: true });
+    await writeFile(join(inner, 'ours.txt'), 'the project\n');
+    await commitAll(inner, 'autopilot: first');
+
+    await writeFile(join(outer, 'theirs.txt'), 'somebody else\n');
     const before = await count(outer);
-    const result = await commitAll(inner, 'autopilot: not mine to commit');
-    expect(result.committed).toBe(false);
-    expect(result.reason).toContain(outer);
+    expect(await commitAll(inner, 'autopilot: E-002')).toEqual({ committed: false });
     expect(await count(outer)).toBe(before);
   });
 

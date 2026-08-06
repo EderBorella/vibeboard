@@ -1,5 +1,4 @@
 import { execFile } from 'node:child_process';
-import { realpath } from 'node:fs/promises';
 import { COMMAND_TIMEOUT_MS } from './commands.js';
 
 // The only module that writes history, and step 10 of the tick is why it exists: committing before
@@ -119,19 +118,23 @@ export interface Refused {
 }
 export type BranchResult = BranchOk | Refused;
 
-// Where the whole repository is, and whether this project is entitled to commit it.
+// Whether this project can be committed at all.
 //
-// THE PROJECT ROOT MUST BE THE REPOSITORY ROOT. `git add -A` stages the whole repository whatever
-// directory it runs from, so a project sitting inside someone else's checkout would have their
-// unrelated work swept into a run's commit — and then "revert the run" reverts their work too.
+// IT NEED NOT BE THE REPOSITORY ROOT (ruled 2026-08-06). An earlier version refused a project that was
+// not the toplevel, on the grounds that `git add -A` stages the whole repository whatever directory it
+// runs from — true of `add -A` with no pathspec, and the reason every command below is scoped to the
+// project directory instead. A monorepo package is an ordinary thing to adopt, and `scaffold.ts`
+// deliberately does not give one its own `.git` (that would shadow the parent), so refusing it here
+// meant a working board auto-pilot would always refuse.
 //
-// A SUBMODULE IS REFUSED even though it satisfies that test, because committing inside one leaves the
-// superproject permanently modified and the revert guarantee only half true: undoing the run inside the
-// submodule still leaves the parent pointing at a commit that is not what it recorded.
+// What the scoping does NOT do is stop an agent editing something outside the project, and that is
+// deliberate rather than overlooked: an agent is expected to touch only the files its card is about, and
+// if one does otherwise the answer is the prompt, not a git flag. The revert guarantee is therefore
+// "everything under this project directory", stated rather than implied.
 //
-// A monorepo package is therefore refused rather than handled, and so is a submodule. Both refusals
-// name what was found, because a refusal the reader cannot act on is the dead end this design refuses
-// to ship. C4's pre-flight is where a project with NO repository is offered `git init`.
+// A SUBMODULE IS STILL REFUSED, and it is a different case: committing inside one leaves the
+// superproject pointing at a commit it never recorded, so undoing the run inside the submodule does not
+// undo it outside. No pathspec fixes that.
 async function committableRoot(root: string, opts: GitOptions = {}): Promise<Refused | undefined> {
   const top = await git(root, ['rev-parse', '--show-toplevel'], { ...opts, timeoutMs: PROBE_TIMEOUT_MS });
   if (!top.ok) {
@@ -141,13 +144,6 @@ async function committableRoot(root: string, opts: GitOptions = {}): Promise<Ref
     return {
       ok: false,
       reason: top.missing ? problem : `${root} is not a git repository (${problem}).`,
-    };
-  }
-  const [found, asked] = await Promise.all([canonical(top.stdout.trim()), canonical(root)]);
-  if (found !== asked) {
-    return {
-      ok: false,
-      reason: `This project is inside the git repository at ${found} rather than being its root, and auto-pilot commits the whole repository before every dispatch. Give the project its own repository first.`,
     };
   }
   const superproject = await git(root, ['rev-parse', '--show-superproject-working-tree'], {
@@ -164,16 +160,6 @@ async function committableRoot(root: string, opts: GitOptions = {}): Promise<Ref
   return undefined;
 }
 
-// Symlinks, because a temp directory is one on some platforms and `--show-toplevel` answers with the
-// resolved path while the caller holds the path it was given.
-async function canonical(path: string): Promise<string> {
-  try {
-    return await realpath(path);
-  } catch {
-    return path;
-  }
-}
-
 // `--show-current` rather than `rev-parse --abbrev-ref HEAD`, which fails on an unborn branch: straight
 // after `git init` there is no commit, and that is the ordinary state of a project's first dispatch.
 //
@@ -188,8 +174,14 @@ async function currentBranch(root: string, opts: GitOptions): Promise<string | u
   return name === '' ? undefined : name;
 }
 
+// SCOPED TO THIS PROJECT with a `.` pathspec, and every other command here is scoped the same way. Without
+// it, a project inside a larger repository would report someone else's edits as its own dirty tree — and
+// then commit them.
 async function porcelain(root: string, opts: GitOptions): Promise<string> {
-  const result = await git(root, ['status', '--porcelain'], { ...opts, timeoutMs: PROBE_TIMEOUT_MS });
+  const result = await git(root, ['status', '--porcelain', '--', '.'], {
+    ...opts,
+    timeoutMs: PROBE_TIMEOUT_MS,
+  });
   return result.ok ? result.stdout.trim() : '';
 }
 
@@ -281,7 +273,7 @@ export async function commitAll(
   }
 
   const work = { ...opts, timeoutMs: opts.timeoutMs ?? WORK_TIMEOUT_MS };
-  const staged = await git(root, ['add', '-A'], work);
+  const staged = await git(root, ['add', '-A', '--', '.'], work);
   if (!staged.ok) return { committed: false, reason: `Could not stage the tree: ${staged.problem}` };
 
   // Asked BEFORE committing rather than by interpreting a failure afterwards: `git commit` on a clean
@@ -289,7 +281,7 @@ export async function commitAll(
   // the run on it would stop every time there was nothing to save.
   //
   // `--cached` because everything is staged by now; `--quiet --exit-code` answers in the exit status.
-  const changes = await git(root, ['diff', '--cached', '--quiet', '--exit-code'], {
+  const changes = await git(root, ['diff', '--cached', '--quiet', '--exit-code', '--', '.'], {
     ...opts,
     timeoutMs: PROBE_TIMEOUT_MS,
   });
@@ -315,7 +307,9 @@ export async function commitAll(
   // `-m` and never `--allow-empty`. One commit per tick on an unchanged tree would bury the ones that
   // matter, and then "which commit was this run?" has no answer. The guard that actually holds that is
   // the `diff --cached` check above — proved by planting, where `--allow-empty` alone changes nothing.
-  const done = await git(root, ['commit', '-q', '-m', message], work);
+  // `-- .` on the commit as well: with a pathspec, `git commit` records only what matches it, so anything
+  // staged outside this project by someone else stays staged rather than being swept into a run's commit.
+  const done = await git(root, ['commit', '-q', '-m', message, '--', '.'], work);
   if (!done.ok) return { committed: false, reason: `Could not commit: ${done.problem}` };
   return { committed: true };
 }

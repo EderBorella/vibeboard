@@ -159,7 +159,12 @@ async function registerControls(api: FastifyInstance, ctx: AppCtx): Promise<void
     if (!ensureOpen(ctx.session, reply)) return;
     // The file, not the mirror: the auto-pilot service writes its own counters and this process does
     // not see those writes.
-    return { state: await ctx.autopilot.current() };
+    //
+    // WITHOUT the process group. `servicePgid` and `servicePgstart` are the reaper's business and nothing in
+    // the browser reads them — sending a pid to a web page is a detail of this machine leaving the machine
+    // for no one's benefit.
+    const { servicePgid, servicePgstart, ...state } = await ctx.autopilot.current();
+    return { state };
   });
 
   // Stop dispatching. The app is untouched: chat, manual runs and the board all carry on.

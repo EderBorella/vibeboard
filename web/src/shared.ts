@@ -165,7 +165,6 @@ export interface AutopilotConfig {
   runTimeoutMs: number;
   attemptCap: number;
   checkupEvery: number;
-  autoPilotConcurrency: number;
   criticThreshold: number; // what a critic's score must reach for a card to advance
   routes: Route[];
   rollup: Rollup[];
@@ -188,7 +187,6 @@ export const AUTOPILOT_CONFIG_KEYS = [
   'runTimeoutMs',
   'attemptCap',
   'checkupEvery',
-  'autoPilotConcurrency',
   'criticThreshold',
   'routes',
   'rollup',

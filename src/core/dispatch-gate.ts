@@ -51,7 +51,10 @@ const SENTENCES: Record<StopReason, string> = {
   stalled: 'Auto-pilot stopped because work remains and nothing it can do would move it.',
   complete: 'Auto-pilot finished: nothing is eligible and nothing is unfinished.',
   'no-op': 'Auto-pilot had nothing to work on, which is not the same as being finished.',
-  interrupted: 'Auto-pilot was interrupted by a restart, so it owes this project a checkup.',
+  // NOT "by a restart". This reason covers three endings — a server that died under a running loop, a loop
+  // killed from outside, and a loop that crashed — and the detail beside it says which. Naming one of them in
+  // the canned sentence told a user whose loop had been SIGKILLed that they had restarted something.
+  interrupted: 'Auto-pilot stopped before it could finish, so it owes this project a checkup.',
   unreadable:
     'This project is halted because VibeBoard could not read its auto-pilot state. Restart it to start again from idle.',
 };

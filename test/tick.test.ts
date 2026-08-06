@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Spend } from '../src/core/accounting.js';
 import { DEFAULT_AUTOPILOT } from '../src/core/autopilot.js';
 import type { AutopilotState } from '../src/core/autopilot-state.js';
+import { eligibility } from '../src/core/eligibility.js';
 import type { RunRecord, RunStatus } from '../src/core/runs.js';
 import { decideTick, type TickInput } from '../src/core/tick.js';
 import type { BoardName, Card } from '../src/core/types.js';
@@ -101,15 +102,6 @@ describe('the caps come first', () => {
     const action = decideTick(input({ ap }));
     expect(action).toMatchObject({ kind: 'stop', reason: 'stalled' });
     expect(action).toHaveProperty('detail', expect.stringContaining('maxIterations'));
-  });
-
-  it('stops stalled and names the field when the concurrency limit is unusable', () => {
-    // The third of the three NaN twins, and the only one nothing held: an unusable limit does not queue,
-    // it lets everything through.
-    const ap = { ...DEFAULT_AUTOPILOT, autoPilotConcurrency: Number.NaN };
-    const action = decideTick(input({ ap }));
-    expect(action).toMatchObject({ kind: 'stop', reason: 'stalled' });
-    expect(action).toHaveProperty('detail', expect.stringContaining('autoPilotConcurrency'));
   });
 
   // BOTH BRANCHES ARMED, which is what makes this about the order rather than about either branch. The
@@ -438,23 +430,23 @@ describe('and otherwise it dispatches', () => {
   // Above a concurrency of one, a count was not enough. `attemptsUsed` deliberately does not count an
   // unfinished run, so the card being worked stays eligible and the pick is deterministic — and the next
   // tick dispatched the SAME card again: two agents editing one card's work in one repository.
-  it('never dispatches a card that already has a run in flight', () => {
-    const ap = { ...DEFAULT_AUTOPILOT, autoPilotConcurrency: 2 };
-    const first = decideTick(input({ ap }));
-    expect(first.kind === 'dispatch' && first.card.id).toBe('P-001');
-
+  // The identities, not just the count. Concurrency is a CONSTANT of 1 now, so a run in flight always fills
+  // the only slot and this reads as `wait` either way — the filter cannot be observed through `decideTick`
+  // while that is true. What is asserted here is the honest thing: an in-flight card is still ELIGIBLE, which
+  // is what stops the loop reporting `stalled` over the very work it is waiting for.
+  it('keeps a card with a run in flight eligible, and waits rather than stalling', () => {
     const busy = [{ card: 'P-001', skill: 'design' }];
-    // One slot free, but the only eligible card is the one being worked.
-    expect(decideTick(input({ ap, inFlight: busy }))).toEqual({ kind: 'wait' });
-
-    // With another card eligible it takes that one instead of waiting.
-    const two = [
-      ...base(),
-      card('F-002', 'features', 'todo', 20, ['P-002']),
-      card('P-002', 'product', 'backlog', 10, ['F-002']),
-    ];
-    const next = decideTick(input({ ap, cards: two, inFlight: busy }));
-    expect(next.kind === 'dispatch' && next.card.id).toBe('P-002');
+    expect(decideTick(input({ inFlight: busy }))).toEqual({ kind: 'wait' });
+    // Not `stalled`, and not `complete`: the card is unfinished and known to be in hand.
+    const el = eligibility({
+      ap: DEFAULT_AUTOPILOT,
+      cards: base(),
+      runs: [],
+      columns: COLUMNS,
+      rollupEligible: [],
+      problems: [],
+    });
+    expect(el.eligible.map((e) => e.card.id)).toContain('P-001');
   });
 
   it('dispatches the picked card and its route', () => {

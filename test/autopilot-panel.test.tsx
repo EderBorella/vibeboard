@@ -139,11 +139,17 @@ describe('the auto-pilot panel', () => {
   it('renders every route, so the lifecycle can be read off the screen', async () => {
     api.getReadiness.mockResolvedValue(readiness());
     render(panel(configWith(true)));
-    // A row per route plus the header: a table showing SOME of the lifecycle would be worse than
-    // none, because the missing phase is the one nobody would think to look for.
-    expect(await screen.findAllByRole('row')).toHaveLength(DEFAULT_AUTOPILOT.routes.length + 1);
+    // A row per route plus a header, AND a row per rollup rule plus its header. A table showing some of the
+    // lifecycle would be worse than none, because the missing phase is the one nobody would think to look for
+    // — and for a long time the rollup rules were exactly that: rendered nowhere, so how a product card ever
+    // reaches Done was unreadable from the screen.
+    const rows = DEFAULT_AUTOPILOT.routes.length + 1 + DEFAULT_AUTOPILOT.rollup.length + 1;
+    expect(await screen.findAllByRole('row')).toHaveLength(rows);
     expect(screen.getByText('derive-features')).toBeTruthy();
     expect(screen.getByText('close-out')).toBeTruthy();
+    // The two rollup rules read differently on purpose: one moves the card, the other only admits it to a run.
+    expect(screen.getByText('advance to done')).toBeTruthy();
+    expect(screen.getByText('becomes eligible for its skill')).toBeTruthy();
   });
 
   it('states what is blocking auto-pilot in words, not as a red dot', async () => {

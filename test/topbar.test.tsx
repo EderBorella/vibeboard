@@ -205,6 +205,32 @@ describe('the auto-pilot chip', () => {
   });
 
   const chip = (): HTMLElement | null => document.querySelector('.ap-chip');
+  const detail = (): HTMLElement | null => document.querySelector('.ap-detail');
+
+  // `whyStuck` works hard to name WHICH cards are stuck and why, and all of it used to live in a `title`
+  // attribute: unreachable on a touch device, and invisible to anyone who does not know to hover.
+  it('shows the sentence for a stop the loop decided, not only the word', () => {
+    const said = 'Nothing can move E-004, E-007 — check that every column that holds a card is routed.';
+    render(<TopBar {...props} autopilot={state({ state: 'stopped', reason: 'stalled', detail: said })} />);
+    expect(detail()?.textContent).toBe(said);
+  });
+
+  it('says nothing extra for a stop a person asked for', () => {
+    // A soft stop needs no explaining: whoever pressed it knows why.
+    render(
+      <TopBar
+        {...props}
+        autopilot={state({ state: 'stopped', reason: 'stopped', detail: 'You stopped it.' })}
+      />,
+    );
+    expect(detail()).toBeNull();
+  });
+
+  it('and nothing at all while it is running', () => {
+    render(<TopBar {...props} autopilot={state({ state: 'running' })} />);
+    expect(detail()).toBeNull();
+  });
+
 
   it('says nothing at all while the project is idle', () => {
     render(<TopBar {...props} autopilot={state({ state: 'idle' })} />);

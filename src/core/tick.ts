@@ -1,5 +1,11 @@
 import type { Spend } from './accounting.js';
-import { type AutopilotConfig, isBlockedColumn, isTerminalColumn, type Route } from './autopilot.js';
+import {
+  AUTOPILOT_CONCURRENCY,
+  type AutopilotConfig,
+  isBlockedColumn,
+  isTerminalColumn,
+  type Route,
+} from './autopilot.js';
 import { shapeProblems } from './autopilot-cover.js';
 import type { AutopilotState } from './autopilot-state.js';
 import type { CardProblem } from './board.js';
@@ -46,7 +52,7 @@ export interface TickInput {
   runs: RunRecord[];
   spend: Spend;
   // The runs queued or running right now, WITH their identities. A bare count was enough for
-  // `autoPilotConcurrency: 1` and wrong for anything above it: `attemptsUsed` deliberately does not
+  // one run and wrong for more than one: `attemptsUsed` deliberately does not
   // count an unfinished run, so the card being worked stays eligible, the pick is a total order and
   // therefore deterministic, and the second tick dispatched the same card again — two agents editing one
   // card's work in one repository, which is the collision decision 4 exists to prevent.
@@ -83,9 +89,6 @@ function notRunning(state: AutopilotState): TickAction {
 function unusableNumber(ap: AutopilotConfig): string | undefined {
   if (!Number.isInteger(ap.checkupEvery) || ap.checkupEvery <= 0) {
     return `checkupEvery is ${JSON.stringify(ap.checkupEvery)}, which is not a whole number above zero, so no checkup would ever be due. Set it in Settings.`;
-  }
-  if (!Number.isInteger(ap.autoPilotConcurrency) || ap.autoPilotConcurrency <= 0) {
-    return `autoPilotConcurrency is ${JSON.stringify(ap.autoPilotConcurrency)}, which is not a whole number above zero, so nothing would limit how many runs start at once. Set it in Settings.`;
   }
   return undefined;
 }
@@ -292,7 +295,7 @@ export function decideTick(input: TickInput): TickAction {
   // with a run in flight is still eligible — on purpose, because `attemptsUsed` does not count an
   // unfinished run — so filtering it out of eligibility instead would make a healthy loop at
   // concurrency 1 report `stalled` over the very work it was waiting for.
-  if (inFlight.length >= ap.autoPilotConcurrency) return { kind: 'wait' };
+  if (inFlight.length >= AUTOPILOT_CONCURRENCY) return { kind: 'wait' };
   const free = el.eligible.filter((e) => !inFlight.some((f) => f.card === e.card.id));
   if (free.length === 0) return { kind: 'wait' };
 

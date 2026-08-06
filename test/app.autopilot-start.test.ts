@@ -185,6 +185,19 @@ describe('pressing start', () => {
 // project that ran ten times, or crashed once, could never dispatch again: Start was accepted and the tick
 // stopped on its first pass, and Restart zeroed the counters and set the flag straight back. Hand-editing the
 // state file was the only exit, and no part of the UI offers it.
+describe('what the browser is told', () => {
+  it('is not told the loop’s process group', async () => {
+    // The pgid and its start time are the reaper's business. Nothing in the browser reads them, and sending a
+    // pid to a web page is a detail of this machine leaving the machine for no one's benefit.
+    const { app } = await ready();
+    expect((await start(app)).json().state.servicePgid).toBeGreaterThan(1);
+    const shown = (await app.inject({ method: 'GET', url: '/api/autopilot/state' })).json().state;
+    expect(shown.state).toBe('running');
+    expect(shown.servicePgid).toBeUndefined();
+    expect(shown.servicePgstart).toBeUndefined();
+  });
+});
+
 describe('a project that owes a checkup', () => {
   it('is refused before the loop is spawned, with the way forward named', async () => {
     const { app, root } = await ready();

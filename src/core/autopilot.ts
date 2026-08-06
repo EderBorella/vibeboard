@@ -53,7 +53,7 @@ export interface AutopilotConfig {
   runTimeoutMs: number;
   attemptCap: number;
   checkupEvery: number;
-  autoPilotConcurrency: number;
+
   // What a critic's score must reach for a card to advance. A THRESHOLD rather than a boolean verdict
   // (S9): a binary pass yields no distribution, and the critic is this design's weakest link — level 4
   // on the study's verification ladder, judgeable only from data collected later. 0.6 is what OpenHands
@@ -82,7 +82,6 @@ export const DEFAULT_AUTOPILOT: AutopilotConfig = {
   runTimeoutMs: 1_800_000,
   attemptCap: 3,
   checkupEvery: 10,
-  autoPilotConcurrency: 1,
   criticThreshold: 0.6,
   routes: [
     { board: 'features', column: 'backlog', skill: 'derive-features', verify: 'critic', next: 'todo' },
@@ -116,6 +115,16 @@ export const DEFAULT_AUTOPILOT: AutopilotConfig = {
   terminal: { features: ['done'], product: ['done'], engineering: ['done'] },
   blockedColumn: 'blocked',
 };
+
+// How many of the loop's own runs may be in flight at once. A CONSTANT rather than a setting, and that is a
+// ruling rather than a simplification: the loop awaits each dispatch settling, so it is strictly sequential
+// whatever a number said — and a dial the backend does not act on is the AgentGPT shape this design is
+// written against. It was a config key, and any value above 1 changed nothing.
+//
+// The thing people actually want from it — a second feature being planned while the first is being executed —
+// is not more runs on one board: it is separate verticals working in separate worktrees, which is a feature of
+// its own rather than a bigger number here.
+export const AUTOPILOT_CONCURRENCY = 1;
 
 export function routeFor(ap: AutopilotConfig, board: BoardName, columnSlug: string): Route | undefined {
   return ap.routes.find((r) => r.board === board && r.column === columnSlug);

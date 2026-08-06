@@ -79,6 +79,15 @@ export function TopBar({
           {chip.label}
         </span>
       )}
+      {/* The sentence, not only the word. `whyStuck` works hard to name WHICH cards are stuck and why, and all
+          of it used to live in a `title` attribute — unreachable on a touch device, and invisible to anyone who
+          does not know to hover. Shown for a stop the loop decided (`stalled`, `capped`, `exhausted`, `no-op`,
+          `complete`) and not for one a person asked for, which needs no explaining. A halt has the overlay. */}
+      {autopilot?.state === 'stopped' && autopilot.reason !== 'stopped' && autopilot.detail && (
+        <span className="ap-detail" data-testid="ap-stop-detail" title={autopilot.detail}>
+          {autopilot.detail}
+        </span>
+      )}
       {showProject && (
         <div className="topbar-tabs" role="group" aria-label="View">
           {TABS.map(({ value, label }) => (

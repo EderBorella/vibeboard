@@ -316,8 +316,11 @@ describe('when the loop dies without stopping first', () => {
     expect(state.reason).toBe('interrupted');
     // The WHOLE sentence, including the reason's own prefix from `stopSentence`. `toContain('code 3')`
     // left that composition unheld, and this is a string a person reads in an overlay.
+    // The canned half no longer names a restart: this reason covers a server that died, a loop killed from
+    // outside and a loop that crashed, and the detail beside it says which. It used to tell someone whose loop
+    // had been SIGKILLed that they had restarted something.
     expect(state.detail).toBe(
-      'Auto-pilot was interrupted by a restart, so it owes this project a checkup. The auto-pilot service exited with code 3 without stopping first, so this project owes a checkup before it resumes.',
+      'Auto-pilot stopped before it could finish, so it owes this project a checkup. The auto-pilot service exited with code 3 without stopping first, so this project owes a checkup before it resumes.',
     );
     // The same reasoning as the startup reconcile: dispatches nobody was watching may be in flight, so
     // resuming without a supervisor pass would assume they went fine.

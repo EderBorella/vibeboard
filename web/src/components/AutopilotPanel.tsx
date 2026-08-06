@@ -1,5 +1,12 @@
 import { useEffect, useState } from 'react';
-import { type AutopilotState, getReadiness, killAutopilot, type Readiness, softStopAutopilot } from '../api';
+import {
+  type AutopilotState,
+  getReadiness,
+  killAutopilot,
+  type Readiness,
+  softStopAutopilot,
+  startAutopilot,
+} from '../api';
 import { killProjectRequest } from '../confirm/requests';
 import { useConfirm } from '../confirm/useConfirm';
 import { useAccounting } from '../runs/useAccounting';
@@ -206,6 +213,7 @@ export function AutopilotPanel({
         · blocked cards go to {ap.blockedColumn} on engineering.
       </div>
 
+      <StartControl state={autopilot} readiness={readiness} refresh={onAutopilotChanged} />
       <StopControls state={autopilot} refresh={onAutopilotChanged} />
 
       <div className="settings-hint" style={{ marginTop: '0.6rem' }}>
@@ -269,6 +277,75 @@ function ThresholdField({ current, onChange }: { current: number; onChange: (val
         auto-pilot runs the loop; nothing dispatches a critic yet.
       </span>
     </label>
+  );
+}
+
+// Press start, and see why not when it refuses.
+//
+// C2's minimal control: an endpoint nobody can press is a feature that does not exist. What is deliberately
+// NOT here is C4's pre-flight and approval screen — this is the button, not the ceremony around it.
+//
+// Every refusal the server can give is rendered verbatim, because each one names the way forward: a missing
+// gate command, an unwritten foundation document, no sandbox, a halted project. The button is disabled for
+// the two states where starting is meaningless, and enabled otherwise — including when the project is not
+// ready, deliberately: a disabled button with no explanation is the dead end this design refuses to ship,
+// and pressing it is how you find out what is missing.
+function StartControl({
+  state,
+  readiness,
+  refresh,
+}: {
+  state: AutopilotState | null;
+  readiness: Readiness | null;
+  refresh: () => void;
+}) {
+  const [error, setError] = useState<string | null>(null);
+  const [starting, setStarting] = useState(false);
+  const running = state?.state === 'running';
+  const halted = state?.state === 'halted';
+
+  return (
+    <>
+      <div className="settings-section">Running</div>
+      <div className="settings-hint">
+        Auto-pilot walks the board on its own: it picks a card, runs its phase's skill, checks the work, and
+        moves the card only if the check passes. It stops on its own when there is nothing left it can do.
+      </div>
+      <div className="ap-controls">
+        <button
+          type="button"
+          className="btn-primary"
+          // Running means it is already going; halted needs a person to restart it first. Not-ready is NOT a
+          // reason to disable: the refusal is how you learn what is missing.
+          disabled={running || halted || starting}
+          onClick={() => {
+            setError(null);
+            setStarting(true);
+            void startAutopilot()
+              .then(() => refresh())
+              .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
+              .finally(() => setStarting(false));
+          }}
+        >
+          {starting ? 'Starting…' : 'Start auto-pilot'}
+        </button>
+        {running && (
+          <span className="settings-hint" data-testid="ap-progress">
+            Running — {state?.iteration ?? 0} dispatch{(state?.iteration ?? 0) === 1 ? '' : 'es'} so far
+          </span>
+        )}
+        {halted && <span className="settings-hint">Halted. Restart it from the overlay first.</span>}
+      </div>
+      {/* The blockers again, next to the button, because the list further up the panel is easy to scroll
+          past — and this is the moment somebody wants to know. */}
+      {!running && readiness && !readiness.ok && (
+        <div className="settings-hint">
+          Auto-pilot cannot start yet: {readiness.blockers.length} thing
+          {readiness.blockers.length === 1 ? '' : 's'} to fix, listed above.
+        </div>
+      )}
+      {error && <div className="settings-error">{error}</div>}
+    </>
   );
 }
 

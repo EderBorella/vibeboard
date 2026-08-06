@@ -636,6 +636,13 @@ export function restartAutopilot(): Promise<{ state: AutopilotState }> {
   return post('/api/autopilot/restart', {});
 }
 
+// Starts the loop. Refused with a sentence when the project is not ready, when there is no sandbox, or when
+// it is already running or halted — and `post` turns each of those into a thrown Error carrying the server's
+// own words, which is what the control renders. A button whose refusal is invisible is a dead end.
+export function startAutopilot(): Promise<{ state: AutopilotState }> {
+  return post('/api/autopilot/start', {});
+}
+
 // --- The diary ---------------------------------------------------------------------------------------
 // Mirrors src/core/diary.ts. An array rather than a bare union so test/mirror.test.ts can assert it: slice
 // D shipped six hand-mirrored types with no guard, and one of them gained a member mid-slice.

@@ -12,6 +12,7 @@ const api = vi.hoisted(() => ({
   getAutopilotState: vi.fn(),
   softStopAutopilot: vi.fn(),
   killAutopilot: vi.fn(),
+  startAutopilot: vi.fn(),
 }));
 vi.mock('../web/src/api.js', () => api);
 vi.mock('../web/src/api', () => api);
@@ -25,6 +26,7 @@ afterEach(() => {
   api.getReadiness.mockReset();
   api.getAccounting.mockReset();
   api.getAccounting.mockRejectedValue(new Error('no ledger in this test'));
+  api.startAutopilot.mockReset();
 });
 
 // Rejected by default: this file is about the routes and the blockers, and a panel that says it could
@@ -61,6 +63,76 @@ const panel = (config: ProjectConfig, over: Partial<PanelProps> = {}) => (
   <AutopilotPanel config={config} autopilot={null} onAutopilotChanged={() => {}} {...over} />
 );
 type PanelProps = Parameters<typeof AutopilotPanel>[0];
+
+// C2's minimal control. An endpoint nobody can press is a feature that does not exist — and a control whose
+// refusal is invisible is the dead end this design refuses to ship, which is what most of these are about.
+describe('the start control', () => {
+  const state = (over: Partial<import('../web/src/api.js').AutopilotState> = {}) => ({
+    state: 'idle' as const,
+    iteration: 0,
+    dispatchesSinceCheckup: 0,
+    needsCheckup: false,
+    ...over,
+  });
+
+  it('starts the loop when pressed', async () => {
+    api.getReadiness.mockResolvedValue(readiness());
+    api.startAutopilot.mockResolvedValue({ state: state({ state: 'running' }) });
+    const changed = vi.fn();
+    render(panel(configWith(true), { autopilot: state(), onAutopilotChanged: changed }));
+    fireEvent.click(await screen.findByRole('button', { name: /start auto-pilot/i }));
+    await waitFor(() => expect(api.startAutopilot).toHaveBeenCalled());
+    // And the panel asks for the new state rather than assuming it: the loop writes counters this render
+    // knows nothing about.
+    await waitFor(() => expect(changed).toHaveBeenCalled());
+  });
+
+  it('shows the server’s refusal verbatim, because it names what to fix', async () => {
+    api.getReadiness.mockResolvedValue(readiness());
+    api.startAutopilot.mockRejectedValue(
+      new Error('Auto-pilot is not ready to start here: foundation/TESTING.md declares no `smoke:` command.'),
+    );
+    render(panel(configWith(true), { autopilot: state() }));
+    fireEvent.click(await screen.findByRole('button', { name: /start auto-pilot/i }));
+    expect(await screen.findByText(/declares no `smoke:` command/)).toBeTruthy();
+  });
+
+  it('is disabled while it is already running, and says how far it has got', async () => {
+    api.getReadiness.mockResolvedValue(readiness());
+    render(panel(configWith(true), { autopilot: state({ state: 'running', iteration: 7 }) }));
+    const button = await screen.findByRole('button', { name: /start auto-pilot/i });
+    expect(button.hasAttribute('disabled')).toBe(true);
+    expect(screen.getByTestId('ap-progress').textContent).toContain('7 dispatches');
+  });
+
+  it('is disabled while halted, and points at the way back', async () => {
+    // A halt is left deliberately, from the overlay — not by pressing start again.
+    api.getReadiness.mockResolvedValue(readiness());
+    render(panel(configWith(true), { autopilot: state({ state: 'halted', reason: 'killed' }) }));
+    const button = await screen.findByRole('button', { name: /start auto-pilot/i });
+    expect(button.hasAttribute('disabled')).toBe(true);
+    expect(screen.getByText(/Restart it from the overlay/)).toBeTruthy();
+  });
+
+  // NOT disabled when the project is not ready, deliberately: a disabled button with no explanation is the
+  // dead end, and pressing it is how a person learns what is missing.
+  it('can still be pressed when the project is not ready', async () => {
+    api.getReadiness.mockResolvedValue(readiness({ ok: false, blockers: ['This project has no README.'] }));
+    api.startAutopilot.mockRejectedValue(new Error('Auto-pilot is not ready to start here: no README.'));
+    render(panel(configWith(true), { autopilot: state() }));
+    const button = await screen.findByRole('button', { name: /start auto-pilot/i });
+    expect(button.hasAttribute('disabled')).toBe(false);
+    fireEvent.click(button);
+    expect(await screen.findByText(/not ready to start here/)).toBeTruthy();
+  });
+
+  it('says nothing about progress before it has started', async () => {
+    api.getReadiness.mockResolvedValue(readiness());
+    render(panel(configWith(true), { autopilot: state() }));
+    await screen.findByRole('button', { name: /start auto-pilot/i });
+    expect(screen.queryByTestId('ap-progress')).toBeNull();
+  });
+});
 
 describe('the auto-pilot panel', () => {
 

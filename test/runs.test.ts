@@ -6,6 +6,7 @@ import {
   needsResolution,
   parseAgentReport,
   parseRun,
+  producedNothing,
   RUN_STATUSES,
   type RunRecord,
   runId,
@@ -337,6 +338,44 @@ describe('withResolution', () => {
   it('survives a round trip through the file, so a reload does not forget', () => {
     const resolved = withResolution(record({ status: 'attention' }), '2026-07-26T21:30:00.000Z');
     expect(parseRun(serializeRun(resolved))?.resolved).toBe('2026-07-26T21:30:00.000Z');
+  });
+});
+
+// Asked before a card's work is verified: verifying nothing is how a card advances over work that never
+// happened. Every clause must hold, so the tests below are mostly the ways it must answer NO.
+describe('a run that produced nothing', () => {
+  const empty = { status: 'failed' as const, filesChanged: 0, report: '' };
+
+  it('is a failed run with no report, no files and no cards', () => {
+    expect(producedNothing(record(empty))).toBe(true);
+  });
+
+  it('is not a run that changed files, however it ended', () => {
+    expect(producedNothing(record({ ...empty, filesChanged: 1 }))).toBe(false);
+  });
+
+  it('is not a run that created cards, which change no files', () => {
+    expect(producedNothing(record({ ...empty, created: ['F-002'] }))).toBe(false);
+  });
+
+  it('is not a run that wrote a report', () => {
+    expect(producedNothing(record({ ...empty, report: '## What I did\n\nnot much' }))).toBe(false);
+  });
+
+  // Absent is not zero. A measurement that could not be taken says nothing about what changed, and reading it
+  // as "nothing changed" would skip verification on a run that may have done the work.
+  it('is not a run whose file count could not be taken', () => {
+    expect(producedNothing(record({ status: 'failed', report: '' }))).toBe(false);
+  });
+
+  // `attention` FINISHED and said it could not do the work: it has a report, and a verdict is exactly what
+  // should judge it. Only an outright failure with nothing behind it is unverifiable.
+  it('is not a run that finished and said it could not do the work', () => {
+    expect(producedNothing(record({ ...empty, status: 'attention', outcome: 'attention' }))).toBe(false);
+  });
+
+  it('is not a run still in flight', () => {
+    expect(producedNothing(record({ ...empty, status: 'running' }))).toBe(false);
   });
 });
 

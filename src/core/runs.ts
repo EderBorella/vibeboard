@@ -508,3 +508,29 @@ export function needsResolution(record: RunRecord): boolean {
 export function withResolution(record: RunRecord, at: string): RunRecord {
   return { ...record, resolved: at };
 }
+
+// A run that left NOTHING behind — no report, no files, no cards. Asked before a card's work is verified,
+// because verifying nothing is the shape that advances a card over work that never happened: a `gates` route
+// whose run died runs its commands over an unchanged tree, which was green before and is green now, and the
+// card advances having implemented nothing. Found by the first hand-run through the critic; the same hole is
+// wider under `gates`, where no model is involved to notice.
+//
+// FAIL CLOSED, and the direction matters: every clause must hold, so the answer is "nothing" only when there
+// is nothing on any of the three counts. Being wrong the other way costs a wasted verification, which is
+// ordinary; being wrong this way is a card advanced over an empty run.
+//
+// Each clause earns its place:
+// - `failed` only. `attention` is a run that finished and SAID it could not do the work — it has a report and
+//   a verdict is exactly what should judge it.
+// - `filesChanged === 0` and never `!filesChanged`: absent means the measurement could not be taken, which is
+//   not evidence that nothing changed.
+// - `created` because a run's product need not be a file at all. `derive-features` writes cards through the
+//   API and legitimately changes no files, so files alone would call a successful derivation empty.
+export function producedNothing(record: RunRecord): boolean {
+  return (
+    record.status === 'failed' &&
+    record.filesChanged === 0 &&
+    !record.report?.trim() &&
+    (record.created?.length ?? 0) === 0
+  );
+}

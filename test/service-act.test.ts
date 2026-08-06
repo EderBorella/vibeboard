@@ -432,6 +432,92 @@ describe('waiting for a run to settle', () => {
   });
 });
 
+// THE FIRST HAND-RUN'S FINDING, generalised past the critic. A run that produced nothing must not be
+// verified, because every verifier would then answer about a tree the run never touched — and `gates` is the
+// dangerous one: its commands were passing before the dispatch and are passing now, so the card advances
+// having implemented nothing, with no model anywhere in the loop to notice.
+//
+// The injected `gates` in `deps` returns PASSED, which is exactly the fixture this needs: if the verifier is
+// consulted at all, the card moves.
+describe('a run that produced nothing', () => {
+  const EMPTY = { status: 'failed' as RunStatus, filesChanged: 0, report: '' };
+
+  it('does not run the route’s verifier, and does not advance the card', async () => {
+    let gatesRan = 0;
+    const r = recorder({ settle: [record(EMPTY)] });
+    const result = await performAction(
+      deps(r.client, {
+        verify: {
+          gates: async () => {
+            gatesRan += 1;
+            return PASSED;
+          },
+          smoke: async () => PASSED,
+        },
+      }),
+      { kind: 'dispatch', card: CARD(), route: ROUTE },
+      context,
+    );
+    expect(gatesRan).toBe(0);
+    expect(r.moves).toEqual([]);
+    expect(result.dispatches).toBe(1);
+  });
+
+  it('records a verdict that says the check did not run', async () => {
+    const r = recorder({ settle: [record(EMPTY)] });
+    await performAction(deps(r.client), { kind: 'dispatch', card: CARD(), route: ROUTE }, context);
+    expect(r.verdicts[0]).toMatchObject({ mode: 'gates', passed: false });
+    expect(r.verdicts[0].reason).toMatch(/produced nothing to verify/i);
+    // No command and no output: naming one would claim a gate ran and failed.
+    expect(r.verdicts[0].command).toBeUndefined();
+    expect(r.verdicts[0].output).toBeUndefined();
+  });
+
+  // A judge is a dispatch (decision 8), so on a flaky backend this was half the budget spent judging nothing.
+  it('dispatches no critic for it', async () => {
+    const r = recorder({ settle: [record(EMPTY)] });
+    const result = await performAction(
+      deps(r.client),
+      { kind: 'dispatch', card: CARD(), route: { ...ROUTE, verify: 'critic' } },
+      context,
+    );
+    expect(r.dispatched).toEqual(['implement']);
+    expect(result.dispatches).toBe(1);
+  });
+
+  it('says in the diary that the check did not run, rather than that it failed', async () => {
+    const r = recorder({ settle: [record(EMPTY)] });
+    await performAction(deps(r.client), { kind: 'dispatch', card: CARD(), route: ROUTE }, context);
+    expect(r.diary[0].text).toContain('gates did not run');
+    expect(r.diary[0].text).not.toContain('gates failed');
+  });
+
+  // THE FAIL-CLOSED DIRECTION, three ways. Being wrong here costs one wasted verification; being wrong the
+  // other way advances a card over an empty run, so every clause must hold before the check is skipped.
+  it('verifies a failed run that changed files, because it may have done real work', async () => {
+    const r = recorder({ settle: [record({ status: 'failed', filesChanged: 3, report: '' })] });
+    await performAction(deps(r.client), { kind: 'dispatch', card: CARD(), route: ROUTE }, context);
+    expect(r.moves).toEqual([{ card: 'E-001', to: 'review' }]);
+  });
+
+  it('verifies a failed run that created cards, which change no files', async () => {
+    // `derive-features` writes cards through the API and legitimately changes nothing on disk, so a
+    // files-only test would call a real derivation empty.
+    const r = recorder({
+      settle: [record({ status: 'failed', filesChanged: 0, report: '', created: ['F-002'] })],
+    });
+    await performAction(deps(r.client), { kind: 'dispatch', card: CARD(), route: ROUTE }, context);
+    expect(r.moves).toEqual([{ card: 'E-001', to: 'review' }]);
+  });
+
+  it('verifies when the file count could not be taken at all', async () => {
+    // Absent is not zero. A measurement that failed is not evidence that nothing changed.
+    const r = recorder({ settle: [record({ status: 'failed', report: '' })] });
+    await performAction(deps(r.client), { kind: 'dispatch', card: CARD(), route: ROUTE }, context);
+    expect(r.moves).toEqual([{ card: 'E-001', to: 'review' }]);
+  });
+});
+
 describe('a critic route', () => {
   const CRITIC_ROUTE: Route = { ...ROUTE, verify: 'critic' };
 

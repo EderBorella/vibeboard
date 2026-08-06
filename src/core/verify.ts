@@ -122,6 +122,16 @@ function reasonFor(input: CriticInput): { reason?: string } {
   };
 }
 
+// A verdict for work that was never done, recorded WITHOUT running the route's verifier — see
+// `producedNothing` in core/runs.ts for why a verifier must not be consulted at all in this case.
+//
+// It wears the route's own mode rather than a fourth one. `VerifyMode` is what a route's `verify:` accepts, so
+// a `none` added here would become a verifier a project could configure, and "this card is checked by nothing"
+// is not a check. The reason says plainly that the check did not run, which is the fact a reader needs.
+export function unverified(mode: VerifyMode, at: string, why: string): Verification {
+  return { mode, passed: false, at, reason: why };
+}
+
 export function criticVerification(at: string, input: CriticInput): Verification {
   return {
     mode: 'critic',

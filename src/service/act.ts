@@ -1,10 +1,10 @@
 import { burnsAttempt } from '../core/accounting.js';
 import { CRITIC_SKILL, type Route } from '../core/autopilot.js';
 import type { StopReason } from '../core/dispatch-gate.js';
-import type { RunRecord } from '../core/runs.js';
+import { producedNothing, type RunRecord } from '../core/runs.js';
 import type { TickAction } from '../core/tick.js';
 import type { BoardName, Card } from '../core/types.js';
-import { criticVerification, type Verification } from '../core/verify.js';
+import { criticVerification, unverified, type Verification } from '../core/verify.js';
 import { commitAll } from '../server/git-work.js';
 import { verifyGates, verifySmoke } from '../server/verifier.js';
 import type { BoardClient } from './board-client.js';
@@ -161,6 +161,37 @@ async function dispatch(deps: ActDeps, card: Card, route: Route, context: TickCo
     return { dispatches: 1 };
   }
 
+  // A run that produced nothing is not verified, and this is a correctness rule rather than an economy one.
+  // Its route's verifier would answer about a tree the run never touched: `gates` runs commands that were
+  // passing before the dispatch and are passing now, so the card advances having implemented nothing — the
+  // first hand-run found this through the critic, and under `gates` there is no model in the loop to notice.
+  // The attempt is still burned: the agent had its chance (accounting.ts).
+  if (producedNothing(settled)) {
+    const verification = unverified(
+      route.verify,
+      deps.now().toISOString(),
+      `The ${route.skill} run produced nothing to verify — it failed, changed no files and wrote no report — so its ${route.verify} check was not run.`,
+    );
+    const recorded = await deps.client.verdict(card.board, card.id, settled.run, verification);
+    if (!recorded.ok) {
+      return refused(
+        deps,
+        `could not record the verdict on ${settled.run}`,
+        recorded.reason,
+        recorded.fatal,
+        1,
+      );
+    }
+    await deps.client.log('run', diaryLine(card, route, verification, settled, context, false), {
+      iteration: context.iteration + 1,
+      card: card.id,
+      board: card.board,
+      skill: route.skill,
+      outcome: settled.status,
+    });
+    return { dispatches: 1 };
+  }
+
   const { verification, dispatches } = await verify(deps, card, route, settled.run);
   // RULE 4: onto the run it judged, before the card moves. A card that advanced with no verdict recorded
   // beside it is a card nobody can explain afterwards.
@@ -187,7 +218,7 @@ async function dispatch(deps: ActDeps, card: Card, route: Route, context: TickCo
   // The STRUCTURED fields as well as the sentence. `DiaryEntry` carries `iteration`, `card`, `board`, `skill`
   // and `outcome` precisely so the checkup — the diary's one reader — does not have to regex prose, and
   // nothing was writing any of them.
-  await deps.client.log('run', diaryLine(card, route, verification, settled, context), {
+  await deps.client.log('run', diaryLine(card, route, verification, settled, context, true), {
     iteration: context.iteration + 1,
     card: card.id,
     board: card.board,
@@ -323,14 +354,22 @@ function diaryLine(
   verification: Verification,
   judged: RunRecord,
   context: TickContext,
+  // Whether the route's verifier actually RAN. Stated by the caller rather than guessed from the verdict:
+  // "critic failed" is a lie when no critic was dispatched, and a line whose opening clause contradicts the
+  // reason after it is worse than one that says less. Required, not defaulted — the two callers are the two
+  // answers, and a default would let a third arrive silently wearing the wrong one.
+  checked: boolean,
 ): string {
+  const judgement = checked
+    ? `${route.verify} ${verification.passed ? 'passed' : 'failed'}`
+    : `${route.verify} did not run`;
   const outcome = verification.passed ? `advanced to ${route.next}` : 'stayed where it is';
   const because = verification.reason ? ` ${verification.reason}` : '';
   // THE AGENT'S OWN SUMMARY, which nothing was appending. Loop step 12 says "append the run's summary to the
   // diary", and decision 10 justifies denying agents diary access on the grounds that auto-pilot appends it for
   // them — so without this the narrative contained no agent voice at all and that justification was unearned.
   const said = judged.summary ? ` It reported: ${judged.summary}` : '';
-  return `Iteration ${context.iteration + 1}: ${card.id} ran ${route.skill}, ${route.verify} ${verification.passed ? 'passed' : 'failed'}, so it ${outcome}.${because}${said}`;
+  return `Iteration ${context.iteration + 1}: ${card.id} ran ${route.skill}, ${judgement}, so it ${outcome}.${because}${said}`;
 }
 
 // A refusal from the board. Reported to the diary where it can be, and fatal refusals end the loop: a loop

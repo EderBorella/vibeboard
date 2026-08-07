@@ -1,4 +1,5 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
+import { CREDENTIAL_COOKIE, CROSS_ORIGIN, readCookie } from './cookies.js';
 import type { Credential, CredentialStore, Scope } from './credentials.js';
 
 declare module 'fastify' {
@@ -101,6 +102,30 @@ export function bearerToken(header: string | undefined): string {
   return match?.[1]?.trim() ?? '';
 }
 
+// THE ONE ASYMMETRY THAT MATTERS IN THIS FILE. A cookie is attached by the browser automatically,
+// which is the single thing a bearer token is not — so a page on another origin can make this server
+// act as the signed-in user without ever reading a secret. `SameSite=Strict` is the primary defence
+// and this is the second.
+//
+// It may be applied ONLY to a caller that authenticated by cookie. An agent sends `Authorization` and
+// no `Origin` at all: checking unconditionally would refuse every run, which is why the caller below
+// passes the bearer's presence rather than this deciding for itself.
+export function sameOrigin(req: {
+  method: string;
+  headers: { origin?: string | undefined; host?: string | undefined };
+}): boolean {
+  const origin = req.headers.origin;
+  // An ABSENT Origin cannot be refused outright — a top-level navigation sends none, and neither does
+  // a same-origin GET in Chrome — but it must not be a licence to mutate. That split is the check.
+  if (!origin) return req.method === 'GET' || req.method === 'HEAD';
+  try {
+    // `null`, which a sandboxed iframe or a file:// page sends, is not a URL and lands in the catch.
+    return new URL(origin).host === req.headers.host;
+  } catch {
+    return false;
+  }
+}
+
 // Whether this credential may make this request. Exported so the table can be tested directly:
 // a row nobody exercises is a row that does not work.
 export function allows(
@@ -138,8 +163,15 @@ export function registerAuth(
   openProject: () => string | undefined,
 ): void {
   api.addHook('preHandler', async (req: FastifyRequest, reply) => {
-    const cred = credentials.verify(bearerToken(req.headers.authorization));
+    // TWO TRANSPORTS, one credential store. Agents send a bearer; a browser sends a cookie it never
+    // reads. Bearer FIRST, so an explicitly presented credential is the one that is judged: a caller
+    // that sends a bad bearer gets a 401 rather than quietly succeeding as whoever holds the cookie.
+    const bearer = bearerToken(req.headers.authorization);
+    const cred = credentials.verify(bearer || readCookie(req.headers.cookie, CREDENTIAL_COOKIE));
     if (!cred) return reply.code(401).send({ error: 'Unauthorized' });
+    // Only for the cookie path — see `sameOrigin`. An agent sends no Origin, so an unconditional check
+    // here would refuse every run in the project.
+    if (!bearer && !sameOrigin(req)) return reply.code(403).send({ error: CROSS_ORIGIN });
     req.credential = cred;
     const { id } = req.params as { id?: string };
     if (!allows(cred, req.method, req.routeOptions.url ?? '', openProject(), id)) {

@@ -21,10 +21,17 @@ export type SigninPhase =
   | { phase: 'in' };
 
 export interface SigninDeps {
+  // A credential this browser already holds — a `?token=` launch URL, or localStorage from before the
+  // cookie transport. Handed to the server so it can set the cookie; see `adoptCredential`.
+  legacyToken: () => string;
+  adopt: (token: string) => Promise<void>;
+  forgetLegacy: () => void;
   claim: () => Promise<{ token: string }>;
   request: () => Promise<SigninRequestOpened>;
   collect: (id: string) => Promise<SigninCollected>;
-  setToken: (token: string) => void;
+  // Called once a credential exists. There is nothing to STORE — the server set an HttpOnly cookie as
+  // it answered — so this only tells the app, which is what wakes the socket out of its dead end.
+  onCredential: () => void;
   sleep: (ms: number) => Promise<void>;
   onPhase: (phase: SigninPhase) => void;
 }
@@ -56,11 +63,14 @@ function refusal(err: unknown, fallback: string): SigninPhase {
 // replaces showed a working board on which every button silently failed.
 export async function runSignin(deps: SigninDeps): Promise<boolean> {
   deps.onPhase({ phase: 'claiming' });
+  // BEFORE CLAIMING, because a browser that already holds a credential must not ask to be let in: the
+  // claim would be refused (a device exists — its own), and it would then wait for an approval that
+  // only it could give. That is the upgrade path from the pre-cookie release, and the `?token=`
+  // recovery route lands here too.
+  if (await adopt(deps)) return true;
   try {
-    const { token } = await deps.claim();
-    deps.setToken(token);
-    deps.onPhase({ phase: 'in' });
-    return true;
+    await deps.claim();
+    return arrived(deps);
   } catch (err) {
     // 'claimed' is the ordinary case — a browser is already signed in, so ask it. Anything else stops
     // here with the server's explanation, because there is nothing useful to try.
@@ -70,6 +80,29 @@ export async function runSignin(deps: SigninDeps): Promise<boolean> {
     }
   }
   return askToBeApproved(deps);
+}
+
+// Announced before the phase, and the order is deliberate: the announcement is what wakes the socket,
+// and it must find the cookie already set rather than waiting on a React render to tell it.
+function arrived(deps: SigninDeps): boolean {
+  deps.onCredential();
+  deps.onPhase({ phase: 'in' });
+  return true;
+}
+
+// The old credential is FORGOTTEN either way. If it worked, the cookie has replaced it; if it did not,
+// keeping it means retrying a dead token on every load for ever, and the flow below is the real answer.
+async function adopt(deps: SigninDeps): Promise<boolean> {
+  const token = deps.legacyToken();
+  if (!token) return false;
+  try {
+    await deps.adopt(token);
+  } catch {
+    deps.forgetLegacy();
+    return false;
+  }
+  deps.forgetLegacy();
+  return arrived(deps);
 }
 
 async function askToBeApproved(deps: SigninDeps): Promise<boolean> {
@@ -92,11 +125,7 @@ async function askToBeApproved(deps: SigninDeps): Promise<boolean> {
       // and giving up here would put "refused" on screen for a network blip.
       continue;
     }
-    if (answer.state === 'approved') {
-      deps.setToken(answer.token);
-      deps.onPhase({ phase: 'in' });
-      return true;
-    }
+    if (answer.state === 'approved') return arrived(deps);
     if (answer.state === 'refused') {
       deps.onPhase(stopped(REFUSED, false)); // a person decided; offering "try again" argues with them
       return false;

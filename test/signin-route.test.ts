@@ -32,13 +32,17 @@ interface Ctx {
   devices: DeviceStore;
   session: ProjectSession;
   root: string;
+  // The store the APP verifies against, so a test that needs a run credential mints one that is really
+  // valid here. Minting against a second store would make every refusal pass for the wrong reason.
+  credentials: CredentialStore;
 }
 
 async function open(opts: { mode?: 'greenfield' | 'brownfield' } = {}): Promise<Ctx> {
   const session = new ProjectSession();
   const devices = DeviceStore.inMemory();
+  const credentials = new CredentialStore(ADMIN, devices);
   const app = buildApp(session, {
-    credentials: new CredentialStore(ADMIN, devices),
+    credentials,
     devices,
     logger: false,
     // Both only matter to the "closed while agents run" block, which dispatches a real hanging run —
@@ -59,7 +63,7 @@ async function open(opts: { mode?: 'greenfield' | 'brownfield' } = {}): Promise<
     headers: admin,
     payload: { path: root, name: 'A', mode: opts.mode ?? 'brownfield' },
   });
-  return { app, devices, session, root };
+  return { app, devices, session, root, credentials };
 }
 
 const claim = (app: FastifyInstance, agent = CHROME) =>
@@ -67,6 +71,17 @@ const claim = (app: FastifyInstance, agent = CHROME) =>
 
 const ask = (app: FastifyInstance, agent = CHROME) =>
   app.inject({ method: 'POST', url: '/auth/request', headers: { 'user-agent': agent } });
+
+// Every Set-Cookie the answer carried, keyed by name. A map rather than the raw list, because what the
+// tests below are about is WHICH cookies moved — and a response that set one of the pair is the bug,
+// not a detail.
+function setCookies(res: { headers: Record<string, unknown> }): Map<string, string> {
+  const raw = res.headers['set-cookie'];
+  const values = Array.isArray(raw) ? (raw as string[]) : raw === undefined ? [] : [String(raw)];
+  return new Map(values.map((v) => [v.slice(0, v.indexOf('=')), v]));
+}
+
+const cookieValue = (cookie: string): string => cookie.slice(cookie.indexOf('=') + 1, cookie.indexOf(';'));
 
 describe('the first browser signs itself in', () => {
   // THE WHOLE POINT OF THE FEATURE: open the URL and the board is there. No button, no code, no
@@ -355,6 +370,161 @@ describe('the device list', () => {
 
     expect((await app.inject({ url: '/api/state', headers })).statusCode).toBe(401);
     expect((await claim(app)).statusCode).toBe(200);
+  });
+});
+
+// HOW THE CREDENTIAL ACTUALLY REACHES THE BROWSER. Every route that hands one out sets it as a cookie,
+// and every route that takes one away clears it — a browser left holding a credential the server has
+// forgotten is the state that made a page load take a minute to connect.
+describe('the cookies sign-in sets and clears', () => {
+  it('sets the credential HttpOnly and a readable hint when a browser claims', async () => {
+    const { app } = await open();
+
+    const cookies = setCookies(await claim(app));
+
+    expect([...cookies.keys()]).toEqual(['vb', 'vb.in']);
+    expect(cookies.get('vb')).toContain('HttpOnly');
+    expect(cookies.get('vb')).toContain('SameSite=Strict');
+    // The hint must NOT be HttpOnly: reading it is the only way the page can answer "am I signed in?"
+    // synchronously, and a round trip there is the flash of the sign-in screen this feature removes.
+    expect(cookies.get('vb.in')).not.toContain('HttpOnly');
+  });
+
+  it('and that cookie is enough on its own, with no Authorization header', async () => {
+    const { app } = await open();
+    const cookie = setCookies(await claim(app)).get('vb') ?? '';
+
+    const res = await app.inject({
+      url: '/api/state',
+      headers: { cookie: `vb=${cookieValue(cookie)}`, host: 'localhost:4610' },
+    });
+
+    expect(res.statusCode).toBe(200);
+  });
+
+  it('sets them again when a waiting browser collects its approval', async () => {
+    const { app } = await open();
+    const { token: first } = (await claim(app)).json();
+    const { id } = (await ask(app, 'Safari on the phone')).json();
+    await app.inject({
+      method: 'POST',
+      url: `/api/signin/approve/${id}`,
+      headers: { authorization: `Bearer ${first}` },
+    });
+
+    const collected = await app.inject({ url: `/auth/request/${id}` });
+
+    const cookies = setCookies(collected);
+    expect([...cookies.keys()]).toEqual(['vb', 'vb.in']);
+    expect(cookieValue(cookies.get('vb') ?? '')).toBe(collected.json().token);
+  });
+
+  it('sets nothing while the request is still pending', async () => {
+    const { app } = await open();
+    await claim(app);
+    const { id } = (await ask(app)).json();
+
+    expect(setCookies(await app.inject({ url: `/auth/request/${id}` })).size).toBe(0);
+  });
+
+  // G7. Sign everything out has to take THIS browser's cookie with it: it is one of the browsers being
+  // signed out, and leaving the cookie behind means it goes on presenting a credential that no longer
+  // exists — for ever, because an idle tab never makes the request that would 401.
+  it('clears both when every browser is signed out', async () => {
+    const { app } = await open();
+    const { token } = (await claim(app)).json();
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/signin/clear',
+      headers: { authorization: `Bearer ${token}` },
+    });
+
+    const cookies = setCookies(res);
+    expect([...cookies.keys()]).toEqual(['vb', 'vb.in']);
+    for (const value of cookies.values()) expect(value).toContain('Max-Age=0');
+  });
+
+  // G8, and its other half in the next test: the clear happens for the caller's OWN device and for no
+  // other, or revoking the phone from the laptop would sign the laptop out.
+  it('clears them when this browser revokes its own device', async () => {
+    const { app } = await open();
+    const { token } = (await claim(app)).json();
+    const headers = { authorization: `Bearer ${token}` };
+    const { thisDevice } = (await app.inject({ url: '/api/signin', headers })).json();
+
+    const res = await app.inject({ method: 'DELETE', url: `/api/signin/devices/${thisDevice}`, headers });
+
+    expect(res.statusCode).toBe(200);
+    expect([...setCookies(res).keys()]).toEqual(['vb', 'vb.in']);
+  });
+
+  it('leaves them alone when this browser revokes a different device', async () => {
+    const { app, devices } = await open();
+    const { token } = (await claim(app)).json();
+    const other = await devices.add('Phone', '192.168.0.31');
+
+    const res = await app.inject({
+      method: 'DELETE',
+      url: `/api/signin/devices/${other.id}`,
+      headers: { authorization: `Bearer ${token}` },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(setCookies(res).size).toBe(0);
+  });
+});
+
+// G11. The `?token=` recovery route, and the upgrade path for a browser whose credential is still in
+// localStorage from before the cookie transport. Without it that browser claims, is told a device
+// already exists, and waits for an approval only it could give.
+describe('adopting a credential this browser already holds', () => {
+  it('sets the cookies for a valid credential', async () => {
+    const { app } = await open();
+    const { token } = (await claim(app)).json();
+
+    const res = await app.inject({ method: 'POST', url: '/auth/adopt', payload: { token } });
+
+    expect(res.statusCode).toBe(200);
+    const cookies = setCookies(res);
+    expect(cookieValue(cookies.get('vb') ?? '')).toBe(token);
+    expect(cookies.get('vb.in')).toBeDefined();
+  });
+
+  it('accepts the server’s own admin token, which is what the recovery URL carries', async () => {
+    const { app } = await open();
+    const res = await app.inject({ method: 'POST', url: '/auth/adopt', payload: { token: ADMIN } });
+    expect(res.statusCode).toBe(200);
+    expect(cookieValue(setCookies(res).get('vb') ?? '')).toBe(ADMIN);
+  });
+
+  it('refuses a credential it does not recognise, and sets nothing', async () => {
+    const { app } = await open();
+    const res = await app.inject({ method: 'POST', url: '/auth/adopt', payload: { token: 'made-up' } });
+    expect(res.statusCode).toBe(401);
+    expect(setCookies(res).size).toBe(0);
+  });
+
+  it('refuses an absent token rather than 500ing on the body', async () => {
+    const { app } = await open();
+    expect((await app.inject({ method: 'POST', url: '/auth/adopt', payload: {} })).statusCode).toBe(401);
+  });
+
+  // A RUN TOKEN MUST NOT BECOME A BROWSER SESSION. It is scoped to one card and expires with its run, so
+  // a cookie outliving it would be a browser holding an authority nothing can revoke — and a run can
+  // reach this endpoint, because it is unauthenticated by necessity.
+  it('refuses a run credential, which is the whole reason it checks the scope', async () => {
+    const { app, root, credentials } = await open();
+    // Minted against the app's OWN store, so it genuinely authenticates here — the scope is the only
+    // thing refusing it. Against a second store this would pass because the token was unknown, which
+    // would leave the check untested.
+    const run = credentials.mintRun('work', 'run-1', root, 'E-001');
+    expect(credentials.verify(run.token)).not.toBeNull();
+
+    const res = await app.inject({ method: 'POST', url: '/auth/adopt', payload: { token: run.token } });
+
+    expect(res.statusCode).toBe(401);
+    expect(setCookies(res).size).toBe(0);
   });
 });
 

@@ -30,8 +30,6 @@ const api = vi.hoisted(() => ({
   signOutEverything: vi.fn().mockResolvedValue({ ok: true }),
 }));
 vi.mock('../web/src/api.js', () => api);
-vi.mock('../web/src/token.js', () => ({ authToken: () => 'dev_this.the-secret-half' }));
-
 const { SignInPanel } = await import('../web/src/components/SignInPanel.js');
 
 afterEach(cleanup);
@@ -79,22 +77,26 @@ describe('the list', () => {
   });
 });
 
-describe('the token', () => {
-  // Hidden until asked for. The user never needs it, and a credential on screen is a credential in a
-  // screenshot or a screen share.
-  it('is not on screen until Show token is clicked', async () => {
+// THE CREDENTIAL CANNOT BE SHOWN, and this panel must not pretend otherwise. It is an HttpOnly
+// cookie, so page JS cannot read it — the button that used to reveal it would have printed an empty
+// string, which is worse than saying nothing. This asserts the absence, because the previous version's
+// promise ("visible in Settings if you go looking") is the thing that changed.
+describe('this browser’s credential', () => {
+  it('offers no way to reveal it, and says why', async () => {
     render(<SignInPanel confirm={yes} />);
-    await waitFor(() => expect(screen.getByRole('button', { name: /show token/i })).toBeTruthy());
-    expect(screen.queryByText('dev_this.the-secret-half')).toBeNull();
 
-    fireEvent.click(screen.getByRole('button', { name: /show token/i }));
-
-    expect(screen.getByText('dev_this.the-secret-half')).toBeTruthy();
+    await waitFor(() => expect(screen.getByText(/not readable by this page/i)).toBeTruthy());
+    // Exact labels, not a substring: `not.toContain('show')` would be satisfied by any wording change,
+    // and "shows" appears in ordinary copy.
+    const labels = screen.getAllByRole('button').map((b) => b.textContent);
+    expect(labels).toEqual(['Sign out', 'Sign every browser out']);
   });
 
-  it('warns what holding it means', async () => {
-    render(<SignInPanel confirm={yes} />);
-    await waitFor(() => expect(screen.getByText(/start agents and edit files/i)).toBeTruthy());
+  it('does not import the module that used to hold the token', async () => {
+    // A `authToken` import here would mean the panel still expects a readable credential, and the
+    // transport has come back. The module no longer exports one, so this is a real constraint.
+    const token = await import('../web/src/token.js');
+    expect(Object.keys(token)).not.toContain('authToken');
   });
 });
 

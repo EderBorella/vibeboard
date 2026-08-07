@@ -1,7 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
-import { claimSignin, collectSignin, onUnauthorized, requestSignin } from './api';
+import { adoptCredential, claimSignin, collectSignin, onUnauthorized, requestSignin } from './api';
 import { runSignin, type SigninPhase } from './signin';
-import { clearToken, hasToken, setToken } from './token';
+import {
+  credentialArrived,
+  forgetLegacyToken,
+  signedIn as isSignedIn,
+  legacyToken,
+  signOutLocally,
+} from './token';
 
 // One flow per page, not per component. React StrictMode invokes effects twice in development, and a
 // second `runSignin` would find the claim already taken by the first and drop this browser into
@@ -27,19 +33,22 @@ export interface Signin {
 export function useSignin(): Signin {
   // Read once, synchronously: a browser that already has a credential must not flash the sign-in
   // screen on every load, and an effect would.
-  const [signedIn, setSignedIn] = useState(() => hasToken());
+  const [signedIn, setSignedIn] = useState(() => isSignedIn());
   const [phase, setPhase] = useState<SigninPhase>(() =>
-    hasToken() ? { phase: 'in' } : { phase: 'claiming' },
+    isSignedIn() ? { phase: 'in' } : { phase: 'claiming' },
   );
 
   const start = useCallback((): void => {
     setPhase({ phase: 'claiming' });
     void once(() =>
       runSignin({
+        legacyToken,
+        adopt: adoptCredential,
+        forgetLegacy: forgetLegacyToken,
         claim: claimSignin,
         request: requestSignin,
         collect: collectSignin,
-        setToken,
+        onCredential: credentialArrived,
         sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
         onPhase: (next) => {
           setPhase(next);
@@ -50,7 +59,9 @@ export function useSignin(): Signin {
   }, []);
 
   useEffect(() => {
-    if (!hasToken()) start();
+    // A legacy credential means this browser is signed in by the old transport and has to be upgraded,
+    // so the flow runs even though `isSignedIn()` may be false — there is no hint cookie yet.
+    if (!isSignedIn() || legacyToken()) start();
   }, [start]);
 
   // A credential that stops working — revoked from another device, or a store that was cleared — drops
@@ -58,7 +69,7 @@ export function useSignin(): Signin {
   // is the exact bug this feature exists to fix. `api.ts` clears the token before firing this.
   useEffect(() => {
     onUnauthorized(() => {
-      clearToken();
+      signOutLocally();
       setSignedIn(false);
       start();
     });

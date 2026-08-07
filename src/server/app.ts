@@ -87,22 +87,17 @@ export function buildApp(
 ): FastifyInstance {
   const app = Fastify({
     logger: withRedaction(opts.logger ?? serverLogger().options),
-    // FIVE SECONDS, NOT FASTIFY'S SEVENTY-TWO, and this is a real bug rather than tuning.
+    // Node's own default, rather than Fastify's 72 seconds. Fastify raises it to favour connection
+    // reuse, which is the right trade for an API and buys almost nothing here: these requests finish
+    // in single-digit milliseconds.
     //
-    // A browser allows six persistent connections per host, and Firefox counts a WebSocket handshake
-    // against that limit. This app fires six /api requests as the board mounts — autopilot state,
-    // skills, models, runs, control files, project state — which takes every slot; keep-alive then
-    // holds those connections open, and the socket's handshake sits QUEUED IN THE BROWSER, never
-    // reaching this server, until one of them is closed. At 72 seconds that is what the user sees as
-    // the board saying "Connecting…" for a minute or two, with nothing in the log to explain it,
-    // because the request genuinely never arrived.
-    //
-    // Measured on a real first load: page at 18:06:23, socket handshake at 18:07:41 — 78 seconds, one
-    // keep-alive cycle. An earlier load waited 120 seconds, two cycles.
-    //
-    // Node's own default is 5s; Fastify raises it to 72s to favour connection reuse, which is the
-    // right trade for an API and the wrong one for an API that shares a host with a websocket. The
-    // requests here finish in single-digit milliseconds, so reuse buys almost nothing.
+    // IT WAS ADDED FOR THE WRONG REASON, and the claim is withdrawn rather than quietly left standing.
+    // The comment here asserted that keep-alive held the browser's six-connection budget and queued the
+    // WebSocket handshake — asserted without measuring, and disproved: during the wait ZERO bytes reach
+    // this server, and Mozilla's own bugs 664305/748766 point the other way. The real cause was a stale
+    // tab whose handshake could never succeed, holding Firefox's one-connection-per-host admission slot
+    // through a fail-delay that grows to a 60-second ceiling. That is fixed by the cookie transport in
+    // cookies.ts, not here. This value stays because it is a sane default, not because it fixed a bug.
     keepAliveTimeout: 5_000,
   });
   const credentials = opts.credentials ?? new CredentialStore(randomUUID());

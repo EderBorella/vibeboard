@@ -1,6 +1,7 @@
 import websocket from '@fastify/websocket';
 import type { FastifyInstance, preValidationHookHandler } from 'fastify';
-import { bearerToken } from './auth.js';
+import { bearerToken, sameOrigin } from './auth.js';
+import { CREDENTIAL_COOKIE, CROSS_ORIGIN, readCookie } from './cookies.js';
 import type { AppCtx, WsClient } from './route-context.js';
 
 // Fan-out to every connected browser. A send on a closed socket is swallowed: a client that
@@ -66,14 +67,23 @@ export function registerWs(
     // checked somewhere, because this socket carries the copilot channel, whose tools write files
     // with no approval step. Locking the HTTP surface while leaving it open would secure nothing.
     //
-    // The token arrives as a query parameter because a browser cannot set headers on a WebSocket
-    // handshake.
+    // A BROWSER SENDS ITS CREDENTIAL AS A COOKIE, which it attaches to the handshake itself. This is
+    // what the `?token=` query parameter used to be for, on the grounds that a browser cannot set
+    // headers on a WebSocket upgrade — true, and it never needed to: a cookie is not a header the page
+    // sets. `?token=` remains for the documented recovery route (~/.vibeboard/token in a URL) and for
+    // non-browser clients, which also send `Authorization`.
     const authenticate: preValidationHookHandler = async (req, reply) => {
       const { token } = req.query as { token?: string };
       // `||`, not `??`: an empty `?token=` is a missing token, not a supplied one, and with `??`
       // it shadowed a perfectly good Authorization header.
-      const cred = ctx.credentials.verify(token || bearerToken(req.headers.authorization));
+      const presented = token || bearerToken(req.headers.authorization);
+      const cred = ctx.credentials.verify(presented || readCookie(req.headers.cookie, CREDENTIAL_COOKIE));
       if (cred?.scope !== 'admin') return reply.code(401).send({ error: 'Unauthorized' });
+      // The standard WebSocket CSRF defence, and here too it applies ONLY to the cookie path: a
+      // non-browser client sends no Origin, and refusing that would refuse the recovery route as well
+      // as every test client. A browser always sends one, so a page on another origin opening this
+      // socket is refused even before SameSite=Strict is considered.
+      if (!presented && !sameOrigin(req)) return reply.code(403).send({ error: CROSS_ORIGIN });
       // Stashed for the handler below, which needs to know WHICH device holds this socket so a revoke
       // can hang up on exactly that one. Re-verifying there would be a second lookup answering a
       // question already answered.

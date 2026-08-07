@@ -3,76 +3,34 @@ import { createControlFile, getState, patchConfig, putSkill } from '../web/src/a
 import { STUB_TOKEN, stubBrowser } from './browser-stubs.js';
 
 // The client half of the boundary. Every call in web/src/api.ts goes through one wrapper, so this
-// covers all of them: what it proves is that the wrapper attaches the credential at all.
+// covers all of them — and what it proves has changed: the wrapper must attach NO credential and must
+// ask for the cookie to be sent.
+//
+// A `Bearer` header from the browser is now a defect, not a feature. It was the transport that put a
+// permanent credential in the WebSocket URL, and the redaction in the server's logging exists only
+// because of it.
 
-describe('the browser attaches its credential', () => {
+describe('the browser sends no credential of its own', () => {
   beforeEach(() => {
     stubBrowser();
   });
 
-  it('sends the stored token as a bearer header', async () => {
-    const fetchMock = vi.fn(async () => new Response('{}', { status: 200 }));
-    vi.stubGlobal('fetch', fetchMock);
-
-    await getState();
-
-    const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
-    expect((init.headers as Record<string, string>).authorization).toBe(`Bearer ${STUB_TOKEN}`);
-  });
-
-  it('reads the token from the launch URL and takes it out of the address bar', () => {
-    // A credential left in the address bar survives in bookmarks, screen shares and history, and
-    // this one does not expire.
-    const store = new Map<string, string>();
-    const replaced: string[] = [];
-    vi.stubGlobal('location', {
-      host: 'localhost:4610',
-      href: 'http://localhost:4610/?token=from-the-link',
-      pathname: '/',
-      search: '?token=from-the-link',
-    });
-    vi.stubGlobal('localStorage', {
-      getItem: (k: string) => store.get(k) ?? null,
-      setItem: (k: string, v: string) => store.set(k, v),
-    });
-    vi.stubGlobal('history', { replaceState: (_s: unknown, _t: string, url: string) => replaced.push(url) });
-    // The module memoises, so this has to run in its own module registry.
-    vi.resetModules();
-
-    return import('../web/src/token.js').then(({ authToken: fresh }) => {
-      expect(fresh()).toBe('from-the-link');
-      expect(store.get('vibeboard.token')).toBe('from-the-link');
-      expect(replaced).toEqual(['http://localhost:4610/']);
-    });
-  });
-
-  // Through a fresh module registry: token.ts memoises, and the first test in this file already
-  // populated the memo — so read through the module-scope import this was asserting the cache, not
-  // the fallback it is named for.
-  it('falls back to the stored token when the URL carries none', async () => {
-    vi.resetModules();
-    stubBrowser(); // search: '' — nothing in the URL to read
-    const { authToken: fresh } = await import('../web/src/token.js');
-    expect(fresh()).toBe(STUB_TOKEN);
-  });
-
-  // One call site out of twenty-five was exercised, and the file's own comment claimed all of them.
-  // Testing one more proved nothing either: the twenty-five reach the network through four helpers,
-  // so it is the four that have to be held, not four of the twenty-five. Breaking any one of them
-  // now fails here.
   it.each([
     ['post', () => createControlFile('docs')],
     ['put', () => putSkill('execute', { name: 'x', description: 'd', boards: [], columns: [], prompt: 'p' })],
     ['patch', () => patchConfig({ name: 'renamed' })],
     ['a bare read', () => getState()],
-  ])('sends the credential through %s', async (_shape, call) => {
+  ])('sends the cookie and no Authorization header through %s', async (_shape, call) => {
     const fetchMock = vi.fn(async () => new Response('{}', { status: 200 }));
     vi.stubGlobal('fetch', fetchMock);
 
     await call();
 
     const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
-    expect((init.headers as Record<string, string>).authorization).toBe(`Bearer ${STUB_TOKEN}`);
+    // Stated rather than left to the default, because that default has changed over the fetch spec's
+    // life and a request that silently omits the cookie is a board on which every button fails.
+    expect(init.credentials).toBe('same-origin');
+    expect(init.headers as Record<string, string>).not.toHaveProperty('authorization');
   });
 
   it('does not eat the caller’s own headers on the way past', async () => {
@@ -81,5 +39,119 @@ describe('the browser attaches its credential', () => {
     await patchConfig({ name: 'renamed' });
     const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     expect((init.headers as Record<string, string>)['content-type']).toBe('application/json');
+  });
+});
+
+// G10: what the page may know is that a credential EXISTS, never what it is. Every one of these runs in
+// its own module registry, because token.ts memoises the URL read — it rewrites the address bar, so a
+// second read would find nothing.
+describe('what the page can tell about being signed in', () => {
+  it('reads the hint cookie, and exposes no way to read the credential', async () => {
+    vi.resetModules();
+    stubBrowser({ signedIn: true });
+    const mod = await import('../web/src/token.js');
+
+    expect(mod.signedIn()).toBe(true);
+    // The credential is HttpOnly, so it is not in `document.cookie` at all — and nothing in this module
+    // returns a token. A `authToken()` here would be the transport coming back.
+    expect(document.cookie).not.toContain(STUB_TOKEN);
+    expect(Object.keys(mod)).not.toContain('authToken');
+  });
+
+  it('is not signed in without the hint', async () => {
+    vi.resetModules();
+    stubBrowser({ signedIn: false });
+    const { signedIn } = await import('../web/src/token.js');
+    expect(signedIn()).toBe(false);
+  });
+
+  // The hint is not a credential, so a forged one is not an escalation — but it must not be READ as one
+  // either: anything other than the exact value the server sets is not a sign-in.
+  it('treats a hint with any other value as not signed in', async () => {
+    vi.resetModules();
+    const browser = stubBrowser({ signedIn: false });
+    browser.cookies.set('vb.in', 'yes');
+    const { signedIn } = await import('../web/src/token.js');
+    expect(signedIn()).toBe(false);
+  });
+
+  it('does not confuse a cookie whose name merely starts the same', async () => {
+    vi.resetModules();
+    const browser = stubBrowser({ signedIn: false });
+    browser.cookies.set('vb', 'the-credential');
+    browser.cookies.set('vb.inbox', '1');
+    const { signedIn } = await import('../web/src/token.js');
+    expect(signedIn()).toBe(false);
+  });
+
+  it('signing out locally drops the hint and bumps the generation', async () => {
+    vi.resetModules();
+    const browser = stubBrowser({ signedIn: true });
+    const { signedIn, signOutLocally, credentialGeneration } = await import('../web/src/token.js');
+    const before = credentialGeneration();
+
+    signOutLocally();
+
+    expect(signedIn()).toBe(false);
+    expect(browser.cookies.has('vb.in')).toBe(false);
+    expect(credentialGeneration()).toBeGreaterThan(before);
+  });
+});
+
+// G11: the `?token=` recovery route and the upgrade from the pre-cookie release. Neither stores the
+// value — both hand it to /auth/adopt, which is the only thing that can set the cookie.
+describe('a credential this browser already holds', () => {
+  it('is read out of the launch URL and taken out of the address bar', async () => {
+    vi.resetModules();
+    const browser = stubBrowser({ signedIn: false, href: 'http://localhost:4610/?token=from-the-link' });
+    const { legacyToken } = await import('../web/src/token.js');
+
+    expect(legacyToken()).toBe('from-the-link');
+    expect(browser.replaced).toEqual(['http://localhost:4610/']);
+    // Nowhere else. The old version wrote it to localStorage on the way past, which is the storage this
+    // whole change removes.
+    expect(browser.storage.size).toBe(0);
+  });
+
+  // THE READ REWRITES THE URL, so it has to be memoised: two callers is the normal case — the effect
+  // that decides whether to sign in, and the flow it starts. Un-memoised, the second found nothing and
+  // the browser sat waiting for an approval only it could give.
+  it('answers the same on a second read', async () => {
+    vi.resetModules();
+    stubBrowser({ signedIn: false, href: 'http://localhost:4610/?token=from-the-link' });
+    const { legacyToken } = await import('../web/src/token.js');
+
+    expect(legacyToken()).toBe('from-the-link');
+    expect(legacyToken()).toBe('from-the-link');
+  });
+
+  it('falls back to the pre-cookie localStorage key', async () => {
+    vi.resetModules();
+    stubBrowser({ signedIn: false, legacy: STUB_TOKEN });
+    const { legacyToken } = await import('../web/src/token.js');
+    expect(legacyToken()).toBe(STUB_TOKEN);
+  });
+
+  it('forgets both halves, so a refused credential is not retried on every load', async () => {
+    vi.resetModules();
+    const browser = stubBrowser({
+      signedIn: false,
+      legacy: STUB_TOKEN,
+      href: 'http://localhost:4610/?token=from-the-link',
+    });
+    const { legacyToken, forgetLegacyToken } = await import('../web/src/token.js');
+    expect(legacyToken()).toBe('from-the-link');
+
+    forgetLegacyToken();
+
+    expect(legacyToken()).toBe('');
+    expect(browser.storage.has('vibeboard.token')).toBe(false);
+  });
+
+  it('is absent on an ordinary load', async () => {
+    vi.resetModules();
+    stubBrowser();
+    const { legacyToken } = await import('../web/src/token.js');
+    expect(legacyToken()).toBe('');
   });
 });

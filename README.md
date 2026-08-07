@@ -186,10 +186,11 @@ Every later browser has to be allowed from one that is already in — it shows a
 prompt naming what is asking and the address it came from. Sign-in is refused
 while agents are running.
 
-Settings › Signed-in browsers lists them, signs one out, and reveals this
-browser's token if you want to see it. **Sign every browser out** is how you
-replace a credential you think somebody else has seen: it forgets them all, and
-the next page load signs itself in again. Locked out of every device?
+The credential is held as an `HttpOnly` cookie, so the page itself cannot read
+it and it never appears in a URL, in the log, or on your screen. Settings ›
+Signed-in browsers lists them and signs one out. **Sign every browser out** is
+how you replace a credential you think somebody else has seen: it forgets them
+all, and the next page load signs itself in again. Locked out of every device?
 `kill -USR2 <pid>` does the same from the terminal.
 
 Setting `VIBEBOARD_HOST=0.0.0.0` makes the board reachable from other devices.

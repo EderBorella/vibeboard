@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { STUB_TOKEN, stubBrowser } from './browser-stubs.js';
+import { type StubbedBrowser, stubBrowser } from './browser-stubs.js';
 
 // THE BUG THIS FILE EXISTS FOR. A browser with no credential opened the board and saw a working
 // screen where every button failed: `getState` and five others read `res.json()` without ever
@@ -13,12 +13,19 @@ import { STUB_TOKEN, stubBrowser } from './browser-stubs.js';
 type Api = typeof import('../web/src/api.js');
 type Token = typeof import('../web/src/token.js');
 
-// api.ts memoises its unauthorized handler and token.ts memoises the credential, so each test needs
-// its own module registry — otherwise a 401 in one test clears the token the next one asserts on.
-async function fresh(): Promise<{ api: Api; token: Token }> {
+// api.ts memoises its unauthorized handler and token.ts memoises the URL read, so each test needs its
+// own module registry — otherwise a 401 in one test signs out the browser the next one asserts on.
+async function fresh(signedIn = true): Promise<{ api: Api; token: Token; browser: StubbedBrowser }> {
   vi.resetModules();
-  stubBrowser();
-  return { api: await import('../web/src/api.js'), token: await import('../web/src/token.js') };
+  const browser = stubBrowser({ signedIn });
+  return { api: await import('../web/src/api.js'), token: await import('../web/src/token.js'), browser };
+}
+
+// A credential arriving, as the server does it: the cookie comes back on the response, and the client
+// is only TOLD. There is nothing for it to store — that was the per-tab state this change removes.
+function credentialArrives(browser: StubbedBrowser, token: Token): void {
+  browser.cookies.set('vb.in', '1');
+  token.credentialArrived();
 }
 
 function answering(status: number, body: string): ReturnType<typeof vi.fn> {
@@ -115,7 +122,7 @@ describe('what a 401 does beyond throwing', () => {
     stubBrowser();
   });
 
-  it('fires onUnauthorized once and clears the credential', async () => {
+  it('fires onUnauthorized once and signs the browser out', async () => {
     const { api, token } = await fresh();
     let fired = 0;
     api.onUnauthorized(() => {
@@ -126,7 +133,7 @@ describe('what a 401 does beyond throwing', () => {
     await failure(() => api.getState());
 
     expect(fired).toBe(1);
-    expect(token.hasToken()).toBe(false);
+    expect(token.signedIn()).toBe(false);
   });
 
   it('does not fire it on any other failure', async () => {
@@ -140,39 +147,40 @@ describe('what a 401 does beyond throwing', () => {
     await failure(() => api.getState());
 
     expect(fired).toBe(0);
-    expect(token.hasToken()).toBe(true);
+    expect(token.signedIn()).toBe(true);
   });
 
   // THE BUG THAT REACHED THE USER. Five hooks fetch on mount, so five requests carrying NO credential
   // were already in flight when the silent claim came back with one. Each 401 cleared the token — the
   // one the claim had just obtained — and restarted sign-in, which now found the device store
   // non-empty and asked a person to approve the browser that had already signed itself in.
-  it('does not discard a credential over a 401 for a request that carried none', async () => {
-    const { api, token } = await fresh();
-    token.clearToken(); // signing in: no credential yet
+  it('does not sign out over a 401 for a request that carried no credential', async () => {
+    const { api, token, browser } = await fresh(false); // signing in: nothing yet
     let fired = 0;
     api.onUnauthorized(() => {
       fired += 1;
     });
-    // The 401 for that credential-less request arrives AFTER the claim has stored one.
+    // The 401 for that credential-less request arrives AFTER the claim has been answered.
     vi.stubGlobal(
       'fetch',
       vi.fn(async () => {
-        token.setToken('minted-by-the-claim');
+        credentialArrives(browser, token);
         return new Response('{"error":"Unauthorized"}', { status: 401 });
       }),
     );
 
     await failure(() => api.getState());
 
-    expect(token.authToken()).toBe('minted-by-the-claim');
+    expect(token.signedIn()).toBe(true);
     expect(fired).toBe(0);
   });
 
   it('does not discard a NEWER credential over a 401 about the one it replaced', async () => {
-    // The same shape without the empty case: a request that left before the credential changed must
-    // not revoke the one that replaced it.
-    const { api, token } = await fresh();
+    // The same shape without the empty case: a request that left before the credential changed must not
+    // revoke the one that replaced it. The credential is unreadable now, so this is decided by the
+    // GENERATION counter — which is a better test than the old value comparison, because it also catches
+    // a replacement by an identical token.
+    const { api, token, browser } = await fresh();
     let fired = 0;
     api.onUnauthorized(() => {
       fired += 1;
@@ -180,14 +188,14 @@ describe('what a 401 does beyond throwing', () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async () => {
-        token.setToken('the-newer-one');
+        credentialArrives(browser, token);
         return new Response('{"error":"Unauthorized"}', { status: 401 });
       }),
     );
 
     await failure(() => api.getState());
 
-    expect(token.authToken()).toBe('the-newer-one');
+    expect(token.signedIn()).toBe(true);
     expect(fired).toBe(0);
   });
 
@@ -203,7 +211,7 @@ describe('what a 401 does beyond throwing', () => {
 
     await failure(() => api.getState());
 
-    expect(token.hasToken()).toBe(false);
+    expect(token.signedIn()).toBe(false);
     expect(fired).toBe(1);
   });
 
@@ -226,41 +234,7 @@ describe('what a 401 does beyond throwing', () => {
 
     expect(err.status).toBeUndefined();
     expect(fired).toBe(0);
-    expect(token.hasToken()).toBe(true);
-  });
-});
-
-describe('setting the credential', () => {
-  beforeEach(() => {
-    stubBrowser();
-  });
-
-  // Sign-in's whole job is to write a token and then use it. `authToken` serves the memo, so a
-  // setter that reached only localStorage would leave the very next request — the one that loads
-  // the board — carrying the previous value, or none.
-  it('makes the next request carry the new token, not the memoised one', async () => {
-    const { api, token } = await fresh();
-    expect(token.authToken()).toBe(STUB_TOKEN); // populate the memo first, as a real page does
-    const fetchMock = answering(200, '{}');
-
-    token.setToken('minted-just-now');
-    await api.getState();
-
-    const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
-    expect((init.headers as Record<string, string>).authorization).toBe('Bearer minted-just-now');
-  });
-
-  it('stops sending a header at all once cleared', async () => {
-    const { api, token } = await fresh();
-    expect(token.authToken()).toBe(STUB_TOKEN);
-    const fetchMock = answering(200, '{}');
-
-    token.clearToken();
-    expect(token.hasToken()).toBe(false);
-    await api.getState();
-
-    const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
-    expect((init.headers as Record<string, string>).authorization).toBeUndefined();
+    expect(token.signedIn()).toBe(true);
   });
 });
 

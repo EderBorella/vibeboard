@@ -8,7 +8,7 @@ import type {
   VerifyMode,
 } from './shared';
 
-import { authHeader, authToken, clearToken } from './token';
+import { credentialGeneration, signedIn, signOutLocally } from './token';
 
 // A failed call, carrying the status as data rather than only as prose. Six readers in this module
 // used to skip the `res.ok` check entirely and return the error body as if it were the answer, so an
@@ -49,34 +49,42 @@ interface RequestOptions {
   allow?: number[];
 }
 
-// Every call in this module goes through here: the credential is attached in one place, and a
-// non-ok response becomes a thrown ApiError in the same place. There is deliberately no bypass
-// flag — a bypass is how the laundering came back.
+// Every call in this module goes through here, and a non-ok response becomes a thrown ApiError in the
+// same place. There is deliberately no bypass flag — a bypass is how the laundering came back.
+//
+// NOTHING ATTACHES A CREDENTIAL. It is an HttpOnly cookie; the browser sends it. `same-origin` is
+// stated rather than left to the default because that default has changed over the fetch spec's life,
+// and a request that silently omits the cookie is a board on which every button fails.
 async function request(url: string, init: RequestInit = {}, opts: RequestOptions = {}): Promise<Response> {
   // Captured before the call, so the 401 handler below can tell WHICH credential was refused.
-  const sent = authToken();
+  const held = signedIn();
+  const generation = credentialGeneration();
   const res = await fetch(url, {
     ...init,
-    headers: { ...(init.headers as Record<string, string>), ...authHeader() },
+    credentials: 'same-origin',
+    headers: { ...(init.headers as Record<string, string>) },
   });
   if (res.ok || opts.allow?.includes(res.status)) return res;
   const body = (await res.json().catch(() => ({}))) as { error?: string; reason?: string };
-  if (res.status === 401 && sent && sent === authToken()) discardCredential();
+  if (res.status === 401 && held && credentialGeneration() === generation) discardCredential();
   throw new ApiError(res.status, body.error ?? opts.fallback ?? res.statusText, body.reason);
 }
 
 // A 401 only means "this browser's credential is no good" when the credential that was refused is
 // still the one this browser holds. THE TWO CASES IT MUST NOT FIRE ON, both of which happened:
 //
-//   sent === ''            a request made while signing in. Five hooks fetch on mount, so five 401s
+//   !held                  a request made while signing in. Five hooks fetch on mount, so five 401s
 //                          were already in flight when the claim came back — and clearing on those
 //                          threw away the credential the claim had just obtained, then started a
 //                          fresh flow, which found the device store no longer empty and asked a
 //                          person to approve the browser that had already signed itself in.
-//   sent !== authToken()   a request that left before a newer credential arrived. Same shape: a late
-//                          answer about an old token must not revoke the new one.
+//   generation changed     a request that left before a newer credential arrived. Same shape: a late
+//                          answer about an old token must not revoke the new one. Compared by
+//                          GENERATION rather than by value, because the value is now unreadable —
+//                          which is a better test anyway: it catches a replacement by an identical
+//                          token, which a value comparison would call unchanged.
 function discardCredential(): void {
-  clearToken();
+  signOutLocally();
   unauthorizedHandler?.();
 }
 
@@ -824,9 +832,12 @@ export interface Readiness {
 }
 
 // ---- Signing in ------------------------------------------------------------
-// The first three are the only calls in this module that carry no credential, because they are how a
-// browser gets one. They still go through `request` — the header helper simply adds nothing when
-// there is no token, and routing them anywhere else would be a second path to the network.
+// The four `/auth/*` calls are the ones a browser with no credential makes, because they are how it
+// gets one. They still go through `request` — there is no header to omit any more, and routing them
+// anywhere else would be a second path to the network.
+//
+// Each of them answers with `Set-Cookie`, which the browser applies before this code sees the
+// response. That is the whole transport: nothing here reads or stores a token.
 
 export interface SigninRequestOpened {
   id: string;
@@ -844,6 +855,18 @@ export type SigninCollected =
 
 export async function claimSignin(): Promise<{ token: string }> {
   return (await request('/auth/claim', { method: 'POST' })).json();
+}
+
+// Hands the server a credential this browser already holds — from a `?token=` launch URL, the
+// documented recovery route, or from localStorage where the pre-cookie version left it — so it can be
+// set as a cookie. Without this, a browser that was already signed in before the transport changed
+// would claim, be told a device already exists, and sit waiting for an approval nobody can give.
+export async function adoptCredential(token: string): Promise<void> {
+  await request('/auth/adopt', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ token }),
+  });
 }
 
 export async function requestSignin(): Promise<SigninRequestOpened> {

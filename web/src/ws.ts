@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from 'react';
 import { probeCredential } from './api';
-import { authToken, hasToken, onCredentialChange } from './token';
+import { onCredentialChange, signedIn } from './token';
 
 // `unauthorized` is a state of its own because a browser CANNOT SEE why a handshake failed: a 401'd
 // upgrade arrives as close code 1006, indistinguishable from "the server is not running". So it is
@@ -74,7 +74,7 @@ export class SharedSocket {
   // the bug this whole file exists to prevent. `#live` rather than `#socket !== undefined`, because a
   // socket object outlives its connection — it is still there, dead, while the retry is pending.
   #credentialChanged(): void {
-    if (this.#refs === 0 || this.#live || !hasToken()) return;
+    if (this.#refs === 0 || this.#live || !signedIn()) return;
     if (this.#retry) {
       clearTimeout(this.#retry);
       this.#retry = undefined;
@@ -112,14 +112,19 @@ export class SharedSocket {
     // event will ever come back. `onCredentialChange` in acquire() is the way out — and it has to be
     // that rather than a React state change, because sign-in replacing a dead credential with a live
     // one can leave `signedIn` looking unchanged within a single batch, and then nothing re-rendered.
-    if (!hasToken()) {
+    if (!signedIn()) {
       this.#setConn('unauthorized');
       return;
     }
     this.#setConn('connecting');
-    // The credential goes in the query string because a browser cannot set headers on a WebSocket
-    // handshake. The server refuses the upgrade without it.
-    const socket = new WebSocket(`ws://${location.host}/ws?token=${encodeURIComponent(authToken())}`);
+    // NO QUERY STRING. The credential is a cookie and the browser attaches it to the handshake itself,
+    // which is why `stripSecrets` in the server's logging no longer has a token to find here.
+    //
+    // A cookie is also SHARED browser state, and that is what fixed the bug this class kept being
+    // patched for: a stale tab running an older bundle sends whatever credential the browser currently
+    // holds, so its handshake SUCCEEDS. Nothing sits failing, so Firefox's per-host fail-delay never
+    // grows, so a good tab's handshake is never queued behind a socket that cannot work.
+    const socket = new WebSocket(`ws://${location.host}/ws`);
     this.#socket = socket;
     // Every handler ignores a socket we have already replaced. close() is asynchronous, so a
     // released socket's events can land AFTER a new one is connecting — the StrictMode

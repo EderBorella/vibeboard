@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from 'react';
 import { getSigninState, revokeDevice, type SigninDevice, signOutEverything } from '../api';
 import { revokeDeviceRequest, signOutEverythingRequest } from '../confirm/requests';
 import type { Confirmer } from '../confirm/useConfirm';
-import { authToken } from '../token';
 
 interface Props {
   // Asked before either irreversible thing here. Both sign a browser out of a live session, and one
@@ -11,18 +10,19 @@ interface Props {
   confirm: Confirmer['confirm'];
 }
 
-// WHERE THE TOKEN STOPS BEING INVISIBLE, and only if you come looking. The user never handles a
-// credential to sign in; this panel is the "unless he wants to check in the settings" half.
+// WHICH BROWSERS ARE SIGNED IN, and the only rotation path that exists. The admin token in
+// ~/.vibeboard/token can only be replaced by deleting the file and restarting, which is why nothing
+// prints it any more. Signing everything out empties the device store, and an empty store re-opens the
+// silent first claim — so the next page load on this machine signs itself in again, with no restart and
+// no command.
 //
-// It is also the only rotation path that exists: the admin token in ~/.vibeboard/token can only be
-// replaced by deleting the file and restarting, which is why nothing prints it any more. Signing
-// everything out empties the device store, and an empty store re-opens the silent first claim — so the
-// next page load on this machine signs itself in again, with no restart and no command.
+// There is no "show token" here, and there cannot be: the credential is an HttpOnly cookie, so this
+// page genuinely cannot read it. That is the point of the transport rather than a gap in this panel —
+// and the alternative was an endpoint whose only job was handing a secret back for display.
 export function SignInPanel({ confirm }: Props) {
   const [devices, setDevices] = useState<SigninDevice[]>([]);
   const [thisDevice, setThisDevice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [revealed, setRevealed] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
 
   const load = useCallback((): void => {
@@ -103,18 +103,11 @@ export function SignInPanel({ confirm }: Props) {
         </div>
       )}
 
-      <div className="settings-section">This browser's token</div>
+      <div className="settings-section">This browser's credential</div>
       <div className="settings-hint">
-        You never need this. Anyone holding it can read this board, start agents and edit files in your
-        projects on this machine — so treat it like a password, and do not paste it anywhere.
+        Held by the browser itself and not readable by this page, so there is nothing here to show, copy or
+        leak. You never need to handle it. To replace it, sign every browser out below.
       </div>
-      {revealed ? (
-        <code className="signin-token">{authToken() || '(this browser has no token)'}</code>
-      ) : (
-        <button type="button" className="btn-secondary" onClick={() => setRevealed(true)}>
-          Show token
-        </button>
-      )}
 
       <div className="settings-section">Start over</div>
       <div className="settings-hint">

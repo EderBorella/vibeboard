@@ -90,6 +90,41 @@ describe('sign-in leaks nothing into the log', () => {
   });
 });
 
+// G9. THE NEW SHAPE OF THE SAME HAZARD. The credential now travels as a Cookie header on every single
+// request a browser makes — far more often than it ever appeared in a URL — so a serializer that logs
+// headers, an error dump that includes them, or a 404 line would write a permanent credential to a file
+// the README tells people to tail and paste.
+describe('the credential never reaches the log as a cookie', () => {
+  it('is absent after a browser has used it on /api, /ws and a 404', async () => {
+    const captured = await captureLog(async (app) => {
+      const cookie = `vb.in=1; vb=${TOKEN}`;
+      await app.inject({ url: '/api/state', headers: { cookie, host: 'localhost:4610' } });
+      // A route that throws: the error path is the one that dumps the most about a request.
+      await app.inject({ method: 'POST', url: '/api/cards', headers: { cookie, host: 'localhost:4610' } });
+      // Fastify's own 404 line, which the request serializer cannot reach.
+      await app.inject({ url: '/api/nope', headers: { cookie, host: 'localhost:4610' } });
+      await app.inject({ url: '/ws', headers: { cookie, host: 'localhost:4610' } });
+    });
+
+    expect(captured).not.toContain(TOKEN);
+    // And the requests really were logged, or this passes on an empty file.
+    expect(captured).toContain('/api/state');
+    expect(captured).toContain('route not found');
+  });
+
+  it('is absent from the answer that hands it over as well as from the request', async () => {
+    // `/auth/adopt` is the one route that takes a credential in a BODY, which is the other place a
+    // serializer could reach for it.
+    const captured = await captureLog(async (app) => {
+      const res = await app.inject({ method: 'POST', url: '/auth/adopt', payload: { token: TOKEN } });
+      expect(res.statusCode).toBe(200);
+    });
+
+    expect(captured).not.toContain(TOKEN);
+    expect(captured).toContain('adopted a credential');
+  });
+});
+
 describe('stripSecrets', () => {
   it('redacts the token and keeps everything else', () => {
     expect(stripSecrets('/ws?token=abc')).toBe('/ws?token=%5Bredacted%5D');

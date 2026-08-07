@@ -8,7 +8,11 @@ import { POLL_LIMIT, runSignin, type SigninDeps, type SigninPhase } from '../web
 interface Harness {
   deps: SigninDeps;
   phases: SigninPhase[];
-  tokens: string[];
+  // How many times the driver said "a credential now exists". There is no token to record any more:
+  // the server sets an HttpOnly cookie as it answers, so the driver's only job is to say so.
+  arrivals: number;
+  adopted: string[];
+  forgotten: number;
   slept: number[];
   polls: number;
 }
@@ -18,17 +22,31 @@ function harness(opts: {
   request?: () => Promise<{ id: string; label: string; address: string }>;
   answers?: SigninCollected[];
   collect?: () => Promise<SigninCollected>;
+  // A credential this browser already holds: a `?token=` launch URL, or localStorage from before the
+  // cookie transport. Absent for every ordinary load.
+  legacy?: string;
+  adopt?: (token: string) => Promise<void>;
 }): Harness {
   const phases: SigninPhase[] = [];
-  const tokens: string[] = [];
   const slept: number[] = [];
   const answers = [...(opts.answers ?? [])];
   const h: Harness = {
     phases,
-    tokens,
+    arrivals: 0,
+    adopted: [],
+    forgotten: 0,
     slept,
     polls: 0,
     deps: {
+      legacyToken: () => opts.legacy ?? '',
+      adopt:
+        opts.adopt ??
+        (async (t) => {
+          h.adopted.push(t);
+        }),
+      forgetLegacy: () => {
+        h.forgotten += 1;
+      },
       claim: opts.claim ?? (async () => ({ token: 'claimed-token' })),
       request: opts.request ?? (async () => ({ id: 'req-1', label: 'Firefox', address: '192.168.0.31' })),
       collect:
@@ -37,7 +55,9 @@ function harness(opts: {
           h.polls += 1;
           return answers.shift() ?? { state: 'pending' };
         }),
-      setToken: (t) => tokens.push(t),
+      onCredential: () => {
+        h.arrivals += 1;
+      },
       sleep: async (ms) => {
         slept.push(ms);
       },
@@ -56,10 +76,65 @@ describe('the first browser', () => {
 
     expect(await runSignin(h.deps)).toBe(true);
 
-    expect(h.tokens).toEqual(['claimed-token']);
+    expect(h.arrivals).toBe(1);
     expect(h.phases).toEqual([{ phase: 'claiming' }, { phase: 'in' }]);
     // Nothing was asked of anybody: no request opened, so no prompt was raised on another browser.
     expect(h.polls).toBe(0);
+  });
+
+  // And it does not offer a credential it does not have. `/auth/adopt` is for a browser that was already
+  // signed in, and calling it with nothing would 401 and delay the claim for no reason.
+  it('adopts nothing when it holds nothing', async () => {
+    const h = harness({});
+    await runSignin(h.deps);
+    expect(h.adopted).toEqual([]);
+  });
+});
+
+// A browser that already holds a credential — from the `?token=` recovery route, or from localStorage
+// where the pre-cookie release left it. THIS RUNS BEFORE THE CLAIM, and it has to: the claim would be
+// refused because a device already exists (its own), and it would then sit waiting for an approval that
+// only it could give. That was the upgrade path locking the user out of their own board.
+describe('a browser that already holds a credential', () => {
+  it('hands it to the server and is in, without claiming or asking anyone', async () => {
+    let claimed = 0;
+    const h = harness({
+      legacy: 'held-already',
+      claim: async () => {
+        claimed += 1;
+        return { token: 'should-not-happen' };
+      },
+    });
+
+    expect(await runSignin(h.deps)).toBe(true);
+
+    expect(h.adopted).toEqual(['held-already']);
+    expect(claimed).toBe(0);
+    expect(h.polls).toBe(0);
+    expect(h.phases).toEqual([{ phase: 'claiming' }, { phase: 'in' }]);
+  });
+
+  it('forgets it once adopted, so it is not offered again', async () => {
+    const h = harness({ legacy: 'held-already' });
+    await runSignin(h.deps);
+    expect(h.forgotten).toBe(1);
+  });
+
+  // A credential that has been revoked since it was stored is not a reason to stop: the ordinary flow is
+  // the answer, and keeping the dead value would mean retrying it on every load for ever.
+  it('falls through to the claim when the server refuses it, and forgets it', async () => {
+    const h = harness({
+      legacy: 'revoked-months-ago',
+      adopt: async () => {
+        throw new ApiError(401, 'That credential is not valid.');
+      },
+    });
+
+    expect(await runSignin(h.deps)).toBe(true);
+
+    expect(h.forgotten).toBe(1);
+    expect(h.arrivals).toBe(1); // from the claim
+    expect(h.phases).toEqual([{ phase: 'claiming' }, { phase: 'in' }]);
   });
 });
 
@@ -81,7 +156,7 @@ describe('a later browser', () => {
       { phase: 'waiting', label: 'Firefox', address: '192.168.0.31' },
       { phase: 'in' },
     ]);
-    expect(h.tokens).toEqual(['approved-token']);
+    expect(h.arrivals).toBe(1);
   });
 
   it('stops, with the reason, when it is refused', async () => {
@@ -98,7 +173,7 @@ describe('a later browser', () => {
     expect(last).toMatchObject({ phase: 'stopped', retry: false });
     // No "try again" after a refusal: a person decided, and offering a retry argues with them.
     expect(last).toHaveProperty('reason', expect.stringContaining('refused'));
-    expect(h.tokens).toEqual([]);
+    expect(h.arrivals).toBe(0);
   });
 
   it('offers a retry when the request timed out', async () => {
@@ -146,7 +221,7 @@ describe('a later browser', () => {
     expect(await runSignin(h.deps)).toBe(true);
 
     expect(calls).toBe(3);
-    expect(h.tokens).toEqual(['late-token']);
+    expect(h.arrivals).toBe(1);
   });
 });
 
@@ -244,30 +319,30 @@ describe('the poll interval', () => {
 });
 
 describe('what the driver never does', () => {
-  it('stores no token unless it got one', async () => {
+  it('claims no credential arrived unless one did', async () => {
     const h = harness({
       claim: async () => {
         throw refused('busy');
       },
     });
     await runSignin(h.deps);
-    expect(h.tokens).toEqual([]);
+    expect(h.arrivals).toBe(0);
   });
 
-  it('reports `in` exactly once, and only after the token is stored', async () => {
+  it('reports `in` exactly once, and only after the credential is announced', async () => {
     const order: string[] = [];
     const h = harness({});
     const deps: SigninDeps = {
       ...h.deps,
-      setToken: () => order.push('token'),
+      onCredential: () => order.push('credential'),
       onPhase: (p) => order.push(p.phase),
     };
 
     await runSignin(deps);
 
-    // The order matters: `in` is what flips the app to the board, and the board's first request
-    // carries the credential.
-    expect(order).toEqual(['claiming', 'token', 'in']);
+    // The order matters, and not only cosmetically: the announcement is what wakes the socket, and it
+    // must find the cookie set rather than waiting on the React render that `in` triggers.
+    expect(order).toEqual(['claiming', 'credential', 'in']);
   });
 });
 

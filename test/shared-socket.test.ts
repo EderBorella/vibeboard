@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ConnState } from '../web/src/ws.js';
 import { BACKOFF_CEILING_MS, backoffMs, SharedSocket } from '../web/src/ws.js';
-import { STUB_TOKEN, stubBrowser } from './browser-stubs.js';
+import { type StubbedBrowser, stubBrowser } from './browser-stubs.js';
 
 // The client's shared socket is the one piece of the two-sockets-into-one change that the
 // server-side tests cannot reach: each of those opens a single client, so none of them
@@ -154,12 +154,13 @@ describe('SharedSocket', () => {
 });
 
 describe('SharedSocket reconnect and teardown', () => {
-  it('connects to the /ws endpoint on the current host', () => {
+  // G2. NO QUERY STRING, and the exact bytes rather than a `not.toContain('token')`: the credential is a
+  // cookie the browser attaches to the handshake itself, and the whole reason `stripSecrets` exists in
+  // the server's logging is that this URL used to carry a permanent credential.
+  it('connects to the /ws endpoint on the current host, carrying nothing', () => {
     const s = new SharedSocket();
     s.acquire();
-    // With the credential: the server refuses the upgrade without one, so a socket URL that
-    // carried only the path would connect to nothing.
-    expect(FakeSocket.instances[0].url).toBe(`ws://localhost:4610/ws?token=${STUB_TOKEN}`);
+    expect(FakeSocket.instances[0].url).toBe('ws://localhost:4610/ws');
   });
 
   it('reconnects a second later when the socket drops while still in use', () => {
@@ -278,10 +279,8 @@ describe('SharedSocket reconnect and teardown', () => {
 // never have succeeded.
 describe('a socket with no credential', () => {
   beforeEach(() => {
-    // No `vibeboard.token` at all, unlike stubBrowser's store.
-    vi.stubGlobal('location', { host: 'localhost:4610', href: 'http://localhost:4610/', search: '' });
-    vi.stubGlobal('localStorage', { getItem: () => null, setItem: () => {}, removeItem: () => {} });
-    vi.stubGlobal('history', { replaceState: () => {} });
+    // No hint cookie, which is the only thing the page can see. stubBrowser sets one by default.
+    stubBrowser({ signedIn: false });
     vi.resetModules();
   });
 
@@ -403,9 +402,7 @@ describe('a handshake that is refused', () => {
   it('does not ask when it never opened a socket for want of a credential', async () => {
     // There is nothing to ask about: the browser knows it has no credential, and the sign-in flow is
     // already the thing that fixes it.
-    vi.stubGlobal('location', { host: 'localhost:4610', href: 'http://localhost:4610/', search: '' });
-    vi.stubGlobal('localStorage', { getItem: () => null, setItem: () => {}, removeItem: () => {} });
-    vi.stubGlobal('history', { replaceState: () => {} });
+    stubBrowser({ signedIn: false });
     vi.resetModules();
     const { SharedSocket: Fresh } = await import('../web/src/ws.js');
     let probes = 0;
@@ -438,52 +435,53 @@ describe('a handshake that is refused', () => {
 // page load sat on "Connecting…" for eighty-three seconds that way.
 describe('a socket waiting for a credential', () => {
   async function withoutCredential(): Promise<{
-    store: Map<string, string>;
+    browser: StubbedBrowser;
     ws: typeof import('../web/src/ws.js');
     token: typeof import('../web/src/token.js');
   }> {
-    const store = new Map<string, string>();
-    vi.stubGlobal('location', { host: 'localhost:4610', href: 'http://localhost:4610/', search: '' });
-    vi.stubGlobal('localStorage', {
-      getItem: (k: string) => store.get(k) ?? null,
-      setItem: (k: string, v: string) => store.set(k, v),
-      removeItem: (k: string) => store.delete(k),
-    });
-    vi.stubGlobal('history', { replaceState: () => {} });
+    const browser = stubBrowser({ signedIn: false });
     vi.resetModules();
     return {
-      store,
+      browser,
       ws: await import('../web/src/ws.js'),
       token: await import('../web/src/token.js'),
     };
   }
 
+  // A credential arriving, as the server does it: it sets the cookies on its answer, and the client is
+  // only told. There is no value for the client to hold any more — which is the whole change, since a
+  // per-tab copy of a credential is what let one tab fail for ever.
+  function arrives(browser: StubbedBrowser, token: typeof import('../web/src/token.js')): void {
+    browser.cookies.set('vb.in', '1');
+    token.credentialArrived();
+  }
+
   it('connects as soon as one arrives, with no re-render involved', async () => {
-    const { ws, token } = await withoutCredential();
+    const { ws, token, browser } = await withoutCredential();
     const s = new ws.SharedSocket();
     const seen: ConnState[] = [];
     s.onConn((c) => seen.push(c));
     s.acquire();
     expect(FakeSocket.instances).toEqual([]); // the dead end
 
-    token.setToken('minted-by-the-claim');
+    arrives(browser, token);
 
     expect(FakeSocket.instances).toHaveLength(1);
-    expect(FakeSocket.instances[0].url).toContain('token=minted-by-the-claim');
+    expect(FakeSocket.instances[0].url).toBe('ws://localhost:4610/ws');
     expect(seen).toEqual(['unauthorized', 'connecting']);
   });
 
   it('does not open a second socket when one is already live', async () => {
     // Two sockets per tab is the bug this whole file exists to prevent, so the wake-up has to be
     // narrower than "a credential changed".
-    const { ws, token } = await withoutCredential();
+    const { ws, token, browser } = await withoutCredential();
     const s = new ws.SharedSocket();
     s.acquire();
-    token.setToken('first');
+    arrives(browser, token);
     expect(FakeSocket.instances).toHaveLength(1);
     FakeSocket.instances[0].fireOpen();
 
-    token.setToken('second');
+    arrives(browser, token);
 
     expect(FakeSocket.instances).toHaveLength(1);
   });
@@ -495,17 +493,17 @@ describe('a socket waiting for a credential', () => {
   // large part of what the user saw as the board taking a minute to connect.
   it('abandons a pending retry and reconnects at once with the new credential', async () => {
     vi.useFakeTimers();
-    const { ws, token } = await withoutCredential();
+    const { ws, token, browser } = await withoutCredential();
     const s = new ws.SharedSocket(() => {});
     s.acquire();
-    token.setToken('stale');
+    arrives(browser, token);
     FakeSocket.instances[0].fireClose(); // refused; a retry is now scheduled
 
-    token.setToken('fresh');
+    arrives(browser, token);
 
     // Immediately, with no timer advanced at all.
     expect(FakeSocket.instances).toHaveLength(2);
-    expect(FakeSocket.instances[1].url).toContain('token=fresh');
+    expect(FakeSocket.instances[1].url).toBe('ws://localhost:4610/ws');
     // And the retry it replaced does not also fire, which would be two sockets in one tab.
     vi.advanceTimersByTime(BACKOFF_CEILING_MS * 2);
     expect(FakeSocket.instances).toHaveLength(2);
@@ -514,10 +512,10 @@ describe('a socket waiting for a credential', () => {
 
   it('starts the backoff over, so the new credential is not charged for the old one’s failures', async () => {
     vi.useFakeTimers();
-    const { ws, token } = await withoutCredential();
+    const { ws, token, browser } = await withoutCredential();
     const s = new ws.SharedSocket(() => {});
     s.acquire();
-    token.setToken('stale');
+    arrives(browser, token);
     // Five refusals: the backoff is now at its ceiling.
     for (let i = 0; i < 5; i += 1) {
       FakeSocket.instances.at(-1)?.fireClose();
@@ -525,7 +523,7 @@ describe('a socket waiting for a credential', () => {
     }
     const before = FakeSocket.instances.length;
 
-    token.setToken('fresh');
+    arrives(browser, token);
     FakeSocket.instances.at(-1)?.fireClose();
     vi.advanceTimersByTime(1000); // one second, the first backoff step
 
@@ -534,12 +532,12 @@ describe('a socket waiting for a credential', () => {
   });
 
   it('stops listening once the last subscriber has gone', async () => {
-    const { ws, token } = await withoutCredential();
+    const { ws, token, browser } = await withoutCredential();
     const s = new ws.SharedSocket();
     s.acquire();
     s.release();
 
-    token.setToken('arrives-after-nobody-is-watching');
+    arrives(browser, token);
 
     expect(FakeSocket.instances).toEqual([]);
   });
@@ -549,7 +547,7 @@ describe('a socket waiting for a credential', () => {
     const s = new ws.SharedSocket();
     s.acquire();
 
-    token.clearToken();
+    token.signOutLocally();
 
     expect(FakeSocket.instances).toEqual([]);
   });

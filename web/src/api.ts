@@ -8,42 +8,79 @@ import type {
   VerifyMode,
 } from './shared';
 
-import { authHeader } from './token';
+import { authHeader, clearToken } from './token';
 
-// Every call in this module goes through here, so the browser's credential is attached in one
-// place rather than at twenty-five call sites — and a new endpoint cannot forget it.
-function request(url: string, init: RequestInit = {}): Promise<Response> {
-  return fetch(url, { ...init, headers: { ...(init.headers as Record<string, string>), ...authHeader() } });
+// A failed call, carrying the status as data rather than only as prose. Six readers in this module
+// used to skip the `res.ok` check entirely and return the error body as if it were the answer, so an
+// unauthenticated browser saw an empty project list and no explanation — indistinguishable from a
+// fresh install. `status` is what lets a caller tell "you are not signed in" from "that failed".
+export class ApiError extends Error {
+  readonly status: number;
+
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+  }
+
+  get unauthorized(): boolean {
+    return this.status === 401;
+  }
 }
 
-async function post<T>(url: string, body: unknown): Promise<T> {
+let unauthorizedHandler: (() => void) | undefined;
+
+// Fired once per 401 from anywhere in the module, so a credential that stops working — revoked from
+// another device, or a server whose store was cleared — drops the app back to sign-in from one place
+// instead of twenty-five call sites each deciding for themselves.
+export function onUnauthorized(fn: () => void): void {
+  unauthorizedHandler = fn;
+}
+
+interface RequestOptions {
+  // What to say when the server sends no `error` of its own. The server's words win where it has any.
+  fallback?: string;
+  // Statuses that are a normal answer for this endpoint rather than a failure, handed back to the
+  // caller as a Response. Only 409-means-something cases; never 401.
+  allow?: number[];
+}
+
+// Every call in this module goes through here: the credential is attached in one place, and a
+// non-ok response becomes a thrown ApiError in the same place. There is deliberately no bypass
+// flag — a bypass is how the laundering came back.
+async function request(url: string, init: RequestInit = {}, opts: RequestOptions = {}): Promise<Response> {
+  const res = await fetch(url, {
+    ...init,
+    headers: { ...(init.headers as Record<string, string>), ...authHeader() },
+  });
+  if (res.ok || opts.allow?.includes(res.status)) return res;
+  const body = (await res.json().catch(() => ({}))) as { error?: string };
+  if (res.status === 401) {
+    clearToken();
+    unauthorizedHandler?.();
+  }
+  throw new ApiError(res.status, body.error ?? opts.fallback ?? res.statusText);
+}
+
+async function send<T>(method: 'POST' | 'PUT' | 'PATCH', url: string, body: unknown): Promise<T> {
   const res = await request(url, {
-    method: 'POST',
+    method,
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(body),
   });
-  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? res.statusText);
   return res.json() as Promise<T>;
 }
 
-async function put<T>(url: string, body: unknown): Promise<T> {
-  const res = await request(url, {
-    method: 'PUT',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? res.statusText);
-  return res.json() as Promise<T>;
+function post<T>(url: string, body: unknown): Promise<T> {
+  return send<T>('POST', url, body);
 }
 
-async function patch<T>(url: string, body: unknown): Promise<T> {
-  const res = await request(url, {
-    method: 'PATCH',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? res.statusText);
-  return res.json() as Promise<T>;
+function put<T>(url: string, body: unknown): Promise<T> {
+  return send<T>('PUT', url, body);
+}
+
+function patch<T>(url: string, body: unknown): Promise<T> {
+  return send<T>('PATCH', url, body);
 }
 
 export interface ProjectRef {
@@ -52,7 +89,7 @@ export interface ProjectRef {
 }
 
 export async function getState(): Promise<{ open: boolean; snapshot?: ProjectSnapshot }> {
-  return (await request('/api/state')).json();
+  return (await request('/api/state', {}, { fallback: 'Failed to read the open project' })).json();
 }
 
 export function patchConfig(body: Partial<ProjectConfig>): Promise<ProjectConfig> {
@@ -84,16 +121,19 @@ export interface ModelStatus {
 }
 
 export async function listModels(backend: string): Promise<ModelOption[]> {
-  return (await request(`/api/models?backend=${encodeURIComponent(backend)}`)).json();
+  const url = `/api/models?backend=${encodeURIComponent(backend)}`;
+  return (await request(url, {}, { fallback: 'Failed to load the model list' })).json();
 }
 
 export async function getModelStatus(id: string): Promise<ModelStatus | null> {
-  return (await request(`/api/model-status?id=${encodeURIComponent(id)}`)).json().then((r) => r.status);
+  const url = `/api/model-status?id=${encodeURIComponent(id)}`;
+  const res = await request(url, {}, { fallback: 'Failed to check this model' });
+  return (await res.json()).status;
 }
 
 export async function listProjects(root?: string): Promise<ProjectRef[]> {
   const q = root ? `?root=${encodeURIComponent(root)}` : '';
-  return (await request(`/api/projects${q}`)).json();
+  return (await request(`/api/projects${q}`, {}, { fallback: 'Failed to list projects' })).json();
 }
 
 export function openProject(path: string): Promise<{ snapshot: ProjectSnapshot }> {
@@ -133,28 +173,25 @@ export function patchCard(board: BoardName, id: string, patchBody: CardFrontmatt
 }
 
 export async function getRaw(board: BoardName, id: string): Promise<string> {
-  const res = await request(`/api/cards/${board}/${id}/raw`);
-  if (!res.ok) throw new Error('Failed to load card file');
+  const res = await request(`/api/cards/${board}/${id}/raw`, {}, { fallback: 'Failed to load card file' });
   return (await res.json()).raw as string;
 }
 
 export async function putRaw(board: BoardName, id: string, raw: string): Promise<void> {
-  const res = await request(`/api/cards/${board}/${id}/raw`, {
-    method: 'PUT',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ raw }),
-  });
-  if (!res.ok) throw new Error('Failed to save card file');
+  await request(
+    `/api/cards/${board}/${id}/raw`,
+    { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ raw }) },
+    { fallback: 'Failed to save card file' },
+  );
 }
 
 // Symmetric link reconcile — updates both sides. The single path for link changes.
 export async function setLinks(board: BoardName, id: string, links: string[]): Promise<void> {
-  const res = await request(`/api/cards/${board}/${id}/links`, {
-    method: 'PUT',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ links }),
-  });
-  if (!res.ok) throw new Error('Failed to update links');
+  await request(
+    `/api/cards/${board}/${id}/links`,
+    { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ links }) },
+    { fallback: 'Failed to update links' },
+  );
 }
 
 // Position a card within a column, or move it into another one, in a single call. `beforeId`
@@ -175,8 +212,7 @@ export function archiveCard(board: BoardName, id: string): Promise<unknown> {
 // Fetched on demand: the archive only grows, so it rides outside the snapshot. The snapshot's
 // archivedCounts tell the UI when this is worth calling again.
 export async function listArchive(board: BoardName): Promise<ArchivedCard[]> {
-  const res = await request(`/api/archive/${board}`);
-  if (!res.ok) throw new Error('Failed to load the archive');
+  const res = await request(`/api/archive/${board}`, {}, { fallback: 'Failed to load the archive' });
   return (await res.json()).cards as ArchivedCard[];
 }
 
@@ -214,24 +250,25 @@ export interface ResourceLink {
 }
 
 export async function listControlFiles(): Promise<ControlGroup[]> {
-  const res = await request('/api/control/files');
-  if (!res.ok) throw new Error('Failed to load control files');
+  const res = await request('/api/control/files', {}, { fallback: 'Failed to load control files' });
   return (await res.json()).groups as ControlGroup[];
 }
 
 export async function getControlFile(path: string): Promise<ControlFile & { content: string }> {
-  const res = await request(`/api/control/file?path=${encodeURIComponent(path)}`);
-  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Failed to load file');
-  return res.json();
+  const url = `/api/control/file?path=${encodeURIComponent(path)}`;
+  return (await request(url, {}, { fallback: 'Failed to load file' })).json();
 }
 
 export async function putControlFile(path: string, content: string): Promise<void> {
-  const res = await request('/api/control/file', {
-    method: 'PUT',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ path, content }),
-  });
-  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Failed to save file');
+  await request(
+    '/api/control/file',
+    {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ path, content }),
+    },
+    { fallback: 'Failed to save file' },
+  );
 }
 
 // Create with a server-assigned default name ("New doc", "New doc 2", …). The UI then renames
@@ -245,23 +282,25 @@ export function renameControlFile(path: string, name: string): Promise<ControlFi
 }
 
 export async function deleteControlFile(path: string): Promise<void> {
-  const res = await request(`/api/control/file?path=${encodeURIComponent(path)}`, { method: 'DELETE' });
-  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Failed to delete file');
+  const url = `/api/control/file?path=${encodeURIComponent(path)}`;
+  await request(url, { method: 'DELETE' }, { fallback: 'Failed to delete file' });
 }
 
 export async function getResources(): Promise<ResourceLink[]> {
-  const res = await request('/api/control/resources');
-  if (!res.ok) throw new Error('Failed to load resources');
+  const res = await request('/api/control/resources', {}, { fallback: 'Failed to load resources' });
   return (await res.json()).links as ResourceLink[];
 }
 
 export async function putResources(links: ResourceLink[]): Promise<void> {
-  const res = await request('/api/control/resources', {
-    method: 'PUT',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ links }),
-  });
-  if (!res.ok) throw new Error('Failed to save resources');
+  await request(
+    '/api/control/resources',
+    {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ links }),
+    },
+    { fallback: 'Failed to save resources' },
+  );
 }
 
 // ---- Explorer --------------------------------------------------------------
@@ -292,24 +331,25 @@ export type FileRead =
   | { kind: 'too-large'; path: string; name: string; size: number };
 
 export async function listDir(path: string): Promise<DirListing> {
-  const res = await request(`/api/explorer/list?path=${encodeURIComponent(path)}`);
-  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Failed to list folder');
-  return res.json();
+  const url = `/api/explorer/list?path=${encodeURIComponent(path)}`;
+  return (await request(url, {}, { fallback: 'Failed to list folder' })).json();
 }
 
 export async function readFsFile(path: string): Promise<FileRead> {
-  const res = await request(`/api/explorer/file?path=${encodeURIComponent(path)}`);
-  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Failed to load file');
-  return res.json();
+  const url = `/api/explorer/file?path=${encodeURIComponent(path)}`;
+  return (await request(url, {}, { fallback: 'Failed to load file' })).json();
 }
 
 export async function putFsFile(path: string, content: string): Promise<void> {
-  const res = await request('/api/explorer/file', {
-    method: 'PUT',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ path, content }),
-  });
-  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Failed to save file');
+  await request(
+    '/api/explorer/file',
+    {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ path, content }),
+    },
+    { fallback: 'Failed to save file' },
+  );
 }
 
 // Created with a server-assigned default name ("Untitled.md", "Untitled 2.md", …), which the tree
@@ -331,18 +371,18 @@ export function moveFsNode(path: string, to: string): Promise<FsNode> {
 // One entry: a file, a link, or an empty folder. 'not-empty' is a normal answer rather than an error —
 // the caller has a harder question to ask in that case.
 export async function deleteFsEntry(path: string): Promise<'ok' | 'not-empty'> {
-  const res = await request(`/api/explorer/entry?path=${encodeURIComponent(path)}`, { method: 'DELETE' });
-  if (res.status === 409) return 'not-empty';
-  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Failed to delete');
-  return 'ok';
+  const url = `/api/explorer/entry?path=${encodeURIComponent(path)}`;
+  // 409 is `allow`ed rather than caught: it is this endpoint's second normal answer, and the caller
+  // has a harder question to ask the user in that case.
+  const res = await request(url, { method: 'DELETE' }, { allow: [409], fallback: 'Failed to delete' });
+  return res.status === 409 ? 'not-empty' : 'ok';
 }
 
 // A folder and everything in it. `confirm` is the folder's own name as the user typed it; the server
 // checks it again, so this is not the only thing standing in the way.
 export async function deleteFsTree(path: string, confirm: string): Promise<void> {
   const url = `/api/explorer/tree?path=${encodeURIComponent(path)}&confirm=${encodeURIComponent(confirm)}`;
-  const res = await request(url, { method: 'DELETE' });
-  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Failed to delete folder');
+  await request(url, { method: 'DELETE' }, { fallback: 'Failed to delete folder' });
 }
 
 // --- Skills ---------------------------------------------------------------
@@ -373,9 +413,7 @@ export interface SkillCatalogue {
 }
 
 export async function listSkills(): Promise<SkillCatalogue> {
-  const res = await request('/api/skills');
-  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? res.statusText);
-  return res.json() as Promise<SkillCatalogue>;
+  return (await request('/api/skills')).json() as Promise<SkillCatalogue>;
 }
 
 // --- Runs -----------------------------------------------------------------
@@ -524,8 +562,7 @@ export interface RunList {
 }
 
 export async function listRuns(): Promise<RunList> {
-  const res = await request('/api/runs');
-  if (!res.ok) throw new Error('Failed to load runs');
+  const res = await request('/api/runs', {}, { fallback: 'Failed to load runs' });
   return res.json() as Promise<RunList>;
 }
 
@@ -555,8 +592,8 @@ export interface CardRuns {
 }
 
 export async function listCardRuns(board: BoardName, card: string): Promise<CardRuns> {
-  const res = await request(`/api/runs/${board}/${encodeURIComponent(card)}`);
-  if (!res.ok) throw new Error('Failed to load this card’s runs');
+  const url = `/api/runs/${board}/${encodeURIComponent(card)}`;
+  const res = await request(url, {}, { fallback: 'Failed to load this card’s runs' });
   return (await res.json()) as CardRuns;
 }
 
@@ -616,8 +653,7 @@ export interface AutopilotState {
 }
 
 export async function getAutopilotState(): Promise<AutopilotState> {
-  const res = await request('/api/autopilot/state');
-  if (!res.ok) throw new Error('Failed to read auto-pilot’s state');
+  const res = await request('/api/autopilot/state', {}, { fallback: 'Failed to read auto-pilot’s state' });
   return (await res.json()).state as AutopilotState;
 }
 
@@ -661,22 +697,21 @@ export interface DiaryEntry {
 }
 
 export async function listDiary(): Promise<DiaryEntry[]> {
-  const res = await request('/api/log');
-  if (!res.ok) throw new Error('Failed to read this project’s log');
+  const res = await request('/api/log', {}, { fallback: 'Failed to read this project’s log' });
   return (await res.json()).entries as DiaryEntry[];
 }
 
 // Everything except `at`, which is the server's — a caller choosing its own timestamps could write an
 // event into the past and change what the sequence says happened.
+// Through `post`, which sets content-type. Hand-rolled, it sent none and Fastify answered 415 —
+// invisible for as long as it lasted because every test of this function mocks the module itself,
+// so the request never met a real server.
 export async function addDiaryEntry(entry: Omit<DiaryEntry, 'at'>): Promise<DiaryEntry> {
-  const res = await request('/api/log', { method: 'POST', body: JSON.stringify(entry) });
-  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Failed to add to the log');
-  return (await res.json()).entry as DiaryEntry;
+  return (await post<{ entry: DiaryEntry }>('/api/log', entry)).entry;
 }
 
 export async function getAccounting(): Promise<Accounting> {
-  const res = await request('/api/accounting');
-  if (!res.ok) throw new Error('Failed to load this project’s usage');
+  const res = await request('/api/accounting', {}, { fallback: 'Failed to load this project’s usage' });
   return (await res.json()) as Accounting;
 }
 
@@ -733,7 +768,7 @@ export interface SandboxState {
 }
 
 export async function getSandbox(): Promise<SandboxState> {
-  return (await request('/api/sandbox')).json();
+  return (await request('/api/sandbox', {}, { fallback: 'Failed to read the sandbox state' })).json();
 }
 
 export function restartOpencodeServer(): Promise<{ ok: true; url: string }> {
@@ -759,5 +794,6 @@ export interface Readiness {
 }
 
 export async function getReadiness(): Promise<Readiness> {
-  return (await request('/api/autopilot/readiness')).json();
+  const url = '/api/autopilot/readiness';
+  return (await request(url, {}, { fallback: 'Failed to check whether auto-pilot could start' })).json();
 }

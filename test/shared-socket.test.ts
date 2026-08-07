@@ -488,20 +488,48 @@ describe('a socket waiting for a credential', () => {
     expect(FakeSocket.instances).toHaveLength(1);
   });
 
-  it('does not open a second socket while a retry is already pending', async () => {
+  // THE PREMISE OF THIS TEST WAS WRONG AND THE CODE WAS WRONG WITH IT. The first version asserted that
+  // a credential arriving during a pending retry should wait the backoff out. But the attempts that
+  // earned that backoff failed with the credential this one REPLACES — sign-in has already fixed the
+  // thing the socket is still being punished for, and the punishment is up to thirty seconds. That is a
+  // large part of what the user saw as the board taking a minute to connect.
+  it('abandons a pending retry and reconnects at once with the new credential', async () => {
     vi.useFakeTimers();
     const { ws, token } = await withoutCredential();
     const s = new ws.SharedSocket(() => {});
     s.acquire();
-    token.setToken('first');
-    FakeSocket.instances[0].fireClose(); // a retry is now scheduled
+    token.setToken('stale');
+    FakeSocket.instances[0].fireClose(); // refused; a retry is now scheduled
 
-    token.setToken('second');
+    token.setToken('fresh');
 
-    expect(FakeSocket.instances).toHaveLength(1);
-    vi.advanceTimersByTime(BACKOFF_CEILING_MS);
-    expect(FakeSocket.instances).toHaveLength(2); // the pending retry, using the newer credential
-    expect(FakeSocket.instances[1].url).toContain('token=second');
+    // Immediately, with no timer advanced at all.
+    expect(FakeSocket.instances).toHaveLength(2);
+    expect(FakeSocket.instances[1].url).toContain('token=fresh');
+    // And the retry it replaced does not also fire, which would be two sockets in one tab.
+    vi.advanceTimersByTime(BACKOFF_CEILING_MS * 2);
+    expect(FakeSocket.instances).toHaveLength(2);
+    vi.useRealTimers();
+  });
+
+  it('starts the backoff over, so the new credential is not charged for the old one’s failures', async () => {
+    vi.useFakeTimers();
+    const { ws, token } = await withoutCredential();
+    const s = new ws.SharedSocket(() => {});
+    s.acquire();
+    token.setToken('stale');
+    // Five refusals: the backoff is now at its ceiling.
+    for (let i = 0; i < 5; i += 1) {
+      FakeSocket.instances.at(-1)?.fireClose();
+      vi.advanceTimersByTime(BACKOFF_CEILING_MS);
+    }
+    const before = FakeSocket.instances.length;
+
+    token.setToken('fresh');
+    FakeSocket.instances.at(-1)?.fireClose();
+    vi.advanceTimersByTime(1000); // one second, the first backoff step
+
+    expect(FakeSocket.instances.length).toBe(before + 2);
     vi.useRealTimers();
   });
 

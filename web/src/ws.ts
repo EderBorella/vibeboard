@@ -48,6 +48,9 @@ export class SharedSocket {
   #closing = false;
   #attempts = 0;
   #unwatch: (() => void) | undefined;
+  // True only while a connection is actually up. A socket OBJECT outlives its connection, so it
+  // cannot answer this question.
+  #live = false;
 
   acquire(): void {
     this.#refs += 1;
@@ -58,12 +61,24 @@ export class SharedSocket {
     this.#connect();
   }
 
-  // The way out of the only dead end this class has. Deliberately narrow: a socket that is open, or
-  // already waiting on a retry, needs nothing — waking those would mean two sockets per tab, which is
-  // the bug this whole file exists to prevent.
+  // A new credential is worth acting on in BOTH states that are not connected:
+  //
+  //   nothing at all      the dead end — no socket, no retry, so nothing would ever bring it back.
+  //   a pending retry     the attempts that failed did so with the credential this one REPLACES, and
+  //                       the backoff they earned is up to thirty seconds. Waiting it out was the
+  //                       first version of this method and it is a large part of what the user saw as
+  //                       the board taking a minute to connect: sign-in had already fixed the problem
+  //                       the socket was still being punished for.
+  //
+  // A LIVE socket is the one case to leave alone: replacing it would be two sockets per tab, which is
+  // the bug this whole file exists to prevent. `#live` rather than `#socket !== undefined`, because a
+  // socket object outlives its connection — it is still there, dead, while the retry is pending.
   #credentialChanged(): void {
-    if (this.#refs === 0 || this.#socket !== undefined || this.#retry !== undefined) return;
-    if (!hasToken()) return;
+    if (this.#refs === 0 || this.#live || !hasToken()) return;
+    if (this.#retry) {
+      clearTimeout(this.#retry);
+      this.#retry = undefined;
+    }
     this.#attempts = 0;
     this.#connect();
   }
@@ -78,6 +93,7 @@ export class SharedSocket {
       clearTimeout(this.#retry);
       this.#retry = undefined;
     }
+    this.#live = false;
     this.#socket?.close();
     this.#socket = undefined;
   }
@@ -119,6 +135,7 @@ export class SharedSocket {
     socket.onopen = () => {
       if (stale()) return;
       opened = true;
+      this.#live = true;
       this.#attempts = 0; // a connection that worked resets the backoff, so a later blip recovers fast
       this.#setConn('open');
     };
@@ -134,6 +151,7 @@ export class SharedSocket {
     };
     socket.onclose = () => {
       if (stale()) return;
+      this.#live = false;
       this.#setConn('closed');
       if (this.#closing || this.#refs === 0) return;
       // THE HALF THAT WAS MISSING. Without it a browser whose credential was revoked — from another

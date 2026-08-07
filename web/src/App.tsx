@@ -10,6 +10,7 @@ import {
   setLinks,
 } from './api';
 import { ApprovalPrompt } from './components/ApprovalPrompt';
+import { AutopilotBar } from './components/AutopilotBar';
 import { HaltOverlay } from './components/HaltOverlay';
 import { ProjectGate } from './components/ProjectGate';
 import { SettingsModal } from './components/SettingsModal';
@@ -267,6 +268,18 @@ export function App() {
         autopilot={autopilot.state}
         conn={conn}
       />
+
+      {/* Stacked under the header, only with a project open: transport for the thing the whole app is
+          for. "Hit play and see it move" used to mean four clicks into a settings modal. */}
+      {which === 'work' && snapshot && (
+        <AutopilotBar
+          state={autopilot.state}
+          runs={allRuns}
+          bump={bump}
+          onChanged={autopilot.refresh}
+          onSettings={() => setSettingsOpen(true)}
+        />
+      )}
 
       {content}
 

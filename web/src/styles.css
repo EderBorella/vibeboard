@@ -1375,3 +1375,128 @@ body {
 }
 .diary-outcome { color: var(--text); }
 .diary-text { line-height: 1.55; font-size: 0.92rem; }
+
+/* ---------- Auto-pilot transport strip ----------
+   Stacked directly under the header, so the thing the app is FOR has a control on the page rather than
+   four clicks inside a settings modal. Tone-coloured on the left edge only: the strip is present at all
+   times, and a full-width colour change on every state would fight the boards for attention. */
+.ap-bar {
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+  border-left: 3px solid var(--border);
+  font-size: 0.82rem;
+}
+.ap-bar-running { border-left-color: var(--accent); }
+.ap-bar-halted { border-left-color: var(--danger); }
+.ap-bar-complete { border-left-color: var(--ok, #3fb950); }
+.ap-bar-stopped { border-left-color: var(--muted); }
+
+.ap-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.4rem 0.75rem;
+  /* The status can be long — a stall names the cards that are stuck — so it is the part that shrinks. */
+  min-width: 0;
+}
+
+/* The transport control. Wider than its label needs, because it is the one button on this strip anybody
+   is looking for, and a target you have to aim at is one you misclick. */
+.ap-transport {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 6.5rem;
+  padding: 0.35rem 0.8rem;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 0.82rem;
+  cursor: pointer;
+  background: var(--accent);
+  color: var(--on-accent);
+}
+.ap-transport-stop { background: var(--panel-2); color: var(--text); border-color: var(--border); }
+.ap-transport:disabled { opacity: 0.5; cursor: default; }
+.ap-transport:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* A dot rather than a second text badge: the state word is already in the status line, and repeating it
+   would be two statements of one fact. */
+.ap-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: none; }
+.ap-dot-running { background: var(--accent); animation: ap-pulse 1.6s ease-in-out infinite; }
+.ap-dot-halted { background: var(--danger); }
+.ap-dot-complete { background: var(--ok, #3fb950); }
+@keyframes ap-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+@media (prefers-reduced-motion: reduce) {
+  .ap-dot-running { animation: none; }
+}
+
+/* Truncated, with the full text in the drawer rather than in a title attribute — a `title` is
+   unreachable on a touch device and invisible to anyone who does not know to hover. */
+.ap-status {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+}
+
+.ap-expand,
+.ap-help-btn,
+.ap-settings-link {
+  flex: none;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.25rem 0.55rem;
+  color: var(--muted);
+  font-size: 0.76rem;
+  cursor: pointer;
+}
+.ap-expand:hover,
+.ap-help-btn:hover,
+.ap-settings-link:hover { border-color: var(--accent); color: var(--text); }
+
+.ap-bar-error {
+  padding: 0.4rem 0.75rem 0.55rem;
+  color: var(--danger);
+  font-size: 0.78rem;
+}
+
+/* Two columns, because the two questions are independent: what it is doing now, and what would stop it
+   starting. Stacks on a narrow screen rather than shrinking both to unreadable. */
+.ap-drawer {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
+  gap: 1rem;
+  padding: 0.2rem 0.75rem 0.7rem;
+  border-top: 1px solid var(--border);
+}
+.ap-drawer-head {
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 0.35rem;
+}
+.ap-drawer-empty { color: var(--muted); font-size: 0.8rem; }
+.ap-work { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.25rem; }
+.ap-work li { font-size: 0.8rem; }
+.ap-waiting { color: var(--muted); font-size: 0.74rem; }
+
+/* The instructions. Taller than the card modal and scrolling inside itself: it is prose, and prose that
+   pushes its own close button off the screen is prose nobody finishes. */
+.ap-help { max-width: 44rem; }
+.ap-help-body { overflow-y: auto; max-height: 70vh; padding: 1rem; line-height: 1.55; }
+.ap-help-body h3 {
+  margin: 1.2rem 0 0.4rem;
+  font-size: 0.9rem;
+  letter-spacing: 0.03em;
+  color: var(--accent);
+}
+.ap-help-body h3:first-child { margin-top: 0; }
+.ap-help-body p { margin: 0 0 0.6rem; font-size: 0.85rem; }
+.ap-help-body ul { margin: 0 0 0.6rem; padding-left: 1.1rem; font-size: 0.85rem; }
+.ap-help-body li { margin-bottom: 0.25rem; }
+.ap-help-body code { font-family: var(--font-mono); font-size: 0.78rem; color: var(--accent); }

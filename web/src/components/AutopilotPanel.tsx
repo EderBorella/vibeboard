@@ -1,12 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
   type AutopilotState,
-  getReadiness,
   killAutopilot,
   type Readiness,
   softStopAutopilot,
   startAutopilot,
 } from '../api';
+import { useReadiness } from '../autopilot/useReadiness';
 import { killProjectRequest } from '../confirm/requests';
 import { useConfirm } from '../confirm/useConfirm';
 import { useAccounting } from '../runs/useAccounting';
@@ -83,22 +83,10 @@ export function AutopilotPanel({
   autopilot: AutopilotState | null;
   onAutopilotChanged: () => void;
 }) {
-  const [readiness, setReadiness] = useState<Readiness | null>(null);
-  const [failed, setFailed] = useState(false);
   const hasLifecycle = config.autopilot !== undefined;
-  useEffect(() => {
-    // Nothing to be ready for without a lifecycle, and the endpoint would only answer with the same
-    // sentence the panel already shows. The hook still runs — the early return is inside it, because
-    // a conditional hook is a different bug.
-    if (!hasLifecycle) return;
-    let live = true;
-    getReadiness()
-      .then((r) => live && setReadiness(r))
-      .catch(() => live && setFailed(true));
-    return () => {
-      live = false;
-    };
-  }, [hasLifecycle]);
+  // The SAME hook the transport strip uses. Two fetches of one question are two answers that can
+  // disagree, and the point of the readiness endpoint is that everything reads one list.
+  const { readiness, failed } = useReadiness(autopilot?.state ?? 'none', hasLifecycle);
 
   // Seeded from config and edited locally; the modal owns the save. Declared before the early return
   // below, because a hook after a conditional return is a different bug.

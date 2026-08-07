@@ -430,3 +430,99 @@ describe('a handshake that is refused', () => {
     expect(probes).toBe(0);
   });
 });
+
+// THE DEAD END, and the way out of it. A socket that starts without a credential creates nothing and
+// schedules nothing, so no close event can ever bring it back. Its wake-up used to be a React state
+// change, which is not reliable: sign-in replacing a dead credential with a live one can leave
+// `signedIn` looking unchanged inside one batch, and then nothing re-renders and nothing rebinds. One
+// page load sat on "Connecting…" for eighty-three seconds that way.
+describe('a socket waiting for a credential', () => {
+  async function withoutCredential(): Promise<{
+    store: Map<string, string>;
+    ws: typeof import('../web/src/ws.js');
+    token: typeof import('../web/src/token.js');
+  }> {
+    const store = new Map<string, string>();
+    vi.stubGlobal('location', { host: 'localhost:4610', href: 'http://localhost:4610/', search: '' });
+    vi.stubGlobal('localStorage', {
+      getItem: (k: string) => store.get(k) ?? null,
+      setItem: (k: string, v: string) => store.set(k, v),
+      removeItem: (k: string) => store.delete(k),
+    });
+    vi.stubGlobal('history', { replaceState: () => {} });
+    vi.resetModules();
+    return {
+      store,
+      ws: await import('../web/src/ws.js'),
+      token: await import('../web/src/token.js'),
+    };
+  }
+
+  it('connects as soon as one arrives, with no re-render involved', async () => {
+    const { ws, token } = await withoutCredential();
+    const s = new ws.SharedSocket();
+    const seen: ConnState[] = [];
+    s.onConn((c) => seen.push(c));
+    s.acquire();
+    expect(FakeSocket.instances).toEqual([]); // the dead end
+
+    token.setToken('minted-by-the-claim');
+
+    expect(FakeSocket.instances).toHaveLength(1);
+    expect(FakeSocket.instances[0].url).toContain('token=minted-by-the-claim');
+    expect(seen).toEqual(['unauthorized', 'connecting']);
+  });
+
+  it('does not open a second socket when one is already live', async () => {
+    // Two sockets per tab is the bug this whole file exists to prevent, so the wake-up has to be
+    // narrower than "a credential changed".
+    const { ws, token } = await withoutCredential();
+    const s = new ws.SharedSocket();
+    s.acquire();
+    token.setToken('first');
+    expect(FakeSocket.instances).toHaveLength(1);
+    FakeSocket.instances[0].fireOpen();
+
+    token.setToken('second');
+
+    expect(FakeSocket.instances).toHaveLength(1);
+  });
+
+  it('does not open a second socket while a retry is already pending', async () => {
+    vi.useFakeTimers();
+    const { ws, token } = await withoutCredential();
+    const s = new ws.SharedSocket(() => {});
+    s.acquire();
+    token.setToken('first');
+    FakeSocket.instances[0].fireClose(); // a retry is now scheduled
+
+    token.setToken('second');
+
+    expect(FakeSocket.instances).toHaveLength(1);
+    vi.advanceTimersByTime(BACKOFF_CEILING_MS);
+    expect(FakeSocket.instances).toHaveLength(2); // the pending retry, using the newer credential
+    expect(FakeSocket.instances[1].url).toContain('token=second');
+    vi.useRealTimers();
+  });
+
+  it('stops listening once the last subscriber has gone', async () => {
+    const { ws, token } = await withoutCredential();
+    const s = new ws.SharedSocket();
+    s.acquire();
+    s.release();
+
+    token.setToken('arrives-after-nobody-is-watching');
+
+    expect(FakeSocket.instances).toEqual([]);
+  });
+
+  it('is not woken by the credential being cleared', async () => {
+    const { ws, token } = await withoutCredential();
+    const s = new ws.SharedSocket();
+    s.acquire();
+
+    token.clearToken();
+
+    expect(FakeSocket.instances).toEqual([]);
+  });
+});

@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from 'react';
 import { probeCredential } from './api';
-import { authToken, hasToken } from './token';
+import { authToken, hasToken, onCredentialChange } from './token';
 
 // `unauthorized` is a state of its own because a browser CANNOT SEE why a handshake failed: a 401'd
 // upgrade arrives as close code 1006, indistinguishable from "the server is not running". So it is
@@ -47,15 +47,32 @@ export class SharedSocket {
   #retry: ReturnType<typeof setTimeout> | undefined;
   #closing = false;
   #attempts = 0;
+  #unwatch: (() => void) | undefined;
 
   acquire(): void {
     this.#refs += 1;
-    if (this.#refs === 1) this.#connect();
+    if (this.#refs !== 1) return;
+    // Woken when a credential arrives, because the branch below has nothing to retry: it never opened
+    // a socket, so no close event will ever bring it back.
+    this.#unwatch = onCredentialChange(() => this.#credentialChanged());
+    this.#connect();
+  }
+
+  // The way out of the only dead end this class has. Deliberately narrow: a socket that is open, or
+  // already waiting on a retry, needs nothing — waking those would mean two sockets per tab, which is
+  // the bug this whole file exists to prevent.
+  #credentialChanged(): void {
+    if (this.#refs === 0 || this.#socket !== undefined || this.#retry !== undefined) return;
+    if (!hasToken()) return;
+    this.#attempts = 0;
+    this.#connect();
   }
 
   release(): void {
     this.#refs -= 1;
     if (this.#refs > 0) return;
+    this.#unwatch?.();
+    this.#unwatch = undefined;
     this.#closing = true;
     if (this.#retry) {
       clearTimeout(this.#retry);
@@ -73,8 +90,12 @@ export class SharedSocket {
     this.#closing = false;
     // NOTHING IS OPENED WITHOUT A CREDENTIAL. The server refuses the upgrade, the browser sees only
     // code 1006, and the old flat one-second retry turned that into an endless reconnect storm — 869
-    // attempts in one log, all of them certain to fail. The sign-in flow is what fixes this state, and
-    // it fires `onUnauthorized` → a re-render with a token, which re-acquires the socket.
+    // attempts in one log, all of them certain to fail.
+    //
+    // This branch schedules NOTHING, which is what makes it a dead end: no socket exists, so no close
+    // event will ever come back. `onCredentialChange` in acquire() is the way out — and it has to be
+    // that rather than a React state change, because sign-in replacing a dead credential with a live
+    // one can leave `signedIn` looking unchanged within a single batch, and then nothing re-rendered.
     if (!hasToken()) {
       this.#setConn('unauthorized');
       return;

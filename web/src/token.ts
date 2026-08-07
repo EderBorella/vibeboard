@@ -36,12 +36,34 @@ export function hasToken(): boolean {
   return authToken() !== '';
 }
 
+// Told whenever the credential appears, changes or goes away.
+//
+// It exists because the WEBSOCKET CANNOT POLL FOR ONE. It declines to open without a credential — the
+// server refuses the upgrade anyway — and at that point it has nothing to retry, so it needs to be
+// woken. Routing that through React state made it depend on a `false → true` flip being observable,
+// and inside a single batch it is not: sign-in clearing a dead credential and obtaining a new one can
+// leave `signedIn` looking unchanged, and the socket then waited for something unrelated to rebind it.
+// One page load took eighty-three seconds to connect that way.
+const listeners = new Set<() => void>();
+
+export function onCredentialChange(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+function announce(): void {
+  for (const listener of listeners) listener();
+}
+
 // Writes BOTH halves. The memo is what `authToken` serves, so a setter that only reached
 // localStorage would leave every request in this page's life carrying the previous value — and the
 // one that matters is the request immediately after signing in.
 export function setToken(token: string): void {
   cached = token;
   localStorage.setItem(KEY, token);
+  announce();
 }
 
 // `cached = ''` rather than `undefined`: `??=` above would re-read localStorage on the next call,
@@ -49,4 +71,5 @@ export function setToken(token: string): void {
 export function clearToken(): void {
   cached = '';
   localStorage.removeItem(KEY);
+  announce();
 }

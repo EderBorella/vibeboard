@@ -5,7 +5,11 @@ import type { AppCtx, WsClient } from './route-context.js';
 
 // Fan-out to every connected browser. A send on a closed socket is swallowed: a client that
 // vanished mid-broadcast must not abort delivery to the others.
-export function createBroadcaster(): { clients: Set<WsClient>; broadcast: (msg: unknown) => void } {
+export function createBroadcaster(): {
+  clients: Set<WsClient>;
+  broadcast: (msg: unknown) => void;
+  closeDevice: (device: string | null) => number;
+} {
   const clients = new Set<WsClient>();
   const broadcast = (msg: unknown): void => {
     const data = JSON.stringify(msg);
@@ -17,7 +21,26 @@ export function createBroadcaster(): { clients: Set<WsClient>; broadcast: (msg: 
       }
     }
   };
-  return { clients, broadcast };
+  // Hangs up on a revoked device. Without this, revocation stops the next HTTP request and leaves the
+  // socket that device already holds streaming the board — and that socket carries the copilot
+  // channel, whose tools write files. `null` closes every one of them, for Sign everything out.
+  //
+  // The set is not mutated here: each socket's own 'close' handler removes it, which is the one place
+  // that knows the socket is really gone.
+  const closeDevice = (device: string | null): number => {
+    let closed = 0;
+    for (const c of clients) {
+      if (device !== null && c.device !== device) continue;
+      try {
+        c.close?.();
+        closed += 1;
+      } catch {
+        /* already gone */
+      }
+    }
+    return closed;
+  };
+  return { clients, broadcast, closeDevice };
 }
 
 // One /ws endpoint carries BOTH the board snapshot stream and the copilot channel, so a
@@ -51,13 +74,28 @@ export function registerWs(
       // it shadowed a perfectly good Authorization header.
       const cred = ctx.credentials.verify(token || bearerToken(req.headers.authorization));
       if (cred?.scope !== 'admin') return reply.code(401).send({ error: 'Unauthorized' });
+      // Stashed for the handler below, which needs to know WHICH device holds this socket so a revoke
+      // can hang up on exactly that one. Re-verifying there would be a second lookup answering a
+      // question already answered.
+      req.credential = cred;
     };
 
-    root.get('/ws', { websocket: true, preValidation: authenticate }, (socket) => {
-      clients.add(socket);
+    root.get('/ws', { websocket: true, preValidation: authenticate }, (socket, req) => {
+      // A wrapper rather than the socket itself, so the registry carries the device this connection
+      // belongs to. The set is keyed by identity, and this object is created once per connection, so
+      // `delete` on close still finds it.
+      const client: WsClient = {
+        send: (data) => socket.send(data),
+        // 1008 is "policy violation", which is what a revoked credential is. The client reads the code
+        // to tell this apart from a server that went away — it cannot read the status of a failed
+        // handshake, so the close code is the only channel there is.
+        close: () => socket.close(1008, 'signed out'),
+        ...(req.credential?.device ? { device: req.credential.device } : {}),
+      };
+      clients.add(client);
       const send = (snapshot: unknown): void => {
         try {
-          socket.send(JSON.stringify({ type: 'snapshot', snapshot }));
+          client.send(JSON.stringify({ type: 'snapshot', snapshot }));
         } catch {
           /* socket closed mid-send */
         }
@@ -71,13 +109,17 @@ export function registerWs(
           .then(send)
           .catch((err) => log.warn({ err }, 'initial snapshot failed'));
       socket.send(JSON.stringify({ type: 'copilot:state', state: ctx.copilot.state }));
+      // The sign-in requests waiting for a decision, pushed on connect as well as on change: a browser
+      // that opens after a request was made must still see the prompt, or the person who has to allow
+      // it would have to have been watching at the moment it arrived.
+      client.send(JSON.stringify({ type: 'signin:pending', pending: ctx.signin.list() }));
       if (ctx.session.isOpen)
-        void sendHistory(socket).catch((err) => log.warn({ err }, 'initial chat history failed'));
+        void sendHistory(client).catch((err) => log.warn({ err }, 'initial chat history failed'));
       const unsubscribe = ctx.session.subscribe(send);
       socket.on('message', (raw: Buffer) => onMessage(raw.toString('utf8')));
       socket.on('close', () => {
         unsubscribe();
-        clients.delete(socket);
+        clients.delete(client);
       });
     });
   });

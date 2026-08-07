@@ -9,6 +9,7 @@ import { ChatStore } from './chat-store.js';
 import { CopilotSession } from './copilot.js';
 import { createCopilotTurns } from './copilot-turns.js';
 import { CredentialStore } from './credentials.js';
+import { DeviceStore } from './devices.js';
 import { REAL_GIT } from './git-measure.js';
 import { type Log, serverLogger, stripSecrets, withRedaction } from './logging.js';
 import {
@@ -29,12 +30,14 @@ import { registerModelRoutes } from './routes/models.js';
 import { registerProjectRoutes } from './routes/project.js';
 import { registerRunRoutes } from './routes/runs.js';
 import { registerSandboxRoutes } from './routes/sandbox.js';
+import { registerAuthRoutes, registerSigninRoutes } from './routes/signin.js';
 import { registerSkillRoutes } from './routes/skills.js';
 import { registerSuggestionRoutes } from './routes/suggestions.js';
 import { listRuns } from './run-store.js';
 import { NOT_REQUESTED, type SandboxStatus } from './sandbox.js';
 import { type ServiceCommand, ServiceProcess } from './service-process.js';
 import type { ProjectSession } from './session.js';
+import { PendingRequests } from './signin.js';
 import { createBroadcaster, registerWs } from './ws.js';
 
 declare module 'fastify' {
@@ -66,6 +69,10 @@ export function buildApp(
     runBin?: string;
     logger?: FastifyServerOptions['logger'];
     credentials?: CredentialStore;
+    // The browsers that have signed in. main.ts passes the store it read off disk; an app built
+    // without one gets an in-memory store, because `buildApp` is synchronous and `DeviceStore.load`
+    // is not. A test that drives sign-in passes its own, the way it does for `credentials`.
+    devices?: DeviceStore;
     // Probed once, by main.ts, before the app exists — every agent this app starts is confined the
     // same way, and re-probing per turn would put a process spawn in front of every dispatch.
     sandbox?: SandboxStatus;
@@ -89,7 +96,17 @@ export function buildApp(
   attachOpencodeLogger(log.child({ component: 'opencode' }));
   // Same singleton, same reason: the managed server is spawned lazily, long after this runs.
   attachSandbox(opts.sandbox ?? NOT_REQUESTED);
-  const { clients, broadcast } = createBroadcaster();
+  const { clients, broadcast, closeDevice } = createBroadcaster();
+  const devices = opts.devices ?? DeviceStore.inMemory();
+  // A corrupt device file empties the store, and an empty store re-opens the unauthenticated claim.
+  // That transition must never be quiet, so it is reported here at the level a person will see.
+  if (devices.problem) log.error({ problem: devices.problem }, 'the device store could not be read');
+  const signin = new PendingRequests({
+    mint: async (label, address) => (await devices.add(label, address)).token,
+    // Every signed-in browser is told immediately. The prompt has to appear on a screen someone is
+    // looking at, and polling for it would put a request-a-second behind a feature used twice a year.
+    onChange: () => broadcast({ type: 'signin:pending', pending: signin.list() }),
+  });
   // A run does real work — implementing a card, not answering a question — so its patience is its
   // own, an order of magnitude beyond the chat's per-turn timeout.
   const runner = new AgentRunner({
@@ -193,6 +210,9 @@ export function buildApp(
     autopilot,
     service,
     credentials,
+    devices,
+    signin,
+    closeDevice,
     broadcast,
     log,
     sandbox: opts.sandbox ?? NOT_REQUESTED,
@@ -200,11 +220,17 @@ export function buildApp(
   const turns = createCopilotTurns(ctx);
 
   registerWs(app, ctx, clients, turns.handleMessage, turns.sendHistory);
+  // THE SECOND AND LAST UNAUTHENTICATED SURFACE on this server, and it is here rather than under /api
+  // deliberately: inside that prefix it would need an exception in registerAuth's hook, and that hook
+  // having no exceptions is what makes "a route absent from the scope table is admin-only" mean
+  // anything. The other unauthenticated surface is the static shell, which carries no secret.
+  registerAuthRoutes(app, ctx);
 
   app.register(
     async (api) => {
       // First inside the scope, so it runs for every route below it and for nothing outside.
       registerAuth(api, credentials, () => session.root);
+      registerSigninRoutes(api, ctx);
       await registerProjectRoutes(api, ctx);
       await registerConfigRoutes(api, ctx);
       await registerModelRoutes(api, ctx);
@@ -228,7 +254,9 @@ export function buildApp(
   app.decorate('spaFallback', null);
   app.setNotFoundHandler((req, reply) => {
     req.log.info({ url: stripSecrets(req.url) }, 'route not found');
-    const isApp = !req.url.startsWith('/api') && !req.url.startsWith('/ws');
+    // `/auth` joins the list: a typo'd sign-in URL answered with index.html has the client parsing
+    // HTML as JSON, and the message it shows the user is then about JSON rather than about sign-in.
+    const isApp = !req.url.startsWith('/api') && !req.url.startsWith('/ws') && !req.url.startsWith('/auth');
     if (isApp && app.spaFallback) return app.spaFallback(reply);
     return reply.code(404).send({ error: 'Not found' });
   });

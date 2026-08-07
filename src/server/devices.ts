@@ -115,16 +115,24 @@ export interface DeviceStoreOptions {
 
 export class DeviceStore {
   readonly #byId = new Map<string, DeviceRecord>();
-  readonly #file: string;
+  // Undefined for the in-memory store below, whose whole point is that it writes nowhere.
+  readonly #file: string | undefined;
   readonly #now: () => Date;
   // Set when the file on disk could not be read as a device store, naming where it was moved. The
   // caller logs it: this class has no logger, and a corrupt credential file that nobody mentions is
   // a silent return to "anyone may claim", which is the one transition that must never be quiet.
   #problem: string | undefined;
 
-  private constructor(file: string, now: () => Date) {
+  private constructor(file: string | undefined, now: () => Date) {
     this.#file = file;
     this.#now = now;
+  }
+
+  // A store that remembers for as long as the process lives and writes nothing. Exists because
+  // `buildApp` is synchronous and `load` is not: production passes the loaded store in from main.ts,
+  // and an app built without one gets this rather than a half-read file or a null nobody checks.
+  static inMemory(now?: () => Date): DeviceStore {
+    return new DeviceStore(undefined, now ?? (() => new Date()));
   }
 
   static async load(options: DeviceStoreOptions = {}): Promise<DeviceStore> {
@@ -190,6 +198,16 @@ export class DeviceStore {
     return { id, token: `${id}.${secret}` };
   }
 
+  // The first-visit claim, and the emptiness check belongs HERE rather than at the endpoint because
+  // it has to be indivisible from the insert. It is: `add` runs synchronously as far as its first
+  // await, so no second caller gets a turn between this check and the record landing in the map.
+  // Written at the endpoint instead, that would be an ordinary `if` around an `await` — and two
+  // browsers loading the page at the same moment would both be first.
+  async claim(label: string | undefined, address: string): Promise<{ id: string; token: string } | 'closed'> {
+    if (!this.empty) return 'closed';
+    return this.add(label ?? '', address);
+  }
+
   // O(1) by id, then one constant-time compare — no scan, so how long this takes says nothing about
   // how many devices exist. The id half is a lookup key and leaks nothing by being compared normally;
   // only the secret half is timed, through the shared compare in credentials.ts.
@@ -227,7 +245,9 @@ export class DeviceStore {
   }
 
   #save(): Promise<void> {
+    const file = this.#file;
+    if (file === undefined) return Promise.resolve();
     const content = `${JSON.stringify({ devices: [...this.#byId.values()] }, null, 2)}\n`;
-    return serialise(`devices:${this.#file}`, () => writeAtomic(this.#file, content, 0o600));
+    return serialise(`devices:${file}`, () => writeAtomic(file, content, 0o600));
   }
 }

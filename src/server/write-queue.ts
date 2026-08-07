@@ -30,6 +30,9 @@
 //
 // If a future slice ever needs the counters to be exact across processes, that is the trigger to revisit.
 
+import { chmod, mkdir, rename, rm, writeFile } from 'node:fs/promises';
+import { dirname } from 'node:path';
+
 const chains = new Map<string, Promise<unknown>>();
 
 // Runs `fn` after everything already queued under `key`, and answers with its result. A rejection reaches
@@ -43,4 +46,30 @@ export function serialise<T>(key: string, fn: () => Promise<T>): Promise<T> {
     mine.catch(() => undefined),
   );
   return mine;
+}
+
+// Temp file plus rename, so a reader sees the old bytes or the new ones and never half of either. The
+// queue above cannot promise that — it orders writers inside one process, and only the rename holds
+// against a writer outside it, or against the process dying mid-write.
+//
+// `mode` applies only where the write CREATES the file and the umask may narrow it further, so it is
+// re-applied explicitly: a 0600 file left world-readable by an earlier version is tightened on the
+// next write rather than staying open forever.
+//
+// autopilot-store.ts and run-store.ts each grew their own copy of this before it lived anywhere; they
+// predate it rather than disagree with it, and adopting this one is a tidy-up on its own.
+let writeSeq = 0;
+export async function writeAtomic(path: string, content: string, mode?: number): Promise<void> {
+  await mkdir(dirname(path), { recursive: true });
+  // Unique per WRITE, not per path: two overlapping writes sharing one temp name race for it, and the
+  // loser's rename finds the file already gone.
+  const temp = `${path}.${process.pid}.${++writeSeq}.tmp`;
+  try {
+    await writeFile(temp, content, mode === undefined ? 'utf8' : { encoding: 'utf8', mode });
+    if (mode !== undefined) await chmod(temp, mode);
+    await rename(temp, path);
+  } catch (err) {
+    await rm(temp, { force: true }).catch(() => {});
+    throw err;
+  }
 }

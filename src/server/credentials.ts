@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
 import { chmod, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -32,6 +32,35 @@ export interface Credential {
   // Absent for admin (a person is not a run) and for the service credential, which belongs to no card.
   board?: BoardName;
   skill?: string;
+  // Which signed-in browser this is, when the caller is a device rather than the admin token. Carried
+  // so a revoke can find and close that browser's open socket: a credential that stops working while
+  // the socket it opened keeps streaming is a revocation that only looks like one.
+  device?: string;
+}
+
+export function sha256Hex(value: string): string {
+  return createHash('sha256').update(value, 'utf8').digest('hex');
+}
+
+// Compares two secrets without leaking their length or their common prefix through how long it takes.
+//
+// Hashing BOTH sides first is what makes it safe to call with anything: timingSafeEqual throws on a
+// length mismatch, and that throw is itself a length oracle — so passing raw tokens would leak the
+// admin token's length to any caller willing to send strings and time the difference between a 401
+// and a 500. Digests are always 32 bytes, so the throw is unreachable.
+export function constantTimeEqual(a: string, b: string): boolean {
+  return timingSafeEqual(
+    createHash('sha256').update(a, 'utf8').digest(),
+    createHash('sha256').update(b, 'utf8').digest(),
+  );
+}
+
+// What a signed-in browser's credential is checked against. A narrow interface rather than the
+// DeviceStore type, because devices.ts imports this module for the token path — naming the class here
+// would make that a cycle.
+export interface DeviceAuthority {
+  verify(token: string): string | null;
+  touch(id: string): Promise<void>;
 }
 
 export function adminTokenFile(): string {
@@ -75,7 +104,12 @@ export async function adminToken(): Promise<string> {
 export class CredentialStore {
   readonly #byToken = new Map<string, Credential>();
 
-  constructor(private readonly admin: string) {}
+  // `devices` is optional so every existing caller — and every test that only cares about run scopes —
+  // keeps working; an app built without one simply has no per-device sign-in.
+  constructor(
+    private readonly admin: string,
+    private readonly devices?: DeviceAuthority,
+  ) {}
 
   mintRun(
     scope: Exclude<Scope, 'admin'>,
@@ -91,9 +125,20 @@ export class CredentialStore {
     return cred;
   }
 
+  // Three kinds of caller, in the order they are cheapest to answer. A browser signed in per device
+  // gets `admin` exactly like the token file does: it IS the person, and there is no lesser authority
+  // for a person to hold — decision 10's table is about confining RUNS.
   verify(token: string): Credential | null {
-    if (token && token === this.admin) return { token, scope: 'admin' };
-    return this.#byToken.get(token) ?? null;
+    if (!token) return null;
+    if (constantTimeEqual(token, this.admin)) return { token, scope: 'admin' };
+    const run = this.#byToken.get(token);
+    if (run) return run;
+    const device = this.devices?.verify(token);
+    if (!device) return null;
+    // Fire-and-forget, and safe to be: `touch` never rejects and returns without writing unless the
+    // day has changed, so an active browser costs no disk write per request.
+    void this.devices?.touch(device);
+    return { token, scope: 'admin', device };
   }
 
   // Called when a run settles. Scanned rather than indexed by run id: the map only ever holds the

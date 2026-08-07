@@ -173,15 +173,31 @@ The profile is `tools/apparmor/vibeboard-agent`, and it is short enough to read.
 
 **The copilot VibeBoard spawns auto-approves its own tool calls** — it can read
 and write anywhere in the open project, which is why it runs inside the sandbox
-described above. The API requires a credential (the token in the URL printed at
-startup), and agents get narrower, per-run ones. It still binds to `127.0.0.1`
-(this machine only) by default: an agent can reach loopback too, so the sandbox
-and the credential are what separate them, not the network.
+described above. The API requires a credential, and agents get narrower, per-run
+ones. It still binds to `127.0.0.1` (this machine only) by default: an agent can
+reach loopback too, so the sandbox and the credential are what separate them,
+not the network.
 
-Setting `VIBEBOARD_HOST=0.0.0.0` makes the board reachable from other devices,
-and *anyone who can reach that port* can drive an agent with filesystem write
-access using your CLI credentials. Only do it on a network you trust, and never
-expose it to the public internet.
+**Signing in.** Open the board and it signs itself in — no token to copy, and
+nothing printed in the terminal. The first page load claims a credential for
+that browser, which is safe exactly once: before any browser is signed in, no
+agent can exist, because starting one needs a credential nobody holds yet.
+Every later browser has to be allowed from one that is already in — it shows a
+prompt naming what is asking and the address it came from. Sign-in is refused
+while agents are running.
+
+Settings › Signed-in browsers lists them, signs one out, and reveals this
+browser's token if you want to see it. **Sign every browser out** is how you
+replace a credential you think somebody else has seen: it forgets them all, and
+the next page load signs itself in again. Locked out of every device?
+`kill -USR2 <pid>` does the same from the terminal.
+
+Setting `VIBEBOARD_HOST=0.0.0.0` makes the board reachable from other devices.
+On a shared network, be aware that "the first page load" then means whoever
+reaches the port first after a fresh install — in practice you, seconds after
+starting the server, but it is a real window. And *anyone allowed in* can drive
+an agent with filesystem write access using your CLI credentials. Only do it on
+a network you trust, and never expose it to the public internet.
 
 ## Features
 

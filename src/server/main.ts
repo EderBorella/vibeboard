@@ -2,10 +2,12 @@ import { networkInterfaces } from 'node:os';
 import { buildApp } from './app.js';
 import { restoreLastProject } from './app-state.js';
 import { adminToken, CredentialStore } from './credentials.js';
+import { DeviceStore } from './devices.js';
 import { installCrashHandlers, serverLogger } from './logging.js';
 import { stopOpencodeServer } from './opencode-server.js';
 import { probeSandbox } from './sandbox.js';
 import { ProjectSession } from './session.js';
+import { installBreakGlass, signinBanner } from './signin-terminal.js';
 import { registerStatic } from './static.js';
 
 // Load ./.env if the user has one, so `npm start` and `npm run dev` pick up local config with
@@ -27,17 +29,22 @@ const session = new ProjectSession();
 // Resolved here rather than inside buildApp so the file is opened once and the banner can say where
 // it is — a log nobody can find is barely better than no log.
 const logging = serverLogger();
-// The browser's credential, persisted so a restart does not log the open tab out. It reaches the
-// page through the URL printed below and nowhere else: serving it over HTTP would hand it to any
-// agent that can reach loopback, which is all of them.
+// The server's own credential, persisted so it survives a restart. It is NO LONGER PRINTED and no
+// longer reaches the browser: browsers sign themselves in per device (see signin.ts). It remains a
+// valid credential, and `?token=` remains an accepted ingestion path, as the documented recovery route
+// for a machine where the loopback claim cannot be reached.
 const admin = await adminToken();
+// Read before the app is built, because `buildApp` is synchronous. `devices.empty` is what decides
+// whether the unauthenticated first claim is open, so this file is the authority on it.
+const devices = await DeviceStore.load();
 // Probed once, here, because the answer cannot change while the process runs and every agent this
 // server starts is confined identically. The banner says which mode we are in: a sandbox nobody can
 // see the state of is a sandbox nobody trusts.
 const sandbox = await probeSandbox();
 const app = buildApp(session, {
   logger: logging.options,
-  credentials: new CredentialStore(admin),
+  credentials: new CredentialStore(admin, devices),
+  devices,
   sandbox,
 });
 // Anything that rejects or throws outside a request used to end the process in silence. Node exits
@@ -69,6 +76,18 @@ process.once('exit', () => {
   stopOpencodeServer();
 });
 
+// The way back in when every signed-in browser is gone — a lost phone, a reimaged laptop, a wiped
+// profile. `on` rather than `once`: needing it twice is not a reason to have to restart the server.
+installBreakGlass({
+  on: (signal, handler) => {
+    process.on(signal, handler);
+  },
+  out: (line) => console.log(line),
+  clear: () => devices.clear(),
+  closeSockets: () => app.closeDevice(null),
+  onError: (err) => app.log.error({ err }, 'could not sign every browser out'),
+});
+
 function lanAddress(): string | undefined {
   for (const iface of Object.values(networkInterfaces())) {
     for (const info of iface ?? []) {
@@ -88,18 +107,20 @@ async function start(): Promise<void> {
   if (reopened) await app.autopilot.load();
   await app.listen({ port, host });
   const lan = isLoopback ? undefined : lanAddress();
-  // The token is in the link on purpose: the browser trades it for a stored credential on first
-  // visit, and the terminal is the one channel an agent has no way to read.
-  //
-  // The separation holds only where the sandbox does. With the profile loaded the token file is
-  // unreadable by any agent (`deny @{HOME}/.vibeboard/token* rwl`); without it — a Mac, or a Linux
-  // box where `npm run sandbox:install` has not been run — manual runs are unconfined and this is
-  // once more a plan rather than a protection, which is what the line below says out loud. Either
-  // way the token stays out of the log only because the request serializer strips it (logging.ts):
-  // it was found sitting in one.
-  const q = `?token=${admin}`;
+  // A PLAIN URL. It used to carry `?token=<admin>`, which put a credential that never expires into
+  // terminal scrollback, screen shares and every screenshot of a first run — and left it in bookmarks
+  // and history at the other end. The browser signs itself in instead; nothing has to be copied.
   console.log(`\n  VibeBoard running`);
-  console.log(`  → http://localhost:${port}/${q}${lan ? `\n  → http://${lan}:${port}/${q}  (LAN)` : ''}`);
+  console.log(`  → http://localhost:${port}/${lan ? `\n  → http://${lan}:${port}/  (LAN)` : ''}`);
+  for (const line of signinBanner({
+    empty: devices.empty,
+    devices: devices.size,
+    pid: process.pid,
+    relocated: process.env.VIBEBOARD_TOKEN_FILE !== undefined,
+    sandboxOk: sandbox.ok,
+  })) {
+    console.log(line);
+  }
   if (reopened) console.log(`  → reopened ${reopened}`);
   if (logging.file) console.log(`  → logging to ${logging.file}`);
   // Stated either way. Silence about an absent sandbox is how "best-effort" quietly becomes "none".

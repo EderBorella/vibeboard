@@ -52,6 +52,10 @@ declare module 'fastify' {
     // The auto-pilot loop's process, so main.ts can take it down on the way out. A detached child
     // survives its parent, so nothing else would.
     service: ServiceProcess;
+    // Hangs up on a revoked device's sockets, or on every socket for `null`. Exposed for main.ts's
+    // SIGUSR2 break-glass: emptying the device store leaves the browsers holding sockets that are
+    // still streaming, and an idle tab never makes the HTTP call that would 401.
+    closeDevice: (device: string | null) => number;
   }
 }
 
@@ -266,6 +270,7 @@ export function buildApp(
   app.decorate('runner', runner);
   app.decorate('autopilot', autopilot);
   app.decorate('service', service);
+  app.decorate('closeDevice', closeDevice);
 
   return app;
 }

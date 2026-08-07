@@ -81,13 +81,20 @@ export interface ServerLogger {
 // README tells people to tail and paste when something misbehaves, inside the directory a sandboxed
 // agent is granted read access to. Stripped in one place so no future query parameter can be
 // forgotten here.
+// A sign-in request id is the SAME hazard in a path segment rather than a query parameter: whoever
+// holds one can collect the credential a person approves for somebody else, and this URL is polled
+// every two seconds. Found by the test in test/token-not-logged.test.ts, which is where the query-string
+// leak was found too — the file was right that the query string was not the whole of it.
+const REQUEST_ID = /^\/auth\/request\/[^/?]+/;
+
 export function stripSecrets(url: string): string {
-  const q = url.indexOf('?');
-  if (q === -1) return url;
-  const params = new URLSearchParams(url.slice(q + 1));
-  if (!params.has('token')) return url;
+  const path = url.replace(REQUEST_ID, '/auth/request/[redacted]');
+  const q = path.indexOf('?');
+  if (q === -1) return path;
+  const params = new URLSearchParams(path.slice(q + 1));
+  if (!params.has('token')) return path;
   params.set('token', '[redacted]');
-  return `${url.slice(0, q)}?${params.toString()}`;
+  return `${path.slice(0, q)}?${params.toString()}`;
 }
 
 const serializers = {

@@ -21,6 +21,12 @@ const ALREADY_CLAIMED = 'A browser has already signed in to this board, so this 
 const TOO_MANY = 'Too many browsers are waiting to be approved. Deal with those first, or try again shortly.';
 const TOO_OFTEN = 'Sign-in was asked for too recently. Try again in a moment.';
 
+// Every refusal carries a `reason` CODE beside its sentence. The client branches on the code — claim
+// then ask, or stop and explain — and a client that branched on the prose instead would change
+// behaviour the next time someone improved the wording.
+type ClaimRefusal = 'busy' | 'claimed';
+type RequestRefusal = 'busy' | 'nobody' | 'too-many' | 'too-often';
+
 // What "agents are running" means, asked of the two places that know. `current()` reads the state file
 // rather than the mirror: this decides whether to open an unauthenticated door, so it asks the
 // authority and not a cache that is allowed to lag.
@@ -42,10 +48,11 @@ export function registerAuthRoutes(root: FastifyInstance, ctx: AppCtx): void {
   // reaches the port first after a fresh install or a Sign-everything-out. In practice that is the
   // user, seconds after starting the server. It is narrow and it happens once — not closed.
   root.post('/auth/claim', async (req, reply) => {
+    const refuse = (code: ClaimRefusal, error: string) => reply.code(409).send({ error, reason: code });
     const closed = signinClosed(await activity(ctx));
-    if (closed) return reply.code(409).send({ error: closed });
+    if (closed) return refuse('busy', closed);
     const claimed = await ctx.devices.claim(agentOf(req), req.ip);
-    if (claimed === 'closed') return reply.code(409).send({ error: ALREADY_CLAIMED });
+    if (claimed === 'closed') return refuse('claimed', ALREADY_CLAIMED);
     // At WARN, because this is the one moment a credential is handed to an unauthenticated caller and
     // it should be visible in the log without anyone raising the level to find it. The token is not
     // logged; the device id is not a secret.
@@ -60,16 +67,18 @@ export function registerAuthRoutes(root: FastifyInstance, ctx: AppCtx): void {
   // to the person deciding — as a label, never as a check: every header a browser sends is
   // reproducible with one curl flag by a process on the same machine.
   root.post('/auth/request', async (req, reply) => {
+    const refuse = (status: number, code: RequestRefusal, error: string) =>
+      reply.code(status).send({ error, reason: code });
     const closed = signinClosed(await activity(ctx));
-    if (closed) return reply.code(409).send({ error: closed });
+    if (closed) return refuse(409, 'busy', closed);
     // Nobody to ask. Answered rather than left to time out, because the browser's next move is to
     // claim instead, and a two-minute wait for an approval that can never come is not a wait.
-    if (ctx.devices.empty) return reply.code(409).send({ error: NO_ONE_TO_ASK });
+    if (ctx.devices.empty) return refuse(409, 'nobody', NO_ONE_TO_ASK);
     const opened = ctx.signin.open(agentOf(req), req.ip);
-    if (opened === 'too-many') return reply.code(429).send({ error: TOO_MANY });
-    if (opened === 'rate-limited') return reply.code(429).send({ error: TOO_OFTEN });
+    if (opened === 'too-many') return refuse(429, 'too-many', TOO_MANY);
+    if (opened === 'rate-limited') return refuse(429, 'too-often', TOO_OFTEN);
     ctx.log.info({ address: req.ip }, 'a browser asked to be signed in');
-    return { id: opened.id };
+    return opened;
   });
 
   // Polled by the waiting browser. 200 for every answer including a refusal: this is the state of a

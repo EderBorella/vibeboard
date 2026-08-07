@@ -1,7 +1,11 @@
 import { useEffect, useMemo } from 'react';
-import { authToken } from './token';
+import { authToken, hasToken } from './token';
 
-export type ConnState = 'connecting' | 'open' | 'closed';
+// `unauthorized` is a state of its own because a browser CANNOT SEE why a handshake failed: a 401'd
+// upgrade arrives as close code 1006, indistinguishable from "the server is not running". So it is
+// never derived from a close event — it is what this socket reports when it declines to connect at all
+// for want of a credential, and the sign-in flow is what resolves it.
+export type ConnState = 'connecting' | 'open' | 'closed' | 'unauthorized';
 type Listener = (msg: Record<string, unknown>) => void;
 
 // ONE socket per tab, shared by the board and the copilot.
@@ -13,6 +17,18 @@ type Listener = (msg: Record<string, unknown>) => void;
 //
 // Reference-counted on purpose: React StrictMode mounts effects twice in dev, so a naive
 // "close on unmount" would tear the socket down under the second subscriber.
+// Doubling from a second up to half a minute. The first two attempts are quick, because the common
+// cause is a server restarting and the board should come back without a reload; past that the cause is
+// something a person has to fix, and hammering it neither helps nor tells anyone.
+//
+// Exported so the bound is asserted rather than reasoned about: a flat 1s retry is 3,600 attempts an
+// hour, and one log has 869 of them against a socket that could never have succeeded.
+export const BACKOFF_CEILING_MS = 30_000;
+
+export function backoffMs(attempt: number): number {
+  return Math.min(BACKOFF_CEILING_MS, 1000 * 2 ** (attempt - 1));
+}
+
 export class SharedSocket {
   #socket: WebSocket | undefined;
   #listeners = new Set<Listener>();
@@ -20,6 +36,7 @@ export class SharedSocket {
   #refs = 0;
   #retry: ReturnType<typeof setTimeout> | undefined;
   #closing = false;
+  #attempts = 0;
 
   acquire(): void {
     this.#refs += 1;
@@ -44,6 +61,14 @@ export class SharedSocket {
 
   #connect(): void {
     this.#closing = false;
+    // NOTHING IS OPENED WITHOUT A CREDENTIAL. The server refuses the upgrade, the browser sees only
+    // code 1006, and the old flat one-second retry turned that into an endless reconnect storm — 869
+    // attempts in one log, all of them certain to fail. The sign-in flow is what fixes this state, and
+    // it fires `onUnauthorized` → a re-render with a token, which re-acquires the socket.
+    if (!hasToken()) {
+      this.#setConn('unauthorized');
+      return;
+    }
     this.#setConn('connecting');
     // The credential goes in the query string because a browser cannot set headers on a WebSocket
     // handshake. The server refuses the upgrade without it.
@@ -57,7 +82,14 @@ export class SharedSocket {
     // exists to fix.
     const stale = (): boolean => this.#socket !== socket;
     socket.onopen = () => {
-      if (!stale()) this.#setConn('open');
+      if (stale()) return;
+      this.#attempts = 0; // a connection that worked resets the backoff, so a later blip recovers fast
+      this.#setConn('open');
+    };
+    // Without this, a handshake error is an unhandled event and the console fills with them. It says
+    // nothing about WHY — see the note on ConnState — so it only stops the noise.
+    socket.onerror = () => {
+      /* the close handler below is what reacts */
     };
     socket.onmessage = (ev) => {
       if (stale()) return;
@@ -67,7 +99,9 @@ export class SharedSocket {
     socket.onclose = () => {
       if (stale()) return;
       this.#setConn('closed');
-      if (!this.#closing && this.#refs > 0) this.#retry = setTimeout(() => this.#connect(), 1000);
+      if (this.#closing || this.#refs === 0) return;
+      this.#attempts += 1;
+      this.#retry = setTimeout(() => this.#connect(), backoffMs(this.#attempts));
     };
   }
 

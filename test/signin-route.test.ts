@@ -262,6 +262,44 @@ describe('a later browser asks to be approved', () => {
   });
 });
 
+// The client branches on the CODE, never on the sentence: "claimed" means ask to be approved,
+// "busy" means stop and explain. Branching on prose would change behaviour the next time someone
+// improved the wording, and the wording is meant to be improvable.
+describe('every refusal names a machine-readable reason', () => {
+  it('tells a claim apart: already claimed, or agents running', async () => {
+    const { app, root } = await open();
+    await claim(app);
+    expect((await claim(app)).json()).toMatchObject({ reason: 'claimed' });
+
+    await writeAutopilotState(root, { ...IDLE_STATE, state: 'running', at: '2026-08-07T09:00:00.000Z' });
+    expect((await claim(app)).json()).toMatchObject({ reason: 'busy' });
+  });
+
+  it('tells a request apart: nobody to ask, or asked too often', async () => {
+    const { app } = await open();
+    expect((await ask(app)).json()).toMatchObject({ reason: 'nobody' });
+
+    await claim(app);
+    expect((await ask(app)).statusCode).toBe(200);
+    expect((await ask(app)).json()).toMatchObject({ reason: 'too-often' });
+  });
+
+  it('hands the waiting browser what the approver will see', async () => {
+    // So the user can match this screen against the prompt on the other one. Without it they are
+    // asked to recognise a prompt they have never been shown.
+    const { app } = await open();
+    await claim(app);
+
+    const res = await ask(app, 'Safari on the phone');
+
+    expect(res.json()).toEqual({
+      id: expect.any(String),
+      label: 'Safari on the phone',
+      address: '127.0.0.1',
+    });
+  });
+});
+
 describe('the device list', () => {
   it('names which row is this browser, so the panel does not offer to revoke itself', async () => {
     const { app } = await open();

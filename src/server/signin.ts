@@ -61,7 +61,9 @@ export interface PendingView {
   at: string;
 }
 
-export type OpenResult = { id: string } | 'too-many' | 'rate-limited';
+// The label and address come back with the id so the WAITING browser can show what the person
+// deciding will see. Without it the user is asked to match a prompt against nothing.
+export type OpenResult = { id: string; label: string; address: string } | 'too-many' | 'rate-limited';
 
 export type CollectResult =
   | { state: 'pending' }
@@ -123,9 +125,10 @@ export class PendingRequests {
     // 32 bytes, so an id cannot be guessed: guessing one would let a second caller collect the token
     // a person approved for the first.
     const id = randomBytes(32).toString('base64url');
+    const label = deviceLabel(userAgent);
     this.#byId.set(id, {
       id,
-      label: deviceLabel(userAgent),
+      label,
       address,
       at: this.#opts.now().toISOString(),
       expires: ms + this.#opts.ttlMs,
@@ -133,7 +136,7 @@ export class PendingRequests {
     });
     this.#opened.push(ms);
     this.#opts.onChange?.();
-    return { id };
+    return { id, label, address };
   }
 
   #pending(): Pending[] {

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ConnState } from '../web/src/ws.js';
-import { SharedSocket } from '../web/src/ws.js';
+import { BACKOFF_CEILING_MS, backoffMs, SharedSocket } from '../web/src/ws.js';
 import { STUB_TOKEN, stubBrowser } from './browser-stubs.js';
 
 // The client's shared socket is the one piece of the two-sockets-into-one change that the
@@ -269,5 +269,84 @@ describe('SharedSocket reconnect and teardown', () => {
     FakeSocket.instances[0].fireOpen();
     s.send({ now: true });
     expect(FakeSocket.instances[0].sent).toEqual([JSON.stringify({ now: true })]);
+  });
+});
+
+// THE 869-ATTEMPT STORM. With no credential the server refuses the upgrade, the browser sees only
+// close code 1006 — which is indistinguishable from "the server is not running" — and a flat
+// one-second retry turned that into a reconnect every second, for ever, against a socket that could
+// never have succeeded.
+describe('a socket with no credential', () => {
+  beforeEach(() => {
+    // No `vibeboard.token` at all, unlike stubBrowser's store.
+    vi.stubGlobal('location', { host: 'localhost:4610', href: 'http://localhost:4610/', search: '' });
+    vi.stubGlobal('localStorage', { getItem: () => null, setItem: () => {}, removeItem: () => {} });
+    vi.stubGlobal('history', { replaceState: () => {} });
+    vi.resetModules();
+  });
+
+  it('opens nothing at all, and says why', async () => {
+    const { SharedSocket: Fresh } = await import('../web/src/ws.js');
+    const s = new Fresh();
+    const seen: ConnState[] = [];
+    s.onConn((c) => seen.push(c));
+
+    s.acquire();
+
+    expect(FakeSocket.instances).toEqual([]);
+    // 'unauthorized', not 'closed': the two need different remedies, and only one of them is
+    // something the user's own browser can fix by signing in.
+    expect(seen).toEqual(['unauthorized']);
+  });
+
+  it('does not retry, because nothing was tried', async () => {
+    vi.useFakeTimers();
+    const { SharedSocket: Fresh } = await import('../web/src/ws.js');
+    const s = new Fresh();
+    s.acquire();
+    vi.advanceTimersByTime(600_000);
+    expect(FakeSocket.instances).toEqual([]);
+    vi.useRealTimers();
+  });
+});
+
+describe('the reconnect backoff', () => {
+  it('doubles from a second and stops at the ceiling', () => {
+    expect([1, 2, 3, 4, 5, 6].map(backoffMs)).toEqual([1000, 2000, 4000, 8000, 16000, 30000]);
+    expect(backoffMs(50)).toBe(BACKOFF_CEILING_MS);
+  });
+
+  // The bound, measured rather than reasoned about. A flat 1s retry is 3,600 attempts an hour.
+  it('makes an hour of a dead server cost tens of attempts, not thousands', () => {
+    vi.useFakeTimers();
+    const s = new SharedSocket();
+    s.acquire();
+    for (let elapsed = 0; elapsed < 3_600_000; elapsed += 1000) {
+      // Every socket it opens fails immediately, which is what a server that is down looks like.
+      for (const sock of FakeSocket.instances) if (sock.readyState !== 3) sock.fireClose();
+      vi.advanceTimersByTime(1000);
+    }
+
+    expect(FakeSocket.instances.length).toBeLessThan(130); // ~121: five short ones, then one per 30s
+    vi.useRealTimers();
+  });
+
+  it('resets after a connection that worked, so a later blip still recovers in a second', () => {
+    vi.useFakeTimers();
+    const s = new SharedSocket();
+    s.acquire();
+    // Fail four times to push the delay out to 8s.
+    for (let i = 0; i < 4; i += 1) {
+      FakeSocket.instances.at(-1)?.fireClose();
+      vi.advanceTimersByTime(BACKOFF_CEILING_MS);
+    }
+    const beforeSuccess = FakeSocket.instances.length;
+    FakeSocket.instances.at(-1)?.fireOpen();
+
+    FakeSocket.instances.at(-1)?.fireClose();
+    vi.advanceTimersByTime(1000);
+
+    expect(FakeSocket.instances.length).toBe(beforeSuccess + 1);
+    vi.useRealTimers();
   });
 });

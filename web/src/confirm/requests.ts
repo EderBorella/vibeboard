@@ -27,6 +27,29 @@ export function archiveCardRequest(card: Card): ConfirmRequest {
   };
 }
 
+// Signing another browser out. Named by its label rather than its id, because the label is what the
+// user recognises — and it is the only thing they have to go on.
+export function revokeDeviceRequest(label: string): ConfirmRequest {
+  return {
+    title: 'Sign this browser out?',
+    body: `${label} loses access immediately, and anything it has open stops working. It can sign in again by asking, and you would have to allow it.`,
+    action: 'Sign it out',
+    danger: true,
+  };
+}
+
+// Signs out every browser INCLUDING this one, which is the half people do not expect — so it is the
+// first thing the body says.
+export function signOutEverythingRequest(count: number): ConfirmRequest {
+  const others = count > 1 ? ` and ${count - 1} other${count > 2 ? 's' : ''}` : '';
+  return {
+    title: 'Sign every browser out?',
+    body: `This browser${others} loses access immediately, and you will be signed in again on the next page load — on this machine only. Use this if you think somebody else has seen this board's credential.`,
+    action: 'Sign everything out',
+    danger: true,
+  };
+}
+
 // The emergency stop. Everything in the project dies — every agent, the backend server, and the loop
 // itself — and the project stays halted until someone restarts it, so the chat and manual runs stop
 // working too. That last part is the half people do not expect, which is why it is in the body.

@@ -9,9 +9,11 @@ import {
   resolveRunRecord,
   setLinks,
 } from './api';
+import { ApprovalPrompt } from './components/ApprovalPrompt';
 import { HaltOverlay } from './components/HaltOverlay';
 import { ProjectGate } from './components/ProjectGate';
 import { SettingsModal } from './components/SettingsModal';
+import { SignIn } from './components/SignIn';
 import { type MainTab, TopBar } from './components/TopBar';
 import { WorkArea } from './components/WorkArea';
 import { archiveCardRequest, stopRunRequest } from './confirm/requests';
@@ -23,10 +25,13 @@ import { useDispatch } from './runs/useDispatch';
 import { useRuns } from './runs/useRuns';
 import { needsAttention } from './runs/viewmodel';
 import { BOARDS, type BoardName, type Card, type CardFrontmatterPatch } from './shared';
+import { chooseContent } from './shell';
 import { useSkills } from './skills/useSkills';
 import { useAutopilot } from './useAutopilot';
 import { useCopilotChoice } from './useCopilotChoice';
 import { useCollapsedBoards, useTheme } from './useLocalPrefs';
+import { usePendingSignins } from './usePendingSignins';
+import { useSignin } from './useSignin';
 import { useSnapshot } from './useSnapshot';
 import { canPlace, presentTags, tagCounts, toggleTag } from './viewmodel';
 
@@ -48,6 +53,10 @@ export function App() {
   const cards = useCardTabs();
   const dock = useDock();
   const dragged = useRef<Card | null>(null);
+  // Signing in comes before everything: with no credential the project gate is a lie — every button on
+  // it fails — and that WAS the bug. Silent on the first ever visit; a wait for approval after that.
+  const signin = useSignin();
+  const pendingSignins = usePendingSignins(bump);
   const { snapshot, conn } = useSnapshot(bump);
   // Auto-pilot's state: the chip in the bar, and the overlay when the project is halted. From the
   // endpoint on mount and from the socket after that, so a kill in another tab raises the overlay here.
@@ -136,12 +145,16 @@ export function App() {
     void placeCard(card.board, card.id, columnSlug, beforeId);
   };
 
+  // Waits for a credential: unauthenticated, this call 401s, and the answer would be read as "no
+  // project open" — which is how the gate came to be shown to a browser that could not use it.
   useEffect(() => {
+    if (!signin.signedIn) return;
+    setReady(false);
     getState()
       .then((s) => setShowGate(!s.open))
       .catch(() => setShowGate(true))
       .finally(() => setReady(true));
-  }, []);
+  }, [signin.signedIn]);
 
   // A newly-opened/scaffolded project: reconnect the socket so it receives the snapshot
   // of the now-open project (the server pushes a snapshot on connect when a project is open).
@@ -155,10 +168,19 @@ export function App() {
   // and one more component, with no change to UtilityDock.
   // A flat chain rather than nested ternaries in the JSX: same four outcomes, and cognitive
   // complexity counts nesting far more heavily than sequence.
+  // The ORDER lives in ./shell as a pure function, because getting it wrong is the bug this feature
+  // fixes — with no credential the project gate is a screen whose every button fails.
+  const which = chooseContent({
+    signedIn: signin.signedIn,
+    ready,
+    showGate,
+    hasSnapshot: Boolean(snapshot),
+  });
   let content: ReactNode;
-  if (!ready) content = <div className="empty">Loading…</div>;
-  else if (showGate) content = <ProjectGate onOpened={onOpened} />;
-  else if (!snapshot)
+  if (which === 'signin') content = <SignIn phase={signin.phase} onRetry={signin.retry} />;
+  else if (which === 'loading') content = <div className="empty">Loading…</div>;
+  else if (which === 'gate') content = <ProjectGate onOpened={onOpened} />;
+  else if (which === 'empty' || !snapshot)
     content = <div className="empty">{conn === 'open' ? 'No project open.' : 'Connecting…'}</div>;
   else
     content = (
@@ -216,7 +238,7 @@ export function App() {
     <div className="app-shell">
       <TopBar
         attentionCount={allRuns.runs.filter(needsAttention).length}
-        showProject={Boolean(snapshot) && !showGate}
+        showProject={Boolean(snapshot) && !showGate && signin.signedIn}
         projectName={snapshot?.name}
         tab={tab}
         onTab={setTab}
@@ -239,6 +261,7 @@ export function App() {
           onSaved={() => setSettingsOpen(false)}
           autopilot={autopilot.state}
           onAutopilotChanged={autopilot.refresh}
+          confirm={confirm}
         />
       )}
 
@@ -248,6 +271,12 @@ export function App() {
       {autopilot.state?.state === 'halted' && !showGate && (
         <HaltOverlay state={autopilot.state} onRestarted={autopilot.refresh} />
       )}
+
+      {/* Above the halt overlay, and above everything else: a browser asking to be let in is the one
+          decision that has to be answerable from whatever state this tab happens to be in — including
+          a halted project, which is exactly when someone is trying to get a second device onto the
+          board to look at it. */}
+      {signin.signedIn && pendingSignins.length > 0 && <ApprovalPrompt pending={pendingSignins} />}
 
       {dialog}
     </div>

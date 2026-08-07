@@ -1,0 +1,87 @@
+import { useEffect, useRef, useState } from 'react';
+import { approveSignin, refuseSignin, type SigninPending } from '../api';
+
+interface Props {
+  pending: SigninPending[];
+  // Pushed over this browser's socket, so the list refreshes itself. Called only to report a failure
+  // the push cannot describe.
+  onError?: (message: string) => void;
+}
+
+// Another browser wants in, and this one is signed in, so this one decides.
+//
+// THE ATTACK ON THIS PATH IS NOT GUESSING — request ids are 32 random bytes. It is PROMPT FATIGUE: a
+// process that can raise this dialog often enough eventually catches an absent-minded Allow. The
+// server caps and rate-limits how often it can appear, and refuses to raise it at all while agents
+// are running; this component carries the rest of the mitigation, and every one of these is deliberate:
+//
+//   - REFUSE IS THE PRIMARY ACTION and holds the focus, so the reflex click and the reflex Enter both
+//     land on "no".
+//   - Enter never allows. There is no form and no default submit.
+//   - The ADDRESS is shown next to the label, because the label is a User-Agent and `curl -H` forges
+//     any of those. Where the request came from is the only part that narrows anything down.
+//   - No "allow all". One decision per browser.
+export function ApprovalPrompt({ pending, onError }: Props) {
+  const [busy, setBusy] = useState<string | null>(null);
+  const refuseRef = useRef<HTMLButtonElement>(null);
+  const first = pending[0];
+  const focusId = first?.id;
+
+  // Focus lands on Refuse, and moves there again whenever the prompt changes to a different request —
+  // otherwise a second request arriving while the first is on screen inherits a focus aimed at the
+  // decision already made.
+  useEffect(() => {
+    if (focusId) refuseRef.current?.focus();
+  }, [focusId]);
+
+  if (!first) return null;
+
+  async function decide(id: string, allow: boolean): Promise<void> {
+    setBusy(id);
+    try {
+      await (allow ? approveSignin(id) : refuseSignin(id));
+    } catch (e) {
+      onError?.(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <div className="halt-backdrop" role="alertdialog" aria-label="A browser is asking to sign in">
+      <div className="halt">
+        <h2 className="halt-title">Allow this browser in?</h2>
+        <p className="halt-why">
+          Something at <code>{first.address}</code> is asking to use this board. It says it is:
+        </p>
+        <p className="signin-label">{first.label}</p>
+        <p className="halt-hint">
+          Allow it only if that is you, on a device you are holding. Anything allowed here can read this
+          board, start agents and edit files in your projects. What it calls itself can be faked — the address
+          is the part that cannot.
+          {pending.length > 1 && ` ${pending.length - 1} more waiting after this one.`}
+        </p>
+        <div className="signin-actions">
+          {/* Refuse first in the DOM as well as visually, so tab order and reading order agree. */}
+          <button
+            ref={refuseRef}
+            type="button"
+            className="btn-primary"
+            onClick={() => void decide(first.id, false)}
+            disabled={busy !== null}
+          >
+            Refuse
+          </button>
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={() => void decide(first.id, true)}
+            disabled={busy !== null}
+          >
+            Allow
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

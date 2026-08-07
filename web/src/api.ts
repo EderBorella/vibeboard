@@ -16,11 +16,15 @@ import { authHeader, clearToken } from './token';
 // fresh install. `status` is what lets a caller tell "you are not signed in" from "that failed".
 export class ApiError extends Error {
   readonly status: number;
+  // The server's machine-readable code where it sent one, so a caller can branch on WHY without
+  // matching on prose that is meant to be improvable. Only the sign-in routes send it today.
+  readonly reason: string | undefined;
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, reason?: string) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
+    this.reason = reason;
   }
 
   get unauthorized(): boolean {
@@ -54,12 +58,12 @@ async function request(url: string, init: RequestInit = {}, opts: RequestOptions
     headers: { ...(init.headers as Record<string, string>), ...authHeader() },
   });
   if (res.ok || opts.allow?.includes(res.status)) return res;
-  const body = (await res.json().catch(() => ({}))) as { error?: string };
+  const body = (await res.json().catch(() => ({}))) as { error?: string; reason?: string };
   if (res.status === 401) {
     clearToken();
     unauthorizedHandler?.();
   }
-  throw new ApiError(res.status, body.error ?? opts.fallback ?? res.statusText);
+  throw new ApiError(res.status, body.error ?? opts.fallback ?? res.statusText, body.reason);
 }
 
 async function send<T>(method: 'POST' | 'PUT' | 'PATCH', url: string, body: unknown): Promise<T> {
@@ -791,6 +795,85 @@ export interface Readiness {
   gates: { ok: boolean; reason?: string; count: number };
   smoke: { ok: boolean; reason?: string };
   routes: { problems: string[]; count: number };
+}
+
+// ---- Signing in ------------------------------------------------------------
+// The first three are the only calls in this module that carry no credential, because they are how a
+// browser gets one. They still go through `request` — the header helper simply adds nothing when
+// there is no token, and routing them anywhere else would be a second path to the network.
+
+export interface SigninRequestOpened {
+  id: string;
+  // What the approving browser will be shown, so this browser can display the same thing and the
+  // user can match one against the other.
+  label: string;
+  address: string;
+}
+
+export type SigninCollected =
+  | { state: 'pending' }
+  | { state: 'refused' }
+  | { state: 'approved'; token: string }
+  | { state: 'expired' };
+
+export async function claimSignin(): Promise<{ token: string }> {
+  return (await request('/auth/claim', { method: 'POST' })).json();
+}
+
+export async function requestSignin(): Promise<SigninRequestOpened> {
+  return (await request('/auth/request', { method: 'POST' })).json();
+}
+
+export async function collectSignin(id: string): Promise<SigninCollected> {
+  return (await request(`/auth/request/${encodeURIComponent(id)}`)).json();
+}
+
+export interface SigninDevice {
+  id: string;
+  label: string;
+  address: string;
+  created: string;
+  lastSeen: string;
+}
+
+export interface SigninPending {
+  id: string;
+  label: string;
+  address: string;
+  at: string;
+}
+
+export interface SigninState {
+  devices: SigninDevice[];
+  // Which row is this browser. Null for a caller holding the admin token, which belongs to no device.
+  thisDevice: string | null;
+  pending: SigninPending[];
+}
+
+export async function getSigninState(): Promise<SigninState> {
+  return (await request('/api/signin', {}, { fallback: 'Failed to read the sign-in state' })).json();
+}
+
+export function approveSignin(id: string): Promise<{ ok: true }> {
+  return post(`/api/signin/approve/${encodeURIComponent(id)}`, {});
+}
+
+export function refuseSignin(id: string): Promise<{ ok: true }> {
+  return post(`/api/signin/refuse/${encodeURIComponent(id)}`, {});
+}
+
+export async function revokeDevice(id: string): Promise<void> {
+  await request(
+    `/api/signin/devices/${encodeURIComponent(id)}`,
+    { method: 'DELETE' },
+    { fallback: 'Failed to sign that browser out' },
+  );
+}
+
+// Signs every browser out, this one included, and re-opens the silent first claim — so the next page
+// load on this machine signs itself in again. This is "regenerate the token", without a restart.
+export function signOutEverything(): Promise<{ ok: true }> {
+  return post('/api/signin/clear', {});
 }
 
 export async function getReadiness(): Promise<Readiness> {

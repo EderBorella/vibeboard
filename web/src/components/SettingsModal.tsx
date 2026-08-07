@@ -7,6 +7,7 @@ import {
   patchConfig,
   type SandboxState,
 } from '../api';
+import type { Confirmer } from '../confirm/useConfirm';
 import { clampToCaps, resolveChoice } from '../copilot/choice';
 import {
   type AutopilotConfig,
@@ -22,6 +23,7 @@ import {
 import { AutopilotPanel } from './AutopilotPanel';
 import { ModelPicker } from './ModelPicker';
 import { SandboxPanel } from './SandboxPanel';
+import { SignInPanel } from './SignInPanel';
 
 const BACKENDS: { value: string; label: string }[] = [
   { value: 'claude-code', label: 'Claude Code' },
@@ -38,6 +40,9 @@ interface Props {
   // hold. It also meant the buttons read the PREVIOUS project's state across a switch.
   autopilot: AutopilotState | null;
   onAutopilotChanged: () => void;
+  // Passed down from the shell, which owns the one confirmer and renders its dialog. Signing a browser
+  // out is irreversible for the session it kills, and one of the two does it to this browser.
+  confirm: Confirmer['confirm'];
 }
 
 // A number box left blank, or holding something that is not a number, means "leave this as it was".
@@ -50,7 +55,7 @@ function parseCsv(text: string): string[] {
     .filter(Boolean);
 }
 
-export function SettingsModal({ config, onClose, onSaved, autopilot, onAutopilotChanged }: Props) {
+export function SettingsModal({ config, onClose, onSaved, autopilot, onAutopilotChanged, confirm }: Props) {
   const [backend, setBackend] = useState(resolveChoice(config.copilot, {}).backend);
   // The auto-pilot caps, edited in the panel below and saved with everything else — one Save button,
   // and one place for the server's refusal to appear (which may be about the routing table rather than
@@ -288,6 +293,11 @@ export function SettingsModal({ config, onClose, onSaved, autopilot, onAutopilot
               <input type="number" value={idPadding} onChange={(e) => setIdPadding(Number(e.target.value))} />
             </label>
           </div>
+
+          {/* Last, because nobody comes to Settings for it: sign-in is meant to be something the user
+              never touches. It is here so the credential is FINDABLE — "unless he wants to check in
+              the settings" — and because signing everything out is the only way to replace one. */}
+          <SignInPanel confirm={confirm} />
 
           {error && <div className="modal-error">{error}</div>}
         </div>

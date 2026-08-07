@@ -20,6 +20,10 @@ const api = vi.hoisted(() => ({
     .mockResolvedValue({ state: 'idle', iteration: 0, dispatchesSinceCheckup: 0, needsCheckup: false }),
   softStopAutopilot: vi.fn(),
   killAutopilot: vi.fn(),
+  // And the sign-in panel, which lists the browsers that have signed in. Rejected for the same reason
+  // as the two above: this file is about the columns warning, and the panel saying it could not read
+  // is honest when nothing answered.
+  getSigninState: vi.fn().mockRejectedValue(new Error('not what this test is about')),
 }));
 vi.mock('../web/src/api.js', () => api);
 
@@ -44,6 +48,9 @@ const show = (autopilot: boolean) =>
       onSaved={() => {}}
       autopilot={null}
       onAutopilotChanged={() => {}}
+      // Nothing in this file asks anything, and a confirmer that resolved true would let a stray click
+      // sign this browser out mid-test. Resolving false makes that a no-op instead.
+      confirm={async () => false}
     />,
   );
 

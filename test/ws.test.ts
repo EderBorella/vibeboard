@@ -40,3 +40,26 @@ describe('/ws live sync', () => {
     client.close();
   }, 5000);
 });
+
+// A browser allows six persistent connections per host and Firefox counts a WebSocket handshake against
+// that limit. This app fires six /api requests as the board mounts, which takes every slot — and
+// keep-alive then holds them, so the socket's handshake is queued IN THE BROWSER and never arrives.
+//
+// Measured on a real load: page at 18:06:23, handshake at 18:07:41. Seventy-eight seconds of a board
+// saying "Connecting…", with nothing in the server log to explain it, because nothing had been sent.
+describe('the keep-alive window', () => {
+  it('is short enough that a queued websocket handshake is not held for a minute', async () => {
+    const { app } = await openTestProject({ name: 'KA' });
+
+    // Fastify's default is 72_000. Asserted as a bound rather than a literal: what matters is that a
+    // browser at its connection limit gets a slot back in seconds.
+    expect(app.server.keepAliveTimeout).toBeLessThanOrEqual(5_000);
+    expect(app.server.keepAliveTimeout).toBeGreaterThan(0); // 0 disables keep-alive entirely
+  });
+
+  it('still advertises keep-alive, so ordinary requests are not one connection each', async () => {
+    const { app } = await openTestProject({ name: 'KA2' });
+    const res = await app.inject({ method: 'GET', url: '/api/state' });
+    expect(res.headers.connection).toBe('keep-alive');
+  });
+});

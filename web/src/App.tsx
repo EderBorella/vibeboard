@@ -25,7 +25,7 @@ import { useDispatch } from './runs/useDispatch';
 import { useRuns } from './runs/useRuns';
 import { needsAttention } from './runs/viewmodel';
 import { BOARDS, type BoardName, type Card, type CardFrontmatterPatch } from './shared';
-import { chooseContent } from './shell';
+import { chooseContent, rebindOnSignIn } from './shell';
 import { useSkills } from './skills/useSkills';
 import { useAutopilot } from './useAutopilot';
 import { useCopilotChoice } from './useCopilotChoice';
@@ -154,6 +154,22 @@ export function App() {
       .then((s) => setShowGate(!s.open))
       .catch(() => setShowGate(true))
       .finally(() => setReady(true));
+  }, [signin.signedIn]);
+
+  // EVERY OTHER FETCH AND THE SOCKET ARE KEYED ON `bump`, so signing in re-runs all of them at once.
+  //
+  // Without this, a browser that signed itself in silently kept whatever those hooks got while it had
+  // no credential: five of them fetch on mount, each answered 401, and none of them is keyed on
+  // anything that changes afterwards — so the auto-pilot chip, the skills rail, the run list and the
+  // model list stayed empty until a manual reload, and the socket, which declines to open without a
+  // credential, never opened at all.
+  //
+  // On the transition only, tracked with a ref: a browser that arrives already holding a credential
+  // must not throw away the socket it just opened.
+  const wasSignedIn = useRef(signin.signedIn);
+  useEffect(() => {
+    if (rebindOnSignIn(signin.signedIn, wasSignedIn.current)) setBump((b) => b + 1);
+    wasSignedIn.current = signin.signedIn;
   }, [signin.signedIn]);
 
   // A newly-opened/scaffolded project: reconnect the socket so it receives the snapshot

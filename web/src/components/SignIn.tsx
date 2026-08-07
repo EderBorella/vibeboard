@@ -15,23 +15,25 @@ export function SignIn({ phase, onRetry }: Props) {
   return (
     <div className="gate">
       <div className="gate-card">
-        <h2>{phase.phase === 'waiting' ? 'Waiting for approval' : 'Signing in'}</h2>
+        <h2>{phase.phase === 'waiting' ? 'Waiting to be let in' : 'Signing in'}</h2>
         {phase.phase === 'claiming' && <p className="gate-hint">Signing this browser in…</p>}
 
         {phase.phase === 'waiting' && (
           <>
+            {/* What to DO, in the first sentence. This screen used to open by telling the user there
+                was nothing to copy — an absence, about a mechanism they had never heard of, which only
+                raises the question of what they were supposed to have copied. */}
             <p className="gate-hint">
-              A browser is already signed in to this board, so it has to allow this one. Look for the prompt
-              on it and choose Allow.
+              This board is already open on another device. Go to that device: it is showing a message asking
+              whether to let this one in. Choose <strong>Allow</strong> there.
             </p>
-            {/* What the other browser is being shown, so the two can be matched. Without it the user
-                is asked to recognise a prompt they have never seen. */}
+            {/* The address, so the user can tell their own request apart from somebody else's. The
+                User-Agent is deliberately NOT repeated here — it means nothing to the person reading
+                this screen, and it is the approving end that needs to recognise the device. */}
             <p className="gate-preview">
-              It will say: <code>{phase.label}</code> at <code>{phase.address}</code>
+              That message will show this address: <code>{phase.address}</code>
             </p>
-            <p className="gate-hint">
-              Nothing to type, and nothing to copy. This page will carry on by itself once it is allowed.
-            </p>
+            <p className="gate-hint">Leave this page open — it continues on its own once you allow it.</p>
           </>
         )}
 

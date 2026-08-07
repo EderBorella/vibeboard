@@ -2,7 +2,7 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { SignIn } from '../web/src/components/SignIn.js';
-import { chooseContent } from '../web/src/shell.js';
+import { chooseContent, rebindOnSignIn } from '../web/src/shell.js';
 
 afterEach(cleanup);
 
@@ -21,23 +21,50 @@ describe('the common case', () => {
   });
 });
 
-describe('waiting for another browser to allow it', () => {
+describe('waiting for another device to allow it', () => {
   const waiting = { phase: 'waiting', label: 'Safari on the phone', address: '192.168.0.31' } as const;
 
-  it('says where to look, and repeats what the other browser will show', () => {
+  it('opens by saying what to do, and where', () => {
     render(<SignIn phase={waiting} onRetry={() => {}} />);
 
-    expect(screen.getByText(/look for the prompt/i)).toBeTruthy();
-    // Both halves, because the user has to recognise the prompt on the other screen. Without them
-    // they are asked to match this against nothing.
-    expect(screen.getByText('Safari on the phone')).toBeTruthy();
+    expect(screen.getByText(/go to that device/i)).toBeTruthy();
+    expect(screen.getByText(/Allow/)).toBeTruthy();
+  });
+
+  it('shows the address, so the user can tell their own request apart', () => {
+    render(<SignIn phase={waiting} onRetry={() => {}} />);
     expect(screen.getByText('192.168.0.31')).toBeTruthy();
   });
 
-  it('still asks for nothing', () => {
+  // THE COMPLAINT THIS FIXES, kept as a test because it is a class of writing and not one sentence.
+  // The screen used to say "Nothing to type, and nothing to copy" — an absence, about a mechanism the
+  // reader has never heard of, which only raises the question of what they were supposed to copy. It
+  // also repeated the raw User-Agent, which means nothing at this end; the approving end is what has
+  // to recognise the device.
+  it('describes no absences, and does not repeat the User-Agent', () => {
+    render(<SignIn phase={waiting} onRetry={() => {}} />);
+    const text = document.body.textContent ?? '';
+    expect(text).not.toMatch(/nothing to (type|copy)/i);
+    expect(text).not.toContain('Safari on the phone');
+  });
+
+  it('still asks for nothing, and says the page carries on by itself', () => {
     render(<SignIn phase={waiting} onRetry={() => {}} />);
     expect(screen.queryByRole('button')).toBeNull();
-    expect(screen.getByText(/nothing to type/i)).toBeTruthy();
+    expect(screen.getByText(/continues on its own/i)).toBeTruthy();
+  });
+});
+
+describe('rebinding when sign-in completes', () => {
+  // Nothing else retries those fetches or reopens that socket, so getting this wrong leaves a browser
+  // that signed itself in sitting on an empty board saying "Connecting…" until a manual reload.
+  it('rebinds on the transition into signed-in, and at no other time', () => {
+    expect(rebindOnSignIn(true, false)).toBe(true);
+    // Already signed in on first render — rebinding would discard the socket just opened.
+    expect(rebindOnSignIn(true, true)).toBe(false);
+    // Signing out is the sign-in screen's business, not a reason to re-fetch a board.
+    expect(rebindOnSignIn(false, true)).toBe(false);
+    expect(rebindOnSignIn(false, false)).toBe(false);
   });
 });
 

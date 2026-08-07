@@ -143,6 +143,70 @@ describe('what a 401 does beyond throwing', () => {
     expect(token.hasToken()).toBe(true);
   });
 
+  // THE BUG THAT REACHED THE USER. Five hooks fetch on mount, so five requests carrying NO credential
+  // were already in flight when the silent claim came back with one. Each 401 cleared the token — the
+  // one the claim had just obtained — and restarted sign-in, which now found the device store
+  // non-empty and asked a person to approve the browser that had already signed itself in.
+  it('does not discard a credential over a 401 for a request that carried none', async () => {
+    const { api, token } = await fresh();
+    token.clearToken(); // signing in: no credential yet
+    let fired = 0;
+    api.onUnauthorized(() => {
+      fired += 1;
+    });
+    // The 401 for that credential-less request arrives AFTER the claim has stored one.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        token.setToken('minted-by-the-claim');
+        return new Response('{"error":"Unauthorized"}', { status: 401 });
+      }),
+    );
+
+    await failure(() => api.getState());
+
+    expect(token.authToken()).toBe('minted-by-the-claim');
+    expect(fired).toBe(0);
+  });
+
+  it('does not discard a NEWER credential over a 401 about the one it replaced', async () => {
+    // The same shape without the empty case: a request that left before the credential changed must
+    // not revoke the one that replaced it.
+    const { api, token } = await fresh();
+    let fired = 0;
+    api.onUnauthorized(() => {
+      fired += 1;
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        token.setToken('the-newer-one');
+        return new Response('{"error":"Unauthorized"}', { status: 401 });
+      }),
+    );
+
+    await failure(() => api.getState());
+
+    expect(token.authToken()).toBe('the-newer-one');
+    expect(fired).toBe(0);
+  });
+
+  it('still discards the credential that was actually refused', async () => {
+    // The other half. A check that never cleared would pass both tests above and leave a revoked
+    // browser sitting on a board where every button fails — which is where this all started.
+    const { api, token } = await fresh();
+    let fired = 0;
+    api.onUnauthorized(() => {
+      fired += 1;
+    });
+    answering(401, '{"error":"Unauthorized"}');
+
+    await failure(() => api.getState());
+
+    expect(token.hasToken()).toBe(false);
+    expect(fired).toBe(1);
+  });
+
   // A dropped connection and a refused credential are different problems with different remedies,
   // and treating one as the other would sign the user out of a board that is merely restarting.
   it('does not read a network failure as unauthenticated', async () => {

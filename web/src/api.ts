@@ -8,7 +8,7 @@ import type {
   VerifyMode,
 } from './shared';
 
-import { authHeader, clearToken } from './token';
+import { authHeader, authToken, clearToken } from './token';
 
 // A failed call, carrying the status as data rather than only as prose. Six readers in this module
 // used to skip the `res.ok` check entirely and return the error body as if it were the answer, so an
@@ -53,17 +53,31 @@ interface RequestOptions {
 // non-ok response becomes a thrown ApiError in the same place. There is deliberately no bypass
 // flag — a bypass is how the laundering came back.
 async function request(url: string, init: RequestInit = {}, opts: RequestOptions = {}): Promise<Response> {
+  // Captured before the call, so the 401 handler below can tell WHICH credential was refused.
+  const sent = authToken();
   const res = await fetch(url, {
     ...init,
     headers: { ...(init.headers as Record<string, string>), ...authHeader() },
   });
   if (res.ok || opts.allow?.includes(res.status)) return res;
   const body = (await res.json().catch(() => ({}))) as { error?: string; reason?: string };
-  if (res.status === 401) {
-    clearToken();
-    unauthorizedHandler?.();
-  }
+  if (res.status === 401 && sent && sent === authToken()) discardCredential();
   throw new ApiError(res.status, body.error ?? opts.fallback ?? res.statusText, body.reason);
+}
+
+// A 401 only means "this browser's credential is no good" when the credential that was refused is
+// still the one this browser holds. THE TWO CASES IT MUST NOT FIRE ON, both of which happened:
+//
+//   sent === ''            a request made while signing in. Five hooks fetch on mount, so five 401s
+//                          were already in flight when the claim came back — and clearing on those
+//                          threw away the credential the claim had just obtained, then started a
+//                          fresh flow, which found the device store no longer empty and asked a
+//                          person to approve the browser that had already signed itself in.
+//   sent !== authToken()   a request that left before a newer credential arrived. Same shape: a late
+//                          answer about an old token must not revoke the new one.
+function discardCredential(): void {
+  clearToken();
+  unauthorizedHandler?.();
 }
 
 async function send<T>(method: 'POST' | 'PUT' | 'PATCH', url: string, body: unknown): Promise<T> {

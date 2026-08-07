@@ -56,8 +56,8 @@ export function SignInPanel({ confirm }: Props) {
     <>
       <div className="settings-section">Signed-in browsers</div>
       <div className="settings-hint">
-        Every browser that opens this board signs itself in — the first one silently, and each later one once
-        you allow it. There is nothing to copy or type; the credential lives in the browser.
+        The first browser to open this board is let in automatically. Every one after that has to be allowed
+        from a browser that is already in.
       </div>
 
       {mine && (

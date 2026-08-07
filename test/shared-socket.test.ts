@@ -350,3 +350,83 @@ describe('the reconnect backoff', () => {
     vi.useRealTimers();
   });
 });
+
+// A REFUSED HANDSHAKE IS INVISIBLE. The browser sees close code 1006, which is byte-for-byte what a
+// server that is not running looks like — so a socket whose credential has been revoked retried every
+// thirty seconds for ever, and the app never learned anything. Observed in a real log: 401 on /ws at
+// 16:26:51, 16:26:53, 16:26:55 … 16:34:44, from a tab that could not recover on its own.
+//
+// The remedy is to ask over HTTP, where a 401 IS visible and already clears the credential and restarts
+// sign-in. The plan said so; only the comment got written.
+describe('a handshake that is refused', () => {
+  it('asks over HTTP why, so a revoked credential can be discovered', () => {
+    let probes = 0;
+    const s = new SharedSocket(() => {
+      probes += 1;
+    });
+    s.acquire();
+
+    FakeSocket.instances[0].fireClose(); // never opened: the upgrade itself was refused
+
+    expect(probes).toBe(1);
+  });
+
+  it('does not ask when the socket had been working, which is a server restarting', () => {
+    // Probing there would be a request per reconnect for a condition that is not about credentials.
+    let probes = 0;
+    const s = new SharedSocket(() => {
+      probes += 1;
+    });
+    s.acquire();
+    FakeSocket.instances[0].fireOpen();
+
+    FakeSocket.instances[0].fireClose();
+
+    expect(probes).toBe(0);
+  });
+
+  it('asks again on each failed attempt, so recovery does not depend on the first one landing', () => {
+    vi.useFakeTimers();
+    let probes = 0;
+    const s = new SharedSocket(() => {
+      probes += 1;
+    });
+    s.acquire();
+    for (let i = 0; i < 3; i += 1) {
+      FakeSocket.instances.at(-1)?.fireClose();
+      vi.advanceTimersByTime(BACKOFF_CEILING_MS);
+    }
+    expect(probes).toBe(3);
+    vi.useRealTimers();
+  });
+
+  it('does not ask when it never opened a socket for want of a credential', async () => {
+    // There is nothing to ask about: the browser knows it has no credential, and the sign-in flow is
+    // already the thing that fixes it.
+    vi.stubGlobal('location', { host: 'localhost:4610', href: 'http://localhost:4610/', search: '' });
+    vi.stubGlobal('localStorage', { getItem: () => null, setItem: () => {}, removeItem: () => {} });
+    vi.stubGlobal('history', { replaceState: () => {} });
+    vi.resetModules();
+    const { SharedSocket: Fresh } = await import('../web/src/ws.js');
+    let probes = 0;
+    const s = new Fresh(() => {
+      probes += 1;
+    });
+
+    s.acquire();
+
+    expect(FakeSocket.instances).toEqual([]);
+    expect(probes).toBe(0);
+  });
+
+  it('does not ask after the last subscriber has gone', () => {
+    let probes = 0;
+    const s = new SharedSocket(() => {
+      probes += 1;
+    });
+    s.acquire();
+    s.release();
+    FakeSocket.instances[0].fireClose();
+    expect(probes).toBe(0);
+  });
+});

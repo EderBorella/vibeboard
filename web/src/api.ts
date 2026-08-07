@@ -106,6 +106,18 @@ export interface ProjectRef {
   name: string;
 }
 
+// Asks the server, over HTTP, whether this browser's credential still works — and does nothing with
+// the answer, because `request()` already does it: a 401 there clears the credential and fires
+// `onUnauthorized`, which restarts sign-in.
+//
+// It exists because A BROWSER CANNOT SEE WHY A WEBSOCKET HANDSHAKE FAILED. A refused upgrade arrives
+// as close code 1006, byte-for-byte identical to "the server is not running", so a socket whose
+// credential has been revoked retries for ever and the app never learns anything. HTTP is the only
+// channel where the 401 is visible.
+export async function probeCredential(): Promise<void> {
+  await request('/api/state').catch(() => {});
+}
+
 export async function getState(): Promise<{ open: boolean; snapshot?: ProjectSnapshot }> {
   return (await request('/api/state', {}, { fallback: 'Failed to read the open project' })).json();
 }

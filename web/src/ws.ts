@@ -1,4 +1,5 @@
 import { useEffect, useMemo } from 'react';
+import { probeCredential } from './api';
 import { authToken, hasToken } from './token';
 
 // `unauthorized` is a state of its own because a browser CANNOT SEE why a handshake failed: a 401'd
@@ -30,6 +31,15 @@ export function backoffMs(attempt: number): number {
 }
 
 export class SharedSocket {
+  // Called when a handshake is refused, to find out why over a channel that can say. Injected so it is
+  // testable and so this module does not decide policy — the default asks the API, whose 401 handling
+  // already clears the credential and restarts sign-in.
+  readonly #probe: () => void;
+
+  constructor(probe: () => void = () => void probeCredential()) {
+    this.#probe = probe;
+  }
+
   #socket: WebSocket | undefined;
   #listeners = new Set<Listener>();
   #connListeners = new Set<(c: ConnState) => void>();
@@ -81,8 +91,13 @@ export class SharedSocket {
     // reconnect, orphaning the live socket: two sockets per tab, which is the bug this file
     // exists to fix.
     const stale = (): boolean => this.#socket !== socket;
+    // Per attempt, not per socket: a socket that opened and then dropped is a server restarting, and
+    // retrying is the right answer. One that never opened had its HANDSHAKE refused, which is the case
+    // that needs explaining.
+    let opened = false;
     socket.onopen = () => {
       if (stale()) return;
+      opened = true;
       this.#attempts = 0; // a connection that worked resets the backoff, so a later blip recovers fast
       this.#setConn('open');
     };
@@ -100,6 +115,10 @@ export class SharedSocket {
       if (stale()) return;
       this.#setConn('closed');
       if (this.#closing || this.#refs === 0) return;
+      // THE HALF THAT WAS MISSING. Without it a browser whose credential was revoked — from another
+      // device, or by Sign everything out — retries this socket every thirty seconds for ever and can
+      // never recover, because 1006 tells it nothing and it makes no other request that would.
+      if (!opened) this.#probe();
       this.#attempts += 1;
       this.#retry = setTimeout(() => this.#connect(), backoffMs(this.#attempts));
     };

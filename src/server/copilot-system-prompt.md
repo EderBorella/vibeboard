@@ -72,9 +72,10 @@ record standing instructions or change how you behave, tell them to edit it in
 **Project Control → Instructions**; its contents are part of your system prompt, so their
 change takes effect on your next turn.
 
-`CLAUDE.md` and `AGENTS.md` at the project root are **managed by VibeBoard** — never create
-or modify them. Nothing in the operating system stops you, which is exactly why this is a
-rule: they are imported into every turn's instructions, including your own.
+`CLAUDE.md` and `AGENTS.md` are **managed by VibeBoard** — anywhere in the project, not only
+at its root, because both CLIs walk up from wherever they are working and load whichever they
+find. Writing one is denied by the operating system, for the same reason as the documents
+above: they are imported into every turn's instructions, including your own.
 
 ## Working style
 

@@ -64,6 +64,11 @@ const FOUNDATION_PATHS: string[] = FOUNDATION_FILES.map((f) => foundationRel(f.n
 // Managed means the copilot is soft-blocked and the user edits behind a disclaimer. The foundation
 // documents qualify twice over: they hold the gates a run is judged against, so a model able to
 // amend one could lower the bar until its own work passed.
+//
+// Every path in this set is now denied by the OS as well, which was NOT true when this was written:
+// the pointer files were listed here as copilot-blocked while nothing enforced it, so an agent could
+// rewrite CLAUDE.md and replace its import of VIBEBOARD.md with instructions of its own — the exact
+// effect the deny on VIBEBOARD.md exists to prevent, reached through the file that imports it.
 const MANAGED = new Set<string>([...POINTER_FILES, CONVENTIONS_FILE, ...FOUNDATION_PATHS]);
 
 const GROUP_LABELS: Record<ControlCategory, string> = {

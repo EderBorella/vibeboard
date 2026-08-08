@@ -98,6 +98,20 @@ profile vibeboard-agent flags=(attach_disconnected) {
   deny /**/.vibeboard/INSTRUCTIONS.md wl,
   deny /**/.vibeboard/VIBEBOARD.md wl,
 
+  # AND THE POINTER FILES THAT IMPORT VIBEBOARD.md. The rule above was half a rule: an agent denied
+  # `VIBEBOARD.md` could still rewrite the file that imports it, replacing the import with its own
+  # instructions and getting exactly the effect the deny exists to prevent. `control-files.ts` has
+  # called these "copilot-blocked" since they were added; nothing in the OS backed that until now.
+  #
+  # NOT scoped to the project root, deliberately: both CLIs auto-discover these by walking UP from the
+  # working directory, so a `CLAUDE.md` an agent drops in any subfolder it is working in is loaded for
+  # every subsequent turn under that path. The name is what gets loaded, wherever it sits.
+  #
+  # Written by the SERVER, which is unconfined — `scaffold.ts` creates them and Project Control edits
+  # them — so denying every agent costs nothing that works today.
+  deny /**/CLAUDE.md wl,
+  deny /**/AGENTS.md wl,
+
   # The diary is appended through an endpoint by the auto-pilot service. An agent writing it
   # directly would be a second path to the same fact, and an unattributable one.
   deny /**/.vibeboard/PROJECT-LOG.md wl,

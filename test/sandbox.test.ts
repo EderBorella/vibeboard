@@ -260,6 +260,15 @@ describe.skipIf(!parserPresent)('the compiled policy, not the globs', () => {
     ['the config', '/w/proj/.vibeboard/config.yaml'],
     ['the instructions injected into every turn', '/w/proj/.vibeboard/INSTRUCTIONS.md'],
     ['the card conventions both pointer files import', '/w/proj/.vibeboard/VIBEBOARD.md'],
+    // THE OTHER HALF OF THAT RULE. Denying VIBEBOARD.md while leaving the files that IMPORT it
+    // writable bought nothing: an agent replaces the import with its own instructions and shapes every
+    // subsequent turn anyway. `control-files.ts` called these copilot-blocked before anything enforced it.
+    ['the CLAUDE.md pointer at the project root', '/w/proj/CLAUDE.md'],
+    ['the AGENTS.md pointer at the project root', '/w/proj/AGENTS.md'],
+    // Both CLIs walk UP from the working directory, so one dropped in a subfolder is loaded for every
+    // turn under that path. The name is what gets loaded, wherever it sits.
+    ['a CLAUDE.md an agent drops in a subfolder', '/w/proj/src/deep/CLAUDE.md'],
+    ['an AGENTS.md an agent drops in a subfolder', '/w/proj/packages/api/AGENTS.md'],
     ['the diary', '/w/proj/.vibeboard/PROJECT-LOG.md'],
     ['a project run record', '/w/proj/.vibeboard/project-runs/20260803-120000-aaaa.md'],
     ['the project-runs folder itself', '/w/proj/.vibeboard/project-runs'],
@@ -283,6 +292,10 @@ describe.skipIf(!parserPresent)('the compiled policy, not the globs', () => {
 
   it.each([
     ['project source', '/w/proj/src/index.ts'],
+    // The names are what the CLIs load, so nothing that merely CONTAINS them is denied — a hardening
+    // that swallowed these would stop an agent writing ordinary documentation.
+    ['a file that merely mentions the name', '/w/proj/docs/CLAUDE.md.example'],
+    ['a differently-cased file', '/w/proj/claude.md'],
     ['a new top-level file', '/w/proj/package.json'],
     ['the run staging area', '/w/proj/.vibeboard/runs/r1.report.md'],
     ['the repository itself', '/w/proj/.git/objects/ab/cdef'],

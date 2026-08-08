@@ -1,4 +1,5 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
+import { FOUNDATION_FILES } from '../core/layout.js';
 import { CREDENTIAL_COOKIE, CROSS_ORIGIN, readCookie } from './cookies.js';
 import type { Credential, CredentialStore, Scope } from './credentials.js';
 
@@ -10,11 +11,24 @@ declare module 'fastify' {
 }
 
 const AGENT_SCOPES = ['work', 'checkup', 'service'] as const;
+// Everything that reads the board. `assist` is the chat copilot, which is driven by a person looking
+// at that board, so it reads everything a run does.
+const READ_SCOPES = [...AGENT_SCOPES, 'assist'] as const;
+// The board verbs the copilot shares with a checkup. Not with `work`: a run is confined to its own
+// card, and the copilot is not a run.
+const BOARD_SCOPES = ['checkup', 'assist'] as const;
 
 interface Rule {
   scopes: readonly Scope[];
   // Scopes additionally confined to the credential's own card, matched against the `:id` param.
   ownCard?: readonly Scope[];
+  // ONE LINE, AND IT IS REQUIRED. The endpoint catalogue an agent is given is generated from this
+  // table (`endpointsFor` below), so a row without a description does not compile — which is the
+  // whole mechanism. It used to be prose typed out three times, in run-prompt.ts twice and in the
+  // seeded VIBEBOARD.md, and adding a row here told no agent anything.
+  //
+  // Written as the agent needs to read it: the payload shape belongs here, not in a comment.
+  describe: string;
 }
 
 // Decision 10's scope table, and the only place that answers "who may call this". A route absent
@@ -24,34 +38,66 @@ interface Rule {
 // cannot drift as ids change.
 const RULES: Record<string, Rule> = {
   // Reads. An agent needs the board it is working on and the config that describes it.
-  'GET /api/state': { scopes: AGENT_SCOPES },
-  'GET /api/config': { scopes: AGENT_SCOPES },
-  'GET /api/archive/:board': { scopes: AGENT_SCOPES },
-  'GET /api/cards/:board/:id/raw': { scopes: AGENT_SCOPES },
+  'GET /api/state': {
+    scopes: READ_SCOPES,
+    describe: 'the whole board — every card on all three boards, plus the project config.',
+  },
+  'GET /api/config': {
+    scopes: READ_SCOPES,
+    describe: 'the project config on its own: the configured columns and their exact slugs.',
+  },
+  'GET /api/archive/:board': { scopes: READ_SCOPES, describe: 'the archived cards of one board.' },
+  'GET /api/cards/:board/:id/raw': {
+    scopes: READ_SCOPES,
+    describe: "one card's file verbatim, frontmatter included.",
+  },
 
   // Writes a work agent needs to do its job: create a card, edit the one it was given, and link.
   // `link` is not optional — break-down must attach children to their parent, and the hierarchy is
   // derived from those links, so without it every card it creates is an orphan.
-  'POST /api/cards': { scopes: ['work', 'checkup'] },
-  'PATCH /api/cards/:board/:id': { scopes: ['work', 'checkup'], ownCard: ['work'] },
+  'POST /api/cards': {
+    scopes: ['work', ...BOARD_SCOPES],
+    describe:
+      '`{ board, columnSlug, title, description?, body?, links? }` — create a card. The id is assigned by the server; never choose one. `columnSlug` must be a column that already exists, because naming one that does not CREATES the folder and the card then vanishes from the board while keeping its id.',
+  },
+  'PATCH /api/cards/:board/:id': {
+    scopes: ['work', ...BOARD_SCOPES],
+    ownCard: ['work'],
+    describe: '`{ title?, description?, tags?, group?, body? }` — edit a card.',
+  },
   // Own card for `work`, like PATCH: the payload is the COMPLETE list, and links are symmetric, so
   // an unconfined PUT lets a run erase the links of any card on any board — including the
   // feature→product→engineering trace the whole hierarchy is derived from. It costs break-down
   // nothing: it links children to their parent, and the parent IS the run's own card.
-  'PUT /api/cards/:board/:id/links': { scopes: ['work', 'checkup'], ownCard: ['work'] },
+  'PUT /api/cards/:board/:id/links': {
+    scopes: ['work', ...BOARD_SCOPES],
+    ownCard: ['work'],
+    describe:
+      '`{ links: [id, ...] }`, the COMPLETE list rather than an addition. Links are symmetric, so the far side is updated for you.',
+  },
 
   // Moving is supervision, not work: a work agent must not be able to put its own card in done and
   // declare itself finished. `/place` is absent deliberately — it is the drag-and-drop verb, and
   // where in a column a card belongs is a person's judgement about a board they can see.
-  'POST /api/cards/:board/:id/move': { scopes: ['checkup', 'service'] },
-  'POST /api/cards/:board/:id/archive': { scopes: ['checkup'] },
+  'POST /api/cards/:board/:id/move': {
+    scopes: ['checkup', 'service', 'assist'],
+    describe: '`{ toColumnSlug }` — move a card to another column on the same board, keeping its id.',
+  },
+  'POST /api/cards/:board/:id/archive': {
+    scopes: BOARD_SCOPES,
+    describe: 'archive a card. It leaves the board and keeps its id; nothing is deleted.',
+  },
 
   // Filing is uncapped and open to both working scopes; READING the list is not. A work agent that
   // can see every open problem in the project is a work agent scoped to one card talking itself
   // into five, which is the scope spiral decision 5 exists to prevent. The service reads them to
   // feed the checkup and files none — it dispatches work, it does not discover it.
-  'POST /api/suggestions': { scopes: ['work', 'checkup'] },
-  'GET /api/suggestions': { scopes: ['checkup', 'service'] },
+  'POST /api/suggestions': {
+    scopes: ['work', ...BOARD_SCOPES],
+    describe:
+      '`{ title, body? }` — file a problem you noticed but were not asked to fix, so it is not lost and not acted on unasked.',
+  },
+  'GET /api/suggestions': { scopes: ['checkup', 'service', 'assist'], describe: 'the open suggestions.' },
   // PATCH is absent on purpose: triage is the human's, and the checkup's in slice C through its own
   // path. A run marking its own finding `dismissed` would close the channel from the inside.
 
@@ -59,7 +105,10 @@ const RULES: Record<string, Rule> = {
   // needs it — the budget is compared between dispatches and the loop is a separate process reaching
   // the board over HTTP like anything else. `work` and `checkup` do not: an agent that can see how
   // much room is left in the budget is an agent reasoning about its own leash.
-  'GET /api/accounting': { scopes: ['service'] },
+  'GET /api/accounting': {
+    scopes: ['service'],
+    describe: "the project's spend and each card's attempt count.",
+  },
 
   // The diary. The SERVICE writes it — loop step 12 appends a run's summary after every dispatch, and
   // the service is a separate process reaching the board over HTTP like anything else. Both working
@@ -67,7 +116,7 @@ const RULES: Record<string, Rule> = {
   // be a second path to one fact. Reading is absent for every scope — admin-only, like triaging a
   // suggestion — because nothing an agent does needs the project's narrative, and an agent reading how
   // the last ten runs went is an agent reasoning about the loop that is running it.
-  'POST /api/log': { scopes: ['service'] },
+  'POST /api/log': { scopes: ['service'], describe: "append a line to the project's diary." },
 
   // Dispatching. THE SERVICE ONLY, and the two working scopes are refused for the reason decision 21
   // gives: a run that can dispatch escapes every counter the loop keeps. Its iteration, its budget and
@@ -76,26 +125,64 @@ const RULES: Record<string, Rule> = {
   //
   // This row is what makes the loop possible at all: without it `POST /api/runs` is admin-only, because
   // a route absent from this table grants nothing.
-  'POST /api/runs': { scopes: ['service'] },
+  'POST /api/runs': { scopes: ['service'], describe: 'dispatch a run.' },
 
   // And the reads that dispatch depends on. `decideTick` counts attempts from the run records and needs
   // to know which runs are in flight, so a loop that could dispatch but not read them would have to be
   // handed the ADMIN token instead — which is decisions 10 and 21 collapsing in one step. Same reasoning
   // as `GET /api/accounting`, and the working scopes are refused for the same reason: an agent that can
   // see every run in the project is an agent reasoning about its own leash.
-  'GET /api/runs': { scopes: ['service'] },
-  'GET /api/runs/:board/:card': { scopes: ['service'] },
+  'GET /api/runs': { scopes: ['service'], describe: 'every run record in the project.' },
+  'GET /api/runs/:board/:card': { scopes: ['service'], describe: "one card's run records." },
 
   // The verdict on a run, written by the loop that judged it (decision 18). Neither working scope may reach
   // it: a run that could write its own verification would be a run advancing itself on self-assessment,
   // which is decision 3's whole subject.
-  'POST /api/runs/:board/:card/:run/verification': { scopes: ['service'] },
+  'POST /api/runs/:board/:card/:run/verification': {
+    scopes: ['service'],
+    describe: "write a run's verdict.",
+  },
 
   // The loop saying why it stopped. The service alone: the other three controls are admin-only because a
   // run that could restart its own project could undo the emergency stop aimed at it, and this one is
   // narrower still — it cannot claim `killed` or `stopped`, which are a person's words.
-  'POST /api/autopilot/stopped': { scopes: ['service'] },
+  'POST /api/autopilot/stopped': { scopes: ['service'], describe: 'record why the loop stopped.' },
+
+  // THE ONE WRITE INTO THE CONTROL PLANE, and `assist` alone. A dedicated route rather than
+  // `PUT /api/control/file` with a path allow-list: `allows()` is a pure function of the route pattern
+  // and its params, and a body-dependent rule would be a new category of thing this table can express.
+  //
+  // Refused to every autonomous scope on purpose. These documents hold the gates a run is judged
+  // against, so a run able to amend one could lower the bar until its own work passed — decision 3's
+  // subject. The copilot is different only because a person is reading its answer as it types.
+  'PUT /api/control/foundation/:name': {
+    scopes: ['assist'],
+    describe: `\`{ content }\` — write one foundation document. \`:name\` is one of ${FOUNDATION_FILES.map((f) => f.name).join(', ')} and nothing else. CODE-QUALITY.md carries the \`gates:\` list and TESTING.md the \`smoke:\` command, both in YAML frontmatter; changing either blocks auto-pilot until a person has reviewed them.`,
+  },
 };
+
+// THE CATALOGUE AN AGENT IS GIVEN, generated from the table above rather than typed out beside it.
+//
+// It replaced three hand-written copies — two in run-prompt.ts and one in the VIBEBOARD.md that
+// scaffold.ts seeds — which is why the table and the prose could disagree: adding a row granted
+// authority no agent was ever told about, and every wording fix had to be made three times. The
+// seeded document now names no endpoints at all and points at the credential section instead, so
+// this is the only list there is.
+//
+// One line per row the scope may call, in the table's own order, which is the order a person grouped
+// them in. The own-card confinement is rendered where the row carries it, because a catalogue that
+// omitted it would describe an authority the agent does not have and every attempt would 403.
+export function endpointsFor(scope: Scope, card?: string): string[] {
+  const lines: string[] = [];
+  for (const [key, rule] of Object.entries(RULES)) {
+    if (!rule.scopes.includes(scope)) continue;
+    const confined = rule.ownCard?.includes(scope)
+      ? ` You may do this to **${card ?? 'your own card'}** and no other card.`
+      : '';
+    lines.push(`- \`${key}\` — ${rule.describe}${confined}`);
+  }
+  return lines;
+}
 
 export function bearerToken(header: string | undefined): string {
   const match = /^Bearer\s+(.+)$/.exec(header ?? '');

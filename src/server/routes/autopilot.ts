@@ -24,6 +24,7 @@ import {
 import { type ReadmeGate, readmeGate } from '../../core/readme.js';
 import type { RunRecord } from '../../core/runs.js';
 import type { BoardName, ProjectConfig } from '../../core/types.js';
+import { readAutopilotState, updateAutopilotState } from '../autopilot-store.js';
 import { attachedOpencodeUrl } from '../opencode-server.js';
 import { type AppCtx, ensureOpen } from '../route-context.js';
 import { listRuns } from '../run-store.js';
@@ -51,6 +52,9 @@ export interface Readiness {
   gates: { ok: boolean; reason?: string; count: number };
   smoke: { ok: boolean; reason?: string };
   routes: { problems: string[]; count: number };
+  // Named separately as well as being a blocker sentence, so the UI can offer the button that clears
+  // it without matching on prose that is meant to be improvable.
+  unreviewedGates: string[];
 }
 
 // A route naming a skill the project does not have is a phase that silently never runs, so the
@@ -72,12 +76,29 @@ interface Read {
   foundation: FoundationStatus;
   gates: GatesResult;
   smoke: SmokeResult;
+  // Gate documents an AGENT rewrote that nobody has read yet. See `unreviewedGates` in
+  // core/autopilot-state.ts: the write is allowed, the EXECUTION waits.
+  unreviewedGates: string[];
 }
 
 // Everything wrong with this project, in the order a person would fix it: the lifecycle first (it is
 // config), then the README (it is the input), then the documents derived from it.
-function blockersFrom(routeProblems: string[], { readme, foundation, gates, smoke }: Read): string[] {
+function blockersFrom(
+  routeProblems: string[],
+  { readme, foundation, gates, smoke, unreviewedGates }: Read,
+): string[] {
   return [
+    // FIRST, and out of the "order a person would fix them" sequence deliberately: this is not a
+    // document to write but a decision to take, and it is the only blocker here that exists because
+    // something might be UNSAFE rather than incomplete. The commands in these documents run through
+    // /bin/sh unsandboxed as the server's user, and an agent chose them.
+    ...(unreviewedGates.length === 0
+      ? []
+      : [
+          `${unreviewedGates.map((n) => `foundation/${n}`).join(' and ')} ${
+            unreviewedGates.length === 1 ? 'was' : 'were'
+          } rewritten by an agent. Read the commands in Project Control before auto-pilot runs them — they run outside the sandbox, as you.`,
+        ]),
     ...routeProblems,
     ...(readme.ok ? [] : [readme.reason]),
     // Named one by one rather than "the foundation is incomplete": the fix is to write a specific
@@ -107,6 +128,7 @@ export function composeReadiness(config: ProjectConfig, skillSlugs: string[], re
     },
     smoke: { ok: smoke.ok, ...(smoke.ok ? {} : { reason: smoke.reason }) },
     // `?.` guards the block, not `routes` — the same defect as above, on the same input.
+    unreviewedGates: read.unreviewedGates,
     routes: {
       problems: routeProblems,
       count: Array.isArray(config.autopilot?.routes) ? config.autopilot.routes.length : 0,
@@ -122,17 +144,18 @@ export function composeReadiness(config: ProjectConfig, skillSlugs: string[], re
 // and its narrowing does not survive being passed through a function boundary. Asking for what it needs
 // keeps the check at the call site where the 409 is sent.
 async function readReadiness(root: string, config: ProjectConfig): Promise<Readiness> {
-  const [readme, foundation, gates, smoke, catalogue] = await Promise.all([
+  const [readme, foundation, gates, smoke, catalogue, state] = await Promise.all([
     readmeGate(root),
     foundationStatus(root),
     readGates(root),
     readSmokeCommand(root),
     readSkills(root, config),
+    readAutopilotState(root, new Date().toISOString()),
   ]);
   return composeReadiness(
     config,
     catalogue.skills.map((s) => s.slug),
-    { readme, foundation, gates, smoke },
+    { readme, foundation, gates, smoke, unreviewedGates: state.unreviewedGates ?? [] },
   );
 }
 
@@ -328,5 +351,18 @@ export async function registerAutopilotRoutes(api: FastifyInstance, ctx: AppCtx)
   api.get('/autopilot/readiness', async (_req, reply) => {
     if (!ensureOpen(ctx.session, reply)) return;
     return readReadiness(ctx.session.root, ctx.session.config);
+  });
+
+  // A person has read the gate commands an agent wrote. ADMIN ONLY, by absence from auth.ts's table —
+  // an agent that could clear this would be an agent approving its own commands, which is the entire
+  // thing the flag exists to prevent.
+  api.post('/autopilot/gates-reviewed', async (_req, reply) => {
+    if (!ensureOpen(ctx.session, reply)) return;
+    const state = await updateAutopilotState(ctx.session.root, new Date().toISOString(), (current) => {
+      const { unreviewedGates: _cleared, ...rest } = current;
+      return rest;
+    });
+    ctx.log.warn({}, 'the gate commands were reviewed; auto-pilot may start again');
+    return { ok: true, state: forClient(state) };
   });
 }

@@ -297,7 +297,9 @@ export class AgentRunner {
     announce = false,
   ): void {
     const run = record.run;
-    const credential = minted ? { token: minted.token, apiBase: this.#opts.apiBase?.() ?? '' } : undefined;
+    const credential = minted
+      ? { token: minted.token, apiBase: this.#opts.apiBase?.() ?? '', scope: minted.scope }
+      : undefined;
     const prompt = buildRunPrompt({
       skill: input.skill,
       card: input.card,

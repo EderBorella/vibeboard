@@ -201,6 +201,12 @@ export class AutopilotRuntime {
       ...(keepGroup && previous.servicePgstart !== undefined
         ? { servicePgstart: previous.servicePgstart }
         : {}),
+      // CARRIED, NOT CLEARED, unlike everything else here. Restart resets the loop's counters and lifts
+      // a halt — it is not a person saying they have read the commands an agent wrote into
+      // foundation/CODE-QUALITY.md. Dropping it would let the sequence "copilot rewrites the gates →
+      // Restart → Start" run those commands unsandboxed with nobody having looked, and the person who
+      // pressed Restart was answering a different question. Only `gates-reviewed` clears it.
+      ...(previous.unreviewedGates?.length ? { unreviewedGates: previous.unreviewedGates } : {}),
     };
     await writeAutopilotState(root, next);
     this.#mirror = next;

@@ -2,6 +2,8 @@ import { relative } from 'node:path';
 import { ARCHIVE_SLUG, RESULTS_DIR } from '../core/layout.js';
 import type { Skill } from '../core/skills.js';
 import type { BoardName, Card } from '../core/types.js';
+import { endpointsFor } from './auth.js';
+import type { Scope } from './credentials.js';
 
 // The dispatch prompt: everything the agent is told about one run, in one string.
 //
@@ -71,7 +73,10 @@ export interface PromptInputs {
   // environment because the OpenCode backend is one long-lived `opencode serve` spawned before any
   // run exists — its environment is fixed, so a per-run value cannot reach it that way.
   // Absent for a runner with no credential store, and then the section is left out entirely.
-  credential?: { token: string; apiBase: string };
+  // `scope` is carried because the endpoint list is GENERATED from it. Without it the section would
+  // have to assume `work`, and a run dispatched under any other scope would be handed a list that is
+  // wrong in both directions — naming rows it cannot call, omitting rows it can.
+  credential?: { token: string; apiBase: string; scope: Scope };
 }
 
 function section(heading: string, body: string): string {
@@ -260,26 +265,35 @@ function previousSection(previous: NonNullable<PromptInputs['previous']>, judgin
 // creates a folder no column maps to, and the card inside it is invisible to the board while still
 // holding its id. The endpoint refuses that; a file write cannot.
 //
-// The confinement is named on purpose. It is enforced server-side either way, but an agent that
-// does not know about it reads a 403 as a broken tool and falls back to editing files.
-function credentialSection(apiBase: string, token: string, cardId: string): string {
+// THE LIST ITSELF IS GENERATED from auth.ts's scope table (`endpointsFor`). It used to be typed out
+// here, again for the judge below, and a third time in the VIBEBOARD.md that scaffold.ts seeds — so
+// granting a scope a new row told no agent anything, and every wording fix had to be made three
+// times. The seeded document no longer lists endpoints at all; it points at whatever the credential
+// section says, which is this. The confinement line is generated too: it is enforced server-side either way, but an agent
+// that does not know about it reads a 403 as a broken tool and falls back to editing files.
+function credentialSection(apiBase: string, token: string, scope: Scope, cardId?: string): string {
+  const endpoints = endpointsFor(scope, cardId);
   return [
     `Your credential: \`${token}\`. Send it as \`Authorization: Bearer <credential>\` to \`${apiBase}\`.`,
     'It stops working the moment this run ends, and it is yours alone — do not put it in a card, a',
     'report or a file.',
     '',
-    'Use these rather than writing card files. A card is a file in a column folder, so a file written',
-    'to a column that does not exist does not fail — it creates one, and the card in it vanishes from',
-    'the board while keeping its id. These endpoints refuse that:',
-    '',
-    '- `POST /api/cards` — `{ board, columnSlug, title, description?, body?, links? }`. The id is',
-    '  assigned for you; never choose one.',
-    `- \`PATCH /api/cards/:board/:id\` — edit title, description, tags, group or body. You may edit **${cardId}** and no other card.`,
-    '- `PUT /api/cards/:board/:id/links` — `{ links: [id, ...] }`, the complete list. Links are',
-    '  symmetric and the far side is written for you.',
+    ...(endpoints.length === 0
+      ? [
+          // A scope with no rows is not a mistake to paper over: `work` narrowed to nothing is a
+          // legitimate future state, and inventing capabilities for it would be worse than silence.
+          'It grants you nothing beyond reading the files, which are yours to read.',
+        ]
+      : [
+          'Use these rather than writing files under `.vibeboard/`. A card is a file in a column folder,',
+          'so a file written to a column that does not exist does not fail — it creates one, and the card',
+          'in it vanishes from the board while keeping its id. These endpoints refuse that:',
+          '',
+          ...endpoints,
+        ]),
     '',
     'Reading is unrestricted: `GET /api/state` is the whole board, and the files are yours to read.',
-    'Moving and archiving cards are not yours — say so in your report instead.',
+    'Anything not listed above is not yours — say so in your report instead.',
   ].join('\n');
 }
 
@@ -301,6 +315,21 @@ function judgeCredentialSection(apiBase: string, token: string): string {
     'It is for READING. `GET /api/state` is the whole board, and the files are yours to read. Nothing',
     'about the board is yours to change: not this card, not another one, not where any of them sit.',
     'Your report is the verdict, and it is the only thing this run produces.',
+  ].join('\n');
+}
+
+// The chat copilot's, when a person has authorised it. Same generator, different scope — which is the
+// point of generating it: the copilot's authority is a row in the same table as everything else.
+export function assistCredentialSection(apiBase: string, token: string): string {
+  return [
+    `Your credential: \`${token}\`. Send it as \`Authorization: Bearer <credential>\` to \`${apiBase}\`.`,
+    'It belongs to THIS conversation and dies with it. Never put it in a card, a file, or a message.',
+    '',
+    'You are authorised to change the board and the foundation documents through these endpoints. Use',
+    'them rather than writing files under `.vibeboard/` — every one of those paths is denied to you by',
+    'the OS, so a write there fails rather than doing something surprising:',
+    '',
+    ...endpointsFor('assist'),
   ].join('\n');
 }
 
@@ -355,7 +384,12 @@ export function buildRunPrompt(input: PromptInputs): string {
         ? section('Your credential', judgeCredentialSection(input.credential.apiBase, input.credential.token))
         : section(
             'Changing the board (required)',
-            credentialSection(input.credential.apiBase, input.credential.token, input.card.id),
+            credentialSection(
+              input.credential.apiBase,
+              input.credential.token,
+              input.credential.scope,
+              input.card.id,
+            ),
           ),
     );
   }

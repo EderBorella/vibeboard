@@ -30,6 +30,10 @@ export interface TransportModel {
   // Whether opening the drawer would show anything. A disclosure arrow that reveals emptiness is worse
   // than no arrow.
   expandable: boolean;
+  // An agent rewrote a document whose commands auto-pilot will run OUTSIDE the sandbox, as the user.
+  // The only blocker a person clears rather than fixes, so it is named rather than left to be matched
+  // out of the blocker prose.
+  reviewGates: boolean;
 }
 
 const HALTED_TITLE = 'This project is halted. Restart it from the overlay before starting auto-pilot.';
@@ -120,5 +124,6 @@ export function transportModel(input: {
     doing,
     missing,
     expandable: doing.length > 0 || missing.length > 0,
+    reviewGates: (readiness?.unreviewedGates?.length ?? 0) > 0,
   };
 }

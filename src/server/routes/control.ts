@@ -1,4 +1,6 @@
 import type { FastifyInstance } from 'fastify';
+import { FOUNDATION_FILES, foundationRel } from '../../core/layout.js';
+import { updateAutopilotState } from '../autopilot-store.js';
 import {
   createControlFile,
   deleteControlFile,
@@ -9,7 +11,35 @@ import {
   writeControlFile,
   writeResources,
 } from '../control-files.js';
+import type { Scope } from '../credentials.js';
 import { type AppCtx, ensureOpen } from '../route-context.js';
+
+// The two documents whose contents are EXECUTED. `CODE-QUALITY.md` carries the `gates:` commands and
+// `TESTING.md` the `smoke:` command, and both run through `/bin/sh` unsandboxed as the server's own
+// user (server/commands.ts). The other three foundation documents are prose and carry no such risk.
+const EXECUTED = new Set(['CODE-QUALITY.md', 'TESTING.md']);
+
+// Record that an AGENT rewrote a document whose commands the server will later run, so auto-pilot can
+// refuse to start until a person has read them. The write itself is allowed — it is the execution that
+// waits, which is where the escalation actually bites.
+//
+// `admin` is exempt because that is you, editing your own gates in Project Control; blocking on that
+// would be a gate nobody could ever satisfy without dismissing it, which teaches everyone to dismiss it.
+async function noteGateChange(ctx: AppCtx, scope: Scope | undefined, name: string): Promise<void> {
+  if (scope === 'admin' || !EXECUTED.has(name)) return;
+  const root = ctx.session.root;
+  if (!root) return;
+  const at = new Date().toISOString();
+  await updateAutopilotState(root, at, (current) => ({
+    ...current,
+    // A set by hand: the same document rewritten three times is one thing to review, not three.
+    unreviewedGates: [...new Set([...(current.unreviewedGates ?? []), name])],
+  }));
+  ctx.log.warn(
+    { document: name, scope },
+    'an agent changed a gate document; auto-pilot is blocked until it is reviewed',
+  );
+}
 
 // Project Control: the file controller for documents that steer the models. Every path is
 // sandboxed to the project root + an allow-list inside control-files.ts.
@@ -32,6 +62,36 @@ export async function registerControlRoutes(api: FastifyInstance, ctx: AppCtx): 
     const { path, content } = req.body as { path?: string; content?: string };
     const ok = await writeControlFile(ctx.session.root, path, content ?? '');
     if (!ok) return reply.code(400).send({ error: 'Path not allowed' });
+    return { ok: true };
+  });
+
+  // THE ONE CONTROL-PLANE WRITE AN AGENT MAY MAKE, and only the `assist` scope — the chat copilot,
+  // which has a person reading its answer as it types. Every autonomous scope is refused, because
+  // these documents hold the gates a run is judged against.
+  //
+  // A dedicated route rather than a path allow-list on `PUT /control/file`: `allows()` in auth.ts is a
+  // pure function of the route pattern and its params, and a rule that depended on the request body
+  // would be a new category of thing that table can express.
+  api.put('/control/foundation/:name', async (req, reply) => {
+    if (!ensureOpen(ctx.session, reply)) return;
+    const { name } = req.params as { name: string };
+    // The FIVE, by exact name. An allow-list rather than a traversal check, so `../config.yaml` and
+    // `..%2fconfig.yaml` alike simply are not in the set — there is no path arithmetic to get wrong.
+    if (!FOUNDATION_FILES.some((f) => f.name === name)) {
+      return reply.code(400).send({
+        error: `Not a foundation document. Expected one of: ${FOUNDATION_FILES.map((f) => f.name).join(', ')}.`,
+      });
+    }
+    const { content } = req.body as { content?: string };
+    if (typeof content !== 'string') return reply.code(400).send({ error: 'Expected `content`.' });
+    // THE FLAG IS RECORDED BEFORE THE CONTENT IT DESCRIBES EXISTS. The other order fails open: if
+    // recording it threw — a full disk, a permission problem — the document with agent-chosen commands
+    // would already be on disk with nothing marking it, and the 500 would not say so. Marked first, a
+    // failure means the write never happened, which is the safe half of the pair.
+    await noteGateChange(ctx, req.credential?.scope, name);
+    if (!(await writeControlFile(ctx.session.root, foundationRel(name), content))) {
+      return reply.code(400).send({ error: 'Path not allowed' });
+    }
     return { ok: true };
   });
 

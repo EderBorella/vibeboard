@@ -47,6 +47,11 @@ export async function registerProjectRoutes(api: FastifyInstance, ctx: AppCtx): 
     const { path } = req.body as { path: string };
     const refusal = await switchRefusal(path);
     if (refusal) return reply.code(409).send({ error: refusal });
+    // The copilot's credential names the project it was minted against, exactly as a run's does. Ended
+    // HERE rather than left to the next turn: `currentId` reloads the newest chat from disk, so coming
+    // back to the original project would otherwise hand the same credential back with nobody having
+    // re-authorised it — the failure `expireScope` exists for, reached by a different door.
+    ctx.copilotAuthority.revoke();
     try {
       const snapshot = await ctx.session.open(path, ctx.runner.activeIds);
       // Before anything else can ask: a project whose state file says `halted` must be halted from the

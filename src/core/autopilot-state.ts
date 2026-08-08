@@ -50,6 +50,21 @@ export interface AutopilotState {
   // identifiable at all.
   servicePgid?: number;
   servicePgstart?: number;
+  // WHICH GATE DOCUMENTS AN AGENT HAS REWRITTEN AND NOBODY HAS READ YET.
+  //
+  // `foundation/CODE-QUALITY.md` and `foundation/TESTING.md` do not merely describe the gates — they
+  // carry the commands, and those run through `/bin/sh` UNSANDBOXED, as the server's own user
+  // (server/commands.ts). So an agent that writes one has chosen code that will later execute outside
+  // the confinement everything else about it is built on.
+  //
+  // The write is allowed; the EXECUTION waits. Auto-pilot refuses to start while this is non-empty,
+  // naming the files, and `POST /api/autopilot/gates-reviewed` clears it. Set only when the writer was
+  // not the admin — editing your own gates in Project Control blocks nothing.
+  //
+  // It lives here because this file is server-owned machine state that the profile already denies to
+  // every agent. A new file would NOT be denied: the profile's own comment says denying the folder
+  // "does not deny creating things inside it — those are mediated on their own paths".
+  unreviewedGates?: string[];
 }
 
 export const IDLE_STATE: AutopilotState = {
@@ -95,6 +110,11 @@ export function parseState(content: string): AutopilotState | 'unreadable' {
   const dispatchesSinceCheckup = counter(d.dispatchesSinceCheckup);
   if (iteration === undefined || dispatchesSinceCheckup === undefined) return 'unreadable';
   const pgid = d.servicePgid;
+  // PRESENT-BUT-MALFORMED IS NOT ABSENT, and here that distinction has teeth: this list is what stops
+  // auto-pilot running commands an agent wrote, so dropping a value we cannot read would fail OPEN on
+  // the one field in this file whose whole purpose is to refuse. Same rule the halt above follows, and
+  // the same rule foundation.ts states as "absence is never a pass".
+  const gates = unreviewed(d);
   return {
     state: d.state,
     iteration,
@@ -109,8 +129,22 @@ export function parseState(content: string): AutopilotState | 'unreadable' {
     ...(typeof d.servicePgstart === 'number' && Number.isInteger(d.servicePgstart) && d.servicePgstart > 0
       ? { servicePgstart: d.servicePgstart }
       : {}),
+    ...(gates.length > 0 ? { unreviewedGates: gates } : {}),
   };
 }
+
+// The gate documents an agent rewrote. Absent is an empty list; a value that will not read is a list
+// with something in it, because the safe answer to "I cannot tell whether an agent rewrote your gate
+// commands" is to make somebody look.
+function unreviewed(d: Record<string, unknown>): string[] {
+  if (d.unreviewedGates === undefined) return [];
+  if (!Array.isArray(d.unreviewedGates)) return [UNREADABLE_GATES];
+  const names = d.unreviewedGates.filter((g): g is string => typeof g === 'string' && g.trim() !== '');
+  return names.length === d.unreviewedGates.length ? names : [...names, UNREADABLE_GATES];
+}
+
+// Reads as a document name in the blocker sentence, because that is where it will be seen.
+export const UNREADABLE_GATES = 'a gate document whose name could not be read';
 
 // THE STATE AS A CLIENT MAY SEE IT. The process group is the reaper's business and nothing outside this server
 // has any use for it: a pid is an instrument for signalling, and handing one to every open tab — and to the

@@ -39,24 +39,19 @@ Freeform markdown body — the card's detail and working notes.
 ## Changing the board
 
 **If your instructions gave you a credential, use the API and do not write card files.**
-That is the case for every skill run. Your own instructions name the base URL, your token
-and the one card you may edit; send the token as `Authorization: Bearer <credential>`.
+Your own instructions list the exact endpoints it opens, the base URL, and any card you are
+confined to; send the token as `Authorization: Bearer <credential>`. That list is generated
+from the server's own permission table, so it is the truth about what you may do — nothing
+here repeats it, because a second copy is a copy that goes stale.
 
-- **Create:** `POST /api/cards` with `{ board, columnSlug, title, description?, body?, links? }`.
-  The id is assigned for you — never choose one.
-- **Edit:** `PATCH /api/cards/:board/:id` with any of `title`, `description`, `tags`,
-  `group`, `body`.
-- **Link (symmetric):** `PUT /api/cards/:board/:id/links` with `{ links: [id, ...] }` — the
-  complete list, not a delta. The far side is written for you.
-- **Move and archive are not yours.** Say what should happen in your report instead.
-- A `403` is not a broken tool. It means that action is outside your authority, and no
-  amount of retrying or writing the file by hand will change that.
+A `403` is not a broken tool. It means that action is outside your authority, and no amount
+of retrying, or writing the file by hand instead, will change that.
 
-**Without a credential** — the chat copilot, driven by a person — edit the files directly:
-write a new `.md` with the next free id and complete frontmatter (`created` = today,
-sensible `order`); move a card by moving its file between column folders, never renaming
-it; archive by moving it to that board's `archive/` **and** setting `archived` +
-`archivedFrom`; link by adding each id to the *other* card's `links` list, both sides.
+**Without a credential** — you cannot change the board at all, and writing the files by hand
+is not the fallback: `.vibeboard/boards/` is denied to you by the operating system, so the
+write fails rather than doing something surprising. Say what should change and ask the person
+to press **Authorise** in the copilot panel. That mints a credential for this conversation,
+and your next message will carry it along with the exact list of endpoints it opens.
 
 **Never invent a column.** A column is a folder, so a path naming one that is not
 configured does not fail — it *creates* the folder, and the card inside it disappears from
@@ -66,11 +61,20 @@ unless the user asks.
 
 ## Files you must not edit
 
-`CLAUDE.md` and `AGENTS.md` (at the project root) and `.vibeboard/VIBEBOARD.md` are
-**managed by VibeBoard** — never create or modify them. If the user asks you to change how
-you behave, add standing instructions, or record project-specific guidance, edit
-**`.vibeboard/INSTRUCTIONS.md`** instead (you may edit that file freely). Its contents are
-already part of your system prompt, so changes there take effect on the next turn.
+Everything under `.vibeboard/` that decides anything — the boards, `config.yaml`, the skills,
+the foundation documents, the instructions — is denied to you for **writing** by the operating
+system. Reading all of it is fine. Attempting a write there fails; it does not silently do the
+wrong thing, and it is not a broken tool.
+
+That includes `.vibeboard/INSTRUCTIONS.md`, which earlier versions of this document told you
+to edit freely — that was wrong, and the write was always refused. If the user asks you to
+record standing instructions or change how you behave, tell them to edit it in
+**Project Control → Instructions**; its contents are part of your system prompt, so their
+change takes effect on your next turn.
+
+`CLAUDE.md` and `AGENTS.md` at the project root are **managed by VibeBoard** — never create
+or modify them. Nothing in the operating system stops you, which is exactly why this is a
+rule: they are imported into every turn's instructions, including your own.
 
 ## Working style
 

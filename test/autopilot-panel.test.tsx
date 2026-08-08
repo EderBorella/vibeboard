@@ -47,6 +47,7 @@ const readiness = (over: Partial<Readiness> = {}): Readiness => ({
   gates: { ok: true, count: 2 },
   smoke: { ok: true },
   routes: { problems: [], count: DEFAULT_AUTOPILOT.routes.length },
+  unreviewedGates: [],
   ...over,
 });
 

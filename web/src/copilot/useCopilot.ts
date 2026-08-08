@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { setAuthority } from '../api';
 import type { ChatMeta, WireTranscriptItem } from '../shared';
 import { useSharedWs } from '../ws';
 
@@ -60,6 +61,7 @@ const ZERO: CopilotStats = { costUsd: 0, turns: 0, lastDurationMs: 0, contextTok
 type WsCopilotMessage =
   | { type: 'copilot:event'; event: CopilotEvent }
   | { type: 'copilot:state'; state: { running: boolean; sessionId?: string; model?: string } }
+  | { type: 'copilot:authority'; authorised: boolean }
   | {
       type: 'copilot:history';
       chats: ChatMeta[];
@@ -73,6 +75,9 @@ type WsCopilotMessage =
 export function useCopilot(bump: number) {
   const [items, setItems] = useState<TranscriptItem[]>([]);
   const [running, setRunning] = useState(false);
+  // Whether this conversation may use the API. Server-owned: the button reflects it, it does not own
+  // it — a closed tab must not be what expires a credential.
+  const [authorised, setAuthorised] = useState(false);
   const [sessionId, setSessionId] = useState<string | undefined>();
   const [model, setModel] = useState<string | undefined>();
   const [stats, setStats] = useState<CopilotStats>(ZERO);
@@ -194,6 +199,12 @@ export function useCopilot(bump: number) {
             setSessionId(m.state.sessionId);
             setModel(m.state.model);
             break;
+          // Pushed on connect and on every change, so this never has to be fetched — and so a second
+          // tab agrees. Authority is shared between them; two buttons disagreeing about it is a person
+          // believing they revoked something they did not.
+          case 'copilot:authority':
+            setAuthorised(m.authorised);
+            break;
           case 'copilot:history':
             setChats(m.chats);
             setCurrentChatId(m.currentChatId);
@@ -259,9 +270,19 @@ export function useCopilot(bump: number) {
 
   const cancel = useCallback(() => sendRaw({ type: 'copilot:cancel' }), [sendRaw]);
 
+  // Optimism is deliberately absent: the answer is the truth, and a button that flips before the
+  // server agreed would show authority that does not exist.
+  const setCopilotAuthority = useCallback((enabled: boolean): void => {
+    void setAuthority(enabled)
+      .then((r) => setAuthorised(r.authorised))
+      .catch(() => setAuthorised(false));
+  }, []);
+
   return {
     items,
     running,
+    authorised,
+    setCopilotAuthority,
     sessionId,
     model,
     stats,

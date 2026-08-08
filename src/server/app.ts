@@ -7,6 +7,7 @@ import { registerAuth } from './auth.js';
 import { AutopilotRuntime } from './autopilot-runtime.js';
 import { ChatStore } from './chat-store.js';
 import { CopilotSession } from './copilot.js';
+import { CopilotAuthority } from './copilot-authority.js';
 import { createCopilotTurns } from './copilot-turns.js';
 import { CredentialStore } from './credentials.js';
 import { DeviceStore } from './devices.js';
@@ -24,6 +25,7 @@ import { registerAutopilotRoutes } from './routes/autopilot.js';
 import { registerCardRoutes } from './routes/cards.js';
 import { registerConfigRoutes } from './routes/config.js';
 import { registerControlRoutes } from './routes/control.js';
+import { registerCopilotRoutes } from './routes/copilot.js';
 import { registerDiaryRoutes } from './routes/diary.js';
 import { registerExplorerRoutes } from './routes/explorer.js';
 import { registerModelRoutes } from './routes/models.js';
@@ -105,6 +107,7 @@ export function buildApp(
   //   jq 'select(.component == "watcher")' logs/vibeboard-*.log
   const log: Log = app.log;
   const copilot = new CopilotSession({ sandbox: opts.sandbox });
+  const copilotAuthority = new CopilotAuthority(credentials);
   const chats = new ChatStore(session, log.child({ component: 'chat' }));
   // The watcher and the debounced snapshot broadcast happen with no request in flight, and the
   // session is constructed before the app — so the composition root hands it the logger.
@@ -220,9 +223,13 @@ export function buildApp(
     onDispatchingEnded: () => credentials.expireScope('service'),
     log: log.child({ component: 'autopilot-service' }),
   });
+  // Told on every change, including the ones no endpoint drives — switching chat or project revokes it,
+  // and a button that still reads "Authorised" is a person believing they hold authority they do not.
+  copilotAuthority.onChange((authorised) => broadcast({ type: 'copilot:authority', authorised }));
   const ctx: AppCtx = {
     session,
     copilot,
+    copilotAuthority,
     chats,
     runner,
     autopilot,
@@ -253,6 +260,7 @@ export function buildApp(
       await registerConfigRoutes(api, ctx);
       await registerModelRoutes(api, ctx);
       await registerControlRoutes(api, ctx);
+      await registerCopilotRoutes(api, ctx);
       await registerSandboxRoutes(api, ctx);
       await registerAutopilotRoutes(api, ctx);
       await registerSuggestionRoutes(api, ctx);

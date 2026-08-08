@@ -223,6 +223,18 @@ async function resolveDispatch(
   };
 }
 
+// The refusal when an agent has rewritten a gate document and nobody has read it. Named rather than
+// inlined so the dispatch handler stays under its complexity budget — flattening beats a suppression —
+// and so the sentence, which is the only thing a person sees, can be tested without dispatching.
+export function unreviewedGatesRefusal(names: string[] | undefined): string | undefined {
+  if (!names || names.length === 0) return undefined;
+  const listed = names.map((n) => `foundation/${n}`).join(' and ');
+  const one = names.length === 1;
+  return `${listed} ${one ? 'was' : 'were'} rewritten by an agent and nobody has read ${
+    one ? 'it' : 'them'
+  }. These files hold commands this server runs outside the sandbox, as you — review them in Project Control, then acknowledge it in the auto-pilot panel.`;
+}
+
 export async function registerRunRoutes(api: FastifyInstance, ctx: AppCtx): Promise<void> {
   // Every run in the project, newest first — the Execution dashboard's list.
   api.get('/runs', async (_req, reply) => {
@@ -267,6 +279,17 @@ export async function registerRunRoutes(api: FastifyInstance, ctx: AppCtx): Prom
     // `autoPilotConcurrency: 1` aspirational rather than true. Both refusals say what to do instead.
     const locked = dispatchLock(await ctx.autopilot.current(), req.credential?.scope);
     if (locked) return reply.code(409).send({ error: locked });
+    // AND THE GATES NOBODY HAS READ. Blocking `POST /autopilot/start` alone was not enough: a loop that
+    // is ALREADY running dispatches without passing through start, and the verifier re-reads
+    // foundation/CODE-QUALITY.md fresh for every card (server/verifier.ts) — so an authorised copilot
+    // rewriting it mid-run had its commands executed on the next dispatch, outside the sandbox, as the
+    // server's user. "The write is allowed; the execution waits" was false in exactly that window,
+    // which is the window an agent is most able to reach.
+    //
+    // Refusing the dispatch stops the loop with a reason rather than killing it, so the work already in
+    // flight finishes and the person is told what to look at.
+    const unreviewed = unreviewedGatesRefusal((await ctx.autopilot.current()).unreviewedGates);
+    if (unreviewed) return reply.code(412).send({ error: unreviewed });
     const resolved = await resolveDispatch(ctx, req.body as DispatchBody);
     if ('error' in resolved) return reply.code(resolved.code).send({ error: resolved.error });
     try {

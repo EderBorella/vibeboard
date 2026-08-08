@@ -4,6 +4,7 @@ import type { AgentRunner } from './agent-runner.js';
 import type { AutopilotRuntime } from './autopilot-runtime.js';
 import type { ChatStore } from './chat-store.js';
 import type { CopilotSession } from './copilot.js';
+import type { CopilotAuthority } from './copilot-authority.js';
 import type { CredentialStore } from './credentials.js';
 import type { DeviceStore } from './devices.js';
 import type { Log } from './logging.js';
@@ -27,6 +28,9 @@ export interface WsClient {
 export interface AppCtx {
   session: ProjectSession;
   copilot: CopilotSession;
+  // The copilot's API credential, when a person has authorised it. Held here rather than on the
+  // session because it is authority, and authority is the composition root's to hand out.
+  copilotAuthority: CopilotAuthority;
   chats: ChatStore;
   // Skill runs. Separate from `copilot` deliberately: the chat is one conversation at a time, a run
   // is one prompt in and one report out, and neither should be able to block the other.

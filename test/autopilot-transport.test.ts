@@ -30,6 +30,7 @@ const ready: Readiness = {
   gates: { ok: true, count: 2 },
   smoke: { ok: true },
   routes: { problems: [], count: 3 },
+  unreviewedGates: [],
 };
 const unready: Readiness = { ...ready, ok: false, blockers: ['README is empty', 'no gate commands'] };
 

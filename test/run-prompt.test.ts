@@ -313,7 +313,7 @@ describe('buildRunPrompt', () => {
 describe('the run credential', () => {
   it('names the token and the base URL when the run has one', () => {
     const text = buildRunPrompt(
-      inputs({ credential: { token: 'tok-123', apiBase: 'http://127.0.0.1:4610' } }),
+      inputs({ credential: { token: 'tok-123', apiBase: 'http://127.0.0.1:4610', scope: 'work' as const } }),
     );
     expect(text).toContain('tok-123');
     expect(text).toContain('http://127.0.0.1:4610');
@@ -328,7 +328,9 @@ describe('the run credential', () => {
   it('tells the agent which card its credential is confined to', () => {
     // Confinement is enforced server-side, but an agent that does not know about it reads a 403 as
     // a broken tool and starts writing files instead.
-    const text = buildRunPrompt(inputs({ credential: { token: 'tok', apiBase: 'http://x' } }));
+    const text = buildRunPrompt(
+      inputs({ credential: { token: 'tok', apiBase: 'http://x', scope: 'work' as const } }),
+    );
     expect(text).toContain('E-010');
   });
 });
@@ -494,7 +496,10 @@ describe('the judging contract', () => {
   // so nothing noticed. A judge needs no write endpoint at all — it reads the work and reports a score.
   it('is not also told how to change the board', () => {
     const text = buildRunPrompt(
-      inputs({ verdict: { threshold: 0.6 }, credential: { token: 'T', apiBase: 'http://127.0.0.1:4610' } }),
+      inputs({
+        verdict: { threshold: 0.6 },
+        credential: { token: 'T', apiBase: 'http://127.0.0.1:4610', scope: 'work' as const },
+      }),
     );
     expect(text).not.toContain('## Changing the board (required)');
     expect(text).not.toContain('POST /api/cards');
@@ -505,7 +510,10 @@ describe('the judging contract', () => {
   // environment with no explanation is an agent that will experiment with it.
   it('says what its credential is for, and that changing the board is not it', () => {
     const text = buildRunPrompt(
-      inputs({ verdict: { threshold: 0.6 }, credential: { token: 'T', apiBase: 'http://127.0.0.1:4610' } }),
+      inputs({
+        verdict: { threshold: 0.6 },
+        credential: { token: 'T', apiBase: 'http://127.0.0.1:4610', scope: 'work' as const },
+      }),
     );
     expect(text).toContain('## Your credential');
     expect(text).toMatch(/read/i);
@@ -513,7 +521,9 @@ describe('the judging contract', () => {
 
   // An ordinary run is unaffected: it still gets the endpoints it needs to do its job.
   it('leaves a working run’s board instructions alone', () => {
-    const text = buildRunPrompt(inputs({ credential: { token: 'T', apiBase: 'http://127.0.0.1:4610' } }));
+    const text = buildRunPrompt(
+      inputs({ credential: { token: 'T', apiBase: 'http://127.0.0.1:4610', scope: 'work' as const } }),
+    );
     expect(text).toContain('## Changing the board (required)');
     expect(text).toContain('POST /api/cards');
   });

@@ -4,12 +4,18 @@ import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import type { BoardName } from '../core/types.js';
 
-// Who a request is allowed to be. Widening order, and each scope is a superset of the one before:
-// `work` is what an ordinary skill run gets, `checkup` adds the board surgery a health check needs,
-// `service` adds dispatching and the diary, and `admin` is the browser. A run is never admin —
-// dispatching runs from inside a run escapes the loop's iteration counter, budget and concurrency
-// cap in one move.
-export type Scope = 'work' | 'checkup' | 'service' | 'admin';
+// Who a request is allowed to be. `work`, `checkup`, `service` are a widening chain, each a superset
+// of the one before: `work` is what an ordinary skill run gets, `checkup` adds the board surgery a
+// health check needs, `service` adds dispatching and the diary, and `admin` is the browser. A run is
+// never admin — dispatching runs from inside a run escapes the loop's iteration counter, budget and
+// concurrency cap in one move.
+//
+// `assist` is DELIBERATELY NOT IN THAT CHAIN. It is the chat copilot, and the difference is not how
+// much authority it has but where the judgement comes from: a person is reading its answer as it
+// types, so it gets the board verbs a checkup has without being confined to one card — and it gets
+// the one control-plane write, which no autonomous scope may have. It gets nothing the loop counts:
+// no dispatch, no diary, no accounting, no verdicts.
+export type Scope = 'work' | 'checkup' | 'service' | 'assist' | 'admin';
 
 export interface Credential {
   token: string;
@@ -139,6 +145,14 @@ export class CredentialStore {
     // day has changed, so an active browser costs no disk write per request.
     void this.devices?.touch(device);
     return { token, scope: 'admin', device };
+  }
+
+  // The chat copilot's credential, minted when a person authorises it and keyed to the CHAT rather
+  // than to a run — so `expireRun(chatId)` retires it when the conversation ends, with no second
+  // index and no new machinery. A chat is not a run and has no card, which is exactly the shape
+  // `mintRun` already produces for a `service` credential.
+  mintChat(chat: string, project: string): Credential {
+    return this.mintRun('assist', chat, project);
   }
 
   // Called when a run settles. Scanned rather than indexed by run id: the map only ever holds the

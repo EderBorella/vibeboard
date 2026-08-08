@@ -226,6 +226,13 @@ export class ChatStore {
 
   // ---- public API ----
 
+  // Which conversation is open. Exposed because the copilot's credential is keyed to it — that is
+  // what makes "the token dies with the chat" true rather than a label — and because `#ensureCurrent`
+  // creates one on first use, so a caller cannot derive it without also deciding when a chat begins.
+  async currentId(): Promise<string> {
+    return (await this.#ensureCurrent()).id;
+  }
+
   async recordUser(text: string): Promise<void> {
     const c = await this.#ensureCurrent();
     if (!c.title) c.title = text.trim().slice(0, TITLE_MAX);

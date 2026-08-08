@@ -54,6 +54,8 @@ export function CopilotPanel({
     openChat,
     deleteChat,
     cancel,
+    authorised,
+    setCopilotAuthority,
   } = copilot;
   const { confirm, dialog } = useConfirm();
   const [draft, setDraft] = useState('');
@@ -158,6 +160,44 @@ export function CopilotPanel({
         }}
         onNew={newSession}
       />
+
+      {/*
+        WHAT THE COPILOT MAY DO TO THE PROJECT, and it is off until you say otherwise.
+
+        Unauthorised it can read anything and write ordinary project files; the whole of `.vibeboard/`
+        is denied to it by the OS, so it cannot touch the board, the config or the foundation documents
+        however it is asked to. Authorising mints a credential for THIS conversation, which the server
+        revokes when the chat or the project changes.
+
+        The confirm is not ceremony: the grant includes writing the foundation documents, and two of
+        those carry commands the server later runs outside the sandbox as you.
+      */}
+      <div className="copilot-authority">
+        <button
+          type="button"
+          className={authorised ? 'btn-primary' : 'btn-secondary'}
+          onClick={() => {
+            if (authorised) {
+              setCopilotAuthority(false);
+              return;
+            }
+            void confirm({
+              title: 'Let the copilot change this project?',
+              body: 'It will be able to create, edit, move and archive cards, and to write the five foundation documents — through the API, for this conversation only. Two of those documents hold commands that auto-pilot later runs outside the sandbox, as you; if it changes one, auto-pilot will not start until you have read them.',
+              action: 'Authorise',
+            }).then((ok) => {
+              if (ok) setCopilotAuthority(true);
+            });
+          }}
+          title={
+            authorised
+              ? 'The copilot holds a credential for this conversation. Click to revoke it.'
+              : 'The copilot can read everything and change nothing. Click to let it use the API.'
+          }
+        >
+          {authorised ? 'Authorised' : 'Authorise'}
+        </button>
+      </div>
 
       <CopilotControls
         caps={caps}

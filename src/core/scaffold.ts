@@ -58,23 +58,13 @@ Markdown body.
 - **Never name a column that is not configured.** Because a column is a folder, a path naming one
   that does not exist does not fail — it CREATES the folder, and the card inside it is invisible to
   the board while still holding its id. The configured columns are in \`${CONFIG_DIR}/config.yaml\`.
-- **If your instructions gave you a credential, change cards through the API rather than by writing
-  files.** Every skill run gets one. Send it as \`Authorization: Bearer <credential>\`:
-  - \`POST /api/cards\` — \`{ board, columnSlug, title, description?, body?, links? }\`. The id is
-    assigned for you; never choose one.
-  - \`PATCH /api/cards/:board/:id\` — title, description, tags, group, body.
-  - \`PUT /api/cards/:board/:id/links\` — \`{ links: [id, ...] }\`, the complete list. The far side is
-    written for you.
-  - Moving and archiving are not yours. A \`403\` means the action is outside your authority, not
-    that the tool is broken.
-- **Without a credential** (the chat copilot, driven by a person), edit the files directly:
-  - Create: next id = highest existing of that prefix + 1, inside a configured column's folder.
-  - Move: move the file to another column folder — do not change its id.
-  - Archive: move it to \`${ARCHIVE_SLUG}/\` **and** set \`archived\` + \`archivedFrom\`, or it cannot be put
-    back where it came from. Restore: move it out and delete both keys — a live card never carries
-    them.
-  - Link: relating two cards records each other's id in both \`links\` lists. Any pairing is allowed
-    — product↔product, engineering↔engineering, or across boards.
+- **Change cards through the API, never by writing files.** \`${CONFIG_DIR}/\` is denied to every agent
+  for writing by the operating system, so a file written there fails — it does not quietly do
+  something else. If your instructions gave you a credential, they also list the exact endpoints it
+  opens; send it as \`Authorization: Bearer <credential>\`. If they did not, you cannot change the
+  board: say what should change and let the person decide.
+- A \`403\` means the action is outside your authority, not that the tool is broken. Retrying it, or
+  writing the file by hand instead, will not work.
 `;
 
 async function ensureFolders(projectRoot: string, config: ProjectConfig): Promise<void> {

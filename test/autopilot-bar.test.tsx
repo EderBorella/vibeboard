@@ -24,6 +24,7 @@ const READY: Readiness = {
   gates: { ok: true, count: 1 },
   smoke: { ok: true },
   routes: { problems: [], count: 1 },
+  unreviewedGates: [],
 };
 
 afterEach(cleanup);

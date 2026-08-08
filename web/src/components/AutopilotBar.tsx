@@ -1,5 +1,11 @@
 import { useState } from 'react';
-import { type AutopilotState, type RunList, softStopAutopilot, startAutopilot } from '../api';
+import {
+  type AutopilotState,
+  acknowledgeGates,
+  type RunList,
+  softStopAutopilot,
+  startAutopilot,
+} from '../api';
 import { transportModel } from '../autopilot/transport';
 import { useReadiness } from '../autopilot/useReadiness';
 import { AutopilotHelp } from './AutopilotHelp';
@@ -30,7 +36,10 @@ export function AutopilotBar({ state, runs, bump, onChanged, onSettings }: Props
   const [helpOpen, setHelpOpen] = useState(false);
   // Re-asked whenever the project changes or the loop's state does: fixing a blocker and pressing play
   // should not require a reload, and stopping may have been caused by one.
-  const { readiness } = useReadiness(`${bump}:${state?.state ?? 'none'}`);
+  // Bumped locally as well, so acknowledging the gate review refetches readiness immediately rather
+  // than waiting for whatever else happens to change.
+  const [reviewed, setReviewed] = useState(0);
+  const { readiness } = useReadiness(`${bump}:${state?.state ?? 'none'}:${reviewed}`);
   const model = transportModel({ state, runs, readiness, starting: busy });
 
   function act(): void {
@@ -127,6 +136,30 @@ export function AutopilotBar({ state, runs, bump, onChanged, onSettings }: Props
                   <li key={b}>{b}</li>
                 ))}
               </ul>
+            )}
+            {/*
+              The one blocker a person CLEARS rather than fixes: an agent rewrote a document whose
+              commands auto-pilot will run outside the sandbox. Offered here, beside the sentence that
+              explains it, because a blocker with no way to act on it is a dead end — and the words on
+              the button are what is actually being asserted, not "OK".
+            */}
+            {model.reviewGates && (
+              <button
+                type="button"
+                className="btn-secondary"
+                data-testid="ap-review-gates"
+                onClick={() => {
+                  // No confirm dialog: the words on the button ARE the assertion, and a second
+                  // "are you sure?" over the top of them is the kind of prompt people learn to click
+                  // through without reading.
+                  void acknowledgeGates().then(() => {
+                    setReviewed((n) => n + 1);
+                    onChanged();
+                  });
+                }}
+              >
+                I have read the gate commands
+              </button>
             )}
           </div>
         </div>

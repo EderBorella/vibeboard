@@ -829,6 +829,13 @@ export interface Readiness {
   gates: { ok: boolean; reason?: string; count: number };
   smoke: { ok: boolean; reason?: string };
   routes: { problems: string[]; count: number };
+  unreviewedGates: string[];
+}
+
+// A person asserting they have read the gate commands an agent wrote. It is the only blocker that is
+// cleared rather than fixed.
+export function acknowledgeGates(): Promise<{ ok: true }> {
+  return post('/api/autopilot/gates-reviewed', {});
 }
 
 // ---- Signing in ------------------------------------------------------------
@@ -875,6 +882,12 @@ export async function requestSignin(): Promise<SigninRequestOpened> {
 
 export async function collectSignin(id: string): Promise<SigninCollected> {
   return (await request(`/auth/request/${encodeURIComponent(id)}`)).json();
+}
+
+// Whether the chat copilot may use the API for this conversation. The server owns the credential and
+// its lifetime; this only asks for it to be minted or revoked.
+export async function setAuthority(enabled: boolean): Promise<{ authorised: boolean }> {
+  return post('/api/copilot/authority', { enabled });
 }
 
 export interface SigninDevice {

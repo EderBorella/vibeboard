@@ -1,0 +1,27 @@
+#!/bin/sh
+# Install system packages into this box. Run as root, BY VIBEBOARD, never by the agent.
+#
+# There is no `sudo` in this image, so an agent turn has no route here at all — VibeBoard reaches it
+# with `docker exec -u 0:0` from outside, which is a privilege the agent cannot ask the kernel for.
+#
+# Arguments are package names and are used as "$@", never interpolated into a shell string: they come
+# from an agent, and an agent's idea of a package name comes from whatever it read in the repository.
+#
+# WHAT THIS MUST NEVER DO: write into /work. Root here is root on the host's bind mount, so a file
+# created by this script would land root-owned in the user's own project and need `sudo` to delete.
+# Packages go into the container's own filesystem, which is thrown away with the box.
+set -e
+
+if [ "$#" -eq 0 ]; then
+  echo "vb-install: no packages given" >&2
+  exit 2
+fi
+
+# The image clears apt's lists to stay small, so an install with no update ahead of it fails with
+# "Unable to locate package" — which reads as a wrong package name rather than a stale index.
+apt-get update >/dev/null
+
+DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends "$@"
+
+# Leave the box as small as we found it.
+rm -rf /var/lib/apt/lists/*

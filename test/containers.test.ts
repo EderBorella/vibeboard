@@ -9,6 +9,11 @@ import {
   type DockerResult,
   type DockerRun,
   execArgs,
+  INSTALL_HELPER,
+  installArgs,
+  isPackageName,
+  netRuleArgs,
+  PRIVATE_RANGES,
   PROJECT_LABEL,
   parsePublishedPort,
   protectedPaths,
@@ -118,9 +123,19 @@ describe('the run argv', () => {
     expect(joined).toContain('--user 1000:1000');
   });
 
-  it('drops privileges an agent never needs', () => {
+  it('forbids gaining privileges, so an agent turn has no escalation route', () => {
     expect(joined).toContain('--security-opt no-new-privileges');
-    expect(joined).toContain('--cap-drop ALL');
+  });
+
+  it('does NOT drop every capability — the brokered install needs root to work at all', () => {
+    // Deliberate, and measured: with the default set, root in the box can `apt-get install` but
+    // still cannot write the read-only mounts, remount them, or touch the firewall. The boundary is
+    // held by the capabilities the container never had (SYS_ADMIN, NET_ADMIN), not by the user id.
+    expect(joined).not.toContain('--cap-drop');
+  });
+
+  it('never grants the box NET_ADMIN — its own rules must be beyond its reach', () => {
+    expect(joined).not.toContain('NET_ADMIN');
   });
 
   it('labels the box so it can be found again without a pid file', () => {
@@ -158,6 +173,73 @@ describe('exec argv', () => {
   });
 });
 
+describe('the network rules', () => {
+  const args = netRuleArgs('vibeboard-abc-claude-code', 'vibeboard-agent:latest');
+  const joined = args.join(' ');
+
+  it('runs in a THROWAWAY container sharing the box’s network, not in the box', () => {
+    // If these ran inside the box, the box would need NET_ADMIN — and then its own privileged
+    // install step, or a package’s post-install script, could flush them.
+    expect(joined).toContain('--network=container:vibeboard-abc-claude-code');
+    expect(args).toContain('--rm');
+    expect(joined).toContain('--cap-add NET_ADMIN');
+  });
+
+  it('rejects every private range, so the agent cannot reach the LAN or the machine’s own services', () => {
+    // SPELLED OUT, not looped over PRIVATE_RANGES. Iterating the constant asserts the code against
+    // itself: deleting a range deletes the assertion with it, and a planted defect proved exactly
+    // that — dropping 192.168/16 failed nothing. These four are the contract.
+    expect(joined).toContain('-d 10.0.0.0/8 -j REJECT'); // most home and corporate LANs
+    expect(joined).toContain('-d 172.16.0.0/12 -j REJECT'); // docker's own bridges live here
+    expect(joined).toContain('-d 192.168.0.0/16 -j REJECT'); // the usual home router range
+    expect(joined).toContain('-d 169.254.0.0/16 -j REJECT'); // link-local, and cloud metadata at .169.254
+    expect(PRIVATE_RANGES).toHaveLength(4);
+  });
+
+  it('leaves the public internet alone — the agent still has to reach the model', () => {
+    expect(joined).not.toMatch(/-A OUTPUT -j (REJECT|DROP)/);
+    expect(joined).not.toContain('0.0.0.0/0');
+  });
+});
+
+describe('the brokered install', () => {
+  it('execs the helper as root, passing packages as ARGV rather than a shell string', () => {
+    expect(installArgs('box', ['jq', 'python3'])).toEqual([
+      'exec',
+      '-u',
+      '0:0',
+      'box',
+      INSTALL_HELPER,
+      'jq',
+      'python3',
+    ]);
+  });
+
+  it('refuses a package name that is really a command', async () => {
+    const calls: string[][] = [];
+    const mgr = new BoxManager({ docker: fakeDocker({}, calls), user: '1000:1000' });
+    const res = await mgr.install('box', ['jq; rm -rf /']);
+    expect(res.code).toBe(2);
+    expect(calls).toHaveLength(0); // never reached docker at all
+  });
+
+  it('refuses an empty request rather than running a bare apt-get', async () => {
+    const mgr = new BoxManager({ docker: fakeDocker({}), user: '1000:1000' });
+    expect((await mgr.install('box', [])).code).toBe(2);
+  });
+
+  it.each([['jq'], ['python3'], ['libpq-dev'], ['g++'], ['lib32z1']])(
+    'accepts the real package name %s',
+    (name) => {
+      expect(isPackageName(name)).toBe(true);
+    },
+  );
+
+  it.each([['../evil'], ['jq&&sh'], ['-rf'], ['$(id)'], ['JQ'], ['']])('rejects %s', (name) => {
+    expect(isPackageName(name)).toBe(false);
+  });
+});
+
 describe('published port', () => {
   it('reads the host port docker chose', () => {
     expect(parsePublishedPort('127.0.0.1:32768\n')).toBe(32768);
@@ -173,6 +255,11 @@ describe('published port', () => {
 describe('ensure', () => {
   const opts = { projectRoot: PROJECT, backend: 'claude-code' as const, paths: PATHS };
 
+  // `docker run` is no longer a synonym for "made the box": the network sidecar is a `docker run`
+  // too. Only a run that NAMES a container creates one, and that is what these assertions mean.
+  const createdBox = (calls: string[][]): boolean =>
+    calls.some((c) => c[0] === 'run' && c.includes('--name'));
+
   it('creates a box that is not there', async () => {
     const calls: string[][] = [];
     const mgr = new BoxManager({
@@ -180,7 +267,7 @@ describe('ensure', () => {
       user: '1000:1000',
     });
     await mgr.ensure(opts);
-    expect(calls.some((c) => c[0] === 'run')).toBe(true);
+    expect(createdBox(calls)).toBe(true);
   });
 
   it('ADOPTS a running box rather than recreating it — a server restart must not bin live work', async () => {
@@ -190,7 +277,7 @@ describe('ensure', () => {
       user: '1000:1000',
     });
     await mgr.ensure(opts);
-    expect(calls.some((c) => c[0] === 'run')).toBe(false);
+    expect(createdBox(calls)).toBe(false);
     expect(calls.some((c) => c[0] === 'start')).toBe(false);
   });
 
@@ -202,7 +289,41 @@ describe('ensure', () => {
     });
     await mgr.ensure(opts);
     expect(calls.some((c) => c[0] === 'start')).toBe(true);
-    expect(calls.some((c) => c[0] === 'run')).toBe(false);
+    expect(createdBox(calls)).toBe(false);
+  });
+
+  it('confines the network of a box it just created', async () => {
+    const calls: string[][] = [];
+    const mgr = new BoxManager({
+      docker: fakeDocker({ inspect: { code: 1, stdout: '', stderr: 'No such object' } }, calls),
+      user: '1000:1000',
+    });
+    await mgr.ensure(opts);
+    expect(calls.some((c) => c.some((a) => a.startsWith('--network=container:')))).toBe(true);
+  });
+
+  it('re-applies them when a stopped box is started — a restart rebuilds the namespace', async () => {
+    const calls: string[][] = [];
+    const mgr = new BoxManager({
+      docker: fakeDocker({ inspect: { code: 0, stdout: 'false\n', stderr: '' } }, calls),
+      user: '1000:1000',
+    });
+    await mgr.ensure(opts);
+    expect(calls.some((c) => c.some((a) => a.startsWith('--network=container:')))).toBe(true);
+  });
+
+  it('DESTROYS the box when its network cannot be confined, rather than serving an open one', async () => {
+    const calls: string[][] = [];
+    const docker: DockerRun = async (args) => {
+      calls.push(args);
+      if (args[0] === 'inspect') return { code: 1, stdout: '', stderr: 'No such object' };
+      if (args.some((a) => a.startsWith('--network=container:')))
+        return { code: 1, stdout: '', stderr: 'iptables: Permission denied' };
+      return { code: 0, stdout: '', stderr: '' };
+    };
+    const mgr = new BoxManager({ docker, user: '1000:1000' });
+    await expect(mgr.ensure(opts)).rejects.toThrow(/confine the agent box's network/);
+    expect(calls.some((c) => c[0] === 'rm' && c.includes('-f'))).toBe(true);
   });
 
   it('fails with docker’s own reason rather than a generic one', async () => {

@@ -13,6 +13,9 @@ import {
   type DockerRun,
   execArgs,
   inspectState,
+  installArgs,
+  isPackageName,
+  netRuleArgs,
   parsePublishedPort,
   protectedPaths,
 } from './containers.js';
@@ -109,17 +112,48 @@ export class BoxManager {
       if (created.code !== 0) {
         throw new Error(`could not start the agent box: ${firstLine(created.stderr)}`);
       }
+      await this.#applyNetworkRules(name, opts.image ?? DEFAULT_IMAGE);
     } else if (state === 'stopped') {
       const started = await this.#docker(['start', name]);
       if (started.code !== 0) {
         throw new Error(`could not restart the agent box: ${firstLine(started.stderr)}`);
       }
+      // Again on restart, NOT only on creation. A container's network namespace is rebuilt when it
+      // starts, so rules installed into the old one are gone — a stopped-and-started box would come
+      // back with the private network open and nothing would say so.
+      await this.#applyNetworkRules(name, opts.image ?? DEFAULT_IMAGE);
     }
 
     return {
       name,
       hostPort: opts.publishPort ? await this.#publishedPort(name, opts.publishPort) : undefined,
     };
+  }
+
+  // FAILS THE BOX, deliberately. A box whose outbound rules did not apply is a box that can reach
+  // every unauthenticated service on the machine and the rest of the LAN — which is precisely the
+  // thing this is here to prevent. Carrying on with a warning would mean the protection is present
+  // when it happens to work and absent, silently, when it does not.
+  async #applyNetworkRules(name: string, image: string): Promise<void> {
+    const res = await this.#docker(netRuleArgs(name, image), { timeoutMs: 60_000 });
+    if (res.code !== 0) {
+      await this.#docker(['rm', '-f', name], { timeoutMs: 60_000 });
+      throw new Error(`could not confine the agent box's network: ${firstLine(res.stderr)}`);
+    }
+  }
+
+  // The privileged half, and the only place in VibeBoard that runs anything in a box as root.
+  async install(name: string, packages: string[]): Promise<DockerResult> {
+    const bad = packages.filter((p) => !isPackageName(p));
+    if (bad.length > 0 || packages.length === 0) {
+      return {
+        code: 2,
+        stdout: '',
+        stderr: packages.length === 0 ? 'no packages given' : `not a package name: ${bad.join(', ')}`,
+      };
+    }
+    // Long, because apt over a slow link is slow and a half-installed package is worse than a wait.
+    return this.#docker(installArgs(name, packages), { timeoutMs: 600_000 });
   }
 
   async #publishedPort(name: string, containerPort: number): Promise<number | undefined> {

@@ -116,6 +116,52 @@ export interface CreateArgs {
   command?: string[];
 }
 
+// WHY THE CAPABILITY SET IS DOCKER'S DEFAULT AND NOT `--cap-drop ALL`.
+//
+// The box has two levels: agent turns exec as the host user, and package installs exec as root —
+// brokered by VibeBoard, never reachable by the agent, because the image ships no `sudo` at all. With
+// every capability dropped, the privileged half cannot install anything either, and the box becomes a
+// cage the agent cannot work in. Docker's default set is what makes the install half work.
+//
+// Measured 2026-08-09, root inside a box with this exact set: `apt-get install` succeeds; writing
+// `/work/.vibeboard` is refused; `mount -o remount,rw` on it is refused ("permission denied");
+// touching the firewall rules is refused. The read-only boundary is held by the capabilities the
+// container was never granted — SYS_ADMIN and NET_ADMIN are not in the default set — and not by the
+// user id, which is why loosening the user id costs nothing.
+//
+// The agent's own turns gain NOTHING from this: capabilities attach to root or to file capabilities,
+// and a non-root process with `no-new-privileges` can acquire neither.
+
+// Blocked outbound. Not exfiltration control — nothing at this layer is — but it keeps an agent away
+// from the unauthenticated services on the machine that hosts it and from the rest of the LAN.
+export const PRIVATE_RANGES = ['10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16', '169.254.0.0/16'] as const;
+
+// The rules are installed by a THROWAWAY CONTAINER sharing the box's network namespace, never by the
+// box itself. That is the whole point: the box is created without NET_ADMIN, so nothing inside it —
+// including the privileged install step, including a package's own post-install script — can flush
+// what this puts there. Measured: from inside, as root, `iptables -F` answers "Permission denied".
+//
+// The alternative was for the box to set its own rules at startup and then drop privileges. It fails
+// for a subtle reason worth recording: `docker exec` takes its capabilities from the CONTAINER's spec,
+// not from PID 1, so dropping them in an entrypoint does not constrain any later exec at all.
+export function netRuleArgs(box: string, image: string): string[] {
+  const script = PRIVATE_RANGES.map((cidr) => `iptables -A OUTPUT -d ${cidr} -j REJECT`).join('; ');
+  return [
+    'run',
+    '--rm',
+    `--network=container:${box}`,
+    '--cap-add',
+    'NET_ADMIN',
+    '--user',
+    '0:0',
+    '--entrypoint',
+    '/bin/sh',
+    image,
+    '-c',
+    script,
+  ];
+}
+
 // Also pure, also exported for its own test. Every flag here is load-bearing and several are the kind
 // that fail silently when wrong, so the argv is asserted rather than trusted.
 export function createArgs(spec: CreateArgs): string[] {
@@ -134,12 +180,10 @@ export function createArgs(spec: CreateArgs): string[] {
     // the project rather than by root.
     '--user',
     spec.user,
-    // No new privileges, and no capabilities. Nothing an agent runs needs either, and dropping them
-    // costs nothing.
+    // No new privileges: a setuid binary cannot gain anything, so an agent turn has no escalation
+    // route even if one were installed. This is what makes the two-level design safe — see below.
     '--security-opt',
     'no-new-privileges',
-    '--cap-drop',
-    'ALL',
     '-w',
     WORK_DIR,
   ];
@@ -185,6 +229,27 @@ export function execArgs(
   for (const [k, v] of Object.entries(env)) out.push('-e', `${k}=${v}`);
   out.push(name, bin, ...args);
   return out;
+}
+
+// THE PRIVILEGED HALF. Installing a system package needs root; an agent must never have it. So the
+// escalation lives out here, in VibeBoard, and the agent reaches it the way it reaches everything else
+// it cannot do for itself — by asking. Same principle as S1: a separate process holding a capability
+// the agent does not have.
+//
+// The image ships no `sudo`, so this is not a blocked route for the agent. It is an absent one.
+export const INSTALL_HELPER = '/opt/vibeboard/vb-install';
+
+// A helper script with `"$@"`, NOT a shell string. Package names arrive from an agent, and an agent
+// reads whatever is in the repository it was pointed at — so a name is untrusted input. Passing argv
+// means `;` and `$(…)` in a name are a name, never a command.
+export function installArgs(name: string, packages: string[]): string[] {
+  return ['exec', '-u', '0:0', name, INSTALL_HELPER, ...packages];
+}
+
+// Belt as well as braces. Debian package names are lowercase alphanumerics with `+`, `-` and `.`;
+// anything else is refused before it reaches docker rather than being escaped.
+export function isPackageName(name: string): boolean {
+  return /^[a-z0-9][a-z0-9+.-]{0,62}$/.test(name);
 }
 
 // The host port docker chose for a published container port. Parsed rather than assumed, because

@@ -18,6 +18,7 @@ import {
 } from './layout.js';
 import { setCardLinks } from './links.js';
 import { type CreateCardInput, createCard } from './mutations.js';
+import { seedDocs } from './seed-docs.js';
 import { seedSkills } from './seed-skills.js';
 import { BOARDS, type BoardName, type Card, type ProjectConfig } from './types.js';
 
@@ -211,6 +212,7 @@ export async function scaffoldProject(
   // as in ensureControlFiles for the same reason the instructions document is — scaffolding has to
   // produce a complete project without depending on a later open.
   await seedSkills(projectRoot);
+  await seedDocs(projectRoot);
   // Sample cards demonstrate the shape for a brand-new project. Adopting an existing repo
   // should add the cockpit and nothing else — three "delete me" cards would just be noise in
   // someone's real project (and in their git status).

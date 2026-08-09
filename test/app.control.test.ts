@@ -241,9 +241,13 @@ describe('DELETE /api/control/file', () => {
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual({ ok: true });
 
+    // The DELETED one is gone — not "the group is empty". A scaffolded project now ships a seeded
+    // document in this category, so asserting emptiness would be asserting that seeding never happened.
     const list = await app.inject({ method: 'GET', url: '/api/control/files' });
     const docs = list.json().groups.find((g: { key: string }) => g.key === 'docs');
-    expect(docs.files).toEqual([]);
+    const names = docs.files.map((f: { name: string }) => f.name);
+    expect(names).not.toContain('new-doc.md');
+    expect(names).toContain('foundation-bootstrap.md');
   });
 
   it('separates a path violation from a file that exists but is protected', async () => {

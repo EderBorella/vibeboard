@@ -1,6 +1,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { CONVENTIONS_FILE, INSTRUCTIONS_FILE, POINTER_FILES } from './layout.js';
+import { seedDocs } from './seed-docs.js';
 import { seedSkills } from './seed-skills.js';
 
 // The user's standing instructions and the CLI pointer files that lead to them. The instructions
@@ -83,4 +84,7 @@ export async function ensureControlFiles(projectRoot: string): Promise<void> {
   // Skills for a project that predates them. Guarded inside: an existing skills folder is left
   // alone, so a skill the user deleted never comes back.
   await seedSkills(projectRoot);
+  // And the documents an agent gets pointed at. Same reasoning, guarded per file rather than per
+  // folder — the docs folder holds the user's own writing too.
+  await seedDocs(projectRoot);
 }

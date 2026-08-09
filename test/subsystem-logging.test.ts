@@ -9,7 +9,12 @@ import type { CopilotEvent } from '../src/server/copilot-events.js';
 import { installCrashHandlers, type Log } from '../src/server/logging.js';
 import { modelStatus } from '../src/server/models.js';
 import { opencodeTurn } from '../src/server/opencode-client.js';
-import { capStartupLog, opencodeBaseUrl, stopOpencodeServer } from '../src/server/opencode-server.js';
+import {
+  attachBoxes,
+  capStartupLog,
+  opencodeBaseUrl,
+  stopOpencodeServer,
+} from '../src/server/opencode-server.js';
 import { ProjectSession } from '../src/server/session.js';
 import { openTestProject, tempDir, testApp, wsClient } from './helpers.js';
 
@@ -292,7 +297,14 @@ describe('the OpenCode backend', () => {
   it('forwards the spawned server’s output to the log once it is up', async () => {
     // Before this, everything the child said after the listening line went nowhere — including the
     // provider errors that explain a failed turn.
+    //
+    // This is the UNBOXED spawn, which now exists only for tests — production runs the server as its
+    // box's main process, where the same output has to be followed with `docker logs` instead. That
+    // path is covered in test/opencode-server.test.ts; what is asserted here is the forwarding rule
+    // itself: which stream lands at which level, and that the banner and blank lines do not.
     const lines = wiredSink();
+    // No box, deliberately: with one attached this would take the container route and never spawn.
+    attachBoxes(undefined);
     delete process.env.VIBEBOARD_OPENCODE_URL; // so a server really is spawned
     process.env.VIBEBOARD_OPENCODE_BIN = SHIM;
 

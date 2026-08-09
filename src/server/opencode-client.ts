@@ -1,5 +1,5 @@
 import { type CopilotEvent, num } from './copilot-events.js';
-import { opencodeBaseUrl, opencodeLog } from './opencode-server.js';
+import { opencodeBaseUrl, opencodeDirectory, opencodeLog } from './opencode-server.js';
 
 // OpenCode's HTTP API wants the model as { providerID, modelID }. Our ids are
 // "provider/model" (modelID itself may contain slashes, e.g. openrouter/deepseek/x:free).
@@ -147,7 +147,7 @@ async function postJson(url: string, body: unknown, signal?: AbortSignal): Promi
 // project to operate in (session + message both scoped to it).
 export async function opencodeTurn(opts: OpencodeTurnOptions): Promise<string> {
   const base = await opencodeBaseUrl();
-  const dq = `?directory=${encodeURIComponent(opts.cwd)}`;
+  const dq = `?directory=${encodeURIComponent(opencodeDirectory(opts.cwd))}`;
   let sessionId = opts.sessionId;
   if (!sessionId) {
     const session = (await postJson(`${base}/session${dq}`, { title: 'VibeBoard' }, opts.signal)) as {

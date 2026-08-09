@@ -16,7 +16,9 @@ export async function registerSandboxRoutes(api: FastifyInstance, ctx: AppCtx): 
     const attached = attachedOpencodeUrl();
     return {
       ok: ctx.sandbox.ok,
-      profile: ctx.sandbox.ok ? ctx.sandbox.profile : undefined,
+      // The image, where this used to be the AppArmor profile name. Same job — name the thing that
+      // is doing the confining, so the UI can show it and a person can check it.
+      profile: ctx.sandbox.ok ? ctx.sandbox.image : undefined,
       reason: ctx.sandbox.ok ? undefined : ctx.sandbox.reason,
       // Reported even when the sandbox is fine, because it is the other half of whether auto-pilot
       // may start — and the UI shows a different action for each.

@@ -13,12 +13,13 @@ const { runAgentTurn } = await import('../src/server/agent-turn.js');
 import { INSTRUCTIONS_FILE } from '../src/core/layout.js';
 import type { AgentTurnOptions, AgentTurnResult } from '../src/server/agent-turn.js';
 import type { CopilotEvent } from '../src/server/copilot-events.js';
-import { probeSandbox, SANDBOX_PROFILE } from '../src/server/sandbox.js';
+
 import { testTmp } from './helpers.js';
 
-// Probed once, at module level: `describe` callbacks are synchronous.
-const live = await probeSandbox();
-if (!live.ok) console.warn(`\n  ⚠ agent-turn sandbox test SKIPPED: ${live.reason}\n`);
+// No probe: the sandbox is a plain fact here, and the suite's stand-in docker is what makes the real
+// wrapping observable. Nothing in this file is skipped any more, which is the point — the old version
+// skipped whenever an AppArmor profile was missing, so most machines never ran it.
+const LIVE_SANDBOX = { ok: true as const, image: 'vibeboard-agent:test' };
 
 const here = dirname(fileURLToPath(import.meta.url));
 const SHIM = join(here, 'fixtures', 'fake-cli.mjs');
@@ -71,7 +72,11 @@ interface Invocation {
   argv: string[];
   cwd: string;
   prompt: string;
-  confinement: string;
+  // Which box the turn travelled through, and the working directory the box was told to use. Empty
+  // means it never went through the wrapper at all.
+  box: string;
+  workdir: string;
+  env: { CLAUDE_CONFIG_DIR: string };
 }
 
 // Every spawn recorded for this test, in order. Counting them is how a test tells "the second turn
@@ -564,27 +569,35 @@ describe('runAgentTurn', () => {
 
 describe('the sandbox', () => {
   it('spawns the CLI directly when there is none', async () => {
-    const { result } = await claudeTurn({ sandbox: { ok: false, reason: 'not linux' } });
+    const { result } = await claudeTurn({ sandbox: { ok: false, reason: 'docker is not available' } });
     expect(result.exitCode).toBe(0);
-    // NOT `toBe('unconfined')`: on macOS the fixture records 'unknown' and under SELinux it records
-    // an unconfined_u:… label, and this test is deliberately not skipped anywhere. What it means is
-    // "the profile did not apply", and that is what it should say.
-    expect(lastInvocation().confinement).not.toBe(`${SANDBOX_PROFILE} (enforce)`);
+    // No box in the environment means the turn never travelled the wrapper. That is the whole
+    // evidence: the wrapper `exec`s the CLI, so its own arguments are gone by the time this runs.
+    expect(lastInvocation().box).toBe('');
   });
 
-  // Skipped without a loaded profile, and it must be. `aa-exec` exits 1 when the profile is
-  // missing, so the shim never runs and never appends — an earlier version of this test compared
-  // two turns by reading the LAST log line twice and was asserting `x === x`. It passed against a
-  // wrapper that dropped every argument.
-  it.skipIf(!live.ok)('really confines the process, without editing the command', async () => {
+  it('really runs the turn inside the box, without editing the command', async () => {
     const plain = await claudeTurn();
-    const confined = await claudeTurn({ sandbox: live });
+    const confined = await claudeTurn({ sandbox: LIVE_SANDBOX, box: 'vibeboard-abc-claude-code' });
 
     // Two separate spawns, or the comparison below is a tautology.
     expect(invocations()).toHaveLength(2);
     expect(confined.result.exitCode).toBe(0);
-    expect(lastInvocation().confinement).toBe(`${SANDBOX_PROFILE} (enforce)`);
+    expect(lastInvocation().box).toBe('vibeboard-abc-claude-code');
+    // And in the project directory as the box sees it, not the host path.
+    expect(lastInvocation().workdir).toBe('/work');
     // The wrapper wraps; it does not edit what it wraps.
     expect(confined.argv).toEqual(plain.argv);
+  });
+
+  it('points the CLI at the config home INSIDE the box, never the host path', async () => {
+    // Getting this wrong does not fail — it silently uses another project's sessions, because Claude
+    // names its session directory after the working directory and that is always /work in a box.
+    await claudeTurn({ sandbox: LIVE_SANDBOX, box: 'vibeboard-abc-claude-code' });
+    expect(lastInvocation().env.CLAUDE_CONFIG_DIR).toBe('/state/claude');
+  });
+
+  it('REFUSES to spawn at all when the sandbox is ok but no box was resolved', async () => {
+    await expect(claudeTurn({ sandbox: LIVE_SANDBOX })).rejects.toThrow(/unconfined/);
   });
 });

@@ -3,13 +3,17 @@ import { mkdtempSync } from 'node:fs';
 import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type { FastifyInstance, FastifyServerOptions } from 'fastify';
 import { onTestFinished } from 'vitest';
 import WebSocket from 'ws';
 import type { Card } from '../src/core/types.js';
 import { buildApp } from '../src/server/app.js';
+import { BoxManager } from '../src/server/box-manager.js';
+import { BoxService } from '../src/server/box-service.js';
+import type { DockerRun } from '../src/server/containers.js';
 import { type Credential, CredentialStore } from '../src/server/credentials.js';
-import { probeProfile, type SandboxStatus, wrapCommand } from '../src/server/sandbox.js';
+import { type SandboxStatus, wrapCommand } from '../src/server/sandbox.js';
 import type { ServiceCommand } from '../src/server/service-process.js';
 import { ProjectSession } from '../src/server/session.js';
 
@@ -31,8 +35,16 @@ export async function tempDir(): Promise<string> {
 // Run a shell command the way an agent turn is run — through the sandbox wrapper, so what the test
 // observes is what a real run would hit. The exit code IS the assertion: a denial surfaces as a
 // non-zero exit and a message on stderr, never as a thrown error here.
-export function sh(status: SandboxStatus, script: string): Promise<{ code: number | null; stderr: string }> {
-  const { bin, args } = wrapCommand('/bin/sh', ['-c', script], status);
+//
+// `box` is required whenever `status` is ok, exactly as it is in production: the wrapper throws
+// rather than quietly returning an unconfined command, and a helper that hid that would let a test
+// prove containment against a command that was never contained.
+export function sh(
+  status: SandboxStatus,
+  script: string,
+  box?: string,
+): Promise<{ code: number | null; stderr: string }> {
+  const { bin, args } = wrapCommand('/bin/sh', ['-c', script], status, box);
   return new Promise((resolve) => {
     const child = spawn(bin, args, { stdio: ['ignore', 'ignore', 'pipe'] });
     let stderr = '';
@@ -64,16 +76,40 @@ export function shimArgsLog(): string {
 
 export const TEST_ADMIN_TOKEN = 'test-admin-token';
 
-// Every agent now needs a sandbox, so every test that dispatches one needs a real profile. This is
-// `unprivileged_userns`, which ships with the distribution's own apparmor package and any
-// unprivileged process may transition into — so the suite exercises the real gate and the real
-// `aa-exec` path, and NO bypass exists in the codebase for anyone to reach for later.
+// Every agent needs a sandbox, so every test that dispatches one needs a status that says so. The
+// suite still travels the REAL wrapping — `wrapCommand` builds a genuine `docker exec` argv and the
+// spawn really happens — because `VIBEBOARD_DOCKER_BIN` points docker at test/fake-docker.mjs, which
+// strips the exec prefix and runs the rest on the host. There is no bypass inside `wrapCommand` for
+// anyone to reach for later; the seam is the binary, and the argv stays under assertion.
 //
-// It is not our profile and enforces none of our denies; it is a stand-in for "confined". The
-// tests that check what is actually denied load `vibeboard-agent` and are in test/sandbox.test.ts.
-// Where AppArmor is absent this is a refusal, and the suites that dispatch will fail rather than
-// quietly pass unsandboxed — the cost of one path, paid by contributors off Debian/Ubuntu/SUSE.
-export const TEST_SANDBOX: SandboxStatus = await probeProfile('unprivileged_userns');
+// What is deliberately NOT simulated is the isolation itself. That is checked against a real
+// container in test/box-integration.test.ts, which skips when docker or the image is absent.
+export const TEST_SANDBOX: SandboxStatus = { ok: true, image: 'vibeboard-agent:test' };
+
+// The path to the stand-in, resolved from this file so it survives whatever the cwd is.
+export const FAKE_DOCKER = fileURLToPath(new URL('./fake-docker.mjs', import.meta.url));
+
+// Point the whole process at it. Called from the suite's setup file, once, rather than per test —
+// process-wide state set in a beforeEach races every other file sharing the worker.
+export function useFakeDocker(): void {
+  process.env.VIBEBOARD_DOCKER_BIN = FAKE_DOCKER;
+}
+
+// A BoxService whose docker is the stand-in: `ensure` answers with a real box name, computed the real
+// way, without a daemon. Tests that dispatch an agent pass this alongside TEST_SANDBOX.
+export function testBoxes(): BoxService {
+  return new BoxService({
+    manager: new BoxManager({ docker: fakeDockerRun, user: '1000:1000' }),
+    image: 'vibeboard-agent:test',
+  });
+}
+
+// Answers as a healthy daemon would, so `ensure` adopts rather than creating and nothing is spawned.
+const fakeDockerRun: DockerRun = async (args) => {
+  if (args[0] === 'inspect') return { code: 0, stdout: 'true\n', stderr: '' };
+  if (args[0] === 'port') return { code: 0, stdout: '127.0.0.1:39999\n', stderr: '' };
+  return { code: 0, stdout: '', stderr: '' };
+};
 
 export interface TestAppOpts {
   runBin?: string;
@@ -85,6 +121,7 @@ export interface TestAppOpts {
   // Confinement, as the composition root would pass it. Absent means unsandboxed, which is what
   // every suite that is about something else wants.
   sandbox?: SandboxStatus;
+  boxes?: BoxService;
 }
 
 // buildApp, plus the browser's credential on every request that does not bring its own. Auth is not
@@ -99,6 +136,10 @@ export function testApp(session: ProjectSession, opts: TestAppOpts = {}): Fastif
   const app = buildApp(session, {
     ...opts,
     sandbox: opts.sandbox ?? TEST_SANDBOX,
+    // Paired with the sandbox for the same reason it is in production: a status that says "confined"
+    // and no box to be confined IN makes `wrapCommand` throw. Coupling them here means a test cannot
+    // accidentally build the one without the other.
+    boxes: opts.boxes ?? testBoxes(),
     credentials: opts.credentials ?? new CredentialStore(TEST_ADMIN_TOKEN),
   });
   app.addHook('onRequest', async (req) => {

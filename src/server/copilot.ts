@@ -7,6 +7,7 @@ import {
   type RunningTurn,
   runAgentTurn,
 } from './agent-turn.js';
+import type { BoxService } from './box-service.js';
 import type { CopilotEvent } from './copilot-events.js';
 import { NOT_REQUESTED, type SandboxStatus } from './sandbox.js';
 
@@ -48,9 +49,11 @@ export class CopilotSession {
   // same terms as a run. Held on the session rather than passed per send: it is a fact about the
   // process, and threading it through every caller of `send` would invite one of them to forget.
   readonly #sandbox: SandboxStatus;
+  readonly #boxes: BoxService | undefined;
 
-  constructor(opts: { sandbox?: SandboxStatus } = {}) {
+  constructor(opts: { sandbox?: SandboxStatus; boxes?: BoxService } = {}) {
     this.#sandbox = opts.sandbox ?? NOT_REQUESTED;
+    this.#boxes = opts.boxes;
   }
 
   get state(): CopilotState {
@@ -90,6 +93,10 @@ export class CopilotSession {
     // test/copilot.test.ts ('spawns with a real model and effort when the caller names
     // neither') and test/opencode-variant.test.ts.
     const defaults = backendDefaults(backend);
+    // Ensured before the turn, like a run's. The copilot SHARES the project's box with every run on
+    // the same backend — S1: its rights are identical, only its credential differs — so this is
+    // usually one `docker inspect` against a container that is already up.
+    const box = this.#boxes ? (await this.#boxes.ensure(opts.cwd, backend)).name : undefined;
     const turnOptions: AgentTurnOptions = {
       cwd: opts.cwd,
       text: opts.text,
@@ -100,6 +107,7 @@ export class CopilotSession {
       sessionId: this.#sessionId,
       timeoutMs: copilotTimeoutMs(),
       sandbox: this.#sandbox,
+      ...(box ? { box } : {}),
       // The chat's own bookkeeping, kept here rather than in the shared turn: a skill run has no
       // session to remember, so watching for it is this class's concern alone.
       onEvent: (event) => {

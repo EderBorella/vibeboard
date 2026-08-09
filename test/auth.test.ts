@@ -197,7 +197,7 @@ describe('the API boundary', () => {
     // Proved by adding a sandbox to `open()`: the status became 400, and this line would have failed for
     // a reason that had nothing to do with authorisation. The refusal's own words are the honest anchor.
     expect(res.statusCode).not.toBe(403);
-    expect(res.json().error).toMatch(/sandbox/i);
+    expect(res.json().error).toMatch(/container/i);
   });
 
   it('refuses a checkup credential on POST /api/runs too', async () => {

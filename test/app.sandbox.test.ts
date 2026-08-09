@@ -2,10 +2,11 @@ import type { FastifyInstance } from 'fastify';
 import { afterEach, describe, expect, it, onTestFinished } from 'vitest';
 import { buildApp } from '../src/server/app.js';
 import { CredentialStore } from '../src/server/credentials.js';
-import { NOT_REQUESTED, SANDBOX_PROFILE, type SandboxStatus } from '../src/server/sandbox.js';
+import { NOT_REQUESTED, type SandboxStatus } from '../src/server/sandbox.js';
 import { ProjectSession } from '../src/server/session.js';
 import { TEST_SANDBOX, tempDir } from './helpers.js';
 
+const TEST_IMAGE = 'vibeboard-agent:test';
 const ADMIN = 'admin-token-for-sandbox-routes';
 const admin = { authorization: `Bearer ${ADMIN}` };
 const bearer = (token: string): Record<string, string> => ({ authorization: `Bearer ${token}` });
@@ -37,28 +38,31 @@ async function open(
 }
 
 describe('GET /api/sandbox', () => {
-  it('reports an enforced profile, and no reason to explain', async () => {
-    const { app } = await open({ ok: true, profile: SANDBOX_PROFILE });
+  it('reports the image doing the confining, and no reason to explain', async () => {
+    const { app } = await open({ ok: true, image: TEST_IMAGE });
     const body = (await app.inject({ method: 'GET', url: '/api/sandbox', headers: admin })).json();
-    expect(body).toMatchObject({ ok: true, profile: SANDBOX_PROFILE, backend: 'managed' });
+    expect(body).toMatchObject({ ok: true, profile: TEST_IMAGE, backend: 'managed' });
     expect(body.reason).toBeUndefined();
     // Nothing to refuse: sandboxed, and managing its own server.
     expect(body.agentRefusal).toBeNull();
   });
 
   it('carries the reason and the refusal when there is no sandbox', async () => {
-    const { app } = await open({ ok: false, reason: 'profile not loaded — run `npm run sandbox:install`' });
+    const { app } = await open({
+      ok: false,
+      reason: 'the agent image is not built — run `npm run box:build`',
+    });
     const body = (await app.inject({ method: 'GET', url: '/api/sandbox', headers: admin })).json();
     expect(body.ok).toBe(false);
-    expect(body.reason).toContain('sandbox:install');
+    expect(body.reason).toContain('box:build');
     // The refusal repeats the reason rather than saying a bare no. This is the string the UI shows,
     // and a dead end here is worse than the condition it describes.
-    expect(body.agentRefusal).toContain('sandbox:install');
+    expect(body.agentRefusal).toContain('box:build');
   });
 
   it('refuses auto-pilot while attached to an external server, sandbox or not', async () => {
     process.env.VIBEBOARD_OPENCODE_URL = 'http://127.0.0.1:9999';
-    const { app } = await open({ ok: true, profile: SANDBOX_PROFILE });
+    const { app } = await open({ ok: true, image: TEST_IMAGE });
     const body = (await app.inject({ method: 'GET', url: '/api/sandbox', headers: admin })).json();
     expect(body).toMatchObject({ ok: true, backend: 'attached', attachedUrl: 'http://127.0.0.1:9999' });
     expect(body.agentRefusal).toContain('VIBEBOARD_OPENCODE_URL');
@@ -67,7 +71,10 @@ describe('GET /api/sandbox', () => {
 
 describe('one path: no agent runs without a sandbox', () => {
   it('refuses to dispatch a run, and says which condition failed', async () => {
-    const { app } = await open({ ok: false, reason: 'profile not loaded — run `npm run sandbox:install`' });
+    const { app } = await open({
+      ok: false,
+      reason: 'the agent image is not built — run `npm run box:build`',
+    });
     const res = await app.inject({
       method: 'POST',
       url: '/api/runs',
@@ -76,7 +83,7 @@ describe('one path: no agent runs without a sandbox', () => {
     });
     // 412, not 403: the request is fine, the machine is not in a state to serve it.
     expect(res.statusCode).toBe(412);
-    expect(res.json().error).toContain('sandbox:install');
+    expect(res.json().error).toContain('box:build');
   });
 
   it('refuses BEFORE resolving the request, so a bad payload still reports the sandbox', async () => {

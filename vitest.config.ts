@@ -1,6 +1,7 @@
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';
 
 // One directory per test RUN, holding every temp project the suite creates, removed by
@@ -34,6 +35,15 @@ export default defineConfig({
     env: {
       // Inside the run root, so it goes with everything else.
       VIBEBOARD_TEST_TMP: RUN_TMP,
+      // `docker` is the suite's stand-in (test/fake-docker.mjs), which strips the exec prefix and runs
+      // the rest on the host. `wrapCommand` still builds a real `docker exec` argv and the spawn still
+      // happens, so the argv stays under assertion — there is no bypass inside the wrapper for anyone
+      // to reach for later. What this does NOT simulate is the isolation; that is checked against a
+      // real container in test/box-integration.test.ts, which uses the real binary explicitly.
+      //
+      // Set HERE rather than in a setup file: a setup file also runs under jsdom, where import.meta.url
+      // is an http URL and `fileURLToPath` throws — which failed the collection of every .tsx suite.
+      VIBEBOARD_DOCKER_BIN: fileURLToPath(new URL('./test/fake-docker.mjs', import.meta.url)),
       VIBEBOARD_STATE_FILE: join(mkdtempSync(join(RUN_TMP, 'state-')), 'state.json'),
       // The server's logger is on by default (src/server/logging.ts). Silence it for the suite —
       // every file that builds an app, directly or through openTestProject, would otherwise bury

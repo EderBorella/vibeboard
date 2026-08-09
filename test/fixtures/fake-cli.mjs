@@ -29,19 +29,22 @@ try {
 }
 const log = (prompt.match(/\[\[log:([^\]]+)\]\]/) ?? [])[1];
 
-// What is confining THIS process. Recorded rather than inferred from argv, because the sandbox
-// wrapper `exec`s the CLI — so by the time this runs, aa-exec is gone and its arguments with it.
-// argv can only ever show the shape of the command; this shows whether the kernel agreed.
-let confinement = 'unknown';
-try {
-  confinement = readFileSync('/proc/self/attr/current', 'utf8').trim();
-} catch {
-  /* no AppArmor, or not Linux — 'unknown' is the honest answer */
-}
+// WHICH BOX confined this process, recorded rather than inferred from argv: the wrapper's own
+// arguments are gone by the time the CLI runs, so argv can only ever show the shape of the command.
+// The suite's stand-in docker puts these in the environment as it strips the exec prefix, so an
+// empty `box` means the turn was spawned WITHOUT going through the wrapper at all.
+//
+// This replaced a read of /proc/self/attr/current, which is what the AppArmor wrapper left behind.
+const box = process.env.VIBEBOARD_FAKE_DOCKER_BOX ?? '';
+const workdir = process.env.VIBEBOARD_FAKE_DOCKER_WORKDIR ?? '';
 
 // The prompt is recorded alongside argv so a test can assert BOTH what was said and that argv did
 // not say it.
-if (log) appendFileSync(log, `${JSON.stringify({ argv: args, cwd: process.cwd(), prompt, confinement })}\n`);
+if (log)
+  appendFileSync(
+    log,
+    `${JSON.stringify({ argv: args, cwd: process.cwd(), prompt, box, workdir, env: { CLAUDE_CONFIG_DIR: process.env.CLAUDE_CONFIG_DIR ?? '' } })}\n`,
+  );
 
 const behaviour = (prompt.match(/\[\[behaviour:(\w+)\]\]/) ?? [])[1] ?? 'ok';
 const write = (s) => process.stdout.write(s);

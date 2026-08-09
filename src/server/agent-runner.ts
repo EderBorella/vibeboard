@@ -11,6 +11,7 @@ import {
 import type { Skill } from '../core/skills.js';
 import type { BoardName, Card } from '../core/types.js';
 import { type Backend, type RunningTurn, runAgentTurn } from './agent-turn.js';
+import type { BoxService } from './box-service.js';
 import type { ResultStats } from './copilot-events.js';
 import type { Credential, CredentialStore } from './credentials.js';
 import type { GitMeasure, GitPoint } from './git-measure.js';
@@ -83,6 +84,10 @@ export interface RunnerOptions {
   // Confines every run this runner dispatches. Absent means unconfined, which is what a test about
   // something else wants; the composition root passes the probe's answer.
   sandbox?: SandboxStatus;
+  // Where a run actually executes. Resolved per dispatch rather than held, because the box belongs to
+  // the PROJECT and the open project changes — and because a box can be removed underneath us by a
+  // prune or an image rebuild, so the answer has to be asked for again each time.
+  boxes?: BoxService;
   // Mints each run a credential when it starts and revokes it when it settles. Optional: a runner
   // without one spawns agents that are told nothing about the API, which is what every test that is
   // about something else wants — and `work` is the only scope a run ever gets, so there is nothing
@@ -254,7 +259,7 @@ export class AgentRunner {
       this.#queue.push({ record, root, input });
       return record;
     }
-    this.#start(root, record, input);
+    await this.#start(root, record, input);
     return record;
   }
 
@@ -262,7 +267,7 @@ export class AgentRunner {
   // this later, with the same record it was written with.
   // `announce` marks a run arriving from the QUEUE: its record is still `queued` on disk, so the write
   // in #spawn is what makes it `running`, and that write is the one the dashboard needs to hear about.
-  #start(root: string, record: RunRecord, input: DispatchInput, announce = false): void {
+  async #start(root: string, record: RunRecord, input: DispatchInput, announce = false): Promise<void> {
     const run = record.run;
     // Minted here rather than in dispatch, so a queued run's credential begins its life when the
     // run actually starts. `work`, confined to its own card: a run that could move cards could put
@@ -282,20 +287,20 @@ export class AgentRunner {
     // the only thing that revokes it is #settle's `finally`, so a throw on the way there would
     // leave a working key alive for the life of the process with no run behind it.
     try {
-      this.#spawn(root, record, input, minted, announce);
+      await this.#spawn(root, record, input, minted, announce);
     } catch (err) {
       this.#opts.credentials?.expireRun(run);
       throw err;
     }
   }
 
-  #spawn(
+  async #spawn(
     root: string,
     record: RunRecord,
     input: DispatchInput,
     minted: Credential | undefined,
     announce = false,
-  ): void {
+  ): Promise<void> {
     const run = record.run;
     const credential = minted
       ? { token: minted.token, apiBase: this.#opts.apiBase?.() ?? '', scope: minted.scope }
@@ -333,6 +338,7 @@ export class AgentRunner {
     });
 
     const timeoutMs = this.#opts.timeoutMs();
+    const box = await this.#boxFor(root, input.backend);
     const turn = runAgentTurn({
       cwd: root,
       text: prompt,
@@ -343,6 +349,7 @@ export class AgentRunner {
       timeoutMs,
       bin: this.#opts.bin,
       sandbox: this.#opts.sandbox,
+      ...(box ? { box } : {}),
       onEvent: (event) => {
         // Chained, not fired and forgotten. Two reasons, both real: concurrent appends of one line
         // each can interleave mid-line, and #settle reads the tail as soon as the process closes —
@@ -413,7 +420,47 @@ export class AgentRunner {
     while (!this.isBusy()) {
       const next = this.#queue.shift();
       if (!next) return;
-      this.#start(next.root, { ...next.record, status: 'running' }, next.input, true);
+      // Not awaited — #drain is called from #settle's synchronous tail — but a rejection must not
+      // become an unhandled one. A queued run whose box cannot be created has to be reported as a
+      // failed run, or it simply disappears: taken off the queue, never spawned, never settled.
+      void this.#start(next.root, { ...next.record, status: 'running' }, next.input, true).catch((err) =>
+        this.#failToStart(next.root, next.record, err),
+      );
+    }
+  }
+
+  // Which box this run executes in.
+  //
+  // Resolved BEFORE the turn, never inferred from its failure: `docker exec` into a missing box exits
+  // non-zero exactly as a genuinely failing agent does, so a containment problem would be reported as
+  // the agent's own. A throw here surfaces as a failed dispatch carrying docker's own reason.
+  async #boxFor(root: string, backend: Backend): Promise<string | undefined> {
+    if (!this.#opts.boxes) return undefined;
+    return (await this.#opts.boxes.ensure(root, backend)).name;
+  }
+
+  // A run that never started, because the thing it needed to run INSIDE could not be made.
+  //
+  // It gets a real, settled record rather than disappearing. A queued run is taken off the queue the
+  // moment it is picked, so a throw with no handler here loses it silently: the board shows nothing
+  // running, nothing queued, and no failure — the worst of the three possible wrong answers.
+  async #failToStart(root: string, record: RunRecord, err: unknown): Promise<void> {
+    const reason = err instanceof Error ? err.message : String(err);
+    this.#opts.log?.error({ err, run: record.run }, 'a run could not be started');
+    const failed = withoutReport(
+      record,
+      'failed',
+      `This run never started: ${reason}`,
+      this.#opts.now().toISOString(),
+    );
+    try {
+      await writeRun(root, failed);
+      this.#opts.onUpdate?.(failed);
+    } catch (writeErr) {
+      this.#opts.log?.error(
+        { err: writeErr, run: record.run },
+        'could not record a run that failed to start',
+      );
     }
   }
 

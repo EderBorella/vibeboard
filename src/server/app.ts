@@ -5,6 +5,7 @@ import { DEFAULT_MAX_RUNS } from '../core/config.js';
 import { AgentRunner } from './agent-runner.js';
 import { registerAuth } from './auth.js';
 import { AutopilotRuntime } from './autopilot-runtime.js';
+import type { BoxService } from './box-service.js';
 import { ChatStore } from './chat-store.js';
 import { CopilotSession } from './copilot.js';
 import { CopilotAuthority } from './copilot-authority.js';
@@ -14,8 +15,10 @@ import { DeviceStore } from './devices.js';
 import { REAL_GIT } from './git-measure.js';
 import { type Log, serverLogger, stripSecrets, withRedaction } from './logging.js';
 import {
+  attachBoxes,
   attachHaltGate,
   attachOpencodeLogger,
+  attachProjectRoot,
   attachSandbox,
   stopOpencodeServer,
 } from './opencode-server.js';
@@ -82,6 +85,9 @@ export function buildApp(
     // Probed once, by main.ts, before the app exists — every agent this app starts is confined the
     // same way, and re-probing per turn would put a process spawn in front of every dispatch.
     sandbox?: SandboxStatus;
+    // Where agents actually run. Optional for the same reason `sandbox` is: a test about something
+    // else neither has docker nor needs it, and without a sandbox no box is ever asked for.
+    boxes?: BoxService;
     // What to spawn for the auto-pilot loop. Tests put a shim here and read back what the process was
     // actually given; production resolves the loop's entry point beside this module.
     serviceCommand?: () => ServiceCommand;
@@ -106,7 +112,7 @@ export function buildApp(
   // Each subsystem logs under its own `component`, so the file can be filtered by area:
   //   jq 'select(.component == "watcher")' logs/vibeboard-*.log
   const log: Log = app.log;
-  const copilot = new CopilotSession({ sandbox: opts.sandbox });
+  const copilot = new CopilotSession({ sandbox: opts.sandbox, boxes: opts.boxes });
   const copilotAuthority = new CopilotAuthority(credentials);
   const chats = new ChatStore(session, log.child({ component: 'chat' }));
   // The watcher and the debounced snapshot broadcast happen with no request in flight, and the
@@ -117,6 +123,10 @@ export function buildApp(
   attachOpencodeLogger(log.child({ component: 'opencode' }));
   // Same singleton, same reason: the managed server is spawned lazily, long after this runs.
   attachSandbox(opts.sandbox ?? NOT_REQUESTED);
+  // The managed OpenCode server runs INSIDE a box, so the singleton needs one to start it in.
+  attachBoxes(opts.boxes);
+  // Which project's box. The singleton outlives any one project, so this is read per start.
+  attachProjectRoot(() => session.root ?? '');
   const { clients, broadcast, closeDevice } = createBroadcaster();
   const devices = opts.devices ?? DeviceStore.inMemory();
   // A corrupt device file empties the store, and an empty store re-opens the unauthenticated claim.
@@ -149,6 +159,7 @@ export function buildApp(
     apiBase: () => `http://127.0.0.1:${process.env.VIBEBOARD_PORT ?? 4610}`,
     bin: opts.runBin,
     sandbox: opts.sandbox,
+    boxes: opts.boxes,
     // S11's files-changed. Real git here; tests that are about something else pass none and the field
     // is absent, which is what it means when there is no repository to ask.
     git: REAL_GIT,

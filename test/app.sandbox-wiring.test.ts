@@ -6,14 +6,18 @@ import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 // The seam is `wrapCommand` — the last thing between a decision made in buildApp and a real spawn.
 // Spied, not replaced: the real implementation still runs, so this cannot pass by neutering the
 // thing it is testing.
-const spy = vi.hoisted(() => ({ statuses: [] as unknown[] }));
+const spy = vi.hoisted(() => ({ statuses: [] as unknown[], boxes: [] as (string | undefined)[] }));
 vi.mock('../src/server/sandbox.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../src/server/sandbox.js')>();
   return {
     ...actual,
-    wrapCommand: (bin: string, args: string[], status: Parameters<typeof actual.wrapCommand>[2]) => {
-      spy.statuses.push(status);
-      return actual.wrapCommand(bin, args, status);
+    // EVERY argument forwarded, deliberately. An earlier version of this spy took only the first
+    // three and dropped the rest, which meant the real `wrapCommand` was called with no box — so it
+    // threw, and the failure looked like a wiring bug rather than a truncated stub.
+    wrapCommand: (...callArgs: Parameters<typeof actual.wrapCommand>) => {
+      spy.statuses.push(callArgs[2]);
+      spy.boxes.push(callArgs[3]);
+      return actual.wrapCommand(...callArgs);
     },
   };
 });
@@ -34,14 +38,14 @@ beforeAll(() => {
   process.env.VIBEBOARD_CLAUDE_BIN = CHAT_SHIM;
 });
 
-// The suite's own status — a real, loaded profile. It has to be `ok`, because a dispatch with
-// anything else is now refused before a spawn happens at all; and it has to be REAL, because
-// wrapCommand runs `aa-exec -p <profile>` for anything ok. Identity is what proves the wiring:
-// this exact object has to arrive at the spawn site.
+// The suite's own status. It has to be `ok`, because a dispatch with anything else is refused before
+// a spawn happens at all. Identity is what proves the wiring: this exact object has to arrive at the
+// spawn site — and now so does a box, because `wrapCommand` throws without one.
 const STATUS: SandboxStatus = TEST_SANDBOX;
 
 afterEach(() => {
   spy.statuses.length = 0;
+  spy.boxes.length = 0;
 });
 
 // Nothing else in the suite connects these two ends. test/agent-turn.test.ts proves the wrapper
@@ -70,6 +74,11 @@ describe('buildApp hands the sandbox to everything that spawns an agent', () => 
     expect(res.statusCode).toBe(200);
     await vi.waitFor(() => expect(spy.statuses.length).toBeGreaterThan(0));
     expect(spy.statuses[0]).toEqual(STATUS);
+    // And a BOX, resolved before the spawn. The status alone no longer means "confined": without
+    // this, `wrapCommand` would have thrown — which is the point, but the wiring is what stops it
+    // ever getting that far, and nothing else in the suite would notice if AgentRunner stopped
+    // asking for one.
+    expect(spy.boxes[0]).toMatch(/^vibeboard-[0-9a-f]{12}-claude-code$/);
   });
 
   it('to the chat copilot, which auto-approves its own tool calls', async () => {
@@ -82,5 +91,8 @@ describe('buildApp hands the sandbox to everything that spawns an agent', () => 
     client.close();
 
     expect(spy.statuses[0]).toEqual(STATUS);
+    // The chat SHARES the project's box with every run on the same backend — S1: its rights are
+    // identical, only its credential differs — so this is the same name a dispatch resolves.
+    expect(spy.boxes[0]).toMatch(/^vibeboard-[0-9a-f]{12}-claude-code$/);
   });
 });

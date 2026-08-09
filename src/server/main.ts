@@ -2,6 +2,8 @@ import { networkInterfaces } from 'node:os';
 import { listenOnApiSocket, removeApiSocketFile } from './api-socket.js';
 import { buildApp } from './app.js';
 import { restoreLastProject } from './app-state.js';
+import { BoxService } from './box-service.js';
+import { DEFAULT_IMAGE } from './containers.js';
 import { adminToken, CredentialStore } from './credentials.js';
 import { DeviceStore } from './devices.js';
 import { installCrashHandlers, serverLogger } from './logging.js';
@@ -38,15 +40,19 @@ const admin = await adminToken();
 // Read before the app is built, because `buildApp` is synchronous. `devices.empty` is what decides
 // whether the unauthenticated first claim is open, so this file is the authority on it.
 const devices = await DeviceStore.load();
+// Every agent box this server makes or adopts. One service, because a box is keyed by project and
+// backend and outlives any single request.
+const boxes = new BoxService();
 // Probed once, here, because the answer cannot change while the process runs and every agent this
 // server starts is confined identically. The banner says which mode we are in: a sandbox nobody can
 // see the state of is a sandbox nobody trusts.
-const sandbox = await probeSandbox();
+const sandbox = await probeSandbox(boxes, DEFAULT_IMAGE);
 const app = buildApp(session, {
   logger: logging.options,
   credentials: new CredentialStore(admin, devices),
   devices,
   sandbox,
+  boxes,
 });
 // Anything that rejects or throws outside a request used to end the process in silence. Node exits
 // on both of these by default, so this only adds the record of why.
@@ -69,7 +75,17 @@ for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) {
     if (app.service.stop()) console.log('  stopped the auto-pilot loop');
     stopOpencodeServer();
     removeApiSocketFile();
-    process.exit(0);
+    // AWAITED, unlike everything above it, because removing a container is a round trip to the daemon
+    // and `process.exit` does not wait for a promise. A box left running is not merely untidy: it
+    // holds the project's bind mounts and an idle CLI for as long as the machine is up. Capped, so a
+    // wedged daemon delays a Ctrl-C by seconds rather than hanging it — the startup sweep is the
+    // backstop for whatever this misses.
+    void Promise.race([
+      boxes.stopAll().then((n) => {
+        if (n > 0) console.log(`  stopped ${n} agent box${n === 1 ? '' : 'es'}`);
+      }),
+      new Promise((r) => setTimeout(r, 15_000)),
+    ]).finally(() => process.exit(0));
   });
 }
 process.once('exit', () => {
@@ -102,6 +118,11 @@ function lanAddress(): string | undefined {
 
 async function start(): Promise<void> {
   const served = await registerStatic(app);
+  // Boxes left by a VibeBoard that did not get to shut down — a SIGKILL, an OOM kill, a crashed host.
+  // Safe to do unconditionally because only this process creates them and it has just started; a
+  // second VibeBoard on one machine is already refused by the API socket below.
+  const swept = await boxes.stopAll().catch(() => 0);
+  if (swept > 0) console.log(`  swept ${swept} agent box${swept === 1 ? '' : 'es'} left by a previous run`);
   // Reopen whatever was open last, so a restart doesn't dump you back at the project gate.
   const reopened = await restoreLastProject(session);
   // A `running` state on disk belongs to the process that died: its children went with it, so
@@ -139,8 +160,8 @@ async function start(): Promise<void> {
   // Stated either way. Silence about an absent sandbox is how "best-effort" quietly becomes "none".
   console.log(
     sandbox.ok
-      ? `  → agents sandboxed (${sandbox.profile}): they cannot write cards, config, skills or instructions`
-      : `  → agents NOT sandboxed — ${sandbox.reason}`,
+      ? `  → agents run in containers (${sandbox.image}): they cannot write cards, config, skills or instructions`
+      : `  → agents DISABLED — ${sandbox.reason}`,
   );
   if (isLoopback) {
     console.log(`\n  This machine only. To reach it from other devices: VIBEBOARD_HOST=0.0.0.0`);

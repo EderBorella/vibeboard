@@ -11,6 +11,7 @@ import {
   DEFAULT_IMAGE,
   type DockerResult,
   type DockerRun,
+  dockerBin,
   execArgs,
   inspectState,
   installArgs,
@@ -26,7 +27,7 @@ const run = promisify(execFile);
 // daemon — and because the tests must not depend on a machine that happens to have docker.
 export const spawnDocker: DockerRun = async (args, opts): Promise<DockerResult> => {
   try {
-    const { stdout, stderr } = await run('docker', args, { timeout: opts?.timeoutMs ?? 30_000 });
+    const { stdout, stderr } = await run(dockerBin(), args, { timeout: opts?.timeoutMs ?? 30_000 });
     return { code: 0, stdout, stderr };
   } catch (err) {
     const e = err as { code?: number; stdout?: string; stderr?: string; message?: string };
@@ -169,7 +170,7 @@ export class BoxManager {
     args: string[],
     env: Record<string, string> = {},
   ): { bin: string; args: string[] } {
-    return { bin: 'docker', args: execArgs(name, bin, args, env) };
+    return { bin: dockerBin(), args: execArgs(name, bin, args, env) };
   }
 
   async stop(projectRoot: string, backend: BoxBackend): Promise<void> {

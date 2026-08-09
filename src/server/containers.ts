@@ -26,11 +26,40 @@ export const BACKEND_LABEL = 'io.vibeboard.backend';
 
 export const DEFAULT_IMAGE = process.env.VIBEBOARD_AGENT_IMAGE ?? 'vibeboard-agent:latest';
 
+// The docker executable. Resolved per call rather than captured, and overridable, for ONE reason:
+// the suite needs to exercise the real wrapping. `aa-exec` was transparent — it ran the host command
+// it was given, so a test could put a shim on the other side of it and watch the real code path.
+// `docker exec` is not: the shim does not exist inside a container. So tests point this at a stand-in
+// that strips the exec prefix and runs the rest, which keeps the argv under assertion instead of
+// putting a bypass inside `wrapCommand` for a gate to be bypassed through.
+export function dockerBin(): string {
+  return process.env.VIBEBOARD_DOCKER_BIN ?? 'docker';
+}
+
 // Where the project is mounted. Fixed, not derived from the host path: the host path is not
 // necessarily representable in the container, and a constant is what lets the same image serve every
 // project. It is also why per-project agent state is needed — see `copilot-env.ts`.
 export const WORK_DIR = '/work';
 export const SOCKET_DIR = '/run/vibeboard';
+// Where the CLI's own state lives inside the box. A constant, because the host path is a digest of
+// the project path and no CLI should ever be shown that.
+export const STATE_DIR = '/state';
+
+// The environment a backend's CLI needs to find its state INSIDE the box. Pure, and exported for its
+// own test, because a wrong value here does not fail — it silently uses another project's sessions.
+//
+// Both backends need this for unrelated reasons, which is the main argument for believing it. Claude
+// names its session directory after the working directory, and in a box that is always `/work`, so
+// without a per-project config home every project on the machine collides in one bucket. OpenCode
+// keeps sessions in a SQLite database in its data home, and sharing the user's own would put several
+// containers and the user on one 265MB file as concurrent writers.
+export function boxEnvFor(backend: BoxBackend): Record<string, string> {
+  if (backend === 'claude-code') return { CLAUDE_CONFIG_DIR: `${STATE_DIR}/claude` };
+  return {
+    XDG_DATA_HOME: `${STATE_DIR}/opencode-data`,
+    XDG_CONFIG_HOME: `${STATE_DIR}/opencode-xdg`,
+  };
+}
 
 // A deterministic name, so a box is found again after a restart without consulting any state we wrote.
 // Hashed because a project path contains `/` and may be long, and truncated because the readable half
@@ -86,7 +115,7 @@ export function protectedPaths(projectRoot: string, exists: (path: string) => bo
 export function boxMounts(paths: BoxPaths): MountSpec[] {
   const mounts: MountSpec[] = [
     { source: paths.projectRoot, target: WORK_DIR },
-    { source: paths.stateDir, target: '/state' },
+    { source: paths.stateDir, target: STATE_DIR },
   ];
   // Read-only ON TOP of the writable project. Nested mounts carry independent flags, which is what
   // makes this hold — and is why the reverse (a read-only parent with a writable child) famously

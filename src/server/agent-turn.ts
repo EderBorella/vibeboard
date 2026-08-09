@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { INSTRUCTIONS_FILE } from '../core/layout.js';
+import { boxEnvFor } from './containers.js';
 import { claudeConfigDir, isolationEnabled } from './copilot-env.js';
 import { type CopilotEvent, parseCopilotLine, type ResultStats } from './copilot-events.js';
 import { opencodeTurn } from './opencode-client.js';
@@ -42,6 +43,10 @@ export interface AgentTurnOptions {
   // and for the same reason: a test must be able to state it rather than inherit process state.
   // Probed once per server, not per turn: it cannot change while the process runs.
   sandbox?: SandboxStatus;
+  // WHICH box to run in. Required whenever `sandbox` is ok — `wrapCommand` throws without it rather
+  // than returning an unconfined command, because "confined" stopped being a property of the status
+  // alone the moment containment became a resource something has to create.
+  box?: string;
   onEvent: (event: CopilotEvent) => void;
 }
 
@@ -206,11 +211,19 @@ function startOpencode(opts: AgentTurnOptions): RunningTurn {
 // Claude Code: spawn `claude -p` and stream its stdout.
 function startClaude(opts: AgentTurnOptions): RunningTurn {
   const { bin, args } = claudeCommand(opts);
-  // Isolated config dir so the personal ~/.claude/CLAUDE.md, plugins, and hooks don't load.
-  const env = isolationEnabled() ? { ...process.env, CLAUDE_CONFIG_DIR: claudeConfigDir() } : process.env;
-  // Confinement is applied here because one Claude turn is one process. Best-effort by design: with
-  // no sandbox this returns the command unchanged, and auto-pilot's own gate is what fails closed.
-  const spawned = wrapCommand(bin, args, opts.sandbox ?? NOT_REQUESTED);
+  const sandbox = opts.sandbox ?? NOT_REQUESTED;
+  // The config dir has to be named on the side of the boundary the CLI actually runs on. Boxed, that
+  // is a path INSIDE the container (`/state/claude`), passed to `docker exec -e`; the host path is a
+  // digest directory that means nothing in there. Unboxed — tests only, now that docker is required —
+  // it is the host path in the spawn's own environment.
+  const boxEnv = isolationEnabled() ? boxEnvFor('claude-code') : {};
+  const env =
+    !sandbox.ok && isolationEnabled()
+      ? { ...process.env, CLAUDE_CONFIG_DIR: claudeConfigDir() }
+      : process.env;
+  // Confinement is applied here because one Claude turn is one process. This THROWS rather than
+  // silently running unconfined when the sandbox is available but no box was resolved.
+  const spawned = wrapCommand(bin, args, sandbox, opts.box, boxEnv);
   // `detached` makes this child a process-group LEADER, so everything it starts — compilers, test
   // runners, servers — belongs to one group we can signal as a unit. Without it a stop reached the
   // direct child only and its grandchildren were reparented to init, still working and still spending.

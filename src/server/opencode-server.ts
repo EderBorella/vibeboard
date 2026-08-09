@@ -2,9 +2,11 @@ import { type ChildProcess, spawn } from 'node:child_process';
 import { mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
+import type { BoxService } from './box-service.js';
+import { dockerBin, WORK_DIR } from './containers.js';
 import { isolationEnabled, opencodeConfigHome } from './copilot-env.js';
 import type { Log } from './logging.js';
-import { NOT_REQUESTED, type SandboxStatus, wrapCommand } from './sandbox.js';
+import { NOT_REQUESTED, type SandboxStatus } from './sandbox.js';
 
 // A single managed `opencode serve` process, started lazily and reused for every turn.
 // We talk to it over HTTP (see opencode-client) — `opencode run` per turn hangs at init on
@@ -18,7 +20,20 @@ function opencodeBin(): string {
 let child: ChildProcess | undefined;
 let urlPromise: Promise<string> | undefined;
 let log: Log | undefined;
+// Kept for `attachSandbox`, which the composition root still calls and tests still assert on. The
+// unboxed spawn below no longer reads it: confinement is the box now, and a spawn with no box is not
+// confined at all — saying so plainly beats a variable that implies otherwise.
 let sandbox: SandboxStatus = NOT_REQUESTED;
+export function opencodeSandbox(): SandboxStatus {
+  return sandbox;
+}
+let boxes: BoxService | undefined;
+// The `docker logs -f` follower for the boxed server, so it can be replaced on restart and stopped
+// on shutdown rather than outliving the thing it is reading.
+let logs: ChildProcess | undefined;
+// The project the managed server serves. A FUNCTION, like `halted`: the server is a process-wide
+// singleton and the open project changes under it.
+let projectRoot: () => string = () => process.cwd();
 // Whether the open project is halted. A FUNCTION, set by the composition root: this module is a
 // process-wide singleton and the answer changes while it runs.
 let halted: () => boolean = () => false;
@@ -31,6 +46,25 @@ let halted: () => boolean = () => false;
 // simplification AppArmor bought over the per-project ruleset the design originally called for.
 export function attachSandbox(status: SandboxStatus): void {
   sandbox = status;
+}
+
+// The box the managed server runs INSIDE. Unlike Claude, this backend is not a command to wrap: it is
+// a long-lived server, so containment here is lifecycle and port discovery rather than an exec prefix.
+export function attachBoxes(next: BoxService | undefined): void {
+  boxes = next;
+}
+
+// The project directory AS THE SERVER SEES IT. Boxed, that is always `/work` — the host path does
+// not exist inside the container, and its failure mode is the trap worth naming: creating a session
+// with a host path returns 200, and the MESSAGE then fails with an anonymous "Unexpected server
+// error. Check server logs for details." It names neither the directory nor the cause, so it reads as
+// an opencode bug rather than a path that means nothing on the other side of a mount.
+export function opencodeDirectory(cwd: string): string {
+  return boxes ? WORK_DIR : cwd;
+}
+
+export function attachProjectRoot(next: () => string): void {
+  projectRoot = next;
 }
 
 // The lazy respawn is what makes a halt real. Decision 12: while halted "nothing dispatches, NOTHING
@@ -108,6 +142,98 @@ export function capStartupLog(out: string, chunk: string): string {
   return out.length >= STARTUP_CAP ? out : (out + chunk).slice(0, STARTUP_CAP);
 }
 
+// The container port `opencode serve` binds inside its box. FIXED, where the host-side spawn used
+// port 0 and read the assignment back from the "listening on" line. Publishing needs a port known
+// before the container exists, so the OS cannot be the one to choose it — but the HOST port still is:
+// `-p 127.0.0.1::4096` lets docker pick, and a fixed host port would collide the moment two projects
+// were open.
+export const OPENCODE_CONTAINER_PORT = 4096;
+
+// How long to wait for `opencode serve` to answer inside a fresh box. Generous: this covers a cold
+// container start as well as the server's own boot.
+const BOX_READY_TIMEOUT_MS = 60_000;
+
+// Poll until it answers ANYTHING, rather than parsing a banner. There is no child process to read
+// stdout from — the server is the container's main process — and "answers HTTP" is the property that
+// actually matters. A 401 or a 404 is a perfectly good sign of life.
+async function waitForServer(url: string, deadline: number): Promise<void> {
+  let lastErr: unknown;
+  while (Date.now() < deadline) {
+    try {
+      await fetch(`${url}/app`, { signal: AbortSignal.timeout(2_000) });
+      return;
+    } catch (err) {
+      lastErr = err;
+      await new Promise((r) => setTimeout(r, 250));
+    }
+  }
+  throw new Error(
+    `opencode serve did not answer on ${url} within ${BOX_READY_TIMEOUT_MS}ms` +
+      (lastErr instanceof Error ? `: ${lastErr.message}` : ''),
+  );
+}
+
+// The managed server, INSIDE its project's box.
+//
+// Nothing here wraps a command, which is the difference from the Claude backend and the reason
+// `wrapCommand` was not enough on its own: this backend is a long-lived server VibeBoard talks to
+// over HTTP, so containment is a container whose main process it is, plus the port discovery that
+// comes with that.
+async function startServerInBox(service: BoxService): Promise<string> {
+  const root = projectRoot();
+  reapOrphanServer(); // a host-side server from before containment, or from an attached-URL session
+  const handle = await service.ensure(root, 'opencode', OPENCODE_CONTAINER_PORT, [
+    'opencode',
+    'serve',
+    '--port',
+    String(OPENCODE_CONTAINER_PORT),
+    // 0.0.0.0 INSIDE the box, not 127.0.0.1. The container's loopback is its own, so a server bound
+    // there is unreachable from the host — including from VibeBoard. What keeps this off the network
+    // is the published port, which docker binds to the host's 127.0.0.1 and nothing else.
+    '--hostname',
+    '0.0.0.0',
+  ]);
+  if (!handle.hostPort) {
+    throw new Error('opencode box started but docker published no port for it');
+  }
+  const url = `http://127.0.0.1:${handle.hostPort}`;
+  await waitForServer(url, Date.now() + BOX_READY_TIMEOUT_MS);
+  followBoxLog(handle.name);
+  log?.info({ url, box: handle.name }, 'opencode serve is up in its box');
+  return url;
+}
+
+// Everything the server says, into VibeBoard's own log.
+//
+// This is not a nicety. Once the server is up, its output is the ONLY account of what the provider
+// actually said: a turn that failed inside opencode used to leave "Streaming response failed" in the
+// transcript and no explanation anywhere. Spawning the server as a child gave us its pipes for free;
+// being the container's main process does not, so its output has to be followed deliberately or it
+// goes to `docker logs` where nobody reading a VibeBoard log will ever find it.
+//
+// `--tail 0` because the interesting part is what happens from now on, and the startup banner has
+// already served its purpose by the time this runs.
+function followBoxLog(box: string): void {
+  logs?.kill('SIGTERM');
+  const proc = spawn(dockerBin(), ['logs', '-f', '--tail', '0', box]);
+  logs = proc;
+  // Same levels as the child-process version, and for the same reasons: stderr is where opencode
+  // reports the failures worth reading, while stdout is per-request chatter that would bury the file.
+  const forward = (stream: 'stdout' | 'stderr') => (chunk: Buffer) => {
+    const line = chunk.toString('utf8').replace(/\s+$/, '');
+    if (!line) return;
+    if (stream === 'stderr') log?.warn({ stream }, line);
+    else log?.debug({ stream }, line);
+  };
+  proc.stdout?.on('data', forward('stdout'));
+  proc.stderr?.on('data', forward('stderr'));
+  // A follower that dies must not take anything with it — the server is still serving.
+  proc.on('error', (err) => log?.warn({ err }, 'could not follow the opencode box log'));
+  proc.on('exit', () => {
+    if (logs === proc) logs = undefined;
+  });
+}
+
 function startServer(): Promise<string> {
   // Default to port 0 (OS-assigned) so we never collide with a stray/previous serve; the
   // actual URL is parsed from opencode's "listening on ..." line below.
@@ -118,10 +244,10 @@ function startServer(): Promise<string> {
   // default XDG_DATA_HOME (~/.local/share/opencode), so login is preserved.
   const env = isolationEnabled() ? { ...process.env, XDG_CONFIG_HOME: opencodeConfigHome() } : process.env;
   reapOrphanServer();
-  // Confined here, at the one place the managed server is created. A server VibeBoard did not spawn
-  // was never wrapped, which is exactly why VIBEBOARD_OPENCODE_URL refuses auto-pilot below.
-  const spawned = wrapCommand(opencodeBin(), args, sandbox);
-  const proc = spawn(spawned.bin, spawned.args, { env });
+  // UNCONFINED, and only reachable when no BoxService was attached — which in practice means a test.
+  // Production always has one, and `agentRefusal` refuses every agent when the sandbox is not ok, so
+  // this path cannot be reached with agents enabled.
+  const proc = spawn(opencodeBin(), args, { env });
   child = proc;
   recordPid(proc.pid);
 
@@ -205,7 +331,7 @@ export function opencodeBaseUrl(): Promise<string> {
       new Error('This project is halted, so VibeBoard will not start an OpenCode server for it.'),
     );
   }
-  if (!urlPromise) urlPromise = startServer();
+  if (!urlPromise) urlPromise = boxes ? startServerInBox(boxes) : startServer();
   return urlPromise;
 }
 
@@ -214,7 +340,15 @@ export function opencodeBaseUrl(): Promise<string> {
 // installed, which would otherwise keep serving unconfined until the app restarted.
 export async function restartOpencodeServer(): Promise<string> {
   stopOpencodeServer();
-  urlPromise = startServer();
+  // Boxed, a restart REMOVES the container rather than killing a child: the server is the container's
+  // main process, so there is nothing else to kill, and a box whose main process exited cannot be
+  // exec'd into or restarted into a working state.
+  if (boxes) {
+    await boxes.stop(projectRoot(), 'opencode').catch(() => undefined);
+    urlPromise = startServerInBox(boxes);
+  } else {
+    urlPromise = startServer();
+  }
   return urlPromise;
 }
 
@@ -228,10 +362,16 @@ export async function takeOverOpencodeServer(): Promise<string> {
 }
 
 export function stopOpencodeServer(): void {
+  // Cleared FIRST and unconditionally. It used to be cleared only alongside killing a child process,
+  // which was fine while every managed server was one — a boxed server is the container's own main
+  // process, so there is no child, and the cached URL survived every stop. The next turn then went on
+  // talking to a server that had been stopped, or to a box that had been removed.
+  urlPromise = undefined;
+  logs?.kill('SIGTERM');
+  logs = undefined;
   if (child) {
     child.kill('SIGTERM');
     child = undefined;
-    urlPromise = undefined;
     // Cleared here rather than on the child's exit event: this runs from a signal handler and from
     // `process.once('exit')`, where nothing asynchronous gets a turn.
     try {

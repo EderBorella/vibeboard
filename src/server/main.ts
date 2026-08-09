@@ -1,4 +1,5 @@
 import { networkInterfaces } from 'node:os';
+import { listenOnApiSocket, removeApiSocketFile } from './api-socket.js';
 import { buildApp } from './app.js';
 import { restoreLastProject } from './app-state.js';
 import { adminToken, CredentialStore } from './credentials.js';
@@ -67,6 +68,7 @@ for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) {
     // state file naming a live group it does not own.
     if (app.service.stop()) console.log('  stopped the auto-pilot loop');
     stopOpencodeServer();
+    removeApiSocketFile();
     process.exit(0);
   });
 }
@@ -74,6 +76,7 @@ process.once('exit', () => {
   app.runner.cancelAll();
   app.service.stop();
   stopOpencodeServer();
+  removeApiSocketFile();
 });
 
 // The way back in when every signed-in browser is gone — a lost phone, a reimaged laptop, a wiped
@@ -106,6 +109,15 @@ async function start(): Promise<void> {
   // survives, which is why the state is persisted at all.
   if (reopened) await app.autopilot.load();
   await app.listen({ port, host });
+  // The same API on a unix socket, for agent boxes. Not fatal if it cannot bind: the board, the browser
+  // and every host-side agent still work without it, and refusing to start the whole server because a
+  // container transport is unavailable would be a worse failure than the one it guards.
+  let apiSocket: string | undefined;
+  try {
+    apiSocket = (await listenOnApiSocket(app)).path;
+  } catch (err) {
+    app.log.error({ err }, 'could not open the API socket; agents in containers will not reach the API');
+  }
   const lan = isLoopback ? undefined : lanAddress();
   // A PLAIN URL. It used to carry `?token=<admin>`, which put a credential that never expires into
   // terminal scrollback, screen shares and every screenshot of a first run — and left it in bookmarks
@@ -123,6 +135,7 @@ async function start(): Promise<void> {
   }
   if (reopened) console.log(`  → reopened ${reopened}`);
   if (logging.file) console.log(`  → logging to ${logging.file}`);
+  if (apiSocket) console.log(`  → API socket ${apiSocket} (how agent boxes reach this server)`);
   // Stated either way. Silence about an absent sandbox is how "best-effort" quietly becomes "none".
   console.log(
     sandbox.ok

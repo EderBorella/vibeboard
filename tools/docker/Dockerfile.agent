@@ -22,6 +22,16 @@ ARG OPENCODE_VERSION=1.17.18
 RUN npm install -g opencode-ai@${OPENCODE_VERSION} \
  && opencode --version
 
+# The API relay and the entrypoint that starts it. Owned by root and world-readable: the box runs as
+# the host user's uid, which is not known at build time, so nothing here may depend on a particular one.
+COPY tools/docker/relay.mjs /opt/vibeboard/relay.mjs
+COPY tools/docker/entrypoint.sh /opt/vibeboard/entrypoint.sh
+RUN chmod 0755 /opt/vibeboard/entrypoint.sh /opt/vibeboard/relay.mjs
+
 # Nothing runs as root. The container is started with --user <host uid>:<host gid> so everything the
 # agent creates in the bind mount is owned by the person who owns the project.
 WORKDIR /work
+ENTRYPOINT ["/opt/vibeboard/entrypoint.sh"]
+# Keeps a box alive with no agent running in it: agents arrive by `docker exec`, and a container whose
+# main process has exited cannot be exec'd into. Overridden for OpenCode, whose box runs `opencode serve`.
+CMD ["sleep", "infinity"]

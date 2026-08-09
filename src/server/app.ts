@@ -38,6 +38,7 @@ import { registerSandboxRoutes } from './routes/sandbox.js';
 import { registerAuthRoutes, registerSigninRoutes } from './routes/signin.js';
 import { registerSkillRoutes } from './routes/skills.js';
 import { registerSuggestionRoutes } from './routes/suggestions.js';
+import { registerToolchainRoutes } from './routes/toolchain.js';
 import { listRuns } from './run-store.js';
 import { NOT_REQUESTED, type SandboxStatus } from './sandbox.js';
 import { type ServiceCommand, ServiceProcess } from './service-process.js';
@@ -252,6 +253,7 @@ export function buildApp(
     broadcast,
     log,
     sandbox: opts.sandbox ?? NOT_REQUESTED,
+    boxes: opts.boxes,
   };
   const turns = createCopilotTurns(ctx);
 
@@ -273,6 +275,7 @@ export function buildApp(
       await registerControlRoutes(api, ctx);
       await registerCopilotRoutes(api, ctx);
       await registerSandboxRoutes(api, ctx);
+      await registerToolchainRoutes(api, ctx);
       await registerAutopilotRoutes(api, ctx);
       await registerSuggestionRoutes(api, ctx);
       await registerDiaryRoutes(api, ctx);

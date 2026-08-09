@@ -118,6 +118,16 @@ const RULES: Record<string, Rule> = {
   // the last ten runs went is an agent reasoning about the loop that is running it.
   'POST /api/log': { scopes: ['service'], describe: "append a line to the project's diary." },
 
+  // The toolchain. OPEN TO EVERY WORKING SCOPE, deliberately: an agent that cannot install what a
+  // job needs is an agent that reports the job as impossible. It installs into the container the
+  // caller is already running in, which is thrown away when VibeBoard stops — so the authority this
+  // grants ends with the box. The escalation itself stays out here, where the agent cannot reach it.
+  'POST /api/toolchain/install': {
+    scopes: ['work', 'checkup', 'service', 'assist'],
+    describe:
+      '`{ packages: ["name", …] }` — install system packages into your own container, as root, on your behalf. For apt packages only; Python, Node, Rust and Go packages you can install yourself without asking, and should. Everything installed is gone when VibeBoard stops, which is deliberate — say what you need each time rather than assuming last week\'s box.',
+  },
+
   // Dispatching. THE SERVICE ONLY, and the two working scopes are refused for the reason decision 21
   // gives: a run that can dispatch escapes every counter the loop keeps. Its iteration, its budget and
   // its attempt cap are all compared between dispatches by the loop — an agent that starts a run from

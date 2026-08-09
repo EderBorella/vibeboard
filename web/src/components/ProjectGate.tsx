@@ -6,6 +6,23 @@ interface Props {
   onOpened: () => void;
 }
 
+// TWO OPTIONS, and only two: open a project VibeBoard already knows, or create one. Ruled
+// 2026-08-09, alongside making a container part of what creating a project produces.
+//
+// What went, and why each one went:
+//
+//  - "Open by path" — a free-text box that could open any folder on the disk. A project is now a
+//    thing with a container, per-project agent state and a place in this list; typing a path that
+//    has none of that produced something that looked like a project and was not.
+//  - "Adopt an existing folder" — bringing a repository you already have under VibeBoard is a real
+//    feature and it is coming back, deliberately AFTER containment rather than designed against a
+//    lifecycle that is still moving. A box is currently born with a project, and an adopted project
+//    has no birth; that needs answering rather than papering over.
+//
+// The list itself is VibeBoard's own record of projects, NOT a query for containers. A box removed
+// by a prune or an image rebuild must not make a project vanish from this screen — it is remade,
+// quietly, when the project is opened.
+
 // Force the project name toward the VibeBoard pattern (dash-separated, lowercase) as the
 // user types. Leading dashes are stripped; a trailing dash is tolerated so separators can
 // be typed mid-word. slugify() produces the final canonical form on submit.
@@ -18,20 +35,14 @@ function toNamePattern(input: string): string {
 
 export function ProjectGate({ onOpened }: Props) {
   const [projects, setProjects] = useState<ProjectRef[]>([]);
-  const [openPath, setOpenPath] = useState('');
   const [newParent, setNewParent] = useState('');
   const [newName, setNewName] = useState('');
-  const [adoptPath, setAdoptPath] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const nameSlug = slugify(newName);
   const parent = newParent.replace(/\/+$/, '');
   const targetPath = parent && nameSlug ? `${parent}/${nameSlug}` : '';
-
-  // Adopting an existing repo: the project name comes from the folder itself.
-  const adoptTarget = adoptPath.trim().replace(/\/+$/, '');
-  const adoptName = slugify(adoptTarget.split('/').pop() ?? '') || 'project';
 
   useEffect(() => {
     listProjects()
@@ -57,7 +68,7 @@ export function ProjectGate({ onOpened }: Props) {
       <div className="gate-card">
         <h2>Open a project</h2>
 
-        {projects.length > 0 && (
+        {projects.length > 0 ? (
           <ul className="gate-list">
             {projects.map((p) => (
               <li key={p.path}>
@@ -68,23 +79,15 @@ export function ProjectGate({ onOpened }: Props) {
               </li>
             ))}
           </ul>
+        ) : (
+          <div className="gate-hint">No projects yet. Create one below.</div>
         )}
 
-        <label className="gate-field">
-          <span>Open by path</span>
-          <div className="gate-row">
-            <input
-              value={openPath}
-              placeholder="/path/to/project"
-              onChange={(e) => setOpenPath(e.target.value)}
-            />
-            <button disabled={busy || !openPath} onClick={() => run(() => openProject(openPath))}>
-              Open
-            </button>
-          </div>
-        </label>
-
         <h3>New project</h3>
+        <div className="gate-hint">
+          Creates the folder, the board, and the container its agents will run in. The container is built the
+          first time and reused after that.
+        </div>
         <label className="gate-field">
           <span>Location (parent folder)</span>
           <input
@@ -112,33 +115,6 @@ export function ProjectGate({ onOpened }: Props) {
         {targetPath && (
           <div className="gate-preview">
             Creates <code>{targetPath}</code>
-          </div>
-        )}
-
-        <h3>Adopt an existing folder</h3>
-        <div className="gate-hint">
-          Adds the board structure to a repo you already have. Existing files are left alone — only a pointer
-          is appended to <code>CLAUDE.md</code> / <code>AGENTS.md</code>, and no sample cards are created.
-        </div>
-        <label className="gate-field">
-          <span>Existing project folder</span>
-          <div className="gate-row">
-            <input
-              value={adoptPath}
-              placeholder="/path/to/existing-repo"
-              onChange={(e) => setAdoptPath(e.target.value)}
-            />
-            <button
-              disabled={busy || !adoptTarget}
-              onClick={() => run(() => scaffoldProject(adoptTarget, adoptName, 'brownfield'))}
-            >
-              Adopt
-            </button>
-          </div>
-        </label>
-        {adoptTarget && (
-          <div className="gate-preview">
-            Adopts <code>{adoptTarget}</code> as <code>{adoptName}</code>
           </div>
         )}
 

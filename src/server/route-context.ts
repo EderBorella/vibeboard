@@ -2,6 +2,7 @@ import type { FastifyReply } from 'fastify';
 import type { ProjectConfig } from '../core/types.js';
 import type { AgentRunner } from './agent-runner.js';
 import type { AutopilotRuntime } from './autopilot-runtime.js';
+import type { BoxService } from './box-service.js';
 import type { ChatStore } from './chat-store.js';
 import type { CopilotSession } from './copilot.js';
 import type { CopilotAuthority } from './copilot-authority.js';
@@ -58,6 +59,8 @@ export interface AppCtx {
   // Whether agents are confined, and to what. Probed once by main.ts: it cannot change while the
   // process runs, so a function would only invite callers to wonder whether it might.
   sandbox: SandboxStatus;
+  // Where agents run. Optional because a test about something else neither has docker nor needs it.
+  boxes?: BoxService;
   broadcast: (msg: unknown) => void;
   // Route handlers already have `request.log`. This is for everything that happens with no request to
   // hang off: the watcher, the WS channel, a run settling long after its dispatch was answered.

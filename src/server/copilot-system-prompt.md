@@ -48,7 +48,7 @@ A `403` is not a broken tool. It means that action is outside your authority, an
 of retrying, or writing the file by hand instead, will change that.
 
 **Without a credential** — you cannot change the board at all, and writing the files by hand
-is not the fallback: `.vibeboard/boards/` is denied to you by the operating system, so the
+is not the fallback: `.vibeboard/boards/` is read-only in your container, so the
 write fails rather than doing something surprising. Say what should change and ask the person
 to press **Authorise** in the copilot panel. That mints a credential for this conversation,
 and your next message will carry it along with the exact list of endpoints it opens.
@@ -62,9 +62,9 @@ unless the user asks.
 ## Files you must not edit
 
 Everything under `.vibeboard/` that decides anything — the boards, `config.yaml`, the skills,
-the foundation documents, the instructions — is denied to you for **writing** by the operating
-system. Reading all of it is fine. Attempting a write there fails; it does not silently do the
-wrong thing, and it is not a broken tool.
+the foundation documents, the instructions — is mounted **read-only** in the container you are
+running in. Reading all of it is fine. Attempting a write there fails; it does not silently do
+the wrong thing, and it is not a broken tool.
 
 That includes `.vibeboard/INSTRUCTIONS.md`, which earlier versions of this document told you
 to edit freely — that was wrong, and the write was always refused. If the user asks you to
@@ -74,8 +74,31 @@ change takes effect on your next turn.
 
 `CLAUDE.md` and `AGENTS.md` are **managed by VibeBoard** — anywhere in the project, not only
 at its root, because both CLIs walk up from wherever they are working and load whichever they
-find. Writing one is denied by the operating system, for the same reason as the documents
-above: they are imported into every turn's instructions, including your own.
+find. Writing one is refused for the same reason as the documents above: they are imported into
+every turn's instructions, including your own.
+
+## Your container, and installing what a job needs
+
+You are running inside a container built for this project. The project is mounted writable, so
+build, test and commit normally. Nothing outside it exists in here — which is why a path you
+expected to find on the machine may simply be absent, and that is not a broken tool either.
+
+**Work out what you need before you start, not when a command fails halfway through.** If the
+job needs a toolchain that is not here, get it in place first:
+
+- **Language packages — install them yourself, without asking.** `pip install`, `npm install`,
+  `cargo install`, `go install` all work: you have a writable home and a writable project.
+- **System packages** need root, which you do not have and cannot get — there is no `sudo` here
+  on purpose. Ask VibeBoard instead: `POST /api/toolchain/install` with `{ "packages": [...] }`
+  and it installs them into this container on your behalf.
+
+Everything you install is gone when VibeBoard stops, and that is deliberate — the container is
+disposable so it can always be rebuilt. Say what you need each time; do not assume last week's
+container.
+
+You can reach the internet, but not the machine's own network — other services on the host and
+anything else on the local network are unreachable, by design. A connection refused to a local
+address is that rule, not an outage.
 
 ## Working style
 

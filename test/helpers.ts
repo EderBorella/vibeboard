@@ -121,7 +121,7 @@ export interface TestAppOpts {
   // Confinement, as the composition root would pass it. Absent means unsandboxed, which is what
   // every suite that is about something else wants.
   sandbox?: SandboxStatus;
-  boxes?: BoxService;
+  boxes?: BoxService | null;
 }
 
 // buildApp, plus the browser's credential on every request that does not bring its own. Auth is not
@@ -139,7 +139,10 @@ export function testApp(session: ProjectSession, opts: TestAppOpts = {}): Fastif
     // Paired with the sandbox for the same reason it is in production: a status that says "confined"
     // and no box to be confined IN makes `wrapCommand` throw. Coupling them here means a test cannot
     // accidentally build the one without the other.
-    boxes: opts.boxes ?? testBoxes(),
+    // `null` means "no containers", explicitly. `undefined` means "the caller did not say", which
+    // gets the default — every test that dispatches an agent needs one, because a sandbox with no box
+    // to be confined in makes the wrapper throw.
+    boxes: opts.boxes === null ? undefined : (opts.boxes ?? testBoxes()),
     credentials: opts.credentials ?? new CredentialStore(TEST_ADMIN_TOKEN),
   });
   app.addHook('onRequest', async (req) => {
@@ -172,6 +175,9 @@ export async function openTestProject(
     mode?: 'greenfield' | 'brownfield';
     runBin?: string;
     sandbox?: SandboxStatus;
+    // Where agents run. A BoxService to record what docker was asked for; `null` for an app with NO
+    // containers at all, which is not a production shape but is what the defensive branches expect.
+    boxes?: BoxService | null;
     // What to spawn for the auto-pilot loop. Tests put a shim here and read back what the process was
     // actually given.
     serviceCommand?: () => ServiceCommand;
@@ -185,6 +191,10 @@ export async function openTestProject(
     runBin: opts.runBin,
     logger: opts.logger,
     sandbox: opts.sandbox,
+    // Forwarded explicitly, and `null` forwarded as `null`: an explicit undefined would fall through
+    // to testApp's default, which is exactly how `sandbox` once silently disabled every dispatch in
+    // the suite (see the note there).
+    boxes: opts.boxes,
     credentials,
     ...(opts.serviceCommand ? { serviceCommand: opts.serviceCommand } : {}),
   });

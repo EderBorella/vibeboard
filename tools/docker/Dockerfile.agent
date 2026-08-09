@@ -1,16 +1,26 @@
-# The agent box: an agent CLI and a toolchain, and no way onto the host.
+# The agent box: the agent CLIs and a toolchain, and no way onto the host.
 #
-# Pinned to the host's CLI version deliberately — `--resume` reads session state written by whichever
-# version created it, and the state directory is bind-mounted from the host, so a version skew here
-# is a skew across the same files.
+# Both CLIs live in one image; credential isolation is done with MOUNTS, not with separate images —
+# an OpenCode box simply never has the Claude credential mounted into it. One image means one build
+# and one thing to keep current.
+#
+# Versions are pinned to the host's deliberately: both CLIs resume sessions from state that the host
+# and the box share over a bind mount, so a version skew here is a skew across the same files.
 FROM node:22-slim
 
+# curl is not optional: agents are told to call the VibeBoard API, and curl is how they do it.
+# Without it the first API call fails with `curl: not found`, which reads like a broken instruction
+# rather than a missing package.
 RUN apt-get update \
- && apt-get install -y --no-install-recommends git ca-certificates \
+ && apt-get install -y --no-install-recommends git ca-certificates curl unzip \
  && rm -rf /var/lib/apt/lists/*
 
 ARG CLAUDE_VERSION=2.1.221
 RUN npm install -g @anthropic-ai/claude-code@${CLAUDE_VERSION}
+
+ARG OPENCODE_VERSION=1.17.18
+RUN npm install -g opencode-ai@${OPENCODE_VERSION} \
+ && opencode --version
 
 # Nothing runs as root. The container is started with --user <host uid>:<host gid> so everything the
 # agent creates in the bind mount is owned by the person who owns the project.

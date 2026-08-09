@@ -1,4 +1,5 @@
 import { execFile } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { promisify } from 'node:util';
 import {
   BOX_LABEL,
@@ -13,6 +14,7 @@ import {
   execArgs,
   inspectState,
   parsePublishedPort,
+  protectedPaths,
 } from './containers.js';
 
 const run = promisify(execFile);
@@ -28,6 +30,17 @@ export const spawnDocker: DockerRun = async (args, opts): Promise<DockerResult> 
     return { code: e.code ?? 1, stdout: e.stdout ?? '', stderr: e.stderr ?? e.message ?? String(err) };
   }
 };
+
+// The mounts for a project, with the protected paths filtered to the ones that actually exist. A bind
+// mount whose source is missing is not ignored by docker — it CREATES it, root-owned, on the host, so a
+// project with no `.git` would grow a root-owned `.git/hooks` the first time a box started.
+export function boxPathsFor(
+  projectRoot: string,
+  extra: Omit<BoxPaths, 'projectRoot' | 'readOnly'>,
+  exists: (path: string) => boolean = existsSync,
+): BoxPaths {
+  return { projectRoot, readOnly: protectedPaths(projectRoot, exists), ...extra };
+}
 
 export interface BoxHandle {
   name: string;

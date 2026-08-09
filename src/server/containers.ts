@@ -57,6 +57,28 @@ export interface BoxPaths {
   socketDir?: string;
   // The backend's own credential, and only that backend's.
   credential?: MountSpec;
+  // Project-relative paths to pin read-only inside the writable project. Passed in rather than derived
+  // here because only the caller can stat them, and a bind mount whose source does not exist is worse
+  // than useless: docker CREATES it, as a root-owned directory, on the host.
+  readOnly?: string[];
+}
+
+// Everything inside a project an agent must not write, and why each one is here.
+//
+// `.vibeboard` is the obvious half: cards, config, skills, foundation, the auto-pilot state — the
+// documents that govern what a run is judged against.
+//
+// The git pair is the half that is easy to forget and worse to miss. `.git/hooks` is code THE HOST
+// runs: an agent that writes `pre-commit` has arranged to execute on your machine the next time you
+// commit, entirely outside the box. `.git/config` reaches the same end by other means — `core.hooksPath`
+// repoints hooks somewhere writable. The old AppArmor profile denied both, and a container that only
+// covered `.vibeboard` would have quietly handed them back.
+export const PROTECTED_PATHS = [CONFIG_DIR, '.git/hooks', '.git/config'] as const;
+
+// Which of the protected paths actually exist. `exists` is injected so this is testable without a
+// filesystem, and so the caller decides what "exists" means.
+export function protectedPaths(projectRoot: string, exists: (path: string) => boolean): string[] {
+  return PROTECTED_PATHS.filter((rel) => exists(join(projectRoot, rel)));
 }
 
 // Pure, and exported for its own test: this is the security boundary, and a boundary computed inside a
@@ -64,13 +86,19 @@ export interface BoxPaths {
 export function boxMounts(paths: BoxPaths): MountSpec[] {
   const mounts: MountSpec[] = [
     { source: paths.projectRoot, target: WORK_DIR },
-    // Read-only ON TOP of the writable project. Nested mounts carry independent flags, which is what
-    // makes this hold — and is why the reverse (a read-only parent with a writable child) famously
-    // leaks. Measured: create, overwrite and delete inside are all refused, while the project stays
-    // writable and the contents stay readable.
-    { source: join(paths.projectRoot, CONFIG_DIR), target: `${WORK_DIR}/${CONFIG_DIR}`, readOnly: true },
     { source: paths.stateDir, target: '/state' },
   ];
+  // Read-only ON TOP of the writable project. Nested mounts carry independent flags, which is what
+  // makes this hold — and is why the reverse (a read-only parent with a writable child) famously
+  // leaks. Measured: create, overwrite and delete inside are all refused, while the project stays
+  // writable and the contents stay readable.
+  //
+  // `.git/config` is a FILE, so this pins its inode: git rewrites it by rename, and a box would go on
+  // reading the old one. That is a staleness cost on a file agents may not write anyway, and it buys
+  // the deny — whereas mounting all of `.git` read-only would break every commit.
+  for (const rel of paths.readOnly ?? [CONFIG_DIR]) {
+    mounts.push({ source: join(paths.projectRoot, rel), target: `${WORK_DIR}/${rel}`, readOnly: true });
+  }
   if (paths.socketDir) mounts.push({ source: paths.socketDir, target: SOCKET_DIR });
   if (paths.credential) mounts.push(paths.credential);
   return mounts;

@@ -11,6 +11,7 @@ import {
   execArgs,
   PROJECT_LABEL,
   parsePublishedPort,
+  protectedPaths,
   WORK_DIR,
 } from '../src/server/containers.js';
 
@@ -61,6 +62,27 @@ describe('mounts — the containment boundary', () => {
     const socket = mounts.find((m) => m.source === '/home/u/.vibeboard/run');
     expect(socket?.target).toBe('/run/vibeboard');
     expect(mounts.some((m) => m.source.endsWith('.sock'))).toBe(false);
+  });
+
+  it('pins the git escalation paths read-only, not just .vibeboard', () => {
+    // `.git/hooks` is code the HOST runs on your next commit, and `.git/config` repoints hooks
+    // somewhere writable via core.hooksPath. The old AppArmor profile denied both; a box that only
+    // covered .vibeboard would have handed them back.
+    const mounts = boxMounts({ ...PATHS, readOnly: ['.vibeboard', '.git/hooks', '.git/config'] });
+    for (const rel of ['.vibeboard', '.git/hooks', '.git/config']) {
+      expect(mounts).toContainEqual({
+        source: `${PROJECT}/${rel}`,
+        target: `${WORK_DIR}/${rel}`,
+        readOnly: true,
+      });
+    }
+  });
+
+  it('never mounts a protected path that does not exist — docker would create it, root-owned', () => {
+    const present = new Set([`${PROJECT}/.vibeboard`]);
+    const rels = protectedPaths(PROJECT, (p) => present.has(p));
+    expect(rels).toEqual(['.vibeboard']);
+    expect(rels).not.toContain('.git/hooks');
   });
 
   it('carries only the credential it was given, so the other backend has none', () => {

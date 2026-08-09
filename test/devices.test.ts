@@ -2,6 +2,7 @@ import { readFile, stat, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { boxMounts } from '../src/server/containers.js';
 import { adminTokenFile } from '../src/server/credentials.js';
 import { DeviceStore, deviceFile, deviceLabel } from '../src/server/devices.js';
 import { tempDir } from './helpers.js';
@@ -259,30 +260,32 @@ describe('where the file lives', () => {
     expect(deviceFile()).toBe('/somewhere/else/token-devices.json');
   });
 
-  // THE REASON THE FILE IS CALLED WHAT IT IS. `deny @{HOME}/.vibeboard/token* rwl` is the profile's
-  // only read-denied rule and it matches by that prefix, so a file named `devices.json` would sit in
-  // the same folder, look every bit as private, and be readable by every agent on the machine.
+  // WHERE THE CREDENTIALS LIVE, AND WHY AN AGENT CANNOT REACH THEM.
   //
-  // Asserted against the profile rather than against a literal, so renaming either side fails here.
-  it('is covered by a read-denying rule in the AppArmor profile', async () => {
+  // This used to be asserted against an AppArmor deny rule, because the file sat in a directory every
+  // agent could otherwise read. Containment made the guarantee stronger and simpler: the box mounts
+  // the project, a state directory, the API socket directory and at most one backend credential —
+  // and nothing else on the disk exists inside it. So the claim is no longer "a rule denies this
+  // path" but "this path is not in the container at all", which is what this checks.
+  //
+  // Derived from the real mount set rather than a literal, so adding a mount that happens to expose
+  // `~/.vibeboard` fails here rather than silently handing every agent the admin credential.
+  it('is not inside ANY of an agent box’s mounts — not denied, absent', () => {
     delete process.env.VIBEBOARD_TOKEN_FILE;
-    const profile = await readFile('tools/apparmor/vibeboard-agent', 'utf8');
+    const mounts = boxMounts({
+      projectRoot: '/data/projects/demo',
+      stateDir: join(homedir(), '.vibeboard', 'copilot', 'projects', 'abc'),
+      socketDir: join(homedir(), '.vibeboard', 'run'),
+      credential: { source: join(homedir(), '.claude', '.credentials.json'), target: '/x' },
+      readOnly: ['.vibeboard'],
+    });
 
-    // Only rules that deny READ count. The folder's own `deny … wl` does not stop a `cat`.
-    const readDenied = [...profile.matchAll(/^\s*deny\s+(\S+)\s+([rwlkmix]+),/gm)]
-      .filter((m) => m[2].includes('r'))
-      .map((m) => m[1].replaceAll('@{HOME}', homedir()));
-    expect(readDenied.length).toBeGreaterThan(0);
+    const inside = (path: string): boolean =>
+      mounts.some((m) => path === m.source || path.startsWith(`${m.source}/`));
 
-    const matches = (path: string): boolean =>
-      readDenied.some((glob) => {
-        const pattern = glob.replace(/[.+^${}()|[\]\\]/g, '\\$&').replaceAll('*', '[^/]*');
-        return new RegExp(`^${pattern}$`).test(path);
-      });
-
-    expect(matches(adminTokenFile())).toBe(true);
-    expect(matches(deviceFile())).toBe(true);
-    // The negative case, or the glob translation above could be matching everything.
-    expect(matches(join(homedir(), '.vibeboard', 'devices.json'))).toBe(false);
+    expect(inside(adminTokenFile())).toBe(false);
+    expect(inside(deviceFile())).toBe(false);
+    // The negative case, or `inside` could be answering false to everything.
+    expect(inside('/data/projects/demo/src/index.ts')).toBe(true);
   });
 });

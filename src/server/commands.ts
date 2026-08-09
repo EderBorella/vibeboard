@@ -7,8 +7,8 @@ import { type CommandResult, tail } from '../core/verify.js';
 //
 // 1. THROUGH A SHELL, because a gate is written by a person as a line they would type
 //    (`npm test -- --run`), not as an argv array. What makes that acceptable is where the command comes
-//    from: `foundation/CODE-QUALITY.md` and `foundation/TESTING.md`, which the AppArmor profile denies
-//    every agent write access to (`tools/apparmor/vibeboard-agent`). A command read from a card, a
+//    from: `foundation/CODE-QUALITY.md` and `foundation/TESTING.md`, which every agent box mounts
+//    read-only along with the rest of `.vibeboard/`. A command read from a card, a
 //    report or a run's output would be an agent choosing what this process executes — never do that.
 //
 //    Stated exactly, because the OS deny is not the whole chain: pre-flight AUTHORS those documents

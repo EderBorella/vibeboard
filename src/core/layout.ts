@@ -70,7 +70,7 @@ export const PROJECT_LOG_FILE = `${CONFIG_DIR}/PROJECT-LOG.md`;
 //
 // Deliberately not inside `docs/`, which is for freeform notes — mixing binding contracts with
 // arbitrary notes means an agent cannot tell which is which. Read-only to agents at the OS level
-// (tools/apparmor/vibeboard-agent): a file that sets the bar must not be writable by the thing being
+// (mounted read-only into every agent box): a file that sets the bar must not be writable by the thing being
 // judged against it.
 export const FOUNDATION_DIR = `${CONFIG_DIR}/foundation`;
 

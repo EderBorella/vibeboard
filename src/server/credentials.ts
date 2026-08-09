@@ -77,9 +77,9 @@ export function adminTokenFile(): string {
 // because a token stored inside the project is readable by anything that can read a card — which is
 // every agent, by design.
 //
-// Being outside is necessary, not sufficient: what denies an agent read access is the AppArmor
-// profile (`tools/apparmor/vibeboard-agent`), and only where it is installed. Without it — a Mac,
-// or a Linux box that has not run `npm run sandbox:install` — the separation this file describes is
+// Being outside is what denies an agent read access, and now it is sufficient rather than merely
+// necessary: an agent runs in a container, and this directory is not among the mounts. There is
+// nothing to deny, because there is nothing to reach. Before containment the separation here was
 // a plan rather than a protection, which is why auto-pilot refuses to start there.
 //
 // VIBEBOARD_TOKEN_FILE moves the token somewhere the profile has never heard of, and nothing

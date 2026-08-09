@@ -84,10 +84,10 @@ repository's own root untouched.
 
 ### Prerequisites
 
-- **Linux, with AppArmor** — Debian, Ubuntu or SUSE. VibeBoard runs every agent inside an OS
-  sandbox, and AppArmor is what enforces it. The board, the explorer and the settings work
-  anywhere Node does; **dispatching a run or a chat turn refuses** without the sandbox, and says
-  so. Fedora and Arch (SELinux, or nothing) and native Windows are not supported for agents —
+- **Docker** — VibeBoard runs every agent inside a container, and that is what confines it. Any
+  distribution works, and so does macOS; there is no per-distribution setup and nothing to `sudo`.
+  The board, the explorer and the settings work anywhere Node does; **dispatching a run or a chat
+  turn refuses** without Docker, and says so. Native Windows is not supported for agents —
   Windows compatibility is planned as a feature of its own once auto-pilot lands.
 - **Node.js >= 20**
 - **At least one AI CLI**, installed and already authenticated:
@@ -102,7 +102,7 @@ repository's own root untouched.
 
 ```bash
 npm install
-npm run sandbox:install   # once per machine — asks before it sudoes, and shows you what it runs
+npm run box:build    # once per machine — builds the container agents run in
 npm run build
 npm start            # → http://localhost:4610
 ```
@@ -148,26 +148,40 @@ gitignored, pruned to the last two weeks, and the path is printed at startup;
 
 ### The agent sandbox
 
-Agents build your project; they must not be able to rewrite the things that govern them. That is
-enforced by the operating system, not by asking nicely in a prompt:
+Agents build your project; they must not be able to rewrite the things that govern them. Every agent
+runs inside a container — not because a prompt asks it to stay put, but because it has nowhere else
+to go.
 
 ```
-npm run sandbox:install   # copies an AppArmor profile to /etc/apparmor.d and loads it
-npm run sandbox:check     # verifies it is in force, and never escalates
+npm run box:build   # once per machine, and again when the image changes
 ```
 
-One command, once per machine — the rules are globs, so every project you open afterwards is
-covered, and it survives a reboot. The script prints the profile and the exact two `sudo` commands
-before asking; without a terminal (CI, a Docker build) it refuses to escalate and prints them
-instead.
+**Docker is required.** Without it, the board, the file explorer and Settings all work and no agent
+will start; the refusal says exactly that and names this command. There is deliberately no fallback:
+maintaining a second, weaker containment path would mean most people quietly ran the weaker one.
 
-With it loaded, an agent can read anything, build anything, and write anywhere in your project
-**except**: cards and run records, `config.yaml`, skills, `foundation/`, the instructions injected
-into every turn, the project log, agent suggestions, chat transcripts, `.git/hooks`, `.git/config`,
-and VibeBoard's own credential in `~/.vibeboard`. It changes the board by calling the API, with a
-per-run credential scoped to the one card it was given.
+One box per project and backend, created with the project and thrown away when VibeBoard stops. Your
+project is mounted writable, so an agent can build, test and commit normally. Mounted **read-only**
+on top of it: `.vibeboard/` — cards and run records, `config.yaml`, skills, `foundation/`, the
+instructions injected into every turn, the log, suggestions, chat transcripts — plus `.git/hooks` and
+`.git/config`, which are how an agent would otherwise arrange to run code on *your* machine at your
+next commit. It changes the board by calling the API, with a per-run credential scoped to the one card
+it was given.
 
-The profile is `tools/apparmor/vibeboard-agent`, and it is short enough to read.
+Not mounted at all, and so not merely denied: everything else on your disk, including VibeBoard's own
+credential in `~/.vibeboard`.
+
+An agent can install what a job needs. Language packages (pip, npm, cargo, go) it installs itself,
+unprivileged; system packages it asks VibeBoard for, which installs them into the box as root. The
+image ships no `sudo`, so the agent never holds root itself — and anything installed goes with the box,
+which is what keeps a box disposable.
+
+Outbound, the box reaches the internet — it has to, to reach the model — but **not** the private
+network: not your LAN, and not the other services running on your machine, which typically ask for no
+password. Those rules are applied from outside the box and cannot be removed from within it. This is
+not exfiltration control, and nothing at this layer is.
+
+The mounts are in `src/server/containers.ts`, and they are short enough to read.
 
 ### ⚠️ Security
 

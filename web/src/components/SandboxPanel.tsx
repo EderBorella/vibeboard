@@ -39,24 +39,25 @@ export function SandboxPanel({ state, backend, onChanged }: Props) {
       <div className="field">
         {state.ok ? (
           <p className="sandbox-state sandbox-ok">
-            {/* This list is a copy. The profile is the source of truth — tools/apparmor/vibeboard-agent —
+            {/* This list is a copy. The box's mounts are the source of truth — src/server/containers.ts —
                 and it has drifted from this text twice. Change one, change both. */}
-            <strong>Enforced by the OS.</strong> Agents can build your project and cannot write the files that
-            govern it — cards and run records, <code>config.yaml</code>, skills, the instructions injected
-            into every turn, the project log, suggestions, chat transcripts, <code>.git/hooks</code>, or
-            VibeBoard's own credential.
+            <strong>Every agent runs in a container.</strong> Agents can build your project and cannot write
+            the files that govern it — cards and run records, <code>config.yaml</code>, skills, the
+            instructions injected into every turn, the project log, suggestions, chat transcripts,
+            <code>.git/hooks</code> or <code>.git/config</code>. VibeBoard's own credential is not in the
+            container at all. They reach the internet but not your local network.
           </p>
         ) : (
           <p className="sandbox-state sandbox-off">
             {/* Said plainly, because it is the whole product on this machine: after the one-path
                 ruling there is no degraded mode to fall back to. */}
             <strong>Agents are disabled.</strong> {state.reason} The board, the explorer and these settings
-            work normally — but dispatching a run or sending a chat message will be refused until the sandbox
-            is installed.
+            work normally — but dispatching a run or sending a chat message will be refused until Docker is
+            available and the agent image is built.
           </p>
         )}
-        {/* Shown whenever it is set, not only when the sandbox is missing: a loaded profile is not
-            enough on its own, because we never wrapped a server we did not spawn. */}
+        {/* Shown whenever it is set, not only when the sandbox is missing: a working image is not
+            enough on its own, because a server we did not spawn is not in a box. */}
         {state.backend === 'attached' && (
           <p className="sandbox-state sandbox-off">
             Attached to an OpenCode server VibeBoard did not start ({state.attachedUrl}), so its filesystem

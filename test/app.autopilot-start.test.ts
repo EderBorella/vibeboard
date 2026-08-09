@@ -140,11 +140,11 @@ describe('pressing start', () => {
 
   it('refuses without a sandbox, which is mandatory for the one caller that runs unattended', async () => {
     const { app } = await openTestProject({
-      sandbox: { ok: false, reason: 'AppArmor is not installed' },
+      sandbox: { ok: false, reason: 'Docker is not available — no daemon' },
     });
     const res = await start(app);
     expect(res.statusCode).toBe(412);
-    expect(res.json().error).toContain('AppArmor is not installed');
+    expect(res.json().error).toContain('Docker is not available');
   });
 
   it('refuses while halted, and says a person has to restart it', async () => {

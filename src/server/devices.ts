@@ -13,8 +13,8 @@ import { serialise, writeAtomic } from './write-queue.js';
 //
 // WHAT IS STORED IS A HASH, NOT THE CREDENTIAL. `~/.vibeboard/token` is the credential itself, so
 // anything that can read that file is admin; here the file holds sha256 digests and replaying one
-// authenticates nothing. That matters exactly where the AppArmor profile is absent — a Mac, or a
-// Linux box that has never run `npm run sandbox:install` — because there the file permissions are the
+// authenticates nothing. That mattered most where the old AppArmor profile was absent — a Mac, or a
+// Linux box that never installed it — because there the file permissions were the
 // only thing between an agent and the board.
 //
 // sha256 rather than a KDF, deliberately: the secret is 256 bits of CSPRNG output, so there is no
@@ -54,7 +54,7 @@ export interface DeviceView {
 
 // Beside the admin token, so there is ONE path to relocate and one to deny rather than two.
 //
-// `token-`prefixed on purpose: `deny @{HOME}/.vibeboard/token* rwl` in tools/apparmor/vibeboard-agent
+// `token-`prefixed on purpose: it kept the whole family under one deny in the old AppArmor profile,
 // is the only read-denied rule in the profile, and it matches by that prefix. A file called
 // `devices.json` would sit in the same folder, look just as private, and be readable by every agent.
 // test/devices.test.ts asserts the match against the profile rather than trusting this paragraph.

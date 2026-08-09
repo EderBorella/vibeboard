@@ -40,14 +40,14 @@ describe('what it says is enforced', () => {
   });
 
   it('carries the reason and the consequence when there is no sandbox', () => {
-    show({ ok: false, profile: undefined, reason: 'profile not loaded — run `npm run sandbox:install`' });
-    expect(screen.getByText(/sandbox:install/)).toBeTruthy();
+    show({ ok: false, profile: undefined, reason: 'the agent image is not built — run `npm run box:build`' });
+    expect(screen.getByText(/box:build/)).toBeTruthy();
     // Both halves: what still works, and what will not. Either alone misleads.
     // The panel used to say manual runs and chat "still work". After the one-path ruling they are
     // refused, and an affirmative false statement about the security posture is worse than a stale
     // list — so this pins the correction.
     expect(screen.getByText(/Agents are disabled/i)).toBeTruthy();
-    expect(screen.getByText(/will be refused until the sandbox is installed/i)).toBeTruthy();
+    expect(screen.getByText(/will be refused until Docker is available/i)).toBeTruthy();
     expect(screen.queryByText(/still work;/i)).toBeNull();
   });
 

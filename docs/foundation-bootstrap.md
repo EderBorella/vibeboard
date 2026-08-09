@@ -12,9 +12,9 @@ disagrees with those, they win and this file is stale.
 
 ## Read this first: the copilot needs authorising
 
-The copilot cannot touch `.vibeboard/foundation/` by writing files — the AppArmor profile denies it,
-and that is deliberate: these documents hold the gates a run is judged against. It writes them
-through an endpoint instead, and only once **you** have granted it.
+The copilot cannot touch `.vibeboard/foundation/` by writing files — its container mounts that folder
+read-only, and that is deliberate: these documents hold the gates a run is judged against. It writes
+them through an endpoint instead, and only once **you** have granted it.
 
 1. Press **Authorise** in the copilot panel. That mints a credential for the current conversation and
    tells the copilot the exact endpoints it opens. It is revoked when the chat or the project changes.

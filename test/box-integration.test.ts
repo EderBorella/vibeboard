@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { BoxManager } from '../src/server/box-manager.js';
-import { DEFAULT_IMAGE, type DockerRun } from '../src/server/containers.js';
+import { DEFAULT_IMAGE, type DockerRun, SOCKET_DIR } from '../src/server/containers.js';
 
 // The boundary itself, against a real container — not the argv that asks for it.
 //
@@ -55,6 +55,10 @@ box('the agent box, for real', () => {
     writeFileSync(join(dir, 'proj', '.vibeboard', 'card.md'), 'governed\n');
     // A real-enough repository: the git escalation paths only get mounted when they exist, because
     // docker CREATES a missing bind-mount source root-owned rather than skipping it.
+    mkdirSync(join(dir, 'run'), { recursive: true });
+    // Something has to BE there, or `rm -f` on a missing path succeeds and the read-only assertion
+    // below passes for the wrong reason.
+    writeFileSync(join(dir, 'run', 'api.sock'), '');
     mkdirSync(join(dir, 'proj', '.git', 'hooks'), { recursive: true });
     writeFileSync(join(dir, 'proj', '.git', 'config'), '[core]\n');
     // THE REAL docker, explicitly. The suite points `VIBEBOARD_DOCKER_BIN` at a stand-in so every
@@ -70,6 +74,7 @@ box('the agent box, for real', () => {
       paths: {
         projectRoot: join(dir, 'proj'),
         stateDir: join(dir, 'state'),
+        socketDir: join(dir, 'run'),
         readOnly: ['.vibeboard', '.git/hooks', '.git/config'],
       },
       command: ['sleep', '600'],
@@ -166,10 +171,73 @@ box('the agent box, for real', () => {
   });
 
   it('cannot see the admin credential at all — it is not mounted, not merely denied', async () => {
-    expect((await asAgent('cat /root/.vibeboard/token; cat "$HOME/.vibeboard/token"')).code).not.toBe(0);
+    // `&&`, not `;`: with `;` the exit status is the SECOND cat's alone and the first path is not
+    // really asserted at all.
+    expect((await asAgent('cat /root/.vibeboard/token')).code).not.toBe(0);
+    expect((await asAgent('cat "$HOME/.vibeboard/token"')).code).not.toBe(0);
     expect(
       (await asAgent('find / -name token -path "*vibeboard*" 2>/dev/null | head -1')).stdout.trim(),
     ).toBe('');
+  });
+
+  it('cannot reach another container on this machine, and CAN reach the internet', async () => {
+    // The headline claim of the whole slice, and it had no behavioural test — only assertions about
+    // the argv, plus one that `iptables -F` is refused. Those can all pass while the rules do
+    // nothing. The peer stands in for the unauthenticated services a real machine runs beside this
+    // one (ollama, qdrant, a proxy manager).
+    const peer = `vb-peer-${process.pid}`;
+    await run('docker', [
+      'run',
+      '-d',
+      '--name',
+      peer,
+      '--entrypoint',
+      '/bin/sh',
+      DEFAULT_IMAGE,
+      '-c',
+      "node -e \"require('http').createServer((q,s)=>s.end('PEER-REACHED')).listen(8080)\"",
+    ]);
+    try {
+      const { stdout: ip } = await run('docker', [
+        'inspect',
+        '-f',
+        '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}',
+        peer,
+      ]);
+      const peerIp = ip.trim();
+      expect(peerIp).toMatch(/^\d+\.\d+\.\d+\.\d+$/);
+      // The peer really is up, or "blocked" below would be meaningless — an unreachable peer and a
+      // rejected one look identical from inside the box.
+      const control = await run('docker', [
+        'run',
+        '--rm',
+        '--entrypoint',
+        '/bin/sh',
+        DEFAULT_IMAGE,
+        '-c',
+        `curl -s -m 5 http://${peerIp}:8080/`,
+      ]);
+      expect(control.stdout).toContain('PEER-REACHED');
+
+      // And from the confined box, it is not.
+      const blocked = await asAgent(`curl -s -m 5 http://${peerIp}:8080/ || echo BLOCKED`);
+      expect(blocked.stdout).toContain('BLOCKED');
+      expect(blocked.stdout).not.toContain('PEER-REACHED');
+    } finally {
+      await run('docker', ['rm', '-f', peer]).catch(() => undefined);
+    }
+  }, 120_000);
+
+  it('can still use the API socket, which is mounted READ-ONLY so it cannot be replaced', async () => {
+    // A writable socket directory lets an agent unlink the live socket and bind its own there. Every
+    // other box's relay reconnects per connection, so the next request from another run lands on the
+    // impostor with its bearer token in the header. `:ro` refuses the unlink — and still permits
+    // `connect()`, which is the part that has to be checked rather than assumed.
+    // The file is really there — otherwise `rm -f` would succeed on nothing.
+    expect((await asAgent(`test -e ${SOCKET_DIR}/api.sock`)).code).toBe(0);
+    expect((await asAgent(`rm -f ${SOCKET_DIR}/api.sock`)).code).not.toBe(0);
+    expect((await asAgent(`touch ${SOCKET_DIR}/mine.sock`)).code).not.toBe(0);
+    expect((await asAgent(`test -e ${SOCKET_DIR}/api.sock`)).code).toBe(0);
   });
 
   it('leaves nothing root-owned in the project — the day-one bind-mount failure', async () => {

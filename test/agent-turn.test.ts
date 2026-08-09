@@ -594,7 +594,10 @@ describe('the sandbox', () => {
     // Getting this wrong does not fail — it silently uses another project's sessions, because Claude
     // names its session directory after the working directory and that is always /work in a box.
     await claudeTurn({ sandbox: LIVE_SANDBOX, box: 'vibeboard-abc-claude-code' });
-    expect(lastInvocation().env.CLAUDE_CONFIG_DIR).toBe('/state/claude');
+    // `/state` IS the Claude box's config home — the whole of it. It used to be `/state/claude`, a
+    // subdirectory of a state root shared with OpenCode, which put OpenCode's `auth.json` inside a
+    // Claude box. Each backend now mounts only its own directory.
+    expect(lastInvocation().env.CLAUDE_CONFIG_DIR).toBe('/state');
   });
 
   it('REFUSES to spawn at all when the sandbox is ok but no box was resolved', async () => {

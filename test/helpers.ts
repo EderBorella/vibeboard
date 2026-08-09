@@ -104,10 +104,14 @@ export function testBoxes(): BoxService {
   });
 }
 
-// Answers as a healthy daemon would, so `ensure` adopts rather than creating and nothing is spawned.
+// Answers as a healthy daemon with NO box yet: every `ensure` creates, which is one no-op call here
+// and keeps the digest out of it. Reporting a running box would mean reporting a spec digest too —
+// adoption checks it now — and a helper that guessed wrong would silently rebuild on every call.
 const fakeDockerRun: DockerRun = async (args) => {
-  if (args[0] === 'inspect') return { code: 0, stdout: 'true\n', stderr: '' };
-  if (args[0] === 'port') return { code: 0, stdout: '127.0.0.1:39999\n', stderr: '' };
+  if (args[0] === 'inspect') return { code: 1, stdout: '', stderr: 'No such object' };
+  // Only for a box that ASKED to publish. Answering unconditionally is what let a box created
+  // without `-p` look like one that had it, which hid a real failure in the OpenCode server path.
+  if (args[0] === 'port') return { code: 1, stdout: '', stderr: 'No public port' };
   return { code: 0, stdout: '', stderr: '' };
 };
 

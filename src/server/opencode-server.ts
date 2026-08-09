@@ -31,6 +31,8 @@ let boxes: BoxService | undefined;
 // The `docker logs -f` follower for the boxed server, so it can be replaced on restart and stopped
 // on shutdown rather than outliving the thing it is reading.
 let logs: ChildProcess | undefined;
+// Which project `urlPromise` belongs to — see `opencodeBaseUrl`.
+let urlProject: string | undefined;
 // The project the managed server serves. A FUNCTION, like `halted`: the server is a process-wide
 // singleton and the open project changes under it.
 let projectRoot: () => string = () => process.cwd();
@@ -41,9 +43,11 @@ let halted: () => boolean = () => false;
 // Set by buildApp, alongside the logger and for the same reason: this server is a process-wide
 // singleton started lazily, long after the app was built.
 //
-// One confinement covers every run in every project it serves, and the chat with it — the profile
-// is globs over `**/.vibeboard/**`, not paths, so switching projects needs no restart. That is the
-// simplification AppArmor bought over the per-project ruleset the design originally called for.
+// CORRECTED 2026-08-09. This used to say "one confinement covers every run in every project it
+// serves … switching projects needs no restart", which was true of the AppArmor profile (globs, not
+// paths) and is now false in a way that caused a real bug: containment is a container per project,
+// and the server's URL points into ONE of them. `opencodeBaseUrl` keys its cache by project for
+// exactly that reason.
 export function attachSandbox(status: SandboxStatus): void {
   sandbox = status;
 }
@@ -331,8 +335,35 @@ export function opencodeBaseUrl(): Promise<string> {
       new Error('This project is halted, so VibeBoard will not start an OpenCode server for it.'),
     );
   }
-  if (!urlPromise) urlPromise = boxes ? startServerInBox(boxes) : startServer();
+  // KEYED BY PROJECT. The URL is a port on a container that belongs to ONE project, and this module
+  // is a process-wide singleton that outlives any of them. Without this, opening project B and
+  // sending a message reached project A's box — and since `?directory=` is now the constant `/work`,
+  // the agent read and wrote project A while the board, the transcript and the run records all said
+  // B. Before containment the same singleton was safe, because the directory carried the real host
+  // path; making the directory constant is what made the server have to be per-project.
+  const root = projectRoot();
+  if (urlPromise && urlProject !== root) {
+    stopOpencodeServer();
+  }
+  if (!urlPromise) {
+    urlProject = root;
+    urlPromise = trackFailure(boxes ? startServerInBox(boxes) : startServer());
+  }
   return urlPromise;
+}
+
+// A rejected promise is still a promise, and `if (!urlPromise)` is happy to keep it forever — so one
+// slow cold start (an image pull past the readiness timeout, a busy daemon) wedged the backend for
+// the life of the process, with nothing in the UI to say a restart would clear it. The child-process
+// path self-healed through its `exit` handler; the boxed one has no child to hear from.
+function trackFailure(p: Promise<string>): Promise<string> {
+  return p.catch((err) => {
+    if (urlPromise === p) {
+      urlPromise = undefined;
+      urlProject = undefined;
+    }
+    throw err;
+  });
 }
 
 // Stop the managed server and start a fresh one, confined by whatever is in force now. Its everyday
@@ -345,9 +376,11 @@ export async function restartOpencodeServer(): Promise<string> {
   // exec'd into or restarted into a working state.
   if (boxes) {
     await boxes.stop(projectRoot(), 'opencode').catch(() => undefined);
-    urlPromise = startServerInBox(boxes);
+    urlProject = projectRoot();
+    urlPromise = trackFailure(startServerInBox(boxes));
   } else {
-    urlPromise = startServer();
+    urlProject = projectRoot();
+    urlPromise = trackFailure(startServer());
   }
   return urlPromise;
 }
@@ -367,6 +400,7 @@ export function stopOpencodeServer(): void {
   // process, so there is no child, and the cached URL survived every stop. The next turn then went on
   // talking to a server that had been stopped, or to a box that had been removed.
   urlPromise = undefined;
+  urlProject = undefined;
   logs?.kill('SIGTERM');
   logs = undefined;
   if (child) {

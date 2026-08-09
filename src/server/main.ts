@@ -116,13 +116,26 @@ function lanAddress(): string | undefined {
   return undefined;
 }
 
-async function start(): Promise<void> {
-  const served = await registerStatic(app);
-  // Boxes left by a VibeBoard that did not get to shut down — a SIGKILL, an OOM kill, a crashed host.
-  // Safe to do unconditionally because only this process creates them and it has just started; a
-  // second VibeBoard on one machine is already refused by the API socket below.
+// Boxes left by a VibeBoard that did not get to shut down — a SIGKILL, an OOM kill, a crashed host.
+//
+// ONLY once this process holds the API socket, which is what makes it the single VibeBoard on this
+// machine. `stopAll` removes every box carrying our label and cannot tell one instance's from
+// another's, so running it unguarded meant starting a second copy destroyed the FIRST one's boxes —
+// killing a run mid-write — before failing to bind the port and exiting. It used to run before the
+// socket was even attempted, justified by a comment claiming the socket refused a second instance:
+// it does, but not until later, and the bind failure is deliberately not fatal.
+async function sweepOldBoxes(ownsSocket: boolean): Promise<void> {
+  if (!ownsSocket) {
+    app.log.warn('did not sweep old agent boxes: another VibeBoard may hold the API socket');
+    return;
+  }
   const swept = await boxes.stopAll().catch(() => 0);
   if (swept > 0) console.log(`  swept ${swept} agent box${swept === 1 ? '' : 'es'} left by a previous run`);
+}
+
+async function start(): Promise<void> {
+  const served = await registerStatic(app);
+
   // Reopen whatever was open last, so a restart doesn't dump you back at the project gate.
   const reopened = await restoreLastProject(session);
   // A `running` state on disk belongs to the process that died: its children went with it, so
@@ -139,6 +152,8 @@ async function start(): Promise<void> {
   } catch (err) {
     app.log.error({ err }, 'could not open the API socket; agents in containers will not reach the API');
   }
+
+  await sweepOldBoxes(apiSocket !== undefined);
   const lan = isLoopback ? undefined : lanAddress();
   // A PLAIN URL. It used to carry `?token=<admin>`, which put a credential that never expires into
   // terminal scrollback, screen shares and every screenshot of a first run — and left it in bookmarks

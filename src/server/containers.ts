@@ -23,6 +23,18 @@ export type BoxBackend = 'claude-code' | 'opencode';
 export const BOX_LABEL = 'io.vibeboard.box';
 export const PROJECT_LABEL = 'io.vibeboard.project';
 export const BACKEND_LABEL = 'io.vibeboard.backend';
+// A digest of everything about a box that cannot be changed after it is created. Adoption is by NAME,
+// so without this a box built for one purpose is silently reused for another: the OpenCode server's
+// box was created as `sleep infinity` with no published port by any turn that ran first, then adopted
+// by the code that needed `opencode serve` on a published port — which discarded both and failed with
+// "docker published no port for it", permanently, because the rejected promise is cached.
+//
+// It also closes a real hole. The read-only set is filtered to the paths that EXIST when the box is
+// made, because docker creates a missing bind source root-owned. A project with no `.git` yet gets a
+// box with no `.git/hooks` pin — and if the agent then runs `git init`, that directory is writable
+// and a `pre-commit` hook it writes runs on the HOST at the user's next commit. Recomputing the
+// digest each time means the box is rebuilt as soon as the set changes.
+export const SPEC_LABEL = 'io.vibeboard.spec';
 
 export const DEFAULT_IMAGE = process.env.VIBEBOARD_AGENT_IMAGE ?? 'vibeboard-agent:latest';
 
@@ -54,10 +66,12 @@ export const STATE_DIR = '/state';
 // keeps sessions in a SQLite database in its data home, and sharing the user's own would put several
 // containers and the user on one 265MB file as concurrent writers.
 export function boxEnvFor(backend: BoxBackend): Record<string, string> {
-  if (backend === 'claude-code') return { CLAUDE_CONFIG_DIR: `${STATE_DIR}/claude` };
+  // /state is the backend's OWN directory, never the project's shared state root. Mounting the root
+  // put OpenCode's `auth.json` inside a Claude box — see the note on `claudeStateDir`.
+  if (backend === 'claude-code') return { CLAUDE_CONFIG_DIR: STATE_DIR };
   return {
-    XDG_DATA_HOME: `${STATE_DIR}/opencode-data`,
-    XDG_CONFIG_HOME: `${STATE_DIR}/opencode-xdg`,
+    XDG_DATA_HOME: `${STATE_DIR}/data`,
+    XDG_CONFIG_HOME: `${STATE_DIR}/config`,
   };
 }
 
@@ -128,7 +142,15 @@ export function boxMounts(paths: BoxPaths): MountSpec[] {
   for (const rel of paths.readOnly ?? [CONFIG_DIR]) {
     mounts.push({ source: join(paths.projectRoot, rel), target: `${WORK_DIR}/${rel}`, readOnly: true });
   }
-  if (paths.socketDir) mounts.push({ source: paths.socketDir, target: SOCKET_DIR });
+  // READ-ONLY, and this is load-bearing. The directory is a single global path shared by every box
+  // on the machine, and the box runs as the uid that owns it — so a writable mount lets an agent
+  // `unlink` the live socket and bind its own there. Every other box's relay reconnects per
+  // connection by design, so the next request from another run (a different card, a different
+  // project, or the copilot) lands on the impostor with its bearer token in the header.
+  //
+  // Measured: `:ro` refuses the unlink and still permits `connect()` — a read-only superblock rejects
+  // writes to files, directories and symlinks, not sockets.
+  if (paths.socketDir) mounts.push({ source: paths.socketDir, target: SOCKET_DIR, readOnly: true });
   if (paths.credential) mounts.push(paths.credential);
   return mounts;
 }
@@ -174,7 +196,10 @@ export const PRIVATE_RANGES = ['10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16', 
 // for a subtle reason worth recording: `docker exec` takes its capabilities from the CONTAINER's spec,
 // not from PID 1, so dropping them in an entrypoint does not constrain any later exec at all.
 export function netRuleArgs(box: string, image: string): string[] {
-  const script = PRIVATE_RANGES.map((cidr) => `iptables -A OUTPUT -d ${cidr} -j REJECT`).join('; ');
+  // `&&`, never `;`. A `;`-joined script exits with the status of the LAST command alone, so three
+  // failed rules and one that worked was indistinguishable from success — and this gate's whole
+  // promise is that a box whose rules did not apply is destroyed rather than served.
+  const script = PRIVATE_RANGES.map((cidr) => `iptables -A OUTPUT -d ${cidr} -j REJECT`).join(' && ');
   return [
     'run',
     '--rm',
@@ -191,6 +216,20 @@ export function netRuleArgs(box: string, image: string): string[] {
   ];
 }
 
+// What must match for a running box to be reusable. Deliberately NOT the whole argv: the labels
+// carry the project path and backend, which are already in the name, and including the digest in its
+// own input would be circular.
+export function specDigest(spec: Omit<CreateArgs, 'name' | 'projectRoot' | 'backend' | 'user'>): string {
+  const shape = {
+    image: spec.image,
+    mounts: spec.mounts.map((m) => `${m.source}:${m.target}${m.readOnly ? ':ro' : ''}`),
+    env: Object.entries(spec.env).sort(),
+    publish: spec.publish?.containerPort ?? null,
+    command: spec.command ?? null,
+  };
+  return createHash('sha256').update(JSON.stringify(shape)).digest('hex').slice(0, 16);
+}
+
 // Also pure, also exported for its own test. Every flag here is load-bearing and several are the kind
 // that fail silently when wrong, so the argv is asserted rather than trusted.
 export function createArgs(spec: CreateArgs): string[] {
@@ -205,6 +244,8 @@ export function createArgs(spec: CreateArgs): string[] {
     `${PROJECT_LABEL}=${spec.projectRoot}`,
     '--label',
     `${BACKEND_LABEL}=${spec.backend}`,
+    '--label',
+    `${SPEC_LABEL}=${specDigest(spec)}`,
     // The host user, so everything the agent creates in the bind mount is owned by the person who owns
     // the project rather than by root.
     '--user',
@@ -241,10 +282,28 @@ export type DockerRun = (args: string[], opts?: { timeoutMs?: number }) => Promi
 
 export type BoxState = 'running' | 'stopped' | 'absent';
 
-export async function inspectState(docker: DockerRun, name: string): Promise<BoxState> {
-  const res = await docker(['inspect', '-f', '{{.State.Running}}', name]);
-  if (res.code !== 0) return 'absent';
-  return res.stdout.trim() === 'true' ? 'running' : 'stopped';
+export interface BoxInspection {
+  state: BoxState;
+  // The spec digest the box was created with, or '' for one made before this label existed.
+  spec: string;
+}
+
+// State AND spec in one call. Two calls would be two round trips and, worse, a window in which the
+// answers disagree.
+export async function inspectState(docker: DockerRun, name: string): Promise<BoxInspection> {
+  const res = await docker([
+    'inspect',
+    '-f',
+    `{{.State.Running}} {{index .Config.Labels "${SPEC_LABEL}"}}`,
+    name,
+  ]);
+  if (res.code !== 0) return { state: 'absent', spec: '' };
+  const [running = '', spec = ''] = res.stdout.trim().split(/\s+/);
+  return {
+    state: running === 'true' ? 'running' : 'stopped',
+    // docker prints `<no value>` for a label that is not set.
+    spec: spec === '<no value>' ? '' : spec,
+  };
 }
 
 // The exec prefix for a box: what `wrapCommand` returns once containment is a container.

@@ -3,13 +3,7 @@ import { apiSocketDir } from './api-socket.js';
 import { BoxManager, boxPathsFor } from './box-manager.js';
 import type { BoxBackend, BoxPaths } from './containers.js';
 import { boxEnvFor, DEFAULT_IMAGE, SOCKET_DIR, STATE_DIR, WORK_DIR } from './containers.js';
-import {
-  claudeCredentialFile,
-  claudeStateDir,
-  opencodeConfigHome,
-  opencodeStateDir,
-  projectStateDir,
-} from './copilot-env.js';
+import { claudeCredentialFile, claudeStateDir, opencodeStateDir } from './copilot-env.js';
 
 // What a box is FOR a given project and backend: which directories it gets, which credential, and
 // which environment the CLI inside it needs. The manager below it knows docker and nothing about
@@ -27,8 +21,11 @@ export function boxPathsForBackend(
   backend: BoxBackend,
   exists: (path: string) => boolean = existsSync,
 ): BoxPaths {
+  // THE BACKEND'S OWN state directory, never the project's shared root. The root holds both
+  // backends' state, and mounting it gave a Claude box a readable copy of OpenCode's `auth.json` —
+  // the one thing S2 exists to prevent. Found in review 2026-08-09.
   const extra: Omit<BoxPaths, 'projectRoot' | 'readOnly'> = {
-    stateDir: projectStateDir(projectRoot),
+    stateDir: backend === 'claude-code' ? claudeStateDir(projectRoot) : opencodeStateDir(projectRoot),
     socketDir: apiSocketDir(),
   };
   if (backend === 'claude-code') {
@@ -74,12 +71,8 @@ export class BoxService {
     publishPort?: number,
     command?: string[],
   ): Promise<EnsuredBox> {
-    // Created eagerly, because docker would otherwise create the missing sources itself, root-owned.
-    if (backend === 'claude-code') claudeStateDir(projectRoot);
-    else {
-      opencodeStateDir(projectRoot);
-      opencodeConfigHome(projectRoot);
-    }
+    // `boxPathsForBackend` creates the state directory as a side effect, which is deliberate: docker
+    // would otherwise create a missing bind source itself, root-owned, on the host.
     return this.#manager.ensure({
       projectRoot,
       backend,

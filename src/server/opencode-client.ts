@@ -142,9 +142,13 @@ async function postJson(url: string, body: unknown, signal?: AbortSignal): Promi
 }
 
 // Run one OpenCode turn over the persistent server. Reuses the session id across turns
-// (create one on first turn), returns the session id for the next turn. The project
-// directory is a QUERY param (`?directory=`) — that's how the shared server knows which
-// project to operate in (session + message both scoped to it).
+// (create one on first turn), returns the session id for the next turn.
+//
+// The project directory is a QUERY param (`?directory=`). It used to carry the real host path, which
+// is how one shared server knew which project to operate in. Containerised it is the CONSTANT
+// `/work` — the host path does not exist inside a box — so what distinguishes one project from
+// another is now the BOX, not this parameter. `opencodeBaseUrl` therefore has to be per project, and
+// is.
 export async function opencodeTurn(opts: OpencodeTurnOptions): Promise<string> {
   const base = await opencodeBaseUrl();
   const dq = `?directory=${encodeURIComponent(opencodeDirectory(opts.cwd))}`;

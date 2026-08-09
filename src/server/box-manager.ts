@@ -19,6 +19,7 @@ import {
   netRuleArgs,
   parsePublishedPort,
   protectedPaths,
+  specDigest,
 } from './containers.js';
 
 const run = promisify(execFile);
@@ -46,6 +47,9 @@ export function boxPathsFor(
   return { projectRoot, readOnly: protectedPaths(projectRoot, exists), ...extra };
 }
 
+// Why a box was thrown away and remade — the digest it had, and the one it needed.
+export type RebuildNotice = (name: string, was: string, now: string) => void;
+
 export interface BoxHandle {
   name: string;
   // Only for a box that publishes one — OpenCode's, whose server VibeBoard reaches over HTTP.
@@ -66,8 +70,13 @@ export class BoxManager {
   #docker: DockerRun;
   #user: string;
 
-  constructor(opts: { docker?: DockerRun; user?: string } = {}) {
+  // Told, not logged directly: rebuilding somebody's box is worth a line in the server log, and this
+  // module has no logger and should not grow one.
+  #onRebuild: RebuildNotice | undefined;
+
+  constructor(opts: { docker?: DockerRun; user?: string; onRebuild?: RebuildNotice } = {}) {
     this.#docker = opts.docker ?? spawnDocker;
+    this.#onRebuild = opts.onRebuild;
     // Resolved once. `process.getuid` is undefined on Windows, where none of this runs anyway.
     this.#user = opts.user ?? `${process.getuid?.() ?? 0}:${process.getgid?.() ?? 0}`;
   }
@@ -95,19 +104,36 @@ export class BoxManager {
   // started rather than rebuilt for the same reason.
   async ensure(opts: EnsureOptions): Promise<BoxHandle> {
     const name = boxName(opts.projectRoot, opts.backend);
-    const state = await inspectState(this.#docker, name);
+    const spec = {
+      image: opts.image ?? DEFAULT_IMAGE,
+      mounts: boxMounts(opts.paths),
+      env: opts.env ?? {},
+      publish: opts.publishPort ? { containerPort: opts.publishPort } : undefined,
+      command: opts.command,
+    };
+    const wanted = specDigest(spec);
+    const found = await inspectState(this.#docker, name);
+    let state = found.state;
+
+    // ADOPTION IS BY NAME **AND SPEC**. A box's mounts, published ports and command are fixed when it
+    // is created, so a box built for one purpose cannot serve another — and adopting one anyway is
+    // silent, which is the worst property a containment decision can have. Two real failures came
+    // from adopting on the name alone: an OpenCode server box adopted from a `sleep infinity` box
+    // that any earlier turn had created, so it never published a port; and a box created before the
+    // project had a `.git`, which therefore had no `.git/hooks` pin and never gained one.
+    if (state !== 'absent' && found.spec !== wanted) {
+      this.#onRebuild?.(name, found.spec, wanted);
+      await this.#docker(['rm', '-f', name], { timeoutMs: 60_000 });
+      state = 'absent';
+    }
 
     if (state === 'absent') {
       const args = createArgs({
         name,
-        image: opts.image ?? DEFAULT_IMAGE,
         projectRoot: opts.projectRoot,
         backend: opts.backend,
-        mounts: boxMounts(opts.paths),
-        env: opts.env ?? {},
         user: this.#user,
-        publish: opts.publishPort ? { containerPort: opts.publishPort } : undefined,
-        command: opts.command,
+        ...spec,
       });
       const created = await this.#docker(args, { timeoutMs: 120_000 });
       if (created.code !== 0) {

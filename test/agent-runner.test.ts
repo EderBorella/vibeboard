@@ -585,6 +585,31 @@ describe('AgentRunner.dispatch', () => {
     expect(running).toEqual([first.run, second.run, third.run]);
   });
 
+  it('never exceeds the cap when a slot frees — one out does NOT let the whole queue in', async () => {
+    // The regression this pins: `#start` became async, so `#active.set` moved behind an await and
+    // `#drain`'s `while (!isBusy())` stopped seeing the count rise. Every queued run was shifted and
+    // spawned in one burst against a cap of one — real agents, real spend. The existing
+    // "starts the waiting run as soon as a slot frees" test could not tell the two apart, because it
+    // only asserts the queue reaches empty, which is true either way.
+    const shim = behaving('hang');
+    const root = await tempDir();
+    let n = 0;
+    const { instance } = runner(root, { suffix: () => `c${++n}`, maxConcurrent: () => 1 });
+    const first = await instance.dispatch(input(root, shim));
+    await instance.dispatch(input(root, shim));
+    await instance.dispatch(input(root, shim));
+    expect(instance.activeIds).toHaveLength(1);
+    expect(instance.queuedIds).toHaveLength(2);
+
+    instance.cancel(first.run);
+    await settled(root, first.run);
+
+    // Exactly ONE of the two waiting runs may start. Two is the bug.
+    await vi.waitFor(() => expect(instance.activeIds).toHaveLength(1));
+    expect(instance.queuedIds).toHaveLength(1);
+    instance.cancelAll();
+  });
+
   it('runs several at once when the cap allows it', async () => {
     const shim = behaving('hang');
     const root = await tempDir();

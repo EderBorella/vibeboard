@@ -55,9 +55,10 @@ export interface DeviceView {
 // Beside the admin token, so there is ONE path to relocate and one to deny rather than two.
 //
 // `token-`prefixed on purpose: it kept the whole family under one deny in the old AppArmor profile,
-// is the only read-denied rule in the profile, and it matches by that prefix. A file called
-// `devices.json` would sit in the same folder, look just as private, and be readable by every agent.
-// test/devices.test.ts asserts the match against the profile rather than trusting this paragraph.
+// which matched by that prefix. The name is kept because it still reads as "this is a credential",
+// but the guarantee no longer rests on it — an agent runs in a container and `~/.vibeboard` is not
+// among its mounts, so there is nothing here to deny. test/devices.test.ts asserts absence from the
+// real mount set rather than trusting this paragraph.
 export function deviceFile(): string {
   return join(dirname(adminTokenFile()), 'token-devices.json');
 }

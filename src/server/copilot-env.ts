@@ -50,10 +50,17 @@ export function projectStateDir(projectRoot: string): string {
   return join(copilotHome(), 'projects', digest);
 }
 
-// Claude's config home for one project. The credentials symlink is the load-bearing part: it points at
-// the user's real file by ABSOLUTE path, and the box mounts that same absolute path, so the link
-// resolves identically inside and out. Token refresh writes through it, which is why it is a link and
-// not a copy.
+// Claude's config home for one project — and the ONLY thing its box mounts as /state.
+//
+// A SUBDIRECTORY of the project's state root, not the root itself. Mounting the shared root gave a
+// Claude box a readable copy of OpenCode's `auth.json`, which is the exact thing S2 exists to
+// prevent: the two backends' credentials must never meet. Found in review 2026-08-09; the reverse
+// direction was already safe only by accident (Claude's credential is a symlink to a host path an
+// OpenCode box does not mount, so it dangles rather than resolving).
+//
+// The credentials symlink is the load-bearing part: it points at the user's real file by ABSOLUTE
+// path, and the box mounts that same absolute path, so the link resolves identically inside and out.
+// Token refresh writes through it, which is why it is a link and not a copy.
 export function claudeStateDir(projectRoot: string): string {
   const dir = join(projectStateDir(projectRoot), 'claude');
   mkdirSync(dir, { recursive: true });
@@ -61,17 +68,19 @@ export function claudeStateDir(projectRoot: string): string {
   return dir;
 }
 
-// OpenCode's data home for one project, seeded with the credential and nothing else. `auth.json` is a
-// few KB; the session database is what we are deliberately NOT sharing, and it is created fresh here.
+// OpenCode's state for one project — and the only thing its box mounts as /state. Holds BOTH of the
+// homes it needs, so one mount covers them: `data/` is XDG_DATA_HOME (auth and the session db),
+// `config/` is XDG_CONFIG_HOME (the permission config, and nothing of the user's own).
 export function opencodeStateDir(projectRoot: string): string {
-  const dir = join(projectStateDir(projectRoot), 'opencode-data');
-  const inner = join(dir, 'opencode');
-  mkdirSync(inner, { recursive: true });
+  const root = join(projectStateDir(projectRoot), 'opencode');
+  const data = join(root, 'data', 'opencode');
+  mkdirSync(data, { recursive: true });
   const real = join(homedir(), '.local', 'share', 'opencode', 'auth.json');
-  const seeded = join(inner, 'auth.json');
-  // Copied, not linked, and only once: this is the file that must NOT appear in a Claude box, and a
-  // copy per project keeps the question "which credential can this box see" answerable by looking at
-  // the mounts. Re-seeded if the user logs in again is not needed — opencode rewrites it in place.
+  const seeded = join(data, 'auth.json');
+  // Copied, not linked, and only once. A copy per project is what keeps "which credential can this
+  // box see" answerable by looking at the mounts — and the session database is the thing we are
+  // deliberately NOT sharing, since the user's own is 265MB and several boxes writing it at once is
+  // several SQLite writers on one file.
   if (existsSync(real) && !existsSync(seeded)) {
     try {
       copyFileSync(real, seeded);
@@ -79,7 +88,8 @@ export function opencodeStateDir(projectRoot: string): string {
       /* auth will fail loudly if this matters */
     }
   }
-  return dir;
+  writeOpencodeConfig(join(root, 'config'));
+  return root;
 }
 
 function linkCredentials(dir: string): void {
@@ -104,20 +114,20 @@ export function claudeCredentialFile(): string {
 // Clean XDG_CONFIG_HOME for OpenCode — opencode looks in $XDG_CONFIG_HOME/opencode, which
 // won't exist here, so no personal AGENTS.md/config/plugins load. Auth stays in the
 // default XDG_DATA_HOME (~/.local/share/opencode).
-export function opencodeConfigHome(projectRoot?: string): string {
-  // Per project when containerised, for no reason of its own — it simply has to live under the one
-  // directory the box mounts, alongside the data dir that genuinely must be per project.
-  const dir = projectRoot
-    ? join(projectStateDir(projectRoot), 'opencode-xdg')
-    : join(copilotHome(), 'opencode-xdg');
-  const cfgDir = join(dir, 'opencode');
+export function opencodeConfigHome(): string {
+  const dir = join(copilotHome(), 'opencode-xdg');
+  writeOpencodeConfig(dir);
+  return dir;
+}
+
+// Auto-approve tools. Headless there is no TTY/SSE to answer a permission prompt, so the default
+// "ask" hangs on any file edit or command (e.g. creating a card). This is the serve-API equivalent
+// of `run --auto`. Shared by the host-side home above and the per-project one inside a box.
+function writeOpencodeConfig(xdgConfigHome: string): void {
+  const cfgDir = join(xdgConfigHome, 'opencode');
   mkdirSync(cfgDir, { recursive: true });
-  // Auto-approve tools. Headless there's no TTY/SSE to answer a permission prompt, so the
-  // default "ask" hangs on any file edit or command (e.g. creating a card). This is the
-  // serve-API equivalent of `run --auto`.
   writeFileSync(
     join(cfgDir, 'opencode.json'),
     JSON.stringify({ $schema: 'https://opencode.ai/config.json', permission: 'allow' }, null, 2),
   );
-  return dir;
 }

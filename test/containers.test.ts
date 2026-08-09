@@ -6,6 +6,7 @@ import {
   boxMounts,
   boxName,
   createArgs,
+  DEFAULT_IMAGE,
   type DockerResult,
   type DockerRun,
   execArgs,
@@ -17,6 +18,7 @@ import {
   PROJECT_LABEL,
   parsePublishedPort,
   protectedPaths,
+  specDigest,
   WORK_DIR,
 } from '../src/server/containers.js';
 
@@ -255,6 +257,18 @@ describe('published port', () => {
 describe('ensure', () => {
   const opts = { projectRoot: PROJECT, backend: 'claude-code' as const, paths: PATHS };
 
+  // What a healthy daemon would report for a box created from exactly these options. Computed rather
+  // than hardcoded: the digest is the adoption key, and a literal here would stop tracking it.
+  const matchingSpec = specDigest({
+    image: DEFAULT_IMAGE,
+    mounts: boxMounts(PATHS),
+    env: {},
+    command: undefined,
+    publish: undefined,
+  });
+  const running = { code: 0, stdout: `true ${matchingSpec}\n`, stderr: '' };
+  const stopped = { code: 0, stdout: `false ${matchingSpec}\n`, stderr: '' };
+
   // `docker run` is no longer a synonym for "made the box": the network sidecar is a `docker run`
   // too. Only a run that NAMES a container creates one, and that is what these assertions mean.
   const createdBox = (calls: string[][]): boolean =>
@@ -273,7 +287,7 @@ describe('ensure', () => {
   it('ADOPTS a running box rather than recreating it — a server restart must not bin live work', async () => {
     const calls: string[][] = [];
     const mgr = new BoxManager({
-      docker: fakeDocker({ inspect: { code: 0, stdout: 'true\n', stderr: '' } }, calls),
+      docker: fakeDocker({ inspect: running }, calls),
       user: '1000:1000',
     });
     await mgr.ensure(opts);
@@ -284,7 +298,7 @@ describe('ensure', () => {
   it('starts a stopped box rather than rebuilding it', async () => {
     const calls: string[][] = [];
     const mgr = new BoxManager({
-      docker: fakeDocker({ inspect: { code: 0, stdout: 'false\n', stderr: '' } }, calls),
+      docker: fakeDocker({ inspect: stopped }, calls),
       user: '1000:1000',
     });
     await mgr.ensure(opts);
@@ -305,7 +319,7 @@ describe('ensure', () => {
   it('re-applies them when a stopped box is started — a restart rebuilds the namespace', async () => {
     const calls: string[][] = [];
     const mgr = new BoxManager({
-      docker: fakeDocker({ inspect: { code: 0, stdout: 'false\n', stderr: '' } }, calls),
+      docker: fakeDocker({ inspect: stopped }, calls),
       user: '1000:1000',
     });
     await mgr.ensure(opts);
@@ -324,6 +338,59 @@ describe('ensure', () => {
     const mgr = new BoxManager({ docker, user: '1000:1000' });
     await expect(mgr.ensure(opts)).rejects.toThrow(/confine the agent box's network/);
     expect(calls.some((c) => c[0] === 'rm' && c.includes('-f'))).toBe(true);
+  });
+
+  it('REBUILDS a running box whose spec no longer matches, rather than adopting it', async () => {
+    // The two failures this closes, both silent: an OpenCode server box adopted from the
+    // `sleep infinity` box an earlier turn created, which therefore published no port and failed
+    // permanently; and a box created before the project had a `.git`, which had no `.git/hooks` pin
+    // and never gained one — leaving the host-executed hooks directory writable.
+    const calls: string[][] = [];
+    const mgr = new BoxManager({
+      docker: fakeDocker({ inspect: { code: 0, stdout: 'true otherdigest\n', stderr: '' } }, calls),
+      user: '1000:1000',
+    });
+    await mgr.ensure(opts);
+    expect(calls.some((c) => c[0] === 'rm' && c.includes('-f'))).toBe(true);
+    expect(createdBox(calls)).toBe(true);
+  });
+
+  it('rebuilds when the protected set has grown — a .git that did not exist at creation', async () => {
+    const calls: string[][] = [];
+    const mgr = new BoxManager({
+      docker: fakeDocker({ inspect: running }, calls),
+      user: '1000:1000',
+    });
+    // Same box name, but `.git/hooks` is now pinned. The digest must differ, or the pin never lands.
+    await mgr.ensure({
+      ...opts,
+      paths: { ...PATHS, readOnly: ['.vibeboard', '.git/hooks', '.git/config'] },
+    });
+    expect(createdBox(calls)).toBe(true);
+    expect(calls.some((c) => c[0] === 'rm')).toBe(true);
+  });
+
+  it('says which digests disagreed, so a rebuild is not a mystery', async () => {
+    const notices: string[][] = [];
+    const mgr = new BoxManager({
+      docker: fakeDocker({ inspect: { code: 0, stdout: 'true otherdigest\n', stderr: '' } }),
+      user: '1000:1000',
+      onRebuild: (name, was, now) => notices.push([name, was, now]),
+    });
+    await mgr.ensure(opts);
+    expect(notices).toHaveLength(1);
+    expect(notices[0][1]).toBe('otherdigest');
+    expect(notices[0][2]).toBe(matchingSpec);
+  });
+
+  it('treats a box with no spec label as unusable — it predates the check', async () => {
+    const calls: string[][] = [];
+    const mgr = new BoxManager({
+      docker: fakeDocker({ inspect: { code: 0, stdout: 'true <no value>\n', stderr: '' } }, calls),
+      user: '1000:1000',
+    });
+    await mgr.ensure(opts);
+    expect(createdBox(calls)).toBe(true);
   });
 
   it('fails with docker’s own reason rather than a generic one', async () => {

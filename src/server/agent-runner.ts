@@ -160,6 +160,8 @@ const redact = (line: string, token?: string): string =>
 export class AgentRunner {
   #opts: RunnerOptions;
   #active = new Map<string, Active>();
+  // Runs whose start is in flight — see `isBusy`.
+  #starting = new Set<string>();
   #queue: Queued[] = [];
   // One append chain per run, so its transcript lines are written in order and can be waited for.
   #transcripts = new Map<string, Promise<void>>();
@@ -176,8 +178,15 @@ export class AgentRunner {
     return this.#queue.map((q) => q.record.run);
   }
 
+  // A slot is held from the moment a start BEGINS, not from when the turn is finally registered.
+  //
+  // `#starting` exists because `#start` became async: it now awaits a docker round trip before
+  // reaching `#active.set`, so every call returns a pending promise while `#active` is still empty.
+  // `#drain`'s `while (!isBusy())` therefore never saw the count rise and emptied the whole queue in
+  // one burst, spawning every waiting run at once against a cap of one. Found in review 2026-08-09;
+  // this was a regression from the containment change, not a pre-existing bug.
   isBusy(): boolean {
-    return this.#active.size >= this.#opts.maxConcurrent();
+    return this.#active.size + this.#starting.size >= this.#opts.maxConcurrent();
   }
 
   // Stop a run, whether it is running or still waiting. A running one becomes `cancelled` on the
@@ -259,7 +268,16 @@ export class AgentRunner {
       this.#queue.push({ record, root, input });
       return record;
     }
-    await this.#start(root, record, input);
+    // The record already says `running` on disk and has been broadcast, so a throw here must not
+    // simply propagate: it would leave a run the board shows as in progress with no process behind
+    // it, for ever, since `#active` was never populated and nothing will settle it. The queued path
+    // got `#failToStart` when it was written; this one needs it for the same reason.
+    try {
+      await this.#start(root, record, input);
+    } catch (err) {
+      await this.#failToStart(root, record, err);
+      throw err;
+    }
     return record;
   }
 
@@ -269,6 +287,10 @@ export class AgentRunner {
   // in #spawn is what makes it `running`, and that write is the one the dashboard needs to hear about.
   async #start(root: string, record: RunRecord, input: DispatchInput, announce = false): Promise<void> {
     const run = record.run;
+    // Added SYNCHRONOUSLY, before the first await, or the reservation is worthless — that is the
+    // whole point of it. Released in the `finally` below, by which time either `#active` holds the
+    // run or it failed and never will.
+    this.#starting.add(run);
     // Minted here rather than in dispatch, so a queued run's credential begins its life when the
     // run actually starts. `work`, confined to its own card: a run that could move cards could put
     // its own into done and declare itself finished.
@@ -291,6 +313,8 @@ export class AgentRunner {
     } catch (err) {
       this.#opts.credentials?.expireRun(run);
       throw err;
+    } finally {
+      this.#starting.delete(run);
     }
   }
 

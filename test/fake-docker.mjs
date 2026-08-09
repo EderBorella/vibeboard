@@ -33,8 +33,11 @@ if (verb === 'logs') {
 } else if (verb !== 'exec') {
   // `version`, `image inspect`, `inspect`, `run`, `start`, `rm`, `ps`, `port` — enough for the manager
   // to believe a box exists. `inspect -f {{.State.Running}}` is the one whose OUTPUT is read.
-  if (verb === 'inspect') process.stdout.write('true\n');
-  if (verb === 'port') process.stdout.write('127.0.0.1:39999\n');
+  // ABSENT, and NO published port. Both used to be answered unconditionally, which meant a box that
+  // never asked to publish looked like one that had — masking the real defect where the OpenCode
+  // server adopted a `sleep infinity` box and then found no port on it.
+  if (verb === 'inspect') process.exit(1);
+  if (verb === 'port') process.exit(1);
   if (verb === 'version') process.stdout.write('29.6.0\n');
   if (verb === 'image') process.stdout.write('sha256:fake\n');
   process.exit(0);

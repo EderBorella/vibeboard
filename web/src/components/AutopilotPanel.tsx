@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import {
   type AutopilotState,
+  acknowledgeGates,
   killAutopilot,
   type Readiness,
   softStopAutopilot,
@@ -378,6 +379,31 @@ function StartControl({
         <div className="settings-hint">
           Auto-pilot cannot start yet: {readiness.blockers.length} thing
           {readiness.blockers.length === 1 ? '' : 's'} to fix, listed above.
+        </div>
+      )}
+      {/*
+        The one blocker this panel can CLEAR rather than describe. Offered here as well as on the bar,
+        because this panel has its own Start button — and listing a blocker beside a button that cannot
+        act on it is exactly how a user got stuck: told to read the commands in Project Control, refused
+        again on their return, with the only working control on a surface behind this modal.
+
+        Not a duplicate of the bar's for the sake of it: wherever Start is, the way past this has to be.
+      */}
+      {(readiness?.unreviewedGates?.length ?? 0) > 0 && (
+        <div className="ap-controls">
+          <button
+            type="button"
+            className="btn-secondary"
+            data-testid="ap-panel-review-gates"
+            onClick={() => {
+              setError(null);
+              void acknowledgeGates()
+                .then(() => refresh())
+                .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)));
+            }}
+          >
+            I have read the gate commands
+          </button>
         </div>
       )}
       {error && <div className="settings-error">{error}</div>}

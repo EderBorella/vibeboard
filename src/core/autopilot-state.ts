@@ -146,6 +146,24 @@ function unreviewed(d: Record<string, unknown>): string[] {
 // Reads as a document name in the blocker sentence, because that is where it will be seen.
 export const UNREADABLE_GATES = 'a gate document whose name could not be read';
 
+// THE SENTENCE, and there is one of it.
+//
+// This lives beside the flag it explains because there used to be two of these, written months apart,
+// and only one was complete. The dispatch refusal named the acknowledgement; the auto-pilot start
+// refusal said "read the commands in Project Control" and stopped there — so a user read them, pressed
+// Start, got the identical message, and reasonably concluded the product was broken. Reading clears
+// nothing; a button does.
+//
+// Every refusal names the action that fixes it. This is that rule applied to the one blocker a person
+// CLEARS rather than fixes, and having a single home is what stops the two drifting apart again.
+export function unreviewedGatesSentence(names: string[]): string {
+  const listed = names.map((n) => `foundation/${n}`).join(' and ');
+  const one = names.length === 1;
+  return `${listed} ${one ? 'was' : 'were'} rewritten by an agent and nobody has read ${
+    one ? 'it' : 'them'
+  }. These files hold commands this server runs outside the sandbox, as you — read them in Project Control, then press "I have read the gate commands" on the auto-pilot bar.`;
+}
+
 // THE STATE AS A CLIENT MAY SEE IT. The process group is the reaper's business and nothing outside this server
 // has any use for it: a pid is an instrument for signalling, and handing one to every open tab — and to the
 // browser's console, and to anything that can read a WebSocket frame — publishes the one value

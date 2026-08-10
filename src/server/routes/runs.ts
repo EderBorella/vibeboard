@@ -4,6 +4,7 @@ import type { FastifyInstance } from 'fastify';
 import { attemptsUsed, sumSpend } from '../../core/accounting.js';
 import { CRITIC_SKILL, DEFAULT_AUTOPILOT } from '../../core/autopilot.js';
 import type { AutopilotState } from '../../core/autopilot-state.js';
+import { unreviewedGatesSentence } from '../../core/autopilot-state.js';
 import { boardColumnSlugs, readBoard } from '../../core/board.js';
 import { resolveCopilotSelection } from '../../core/copilot-choice.js';
 import { findCard } from '../../core/find.js';
@@ -228,11 +229,9 @@ async function resolveDispatch(
 // and so the sentence, which is the only thing a person sees, can be tested without dispatching.
 export function unreviewedGatesRefusal(names: string[] | undefined): string | undefined {
   if (!names || names.length === 0) return undefined;
-  const listed = names.map((n) => `foundation/${n}`).join(' and ');
-  const one = names.length === 1;
-  return `${listed} ${one ? 'was' : 'were'} rewritten by an agent and nobody has read ${
-    one ? 'it' : 'them'
-  }. These files hold commands this server runs outside the sandbox, as you — review them in Project Control, then acknowledge it in the auto-pilot panel.`;
+  // The wording lives in core/autopilot-state.ts, beside the flag it describes. It was written twice
+  // before, and only one copy told you how to clear it.
+  return unreviewedGatesSentence(names);
 }
 
 export async function registerRunRoutes(api: FastifyInstance, ctx: AppCtx): Promise<void> {

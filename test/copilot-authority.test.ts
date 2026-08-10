@@ -1,6 +1,11 @@
 import type { FastifyInstance } from 'fastify';
 import { describe, expect, it, onTestFinished } from 'vitest';
-import { type AutopilotState, parseState, UNREADABLE_GATES } from '../src/core/autopilot-state.js';
+import {
+  type AutopilotState,
+  parseState,
+  UNREADABLE_GATES,
+  unreviewedGatesSentence,
+} from '../src/core/autopilot-state.js';
 import { FOUNDATION_FILES, foundationRel } from '../src/core/layout.js';
 import { buildApp } from '../src/server/app.js';
 import { allows, endpointsFor } from '../src/server/auth.js';
@@ -553,6 +558,24 @@ describe('a dispatch while the gates are unreviewed', () => {
   it('is silent when there is nothing to review', () => {
     expect(unreviewedGatesRefusal(undefined)).toBeUndefined();
     expect(unreviewedGatesRefusal([])).toBeUndefined();
+  });
+
+  // THE MISSING ASSERTION, and its absence is why this went wrong. Nothing said the sentence had to
+  // name the action, so a second copy was written elsewhere that told the user to read the commands and
+  // stopped there — and reading clears nothing. A person read them, pressed Start, got the identical
+  // refusal, and concluded the product was broken.
+  it('names the ACTION that clears it, not just the thing to read', () => {
+    const sentence = unreviewedGatesRefusal(['CODE-QUALITY.md']) ?? '';
+    expect(sentence).toMatch(/Project Control/i); // where to read them
+    expect(sentence).toContain('I have read the gate commands'); // and what to press afterwards
+  });
+
+  // One home for the wording. Two existed, months apart, and only one was complete — so this asserts
+  // they are the same string rather than two strings that happen to agree today.
+  it('is the same sentence auto-pilot’s own readiness blocker uses', () => {
+    for (const names of [['CODE-QUALITY.md'], ['CODE-QUALITY.md', 'TESTING.md']]) {
+      expect(unreviewedGatesRefusal(names)).toBe(unreviewedGatesSentence(names));
+    }
   });
 });
 

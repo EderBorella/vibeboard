@@ -11,7 +11,7 @@ import {
 import { type AutopilotConfig, DEFAULT_AUTOPILOT } from '../../core/autopilot.js';
 import { coverageProblems, skillProblems } from '../../core/autopilot-cover.js';
 import type { AutopilotState } from '../../core/autopilot-state.js';
-import { forClient } from '../../core/autopilot-state.js';
+import { forClient, unreviewedGatesSentence } from '../../core/autopilot-state.js';
 import { STOP_REASONS, type StopReason } from '../../core/dispatch-gate.js';
 import {
   type FoundationStatus,
@@ -92,13 +92,10 @@ function blockersFrom(
     // document to write but a decision to take, and it is the only blocker here that exists because
     // something might be UNSAFE rather than incomplete. The commands in these documents run through
     // /bin/sh unsandboxed as the server's user, and an agent chose them.
-    ...(unreviewedGates.length === 0
-      ? []
-      : [
-          `${unreviewedGates.map((n) => `foundation/${n}`).join(' and ')} ${
-            unreviewedGates.length === 1 ? 'was' : 'were'
-          } rewritten by an agent. Read the commands in Project Control before auto-pilot runs them — they run outside the sandbox, as you.`,
-        ]),
+    // The SAME sentence the dispatch refusal uses, from one home. This one used to be its own shorter
+    // copy that told you to read the commands and stopped there — so it named the thing that does not
+    // clear the block and omitted the thing that does.
+    ...(unreviewedGates.length === 0 ? [] : [unreviewedGatesSentence(unreviewedGates)]),
     ...routeProblems,
     ...(readme.ok ? [] : [readme.reason]),
     // Named one by one rather than "the foundation is incomplete": the fix is to write a specific

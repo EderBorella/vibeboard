@@ -6,6 +6,7 @@ import { defaultConfig } from '../src/core/config.js';
 
 // The panel also asks for the ledger, to name the cap that will actually stop the run.
 const api = vi.hoisted(() => ({
+  acknowledgeGates: vi.fn(),
   getReadiness: vi.fn(),
   getAccounting: vi.fn(),
   // The panel carries the stop controls, which read the state and act on it.
@@ -458,5 +459,40 @@ describe('the critic threshold field', () => {
     render(panel(config, {}));
     await screen.findAllByRole('row');
     expect(field('Critic passes at').value).toBe('0.6');
+  });
+});
+
+describe('the gate acknowledgement, in Settings', () => {
+  // This panel has its own Start button, listed the blocker, and had NO way to clear it — while the only
+  // working control sat behind this very modal. A user got stuck in exactly that gap.
+  it('offers the button when an agent rewrote a gate document', async () => {
+    api.getReadiness.mockResolvedValue(
+      readiness({
+        ok: false,
+        blockers: ['foundation/CODE-QUALITY.md was rewritten by an agent and nobody has read it.'],
+        unreviewedGates: ['CODE-QUALITY.md'],
+      }),
+    );
+    render(panel(configWith(true), { autopilot: null }));
+    expect(await screen.findByTestId('ap-panel-review-gates')).toBeTruthy();
+  });
+
+  it('clears the flag and refreshes, so the blocker goes with it', async () => {
+    api.getReadiness.mockResolvedValue(
+      readiness({ ok: false, blockers: ['rewritten'], unreviewedGates: ['CODE-QUALITY.md'] }),
+    );
+    api.acknowledgeGates.mockResolvedValue({ ok: true });
+    render(panel(configWith(true), { autopilot: null }));
+    fireEvent.click(await screen.findByTestId('ap-panel-review-gates'));
+    await waitFor(() => expect(api.acknowledgeGates).toHaveBeenCalled());
+  });
+
+  it('is absent when no gate document is waiting — including for other blockers', async () => {
+    api.getReadiness.mockResolvedValue(
+      readiness({ ok: false, blockers: ['README.md is empty.'], unreviewedGates: [] }),
+    );
+    render(panel(configWith(true), { autopilot: null }));
+    await waitFor(() => expect(api.getReadiness).toHaveBeenCalled());
+    expect(screen.queryByTestId('ap-panel-review-gates')).toBeNull();
   });
 });

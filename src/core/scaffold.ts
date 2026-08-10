@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { mkdir, stat, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { boardColumnSlugs } from './board.js';
@@ -166,6 +166,43 @@ async function ensureRepo(projectRoot: string): Promise<void> {
   }
 }
 
+// `.vibeboard/` goes in `.gitignore`, and the whole of it — ruled 2026-08-10.
+//
+// WHY THE WHOLE FOLDER. Nobody wants two hundred AI-generated cards, run records and reports in their
+// repository. The board is the cockpit, not the product: what belongs in someone's history is the code
+// their project is made of.
+//
+// It also removes a dead end that had no way out. Auto-pilot refuses to create its branch on a dirty
+// tree, because `checkout -b` carries uncommitted work onto the new branch and the loop's next act is to
+// commit everything — so a user's work-in-progress would land under a message saying an agent wrote it.
+// But VibeBoard writes into this folder constantly: a chat transcript per message, run records per tick,
+// its own state file. The tree was therefore never clean, and a user who followed the refusal's advice
+// and committed those files made it worse — they were now tracked, so every message dirtied the tree
+// again. The same class of bug was found once before (2026-08-06) and fixed for exactly one filename.
+//
+// APPENDED, NEVER REWRITTEN, and skipped entirely when the rule is already there: this is the user's
+// file and it may be full of theirs. Matched on the exact line rather than a substring, so a
+// `!.vibeboard/keep` exception someone added on purpose is not mistaken for our own entry.
+async function ensureGitignore(projectRoot: string): Promise<void> {
+  const path = join(projectRoot, '.gitignore');
+  const rule = `${CONFIG_DIR}/`;
+  let existing = '';
+  try {
+    existing = await readFile(path, 'utf8');
+  } catch {
+    /* no .gitignore yet — the write below creates it */
+  }
+  if (existing.split('\n').some((line) => line.trim() === rule)) return;
+  // A newline before ours whenever there is content to separate. That single `\n` does BOTH jobs — it
+  // terminates a last line that had none (`dist/` + `.vibeboard/` on one line ignores nothing and
+  // reports no error) and it separates the blocks when the file already ended cleanly. A second guard
+  // for the no-trailing-newline case was written here first and deleted: a planted defect proved it
+  // changed nothing, because this covers it.
+  const spacer = existing.trim() === '' ? '' : '\n';
+  const block = `${spacer}# VibeBoard's board, runs and chat history — the cockpit, not the project.\n${rule}\n`;
+  await writeFile(path, `${existing}${block}`, 'utf8');
+}
+
 // The diary's first line. Both modes get one — it is the project's narrative, not sample content — and
 // an existing diary is left completely alone: scaffolding is idempotent everywhere else here, and this is
 // the one file where a mistake cannot be undone from the board, the run records or git.
@@ -218,5 +255,9 @@ export async function scaffoldProject(
   // someone's real project (and in their git status).
   if (greenfield) await writeSampleCards(projectRoot, config, opts.today);
   await ensureDiary(projectRoot, opts.name, opts.today);
+  // Order relative to `ensureRepo` does not matter — git reads `.gitignore` when it is asked about the
+  // tree, not when the repository is created. Moving it after made no test fail, and the claim that it
+  // had to come first was withdrawn rather than left standing.
+  await ensureGitignore(projectRoot);
   await ensureRepo(projectRoot);
 }

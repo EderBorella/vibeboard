@@ -249,3 +249,61 @@ describe('the project log', () => {
     expect((await readDiary(root)).map((e) => e.text)).toEqual([expect.stringContaining('created'), 'next']);
   });
 });
+
+describe('the .gitignore entry', () => {
+  const scaffold = (root: string, mode: 'greenfield' | 'brownfield' = 'greenfield') =>
+    scaffoldProject(root, { name: 'T', mode, today: '2026-08-10' });
+
+  it('ignores the whole board folder, so a repo carries the code and not the cockpit', async () => {
+    const root = await tempDir();
+    await scaffold(root);
+    const ignore = await readFile(join(root, '.gitignore'), 'utf8');
+    expect(ignore.split('\n')).toContain('.vibeboard/');
+  });
+
+  it('really keeps it out of git, which the entry alone does not prove', async () => {
+    // The assertion that matters: ask GIT, not the file. A rule with a typo, or one written after
+    // `git init` in a way git never reads, would still pass the test above.
+    const root = await tempDir();
+    await scaffold(root);
+    expect(await git(root, 'status', '--porcelain')).not.toContain('.vibeboard');
+  });
+
+  it('APPENDS to a .gitignore that is already there, keeping every line of it', async () => {
+    // Somebody's own file. Rewriting it would delete their rules to add ours, which is the kind of
+    // help nobody asks for twice.
+    const root = await tempDir();
+    await writeFile(join(root, '.gitignore'), 'node_modules/\ndist/\n', 'utf8');
+    await scaffold(root);
+    const ignore = await readFile(join(root, '.gitignore'), 'utf8');
+    expect(ignore).toContain('node_modules/');
+    expect(ignore).toContain('dist/');
+    expect(ignore.split('\n')).toContain('.vibeboard/');
+  });
+
+  it('does not add it twice when scaffolding runs again', async () => {
+    const root = await tempDir();
+    await scaffold(root);
+    await scaffold(root);
+    const ignore = await readFile(join(root, '.gitignore'), 'utf8');
+    expect(ignore.split('\n').filter((l) => l.trim() === '.vibeboard/')).toHaveLength(1);
+  });
+
+  it('leaves a file with no trailing newline valid, rather than joining two rules into one', async () => {
+    // `dist/.vibeboard/` ignores nothing and reports no error. The failure is silent, which is why
+    // this is its own test.
+    const root = await tempDir();
+    await writeFile(join(root, '.gitignore'), 'dist/', 'utf8');
+    await scaffold(root);
+    const ignore = await readFile(join(root, '.gitignore'), 'utf8');
+    expect(ignore.split('\n')).toContain('dist/');
+    expect(ignore.split('\n')).toContain('.vibeboard/');
+    expect(ignore).not.toContain('dist/.vibeboard/');
+  });
+
+  it('adds it when adopting an existing project too, not only a new one', async () => {
+    const root = await tempDir();
+    await scaffold(root, 'brownfield');
+    expect((await readFile(join(root, '.gitignore'), 'utf8')).split('\n')).toContain('.vibeboard/');
+  });
+});

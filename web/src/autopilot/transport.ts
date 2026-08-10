@@ -34,6 +34,12 @@ export interface TransportModel {
   // The only blocker a person clears rather than fixes, so it is named rather than left to be matched
   // out of the blocker prose.
   reviewGates: boolean;
+  // The emergency stop. On the bar rather than only in Settings — a control that kills work is no use
+  // behind a modal you cannot reach while the thing you want to stop is running, and it was: the
+  // acknowledge button had the same problem and that is how a user got stuck with no way out.
+  //
+  // Disabled while halted, because there is nothing left to kill and the way back is the overlay.
+  emergency: { disabled: boolean; title: string };
 }
 
 const HALTED_TITLE = 'This project is halted. Restart it from the overlay before starting auto-pilot.';
@@ -125,5 +131,11 @@ export function transportModel(input: {
     missing,
     expandable: doing.length > 0 || missing.length > 0,
     reviewGates: (readiness?.unreviewedGates?.length ?? 0) > 0,
+    emergency: {
+      disabled: halted,
+      title: halted
+        ? 'Already halted. Restart it from the overlay.'
+        : 'Kill every agent in this project and halt it. Asks first.',
+    },
   };
 }

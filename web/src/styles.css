@@ -1458,6 +1458,46 @@ body {
 .ap-help-btn:hover,
 .ap-settings-link:hover { border-color: var(--accent); color: var(--text); }
 
+/* The emergency stop, on the bar. Quiet until hovered, then unmistakably dangerous: a control that is
+   permanently red is one people stop reading, and this bar's whole job is to be read. The guard against
+   pressing it by accident is the confirm dialog, which names what dies — not the styling. */
+.ap-kill {
+  flex: none;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.25rem 0.55rem;
+  color: var(--muted);
+  font-size: 0.76rem;
+  cursor: pointer;
+}
+.ap-kill:hover:not(:disabled) {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+.ap-kill:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* LAST in the row, and the only control here that disappears when used — so nothing sits after it to
+   jump leftwards when it goes. `margin-left: auto` would push it to the far edge and reintroduce exactly
+   that shift for the buttons before it, so it does NOT get one. */
+.ap-review-gates {
+  flex: none;
+  /* `--accent-2` is every theme's secondary/attention colour, so this follows the theme instead of
+     pinning an amber that fights three of the five palettes. */
+  background: color-mix(in srgb, var(--accent-2) 14%, transparent);
+  border: 1px solid var(--accent-2);
+  border-radius: 6px;
+  padding: 0.25rem 0.6rem;
+  color: var(--text);
+  font-size: 0.76rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+.ap-review-gates:hover { border-color: var(--accent); }
+
 .ap-bar-error {
   padding: 0.4rem 0.75rem 0.55rem;
   color: var(--danger);

@@ -7,6 +7,8 @@ const api = vi.hoisted(() => ({
   getReadiness: vi.fn(),
   startAutopilot: vi.fn(),
   softStopAutopilot: vi.fn(),
+  killAutopilot: vi.fn(),
+  acknowledgeGates: vi.fn(),
   // Re-exported by the module under test's import of ../api, so the real one must be present.
   isSuccessReason: (reason: string) => reason === 'complete',
 }));
@@ -32,7 +34,20 @@ beforeEach(() => {
   api.getReadiness.mockReset().mockResolvedValue(READY);
   api.startAutopilot.mockReset().mockResolvedValue({ state: IDLE });
   api.softStopAutopilot.mockReset().mockResolvedValue({ state: IDLE });
+  api.killAutopilot.mockReset().mockResolvedValue({ state: IDLE });
+  api.acknowledgeGates.mockReset().mockResolvedValue({ ok: true });
 });
+
+// What a project looks like when an agent rewrote the two documents whose commands run on the HOST.
+// Taken from a real one (tik-tak-toe, 2026-08-10), where a user got stuck with no reachable way out.
+const GATES_UNREVIEWED: Readiness = {
+  ...READY,
+  ok: false,
+  blockers: [
+    'foundation/CODE-QUALITY.md and foundation/TESTING.md were rewritten by an agent. Read the commands in Project Control before auto-pilot runs them — they run outside the sandbox, as you.',
+  ],
+  unreviewedGates: ['CODE-QUALITY.md', 'TESTING.md'],
+};
 
 const show = (over: { state?: AutopilotState | null; runs?: RunList; onChanged?: () => void; onSettings?: () => void } = {}) =>
   render(
@@ -197,5 +212,94 @@ describe('the way through to the rest', () => {
     for (const b of screen.getAllByRole('button')) {
       expect(b.textContent?.toLowerCase()).not.toContain('kill');
     }
+  });
+});
+
+describe('the stops are on the bar, not behind Settings', () => {
+  // The emergency stop used to be Settings-only. That put the control that kills a running loop behind
+  // a modal opened on top of the board you are watching it work on — and Settings is exactly where a
+  // user pressed Start, got refused, and could not find the way forward either.
+  it('offers the emergency stop without opening anything', async () => {
+    show({ state: { ...IDLE, state: 'running', iteration: 2 } });
+    expect(await screen.findByTestId('ap-kill')).toBeTruthy();
+  });
+
+  it('asks before killing, and does nothing if you decline', async () => {
+    show({ state: { ...IDLE, state: 'running', iteration: 2 } });
+    fireEvent.click(await screen.findByTestId('ap-kill'));
+
+    // The dialog names the half people do not expect: the chat and manual runs stop too.
+    expect(await screen.findByText(/Kill everything in this project\?/)).toBeTruthy();
+    expect(api.killAutopilot).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByText('Cancel'));
+    await waitFor(() => expect(screen.queryByText(/Kill everything in this project\?/)).toBeNull());
+    expect(api.killAutopilot).not.toHaveBeenCalled();
+  });
+
+  it('kills on confirmation, saying where it came from', async () => {
+    const onChanged = vi.fn();
+    show({ state: { ...IDLE, state: 'running', iteration: 2 }, onChanged });
+    fireEvent.click(await screen.findByTestId('ap-kill'));
+    fireEvent.click(await screen.findByText('Kill everything'));
+
+    // The reason reaches the diary, so it has to say which control was used — "from Settings" would be
+    // a false record now that this one exists.
+    await waitFor(() => expect(api.killAutopilot).toHaveBeenCalledWith(expect.stringMatching(/bar/i)));
+    await waitFor(() => expect(onChanged).toHaveBeenCalled());
+  });
+
+  it('is disabled once the project is halted — the way back is the overlay', async () => {
+    show({ state: { ...IDLE, state: 'halted' } });
+    expect((await screen.findByTestId('ap-kill')).hasAttribute('disabled')).toBe(true);
+  });
+
+  it('still soft-stops from the transport button while running', async () => {
+    show({ state: { ...IDLE, state: 'running', iteration: 1 } });
+    fireEvent.click(await screen.findByRole('button', { name: /^stop$/i }));
+    await waitFor(() => expect(api.softStopAutopilot).toHaveBeenCalled());
+  });
+});
+
+describe('the gate acknowledgement', () => {
+  // This button existed before, INSIDE the details drawer, and nothing tested it. A user hit the
+  // consequence: told to read the commands in Project Control, they did, were refused again, and could
+  // not find the control — it was behind a disclosure arrow on a surface they had no reason to open.
+  it('is on the bar itself, with nothing to open first', async () => {
+    api.getReadiness.mockResolvedValue(GATES_UNREVIEWED);
+    show();
+
+    // NOT preceded by a click on ap-expand. That is the whole point of this test.
+    expect(await screen.findByTestId('ap-review-gates')).toBeTruthy();
+  });
+
+  it('is the LAST control in the row, so nothing shifts when it disappears', async () => {
+    api.getReadiness.mockResolvedValue(GATES_UNREVIEWED);
+    show();
+    const button = await screen.findByTestId('ap-review-gates');
+
+    const row = button.parentElement;
+    expect(row?.className).toContain('ap-bar-row');
+    // Asserted as identity, not as an index: "last" is the property that makes its removal harmless,
+    // and an index would still pass with one more control appended after it.
+    expect(row?.lastElementChild).toBe(button);
+  });
+
+  it('clears the flag and takes itself away', async () => {
+    api.getReadiness.mockResolvedValue(GATES_UNREVIEWED);
+    show();
+    fireEvent.click(await screen.findByTestId('ap-review-gates'));
+
+    await waitFor(() => expect(api.acknowledgeGates).toHaveBeenCalled());
+    // The refetch is what removes it: readiness is re-asked with the flag gone.
+    api.getReadiness.mockResolvedValue(READY);
+    await waitFor(() => expect(screen.queryByTestId('ap-review-gates')).toBeNull());
+  });
+
+  it('is absent when no agent has rewritten a gate document', async () => {
+    api.getReadiness.mockResolvedValue({ ...READY, ok: false, blockers: ['README is empty'] });
+    show();
+    await waitFor(() => expect(api.getReadiness).toHaveBeenCalled());
+    expect(screen.queryByTestId('ap-review-gates')).toBeNull();
   });
 });

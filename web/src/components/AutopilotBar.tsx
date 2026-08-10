@@ -2,12 +2,15 @@ import { useState } from 'react';
 import {
   type AutopilotState,
   acknowledgeGates,
+  killAutopilot,
   type RunList,
   softStopAutopilot,
   startAutopilot,
 } from '../api';
 import { transportModel } from '../autopilot/transport';
 import { useReadiness } from '../autopilot/useReadiness';
+import { killProjectRequest } from '../confirm/requests';
+import { useConfirm } from '../confirm/useConfirm';
 import { AutopilotHelp } from './AutopilotHelp';
 
 interface Props {
@@ -16,7 +19,7 @@ interface Props {
   // Changes when the project does, so readiness is re-asked for the new one.
   bump: number;
   onChanged: () => void;
-  // Where the caps, the routing table and the emergency stop live. This strip is transport only.
+  // Where the caps and the routing table live. The stops are HERE now — see below.
   onSettings: () => void;
 }
 
@@ -26,9 +29,18 @@ interface Props {
 // scroll past the copilot and sandbox sections — and the only thing on the board itself was a
 // one-word chip whose explanation was in a `title` attribute nobody hovers.
 //
-// Deliberately NOT the whole panel. Start and stop are the two reversible things; the caps, the routing
-// table and the emergency stop stay in Settings, because a kill button on the header is a kill button
-// somebody presses by accident.
+// Deliberately NOT the whole panel — the caps and the routing table stay in Settings. Every CONTROL is
+// here, though, including the two that used to be behind that modal:
+//
+//  - **The emergency stop.** It was Settings-only, on the reasoning that a kill button on the header is
+//    one somebody presses by accident. That trade was wrong: the thing you most want to kill is a loop
+//    that is running right now, and reaching it meant opening a modal on top of the board you are
+//    watching. The accident is guarded by a confirm dialog that names what dies, which is the right
+//    place for that guard.
+//  - **The gate acknowledgement.** It was inside this bar's own drawer, behind a disclosure arrow, while
+//    Settings had a Start button and no way to clear the block at all. A user hit exactly that: told to
+//    read the commands in Project Control, then refused again, with the only control on another surface.
+//    It is on the bar now, LAST in the row, so that when it disappears nothing else moves.
 export function AutopilotBar({ state, runs, bump, onChanged, onSettings }: Props) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -39,6 +51,7 @@ export function AutopilotBar({ state, runs, bump, onChanged, onSettings }: Props
   // Bumped locally as well, so acknowledging the gate review refetches readiness immediately rather
   // than waiting for whatever else happens to change.
   const [reviewed, setReviewed] = useState(0);
+  const { confirm, dialog } = useConfirm();
   const { readiness } = useReadiness(`${bump}:${state?.state ?? 'none'}:${reviewed}`);
   const model = transportModel({ state, runs, readiness, starting: busy });
 
@@ -54,6 +67,20 @@ export function AutopilotBar({ state, runs, bump, onChanged, onSettings }: Props
       .finally(() => setBusy(false));
   }
 
+  // The emergency stop. Asks first, with a dialog that names what dies — including the part people do
+  // not expect, that the chat and manual runs stop working too until the project is restarted.
+  function kill(): void {
+    void confirm(killProjectRequest()).then((ok) => {
+      if (!ok) return;
+      setBusy(true);
+      setError(null);
+      void killAutopilot('You stopped everything from the auto-pilot bar.')
+        .then(() => onChanged())
+        .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
+        .finally(() => setBusy(false));
+    });
+  }
+
   return (
     <div className={`ap-bar ap-bar-${model.tone}`} data-testid="ap-bar">
       <div className="ap-bar-row">
@@ -67,6 +94,19 @@ export function AutopilotBar({ state, runs, bump, onChanged, onSettings }: Props
         >
           <span aria-hidden="true">{model.control.kind === 'stop' ? '■' : '▶'}</span>
           {model.control.label}
+        </button>
+
+        {/* Beside the transport, because it IS transport — the most destructive kind. Quiet until you
+            hover it: a permanently red bar teaches people to stop reading the bar. */}
+        <button
+          type="button"
+          className="ap-kill"
+          disabled={model.emergency.disabled || busy}
+          title={model.emergency.title}
+          data-testid="ap-kill"
+          onClick={kill}
+        >
+          <span aria-hidden="true">✕</span> Emergency stop
         </button>
 
         <span className={`ap-dot ap-dot-${model.tone}`} aria-hidden="true" />
@@ -101,6 +141,36 @@ export function AutopilotBar({ state, runs, bump, onChanged, onSettings }: Props
         >
           Settings
         </button>
+
+        {/*
+          LAST IN THE ROW, deliberately. It is the one blocker a person CLEARS rather than fixes, so it
+          is the one control that vanishes the moment it is used — and anything after it would jump
+          leftwards as it went. Nothing is after it.
+
+          It used to live inside this bar's drawer, behind a disclosure arrow, while Settings offered a
+          Start button and no way to clear the block at all. A user was told to read the commands in
+          Project Control, did, was refused again, and could not find the way out — because the way out
+          was on a surface they had no reason to open.
+
+          No confirm dialog: the words on the button ARE the assertion, and a second "are you sure?" over
+          the top of them is the kind of prompt people learn to click through without reading.
+        */}
+        {model.reviewGates && (
+          <button
+            type="button"
+            className="ap-review-gates"
+            data-testid="ap-review-gates"
+            title="These files hold commands this server runs outside the sandbox, as you. Read them in Project Control first."
+            onClick={() => {
+              void acknowledgeGates().then(() => {
+                setReviewed((n) => n + 1);
+                onChanged();
+              });
+            }}
+          >
+            I have read the gate commands
+          </button>
+        )}
       </div>
 
       {error && (
@@ -137,35 +207,12 @@ export function AutopilotBar({ state, runs, bump, onChanged, onSettings }: Props
                 ))}
               </ul>
             )}
-            {/*
-              The one blocker a person CLEARS rather than fixes: an agent rewrote a document whose
-              commands auto-pilot will run outside the sandbox. Offered here, beside the sentence that
-              explains it, because a blocker with no way to act on it is a dead end — and the words on
-              the button are what is actually being asserted, not "OK".
-            */}
-            {model.reviewGates && (
-              <button
-                type="button"
-                className="btn-secondary"
-                data-testid="ap-review-gates"
-                onClick={() => {
-                  // No confirm dialog: the words on the button ARE the assertion, and a second
-                  // "are you sure?" over the top of them is the kind of prompt people learn to click
-                  // through without reading.
-                  void acknowledgeGates().then(() => {
-                    setReviewed((n) => n + 1);
-                    onChanged();
-                  });
-                }}
-              >
-                I have read the gate commands
-              </button>
-            )}
           </div>
         </div>
       )}
 
       {helpOpen && <AutopilotHelp onClose={() => setHelpOpen(false)} />}
+      {dialog}
     </div>
   );
 }

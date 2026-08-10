@@ -80,7 +80,8 @@ export function AutopilotHelp({ onClose }: { onClose: () => void }) {
             </li>
             <li>
               <strong>stopped</strong> / <strong>killed</strong> — you did. Stop is reversible and lets runs
-              in flight finish; the emergency stop in Settings kills every agent in the project and halts it.
+              in flight finish; the emergency stop, beside it on this bar, kills every agent in the project
+              and halts it.
             </li>
           </ul>
           <p>

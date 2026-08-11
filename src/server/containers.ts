@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
-import { CONFIG_DIR } from '../core/layout.js';
+import { CONFIG_DIR, RUNS_DIR } from '../core/layout.js';
 
 // The agent box: one container per (project, backend), and the only place an agent runs.
 //
@@ -104,6 +104,9 @@ export interface BoxPaths {
   // here because only the caller can stat them, and a bind mount whose source does not exist is worse
   // than useless: docker CREATES it, as a root-owned directory, on the host.
   readOnly?: string[];
+  // Project-relative paths to keep WRITABLE inside a read-only one — the report directory. The caller
+  // must have created these, for the same root-owned reason as above.
+  writable?: string[];
 }
 
 // Everything inside a project an agent must not write, and why each one is here.
@@ -117,6 +120,29 @@ export interface BoxPaths {
 // repoints hooks somewhere writable. The old AppArmor profile denied both, and a container that only
 // covered `.vibeboard` would have quietly handed them back.
 export const PROTECTED_PATHS = [CONFIG_DIR, '.git/hooks', '.git/config'] as const;
+
+// The ONE place inside `.vibeboard/` an agent must be able to write: where its report goes.
+//
+// This was a regression, and an instructive one. The AppArmor profile containment replaced denied the
+// `.vibeboard` directory entry and then each governed path BY NAME — boards, config.yaml, skills,
+// foundation, project-runs, the diary, the state file — with a comment on the first line reading
+// "`runs/` stays writable, which the suite pins". Replacing that enumerated list with one blanket
+// read-only mount took away the only directory an agent is REQUIRED to write to.
+//
+// What it looked like: `derive-features` did its work, created ten cards through the API, and came back
+// `attention` — "finished without writing a report". The critic could not write its verdict either, so
+// it could not judge. Two runs, real money, no way to record either. The agent diagnosed it in its own
+// thinking: "the directory is read-only. This seems like a system-level issue."
+//
+// How it was missed: the plan checked `RESULTS_DIR` — `boards/…/results/`, which the SERVER writes —
+// concluded the folder was safe to deny wholesale, and never looked at `RUNS_DIR`, the report path and a
+// different constant entirely.
+//
+// A writable mount nested inside the read-only one, rather than a return to an enumerated deny list.
+// That keeps the default at DENY: anything added to `.vibeboard/` later is refused without anyone having
+// to remember to name it, which is the failure mode the enumerated version carried. Measured: the report
+// lands, and boards, foundation and the `.vibeboard` root itself all still refuse.
+export const AGENT_WRITABLE_PATHS = [RUNS_DIR] as const;
 
 // Which of the protected paths actually exist. `exists` is injected so this is testable without a
 // filesystem, and so the caller decides what "exists" means.
@@ -150,6 +176,12 @@ export function boxMounts(paths: BoxPaths): MountSpec[] {
   //
   // Measured: `:ro` refuses the unlink and still permits `connect()` — a read-only superblock rejects
   // writes to files, directories and symlinks, not sockets.
+  // AFTER the read-only ones, and nested inside them. Docker orders bind mounts by destination depth so
+  // the parent is mounted first either way, but stating it here keeps the intent readable: the deny is
+  // the default and this is the single hole punched in it.
+  for (const rel of paths.writable ?? []) {
+    mounts.push({ source: join(paths.projectRoot, rel), target: `${WORK_DIR}/${rel}` });
+  }
   if (paths.socketDir) mounts.push({ source: paths.socketDir, target: SOCKET_DIR, readOnly: true });
   if (paths.credential) mounts.push(paths.credential);
   return mounts;

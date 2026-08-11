@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { CONFIG_DIR, RUNS_DIR } from '../src/core/layout.js';
 import { BoxManager } from '../src/server/box-manager.js';
 import {
   BACKEND_LABEL,
@@ -83,6 +84,38 @@ describe('mounts — the containment boundary', () => {
         readOnly: true,
       });
     }
+  });
+
+  it('keeps the REPORT directory writable inside the read-only one', () => {
+    // The regression this pins. The old AppArmor profile denied `.vibeboard` and then each governed path
+    // by name, deliberately leaving `runs/` writable — "which the suite pins", said its own comment. One
+    // blanket read-only mount took that away, so every run came back `attention`: the work was done and
+    // there was nowhere to write the report that says so.
+    const mounts = boxMounts({ ...PATHS, readOnly: [CONFIG_DIR], writable: [RUNS_DIR] });
+    const reports = mounts.find((m) => m.target === `${WORK_DIR}/${RUNS_DIR}`);
+    expect(reports).toEqual({ source: `${PROJECT}/${RUNS_DIR}`, target: `${WORK_DIR}/${RUNS_DIR}` });
+    expect(reports?.readOnly).toBeUndefined();
+
+    // And its parent is still read-only, which is the point: one hole, not an open folder.
+    expect(mounts.find((m) => m.target === `${WORK_DIR}/${CONFIG_DIR}`)?.readOnly).toBe(true);
+  });
+
+  it('mounts the report directory AFTER its read-only parent', () => {
+    // Docker orders by destination depth regardless, so this is about the argv reading the way the
+    // intent reads — parent first, then the single exception punched into it.
+    const mounts = boxMounts({ ...PATHS, readOnly: [CONFIG_DIR], writable: [RUNS_DIR] });
+    const parent = mounts.findIndex((m) => m.target === `${WORK_DIR}/${CONFIG_DIR}`);
+    const child = mounts.findIndex((m) => m.target === `${WORK_DIR}/${RUNS_DIR}`);
+    expect(parent).toBeLessThan(child);
+  });
+
+  it('opens NOTHING when no writable path is given', () => {
+    // `writable` absent must not mean "the whole folder": that is the shape of the bug this fixes, in
+    // reverse. Every mount under .vibeboard stays read-only unless it was asked for by name.
+    const mounts = boxMounts({ ...PATHS, readOnly: [CONFIG_DIR] });
+    const under = mounts.filter((m) => m.target.startsWith(`${WORK_DIR}/${CONFIG_DIR}`));
+    expect(under).toHaveLength(1);
+    expect(under[0].readOnly).toBe(true);
   });
 
   it('never mounts a protected path that does not exist — docker would create it, root-owned', () => {

@@ -1,8 +1,16 @@
-import { existsSync } from 'node:fs';
+import { existsSync, mkdirSync } from 'node:fs';
+import { join } from 'node:path';
 import { apiSocketDir } from './api-socket.js';
 import { BoxManager, boxPathsFor } from './box-manager.js';
 import type { BoxBackend, BoxPaths } from './containers.js';
-import { boxEnvFor, DEFAULT_IMAGE, SOCKET_DIR, STATE_DIR, WORK_DIR } from './containers.js';
+import {
+  AGENT_WRITABLE_PATHS,
+  boxEnvFor,
+  DEFAULT_IMAGE,
+  SOCKET_DIR,
+  STATE_DIR,
+  WORK_DIR,
+} from './containers.js';
 import { claudeCredentialFile, claudeStateDir, opencodeStateDir } from './copilot-env.js';
 
 // What a box is FOR a given project and backend: which directories it gets, which credential, and
@@ -25,6 +33,13 @@ export function boxPathsForBackend(
   // backends' state, and mounting it gave a Claude box a readable copy of OpenCode's `auth.json` —
   // the one thing S2 exists to prevent. Found in review 2026-08-09.
   const extra: Omit<BoxPaths, 'projectRoot' | 'readOnly'> = {
+    // Created here, because a bind mount whose source is missing is created BY DOCKER, root-owned — and
+    // this one is missing on every project that has not run an agent yet, which is exactly the projects
+    // that are about to.
+    writable: [...AGENT_WRITABLE_PATHS].map((rel) => {
+      mkdirSync(join(projectRoot, rel), { recursive: true });
+      return rel;
+    }),
     stateDir: backend === 'claude-code' ? claudeStateDir(projectRoot) : opencodeStateDir(projectRoot),
     socketDir: apiSocketDir(),
   };

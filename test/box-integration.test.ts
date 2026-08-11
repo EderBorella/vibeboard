@@ -1,5 +1,5 @@
 import { execFile, spawn } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
@@ -56,6 +56,7 @@ box('the agent box, for real', () => {
     writeFileSync(join(dir, 'proj', '.vibeboard', 'card.md'), 'governed\n');
     // A real-enough repository: the git escalation paths only get mounted when they exist, because
     // docker CREATES a missing bind-mount source root-owned rather than skipping it.
+    mkdirSync(join(dir, 'proj', '.vibeboard', 'runs'), { recursive: true });
     mkdirSync(join(dir, 'run'), { recursive: true });
     // Something has to BE there, or `rm -f` on a missing path succeeds and the read-only assertion
     // below passes for the wrong reason.
@@ -77,6 +78,7 @@ box('the agent box, for real', () => {
         stateDir: join(dir, 'state'),
         socketDir: join(dir, 'run'),
         readOnly: ['.vibeboard', '.git/hooks', '.git/config'],
+        writable: ['.vibeboard/runs'],
       },
       command: ['sleep', '600'],
     });
@@ -279,6 +281,25 @@ box('the agent box, for real', () => {
     );
     expect(args.join(' ')).not.toContain('secret');
     expect(args).toContain('-i');
+  });
+
+  it('CAN write its report, which is the one thing it must write into .vibeboard', async () => {
+    // The regression this exists for: `.vibeboard/` was mounted read-only in one piece, and the report
+    // directory is inside it — so `derive-features` created ten cards through the API and then came back
+    // `attention`, "finished without writing a report", with the critic unable to write a verdict either.
+    // Two runs, real money, nothing recorded. The argv tests could not see it; only a container can.
+    const report = '# Report\n\noutcome: success\n';
+    expect((await asAgent(`printf '%s' '${report}' > /work/.vibeboard/runs/r.report.md`)).code).toBe(0);
+    // Reached the host, and owned by the user rather than root.
+    expect(readFileSync(join(dir, 'proj', '.vibeboard', 'runs', 'r.report.md'), 'utf8')).toBe(report);
+  });
+
+  it('still cannot write anything else under .vibeboard, including a new file at its root', async () => {
+    // The hole is ONE directory. If the fix had gone back to an enumerated deny list, anything added to
+    // `.vibeboard/` later would have been writable until somebody remembered to name it.
+    expect((await asAgent('echo x > /work/.vibeboard/sneaky.md')).code).not.toBe(0);
+    expect((await asAgent('echo x > /work/.vibeboard/card.md')).code).not.toBe(0);
+    expect((await asAgent('mkdir -p /work/.vibeboard/runs2')).code).not.toBe(0);
   });
 
   it('leaves nothing root-owned in the project — the day-one bind-mount failure', async () => {

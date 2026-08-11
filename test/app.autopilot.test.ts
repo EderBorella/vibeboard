@@ -39,6 +39,15 @@ async function makeReady(app: FastifyInstance, root: string): Promise<void> {
   await putFoundation(app, 'TESTING.md', TESTING);
   await putFoundation(app, 'UX.md', 'One screen, keyboard first.\n');
   await putFoundation(app, 'DESIGN.md', 'Two typefaces, one accent.\n');
+  // And a card. Readiness includes having WORK — an empty board is a blocker, not a stop, since
+  // otherwise pressing Start ends the loop instantly with `no-op` and looks like nothing happening.
+  // Through the endpoint, like the documents above, because that is the write path.
+  const created = await app.inject({
+    method: 'POST',
+    url: '/api/cards',
+    payload: { board: 'features', columnSlug: 'todo', title: 'Something to do' },
+  });
+  expect(created.statusCode).toBe(200);
 }
 
 describe('GET /api/autopilot/readiness', () => {
@@ -55,6 +64,26 @@ describe('GET /api/autopilot/readiness', () => {
     // cover check running at save time.
     expect(r.routes.problems).toEqual([]);
     expect(r.routes.count).toBeGreaterThan(0);
+  });
+
+  it('blocks on an EMPTY BOARD, and names the two ways forward', async () => {
+    // The flow bug this fixes: everything else was in place, so Start was pressed — and the loop began,
+    // found nothing, and ended on its first tick. It models that correctly (`no-op`, "had nothing to
+    // work on, which is not the same as being finished") but only AFTER you press it, so the button
+    // looked broken. Told beforehand it is a thing to do.
+    const { app, root } = await openTestProject({ name: 'A', mode: 'brownfield' });
+    await writeFile(join(root, 'README.md'), README, 'utf8');
+    await putFoundation(app, 'STACK.md', 'Node 22.\n');
+    await putFoundation(app, 'CODE-QUALITY.md', GATES);
+    await putFoundation(app, 'TESTING.md', TESTING);
+    await putFoundation(app, 'UX.md', 'One screen.\n');
+    await putFoundation(app, 'DESIGN.md', 'One accent.\n');
+
+    const r = await readiness(app);
+    expect(r.ok).toBe(false);
+    expect(r.blockers).toEqual([
+      'There is no card on any board, so auto-pilot has nothing to pick up. Add one, or ask the copilot to break your README down into feature cards.',
+    ]);
   });
 
   it('says yes once the README and the five documents are there', async () => {

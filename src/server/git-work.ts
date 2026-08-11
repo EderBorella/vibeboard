@@ -277,6 +277,29 @@ export interface CommitResult {
 // uncommitted work to their own branch under a message saying an agent did it. Optional, because the
 // check cannot be invented here — there is no way to tell the run's branch from any other one — but the
 // loop always has it, and the refusal names both branches so a mismatch is readable.
+// The pathspec for `git add`, which needs its own because `add` is the one command that treats an
+// `:(exclude)` inside an IGNORED directory as an explicit request for an ignored path — and fails.
+//
+// Reproduced exactly (2026-08-11): with `.vibeboard/` in `.gitignore`,
+// `git add -A -- . :(exclude).vibeboard/autopilot-state.json` exits 1 with "The following paths are
+// ignored by one of your .gitignore files: .vibeboard". So every commit-before-dispatch failed, and
+// auto-pilot stopped on its first tick — caused by the change that made scaffolding ignore that folder.
+//
+// The exclusion cannot simply go, because it is still doing real work on a project that TRACKS the
+// board: measured, without it the state file is staged and committed, which is the 2026-08-06 bug
+// ("auto-pilot could not start on ANY project") coming back from the other side. So the discriminator
+// is whether git ignores the file at all.
+//
+// `check-ignore -q` exits 0 for ignored, 1 for not. Anything else — no git, a broken repo — falls back
+// to the exclusion, which is the older and safer of the two behaviours.
+async function stagePathspec(root: string, opts: GitOptions): Promise<string[]> {
+  const ignored = await git(root, ['check-ignore', '-q', AUTOPILOT_STATE_FILE], {
+    ...opts,
+    timeoutMs: PROBE_TIMEOUT_MS,
+  });
+  return ignored.ok ? ['--', '.'] : PROJECT_ONLY;
+}
+
 export async function commitAll(
   root: string,
   message: string,
@@ -313,7 +336,7 @@ export async function commitAll(
   }
 
   const work = { ...opts, timeoutMs: opts.timeoutMs ?? WORK_TIMEOUT_MS };
-  const staged = await git(root, ['add', '-A', ...PROJECT_ONLY], work);
+  const staged = await git(root, ['add', '-A', ...(await stagePathspec(root, opts))], work);
   if (!staged.ok) return { committed: false, reason: `Could not stage the tree: ${staged.problem}` };
 
   // Asked BEFORE committing rather than by interpreting a failure afterwards: `git commit` on a clean

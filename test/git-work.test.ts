@@ -3,7 +3,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { describe, expect, it } from 'vitest';
-import { AUTOPILOT_STATE_FILE } from '../src/core/layout.js';
+import { AUTOPILOT_STATE_FILE, CONFIG_DIR } from '../src/core/layout.js';
 import { COMMAND_TIMEOUT_MS } from '../src/server/commands.js';
 import { commitAll, ensureBranch, PROBE_TIMEOUT_MS, WORK_TIMEOUT_MS } from '../src/server/git-work.js';
 import { tempDir } from './helpers.js';
@@ -290,6 +290,42 @@ describe('committing before every dispatch', () => {
     expect(await commitAll(dir, 'autopilot: before E-001')).toEqual({ committed: true });
     expect(await tracked(dir)).toEqual(['new.txt', 'seed.txt']);
     expect(await count(dir)).toBe(2);
+  });
+
+  it('commits when the board folder is GITIGNORED, which is how projects ship', async () => {
+    // The bug this pins, observed on a real project (2026-08-11): `git add` is the one command that
+    // treats an `:(exclude)` inside an ignored directory as an explicit request for an ignored path,
+    // and FAILS — exit 1, "The following paths are ignored by one of your .gitignore files". So every
+    // commit-before-dispatch failed and auto-pilot stopped on its first tick. Scaffolding started
+    // ignoring that folder the day before, which is what exposed it.
+    const dir = await repo();
+    await writeFile(join(dir, '.gitignore'), `${CONFIG_DIR}/\n`, 'utf8');
+    await mkdir(join(dir, CONFIG_DIR), { recursive: true });
+    await writeFile(join(dir, AUTOPILOT_STATE_FILE), '{"state":"running"}\n', 'utf8');
+    await committed(dir);
+    await writeFile(join(dir, 'app.ts'), 'export const x = 1;\n', 'utf8');
+
+    expect(await commitAll(dir, 'autopilot: before E-001')).toEqual({ committed: true });
+    expect(await tracked(dir)).toContain('app.ts');
+    // And the ignored folder stayed out, which is the whole reason it is ignored.
+    expect((await tracked(dir)).some((f) => f.startsWith(CONFIG_DIR))).toBe(false);
+  });
+
+  it('still keeps the state file out of a project that TRACKS the board folder', async () => {
+    // The other half, and why the exclusion cannot simply be deleted: a project with no `.gitignore`
+    // — every project scaffolded before 2026-08-10 — would otherwise commit the loop's own state file,
+    // which holds a process group id meaningless on another machine. That was the 2026-08-06 bug.
+    const dir = await repo();
+    await mkdir(join(dir, CONFIG_DIR), { recursive: true });
+    await writeFile(join(dir, `${CONFIG_DIR}/config.yaml`), 'name: T\n', 'utf8');
+    await committed(dir);
+    await writeFile(join(dir, AUTOPILOT_STATE_FILE), '{"state":"running"}\n', 'utf8');
+    await writeFile(join(dir, 'app.ts'), 'export const x = 1;\n', 'utf8');
+
+    expect(await commitAll(dir, 'autopilot: before E-001')).toEqual({ committed: true });
+    const files = await tracked(dir);
+    expect(files).toContain('app.ts');
+    expect(files).not.toContain(AUTOPILOT_STATE_FILE);
   });
 
   it('uses the message verbatim', async () => {

@@ -108,7 +108,21 @@ describe('the status line', () => {
         detail: 'E-002 and E-005 are blocked on their gates',
       },
     });
-    expect(m.status).toBe('E-002 and E-005 are blocked on their gates');
+    // The row stays a row; the explanation moves to `detail`, which the bar renders in its own wrapping
+    // block. It used to BE the status — one line, ellipsised — so these sentences, which quote git and
+    // name several cards, were cut exactly where they got useful.
+    expect(m.status).toBe('Stopped.');
+    expect(m.detail).toBe('E-002 and E-005 are blocked on their gates');
+  });
+
+  it('says FINISHED rather than stopped for the one reason that is a success', () => {
+    const m = model({ state: { ...IDLE, state: 'stopped', reason: 'complete' } });
+    expect(m.status).toBe('Finished.');
+  });
+
+  it('carries no detail while running or idle — there is nothing to explain', () => {
+    expect(model({ state: { ...IDLE, state: 'running', iteration: 1 } }).detail).toBeNull();
+    expect(model({ state: IDLE }).detail).toBeNull();
   });
 
   it('counts what is missing when nothing has run yet', () => {
@@ -118,9 +132,10 @@ describe('the status line', () => {
     );
   });
 
-  it('explains a halt', () => {
+  it('explains a halt, with the reason below rather than truncated into the row', () => {
     const m = model({ state: { ...IDLE, state: 'halted', detail: 'Killed at your request.' } });
-    expect(m.status).toBe('Killed at your request.');
+    expect(m.status).toBe('Halted. Everything in this project was stopped.');
+    expect(m.detail).toBe('Killed at your request.');
   });
 });
 

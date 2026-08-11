@@ -40,6 +40,13 @@ export interface TransportModel {
   //
   // Disabled while halted, because there is nothing left to kill and the way back is the overlay.
   emergency: { disabled: boolean; title: string };
+  // WHY it stopped, in full, when there is more to say than fits on a line.
+  //
+  // Separate from `status` because `status` is a row: one line, ellipsised, and these sentences are
+  // deliberately long — they name the branch that could not be created, the git output underneath, the
+  // cards that are stuck. Truncated, the useful half is always the half that is cut. Reported twice by
+  // the same user before it was fixed, the second time by reading it out of the DOM by hand.
+  detail: string | null;
 }
 
 const HALTED_TITLE = 'This project is halted. Restart it from the overlay before starting auto-pilot.';
@@ -71,9 +78,18 @@ function workFrom(runs: RunList): ActiveWork[] {
   return [...runs.active.map((id) => name(id, false)), ...runs.queued.map((id) => name(id, true))];
 }
 
+// The full explanation, wherever there is one. `detail` is what the loop wrote — which cards are stuck,
+// what git said, which branch it could not make — and it is the part a person actually needs.
+function detailFor(state: AutopilotState | null): string | null {
+  if (!state) return null;
+  if (state.state === 'stopped' || state.state === 'halted') return state.detail ?? null;
+  return null;
+}
+
+// The ROW. Short by construction: anything that needs room goes to `detailFor` instead.
 function statusFor(state: AutopilotState | null, doing: ActiveWork[], missing: string[]): string {
   if (state?.state === 'halted') {
-    return state.detail ?? 'Everything in this project was stopped.';
+    return 'Halted. Everything in this project was stopped.';
   }
   if (state?.state === 'running') {
     const n = state.iteration;
@@ -84,11 +100,14 @@ function statusFor(state: AutopilotState | null, doing: ActiveWork[], missing: s
       doing.length === 0 ? 'choosing the next card' : doing.map((w) => `${w.label} · ${w.skill}`).join(', ');
     return `${counted} · ${work}`;
   }
-  // Stopped: the loop's own sentence, which names WHICH cards are stuck and why. Far better than the
-  // one-word reason, and it used to be reachable only by hovering a chip.
-  if (state?.state === 'stopped' && state.detail) return state.detail;
   if (missing.length > 0) return NOT_READY(missing.length);
-  return state?.state === 'stopped' ? 'Stopped.' : 'Not started.';
+  if (state?.state === 'stopped') {
+    // Two words, because `detail` already carries the loop's own full sentence — the server stores
+    // `stopSentence(reason, detail)`, canned explanation and specifics together — and that now has a
+    // block of its own to wrap in.
+    return state.reason && isSuccessReason(state.reason) ? 'Finished.' : 'Stopped.';
+  }
+  return 'Not started.';
 }
 
 export function transportModel(input: {
@@ -126,6 +145,7 @@ export function transportModel(input: {
   return {
     control,
     status: statusFor(state, doing, missing),
+    detail: detailFor(state),
     tone: toneOf(state),
     doing,
     missing,

@@ -179,6 +179,18 @@ export function AutopilotBar({ state, runs, bump, onChanged, onSettings }: Props
         </div>
       )}
 
+      {/*
+        WHY IT STOPPED, in full and wrapping. Its own block rather than the status line, which is a row:
+        one line, ellipsised. These sentences name the branch that could not be created and quote git's
+        own output underneath, so truncating them removes exactly the part worth reading — a user hit
+        that twice and got the text out of the DOM by hand the second time.
+      */}
+      {model.detail && (
+        <div className="ap-bar-detail" data-testid="ap-bar-detail">
+          {model.detail}
+        </div>
+      )}
+
       {open && (
         <div className="ap-drawer" data-testid="ap-drawer">
           <div className="ap-drawer-col">

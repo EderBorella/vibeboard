@@ -286,13 +286,20 @@ describe('the gate acknowledgement', () => {
   });
 
   it('clears the flag and takes itself away', async () => {
-    api.getReadiness.mockResolvedValue(GATES_UNREVIEWED);
+    // The mock answers from STATE, not from a value swapped in after the click. Swapping it afterwards
+    // races the refetch: if readiness had already been re-asked, the stale answer wins and the button
+    // stays — which made this test fail depending on what else was in the file.
+    let acknowledged = false;
+    api.acknowledgeGates.mockImplementation(async () => {
+      acknowledged = true;
+      return { ok: true };
+    });
+    api.getReadiness.mockImplementation(async () => (acknowledged ? READY : GATES_UNREVIEWED));
     show();
+
     fireEvent.click(await screen.findByTestId('ap-review-gates'));
 
     await waitFor(() => expect(api.acknowledgeGates).toHaveBeenCalled());
-    // The refetch is what removes it: readiness is re-asked with the flag gone.
-    api.getReadiness.mockResolvedValue(READY);
     await waitFor(() => expect(screen.queryByTestId('ap-review-gates')).toBeNull());
   });
 
@@ -301,5 +308,32 @@ describe('the gate acknowledgement', () => {
     show();
     await waitFor(() => expect(api.getReadiness).toHaveBeenCalled());
     expect(screen.queryByTestId('ap-review-gates')).toBeNull();
+  });
+});
+
+describe('why it stopped, readable in full', () => {
+  // Reported twice by the same user, the second time after copying the text out of the DOM by hand
+  // because the element had collapsed it. `.ap-status` is a row — one line, `text-overflow: ellipsis` —
+  // and these sentences quote git's own output, so the useful half was always the half that was cut.
+  const LONG =
+    'Auto-pilot stopped before dispatching F-002: Could not stage the tree: The following paths are ' +
+    'ignored by one of your .gitignore files: .vibeboard hint: Use -f if you really want to add them.';
+
+  it('renders the whole reason in its own block, not in the one-line status', async () => {
+    show({ state: { ...IDLE, state: 'stopped', reason: 'stalled', detail: LONG } });
+
+    const detail = await screen.findByTestId('ap-bar-detail');
+    // The WHOLE string. `toContain` on a fragment would pass against a truncated render, which is the
+    // bug — so this asserts the full text is present.
+    expect(detail.textContent).toBe(LONG);
+
+    // And the row stays short, so nothing is relying on the ellipsised element to carry it.
+    expect(screen.getByTestId('ap-status').textContent).toBe('Stopped.');
+  });
+
+  it('says nothing when there is nothing to explain', async () => {
+    show({ state: { ...IDLE, state: 'running', iteration: 1 } });
+    await waitFor(() => expect(api.getReadiness).toHaveBeenCalled());
+    expect(screen.queryByTestId('ap-bar-detail')).toBeNull();
   });
 });

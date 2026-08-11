@@ -1502,6 +1502,21 @@ body {
   padding: 0.4rem 0.75rem 0.55rem;
   color: var(--danger);
   font-size: 0.78rem;
+  /* Wraps. Both of these carry sentences that quote git or name several cards, and a refusal nobody can
+     read to the end is the dead end this whole strip exists to remove. */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* Why the loop stopped. NOT ellipsised, unlike `.ap-status` — that one is a row and this one is prose. */
+.ap-bar-detail {
+  padding: 0 0.75rem 0.55rem;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.45;
+  max-width: 90ch;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 /* Two columns, because the two questions are independent: what it is doing now, and what would stop it

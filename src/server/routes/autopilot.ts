@@ -12,6 +12,7 @@ import { type AutopilotConfig, DEFAULT_AUTOPILOT } from '../../core/autopilot.js
 import { coverageProblems, skillProblems } from '../../core/autopilot-cover.js';
 import type { AutopilotState } from '../../core/autopilot-state.js';
 import { forClient, unreviewedGatesSentence } from '../../core/autopilot-state.js';
+import { readBoard } from '../../core/board.js';
 import { STOP_REASONS, type StopReason } from '../../core/dispatch-gate.js';
 import {
   type FoundationStatus,
@@ -24,6 +25,7 @@ import {
 import { type ReadmeGate, readmeGate } from '../../core/readme.js';
 import type { RunRecord } from '../../core/runs.js';
 import type { BoardName, ProjectConfig } from '../../core/types.js';
+import { BOARDS } from '../../core/types.js';
 import { readAutopilotState, updateAutopilotState } from '../autopilot-store.js';
 import { attachedOpencodeUrl } from '../opencode-server.js';
 import { type AppCtx, ensureOpen } from '../route-context.js';
@@ -79,13 +81,15 @@ interface Read {
   // Gate documents an AGENT rewrote that nobody has read yet. See `unreviewedGates` in
   // core/autopilot-state.ts: the write is allowed, the EXECUTION waits.
   unreviewedGates: string[];
+  // How many live cards there are across all three boards. Zero is a blocker, not a stop — see below.
+  liveCards: number;
 }
 
 // Everything wrong with this project, in the order a person would fix it: the lifecycle first (it is
 // config), then the README (it is the input), then the documents derived from it.
 function blockersFrom(
   routeProblems: string[],
-  { readme, foundation, gates, smoke, unreviewedGates }: Read,
+  { readme, foundation, gates, smoke, unreviewedGates, liveCards }: Read,
 ): string[] {
   return [
     // FIRST, and out of the "order a person would fix them" sequence deliberately: this is not a
@@ -106,6 +110,19 @@ function blockersFrom(
     // altogether, since the line above already names it and one problem deserves one sentence.
     ...(gates.ok || foundation.missing.includes('CODE-QUALITY.md') ? [] : [gates.reason]),
     ...(smoke.ok || foundation.missing.includes('TESTING.md') ? [] : [smoke.reason]),
+    // LAST, because it is the last thing a person does: the README first, then the documents derived
+    // from it, then the work itself.
+    //
+    // A BLOCKER rather than a stop, which is the fix for a real flow problem. The loop already models
+    // this correctly — it ends with `no-op`, "had nothing to work on, which is not the same as being
+    // finished" — but that arrives AFTER you press Start, so pressing it looked like nothing happening
+    // at all. Told beforehand, with the two ways forward named, it is a thing to do rather than a
+    // mystery.
+    ...(liveCards > 0
+      ? []
+      : [
+          'There is no card on any board, so auto-pilot has nothing to pick up. Add one, or ask the copilot to break your README down into feature cards.',
+        ]),
   ];
 }
 
@@ -140,19 +157,28 @@ export function composeReadiness(config: ProjectConfig, skillSlugs: string[], re
 // Takes the root and config rather than the context: `ensureOpen` is a type predicate over the SESSION,
 // and its narrowing does not survive being passed through a function boundary. Asking for what it needs
 // keeps the check at the call site where the 409 is sent.
+// Live cards across all three boards. ARCHIVED ONES DO NOT COUNT: `readBoard` walks the configured
+// columns and the archive is not one of them, which is the distinction that matters here — a project
+// whose every card is archived has nothing to pick up either, and the loop says so separately.
+async function countLiveCards(root: string, config: ProjectConfig): Promise<number> {
+  const counts = await Promise.all(BOARDS.map(async (b) => (await readBoard(root, b, config)).length));
+  return counts.reduce((total, n) => total + n, 0);
+}
+
 async function readReadiness(root: string, config: ProjectConfig): Promise<Readiness> {
-  const [readme, foundation, gates, smoke, catalogue, state] = await Promise.all([
+  const [readme, foundation, gates, smoke, catalogue, state, liveCards] = await Promise.all([
     readmeGate(root),
     foundationStatus(root),
     readGates(root),
     readSmokeCommand(root),
     readSkills(root, config),
     readAutopilotState(root, new Date().toISOString()),
+    countLiveCards(root, config),
   ]);
   return composeReadiness(
     config,
     catalogue.skills.map((s) => s.slug),
-    { readme, foundation, gates, smoke, unreviewedGates: state.unreviewedGates ?? [] },
+    { readme, foundation, gates, smoke, unreviewedGates: state.unreviewedGates ?? [], liveCards },
   );
 }
 

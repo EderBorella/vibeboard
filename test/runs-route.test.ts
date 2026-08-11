@@ -2,9 +2,11 @@ import { chmodSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { IDLE_STATE } from '../src/core/autopilot-state.js';
 import { boardRel, FOUNDATION_DIR, RESULTS_DIR, RUNS_DIR } from '../src/core/layout.js';
 import type { RunRecord } from '../src/core/runs.js';
-import { readRun, writeRun } from '../src/server/run-store.js';
+import { writeAutopilotState } from '../src/server/autopilot-store.js';
+import { readProjectRun, readRun, writeRun } from '../src/server/run-store.js';
 import { ProjectSession } from '../src/server/session.js';
 import { openTestProject, shimArgsLog, type TestProject, testApp, wsClient } from './helpers.js';
 
@@ -847,5 +849,109 @@ describe('POST /api/runs — the foundation', () => {
     // But not under a heading promising the gates it does not contain.
     expect(prompt).not.toContain('The gates your work must pass');
     expect(prompt).not.toContain('Be careful out there');
+  }, 30000);
+});
+
+// A run about the PROJECT, dispatched with no card at all. It exists because the loop shipped a
+// contradiction: the skill on the first features column derives the feature list from the README, so an empty
+// board is a project auto-pilot can start — but a per-card dispatch needs a card, and the card is the thing
+// the run exists to create (see `bootstrapSkill` in core/autopilot.ts).
+describe('POST /api/runs with no card', () => {
+  const BOOTSTRAP = { project: true, skill: 'derive-features' };
+
+  // The loop's own credential, in the one state that gives it authority.
+  async function asService(): Promise<TestProject & { headers: { authorization: string } }> {
+    const project = await openTestProject({ runBin: SHIM, mode: 'brownfield' });
+    await writeAutopilotState(project.root, { ...IDLE_STATE, state: 'running' });
+    const service = project.mint('service', 'run-svc');
+    return { ...project, headers: { authorization: `Bearer ${service.token}` } };
+  }
+
+  async function settledProjectRun(project: TestProject, run: string): Promise<RunRecord> {
+    for (let i = 0; i < 300; i++) {
+      const record = await readProjectRun(project.root, run);
+      if (record && record.status !== 'running' && record.status !== 'queued') return record;
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    throw new Error('project run never settled');
+  }
+
+  it('records it with neither card nor board, in the project store', async () => {
+    const project = await asService();
+    const res = await project.app.inject({
+      method: 'POST',
+      url: '/api/runs',
+      headers: project.headers,
+      payload: BOOTSTRAP,
+    });
+    expect(res.statusCode).toBe(200);
+    const { run } = res.json() as { run: RunRecord };
+    expect(run.card).toBeUndefined();
+    expect(run.board).toBeUndefined();
+    // FROM DISK and from the project store specifically: `card`/`board` are what route a record to its home,
+    // so a record that kept them would be written beside a card that does not exist.
+    const settled = await settledProjectRun(project, run.run);
+    expect(settled.skill).toBe('derive-features');
+  }, 30000);
+
+  // ONLY the loop. A card-less run is the only run confined to no card, and everyone at the browser is
+  // dispatching FROM a card and has one to name.
+  //
+  // Asked on an IDLE project, so the refusal is this rule's own: while auto-pilot is running, `dispatchLock`
+  // refuses every by-hand dispatch first with a 409, and the test would pass with this check deleted.
+  it('is refused to a browser, which has a card to name', async () => {
+    const project = await openTestProject({ runBin: SHIM, mode: 'brownfield' });
+    const res = await project.app.inject({ method: 'POST', url: '/api/runs', payload: BOOTSTRAP });
+    expect(res.statusCode).toBe(403);
+    expect(res.json().error).toContain('Only auto-pilot');
+  });
+
+  // The flag is explicit rather than inferred from a missing card, so a request that simply forgot which card
+  // it meant keeps getting its 400 instead of quietly becoming a more powerful run.
+  it('does not turn a request that forgot its card into a project run', async () => {
+    const project = await asService();
+    const res = await project.app.inject({
+      method: 'POST',
+      url: '/api/runs',
+      headers: project.headers,
+      payload: { skill: 'derive-features' },
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().error).toBe('Unknown board');
+  });
+
+  it('still refuses a skill the project does not have', async () => {
+    const project = await asService();
+    const res = await project.app.inject({
+      method: 'POST',
+      url: '/api/runs',
+      headers: project.headers,
+      payload: { project: true, skill: 'no-such-skill' },
+    });
+    expect(res.statusCode).toBe(404);
+  });
+
+  it('tells the agent there is no card, and points it at the README', async () => {
+    // The awkward half: the skill file was written for a per-card dispatch and says "the column this card is
+    // in". Unaddressed, an agent hunts for a card it will not find or invents one to reason about.
+    const argsLog = await recordingShimArgs();
+    const project = await asService();
+    const res = await project.app.inject({
+      method: 'POST',
+      url: '/api/runs',
+      headers: project.headers,
+      payload: BOOTSTRAP,
+    });
+    const { run } = res.json() as { run: RunRecord };
+    await settledProjectRun(project, run.run);
+    const prompt = await promptFrom(argsLog);
+    expect(prompt).toContain('This run is about the project, not a card');
+    expect(prompt).toContain('README at the project root is the brief');
+    // No card heading, and no promise of a card-confined endpoint: `allows` DENIES the own-card rows to a
+    // credential minted without one, so listing them would describe the one authority it cannot have.
+    expect(prompt).not.toContain('## The card:');
+    expect(prompt).not.toContain('and no other card');
+    // But it still gets the columns and the credential — it has cards to create.
+    expect(prompt).toContain('POST /api/cards');
   }, 30000);
 });

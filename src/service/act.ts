@@ -3,11 +3,11 @@ import { CRITIC_SKILL, type Route } from '../core/autopilot.js';
 import type { StopReason } from '../core/dispatch-gate.js';
 import { producedNothing, type RunRecord } from '../core/runs.js';
 import type { TickAction } from '../core/tick.js';
-import type { BoardName, Card } from '../core/types.js';
+import { BOARDS, type Card } from '../core/types.js';
 import { criticVerification, unverified, type Verification } from '../core/verify.js';
 import { commitAll } from '../server/git-work.js';
 import { verifyGates, verifySmoke } from '../server/verifier.js';
-import type { BoardClient } from './board-client.js';
+import type { Answer, BoardClient } from './board-client.js';
 import type { ActResult, TickContext } from './loop.js';
 
 // Carrying ONE action out. The decision was made by `decideTick`; this is the doing, and the order it does
@@ -94,6 +94,8 @@ export async function performAction(
       return await block(deps, action.card, action.to);
     case 'dispatch':
       return await dispatch(deps, action.card, action.route, context);
+    case 'bootstrap':
+      return await bootstrap(deps, action.skill, context);
     // A `wait` is the one action with nothing to do: the loop sleeps and looks again.
     default:
       return { dispatches: 0 };
@@ -142,7 +144,7 @@ async function dispatch(deps: ActDeps, card: Card, route: Route, context: TickCo
     return refused(deps, `could not dispatch ${route.skill} for ${card.id}`, started.reason, started.fatal);
   }
 
-  const settled = await settle(deps, card.board, card.id, started.value.run.run);
+  const settled = await settle(deps, started.value.run.run, () => deps.client.cardRuns(card.board, card.id));
   if (!settled) {
     return stop(
       deps,
@@ -232,6 +234,79 @@ async function dispatch(deps: ActDeps, card: Card, route: Route, context: TickCo
   return { dispatches: spent };
 }
 
+// THE BOOTSTRAP: one run about the project, with no card to be about. It is how a board with a README and no
+// cards gets its first ones — see `bootstrapSkill` in core/autopilot.ts for the contradiction it resolves.
+//
+// It follows the same order as `dispatch` and departs from it in exactly two places, both because there is no
+// card:
+//
+//  * NO VERDICT IS RECORDED. `POST /runs/:board/:card/:run/verification` is card-scoped, and there is no card
+//    for it to be written beside. Nothing is lost that a person needs: what this run did is on the board.
+//  * WHAT IT PRODUCED IS THE JUDGEMENT, and it is read off the board rather than out of the report. Rule 2
+//    holds — `settled.outcome` is never consulted — and cards are created through the API, so a bootstrap
+//    that worked changes no files and a file-based check would call every success a failure.
+//
+// A bootstrap that produced nothing does NOT stop the loop here. The attempt is burned by the record itself,
+// `decideTick` counts those attempts, and it is the one place that decides when to give up — a second opinion
+// here would be a second cap disagreeing with the first.
+async function bootstrap(deps: ActDeps, skill: string, context: TickContext): Promise<ActResult> {
+  // RULE 1, for the same reason as a dispatch: from here on the agent is writing, and a commit first is what
+  // makes any of it one command from gone.
+  const committed = await (deps.commit ?? commitAll)(
+    deps.root,
+    `autopilot: before ${skill} on the empty board (iteration ${context.iteration + 1})`,
+    { branch: deps.branch },
+  );
+  if (committed.reason !== undefined) {
+    return stop(deps, 'stalled', `Auto-pilot stopped before deriving the board: ${committed.reason}`);
+  }
+
+  const started = await deps.client.dispatch({ project: true, skill });
+  if (!started.ok) {
+    return refused(deps, `could not dispatch ${skill} to derive the board`, started.reason, started.fatal);
+  }
+
+  // The project's whole list, because a project run has no card route to be found under.
+  const settled = await settle(deps, started.value.run.run, () => deps.client.runs());
+  if (!settled) {
+    return stop(
+      deps,
+      'stalled',
+      `The ${skill} run that was deriving the board did not finish within the time auto-pilot waits for one, so nothing can be said about it.`,
+    );
+  }
+
+  const board = await deps.client.board();
+  const created = board.ok ? BOARDS.reduce((n, b) => n + (board.value.boards[b]?.length ?? 0), 0) : undefined;
+  await deps.client.log('run', bootstrapLine(skill, settled, created, context), {
+    iteration: context.iteration + 1,
+    skill,
+    outcome: settled.status,
+  });
+  return { dispatches: 1 };
+}
+
+// What a person reads afterwards about a bootstrap. The count is what happened; the run's own summary is what
+// it says about it, and the two are kept apart deliberately — a run reporting success over an empty board is
+// exactly the disagreement worth being able to see.
+function bootstrapLine(
+  skill: string,
+  settled: RunRecord,
+  // Absent when the board could not be read back. Stated as unknown rather than guessed at: "created no cards"
+  // is a verdict, and a failed read is not evidence for it.
+  cards: number | undefined,
+  context: TickContext,
+): string {
+  const outcome =
+    cards === undefined
+      ? 'the board could not be read back, so what it produced is unknown'
+      : cards === 0
+        ? 'the board is still empty'
+        : `the board now has ${cards} card${cards === 1 ? '' : 's'}`;
+  const said = settled.summary ? ` It reported: ${settled.summary}` : '';
+  return `Iteration ${context.iteration + 1}: ${skill} ran against the project to derive the board — ${outcome}.${said}`;
+}
+
 // How a run's work is judged. `gates` and `smoke` run commands declared in `foundation/`, in this process.
 // `critic` dispatches a fresh agent whose only job is to score the work — which costs an iteration of its own
 // (decision 8), reported back so the loop counts it.
@@ -278,7 +353,7 @@ async function critique(
     };
   }
   const judge = started.value.run.run;
-  const settled = await settle(deps, card.board, card.id, judge);
+  const settled = await settle(deps, judge, () => deps.client.cardRuns(card.board, card.id));
   if (!settled) {
     return {
       verification: criticVerification(at, {
@@ -314,11 +389,14 @@ async function critique(
 // Ask until it has finished. The record is the only place a run's ending is written, and it is written by the
 // server — so this is polling by design rather than for want of an event: the loop is a separate process and
 // has no channel of its own.
+//
+// WHERE to look is the caller's, because a run does not always live beside a card. A card's runs come from the
+// card route; a project run — the bootstrap — has no card in its path and is found in the project's whole list.
+// Passed as a thunk rather than as a board/card pair so the card-less case is not an absence to interpret.
 async function settle(
   deps: ActDeps,
-  board: BoardName,
-  card: string,
   run: string,
+  look: () => Promise<Answer<{ runs: RunRecord[] }>>,
 ): Promise<RunRecord | undefined> {
   const sleep = deps.sleep ?? ((ms: number) => new Promise((r) => setTimeout(r, ms)));
   const timeout = deps.settleTimeoutMs ?? SETTLE_TIMEOUT_MS;
@@ -334,7 +412,7 @@ async function settle(
   const patience = usable(timeout, SETTLE_TIMEOUT_MS, 0, MAX_SETTLE_TIMEOUT_MS);
   const attempts = Math.min(MAX_SETTLE_POLLS, Math.max(1, Math.floor(patience / poll) + 1));
   for (let attempt = 0; attempt < attempts; attempt += 1) {
-    const answer = await deps.client.cardRuns(board, card);
+    const answer = await look();
     if (answer.ok) {
       const found = answer.value.runs.find((r) => r.run === run);
       // `queued` and `running` are the two that have not ended. Everything else is an ending, including the

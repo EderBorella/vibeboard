@@ -182,13 +182,18 @@ const RULES: Record<string, Rule> = {
 // One line per row the scope may call, in the table's own order, which is the order a person grouped
 // them in. The own-card confinement is rendered where the row carries it, because a catalogue that
 // omitted it would describe an authority the agent does not have and every attempt would 403.
+//
+// AN OWN-CARD ROW IS LEFT OUT ENTIRELY when there is no card, because `allows` DENIES those rows to a
+// credential minted without one — "a run minted without a card has no card to be confined to". The card-less
+// caller is real: a project run (the bootstrap) is `work` scope with no card at all, and listing PATCH beside
+// a promise about "your own card" would describe the one authority it is guaranteed not to have.
 export function endpointsFor(scope: Scope, card?: string): string[] {
   const lines: string[] = [];
   for (const [key, rule] of Object.entries(RULES)) {
     if (!rule.scopes.includes(scope)) continue;
-    const confined = rule.ownCard?.includes(scope)
-      ? ` You may do this to **${card ?? 'your own card'}** and no other card.`
-      : '';
+    const ownCard = rule.ownCard?.includes(scope) === true;
+    if (ownCard && card === undefined) continue;
+    const confined = ownCard ? ` You may do this to **${card}** and no other card.` : '';
     lines.push(`- \`${key}\` — ${rule.describe}${confined}`);
   }
   return lines;

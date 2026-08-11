@@ -1,7 +1,8 @@
-import type { Spend } from './accounting.js';
+import { burnsAttempt, type Spend } from './accounting.js';
 import {
   AUTOPILOT_CONCURRENCY,
   type AutopilotConfig,
+  bootstrapSkill,
   isBlockedColumn,
   isTerminalColumn,
   type Route,
@@ -21,6 +22,7 @@ import { liveCards } from './hierarchy.js';
 import { ARCHIVE_SLUG } from './layout.js';
 import { type RollupAdvance, rollupOutcomes } from './rollup.js';
 import type { RunRecord } from './runs.js';
+import { isProjectRun } from './runs.js';
 import type { BoardName, Card } from './types.js';
 
 // One tick of the loop, as one pure function over data. No clock, no disk, no process, no model: it
@@ -42,6 +44,9 @@ export type TickAction =
   | { kind: 'rollup'; advance: RollupAdvance[] }
   | { kind: 'block'; card: Card; to: string } // an engineering card out of attempts
   | { kind: 'dispatch'; card: Card; route: Route }
+  // Derive the board itself, with no card to derive it FOR. The bootstrap: an empty board and a README
+  // is a project that has said what it wants and has nothing to pick up yet.
+  | { kind: 'bootstrap'; skill: string; detail: string }
   | { kind: 'wait' }; // as much is in flight as the config allows
 
 export interface TickInput {
@@ -220,7 +225,14 @@ function whyStuck(ap: AutopilotConfig, cards: Card[], unfinished: Card[], el: El
 // EVIDENCE that finished work exists. Absence of unfinished work is not presence of finished work: an
 // empty board, a board whose every card was archived, and a fetch that returned nothing all produce an
 // empty list, and all three used to answer with the project's only success.
-function nothingEligible(ap: AutopilotConfig, cards: Card[], el: EligibilitySet): TickAction {
+function nothingEligible(
+  ap: AutopilotConfig,
+  cards: Card[],
+  el: EligibilitySet,
+  // For the bootstrap only: which skill derives the board, and whether it has already tried.
+  columns: Record<BoardName, string[]>,
+  runs: RunRecord[],
+): TickAction {
   const live = liveCards(cards);
   // A card that is NOT live and NOT in the archive is a half-finished archive, and it was invisible to all
   // three sets `complete` is decided from — eligible, unfinished, and problems. `archiveCard` stamps the
@@ -245,6 +257,28 @@ function nothingEligible(ap: AutopilotConfig, cards: Card[], el: EligibilitySet)
     };
   }
   if (live.length === 0) {
+    // THE BOOTSTRAP. An empty board used to be the end: `no-op`, "nothing to work on, which is not the
+    // same as being finished". It is instead the one state where the loop derives the board itself — see
+    // `bootstrapSkill` in autopilot.ts for why a card-less dispatch is the only shape that can.
+    //
+    // Capped by the same attempt cap as anything else, counted over PROJECT runs of that skill, so a
+    // derivation that keeps failing stops rather than looping on an empty board for ever.
+    const boot = bootstrapSkill(ap, columns.features);
+    if (cards.length === 0 && boot) {
+      const tried = runs.filter((r) => isProjectRun(r) && r.skill === boot && burnsAttempt(r.status)).length;
+      if (tried < ap.attemptCap) {
+        return {
+          kind: 'bootstrap',
+          skill: boot,
+          detail: `The board is empty, so auto-pilot is deriving it from the README with ${boot}.`,
+        };
+      }
+      return {
+        kind: 'stop',
+        reason: 'stalled',
+        detail: `The board is empty and ${boot} has used all ${ap.attemptCap} attempts at deriving it from the README. Read its runs: the README may be too thin to derive features from, in which case say more in it, or add the first card by hand.`,
+      };
+    }
     return {
       kind: 'stop',
       reason: 'no-op',
@@ -289,7 +323,7 @@ export function decideTick(input: TickInput): TickAction {
   const capped = outOfAttempts(ap, el, columns.engineering ?? []);
   if (capped) return capped;
 
-  if (el.eligible.length === 0) return nothingEligible(ap, cards, el);
+  if (el.eligible.length === 0) return nothingEligible(ap, cards, el, columns, runs);
 
   // BOTH waits come after the empty check and before the pick, and that order is load-bearing. A card
   // with a run in flight is still eligible — on purpose, because `attemptsUsed` does not count an

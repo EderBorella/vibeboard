@@ -70,6 +70,10 @@ function recorder(
     dispatch?: { ok: false; reason: string; fatal: boolean };
     move?: { ok: false; reason: string; fatal: boolean };
     verdict?: { ok: false; reason: string; fatal: boolean };
+    // What the board holds when it is read back — the bootstrap's only evidence that it worked, since cards
+    // are created through the API and a run that made a dozen of them changes no files.
+    boardCards?: Card[];
+    board?: { ok: false; reason: string; fatal: boolean };
   } = {},
 ) {
   const calls: string[] = [];
@@ -108,6 +112,23 @@ function recorder(
       return { ok: true as const, value: { run: started } };
     },
     cardRuns: async () => ({ ok: true as const, value: { runs: live } }),
+    // The project's whole list, which is where a run with no card is found. Answering from the same `live`
+    // array as `cardRuns` on purpose: a fixture with two sources would let a test pass while the code looked
+    // in the wrong one.
+    runs: async () => {
+      calls.push('runs');
+      return { ok: true as const, value: { runs: live } };
+    },
+    board: async () => {
+      calls.push('board');
+      if (opts.board) return opts.board;
+      const boards = { features: [], product: [], engineering: [] } as Record<BoardName, Card[]>;
+      for (const card of opts.boardCards ?? []) boards[card.board].push(card);
+      return {
+        ok: true as const,
+        value: { config: { boards: {} } as never, boards, problems: [] },
+      };
+    },
     move: async (_board: BoardName, card: string, to: string) => {
       calls.push(`move:${card}->${to}`);
       moves.push({ card, to });
@@ -724,5 +745,122 @@ describe('the two actions that dispatch nothing', () => {
     expect(result.stop).toBeUndefined();
     // And it says so where a person will see it, rather than only in a log nobody reads.
     expect(r.diary.some((d) => d.kind === 'note')).toBe(true);
+  });
+});
+
+// THE BOOTSTRAP: the one action that dispatches a run about the PROJECT rather than about a card. It is how a
+// board with a README and no cards gets its first ones — see `bootstrapSkill` in core/autopilot.ts for the
+// contradiction it resolves.
+describe('deriving an empty board', () => {
+  const BOOTSTRAP = { kind: 'bootstrap' as const, skill: 'derive-features', detail: 'deriving' };
+
+  it('dispatches with no card at all, and says so rather than naming one', async () => {
+    // The whole point: `card` and `board` absent, `project` true. A request that named a card would be the
+    // trigger-card workaround this replaces, and the run record would land beside a card that does not exist.
+    const r = recorder({ settle: [record({ card: undefined, board: undefined })] });
+    const result = await performAction(deps(r.client), BOOTSTRAP, context);
+    expect(result.dispatches).toBe(1);
+    expect(r.requests).toEqual([{ project: true, skill: 'derive-features' }]);
+  });
+
+  it('commits before it dispatches, exactly as a card dispatch does', async () => {
+    // Rule 1 is not about cards: from the moment the agent starts writing, a commit first is what makes any of
+    // it one command from gone.
+    const order: string[] = [];
+    const r = recorder({ settle: [record({ card: undefined, board: undefined })] });
+    const original = r.client.dispatch;
+    r.client.dispatch = async (input) => {
+      order.push('dispatch');
+      return original(input);
+    };
+    await performAction(
+      deps(r.client, {
+        commit: async () => {
+          order.push('commit');
+          return { committed: true };
+        },
+      }),
+      BOOTSTRAP,
+      context,
+    );
+    expect(order).toEqual(['commit', 'dispatch']);
+  });
+
+  it('stops the loop when that commit fails', async () => {
+    const r = recorder({ settle: [record({ card: undefined, board: undefined })] });
+    const result = await performAction(
+      deps(r.client, { commit: async () => ({ committed: false, reason: 'the tree is dirty' }) }),
+      BOOTSTRAP,
+      context,
+    );
+    expect(result.stop?.reason).toBe('stalled');
+    expect(result.stop?.detail).toContain('the tree is dirty');
+    expect(r.requests).toEqual([]);
+  });
+
+  it('watches the PROJECT list for its ending, not a card route', async () => {
+    // A project run has no card in its path, so `GET /runs/:board/:card` cannot find it. Asserted through the
+    // calls rather than by mocking one away: pointed at the card route the run never settles and the loop
+    // reports a timeout, which reads as a broken agent rather than as looking in the wrong place.
+    const r = recorder({ settle: [record({ card: undefined, board: undefined })] });
+    await performAction(deps(r.client), BOOTSTRAP, context);
+    expect(r.calls).toContain('runs');
+    expect(r.calls.some((c) => c.startsWith('cardRuns'))).toBe(false);
+  });
+
+  it('records no verdict, because there is no card to write one beside', async () => {
+    const r = recorder({ settle: [record({ card: undefined, board: undefined })] });
+    await performAction(deps(r.client), BOOTSTRAP, context);
+    expect(r.verdicts).toEqual([]);
+    expect(r.moves).toEqual([]);
+  });
+
+  it('reports what the board holds afterwards, which is the only evidence there is', async () => {
+    // NOT the run's own outcome (rule 2), and not files changed: cards are created through the API, so a
+    // bootstrap that worked perfectly changes nothing on disk.
+    const r = recorder({
+      settle: [record({ card: undefined, board: undefined, summary: 'Derived four features' })],
+      boardCards: [CARD('F-001', 'features'), CARD('F-002', 'features')],
+    });
+    await performAction(deps(r.client), BOOTSTRAP, context);
+    const line = r.diary.find((d) => d.kind === 'run')?.text ?? '';
+    expect(line).toContain('the board now has 2 cards');
+    expect(line).toContain('Derived four features');
+  });
+
+  it('says the board is still empty when nothing was created, and does not stop the loop', async () => {
+    // The attempt is burned by the record itself and `decideTick` counts it — one cap, in one place. A stop
+    // here would be a second opinion about when to give up.
+    const r = recorder({ settle: [record({ card: undefined, board: undefined, status: 'attention' })] });
+    const result = await performAction(deps(r.client), BOOTSTRAP, context);
+    expect(r.diary.find((d) => d.kind === 'run')?.text).toContain('the board is still empty');
+    expect(result.stop).toBeUndefined();
+    expect(result.dispatches).toBe(1);
+  });
+
+  it('does not claim the board is empty when it could not be read', async () => {
+    // "Created no cards" is a verdict; a failed read is not evidence for it.
+    const r = recorder({
+      settle: [record({ card: undefined, board: undefined })],
+      board: { ok: false, reason: 'could not reach the board', fatal: false },
+    });
+    await performAction(deps(r.client), BOOTSTRAP, context);
+    const line = r.diary.find((d) => d.kind === 'run')?.text ?? '';
+    expect(line).toContain('unknown');
+    expect(line).not.toContain('still empty');
+  });
+
+  it('stops when the derivation never finishes', async () => {
+    const r = recorder({ settle: [record({ card: undefined, board: undefined, status: 'running' })] });
+    const result = await performAction(deps(r.client), BOOTSTRAP, context);
+    expect(result.stop?.reason).toBe('stalled');
+    expect(result.stop?.detail).toContain('did not finish');
+  });
+
+  it('reports a refused dispatch rather than pretending it ran', async () => {
+    const r = recorder({ dispatch: { ok: false, reason: 'refused with 403', fatal: false } });
+    const result = await performAction(deps(r.client), BOOTSTRAP, context);
+    expect(result.dispatches).toBe(0);
+    expect(r.diary.some((d) => d.kind === 'note' && d.text.includes('403'))).toBe(true);
   });
 });

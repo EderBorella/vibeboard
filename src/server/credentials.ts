@@ -123,8 +123,9 @@ export class CredentialStore {
     project?: string,
     card?: string,
     // An object rather than two more positionals: five was already the limit of what reads at a call site,
-    // and only the dispatcher has these to give.
-    dispatched?: { board: BoardName; skill: string },
+    // and only the dispatcher has these to give. `board` is optional inside it because a project run has a
+    // skill and no board — see the comment at the call site in agent-runner.ts.
+    dispatched?: { board?: BoardName; skill: string },
   ): Credential {
     const cred: Credential = { token: randomUUID(), scope, run, project, card, ...dispatched };
     this.#byToken.set(cred.token, cred);

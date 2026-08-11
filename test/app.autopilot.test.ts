@@ -66,11 +66,11 @@ describe('GET /api/autopilot/readiness', () => {
     expect(r.routes.count).toBeGreaterThan(0);
   });
 
-  it('blocks on an EMPTY BOARD, and names the two ways forward', async () => {
-    // The flow bug this fixes: everything else was in place, so Start was pressed — and the loop began,
-    // found nothing, and ended on its first tick. It models that correctly (`no-op`, "had nothing to
-    // work on, which is not the same as being finished") but only AFTER you press it, so the button
-    // looked broken. Told beforehand it is a thing to do.
+  // The correction, and it is the whole of the bootstrap on this side: an empty board with a README is the
+  // state auto-pilot DERIVES the board from, so blocking it made the flow self-contradictory in a real
+  // project's hands — it could not start without a card, and the run that creates the cards was the one it
+  // could not start. The panel and the tick now read the same two facts (`bootstrapSkill`).
+  it('does NOT block an empty board when the README is there to derive it from', async () => {
     const { app, root } = await openTestProject({ name: 'A', mode: 'brownfield' });
     await writeFile(join(root, 'README.md'), README, 'utf8');
     await putFoundation(app, 'STACK.md', 'Node 22.\n');
@@ -80,10 +80,20 @@ describe('GET /api/autopilot/readiness', () => {
     await putFoundation(app, 'DESIGN.md', 'One accent.\n');
 
     const r = await readiness(app);
+    expect(r.blockers).toEqual([]);
+    expect(r.ok).toBe(true);
+  });
+
+  // The blocker that remains, and it is a different fact: nothing on the board AND nothing to derive one
+  // from. The README's own blocker names the file; this one names the consequence, because a person reading
+  // "write a README" needs to know that the board being empty is why it matters.
+  it('blocks an empty board with no README, naming both ways forward', async () => {
+    const { app } = await openTestProject({ name: 'A', mode: 'brownfield' });
+    const r = await readiness(app);
     expect(r.ok).toBe(false);
-    expect(r.blockers).toEqual([
-      'There is no card on any board, so auto-pilot has nothing to pick up. Add one, or ask the copilot to break your README down into feature cards.',
-    ]);
+    expect(r.blockers).toContain(
+      'There is no card on any board, and nothing auto-pilot could derive one from. Add a card, or write the README so it can derive the feature list from it.',
+    );
   });
 
   it('says yes once the README and the five documents are there', async () => {

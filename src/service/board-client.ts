@@ -47,8 +47,12 @@ export interface DiaryDetails {
 }
 
 export interface DispatchRequest {
-  board: BoardName;
-  card: string;
+  // The card this run is about — both fields, or neither with `project: true`. A run about the PROJECT has no
+  // card: the bootstrap derives the board from the README, so the card it would be dispatched against is the
+  // thing it exists to create (see `bootstrapSkill` in core/autopilot.ts).
+  board?: BoardName;
+  card?: string;
+  project?: true;
   skill: string;
   // The run this one follows: for a critic, the run it is judging. Without it the judge was told to score
   // "work that is already done" and had to guess which — and on the first hand-run it guessed the previous,

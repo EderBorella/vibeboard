@@ -23,12 +23,16 @@ export interface BoardColumns {
 
 export interface PromptInputs {
   skill: Skill;
-  card: Card;
+  // The card this run is about, and its file verbatim. BOTH ABSENT for a PROJECT run — the bootstrap, which
+  // derives the board itself and therefore has no card to be about (see `bootstrapSkill` in autopilot.ts).
+  // Both or neither: a card with no file would render a heading over nothing, and a file with no card has
+  // nothing to name.
+  card?: Card;
   // The columns that exist, per board, in the order they are displayed. A list rather than a Record
   // so rendering is a plain map, and so the caller chooses which boards a run is told about.
   boardColumns: BoardColumns[];
   // The card's file, verbatim. Small and always needed, so it goes in rather than being fetched.
-  cardFile: string;
+  cardFile?: string;
   // Cards this one links to. `body` is included only where it earns its tokens — see linkedSection.
   linked: Card[];
   // Files the user attached, as project-root-relative paths. Paths, not content: the agent has a
@@ -81,6 +85,27 @@ export interface PromptInputs {
 
 function section(heading: string, body: string): string {
   return `## ${heading}\n\n${body}`;
+}
+
+// What a PROJECT run is told in place of a card, and it has to do two jobs. The first is to say plainly that
+// there is no card, because the absence is otherwise indistinguishable from a prompt that lost one.
+//
+// The second is the awkward one: the skill file was written for a per-card dispatch and says so — "the column
+// this card is in", "the card below". Left unaddressed, an agent reading that either hunts for a card it will
+// not find or invents one to reason about. So the reading is fixed here, once, rather than by rewording every
+// skill: the project is the subject, and any instruction phrased about "this card" is about the board as a
+// whole.
+function projectSubject(): string {
+  return [
+    'There is no card. The board is empty, and creating its first cards is what this run is for — so nothing',
+    'on the board is your subject and there is none to read, move or edit.',
+    '',
+    'The **README at the project root is the brief.** Read it, and derive the work from it.',
+    '',
+    'The skill above was written for a run that has a card, so it may say things like "the column this card is',
+    'in" or "the card below". There is no such card: read those as being about the project\'s board as a whole,',
+    'and do not invent a card to stand in for one.',
+  ].join('\n');
 }
 
 function cardLine(card: Card): string {
@@ -338,10 +363,12 @@ export function buildRunPrompt(input: PromptInputs): string {
   // blank — otherwise the heading and the skill body end up four newlines apart.
   const parts: string[] = [
     `# ${input.skill.name}\n\n${input.skill.prompt.trim()}`,
-    section(
-      `The card: ${input.card.id}`,
-      `File: ${relative(input.projectRoot, input.card.filePath)}\n\n\`\`\`markdown\n${input.cardFile.trim()}\n\`\`\``,
-    ),
+    input.card
+      ? section(
+          `The card: ${input.card.id}`,
+          `File: ${relative(input.projectRoot, input.card.filePath)}\n\n\`\`\`markdown\n${(input.cardFile ?? '').trim()}\n\`\`\``,
+        )
+      : section('This run is about the project, not a card', projectSubject()),
   ];
 
   // Straight after the card, which names one column: the full set belongs next to the one example of
@@ -388,7 +415,7 @@ export function buildRunPrompt(input: PromptInputs): string {
               input.credential.apiBase,
               input.credential.token,
               input.credential.scope,
-              input.card.id,
+              input.card?.id,
             ),
           ),
     );

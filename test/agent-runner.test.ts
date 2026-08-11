@@ -8,7 +8,13 @@ import type { Skill } from '../src/core/skills.js';
 import type { BoardName, Card } from '../src/core/types.js';
 import { AgentRunner, type DispatchInput, type RunnerOptions } from '../src/server/agent-runner.js';
 import { type Credential, CredentialStore, type Scope } from '../src/server/credentials.js';
-import { listCardRuns, readRun, reportPath, transcriptTail } from '../src/server/run-store.js';
+import {
+  listCardRuns,
+  readProjectRun,
+  readRun,
+  reportPath,
+  transcriptTail,
+} from '../src/server/run-store.js';
 import { countRunSuggestions, writeSuggestion } from '../src/server/suggestion-store.js';
 import { tempDir } from './helpers.js';
 
@@ -100,6 +106,16 @@ async function settled(root: string, run: string): Promise<RunRecord> {
     await new Promise((r) => setTimeout(r, 100));
   }
   throw new Error('run never settled');
+}
+
+// The same wait for a run with no card, which lives in the project store rather than beside a card.
+async function settledProject(root: string, run: string): Promise<RunRecord> {
+  for (let i = 0; i < 300; i++) {
+    const record = await readProjectRun(root, run);
+    if (record && record.status !== 'running' && record.status !== 'queued') return record;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  throw new Error('project run never settled');
 }
 
 afterEach(() => vi.restoreAllMocks());
@@ -873,7 +889,9 @@ describe('the run credential', () => {
       run: string,
       project?: string,
       card?: string,
-      dispatched?: { board: BoardName; skill: string },
+      // `board` optional inside it, exactly as the store declares it: a project run has a skill and no board,
+      // and a spy typed more narrowly than the thing it wraps is a spy that stops forwarding one day.
+      dispatched?: { board?: BoardName; skill: string },
     ): Credential {
       const cred = super.mintRun(scope, run, project, card, dispatched);
       this.minted.push(cred);
@@ -902,6 +920,25 @@ describe('the run credential', () => {
     const text: string = JSON.parse((await readFile(argsLog, 'utf8')).trim().split('\n')[0]).prompt;
     expect(text).toContain(store.minted[0].token);
     expect(text).toContain('http://127.0.0.1:4610');
+  });
+
+  // A PROJECT run — the bootstrap. It has no card, so the credential must carry the SKILL without a board:
+  // `POST /api/cards` refuses a run creating a card in the column that dispatches its own skill, and that
+  // comparison is made against the credential. Minted without the skill, the bootstrap could derive the whole
+  // feature list into the column that sends every one of those features straight back through derive-features —
+  // and nothing else on the request knows which skill is running.
+  it('mints a card-less credential that still names the skill, for a run about the project', async () => {
+    const root = await tempDir();
+    const store = new RecordingStore('admin');
+    const { instance } = runner(root, { credentials: store });
+    const { card: _card, cardFile: _cardFile, ...project } = input(root);
+
+    const { run } = await instance.dispatch(project as DispatchInput);
+    await settledProject(root, run);
+
+    expect(store.minted[0]).toMatchObject({ scope: 'work', run, project: root, skill: 'execute' });
+    expect(store.minted[0].card).toBeUndefined();
+    expect(store.minted[0].board).toBeUndefined();
   });
 
   it('revokes the credential however the run ends', async () => {

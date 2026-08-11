@@ -80,6 +80,11 @@ function isBoard(value: unknown): value is BoardName {
 interface DispatchBody {
   board?: string;
   card?: string;
+  // A run about the PROJECT rather than a card: the bootstrap, which derives the board from the README and so
+  // has no card to be dispatched against (see `bootstrapSkill` in core/autopilot.ts). Explicit rather than
+  // inferred from a missing `card`, because a request that simply forgot which card it meant must keep getting
+  // its 404 — inferring would turn every such mistake into a silently different, more powerful run.
+  project?: boolean;
   skill?: string;
   prompt?: string;
   attachments?: string[];
@@ -146,6 +151,72 @@ async function resolvePrevious(
   };
 }
 
+// Everything a dispatch needs that does NOT depend on there being a card: the columns, the resources, the
+// foundation documents, and which backend/model/effort a bare request means. One home, because the card path
+// and the project path need all of it and a second copy would drift the moment one gained a field.
+async function dispatchFrame(
+  root: string,
+  config: ProjectConfig,
+  body: DispatchBody,
+): Promise<
+  Pick<
+    DispatchInput,
+    'boardColumns' | 'links' | 'foundation' | 'backend' | 'model' | 'effort' | 'mode' | 'attachments'
+  >
+> {
+  // A dispatch may name any of backend/model/effort, or none: the project's saved selection fills
+  // the rest, through the same precedence the chat uses.
+  const choice = resolveCopilotSelection(config.copilot, {
+    backend: body.backend,
+    model: body.model,
+    effort: body.effort,
+  });
+  // Only the documents that exist. A path list naming a file that is not there teaches an agent that
+  // the paths in this prompt are approximate, and the next one it cannot find it will not look for.
+  const foundation = await foundationStatus(root);
+  // Inlined under "the gates your work must pass, in full" only if it actually declares gates.
+  // `present` means the file exists and is non-empty — so a CODE-QUALITY.md of prose with no `gates:`
+  // frontmatter, or frontmatter that will not parse, was handed to the agent under a heading
+  // asserting it contained the bar, containing no bar. Readiness would refuse such a project, but
+  // nothing on the dispatch path consults readiness.
+  const codeQuality = (await readGates(root)).ok
+    ? await readFile(join(root, foundationRel('CODE-QUALITY.md')), 'utf8')
+    : undefined;
+  return {
+    boardColumns: everyBoardColumns(config),
+    links: await readResources(root),
+    attachments: Array.isArray(body.attachments) ? body.attachments.map(String) : [],
+    foundation: {
+      paths: foundation.present.map(foundationRel),
+      ...(codeQuality ? { codeQuality } : {}),
+    },
+    backend: choice.backend as Backend,
+    model: choice.model,
+    effort: choice.effort,
+    mode: body.mode ?? 'bypassPermissions',
+  };
+}
+
+// A run about the project. No card, no card file, no linked cards and no previous run: there is no card for any
+// of them to hang off, and `resolvePrevious` needs a board to find one on.
+async function resolveProjectDispatch(
+  root: string,
+  config: ProjectConfig,
+  body: DispatchBody,
+): Promise<{ input: DispatchInput } | { code: number; error: string }> {
+  const { skills } = await readSkills(root, config);
+  const skill = skills.find((s) => s.slug === body.skill);
+  if (!skill) return { code: 404, error: 'No such skill' };
+  return {
+    input: {
+      skill,
+      linked: [],
+      userPrompt: body.prompt,
+      ...(await dispatchFrame(root, config, body)),
+    },
+  };
+}
+
 async function resolveDispatch(
   ctx: AppCtx,
   body: DispatchBody,
@@ -153,6 +224,7 @@ async function resolveDispatch(
   const root = ctx.session.root;
   const config = ctx.session.config;
   if (!root || !config) return { code: 409, error: 'No project open' };
+  if (body.project === true) return await resolveProjectDispatch(root, config, body);
   if (!isBoard(body.board)) return { code: 400, error: 'Unknown board' };
 
   const card = await findCard(root, body.board, body.card ?? '', config);
@@ -171,14 +243,6 @@ async function resolveDispatch(
     return { code: 409, error: 'That card has no file on disk any more' };
   }
 
-  // A dispatch may name any of backend/model/effort, or none: the project's saved selection fills
-  // the rest, through the same precedence the chat uses.
-  const choice = resolveCopilotSelection(config.copilot, {
-    backend: body.backend,
-    model: body.model,
-    effort: body.effort,
-  });
-
   // Linked cards, resolved live rather than from the client's view of them.
   const everyCard = (await Promise.all(BOARDS.map((b) => readBoard(root, b, config)))).flat();
   const linked = card.links
@@ -188,38 +252,16 @@ async function resolveDispatch(
   const previous = await resolvePrevious(root, body, card.id);
   if (previous && 'error' in previous) return previous;
 
-  // Only the documents that exist. A path list naming a file that is not there teaches an agent that
-  // the paths in this prompt are approximate, and the next one it cannot find it will not look for.
-  const foundation = await foundationStatus(root);
-  // Inlined under "the gates your work must pass, in full" only if it actually declares gates.
-  // `present` means the file exists and is non-empty — so a CODE-QUALITY.md of prose with no `gates:`
-  // frontmatter, or frontmatter that will not parse, was handed to the agent under a heading
-  // asserting it contained the bar, containing no bar. Readiness would refuse such a project, but
-  // nothing on the dispatch path consults readiness.
-  const codeQuality = (await readGates(root)).ok
-    ? await readFile(join(root, foundationRel('CODE-QUALITY.md')), 'utf8')
-    : undefined;
-
   return {
     input: {
       skill,
       card,
       ...verdictFor(skill.slug, config),
-      boardColumns: everyBoardColumns(config),
       cardFile,
       linked,
-      attachments: Array.isArray(body.attachments) ? body.attachments.map(String) : [],
-      links: await readResources(root),
       ...(previous ? { previous: previous.run } : {}),
       userPrompt: body.prompt,
-      foundation: {
-        paths: foundation.present.map(foundationRel),
-        ...(codeQuality ? { codeQuality } : {}),
-      },
-      backend: choice.backend as Backend,
-      model: choice.model,
-      effort: choice.effort,
-      mode: body.mode ?? 'bypassPermissions',
+      ...(await dispatchFrame(root, config, body)),
     },
   };
 }
@@ -232,6 +274,49 @@ export function unreviewedGatesRefusal(names: string[] | undefined): string | un
   // The wording lives in core/autopilot-state.ts, beside the flag it describes. It was written twice
   // before, and only one copy told you how to clear it.
   return unreviewedGatesSentence(names);
+}
+
+// Everything that refuses a dispatch before anything is resolved or written, in the order it is asked. Its own
+// function rather than four guards in the handler — flattening beats a suppression, and the handler is then
+// dispatch-and-report while the refusals, each of which is a rule with a history, sit together.
+async function dispatchRefusal(
+  ctx: AppCtx,
+  body: DispatchBody,
+  scope: Scope | undefined,
+): Promise<{ code: number; error: string } | undefined> {
+  // A run that cannot be confined is a run that does not start. 412 rather than 403 — the request is fine, the
+  // machine is not in a state to serve it.
+  const refusal = agentRefusal(ctx.sandbox, attachedOpencodeUrl());
+  if (refusal) return { code: 412, error: refusal };
+  // Then the project's own state. Halted means nothing dispatches at all; running means auto-pilot
+  // owns this project, and S6 is the reason — the runner, the concurrency cap and the queue are
+  // shared, so a manual dispatch would queue ahead of the loop's next one and make
+  // `autoPilotConcurrency: 1` aspirational rather than true. Both refusals say what to do instead.
+  const state = await ctx.autopilot.current();
+  const locked = dispatchLock(state, scope);
+  if (locked) return { code: 409, error: locked };
+  // AND THE GATES NOBODY HAS READ. Blocking `POST /autopilot/start` alone was not enough: a loop that
+  // is ALREADY running dispatches without passing through start, and the verifier re-reads
+  // foundation/CODE-QUALITY.md fresh for every card (server/verifier.ts) — so an authorised copilot
+  // rewriting it mid-run had its commands executed on the next dispatch, outside the sandbox, as the
+  // server's user. "The write is allowed; the execution waits" was false in exactly that window,
+  // which is the window an agent is most able to reach.
+  //
+  // Refusing the dispatch stops the loop with a reason rather than killing it, so the work already in
+  // flight finishes and the person is told what to look at.
+  const unreviewed = unreviewedGatesRefusal(state.unreviewedGates);
+  if (unreviewed) return { code: 412, error: unreviewed };
+  // A PROJECT run is the loop's alone. It is the only run confined to no card — decision 5's scope spiral is
+  // exactly what a card gives you — and the only caller with a reason to start one is the loop deriving an
+  // empty board. Anyone at the browser is dispatching FROM a card and has one to name.
+  if (body?.project === true && scope !== 'service') {
+    return {
+      code: 403,
+      error:
+        'Only auto-pilot may start a run with no card. Dispatch this skill from a card, or let auto-pilot derive the board.',
+    };
+  }
+  return undefined;
 }
 
 export async function registerRunRoutes(api: FastifyInstance, ctx: AppCtx): Promise<void> {
@@ -268,28 +353,10 @@ export async function registerRunRoutes(api: FastifyInstance, ctx: AppCtx): Prom
 
   api.post('/runs', async (req, reply) => {
     if (!ensureOpen(ctx.session, reply)) return;
-    // Before anything is resolved or written: a run that cannot be confined is a run that does not
-    // start. 412 rather than 403 — the request is fine, the machine is not in a state to serve it.
-    const refusal = agentRefusal(ctx.sandbox, attachedOpencodeUrl());
-    if (refusal) return reply.code(412).send({ error: refusal });
-    // Then the project's own state. Halted means nothing dispatches at all; running means auto-pilot
-    // owns this project, and S6 is the reason — the runner, the concurrency cap and the queue are
-    // shared, so a manual dispatch would queue ahead of the loop's next one and make
-    // `autoPilotConcurrency: 1` aspirational rather than true. Both refusals say what to do instead.
-    const locked = dispatchLock(await ctx.autopilot.current(), req.credential?.scope);
-    if (locked) return reply.code(409).send({ error: locked });
-    // AND THE GATES NOBODY HAS READ. Blocking `POST /autopilot/start` alone was not enough: a loop that
-    // is ALREADY running dispatches without passing through start, and the verifier re-reads
-    // foundation/CODE-QUALITY.md fresh for every card (server/verifier.ts) — so an authorised copilot
-    // rewriting it mid-run had its commands executed on the next dispatch, outside the sandbox, as the
-    // server's user. "The write is allowed; the execution waits" was false in exactly that window,
-    // which is the window an agent is most able to reach.
-    //
-    // Refusing the dispatch stops the loop with a reason rather than killing it, so the work already in
-    // flight finishes and the person is told what to look at.
-    const unreviewed = unreviewedGatesRefusal((await ctx.autopilot.current()).unreviewedGates);
-    if (unreviewed) return reply.code(412).send({ error: unreviewed });
-    const resolved = await resolveDispatch(ctx, req.body as DispatchBody);
+    const body = req.body as DispatchBody;
+    const stopped = await dispatchRefusal(ctx, body, req.credential?.scope);
+    if (stopped) return reply.code(stopped.code).send({ error: stopped.error });
+    const resolved = await resolveDispatch(ctx, body);
     if ('error' in resolved) return reply.code(resolved.code).send({ error: resolved.error });
     try {
       return { run: await ctx.runner.dispatch(resolved.input) };

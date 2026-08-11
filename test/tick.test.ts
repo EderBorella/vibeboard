@@ -361,14 +361,12 @@ describe('nothing eligible is not the same as nothing left', () => {
     });
   });
 
-  // The absence of unfinished work is not the presence of finished work, and all three of these produce
-  // the same empty list: an empty project, a project archived down to nothing, and — the one that will
-  // actually happen — a board fetch that returned nothing because something upstream went wrong.
-  it('stops no-op, never complete, when there is no live card at all', () => {
-    const empty = decideTick(input({ cards: [] }));
-    expect(empty).toMatchObject({ kind: 'stop', reason: 'no-op' });
-    expect(empty).toHaveProperty('detail', expect.stringContaining('no card on any board'));
-
+  // The absence of unfinished work is not the presence of finished work, and both of these produce the same
+  // empty list: a project archived down to nothing, and — the one that will actually happen — a board fetch
+  // that returned nothing because something upstream went wrong.
+  //
+  // An EMPTY board is the third, and it is no longer a stop: see the bootstrap tests below.
+  it('stops no-op, never complete, when every card there is has been archived', () => {
     const archived = [
       { ...card('F-001', 'features', 'archive', 10, []), archived: '2026-08-05T10:00:00Z' },
       { ...card('P-001', 'product', 'archive', 10, []), archived: '2026-08-05T10:00:00Z' },
@@ -376,6 +374,72 @@ describe('nothing eligible is not the same as nothing left', () => {
     const gone = decideTick(input({ cards: archived }));
     expect(gone).toMatchObject({ kind: 'stop', reason: 'no-op' });
     expect(gone).toHaveProperty('detail', expect.stringContaining('archived'));
+  });
+
+  // THE BOOTSTRAP, and it exists because the loop shipped a contradiction: the skill on the first features
+  // column derives the feature list from the README — the card it is dispatched against is only a trigger,
+  // its content unread — so the board could not start without a card, and the run that creates the cards was
+  // the one it could not start.
+  describe('an empty board with a README derives itself', () => {
+    it('bootstraps through whatever skill the first features column routes to', () => {
+      const decided = decideTick(input({ cards: [] }));
+      expect(decided).toMatchObject({ kind: 'bootstrap', skill: 'derive-features' });
+      expect(decided).toHaveProperty('detail', expect.stringContaining('README'));
+    });
+
+    // Not a hard-coded skill name. A project that renamed its first column, or pointed it at something else,
+    // bootstraps through its own choice — and the whole point of reading it off the table is that this holds.
+    it('takes the skill from the project’s own routing table, not from a constant', () => {
+      const ap = {
+        ...DEFAULT_AUTOPILOT,
+        routes: DEFAULT_AUTOPILOT.routes.map((r) =>
+          r.board === 'features' && r.column === 'backlog' ? { ...r, skill: 'invent-the-work' } : r,
+        ),
+      };
+      expect(decideTick(input({ cards: [], ap }))).toMatchObject({
+        kind: 'bootstrap',
+        skill: 'invent-the-work',
+      });
+    });
+
+    // A board with nothing on it and no way to derive it is the genuine no-op the case above used to cover:
+    // there is no run to dispatch, so saying so is all there is to do.
+    it('stops no-op when the first features column routes to nothing', () => {
+      const ap = {
+        ...DEFAULT_AUTOPILOT,
+        routes: DEFAULT_AUTOPILOT.routes.filter((r) => !(r.board === 'features' && r.column === 'backlog')),
+      };
+      const decided = decideTick(input({ cards: [], ap }));
+      expect(decided).toMatchObject({ kind: 'stop', reason: 'no-op' });
+      expect(decided).toHaveProperty('detail', expect.stringContaining('no card on any board'));
+    });
+
+    // The same attempt cap as anything else, counted over PROJECT runs of that skill — a card-less run has no
+    // card for `attemptsUsed` to count it against, so this is the only tally there is. Without it a README too
+    // thin to derive features from is an empty board dispatching for ever.
+    it('stops stalled once the derivation has used every attempt', () => {
+      const tried = Array.from({ length: DEFAULT_AUTOPILOT.attemptCap }, (_, i) => ({
+        ...run('unused', 'features', 'derive-features', 'attention'),
+        run: `p-${i}`,
+        card: undefined,
+        board: undefined,
+      }));
+      const decided = decideTick(input({ cards: [], runs: tried }));
+      expect(decided).toMatchObject({ kind: 'stop', reason: 'stalled' });
+      expect(decided).toHaveProperty('detail', expect.stringContaining('all 3 attempts'));
+    });
+
+    // A run that burned no attempt does not count towards the cap, which is `burnsAttempt`'s whole job: a
+    // cancelled derivation is one nobody is answerable for, so the next tick tries again.
+    it('does not count a cancelled derivation against the cap', () => {
+      const tried = Array.from({ length: DEFAULT_AUTOPILOT.attemptCap }, (_, i) => ({
+        ...run('unused', 'features', 'derive-features', 'cancelled'),
+        run: `p-${i}`,
+        card: undefined,
+        board: undefined,
+      }));
+      expect(decideTick(input({ cards: [], runs: tried }))).toMatchObject({ kind: 'bootstrap' });
+    });
   });
 
   it('still reports complete when finished work is actually there', () => {

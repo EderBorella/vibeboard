@@ -535,3 +535,45 @@ describe('the judging contract', () => {
     expect(judging()).toMatch(/even when the answer is 0/);
   });
 });
+
+// A run about the PROJECT: no card, and therefore no card section. The absence has to be STATED — a prompt
+// that simply lacks the card heading is indistinguishable from one that lost it, and an agent reading a skill
+// written for a per-card dispatch will otherwise hunt for the card or invent one.
+describe('buildRunPrompt with no card', () => {
+  const project = (over: Partial<PromptInputs> = {}): PromptInputs => {
+    const { card: _card, cardFile: _cardFile, ...rest } = inputs(over);
+    return rest as PromptInputs;
+  };
+
+  it('says there is no card, in place of the card section', () => {
+    const text = buildRunPrompt(project());
+    expect(text).toContain('## This run is about the project, not a card');
+    expect(text).not.toContain('## The card:');
+    expect(text).toContain('There is no card.');
+  });
+
+  it('names the README as the brief, which is the only subject it has', () => {
+    expect(buildRunPrompt(project())).toContain('README at the project root is the brief');
+  });
+
+  // The awkward half, and the reason this is prose rather than an omission: the seeded skills say "the column
+  // this card is in" and "the card below", and rewording every one of them would be five copies of one fact.
+  it('fixes how a card-shaped instruction should be read, so the agent invents nothing', () => {
+    const text = buildRunPrompt(project());
+    expect(text).toContain('do not invent a card to stand in for one');
+  });
+
+  it('still states every column, because it has cards to create', () => {
+    expect(buildRunPrompt(project())).toContain("## The project's columns");
+  });
+
+  // `allows` DENIES the own-card rows to a credential minted without a card — "a run minted without one has no
+  // card to be confined to" — so promising them here would describe the one authority this run cannot have.
+  it('lists no card-confined endpoint, because the server would refuse every one', () => {
+    const credential = { token: 't', apiBase: 'http://127.0.0.1:4610', scope: 'work' as const };
+    const text = buildRunPrompt(project({ credential }));
+    expect(text).toContain('POST /api/cards');
+    expect(text).not.toContain('and no other card');
+    expect(text).not.toContain('PATCH /api/cards/:board/:id');
+  });
+});

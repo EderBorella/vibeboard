@@ -40,11 +40,14 @@ import { countRunSuggestions } from './suggestion-store.js';
 
 export interface DispatchInput {
   skill: Skill;
-  card: Card;
+  // The card this run is about, and its file. ABSENT for a PROJECT run: the bootstrap derives the board from
+  // the README and so has no card, which is the whole reason it exists (see `bootstrapSkill` in autopilot.ts).
+  // Both or neither, like the record's own `card`/`board` pair and for the same reason.
+  card?: Card;
   // Carried, not derived: the runner reads no config, and the columns must be the ones the project
   // had when the dispatch was resolved — a queued run may start after they were renamed.
   boardColumns: BoardColumns[];
-  cardFile: string;
+  cardFile?: string;
   linked: Card[];
   attachments: string[];
   links: { title: string; url: string }[];
@@ -151,6 +154,20 @@ function usageFromStats(stats: ResultStats | undefined): RunUsage | undefined {
   };
 }
 
+// The previous run as the prompt needs it: the whole record narrowed, not just its report. A run that FAILED
+// has no report, and that is exactly the run a judge must be able to see (see run-prompt.ts) — so how it ended
+// and what VibeBoard noted about it travel with it.
+function narrowPrevious(previous: RunRecord): NonNullable<Parameters<typeof buildRunPrompt>[0]['previous']> {
+  return {
+    run: previous.run,
+    skill: previous.skill,
+    status: previous.status,
+    ...(previous.report ? { report: previous.report } : {}),
+    ...(previous.note ? { note: previous.note } : {}),
+    ...(previous.filesChanged === undefined ? {} : { filesChanged: previous.filesChanged }),
+  };
+}
+
 // Transcripts live under `.vibeboard/` where every agent can read them, and a run's credential is
 // only its own while it stays out of them. An agent that echoes the token — quoting the prompt back,
 // pasting a failed curl — would otherwise hand a concurrent run a working key.
@@ -247,8 +264,10 @@ export class AgentRunner {
 
     const record: RunRecord = {
       run,
-      card: input.card.id,
-      board: input.card.board as BoardName,
+      // BOTH OR NEITHER (see RunRecord.card): `card` alone cannot say which board's results folder holds the
+      // record, and `board` alone names a folder with no card in it. A project run has neither, and that is
+      // what routes it to the project store rather than beside a card.
+      ...(input.card ? { card: input.card.id, board: input.card.board as BoardName } : {}),
       skill: input.skill.slug,
       status: this.isBusy() ? 'queued' : 'running',
       started: startedAt.toISOString(),
@@ -295,16 +314,17 @@ export class AgentRunner {
     // run actually starts. `work`, confined to its own card: a run that could move cards could put
     // its own into done and declare itself finished.
     // The board and skill go on the credential so the card endpoint can refuse a run creating work for
-    // itself — see `runMayCreate` in routes/cards.ts.
-    // Conditional because `board` is optional on a run record: a PROJECT run (the checkup, pre-flight) has no
-    // card and no board, and a credential claiming one would be a fact invented here.
-    const minted = this.#opts.credentials?.mintRun(
-      'work',
-      run,
-      root,
-      record.card,
-      record.board ? { board: record.board, skill: record.skill } : undefined,
-    );
+    // itself — see `wrongColumnForRun` in routes/cards.ts.
+    //
+    // THE SKILL IS ALWAYS CARRIED; the board only when there is one. A PROJECT run has no card and no board,
+    // and a credential claiming one would be a fact invented here — but it does have a skill, and that is
+    // what the refusal compares: the bootstrap derives features, so a feature it created in the column that
+    // dispatches `derive-features` would be sent straight back through the phase that made it. That loop is
+    // the reason the rule exists, and a card-less run is the one caller most able to walk into it.
+    const minted = this.#opts.credentials?.mintRun('work', run, root, record.card, {
+      ...(record.board ? { board: record.board } : {}),
+      skill: record.skill,
+    });
     // Everything from here to the handover to #settle is inside the try: once a credential exists,
     // the only thing that revokes it is #settle's `finally`, so a throw on the way there would
     // leave a working key alive for the life of the process with no run behind it.
@@ -331,28 +351,14 @@ export class AgentRunner {
       : undefined;
     const prompt = buildRunPrompt({
       skill: input.skill,
-      card: input.card,
+      // Both or neither, spread rather than passed: `exactOptionalPropertyTypes` refuses an explicit
+      // `undefined` here, and the prompt decides which subject section to render on the card's presence.
+      ...(input.card ? { card: input.card, cardFile: input.cardFile ?? '' } : {}),
       boardColumns: input.boardColumns,
-      cardFile: input.cardFile,
       linked: input.linked,
       attachments: input.attachments,
       links: input.links,
-      // The whole record, narrowed — not just its report. A run that failed HAS no report, and that is
-      // exactly the run a judge must be able to see (see run-prompt.ts).
-      ...(input.previous
-        ? {
-            previous: {
-              run: input.previous.run,
-              skill: input.previous.skill,
-              status: input.previous.status,
-              ...(input.previous.report ? { report: input.previous.report } : {}),
-              ...(input.previous.note ? { note: input.previous.note } : {}),
-              ...(input.previous.filesChanged === undefined
-                ? {}
-                : { filesChanged: input.previous.filesChanged }),
-            },
-          }
-        : {}),
+      ...(input.previous ? { previous: narrowPrevious(input.previous) } : {}),
       userPrompt: input.userPrompt,
       foundation: input.foundation,
       verdict: input.verdict,

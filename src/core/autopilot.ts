@@ -134,6 +134,28 @@ export function isTerminalColumn(ap: AutopilotConfig, board: BoardName, columnSl
   return (ap.terminal[board] ?? []).includes(columnSlug);
 }
 
+// THE SKILL THAT DERIVES THE BOARD FROM THE README: whatever the FIRST features column routes to.
+//
+// It exists because of a contradiction the loop shipped with. The skill on that column reads the README and
+// creates the feature list; the card it is dispatched against is only a trigger, and its content is never
+// read. So a project with a README and no cards is one auto-pilot can start — but a route is per-card, and a
+// per-card dispatch needs a card, which is the thing the run exists to create. The only way in was for a
+// person to place a card whose sole purpose was to be dispatched against, which then advanced and was
+// counted as a feature.
+//
+// Read off the routing table and the column order rather than named here, because both belong to the
+// project: one that renamed its first column, or pointed it at a different skill, still bootstraps through
+// whatever it chose. Absent — and then there is no bootstrap — for a project whose first features column is
+// unrouted, which the cover check reports as the config defect it is.
+export function bootstrapSkill(
+  ap: AutopilotConfig,
+  featureColumns: string[] | undefined,
+): string | undefined {
+  const first = featureColumns?.[0];
+  if (first === undefined) return undefined;
+  return ap.routes.find((r) => r.board === 'features' && r.column === first)?.skill;
+}
+
 // Engineering's alone. A product or feature card that cannot be designed after three tries is a
 // project-level problem that stops the run, so `blocked` on those boards would be a column nothing
 // ever puts a card into — and one the cover check would then have to excuse.

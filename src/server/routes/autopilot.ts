@@ -8,11 +8,11 @@ import {
   splitCardKey,
   sumSpend,
 } from '../../core/accounting.js';
-import { type AutopilotConfig, DEFAULT_AUTOPILOT } from '../../core/autopilot.js';
+import { type AutopilotConfig, bootstrapSkill, DEFAULT_AUTOPILOT } from '../../core/autopilot.js';
 import { coverageProblems, skillProblems } from '../../core/autopilot-cover.js';
 import type { AutopilotState } from '../../core/autopilot-state.js';
 import { forClient, unreviewedGatesSentence } from '../../core/autopilot-state.js';
-import { readBoard } from '../../core/board.js';
+import { boardColumnSlugs, readBoard } from '../../core/board.js';
 import { STOP_REASONS, type StopReason } from '../../core/dispatch-gate.js';
 import {
   type FoundationStatus,
@@ -90,6 +90,9 @@ interface Read {
 function blockersFrom(
   routeProblems: string[],
   { readme, foundation, gates, smoke, unreviewedGates, liveCards }: Read,
+  // Whether an empty board is a state auto-pilot can start from: a README it can derive the feature list from,
+  // and a skill on the first features column to derive it with. See the empty-board blocker below.
+  canDerive: boolean,
 ): string[] {
   return [
     // FIRST, and out of the "order a person would fix them" sequence deliberately: this is not a
@@ -113,22 +116,31 @@ function blockersFrom(
     // LAST, because it is the last thing a person does: the README first, then the documents derived
     // from it, then the work itself.
     //
-    // A BLOCKER rather than a stop, which is the fix for a real flow problem. The loop already models
-    // this correctly — it ends with `no-op`, "had nothing to work on, which is not the same as being
-    // finished" — but that arrives AFTER you press Start, so pressing it looked like nothing happening
-    // at all. Told beforehand, with the two ways forward named, it is a thing to do rather than a
-    // mystery.
-    ...(liveCards > 0
+    // A BLOCKER rather than a stop, which is the fix for a real flow problem: the loop's own `no-op` ending
+    // arrives AFTER you press Start, so pressing it looked like nothing happening at all.
+    //
+    // AND ONLY WHEN THE BOARD CANNOT BE DERIVED, which is the correction. An empty board with a README is the
+    // one auto-pilot bootstraps (`bootstrapSkill` in core/autopilot.ts), and blocking it made the flow
+    // self-contradictory in the user's hands: it could not start without a card, and the run that creates the
+    // cards is the one it could not start. Guarded by the same two facts the tick's own branch needs, so the
+    // panel and the loop cannot disagree about whether this project can begin.
+    ...(liveCards > 0 || canDerive
       ? []
       : [
-          'There is no card on any board, so auto-pilot has nothing to pick up. Add one, or ask the copilot to break your README down into feature cards.',
+          'There is no card on any board, and nothing auto-pilot could derive one from. Add a card, or write the README so it can derive the feature list from it.',
         ]),
   ];
 }
 
 export function composeReadiness(config: ProjectConfig, skillSlugs: string[], read: Read): Readiness {
   const routeProblems = routeProblemsFor(config, skillSlugs);
-  const blockers = blockersFrom(routeProblems, read);
+  // BOTH facts, and the skill one is not a formality: a project whose first features column is unrouted has
+  // nothing to bootstrap with, and telling such a project to go and write its README would send the reader to
+  // fix the wrong file. The route problems above name the real one.
+  const canDerive =
+    read.readme.ok &&
+    bootstrapSkill(config.autopilot ?? DEFAULT_AUTOPILOT, boardColumnSlugs(config, 'features')) !== undefined;
+  const blockers = blockersFrom(routeProblems, read, canDerive);
   const { readme, foundation, gates, smoke } = read;
   return {
     ok: blockers.length === 0,

@@ -85,8 +85,13 @@ function wrongColumnForRun(
   const routes = config.autopilot?.routes;
   // A project with no lifecycle has no phases to make work for themselves. `Array.isArray` because
   // `autopilot` is parsed YAML, and a hand-edited block reaches here as whatever was in the file.
-  if (!Array.isArray(routes) || !cred.skill || !cred.board) return undefined;
-  if (cred.board !== input.board) return undefined;
+  if (!Array.isArray(routes) || !cred.skill) return undefined;
+  // A run with NO BOARD is a project run — the bootstrap — and it is checked on every board rather than
+  // excused. It is the caller most able to walk into this loop and the one with nothing to stop it: it has no
+  // card, so `stampForRun` corrects nothing for it, and the skill it runs is by definition the one the first
+  // features column dispatches. Derive features into that column and every card it made is sent back through
+  // the phase that made it.
+  if (cred.board !== undefined && cred.board !== input.board) return undefined;
   const loop = routes.find(
     (r) => isRoute(r) && r.board === input.board && r.column === input.columnSlug && r.skill === cred.skill,
   );

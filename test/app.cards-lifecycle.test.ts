@@ -97,6 +97,31 @@ describe('a run creating a card in the column that dispatches its own skill', ()
     expect(res.json().error).toContain('break-down');
   });
 
+  // A PROJECT RUN — the bootstrap — is held to the same rule, and it is the caller most able to walk into this
+  // loop: it has no card, so nothing corrects its column for it, and the skill it runs is by definition the one
+  // the first features column dispatches. Excused, it would derive the whole feature list into the column that
+  // sends every one of those features straight back through derive-features.
+  it('is refused for a run with no card at all, which is the one most able to loop', async () => {
+    const { app, store, root } = await open();
+    const boot = store.mintRun('work', 'run-boot', root, undefined, { skill: 'derive-features' });
+
+    const refused = await create(app, bearer(boot.token), {
+      board: 'features',
+      columnSlug: 'backlog',
+      title: 'Emit JSON output',
+    });
+    expect(refused.statusCode).toBe(409);
+    expect(refused.json().error).toContain('features/todo');
+
+    // And allowed where the phase actually sends its output, so the bootstrap can do its job.
+    const allowed = await create(app, bearer(boot.token), {
+      board: 'features',
+      columnSlug: 'todo',
+      title: 'Emit JSON output',
+    });
+    expect(allowed.statusCode).toBe(200);
+  });
+
   // THE ADVICE, which a review showed was wrong for four of the five routes it could fire on. `route.next` is
   // where the run's OWN card goes when it passes, not where a new card belongs: `test` refused in
   // engineering/review was told engineering/done — TERMINAL, and `complete`'s positive evidence is a live card

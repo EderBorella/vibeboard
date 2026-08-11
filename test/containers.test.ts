@@ -165,6 +165,7 @@ describe('exec argv', () => {
   it('runs in the work directory and passes the command through unmangled', () => {
     expect(execArgs('box', 'claude', ['-p', 'hello world'])).toEqual([
       'exec',
+      '-i',
       '-w',
       WORK_DIR,
       'box',
@@ -172,6 +173,20 @@ describe('exec argv', () => {
       '-p',
       'hello world',
     ]);
+  });
+
+  it('KEEPS STDIN OPEN with -i, which is the whole way the prompt reaches the agent', () => {
+    // `docker exec` without `-i` discards stdin entirely — no error, no warning. The prompt goes in on
+    // stdin deliberately, because it carries the run's credential and a command line is world-readable
+    // through /proc/<pid>/cmdline. Without this flag `claude -p` exits 1 with "Input must be provided
+    // either through stdin or as a prompt argument", which is what happened on a real project: three
+    // attempts burned in six seconds and the card left needing a person.
+    //
+    // Asserted as a POSITION, not just membership: `-i` after the container name would be an argument
+    // to the agent's own command instead of a flag to docker.
+    const args = execArgs('box', 'claude', ['-p']);
+    expect(args).toContain('-i');
+    expect(args.indexOf('-i')).toBeLessThan(args.indexOf('box'));
   });
 });
 

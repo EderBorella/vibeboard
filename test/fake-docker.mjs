@@ -50,6 +50,11 @@ if (verb !== 'exec') {
 let i = 1;
 const env = { ...process.env };
 let cwd;
+// Whether `-i` was passed. THE DOUBLE HONOURS THIS, and it must: real `docker exec` discards stdin
+// without it, and a double that forwarded stdin regardless would be kinder than the real thing — which
+// is exactly how a missing `-i` shipped. Everything an agent is asked to do arrives on stdin, so the
+// bug was total and the suite could not see it, because nothing here could fail without the flag.
+let interactive = false;
 while (i < argv.length) {
   const flag = argv[i];
   if (flag === '-e') {
@@ -64,6 +69,9 @@ while (i < argv.length) {
   } else if (flag === '-u') {
     env.VIBEBOARD_FAKE_DOCKER_USER = argv[i + 1];
     i += 2;
+  } else if (flag === '-i') {
+    interactive = true;
+    i += 1;
   } else {
     break;
   }
@@ -78,7 +86,13 @@ if (!bin) {
   process.exit(2);
 }
 
-const child = spawn(bin, rest, { stdio: 'inherit', env, cwd });
+const child = spawn(bin, rest, {
+  // stdin only when asked, exactly as docker behaves. stdout/stderr always, because `docker exec`
+  // always returns those.
+  stdio: [interactive ? 'inherit' : 'ignore', 'inherit', 'inherit'],
+  env,
+  cwd,
+});
 child.on('error', (err) => {
   process.stderr.write(`fake-docker: ${err.message}\n`);
   process.exit(127);

@@ -17,7 +17,18 @@ describe('wrapCommand', () => {
   it('routes the command into the box when there is one', () => {
     const { bin, args } = wrapCommand('claude', ['-p', 'hello'], OK, 'vibeboard-abc-claude-code');
     expect(bin).toContain('docker');
-    expect(args).toEqual(['exec', '-w', WORK_DIR, 'vibeboard-abc-claude-code', 'claude', '-p', 'hello']);
+    // `-i` is not cosmetic: docker discards stdin without it, and the prompt travels on stdin because
+    // it carries the run's credential and a command line is world-readable.
+    expect(args).toEqual([
+      'exec',
+      '-i',
+      '-w',
+      WORK_DIR,
+      'vibeboard-abc-claude-code',
+      'claude',
+      '-p',
+      'hello',
+    ]);
   });
 
   it('carries the environment the CLI needs on the far side of the boundary', () => {

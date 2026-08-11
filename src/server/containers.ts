@@ -313,7 +313,18 @@ export function execArgs(
   args: string[],
   env: Record<string, string> = {},
 ): string[] {
-  const out = ['exec', '-w', WORK_DIR];
+  // `-i` IS LOAD-BEARING, and its absence is silent. `docker exec` without it does not forward stdin
+  // at all — it is discarded before the container sees a byte.
+  //
+  // Everything the agent is asked to do arrives on stdin. That is deliberate and cannot change: the
+  // prompt carries the run's credential, and a command line is world-readable through
+  // /proc/<pid>/cmdline for as long as the process lives, so passing it as an argument would let any
+  // other agent on the machine lift another run's token with `ps`.
+  //
+  // Without this flag `claude -p` starts, finds nothing on stdin, and exits 1 with "Input must be
+  // provided either through stdin or as a prompt argument when using --print". Observed on a real
+  // project: three attempts burned in six seconds and the card left needing a person.
+  const out = ['exec', '-i', '-w', WORK_DIR];
   for (const [k, v] of Object.entries(env)) out.push('-e', `${k}=${v}`);
   out.push(name, bin, ...args);
   return out;

@@ -1,4 +1,4 @@
-import { execFile } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -6,6 +6,7 @@ import { promisify } from 'node:util';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { BoxManager } from '../src/server/box-manager.js';
 import { DEFAULT_IMAGE, type DockerRun, SOCKET_DIR } from '../src/server/containers.js';
+import { wrapCommand } from '../src/server/sandbox.js';
 
 // The boundary itself, against a real container — not the argv that asks for it.
 //
@@ -238,6 +239,46 @@ box('the agent box, for real', () => {
     expect((await asAgent(`rm -f ${SOCKET_DIR}/api.sock`)).code).not.toBe(0);
     expect((await asAgent(`touch ${SOCKET_DIR}/mine.sock`)).code).not.toBe(0);
     expect((await asAgent(`test -e ${SOCKET_DIR}/api.sock`)).code).toBe(0);
+  });
+
+  it('DELIVERS A PROMPT ON STDIN, which is the only way an agent is told what to do', async () => {
+    // The bug this exists for, observed on a real project: `docker exec` without `-i` discards stdin
+    // entirely — no error, no warning — so every turn started, found nothing on stdin, and exited 1
+    // with "Input must be provided either through stdin or as a prompt argument". Three attempts burned
+    // in six seconds and the card was left needing a person.
+    //
+    // It has to be a REAL container. The suite's docker stand-in used to forward stdin whether `-i` was
+    // passed or not, which made it kinder than the real thing and is precisely why nothing failed. It
+    // honours the flag now, but a double that models the behaviour is still not the behaviour.
+    const prompt = 'implement the thing [[secret:do-not-put-me-in-argv]]';
+    const { args } = wrapCommand(
+      '/bin/sh',
+      ['-c', 'cat > /tmp/prompt'],
+      { ok: true, image: DEFAULT_IMAGE },
+      name,
+    );
+
+    const child = spawn('docker', args, { stdio: ['pipe', 'inherit', 'inherit'] });
+    child.stdin?.end(prompt, 'utf8');
+    const code = await new Promise<number | null>((resolve) => child.on('close', resolve));
+    expect(code).toBe(0);
+
+    // Arrived whole, byte for byte.
+    expect((await asAgent('cat /tmp/prompt')).stdout).toBe(prompt);
+  }, 60_000);
+
+  it('does NOT put the prompt in the command line, where any agent could read it with ps', async () => {
+    // The reason the prompt is on stdin at all. `/proc/<pid>/cmdline` is world-readable for as long as
+    // the process lives, so a prompt passed as an argument would let another agent on this machine lift
+    // the run's credential out of it.
+    const { args } = wrapCommand(
+      'claude',
+      ['-p', '--model', 'haiku'],
+      { ok: true, image: DEFAULT_IMAGE },
+      name,
+    );
+    expect(args.join(' ')).not.toContain('secret');
+    expect(args).toContain('-i');
   });
 
   it('leaves nothing root-owned in the project — the day-one bind-mount failure', async () => {

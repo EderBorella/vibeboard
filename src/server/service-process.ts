@@ -1,10 +1,11 @@
 import { type ChildProcess, spawn } from 'node:child_process';
+import { closeSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import type { AutopilotState } from '../core/autopilot-state.js';
 import { stopSentence } from '../core/dispatch-gate.js';
 import { updateAutopilotState } from './autopilot-store.js';
 import type { CredentialStore } from './credentials.js';
-import type { Log } from './logging.js';
+import { type AutopilotLogTarget, type Log, openAutopilotLog } from './logging.js';
 import { groupStartTime, terminateGroup } from './process-group.js';
 
 // Starting, and outliving, the process that walks the board.
@@ -53,6 +54,13 @@ export interface ServiceProcessOptions {
   // the LAN and one opened on localhost are the same code with different origins.
   apiBase: () => string;
   command?: () => ServiceCommand;
+  // Whether to keep the loop's ORDINARY output as well as its errors — the app-level debug setting. Asked
+  // at every start rather than captured, so the toggle takes effect on the next Start rather than at the
+  // next restart. Absent means off, which is what every test that is about something else wants.
+  debugLog?: () => Promise<boolean>;
+  // Where that output goes, injected so a test can point it somewhere it can read. Absent means the
+  // install's own log directory, and `undefined` from it means write no file at all.
+  openLog?: (what: string) => AutopilotLogTarget | undefined;
   log?: Log;
   // Told when the child ends without the loop having recorded a stop — see `#supervise`.
   onStopped?: (state: AutopilotState) => void;
@@ -161,6 +169,19 @@ export class ServiceProcess {
       at: startedAt,
     }));
 
+    // WHERE THE LOOP'S OUTPUT GOES, opened before the spawn because the descriptor is what the child is
+    // handed. Both halves matter and they are not the same decision:
+    //
+    //   stderr is ALWAYS kept. `src/service/main.ts` refuses to start on a missing environment variable or
+    //   a board it cannot read, and both `console.error` and exit 2 — so with stderr discarded those two
+    //   failures left no trace anywhere: no state, no diary, no log. Pressing Start did nothing, visibly.
+    //   That is the hole this exists to close, and a setting defaulting to off would not close it.
+    //
+    //   stdout is kept only when the debug setting is on. It is the per-tick narrative — useful when you are
+    //   debugging the loop, noise for the rest of the time.
+    const target = (this.#opts.openLog ?? openAutopilotLog)(`auto-pilot starting for ${root}`);
+    const verbose = target === undefined ? false : ((await this.#opts.debugLog?.()) ?? false);
+
     let child: ChildProcess;
     let command: ServiceCommand;
     try {
@@ -177,12 +198,16 @@ export class ServiceProcess {
         },
         // See the header: its own group, so an emergency stop reaches everything it started.
         detached: true,
-        // `ignore` rather than a pipe: nothing reads these, and an unread pipe eventually blocks the
-        // writer. What the loop has to say, it says in the diary and the state file.
-        stdio: ['ignore', 'ignore', 'ignore'],
+        // A FILE, never a pipe. A pipe needs a reader and this process has none, so it would fill and then
+        // block the loop for ever — which is why this was `ignore` before there was a file to point at.
+        stdio: ['ignore', target && verbose ? target.fd : 'ignore', target ? target.fd : 'ignore'],
       });
     } catch (err) {
       return this.#couldNotStart(root, String(err));
+    } finally {
+      // The child holds its own duplicate from here on. Ours is closed whether the spawn worked or threw —
+      // one descriptor leaked per Start would otherwise accumulate for the life of the server.
+      if (target) closeSync(target.fd);
     }
     // ASYNCHRONOUS failures. `spawn` does not throw for a missing or unrunnable entry point — it emits
     // `error` on the next tick — so the try/catch above cannot see it, and with no listener attached that

@@ -1,13 +1,15 @@
-import { readFile, rm, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import type { FastifyInstance } from 'fastify';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, onTestFinished } from 'vitest';
 import { CONFIG_DIR } from '../src/core/layout.js';
 import {
+  debugLogging,
   readState,
   rememberProject,
   restoreLastProject,
+  setDebugLogging,
   stateFile,
   writeState,
 } from '../src/server/app-state.js';
@@ -71,6 +73,52 @@ describe('app state file', () => {
     await rememberProject('/new');
     const raw = JSON.parse(await readFile(stateFile(), 'utf8'));
     expect(raw).toEqual({ lastProject: '/new' });
+  });
+});
+
+// The app-level debug switch: whether the auto-pilot loop's ordinary output is kept as well as its errors.
+// Here rather than in a project's config.yaml because the logs are VibeBoard's own folder, and a debug
+// switch in the user's document would also be forgotten the moment they switched project.
+describe('the debug logging setting', () => {
+  it('round-trips, and is off when nothing has been said', async () => {
+    expect(await debugLogging()).toBe(false);
+    await setDebugLogging(true);
+    expect(await debugLogging()).toBe(true);
+    await setDebugLogging(false);
+    expect(await debugLogging()).toBe(false);
+  });
+
+  // The two settings share ONE file, so each writer has to preserve the other's field. Written as a
+  // wholesale overwrite, opening a project would silently turn the switch off.
+  it('survives a project being opened, and does not disturb it', async () => {
+    await setDebugLogging(true);
+    await rememberProject('/some/project');
+    expect(await readState()).toEqual({ lastProject: '/some/project', debugLog: true });
+
+    await setDebugLogging(false);
+    expect(await readState()).toEqual({ lastProject: '/some/project', debugLog: false });
+  });
+
+  // Each field validated on its own. Read through a single ternary over `lastProject` — which is what this
+  // did — a file holding one nonsense value discarded the other, so a typo in the state file would forget
+  // which project you had open.
+  it('ignores a non-boolean without discarding the rest of the file', async () => {
+    await writeFile(stateFile(), '{"lastProject":"/p","debugLog":"yes"}', 'utf8');
+    expect(await readState()).toEqual({ lastProject: '/p' });
+  });
+
+  // It THROWS rather than swallowing, and that is the point of the split: a switch that reports success and
+  // changes nothing is worse than one that says it could not save. `rememberProject` keeps the old
+  // behaviour, because remembering a project is a convenience that must never fail an open.
+  it('reports a write it could not make, where remembering a project does not', async () => {
+    process.env.VIBEBOARD_STATE_FILE = join(await tempDir(), 'no-such-dir', 'x', 'state.json');
+    const readOnly = dirname(dirname(process.env.VIBEBOARD_STATE_FILE));
+    await mkdir(readOnly, { recursive: true });
+    await chmod(readOnly, 0o500);
+    onTestFinished(() => chmod(readOnly, 0o700));
+
+    await expect(setDebugLogging(true)).rejects.toThrow();
+    await expect(rememberProject('/p')).resolves.toBeUndefined();
   });
 });
 

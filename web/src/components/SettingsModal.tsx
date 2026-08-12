@@ -21,6 +21,7 @@ import {
   type ProjectConfig,
 } from '../shared';
 import { AutopilotPanel } from './AutopilotPanel';
+import { DiagnosticsPanel } from './DiagnosticsPanel';
 import { ModelPicker } from './ModelPicker';
 import { SandboxPanel } from './SandboxPanel';
 import { SignInPanel } from './SignInPanel';
@@ -293,6 +294,10 @@ export function SettingsModal({ config, onClose, onSaved, autopilot, onAutopilot
               <input type="number" value={idPadding} onChange={(e) => setIdPadding(Number(e.target.value))} />
             </label>
           </div>
+
+          {/* Both of these save themselves and are NOT part of what the Save button writes: they are
+              app-level, stored outside every project, so a project-config patch is the wrong carrier. */}
+          <DiagnosticsPanel />
 
           {/* Last, because nobody comes to Settings for it: sign-in is meant to be something the user
               never touches. It is here so the credential is FINDABLE — "unless he wants to check in

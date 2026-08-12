@@ -79,6 +79,13 @@ if (logPath) {
   );
 }
 
+// One line on each stream, always. The real loop writes to both — `console.error` for the three refusals
+// that end it before it starts, `console.log` for the per-tick narrative — and the server points them at
+// different places on purpose: errors are always kept, the narrative only when the debug setting is on. A
+// test can only tell those apart if the shim writes to both.
+process.stdout.write('shim on stdout\n');
+process.stderr.write('shim on stderr\n');
+
 if (behaviour.startsWith('exit:')) process.exit(Number(behaviour.slice(5)));
 
 // Otherwise stay alive until killed — but NOT for ever. This shim is spawned detached and in its own

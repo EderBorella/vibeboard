@@ -3,6 +3,7 @@ import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastif
 import { forClient } from '../core/autopilot-state.js';
 import { DEFAULT_MAX_RUNS } from '../core/config.js';
 import { AgentRunner } from './agent-runner.js';
+import { debugLogging } from './app-state.js';
 import { registerAuth } from './auth.js';
 import { AutopilotRuntime } from './autopilot-runtime.js';
 import type { BoxService } from './box-service.js';
@@ -35,6 +36,7 @@ import { registerModelRoutes } from './routes/models.js';
 import { registerProjectRoutes } from './routes/project.js';
 import { registerRunRoutes } from './routes/runs.js';
 import { registerSandboxRoutes } from './routes/sandbox.js';
+import { registerSettingsRoutes } from './routes/settings.js';
 import { registerAuthRoutes, registerSigninRoutes } from './routes/signin.js';
 import { registerSkillRoutes } from './routes/skills.js';
 import { registerSuggestionRoutes } from './routes/suggestions.js';
@@ -230,6 +232,9 @@ export function buildApp(
     // port set after buildApp still lands.
     apiBase: () => `http://127.0.0.1:${process.env.VIBEBOARD_PORT ?? 4610}`,
     ...(opts.serviceCommand ? { command: opts.serviceCommand } : {}),
+    // Read at every start, so flipping the switch in Settings takes effect on the next Start rather than at
+    // the next restart of the whole app.
+    debugLog: debugLogging,
     // A loop that died without saying why still has to raise the overlay in every open tab.
     onStopped: (state) => broadcast({ type: 'autopilot:state', state: forClient(state) }),
     onDispatchingEnded: () => credentials.expireScope('service'),
@@ -275,6 +280,7 @@ export function buildApp(
       await registerControlRoutes(api, ctx);
       await registerCopilotRoutes(api, ctx);
       await registerSandboxRoutes(api, ctx);
+      await registerSettingsRoutes(api);
       await registerToolchainRoutes(api, ctx);
       await registerAutopilotRoutes(api, ctx);
       await registerSuggestionRoutes(api, ctx);

@@ -1,13 +1,16 @@
-import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, closeSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Writable } from 'node:stream';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import {
+  type AutopilotLogTarget,
+  autopilotLogFileFor,
   DEFAULT_LOG_KEEP,
   DEFAULT_LOG_LEVEL,
   LOG_LEVELS,
   logDir,
   logFileFor,
+  openAutopilotLog,
   pruneLogs,
   resolveKeep,
   resolveLevel,
@@ -74,6 +77,59 @@ describe('logFileFor', () => {
   });
 });
 
+describe('autopilotLogFileFor', () => {
+  it('is a SECOND file beside the server’s, not the same one', () => {
+    // Two processes appending to one file interleave mid-line, and the server's is machine-readable JSON —
+    // a plain `[autopilot] …` line inside it makes the whole day unparseable by whatever reads it.
+    const at = new Date('2026-08-12T09:00:00.000Z');
+    expect(autopilotLogFileFor('/logs', at)).toBe('/logs/autopilot-2026-08-12.log');
+    expect(autopilotLogFileFor('/logs', at)).not.toBe(logFileFor('/logs', at));
+  });
+});
+
+describe('openAutopilotLog', () => {
+  it('appends a dated header naming the session, and hands back the descriptor', async () => {
+    const dir = await tempDir();
+    const at = new Date('2026-08-12T09:00:00.000Z');
+    const first = openAutopilotLog('auto-pilot starting for /p', at, { VIBEBOARD_LOG_DIR: dir });
+    expect(first).toBeDefined();
+    closeSync((first as AutopilotLogTarget).fd);
+    // APPENDED, not truncated: a day's file holds every session, and each one has to be findable in it.
+    const second = openAutopilotLog('auto-pilot starting for /p', at, { VIBEBOARD_LOG_DIR: dir });
+    closeSync((second as AutopilotLogTarget).fd);
+
+    const text = readFileSync(join(dir, 'autopilot-2026-08-12.log'), 'utf8');
+    expect(text.match(/--- 2026-08-12T09:00:00.000Z auto-pilot starting for \/p/g)).toHaveLength(2);
+  });
+
+  it('creates the directory, because the first session may precede any server log', async () => {
+    const dir = join(await tempDir(), 'not-yet');
+    const target = openAutopilotLog('starting', new Date('2026-08-12T09:00:00.000Z'), {
+      VIBEBOARD_LOG_DIR: dir,
+    });
+    expect(target).toBeDefined();
+    closeSync((target as AutopilotLogTarget).fd);
+    expect(readdirSync(dir)).toEqual(['autopilot-2026-08-12.log']);
+  });
+
+  it('writes nothing when this install writes no log files', () => {
+    // The same contract as the server's logger, and the suite runs this way — so a test that has not asked
+    // for a file gets none.
+    expect(openAutopilotLog('starting', new Date(), { VIBEBOARD_LOG_DIR: '' })).toBeUndefined();
+  });
+
+  it('degrades to no file rather than refusing to start the loop', async () => {
+    // A read-only or root-owned log directory must not be the reason auto-pilot cannot run. Reported to the
+    // console, because silence here is the bug this file exists to fix.
+    const dir = await tempDir();
+    chmodSync(dir, 0o500);
+    onTestFinished(() => chmodSync(dir, 0o700));
+    const said = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    expect(openAutopilotLog('starting', new Date(), { VIBEBOARD_LOG_DIR: dir })).toBeUndefined();
+    expect(said).toHaveBeenCalled();
+  });
+});
+
 describe('pruneLogs', () => {
   it('keeps the newest N and deletes the rest', async () => {
     const dir = await tempDir();
@@ -104,6 +160,24 @@ describe('pruneLogs', () => {
 
   it('is a no-op on the first run, when the folder does not exist yet', () => {
     expect(pruneLogs('/nonexistent/vibeboard-logs', 5)).toEqual([]);
+  });
+
+  // The auto-pilot log is bounded by the same pruner and NOT by the same budget. Counted together, a week of
+  // auto-pilot sessions would have deleted a week of server logs — and unpruned it would have been a file
+  // per day for ever, which is the leak this suite has already paid for once.
+  it('bounds the auto-pilot log too, and each family keeps its own N', async () => {
+    const dir = await tempDir();
+    for (const day of ['01', '02', '03']) {
+      writeFileSync(join(dir, `vibeboard-2026-07-${day}.log`), 'x');
+      writeFileSync(join(dir, `autopilot-2026-07-${day}.log`), 'x');
+    }
+    expect(pruneLogs(dir, 2).sort()).toEqual(['autopilot-2026-07-01.log', 'vibeboard-2026-07-01.log']);
+    expect(readdirSync(dir).sort()).toEqual([
+      'autopilot-2026-07-02.log',
+      'autopilot-2026-07-03.log',
+      'vibeboard-2026-07-02.log',
+      'vibeboard-2026-07-03.log',
+    ]);
   });
 });
 

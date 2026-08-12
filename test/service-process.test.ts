@@ -1,4 +1,4 @@
-import { chmodSync, existsSync, readFileSync } from 'node:fs';
+import { chmodSync, existsSync, openSync, readdirSync, readFileSync } from 'node:fs';
 import { mkdtemp } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -56,7 +56,17 @@ function recordingLog(lines: string[]): Log {
   return log;
 }
 
-async function harness(opts: { behaviour?: string; log?: string } = {}) {
+async function harness(
+  opts: {
+    behaviour?: string;
+    log?: string;
+    // Where the child's own stdout and stderr should land, and whether the ordinary output goes there too.
+    // Absent means neither is captured, which is what the rest of this file wants: the suite runs with no log
+    // directory at all, so a test that has not asked for a file writes none.
+    output?: string;
+    debugLog?: boolean;
+  } = {},
+) {
   const root = await tempDir();
   await writeAutopilotState(root, IDLE_STATE);
   const log = opts.log ?? (await logPath());
@@ -70,6 +80,10 @@ async function harness(opts: { behaviour?: string; log?: string } = {}) {
       bin: process.execPath,
       args: [SHIM, log, opts.behaviour ?? 'sleep'],
     }),
+    ...(opts.output
+      ? { openLog: (what: string) => ({ fd: openSync(opts.output as string, 'a'), file: what }) }
+      : {}),
+    ...(opts.debugLog === undefined ? {} : { debugLog: async () => opts.debugLog === true }),
   });
   // EVERY harness kills what it started. Twelve sleeping children leaked per run of this file and its
   // sibling before this existed, reparented to init and holding ~48 MB each; 275 of them accumulated on
@@ -358,6 +372,77 @@ describe('when the loop dies without stopping first', () => {
 // The one thing about the default that can be checked without a built tree: it points at the loop's
 // entry beside this module rather than at a path relative to whatever directory the server was started
 // from, and it carries the loader that got us here so a `.ts` entry still runs under tsx.
+// WHAT THE LOOP SAYS, and where it goes.
+//
+// The hole this closes: the child was spawned with all three streams `ignore`d, so `src/service/main.ts`'s
+// two hard refusals — a missing environment variable, and a board it cannot read — printed to a stderr that
+// went nowhere and exited 2. No state, no diary, no log: pressing Start did nothing, visibly, and there was
+// no file to read afterwards.
+describe('the loop’s output', () => {
+  // Waits for the child to have written, since the write happens in another process a moment after
+  // `start` resolves.
+  async function captured(file: string, expected: string): Promise<string> {
+    for (let i = 0; i < 100; i += 1) {
+      const text = existsSync(file) ? readFileSync(file, 'utf8') : '';
+      if (text.includes(expected)) return text;
+      await new Promise((r) => setTimeout(r, 20));
+    }
+    return existsSync(file) ? readFileSync(file, 'utf8') : '';
+  }
+
+  it('keeps stderr whatever the debug setting says, because that is where the refusals go', async () => {
+    const file = join(await tempDir(), 'autopilot.log');
+    const { service } = await harness({ output: file, debugLog: false });
+    await service.start();
+    expect(await captured(file, 'shim on stderr')).toContain('shim on stderr');
+  });
+
+  it('leaves the ordinary output out until the setting asks for it', async () => {
+    const file = join(await tempDir(), 'autopilot.log');
+    const { service } = await harness({ output: file, debugLog: false });
+    await service.start();
+    // Waited for through the stderr line, which is written immediately after it: asserting the absence of
+    // something the child has not had time to write yet would pass with the redirect wired wrongly.
+    const text = await captured(file, 'shim on stderr');
+    expect(text).not.toContain('shim on stdout');
+  });
+
+  it('keeps both when it is on', async () => {
+    const file = join(await tempDir(), 'autopilot.log');
+    const { service } = await harness({ output: file, debugLog: true });
+    await service.start();
+    const text = await captured(file, 'shim on stdout');
+    expect(text).toContain('shim on stdout');
+    expect(text).toContain('shim on stderr');
+  });
+
+  // The descriptor is ours until `spawn` has duplicated it into the child. Left open, the server accumulates
+  // one per Start for its whole life — and Start is a button a person presses repeatedly while working out
+  // why the loop stopped, which is the same shape as the temp-directory leak this project has already paid
+  // for once.
+  it('closes its own copy of the descriptor, so a session of restarts leaks nothing', async () => {
+    const file = join(await tempDir(), 'autopilot.log');
+    const mine = (): number => readdirSync('/proc/self/fd').length;
+    const { service } = await harness({ output: file, debugLog: false });
+    await service.start();
+    await captured(file, 'shim on stderr');
+    const before = mine();
+    for (let i = 0; i < 5; i += 1) await service.start();
+    // Not an exact equality: starting a child moves other descriptors around. Five starts leaking one each
+    // would be five above the baseline, and this catches that with room to spare.
+    expect(mine()).toBeLessThan(before + 3);
+  });
+
+  it('writes no file at all when this install writes none', async () => {
+    // The default path, which is what the whole suite runs on: VIBEBOARD_LOG_DIR is empty, so
+    // `openAutopilotLog` answers `undefined` and the streams stay ignored. Proved through the child rather
+    // than by inspecting the options: it starts and runs normally with nothing captured.
+    const { service, log } = await harness({ debugLog: true });
+    expect((await service.start()).ok).toBe(true);
+    expect((await recorded(log)).projectRoot).not.toBeNull();
+  });
+});
+
 describe('the default command', () => {
   it('resolves the loop’s entry beside the server, with this process’s loader', () => {
     const command = defaultServiceCommand();

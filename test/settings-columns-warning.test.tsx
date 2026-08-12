@@ -24,6 +24,10 @@ const api = vi.hoisted(() => ({
   // as the two above: this file is about the columns warning, and the panel saying it could not read
   // is honest when nothing answered.
   getSigninState: vi.fn().mockRejectedValue(new Error('not what this test is about')),
+  // The diagnostics panel, same again. Its own file covers what it does; here it only has to not throw
+  // on mount — a whole-module mock makes every export this modal reaches this file's business.
+  getAppSettings: vi.fn().mockRejectedValue(new Error('not what this test is about')),
+  setDebugLog: vi.fn(),
 }));
 vi.mock('../web/src/api.js', () => api);
 

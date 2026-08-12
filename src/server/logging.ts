@@ -47,13 +47,31 @@ export function logFileFor(dir: string, now: Date): string {
   return join(dir, `vibeboard-${now.toISOString().slice(0, 10)}.log`);
 }
 
+// WHERE THE LOOP'S OWN OUTPUT GOES, and it is a second file rather than the server's.
+//
+// It cannot be the server's: the loop is a separate process (decision 20), and pino owns that file
+// through one open descriptor with synchronous writes. Two processes appending to one file interleave
+// mid-line, and the server's is machine-readable JSON — a plain `[autopilot] …` line in the middle of it
+// makes the whole day's log unparseable by whatever reads it.
+//
+// Same directory and the same one-file-per-day shape, so there is one folder to look in and `pruneLogs`
+// bounds both.
+export function autopilotLogFileFor(dir: string, now: Date): string {
+  return join(dir, `autopilot-${now.toISOString().slice(0, 10)}.log`);
+}
+
+// The two families of file this directory holds. Both are pruned, and each keeps its own `keep` — a day
+// with no auto-pilot session writes no autopilot file, so counting them together would silently shorten
+// how far back the server's log goes.
+const LOG_FAMILIES = [/^vibeboard-\d{4}-\d{2}-\d{2}\.log$/, /^autopilot-\d{4}-\d{2}-\d{2}\.log$/] as const;
+
 export function resolveKeep(raw: string | undefined): number {
   const keep = Number(raw);
   return Number.isInteger(keep) && keep > 0 ? keep : DEFAULT_LOG_KEEP;
 }
 
-// Keep the newest `keep` files and delete the rest. The date in the name sorts lexicographically,
-// so no stat() is needed. A missing directory is the first-run case, not an error.
+// Keep the newest `keep` files of EACH family and delete the rest. The date in the name sorts
+// lexicographically, so no stat() is needed. A missing directory is the first-run case, not an error.
 export function pruneLogs(dir: string, keep: number): string[] {
   let names: string[];
   try {
@@ -61,10 +79,12 @@ export function pruneLogs(dir: string, keep: number): string[] {
   } catch {
     return [];
   }
-  const stale = names
-    .filter((n) => /^vibeboard-\d{4}-\d{2}-\d{2}\.log$/.test(n))
-    .sort()
-    .slice(0, -keep);
+  const stale = LOG_FAMILIES.flatMap((family) =>
+    names
+      .filter((n) => family.test(n))
+      .sort()
+      .slice(0, -keep),
+  );
   for (const name of stale) rmSync(join(dir, name), { force: true });
   return stale;
 }
@@ -131,6 +151,47 @@ export function serverLogger(env: NodeJS.ProcessEnv = process.env, now: Date = n
     // preventing startup. Said out loud, because silently losing the logs is the original bug.
     console.error(`log directory ${dir} is not writable, logging to stdout:`, (err as Error).message);
     return { options: { level } };
+  }
+}
+
+// A descriptor for the loop to write into, or nothing. Handed to `spawn` as the child's stderr — and,
+// when the debug setting is on, its stdout too.
+//
+// A FILE DESCRIPTOR RATHER THAN A PIPE, and that is the whole reason this is safe now when it was not
+// before: a pipe needs a reader, and the parent had none, so an unread one fills its buffer and then
+// blocks the writer for ever — which is worse than losing the output. A file cannot block, needs nobody
+// listening, and outlives both processes.
+//
+// The caller must close it once `spawn` has returned: the child gets its own duplicate, so a descriptor
+// left open here leaks one per start for the life of the server.
+export interface AutopilotLogTarget {
+  fd: number;
+  file: string;
+}
+
+export function openAutopilotLog(
+  // What the header line names, so a day's file separates one session from the next.
+  what: string,
+  now: Date = new Date(),
+  env: NodeJS.ProcessEnv = process.env,
+): AutopilotLogTarget | undefined {
+  const dir = logDir(env);
+  // An explicitly empty VIBEBOARD_LOG_DIR means "write no files", and it means it here too. The test
+  // suite runs that way, so nothing below touches the disk during a test that has not asked for it.
+  if (dir === undefined) return undefined;
+  try {
+    mkdirSync(dir, { recursive: true });
+    const file = autopilotLogFileFor(dir, now);
+    const fd = openSync(file, 'a');
+    // Appended by the SERVER before the child exists, so the file says a session began even when the loop
+    // dies too early to say anything itself — which is exactly the case this file was added for.
+    writeSync(fd, `\n--- ${now.toISOString()} ${what}\n`);
+    return { fd, file };
+  } catch (err) {
+    // Degrade to no file rather than refusing to start the loop. Said out loud, because silence here is
+    // the original bug wearing a different hat.
+    console.error(`could not open the auto-pilot log in ${dir}:`, (err as Error).message);
+    return undefined;
   }
 }
 

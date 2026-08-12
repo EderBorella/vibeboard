@@ -1,6 +1,6 @@
 import { DEFAULT_AUTOPILOT } from '../core/autopilot.js';
 import { readAutopilotState, updateAutopilotState } from '../server/autopilot-store.js';
-import { ensureBranch } from '../server/git-work.js';
+import { startSession } from '../server/git-work.js';
 import { commitTail, performAction } from './act.js';
 import { BoardClient } from './board-client.js';
 import { runLoop } from './loop.js';
@@ -38,9 +38,8 @@ const log = (message: string): void => {
 };
 
 // The branch this session works on, and the bar a critic is judged against, both read once at start-up: the
-// branch because `ensureBranch` refuses a switch on a dirty tree and every agent leaves one dirty, so it is
-// per SESSION rather than per run; the threshold because the bar a card was judged against must not differ
-// from the bar the tick compared.
+// branch because a session commits and switches ONCE (`startSession`) rather than per run; the threshold
+// because the bar a card was judged against must not differ from the bar the tick compared.
 const board = await client.board();
 if (!board.ok) {
   console.error(`the auto-pilot loop cannot start: ${board.reason}`);
@@ -48,7 +47,10 @@ if (!board.ok) {
 }
 const ap = board.value.config.autopilot ?? DEFAULT_AUTOPILOT;
 const branchName = `autopilot/${new Date().toISOString().slice(0, 10)}`;
-const branch = await ensureBranch(root, branchName);
+// Commits whatever was already in the tree, THEN switches. A dirty tree is not a blocker (ruling
+// 2026-08-11): the only moment a person's own edits can be sitting there is the moment they press Start, so
+// the session records them where they made them and begins from that.
+const branch = await startSession(root, branchName);
 if (!branch.ok) {
   // Reported through the server so it reaches the overlay and the diary rather than a stdout nobody reads.
   await client.stopped('stalled', `Auto-pilot could not start on its own branch: ${branch.reason}`);

@@ -242,9 +242,12 @@ export async function ensureBranch(root: string, name: string, opts: GitOptions 
   // run commits, under a message saying an agent wrote it. Git itself refuses the other direction when
   // a checkout would clobber, but it happily carries work onto a new branch.
   //
-  // Consequence worth knowing: a freshly scaffolded project has untracked `.vibeboard/` files, so this
-  // refuses until they are committed. The refusal says so; C4's pre-flight is where that becomes part
-  // of getting a project ready rather than something the loop trips over.
+  // A BACKSTOP RATHER THAN THE FLOW, since `startSession` below. The loop no longer walks into this: it
+  // commits the tree first, so by the time this runs there is nothing to carry. Kept because the guard
+  // belongs with the operation it protects — this function is exported and a future caller may not commit
+  // first — and because `startSession` reports a failed commit rather than proceeding, which is the only
+  // way the tree can still be dirty here. The same shape as `dispatchLock`'s halted branch, tested
+  // directly for the same reason.
   const dirty = await porcelain(root, opts);
   if (dirty !== '') {
     return {
@@ -261,6 +264,43 @@ export async function ensureBranch(root: string, name: string, opts: GitOptions 
     return { ok: false, reason: `Could not check out ${name}: ${switched.problem}` };
   }
   return { ok: true, branch: name, created: !exists };
+}
+
+// What the message on the pre-flight commit says. Named here rather than at the call site so a person
+// reading `git log` and a person reading this module see the same words.
+export const PREFLIGHT_MESSAGE = 'autopilot: the tree as it was before this session';
+
+// WHAT A SESSION DOES TO THE REPOSITORY BEFORE IT BEGINS: commit whatever is lying about, then get onto its
+// own branch. Two operations, one step, because either alone is wrong.
+//
+// The ruling it implements (2026-08-11): a dirty tree must not be a blocker. It had been one — `ensureBranch`
+// refuses to carry uncommitted work onto a new branch — and the refusal was reached by the ordinary case
+// rather than an unusual one: a freshly scaffolded project has untracked files, and a previous session leaves
+// its last agent's work uncommitted by construction. Twice in one week that refusal was the only thing
+// standing between a working project and Start doing nothing.
+//
+// THE COMMIT LANDS ON THE BRANCH YOU WERE ALREADY ON, before the switch, and that is the whole reason this is
+// ordered rather than two calls a caller could make in either sequence. Committed after the switch, a
+// person's own uncommitted work would live only on an auto-pilot branch — delete the branch and it is gone.
+// Committed before it, their work stays where they left it and the session starts from it.
+//
+// It is NOT `--allow-empty`, so a clean tree costs nothing and records nothing: `commitAll` answers
+// `{committed: false}` with no reason, which is the ordinary case and not a failure.
+export async function startSession(root: string, name: string, opts: GitOptions = {}): Promise<BranchResult> {
+  // No `branch` option, deliberately: this commit happens BEFORE the switch, so the tree is on whatever
+  // branch the person left it on and there is nothing yet to compare against.
+  const swept = await commitAll(root, PREFLIGHT_MESSAGE, opts);
+  if (swept.reason !== undefined) {
+    // Stopping here rather than switching anyway. A tree that cannot be committed is a session with no
+    // revert guarantee, which is the promise that makes running unattended safe — and the reason names the
+    // real obstacle (a merge in progress, a submodule, a hook that failed) instead of the dirty tree it
+    // leaves behind.
+    return {
+      ok: false,
+      reason: `Auto-pilot could not commit what was already in the tree, so it has not started: ${swept.reason}`,
+    };
+  }
+  return await ensureBranch(root, name, opts);
 }
 
 export interface CommitResult {

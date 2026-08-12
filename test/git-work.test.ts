@@ -5,7 +5,14 @@ import { promisify } from 'node:util';
 import { describe, expect, it } from 'vitest';
 import { AUTOPILOT_STATE_FILE, CONFIG_DIR } from '../src/core/layout.js';
 import { COMMAND_TIMEOUT_MS } from '../src/server/commands.js';
-import { commitAll, ensureBranch, PROBE_TIMEOUT_MS, WORK_TIMEOUT_MS } from '../src/server/git-work.js';
+import {
+  commitAll,
+  ensureBranch,
+  PREFLIGHT_MESSAGE,
+  PROBE_TIMEOUT_MS,
+  startSession,
+  WORK_TIMEOUT_MS,
+} from '../src/server/git-work.js';
 import { tempDir } from './helpers.js';
 
 const exec = promisify(execFile);
@@ -623,5 +630,110 @@ describe('a project’s own pre-commit hook', () => {
     await hook(dir, 'exit 0');
     await writeFile(join(dir, 'new.txt'), 'new\n');
     expect(await commitAll(dir, 'autopilot: E-001')).toEqual({ committed: true });
+  });
+});
+
+// STARTING A SESSION: commit whatever is lying about, then get onto the session's own branch.
+//
+// The ruling behind it (2026-08-11): a dirty tree must not be a blocker. It had been one, and the refusal was
+// reached by the ordinary case rather than an unusual one — a freshly scaffolded project has untracked files,
+// and every session leaves its last agent's work uncommitted by construction. In the real project that
+// blocked Start, the dirty entries were two stray agent reports from the day before.
+describe('starting a session', () => {
+  it('commits what was already there and then switches, in that order', async () => {
+    const dir = await committed(await repo());
+    await writeFile(join(dir, 'mine.txt'), 'work in progress\n');
+
+    expect(await startSession(dir, 'autopilot/2026-08-12')).toMatchObject({ ok: true, created: true });
+    expect(await branch(dir)).toBe('autopilot/2026-08-12');
+    expect(await committedFiles(dir)).toEqual(['mine.txt', 'seed.txt']);
+  });
+
+  // THE ORDER IS THE BEHAVIOUR, and this is the assertion that pins it: the pre-flight commit belongs to the
+  // branch the person was on. Committed after the switch instead, their own uncommitted work would live only
+  // on an auto-pilot branch — delete that branch and it is gone.
+  it('leaves that commit on the branch you were already on, not on the session’s', async () => {
+    const dir = await committed(await repo());
+    await writeFile(join(dir, 'mine.txt'), 'work in progress\n');
+    await startSession(dir, 'autopilot/2026-08-12');
+
+    // `main` has it too, which can only be true if the commit was made before the branch was created.
+    expect((await git(dir, ['log', '--oneline', 'main'])).stdout).toContain(PREFLIGHT_MESSAGE);
+    expect((await git(dir, ['rev-parse', 'main'])).stdout.trim()).toBe(
+      (await git(dir, ['rev-parse', 'autopilot/2026-08-12'])).stdout.trim(),
+    );
+  });
+
+  // The exact shape that blocked the real project: files an agent left at the project root, untracked, and
+  // not covered by `.gitignore` because they are not under `.vibeboard/`.
+  it('sweeps an untracked file at the project root, which is what blocked a real Start', async () => {
+    const dir = await committed(await repo());
+    await writeFile(join(dir, '20260811-211852-exer.report.md'), '---\noutcome: success\n---\n');
+
+    expect(await startSession(dir, 'autopilot/2026-08-12')).toMatchObject({ ok: true });
+    expect(await committedFiles(dir)).toContain('20260811-211852-exer.report.md');
+  });
+
+  it('records nothing when the tree is already clean', async () => {
+    const dir = await committed(await repo());
+    const before = await count(dir);
+    expect(await startSession(dir, 'autopilot/2026-08-12')).toMatchObject({ ok: true });
+    // No `--allow-empty` anywhere: a clean tree costs nothing and leaves no commit saying it did.
+    expect(await count(dir)).toBe(before);
+    expect(await message(dir)).toBe('seed');
+  });
+
+  // Already on the branch — a second session the same day. It still commits, and that is the point rather
+  // than a side effect: `ensureBranch` allows a dirty tree in that case, so without the sweep the previous
+  // session's leftovers would be swept up by the next card's commit, under that card's message.
+  it('still commits when it is already on the session’s branch', async () => {
+    const dir = await committed(await repo());
+    await startSession(dir, 'autopilot/2026-08-12');
+    await writeFile(join(dir, 'left-behind.txt'), 'yesterday’s agent\n');
+
+    expect(await startSession(dir, 'autopilot/2026-08-12')).toMatchObject({ ok: true, created: false });
+    expect(await message(dir)).toBe(PREFLIGHT_MESSAGE);
+    expect(await committedFiles(dir)).toContain('left-behind.txt');
+  });
+
+  // A tree that cannot be committed is a session with no revert guarantee, which is the promise that makes
+  // running unattended safe. It stops, and it names the real obstacle.
+  //
+  // ALREADY ON THE BRANCH, and a failing hook rather than a submodule, because those two details are the only
+  // way this assertion is about the new guard at all. Planting showed why: with the guard deleted, the
+  // submodule version still failed — `ensureBranch` refuses a submodule too, and a dirty tree, so both of the
+  // obvious fixtures are held by the OLD code and the sentence merely happened to match. Already on the
+  // branch, `ensureBranch` is a no-op that allows any tree, so nothing else can catch this.
+  it('does not begin a session whose tree it could not commit', async () => {
+    const dir = await committed(await repo());
+    await startSession(dir, 'autopilot/2026-08-12');
+    await hook(dir, 'echo "the gate says no" 1>&2; exit 1');
+    await writeFile(join(dir, 'mine.txt'), 'work in progress\n');
+
+    const result = await startSession(dir, 'autopilot/2026-08-12');
+    expect(result.ok).toBe(false);
+    expect(result.ok === false && result.reason).toContain('the gate says no');
+    expect(result.ok === false && result.reason).toMatch(/could not commit what was already in the tree/i);
+  });
+
+  // The other obstacle, which `ensureBranch` also refuses. Kept because the SENTENCE is what a person acts
+  // on, and it must name the submodule rather than the dirty tree that is merely a consequence of it.
+  it('names a submodule as the obstacle, not the tree it left dirty', async () => {
+    const { outer, sub } = await withSubmodule();
+    await writeFile(join(sub, 'inside.txt'), 'edited inside the submodule\n');
+
+    const result = await startSession(sub, 'autopilot/2026-08-12');
+    expect(result.ok).toBe(false);
+    expect(result.ok === false && result.reason).toMatch(/submodule/i);
+    // Still where it was: no branch was created, in either repository.
+    expect(await branch(sub)).toBe('main');
+    expect(await branch(outer)).toBe('main');
+  });
+
+  it('works on a repository with no commits yet, which is a project’s first session', async () => {
+    const dir = await repo();
+    await writeFile(join(dir, 'README.md'), '# New\n');
+    expect(await startSession(dir, 'autopilot/2026-08-12')).toMatchObject({ ok: true, created: true });
+    expect(await committedFiles(dir)).toEqual(['README.md']);
   });
 });

@@ -629,14 +629,14 @@ describe('a card’s ledger line', () => {
     render(
       <CardReports
         runs={[run()]}
-        account={account({ attempts: { implement: 2, critic: 0 } })}
+        account={account({ attempts: { implement: 2, review: 0 } })}
         onOpen={vi.fn()}
         onCancel={vi.fn()}
       />,
     );
     const line = document.querySelector('.reports-ledger')?.textContent ?? '';
     expect(line).toContain('implement 2 of 3');
-    expect(line).not.toContain('critic');
+    expect(line).not.toContain('review');
   });
 
   it('says the backend reported nothing rather than showing zero', () => {

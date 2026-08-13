@@ -66,10 +66,12 @@ describe('the project ledger', () => {
     await writeRun(root, run({ run: '20260803-100000-a1', skill: 'implement', status: 'failed' }));
     await writeRun(root, run({ run: '20260803-100000-a2', skill: 'implement', status: 'attention' }));
     await writeRun(root, run({ run: '20260803-100000-a3', skill: 'implement', status: 'cancelled' }));
-    await writeRun(root, run({ run: '20260803-100000-a4', skill: 'critic', status: 'failed' }));
+    await writeRun(root, run({ run: '20260803-100000-a4', skill: 'review', status: 'failed' }));
     const body = await accounting(app);
-    // The cancelled run burns nothing — you stopped it — and the critic has its own tally.
-    expect(body.cards[0].attempts).toEqual({ implement: 2, critic: 1 });
+    // The cancelled run burns nothing — you stopped it — and the JUDGING run has its own tally. That
+    // separation is what the review and fix caps are counted on; the skill answering it used to be the
+    // critic and is now `review`.
+    expect(body.cards[0].attempts).toEqual({ implement: 2, review: 1 });
     expect(body.attemptCap).toBe(3);
   });
 

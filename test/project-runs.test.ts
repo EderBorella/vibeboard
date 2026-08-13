@@ -77,11 +77,42 @@ describe('a run about the project rather than a card', () => {
   // Summing spend and listing history read BOTH locations. That is the whole cost of the decision.
   it('is listed alongside card runs, newest first', async () => {
     const root = await tempDir();
-    const older = cardRun({ run: '20260803-090000-bbbb' });
-    const newer = projectRun({ run: '20260803-120000-cccc' });
+    // Distinct `started` values, because that is what "newest" means here. Both fixtures shared one
+    // timestamp, so this case was ordering by the id tie-break and could not have told the two apart.
+    const older = cardRun({ run: '20260803-090000-bbbb', started: '2026-08-03T09:00:00.000Z' });
+    const newer = projectRun({ run: '20260803-120000-cccc', started: '2026-08-03T12:00:00.000Z' });
     await writeRun(root, older);
     await writeRun(root, newer);
     expect((await listRuns(root)).map((r) => r.run)).toEqual([newer.run, older.run]);
+  });
+
+  // THE ID IS NOT THE ORDER. It is the timestamp to the SECOND plus a random four-character suffix, so two
+  // runs inside one second sort on a coin flip — and `started` is written by the server at dispatch with
+  // milliseconds. The two are made to DISAGREE here, which is the only way to tell the fix from the flaw: by
+  // id alone `zzzz` sorts first, and it is the older run.
+  //
+  // Nothing consuming this list is order-sensitive today, so this is a latent bug rather than a live one. It
+  // is pinned because the identical flaw in core/bounds.ts made `latestWorkRun` answer with the wrong run in
+  // half the end-to-end trace's runs, and there it decided whether a task whose gates failed once could ever
+  // pass — a bug that presented as a test flaking.
+  it('orders two runs from the same second by when they started, not by their ids', async () => {
+    const root = await tempDir();
+    const first = cardRun({ run: '20260803-101500-zzzz', started: '2026-08-03T10:15:00.100Z' });
+    const second = cardRun({ run: '20260803-101500-aaaa', started: '2026-08-03T10:15:00.900Z' });
+    await writeRun(root, first);
+    await writeRun(root, second);
+    expect((await listRuns(root)).map((r) => r.run)).toEqual([second.run, first.run]);
+  });
+
+  // A record with no readable start time is NOT assumed to be the newest, which is the fail-closed
+  // direction: it sorts last, and the id decides between it and anything else without one.
+  it('does not treat a record with an unreadable start time as the newest', async () => {
+    const root = await tempDir();
+    const dated = cardRun({ run: '20260803-101500-aaaa', started: '2026-08-03T10:15:00.000Z' });
+    const undated = cardRun({ run: '20260803-101500-zzzz', started: 'sometime' });
+    await writeRun(root, dated);
+    await writeRun(root, undated);
+    expect((await listRuns(root)).map((r) => r.run)).toEqual([dated.run, undated.run]);
   });
 
   it('ignores a stray markdown file in either store', async () => {

@@ -30,7 +30,7 @@ class FakeSocket {
 let nextBump = 5000;
 const freshBump = (): number => ++nextBump;
 
-const idle = { state: 'idle', iteration: 0, dispatchesSinceCheckup: 0, needsCheckup: false };
+const idle = { state: 'idle', iteration: 0 };
 
 beforeEach(() => {
   FakeSocket.instances = [];
@@ -99,8 +99,8 @@ describe('useAutopilot', () => {
     await waitFor(() => expect(result.current.state?.reason).toBe('complete'));
   });
 
-  // THE COUNTERS, which arrive by no other route. The loop writes `iteration` and `dispatchesSinceCheckup`
-  // straight to the state file — decision 20's carve-out — and nothing watches that file, so no broadcast
+  // THE COUNTER, which arrives by no other route. The loop writes `iteration` straight to the state file
+  // — decision 20's carve-out — and nothing watches that file, so no broadcast
   // accompanies them: without this poll the panel says "0 dispatches" for a whole run while the ledger beside
   // it, computed server-side from the same file, says seven. A review found the entire effect deletable with
   // the full suite green.

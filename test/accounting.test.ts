@@ -124,12 +124,13 @@ describe('which endings burn an attempt', () => {
     const runs = [
       run({ skill: 'implement', status: 'failed' }),
       run({ skill: 'implement', status: 'cancelled' }),
-      run({ skill: 'critic', status: 'failed' }),
+      run({ skill: 'review', status: 'failed' }),
       run({ card: 'E-002', skill: 'implement', status: 'failed' }),
       run({ card: undefined, board: undefined, skill: 'implement', status: 'failed' }),
     ];
-    // The critic run and the checkup must not inflate the tally — that is what the skill filter is
-    // for, and a run with no card belongs to no card's count.
+    // The judging run and the checkup must not inflate the tally — that is what the skill filter is for,
+    // and a run with no card belongs to no card's count. The judge used to be the critic; the property is
+    // the same and is what the review and fix caps are counted on.
     expect(attemptsUsed(runs, 'E-001', 'implement')).toBe(1);
   });
 });

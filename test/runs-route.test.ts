@@ -553,16 +553,20 @@ describe('POST /api/runs/:board/:card/:run/verification', () => {
     expect(res.json().error).toContain('not a verification');
   });
 
-  // `asVerification` is reused precisely so this cannot get through: a critic score that does not agree with
-  // the threshold it claims to have been judged against is a verdict nobody can trust.
-  it('refuses a critic score that disagrees with its own threshold', async () => {
+  // `asVerification` is reused precisely so this cannot get through, and the case has MOVED rather than
+  // been deleted: it used to send a critic score disagreeing with its own threshold, which stopped being
+  // what it tested the moment `critic` left VERIFY_MODES — the body was then refused on the mode and the
+  // test passed for the wrong reason. The disagreement check retired with the critic; what is live is that
+  // the retired mode cannot be written onto a run through this endpoint.
+  it('refuses a verdict claiming the retired critic mode', async () => {
     const project = await judged();
     const res = await project.app.inject({
       method: 'POST',
       url: url(project),
-      payload: { mode: 'critic', passed: true, at: 'T', score: 0.2, threshold: 0.6 },
+      payload: { mode: 'critic', passed: true, at: 'T' },
     });
     expect(res.statusCode).toBe(400);
+    expect(res.json().error).toContain('not a verification');
   });
 
   it('refuses an unknown board, a malformed run id, and a run that does not exist', async () => {

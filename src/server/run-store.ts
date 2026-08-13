@@ -1,5 +1,6 @@
 import { mkdir, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { startedAt } from '../core/bounds.js';
 import { boardRel, PROJECT_RUNS_DIR, RESULTS_DIR, RUNS_DIR } from '../core/layout.js';
 import {
   isInFlight,
@@ -156,6 +157,13 @@ export async function readProjectRun(root: string, run: string): Promise<RunReco
 // Every run in the project, newest first — the Execution dashboard's list, and what spend is summed
 // from. Reads BOTH stores: each board's results folders and the project-level one. That is the whole
 // cost of giving project runs a home of their own.
+//
+// NEWEST BY `started`, WITH THE ID AS THE TIE-BREAK, and not by the id alone, which is what this was. A run
+// id is the timestamp to the SECOND plus a random four-character suffix (server/app.ts), so two runs in the
+// same second sorted on a coin flip. Nothing was broken by it — every consumer of this list is
+// order-insensitive today — and it is fixed anyway because it is the same latent bug that made `bounds.ts`
+// answer with the wrong work run in half the end-to-end trace's runs, and there it decided whether a task
+// whose gates failed once could ever pass.
 export async function listRuns(root: string): Promise<RunRecord[]> {
   const all: RunRecord[] = await listProjectRuns(root);
   for (const board of BOARDS) {
@@ -169,7 +177,7 @@ export async function listRuns(root: string): Promise<RunRecord[]> {
     }
     for (const card of cards) all.push(...(await listCardRuns(root, board, card)));
   }
-  return all.sort((a, b) => b.run.localeCompare(a.run));
+  return all.sort((a, b) => startedAt(b) - startedAt(a) || b.run.localeCompare(a.run));
 }
 
 // Read and consume the agent's report. Consumed so a later run cannot pick up an earlier one's

@@ -25,7 +25,12 @@ import type { Verification } from './verify.js';
 // `started` is written by the server at dispatch, in ISO with milliseconds, and is the only field that
 // says when. Compared as a TIME rather than as a string: the two ISO precisions the codebase holds
 // (`…:00Z` and `…:00.500Z`) sort the wrong way round as text, because `Z` is above `.`.
-const startedAt = (run: RunRecord): number => {
+//
+// EXPORTED because this is not the machine's rule, it is the rule for reading runs in order, and
+// `listRuns` (server/run-store.ts) had the same latent flaw: it sorted newest-first by id alone. No current
+// consumer of that list is order-sensitive, so nothing was broken by it — but this class has now bitten
+// three times, and a second copy of the comparison is a second thing to get wrong.
+export const startedAt = (run: RunRecord): number => {
   const at = Date.parse(run.started);
   // A record with no readable start time — hand-edited, or written by something older — is not assumed
   // to be the newest. It sorts first, and the id decides between it and anything else without one.

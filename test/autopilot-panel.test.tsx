@@ -37,8 +37,6 @@ api.getAccounting.mockRejectedValue(new Error('no ledger in this test'));
 api.getAutopilotState.mockResolvedValue({
   state: 'idle',
   iteration: 0,
-  dispatchesSinceCheckup: 0,
-  needsCheckup: false,
 });
 
 const readiness = (over: Partial<Readiness> = {}): Readiness => ({
@@ -78,8 +76,6 @@ describe('the start control', () => {
   const state = (over: Partial<import('../web/src/api.js').AutopilotState> = {}) => ({
     state: 'idle' as const,
     iteration: 0,
-    dispatchesSinceCheckup: 0,
-    needsCheckup: false,
     ...over,
   });
 
@@ -293,7 +289,7 @@ describe('the stop controls', () => {
     api.getReadiness.mockResolvedValue(readiness());
     render(
       panel(configWith(true), {
-        autopilot: { state, iteration: 0, dispatchesSinceCheckup: 0, needsCheckup: false } as never,
+        autopilot: { state, iteration: 0 } as never,
       }),
     );
     await settled();

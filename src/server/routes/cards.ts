@@ -165,19 +165,24 @@ async function stampForRun(
   // every card a run creates, the bootstrap's features included. It is what makes "has this already been
   // done?" answerable from the board with nothing to trust.
   const creator = { createdBy: cred.run };
-  // THE ONE SURVIVING SAME-BOARD SKIP (ruling 61). It used to cover every same-board create, because the only
-  // one was `derive-features` making features; decision 47 added a second — a story checkup creating sibling
-  // stories on product — and unstamped those get no entry column and no group, so they could be created
-  // straight into `product/done` and become `complete`'s positive evidence.
-  if (cred.skill !== undefined && phaseForRun(cred.skill, cred.board)?.name === 'bootstrap') {
-    return { patch: creator };
-  }
+  // THE COLUMN IS STAMPED FOR EVERY RUN, THE BOOTSTRAP INCLUDED, and that is a correction. The skip below used
+  // to cover the entry column as well, on the grounds that the bootstrap's features are a same-board create —
+  // and it is ruling 61's own failure left standing for the one caller the rule it replaced deliberately
+  // excused. Unstamped, five features created into `features/done` read as: the board grew, so `createdNothing`
+  // passes; `stampSetup` finds no feature in `backlog` and withholds the flag; the next tick derives an empty
+  // position, `unfinished` is empty and a live card sits in a terminal column — `complete`, on a project where
+  // nothing was built.
   const entry = entryColumn(config, input.board);
   if (entry === undefined) {
     const first = boardColumnSlugs(config, input.board)[0];
     return {
       error: `A run cannot create a card on ${input.board}: a new card enters a board at its first column, and that board opens with ${first === undefined ? 'no column at all' : `"${first}"`}, which nothing can continue from. Reorder that board's columns in Settings.`,
     };
+  }
+  // WHAT THE BOOTSTRAP IS STILL EXCUSED IS THE GROUP, and only that: a project run is about no card, so there
+  // is no parent to take a vertical from — the features it derives are the tops of their own verticals.
+  if (cred.skill !== undefined && phaseForRun(cred.skill, cred.board)?.name === 'bootstrap') {
+    return { patch: { ...creator, columnSlug: entry } };
   }
   const parent = cred.card ? await findCard(root, cred.board ?? input.board, cred.card, config) : undefined;
   return {

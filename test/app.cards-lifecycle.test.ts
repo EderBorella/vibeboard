@@ -212,17 +212,33 @@ describe('the column a created card enters', () => {
     expect(created.json().columnSlug).toBe('backlog');
   });
 
-  it('leaves the bootstrap’s own features unstamped in column and group', async () => {
-    // The ONE surviving skip: a feature is the root of its own vertical, and `features/backlog` is where
-    // derive-features is told to put them.
+  // RULING 61 APPLIES TO THE BOOTSTRAP TOO, which is the caller the rule it replaced deliberately excused —
+  // and excusing it here is what let `derive-features` manufacture a `complete`: five features created into
+  // `features/done` read as the board having grown, so `createdNothing` passes; `stampSetup` then finds no
+  // feature in `backlog` and withholds the flag; and the next tick derives an empty position with a live card
+  // in a terminal column, which is `complete`'s positive evidence, on a project where nothing was built.
+  it('stamps the bootstrap’s own features into features/backlog, whatever was asked for', async () => {
     const { app, store, root } = await open();
     const boot = store.mintRun('work', 'run-10', root, undefined, { skill: 'derive-features' });
+    const asked = await create(app, bearer(boot.token), {
+      board: 'features',
+      columnSlug: 'done',
+      title: 'Emit JSON output',
+    });
+    expect(asked.statusCode).toBe(200);
+    expect(asked.json().columnSlug).toBe('backlog');
+  });
+
+  it('still excuses the bootstrap its GROUP, because a project run is about no card', async () => {
+    // The one surviving half of the skip: a feature is the root of its own vertical, so there is no parent
+    // for it to take one from.
+    const { app, store, root } = await open();
+    const boot = store.mintRun('work', 'run-11', root, undefined, { skill: 'derive-features' });
     const res = await create(app, bearer(boot.token), {
       board: 'features',
       columnSlug: 'todo',
       title: 'Emit JSON output',
     });
-    expect(res.json().columnSlug).toBe('todo');
     expect(res.json().group).toBeUndefined();
   });
 

@@ -405,6 +405,23 @@ describe('a run that produced nothing', () => {
   it('is not a run still in flight', () => {
     expect(producedNothing(record({ ...empty, status: 'running' }))).toBe(false);
   });
+
+  // The successful shape of every CARD-PRODUCING skill, and the reason `createdNothing` had to be a second
+  // predicate rather than a clause added here: cards are created through the API, so a real derivation
+  // legitimately changes no files and reports success. Not one of the three clauses holds, and it must not —
+  // this run left plenty behind. Composed through withReport, not hand-built.
+  it('is false for a run that created cards and changed no files', () => {
+    const derived = withFilesChanged(
+      withReport(
+        record({ status: 'running', skill: 'derive-features', card: undefined, board: undefined }),
+        { outcome: 'success', summary: 'five features', created: ['F-001', 'F-002'], body: '## What I did' },
+        'T',
+      ),
+      0,
+    );
+    expect(derived.created).toEqual(['F-001', 'F-002']);
+    expect(producedNothing(derived)).toBe(false);
+  });
 });
 
 describe('the suggestion count on a run record', () => {

@@ -1381,6 +1381,47 @@ describe('a checkup’s evidence', () => {
     expect(r.requests[0]?.checkup?.suggestions).toEqual([]);
   });
 
+  // THE GATE-DOCUMENT REFUSAL IN FRONT OF THE SMOKE COMMAND TOO (decision 51). `foundation/TESTING.md` carries
+  // `smoke:` and is in the same EXECUTED set as `foundation/CODE-QUALITY.md`; both run through `/bin/sh`
+  // unsandboxed as the server's user. Guarded only on the gates, the hole stayed open one document over.
+  it('runs no smoke command and dispatches nothing while a gate document is unread', async () => {
+    let ran = 0;
+    const r = recorder({ boardCards: board() });
+    const result = await performAction(
+      deps(r.client, {
+        state: async () => ({ unreviewedGates: ['TESTING.md'] }),
+        verify: {
+          gates,
+          smoke: async () => {
+            ran += 1;
+            return await smokePass();
+          },
+        } as unknown as ActDeps['verify'],
+      }),
+      FEATURE_CHECKUP,
+      context,
+    );
+    expect(ran).toBe(0);
+    expect(r.dispatched).toEqual([]);
+    expect(r.moves).toEqual([]);
+    expect(result.stop?.reason).toBe('stalled');
+    expect(result.stop?.detail).toContain('will not run a gate command');
+    expect(result.stop?.detail).toContain('foundation/TESTING.md');
+  });
+
+  it('runs a story checkup while a gate document is unread, because it spawns nothing', async () => {
+    // The refusal is about EXECUTION, not about checkups: a story checkup has no command of its own, so
+    // refusing it would cost the project for a risk that is not there.
+    const r = recorder({ boardCards: board() });
+    const result = await performAction(
+      deps(r.client, { state: async () => ({ unreviewedGates: ['TESTING.md'] }) }),
+      STORY_CHECKUP,
+      context,
+    );
+    expect(r.dispatched).toEqual(['checkup-story']);
+    expect(result.stop).toBeUndefined();
+  });
+
   it('sends no checkup evidence with any other phase', async () => {
     const r = recorder({ boardBefore: [], boardCards: [CARD('P-001', 'product')] });
     await performAction(deps(r.client), BREAKDOWN(), context);

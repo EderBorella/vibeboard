@@ -408,6 +408,38 @@ describe('the lifecycle, driven end to end', () => {
     expect((await runs(started.project)).filter((r) => r.skill === 'review')).toEqual([]);
   });
 
+  // THE SAME HOLE, ONE DOCUMENT OVER. `foundation/TESTING.md` carries the `smoke:` command and is in the same
+  // EXECUTED set as `foundation/CODE-QUALITY.md` (server/routes/control.ts) — both run through `/bin/sh`
+  // unsandboxed as this user. The refusal guarded only the gates, so a copilot could rewrite `TESTING.md`, the
+  // loop would reach a feature checkup, and the new command would execute before the dispatch that would have
+  // been refused.
+  //
+  // Counted from what the command itself WROTE, exactly as the gate case is: a seam would prove the loop
+  // called something in an order, not that no shell ran.
+  it('runs no smoke command and stops while a gate document is unreviewed', async () => {
+    const started = await start({
+      skills: { ...HAPPY, 'derive-features': '[[behaviour:create:features:1:product:1:engineering:1]]' },
+    });
+    // Six ticks: bootstrap, the feature's break-down, the story's, E-001's implement, its review, and P-001's
+    // checkup — which leaves F-001 open with every story of it settled, one tick short of its own checkup.
+    // Both premises are asserted rather than assumed: a budget one tick longer would run the smoke command
+    // itself and this test would then be about nothing.
+    const first = await drive(started, { ticks: 6 });
+    expect(first.reason).toBe('stopped');
+    expect(await columnOf(started.project, 'P-001')).toBe('done');
+    expect(await columnOf(started.project, 'F-001')).toBe('in-progress');
+    expect(await ranTimes(started.project.root, SMOKE_LOG)).toBe(0);
+
+    const ended = await drive(started, { unreviewedGates: ['TESTING.md'] });
+    expect(ended.reason).toBe('stalled');
+    expect(ended.detail).toContain('will not run a gate command');
+    // NOTHING EXECUTED. The refusal is in front of the shell, not after it.
+    expect(await ranTimes(started.project.root, SMOKE_LOG)).toBe(0);
+    // And no checkup was asked either: the loop stopped before the dispatch the endpoint would have refused.
+    expect((await runs(started.project)).filter((r) => r.skill === 'checkup-feature')).toEqual([]);
+    expect(await columnOf(started.project, 'F-001')).toBe('in-progress');
+  });
+
   it('blocks a task that cannot be fixed, and still closes its story and its feature', async () => {
     const started = await start({
       gates: `echo ran >> ${GATE_LOG}; exit 1`,

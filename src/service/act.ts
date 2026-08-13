@@ -162,7 +162,11 @@ async function checkupEvidence(
   action: Dispatch,
   card: Card,
   context: TickContext,
-): Promise<CheckupEvidence> {
+): Promise<{ evidence?: CheckupEvidence; refused?: ActResult }> {
+  // BEFORE ANY OF THE READS, because for a feature checkup gathering the evidence RUNS A COMMAND, and a
+  // command out of a gate document nobody has read does not run (see `refuseWhileGateDocumentUnread`).
+  const smoke = await smokeFor(deps, action, context);
+  if (smoke.refused) return { refused: smoke.refused };
   const board = await deps.client.board();
   const ap = board.ok ? (board.value.config.autopilot ?? DEFAULT_AUTOPILOT) : DEFAULT_AUTOPILOT;
   const cards = board.ok ? BOARDS.flatMap((b) => board.value.boards[b] ?? []) : [];
@@ -179,26 +183,33 @@ async function checkupEvidence(
     blocked: isBlockedColumn(ap, child.board, child.columnSlug),
   }));
   return {
-    children,
-    // Through as many levels as there are: a feature's problem is often two levels down, where its story is
-    // done and the task under that story is what is blocked.
-    blocked: blockedUnder(ap, card, cards).map((c) => c.id),
-    suggestions: suggestions.ok
-      ? suggestions.value.suggestions.map((s) => ({ id: s.id, title: s.title }))
-      : [],
-    ...(await smokeFor(deps, action, context)),
+    evidence: {
+      children,
+      // Through as many levels as there are: a feature's problem is often two levels down, where its story is
+      // done and the task under that story is what is blocked.
+      blocked: blockedUnder(ap, card, cards).map((c) => c.id),
+      suggestions: suggestions.ok
+        ? suggestions.value.suggestions.map((s) => ({ id: s.id, title: s.title }))
+        : [],
+      ...(smoke.smoke === undefined ? {} : { smoke: smoke.smoke }),
+    },
   };
 }
 
 // The smoke command, run by the LOOP in its own process before the dispatch (ruling 55), and handed over as
 // EVIDENCE rather than as a gate: a feature whose smoke command fails is exactly what a person needs told
 // about, and blocking on it would stop the project instead of reporting it.
+//
+// THE GATE-DOCUMENT REFUSAL IS IN HERE, in front of the spawn, rather than at the call site: it is the one
+// place this command is ever run, and a caller that had to remember the check is a caller that will not.
 async function smokeFor(
   deps: ActDeps,
   action: Dispatch,
   context: TickContext,
-): Promise<{ smoke?: Verification }> {
+): Promise<{ smoke?: Verification; refused?: ActResult }> {
   if (action.phase !== 'feature-checkup') return {};
+  const unread = await refuseWhileGateDocumentUnread(deps);
+  if (unread) return { refused: unread };
   const smoke = await (deps.verify?.smoke ?? verifySmoke)(deps.root, deps.now().toISOString());
   await deps.client.log(
     'run',
@@ -206,6 +217,29 @@ async function smokeFor(
     { iteration: context.iteration + 1, ...(action.card ? { card: action.card.id } : {}) },
   );
   return { smoke };
+}
+
+// THE GATE-DOCUMENT REFUSAL, in front of EVERY command this file spawns (decision 51). Until the review phase
+// ran its gates before dispatching, the only thing between an agent-rewritten gate document and its commands
+// running unsandboxed as this user was the refusal on `POST /api/runs` — which worked precisely because the
+// commands ran AFTER a dispatch the endpoint could refuse.
+//
+// BOTH DOCUMENTS, and that is the correction. `foundation/CODE-QUALITY.md` carries `gates:` and
+// `foundation/TESTING.md` carries `smoke:`; they are the same `EXECUTED` set in routes/control.ts and both run
+// through `/bin/sh` as the server's own user. Guarding only the gates left the hole open one document over: a
+// copilot rewrites `TESTING.md`, the loop reaches a feature checkup, and the new command executes before the
+// dispatch that would have been refused.
+//
+// Read at the moment the command would run rather than once at start-up, because an agent may rewrite the
+// document mid-session. `undefined` means nothing is unread and the caller may go on.
+async function refuseWhileGateDocumentUnread(deps: ActDeps): Promise<ActResult | undefined> {
+  const unread = (await deps.state()).unreviewedGates;
+  if (!unread || unread.length === 0) return undefined;
+  return await stop(
+    deps,
+    'stalled',
+    `Auto-pilot will not run a gate command while a gate document is unread. ${unreviewedGatesSentence(unread)}`,
+  );
 }
 
 // The latest run on one card, by run id — the same sortable stamp the store reads "latest" off.
@@ -269,13 +303,13 @@ async function dispatch(deps: ActDeps, action: Dispatch, context: TickContext): 
   const before = countsTheBoard(action.phase) ? await liveCount(deps) : undefined;
 
   // EVERYTHING A CHECKUP IS TOLD, gathered before the dispatch because it is the dispatch's own input — and for
-  // a feature checkup that includes running the smoke command, which is why this is before rather than after.
-  const evidence =
-    CHECKUP_PHASES.includes(action.phase) && card
-      ? await checkupEvidence(deps, action, card, context)
-      : undefined;
+  // a feature checkup that includes running the smoke command, which is why this is before rather than after,
+  // and why gathering it can REFUSE: a command out of an unread gate document does not run (decision 51).
+  const gathered =
+    CHECKUP_PHASES.includes(action.phase) && card ? await checkupEvidence(deps, action, card, context) : {};
+  if (gathered.refused) return gathered.refused;
 
-  const started = await deps.client.dispatch(requestFor(action, evidence));
+  const started = await deps.client.dispatch(requestFor(action, gathered.evidence));
   if (!started.ok) return await refused(deps, `could not dispatch ${whose}`, started.reason, started.fatal);
 
   // WHERE to look differs: a card's runs come from the card route, and a project run has no card in its path
@@ -626,14 +660,8 @@ export async function reviewTask(
       `${card.id} is in review with no run to judge, so there is nothing auto-pilot can say about it.`,
     );
   }
-  const unread = (await deps.state()).unreviewedGates;
-  if (unread && unread.length > 0) {
-    return stop(
-      deps,
-      'stalled',
-      `Auto-pilot will not run a gate command while a gate document is unread. ${unreviewedGatesSentence(unread)}`,
-    );
-  }
+  const unread = await refuseWhileGateDocumentUnread(deps);
+  if (unread) return unread;
   const gates = await (deps.verify?.gates ?? verifyGates)(deps.root, deps.now().toISOString());
   // THE ONE NARROW EXCEPTION, narrow in two ways: only in the setup subtree, and only for a gate set that was
   // never run. Installing the toolchain and the test runner is what a setup card is FOR, so it has no gates to

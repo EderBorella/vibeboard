@@ -42,6 +42,101 @@ describe('PUT /cards/:board/:id/links', () => {
   });
 });
 
+// THE FIELD NO TEST ANYWHERE EXERCISED, which is how it shipped: `POST /api/cards` accepted `links`, wrote them
+// into the new card's frontmatter without the far side, and answered 200 echoing them back. It is a person's
+// field now (ruling 65) — a run's parent link is the server's — and it goes through the one writer that does both
+// sides.
+describe('POST /cards with links', () => {
+  const create = (
+    app: Awaited<ReturnType<typeof openTestProject>>['app'],
+    payload: Record<string, unknown>,
+  ): Promise<{ statusCode: number; json: () => Record<string, string> }> =>
+    app.inject({ method: 'POST', url: '/api/cards', payload }) as unknown as Promise<{
+      statusCode: number;
+      json: () => Record<string, string>;
+    }>;
+
+  it('writes the far side, so the new card is a child rather than an orphan', async () => {
+    const { app } = await openTestProject({ name: 'L' });
+    const made = await create(app, {
+      board: 'product',
+      columnSlug: 'todo',
+      title: 'Mine, under F-001',
+      links: ['F-001'],
+    });
+    expect(made.statusCode).toBe(200);
+    expect((made.json() as unknown as { links: string[] }).links).toEqual(['F-001']);
+
+    const state = await app.inject({ method: 'GET', url: '/api/state' });
+    const f1 = state.json().snapshot.boards.features.find((c: { id: string }) => c.id === 'F-001');
+    expect(f1.links).toContain(made.json().id);
+  });
+
+  it('still ignores an id that names no card, which is the documented contract', async () => {
+    const { app } = await openTestProject({ name: 'L' });
+    const made = await create(app, {
+      board: 'product',
+      columnSlug: 'todo',
+      title: 'Linked to nothing',
+      links: ['F-999'],
+    });
+    expect(made.statusCode).toBe(200);
+    expect((made.json() as unknown as { links: string[] }).links).toEqual([]);
+  });
+
+  it('refuses a second parent once the project asks for the discipline, and keeps no card', async () => {
+    const { app } = await openTestProject({ name: 'L' });
+    await create(app, { board: 'features', columnSlug: 'todo', title: 'Second feature' }); // F-002
+    await app.inject({ method: 'PATCH', url: '/api/config', payload: { enforceOneParent: true } });
+
+    const refused = await create(app, {
+      board: 'product',
+      columnSlug: 'todo',
+      title: 'Under both',
+      links: ['F-001', 'F-002'],
+    });
+    expect(refused.statusCode).toBe(400);
+    expect(refused.json().error).toContain('two parents on the features board');
+
+    // NOTHING LEFT BEHIND, and the id proves it: a refused create that left its file standing would have spent
+    // P-002, so the next card would be P-003.
+    const next = await create(app, { board: 'product', columnSlug: 'todo', title: 'The next one' });
+    expect(next.json().id).toBe('P-002');
+  });
+
+  it('refuses giving an existing card a second parent through the back-reference', async () => {
+    // The FAR side, which is the half the create path had no check for at all: E-001 already hangs off P-001, and
+    // the payload below writes this new card's id onto it.
+    const { app } = await openTestProject({ name: 'L' });
+    await app.inject({ method: 'PATCH', url: '/api/config', payload: { enforceOneParent: true } });
+    const refused = await create(app, {
+      board: 'product',
+      columnSlug: 'todo',
+      title: 'Adopting a task that has a story',
+      links: ['E-001'],
+    });
+    expect(refused.statusCode).toBe(400);
+    expect(refused.json().error).toContain('already has a parent on the product board');
+  });
+
+  it('lets the browser hang a card off two features by default', async () => {
+    // Same trade as the links route: many-to-many is legitimate when a person means it, and only rollup cannot
+    // survive it — so the switch, not the create, is what decides.
+    const { app } = await openTestProject({ name: 'L' });
+    await create(app, { board: 'features', columnSlug: 'todo', title: 'Second feature' }); // F-002
+    const made = await create(app, {
+      board: 'product',
+      columnSlug: 'todo',
+      title: 'Under both',
+      links: ['F-001', 'F-002'],
+    });
+    expect(made.statusCode).toBe(200);
+    expect((made.json() as unknown as { links: string[] }).links).toEqual(
+      expect.arrayContaining(['F-001', 'F-002']),
+    );
+  });
+});
+
 // Answering 200 here tells an agent its child is attached when the child is an orphan. break-down
 // derives the whole hierarchy from these links, so a false success is a hole in the tree the loop
 // then walks.

@@ -4,13 +4,12 @@ import { boardColumnSlugs, type CardProblem, readArchive, readBoard } from '../.
 import { FORBIDDEN_PATCH_KEYS, forbiddenPatchSentence, pickCardPatch } from '../../core/card.js';
 import { entryColumn } from '../../core/entry-column.js';
 import { findCard } from '../../core/find.js';
-import { oneParentProblem } from '../../core/hierarchy.js';
+import { oneParentProblem, parentBoardOf, parentOf } from '../../core/hierarchy.js';
 import { ARCHIVE_SLUG } from '../../core/layout.js';
-import { setCardLinks } from '../../core/links.js';
+import { createLinkedCard, setCardLinks } from '../../core/links.js';
 import {
   archiveCard,
   type CreateCardInput,
-  createCard,
   placeCard,
   restoreCard,
   restoreTarget,
@@ -18,7 +17,13 @@ import {
 } from '../../core/mutations.js';
 import { phaseForRun } from '../../core/phases.js';
 import { slugify } from '../../core/slug.js';
-import { BOARDS, type BoardName, type CardFrontmatter, type ProjectConfig } from '../../core/types.js';
+import {
+  BOARDS,
+  type BoardName,
+  type Card,
+  type CardFrontmatter,
+  type ProjectConfig,
+} from '../../core/types.js';
 import { type AppCtx, ensureOpen, nowIso, today } from '../route-context.js';
 import { resolveCardRuns } from '../run-store.js';
 
@@ -106,9 +111,37 @@ function whereItGoes(config: ProjectConfig, board: BoardName): string {
     : `Create it in ${board}/${entry} instead — that is where a new card enters that board.`;
 }
 
+// THE PARENT LINK IS THE SERVER'S TOO (ruling 65), and it is the fourth fact this endpoint asserts rather than
+// accepts. `POST /api/cards` took a `links` field and wrote it straight into the new card's frontmatter, which
+// is one side of a symmetric relation: `childrenOf` and `parentOf` both read the PARENT's list, so a
+// child-side-only link is invisible in both directions. The server had the parent in hand on that very request
+// — the stamp below loads it for the vertical — and stamped the group from it while not linking to it.
+//
+// THE PARENT IS THE CARD ON THE BOARD ABOVE WHAT THIS PHASE CREATES, in the run's vertical. "Link to the run's
+// own card" is the version that looks right and silently does nothing: `story-checkup` creates SIBLINGS on its
+// own board, whose parent is the feature, and a sibling linked to its sibling is nobody's child. So: the run's
+// own card when it sits on that board (both break-downs, `feature-checkup`), the card above it when the phase
+// creates on its own board (`story-checkup`), and none at all when the phase creates features — nothing sits
+// above a feature.
+//
+// UNRESOLVABLE MEANS NO LINK AND NO REFUSAL, the trade the group already makes: the run's own card may have
+// been archived under it, and refusing real work over a label is the wrong way round.
+async function parentForRun(
+  root: string,
+  config: ProjectConfig,
+  own: Card | undefined,
+  creating: BoardName,
+): Promise<string | undefined> {
+  const above = parentBoardOf(creating);
+  if (above === undefined || own === undefined) return undefined;
+  if (own.board === above) return own.id;
+  return parentOf(own, await readBoard(root, above, config))?.id;
+}
+
 // What the server decides about a card a run is creating, or why it will not create one: the column it enters,
-// the vertical it belongs to, and which run made it. RULING 58 and RULING 61 both land here, beside the group —
-// which is already where "a value the caller supplies is a value the caller can get wrong" is acted on.
+// the vertical it belongs to, which run made it, and the parent it hangs off. RULING 58, RULING 61 and RULING
+// 65 all land here, beside the group — which is already where "a value the caller supplies is a value the
+// caller can get wrong" is acted on.
 //
 // THE VERTICAL is the id of the feature at the top of it, stamped for the reason every other field on a run
 // record is stamped: a value the caller supplies is a value the caller can get wrong, and one mistyped group
@@ -133,7 +166,7 @@ async function stampForRun(
   ctx: AppCtx,
   cred: { board?: BoardName; card?: string; skill?: string; run?: string },
   input: CreateCardInput,
-): Promise<{ patch: Partial<CreateCardInput> } | { error: string }> {
+): Promise<{ patch: Partial<CreateCardInput>; links: string[] } | { error: string }> {
   const { root, config } = ctx.session as { root: string; config: ProjectConfig };
   // RULING 58: which run made this card, from the credential the server minted — never from the body, and on
   // every card a run creates, the bootstrap's features included. It is what makes "has this already been
@@ -153,25 +186,30 @@ async function stampForRun(
       error: `A run cannot create a card on ${input.board}: a new card enters a board at its first column, and that board opens with ${first === undefined ? 'no column at all' : `"${first}"`}, which nothing can continue from. Reorder that board's columns in Settings.`,
     };
   }
-  // WHAT THE BOOTSTRAP IS STILL EXCUSED IS THE GROUP, and only that: a project run is about no card, so there
-  // is no parent to take a vertical from — the features it derives are the tops of their own verticals.
+  // WHAT THE BOOTSTRAP IS STILL EXCUSED IS THE GROUP AND THE LINK, and only those: a project run is about no
+  // card, so there is no parent to take a vertical from and none to hang off — the features it derives are the
+  // tops of their own verticals.
   if (cred.skill !== undefined && phaseForRun(cred.skill, cred.board)?.name === 'bootstrap') {
-    return { patch: { ...creator, columnSlug: entry } };
+    return { patch: { ...creator, columnSlug: entry }, links: [] };
   }
-  const parent = cred.card ? await findCard(root, cred.board ?? input.board, cred.card, config) : undefined;
+  // The card the run is ABOUT. Both facts below are read off it, and both are `undefined` when it cannot be
+  // found rather than taken from the caller.
+  const own = cred.card ? await findCard(root, cred.board ?? input.board, cred.card, config) : undefined;
+  const parent = await parentForRun(root, config, own, input.board);
   return {
     patch: {
       ...creator,
       columnSlug: entry,
-      // ALWAYS decided here, `undefined` included. No parent found is not an error — the run's card may have
+      // ALWAYS decided here, `undefined` included. No card found is not an error — the run's card may have
       // been archived under it, and refusing real work over a label would be the wrong trade — but the card
       // then has NO group rather than whatever the agent sent. A review found the agent's own value surviving
       // this branch, which is the one thing the stamp exists to prevent: a vertical labelled by a guess.
       //
       // The group of the card the run is ABOUT, not that card's parent's (ruling 61): a checkup's sibling
       // belongs to the same vertical as the card it was created beside.
-      group: parent ? (parent.group ?? parent.id) : undefined,
+      group: own ? (own.group ?? own.id) : undefined,
     },
+    links: parent ? [parent] : [],
   };
 }
 
@@ -226,7 +264,7 @@ async function lifecycleRulesForCreate(
   ctx: AppCtx,
   cred: RunCredential,
   input: CreateCardInput,
-): Promise<{ effective: CreateCardInput } | { error: string }> {
+): Promise<{ effective: CreateCardInput; links: string[] } | { error: string }> {
   const { config } = ctx.session as { config: ProjectConfig };
   const wrong = wrongBoardForRun(config, cred, input);
   if (wrong) return { error: wrong };
@@ -236,7 +274,7 @@ async function lifecycleRulesForCreate(
   // agent does.
   const effective = { ...input, ...stamped.patch };
   const duplicate = await duplicateTitleForRun(ctx, effective);
-  return duplicate ? { error: duplicate } : { effective };
+  return duplicate ? { error: duplicate } : { effective, links: stamped.links };
 }
 
 // The two flags and nothing else. `false` CLEARS rather than being rejected: `serializeCard` emits either
@@ -245,6 +283,24 @@ async function lifecycleRulesForCreate(
 // A body with neither is a 400, not a 200: a request that changed nothing would tell the loop its stamp
 // landed, and the bootstrap's exit is the one deterministic act decision 44 rests on.
 const FLAGS = ['setup', 'followUp'] as const;
+
+// WHAT THE BODY OF A CREATE MAY SAY, and `links` is a PERSON'S field alone (ruling 65). A `work` credential is
+// confined to its own card for `PUT …/links`, so the only link a run may legitimately write is parent↔child —
+// and this field is where that confinement leaked, into an asymmetric write nothing inspects. A run's parent
+// link is now the server's to assert, so what a run sends here is not consulted; the field is off the
+// catalogue the credential advertises (server/auth.ts) in the same change, because a contract that still
+// offers it keeps inviting the bug.
+type CreateCardBody = CreateCardInput & { links?: string[] };
+
+// Always for a run credential: rollup derives the hierarchy from links, and an agent has no way to know which
+// of two links a person meant as "see also". For the browser and the copilot it is the project's choice —
+// many-to-many is legitimate when someone means it, and only rollup cannot survive it.
+//
+// ONE HOME for the two writers that need it. The create path grew the same check (ruling 65), and two copies
+// would drift into a project where a link the create refuses an edit allows.
+function enforcesOneParent(config: ProjectConfig, scope?: string): boolean {
+  return scope !== 'admin' || config.enforceOneParent === true;
+}
 
 function pickFlags(body: unknown): { patch: Partial<CardFrontmatter>; error?: string } {
   const o = (body ?? {}) as Record<string, unknown>;
@@ -264,24 +320,47 @@ function pickFlags(body: unknown): { patch: Partial<CardFrontmatter>; error?: st
   return { patch };
 }
 
+// THE WHOLE OF A CREATE, in a function of its own for the same reason `lifecycleRulesForCreate` is one: the route
+// stays a flat sequence of "ask, then answer", and the sequence is where every refusal's ORDER lives.
+async function createForRequest(
+  ctx: AppCtx,
+  cred: (RunCredential & { scope?: string }) | undefined,
+  body: CreateCardBody,
+): Promise<{ card: Card } | { code: number; error: string }> {
+  // SEPARATED at the door: `links` is the person's field, and everything else is the card. A run's copy of it goes
+  // no further than this line — the server writes that link itself.
+  const { links: asked, ...input } = body;
+  // The board is checked before the mutation layer sees it, because everything downstream indexes
+  // `config.boards[board]` and an unknown name dereferences undefined — a stack trace and a 500, handed to the
+  // caller least able to interpret one. Decision 10 says the board is validated; it was not.
+  if (!BOARDS.includes(input.board)) return { code: 400, error: 'Unknown board' };
+  // A run is held to the lifecycle; a person at the browser is not.
+  const ruled = cred?.run
+    ? await lifecycleRulesForCreate(ctx, cred, input)
+    : { effective: input, links: Array.isArray(asked) ? asked : [] };
+  // 409 rather than 400: the request is well formed, and it is the project's lifecycle that makes it wrong.
+  if ('error' in ruled) return { code: 409, error: ruled.error };
+  const { root, config } = ctx.session as { root: string; config: ProjectConfig };
+  const card = await createLinkedCard(
+    root,
+    config,
+    ruled.effective,
+    ruled.links,
+    today(),
+    enforcesOneParent(config, cred?.scope),
+  );
+  if (card === 'unknown-column') return { code: 400, error: 'Unknown column' };
+  // 400 and the same sentence the links route answers with: what is wrong is the shape of the hierarchy, not the
+  // lifecycle. Unreachable for a run — the one link it gets is the server's own, on the board above.
+  if ('problem' in card) return { code: 400, error: card.problem };
+  return { card };
+}
+
 export async function registerCardRoutes(api: FastifyInstance, ctx: AppCtx): Promise<void> {
   api.post('/cards', async (req, reply) => {
     if (!ensureOpen(ctx.session, reply)) return;
-    const input = req.body as CreateCardInput;
-    // The board is checked before the mutation layer sees it, because everything downstream indexes
-    // `config.boards[board]` and an unknown name dereferences undefined — a stack trace and a 500,
-    // handed to the caller least able to interpret one. Decision 10 says the board is validated;
-    // it was not.
-    if (!BOARDS.includes(input?.board)) return reply.code(400).send({ error: 'Unknown board' });
-    // A run is held to the lifecycle; a person at the browser is not.
-    const ruled = req.credential?.run
-      ? await lifecycleRulesForCreate(ctx, req.credential, input)
-      : { effective: input };
-    // 409 rather than 400: the request is well formed, and it is the project's lifecycle that makes it wrong.
-    if ('error' in ruled) return reply.code(409).send({ error: ruled.error });
-    const card = await createCard(ctx.session.root, ctx.session.config, ruled.effective, today());
-    if (card === 'unknown-column') return reply.code(400).send({ error: 'Unknown column' });
-    return card;
+    const made = await createForRequest(ctx, req.credential, (req.body ?? {}) as CreateCardBody);
+    return 'error' in made ? reply.code(made.code).send({ error: made.error }) : made.card;
   });
 
   api.patch('/cards/:board/:id', async (req, reply) => {
@@ -352,13 +431,7 @@ export async function registerCardRoutes(api: FastifyInstance, ctx: AppCtx): Pro
     const card = await findCard(ctx.session.root, board, id, ctx.session.config);
     if (!card) return reply.code(404).send({ error: 'Card not found' });
 
-    // Always for a run credential: rollup derives the hierarchy from links, and an agent has no way
-    // to know which of two links a person meant as "see also". For the browser and the copilot it is
-    // the project's choice — many-to-many is legitimate when someone means it, and only rollup cannot
-    // survive it.
-    const enforceOneParent =
-      req.credential?.scope !== 'admin' || ctx.session.config.enforceOneParent === true;
-    if (enforceOneParent) {
+    if (enforcesOneParent(ctx.session.config, req.credential?.scope)) {
       // Hoisted: `ensureOpen` narrows the session, and that narrowing does not survive into the
       // closure below.
       const { root, config } = ctx.session;

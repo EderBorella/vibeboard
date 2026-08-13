@@ -440,6 +440,18 @@ describe('the generated endpoint catalogue', () => {
     }
   });
 
+  // RULING 65. The field was advertised here and written into the new card's frontmatter unaccompanied, so a
+  // break-down was told it had linked its children and left orphans. The payload shape is asserted as EXACT
+  // BYTES because that string IS the contract an agent reads — a substring match on "links" would pass on a
+  // description that still offered it.
+  it('offers a run no links field on the create, and keeps the link route it does have', () => {
+    const work = endpointsFor('work', 'E-042').join('\n');
+    expect(work).toContain('`{ board, columnSlug, title, description?, body? }` — create a card.');
+    // `PUT …/links` is confined to the run's own card, which is why it survives: parent↔child is the only link
+    // a run can mean, and the far side is written for it there.
+    expect(work).toContain('PUT /api/cards/:board/:id/links');
+  });
+
   it('describes every row it emits', () => {
     // A row whose description is empty compiles — `describe` is required, not non-empty — and would
     // produce a catalogue line that names an endpoint and explains nothing.

@@ -53,12 +53,16 @@ const RULES: Record<string, Rule> = {
   },
 
   // Writes a work agent needs to do its job: create a card, edit the one it was given, and link.
-  // `link` is not optional — break-down must attach children to their parent, and the hierarchy is
-  // derived from those links, so without it every card it creates is an orphan.
+  //
+  // NO `links` ON THE CREATE (ruling 65). It was advertised here and written into the new card's frontmatter
+  // unaccompanied — one side of a symmetric relation, and the side nothing reads — so a break-down told it had
+  // linked its children left orphans. The parent link is now the server's to assert, from the credential it is
+  // already holding, which is where the column, the group and the creating run come from too. `PUT …/links`
+  // stays for the run's own card: it is confined to it, and parent↔child is the only link a run can mean.
   'POST /api/cards': {
     scopes: ['work', ...BOARD_SCOPES],
     describe:
-      '`{ board, columnSlug, title, description?, body?, links? }` — create a card. The id is assigned by the server; never choose one. `columnSlug` must be a column that already exists, because naming one that does not CREATES the folder and the card then vanishes from the board while keeping its id.',
+      '`{ board, columnSlug, title, description?, body? }` — create a card. The id is assigned by the server; never choose one. `columnSlug` must be a column that already exists, because naming one that does not CREATES the folder and the card then vanishes from the board while keeping its id.',
   },
   'PATCH /api/cards/:board/:id': {
     scopes: ['work', ...BOARD_SCOPES],

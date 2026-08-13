@@ -645,3 +645,161 @@ describe('the run that created a card', () => {
     expect(created.json().createdBy).toBeUndefined();
   });
 });
+
+// RULING 65, and it is the fact the loop cannot function without. The first real run's `break-down` created two
+// tasks with `links: ["P-002"]` in the POST body, was answered 200 echoing that back, and produced two pure
+// orphans: `createCard` wrote the field into the new card's frontmatter without going through `setCardLinks`,
+// and both `childrenOf` and `parentOf` read the PARENT's side. The loop then behaved perfectly — the story had
+// no children, the phase re-dispatched, the agent saw its own earlier work, three attempts, an honest stop.
+//
+// Read off the BOARD as well as out of the response, because the response body is exactly what was already
+// truthful about a link that did not exist.
+describe('the parent a run’s new card hangs off', () => {
+  const linksOn = async (app: FastifyInstance, board: string, id: string): Promise<string[] | undefined> => {
+    const res = await app.inject({ method: 'GET', url: '/api/state', headers: admin });
+    const boards = (res.json() as { snapshot: { boards: Record<string, { id: string; links: string[] }[]> } })
+      .snapshot.boards;
+    return boards[board].find((c) => c.id === id)?.links;
+  };
+  const linksIn = (res: { json: () => Record<string, string> }): string[] =>
+    (res.json() as unknown as { links: string[] }).links;
+
+  it('is the run’s own card for a feature break-down, on both sides', async () => {
+    const { app, store, root } = await open();
+    const run = store.mintRun('work', 'run-p1', root, 'F-001', { board: 'features', skill: 'break-down' });
+    const story = await create(app, bearer(run.token), {
+      board: 'product',
+      columnSlug: 'backlog',
+      title: 'As a user I can ask for JSON',
+    });
+    expect(story.statusCode).toBe(200);
+    expect(linksIn(story)).toEqual(['F-001']);
+    // THE HALF THAT WAS MISSING. `childrenOf` reads the parent's list, so without this the story is invisible
+    // to the machine in both directions and its feature has no children.
+    expect(await linksOn(app, 'features', 'F-001')).toContain(story.json().id);
+  });
+
+  it('is the run’s own card for a story break-down', async () => {
+    const { app, store, root } = await open();
+    const run = store.mintRun('work', 'run-p2', root, 'P-001', { board: 'product', skill: 'break-down' });
+    const task = await create(app, bearer(run.token), {
+      board: 'engineering',
+      columnSlug: 'backlog',
+      title: 'Add the --json flag',
+    });
+    expect(linksIn(task)).toEqual(['P-001']);
+    expect(await linksOn(app, 'product', 'P-001')).toContain(task.json().id);
+  });
+
+  it('is the run’s own card for a feature checkup, which creates one board down', async () => {
+    // The orphan that costs the most, and the only one that is silent: a story invisible to `allSettled` lets
+    // the feature close to `done` with real work parked for ever and nothing said.
+    const { app, store, root } = await open();
+    const run = store.mintRun('work', 'run-p3', root, 'F-001', {
+      board: 'features',
+      skill: 'checkup-feature',
+    });
+    const story = await create(app, bearer(run.token), {
+      board: 'product',
+      columnSlug: 'backlog',
+      title: 'The story we missed',
+    });
+    expect(linksIn(story)).toEqual(['F-001']);
+    expect(await linksOn(app, 'features', 'F-001')).toContain(story.json().id);
+  });
+
+  // THE CASE THAT MAKES "link to the run's own card" WRONG, and getting it wrong would silently do nothing: a
+  // story checkup creates SIBLINGS on its own board, and a sibling linked to its sibling is nobody's child.
+  it('is the card ABOVE the run’s own card for a story checkup, which creates siblings', async () => {
+    const { app, store, root } = await open();
+    // The scaffolded P-001 already hangs off F-001, which is the vertical the sibling belongs in.
+    const run = store.mintRun('work', 'run-p4', root, 'P-001', { board: 'product', skill: 'checkup-story' });
+    const sibling = await create(app, bearer(run.token), {
+      board: 'product',
+      columnSlug: 'backlog',
+      title: 'The bit we missed',
+    });
+    expect(linksIn(sibling)).toEqual(['F-001']);
+    expect(await linksOn(app, 'features', 'F-001')).toContain(sibling.json().id);
+    // And NOT to the card it ran on: two stories that name each other are two orphans.
+    expect(await linksOn(app, 'product', 'P-001')).not.toContain(sibling.json().id);
+  });
+
+  it('is nobody for the bootstrap, because nothing sits above a feature', async () => {
+    const { app, store, root } = await open();
+    const boot = store.mintRun('work', 'run-p5', root, undefined, { skill: 'derive-features' });
+    const feature = await create(app, bearer(boot.token), {
+      board: 'features',
+      columnSlug: 'backlog',
+      title: 'Emit JSON output',
+    });
+    expect(feature.statusCode).toBe(200);
+    expect(linksIn(feature)).toEqual([]);
+  });
+
+  // NO LINK AND NO REFUSAL, the same trade the group already makes: the run's own card may have been archived
+  // under it, and refusing real work over a label is the wrong way round.
+  it('creates the card anyway when the run’s own card cannot be found', async () => {
+    const { app, store, root } = await open();
+    const run = store.mintRun('work', 'run-p6', root, 'F-404', { board: 'features', skill: 'break-down' });
+    const story = await create(app, bearer(run.token), {
+      board: 'product',
+      columnSlug: 'backlog',
+      title: 'An orphan story',
+    });
+    expect(story.statusCode).toBe(200);
+    expect(linksIn(story)).toEqual([]);
+  });
+
+  it('creates the card anyway when a story checkup’s own card has no feature above it', async () => {
+    const { app, store, root } = await open();
+    const loose = await create(app, admin, {
+      board: 'product',
+      columnSlug: 'backlog',
+      title: 'A story nobody hung off anything',
+    });
+    const run = store.mintRun('work', 'run-p7', root, loose.json().id, {
+      board: 'product',
+      skill: 'checkup-story',
+    });
+    const sibling = await create(app, bearer(run.token), {
+      board: 'product',
+      columnSlug: 'backlog',
+      title: 'The bit we missed',
+    });
+    expect(sibling.statusCode).toBe(200);
+    expect(linksIn(sibling)).toEqual([]);
+  });
+
+  // `links?` IS OFF THE CREATE CONTRACT FOR A RUN. A `work` credential is confined to its own card for
+  // `PUT …/links`, so parent↔child is the only link a run may legitimately write — and this field is where that
+  // confinement leaked. Not refused: the card is good and the server was going to write the right link anyway,
+  // which is the same trade the column and the group make.
+  it('ignores the links a run sends, and writes the parent instead', async () => {
+    const { app, store, root } = await open();
+    const run = store.mintRun('work', 'run-p8', root, 'F-001', { board: 'features', skill: 'break-down' });
+    const story = await create(app, bearer(run.token), {
+      board: 'product',
+      columnSlug: 'backlog',
+      title: 'A story',
+      links: ['E-001'],
+    });
+    expect(story.statusCode).toBe(200);
+    expect(linksIn(story)).toEqual(['F-001']);
+    // E-001's own list is untouched, which is the write a run has no business making.
+    expect(await linksOn(app, 'engineering', 'E-001')).not.toContain(story.json().id);
+  });
+
+  it('leaves a person at the browser their links, written on both sides', async () => {
+    // The field survives for a person: they may hang a card off whatever they are looking at.
+    const { app } = await open();
+    const story = await create(app, admin, {
+      board: 'product',
+      columnSlug: 'backlog',
+      title: 'Mine, under F-001',
+      links: ['F-001'],
+    });
+    expect(linksIn(story)).toEqual(['F-001']);
+    expect(await linksOn(app, 'features', 'F-001')).toContain(story.json().id);
+  });
+});

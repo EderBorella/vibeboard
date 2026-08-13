@@ -86,7 +86,11 @@ describe('CardTile open suggestions', () => {
 // clean." The card's own state is its column, which the board already shows; what needs saying is what
 // is UNDER it, which is on no tile a person can see from here.
 describe('CardTile carrying a problem', () => {
-  it('marks a card carrying a blocked task', () => {
+  // ONE CASE FOR THE BADGE, not three. There were two more — a card in DONE, and "for a story and for a
+  // feature" — and the tile reads neither `card.board` nor `card.columnSlug` for this, so all three rendered
+  // the same thing and only one of them could ever fail. The board-and-column claim is real and belongs to
+  // test/snapshot.test.ts, which names the blocked task against the story AND the feature and can fail on it.
+  it('marks a card carrying a blocked task, from the prop and nothing else', () => {
     render(
       <CardTile
         card={card({ id: 'P-001', board: 'product', columnSlug: 'done' })}
@@ -114,38 +118,6 @@ describe('CardTile carrying a problem', () => {
     expect(title).toContain('E-007');
   });
 
-  it('marks a card in DONE, which is the case the decision is about', () => {
-    render(
-      <CardTile
-        card={card({ id: 'P-001', board: 'product', columnSlug: 'done' })}
-        miniatureChars={80}
-        carryingAProblem={['E-001']}
-      />,
-    );
-    expect(screen.getByTitle(/E-001/)).toBeTruthy();
-  });
-
-  it('renders the badge for a story and for a feature', () => {
-    // Both levels reach the tile: a feature's blocked task is two levels down, and the snapshot
-    // names it against the feature as well as against the story.
-    render(
-      <CardTile
-        card={card({ id: 'P-001', board: 'product', columnSlug: 'done' })}
-        miniatureChars={80}
-        carryingAProblem={['E-001']}
-      />,
-    );
-    expect(screen.getByTitle(/E-001/)).toBeTruthy();
-    cleanup();
-    render(
-      <CardTile
-        card={card({ id: 'F-001', board: 'features', columnSlug: 'done' })}
-        miniatureChars={80}
-        carryingAProblem={['E-001']}
-      />,
-    );
-    expect(screen.getByTitle(/E-001/)).toBeTruthy();
-  });
 });
 
 // The barrier's effect is invisible from the card it sits on: nothing outside this feature's subtree

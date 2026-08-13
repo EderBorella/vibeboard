@@ -54,10 +54,18 @@ describe('the Suggestions pane', () => {
     expect(screen.getAllByText(new Date('2026-08-05T10:00:00.000Z').toLocaleString()).length).toBe(2);
   });
 
-  it('offers exactly two actions', () => {
-    render(pane());
-    expect(screen.getByRole('button', { name: /dismiss/i })).toBeTruthy();
-    expect(screen.getByRole('button', { name: /make a card/i })).toBeTruthy();
+  it('offers exactly two actions on a suggestion, and Refresh is not one of them', () => {
+    const { container } = render(pane());
+    // SCOPED AND EXACT. It asserted that two buttons EXISTED while the pane renders three in this row plus
+    // one per suggestion — so "exactly two" was held by nothing, and a third action beside them would have
+    // passed. TWO ACTIONS, FIXED (decision 49): Refresh re-reads the list, it is not something done to a
+    // finding.
+    const actions = container.querySelector('.suggestions-actions') as HTMLElement;
+    expect([...actions.querySelectorAll('button')].map((b) => b.textContent)).toEqual([
+      'Dismiss',
+      'Make a card',
+      'Refresh',
+    ]);
     // And NOT the skills list, which was agreed and then corrected (decision 49): dispatching an
     // implementation skill at a suggestion produced work with no card to report against.
     expect(screen.queryByText(/implement/i)).toBeNull();

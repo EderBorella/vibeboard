@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { Spend } from '../src/core/accounting.js';
+import type { TickAction } from '../src/core/actions.js';
 import { DEFAULT_AUTOPILOT } from '../src/core/autopilot.js';
 import type { AutopilotState } from '../src/core/autopilot-state.js';
-import { eligibility } from '../src/core/eligibility.js';
 import type { RunRecord, RunStatus } from '../src/core/runs.js';
 import { decideTick, type TickInput } from '../src/core/tick.js';
 import type { BoardName, Card } from '../src/core/types.js';
@@ -41,6 +41,15 @@ function run(cardId: string, board: BoardName, skill: string, status: RunStatus)
   };
 }
 
+// A card-less run of the bootstrap skill, which is the only tally the bootstrap's cap has: `attemptsUsed`
+// counts per card, and a project run has none.
+const derivation = (status: RunStatus, i: number): RunRecord => ({
+  ...run('unused', 'features', 'derive-features', status),
+  run: `p-${i}`,
+  card: undefined,
+  board: undefined,
+});
+
 const COLUMNS: Record<BoardName, string[]> = {
   features: ['backlog', 'todo', 'in-progress', 'done'],
   product: ['backlog', 'todo', 'in-progress', 'done'],
@@ -56,7 +65,8 @@ const RUNNING: AutopilotState = {
 
 const NO_SPEND: Spend = { runs: 0, withCost: 0, withoutCost: 0 };
 
-// One product card eligible for `design`, under a feature that is waiting on it.
+// One feature being worked, with one story under it. ONE open feature, because two is a refusal now
+// (decision 39's invariant) and a fixture that trips it would answer every test with the same stop.
 const base = (): Card[] => [
   card('F-001', 'features', 'todo', 10, ['P-001']),
   card('P-001', 'product', 'backlog', 10, ['F-001']),
@@ -75,6 +85,8 @@ const input = (over: Partial<TickInput> = {}): TickInput => ({
 });
 
 const state = (over: Partial<AutopilotState>): AutopilotState => ({ ...RUNNING, ...over });
+
+const detailOf = (action: TickAction): string => (action.kind === 'stop' ? (action.detail ?? '') : '');
 
 describe('the caps come first', () => {
   it('stops capped at the iteration cap', () => {
@@ -104,18 +116,21 @@ describe('the caps come first', () => {
     expect(action).toHaveProperty('detail', expect.stringContaining('maxIterations'));
   });
 
-  // BOTH BRANCHES ARMED, which is what makes this about the order rather than about either branch. The
-  // whole describe block passed with the rollup moved ahead of the caps, because no fixture had a rollup
-  // to do while it was over budget.
-  it('refuses to spend a tick rolling up when the project is already over budget', () => {
+  // MOVED HERE FROM eligibility.ts WITH THE COMPARISON IT GUARDS. The new tick counts every bound itself —
+  // the bootstrap's attempts, and every phase's — so a cap that is not a number would delete the limit here
+  // rather than in a module nothing calls any more. `used >= NaN` is false, so it fails open.
+  it('stops stalled and names attemptCap when it is not a usable number', () => {
+    const ap = { ...DEFAULT_AUTOPILOT, attemptCap: Number.NaN };
+    const action = decideTick(input({ ap }));
+    expect(action).toMatchObject({ kind: 'stop', reason: 'stalled' });
+    expect(action).toHaveProperty('detail', expect.stringContaining('attemptCap'));
+  });
+
+  // BOTH BRANCHES ARMED, which is what makes this about the ORDER rather than about either branch: an empty
+  // board would otherwise answer with the bootstrap dispatch.
+  it('refuses to spend a tick deriving the board when the project is already over budget', () => {
     const spend: Spend = { runs: 1, withCost: 1, withoutCost: 0, costUsd: 25 };
-    const cards = [
-      card('F-001', 'features', 'todo', 10, ['P-001']),
-      card('P-001', 'product', 'in-progress', 10, ['F-001', 'E-001']),
-      card('E-001', 'engineering', 'done', 10, ['P-001']),
-    ];
-    // Without the caps first this answers `rollup`.
-    expect(decideTick(input({ cards, spend }))).toMatchObject({ kind: 'stop', reason: 'exhausted' });
+    expect(decideTick(input({ cards: [], spend }))).toMatchObject({ kind: 'stop', reason: 'exhausted' });
   });
 
   it('keeps a halted project’s own reason rather than reporting the cap it also happens to have hit', () => {
@@ -162,132 +177,67 @@ describe('the shape of the config, not just its numbers', () => {
   });
 });
 
-describe('the rollup settles the board before anything dispatches', () => {
-  // P-001's only child is finished, so it advances with no dispatch. P-002 is eligible at the same
-  // time, and must wait: a supervisor or a critic downstream should judge a settled board (S12).
-  const cards = (): Card[] => [
-    card('F-001', 'features', 'todo', 10, ['P-001']),
-    card('P-001', 'product', 'in-progress', 10, ['F-001', 'E-001']),
-    card('E-001', 'engineering', 'done', 10, ['P-001']),
-    card('F-002', 'features', 'todo', 20, ['P-002']),
-    card('P-002', 'product', 'backlog', 10, ['F-002']),
-  ];
-
-  it('returns the rollup rather than the dispatch it could also have made', () => {
-    const action = decideTick(input({ cards: cards() }));
-    expect(action.kind).toBe('rollup');
-    expect(action.kind === 'rollup' && action.advance.map((a) => [a.card.id, a.to])).toEqual([
-      ['P-001', 'done'],
-    ]);
+// FINDING C, and it is a CARRIED guard rather than a new one. An unreadable card used to reach the loop only
+// through eligibility.ts, which slice 3 deletes — so without this branch that deletion would silently remove
+// the fail-closed refusal, and the sentence a user reads with it.
+describe('a card that will not parse stops everything', () => {
+  it('stops stalled naming the file and the reason', () => {
+    const problems = [{ path: 'boards/features/todo/F-002.md', reason: 'bad YAML' }];
+    const action = decideTick(input({ problems }));
+    expect(action).toMatchObject({ kind: 'stop', reason: 'stalled' });
+    expect(detailOf(action)).toContain('F-002.md');
+    expect(detailOf(action)).toContain('bad YAML');
   });
 
-  it('and does it even when a checkup is owed, so the checkup sees the settled board', () => {
-    const action = decideTick(input({ cards: cards(), state: state({ needsCheckup: true }) }));
-    expect(action.kind).toBe('rollup');
+  it('says how many more there are without listing all of them', () => {
+    const problems = [
+      { path: 'a.md', reason: 'bad YAML' },
+      { path: 'b.md', reason: 'bad YAML' },
+      { path: 'c.md', reason: 'bad YAML' },
+    ];
+    expect(detailOf(decideTick(input({ problems })))).toContain('2 more');
+  });
+
+  // BEFORE the position is derived, because the broken file could BE the open feature — or a child that
+  // would change which story is next. A position derived from a board that will not fully parse is a guess.
+  it('refuses before deriving a position, even when the readable cards look fine', () => {
+    const problems = [{ path: 'boards/product/backlog/P-002.md', reason: 'bad indentation' }];
+    const action = decideTick(input({ cards: base(), problems }));
+    expect(action).toMatchObject({ kind: 'stop', reason: 'stalled' });
+    expect(detailOf(action)).toContain('P-002.md');
   });
 });
 
-describe('the checkup is owed, and C2 cannot run it', () => {
-  it('stops when the state says a checkup is needed', () => {
-    const action = decideTick(input({ state: state({ needsCheckup: true }) }));
+// DECISION 39's INVARIANT, reaching the loop. The position refuses rather than guessing, and the tick's job
+// is to carry that refusal out with the sentence intact.
+describe('two open cards of the same kind stop the loop', () => {
+  it('stops stalled and names both features', () => {
+    const cards = [
+      card('F-002', 'features', 'todo', 10, []),
+      card('F-005', 'features', 'in-progress', 20, []),
+    ];
+    const action = decideTick(input({ cards }));
     expect(action).toMatchObject({ kind: 'stop', reason: 'stalled' });
-    expect(action).toHaveProperty('detail', expect.stringContaining('owes a supervisor checkup'));
-    // The clause that says C2 CANNOT run it — the whole reason this branch is a stop and not a dispatch.
-    // Asserting on the word "checkup" held nothing: it already appears in the sentence before this one.
-    expect(action).toHaveProperty('detail', expect.stringContaining('not built yet'));
+    expect(detailOf(action)).toContain('F-002');
+    expect(detailOf(action)).toContain('F-005');
+    expect(detailOf(action)).toContain('Move one back to Backlog');
   });
 
-  it('stops when enough dispatches have passed since the last one', () => {
-    const action = decideTick(input({ state: state({ dispatchesSinceCheckup: 10 }) }));
+  it('stops stalled and names both stories, and the feature they belong to', () => {
+    const cards = [
+      card('F-001', 'features', 'in-progress', 10, ['P-002', 'P-005']),
+      card('P-002', 'product', 'todo', 10, ['F-001']),
+      card('P-005', 'product', 'in-progress', 20, ['F-001']),
+    ];
+    const action = decideTick(input({ cards }));
     expect(action).toMatchObject({ kind: 'stop', reason: 'stalled' });
-    expect(action).toHaveProperty('detail', expect.stringContaining('10 dispatches since'));
-    expect(action).toHaveProperty('detail', expect.stringContaining('not built yet'));
-  });
-
-  it('does not stop while the count is below the interval', () => {
-    expect(decideTick(input({ state: state({ dispatchesSinceCheckup: 9 }) })).kind).toBe('dispatch');
-  });
-
-  // Same NaN class as the caps: `9 >= NaN` is false, so an unusable interval silently means "never".
-  it('stops stalled and names the field when the interval is unusable', () => {
-    const ap = { ...DEFAULT_AUTOPILOT, checkupEvery: Number.NaN };
-    const action = decideTick(input({ ap }));
-    expect(action).toMatchObject({ kind: 'stop', reason: 'stalled' });
-    expect(action).toHaveProperty('detail', expect.stringContaining('checkupEvery'));
+    expect(detailOf(action)).toContain('P-002');
+    expect(detailOf(action)).toContain('P-005');
+    expect(detailOf(action)).toContain('F-001');
   });
 });
 
-describe('a card that has run out of attempts', () => {
-  const failures = (n: number, cardId: string, board: BoardName, skill: string): RunRecord[] =>
-    Array.from({ length: n }, () => run(cardId, board, skill, 'failed'));
-
-  it('stops the run when it is not an engineering card, and names it', () => {
-    const runs = failures(3, 'P-001', 'product', 'design');
-    const action = decideTick(input({ runs }));
-    expect(action).toMatchObject({ kind: 'stop', reason: 'stalled' });
-    expect(action).toHaveProperty('detail', expect.stringContaining('P-001'));
-  });
-
-  it('moves an engineering card to the blocked column and lets the loop continue', () => {
-    const cards = [
-      card('F-001', 'features', 'todo', 10, ['P-001']),
-      card('P-001', 'product', 'in-progress', 10, ['F-001', 'E-001']),
-      card('E-001', 'engineering', 'backlog', 10, ['P-001']),
-      card('F-002', 'features', 'todo', 20, ['P-002']),
-      card('P-002', 'product', 'backlog', 10, ['F-002']),
-    ];
-    const runs = failures(3, 'E-001', 'engineering', 'implement');
-    // Renamed, because with the default config `to: 'blocked'` passes just as well against a hardcoded
-    // string — and a user who renames the column would have had cards moved to a folder that does not
-    // exist. rollup.test.ts already reads terminal columns from config for the same reason.
-    const ap = { ...DEFAULT_AUTOPILOT, blockedColumn: 'parked' };
-    // The column list is renamed with it, because a column IS a folder: renaming one rewrites the config
-    // and the routing table together. Renaming only the setting is the next test.
-    const columns = { ...COLUMNS, engineering: ['backlog', 'in-progress', 'review', 'parked', 'done'] };
-    const action = decideTick(input({ ap, cards, columns, runs }));
-    // Before the dispatch P-002 was also entitled to: tidying the board first is what keeps a card at
-    // its cap from sitting in a routed column for ever.
-    expect(action).toMatchObject({ kind: 'block', to: 'parked' });
-    expect(action.kind === 'block' && action.card.id).toBe('E-001');
-  });
-
-  // A `block` carrying a column that does not exist would move a card into a folder named after nothing,
-  // or be refused by the endpoint — and since a block consumes no iteration and no budget, neither of the
-  // loop's two backstops would ever end the retry. `coverageProblems` refuses this when the config is
-  // SAVED; config.yaml is a file a person can edit while the loop is running.
-  it('stops rather than blocking when the blocked column is not a column at all', () => {
-    const cards = [
-      card('F-001', 'features', 'todo', 10, ['P-001']),
-      card('P-001', 'product', 'in-progress', 10, ['F-001', 'E-001']),
-      card('E-001', 'engineering', 'backlog', 10, ['P-001']),
-    ];
-    const runs = failures(3, 'E-001', 'engineering', 'implement');
-    const ap = { ...DEFAULT_AUTOPILOT, blockedColumn: 'nowhere' };
-    const action = decideTick(input({ ap, cards, runs }));
-    expect(action).toMatchObject({ kind: 'stop', reason: 'stalled' });
-    expect(action).toHaveProperty('detail', expect.stringContaining('blockedColumn'));
-    expect(action).toHaveProperty('detail', expect.stringContaining('E-001'));
-  });
-
-  it('stops instead of blocking when the exhausted card is inside the setup feature', () => {
-    // Blocking it would leave the barrier unfinished for ever, and nothing outside the setup subtree is
-    // eligible while that is true — a stall the board would never explain.
-    const cards = [
-      { ...card('F-001', 'features', 'in-progress', 10, ['P-001']), setup: true },
-      card('P-001', 'product', 'in-progress', 10, ['F-001', 'E-001']),
-      card('E-001', 'engineering', 'backlog', 10, ['P-001']),
-    ];
-    const runs = failures(3, 'E-001', 'engineering', 'implement');
-    const action = decideTick(input({ cards, runs }));
-    expect(action).toMatchObject({ kind: 'stop', reason: 'stalled' });
-    expect(action).toHaveProperty('detail', expect.stringContaining('E-001'));
-    expect(action).toHaveProperty('detail', expect.stringContaining('setup'));
-  });
-});
-
-// The two facts this design exists to keep apart. Conflating them produced the worst failure on
-// record: success reported over unfinished work.
-describe('nothing eligible is not the same as nothing left', () => {
+describe('nothing to work on is not the same as nothing left', () => {
   it('stops complete when every card is in a terminal column', () => {
     const cards = [
       card('F-001', 'features', 'done', 10, ['P-001']),
@@ -296,36 +246,7 @@ describe('nothing eligible is not the same as nothing left', () => {
     expect(decideTick(input({ cards }))).toMatchObject({ kind: 'stop', reason: 'complete' });
   });
 
-  // One list of ids with one piece of advice told the reader to check their routing table about cards
-  // the loop itself had blocked and cards the setup barrier was holding back — advice that is wrong for
-  // both. Each kind of stuck now carries its own remedy.
-  it('says why each kind of stuck card is stuck, rather than blaming the routing table for all of them', () => {
-    const cards = [
-      { ...card('F-001', 'features', 'in-progress', 10, ['P-001']), setup: true },
-      card('P-001', 'product', 'in-progress', 10, ['F-001', 'E-001']),
-      card('E-001', 'engineering', 'blocked', 10, ['P-001']),
-      card('F-002', 'features', 'todo', 20, ['P-002']),
-      card('P-002', 'product', 'backlog', 10, ['F-002']),
-    ];
-    const action = decideTick(input({ cards }));
-    expect(action).toMatchObject({ kind: 'stop', reason: 'stalled' });
-    const detail = action.kind === 'stop' ? (action.detail ?? '') : '';
-    // E-001 is in the blocked column: the message must say that is why, and that it is what stops this
-    // project ever reporting itself finished.
-    expect(detail).toMatch(/E-001 ran out of attempts/);
-    expect(detail).toMatch(/cannot report itself finished/);
-    // F-002 and P-002 are outside the setup subtree, so the barrier is holding them, not the routing.
-    expect(detail).toMatch(/F-002, P-002 are waiting for the setup feature/);
-    // F-001 and P-001 are parents whose own children are unfinished — the ordinary shape of a stalled
-    // board, and the category the first version of this message had no word for.
-    expect(detail).toMatch(/F-001, P-001 are waiting for their own cards further down/);
-    // And nothing in this fixture is unroutable, so the routing advice must not appear at all.
-    expect(detail).not.toMatch(/routed, terminal or blocked/);
-  });
-
-  // THE B3 SHAPE, and the fixture has to be a column that is neither routed, terminal NOR blocked. The
-  // first version of this test used `engineering/blocked`, which is unrouted BY DESIGN and validated as
-  // such — so it never exercised the case that once turned "nothing eligible" into a reported success.
+  // THE B3 SHAPE, and the fixture has to be a column that is neither routed, terminal NOR blocked.
   // `triage` is a folder somebody made, or a column removed from the config with cards still in it.
   it('stops stalled, naming the cards, when a card sits in a column nothing covers', () => {
     const cards = [
@@ -335,9 +256,9 @@ describe('nothing eligible is not the same as nothing left', () => {
     ];
     const action = decideTick(input({ cards }));
     expect(action).toMatchObject({ kind: 'stop', reason: 'stalled' });
-    expect(action).toHaveProperty('detail', expect.stringContaining('E-009'));
+    expect(detailOf(action)).toContain('E-009');
     // And this is the one case where the routing advice is the right advice.
-    expect(action).toHaveProperty('detail', expect.stringContaining('routed, terminal or blocked'));
+    expect(detailOf(action)).toContain('routed, terminal or blocked');
   });
 
   it('stops stalled for a card the loop itself blocked, and says that is what happened', () => {
@@ -348,11 +269,35 @@ describe('nothing eligible is not the same as nothing left', () => {
     ];
     const action = decideTick(input({ cards }));
     expect(action).toMatchObject({ kind: 'stop', reason: 'stalled' });
-    expect(action).toHaveProperty('detail', expect.stringContaining('E-009 ran out of attempts'));
+    expect(detailOf(action)).toContain('E-009 ran out of attempts');
   });
 
-  // The ordinary resume path, and the one stop reason with no test: `reconcile` writes exactly this
-  // state when a server dies under a running loop.
+  // THE SETUP BARRIER'S SENTENCE IS GONE WITH THE BARRIER (decision 44). Nothing can be "waiting for the
+  // setup feature" any more, and a message about a rule that no longer exists is worse than none.
+  it('never says a card is waiting for the setup feature', () => {
+    const cards = [
+      { ...card('F-001', 'features', 'in-progress', 10, ['P-001']), setup: true },
+      card('P-001', 'product', 'in-progress', 10, ['F-001', 'E-001']),
+      card('E-001', 'engineering', 'blocked', 10, ['P-001']),
+    ];
+    expect(detailOf(decideTick(input({ cards })))).not.toContain('waiting for the setup feature');
+  });
+
+  it('says a parent is waiting for its own cards further down', () => {
+    const cards = [
+      card('F-001', 'features', 'in-progress', 10, ['P-001']),
+      card('P-001', 'product', 'in-progress', 10, ['F-001', 'E-001']),
+      card('E-001', 'engineering', 'blocked', 10, ['P-001']),
+    ];
+    const detail = detailOf(decideTick(input({ cards })));
+    expect(detail).toMatch(/E-001 ran out of attempts/);
+    expect(detail).toMatch(/F-001, P-001 are waiting for their own cards further down/);
+    // Nothing in this fixture is unroutable, so the routing advice must not appear at all.
+    expect(detail).not.toMatch(/routed, terminal or blocked/);
+  });
+
+  // The ordinary resume path, and the one stop reason with no test of its own otherwise: `reconcile` writes
+  // exactly this state when a server dies under a running loop.
   it('re-states an interrupted restart rather than deciding anything for it', () => {
     const interrupted = state({ state: 'stopped', reason: 'interrupted', needsCheckup: true });
     expect(decideTick(input({ state: interrupted }))).toMatchObject({
@@ -364,8 +309,6 @@ describe('nothing eligible is not the same as nothing left', () => {
   // The absence of unfinished work is not the presence of finished work, and both of these produce the same
   // empty list: a project archived down to nothing, and — the one that will actually happen — a board fetch
   // that returned nothing because something upstream went wrong.
-  //
-  // An EMPTY board is the third, and it is no longer a stop: see the bootstrap tests below.
   it('stops no-op, never complete, when every card there is has been archived', () => {
     const archived = [
       { ...card('F-001', 'features', 'archive', 10, []), archived: '2026-08-05T10:00:00Z' },
@@ -373,86 +316,17 @@ describe('nothing eligible is not the same as nothing left', () => {
     ];
     const gone = decideTick(input({ cards: archived }));
     expect(gone).toMatchObject({ kind: 'stop', reason: 'no-op' });
-    expect(gone).toHaveProperty('detail', expect.stringContaining('archived'));
-  });
-
-  // THE BOOTSTRAP, and it exists because the loop shipped a contradiction: the skill on the first features
-  // column derives the feature list from the README — the card it is dispatched against is only a trigger,
-  // its content unread — so the board could not start without a card, and the run that creates the cards was
-  // the one it could not start.
-  describe('an empty board with a README derives itself', () => {
-    it('bootstraps through whatever skill the first features column routes to', () => {
-      const decided = decideTick(input({ cards: [] }));
-      expect(decided).toMatchObject({ kind: 'bootstrap', skill: 'derive-features' });
-      expect(decided).toHaveProperty('detail', expect.stringContaining('README'));
-    });
-
-    // Not a hard-coded skill name. A project that renamed its first column, or pointed it at something else,
-    // bootstraps through its own choice — and the whole point of reading it off the table is that this holds.
-    it('takes the skill from the project’s own routing table, not from a constant', () => {
-      const ap = {
-        ...DEFAULT_AUTOPILOT,
-        routes: DEFAULT_AUTOPILOT.routes.map((r) =>
-          r.board === 'features' && r.column === 'backlog' ? { ...r, skill: 'invent-the-work' } : r,
-        ),
-      };
-      expect(decideTick(input({ cards: [], ap }))).toMatchObject({
-        kind: 'bootstrap',
-        skill: 'invent-the-work',
-      });
-    });
-
-    // A board with nothing on it and no way to derive it is the genuine no-op the case above used to cover:
-    // there is no run to dispatch, so saying so is all there is to do.
-    it('stops no-op when the first features column routes to nothing', () => {
-      const ap = {
-        ...DEFAULT_AUTOPILOT,
-        routes: DEFAULT_AUTOPILOT.routes.filter((r) => !(r.board === 'features' && r.column === 'backlog')),
-      };
-      const decided = decideTick(input({ cards: [], ap }));
-      expect(decided).toMatchObject({ kind: 'stop', reason: 'no-op' });
-      expect(decided).toHaveProperty('detail', expect.stringContaining('no card on any board'));
-    });
-
-    // The same attempt cap as anything else, counted over PROJECT runs of that skill — a card-less run has no
-    // card for `attemptsUsed` to count it against, so this is the only tally there is. Without it a README too
-    // thin to derive features from is an empty board dispatching for ever.
-    it('stops stalled once the derivation has used every attempt', () => {
-      const tried = Array.from({ length: DEFAULT_AUTOPILOT.attemptCap }, (_, i) => ({
-        ...run('unused', 'features', 'derive-features', 'attention'),
-        run: `p-${i}`,
-        card: undefined,
-        board: undefined,
-      }));
-      const decided = decideTick(input({ cards: [], runs: tried }));
-      expect(decided).toMatchObject({ kind: 'stop', reason: 'stalled' });
-      expect(decided).toHaveProperty('detail', expect.stringContaining('all 3 attempts'));
-    });
-
-    // A run that burned no attempt does not count towards the cap, which is `burnsAttempt`'s whole job: a
-    // cancelled derivation is one nobody is answerable for, so the next tick tries again.
-    it('does not count a cancelled derivation against the cap', () => {
-      const tried = Array.from({ length: DEFAULT_AUTOPILOT.attemptCap }, (_, i) => ({
-        ...run('unused', 'features', 'derive-features', 'cancelled'),
-        run: `p-${i}`,
-        card: undefined,
-        board: undefined,
-      }));
-      expect(decideTick(input({ cards: [], runs: tried }))).toMatchObject({ kind: 'bootstrap' });
-    });
+    expect(detailOf(gone)).toContain('archived');
   });
 
   it('still reports complete when finished work is actually there', () => {
-    // The other half of the rule above: `complete` needs at least one live card in a terminal column, so
-    // this test is what stops the no-op check from swallowing the success case.
     const cards = [card('F-001', 'features', 'done', 10, [])];
     expect(decideTick(input({ cards }))).toMatchObject({ kind: 'stop', reason: 'complete' });
   });
 
-  // THE FOURTH ROUTE to this failure, after the unreadable folder, the empty board and the optional problems
-  // list. `archiveCard` stamps the frontmatter and THEN moves the file, so a server killed between those two
-  // writes leaves a card marked archived while still sitting in a live column — invisible to eligible, to
-  // unfinished and to problems, which are the three sets `complete` is decided from. The board still shows it.
+  // THE FOURTH ROUTE to a false success. `archiveCard` stamps the frontmatter and THEN moves the file, so a
+  // server killed between those two writes leaves a card marked archived while still sitting in a live
+  // column — invisible to the position, to `unfinished` and to `problems`. The board still shows it.
   it('refuses to call a project finished while a card is half-archived', () => {
     const cards = [
       card('F-001', 'features', 'done', 10, []),
@@ -460,14 +334,11 @@ describe('nothing eligible is not the same as nothing left', () => {
     ];
     const action = decideTick(input({ cards }));
     expect(action).toMatchObject({ kind: 'stop', reason: 'stalled' });
-    expect(action).toHaveProperty('detail', expect.stringContaining('E-009'));
-    expect(action).toHaveProperty(
-      'detail',
-      expect.stringContaining('marked archived but still in a live column'),
-    );
+    expect(detailOf(action)).toContain('E-009');
+    expect(detailOf(action)).toContain('marked archived but still in a live column');
   });
 
-  it('counts an archived card as neither eligible nor unfinished', () => {
+  it('counts an archived card as neither work nor unfinished', () => {
     const cards = [
       card('F-001', 'features', 'done', 10, ['P-001']),
       card('P-001', 'product', 'done', 10, ['F-001']),
@@ -475,74 +346,113 @@ describe('nothing eligible is not the same as nothing left', () => {
     ];
     expect(decideTick(input({ cards }))).toMatchObject({ kind: 'stop', reason: 'complete' });
   });
+});
 
-  it('stops stalled with the reason when the board cannot be read', () => {
-    const problems = [{ path: 'boards/features/todo/F-001.md', reason: 'bad indentation' }];
-    const action = decideTick(input({ problems }));
-    expect(action).toMatchObject({ kind: 'stop', reason: 'stalled' });
-    expect(action).toHaveProperty('detail', expect.stringContaining('F-001.md'));
+// THE BOOTSTRAP. An empty board with a README is a project that has said what it wants and has nothing to
+// pick up yet — the one state where the loop derives the board itself.
+describe('an empty board with a README derives itself', () => {
+  it('dispatches derive-features as a project run, with no card', () => {
+    const action = decideTick(input({ cards: [] }));
+    expect(action).toMatchObject({ kind: 'dispatch', phase: 'bootstrap', skill: 'derive-features' });
+    expect(action.kind === 'dispatch' && action.card).toBeUndefined();
+  });
+
+  // RULING 52: the skill comes from the PHASE TABLE, which is code, and not from `routes` in config.yaml.
+  // The previous behaviour read it off the routing table so a project could point the first features column
+  // anywhere; the machine is no longer a setting, and this is what says so.
+  it('takes the skill from the phase table, not from the project’s routing table', () => {
+    const ap = {
+      ...DEFAULT_AUTOPILOT,
+      routes: DEFAULT_AUTOPILOT.routes.map((r) =>
+        r.board === 'features' && r.column === 'backlog' ? { ...r, skill: 'invent-the-work' } : r,
+      ),
+    };
+    expect(decideTick(input({ cards: [], ap }))).toMatchObject({
+      kind: 'dispatch',
+      phase: 'bootstrap',
+      skill: 'derive-features',
+    });
+  });
+
+  it('still derives the board when the routing table has no features entry at all', () => {
+    // The routing table is dead weight to this decision now, so removing an entry from it changes nothing.
+    const ap = {
+      ...DEFAULT_AUTOPILOT,
+      routes: DEFAULT_AUTOPILOT.routes.filter((r) => !(r.board === 'features' && r.column === 'backlog')),
+    };
+    expect(decideTick(input({ cards: [], ap }))).toMatchObject({ kind: 'dispatch', phase: 'bootstrap' });
+  });
+
+  // The same attempt cap as anything else, counted over PROJECT runs of that skill — a card-less run has no
+  // card for `attemptsUsed` to count it against, so this is the only tally there is. Without it a README too
+  // thin to derive features from is an empty board dispatching for ever.
+  it('stops stalled once the derivation has used every attempt, naming the README', () => {
+    const tried = Array.from({ length: DEFAULT_AUTOPILOT.attemptCap }, (_, i) => derivation('attention', i));
+    const decided = decideTick(input({ cards: [], runs: tried }));
+    expect(decided).toMatchObject({ kind: 'stop', reason: 'stalled' });
+    expect(detailOf(decided)).toContain('all 3 attempts');
+    expect(detailOf(decided)).toContain('README');
+  });
+
+  // A run that burned no attempt does not count towards the cap, which is `burnsAttempt`'s whole job: a
+  // cancelled derivation is one nobody is answerable for, so the next tick tries again.
+  it('does not count a cancelled derivation against the cap', () => {
+    const tried = Array.from({ length: DEFAULT_AUTOPILOT.attemptCap }, (_, i) => derivation('cancelled', i));
+    expect(decideTick(input({ cards: [], runs: tried }))).toMatchObject({ kind: 'dispatch' });
+  });
+
+  // The setup flag is NOT decided here: decision 44 fires it as the bootstrap's EXIT, from the board, in the
+  // service. A board predicate would stamp it on any project whose first feature a person typed by hand.
+  it('never answers with anything but the four members of the union', () => {
+    const branches: TickInput[] = [
+      input(),
+      input({ cards: [] }),
+      input({ problems: [{ path: 'a.md', reason: 'bad YAML' }] }),
+      input({ inFlight: [{ card: 'P-001', skill: 'break-down' }] }),
+      input({ state: state({ iteration: 250 }) }),
+      input({ state: state({ state: 'idle' }) }),
+      input({ cards: [card('F-001', 'features', 'done', 10, [])] }),
+      input({
+        cards: [card('F-002', 'features', 'todo', 10, []), card('F-005', 'features', 'todo', 20, [])],
+      }),
+    ];
+    for (const one of branches) {
+      expect(['stop', 'dispatch', 'stamp', 'wait']).toContain(decideTick(one).kind);
+    }
   });
 });
 
-describe('and otherwise it dispatches', () => {
+describe('a run already in flight', () => {
   it('waits while as many runs are in flight as the config allows', () => {
-    expect(decideTick(input({ inFlight: [{ card: 'P-009', skill: 'design' }] }))).toEqual({ kind: 'wait' });
-    // A project run — a checkup — has no card and counts towards the limit just the same.
-    expect(decideTick(input({ inFlight: [{ skill: 'checkup' }] }))).toEqual({ kind: 'wait' });
+    expect(decideTick(input({ inFlight: [{ card: 'P-009', skill: 'break-down' }] }))).toEqual({
+      kind: 'wait',
+    });
+    // A project run — the bootstrap — has no card and counts towards the limit just the same.
+    expect(decideTick(input({ inFlight: [{ skill: 'derive-features' }] }))).toEqual({ kind: 'wait' });
   });
 
-  // Above a concurrency of one, a count was not enough. `attemptsUsed` deliberately does not count an
-  // unfinished run, so the card being worked stays eligible and the pick is deterministic — and the next
-  // tick dispatched the SAME card again: two agents editing one card's work in one repository.
-  // The identities, not just the count. Concurrency is a CONSTANT of 1 now, so a run in flight always fills
-  // the only slot and this reads as `wait` either way — the filter cannot be observed through `decideTick`
-  // while that is true. What is asserted here is the honest thing: an in-flight card is still ELIGIBLE, which
-  // is what stops the loop reporting `stalled` over the very work it is waiting for.
-  it('keeps a card with a run in flight eligible, and waits rather than stalling', () => {
-    const busy = [{ card: 'P-001', skill: 'design' }];
-    expect(decideTick(input({ inFlight: busy }))).toEqual({ kind: 'wait' });
-
-    // MORE UNFINISHED RUNS THAN THE ATTEMPT CAP, which is what makes this test about its subject. It passed
-    // `runs: []` — no runs at all — so `attemptsUsed` was trivially 0 and the property "an unfinished run does
-    // not burn an attempt" was never exercised: a review showed `burnsAttempt` could be made to count
-    // `running` with this file green. With `attemptCap` runs of the same skill IN FLIGHT, counting any of them
-    // would put the card at its cap and drop it out of eligibility entirely — after which the loop reports
-    // `stalled` over the very work it is waiting for.
-    const inFlightRuns = Array.from({ length: DEFAULT_AUTOPILOT.attemptCap }, () =>
-      run('P-001', 'product', 'design', 'running'),
+  // An unfinished run does not burn an attempt (`burnsAttempt`), which is what keeps the card being worked
+  // from reaching its cap while its own run is still going. With attemptCap runs IN FLIGHT the answer must
+  // still be `wait` and never a stop about the very work the loop is waiting for.
+  it('waits rather than stalling when the card being worked has attemptCap runs in flight', () => {
+    const busy = Array.from({ length: DEFAULT_AUTOPILOT.attemptCap }, () =>
+      run('P-001', 'product', 'break-down', 'running'),
     );
-    const el = eligibility({
-      ap: DEFAULT_AUTOPILOT,
-      cards: base(),
-      runs: inFlightRuns,
-      columns: COLUMNS,
-      rollupEligible: [],
-      problems: [],
-    });
-    expect(el.eligible.map((e) => e.card.id)).toContain('P-001');
-
-    // And the same card WOULD drop out once those runs really have ended, which is what says the fixture is
-    // strong enough to tell the two apart.
-    const finished = inFlightRuns.map((r) => ({ ...r, status: 'failed' as const }));
-    const after = eligibility({
-      ap: DEFAULT_AUTOPILOT,
-      cards: base(),
-      runs: finished,
-      columns: COLUMNS,
-      rollupEligible: [],
-      problems: [],
-    });
-    expect(after.eligible.map((e) => e.card.id)).not.toContain('P-001');
+    const inFlight = busy.map((r) => ({ card: r.card as string, skill: r.skill }));
+    expect(decideTick(input({ runs: busy, inFlight }))).toEqual({ kind: 'wait' });
   });
 
-  it('dispatches the picked card and its route', () => {
-    const action = decideTick(input());
-    expect(action.kind).toBe('dispatch');
-    expect(action.kind === 'dispatch' && [action.card.id, action.route.skill]).toEqual(['P-001', 'design']);
+  // An EMPTY board with the derivation still going is a wait, not a second bootstrap: the tick that
+  // dispatched it has not seen it finish yet, and dispatching again would double-derive the whole board.
+  it('waits rather than deriving the board a second time', () => {
+    expect(decideTick(input({ cards: [], inFlight: [{ skill: 'derive-features' }] }))).toEqual({
+      kind: 'wait',
+    });
   });
+});
 
-  // The state check belongs here as well as in the service: Principle 1 puts the refusal where the
-  // decision is made rather than trusting a guard upstream.
+describe('the state guard', () => {
+  // Principle 1 puts the refusal where the decision is made rather than trusting a guard upstream.
   it('refuses to decide anything for a project that is not running', () => {
     expect(decideTick(input({ state: state({ state: 'halted', reason: 'killed' }) }))).toMatchObject({
       kind: 'stop',

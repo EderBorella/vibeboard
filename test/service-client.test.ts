@@ -2,27 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { IDLE_STATE } from '../src/core/autopilot-state.js';
 import { defaultConfig } from '../src/core/config.js';
 import type { TickAction } from '../src/core/tick.js';
-import type { BoardName, Card } from '../src/core/types.js';
 import { writeAutopilotState } from '../src/server/autopilot-store.js';
 import type { BoardView } from '../src/service/board-client.js';
 import { BoardClient } from '../src/service/board-client.js';
 import { type ActResult, type LoopDeps, runLoop } from '../src/service/loop.js';
 import { openTestProject } from './helpers.js';
-
-function card(id: string, board: BoardName, columnSlug: string, links: string[]): Card {
-  return {
-    id,
-    title: id,
-    order: 10,
-    tags: [],
-    links,
-    created: '2026-08-06',
-    board,
-    columnSlug,
-    body: '',
-    filePath: `/tmp/${id}.md`,
-  };
-}
 
 // The loop's HTTP surface, against a REAL app with a REAL minted service credential — the same store the
 // app verifies against, so a token this suite accepts is one the server would.
@@ -215,13 +199,13 @@ describe('the loop’s sequencing', () => {
   // A board that genuinely yields a `dispatch`, because the loop calls the REAL `decideTick` — it holds no
   // decisions of its own, so a fixture thin enough to decide nothing would make every sequencing test below
   // pass on a `no-op` stop instead of on the thing it names.
+  // AN EMPTY BOARD, deliberately: these tests are about SEQUENCING, so all the board has to be is one
+  // `decideTick` answers with an action rather than a stop — and the empty board is the smallest such, since
+  // it is the bootstrap's own trigger. A board mid-lifecycle would make every test here depend on which phase
+  // the tick picked, which is `test/tick.test.ts`'s subject and not this file's.
   const board = (): BoardView => ({
     config: defaultConfig('T'),
-    boards: {
-      features: [card('F-001', 'features', 'todo', ['P-001'])],
-      product: [card('P-001', 'product', 'backlog', ['F-001'])],
-      engineering: [],
-    },
+    boards: { features: [], product: [], engineering: [] },
     problems: [],
   });
 

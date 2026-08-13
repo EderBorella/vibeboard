@@ -175,6 +175,70 @@ async function stampForRun(
   };
 }
 
+// A RUN MAY NOT CREATE A SECOND CARD FOR ONE PIECE OF WORK, and this is ruling 58's correction. The
+// `createdBy` stamp answers "has a RE-RUN already done this"; it says nothing about one run creating the same
+// card twice in a single pass, which is what the first real run did — `E-001` and `E-002` both "Create
+// package.json with metadata", while its own report claimed two tasks where the board had three. The loop was
+// unharmed, because it counts the board rather than the report, but the duplicate then cost a full
+// implement-and-review cycle on work that was already done. The ten-features incident was the same shape.
+//
+// AT THE ENDPOINT rather than in a prompt, for the reason every other rule here is: an agent that has lost
+// track of its own work is exactly the agent that cannot be asked to remember.
+//
+// IT NAMES THE CARD THAT ALREADY HOLDS THE TITLE, because an agent told only "no" tries again — and the id is
+// also the answer to what it should have found by reading the board first.
+async function duplicateTitleForRun(ctx: AppCtx, input: CreateCardInput): Promise<string | undefined> {
+  const { root, config } = ctx.session as { root: string; config: ProjectConfig };
+  const wanted = comparableTitle(input.title);
+  // An untitled card is a different fault and not this one's to report: matching every other untitled card
+  // would refuse the second one for the wrong reason.
+  if (wanted === '') return undefined;
+  // LIVE CARDS IN ONE COLUMN. `readBoard` skips the archive, which is deliberate — a card must not collide
+  // with its own history — and the column narrows it because a card advancing through the board would
+  // otherwise collide with itself, and a genuinely different task may share a title with one elsewhere.
+  const live = await readBoard(root, input.board, config);
+  const holder = live.find((c) => c.columnSlug === input.columnSlug && comparableTitle(c.title) === wanted);
+  if (!holder) return undefined;
+  return `${holder.id} in ${input.board}/${input.columnSlug} is already titled "${holder.title}", so this would be a second card for one piece of work. If ${holder.id} is the card you meant, it is already made and there is nothing to create; if this is genuinely different work, say how in the title.`;
+}
+
+// Case and surrounding whitespace only. Not `slugify`, which also folds punctuation and would call two titles
+// a person can tell apart the same one — and a refusal is expensive enough that it must not be a guess.
+function comparableTitle(title: unknown): string {
+  return typeof title === 'string' ? title.trim().toLowerCase() : '';
+}
+
+// What the credential says about the run doing the creating. The three rules above each read a subset of it.
+type RunCredential = { board?: BoardName; card?: string; skill?: string; run?: string };
+
+// EVERY LIFECYCLE RULE A CREATE MUST PASS, in the one order that works — and in a function of its own so the
+// route stays a flat sequence, which is also what keeps its complexity where a nested chain of refusals put it.
+//
+// THE BOARD IS JUDGED BEFORE THE STAMP, which is a change of order: the refusal used to read the column the
+// agent guessed, so the stamp had to correct it first. It now reads the board alone, and asking which board a
+// run may write to before working out where on it the card goes is the order that cannot produce a sentence
+// about the wrong board.
+//
+// AND THE TITLE IS JUDGED AFTER IT, for the mirror-image reason: the column the card actually enters is the one
+// the stamp decided, so comparing against the column the agent asked for would look in a column the card was
+// never going to land in — and a run could get its duplicate through by naming a different one.
+async function lifecycleRulesForCreate(
+  ctx: AppCtx,
+  cred: RunCredential,
+  input: CreateCardInput,
+): Promise<{ effective: CreateCardInput } | { error: string }> {
+  const { config } = ctx.session as { config: ProjectConfig };
+  const wrong = wrongBoardForRun(config, cred, input);
+  if (wrong) return { error: wrong };
+  const stamped = await stampForRun(ctx, cred, input);
+  if ('error' in stamped) return stamped;
+  // The stamp wins over anything the caller sent, like every other field the server knows better than the
+  // agent does.
+  const effective = { ...input, ...stamped.patch };
+  const duplicate = await duplicateTitleForRun(ctx, effective);
+  return duplicate ? { error: duplicate } : { effective };
+}
+
 // The two flags and nothing else. `false` CLEARS rather than being rejected: `serializeCard` emits either
 // key only when true, so turning one off is the same write as never having set it.
 //
@@ -210,23 +274,12 @@ export async function registerCardRoutes(api: FastifyInstance, ctx: AppCtx): Pro
     // it was not.
     if (!BOARDS.includes(input?.board)) return reply.code(400).send({ error: 'Unknown board' });
     // A run is held to the lifecycle; a person at the browser is not.
-    //
-    // THE BOARD IS JUDGED BEFORE THE STAMP, which is a change of order: the refusal used to read the column
-    // the agent guessed, so the stamp had to correct it first. It now reads the board alone, and asking which
-    // board a run may write to before working out where on it the card goes is the order that cannot produce a
-    // sentence about the wrong board.
-    let effective = input;
-    if (req.credential?.run) {
-      // 409 rather than 400: the request is well formed, and it is the project's lifecycle that makes it wrong.
-      const wrong = wrongBoardForRun(ctx.session.config, req.credential, input);
-      if (wrong) return reply.code(409).send({ error: wrong });
-      const stamped = await stampForRun(ctx, req.credential, input);
-      if ('error' in stamped) return reply.code(409).send({ error: stamped.error });
-      // The stamp wins over anything the caller sent, like every other field the server knows better than the
-      // agent does.
-      effective = { ...input, ...stamped.patch };
-    }
-    const card = await createCard(ctx.session.root, ctx.session.config, effective, today());
+    const ruled = req.credential?.run
+      ? await lifecycleRulesForCreate(ctx, req.credential, input)
+      : { effective: input };
+    // 409 rather than 400: the request is well formed, and it is the project's lifecycle that makes it wrong.
+    if ('error' in ruled) return reply.code(409).send({ error: ruled.error });
+    const card = await createCard(ctx.session.root, ctx.session.config, ruled.effective, today());
     if (card === 'unknown-column') return reply.code(400).send({ error: 'Unknown column' });
     return card;
   });

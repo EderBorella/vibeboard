@@ -408,6 +408,192 @@ describe('the vertical a run’s new card belongs to', () => {
   });
 });
 
+// RULING 58's CORRECTION, forced by the first real run: `break-down` created `E-001` and `E-002` both titled
+// "Create package.json with metadata" in ONE pass, and the stamp cannot see that — it answers "has a RE-RUN
+// already done this". The duplicate cost a full implement-and-review cycle on work that was already done.
+describe('a second card with the same title', () => {
+  it('is refused, and names the card that already holds the title', async () => {
+    const { app, store, root } = await open();
+    const run = store.mintRun('work', 'run-dup-1', root, 'P-001', { board: 'product', skill: 'break-down' });
+    const first = await create(app, bearer(run.token), {
+      board: 'engineering',
+      columnSlug: 'backlog',
+      title: 'Create package.json with metadata',
+    });
+    expect(first.statusCode).toBe(200);
+
+    const second = await create(app, bearer(run.token), {
+      board: 'engineering',
+      columnSlug: 'backlog',
+      title: 'Create package.json with metadata',
+    });
+    // 409 like every other lifecycle refusal: the request is well formed, and it is the board that makes it
+    // wrong.
+    expect(second.statusCode).toBe(409);
+    // NAMED, because an agent told only "no" tries again — and the id is what it should have found by reading
+    // the board first.
+    expect(second.json().error).toContain(first.json().id);
+    expect(second.json().error).toContain('Create package.json with metadata');
+  });
+
+  it('is refused across a difference of case or surrounding whitespace', async () => {
+    // The differences a model re-typing its own title actually produces. Compared this way rather than
+    // exactly, because an agent that has lost track of its work does not lose track of it verbatim.
+    const { app, store, root } = await open();
+    const run = store.mintRun('work', 'run-dup-2', root, 'P-001', { board: 'product', skill: 'break-down' });
+    const first = await create(app, bearer(run.token), {
+      board: 'engineering',
+      columnSlug: 'backlog',
+      title: 'Add the --json flag',
+    });
+    expect(first.statusCode).toBe(200);
+
+    const second = await create(app, bearer(run.token), {
+      board: 'engineering',
+      columnSlug: 'backlog',
+      title: '  ADD THE --json FLAG  ',
+    });
+    expect(second.statusCode).toBe(409);
+    expect(second.json().error).toContain(first.json().id);
+  });
+
+  // A SECOND RUN TOO, not merely the same one twice: the refusal is about the board's state, and a re-run that
+  // has forgotten its own output is the case the stamp was supposed to cover on its own.
+  it('is refused for a different run of the same phase', async () => {
+    const { app, store, root } = await open();
+    const one = store.mintRun('work', 'run-dup-3a', root, 'P-001', { board: 'product', skill: 'break-down' });
+    const two = store.mintRun('work', 'run-dup-3b', root, 'P-001', { board: 'product', skill: 'break-down' });
+    await create(app, bearer(one.token), {
+      board: 'engineering',
+      columnSlug: 'backlog',
+      title: 'Write the tests',
+    });
+    const again = await create(app, bearer(two.token), {
+      board: 'engineering',
+      columnSlug: 'backlog',
+      title: 'Write the tests',
+    });
+    expect(again.statusCode).toBe(409);
+  });
+
+  // THE COLUMN IT ENTERS, not the one it asked for. The stamp decides that (ruling 61), so a comparison made
+  // before the stamp would look in a column the card was never going to land in — and the two together would
+  // let a run create its duplicate by asking for a different column.
+  it('is refused even when the second create asks for a different column', async () => {
+    const { app, store, root } = await open();
+    const run = store.mintRun('work', 'run-dup-4', root, 'P-001', { board: 'product', skill: 'break-down' });
+    const first = await create(app, bearer(run.token), {
+      board: 'engineering',
+      columnSlug: 'backlog',
+      title: 'Parse the arguments',
+    });
+    expect(first.json().columnSlug).toBe('backlog');
+    const second = await create(app, bearer(run.token), {
+      board: 'engineering',
+      columnSlug: 'in-progress',
+      title: 'Parse the arguments',
+    });
+    expect(second.statusCode).toBe(409);
+    expect(second.json().error).toContain(first.json().id);
+  });
+
+  // NOT ACROSS COLUMNS. A card advancing through the board must not collide with itself: the task it is
+  // breaking down moved on, and a new card of that name is a new card.
+  it('allows a title a card in ANOTHER column of the same board holds', async () => {
+    const { app, store, root } = await open();
+    // A person's card, parked where a run's create can never land.
+    const mine = await create(app, admin, {
+      board: 'engineering',
+      columnSlug: 'in-progress',
+      title: 'Read the config file',
+    });
+    expect(mine.statusCode).toBe(200);
+    const run = store.mintRun('work', 'run-dup-5', root, 'P-001', { board: 'product', skill: 'break-down' });
+    const res = await create(app, bearer(run.token), {
+      board: 'engineering',
+      columnSlug: 'backlog',
+      title: 'Read the config file',
+    });
+    expect(res.statusCode).toBe(200);
+  });
+
+  // NOR AGAINST THE ARCHIVE, for the same reason one level further on: a card the user threw away must not
+  // veto the work being done properly, and `readBoard` reads the live columns only.
+  //
+  // TWO GUARDS MASK EACH OTHER HERE, verified rather than assumed: concatenating `readArchive` onto the list
+  // leaves this test GREEN, because an archived card's `columnSlug` is `archive` and the column filter above
+  // excludes it anyway. Both mutations at once is what turns this red. So this asserts the behaviour and not
+  // the mechanism — the mechanism is held by the test above it.
+  it('allows a title only an ARCHIVED card holds', async () => {
+    const { app, store, root } = await open();
+    const run = store.mintRun('work', 'run-dup-6', root, 'P-001', { board: 'product', skill: 'break-down' });
+    const first = await create(app, bearer(run.token), {
+      board: 'engineering',
+      columnSlug: 'backlog',
+      title: 'Print the usage text',
+    });
+    const archived = await app.inject({
+      method: 'POST',
+      url: `/api/cards/engineering/${first.json().id}/archive`,
+      headers: admin,
+    });
+    expect(archived.statusCode).toBe(200);
+
+    const again = await create(app, bearer(run.token), {
+      board: 'engineering',
+      columnSlug: 'backlog',
+      title: 'Print the usage text',
+    });
+    expect(again.statusCode).toBe(200);
+  });
+
+  // NOT ACROSS BOARDS either, which falls out of reading one board: a task legitimately carries the title of
+  // the story above it, and that is the hierarchy working rather than a duplicate.
+  it('allows a story and its task to share a title', async () => {
+    const { app, store, root } = await open();
+    const breakingDown = store.mintRun('work', 'run-dup-7', root, 'F-001', {
+      board: 'features',
+      skill: 'break-down',
+    });
+    const story = await create(app, bearer(breakingDown.token), {
+      board: 'product',
+      columnSlug: 'backlog',
+      title: 'As a user I can ask for JSON',
+    });
+    expect(story.statusCode).toBe(200);
+    const splitting = store.mintRun('work', 'run-dup-8', root, story.json().id, {
+      board: 'product',
+      skill: 'break-down',
+    });
+    const task = await create(app, bearer(splitting.token), {
+      board: 'engineering',
+      columnSlug: 'backlog',
+      title: 'As a user I can ask for JSON',
+    });
+    expect(task.statusCode).toBe(200);
+  });
+
+  // IT APPLIES TO A RUN, NOT TO A PERSON, and that line is drawn on `req.credential?.run` exactly as
+  // `stampForRun` and `wrongBoardForRun` draw it: someone at the browser may legitimately want two cards with
+  // one title, and it is not the server's business to argue.
+  it('lets a person at the browser create two cards with one title', async () => {
+    const { app } = await open();
+    const first = await create(app, admin, {
+      board: 'engineering',
+      columnSlug: 'backlog',
+      title: 'Tidy the helpers',
+    });
+    const second = await create(app, admin, {
+      board: 'engineering',
+      columnSlug: 'backlog',
+      title: 'Tidy the helpers',
+    });
+    expect(first.statusCode).toBe(200);
+    expect(second.statusCode).toBe(200);
+    expect(second.json().id).not.toBe(first.json().id);
+  });
+});
+
 // RULING 58. `Card.createdBy` is what makes "has this already been done?" a board question with nothing to
 // trust: a re-run sees its own earlier output, and unlike `RunRecord.created` — frontmatter the agent wrote
 // about itself — this is unforgeable.

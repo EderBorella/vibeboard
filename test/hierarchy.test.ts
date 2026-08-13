@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
   farSideParentProblem,
+  isLive,
+  liveCards,
   oneParentProblem,
   parentBoardOf,
   secondParentProblem,
 } from '../src/core/hierarchy.js';
+import { ARCHIVE_SLUG } from '../src/core/layout.js';
 import type { BoardName, Card } from '../src/core/types.js';
 
 const card = (id: string, board: BoardName, links: string[] = []): Card => ({
@@ -113,5 +116,34 @@ describe('the parent side', () => {
       'already has a parent',
     );
     expect(oneParentProblem(card('P-002', 'product'), ['F-001'], withParent)).toBeNull();
+  });
+});
+
+// BOTH HALVES OF THE LIVENESS RULE, each on its own, because they are written by different paths: the
+// FOLDER is what the board reads a card's state from, and the FIELD is what a restore puts it back with —
+// so a half-written archive has one without the other. The folder half had no cover at all: the one test
+// that pinned it went with the rollup rules, every surviving archived fixture sets the field, and deleting
+// the clause left the whole suite green.
+describe('a card auto-pilot can see', () => {
+  it('counts an ordinary card as live', () => {
+    // A fixture of refusals alone would pass against a function that answered false to everything.
+    expect(isLive(card('P-001', 'product'))).toBe(true);
+  });
+
+  it('excludes a card sitting in the archive FOLDER with no archived stamp', () => {
+    expect(isLive({ ...card('P-001', 'product'), columnSlug: ARCHIVE_SLUG })).toBe(false);
+  });
+
+  it('excludes a card stamped archived while its folder still says otherwise', () => {
+    expect(isLive({ ...card('P-001', 'product'), archived: '2026-08-13T00:00:00Z' })).toBe(false);
+  });
+
+  it('filters a list by the same rule, which is the form every reader uses', () => {
+    const cards = [
+      card('P-001', 'product'),
+      { ...card('P-002', 'product'), columnSlug: ARCHIVE_SLUG },
+      { ...card('P-003', 'product'), archived: '2026-08-13T00:00:00Z' },
+    ];
+    expect(liveCards(cards).map((c) => c.id)).toEqual(['P-001']);
   });
 });

@@ -248,7 +248,11 @@ function finished(ap: AutopilotConfig, live: Card[], blocked: Card[]): TickActio
   // AND `complete` SAYS WHAT IT LEFT BEHIND (decision 45). Without the sentence the repeal would be a silent
   // success over work a person still has to deal with.
   if (blocked.length === 0) return stop('complete');
-  const count = `${blocked.length} task${blocked.length === 1 ? '' : 's'}`;
+  // "CARD" AND NOT "TASK", because a story can be blocked too since decision 45's 2026-08-13 correction.
+  // The sentence is the whole visible part of that repeal — a `complete` that did not say what it left
+  // behind would be a silent success over work a person still has to deal with — so naming the wrong kind
+  // of thing in it is not a wording detail.
+  const count = `${blocked.length} card${blocked.length === 1 ? '' : 's'}`;
   return stop(
     'complete',
     `Auto-pilot finished. ${count} ${isAre(blocked)} blocked and ${blocked.length === 1 ? 'needs' : 'need'} you: ${names(blocked)}.`,

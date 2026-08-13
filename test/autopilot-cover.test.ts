@@ -53,8 +53,29 @@ describe('lifecycle coverage', () => {
     // The exact string rather than a match: it carried the "also routed" half of this refusal too, and
     // that half retired with the routing table.
     expect(coverageProblems(config)).toContain(
-      'blockedColumn "blocked" is listed as terminal, which would report blocked work as done.',
+      'blockedColumn "blocked" is listed as terminal for engineering, which would report blocked work as done.',
     );
+  });
+
+  // AND THE SAME ONE LINE UNDER PRODUCT, which decision 45's 2026-08-13 correction made reachable: a
+  // blocked story listed as terminal is `complete`'s own positive evidence, so a project whose last story
+  // nobody could break down would report itself finished over it. The board is NAMED, or a reader who
+  // wrote the line under product is sent to look at engineering.
+  it('refuses a config listing blocked under terminal.product', () => {
+    const config = fresh();
+    ap(config).terminal.product = ['done', 'blocked'];
+    expect(coverageProblems(config)).toContain(
+      'blockedColumn "blocked" is listed as terminal for product, which would report blocked work as done.',
+    );
+  });
+
+  // Features has no blocked column, so `blocked` under terminal.features is not this refusal's business —
+  // it is a mistyped terminal column, which `checkTerminal` already names, and reporting both would be one
+  // problem told twice with two different remedies.
+  it('says nothing about a blocked column on a board that has none', () => {
+    const config = fresh();
+    ap(config).terminal.features = ['done', 'blocked'];
+    expect(coverageProblems(config).join(' ')).not.toContain('would report blocked work as done');
   });
 
   // The unknown-verify-mode half of this case went with `verify:`, which was a per-route field. Nothing

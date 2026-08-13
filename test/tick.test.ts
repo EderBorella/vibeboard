@@ -920,7 +920,9 @@ describe('decideTick — finding D: complete with a blocked task', () => {
     expect(action).toMatchObject({ kind: 'stop', reason: 'complete' });
     expect(detailOf(action)).toContain('E-001');
     expect(detailOf(action)).toContain('E-003');
-    expect(detailOf(action)).toMatch(/2 tasks are blocked/);
+    // "cards", not "tasks": a story can be blocked too, so the noun this sentence used to carry became a
+    // lie the moment product got a blocked column.
+    expect(detailOf(action)).toMatch(/2 cards are blocked/);
   });
 
   it('says nothing about blocked work when there is none', () => {
@@ -953,5 +955,60 @@ describe('decideTick — finding D: complete with a blocked task', () => {
     const detail = detailOf(decideTick(input({ cards })));
     expect(detail).toContain('E-001');
     expect(detail).not.toContain('cannot report itself finished');
+  });
+});
+
+// THE SAME FOUR CHANGES, ONE LEVEL UP (decision 45, corrected 2026-08-13). A blocked STORY settles, so it
+// leaves `unfinished` — and taking anything out of that set is what opens a false success, which is why
+// each piece is asserted on its own here rather than trusted to follow from the predicate. The cover
+// check's half lives in test/autopilot-cover.test.ts, where the config it refuses can be built.
+describe('decideTick — complete over a blocked story', () => {
+  const blockedStory = (over: Partial<Card> = {}): Card => ({
+    ...card('P-002', 'product', 'blocked', 20, ['F-001']),
+    ...over,
+  });
+
+  // PIECE ONE: blocked stories leave the `unfinished` set. Without it `complete` is exactly as unreachable
+  // as it was before the repeal — one redundant story, and every feature behind it is lost.
+  it('reports complete when the only unsettled card is a blocked story', () => {
+    const cards = [
+      card('F-001', 'features', 'done', 10, ['P-001', 'P-002']),
+      card('P-001', 'product', 'done', 10, ['F-001']),
+      blockedStory(),
+    ];
+    expect(decideTick(input({ cards }))).toMatchObject({ kind: 'stop', reason: 'complete' });
+  });
+
+  it('names the blocked story in the complete detail, as a card rather than a task', () => {
+    const cards = [
+      card('F-001', 'features', 'done', 10, ['P-001', 'P-002']),
+      card('P-001', 'product', 'done', 10, ['F-001']),
+      blockedStory(),
+    ];
+    const action = decideTick(input({ cards }));
+    expect(detailOf(action)).toContain('P-002');
+    expect(detailOf(action)).toMatch(/1 card is blocked/);
+    // The noun is the point: a story is not a task, and this sentence is the whole visible part of the
+    // repeal — the one thing telling a person what the project left behind.
+    expect(detailOf(action)).not.toContain('task');
+  });
+
+  // PIECE TWO: `complete` still asserts its POSITIVE EVIDENCE. With blocked stories out of `unfinished`,
+  // "every live card is terminal" stops being implied by "nothing unfinished and something live" — so a
+  // board holding nothing but a blocked story would report the project finished.
+  it('reports stalled, naming the story, for a board holding only a blocked story', () => {
+    const action = decideTick(input({ cards: [blockedStory()] }));
+    expect(action).toMatchObject({ kind: 'stop', reason: 'stalled' });
+    expect(detailOf(action)).toContain('P-002');
+  });
+
+  // The same claim with the evidence archived rather than absent, which is the shape that actually
+  // happens: a project worked down to one story nobody could break down and then tidied up.
+  it('does not count an archived feature as the finished work it needs', () => {
+    const cards = [
+      { ...card('F-001', 'features', 'archive', 10, []), archived: '2026-08-13T00:00:00Z' },
+      blockedStory(),
+    ];
+    expect(decideTick(input({ cards }))).toMatchObject({ kind: 'stop', reason: 'stalled' });
   });
 });

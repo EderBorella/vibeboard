@@ -1,4 +1,4 @@
-import { type AutopilotConfig, isTerminalColumn } from './autopilot.js';
+import { type AutopilotConfig, BLOCKED_BOARDS, isTerminalColumn } from './autopilot.js';
 import { boardColumnSlugs } from './board.js';
 import { LIFECYCLE_SKILLS, PHASES } from './phases.js';
 import { BOARDS, type BoardName, type ProjectConfig } from './types.js';
@@ -80,15 +80,23 @@ function checkTerminal(ap: AutopilotConfig, columns: Record<BoardName, string[]>
 
 function checkNamedColumns(ap: AutopilotConfig, columns: Record<BoardName, string[]>, out: string[]): void {
   checkTerminal(ap, columns, out);
+  // THE COLUMN MUST EXIST — on engineering alone, and that is ruling 59 rather than an oversight. Product
+  // gained a blocked column on 2026-08-13 and there is no migration, so every project scaffolded before
+  // then has none: demanded here, this would refuse to START a lifecycle that ran perfectly the day
+  // before. The stamp fails closed instead and names the missing column (core/tick.ts), which costs one
+  // story its carry-on rather than costing the project every feature it has left.
   if (!columns.engineering.includes(ap.blockedColumn)) {
     out.push(`blockedColumn is "${ap.blockedColumn}", which is not a column on the engineering board.`);
   }
-  // The blocked-is-not-terminal half STAYS, and it is the only one of the two that ever guarded
-  // anything real: listing `blocked` under terminal.engineering is one line that would make a blocked
-  // card count as `complete`'s own positive evidence. The "also routed" half retired with the table.
-  if (isTerminalColumn(ap, 'engineering', ap.blockedColumn)) {
+  // AND IT MUST NOT BE TERMINAL, on every board that has one. The only one of the routing checks that
+  // ever guarded anything real: listing `blocked` under `terminal` is one line that would make a blocked
+  // card count as `complete`'s own positive evidence, which is the false success the rest of decision 45's
+  // repeal was careful not to open. Per BOARD because `terminal` is per board — and the board is NAMED,
+  // or a reader who wrote the line under product would go looking at engineering.
+  for (const board of BLOCKED_BOARDS) {
+    if (!isTerminalColumn(ap, board, ap.blockedColumn)) continue;
     out.push(
-      `blockedColumn "${ap.blockedColumn}" is listed as terminal, which would report blocked work as done.`,
+      `blockedColumn "${ap.blockedColumn}" is listed as terminal for ${board}, which would report blocked work as done.`,
     );
   }
 }

@@ -10,6 +10,7 @@ import {
 } from '../src/core/layout.js';
 import type { Skill } from '../src/core/skills.js';
 import type { BoardName, Card } from '../src/core/types.js';
+import type { Verification } from '../src/core/verify.js';
 import { type BoardColumns, buildRunPrompt, type PromptInputs } from '../src/server/run-prompt.js';
 
 const ROOT = '/p';
@@ -533,6 +534,74 @@ describe('the judging contract', () => {
   // closed but says nothing anyone can act on.
   it('asks for an answer even when the answer is zero', () => {
     expect(judging()).toMatch(/even when the answer is 0/);
+  });
+});
+
+// WHAT A `fix` RUN IS TOLD ABOUT WHY ITS CARD CAME BACK. Spec §6: a `fix` receives "the failing verdict —
+// either a gate's own command and output, or the reviewer's findings — rendered from the `previous` run".
+//
+// A fix that is not told what failed will GUESS, and that makes the review loop a random walk bounded only by
+// `attemptCap`: the review sends it back, the fix changes something unrelated, the review sends it back again,
+// three times, and the task is blocked for a reason nobody can read.
+describe('the failing verdict a fix run is handed', () => {
+  const withVerdict = (verification: Verification, over: Record<string, unknown> = {}) =>
+    buildRunPrompt(
+      inputs({
+        previous: { run: 'IMPL-1', skill: 'implement', status: 'success', verification, ...over },
+      }),
+    );
+
+  it('tells a fix run which gate failed and what it printed', () => {
+    const prompt = withVerdict({
+      mode: 'gates',
+      passed: false,
+      at: 'T',
+      command: 'npm test',
+      output: 'Tests  1 failed | 40 passed',
+      reason: '`npm test` exited with 1.',
+    });
+    expect(prompt).toContain('npm test');
+    expect(prompt).toContain('Tests  1 failed | 40 passed');
+    expect(prompt).toContain('`npm test` exited with 1.');
+  });
+
+  it('tells a fix run what the reviewer asked for when no gate failed', () => {
+    // The OTHER rendering, and it needs its own test: a gate failure carries a command and a review carries
+    // words, so a single assertion over either would pass with the other half deleted.
+    const prompt = withVerdict({
+      mode: 'review',
+      passed: false,
+      at: 'T',
+      by: 'REV-1',
+      reason: 'the --json flag is parsed but never used',
+    });
+    expect(prompt).toContain('the --json flag is parsed but never used');
+    // And the run whose report holds the findings in full, so a fix that needs more can go and read them.
+    expect(prompt).toContain('REV-1');
+  });
+
+  it('says which of the two sent it back, so the fix knows what kind of failure it is', () => {
+    // A failing command and a reviewer's opinion are different things to address, and a fix told only "this
+    // failed" cannot tell whether to make a test pass or to change what the code does.
+    expect(withVerdict({ mode: 'gates', passed: false, at: 'T', command: 'npm test' })).toMatch(/gates/i);
+    expect(
+      withVerdict({ mode: 'review', passed: false, at: 'T', reason: 'not what the card asked' }),
+    ).toMatch(/review/i);
+  });
+
+  it('does not describe a passing verdict as something to fix', () => {
+    const prompt = withVerdict({ mode: 'review', passed: true, at: 'T', by: 'REV-1' });
+    expect(prompt).not.toMatch(/did NOT pass/);
+    expect(prompt).toMatch(/passed/i);
+  });
+
+  it('renders nothing about a verdict when the previous run carries none', () => {
+    // The ordinary hand-over case: a run that continues earlier work, with nothing yet decided about it.
+    const prompt = buildRunPrompt(
+      inputs({ previous: { run: 'IMPL-1', skill: 'implement', status: 'success' } }),
+    );
+    expect(prompt).not.toMatch(/did NOT pass/);
+    expect(prompt).toContain('This continues earlier work.');
   });
 });
 

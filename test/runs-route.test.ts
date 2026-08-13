@@ -1091,3 +1091,53 @@ describe('POST /api/runs — the loop’s own evidence', () => {
     expect(prompt).toMatch(/nobody has run the gates/i);
   }, 30000);
 });
+
+// AND THE VERDICT REACHES THE PROMPT THROUGH THE APP, which is the half a unit test on `buildRunPrompt` cannot
+// prove: the record already carries `verification` — the verdict path wrote it — so this is a render rather than
+// a new fact, and what had to be shown is that nothing between the record and the prompt drops it.
+describe('POST /api/runs — a fix run is told what failed', () => {
+  it('carries the failing verdict off the previous run’s record into the prompt', async () => {
+    const argsLog = await recordingShimArgs();
+    const project = await projectWithCard();
+    await writeRun(project.root, {
+      run: '20260813-100000-impl',
+      card: project.card,
+      board: 'engineering',
+      skill: 'implement',
+      status: 'success',
+      started: '2026-08-13T10:00:00.000Z',
+      backend: 'claude-code',
+      model: 'opus',
+      effort: 'high',
+      mode: 'bypassPermissions',
+      report: 'added the flag',
+      // Written by the loop's gate step, onto the run it judged (decision 18).
+      verification: {
+        mode: 'gates',
+        passed: false,
+        at: '2026-08-13T10:05:00.000Z',
+        command: 'npm test',
+        output: 'Tests  1 failed | 40 passed',
+        reason: '`npm test` exited with 1.',
+      },
+    });
+    const { run } = (
+      await project.app.inject({
+        method: 'POST',
+        url: '/api/runs',
+        payload: {
+          board: 'engineering',
+          card: project.card,
+          skill: 'execute',
+          previous: '20260813-100000-impl',
+        },
+      })
+    ).json() as { run: RunRecord };
+    await settled(project, project.card, run.run);
+    delete process.env.VIBEBOARD_SHIM_ARGS;
+
+    const prompt = await promptFrom(argsLog);
+    expect(prompt).toContain('npm test');
+    expect(prompt).toContain('Tests  1 failed | 40 passed');
+  }, 30000);
+});

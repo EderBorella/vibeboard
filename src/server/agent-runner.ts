@@ -173,6 +173,9 @@ function narrowPrevious(previous: RunRecord): NonNullable<Parameters<typeof buil
     ...(previous.report ? { report: previous.report } : {}),
     ...(previous.note ? { note: previous.note } : {}),
     ...(previous.filesChanged === undefined ? {} : { filesChanged: previous.filesChanged }),
+    // WHAT WAS DECIDED ABOUT IT. Already on the record, written by the verdict path — and it is the whole
+    // input to a `fix` run, which is otherwise told its card came back and not why.
+    ...(previous.verification ? { verification: previous.verification } : {}),
   };
 }
 

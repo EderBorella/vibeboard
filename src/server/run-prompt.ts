@@ -58,6 +58,11 @@ export interface PromptInputs {
     // What VibeBoard recorded when there was no report — an exit code, a timeout, an empty answer.
     note?: string;
     filesChanged?: number;
+    // WHAT WAS DECIDED ABOUT IT, where anything was. This is what a `fix` run is addressing: a gate's own
+    // command and output, or the reviewer's findings. It is already on the record — the verdict path wrote it
+    // there (decision 18) — so this is a render rather than a new fact, and without it a fix run is told its
+    // card came back and not why, which makes the review loop a random walk bounded only by `attemptCap`.
+    verification?: Verification;
   };
   // The user's own words for this dispatch.
   userPrompt?: string;
@@ -443,10 +448,42 @@ function previousSection(previous: NonNullable<PromptInputs['previous']>, judgin
   const report = previous.report?.trim()
     ? `What it reported:\n\n${previous.report.trim()}`
     : 'It wrote no report.';
+  const verdict = previous.verification ? `\n\n${verdictEvidence(previous.verification)}` : '';
   return section(
     judging ? 'The run you are judging' : 'The previous run on this card',
-    `${judging ? '' : 'This continues earlier work.\n\n'}${facts.join('\n')}\n\n${report}`,
+    `${judging ? '' : 'This continues earlier work.\n\n'}${facts.join('\n')}\n\n${report}${verdict}`,
   );
+}
+
+// WHAT WAS DECIDED ABOUT THAT RUN, and it is the whole input to a `fix`. Two renderings, because there are two
+// kinds of failure and they are addressed differently: a failing COMMAND is a thing to make pass, and a
+// reviewer's FINDING is a thing to change. A fix told only "this failed" cannot tell which it is looking at.
+function verdictEvidence(v: Verification): string {
+  const who = v.mode === 'review' ? 'The review' : `The ${v.mode}`;
+  if (v.passed) return `${who} passed this run.`;
+  const head = `${who} did NOT pass this run:`;
+  // A GATE FAILURE carries its own command and what that command printed, which is evidence nobody has to
+  // interpret. `reason` distinguishes a command that was killed or could not be spawned from one that exited
+  // non-zero, and the first two are not failures of the code (core/verify.ts).
+  if (v.command) {
+    return [
+      head,
+      ...(v.reason ? ['', v.reason] : []),
+      '',
+      `The command that failed: \`${v.command}\``,
+      ...(v.output ? ['', 'What it printed:', '', '```', v.output.trim(), '```'] : []),
+    ].join('\n');
+  }
+  // AND A REVIEW CARRIES WORDS. This is not a tidy-up for a missing field: a fix handed no findings guesses,
+  // and a guess is what turns the review loop into a random walk that spends every attempt the cap allows.
+  return [
+    head,
+    ...(v.reason
+      ? ['', v.reason]
+      : ['', 'It recorded no reason, which is itself worth saying in your report.']),
+    // The judging run's own report holds the findings in full, so a fix that needs more can go and read them.
+    ...(v.by ? ['', `Its full findings are on run **${v.by}**.`] : []),
+  ].join('\n');
 }
 
 // The board is changed through the API, not by writing card files. Stated as the mechanism rather

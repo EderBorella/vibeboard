@@ -1,7 +1,8 @@
 import { attemptsUsed } from './accounting.js';
 import { type AutopilotConfig, isTerminalColumn, type Route, routeFor } from './autopilot.js';
 import type { CardProblem } from './board.js';
-import { childrenOf, isLive, liveCards, parentOf } from './hierarchy.js';
+import { hasUnfinishedChildren } from './derived-status.js';
+import { isLive, liveCards, parentOf } from './hierarchy.js';
 import type { RunRecord } from './runs.js';
 import { type SetupState, setupState, setupSubtreeIds } from './setup-feature.js';
 import { BOARDS, type BoardName, type Card } from './types.js';
@@ -47,13 +48,10 @@ export interface EligibilitySet {
   problem?: string;
 }
 
-// A universal quantifier, so it passes vacuously for a childless card — deliberately: a product card
-// nobody has broken down yet is exactly what the break-down route is for. What holds the vacuous case
-// shut for a CLOSE-OUT is the rollup, which requires at least one live child.
-export function hasUnfinishedChildren(ap: AutopilotConfig, card: Card, cards: Card[]): boolean {
-  const children = childrenOf(card, cards);
-  return children.some((child) => !isTerminalColumn(ap, child.board, child.columnSlug));
-}
+// RULING 62: this now lives in derived-status.ts, the module that owns "what is under this card", and is
+// re-exported here so nothing else has to move while both modules exist. What holds its vacuous case shut
+// for a CLOSE-OUT is the rollup, which requires at least one live child.
+export { hasUnfinishedChildren };
 
 // Whether this card's column earns its dispatch from a rollup rather than merely from having a route.
 // `advance` rules are not consulted: they move the card themselves, before anything can dispatch.

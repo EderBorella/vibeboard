@@ -17,6 +17,8 @@ const api = vi.hoisted(() => ({
   }),
   listResources: vi.fn(async () => []),
   listDiary: vi.fn(async () => []),
+  // The Project Log is a split now: the diary tab reads what agents filed as well.
+  listSuggestions: vi.fn(async () => []),
   listSkills: vi.fn(async () => ({ skills: [], invalid: [] })),
   listModels: vi.fn(async () => []),
   getModelStatus: vi.fn(async () => ({ up: true })),

@@ -7,6 +7,7 @@ import * as coreGate from '../src/core/dispatch-gate.js';
 import { skillRel } from '../src/core/layout.js';
 import * as coreRuns from '../src/core/runs.js';
 import * as coreSkills from '../src/core/skills.js';
+import * as coreSuggestions from '../src/core/suggestions.js';
 import * as core from '../src/core/types.js';
 import * as serverSnapshot from '../src/server/snapshot.js';
 import * as webApi from '../web/src/api.js';
@@ -75,6 +76,18 @@ describe('web/shared mirrors src/core', () => {
   it('mirrors every snapshot field, or declares why not', () => {
     expect([...web.SNAPSHOT_FIELDS, ...web.SNAPSHOT_NOT_MIRRORED].sort()).toEqual(
       [...serverSnapshot.SNAPSHOT_KEYS].sort(),
+    );
+  });
+
+  // NEW, like the snapshot guard above it: nothing in the browser could read a suggestion at all, so the
+  // web side carried no `Suggestion` type — only the per-card count on the snapshot.
+  it('mirrors the suggestion states', () => {
+    expect([...web.SUGGESTION_STATES]).toEqual([...coreSuggestions.SUGGESTION_STATES]);
+  });
+
+  it('mirrors every suggestion field, or declares why not', () => {
+    expect([...web.SUGGESTION_FIELDS, ...web.SUGGESTION_NOT_MIRRORED].sort()).toEqual(
+      [...coreSuggestions.SUGGESTION_KEYS].sort(),
     );
   });
 

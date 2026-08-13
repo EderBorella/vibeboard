@@ -1,7 +1,8 @@
 import { memo, useMemo, useState } from 'react';
 import { addDiaryEntry, type DiaryEntry } from '../api';
 import { useDiary } from '../diary/useDiary';
-import { MAX_ENTRY_TEXT } from '../shared';
+import { MAX_ENTRY_TEXT, type Suggestion } from '../shared';
+import { useSuggestions } from '../suggestions/useSuggestions';
 
 // The diary, and the permanent way to add to it.
 //
@@ -65,6 +66,69 @@ const DiaryList = memo(function DiaryList({ entries }: { entries: DiaryEntry[] }
   );
 });
 
+// The right-hand half (decision 48). Newest first, like the diary beside it, and copied rather than
+// reversed in place — `suggestions` belongs to the hook.
+//
+// Read-only here. The two actions live in the dock's pane, where a person is working on one thing; this
+// column is the RECORD, and it shows dismissed ones with their reason, which is the part that stops a
+// later checkup re-raising the same finding.
+function FiledList({ suggestions }: { suggestions: Suggestion[] }) {
+  const ordered = useMemo(() => [...suggestions].reverse(), [suggestions]);
+  return (
+    <ol className="filed-list">
+      {ordered.map((s) => (
+        <li className="filed-entry" data-state={s.state} key={s.id}>
+          <div className="filed-meta">
+            <span className="filed-state">{s.state}</span>
+            <time dateTime={s.created}>{when(s.created)}</time>
+            {/* Only what is there: a project-level finding carries no card, and an invented dash for
+                every absent field would make every row look the same shape. */}
+            {s.run && <span className="diary-chip">{s.run}</span>}
+            {s.card && <span className="diary-chip">{s.card}</span>}
+            {s.became && <span className="diary-chip">became {s.became}</span>}
+          </div>
+          <p className="filed-title">{s.title}</p>
+          {s.body && <p className="filed-text">{s.body}</p>}
+          {s.reason && <p className="filed-reason">{s.reason}</p>}
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+function FiledColumn({ bump }: { bump: number }) {
+  const { suggestions, failed, refresh } = useSuggestions(bump);
+  return (
+    <section className="filed" aria-label="What agents filed">
+      <div className="diary-head">
+        <h2>What agents filed</h2>
+        <p className="diary-lede">
+          Work an agent noticed and deliberately did not do. Nothing blocks on one and nothing is lost; triage
+          them in the Suggestions pane.
+        </p>
+        <button type="button" className="btn-secondary diary-refresh" onClick={refresh}>
+          Refresh suggestions
+        </button>
+      </div>
+      {failed ? (
+        <div className="diary-empty">
+          <p>Could not read what agents filed.</p>
+          <button type="button" className="btn-secondary" onClick={refresh}>
+            Try again
+          </button>
+        </div>
+      ) : suggestions.length === 0 ? (
+        // Said out loud, like the diary's own empty state: an empty column reads as a broken one.
+        <div className="diary-empty">
+          <p>Nothing has been filed in this project yet.</p>
+        </div>
+      ) : (
+        <FiledList suggestions={suggestions} />
+      )}
+    </section>
+  );
+}
+
 export function DiaryView({ bump }: { bump: number }) {
   const { entries, failed, refresh, add: onWritten } = useDiary(bump);
   const [draft, setDraft] = useState('');
@@ -94,62 +158,67 @@ export function DiaryView({ bump }: { bump: number }) {
   }
 
   return (
-    <section className="diary">
-      <div className="diary-head">
-        <h2>Project log</h2>
-        <p className="diary-lede">
-          One line per event — what happened to this project, in order. Auto-pilot will write here after every
-          dispatch and whenever it stops; add your own for anything you did by hand.
-        </p>
-        {/* Always reachable, not only after a failed read. New entries arrive over the socket, and a dropped
+    // THE SPLIT (decision 48): the diary on the left, what agents filed on the right, in the space the
+    // diary list never uses. Both are the record of what happened while nobody was watching.
+    <div className="log-split">
+      <section className="diary" aria-label="Project log">
+        <div className="diary-head">
+          <h2>Project log</h2>
+          <p className="diary-lede">
+            One line per event — what happened to this project, in order. Auto-pilot will write here after
+            every dispatch and whenever it stops; add your own for anything you did by hand.
+          </p>
+          {/* Always reachable, not only after a failed read. New entries arrive over the socket, and a dropped
             socket is invisible: reconnecting does not change `bump`, and the server replays only the board
             snapshot on connect — so without this the log can sit silently stale with no way to ask again. */}
-        <button type="button" className="btn-secondary diary-refresh" onClick={refresh}>
-          Refresh
-        </button>
-      </div>
-
-      <div className="diary-compose">
-        <textarea
-          aria-label="Add to the log"
-          placeholder="What happened?"
-          value={draft}
-          rows={2}
-          // The server bounds an entry at this length and truncates quietly, which is right for an
-          // agent's summary and wrong for a paragraph somebody typed — this file argues two screens down
-          // that such a paragraph is not recoverable from anywhere. So the box will not accept more than
-          // will survive, rather than accepting it and losing the tail on save.
-          maxLength={MAX_ENTRY_TEXT}
-          onChange={(e) => setDraft(e.target.value)}
-        />
-        <button
-          type="button"
-          className="btn-primary"
-          disabled={busy || text === ''}
-          onClick={() => void add()}
-        >
-          {busy ? 'Adding…' : 'Add entry'}
-        </button>
-      </div>
-      {/* `assertive`, not `polite`: the entry was NOT written, and the box still holds what was typed. */}
-      <div aria-live="assertive">{error && <p className="diary-error">{error}</p>}</div>
-
-      {failed ? (
-        <div className="diary-empty">
-          <p>Could not read this project’s log.</p>
-          <button type="button" className="btn-secondary" onClick={refresh}>
-            Try again
+          <button type="button" className="btn-secondary diary-refresh" onClick={refresh}>
+            Refresh
           </button>
         </div>
-      ) : entries.length === 0 ? (
-        // Said out loud. An empty screen would read as a broken one, and this is the file a reader comes
-        // to precisely when they want to know what has been going on.
-        <div className="diary-empty">
-          <p>Nothing has happened in this project yet.</p>
+
+        <div className="diary-compose">
+          <textarea
+            aria-label="Add to the log"
+            placeholder="What happened?"
+            value={draft}
+            rows={2}
+            // The server bounds an entry at this length and truncates quietly, which is right for an
+            // agent's summary and wrong for a paragraph somebody typed — this file argues two screens down
+            // that such a paragraph is not recoverable from anywhere. So the box will not accept more than
+            // will survive, rather than accepting it and losing the tail on save.
+            maxLength={MAX_ENTRY_TEXT}
+            onChange={(e) => setDraft(e.target.value)}
+          />
+          <button
+            type="button"
+            className="btn-primary"
+            disabled={busy || text === ''}
+            onClick={() => void add()}
+          >
+            {busy ? 'Adding…' : 'Add entry'}
+          </button>
         </div>
-      ) : (
-        <DiaryList entries={entries} />
-      )}
-    </section>
+        {/* `assertive`, not `polite`: the entry was NOT written, and the box still holds what was typed. */}
+        <div aria-live="assertive">{error && <p className="diary-error">{error}</p>}</div>
+
+        {failed ? (
+          <div className="diary-empty">
+            <p>Could not read this project’s log.</p>
+            <button type="button" className="btn-secondary" onClick={refresh}>
+              Try again
+            </button>
+          </div>
+        ) : entries.length === 0 ? (
+          // Said out loud. An empty screen would read as a broken one, and this is the file a reader comes
+          // to precisely when they want to know what has been going on.
+          <div className="diary-empty">
+            <p>Nothing has happened in this project yet.</p>
+          </div>
+        ) : (
+          <DiaryList entries={entries} />
+        )}
+      </section>
+      <FiledColumn bump={bump} />
+    </div>
   );
 }

@@ -1383,6 +1383,45 @@ body {
 .diary-outcome { color: var(--text); }
 .diary-text { line-height: 1.55; font-size: 0.92rem; }
 
+/* THE SPLIT (decision 48). The diary is a 68ch reading column, so the right-hand half costs nothing that
+   was being used — and what agents filed belongs beside the narrative rather than behind another tab. */
+.log-split { flex: 1; min-width: 0; display: flex; overflow: hidden; }
+.filed {
+  flex: 0 1 42%; min-width: 0; overflow-y: auto; background: var(--wash);
+  border-left: 1px solid var(--border);
+  padding: 1.25rem 1.5rem; display: flex; flex-direction: column; gap: 1rem;
+}
+/* Narrow enough that the two columns stop being two columns: the diary keeps the width, and this stacks
+   under it rather than becoming a gutter neither half can be read in. */
+@media (max-width: 1100px) {
+  .log-split { flex-direction: column; overflow-y: auto; }
+  .filed { flex: none; border-left: none; border-top: 1px solid var(--border); }
+}
+
+.filed-list { list-style: none; display: flex; flex-direction: column; gap: 0.1rem; }
+.filed-entry {
+  display: flex; flex-direction: column; gap: 0.2rem;
+  padding: 0.6rem 0 0.6rem 0.75rem;
+  border-left: 2px solid var(--border);
+}
+/* The state in the rail as well as the word. An active finding is the one asking for something; a
+   dismissed one is kept for what its reason says, and it must not read as still open. */
+.filed-entry[data-state='active'] { border-left-color: var(--warn, #b8860b); }
+.filed-entry[data-state='actioned'] { border-left-color: var(--accent); }
+.filed-entry[data-state='dismissed'] { border-left-color: var(--border); }
+.filed-meta {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.5rem;
+  font-size: 0.72rem; color: var(--muted);
+}
+.filed-state {
+  font-family: var(--font-display); text-transform: uppercase; letter-spacing: 0.1em;
+  font-size: 0.66rem; color: var(--text);
+}
+.filed-title { font-size: 0.92rem; line-height: 1.5; color: var(--text); }
+.filed-text { font-size: 0.86rem; line-height: 1.5; color: var(--muted); }
+/* Why it was said no to. Quiet, and italic so it does not read as part of the finding itself. */
+.filed-reason { font-size: 0.82rem; line-height: 1.5; color: var(--muted); font-style: italic; }
+
 /* ---------- Auto-pilot transport strip ----------
    Stacked directly under the header, so the thing the app is FOR has a control on the page rather than
    four clicks inside a settings modal. Tone-coloured on the left edge only: the strip is present at all

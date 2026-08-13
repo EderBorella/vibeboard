@@ -1,10 +1,15 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DiaryEntry } from '../web/src/api.js';
 import { MAX_ENTRY_TEXT } from '../src/core/diary.js';
+import type { Suggestion } from '../web/src/shared.js';
 
-const api = vi.hoisted(() => ({ listDiary: vi.fn(), addDiaryEntry: vi.fn() }));
+const api = vi.hoisted(() => ({
+  listDiary: vi.fn(),
+  addDiaryEntry: vi.fn(),
+  listSuggestions: vi.fn(),
+}));
 vi.mock('../web/src/api.js', () => api);
 vi.mock('../web/src/api', () => api);
 
@@ -57,13 +62,30 @@ afterEach(() => {
   cleanup();
   api.listDiary.mockReset();
   api.addDiaryEntry.mockReset();
+  api.listSuggestions.mockReset();
   ws.reset();
+});
+
+// The half of the screen every test in this file now renders, whether or not it is what the test is
+// about. Unset, it would answer `undefined` and the column would fail its read for the wrong reason.
+beforeEach(() => {
+  api.listSuggestions.mockResolvedValue([]);
 });
 
 const entry = (over: Partial<DiaryEntry> = {}): DiaryEntry => ({
   at: '2026-08-05T10:00:00.000Z',
   kind: 'lifecycle',
   text: 'something happened',
+  ...over,
+});
+
+const suggestion = (over: Partial<Suggestion> = {}): Suggestion => ({
+  id: '20260805-100000-abcd1234',
+  state: 'active',
+  created: '2026-08-05T10:00:00.000Z',
+  title: 'The card query is linear',
+  body: 'It scans every card on every keystroke.',
+  run: 'run-7',
   ...over,
 });
 
@@ -251,6 +273,66 @@ describe('adding to the log by hand', () => {
     fireEvent.click(screen.getByText('Add entry'));
     expect(await screen.findByText(/needs something to say/)).toBeTruthy();
     expect(compose().value).toBe('why I did it');
+  });
+});
+
+// Decision 48: the Project Log becomes a split — the diary on the left, what agents filed on the right,
+// in the space the diary list never uses. Both are the record of what happened while nobody was watching,
+// and until now nothing in the browser could read a suggestion at all.
+describe('the split — what agents filed', () => {
+  const filed = () => screen.getByLabelText('What agents filed');
+
+  it('renders the diary on the left and the suggestions on the right', async () => {
+    api.listDiary.mockResolvedValue([entry({ text: 'a diary line' })]);
+    api.listSuggestions.mockResolvedValue([suggestion()]);
+    render(<DiaryView bump={0} />);
+    expect(await screen.findByText('a diary line')).toBeTruthy();
+    expect(within(screen.getByLabelText('Project log')).getByText('a diary line')).toBeTruthy();
+    expect(within(filed()).getByText('The card query is linear')).toBeTruthy();
+  });
+
+  it("shows a suggestion's text, when it was filed, and which run filed it", async () => {
+    api.listDiary.mockResolvedValue([]);
+    api.listSuggestions.mockResolvedValue([suggestion()]);
+    render(<DiaryView bump={0} />);
+    const region = within(await waitFor(() => filed()));
+    expect(region.getByText('The card query is linear')).toBeTruthy();
+    expect(region.getByText('It scans every card on every keystroke.')).toBeTruthy();
+    expect(region.getByText('run-7')).toBeTruthy();
+    // The date as the reader's own locale renders it, from the `created` stamp rather than the id.
+    expect(region.getByText(new Date('2026-08-05T10:00:00.000Z').toLocaleString())).toBeTruthy();
+  });
+
+  it('says so when there are no suggestions, rather than showing an empty column', async () => {
+    api.listDiary.mockResolvedValue([entry()]);
+    api.listSuggestions.mockResolvedValue([]);
+    render(<DiaryView bump={0} />);
+    expect(await within(filed()).findByText(/Nothing has been filed/)).toBeTruthy();
+  });
+
+  it('offers a way to ask again when the read failed', async () => {
+    api.listDiary.mockResolvedValue([entry({ text: 'the diary is fine' })]);
+    api.listSuggestions.mockRejectedValue(new Error('nope'));
+    render(<DiaryView bump={0} />);
+    expect(await within(filed()).findByText(/Could not read/)).toBeTruthy();
+    // "Nothing filed" and "we could not find out" are different facts, and only the second is a cue to
+    // ask again.
+    expect(within(filed()).queryByText(/Nothing has been filed/)).toBeNull();
+
+    api.listSuggestions.mockResolvedValue([suggestion({ title: 'it came back' })]);
+    fireEvent.click(within(filed()).getByText('Try again'));
+    expect(await within(filed()).findByText('it came back')).toBeTruthy();
+  });
+
+  it('keeps the composer working — the diary half is unchanged', async () => {
+    api.listDiary.mockResolvedValue([]);
+    api.addDiaryEntry.mockResolvedValue(entry({ text: 'typed by hand' }));
+    api.listSuggestions.mockResolvedValue([suggestion()]);
+    render(<DiaryView bump={0} />);
+    await screen.findByText(/Nothing has happened/);
+    fireEvent.change(screen.getByLabelText('Add to the log'), { target: { value: 'typed by hand' } });
+    fireEvent.click(screen.getByText('Add entry'));
+    expect(await screen.findByText('typed by hand')).toBeTruthy();
   });
 });
 

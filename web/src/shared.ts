@@ -153,6 +153,55 @@ type UnlistedCardField = Exclude<
 const _everyCardFieldIsListed: UnlistedCardField extends never ? true : UnlistedCardField = true;
 void _everyCardFieldIsListed;
 
+// What an agent found and deliberately did not act on. Mirrors src/core/suggestions.ts — nothing in the
+// browser could read one until now, so this side carried only the per-card count on the snapshot.
+export const SUGGESTION_STATES = ['active', 'actioned', 'dismissed'] as const;
+export type SuggestionState = (typeof SUGGESTION_STATES)[number];
+
+export interface Suggestion {
+  id: string;
+  state: SuggestionState;
+  created: string; // ISO
+  title: string;
+  run?: string; // the run that filed it
+  card?: string; // the card it was filed FROM
+  // Why it was rejected. What stops a later checkup re-raising the same thing.
+  reason?: string;
+  // The card it BECAME when it was carded. A different fact from `card` above.
+  became?: string;
+  body: string;
+}
+
+export const SUGGESTION_FIELDS = [
+  'id',
+  'state',
+  'created',
+  'title',
+  'run',
+  'card',
+  'reason',
+  'became',
+  'body',
+] as const;
+
+export const SUGGESTION_NOT_MIRRORED = [
+  // Which board the finding was about. `POST /api/suggestions` deliberately does not accept it — a
+  // Credential carries no board, so it could only come from the caller — so nothing writes it and there
+  // is nothing to render. The card id names its board anyway.
+  'board',
+] as const;
+
+// `never` when every field is listed; otherwise this line fails to compile and names the one missed.
+type UnlistedSuggestionField = Exclude<keyof Suggestion, (typeof SUGGESTION_FIELDS)[number]>;
+const _everySuggestionFieldIsListed: UnlistedSuggestionField extends never ? true : UnlistedSuggestionField =
+  true;
+void _everySuggestionFieldIsListed;
+
+// The two levels a suggestion may be carded at (decision 49). A task is not one of them: it needs a
+// story to belong to, so carding one either hunts for a parent or makes an orphan.
+export const SUGGESTION_LEVELS = ['feature', 'story'] as const;
+export type SuggestionLevel = (typeof SUGGESTION_LEVELS)[number];
+
 // An archived card plus where a restore would put it back — resolved server-side, since the
 // original column may have been renamed away since.
 export interface ArchivedCard extends Card {

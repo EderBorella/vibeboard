@@ -116,6 +116,12 @@ describe('the phase skills the routing table names', () => {
     expect(boardsOf('implement')).toEqual(['engineering']);
     expect(boardsOf('test')).toEqual(['engineering']);
     expect(boardsOf('break-down')).toEqual(['features', 'product']);
+    // The lifecycle's own, each scoped to the one board its phase sits on: a `fix` and a `review` are always
+    // about a task, a story checkup about a story, a feature checkup about a feature.
+    expect(boardsOf('fix')).toEqual(['engineering']);
+    expect(boardsOf('review')).toEqual(['engineering']);
+    expect(boardsOf('checkup-story')).toEqual(['product']);
+    expect(boardsOf('checkup-feature')).toEqual(['features']);
   });
 
   // What keeps a proof of concept from becoming a product. Both halves have to be in the prompt, or
@@ -128,24 +134,25 @@ describe('the phase skills the routing table names', () => {
     expect(content).toContain('PUT /api/cards/:board/:id/links');
   });
 
-  // THE FIRST HAND-RUN. F-002 — itself a card `derive-features` had just created in features/backlog — was
-  // dispatched `derive-features`, reported "nothing needed to be created", was PASSED by the critic and
-  // advanced. A card advanced for doing nothing, and two iterations went with it. The output column is the
-  // fix: todo is where a feature waits to be broken down, which is what actually comes next for it.
-  it('tells derive-features to put its features where they will be broken down, not back in its own column', () => {
+  // SUPERSEDED, and recorded rather than quietly rewritten. This asserted `features/todo` and "never in the
+  // column this card is in", which was decision 37: `features/backlog` dispatched `derive-features`, so a
+  // feature created there was sent straight back through the phase that made it. Under this machine a column
+  // dispatches nothing — the phase comes from the position — so `backlog` is where the queue belongs, and the
+  // self-loop is closed by the machine rather than by an instruction (decision 43's own table).
+  it('tells derive-features where the feature queue lives, and which feature is the scaffolding', () => {
     const content = SEED_SKILLS.find((s) => s.slug === 'derive-features')?.content ?? '';
-    expect(content).toContain('features/todo');
-    // The reason, not only the instruction: an agent that knows WHY does not reason its way out of it.
-    expect(content).toMatch(/never in the column this card is in/i);
+    expect(content).toContain('features/backlog');
+    expect(content).not.toContain('features/todo');
   });
 
-  // One group is one vertical: a feature, its user stories, their tasks. The rule has to be evaluable from
-  // the card in front of the agent, which is why it is "this card's group, or else this card's id" — that
-  // yields the feature's id at every level without the agent needing to walk the link graph.
-  it('tells break-down to carry the vertical’s group down to every card it creates', () => {
+  // WEAKENED DELIBERATELY, because the instruction stopped being the mechanism. The endpoint stamps `group`
+  // now (server/routes/cards.ts), so "this card's own group if it has one, and otherwise this card's id" is a
+  // rule the agent no longer carries out — and asserting it would pin an instruction that cannot be wrong.
+  // What survives is that the body NAMES the field, so an agent reading a value it did not set is not
+  // surprised by it and does not try to correct it.
+  it('tells break-down that the vertical’s group is stamped for it', () => {
     const content = SEED_SKILLS.find((s) => s.slug === 'break-down')?.content ?? '';
     expect(content).toContain('`group`');
-    expect(content).toMatch(/own .?group.? if it has one, and otherwise this card's id/i);
   });
 
   // THE DIRECTION of the spine, not merely its vocabulary. These were dotAll `.+` regexes, which a review
@@ -180,5 +187,154 @@ describe('the critic seed', () => {
     expect(critic).toBeDefined();
     expect(critic?.content).toMatch(/score/i);
     expect(critic?.content).toMatch(/do not (change|edit|fix)/i);
+  });
+});
+
+// THE LIFECYCLE'S OWN SEVEN. Every one of these is prose, and for a prompt the wording IS the behaviour — so
+// what is asserted here is the exact sentences the design turns on, not that a body exists.
+describe('the lifecycle skills', () => {
+  const body = (slug: string): string => SEED_SKILLS.find((s) => s.slug === slug)?.content ?? '';
+
+  it('seeds every lifecycle skill the phase table names', async () => {
+    // From the TABLE, not from a list here: a phase whose skill nothing seeds is a phase that can never run,
+    // and under auto-pilot nobody is watching it not happen.
+    const { LIFECYCLE_SKILLS } = await import('../src/core/phases.js');
+    const slugs = SEED_SKILLS.map((s) => s.slug);
+    for (const skill of LIFECYCLE_SKILLS) expect(slugs, skill).toContain(skill);
+  });
+
+  // DECISION 45, VERBATIM, and this is the boundary that makes the attempt cap unescapable. Without it a
+  // checkup can create work to get past a blocked task — and that story gets three fix attempts of its own,
+  // then another checkup, then another story, through the one authority these runs have.
+  it('tells both checkups the blocked-task rule, verbatim', () => {
+    for (const slug of ['checkup-story', 'checkup-feature']) {
+      expect(body(slug), slug).toContain('A blocked task is **settled**, not outstanding');
+      expect(body(slug), slug).toContain('Do not create work to get past a blocked task');
+      expect(body(slug), slug).toContain(
+        'it has already had every attempt it is allowed, and it is waiting for a person',
+      );
+    }
+  });
+
+  it('tells the feature checkup the same rule one level up', () => {
+    // A story whose task is blocked is itself settled. Without this, a feature checkup attacks the story
+    // instead of the task, which is the same escape one level out.
+    expect(body('checkup-feature')).toContain('A story carrying a blocked task is settled too');
+  });
+
+  it('tells every creating skill to read the board first', () => {
+    // Decision 43: creating work is not idempotent, so a creating phase must look first. And one card per
+    // call, never a shell loop the agent cannot verify.
+    for (const slug of ['derive-features', 'break-down', 'checkup-story', 'checkup-feature']) {
+      expect(body(slug), slug).toMatch(/read the board first/i);
+      expect(body(slug), slug).toContain('one card per call');
+    }
+  });
+
+  it('tells derive-features that the first feature is the scaffolding', () => {
+    expect(body('derive-features')).toContain('scaffolding');
+    expect(body('derive-features')).toContain('CODE-QUALITY.md');
+    // And it must NOT ask the agent to flag it: the loop stamps that at the bootstrap's exit, from the board,
+    // and `CreateCardInput` has no such field for an agent to set even if it tried.
+    expect(body('derive-features')).not.toContain('setup: true');
+  });
+
+  // BESIDE the exact-bytes assertion above, never instead of it. That one catches a REWORDED sentence; this
+  // one catches a REORDERING that leaves both sentences intact — "a user story breaks into features" reads
+  // perfectly and is the wrong way up.
+  //
+  // THE PROSE, not the frontmatter: `boards: [features, product]` contains the word "features", so an indexOf
+  // over the whole file matched the frontmatter and half this assertion was vacuous.
+  it('names the spine in the right direction, as well as in the right words', () => {
+    const prose = body('break-down').split('---')[2] ?? '';
+    expect(prose.indexOf('user stories')).toBeGreaterThan(-1);
+    expect(prose.indexOf('user stories')).toBeLessThan(prose.indexOf('tasks'));
+    expect(prose.indexOf('**feature**')).toBeLessThan(prose.indexOf('user stories'));
+  });
+
+  it('tells fix to address the findings and nothing else', () => {
+    // A fix that widens the card is a fix nobody asked for, and it spends the same budget as the one that
+    // was asked for.
+    expect(body('fix')).toContain('POST /api/suggestions');
+    expect(body('fix')).toMatch(/do not widen/i);
+  });
+
+  it('tells review to change nothing and to answer with a verdict', () => {
+    // "Change nothing" rather than "do not edit": a judge that fixes what it is judging is grading its own
+    // work, and the credential grants it nothing on the board either way.
+    expect(body('review')).toContain('Change nothing');
+    expect(body('review')).toContain('verdict');
+  });
+
+  it('tells review it is judging ONE run, not the card’s whole history', () => {
+    // The first hand-run's finding, in the skill as well as in the prompt: an earlier run on this card may
+    // have succeeded, and its work is not this run's work.
+    expect(body('review')).toMatch(/one run/i);
+  });
+
+  it('tells both checkups they do not move their own card', () => {
+    // The loop stamps the column (decision 38). A checkup that moved its card would be a card advancing on
+    // the say-so of the run being judged.
+    for (const slug of ['checkup-story', 'checkup-feature']) {
+      expect(body(slug), slug).toMatch(/do not move/i);
+    }
+  });
+
+  it('tells the feature checkup the smoke result is evidence rather than a verdict', () => {
+    // RULING 55. A feature whose smoke command fails is exactly what a person needs told about, so the run
+    // decides what it means rather than being blocked by it.
+    expect(body('checkup-feature')).toMatch(/evidence/i);
+  });
+});
+
+// THE THREE HAND-DISPATCH SKILLS the lifecycle never uses. Frozen as exact bytes, because "untouched" is a
+// claim about this task and an assertion about a substring would not have held it.
+const FROZEN: Record<string, string> = {
+  execute: `---
+name: Execute
+description: Implement what the card describes
+boards: [engineering]
+---
+Implement the card below.
+
+Read any linked product card first: it carries the intent, while an engineering
+card often carries only the mechanics. Work in small steps, and run the
+project's own test and lint commands before you finish.
+
+Do not change a card's id, and do not move a card between columns unless the
+card itself asks you to.
+`,
+  research: `---
+name: Research
+description: Gather context and options without changing anything
+---
+Research the card below and report what you find.
+
+Do NOT create, edit or delete any file except the report you are asked to write.
+This is a reading task: explore the codebase, the linked cards and any attached
+material, and weigh the options.
+
+End with a recommendation and the reasoning behind it, so the next run can act
+on it without repeating the search.
+`,
+  summarise: `---
+name: Summarise
+description: Condense the card and everything it links to
+---
+Summarise the card below together with every card it links to.
+
+Say what the work is, what state it is in, and what is left. Keep it short
+enough to read at a glance — this exists so someone returning to the card does
+not have to read the whole chain.
+
+Change nothing on disk except the report you are asked to write.
+`,
+};
+
+describe('the skills the lifecycle does not use', () => {
+  it('leaves the three hand-dispatch skills untouched', () => {
+    for (const slug of ['execute', 'research', 'summarise']) {
+      expect(SEED_SKILLS.find((s) => s.slug === slug)?.content, slug).toBe(FROZEN[slug]);
+    }
   });
 });

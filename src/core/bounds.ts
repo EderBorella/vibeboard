@@ -10,10 +10,30 @@ import type { Verification } from './verify.js';
 // Which phase a run belongs to is asked of the TABLE rather than restated here (`phaseForRun`), so the two
 // skills a verdict lands on and the one skill that judges them have a single home.
 
-// Ordering is by run id, which is a sortable stamp — the same basis the store reads "latest" off
-// (src/server/run-store.ts:116-122,172), so no caller has to pass runs in any particular order.
+// Ordering is by WHEN THE RUN STARTED, with the id as the tie-break, so no caller has to pass runs in
+// any particular order.
+//
+// NOT BY ID ALONE, which is what this was and what made the machine wrong about half the time it
+// mattered. A run id is `YYYYMMDD-HHMMSS-` plus a RANDOM four-character suffix (src/server/app.ts:149),
+// so it is only sortable to the second and two runs inside one second sort at random. An implement run
+// and the fix that followed it land in the same second routinely — the end-to-end trace hit it in half
+// its runs — and when the fix sorted first, `latestWorkRun` answered with the implement run, whose
+// failed gates verdict was therefore still outstanding: the task was re-stamped back to `in-progress`
+// and fixed again until the cap blocked a task whose gates had failed exactly once. That is the same
+// failure as the one the review trigger was corrected for, arriving through the ordering instead.
+//
+// `started` is written by the server at dispatch, in ISO with milliseconds, and is the only field that
+// says when. Compared as a TIME rather than as a string: the two ISO precisions the codebase holds
+// (`…:00Z` and `…:00.500Z`) sort the wrong way round as text, because `Z` is above `.`.
+const startedAt = (run: RunRecord): number => {
+  const at = Date.parse(run.started);
+  // A record with no readable start time — hand-edited, or written by something older — is not assumed
+  // to be the newest. It sorts first, and the id decides between it and anything else without one.
+  return Number.isFinite(at) ? at : 0;
+};
+
 const latest = (runs: RunRecord[]): RunRecord | undefined =>
-  [...runs].sort((a, b) => a.run.localeCompare(b.run)).at(-1);
+  [...runs].sort((a, b) => startedAt(a) - startedAt(b) || a.run.localeCompare(b.run)).at(-1);
 
 // A run whose WORK a verdict is written onto: the engineering phases whose exit is `review`, which is
 // `implement` and `fix`. Read off the table rather than listed again — and a review run is excluded by

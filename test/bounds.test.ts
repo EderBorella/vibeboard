@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { creatingRoundSpent, inconclusiveReviews, outstandingVerdict } from '../src/core/bounds.js';
+import {
+  creatingRoundSpent,
+  inconclusiveReviews,
+  latestWorkRun,
+  outstandingVerdict,
+} from '../src/core/bounds.js';
 import {
   type ReviewVerdict,
   type RunRecord,
@@ -102,6 +107,49 @@ describe('outstandingVerdict', () => {
   it('is scoped to the card', () => {
     const other = withVerification(work('implement', 'E-002'), gates(false));
     expect(outstandingVerdict([other], 'E-001')).toBeUndefined();
+  });
+});
+
+// TWO RUNS INSIDE ONE SECOND, which is the ordinary case rather than a corner: a run id is
+// `YYYYMMDD-HHMMSS-` plus a random four-character suffix, so an implement run and the fix that followed
+// it seconds later have the same stamp and a suffix that decides nothing. Ordered by id alone, the fix
+// here sorts FIRST, its predecessor's failed verdict stays outstanding, and the task is sent back to be
+// fixed again and again until the cap blocks it.
+describe('latest, when two runs share a second', () => {
+  const inOneSecond = (
+    skill: 'implement' | 'fix',
+    id: string,
+    started: string,
+    over: Partial<RunRecord> = {},
+  ): RunRecord =>
+    withReport(
+      { ...base({ skill, ...over }), run: `20260813-100000-${id}`, started },
+      { outcome: 'success', summary: 'did it', body: '## What I did' },
+      'T',
+    );
+
+  it('answers with the run that started later, not the one whose id sorts higher', () => {
+    const implement = inOneSecond('implement', 'uzpn', '2026-08-13T10:00:00.536Z');
+    const fix = inOneSecond('fix', 'oigs', '2026-08-13T10:00:00.616Z');
+    expect(latestWorkRun([implement, fix], 'E-001')?.skill).toBe('fix');
+    expect(latestWorkRun([fix, implement], 'E-001')?.skill).toBe('fix');
+  });
+
+  it('leaves no verdict outstanding when the later fix carries none', () => {
+    // The whole failure in one assertion: the implement run's failed gates verdict must not be what the
+    // task stands under once a fix has run, or the loop re-stamps it back to `in-progress` for ever.
+    const implement = withVerification(
+      inOneSecond('implement', 'uzpn', '2026-08-13T10:00:00.536Z'),
+      gates(false),
+    );
+    const fix = inOneSecond('fix', 'oigs', '2026-08-13T10:00:00.616Z');
+    expect(latestWorkRun([implement, fix], 'E-001')?.verification).toBeUndefined();
+  });
+
+  it('falls back to the id when neither run says when it started', () => {
+    const first = inOneSecond('implement', 'aaaa', '');
+    const second = inOneSecond('fix', 'zzzz', '');
+    expect(latestWorkRun([second, first], 'E-001')?.skill).toBe('fix');
   });
 });
 

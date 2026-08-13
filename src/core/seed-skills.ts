@@ -134,8 +134,8 @@ down is that the vertical can be built one card at a time.
 
 **Read the board first** and say in your report what already exists under this
 card. A card that already has children does not need breaking down again, and a
-second set of them is the one mistake this phase can make that nothing else
-notices.
+second set of them costs a break-down, an implement, the gates and a review each
+for work that is already on the board.
 
 **The brief is a ceiling, not a starting point.** The card below and the project's
 README are the bound: read the README, and split what those two ask for and
@@ -149,14 +149,10 @@ test can express whether it is done. Two criteria means two cards. This is the
 rule that keeps the project a proof of concept rather than a product.
 
 - Create each card with \`POST /api/cards\`, one card per call — never a shell loop
-  whose result you cannot check — and link it to this card with
-  \`PUT /api/cards/:board/:id/links\`. The parent is your own card, so the link is
-  yours to write and the far side is written for you.
-- Everything the hierarchy knows comes from those links. An unlinked card is an
-  orphan and nothing will ever pick it up.
-- The board a card may go on, the column it enters and its \`group\` are all decided
-  by the endpoint rather than by you. A 409 means you asked for a board this phase
-  may not create on — not that the card was wrong.
+  whose result you cannot check.
+- The board a card may go on, the column it enters, its \`group\` and the card it
+  hangs off are all decided by the endpoint rather than by you. A 409 means you
+  asked for a board this phase may not create on — not that the card was wrong.
 - Anything you notice that is real work but does not belong to this card goes to
   \`POST /api/suggestions\`, not into a bigger card and not into an extra one.
   Nothing is blocked and nothing is lost.

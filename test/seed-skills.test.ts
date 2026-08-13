@@ -120,8 +120,31 @@ describe('the phase skills the phase table names', () => {
     const content = SEED_SKILLS.find((s) => s.slug === 'break-down')?.content ?? '';
     expect(content).toContain('One acceptance criterion per card');
     expect(content).toContain('POST /api/suggestions');
-    // Links are what the hierarchy is derived from; a card created without one is an orphan.
-    expect(content).toContain('PUT /api/cards/:board/:id/links');
+  });
+
+  // SUPERSEDED BY RULING 65, and recorded rather than quietly dropped. This asserted
+  // `PUT /api/cards/:board/:id/links` — the obligation to attach each new card to this one — and the endpoint
+  // now writes that link itself, from the credential it is already holding. Leaving the instruction would be
+  // two writers for one fact, and the agent's is the one that can send an INCOMPLETE list: the payload replaces
+  // a card's links wholesale, so a break-down that had created two children and named one would orphan the
+  // other. The exact bytes of what replaced it are pinned below.
+  it('no longer tells break-down to write the link, which the endpoint now writes', () => {
+    const content = SEED_SKILLS.find((s) => s.slug === 'break-down')?.content ?? '';
+    expect(content).not.toContain('PUT /api/cards/:board/:id/links');
+    expect(content).toContain(
+      '- The board a card may go on, the column it enters, its `group` and the card it\n  hangs off are all decided by the endpoint rather than by you.',
+    );
+  });
+
+  // RULING 58's refusal falsified this sentence: a second card with the same title in the same column is
+  // refused at the endpoint, so a second set of children is NOT a mistake nothing else notices. What replaced
+  // it is the cost, which is true whoever notices.
+  it('does not tell break-down that nothing notices a second set of children', () => {
+    const content = SEED_SKILLS.find((s) => s.slug === 'break-down')?.content ?? '';
+    expect(content).not.toContain('nothing else\nnotices');
+    expect(content).toContain(
+      'A card that already has children does not need breaking down again, and a\nsecond set of them costs a break-down, an implement, the gates and a review each\nfor work that is already on the board.',
+    );
   });
 
   // SUPERSEDED, and recorded rather than quietly rewritten. This asserted `features/todo` and "never in the
@@ -322,6 +345,17 @@ describe('the lifecycle skills', () => {
       expect(body(slug), slug).toContain(
         'over-scope, and **naming it in\nyour report is the whole of what you do about it** — your one creating round is for\nwhat was MISSED, never for work nobody asked for.',
       );
+    }
+  });
+
+  // RULING 65, and the checkups are the half of it that is a FINDING rather than a change: neither body has
+  // ever mentioned linking, so a checkup agent following its instructions exactly created an orphan even before
+  // the endpoint bug. The server writes the link now, so what these must not acquire is the obligation ruling 65
+  // took off break-down — two writers for one fact, one of which can send an incomplete list.
+  it('tells neither checkup to link what it creates, and asks each for a card per call', () => {
+    for (const slug of ['checkup-story', 'checkup-feature']) {
+      expect(body(slug), slug).not.toContain('/links');
+      expect(body(slug), slug).toContain('one card per call');
     }
   });
 

@@ -16,7 +16,7 @@ import type { ResultStats } from './copilot-events.js';
 import type { Credential, CredentialStore } from './credentials.js';
 import type { GitMeasure, GitPoint } from './git-measure.js';
 import type { Log } from './logging.js';
-import { type BoardColumns, buildRunPrompt } from './run-prompt.js';
+import { type BoardColumns, buildRunPrompt, type PromptInputs } from './run-prompt.js';
 import {
   appendTranscript,
   foldReport,
@@ -64,6 +64,10 @@ export interface DispatchInput {
   // the same reason as `verdict` — a queued review must be told about the gate run that preceded it, not
   // about whatever the tree looks like when it finally starts.
   review?: { gatesPassed: boolean; setupSubtree: boolean };
+  // Present when this run is a CHECKUP: everything the loop gathered about what is under its card (ruling 60).
+  // Carried like `foundation` and for the same reason — a queued checkup must be told about the board and the
+  // smoke run that preceded its dispatch, not about whatever they look like when it finally starts.
+  checkup?: PromptInputs['checkup'];
   backend: Backend;
   model: string;
   effort: string;
@@ -367,6 +371,7 @@ export class AgentRunner {
       foundation: input.foundation,
       verdict: input.verdict,
       review: input.review,
+      checkup: input.checkup,
       reportPath: reportContract(run),
       projectRoot: root,
       credential,

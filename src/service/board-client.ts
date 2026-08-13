@@ -65,6 +65,16 @@ export interface DispatchRequest {
   // `PromptInputs` — and refused from every scope but this one at the far end (ruling 63): a review agent
   // able to send `gatesPassed: true` could talk its own reviewer into a pass.
   review?: { gatesPassed: boolean; setupSubtree: boolean };
+  // AND WHAT THE LOOP GATHERED for a checkup: the card's children with their columns and how their last runs
+  // ended, the blocked ones named, the open suggestions, and — for a feature checkup — what the smoke command
+  // did. Every one of them is a fact a `work` credential cannot reach, which is the whole reason the loop
+  // assembles them (ruling 60); and like `review`, they are refused from every other scope (ruling 63).
+  checkup?: {
+    children: { id: string; column: string; outcome?: string; blocked: boolean }[];
+    blocked: string[];
+    suggestions: { id: string; title: string }[];
+    smoke?: Verification;
+  };
 }
 
 export interface ClientOptions {
@@ -154,6 +164,13 @@ export class BoardClient {
 
   runs(): Promise<Answer<{ runs: RunRecord[] }>> {
     return this.#call('GET', '/runs');
+  }
+
+  // The open suggestions, for a checkup's prompt. `GET /api/suggestions` is open to `service` (auth.ts), which
+  // the loop holds and a card run does not — so the loop reads them and hands them over rather than the scope
+  // table widening to let an agent fetch its own (ruling 60).
+  suggestions(): Promise<Answer<{ suggestions: { id: string; title: string }[] }>> {
+    return this.#call('GET', '/suggestions?state=active');
   }
 
   accounting(): Promise<Answer<Accounting>> {

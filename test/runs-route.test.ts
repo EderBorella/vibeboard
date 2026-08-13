@@ -1021,6 +1021,44 @@ describe('POST /api/runs — the loop’s own evidence', () => {
     await settled(project, project.card, (res.json() as { run: RunRecord }).run.run);
   }, 30000);
 
+  // THE SAME RULE FOR THE CHECKUP'S EVIDENCE (ruling 60 carried by ruling 63). The blocked list and the smoke
+  // result are facts only the loop holds, and a card run able to supply them could describe its own children.
+  it('refuses the checkup’s evidence from anyone but the loop', async () => {
+    const project = await projectWithCard();
+    const res = await project.app.inject({
+      method: 'POST',
+      url: '/api/runs',
+      payload: {
+        board: 'engineering',
+        card: project.card,
+        // Any skill: the field is refused before the skill is even resolved, because it is about who may
+        // supply the loop's own facts rather than about what the run is for. `checkup-story` is seeded in a
+        // later task, and this rule must not wait for it.
+        skill: 'execute',
+        checkup: { children: [], blocked: [], suggestions: [] },
+      },
+    });
+    expect(res.statusCode).toBe(403);
+    expect(res.json().error).toMatch(/auto-pilot/i);
+  });
+
+  it('accepts the checkup’s evidence from the service credential', async () => {
+    const project = await asService();
+    const res = await project.app.inject({
+      method: 'POST',
+      url: '/api/runs',
+      headers: project.headers,
+      payload: {
+        board: 'engineering',
+        card: project.card,
+        skill: 'execute',
+        checkup: { children: [], blocked: [], suggestions: [] },
+      },
+    });
+    expect(res.statusCode).toBe(200);
+    await settled(project, project.card, (res.json() as { run: RunRecord }).run.run);
+  }, 30000);
+
   // THE POINT OF THE REFUSAL, and the half that a status code alone does not prove.
   it('does not reach the prompt when refused', async () => {
     const argsLog = await recordingShimArgs();

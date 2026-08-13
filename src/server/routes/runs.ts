@@ -99,10 +99,22 @@ interface DispatchBody {
   // from every scope but `service` (ruling 63), which is what stops a review agent talking its own reviewer
   // into a pass.
   review?: unknown;
+  // AND WHAT THE LOOP GATHERED for a checkup (ruling 60): its card's children, the blocked ones, the open
+  // suggestions and the smoke result. `unknown` and refused from every scope but `service`, for the same reason
+  // as `review` — a card run able to supply these could describe its own children.
+  checkup?: unknown;
 }
 
 // The two booleans, coerced. A `service` caller is the loop, but a body is still JSON: `=== true` is the only
 // reading that cannot turn a string, a number or a missing key into a pass.
+// The checkup's evidence, shape-checked rather than trusted. A `service` caller is the loop, but a body is
+// still JSON, and a prompt built over a `children` that is not an array is a 500 handed to the loop.
+function isCheckupEvidence(given: unknown): given is NonNullable<DispatchInput['checkup']> {
+  if (typeof given !== 'object' || given === null) return false;
+  const o = given as Record<string, unknown>;
+  return Array.isArray(o.children) && Array.isArray(o.blocked) && Array.isArray(o.suggestions);
+}
+
 function reviewFacts(given: unknown): { gatesPassed: boolean; setupSubtree: boolean } {
   const o = (given ?? {}) as Record<string, unknown>;
   return { gatesPassed: o.gatesPassed === true, setupSubtree: o.setupSubtree === true };
@@ -277,6 +289,10 @@ async function resolveDispatch(
       skill,
       card,
       ...reviewFor(skill.slug, body.review),
+      // Passed straight through. The route computes nothing here: unlike the review contract, whose PRESENCE is
+      // a property of the skill, every field is a fact only the loop holds — so there is no honest default for
+      // a hand dispatch, and its absence is what the prompt renders nothing from.
+      ...(isCheckupEvidence(body.checkup) ? { checkup: body.checkup } : {}),
       cardFile,
       linked,
       ...(previous ? { previous: previous.run } : {}),
@@ -343,11 +359,11 @@ async function dispatchRefusal(
   // and whether the card is in the setup subtree where an absent gate set is expected. A field on this request
   // is a field its caller can set, so a review able to send `gatesPassed: true` could talk its own reviewer
   // into a pass — decision 40 defeated through a side door.
-  if (body?.review !== undefined && scope !== 'service') {
+  if ((body?.review !== undefined || body?.checkup !== undefined) && scope !== 'service') {
     return {
       code: 403,
       error:
-        'Only auto-pilot may say what its gates did: it runs them itself, in its own process, and a run that could claim they passed would be judging its own work. Dispatch the review without it, and it will be told plainly that nobody has run them.',
+        'Only auto-pilot may say what its own gates, its own board read and its own commands produced: it computes those facts, and a run that could supply them would be describing the work it is being judged on. Dispatch without them, and the run will be told plainly what is and is not known.',
     };
   }
   return undefined;

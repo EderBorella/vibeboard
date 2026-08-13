@@ -1,16 +1,19 @@
 import { burnsAttempt } from '../core/accounting.js';
 import type { TickAction } from '../core/actions.js';
+import { DEFAULT_AUTOPILOT, isBlockedColumn } from '../core/autopilot.js';
 import type { AutopilotState } from '../core/autopilot-state.js';
 import { unreviewedGatesSentence } from '../core/autopilot-state.js';
 import { countLive, createdNothing } from '../core/created.js';
+import { blockedUnder } from '../core/derived-status.js';
 import type { StopReason } from '../core/dispatch-gate.js';
+import { childrenOf } from '../core/hierarchy.js';
 import { type PhaseName, phase } from '../core/phases.js';
 import { producedNothing, type RunRecord } from '../core/runs.js';
 import { hasSetupFeature, setupSubtreeIds } from '../core/setup-feature.js';
 import { BOARDS, type Card } from '../core/types.js';
 import { unverified, type Verification } from '../core/verify.js';
 import { commitAll } from '../server/git-work.js';
-import { verifyGates, type verifySmoke } from '../server/verifier.js';
+import { verifyGates, verifySmoke } from '../server/verifier.js';
 import type { Answer, BoardClient, DispatchRequest } from './board-client.js';
 import type { ActResult, TickContext } from './loop.js';
 import { stamp } from './stamp.js';
@@ -128,7 +131,7 @@ async function stampOnly(deps: ActDeps, action: Stamp): Promise<ActResult> {
 // WHAT IS DISPATCHED, in one place. A card run names its card and may carry the run whose findings it is
 // addressing; a project run names neither, because the card it would be about is the thing it exists to
 // create.
-function requestFor(action: Dispatch): DispatchRequest {
+function requestFor(action: Dispatch, checkup?: CheckupEvidence): DispatchRequest {
   const card = action.card;
   if (!card) return { project: true, skill: action.skill };
   return {
@@ -136,7 +139,80 @@ function requestFor(action: Dispatch): DispatchRequest {
     card: card.id,
     skill: action.skill,
     ...(action.previous === undefined ? {} : { previous: action.previous }),
+    ...(checkup === undefined ? {} : { checkup }),
   };
+}
+
+type CheckupEvidence = NonNullable<DispatchRequest['checkup']>;
+
+// THE TWO CHECKUP PHASES, and only the feature's has a smoke command: the one `foundation/TESTING.md` declares
+// exercises the whole feature, and there is no per-story equivalent to run.
+const CHECKUP_PHASES: readonly PhaseName[] = ['story-checkup', 'feature-checkup'];
+
+// EVERYTHING A CHECKUP IS TOLD, gathered here because it cannot fetch any of it (ruling 60). Every card run is
+// minted `work` scope: `GET /api/runs` is `service`-only, `GET /api/suggestions` is not `work`'s, and the diary
+// has no read row at all. Minting a wider scope would grant an agent authority to solve a problem the loop can
+// solve — and the loop already holds every one of these facts.
+//
+// A read that fails degrades to an EMPTY list rather than to no field. "There is nothing outstanding" is how a
+// checkup concludes a project is clean, so the honest failure is to say the list is empty and let the checkup's
+// own subject — the cards — still be judged.
+async function checkupEvidence(
+  deps: ActDeps,
+  action: Dispatch,
+  card: Card,
+  context: TickContext,
+): Promise<CheckupEvidence> {
+  const board = await deps.client.board();
+  const ap = board.ok ? (board.value.config.autopilot ?? DEFAULT_AUTOPILOT) : DEFAULT_AUTOPILOT;
+  const cards = board.ok ? BOARDS.flatMap((b) => board.value.boards[b] ?? []) : [];
+  const runs = await deps.client.runs();
+  const suggestions = await deps.client.suggestions();
+  const children = childrenOf(card, cards).map((child) => ({
+    id: child.id,
+    column: child.columnSlug,
+    // HOW ITS LAST RUN ENDED — `status`, which the runner assigns, never the `outcome` the agent wrote about
+    // itself (decision 40). Absent rather than invented for a child nothing has run on yet.
+    ...(runs.ok ? lastOutcome(runs.value.runs, child.id) : {}),
+    // Named as a fact rather than left to be derived from the column: which slug means blocked is config, and
+    // the checkup has no way to read it.
+    blocked: isBlockedColumn(ap, child.board, child.columnSlug),
+  }));
+  return {
+    children,
+    // Through as many levels as there are: a feature's problem is often two levels down, where its story is
+    // done and the task under that story is what is blocked.
+    blocked: blockedUnder(ap, card, cards).map((c) => c.id),
+    suggestions: suggestions.ok
+      ? suggestions.value.suggestions.map((s) => ({ id: s.id, title: s.title }))
+      : [],
+    ...(await smokeFor(deps, action, context)),
+  };
+}
+
+// The smoke command, run by the LOOP in its own process before the dispatch (ruling 55), and handed over as
+// EVIDENCE rather than as a gate: a feature whose smoke command fails is exactly what a person needs told
+// about, and blocking on it would stop the project instead of reporting it.
+async function smokeFor(
+  deps: ActDeps,
+  action: Dispatch,
+  context: TickContext,
+): Promise<{ smoke?: Verification }> {
+  if (action.phase !== 'feature-checkup') return {};
+  const smoke = await (deps.verify?.smoke ?? verifySmoke)(deps.root, deps.now().toISOString());
+  await deps.client.log(
+    'run',
+    `Iteration ${context.iteration + 1}: auto-pilot ran the smoke command before ${action.card?.id ?? 'the'} checkup — it ${smoke.passed ? 'passed' : 'did not pass'}. The checkup decides what that means.`,
+    { iteration: context.iteration + 1, ...(action.card ? { card: action.card.id } : {}) },
+  );
+  return { smoke };
+}
+
+// The latest run on one card, by run id — the same sortable stamp the store reads "latest" off.
+function lastOutcome(runs: RunRecord[], card: string): { outcome?: string } {
+  const mine = runs.filter((r) => r.card === card).sort((a, b) => a.run.localeCompare(b.run));
+  const last = mine.at(-1);
+  return last === undefined ? {} : { outcome: last.status };
 }
 
 // THE ENTRY STAMP, and only where the phase names one. `task-review` and `task-fix` name none because the
@@ -192,7 +268,14 @@ async function dispatch(deps: ActDeps, action: Dispatch, context: TickContext): 
   // lead to the same place: a comparison that cannot be made is not evidence that nothing happened.
   const before = CREATING_PHASES.includes(action.phase) ? await liveCount(deps) : undefined;
 
-  const started = await deps.client.dispatch(requestFor(action));
+  // EVERYTHING A CHECKUP IS TOLD, gathered before the dispatch because it is the dispatch's own input — and for
+  // a feature checkup that includes running the smoke command, which is why this is before rather than after.
+  const evidence =
+    CHECKUP_PHASES.includes(action.phase) && card
+      ? await checkupEvidence(deps, action, card, context)
+      : undefined;
+
+  const started = await deps.client.dispatch(requestFor(action, evidence));
   if (!started.ok) return await refused(deps, `could not dispatch ${whose}`, started.reason, started.fatal);
 
   // WHERE to look differs: a card's runs come from the card route, and a project run has no card in its path

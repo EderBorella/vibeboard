@@ -103,6 +103,7 @@ function recorder(
     boardBefore?: Card[];
     board?: { ok: false; reason: string; fatal: boolean };
     archive?: Card[];
+    suggestions?: { id: string; title: string }[];
     flags?: { ok: false; reason: string; fatal: boolean };
   } = {},
 ) {
@@ -183,6 +184,10 @@ function recorder(
       calls.push(`log:${kind}`);
       diary.push({ kind, text });
       return { ok: true as const, value: {} };
+    },
+    suggestions: async () => {
+      calls.push('suggestions');
+      return { ok: true as const, value: { suggestions: opts.suggestions ?? [] } };
     },
     archive: async (board: BoardName) => {
       calls.push(`archive:${board}`);
@@ -1164,5 +1169,170 @@ describe('a creating run that created nothing', () => {
     expect(r.diary.some((d) => d.text.includes('the board is still empty'))).toBe(true);
     expect(result.stop).toBeUndefined();
     expect(result.dispatches).toBe(1);
+  });
+});
+
+// THE CHECKUP'S EVIDENCE, GATHERED BY THE LOOP (ruling 60). Every card run is minted `work` scope, and three of
+// the four facts a checkup needs are unreachable from it. Widening the scope table would grant an agent
+// authority to solve a problem the loop can solve — and the loop already holds every one of them.
+describe('a checkup’s evidence', () => {
+  const smokePass = async (): Promise<Verification> => ({
+    mode: 'smoke',
+    passed: true,
+    at: 'T',
+  });
+  const smokeFail = async (): Promise<Verification> => ({
+    mode: 'smoke',
+    passed: false,
+    at: 'T',
+    command: 'npm run smoke',
+    output: 'exited 1',
+    reason: '`npm run smoke` exited with 1.',
+  });
+  const gates = async (): Promise<Verification> => ({ mode: 'gates', passed: true, at: 'T' });
+
+  const verify = (smoke: () => Promise<Verification>) => ({ gates, smoke }) as unknown as ActDeps['verify'];
+
+  // F-001 → P-001, P-002. P-001 → E-001 (blocked). Two stories, so "all of them" can be told from "one of
+  // them", and a blocked grandchild so `blockedUnder` has something to find two levels down.
+  const feature = { ...CARD('F-001', 'features'), columnSlug: 'in-progress', links: ['P-001', 'P-002'] };
+  const story = { ...CARD('P-001', 'product'), columnSlug: 'done', links: ['E-001'] };
+  const story2 = { ...CARD('P-002', 'product'), columnSlug: 'done', links: [] };
+  const task = { ...CARD('E-001', 'engineering'), columnSlug: 'blocked' };
+
+  const FEATURE_CHECKUP: TickAction = {
+    kind: 'dispatch',
+    phase: 'feature-checkup',
+    skill: 'checkup-feature',
+    card: feature,
+  };
+  const STORY_CHECKUP: TickAction = {
+    kind: 'dispatch',
+    phase: 'story-checkup',
+    skill: 'checkup-story',
+    card: story,
+  };
+
+  const board = () => [feature, story, story2, task];
+
+  it('runs the smoke command before dispatching checkup-feature, and hands the result over', async () => {
+    const order: string[] = [];
+    const r = recorder({ boardCards: board() });
+    const original = r.client.dispatch;
+    r.client.dispatch = async (input) => {
+      order.push('dispatch');
+      return original(input);
+    };
+    await performAction(
+      deps(r.client, {
+        verify: {
+          gates,
+          smoke: async () => {
+            order.push('smoke');
+            return await smokePass();
+          },
+        } as unknown as ActDeps['verify'],
+      }),
+      FEATURE_CHECKUP,
+      context,
+    );
+    expect(order).toEqual(['smoke', 'dispatch']);
+    expect(r.requests[0]?.checkup?.smoke).toMatchObject({ mode: 'smoke', passed: true });
+  });
+
+  it('does not run the smoke command for a story checkup', async () => {
+    // A story has no end-to-end command of its own; the one `foundation/TESTING.md` declares is the feature's.
+    let ran = 0;
+    const r = recorder({ boardCards: board() });
+    await performAction(
+      deps(r.client, {
+        verify: {
+          gates,
+          smoke: async () => {
+            ran += 1;
+            return await smokePass();
+          },
+        } as unknown as ActDeps['verify'],
+      }),
+      STORY_CHECKUP,
+      context,
+    );
+    expect(ran).toBe(0);
+    expect(r.requests[0]?.checkup?.smoke).toBeUndefined();
+  });
+
+  it('dispatches the checkup even when the smoke command failed', async () => {
+    // EVIDENCE, NOT A GATE (ruling 55). A feature whose smoke command fails is exactly what a person needs
+    // told about, and blocking there would stop the project instead of reporting it.
+    const r = recorder({ boardCards: board() });
+    await performAction(deps(r.client, { verify: verify(smokeFail) }), FEATURE_CHECKUP, context);
+    expect(r.requests).toHaveLength(1);
+    expect(r.requests[0]?.checkup?.smoke).toMatchObject({ passed: false, command: 'npm run smoke' });
+  });
+
+  it('assembles the children and the blocked list from the board it already read', async () => {
+    const r = recorder({ boardCards: board() });
+    await performAction(deps(r.client, { verify: verify(smokePass) }), FEATURE_CHECKUP, context);
+    const evidence = r.requests[0]?.checkup;
+    // A feature's children are its STORIES, one board down — not its tasks.
+    expect(evidence?.children.map((c) => c.id)).toEqual(['P-001', 'P-002']);
+    // And the blocked list reaches through as many levels as there are: E-001 is under P-001, which is done,
+    // so a one-level walk would call this feature clean.
+    expect(evidence?.blocked).toEqual(['E-001']);
+  });
+
+  it('names each child’s column and how its last run ended', async () => {
+    const r = recorder({ boardCards: board() });
+    // A run on P-001, which is the fact `GET /api/runs` would otherwise have been asked for.
+    r.client.runs = async () => ({
+      ok: true as const,
+      value: {
+        runs: [record({ card: 'P-001', board: 'product', skill: 'break-down', status: 'attention' })],
+      },
+    });
+    await performAction(deps(r.client, { verify: verify(smokePass) }), FEATURE_CHECKUP, context);
+    const children = r.requests[0]?.checkup?.children ?? [];
+    expect(children.find((c) => c.id === 'P-001')).toMatchObject({ column: 'done', outcome: 'attention' });
+    // Absent rather than invented for a child nothing has run on yet.
+    expect(children.find((c) => c.id === 'P-002')?.outcome).toBeUndefined();
+  });
+
+  it('marks a blocked child as blocked, so the prompt need not know which slug means it', async () => {
+    const r = recorder({ boardCards: board() });
+    await performAction(deps(r.client), STORY_CHECKUP, context);
+    expect(r.requests[0]?.checkup?.children).toEqual([{ id: 'E-001', column: 'blocked', blocked: true }]);
+  });
+
+  it('fetches the suggestions with its OWN service credential, not the checkup’s', async () => {
+    // `GET /api/suggestions` is open to `service` (auth.ts), which the loop holds and a `work` run does not.
+    const r = recorder({
+      boardCards: board(),
+      suggestions: [{ id: 'S-1', title: 'the config loader has no tests' }],
+    });
+    await performAction(deps(r.client, { verify: verify(smokePass) }), FEATURE_CHECKUP, context);
+    expect(r.calls).toContain('suggestions');
+    expect(r.requests[0]?.checkup?.suggestions).toEqual([
+      { id: 'S-1', title: 'the config loader has no tests' },
+    ]);
+  });
+
+  it('dispatches with an empty suggestion list rather than none when that read failed', async () => {
+    // A failed read must not become "there is nothing outstanding": that is how a checkup concludes a project
+    // is clean. It is dispatched anyway, because the checkup's own subject is the cards.
+    const r = recorder({ boardCards: board() });
+    r.client.suggestions = (async () => ({
+      ok: false as const,
+      reason: 'refused with 500',
+      fatal: false,
+    })) as unknown as typeof r.client.suggestions;
+    await performAction(deps(r.client, { verify: verify(smokePass) }), FEATURE_CHECKUP, context);
+    expect(r.requests).toHaveLength(1);
+    expect(r.requests[0]?.checkup?.suggestions).toEqual([]);
+  });
+
+  it('sends no checkup evidence with any other phase', async () => {
+    const r = recorder({ boardBefore: [], boardCards: [CARD('P-001', 'product')] });
+    await performAction(deps(r.client), BREAKDOWN(), context);
+    expect(r.requests[0]?.checkup).toBeUndefined();
   });
 });

@@ -2,6 +2,7 @@ import { relative } from 'node:path';
 import { ARCHIVE_SLUG, RESULTS_DIR } from '../core/layout.js';
 import type { Skill } from '../core/skills.js';
 import type { BoardName, Card } from '../core/types.js';
+import type { Verification } from '../core/verify.js';
 import { endpointsFor } from './auth.js';
 import type { Scope } from './credentials.js';
 
@@ -80,6 +81,24 @@ export interface PromptInputs {
   // `gatesPassed: true` could talk its own reviewer into a pass, which is decision 40 defeated through a
   // side door.
   review?: { gatesPassed: boolean; setupSubtree: boolean };
+  // Present when this run is a CHECKUP, and every field in it was gathered BY THE LOOP (ruling 60). Three of
+  // the four facts a checkup needs are unreachable from the `work` scope every card run is minted with —
+  // `GET /api/suggestions`, `GET /api/runs`, and the diary, which has no read row at all — and widening the
+  // scope table would grant an agent authority to solve a problem the loop can solve.
+  //
+  // `blocked` is separate from `children` deliberately: told only the columns, a checkup would have to know
+  // which slug means blocked, which is a config fact it has no way to read.
+  //
+  // `smoke` is the feature checkup's alone (ruling 55), and it is a `Verification` — the same shape as the gate
+  // evidence above, because "a command ran and here is what happened" is one fact and not two. Its `reason`
+  // carries the endings apart: a command that was killed, one that could not be spawned, and one that exited
+  // non-zero are different facts, and the first two are not failures of the code.
+  checkup?: {
+    children: { id: string; column: string; outcome?: string; blocked: boolean }[];
+    blocked: string[];
+    suggestions: { id: string; title: string }[];
+    smoke?: Verification;
+  };
   // Where the agent must write its report, project-root-relative.
   reportPath: string;
   projectRoot: string;
@@ -176,6 +195,67 @@ function foundationSection(foundation: NonNullable<PromptInputs['foundation']>):
     );
   }
   return lines.join('\n');
+}
+
+// WHAT IS UNDER THIS CARD, as the loop already knows it. Every line here is a fact the checkup would otherwise
+// have had to fetch, and cannot: `GET /api/runs` is `service`-only and the diary has no read row at all
+// (ruling 60). So it is told, and the prompt never suggests it go and look.
+function checkupSection(checkup: NonNullable<PromptInputs['checkup']>): string {
+  const children = checkup.children.map((c) => {
+    const ended = c.outcome
+      ? `, and its last run ended as \`${c.outcome}\``
+      : ', and nothing has run on it yet';
+    return `- **${c.id}** is in \`${c.column}\`${ended}${c.blocked ? ' — it is BLOCKED' : ''}.`;
+  });
+  return [
+    ...(children.length > 0 ? children : ['There is nothing under this card.']),
+    '',
+    // Named as a list rather than left to be derived from the columns: which slug means blocked is a config
+    // fact this run has no way to read, and the report is expected to name them.
+    checkup.blocked.length > 0
+      ? `Blocked and waiting for a person: ${checkup.blocked.join(', ')}. A blocked card has already had every attempt it is allowed — do not create work to get past one.`
+      : 'Nothing under this card is blocked.',
+    '',
+    ...(checkup.suggestions.length > 0
+      ? [
+          'Already filed as suggestions, so do not file them again:',
+          '',
+          ...checkup.suggestions.map((s) => `- ${s.id}: ${s.title}`),
+        ]
+      : ['There are no open suggestions on this project.']),
+  ].join('\n');
+}
+
+// RULING 55: the loop ran it, and this is EVIDENCE rather than a verdict — the model is told what the command
+// did and decides what it means. A feature whose smoke command fails is exactly what a person needs told about,
+// so blocking on it would stop the project instead of reporting it.
+function smokeSection(smoke: Verification): string {
+  const lines = smoke.passed
+    ? ['The smoke command passed.']
+    : [
+        'The smoke command did NOT pass.',
+        ...(smoke.reason ? ['', smoke.reason] : []),
+        ...(smoke.command ? ['', `The command: \`${smoke.command}\``] : []),
+        ...(smoke.output ? ['', 'What it printed:', '', '```', smoke.output.trim(), '```'] : []),
+      ];
+  return [
+    'Auto-pilot ran this in its own process before dispatching you, and it is evidence rather than a verdict:',
+    'what it means is yours to decide.',
+    '',
+    ...lines,
+  ].join('\n');
+}
+
+// TWO SECTIONS, and separate because the smoke result is the FEATURE checkup's alone: a heading over nothing is
+// worse than no heading, which is the rule this file already follows. Returned as a list rather than pushed by
+// the caller so `buildRunPrompt` stays a flat sequence — a nested conditional inside it costs far more
+// complexity than the length it saves, and flattening beats a suppression.
+function checkupSections(checkup: PromptInputs['checkup']): string[] {
+  if (!checkup) return [];
+  return [
+    section('What is under this card', checkupSection(checkup)),
+    ...(checkup.smoke ? [section('The smoke command', smokeSection(checkup.smoke))] : []),
+  ];
 }
 
 const CONTRACT_LINES = [
@@ -495,6 +575,8 @@ export function buildRunPrompt(input: PromptInputs): string {
   if (input.links.length > 0) {
     parts.push(section('Reference links', input.links.map((l) => `- [${l.title}](${l.url})`).join('\n')));
   }
+  // After the linked cards and before the contract: this IS the checkup's subject.
+  parts.push(...checkupSections(input.checkup));
   const judging = input.verdict !== undefined || input.review !== undefined;
   if (input.previous) parts.push(previousSection(input.previous, judging));
   // Last of the context and immediately before the contract: the user's words are the most

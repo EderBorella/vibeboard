@@ -630,6 +630,119 @@ describe('the review contract', () => {
   });
 });
 
+// THE CHECKUP'S EVIDENCE, ASSEMBLED BY THE LOOP (ruling 60). Three of the four inputs a checkup needs are
+// unreachable from the `work` scope every card run is minted with — `GET /api/suggestions`, `GET /api/runs` and
+// the diary, which has no read row at all — and widening the table would grant an agent authority to solve a
+// problem the loop can solve. So the loop gathers them and puts them here.
+describe('the checkup’s evidence', () => {
+  const evidence = (over: Partial<NonNullable<PromptInputs['checkup']>> = {}) => ({
+    children: [
+      { id: 'E-001', column: 'done', outcome: 'success', blocked: false },
+      { id: 'E-002', column: 'blocked', outcome: 'failed', blocked: true },
+    ],
+    blocked: ['E-002'],
+    suggestions: [{ id: 'S-1', title: 'the config loader has no tests' }],
+    ...over,
+  });
+
+  const checkingUp = (over: Partial<NonNullable<PromptInputs['checkup']>> = {}) =>
+    buildRunPrompt(inputs({ checkup: evidence(over) }));
+
+  it('lists every child with its column and whether it is blocked', () => {
+    const prompt = checkingUp();
+    expect(prompt).toContain('E-001');
+    expect(prompt).toContain('done');
+    expect(prompt).toContain('E-002');
+    // How its last run ended, which is the fact `GET /api/runs` would have been asked for.
+    expect(prompt).toContain('success');
+    expect(prompt).toContain('failed');
+  });
+
+  it('names the blocked children separately, so the report can name them without being asked', () => {
+    // A checkup told only the columns would have to know which slug means blocked, which is a config fact it
+    // has no way to read. Named as a list, it can name them in its report without being asked to work it out.
+    const prompt = checkingUp();
+    expect(prompt).toMatch(/blocked and waiting for a person: E-002/i);
+  });
+
+  it('says so plainly when nothing under the card is blocked', () => {
+    // An empty list rendered as a heading over nothing would read as "the blocked ones are missing from this
+    // prompt" rather than "there are none".
+    const prompt = checkingUp({ blocked: [], children: [{ id: 'E-001', column: 'done', blocked: false }] });
+    expect(prompt).toMatch(/nothing under this card is blocked/i);
+    expect(prompt).not.toMatch(/blocked and waiting for a person:/i);
+  });
+
+  it('lists the open suggestions', () => {
+    expect(checkingUp()).toContain('the config loader has no tests');
+  });
+
+  it('says there are no open suggestions rather than leaving the reader to wonder', () => {
+    expect(checkingUp({ suggestions: [] })).toMatch(/no open suggestions/i);
+  });
+
+  // RULING 55, with the shape ruling of 2026-08-13: the smoke result is a `Verification`, the same shape the
+  // gate evidence wears, because "a command ran and here is what happened" is one fact and not two.
+  it('renders the smoke result with its command and its output', () => {
+    const prompt = checkingUp({
+      smoke: {
+        mode: 'smoke',
+        passed: false,
+        at: 'T',
+        command: 'npm run smoke',
+        output: 'Error: no such flag --json',
+        reason: '`npm run smoke` exited with 1.',
+      },
+    });
+    expect(prompt).toContain('npm run smoke');
+    expect(prompt).toContain('Error: no such flag --json');
+  });
+
+  it('says the smoke command could not be run rather than implying it passed', () => {
+    // `reason` is what carries the three endings apart: a command that was KILLED, one that could not be
+    // spawned, and one that exited non-zero are different facts, and the first two are not failures of the
+    // code. `commandReason` writes them (core/verify.ts), and this prompt shows them.
+    const prompt = checkingUp({
+      smoke: { mode: 'smoke', passed: false, at: 'T', reason: 'foundation/TESTING.md declares no command.' },
+    });
+    expect(prompt).toContain('foundation/TESTING.md declares no command.');
+    expect(prompt).not.toMatch(/the smoke command passed/i);
+  });
+
+  it('says the smoke command passed when it did', () => {
+    expect(checkingUp({ smoke: { mode: 'smoke', passed: true, at: 'T' } })).toMatch(
+      /the smoke command passed/i,
+    );
+  });
+
+  // EVIDENCE, NOT A VERDICT (ruling 55): the model is told what the command did and decides what it means.
+  it('does not tell the checkup what the smoke result means', () => {
+    const prompt = checkingUp({ smoke: { mode: 'smoke', passed: false, at: 'T', command: 'npm run smoke' } });
+    expect(prompt).toMatch(/what it means is yours to decide/i);
+  });
+
+  it('omits the smoke section entirely for a story checkup', () => {
+    // A heading over nothing is worse than no heading — the rule this file already follows. A story checkup
+    // has no smoke command to run, so there is nothing to say about one.
+    const prompt = checkingUp();
+    expect(prompt).not.toContain('The smoke command');
+  });
+
+  it('renders nothing about a checkup for any other run', () => {
+    const prompt = buildRunPrompt(inputs());
+    expect(prompt).not.toContain('What is under this card');
+    expect(prompt).not.toContain('The smoke command');
+  });
+
+  it('does not tell a checkup to fetch any of it', () => {
+    // It cannot: `work` scope reaches none of those endpoints. A prompt that asked would produce 403s and an
+    // agent that concludes the tools are broken.
+    const prompt = checkingUp();
+    expect(prompt).not.toContain('GET /api/suggestions');
+    expect(prompt).not.toContain('GET /api/runs');
+  });
+});
+
 // A run about the PROJECT: no card, and therefore no card section. The absence has to be STATED — a prompt
 // that simply lacks the card heading is indistinguishable from one that lost it, and an agent reading a skill
 // written for a per-card dispatch will otherwise hunt for the card or invent one.

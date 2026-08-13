@@ -52,9 +52,14 @@ export interface TickContext {
 // What an action did, as far as the loop needs to know. `dispatched` is what moves the counters — decision
 // 8: everything a model does counts, so a review and a checkup increment them exactly as work does.
 export interface ActResult {
-  // HOW MANY runs this action started, not whether it started one. A review dispatches the work and then a
-  // judge, and decision 8 says everything a model does counts against every cap — so a boolean here would
-  // have let every judged card cost one iteration instead of two.
+  // HOW MANY runs this action started, not whether it started one. NO ACTION DISPATCHES MORE THAN ONCE
+  // TODAY — every dispatching branch in act.ts returns 1, so the accumulation below is reachable only with
+  // a 1 — and the claim this replaces ("a review dispatches the work and then a judge") was true of the
+  // critic route, which has retired.
+  //
+  // A number rather than a boolean so the counters stay ADDITIVE, which is decision 8: everything a model
+  // does counts against every cap, so an action that ever starts two runs has to cost two iterations
+  // instead of one. A boolean would make that a change to the loop rather than to the action.
   dispatches: number;
   // A reason to stop, when carrying the action out revealed one. `act` never decides to stop on its own —
   // it reports, and the next tick's `decideTick` sees the world the action left behind.

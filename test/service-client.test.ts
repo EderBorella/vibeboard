@@ -273,10 +273,12 @@ describe('the loop’s sequencing', () => {
     expect(added).toEqual([1]);
   });
 
-  it('counts a tick that dispatched twice as two, because a judging run costs an iteration of its own', async () => {
-    // Decision 8: everything a model does counts against every cap. A review dispatches the work and then a
-    // judge, so a boolean here would have made every judged card cost one iteration instead of two — and the
-    // cap is the thing standing between an unattended loop and an unbounded bill.
+  it('counts a tick that dispatched twice as two, so the counters stay additive', async () => {
+    // Decision 8: everything a model does counts against every cap, and the cap is the thing standing between
+    // an unattended loop and an unbounded bill — so an action that starts two runs must cost two iterations
+    // rather than one. NO ACTION DOES THAT TODAY: every dispatching branch in act.ts returns 1, and the case
+    // this used to name (a review dispatching the work and then a judge) went with the critic. It is the
+    // contract for the number rather than a live path, which is exactly why it needs a test of its own.
     const { deps, added } = harness({
       states: [
         { ...running, iteration: 10 },

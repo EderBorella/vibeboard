@@ -288,6 +288,43 @@ describe('the lifecycle skills', () => {
     expect(body('checkup-feature')).not.toMatch(/you may close the feature/i);
   });
 
+  // THE BRIEF IS A CEILING, and this is the first real run's other finding. The test project's README says
+  // "a single Node script with no dependencies beyond the standard library, and it has tests"; `break-down`
+  // turned its scaffolding feature into FIVE user stories, two of them a build-and-deployment pipeline and a
+  // set of git hooks. Nothing malfunctioned, which is the whole problem: the machine delivers every story it
+  // is given, at a break-down, an implement, the gates and a review apiece.
+  //
+  // EXACT BYTES, in both halves. A substring match on "ceiling" would pass just as well on a sentence that
+  // said the opposite, and for a prompt the wording IS the behaviour. What the real verification is — a
+  // by-hand run against a real model — no test here can be.
+  it('tells break-down that the brief is the ceiling, verbatim', () => {
+    expect(body('break-down')).toContain(
+      "**The brief is a ceiling, not a starting point.** The card below and the project's\nREADME are the bound: read the README, and split what those two ask for and\nnothing else.",
+    );
+    // The other half of the same rule: over-scope is a SUGGESTION, so nothing is blocked and nothing is lost
+    // (decision 11). Without this the ceiling would read as "drop it on the floor".
+    expect(body('break-down')).toContain(
+      'Work neither of them asks for is a **suggestion**, not a card — file\nit with `POST /api/suggestions`',
+    );
+  });
+
+  // THE VERIFIER HALF, and the more durable one: the checkups are the only runs that see a whole feature at
+  // once, so they are where a story nobody asked for can actually be noticed. Identical bytes in both, because
+  // the rule is one rule.
+  it('gives both checkups the job of noticing over-scope, in the same words', () => {
+    for (const slug of ['checkup-story', 'checkup-feature']) {
+      expect(body(slug), slug).toContain(
+        "**The brief is a ceiling, and this phase is where over-scope is noticed.** Read the\nproject's README: it and the card below are the bound on what belongs under this\ncard.",
+      );
+      // AND THE BOUNDARY WITH IT (decisions 45 and 47). Noticing over-scope is a thing to REPORT: a checkup
+      // creates for what was MISSED, and a licence to act on what it disagrees with would be a licence to
+      // archive a card on a model's opinion.
+      expect(body(slug), slug).toContain(
+        'over-scope, and **naming it in\nyour report is the whole of what you do about it** — your one creating round is for\nwhat was MISSED, never for work nobody asked for.',
+      );
+    }
+  });
+
   it('promises the feature checkup the blocked list it is actually rendered', () => {
     // `checkupSection` renders ONE flat list of everything blocked beneath the card, at any depth. The body
     // promised each story's blocked descendants per story, which is a fact the prompt does not carry — so the

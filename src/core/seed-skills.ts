@@ -137,6 +137,13 @@ card. A card that already has children does not need breaking down again, and a
 second set of them is the one mistake this phase can make that nothing else
 notices.
 
+**The brief is a ceiling, not a starting point.** The card below and the project's
+README are the bound: read the README, and split what those two ask for and
+nothing else. Work neither of them asks for is a **suggestion**, not a card — file
+it with \`POST /api/suggestions\`, and a person decides whether it becomes work.
+Every card you create costs a break-down, an implement, the gates and a review, so
+one nobody asked for is not free.
+
 **One acceptance criterion per card.** A card is the right size when exactly one
 test can express whether it is done. Two criteria means two cards. This is the
 rule that keeps the project a proof of concept rather than a product.
@@ -236,6 +243,12 @@ So: create work for what was MISSED, never for what was attempted and blocked.
 one card per call. You get ONE round of creating: anything you still believe is
 missing afterwards goes to \`POST /api/suggestions\`.
 
+**The brief is a ceiling, and this phase is where over-scope is noticed.** Read the
+project's README: it and the card below are the bound on what belongs under this
+card. Anything under it that neither asks for is over-scope, and **naming it in
+your report is the whole of what you do about it** — your one creating round is for
+what was MISSED, never for work nobody asked for.
+
 You do not move or archive any card. Auto-pilot stamps the column when this run
 finishes.
 
@@ -278,6 +291,12 @@ So: create work for what was MISSED, never for what was attempted and blocked.
 one card per call. You get ONE round of creating at this feature: when what you
 created is settled and you run here again, either report the feature as finished
 or say why it is not — and anything still missing goes to \`POST /api/suggestions\`.
+
+**The brief is a ceiling, and this phase is where over-scope is noticed.** Read the
+project's README: it and the card below are the bound on what belongs under this
+card. Anything under it that neither asks for is over-scope, and **naming it in
+your report is the whole of what you do about it** — your one creating round is for
+what was MISSED, never for work nobody asked for.
 
 You do not move or archive any card. Auto-pilot stamps the column when this run
 finishes.

@@ -377,7 +377,13 @@ function fixPhase(input: TickInput, task: Card, carrying: RunRecord): TickAction
 // crashed produced no verdict at all. Marking its task blocked would put a dead API key on the board
 // permanently as work nobody can fix.
 function reviewPhase(input: TickInput, task: Card): TickAction | undefined {
-  const already = outstandingVerdict(input.runs, task.id);
+  const judging = latestWorkRun(input.runs, task.id);
+  // THE LATEST WORK RUN's own verdict, which is what P4 and P4r are asked of — not `outstandingVerdict`, which
+  // answers "the latest work run that carries a verdict" and is a different question. With that one, a task
+  // sent back by its gates could never pass: the implement run's failure stayed outstanding after the fix, so
+  // a fix that landed back in review was re-stamped to in-progress and fixed again, until the cap blocked a
+  // task whose gates had failed exactly once. P5 still reads `outstandingVerdict`, where it IS the question.
+  const already = judging?.verification;
   if (already) {
     const remove = phase('task-review-remove');
     const to = already.passed ? remove.exitPass : remove.exitFail;
@@ -388,7 +394,6 @@ function reviewPhase(input: TickInput, task: Card): TickAction | undefined {
     return stampTo('task-review-remove', task, to, why);
   }
   const skill = phase('task-review').skill;
-  const judging = latestWorkRun(input.runs, task.id);
   if (skill === undefined || judging === undefined) return undefined;
   if (inconclusiveReviews(input.runs, task.id) >= input.ap.attemptCap) {
     return stop(

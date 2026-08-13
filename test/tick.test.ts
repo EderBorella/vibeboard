@@ -25,10 +25,15 @@ function card(id: string, board: BoardName, columnSlug: string, order: number, l
 
 let runCount = 0;
 
+// The id SORTS BY THE ORDER THE FIXTURE MADE IT, because that is the one property production run ids have
+// that the loop depends on: `latest` in bounds.ts ranks by id, so "the newest run on this card" is a string
+// comparison. `${cardId}-${skill}-${n}` did not have it — `E-001-fix-2` sorts before `E-001-implement-1`, so
+// a fix made after an implement read as older, and no fixture could tell a real ordering bug from a right
+// answer reached backwards.
 function run(cardId: string, board: BoardName, skill: string, status: RunStatus): RunRecord {
   runCount += 1;
   return {
-    run: `${cardId}-${skill}-${runCount}`,
+    run: `${String(runCount).padStart(4, '0')}-${cardId}-${skill}`,
     card: cardId,
     board,
     skill,
@@ -779,6 +784,24 @@ describe('decideTick — the review loop', () => {
       phase: 'task-review-remove',
       to: 'in-progress',
     });
+  });
+
+  // THE FIXTURE WITH TWO WORK RUNS, which is what tells the two rows apart. P4 asks whether the LATEST work
+  // run carries a verdict; "the latest work run that carries one" is a different question, and every fixture
+  // above has a single work run, so neither can distinguish them.
+  //
+  // The sequence is the ordinary one: implement, gates fail, fix, back to review. The fix has not been judged,
+  // so it is the review's turn — reading the implement run's old failure as still outstanding would send the
+  // card back to in-progress for another fix, and it would do so after every fix, until the cap blocked a task
+  // whose gates had failed exactly once.
+  it('reviews a task back in review after a fix, rather than re-stamping it on the old verdict', () => {
+    const cards = [...story(['E-001']), task('E-001', 'review')];
+    const failed = judged('implement', false);
+    const fixed = work('fix');
+    const action = decideTick(input({ cards, runs: [failed, fixed] }));
+    expect(action).toMatchObject({ kind: 'dispatch', phase: 'task-review', skill: 'review' });
+    // And it judges THE FIX, not the implement run that was already judged.
+    expect(action.kind === 'dispatch' && action.previous).toBe(fixed.run);
   });
 
   it('dispatches fix for a task in in-progress with an outstanding failed verdict', () => {

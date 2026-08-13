@@ -25,7 +25,7 @@ export interface BoardColumns {
 export interface PromptInputs {
   skill: Skill;
   // The card this run is about, and its file verbatim. BOTH ABSENT for a PROJECT run — the bootstrap, which
-  // derives the board itself and therefore has no card to be about (see `bootstrapSkill` in autopilot.ts).
+  // derives the board itself and therefore has no card to be about (the `bootstrap` row of core/phases.ts).
   // Both or neither: a card with no file would render a heading over nothing, and a file with no card has
   // nothing to name.
   card?: Card;

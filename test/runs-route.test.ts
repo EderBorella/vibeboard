@@ -857,7 +857,7 @@ describe('POST /api/runs — the foundation', () => {
 // A run about the PROJECT, dispatched with no card at all. It exists because the loop shipped a
 // contradiction: the skill on the first features column derives the feature list from the README, so an empty
 // board is a project auto-pilot can start — but a per-card dispatch needs a card, and the card is the thing
-// the run exists to create (see `bootstrapSkill` in core/autopilot.ts).
+// the run exists to create (the `bootstrap` row of core/phases.ts).
 describe('POST /api/runs with no card', () => {
   const BOOTSTRAP = { project: true, skill: 'derive-features' };
 

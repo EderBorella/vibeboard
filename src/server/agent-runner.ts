@@ -41,7 +41,7 @@ import { countRunSuggestions } from './suggestion-store.js';
 export interface DispatchInput {
   skill: Skill;
   // The card this run is about, and its file. ABSENT for a PROJECT run: the bootstrap derives the board from
-  // the README and so has no card, which is the whole reason it exists (see `bootstrapSkill` in autopilot.ts).
+  // the README and so has no card, which is the whole reason it exists (the `bootstrap` row of core/phases.ts).
   // Both or neither, like the record's own `card`/`board` pair and for the same reason.
   card?: Card;
   // Carried, not derived: the runner reads no config, and the columns must be the ones the project

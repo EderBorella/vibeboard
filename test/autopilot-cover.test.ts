@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { type AutopilotConfig, DEFAULT_AUTOPILOT } from '../src/core/autopilot.js';
-import { coverageProblems, skillProblems } from '../src/core/autopilot-cover.js';
+import type { AutopilotConfig } from '../src/core/autopilot.js';
+import { coverageProblems, phaseSkillProblems } from '../src/core/autopilot-cover.js';
 import { defaultConfig } from '../src/core/config.js';
+import { LIFECYCLE_SKILLS } from '../src/core/phases.js';
 import type { ProjectConfig } from '../src/core/types.js';
 
 const fresh = (): ProjectConfig => defaultConfig('T');
@@ -194,16 +195,40 @@ describe('routing-table coverage', () => {
       'This project has no autopilot block in config.yaml, so there is no lifecycle to run.',
     ]);
   });
+});
 
-  it('names a route whose skill is not in the catalogue', () => {
-    expect(skillProblems(DEFAULT_AUTOPILOT, ['implement', 'test'])).toContain(
-      'The route on features/backlog needs a skill called "derive-features", and this project has none.',
-    );
-    // The critic is in the list because a route's VERIFIER is part of its cover too (slice C1): the
-    // default table has critic-verified routes, so a catalogue holding only the routed skills is
-    // genuinely missing one. The premise of this line changed, not the behaviour it asserts.
-    const all = [...DEFAULT_AUTOPILOT.routes.map((r) => r.skill), 'critic'];
-    expect(skillProblems(DEFAULT_AUTOPILOT, all)).toEqual([]);
+// A phase whose skill does not exist is the unreachable-column failure one level in: the phase is chosen,
+// the dispatch 404s, and nothing can ever advance the card. Asked of the PHASE TABLE rather than of
+// `routes` (ruling 52), which is what stops the panel and the loop disagreeing about the lifecycle.
+describe('the skill every phase needs', () => {
+  it('blocks when a project has no skill for a phase', () => {
+    const problems = phaseSkillProblems(['implement', 'review']);
+    expect(problems.join(' ')).toContain('fix');
+    expect(problems.join(' ')).toContain('checkup-story');
+    // Every refusal names the action that fixes it: `seedSkills` writes only into a project with NO
+    // skills folder, so a project that lost one cannot get it back by reopening.
+    expect(problems.join(' ')).toContain('Skills tab');
+  });
+
+  it('passes a project that has all seven', () => {
+    expect(phaseSkillProblems([...LIFECYCLE_SKILLS])).toEqual([]);
+  });
+
+  it('says nothing about a skill no phase names', () => {
+    // `execute` is a seeded skill the machine never dispatches. Its absence blocks nothing, or every
+    // project that deleted a skill it does not use would be refused.
+    const said = phaseSkillProblems([...LIFECYCLE_SKILLS]).join(' ');
+    expect(said).not.toContain('execute');
+    expect(phaseSkillProblems([...LIFECYCLE_SKILLS, 'execute'])).toEqual([]);
+  });
+
+  // One sentence per missing skill, naming every phase that wanted it: `break-down` is two phases, and
+  // two sentences about one absent file would be one problem reported twice.
+  it('names the phases that wanted a missing skill, once', () => {
+    const problems = phaseSkillProblems(LIFECYCLE_SKILLS.filter((s) => s !== 'break-down'));
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toContain('feature-breakdown');
+    expect(problems[0]).toContain('story-breakdown');
   });
 });
 
@@ -371,37 +396,6 @@ describe('the critic threshold', () => {
   });
 });
 
-describe('a route verified by a critic', () => {
-  // A phase whose VERIFIER does not exist can never pass: the card is picked up, the run happens, and
-  // nothing can advance it — the unreachable-column failure one level in. The default table has three
-  // critic-verified routes, so this is the ordinary case rather than an exotic one.
-  it('is refused when the project has no critic skill', () => {
-    const routed = DEFAULT_AUTOPILOT.routes.map((r) => r.skill);
-    expect(skillProblems(DEFAULT_AUTOPILOT, routed).join(' ')).toMatch(/critic/);
-  });
-
-  // Every refusal that reaches a person has to say what to do next. `seedSkills` only writes into a
-  // project with NO skills folder, so an existing project cannot get the shipped critic back by
-  // reopening — which makes "you have no critic skill" a dead end unless it says where to make one.
-  it('names the routes it is about, and the way out', () => {
-    const routed = DEFAULT_AUTOPILOT.routes.map((r) => r.skill);
-    const said = skillProblems(DEFAULT_AUTOPILOT, routed).join(' ');
-    expect(said).toContain('features/backlog');
-    expect(said).toContain('product/backlog');
-    expect(said).toMatch(/Skills tab/);
-  });
-
-  it('is satisfied by the critic skill being there', () => {
-    const routed = DEFAULT_AUTOPILOT.routes.map((r) => r.skill);
-    expect(skillProblems(DEFAULT_AUTOPILOT, [...routed, 'critic'])).toEqual([]);
-  });
-
-  it('is not asked of a project whose routes are all verified another way', () => {
-    const noCritic = {
-      ...DEFAULT_AUTOPILOT,
-      routes: DEFAULT_AUTOPILOT.routes.filter((r) => r.verify !== 'critic'),
-    };
-    const routed = noCritic.routes.map((r) => r.skill);
-    expect(skillProblems(noCritic, routed)).toEqual([]);
-  });
-});
+// The four cases that pinned `skillProblems`'s route reading and its `critic` special case are gone with
+// the function: the question is no longer which skill a ROUTE names but which one a PHASE names, and the
+// phase table has no verifier to look up — a review is a phase of its own. See the describe above.

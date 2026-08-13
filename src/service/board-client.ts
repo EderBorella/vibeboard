@@ -49,7 +49,7 @@ export interface DiaryDetails {
 export interface DispatchRequest {
   // The card this run is about — both fields, or neither with `project: true`. A run about the PROJECT has no
   // card: the bootstrap derives the board from the README, so the card it would be dispatched against is the
-  // thing it exists to create (see `bootstrapSkill` in core/autopilot.ts).
+  // thing it exists to create (the `bootstrap` row of core/phases.ts).
   board?: BoardName;
   card?: string;
   project?: true;

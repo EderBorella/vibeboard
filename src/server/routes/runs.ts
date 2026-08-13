@@ -82,7 +82,7 @@ interface DispatchBody {
   board?: string;
   card?: string;
   // A run about the PROJECT rather than a card: the bootstrap, which derives the board from the README and so
-  // has no card to be dispatched against (see `bootstrapSkill` in core/autopilot.ts). Explicit rather than
+  // has no card to be dispatched against (the `bootstrap` row of core/phases.ts). Explicit rather than
   // inferred from a missing `card`, because a request that simply forgot which card it meant must keep getting
   // its 404 — inferring would turn every such mistake into a silently different, more powerful run.
   project?: boolean;

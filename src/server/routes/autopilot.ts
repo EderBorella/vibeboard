@@ -8,11 +8,11 @@ import {
   splitCardKey,
   sumSpend,
 } from '../../core/accounting.js';
-import { type AutopilotConfig, bootstrapSkill, DEFAULT_AUTOPILOT } from '../../core/autopilot.js';
-import { coverageProblems, skillProblems } from '../../core/autopilot-cover.js';
+import { type AutopilotConfig, DEFAULT_AUTOPILOT } from '../../core/autopilot.js';
+import { coverageProblems, phaseSkillProblems, shapeProblems } from '../../core/autopilot-cover.js';
 import type { AutopilotState } from '../../core/autopilot-state.js';
 import { forClient, unreviewedGatesSentence } from '../../core/autopilot-state.js';
-import { boardColumnSlugs, readBoard } from '../../core/board.js';
+import { readBoard } from '../../core/board.js';
 import { STOP_REASONS, type StopReason } from '../../core/dispatch-gate.js';
 import {
   type FoundationStatus,
@@ -22,6 +22,7 @@ import {
   readSmokeCommand,
   type SmokeResult,
 } from '../../core/foundation.js';
+import { PHASES, phase } from '../../core/phases.js';
 import { type ReadmeGate, readmeGate } from '../../core/readme.js';
 import type { RunRecord } from '../../core/runs.js';
 import type { BoardName, ProjectConfig } from '../../core/types.js';
@@ -59,18 +60,16 @@ export interface Readiness {
   unreviewedGates: string[];
 }
 
-// A route naming a skill the project does not have is a phase that silently never runs, so the
+// A phase naming a skill the project does not have is a phase that silently never runs, so the
 // catalogue is part of the lifecycle's completeness rather than a separate concern.
-function routeProblemsFor(config: ProjectConfig, skillSlugs: string[]): string[] {
+function lifecycleProblemsFor(config: ProjectConfig, skillSlugs: string[]): string[] {
   const problems = coverageProblems(config);
   const ap = config.autopilot;
-  // SHAPE, not presence. `coverageProblems` returns early on `shapeProblems` precisely so nothing
-  // indexes into a malformed block — and then this guard asked whether the block EXISTS and handed a
-  // hand-edited `autopilot:\n  maxIterations: 10` to `skillProblems`, which does `ap.routes.filter`.
-  // A 500 in place of the list of shape problems already computed and sitting in `problems`: the exact
-  // crash autopilot-cover.ts has a comment about, reintroduced one layer up.
-  if (!ap || !Array.isArray(ap.routes)) return problems;
-  return [...problems, ...skillProblems(ap, skillSlugs)];
+  // SHAPE FIRST AND ALONE, which is the same ordering `coverageProblems` keeps internally. A hand-edited
+  // `autopilot:\n  maxIterations: 10` has a dozen things wrong with it, and appending a list about missing
+  // skills to a list about a block that will not parse buries the one the reader has to fix first.
+  if (!ap || shapeProblems(ap).length > 0) return problems;
+  return [...problems, ...phaseSkillProblems(skillSlugs)];
 }
 
 interface Read {
@@ -91,7 +90,7 @@ function blockersFrom(
   routeProblems: string[],
   { readme, foundation, gates, smoke, unreviewedGates, liveCards }: Read,
   // Whether an empty board is a state auto-pilot can start from: a README it can derive the feature list from,
-  // and a skill on the first features column to derive it with. See the empty-board blocker below.
+  // and the bootstrap phase's skill to derive it with. See the empty-board blocker below.
   canDerive: boolean,
 ): string[] {
   return [
@@ -120,7 +119,7 @@ function blockersFrom(
     // arrives AFTER you press Start, so pressing it looked like nothing happening at all.
     //
     // AND ONLY WHEN THE BOARD CANNOT BE DERIVED, which is the correction. An empty board with a README is the
-    // one auto-pilot bootstraps (`bootstrapSkill` in core/autopilot.ts), and blocking it made the flow
+    // one auto-pilot bootstraps (the `bootstrap` row of core/phases.ts), and blocking it made the flow
     // self-contradictory in the user's hands: it could not start without a card, and the run that creates the
     // cards is the one it could not start. Guarded by the same two facts the tick's own branch needs, so the
     // panel and the loop cannot disagree about whether this project can begin.
@@ -133,13 +132,16 @@ function blockersFrom(
 }
 
 export function composeReadiness(config: ProjectConfig, skillSlugs: string[], read: Read): Readiness {
-  const routeProblems = routeProblemsFor(config, skillSlugs);
-  // BOTH facts, and the skill one is not a formality: a project whose first features column is unrouted has
-  // nothing to bootstrap with, and telling such a project to go and write its README would send the reader to
-  // fix the wrong file. The route problems above name the real one.
-  const canDerive =
-    read.readme.ok &&
-    bootstrapSkill(config.autopilot ?? DEFAULT_AUTOPILOT, boardColumnSlugs(config, 'features')) !== undefined;
+  const routeProblems = lifecycleProblemsFor(config, skillSlugs);
+  // BOTH facts, and the skill one is not a formality: a project with no `derive-features` skill has nothing
+  // to bootstrap with, and telling it to go and write its README would send the reader to fix the wrong file.
+  // The lifecycle problems above name the real one.
+  //
+  // THE BOOTSTRAP'S SKILL COMES FROM THE PHASE TABLE, which is the same place the tick takes it from
+  // (core/tick.ts's `bootstrap`) — so the panel and the loop cannot disagree about whether this project can
+  // begin. It used to be read off `config.autopilot.routes`, and they could.
+  const bootstrapSkill = phase('bootstrap').skill;
+  const canDerive = read.readme.ok && bootstrapSkill !== undefined && skillSlugs.includes(bootstrapSkill);
   const blockers = blockersFrom(routeProblems, read, canDerive);
   const { readme, foundation, gates, smoke } = read;
   return {
@@ -153,12 +155,11 @@ export function composeReadiness(config: ProjectConfig, skillSlugs: string[], re
       count: gates.ok ? gates.gates.length : 0,
     },
     smoke: { ok: smoke.ok, ...(smoke.ok ? {} : { reason: smoke.reason }) },
-    // `?.` guards the block, not `routes` — the same defect as above, on the same input.
     unreviewedGates: read.unreviewedGates,
-    routes: {
-      problems: routeProblems,
-      count: Array.isArray(config.autopilot?.routes) ? config.autopilot.routes.length : 0,
-    },
+    // The name and shape stay, so the panel does not change twice (Task 28 renames the field). `count` is now
+    // how many phases DISPATCH, which is a fact about the machine — so a malformed config block no longer
+    // makes it zero, because the number was never about the config.
+    routes: { problems: routeProblems, count: PHASES.filter((p) => p.skill !== undefined).length },
   };
 }
 

@@ -1,6 +1,5 @@
 import {
   type AutopilotConfig,
-  CRITIC_SKILL,
   isBlockedColumn,
   isTerminalColumn,
   ROLLUP_ACTIONS,
@@ -9,6 +8,7 @@ import {
   VERIFY_MODES,
 } from './autopilot.js';
 import { boardColumnSlugs } from './board.js';
+import { LIFECYCLE_SKILLS, PHASES } from './phases.js';
 import { BOARDS, type BoardName, type ProjectConfig } from './types.js';
 
 // "Is this lifecycle complete?" — asked before auto-pilot starts, and again on every config change.
@@ -345,30 +345,28 @@ export function coverageProblems(config: ProjectConfig): string[] {
   return out;
 }
 
-// Separate from the above because it needs the skills folder read, and coverageProblems is pure over
-// config alone — it runs inside the config PATCH handler, where a disk read per save is not
-// something to add without a reason.
-export function skillProblems(ap: AutopilotConfig, skillSlugs: string[]): string[] {
+// DOES EVERY PHASE HAVE A SKILL TO DISPATCH? Separate from the checks above because it needs the skills
+// folder read, and `coverageProblems` is pure over config alone — it runs inside the config PATCH handler,
+// where a disk read per save is not something to add without a reason.
+//
+// Asked of the PHASE TABLE, not of `ap.routes` (ruling 52), which is why it takes no `AutopilotConfig`: the
+// lifecycle is code, so which skills a project must have is a fact about the machine rather than about this
+// project's config. Readiness used to ask the routing table the same question and could therefore disagree
+// with the loop, which reads the table.
+//
+// A phase whose skill does not exist is the unreachable-column failure one level in: the phase is chosen,
+// the dispatch 404s, and nothing can ever advance the card.
+export function phaseSkillProblems(skillSlugs: string[]): string[] {
   const have = new Set(skillSlugs);
-  const problems = ap.routes
-    .filter((r) => !have.has(r.skill))
-    .map(
-      (r) =>
-        `The route on ${r.board}/${r.column} needs a skill called "${r.skill}", and this project has none.`,
-    );
-  // A route's VERIFIER has to exist too. `verify: critic` dispatches a skill by that name, so without
-  // one the phase is picked up, the run happens, and nothing can ever advance the card — the
-  // unreachable-column failure one level in. Asked only of a project that actually uses the mode.
-  const criticRoutes = ap.routes.filter((r) => r.verify === 'critic');
-  if (criticRoutes.length > 0 && !have.has(CRITIC_SKILL)) {
-    // Names the routes and the remedy, like its sibling above. `seedSkills` writes only into a project
-    // whose skills folder is ABSENT — which is what makes deleting a skill permanent — so an existing
-    // project, or one where somebody removed this skill, cannot get it back by reopening. Without the
-    // second sentence the refusal is a dead end about a file the reader has no reason to know the shape of.
-    const where = criticRoutes.map((r) => `${r.board}/${r.column}`).join(', ');
-    problems.push(
-      `The routes on ${where} are verified by a critic, and this project has no "${CRITIC_SKILL}" skill for them to dispatch. Add one in the Skills tab — a judging skill needs no boards or columns, and the score it must report is stated in the prompt at dispatch.`,
-    );
-  }
-  return problems;
+  return LIFECYCLE_SKILLS.filter((skill) => !have.has(skill)).map((skill) => {
+    // Every phase that wanted it, in ONE sentence: `break-down` is two phases, and two sentences about one
+    // absent file would report one problem twice.
+    const phases = PHASES.filter((p) => p.skill === skill).map((p) => p.name);
+    const which =
+      phases.length === 1 ? `The ${phases[0]} phase needs` : `The ${phases.join(' and ')} phases need`;
+    // The remedy is part of the refusal. `seedSkills` writes only into a project whose skills folder is
+    // ABSENT — which is what makes deleting a skill permanent — so a project that lost one cannot get it
+    // back by reopening, and a sentence that names only the gap is a dead end.
+    return `${which} a skill called "${skill}", and this project has none. Add one in the Skills tab.`;
+  });
 }

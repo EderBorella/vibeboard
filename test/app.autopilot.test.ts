@@ -32,16 +32,18 @@ const putFoundation = (app: FastifyInstance, name: string, content: string) =>
 // Written through the endpoint rather than to disk, because that IS the write path: the OS denies
 // this folder to every agent, so if the editor route stopped accepting it the project could never
 // become ready and nothing else would notice.
-async function makeReady(app: FastifyInstance, root: string): Promise<void> {
+async function makeReady(app: FastifyInstance, root: string, opts: { cards?: boolean } = {}): Promise<void> {
   await writeFile(join(root, 'README.md'), README, 'utf8');
   await putFoundation(app, 'STACK.md', 'Node 22, TypeScript.\n');
   await putFoundation(app, 'CODE-QUALITY.md', GATES);
   await putFoundation(app, 'TESTING.md', TESTING);
   await putFoundation(app, 'UX.md', 'One screen, keyboard first.\n');
   await putFoundation(app, 'DESIGN.md', 'Two typefaces, one accent.\n');
-  // And a card. Readiness includes having WORK — an empty board is a blocker, not a stop, since
+  // And a card, unless the caller wants the empty board the bootstrap derives from. Readiness includes
+  // having WORK when there is nothing to derive it from — an empty board is a blocker, not a stop, since
   // otherwise pressing Start ends the loop instantly with `no-op` and looks like nothing happening.
   // Through the endpoint, like the documents above, because that is the write path.
+  if (opts.cards === false) return;
   const created = await app.inject({
     method: 'POST',
     url: '/api/cards',
@@ -69,7 +71,7 @@ describe('GET /api/autopilot/readiness', () => {
   // The correction, and it is the whole of the bootstrap on this side: an empty board with a README is the
   // state auto-pilot DERIVES the board from, so blocking it made the flow self-contradictory in a real
   // project's hands — it could not start without a card, and the run that creates the cards was the one it
-  // could not start. The panel and the tick now read the same two facts (`bootstrapSkill`).
+  // could not start. The panel and the tick now read the same two facts, the bootstrap phase's skill included.
   it('does NOT block an empty board when the README is there to derive it from', async () => {
     const { app, root } = await openTestProject({ name: 'A', mode: 'brownfield' });
     await writeFile(join(root, 'README.md'), README, 'utf8');
@@ -134,10 +136,10 @@ describe('GET /api/autopilot/readiness', () => {
     ]);
   });
 
-  // Skills are ordinary files a person may delete from Project Control, and the routing table has no
+  // Skills are ordinary files a person may delete from Project Control, and the phase table has no
   // idea. Deleting the one a phase runs makes that phase quietly impossible, so readiness has to be
   // where it surfaces.
-  it('names a route whose skill has been deleted', async () => {
+  it('names a phase whose skill has been deleted', async () => {
     const { app, root } = await openTestProject({ name: 'A', mode: 'brownfield' });
     await makeReady(app, root);
     expect((await readiness(app)).ok).toBe(true);
@@ -150,11 +152,50 @@ describe('GET /api/autopilot/readiness', () => {
 
     const r = await readiness(app);
     expect(r.ok).toBe(false);
-    expect(r.routes.problems).toContain(
-      'The route on engineering/backlog needs a skill called "implement", and this project has none.',
-    );
-    // Every route problem reaches the blocker list — the panel shows one list, not two.
+    expect(r.routes.problems.join(' ')).toContain('task-implement');
+    expect(r.routes.problems.join(' ')).toContain('"implement"');
+    // Every one of them reaches the blocker list — the panel shows one list, not two.
     expect(r.blockers).toEqual(expect.arrayContaining(r.routes.problems));
+  });
+
+  // The empty board on the NEW basis, and this is the disagreement Task 16 closes. Readiness used to ask
+  // "does the first features column route to a skill?" while the tick took the bootstrap's skill from the
+  // phase table and derived the board regardless — so a project whose features route had been removed was
+  // told it could not bootstrap by the panel that the loop would have bootstrapped anyway.
+  it('does not blame an empty board on the routing table', async () => {
+    const { app, root, session } = await openTestProject({ name: 'A', mode: 'brownfield' });
+    await makeReady(app, root, { cards: false });
+    const config = parse(await readFile(configPath(root), 'utf8')) as {
+      autopilot: { routes: { board: string; column: string }[] };
+    };
+    config.autopilot.routes = config.autopilot.routes.filter(
+      (r) => !(r.board === 'features' && r.column === 'backlog'),
+    );
+    await writeFile(configPath(root), stringify(config), 'utf8');
+    await session.reloadConfig();
+
+    const r = await readiness(app);
+    expect(r.blockers.join(' ')).not.toContain('There is no card on any board');
+  });
+
+  // And it IS blocked when the phase table's own skill is missing: the bootstrap is a row in that table,
+  // so the fact that decides whether an empty board can be derived is whether that row's skill exists.
+  it('blocks an empty board when the bootstrap phase has no skill', async () => {
+    const { app, root } = await openTestProject({ name: 'A', mode: 'brownfield' });
+    await makeReady(app, root, { cards: false });
+    expect((await readiness(app)).ok).toBe(true);
+
+    const deleted = await app.inject({
+      method: 'DELETE',
+      url: `/api/control/file?path=${encodeURIComponent(skillRel('derive-features', 'SKILL.md'))}`,
+    });
+    expect(deleted.statusCode).toBe(200);
+
+    const r = await readiness(app);
+    expect(r.ok).toBe(false);
+    expect(r.blockers).toContain(
+      'There is no card on any board, and nothing auto-pilot could derive one from. Add a card, or write the README so it can derive the feature list from it.',
+    );
   });
 
   it('refuses when no project is open, rather than reporting on nothing', async () => {
@@ -220,7 +261,29 @@ describe('readiness on a malformed autopilot block', () => {
     const r = res.json() as Readiness;
     expect(r.ok).toBe(false);
     expect(r.routes.problems).toContain('autopilot.routes must be a list of routes.');
-    expect(r.routes.count).toBe(0);
+    // The number of phases that dispatch, which is a fact about the machine rather than about this
+    // project's config — so a malformed block does not make it zero.
+    expect(r.routes.count).toBeGreaterThan(0);
     expect(r.blockers).toEqual(expect.arrayContaining(r.routes.problems));
+  });
+
+  // SHAPE FIRST AND ALONE, one layer up from `coverageProblems`' own guard. `{autopilot: {maxIterations: 10}}`
+  // produced a 500 "ap.routes is not iterable" before this ordering existed, and reporting the phase check
+  // alongside a shape problem would bury the one thing the reader has to fix first.
+  it('still reports the shape problems first and alone', async () => {
+    const { app, root, session } = await openTestProject({ name: 'A', mode: 'brownfield' });
+    await makeReady(app, root);
+    const config = parse(await readFile(configPath(root), 'utf8')) as Record<string, unknown>;
+    config.autopilot = { maxIterations: 10 };
+    await writeFile(configPath(root), stringify(config), 'utf8');
+    await session.reloadConfig();
+    // A skill a phase needs, deleted as well: with both wrong, only the shape is reported.
+    await app.inject({
+      method: 'DELETE',
+      url: `/api/control/file?path=${encodeURIComponent(skillRel('fix', 'SKILL.md'))}`,
+    });
+
+    const r = await readiness(app);
+    expect(r.routes.problems.every((p) => p.startsWith('autopilot.'))).toBe(true);
   });
 });

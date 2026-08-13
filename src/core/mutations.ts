@@ -17,6 +17,11 @@ export interface CreateCardInput {
   links?: string[];
   group?: string;
   body?: string;
+  // The run that created this card (ruling 58). Stamped by the endpoint from the credential it already
+  // holds, never accepted from a caller — but it has to travel through here, because `createCard` builds
+  // its `Card` field by field rather than spreading its input, so a field absent from this interface is
+  // one the stamp loses on the floor.
+  createdBy?: string;
 }
 
 // `exclusive` is for the create path: `wx` fails with EEXIST rather than replacing a file that is
@@ -62,6 +67,7 @@ export async function createCard(
     links: input.links ?? [],
     group: input.group,
     created: today,
+    createdBy: input.createdBy,
     board: input.board,
     columnSlug: input.columnSlug,
     body: input.body ?? '',

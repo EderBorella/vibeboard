@@ -57,6 +57,16 @@ describe('web/shared mirrors src/core', () => {
     );
   });
 
+  // A NEW guard, and it CREATES cover rather than extending it: there was no card-frontmatter mirror at
+  // all, so `setup` had already reached the wire with the web type carrying it only by luck. Exact rather
+  // than "web ⊆ core", for the same reason as the run record: a field the UI deliberately does not carry
+  // has to SAY so, or the next one slips through as deliberate too.
+  it('mirrors every card frontmatter field, or declares why not', () => {
+    expect([...web.CARD_FIELDS, ...web.CARD_FIELDS_NOT_MIRRORED].sort()).toEqual(
+      [...core.CARD_FRONTMATTER_KEYS].sort(),
+    );
+  });
+
   it('mirrors the diary entry bound', () => {
     expect(web.MAX_ENTRY_TEXT).toBe(coreDiary.MAX_ENTRY_TEXT);
   });

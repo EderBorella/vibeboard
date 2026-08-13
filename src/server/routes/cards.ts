@@ -1,7 +1,7 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { boardColumnSlugs, type CardProblem, readArchive, readBoard } from '../../core/board.js';
-import { pickCardPatch } from '../../core/card.js';
+import { FORBIDDEN_PATCH_KEYS, forbiddenPatchSentence, pickCardPatch } from '../../core/card.js';
 import { findCard } from '../../core/find.js';
 import { oneParentProblem } from '../../core/hierarchy.js';
 import { ARCHIVE_SLUG } from '../../core/layout.js';
@@ -16,7 +16,7 @@ import {
   updateCard,
 } from '../../core/mutations.js';
 import { slugify } from '../../core/slug.js';
-import { BOARDS, type BoardName, type ProjectConfig } from '../../core/types.js';
+import { BOARDS, type BoardName, type CardFrontmatter, type ProjectConfig } from '../../core/types.js';
 import { type AppCtx, ensureOpen, nowIso, today } from '../route-context.js';
 import { resolveCardRuns } from '../run-store.js';
 
@@ -199,6 +199,31 @@ async function stampForRun(
   };
 }
 
+// The two flags and nothing else. `false` CLEARS rather than being rejected: `serializeCard` emits either
+// key only when true, so turning one off is the same write as never having set it.
+//
+// A body with neither is a 400, not a 200: a request that changed nothing would tell the loop its stamp
+// landed, and the bootstrap's exit is the one deterministic act decision 44 rests on.
+const FLAGS = ['setup', 'followUp'] as const;
+
+function pickFlags(body: unknown): { patch: Partial<CardFrontmatter>; error?: string } {
+  const o = (body ?? {}) as Record<string, unknown>;
+  const unknown = Object.keys(o).filter((k) => !(FLAGS as readonly string[]).includes(k));
+  if (unknown.length > 0) {
+    return { patch: {}, error: `Cannot set ${unknown.join(', ')} here: this route sets setup and followUp.` };
+  }
+  const patch: Partial<CardFrontmatter> = {};
+  for (const key of FLAGS) {
+    if (o[key] === undefined) continue;
+    if (typeof o[key] !== 'boolean') return { patch: {}, error: `${key} must be true or false.` };
+    patch[key] = o[key] === true ? true : undefined;
+  }
+  if (!FLAGS.some((k) => k in patch)) {
+    return { patch: {}, error: 'Set setup or followUp: a request that sets neither would change nothing.' };
+  }
+  return { patch };
+}
+
 export async function registerCardRoutes(api: FastifyInstance, ctx: AppCtx): Promise<void> {
   api.post('/cards', async (req, reply) => {
     if (!ensureOpen(ctx.session, reply)) return;
@@ -236,11 +261,34 @@ export async function registerCardRoutes(api: FastifyInstance, ctx: AppCtx): Pro
     const { patch, rejected } = pickCardPatch(req.body);
     // A wrong-typed field is refused, not dropped. Answering 200 over a card that did not change tells
     // the caller — very often an agent — that it succeeded, so it never tries the other spelling.
+    //
+    // TWO CLAUSES, because there are two reasons to refuse and one sentence could only be right about
+    // one of them: shape for a field this endpoint takes, and authority for a field it does not. Telling
+    // a caller that `setup` was "expected a string" sends it to fix the wrong thing.
     if (rejected.length > 0) {
-      return reply.code(400).send({
-        error: `Cannot set ${rejected.join(', ')}: expected a string, or a list of strings for tags`,
-      });
+      const forbidden = rejected.filter((k) => FORBIDDEN_PATCH_KEYS.includes(k));
+      const mistyped = rejected.filter((k) => !FORBIDDEN_PATCH_KEYS.includes(k));
+      const parts = [
+        mistyped.length > 0
+          ? `Cannot set ${mistyped.join(', ')}: expected a string, or a list of strings for tags`
+          : undefined,
+        forbidden.length > 0 ? forbiddenPatchSentence(forbidden) : undefined,
+      ].filter((p): p is string => p !== undefined);
+      return reply.code(400).send({ error: parts.join('. ') });
     }
+    return updateCard(ctx.session.root, card, patch);
+  });
+
+  // The `service`-only write path decision 44 needs. A route of its own rather than widening PATCH: the
+  // PATCH allow-list is what stops a work agent flagging its own card, and a body-dependent exception to
+  // it would be a new category of thing the scope table cannot express.
+  api.post('/cards/:board/:id/flags', async (req, reply) => {
+    if (!ensureOpen(ctx.session, reply)) return;
+    const { board, id } = req.params as { board: BoardName; id: string };
+    const card = await findCard(ctx.session.root, board, id, ctx.session.config);
+    if (!card) return reply.code(404).send({ error: 'Card not found' });
+    const { patch, error } = pickFlags(req.body);
+    if (error) return reply.code(400).send({ error });
     return updateCard(ctx.session.root, card, patch);
   });
 

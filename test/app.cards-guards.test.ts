@@ -24,6 +24,7 @@ const cardRoutes = [
   { method: 'PUT' as const, url: `/api/cards/${MISSING}/links`, payload: { links: [] } },
   { method: 'POST' as const, url: `/api/cards/${MISSING}/place`, payload: { toColumnSlug: 'todo' } },
   { method: 'POST' as const, url: `/api/cards/${MISSING}/archive` },
+  { method: 'POST' as const, url: `/api/cards/${MISSING}/flags`, payload: { setup: true } },
   { method: 'POST' as const, url: `/api/cards/${MISSING}/restore`, payload: {} },
 ];
 
@@ -95,8 +96,13 @@ describe('restore refusals', () => {
 // PATCH used to spread the request body straight onto the card, so anything with a matching key
 // landed. The fields below are each governed by something else, and `setup` is authority: a work
 // agent able to flag its own card would make its own subtree the only eligible work in the project.
+//
+// THIS TEST'S PREMISE CHANGED, and the behaviour is what its own comment always said it was. It used to
+// assert 200 with each field silently dropped; silence told an agent that sent `setup: true` that it had
+// succeeded, so it never tried the other spelling. The fields are refused for AUTHORITY — which is what
+// the comment below already said — and a refusal now says so.
 describe('PATCH /api/cards accepts only the fields it is for', () => {
-  it('ignores setup, id, order, archived and links', async () => {
+  it('400s on setup, id, order, archived and links, naming every one and who owns it', async () => {
     const { app, root, session } = await openTestProject({ name: 'G' });
     const state = (await app.inject({ method: 'GET', url: '/api/state' })).json();
     const before = state.snapshot.boards.engineering[0];
@@ -116,17 +122,20 @@ describe('PATCH /api/cards accepts only the fields it is for', () => {
         links: ['P-404'],
       },
     });
-    expect(res.statusCode).toBe(200);
+    expect(res.statusCode).toBe(400);
+    const { error } = res.json();
+    for (const field of ['setup', 'id', 'order', 'archived', 'archivedFrom', 'links']) {
+      expect(error, field).toContain(field);
+    }
+    // The authority clause, not the shape one: nothing here is the wrong type.
+    expect(error).toContain('set by auto-pilot');
+    expect(error).not.toContain('expected a string');
 
-    const after = res.json();
-    expect(after.title).toBe('A new title'); // the field it IS for still works
-    expect(after.setup).toBeUndefined();
-    expect(after.id).toBe(before.id);
-    expect(after.order).toBe(before.order);
-    expect(after.archived).toBeUndefined();
-    expect(after.links).toEqual(before.links);
-
-    // And on disk, not merely in the reply.
+    // Nothing applied — not even the field that WAS valid, and not on disk either. The on-disk half is
+    // what proves the refusal happened BEFORE the write rather than after it.
+    const after = (await app.inject({ method: 'GET', url: '/api/state' })).json().snapshot.boards
+      .engineering[0];
+    expect(after.title).toBe(before.title);
     await session.reloadConfig();
     const raw = await readFile(
       join(root, boardRel('engineering', after.columnSlug, `${before.id}.md`)),
@@ -134,6 +143,7 @@ describe('PATCH /api/cards accepts only the fields it is for', () => {
     );
     expect(raw).not.toContain('setup');
     expect(raw).not.toContain('E-999');
+    expect(raw).not.toContain('A new title');
   });
 });
 

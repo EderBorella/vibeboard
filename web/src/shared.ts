@@ -105,6 +105,8 @@ export interface Card {
   created: string;
   // The project-level barrier: while this feature is unfinished nothing outside its subtree runs.
   setup?: boolean;
+  // The one open follow-up feature, which is where work carded out of a suggestion hangs off.
+  followUp?: boolean;
   // Present only while the card sits in the archive.
   archived?: string; // ISO timestamp
   archivedFrom?: string; // column slug it left
@@ -113,6 +115,43 @@ export interface Card {
   body: string;
   filePath: string;
 }
+
+// The card's FRONTMATTER fields, as data, so test/mirror.test.ts can hold this hand-mirror to
+// CARD_FRONTMATTER_KEYS in src/core/types.ts. There was no such guard until now, which is why `setup`
+// reached the wire with this side carrying it only by luck.
+//
+// The four DERIVED fields above (board, columnSlug, body, filePath) are not in it: they come from the
+// file's path and its body rather than from its frontmatter, so they are not part of the comparison.
+export const CARD_FIELDS = [
+  'id',
+  'title',
+  'description',
+  'order',
+  'tags',
+  'links',
+  'group',
+  'created',
+  'setup',
+  'followUp',
+  'archived',
+  'archivedFrom',
+] as const;
+
+export const CARD_FIELDS_NOT_MIRRORED = [
+  // Which run created the card. It is how the loop answers "has this already been done?" from the board;
+  // nothing on screen shows it, and a run id on a tile would invite reading it as provenance the user is
+  // meant to act on.
+  'createdBy',
+] as const;
+
+// A frontmatter field on the interface above that `CARD_FIELDS` does not name. `never` when every one is
+// there; otherwise this line fails to compile and names the field the guard would have missed.
+type UnlistedCardField = Exclude<
+  keyof Card,
+  (typeof CARD_FIELDS)[number] | 'board' | 'columnSlug' | 'body' | 'filePath'
+>;
+const _everyCardFieldIsListed: UnlistedCardField extends never ? true : UnlistedCardField = true;
+void _everyCardFieldIsListed;
 
 // An archived card plus where a restore would put it back — resolved server-side, since the
 // original column may have been renamed away since.

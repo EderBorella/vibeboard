@@ -87,6 +87,15 @@ const RULES: Record<string, Rule> = {
     scopes: BOARD_SCOPES,
     describe: 'archive a card. It leaves the board and keeps its id; nothing is deleted.',
   },
+  // THE SERVICE ALONE, and `checkup` is refused as deliberately as `work` is (decision 44). `setup` makes
+  // an absent gate set EXPECTED for a whole subtree (decision 51), and `followUp` decides which feature a
+  // second wave of work hangs off — so both are authority rather than supervision, and neither is a thing
+  // an agent may grant itself. Reachable by the browser regardless, because `allows` returns true for
+  // admin before it consults this table.
+  'POST /api/cards/:board/:id/flags': {
+    scopes: ['service'],
+    describe: '`{ setup?, followUp? }` — set or clear the two flags auto-pilot owns.',
+  },
 
   // Filing is uncapped and open to both working scopes; READING the list is not. A work agent that
   // can see every open problem in the project is a work agent scoped to one card talking itself

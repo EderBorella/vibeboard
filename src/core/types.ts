@@ -29,12 +29,49 @@ export interface CardFrontmatter {
   // F-001 would silently remove the barrier. Not accepted by the card PATCH endpoint either — a work
   // agent able to flag its own card would make its own subtree the only work in the project.
   setup?: boolean;
+  // The one open FOLLOW-UP feature (decision 50). Work that arrives after the first pass has nowhere
+  // to go — a project's features are done and a story carded out of a suggestion would be an orphan —
+  // so those stories hang off this card. A flag rather than a title convention, because "the open
+  // follow-up" must be a fact and not a guess from a title the user can rename. Same write path as
+  // `setup`: service only.
+  followUp?: boolean;
+  // WHICH RUN CREATED THIS CARD, stamped by POST /api/cards from the credential it is already holding
+  // (ruling 58). That is what makes "has this already been done?" answerable from the board with
+  // nothing to trust: `RunRecord.created` is frontmatter the agent wrote about itself, and this is not.
+  createdBy?: string; // a run id
   // Set only while a card sits in archive/, cleared on restore. `archived` is a full
   // timestamp (not a date like `created`) so the drawer can order by what was thrown away
   // most recently; `archivedFrom` is the column slug to put it back into.
   archived?: string; // ISO timestamp
   archivedFrom?: string; // column slug
 }
+
+// The frontmatter field set, as data. An interface has no runtime keys, so nothing could compare the web
+// hand-mirror with this one — the same gap `AUTOPILOT_CONFIG_KEYS` exists to close. Asserted against
+// web/src/shared.ts in test/mirror.test.ts.
+//
+// The order is the order `serializeCard` writes them in, which is the order a person reads them in a diff.
+export const CARD_FRONTMATTER_KEYS = [
+  'id',
+  'title',
+  'description',
+  'order',
+  'tags',
+  'links',
+  'group',
+  'created',
+  'setup',
+  'followUp',
+  'createdBy',
+  'archived',
+  'archivedFrom',
+] as const;
+
+// A field on `CardFrontmatter` that the list above does not name. `never` when every one is covered;
+// otherwise this line fails to compile and names the field the mirror guard would have missed.
+type UnlistedCardField = Exclude<keyof CardFrontmatter, (typeof CARD_FRONTMATTER_KEYS)[number]>;
+const _everyCardFieldIsListed: UnlistedCardField extends never ? true : UnlistedCardField = true;
+void _everyCardFieldIsListed;
 
 export interface Card extends CardFrontmatter {
   board: BoardName; // derived from path

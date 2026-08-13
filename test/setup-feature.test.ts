@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { ARCHIVE_SLUG } from '../src/core/layout.js';
-import { hasSetupFeature, setupFeature, setupSubtreeIds } from '../src/core/setup-feature.js';
+import {
+  followUpCount,
+  hasSetupFeature,
+  openFollowUp,
+  setupFeature,
+  setupSubtreeIds,
+} from '../src/core/setup-feature.js';
 import type { BoardName, Card } from '../src/core/types.js';
 
 function card(id: string, board: BoardName, columnSlug: string, links: string[], setup?: boolean): Card {
@@ -126,5 +132,68 @@ describe('hasSetupFeature', () => {
     };
     expect(setupFeature([archived])).toBeUndefined();
     expect(hasSetupFeature([archived])).toBe(true);
+  });
+});
+
+// THE ONE OPEN FOLLOW-UP (decision 50). Its only cover was through the endpoint that carded a suggestion,
+// which cannot reach the no-block case at all — and the flag is what makes "the open follow-up" a fact
+// rather than a guess from a title a user can rename.
+describe('the open follow-up', () => {
+  const TERMINAL: Record<BoardName, string[]> = {
+    features: ['done'],
+    product: ['done'],
+    engineering: ['done'],
+  };
+  // No block at all, which is a project written before the lifecycle: `openFollowUp` takes `terminal` rather
+  // than the whole block precisely so it still answers here.
+  const NO_BLOCK = {} as Record<BoardName, string[]>;
+
+  const follow = (id: string, columnSlug: string): Card => ({
+    ...card(id, 'features', columnSlug, []),
+    followUp: true,
+  });
+
+  it('finds a flagged feature whose column is not terminal', () => {
+    expect(openFollowUp([follow('F-001', 'in-progress')], TERMINAL)?.id).toBe('F-001');
+  });
+
+  it('is nothing when the only flagged feature is finished', () => {
+    // Reopening it would un-do something a feature checkup recorded as finished and contradict the derived
+    // status the board shows, so the next story carded starts a new wave instead.
+    expect(openFollowUp([follow('F-001', 'done')], TERMINAL)).toBeUndefined();
+  });
+
+  it('reads the FLAG, not the title', () => {
+    const decoy = card('F-001', 'features', 'backlog', []);
+    expect(openFollowUp([{ ...decoy, title: 'Follow-up 1' }], TERMINAL)).toBeUndefined();
+  });
+
+  it('ignores an archived follow-up, which is neither open nor a wave', () => {
+    const archived = { ...follow('F-001', ARCHIVE_SLUG), archived: '2026-08-13T00:00:00Z' };
+    expect(openFollowUp([archived], TERMINAL)).toBeUndefined();
+    expect(followUpCount([archived])).toBe(0);
+  });
+
+  it('takes the first when a board somehow has two, rather than guessing', () => {
+    const two = [follow('F-001', 'backlog'), follow('F-002', 'backlog')];
+    expect(openFollowUp(two, TERMINAL)?.id).toBe('F-001');
+  });
+
+  // STATED BEHAVIOUR, not an accident: with no block nothing is terminal, so a follow-up somebody moved to
+  // Done still reads as open and is reused. It cannot un-do a checkup's ruling, because a project with no
+  // block has no lifecycle to run — a missing block is `coverageProblems`' loudest refusal — so no checkup
+  // has ever closed anything there. Reading every column as terminal instead would start a new wave for
+  // every single suggestion.
+  it('reuses a finished follow-up on a project with no autopilot block, where nothing is terminal', () => {
+    expect(openFollowUp([follow('F-001', 'done')], NO_BLOCK)?.id).toBe('F-001');
+  });
+
+  it('counts the waves from the flag, so a card titled like one is nobody’s wave', () => {
+    const board = [
+      follow('F-001', 'done'),
+      follow('F-002', 'in-progress'),
+      { ...card('F-003', 'features', 'backlog', []), title: 'Follow-up 3' },
+    ];
+    expect(followUpCount(board)).toBe(2);
   });
 });

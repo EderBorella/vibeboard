@@ -47,6 +47,12 @@ export function hasSetupFeature(cards: Card[]): boolean {
 //
 // `terminal` rather than the whole autopilot block: a project written before the lifecycle has no
 // block, and this must still answer.
+//
+// WITH NO BLOCK NOTHING IS TERMINAL, so on such a project a follow-up somebody moved to Done still reads as
+// open and is reused. Deliberate, and stated because it looks like decision 50's forbidden reopen: it cannot
+// un-do a ruling a checkup recorded, because a project with no block has no lifecycle to run at all — a
+// missing block is `coverageProblems`' loudest refusal — so no checkup has ever closed anything there. The
+// alternative reading, treating every column as terminal, would start a new wave for every suggestion.
 export function openFollowUp(cards: Card[], terminal: Record<BoardName, string[]>): Card | undefined {
   return live(cards).find(
     (c) => c.board === 'features' && c.followUp === true && !(terminal.features ?? []).includes(c.columnSlug),

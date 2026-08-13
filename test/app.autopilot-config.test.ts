@@ -2,6 +2,7 @@ import { readdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { parse, stringify } from 'yaml';
+import { coverageProblems } from '../src/core/autopilot-cover.js';
 import { configPath, readConfig, writeConfig } from '../src/core/config.js';
 import { boardRel } from '../src/core/layout.js';
 import type { ProjectConfig } from '../src/core/types.js';
@@ -290,5 +291,118 @@ describe('a project created before a key existed', () => {
     });
     expect(res.statusCode).toBe(400);
     expect(res.json().error).toMatch(/attemptCap/);
+  });
+});
+
+// RULING 52 made adding a column free: a column decides nothing any more, so there is no route for a new one
+// to be missing from. RULING 59 says there is no migration for the projects written before that — every one
+// of them is a disposable test project. Both are BEHAVIOUR CHANGES, and both were shipped with no server-side
+// test: the case that pinned the old refusal was replaced by nothing, and SettingsModal now promises the new
+// behaviour on screen with only a browser test behind it.
+describe('adding a column, and the projects written before the lifecycle changed', () => {
+  const OLD_SHAPE = {
+    // The three keys the retirement deleted. Nothing reads them, and that is the whole claim: a file still
+    // carrying them is simply valid.
+    routes: [{ board: 'engineering', column: 'backlog', skill: 'implement', next: 'review' }],
+    rollup: [{ board: 'product', when: 'all-children-terminal', action: 'advance' }],
+    checkupEvery: 5,
+  };
+
+  it('permits ADDING a column, which used to be refused', async () => {
+    const { app, root } = await openTestProject({ name: 'A', mode: 'brownfield' });
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/api/config',
+      payload: { boards: { engineering: { columns: [...ENGINEERING, 'Staging'] } } },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().boards.engineering.columns).toContain('Staging');
+    // Persisted, and the block is untouched by it: a new column is not terminal and not blocked, and under
+    // the retired cover check that alone was the refusal.
+    const disk = await readDisk(root);
+    expect(disk.boards.engineering.columns).toContain('Staging');
+    expect(disk.autopilot?.terminal.engineering).toEqual(['done']);
+    expect(disk.autopilot?.blockedColumn).toBe('blocked');
+  });
+
+  // The other side of it, which has NOT changed: removing the column a board finishes in is still refused,
+  // and that is what the Boards section warns about before anyone types.
+  it('still refuses REMOVING the column the board finishes in', async () => {
+    const { app } = await openTestProject({ name: 'A', mode: 'brownfield' });
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/api/config',
+      payload: { boards: { engineering: { columns: ['Backlog', 'In Progress', 'Review', 'Blocked'] } } },
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().error).toContain('terminal names "done" for engineering');
+  });
+
+  it('scaffolds exactly the six keys the lifecycle needs, and they validate clean', async () => {
+    const { root } = await openTestProject({ name: 'A', mode: 'brownfield' });
+    const disk = await readDisk(root);
+    // EXACT. A key nothing reads is dead weight the next reader has to rule out, and a key that has gone
+    // missing is a refusal every project meets on its first save.
+    expect(Object.keys(disk.autopilot ?? {}).sort()).toEqual([
+      'attemptCap',
+      'blockedColumn',
+      'budgetUsd',
+      'maxIterations',
+      'runTimeoutMs',
+      'terminal',
+    ]);
+    expect(coverageProblems(disk)).toEqual([]);
+  });
+
+  it('reads a block still carrying the retired keys as valid, and saves over it', async () => {
+    const { app, root, session } = await openTestProject({ name: 'A', mode: 'brownfield' });
+    const config = await readDisk(root);
+    config.autopilot = { ...config.autopilot, ...OLD_SHAPE } as ProjectConfig['autopilot'];
+    await writeFile(configPath(root), stringify(config), 'utf8');
+    await session.reloadConfig();
+
+    // NO MIGRATION means no new refusal either. The dead keys are not read, so they cannot be wrong.
+    expect(coverageProblems(session.config as ProjectConfig)).toEqual([]);
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/api/config',
+      payload: { boards: { engineering: { columns: [...ENGINEERING, 'Staging'] } } },
+    });
+    expect(res.statusCode).toBe(200);
+  });
+
+  it('refuses to start an old-shape project for exactly what a new-shape one is refused for', async () => {
+    const { app, root, session } = await openTestProject({ name: 'A', mode: 'brownfield' });
+    // MEASURED BEFORE AND AFTER, and compared, rather than matched against a list of words the block might
+    // use: "no migration" is the claim that the old shape changes NOTHING, and a refusal invented for it
+    // would not have to name a key to be a new refusal. A planted migration check passed a word filter.
+    const before = await app.inject({ method: 'POST', url: '/api/autopilot/start', payload: {} });
+    expect(before.statusCode).toBe(412);
+
+    const config = await readDisk(root);
+    config.autopilot = { ...config.autopilot, ...OLD_SHAPE } as ProjectConfig['autopilot'];
+    await writeFile(configPath(root), stringify(config), 'utf8');
+    await session.reloadConfig();
+
+    const after = await app.inject({ method: 'POST', url: '/api/autopilot/start', payload: {} });
+    // 412 for what is genuinely missing — a README long enough to derive from, and the foundation documents —
+    // and not a crash, and not one blocker more than the same project had before its block grew dead keys.
+    expect(after.statusCode).toBe(412);
+    expect(after.json().blockers).toEqual(before.json().blockers);
+    expect((after.json().blockers as string[]).join(' ')).toMatch(/README/i);
+  });
+
+  // The other direction of ruling 59: a block that has LOST a key is answered rather than crashed on, and
+  // with one sentence naming the key — the checks below it all index into the block, so reporting the
+  // consequences alongside it would be no report at all.
+  it('answers a block stripped of `terminal` with exactly one sentence naming the key', async () => {
+    const { app } = await openTestProject({ name: 'A', mode: 'brownfield' });
+    const current = (await app.inject({ method: 'GET', url: '/api/config' })).json() as ProjectConfig;
+    const autopilot = structuredClone(current.autopilot);
+    if (!autopilot) throw new Error('a project scaffolded today has an autopilot block');
+    delete (autopilot as { terminal?: unknown }).terminal;
+    const res = await app.inject({ method: 'PATCH', url: '/api/config', payload: { autopilot } });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().error).toBe('autopilot.terminal must name the terminal columns of each board.');
   });
 });

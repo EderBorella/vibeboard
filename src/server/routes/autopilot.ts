@@ -54,7 +54,7 @@ export interface Readiness {
   foundation: FoundationStatus;
   gates: { ok: boolean; reason?: string; count: number };
   smoke: { ok: boolean; reason?: string };
-  routes: { problems: string[]; count: number };
+  phases: { problems: string[]; count: number };
   // Named separately as well as being a blocker sentence, so the UI can offer the button that clears
   // it without matching on prose that is meant to be improvable.
   unreviewedGates: string[];
@@ -87,7 +87,7 @@ interface Read {
 // Everything wrong with this project, in the order a person would fix it: the lifecycle first (it is
 // config), then the README (it is the input), then the documents derived from it.
 function blockersFrom(
-  routeProblems: string[],
+  lifecycleProblems: string[],
   { readme, foundation, gates, smoke, unreviewedGates, liveCards }: Read,
   // Whether an empty board is a state auto-pilot can start from: a README it can derive the feature list from,
   // and the bootstrap phase's skill to derive it with. See the empty-board blocker below.
@@ -102,7 +102,7 @@ function blockersFrom(
     // copy that told you to read the commands and stopped there — so it named the thing that does not
     // clear the block and omitted the thing that does.
     ...(unreviewedGates.length === 0 ? [] : [unreviewedGatesSentence(unreviewedGates)]),
-    ...routeProblems,
+    ...lifecycleProblems,
     ...(readme.ok ? [] : [readme.reason]),
     // Named one by one rather than "the foundation is incomplete": the fix is to write a specific
     // file, and the point of an enumerated set is that nobody has to guess which.
@@ -132,7 +132,7 @@ function blockersFrom(
 }
 
 export function composeReadiness(config: ProjectConfig, skillSlugs: string[], read: Read): Readiness {
-  const routeProblems = lifecycleProblemsFor(config, skillSlugs);
+  const lifecycleProblems = lifecycleProblemsFor(config, skillSlugs);
   // BOTH facts, and the skill one is not a formality: a project with no `derive-features` skill has nothing
   // to bootstrap with, and telling it to go and write its README would send the reader to fix the wrong file.
   // The lifecycle problems above name the real one.
@@ -142,7 +142,7 @@ export function composeReadiness(config: ProjectConfig, skillSlugs: string[], re
   // begin. It used to be read off `config.autopilot.routes`, and they could.
   const bootstrapSkill = phase('bootstrap').skill;
   const canDerive = read.readme.ok && bootstrapSkill !== undefined && skillSlugs.includes(bootstrapSkill);
-  const blockers = blockersFrom(routeProblems, read, canDerive);
+  const blockers = blockersFrom(lifecycleProblems, read, canDerive);
   const { readme, foundation, gates, smoke } = read;
   return {
     ok: blockers.length === 0,
@@ -156,10 +156,9 @@ export function composeReadiness(config: ProjectConfig, skillSlugs: string[], re
     },
     smoke: { ok: smoke.ok, ...(smoke.ok ? {} : { reason: smoke.reason }) },
     unreviewedGates: read.unreviewedGates,
-    // The name and shape stay, so the panel does not change twice (Task 28 renames the field). `count` is now
-    // how many phases DISPATCH, which is a fact about the machine — so a malformed config block no longer
-    // makes it zero, because the number was never about the config.
-    routes: { problems: routeProblems, count: PHASES.filter((p) => p.skill !== undefined).length },
+    // `phases`, not `routes`: the count is how many phases DISPATCH, which is a fact about the machine, so a
+    // malformed config block no longer makes it zero — the number was never about the config.
+    phases: { problems: lifecycleProblems, count: PHASES.filter((p) => p.skill !== undefined).length },
   };
 }
 
@@ -195,18 +194,17 @@ async function readReadiness(root: string, config: ProjectConfig): Promise<Readi
   );
 }
 
-// Why this project cannot be started right now, or nothing. `halted` needs a person (decision 12); `running`
-// means it is already going; and an owed checkup is one this slice cannot run — the tick would stop for it on
-// its first pass, so refusing here puts the reason in the panel instead of delivering it as a stop nobody
-// asked for. Each names the control that clears it, because a refusal without a way forward is a dead end.
-function stateConflict(state: AutopilotState, ap: AutopilotConfig): string | undefined {
+// Why this project cannot be started right now, or nothing. `halted` needs a person (decision 12) and
+// `running` means it is already going. Each names the control that clears it, because a refusal without a
+// way forward is a dead end.
+//
+// The third refusal — an owed periodic checkup — retired with `checkupEvery` (decision 47). It was the one
+// that stopped a project after roughly five cards and waited for a human.
+function stateConflict(state: AutopilotState): string | undefined {
   if (state.state === 'halted') {
     return 'This project is halted. Restart it from the auto-pilot panel before starting auto-pilot.';
   }
   if (state.state === 'running') return 'Auto-pilot is already running this project.';
-  if (state.needsCheckup || state.dispatchesSinceCheckup >= ap.checkupEvery) {
-    return 'This project owes a supervisor checkup, which auto-pilot cannot run yet. Restart it from the auto-pilot panel to clear that and start again from zero.';
-  }
   return undefined;
 }
 
@@ -270,7 +268,7 @@ async function registerControls(api: FastifyInstance, ctx: AppCtx): Promise<void
 
     // Then the state, which is the project's own business rather than the machine's — 409 for each.
     const state = await ctx.autopilot.current();
-    const conflict = stateConflict(state, ctx.session.config.autopilot ?? DEFAULT_AUTOPILOT);
+    const conflict = stateConflict(state);
     if (conflict) return reply.code(409).send({ error: conflict });
 
     const started = await ctx.service.start();

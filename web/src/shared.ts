@@ -226,28 +226,19 @@ export interface BoardConfig {
   columns: string[];
 }
 
-// Mirrors src/core/autopilot.ts. Nothing renders the table yet — the auto-pilot settings tab is a
-// later task; today the UI only asks whether the block EXISTS, to decide whether a column edit is
-// about to be refused. config.yaml is where the table is edited.
+// Mirrors src/core/autopilot.ts. The LIFECYCLE IS NOT HERE and must not be mirrored here: ruling 52 puts
+// the phase table in src/core/phases.ts, which this bundle cannot import, so a copy of it on this side
+// would be a second statement of the machine with nothing to compare it against.
 // A runtime array as well as a type, so test/mirror.test.ts can compare it with the core list. A hand
 // written union drifts silently; a list can be asserted.
 export const VERIFY_MODES = ['gates', 'critic', 'smoke', 'review'] as const;
 export type VerifyMode = (typeof VERIFY_MODES)[number];
-export interface Route {
-  board: BoardName;
-  column: string; // slug
-  skill: string;
-  verify: VerifyMode;
-  next: string; // slug
-}
 export interface AutopilotConfig {
   maxIterations: number;
   budgetUsd: number;
   runTimeoutMs: number;
   attemptCap: number;
-  checkupEvery: number;
   criticThreshold: number; // what a critic's score must reach for a card to advance
-  routes: Route[];
   terminal: Record<BoardName, string[]>; // per board: a column belongs to one
   blockedColumn: string;
 }
@@ -266,9 +257,7 @@ export const AUTOPILOT_CONFIG_KEYS = [
   'budgetUsd',
   'runTimeoutMs',
   'attemptCap',
-  'checkupEvery',
   'criticThreshold',
-  'routes',
   'terminal',
   'blockedColumn',
 ] as const;

@@ -34,8 +34,8 @@ describe('GET /api/autopilot/readiness', () => {
     expect(r.blockers).toContain('foundation/DESIGN.md has not been written yet.');
     // The lifecycle itself is complete on a project scaffolded today — that is the point of the
     // cover check running at save time.
-    expect(r.routes.problems).toEqual([]);
-    expect(r.routes.count).toBeGreaterThan(0);
+    expect(r.phases.problems).toEqual([]);
+    expect(r.phases.count).toBeGreaterThan(0);
   });
 
   // The correction, and it is the whole of the bootstrap on this side: an empty board with a README is the
@@ -122,28 +122,21 @@ describe('GET /api/autopilot/readiness', () => {
 
     const r = await readiness(app);
     expect(r.ok).toBe(false);
-    expect(r.routes.problems.join(' ')).toContain('task-implement');
-    expect(r.routes.problems.join(' ')).toContain('"implement"');
+    expect(r.phases.problems.join(' ')).toContain('task-implement');
+    expect(r.phases.problems.join(' ')).toContain('"implement"');
     // Every one of them reaches the blocker list — the panel shows one list, not two.
-    expect(r.blockers).toEqual(expect.arrayContaining(r.routes.problems));
+    expect(r.blockers).toEqual(expect.arrayContaining(r.phases.problems));
   });
 
   // The empty board on the NEW basis, and this is the disagreement Task 16 closes. Readiness used to ask
   // "does the first features column route to a skill?" while the tick took the bootstrap's skill from the
   // phase table and derived the board regardless — so a project whose features route had been removed was
   // told it could not bootstrap by the panel that the loop would have bootstrapped anyway.
-  it('does not blame an empty board on the routing table', async () => {
-    const { app, root, session } = await openTestProject({ name: 'A', mode: 'brownfield' });
+  it('does not blame an empty board on the config', async () => {
+    const { app, root } = await openTestProject({ name: 'A', mode: 'brownfield' });
     await makeReady(app, root, { cards: false });
-    const config = parse(await readFile(configPath(root), 'utf8')) as {
-      autopilot: { routes: { board: string; column: string }[] };
-    };
-    config.autopilot.routes = config.autopilot.routes.filter(
-      (r) => !(r.board === 'features' && r.column === 'backlog'),
-    );
-    await writeFile(configPath(root), stringify(config), 'utf8');
-    await session.reloadConfig();
-
+    // No config edit is even possible now: the bootstrap's skill comes from the phase table, and there is
+    // nothing left in the block for a project to point somewhere else. That IS the disagreement Task 16 closed.
     const r = await readiness(app);
     expect(r.blockers.join(' ')).not.toContain('There is no card on any board');
   });
@@ -230,15 +223,16 @@ describe('readiness on a malformed autopilot block', () => {
     expect(res.statusCode).toBe(200);
     const r = res.json() as Readiness;
     expect(r.ok).toBe(false);
-    expect(r.routes.problems).toContain('autopilot.routes must be a list of routes.');
+    expect(r.phases.problems).toContain('autopilot.terminal must name the terminal columns of each board.');
     // The number of phases that dispatch, which is a fact about the machine rather than about this
     // project's config — so a malformed block does not make it zero.
-    expect(r.routes.count).toBeGreaterThan(0);
-    expect(r.blockers).toEqual(expect.arrayContaining(r.routes.problems));
+    expect(r.phases.count).toBeGreaterThan(0);
+    expect(r.blockers).toEqual(expect.arrayContaining(r.phases.problems));
   });
 
   // SHAPE FIRST AND ALONE, one layer up from `coverageProblems`' own guard. `{autopilot: {maxIterations: 10}}`
-  // produced a 500 "ap.routes is not iterable" before this ordering existed, and reporting the phase check
+  // produced a 500 "ap.routes is not iterable" when the block held a routing table, and reporting the phase
+  // check
   // alongside a shape problem would bury the one thing the reader has to fix first.
   it('still reports the shape problems first and alone', async () => {
     const { app, root, session } = await openTestProject({ name: 'A', mode: 'brownfield' });
@@ -254,6 +248,6 @@ describe('readiness on a malformed autopilot block', () => {
     });
 
     const r = await readiness(app);
-    expect(r.routes.problems.every((p) => p.startsWith('autopilot.'))).toBe(true);
+    expect(r.phases.problems.every((p) => p.startsWith('autopilot.'))).toBe(true);
   });
 });

@@ -260,7 +260,7 @@ describe('the loop’s sequencing', () => {
   it('adds to its own counters relatively, never writing an absolute it computed earlier', async () => {
     const { deps, added } = harness({
       states: [
-        { ...running, iteration: 4, dispatchesSinceCheckup: 2 },
+        { ...running, iteration: 4 },
         { ...IDLE_STATE, state: 'stopped' },
       ],
       act: async (): Promise<ActResult> => ({ dispatches: 1 }),
@@ -269,17 +269,17 @@ describe('the loop’s sequencing', () => {
     // RELATIVE, and that is the whole assertion. Computed as absolutes from the state read at the top of the
     // tick, a Restart landing mid-dispatch was undone: the reset wrote 0, this merged 4+1 over it, and the
     // project came back `idle` with 5 — instantly capped on something the user had just cleared. Decision 20's
-    // split still holds: the loop touches the counters and nothing else.
+    // split still holds: the loop touches the counter and nothing else.
     expect(added).toEqual([1]);
   });
 
-  it('counts a tick that dispatched twice as two, because a critic costs an iteration of its own', async () => {
-    // Decision 8: everything a model does counts against every cap. A `critic` route dispatches the work and
-    // then a judge, so a boolean here would have made every critic-verified card cost one iteration instead
-    // of two — and the cap is the thing standing between an unattended loop and an unbounded bill.
+  it('counts a tick that dispatched twice as two, because a judging run costs an iteration of its own', async () => {
+    // Decision 8: everything a model does counts against every cap. A review dispatches the work and then a
+    // judge, so a boolean here would have made every judged card cost one iteration instead of two — and the
+    // cap is the thing standing between an unattended loop and an unbounded bill.
     const { deps, added } = harness({
       states: [
-        { ...running, iteration: 10, dispatchesSinceCheckup: 1 },
+        { ...running, iteration: 10 },
         { ...IDLE_STATE, state: 'stopped' },
       ],
       act: async (): Promise<ActResult> => ({ dispatches: 2 }),

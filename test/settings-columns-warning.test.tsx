@@ -17,7 +17,7 @@ const api = vi.hoisted(() => ({
   // about the columns warning and the caps, and an idle project is the state with nothing to stop.
   getAutopilotState: vi
     .fn()
-    .mockResolvedValue({ state: 'idle', iteration: 0, dispatchesSinceCheckup: 0, needsCheckup: false }),
+    .mockResolvedValue({ state: 'idle', iteration: 0 }),
   softStopAutopilot: vi.fn(),
   killAutopilot: vi.fn(),
   // And the sign-in panel, which lists the browsers that have signed in. Rejected for the same reason
@@ -58,33 +58,35 @@ const show = (autopilot: boolean) =>
     />,
   );
 
-// Adding or removing a column is refused while a routing table exists, and the routing table is not
-// editable from the UI yet. Being told that at Save, with no way forward in the message, is a dead
-// end — so the Boards section says it before anyone types.
+// Removing the column a board finishes in, or engineering's blocked column, is refused while the block
+// exists, and the block is not editable from the UI. Being told that at Save, with no way forward in the
+// message, is a dead end — so the Boards section says it before anyone types. It used to warn about ADDING
+// a column too; that refusal retired with the routing table, and warning about a refusal that cannot
+// happen is its own dead end.
 describe('the columns warning', () => {
-  it('warns that adding or removing a column will be refused, and names where to change it', () => {
+  it('warns that removing a named column will be refused, and names where to change it', () => {
     show(true);
     // Scoped to the warning itself: the auto-pilot panel below it also names config.yaml, and an
     // assertion satisfied by either one would survive the warning being deleted.
-    const warning = screen.getByText(/Adding or removing a column will be refused/i).closest('.settings-warn');
+    const warning = screen.getByText(/will be refused/i).closest('.settings-warn');
     expect(warning).not.toBeNull();
     const inWarning = within(warning as HTMLElement);
     expect(inWarning.getByText('.vibeboard/config.yaml')).toBeTruthy();
     // The remedy is two keys, and naming only one of them sends the user back for a second refusal.
-    expect(inWarning.getByText('routes')).toBeTruthy();
     expect(inWarning.getByText('terminal')).toBeTruthy();
+    expect(inWarning.getByText('blockedColumn')).toBeTruthy();
   });
 
-  it('says nothing on a project with no routing table, where the edit is not refused', () => {
+  it('says nothing on a project with no autopilot block, where the edit is not refused', () => {
     show(false);
-    expect(screen.queryByText(/Adding or removing a column will be refused/i)).toBeNull();
+    expect(screen.queryByText(/will be refused/i)).toBeNull();
     // The ordinary hint is still there — this is a warning added to that section, not a replacement.
     expect(screen.getByText(/Columns are comma-separated/i)).toBeTruthy();
   });
 
-  it('pins the default table to what the warning promises: every default column is covered', () => {
-    // If a future default column arrives unrouted, the warning above becomes a lie — every project
-    // would be refused on its first column edit for a hole it was scaffolded with.
+  it('pins the default block to what the warning promises', () => {
+    // If a future default block names a column the scaffold does not create, the warning above becomes a
+    // lie — every project would be refused on its first column edit for a hole it was scaffolded with.
     const config = defaultConfig('T');
     expect(config.autopilot).toEqual(DEFAULT_AUTOPILOT);
   });
@@ -132,10 +134,10 @@ describe('saving the caps', () => {
     await waitFor(() => expect(api.patchConfig).toHaveBeenCalled());
     const patch = api.patchConfig.mock.calls[0][0];
     expect(patch.autopilot.budgetUsd).toBe(5);
-    // The routing table travels with it: the server validates the lifecycle on any patch that touches
-    // `autopilot`, and a partial block would ask it to check a lifecycle with no routes in it.
-    expect(patch.autopilot.routes).toEqual(DEFAULT_AUTOPILOT.routes);
+    // The whole block travels with it: the server validates the lifecycle on any patch that touches
+    // `autopilot`, and a partial block would ask it to check one with no terminal columns in it.
     expect(patch.autopilot.terminal).toEqual(DEFAULT_AUTOPILOT.terminal);
+    expect(patch.autopilot.blockedColumn).toBe(DEFAULT_AUTOPILOT.blockedColumn);
   });
 
   it('sends no autopilot block at all for a project that has none', async () => {

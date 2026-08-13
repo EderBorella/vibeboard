@@ -199,8 +199,6 @@ describe('the auto-pilot chip', () => {
   const state = (over: Partial<AutopilotState>): AutopilotState => ({
     state: 'stopped',
     iteration: 0,
-    dispatchesSinceCheckup: 0,
-    needsCheckup: false,
     ...over,
   });
 

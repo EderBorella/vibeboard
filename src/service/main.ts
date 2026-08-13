@@ -78,7 +78,6 @@ const ended = await runLoop({
     await updateAutopilotState(root, new Date().toISOString(), (current) => ({
       ...current,
       iteration: current.iteration + dispatches,
-      dispatchesSinceCheckup: current.dispatchesSinceCheckup + dispatches,
     }));
   },
   commitTail: (reason) => commitTail(actDeps, reason),

@@ -66,12 +66,7 @@ const COLUMNS: Record<BoardName, string[]> = {
   engineering: ['backlog', 'in-progress', 'review', 'blocked', 'done'],
 };
 
-const RUNNING: AutopilotState = {
-  state: 'running',
-  iteration: 0,
-  dispatchesSinceCheckup: 0,
-  needsCheckup: false,
-};
+const RUNNING: AutopilotState = { state: 'running', iteration: 0 };
 
 const NO_SPEND: Spend = { runs: 0, withCost: 0, withoutCost: 0 };
 
@@ -312,14 +307,12 @@ describe('nothing to work on is not the same as nothing left', () => {
     const detail = detailOf(decideTick(input({ cards: orphaned() })));
     expect(detail).toMatch(/E-001 ran out of attempts/);
     expect(detail).toMatch(/P-001 is waiting for its own cards further down/);
-    // Nothing in this fixture is unroutable, so the routing advice must not appear at all.
-    expect(detail).not.toMatch(/routed, terminal or blocked/);
   });
 
   // The ordinary resume path, and the one stop reason with no test of its own otherwise: `reconcile` writes
   // exactly this state when a server dies under a running loop.
   it('re-states an interrupted restart rather than deciding anything for it', () => {
-    const interrupted = state({ state: 'stopped', reason: 'interrupted', needsCheckup: true });
+    const interrupted = state({ state: 'stopped', reason: 'interrupted' });
     expect(decideTick(input({ state: interrupted }))).toMatchObject({
       kind: 'stop',
       reason: 'interrupted',
@@ -377,31 +370,9 @@ describe('an empty board with a README derives itself', () => {
     expect(action.kind === 'dispatch' && action.card).toBeUndefined();
   });
 
-  // RULING 52: the skill comes from the PHASE TABLE, which is code, and not from `routes` in config.yaml.
-  // The previous behaviour read it off the routing table so a project could point the first features column
-  // anywhere; the machine is no longer a setting, and this is what says so.
-  it('takes the skill from the phase table, not from the project’s routing table', () => {
-    const ap = {
-      ...DEFAULT_AUTOPILOT,
-      routes: DEFAULT_AUTOPILOT.routes.map((r) =>
-        r.board === 'features' && r.column === 'backlog' ? { ...r, skill: 'invent-the-work' } : r,
-      ),
-    };
-    expect(decideTick(input({ cards: [], ap }))).toMatchObject({
-      kind: 'dispatch',
-      phase: 'bootstrap',
-      skill: 'derive-features',
-    });
-  });
-
-  it('still derives the board when the routing table has no features entry at all', () => {
-    // The routing table is dead weight to this decision now, so removing an entry from it changes nothing.
-    const ap = {
-      ...DEFAULT_AUTOPILOT,
-      routes: DEFAULT_AUTOPILOT.routes.filter((r) => !(r.board === 'features' && r.column === 'backlog')),
-    };
-    expect(decideTick(input({ cards: [], ap }))).toMatchObject({ kind: 'dispatch', phase: 'bootstrap' });
-  });
+  // RULING 52 is now structural rather than asserted against a rival: the skill for `bootstrap` can only
+  // come from the phase table, because `routes` — which a project could point anywhere — no longer exists.
+  // The two cases that proved the table won that argument retired with the loser.
 
   // The same attempt cap as anything else, counted over PROJECT runs of that skill — a card-less run has no
   // card for `attemptsUsed` to count it against, so this is the only tally there is. Without it a README too

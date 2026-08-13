@@ -48,13 +48,13 @@ export function useAutopilot(bump: number): {
     [ws],
   );
 
-  // POLLED WHILE RUNNING, and only while running. The loop writes `iteration` and
-  // `dispatchesSinceCheckup` straight to `autopilot-state.json` — decision 20's carve-out — and
-  // `session.ts` deliberately does not watch that file, so no broadcast accompanies them. Without this the
-  // panel said "0 dispatches" for an entire run while the ledger beside it, computed server-side from the
-  // same file, correctly said seven: two counters of one fact in one panel, one of them frozen.
+  // POLLED WHILE RUNNING, and only while running. The loop writes `iteration` straight to
+  // `autopilot-state.json` — decision 20's carve-out — and `session.ts` deliberately does not watch that
+  // file, so no broadcast accompanies it. Without this the panel said "0 dispatches" for an entire run
+  // while the ledger beside it, computed server-side from the same file, correctly said seven: two
+  // counters of one fact in one panel, one of them frozen.
   //
-  // Every other state change still arrives on the socket; this exists for the counters alone, which is why
+  // Every other state change still arrives on the socket; this exists for the counter alone, which is why
   // it stops the moment the run does.
   useEffect(() => {
     if (state?.state !== 'running') return;

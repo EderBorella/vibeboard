@@ -2,7 +2,6 @@ import { readdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { parse, stringify } from 'yaml';
-import type { Route } from '../src/core/autopilot.js';
 import { configPath, readConfig, writeConfig } from '../src/core/config.js';
 import { boardRel } from '../src/core/layout.js';
 import type { ProjectConfig } from '../src/core/types.js';
@@ -16,25 +15,22 @@ const ENGINEERING = ['Backlog', 'In Progress', 'Review', 'Blocked', 'Done'];
 const readDisk = async (root: string): Promise<ProjectConfig> =>
   parse(await readFile(configPath(root), 'utf8')) as ProjectConfig;
 
-describe('PATCH /api/config and the routing table', () => {
-  it('carries the routes through a column rename, so a renamed column keeps its skill', async () => {
+describe('PATCH /api/config and the autopilot block', () => {
+  it('carries the block through a column rename, so terminal still names a column that exists', async () => {
     const { app, root } = await openTestProject({ name: 'A', mode: 'brownfield' });
     const res = await app.inject({
       method: 'PATCH',
       url: '/api/config',
-      payload: { boards: { engineering: { columns: ['Backlog', 'In Progress', 'QA', 'Blocked', 'Done'] } } },
+      payload: {
+        boards: { engineering: { columns: ['Backlog', 'In Progress', 'Review', 'Blocked', 'Shipped'] } },
+      },
     });
     expect(res.statusCode).toBe(200);
-    const routes: Route[] = res.json().autopilot.routes;
-    expect(routes.find((r) => r.column === 'qa')).toMatchObject({
-      board: 'engineering',
-      skill: 'test',
-      next: 'done',
-    });
-    // The other side of the rename: backlog advanced into `review`, which no longer exists.
-    expect(routes.find((r) => r.board === 'engineering' && r.column === 'backlog')?.next).toBe('qa');
+    expect(res.json().autopilot.terminal.engineering).toEqual(['shipped']);
+    // The other boards' Done columns were not renamed and must stay terminal — a flat list got this wrong.
+    expect(res.json().autopilot.terminal.product).toEqual(['done']);
     // Persisted, not merely returned: a reply nobody wrote down would keep working until restart.
-    expect((await readDisk(root)).autopilot?.routes.some((r) => r.column === 'qa')).toBe(true);
+    expect((await readDisk(root)).autopilot?.terminal.engineering).toEqual(['shipped']);
   });
 
   // The Settings modal sends all three boards on every save, so a refusal has to be able to arrive
@@ -98,18 +94,18 @@ describe('PATCH /api/config and the routing table', () => {
       payload: { autopilot: { maxIterations: 10 } },
     });
     expect(res.statusCode).toBe(400);
-    expect(res.json().error).toContain('autopilot.routes must be a list of routes.');
+    expect(res.json().error).toContain('autopilot.terminal must name the terminal columns of each board.');
   });
 
-  it('refuses a hand-edited routing table that names a column the board does not have', async () => {
+  it('refuses a hand-edited block that names a column the board does not have', async () => {
     const { app } = await openTestProject({ name: 'A', mode: 'brownfield' });
     const current = (await app.inject({ method: 'GET', url: '/api/config' })).json() as ProjectConfig;
     const autopilot = structuredClone(current.autopilot);
     if (!autopilot) throw new Error('a project scaffolded today has an autopilot block');
-    autopilot.routes[0] = { ...autopilot.routes[0], next: 'shipped' };
+    autopilot.terminal.engineering = ['shipped'];
     const res = await app.inject({ method: 'PATCH', url: '/api/config', payload: { autopilot } });
     expect(res.statusCode).toBe(400);
-    expect(res.json().error).toContain('advances to "shipped"');
+    expect(res.json().error).toContain('terminal names "shipped" for engineering');
   });
 
   // Migration is deferred deliberately, so a project written before the lifecycle existed keeps
@@ -144,7 +140,7 @@ describe('PATCH /api/config cannot delete the lifecycle', () => {
     expect(res.statusCode).toBe(400);
     expect(res.json().error).toContain('would remove the autopilot block');
     // Still on disk, not merely still in memory.
-    expect((await readDisk(root)).autopilot?.routes.length).toBeGreaterThan(0);
+    expect((await readDisk(root)).autopilot?.terminal.engineering.length).toBeGreaterThan(0);
   });
 
   it('still refuses when the block is invalid — the way out is to fix it, not to delete it', async () => {
@@ -198,7 +194,7 @@ describe('an invalid lifecycle does not lock the rest of Settings', () => {
       payload: { boards: { engineering: { columns: [...ENGINEERING, 'Staging'] } } },
     });
     expect(res.statusCode).toBe(400);
-    expect(res.json().error).toContain('autopilot.routes must be a list of routes.');
+    expect(res.json().error).toContain('autopilot.terminal must name the terminal columns of each board.');
   });
 
   it('still refuses a patch that would remove the block, which touches it by definition', async () => {
@@ -214,7 +210,7 @@ describe('an invalid lifecycle does not lock the rest of Settings', () => {
 // message the project's own rule forbids — and the same shape as the bug already recorded as fixed.
 describe('refusing a cap, and saying the right thing about it', () => {
   // The whole block, with one cap replaced — which is what Settings sends: `{...config.autopilot,
-  // ...editedCaps}`. Patching the caps alone would drop `routes` and be refused for a different reason,
+  // ...editedCaps}`. Patching the caps alone would drop `terminal` and be refused for a different reason,
   // and the test would then pass while proving nothing about the remedy.
   const patchCap = async (payload: Record<string, unknown>) => {
     const { app, session } = await openTestProject({ name: 'A', mode: 'brownfield' });

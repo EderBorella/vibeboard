@@ -14,25 +14,9 @@ function ap(config: ProjectConfig): AutopilotConfig {
   return config.autopilot;
 }
 
-describe('routing-table coverage', () => {
-  it('passes a default project — every configured column is routed, terminal or blocked', () => {
+describe('lifecycle coverage', () => {
+  it('passes a default project', () => {
     expect(coverageProblems(fresh())).toEqual([]);
-  });
-
-  it('refuses a route whose next column does not exist', () => {
-    const config = fresh();
-    ap(config).routes[0] = { ...ap(config).routes[0], next: 'shipped' };
-    expect(coverageProblems(config)).toContain(
-      'features: the route on "backlog" advances to "shipped", which is not a column on that board.',
-    );
-  });
-
-  it('refuses a route that advances to itself, since a passing card would never move', () => {
-    const config = fresh();
-    ap(config).routes[0] = { ...ap(config).routes[0], next: 'backlog' };
-    expect(coverageProblems(config)).toContain(
-      'features: the route on "backlog" advances to itself, so a passing card never moves.',
-    );
   });
 
   it('refuses a terminal column that exists on no board', () => {
@@ -58,26 +42,6 @@ describe('routing-table coverage', () => {
     expect(problems).toContain('blockedColumn is "stuck", which is not a column on the engineering board.');
   });
 
-  it('refuses a blocked column that is also routed or terminal', () => {
-    const routed = fresh();
-    ap(routed).routes.push({
-      board: 'engineering',
-      column: 'blocked',
-      skill: 'implement',
-      verify: 'gates',
-      next: 'review',
-    });
-    expect(coverageProblems(routed)).toContain(
-      'blockedColumn "blocked" is also routed; a blocked card must stay put.',
-    );
-
-    const terminal = fresh();
-    ap(terminal).terminal.engineering = ['done', 'blocked'];
-    expect(coverageProblems(terminal)).toContain(
-      'blockedColumn "blocked" is listed as terminal, which would report blocked work as done.',
-    );
-  });
-
   // CHANGE 3 OF DECISION 45's REPEAL, and the only one of the four that is a change to NOTHING: this refusal
   // STAYS. Its own test rather than the second half of the one above, because it now guards a specific
   // shortcut — making `complete` reachable by listing `blocked` under terminal.engineering. That one line
@@ -86,28 +50,19 @@ describe('routing-table coverage', () => {
   it('refuses a config listing blocked under terminal.engineering', () => {
     const config = fresh();
     ap(config).terminal.engineering = ['done', 'blocked'];
-    expect(coverageProblems(config).join(' ')).toMatch(/report blocked work as done/);
-  });
-
-  it('refuses two routes on one phase — that is a half-landed edit, not a tie to break', () => {
-    const config = fresh();
-    ap(config).routes.push({ ...ap(config).routes[0], skill: 'design' });
+    // The exact string rather than a match: it carried the "also routed" half of this refusal too, and
+    // that half retired with the routing table.
     expect(coverageProblems(config)).toContain(
-      'features/backlog has more than one route; a phase runs exactly one skill.',
+      'blockedColumn "blocked" is listed as terminal, which would report blocked work as done.',
     );
   });
 
-  it('refuses an unknown verify mode and a non-positive cap', () => {
+  // The unknown-verify-mode half of this case went with `verify:`, which was a per-route field. Nothing
+  // configures how work is judged any more — the phase table does (ruling 52).
+  it('refuses a non-positive cap', () => {
     const config = fresh();
-    ap(config).routes[0] = { ...ap(config).routes[0], verify: 'vibes' as never };
     ap(config).attemptCap = 0;
-    const problems = coverageProblems(config);
-    // The exact string, not a `toContain`: the LIST is what this message exists to tell the reader, so a
-    // mode added to `VERIFY_MODES` and missing from the sentence is the whole defect.
-    expect(problems).toContain(
-      'features: the route on "backlog" verifies with "vibes" — expected gates, critic, smoke, review.',
-    );
-    expect(problems).toContain('attemptCap must be a positive whole number; it is 0.');
+    expect(coverageProblems(config)).toContain('attemptCap must be a positive whole number; it is 0.');
   });
 
   // Zero is a real budget: for a subscription-backed or local model the figure is zero or not what
@@ -132,8 +87,9 @@ describe('routing-table coverage', () => {
 });
 
 // A phase whose skill does not exist is the unreachable-column failure one level in: the phase is chosen,
-// the dispatch 404s, and nothing can ever advance the card. Asked of the PHASE TABLE rather than of
-// `routes` (ruling 52), which is what stops the panel and the loop disagreeing about the lifecycle.
+// the dispatch 404s, and nothing can ever advance the card. Asked of the PHASE TABLE (ruling 52), which is
+// what stops the panel and the loop disagreeing about the lifecycle — and it is now the ONLY structural
+// check left here, the routing table's six having retired with the table itself.
 describe('the skill every phase needs', () => {
   it('blocks when a project has no skill for a phase', () => {
     const problems = phaseSkillProblems(['implement', 'review']);
@@ -169,49 +125,11 @@ describe('the skill every phase needs', () => {
 // Findings from the slice A review. Each of these returned [] before the fix, and each of them ends
 // in the same place the whole validator exists to prevent: a run that reports success, or one that
 // cannot finish and does not say why.
-describe('routing-table coverage — holes found in review', () => {
-  it('refuses a cycle: every column routed, and no card can ever reach a terminal one', () => {
-    const config = fresh();
-    const review = ap(config).routes.find((r) => r.board === 'engineering' && r.column === 'review');
-    if (!review) throw new Error('the default table routes engineering/review');
-    review.next = 'in-progress';
-    expect(coverageProblems(config)).toContain(
-      'engineering: the columns in-progress, review advance into each other and never reach a terminal column.',
-    );
-  });
-
-  it('names a cycle once, not once per column that leads into it', () => {
-    const config = fresh();
-    const review = ap(config).routes.find((r) => r.board === 'engineering' && r.column === 'review');
-    if (!review) throw new Error('the default table routes engineering/review');
-    review.next = 'in-progress';
-    // backlog and in-progress both feed review, so the naive version reported the same loop twice.
-    expect(coverageProblems(config).filter((p) => p.includes('advance into each other'))).toHaveLength(1);
-  });
-
-  it('refuses a column that is both routed and terminal', () => {
-    const config = fresh();
-    ap(config).terminal.engineering = ['done', 'review'];
-    expect(coverageProblems(config)).toContain(
-      'engineering: the column "review" is both routed and terminal, so a card that never passes there would still be reported as finished.',
-    );
-  });
-
-  it('refuses a route that advances a passing card into the blocked column', () => {
-    const config = fresh();
-    const review = ap(config).routes.find((r) => r.board === 'engineering' && r.column === 'review');
-    if (!review) throw new Error('the default table routes engineering/review');
-    review.next = 'blocked';
-    expect(coverageProblems(config)).toContain(
-      'engineering: the route on "review" advances a PASSING card into "blocked", which is where exhausted cards go and is never routed onward.',
-    );
-  });
-
+describe('coverage — holes found in review', () => {
   it('reports a malformed block instead of throwing on it', () => {
     const config = fresh();
     config.autopilot = { maxIterations: 10 } as unknown as AutopilotConfig;
     const problems = coverageProblems(config);
-    expect(problems).toContain('autopilot.routes must be a list of routes.');
     expect(problems).toContain('autopilot.terminal must name the terminal columns of each board.');
     // Shape problems come back ALONE: the checks below them all index into the block.
     expect(problems.every((p) => p.startsWith('autopilot.'))).toBe(true);
@@ -228,10 +146,10 @@ describe('routing-table coverage — holes found in review', () => {
   it('refuses a fractional cap, which no integer counter ever equals', () => {
     const config = fresh();
     ap(config).attemptCap = 0.5;
-    ap(config).checkupEvery = 2.5;
+    ap(config).maxIterations = 2.5;
     const problems = coverageProblems(config);
     expect(problems).toContain('attemptCap must be a positive whole number; it is 0.5.');
-    expect(problems).toContain('checkupEvery must be a positive whole number; it is 2.5.');
+    expect(problems).toContain('maxIterations must be a positive whole number; it is 2.5.');
   });
 });
 
@@ -249,10 +167,6 @@ describe('a block that is not the shape it claims', () => {
     expect(malformed({ blockedColumn: 42 })).toEqual(['autopilot.blockedColumn must be a column slug.']);
   });
 
-  it('refuses routes that are not a list', () => {
-    expect(malformed({ routes: 'implement' })).toEqual(['autopilot.routes must be a list of routes.']);
-  });
-
   it('refuses a terminal block that is absent, or the flat list it used to be', () => {
     const gone = fresh();
     delete (ap(gone) as { terminal?: unknown }).terminal;
@@ -265,10 +179,10 @@ describe('a block that is not the shape it claims', () => {
   });
 
   // Alone, and that is the claim: a malformed shape returns before anything indexes into the block, so a
-  // reader is not handed "routes is not a list" next to a dozen consequences of it.
+  // reader is not handed "terminal is not a list" next to a dozen consequences of it.
   it('reports the shape and nothing else, even when the rest is also wrong', () => {
-    expect(malformed({ routes: 'implement', attemptCap: 0 })).toEqual([
-      'autopilot.routes must be a list of routes.',
+    expect(malformed({ terminal: 'done', attemptCap: 0 })).toEqual([
+      'autopilot.terminal must name the terminal columns of each board.',
     ]);
   });
 });

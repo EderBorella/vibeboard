@@ -40,7 +40,6 @@ describe('recording a stop', () => {
         await updateAutopilotState(root, AT, (current) => ({
           ...current,
           iteration: 42,
-          dispatchesSinceCheckup: 7,
           servicePgid: 4242,
           servicePgstart: 99,
         }));
@@ -55,7 +54,6 @@ describe('recording a stop', () => {
       state: 'halted',
       reason: 'killed',
       iteration: 42,
-      dispatchesSinceCheckup: 7,
       servicePgid: 4242,
       servicePgstart: 99,
     });
@@ -116,11 +114,6 @@ describe('restarting', () => {
     expect(await readAutopilotState(root, AT)).toEqual({
       state: 'idle',
       iteration: 0,
-      dispatchesSinceCheckup: 0,
-      // CLEARED, and in C2 that is what makes a second run possible at all: the flag is set by the reconcile,
-      // by a crashed loop and by a halt, and until C3's checkup exists nothing else can clear it. A person
-      // pressing Restart on a board they are looking at is the supervisor pass decision 15 asks for.
-      needsCheckup: false,
       at: AT,
       servicePgid: 4242,
       servicePgstart: 987,
@@ -135,18 +128,14 @@ describe('restarting', () => {
       reason: 'killed',
       iteration: 40,
       servicePgid: 999,
-      dispatchesSinceCheckup: 7,
     });
     const { runtime } = build(root);
     const result = await runtime.restart();
     expect(result.ok).toBe(true);
-    // Everything the halt held is dropped, `needsCheckup` included — see the note in `restart()`. Until C3
-    // there is no checkup to owe, and leaving the flag set made a halted project unstartable for ever.
+    // Everything the halt held is dropped: the reason, the detail, the counter and the process group.
     expect(await readAutopilotState(root, AT)).toEqual({
       state: 'idle',
       iteration: 0,
-      dispatchesSinceCheckup: 0,
-      needsCheckup: false,
       at: AT,
     });
   });
@@ -155,7 +144,7 @@ describe('restarting', () => {
   // bought a fresh cap, with nobody raising it. The plan asked for a no-op and this was not one.
   it('changes nothing on a project that is already idle', async () => {
     const root = await tempDir();
-    await writeAutopilotState(root, { ...IDLE_STATE, iteration: 250, dispatchesSinceCheckup: 4 });
+    await writeAutopilotState(root, { ...IDLE_STATE, iteration: 250 });
     const { runtime, changes } = build(root);
     const result = await runtime.restart();
     expect(result.ok).toBe(true);

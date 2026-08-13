@@ -456,7 +456,7 @@ describe('the generated endpoint catalogue', () => {
 // make somebody look rather than being dropped.
 describe('reading the flag back off disk', () => {
   const state = (over: Record<string, unknown>): string =>
-    JSON.stringify({ state: 'idle', iteration: 0, dispatchesSinceCheckup: 0, needsCheckup: false, ...over });
+    JSON.stringify({ state: 'idle', iteration: 0, ...over });
 
   it('carries the names through', () => {
     const parsed = parseState(state({ unreviewedGates: ['CODE-QUALITY.md'] }));
@@ -502,8 +502,6 @@ describe('reading the flag back off disk', () => {
     await writeAutopilotState(root, {
       state: 'stopped',
       iteration: 7,
-      dispatchesSinceCheckup: 3,
-      needsCheckup: true,
       reason: 'capped',
       unreviewedGates: ['CODE-QUALITY.md'],
     });

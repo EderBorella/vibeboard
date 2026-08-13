@@ -320,10 +320,6 @@ export class ServiceProcess {
             'interrupted',
             `The auto-pilot service ${how} without stopping first, so this project owes a checkup before it resumes.`,
           ),
-          // The same reasoning as the startup reconcile: dispatches nobody was watching may be in
-          // flight, and resuming without a supervisor pass would be acting on the assumption they went
-          // fine.
-          needsCheckup: true,
           at,
           // The group is GONE, so the number must go with it. Left behind it named a process that no
           // longer exists, and a later reaper reading a pgid whose start time is absent falls back to the

@@ -1,4 +1,3 @@
-import type { CardProblem } from './board.js';
 import { childrenOf, liveCards } from './hierarchy.js';
 import type { BoardName, Card } from './types.js';
 
@@ -46,8 +45,8 @@ export function hasSetupFeature(cards: Card[]): boolean {
 // is a card somebody made by hand. When a feature checkup closes one, the next story carded out of a
 // suggestion starts a new one rather than reopening a card recorded as finished.
 //
-// `terminal` rather than the whole autopilot block, like `setupState`: a project written before the
-// lifecycle has no block, and this must still answer.
+// `terminal` rather than the whole autopilot block: a project written before the lifecycle has no
+// block, and this must still answer.
 export function openFollowUp(cards: Card[], terminal: Record<BoardName, string[]>): Card | undefined {
   return live(cards).find(
     (c) => c.board === 'features' && c.followUp === true && !(terminal.features ?? []).includes(c.columnSlug),
@@ -71,38 +70,7 @@ export function setupSubtreeIds(cards: Card[]): Set<string> {
   return ids;
 }
 
-// Three states, not two, and the third is the point.
-//
-// `readBoard` DROPS any card whose file will not parse (core/board.ts) — it reports it through the
-// optional `problems` array, which most callers do not pass. So a setup feature with one bad YAML
-// quote simply is not in `cards`, `setupSubtreeIds` finds nothing, and a boolean would answer
-// "finished": the barrier the whole design rests on lifts in silence and auto-pilot starts building
-// features before the stack exists.
-//
-// "No barrier" and "we cannot tell" are different facts. The first is deliberately not a blocker — an
-// adopted repo, or a board someone built by hand, must not be frozen out of its own lifecycle by a
-// card nobody wrote. The second must never advance anything. Same distinction `foundation.ts` draws
-// between a document that is absent and one that will not parse.
-export type SetupState = 'finished' | 'unfinished' | 'unknown';
-
-export function setupState(
-  cards: Card[],
-  terminal: Record<BoardName, string[]>,
-  // Whatever `readBoard` could not parse. ANY unreadable card makes this unknown, not just one on the
-  // features board: the broken file could be the barrier, a child that would extend the subtree, or a
-  // descendant sitting outside a terminal column.
-  //
-  // REQUIRED, and it used to default to `[]`. That default made the ABSENCE OF THE ARGUMENT read as the
-  // absence of problems, so the whole three-valued answer below hung on every caller remembering an
-  // optional parameter — and the one thing known about this parameter is that most callers did not pass
-  // it. An empty array is still fine; it just has to be written by someone who meant it.
-  problems: CardProblem[],
-): SetupState {
-  if (problems.length > 0) return 'unknown';
-  const ids = setupSubtreeIds(cards);
-  if (ids.size === 0) return 'finished'; // genuinely no barrier — see above
-  const done = live(cards)
-    .filter((c) => ids.has(c.id))
-    .every((c) => (terminal[c.board] ?? []).includes(c.columnSlug));
-  return done ? 'finished' : 'unfinished';
-}
+// NO `setupState`. Its three-valued answer — finished / unfinished / unknown — existed for the
+// eligibility filter, whose only caller was eligibility.ts:101. The `unknown` case it was written for is
+// NOT lost: any unreadable card still stops the loop, from the tick itself (core/tick.ts's
+// `unreadableSentence`, finding C), which is the one route by which a broken file has to fail closed.

@@ -11,7 +11,7 @@ import { useReadiness } from '../autopilot/useReadiness';
 import { killProjectRequest } from '../confirm/requests';
 import { useConfirm } from '../confirm/useConfirm';
 import { useAccounting } from '../runs/useAccounting';
-import { type AutopilotConfig, BOARD_LABELS, type ProjectConfig } from '../shared';
+import type { AutopilotConfig, ProjectConfig } from '../shared';
 
 // The lifecycle as it will actually be executed, plus what is stopping it.
 //
@@ -50,13 +50,6 @@ const CAPS = [
     min: 1,
     step: 1,
     hint: 'How many runs of one skill a card gets before it is blocked. A run you stopped does not count against it.',
-  },
-  {
-    key: 'checkupEvery' as const,
-    label: 'Checkup every N dispatches',
-    min: 1,
-    step: 1,
-    hint: 'How often the supervisor reads the board and the diary to judge whether the project is circling.',
   },
 ];
 
@@ -124,32 +117,9 @@ export function AutopilotPanel({
     <>
       <div className="settings-section">Auto-pilot</div>
       <div className="settings-hint">
-        What runs where. A card in a routed column gets that skill; when the work passes its check it moves to
-        the column on the right. Edit these in <code>.vibeboard/config.yaml</code>.
-      </div>
-      <div className="routes-wrap">
-        <table className="routes">
-          <thead>
-            <tr>
-              <th>Board</th>
-              <th>Column</th>
-              <th>Skill</th>
-              <th>Verified by</th>
-              <th>Then</th>
-            </tr>
-          </thead>
-          <tbody>
-            {ap.routes.map((r) => (
-              <tr key={`${r.board}/${r.column}`}>
-                <td>{BOARD_LABELS[r.board]}</td>
-                <td>{r.column}</td>
-                <td>{r.skill}</td>
-                <td>{r.verify}</td>
-                <td>{r.next}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        The lifecycle is fixed (ruling 52): auto-pilot derives where a project is from the board and looks up
+        what to do next. It is not a setting, so there is no table here to edit — only the caps below, the
+        columns that mean finished, and where a blocked card goes.
       </div>
       <div className="settings-section">Caps</div>
       <div className="settings-hint">

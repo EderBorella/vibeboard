@@ -1,9 +1,9 @@
 import type { BoardName } from './types.js';
 
-// The lifecycle as data. A phase is a (board, column) pair, and what happens there is a LOOKUP
-// rather than an agent's judgement: which skill runs, how its work is verified, and which column the
-// card moves to when it passes. Inspectable and reproducible — no planning call per tick, and
-// "am I done?" is never the working agent's opinion.
+// What auto-pilot is allowed to spend, and which columns mean "finished". THE LIFECYCLE ITSELF IS NOT
+// HERE — ruling 52 puts the phase table in code (core/phases.ts), because this block has already
+// shipped two keys that were lies (`setupFeatureFlag`, read by nothing; `autoPilotConcurrency`, where
+// any value above 1 changed nothing) and a lifecycle a person can edit is a third waiting to happen.
 //
 // Columns are SLUGS here. `config.boards[b].columns` holds display names ("In Progress") and
 // slugging is one-way, so every comparison against config goes through `boardColumnSlugs`.
@@ -23,32 +23,22 @@ export type VerifyMode = (typeof VERIFY_MODES)[number];
 // route whose verifier cannot be found is a card nothing can ever advance.
 export const CRITIC_SKILL = 'critic';
 
-export interface Route {
-  board: BoardName;
-  column: string; // slug
-  skill: string; // slug of a skill in .vibeboard/skills/
-  verify: VerifyMode;
-  next: string; // slug of the column a passing card moves to
-}
-
-// NO `rollup`. A parent used to complete from its children; decision 42 replaced that with the two
-// checkup phases, which close a card by running something rather than by counting what is under it.
+// NO `routes` and NO `rollup`. A column dispatched a skill and a parent completed from its children;
+// ruling 52 and decision 42 replaced both with the phase table in core/phases.ts, so which skill runs
+// is a fact about the machine rather than about this project's config.
 
 export interface AutopilotConfig {
   maxIterations: number;
   budgetUsd: number;
   runTimeoutMs: number;
   attemptCap: number;
-  checkupEvery: number;
-
   // What a critic's score must reach for a card to advance. A THRESHOLD rather than a boolean verdict
   // (S9): a binary pass yields no distribution, and the critic is this design's weakest link — level 4
   // on the study's verification ladder, judgeable only from data collected later. 0.6 is what OpenHands
   // ships for the same mechanism, which is the only prior art there is for the number.
   criticThreshold: number;
-  routes: Route[];
-  // Explicit, never inferred from the absence of a route: a mistyped column must fail loudly rather
-  // than silently making its cards terminal.
+  // Explicit, never inferred: a mistyped column must fail loudly rather than silently making its
+  // cards terminal.
   //
   // Per BOARD, not one flat list of slugs. A column belongs to a board, and a flat list cannot say
   // so: renaming engineering's Done to Stage 5 rewrote the single entry `done` and thereby
@@ -67,22 +57,7 @@ export const DEFAULT_AUTOPILOT: AutopilotConfig = {
   budgetUsd: 20,
   runTimeoutMs: 1_800_000,
   attemptCap: 3,
-  checkupEvery: 10,
   criticThreshold: 0.6,
-  routes: [
-    { board: 'features', column: 'backlog', skill: 'derive-features', verify: 'critic', next: 'todo' },
-    { board: 'features', column: 'todo', skill: 'break-down', verify: 'critic', next: 'in-progress' },
-    { board: 'features', column: 'in-progress', skill: 'close-out', verify: 'smoke', next: 'done' },
-    { board: 'product', column: 'backlog', skill: 'design', verify: 'critic', next: 'todo' },
-    { board: 'product', column: 'todo', skill: 'break-down', verify: 'critic', next: 'in-progress' },
-    { board: 'engineering', column: 'backlog', skill: 'implement', verify: 'gates', next: 'review' },
-    // In Progress is engineering's human column: nothing auto-pilot does puts a card there, but a
-    // person drags one, the copilot moves one, or a restore puts one back. It routes to the same
-    // phase as Backlog rather than being left uncovered — which is exactly the hole that once turned
-    // "nothing eligible" into a reported success.
-    { board: 'engineering', column: 'in-progress', skill: 'implement', verify: 'gates', next: 'review' },
-    { board: 'engineering', column: 'review', skill: 'test', verify: 'gates', next: 'done' },
-  ],
   terminal: { features: ['done'], product: ['done'], engineering: ['done'] },
   blockedColumn: 'blocked',
 };
@@ -97,10 +72,6 @@ export const DEFAULT_AUTOPILOT: AutopilotConfig = {
 // its own rather than a bigger number here.
 export const AUTOPILOT_CONCURRENCY = 1;
 
-export function routeFor(ap: AutopilotConfig, board: BoardName, columnSlug: string): Route | undefined {
-  return ap.routes.find((r) => r.board === board && r.column === columnSlug);
-}
-
 export function isTerminalColumn(ap: AutopilotConfig, board: BoardName, columnSlug: string): boolean {
   return (ap.terminal[board] ?? []).includes(columnSlug);
 }
@@ -110,16 +81,16 @@ export function isTerminalColumn(ap: AutopilotConfig, board: BoardName, columnSl
 // the lookup here is gone: a project that had removed that route was told by the panel that it could not
 // bootstrap while the loop, reading the table, would have bootstrapped it anyway.
 
-// Engineering's alone. A product or feature card that cannot be designed after three tries is a
+// Engineering's alone. A product or feature card that cannot be broken down after three tries is a
 // project-level problem that stops the run, so `blocked` on those boards would be a column nothing
-// ever puts a card into — and one the cover check would then have to excuse.
+// ever puts a card into.
 export function isBlockedColumn(ap: AutopilotConfig, board: BoardName, columnSlug: string): boolean {
   return board === 'engineering' && ap.blockedColumn === columnSlug;
 }
 
-// A column IS a folder, so renaming one moves the folder (columns.ts) — and the routing table names
-// columns by slug on BOTH sides. Rewriting only `column` would leave some other route's `next`
-// pointing at a slug that no longer exists, which is the same silent gap as an unrouted column.
+// A column IS a folder, so renaming one moves the folder (columns.ts) — and this block names columns
+// by slug, so a rename left unapplied here points `terminal` or `blockedColumn` at a slug that no
+// longer exists, which silently makes nothing terminal and un-blocks the blocked column.
 export function applyRouteRenames(
   ap: AutopilotConfig,
   board: BoardName,
@@ -129,7 +100,6 @@ export function applyRouteRenames(
   const to = (slug: string): string => renamed.find((r) => r.from === slug)?.to ?? slug;
   return {
     ...ap,
-    routes: ap.routes.map((r) => (r.board === board ? { ...r, column: to(r.column), next: to(r.next) } : r)),
     // Only this board's entry: the others' Done columns were not renamed and must stay terminal.
     terminal: { ...ap.terminal, [board]: (ap.terminal[board] ?? []).map(to) },
     // Engineering's alone, so a rename anywhere else cannot be about it — and applying one would

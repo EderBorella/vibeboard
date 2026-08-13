@@ -213,20 +213,18 @@ describe('starting the loop', () => {
     expect(state.detail).toBeUndefined();
   });
 
-  it('keeps the counters, which belong to the service rather than to this process', async () => {
-    // Decision 20's split: the server owns state/reason/detail/at, the service owns the counters. A
+  it('keeps the counter, which belongs to the service rather than to this process', async () => {
+    // Decision 20's split: the server owns state/reason/detail/at, the service owns the counter. A
     // start that reset `iteration` would hand back a cap nobody raised.
     const { root, service } = await harness();
     await writeAutopilotState(root, {
       ...IDLE_STATE,
       state: 'stopped',
       iteration: 7,
-      dispatchesSinceCheckup: 3,
     });
     await service.start();
     const state = await readAutopilotState(root, '2026-08-05T10:00:00Z');
     expect(state.iteration).toBe(7);
-    expect(state.dispatchesSinceCheckup).toBe(3);
   });
 
   // REPLACES rather than refuses, and the difference is a dead end the panel could not explain: press
@@ -336,9 +334,9 @@ describe('when the loop dies without stopping first', () => {
     expect(state.detail).toBe(
       'Auto-pilot stopped before it could finish, so it owes this project a checkup. The auto-pilot service exited with code 3 without stopping first, so this project owes a checkup before it resumes.',
     );
-    // The same reasoning as the startup reconcile: dispatches nobody was watching may be in flight, so
-    // resuming without a supervisor pass would assume they went fine.
-    expect(state.needsCheckup).toBe(true);
+    // And no checkup flag with it (decision 47). The guard it bought is structural now: the position is
+    // re-derived every tick, so a loop that died mid-dispatch cannot resume on an assumption.
+    expect('needsCheckup' in state).toBe(false);
   });
 
   // The ordinary ending. The loop writes its own stop — `complete`, `capped`, `exhausted` — and THEN

@@ -221,31 +221,16 @@ describe('what the browser is told', () => {
   });
 });
 
-describe('a project that owes a checkup', () => {
-  it('is refused before the loop is spawned, with the way forward named', async () => {
-    const { app, root } = await ready();
-    await writeAutopilotState(root, { ...IDLE_STATE, needsCheckup: true });
-    const refused = await start(app);
-    expect(refused.statusCode).toBe(409);
-    expect(refused.json().error).toContain('owes a supervisor checkup');
-    // Named, because a refusal a person cannot act on is worse than the condition.
-    expect(refused.json().error).toContain('Restart');
-  });
-
-  it('is refused the same way once enough dispatches have passed', async () => {
-    const { app, root } = await ready();
-    await writeAutopilotState(root, { ...IDLE_STATE, dispatchesSinceCheckup: 10 });
-    expect((await start(app)).statusCode).toBe(409);
-  });
-
-  it('and Restart is genuinely the way out', async () => {
+// The owed-checkup refusal retired with `checkupEvery` (decision 47): it was the one that stopped a project
+// after roughly five cards and told a person to press Restart. What survives is Restart clearing a run that
+// reached its cap, which is a different fact and is what this asserts.
+describe('a project stopped at its cap', () => {
+  it('is startable again once Restart has cleared the run', async () => {
     const { app, root } = await ready();
     await writeAutopilotState(root, {
       ...IDLE_STATE,
       state: 'stopped',
       reason: 'stalled',
-      needsCheckup: true,
-      dispatchesSinceCheckup: 10,
       iteration: 250,
     });
     expect(

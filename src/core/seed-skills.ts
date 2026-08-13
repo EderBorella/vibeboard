@@ -1,6 +1,5 @@
 import { mkdir, readdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { CRITIC_SKILL } from './autopilot.js';
 import { SKILLS_DIR } from './layout.js';
 
 // The skills a project starts with. They are ordinary files: the user edits or deletes them like
@@ -159,27 +158,6 @@ List every card you created in your report, by id.
 `,
   },
   {
-    slug: 'design',
-    content: `---
-name: Design
-description: Decide what this product card is and why, before anyone builds it
-boards: [product]
----
-Decide what the card below is, and why.
-
-Write the intent: what a person can do afterwards that they could not do before,
-and how anyone would know it works. An engineering card usually carries only the
-mechanics — this card is where the reason lives, and the run that implements it
-is given this card's body in full.
-
-Follow the project's foundation documents. The stack, the gates and the design
-language are already decided and are not yours to revisit.
-
-Edit this card with \`PATCH /api/cards/:board/:id\`. Do not create engineering
-cards here — breaking down is its own phase.
-`,
-  },
-  {
     slug: 'implement',
     content: `---
 name: Implement
@@ -202,76 +180,6 @@ missing dependency, work the card implies but does not say — goes to
 
 You do not move your own card, and cannot: auto-pilot moves it when this run
 finishes, and your credential grants nothing that could.
-`,
-  },
-  {
-    slug: 'test',
-    content: `---
-name: Test
-description: Prove the card's behaviour is actually held in place
-boards: [engineering]
----
-Write the tests that hold the card below in place.
-
-A passing test proves the code ran, not that anything constrains it. For each
-test you write, break the behaviour it names on purpose and watch it fail, then
-restore it. A test that passes against deleted code is not a test.
-
-Assert the behaviour the card describes, not the implementation that happens to
-provide it. If the card's premise turns out to be wrong, say which — the code or
-the card — in your report rather than widening an assertion to make it pass.
-
-Run the project's gates before you finish.
-`,
-  },
-  {
-    slug: 'close-out',
-    content: `---
-name: Close out
-description: Exercise the whole feature end to end
-boards: [features]
----
-Exercise the feature below end to end.
-
-Its cards have each passed their own tests. That is not the same as the feature
-working: three correct parts compose into something broken often enough that this
-phase exists. Run the smoke test declared in the project's TESTING.md and use the
-feature the way a person would.
-
-Report what works and what does not, specifically. If it does not work, say which
-card's assumption was wrong — that is what the next run needs, and "it fails" is
-not it.
-
-Change as little as possible: this is a verification phase, not a second chance
-to implement.
-`,
-  },
-  {
-    // The verifier a `critic` route dispatches. No `boards:` — it judges cards on all three, and a
-    // route on any of them may name it. Its prompt says nothing about the threshold: that number comes
-    // from the project's config and is stated in the dispatch prompt, so a project that changes it does
-    // not have to remember to edit a skill file too.
-    slug: CRITIC_SKILL,
-    content: `---
-name: Critic
-description: Judge finished work against the card that asked for it
----
-Judge the work described below against its card, and score it.
-
-You are not building anything. Do not edit the code, do not edit the card and do
-not move it: your report is the verdict, and a judge that fixes what it is
-judging is grading its own work.
-
-Read the card first, then the work as it stands now. Ask one question: does this
-meet the acceptance criterion the card states? Not "is it good", not "is it what
-I would have built" — does it do what was asked.
-
-Work that does MORE than the card asked still passes. Note it as an overshoot
-instead: failing a card for over-delivery throws away working code and spends one
-of the card's attempts rebuilding it.
-
-Say what you checked and where the work and the card differ, specifically enough
-that someone can disagree with you.
 `,
   },
   {

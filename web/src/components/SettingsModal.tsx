@@ -135,7 +135,7 @@ export function SettingsModal({ config, onClose, onSaved, autopilot, onAutopilot
         // Only when a cap was actually EDITED, and then the whole block.
         //
         // Both halves matter. The whole block, because the server validates the routing table on any
-        // patch touching `autopilot` and a partial one would ask it to check a lifecycle with no routes
+        // patch touching `autopilot` and a partial one would ask it to check a block with no terminal
         // in it. Only when edited, because the check runs on any patch that touches the key at all —
         // so sending it unconditionally undid the fix of the commit immediately before this slice
         // (a project whose lifecycle is invalid could once again save no setting at all, and the
@@ -237,14 +237,16 @@ export function SettingsModal({ config, onClose, onSaved, autopilot, onAutopilot
             is refused — do those one at a time.
           </div>
           {config.autopilot && (
-            // Only when there is a routing table to break. The refusal below is deliberate — a column
-            // nothing routes to is one whose cards are never picked up, and auto-pilot reporting
-            // "nothing left to do" over them is the failure the whole lifecycle is built against — but
-            // being refused at Save with no warning beforehand is a dead end, so it is said up front.
+            // Only when there is a block to break. Adding a column is free now that nothing routes — the
+            // lifecycle is code (ruling 52) — but REMOVING the terminal or blocked column is still refused,
+            // and being refused at Save with no warning beforehand is a dead end.
             <div className="settings-warn">
-              <strong>Auto-pilot routes cards by column.</strong> Renaming one is carried across the routing
-              table for you. <strong>Adding or removing a column will be refused</strong> until its route
-              exists: edit <code>routes</code> and <code>terminal</code> in{' '}
+              <strong>Auto-pilot reads two of these columns by name.</strong> Renaming one is carried across
+              for you.{' '}
+              <strong>
+                Removing the column a board finishes in, or engineering's blocked column, will be refused
+              </strong>{' '}
+              until you change what names it: edit <code>terminal</code> and <code>blockedColumn</code> in{' '}
               <code>.vibeboard/config.yaml</code> in the same change.
             </div>
           )}

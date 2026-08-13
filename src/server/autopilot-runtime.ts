@@ -147,19 +147,12 @@ export class AutopilotRuntime {
     return { ok: true, state: next };
   }
 
-  // The way back, and in C2 it is also the CHECKUP'S STAND-IN.
+  // The way back. It no longer has a checkup flag to clear — `needsCheckup` retired with the periodic
+  // checkup (decision 47), and the two lifecycle checkups are phases the loop runs rather than something a
+  // person is asked to stand in for. Restart used to be that stand-in, because nothing else could clear the
+  // flag and a project that survived one crash could never dispatch again.
   //
-  // `needsCheckup` is set by the startup reconcile, by a crashed loop and by an emergency stop, and until C3
-  // exists nothing can clear it — so a project that reached `checkupEvery` once, or survived one crash, could
-  // never dispatch again: Start refused, Restart zeroed the counters and set the flag straight back. The only
-  // way out was hand-editing `autopilot-state.json`, which no part of the UI offers.
-  //
-  // So Restart clears it, and the reasoning is that decision 15 asks for a SUPERVISOR PASS before resuming —
-  // a person pressing Restart on a board they are looking at is exactly that, and it is the only supervisor
-  // this slice has. C3 replaces this with the real checkup, at which point the flag goes back to being the
-  // service's to clear.
-  //
-  // The counters are reset with it, and that is deliberate rather than incidental: Restart is a person
+  // The counter is reset, and that is deliberate rather than incidental: Restart is a person
   // deciding to go again, so it is the one place a cap may legitimately be reset. An earlier comment here
   // claimed the `idle` no-op below closed that loophole — it does not, and never did for `stopped`; what it
   // actually prevents is a Restart on an untouched project silently buying a fresh cap.
@@ -193,9 +186,6 @@ export class AutopilotRuntime {
     const next: AutopilotState = {
       state: 'idle',
       iteration: 0,
-      dispatchesSinceCheckup: 0,
-      // Cleared, not set — see the note above. The person pressing this is the supervisor pass.
-      needsCheckup: false,
       at: this.#at(),
       ...(keepGroup && previous.servicePgid !== undefined ? { servicePgid: previous.servicePgid } : {}),
       ...(keepGroup && previous.servicePgstart !== undefined

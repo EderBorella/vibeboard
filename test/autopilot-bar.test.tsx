@@ -16,7 +16,7 @@ vi.mock('../web/src/api.js', () => api);
 
 const { AutopilotBar } = await import('../web/src/components/AutopilotBar.js');
 
-const IDLE: AutopilotState = { state: 'idle', iteration: 0, dispatchesSinceCheckup: 0, needsCheckup: false };
+const IDLE: AutopilotState = { state: 'idle', iteration: 0 };
 const NO_RUNS: RunList = { runs: [], active: [], queued: [] };
 const READY: Readiness = {
   ok: true,
@@ -25,7 +25,7 @@ const READY: Readiness = {
   foundation: { present: [], missing: [], ok: true },
   gates: { ok: true, count: 1 },
   smoke: { ok: true },
-  routes: { problems: [], count: 1 },
+  phases: { problems: [], count: 1 },
   unreviewedGates: [],
 };
 

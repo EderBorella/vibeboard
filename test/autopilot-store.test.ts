@@ -65,7 +65,6 @@ describe('auto-pilot state on disk', () => {
         ...IDLE_STATE,
         state: 'running',
         iteration: 9,
-        dispatchesSinceCheckup: 4,
         servicePgid: 55,
       });
       const next = await updateAutopilotState(root, AT, (current) => ({
@@ -77,7 +76,6 @@ describe('auto-pilot state on disk', () => {
         state: 'stopped',
         reason: 'stopped',
         iteration: 9,
-        dispatchesSinceCheckup: 4,
         servicePgid: 55,
       });
       expect(await readAutopilotState(root, AT)).toEqual(next);

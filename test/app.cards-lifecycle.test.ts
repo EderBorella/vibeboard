@@ -292,7 +292,7 @@ describe('a dispatch naming a previous run', () => {
       method: 'POST',
       url: '/api/runs',
       headers: admin,
-      payload: { board: 'features', card: 'F-001', skill: 'critic', previous: '20260806-000000-nope' },
+      payload: { board: 'features', card: 'F-001', skill: 'break-down', previous: '20260806-000000-nope' },
     });
     expect(res.statusCode).toBe(409);
     expect(res.json().error).toContain('20260806-000000-nope');

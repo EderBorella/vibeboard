@@ -142,8 +142,6 @@ async function drive(
   await writeAutopilotState(project.root, {
     state: 'running',
     iteration: 0,
-    dispatchesSinceCheckup: 0,
-    needsCheckup: false,
     ...(opts.unreviewedGates ? { unreviewedGates: opts.unreviewedGates } : {}),
   });
   const credential = project.mint('service', 'run-service');
@@ -177,7 +175,6 @@ async function drive(
       await updateAutopilotState(project.root, new Date().toISOString(), (current) => ({
         ...current,
         iteration: current.iteration + dispatches,
-        dispatchesSinceCheckup: current.dispatchesSinceCheckup + dispatches,
       }));
     },
     act: (action, context) => performAction(actDeps, action, context),

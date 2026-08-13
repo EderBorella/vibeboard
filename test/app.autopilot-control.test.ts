@@ -72,10 +72,6 @@ describe('the auto-pilot controls', () => {
     expect(after.state).toBe('idle');
     expect(after.reason).toBeUndefined();
     expect(after.detail).toBeUndefined();
-    // And the owed checkup is cleared with it. Decision 15 asks for a supervisor pass before resuming, and in
-    // C2 the person pressing Restart on a board they are looking at IS that pass — nothing else can clear the
-    // flag until C3's checkup exists, so leaving it set made a killed project unstartable for ever.
-    expect(after.needsCheckup).toBe(false);
   });
 
   it('refuses a restart while auto-pilot is running', async () => {
@@ -88,19 +84,17 @@ describe('the auto-pilot controls', () => {
 
   // The service owns the counters; the main server owns the state. A stop must not lose the other's
   // fields — they are the ledger of the run being stopped.
-  it('keeps the service’s counters when it records a stop', async () => {
+  it('keeps the service’s counter when it records a stop', async () => {
     const { app, root } = await openTestProject();
     await writeAutopilotState(root, {
       ...IDLE_STATE,
       state: 'running',
       iteration: 12,
-      dispatchesSinceCheckup: 3,
     });
     await app.inject({ method: 'POST', url: '/api/autopilot/stop', payload: {} });
     expect(await readAutopilotState(root, AT)).toMatchObject({
       state: 'stopped',
       iteration: 12,
-      dispatchesSinceCheckup: 3,
     });
   });
 
@@ -177,7 +171,6 @@ describe('the auto-pilot controls', () => {
       await updateAutopilotState(root, AT, (current) => ({
         ...current,
         iteration: 42,
-        dispatchesSinceCheckup: 7,
         servicePgid: 4242,
         servicePgstart: 99,
       }));
@@ -193,7 +186,6 @@ describe('the auto-pilot controls', () => {
     expect(after).toMatchObject({
       reason: 'killed',
       iteration: 42,
-      dispatchesSinceCheckup: 7,
       servicePgid: 4242,
       servicePgstart: 99,
     });
@@ -209,14 +201,13 @@ describe('the auto-pilot controls', () => {
   });
 
   // A server restart finds `running` with no live processes: those children died with it.
-  it('reconciles a running state into one that owes a checkup when the project opens', async () => {
+  it('reconciles a running state into a stopped one when the project opens', async () => {
     const { app, root } = await openTestProject();
     await writeAutopilotState(root, { ...IDLE_STATE, state: 'running', iteration: 7 });
     await app.inject({ method: 'POST', url: '/api/project/open', payload: { path: root } });
     expect((await state(app)).state).toMatchObject({
       state: 'stopped',
       reason: 'interrupted',
-      needsCheckup: true,
       iteration: 7,
     });
   });

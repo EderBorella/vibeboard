@@ -6,10 +6,11 @@ import { STOP_REASONS } from './dispatch-gate.js';
 // API, which is the one deliberate carve-out in decision 20.
 //
 // WHO OWNS WHAT, because two processes touch this file:
-//   the auto-pilot service  →  iteration, dispatchesSinceCheckup
+//   the auto-pilot service  →  iteration
 //   the main server         →  state, reason, detail, at, servicePgid, servicePgstart
-//   both, in one direction each  →  needsCheckup: SET by the server (the reconcile, a halt, a crashed
-//                                   loop), CLEARED by the service once the checkup has run
+//
+// There is no longer a field both write. `needsCheckup` was one — set by the server, cleared by the
+// service — and it retired with the periodic checkup (decision 47).
 //
 // The pgid pair moved to the server's row in C2, and this table said the service owned it. Writing it from
 // the server is the better choice — the alternative leaves a window in which an emergency stop has no group
@@ -32,11 +33,6 @@ export type AutopilotStateName = (typeof AUTOPILOT_STATES)[number];
 export interface AutopilotState {
   state: AutopilotStateName;
   iteration: number; // dispatches this run, compared against maxIterations
-  dispatchesSinceCheckup: number; // a counter, not iteration % checkupEvery: the checkup consumes an
-  // iteration itself, so a modulo would misfire — and it would fire at zero, before any work exists
-  // The checkup is MANDATORY on resume, so this is a fact about the project rather than a preference:
-  // set by the startup reconcile, cleared by the service once the checkup has run.
-  needsCheckup: boolean;
   reason?: StopReason; // why it stopped, or why it is halted
   detail?: string; // the sentence a person reads — the specifics the reason cannot carry
   at?: string; // when this state was entered; the overlay's timestamp
@@ -70,8 +66,6 @@ export interface AutopilotState {
 export const IDLE_STATE: AutopilotState = {
   state: 'idle',
   iteration: 0,
-  dispatchesSinceCheckup: 0,
-  needsCheckup: false,
 };
 
 // A whole number at or above zero. `iteration` is compared with `>=` against the cap, so a fractional
@@ -107,8 +101,7 @@ export function parseState(content: string): AutopilotState | 'unreadable' {
   const d = parsed as Record<string, unknown>;
   if (!isState(d.state)) return 'unreadable';
   const iteration = counter(d.iteration);
-  const dispatchesSinceCheckup = counter(d.dispatchesSinceCheckup);
-  if (iteration === undefined || dispatchesSinceCheckup === undefined) return 'unreadable';
+  if (iteration === undefined) return 'unreadable';
   const pgid = d.servicePgid;
   // PRESENT-BUT-MALFORMED IS NOT ABSENT, and here that distinction has teeth: this list is what stops
   // auto-pilot running commands an agent wrote, so dropping a value we cannot read would fail OPEN on
@@ -118,8 +111,6 @@ export function parseState(content: string): AutopilotState | 'unreadable' {
   return {
     state: d.state,
     iteration,
-    dispatchesSinceCheckup,
-    needsCheckup: d.needsCheckup === true,
     // Dropped, not refused: the reason is what the overlay SHOWS, and losing the label is a far
     // better outcome than losing the halt it labels.
     ...(isReason(d.reason) ? { reason: d.reason } : {}),
@@ -212,11 +203,14 @@ export function reconcile(
   ) {
     return state;
   }
+  // NO `needsCheckup`. Decision 15's "a checkup is mandatory on resume" has not retired — what changed is
+  // that it no longer needs a flag. The position is re-derived every tick, a task left in `review` is
+  // re-judged or re-stamped, and an in-flight run is `interrupted` by `markInterrupted`, which burns no
+  // attempt. The honesty the flag bought is structural now.
   return {
     ...state,
     state: 'stopped',
     reason: 'interrupted',
-    needsCheckup: true,
     at,
   };
 }

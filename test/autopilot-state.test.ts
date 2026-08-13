@@ -21,8 +21,6 @@ describe('the state record', () => {
     const running = {
       state: 'running' as const,
       iteration: 12,
-      dispatchesSinceCheckup: 2,
-      needsCheckup: false,
       servicePgid: 4242,
       at: '2026-08-03T10:00:00.000Z',
     };
@@ -35,13 +33,8 @@ describe('the state record', () => {
     }
   });
 
-  it('defaults the counters when a valid record omits them', () => {
-    expect(parseState('{"state":"running"}')).toEqual({
-      state: 'running',
-      iteration: 0,
-      dispatchesSinceCheckup: 0,
-      needsCheckup: false,
-    });
+  it('defaults the counter when a valid record omits it', () => {
+    expect(parseState('{"state":"running"}')).toEqual({ state: 'running', iteration: 0 });
   });
 
   it('refuses a state it does not know', () => {
@@ -59,7 +52,6 @@ describe('the state record', () => {
   it('refuses a counter that is not a whole number at or above zero', () => {
     expect(parseState('{"state":"running","iteration":2.5}')).toBe('unreadable');
     expect(parseState('{"state":"running","iteration":-1}')).toBe('unreadable');
-    expect(parseState('{"state":"running","dispatchesSinceCheckup":-3}')).toBe('unreadable');
   });
 
   // Dropped rather than refused: a reason is what the overlay SHOWS, and refusing the record over it
@@ -81,17 +73,18 @@ describe('reconciling a state found on disk at startup', () => {
   const at = '2026-08-03T12:00:00.000Z';
 
   // A server restart can find `running` with no live processes: its children died with it. Auto-pilot
-  // must come back needing a checkup rather than resuming dispatch on the assumption those runs are
-  // still going.
-  it('turns a running project into one that owes a checkup', () => {
+  // must come back STOPPED rather than resuming dispatch on the assumption those runs went fine. It no
+  // longer sets a checkup flag with it (decision 47): the position is re-derived every tick, a task left
+  // in review is re-judged or re-stamped, and an in-flight run is interrupted and burns no attempt.
+  it('turns a running project with no live process into a stopped one', () => {
     const next = reconcile({ ...IDLE_STATE, state: 'running', iteration: 7 }, at);
     expect(next).toMatchObject({
       state: 'stopped',
       reason: 'interrupted',
-      needsCheckup: true,
       iteration: 7,
       at,
     });
+    expect('needsCheckup' in next).toBe(false);
   });
 
   // The half that was NOT true, and the comment claiming it was is now corrected in the source: the loop is

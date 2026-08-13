@@ -270,26 +270,20 @@ describe('ensureAutopilotKeys', () => {
   it('fills any missing key, not just the newest one', () => {
     const config = defaultConfig('T');
     const ap = config.autopilot as unknown as Record<string, unknown>;
-    delete ap.checkupEvery;
-    delete ap.routes;
+    delete ap.attemptCap;
+    delete ap.terminal;
     expect(ensureAutopilotKeys(config)).toBe(true);
-    expect(config.autopilot?.checkupEvery).toBe(DEFAULT_AUTOPILOT.checkupEvery);
-    expect(config.autopilot?.routes).toEqual(DEFAULT_AUTOPILOT.routes);
+    expect(config.autopilot?.attemptCap).toBe(DEFAULT_AUTOPILOT.attemptCap);
+    expect(config.autopilot?.terminal).toEqual(DEFAULT_AUTOPILOT.terminal);
   });
 
   // A clone, like `defaultConfig` takes: a shared reference would let one project's edit reach the
   // next project's defaults inside the same process.
   it('gives each project its own copy of a filled list', () => {
     const config = defaultConfig('T');
-    delete (config.autopilot as unknown as Record<string, unknown>).routes;
+    delete (config.autopilot as unknown as Record<string, unknown>).terminal;
     ensureAutopilotKeys(config);
-    config.autopilot?.routes.push({
-      board: 'features',
-      column: 'x',
-      skill: 'y',
-      verify: 'critic',
-      next: 'z',
-    });
-    expect(DEFAULT_AUTOPILOT.routes).toHaveLength(8);
+    config.autopilot?.terminal.engineering.push('shipped');
+    expect(DEFAULT_AUTOPILOT.terminal.engineering).toEqual(['done']);
   });
 });

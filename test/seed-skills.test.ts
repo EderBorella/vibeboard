@@ -93,28 +93,18 @@ describe('the two entry points', () => {
   });
 });
 
-// The routing table names skills by slug, and the seeds are where those skills come from. Nothing
-// else ties the two together: rename a folder and the route points at nothing, so the phase silently
-// never runs — under auto-pilot, where nobody is watching it not happen.
-describe('the phase skills the routing table names', () => {
-  it('provides a skill for every route in the default table', async () => {
-    const { DEFAULT_AUTOPILOT } = await import('../src/core/autopilot.js');
-    const slugs = new Set(SEED_SKILLS.map((s) => s.slug));
-    for (const route of DEFAULT_AUTOPILOT.routes) {
-      expect(slugs, `${route.board}/${route.column}`).toContain(route.skill);
-    }
-  });
-
-  it('scopes each phase skill to the board its route is on', async () => {
+// The phase table names skills by slug, and the seeds are where those skills come from. Nothing else ties
+// the two together: rename a folder and the phase dispatches nothing, so it silently never runs — under
+// auto-pilot, where nobody is watching it not happen. Asked of PHASES rather than of a routing table
+// (ruling 52), which is also what `phaseSkillProblems` asks a live project.
+describe('the phase skills the phase table names', () => {
+  it('scopes each phase skill to the board its phase sits on', async () => {
     const root = await tempDir();
     await seedSkills(root);
     const { skills } = await readSkills(root, config);
     const boardsOf = (slug: string): string[] => skills.find((s) => s.slug === slug)?.boards ?? ['MISSING'];
     expect(boardsOf('derive-features')).toEqual(['features']);
-    expect(boardsOf('close-out')).toEqual(['features']);
-    expect(boardsOf('design')).toEqual(['product']);
     expect(boardsOf('implement')).toEqual(['engineering']);
-    expect(boardsOf('test')).toEqual(['engineering']);
     expect(boardsOf('break-down')).toEqual(['features', 'product']);
     // The lifecycle's own, each scoped to the one board its phase sits on: a `fix` and a `review` are always
     // about a task, a story checkup about a story, a feature checkup about a feature.
@@ -176,17 +166,6 @@ describe('the phase skills the routing table names', () => {
     expect(SEED_SKILLS.map((s) => s.slug)).toEqual(
       expect.arrayContaining(['execute', 'research', 'review', 'summarise']),
     );
-  });
-});
-
-describe('the critic seed', () => {
-  // Shipped as an ordinary skill file, because that is what the loop dispatches. Without it every
-  // critic-verified route is a phase that can never pass — which readiness now refuses to start on.
-  it('is there, is told to score, and is told not to touch', () => {
-    const critic = SEED_SKILLS.find((s) => s.slug === 'critic');
-    expect(critic).toBeDefined();
-    expect(critic?.content).toMatch(/score/i);
-    expect(critic?.content).toMatch(/do not (change|edit|fix)/i);
   });
 });
 

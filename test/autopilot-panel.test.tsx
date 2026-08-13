@@ -2,6 +2,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_AUTOPILOT } from '../src/core/autopilot.js';
+import { PHASES } from '../src/core/phases.js';
 import { defaultConfig } from '../src/core/config.js';
 
 // The panel also asks for the ledger, to name the cap that will actually stop the run.
@@ -47,10 +48,15 @@ const readiness = (over: Partial<Readiness> = {}): Readiness => ({
   foundation: { present: [], missing: [], ok: true },
   gates: { ok: true, count: 2 },
   smoke: { ok: true },
-  routes: { problems: [], count: DEFAULT_AUTOPILOT.routes.length },
+  phases: { problems: [], count: PHASES.filter((p) => p.skill !== undefined).length },
   unreviewedGates: [],
   ...over,
 });
+
+// The routes table used to be the "readiness has arrived" gate for every test below. With no table, the
+// gate is the readiness section itself — which is what was actually being waited for, and asserting on a
+// table was only ever a proxy for it.
+const settled = (): Promise<HTMLElement> => screen.findByText(/Before auto-pilot can start:/i);
 
 // The core config and the web mirror are two declarations of one shape; this cast is that seam.
 const configWith = (autopilot: boolean): ProjectConfig => {
@@ -138,14 +144,16 @@ describe('the start control', () => {
 
 describe('the auto-pilot panel', () => {
 
-  it('renders every route, so the lifecycle can be read off the screen', async () => {
+  // There is no table any more, and its absence is the claim: a lifecycle a person can edit is a lie
+  // waiting to happen (ruling 52), so the panel says the machine is fixed rather than showing a table
+  // that could disagree with the code. A stale table left rendering half a retired config would be
+  // worse than none, which is what this asserts.
+  it('says the lifecycle is fixed instead of rendering a table that could disagree with the code', async () => {
     api.getReadiness.mockResolvedValue(readiness());
     render(panel(configWith(true)));
-    // A row per route plus a header. A table showing some of the lifecycle would be worse than none,
-    // because the missing phase is the one nobody would think to look for.
-    expect(await screen.findAllByRole('row')).toHaveLength(DEFAULT_AUTOPILOT.routes.length + 1);
-    expect(screen.getByText('derive-features')).toBeTruthy();
-    expect(screen.getByText('close-out')).toBeTruthy();
+    expect(await screen.findByText(/The lifecycle is fixed/i)).toBeTruthy();
+    expect(screen.queryAllByRole('row')).toEqual([]);
+    expect(screen.queryByText('derive-features')).toBeNull();
   });
 
   it('states what is blocking auto-pilot in words, not as a red dot', async () => {
@@ -196,7 +204,7 @@ describe('the caps', () => {
     const config = configWith(true);
     config.autopilot = { ...DEFAULT_AUTOPILOT, budgetUsd: 42, maxIterations: 7, attemptCap: 2 };
     render(panel(config));
-    await screen.findAllByRole('row');
+    await settled();
     expect(field('Budget (USD)').value).toBe('42');
     expect(field('Max dispatches').value).toBe('7');
     expect(field('Attempts per card').value).toBe('2');
@@ -207,7 +215,7 @@ describe('the caps', () => {
     api.getReadiness.mockResolvedValue(readiness());
     const onCaps = vi.fn();
     render(panel(configWith(true), { onCaps: onCaps }));
-    await screen.findAllByRole('row');
+    await settled();
     expect(field('Run timeout (minutes)').value).toBe('30');
     fireEvent.change(field('Run timeout (minutes)'), { target: { value: '5' } });
     expect(onCaps).toHaveBeenCalledWith(expect.objectContaining({ runTimeoutMs: 300_000 }));
@@ -227,7 +235,7 @@ describe('the caps', () => {
     api.getReadiness.mockResolvedValue(readiness());
     const onCaps = vi.fn();
     render(panel(configWith(true), { onCaps: onCaps }));
-    await screen.findAllByRole('row');
+    await settled();
     fireEvent.change(field(label), { target: { value: typed } });
     expect(onCaps).toHaveBeenLastCalledWith(expect.objectContaining({ [key]: expected }));
   });
@@ -236,7 +244,7 @@ describe('the caps', () => {
     api.getReadiness.mockResolvedValue(readiness());
     const onCaps = vi.fn();
     render(panel(configWith(true), { onCaps: onCaps }));
-    await screen.findAllByRole('row');
+    await settled();
     fireEvent.change(field('Budget (USD)'), { target: { value: '9' } });
     fireEvent.change(field('Attempts per card'), { target: { value: '4' } });
     expect(onCaps).toHaveBeenLastCalledWith(expect.objectContaining({ budgetUsd: 9, attemptCap: 4 }));
@@ -247,7 +255,7 @@ describe('the caps', () => {
     api.getReadiness.mockResolvedValue(readiness());
     const onCaps = vi.fn();
     render(panel(configWith(true), { onCaps: onCaps }));
-    await screen.findAllByRole('row');
+    await settled();
     fireEvent.change(field('Budget (USD)'), { target: { value: '0' } });
     expect(onCaps).toHaveBeenLastCalledWith(expect.objectContaining({ budgetUsd: 0 }));
   });
@@ -288,7 +296,7 @@ describe('the stop controls', () => {
         autopilot: { state, iteration: 0, dispatchesSinceCheckup: 0, needsCheckup: false } as never,
       }),
     );
-    await screen.findAllByRole('row');
+    await settled();
   };
 
   // The regression this fix exists to prevent, asserted rather than assumed. `socketFor` is a
@@ -354,7 +362,7 @@ describe('the critic threshold field', () => {
     const onCaps = vi.fn();
     api.getReadiness.mockResolvedValue(readiness());
     render(panel(configWith(true), { onCaps }));
-    await screen.findAllByRole('row');
+    await settled();
     const box = field('Critic passes at');
     expect(box.value).toBe('0.6');
     fireEvent.change(box, { target: { value: '0.8' } });
@@ -372,7 +380,7 @@ describe('the critic threshold field', () => {
     const onCaps = vi.fn();
     api.getReadiness.mockResolvedValue(readiness());
     render(panel(configWith(true), { onCaps }));
-    await screen.findAllByRole('row');
+    await settled();
     const box = field('Critic passes at');
 
     // `5` is here rather than clamped to 1: a bar the server would refuse is not a bar, and clamping it
@@ -395,7 +403,7 @@ describe('the critic threshold field', () => {
     const onCaps = vi.fn();
     api.getReadiness.mockResolvedValue(readiness());
     render(panel(configWith(true), { onCaps }));
-    await screen.findAllByRole('row');
+    await settled();
     const box = field('Critic passes at');
 
     // `0.` cannot be OBSERVED here, and that is a DOM fact rather than a test artefact: an
@@ -415,7 +423,7 @@ describe('the critic threshold field', () => {
     const config = configWith(true);
     delete (config.autopilot as unknown as Record<string, unknown>).criticThreshold;
     render(panel(config, {}));
-    await screen.findAllByRole('row');
+    await settled();
     expect(field('Critic passes at').value).toBe('0.6');
   });
 });

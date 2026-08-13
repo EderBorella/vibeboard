@@ -688,8 +688,6 @@ export function isSuccessReason(reason: StopReason): boolean {
 export interface AutopilotState {
   state: AutopilotStateName;
   iteration: number;
-  dispatchesSinceCheckup: number;
-  needsCheckup: boolean;
   reason?: StopReason;
   detail?: string;
   at?: string;
@@ -866,7 +864,7 @@ export interface Readiness {
   foundation: { present: string[]; missing: string[]; ok: boolean };
   gates: { ok: boolean; reason?: string; count: number };
   smoke: { ok: boolean; reason?: string };
-  routes: { problems: string[]; count: number };
+  phases: { problems: string[]; count: number };
   unreviewedGates: string[];
 }
 

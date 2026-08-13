@@ -19,8 +19,6 @@ const NOW = '2026-08-03T09:15:00.000Z';
 const halted = (over: Partial<AutopilotState> = {}): AutopilotState => ({
   state: 'halted',
   iteration: 4,
-  dispatchesSinceCheckup: 1,
-  needsCheckup: true,
   reason: 'killed',
   detail: 'Everything in this project was killed by an emergency stop.',
   at: NOW,

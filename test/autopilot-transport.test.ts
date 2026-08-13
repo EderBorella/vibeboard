@@ -5,7 +5,7 @@ import { transportModel } from '../web/src/autopilot/transport.js';
 // The decisions behind the transport strip, asserted directly. The alternative is mocking four hooks to
 // check a sentence, and every defect in this feature so far has hidden behind exactly that.
 
-const IDLE: AutopilotState = { state: 'idle', iteration: 0, dispatchesSinceCheckup: 0, needsCheckup: false };
+const IDLE: AutopilotState = { state: 'idle', iteration: 0 };
 const NO_RUNS: RunList = { runs: [], active: [], queued: [] };
 
 const run = (over: Partial<RunRecord>): RunRecord =>
@@ -29,7 +29,7 @@ const ready: Readiness = {
   foundation: { present: [], missing: [], ok: true },
   gates: { ok: true, count: 2 },
   smoke: { ok: true },
-  routes: { problems: [], count: 3 },
+  phases: { problems: [], count: 3 },
   unreviewedGates: [],
 };
 const unready: Readiness = { ...ready, ok: false, blockers: ['README is empty', 'no gate commands'] };

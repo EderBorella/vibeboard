@@ -140,9 +140,9 @@ export function ensureAutopilotKeys(config: ProjectConfig): boolean {
   let changed = false;
   for (const [key, value] of Object.entries(DEFAULT_AUTOPILOT)) {
     if (block[key] !== undefined) continue;
-    // A clone, like defaultConfig takes: `routes`, `rollup` and `terminal` are mutated in place by the
-    // column helpers, so a shared reference would let one project's edit reach the next project's
-    // defaults inside the same process.
+    // A clone, like defaultConfig takes: `terminal` is mutated in place by the column helpers, so a
+    // shared reference would let one project's edit reach the next project's defaults inside the same
+    // process.
     block[key] = structuredClone(value);
     changed = true;
   }

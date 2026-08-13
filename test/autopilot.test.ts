@@ -4,24 +4,10 @@ import {
   DEFAULT_AUTOPILOT,
   isBlockedColumn,
   isTerminalColumn,
-  routeFor,
 } from '../src/core/autopilot.js';
 import { defaultConfig } from '../src/core/config.js';
 
-describe('the autopilot routing table', () => {
-  it('routes a card by (board, column) and names where it goes next', () => {
-    const route = routeFor(DEFAULT_AUTOPILOT, 'engineering', 'backlog');
-    expect(route).toEqual({
-      board: 'engineering',
-      column: 'backlog',
-      skill: 'implement',
-      verify: 'gates',
-      next: 'review',
-    });
-    // A lookup, not a judgement: an unrouted column answers "nothing runs here".
-    expect(routeFor(DEFAULT_AUTOPILOT, 'engineering', 'done')).toBeUndefined();
-  });
-
+describe('the autopilot block', () => {
   it('treats terminal and blocked as explicit facts, never as the absence of a route', () => {
     expect(isTerminalColumn(DEFAULT_AUTOPILOT, 'engineering', 'done')).toBe(true);
     expect(isTerminalColumn(DEFAULT_AUTOPILOT, 'engineering', 'review')).toBe(false);
@@ -30,7 +16,7 @@ describe('the autopilot routing table', () => {
     expect(isBlockedColumn(DEFAULT_AUTOPILOT, 'product', 'blocked')).toBe(false);
   });
 
-  it('a new project ships the block, so its routes and its columns agree from the start', () => {
+  it('a new project ships the block, so its terminal columns and its columns agree from the start', () => {
     expect(defaultConfig('T').autopilot).toEqual(DEFAULT_AUTOPILOT);
   });
 
@@ -39,18 +25,8 @@ describe('the autopilot routing table', () => {
   it('hands each project its own copy of the defaults', () => {
     const config = defaultConfig('T');
     expect(config.autopilot).not.toBe(DEFAULT_AUTOPILOT);
-    config.autopilot!.routes.pop();
-    expect(defaultConfig('U').autopilot!.routes).toHaveLength(DEFAULT_AUTOPILOT.routes.length);
-  });
-
-  it('carries routes through a column rename, on both the source and the destination side', () => {
-    const renamed = applyRouteRenames(DEFAULT_AUTOPILOT, 'engineering', [{ from: 'review', to: 'qa' }]);
-    expect(routeFor(renamed, 'engineering', 'qa')?.skill).toBe('test');
-    expect(routeFor(renamed, 'engineering', 'review')).toBeUndefined();
-    // `next` is a column too: renaming Review must not leave backlog pointing at a column that is gone.
-    expect(routeFor(renamed, 'engineering', 'backlog')?.next).toBe('qa');
-    // Another board's routes are untouched.
-    expect(routeFor(renamed, 'product', 'backlog')?.next).toBe('todo');
+    config.autopilot!.terminal.engineering.pop();
+    expect(defaultConfig('U').autopilot!.terminal.engineering).toEqual(['done']);
   });
 
   it('renames the terminal and blocked columns of the board being renamed, and only that board', () => {
@@ -61,8 +37,6 @@ describe('the autopilot routing table', () => {
     expect(renamed.terminal.engineering).toEqual(['shipped']);
     expect(renamed.blockedColumn).toBe('stuck');
     expect(isTerminalColumn(renamed, 'engineering', 'done')).toBe(false);
-    // The routes that advanced into `done` advance into its new name.
-    expect(routeFor(renamed, 'engineering', 'review')?.next).toBe('shipped');
     // The other boards still have a Done column of their own, and it is still where a card finishes.
     // A single flat list of slugs got this wrong: renaming engineering's Done un-terminalled theirs.
     expect(renamed.terminal.product).toEqual(['done']);

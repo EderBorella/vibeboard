@@ -92,6 +92,17 @@ describe('routing-table coverage', () => {
     );
   });
 
+  // CHANGE 3 OF DECISION 45's REPEAL, and the only one of the four that is a change to NOTHING: this refusal
+  // STAYS. Its own test rather than the second half of the one above, because it now guards a specific
+  // shortcut — making `complete` reachable by listing `blocked` under terminal.engineering. That one line
+  // would do it, and it would also make a blocked card count as `complete`'s own positive evidence, which is
+  // the false success the other three changes were careful not to open.
+  it('refuses a config listing blocked under terminal.engineering', () => {
+    const config = fresh();
+    ap(config).terminal.engineering = ['done', 'blocked'];
+    expect(coverageProblems(config).join(' ')).toMatch(/report blocked work as done/);
+  });
+
   // The column a product card advances FROM is moved by the rollup and by no route. Without rollup
   // counting as cover, the default table would fail its own validator.
   it('counts an advancing rollup as cover, and an eligibility rule as no cover at all', () => {

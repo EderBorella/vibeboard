@@ -3,9 +3,10 @@ import type { Spend } from '../src/core/accounting.js';
 import type { TickAction } from '../src/core/actions.js';
 import { DEFAULT_AUTOPILOT } from '../src/core/autopilot.js';
 import type { AutopilotState } from '../src/core/autopilot-state.js';
-import type { RunRecord, RunStatus } from '../src/core/runs.js';
+import { type RunRecord, type RunStatus, withVerification } from '../src/core/runs.js';
 import { decideTick, type TickInput } from '../src/core/tick.js';
 import type { BoardName, Card } from '../src/core/types.js';
+import type { Verification } from '../src/core/verify.js';
 
 function card(id: string, board: BoardName, columnSlug: string, order: number, links: string[]): Card {
   return {
@@ -261,15 +262,18 @@ describe('nothing to work on is not the same as nothing left', () => {
     expect(detailOf(action)).toContain('routed, terminal or blocked');
   });
 
-  it('stops stalled for a card the loop itself blocked, and says that is what happened', () => {
+  // WAS "stops stalled for a card the loop itself blocked". Decision 45 REPEALS that: a blocked task is
+  // settled, so a board whose only outstanding card is one reports `complete` and names it. The finding-D
+  // block at the end of this file is where that behaviour is pinned, both directions.
+  it('reports complete, not stalled, for a card the loop itself blocked', () => {
     const cards = [
       card('F-001', 'features', 'done', 10, ['P-001']),
       card('P-001', 'product', 'done', 10, ['F-001']),
       card('E-009', 'engineering', 'blocked', 10, []),
     ];
     const action = decideTick(input({ cards }));
-    expect(action).toMatchObject({ kind: 'stop', reason: 'stalled' });
-    expect(detailOf(action)).toContain('E-009 ran out of attempts');
+    expect(action).toMatchObject({ kind: 'stop', reason: 'complete' });
+    expect(detailOf(action)).toContain('E-009');
   });
 
   // ORPHANED WORK UNDER A CLOSED FEATURE, which is what it takes to reach this sentence at all now: anything
@@ -675,5 +679,215 @@ describe('decideTick — the story loop', () => {
       phase: 'feature-breakdown-skip',
       card: { id: 'F-001' },
     });
+  });
+});
+
+// ── the task loop and the review loop ───────────────────────────────────────────────────────────────
+//
+// Composed through the real `withVerification`, because a verdict is what every branch below turns on and a
+// hand-built one is a shape nothing writes.
+
+const gates = (passed: boolean): Verification =>
+  passed
+    ? { mode: 'gates', passed: true, at: 'T' }
+    : { mode: 'gates', passed: false, at: 'T', command: 'npm test', output: '1 failing' };
+
+const work = (skill: 'implement' | 'fix', cardId = 'E-001'): RunRecord =>
+  run(cardId, 'engineering', skill, 'success');
+
+const judged = (skill: 'implement' | 'fix', passed: boolean, cardId = 'E-001'): RunRecord =>
+  withVerification(work(skill, cardId), gates(passed));
+
+// A review that answered, and one that did not. Only the second kind counts towards the review bound.
+const answered = (verdict: 'done' | 'sent-back', cardId = 'E-001'): RunRecord => ({
+  ...run(cardId, 'engineering', 'review', 'success'),
+  verdict,
+});
+const inconclusive = (cardId = 'E-001'): RunRecord => run(cardId, 'engineering', 'review', 'failed');
+
+// The story that owns the tasks, in progress with its break-down done.
+const story = (taskIds: string[]): Card[] => [
+  card('F-001', 'features', 'in-progress', 10, ['P-001']),
+  card('P-001', 'product', 'in-progress', 10, ['F-001', ...taskIds]),
+];
+
+const task = (id: string, columnSlug: string, order = 10): Card =>
+  card(id, 'engineering', columnSlug, order, ['P-001']);
+
+describe('decideTick — the task loop', () => {
+  it('stamps a backlog task into in-progress and dispatches implement', () => {
+    const cards = [...story(['E-001']), task('E-001', 'backlog')];
+    const action = decideTick(input({ cards }));
+    expect(action).toMatchObject({ kind: 'dispatch', phase: 'task-implement', skill: 'implement' });
+    expect(action.kind === 'dispatch' && action.card?.id).toBe('E-001');
+  });
+
+  it('takes tasks in (order, then id)', () => {
+    // Only `order` can decide this: E-002 sorts first by number and last by order.
+    const cards = [...story(['E-001', 'E-002']), task('E-001', 'backlog', 20), task('E-002', 'backlog', 10)];
+    expect(decideTick(input({ cards }))).toMatchObject({ kind: 'dispatch', card: { id: 'E-002' } });
+  });
+
+  it('finishes one task before starting the next', () => {
+    // The trace's own shape: E-001 goes all the way to done before E-002 is picked up.
+    const cards = [...story(['E-001', 'E-002']), task('E-001', 'review', 10), task('E-002', 'backlog', 20)];
+    const action = decideTick(input({ cards, runs: [work('implement')] }));
+    expect(action).toMatchObject({ kind: 'dispatch', phase: 'task-review', card: { id: 'E-001' } });
+  });
+
+  it('dispatches implement for a task in in-progress with no verdict on record', () => {
+    // A crashed dispatch left it there; it has not been sent back, so it is still implement's phase.
+    const cards = [...story(['E-001']), task('E-001', 'in-progress')];
+    expect(decideTick(input({ cards, runs: [work('implement')] }))).toMatchObject({
+      kind: 'dispatch',
+      phase: 'task-implement',
+    });
+  });
+
+  it('sends a task at the implement cap to review anyway', () => {
+    // Section 5: the gates and the reviewer judge it. NOT blocked, and NOT a stop.
+    const cards = [...story(['E-001']), task('E-001', 'in-progress')];
+    const runs = threeRunsOf('E-001', 'engineering', 'implement');
+    expect(decideTick(input({ cards, runs }))).toMatchObject({ kind: 'stamp', to: 'review' });
+  });
+});
+
+describe('decideTick — the review loop', () => {
+  it('reviews a task in review whose work run carries no verdict', () => {
+    const cards = [...story(['E-001']), task('E-001', 'review')];
+    const implement = work('implement');
+    const action = decideTick(input({ cards, runs: [implement] }));
+    expect(action).toMatchObject({ kind: 'dispatch', phase: 'task-review', skill: 'review' });
+    // Told WHICH run it is judging, or it judges whatever else it can find on the card.
+    expect(action.kind === 'dispatch' && action.previous).toBe(implement.run);
+  });
+
+  // "HAS THIS ALREADY BEEN DONE" — the row that stops a second judgement being paid for.
+  it('re-stamps rather than re-judging a task whose verdict already passed', () => {
+    const cards = [...story(['E-001']), task('E-001', 'review')];
+    expect(decideTick(input({ cards, runs: [judged('implement', true)] }))).toMatchObject({
+      kind: 'stamp',
+      phase: 'task-review-remove',
+      to: 'done',
+    });
+  });
+
+  it('re-stamps a task whose verdict already failed back to in-progress', () => {
+    const cards = [...story(['E-001']), task('E-001', 'review')];
+    expect(decideTick(input({ cards, runs: [judged('implement', false)] }))).toMatchObject({
+      kind: 'stamp',
+      phase: 'task-review-remove',
+      to: 'in-progress',
+    });
+  });
+
+  it('dispatches fix for a task in in-progress with an outstanding failed verdict', () => {
+    const cards = [...story(['E-001']), task('E-001', 'in-progress')];
+    const failed = judged('implement', false);
+    const action = decideTick(input({ cards, runs: [failed] }));
+    expect(action).toMatchObject({ kind: 'dispatch', phase: 'task-fix', skill: 'fix' });
+    // The run carrying the findings, so the fix is handed the evidence rather than told to look.
+    expect(action.kind === 'dispatch' && action.previous).toBe(failed.run);
+  });
+
+  // ONE BUDGET FOR BOTH SEND-BACK KINDS. Two would let a task alternate and spend twice the cap.
+  it('blocks a task that has used every fix attempt, and does not stop the loop', () => {
+    const cards = [...story(['E-001', 'E-002']), task('E-001', 'in-progress'), task('E-002', 'backlog', 20)];
+    const runs = [judged('implement', false), ...threeRunsOf('E-001', 'engineering', 'fix')];
+    expect(decideTick(input({ cards, runs }))).toMatchObject({
+      kind: 'stamp',
+      phase: 'task-fix',
+      to: 'blocked',
+    });
+  });
+
+  it('spends the same fix budget whether the send-backs came from gates or from the reviewer', () => {
+    // Two gate failures and one review send-back, each with its own fix run: the fourth attempt is blocked
+    // rather than granted from a second budget.
+    const cards = [...story(['E-001']), task('E-001', 'in-progress')];
+    const runs = [
+      judged('implement', false),
+      run('E-001', 'engineering', 'fix', 'failed'),
+      judged('fix', false),
+      run('E-001', 'engineering', 'fix', 'failed'),
+      answered('sent-back'),
+      run('E-001', 'engineering', 'fix', 'failed'),
+      judged('fix', false),
+    ];
+    expect(decideTick(input({ cards, runs }))).toMatchObject({ kind: 'stamp', to: 'blocked' });
+  });
+
+  // A REVIEW THAT CANNOT COMPLETE IS NOT A BLOCKED TASK (decision 51). It names the review.
+  it('stops stalled naming the review when the review runs will not complete', () => {
+    const cards = [...story(['E-001']), task('E-001', 'review')];
+    const runs = [work('implement'), inconclusive(), inconclusive(), inconclusive()];
+    const action = decideTick(input({ cards, runs }));
+    expect(action).toMatchObject({ kind: 'stop', reason: 'stalled' });
+    expect(detailOf(action)).toContain('review');
+    // It must NOT say the task is unfixable: a dead API key is not work nobody can fix.
+    expect(detailOf(action)).not.toContain('blocked');
+  });
+
+  it('does not count three completed reviews towards that bound', () => {
+    // Finding A, through the tick: `BURNS.success` is true, so a cap over every review run would stall a
+    // perfectly healthy task at three.
+    const cards = [...story(['E-001']), task('E-001', 'review')];
+    const runs = [work('implement'), answered('done'), answered('sent-back'), answered('done')];
+    expect(decideTick(input({ cards, runs }))).toMatchObject({ kind: 'dispatch', phase: 'task-review' });
+  });
+});
+
+describe('decideTick — finding D: complete with a blocked task', () => {
+  const closed = (taskCards: Card[]): Card[] => [
+    card('F-001', 'features', 'done', 10, ['P-001']),
+    card('P-001', 'product', 'done', 10, ['F-001', ...taskCards.map((c) => c.id)]),
+    ...taskCards,
+  ];
+
+  // CHANGE 2: blocked tasks leave the `unfinished` set, or `complete` stays unreachable exactly as before.
+  it('reports complete when the only unfinished card is a blocked task', () => {
+    const cards = closed([task('E-001', 'blocked'), task('E-002', 'done', 20)]);
+    expect(decideTick(input({ cards }))).toMatchObject({ kind: 'stop', reason: 'complete' });
+  });
+
+  it('names every blocked task in the complete detail', () => {
+    const cards = closed([task('E-001', 'blocked'), task('E-002', 'done', 20), task('E-003', 'blocked', 30)]);
+    const action = decideTick(input({ cards }));
+    expect(action).toMatchObject({ kind: 'stop', reason: 'complete' });
+    expect(detailOf(action)).toContain('E-001');
+    expect(detailOf(action)).toContain('E-003');
+    expect(detailOf(action)).toMatch(/2 tasks are blocked/);
+  });
+
+  it('says nothing about blocked work when there is none', () => {
+    const cards = closed([task('E-001', 'done')]);
+    const action = decideTick(input({ cards }));
+    expect(action).toMatchObject({ kind: 'stop', reason: 'complete' });
+    expect(detailOf(action)).toBe('');
+  });
+
+  // CHANGE 4, and it exists because the other three open a false success.
+  it('reports stalled, naming the task, for a board holding only a blocked task', () => {
+    const action = decideTick(input({ cards: [task('E-001', 'blocked')] }));
+    expect(action).toMatchObject({ kind: 'stop', reason: 'stalled' });
+    expect(detailOf(action)).toContain('E-001');
+  });
+
+  it('requires a live card in a terminal column, asserted, not implied', () => {
+    // Every card archived except one blocked task: no terminal evidence, so never `complete`.
+    const cards = [
+      { ...card('F-001', 'features', 'archive', 10, []), archived: '2026-08-13T00:00:00Z' },
+      task('E-001', 'blocked'),
+    ];
+    expect(decideTick(input({ cards }))).toMatchObject({ kind: 'stop', reason: 'stalled' });
+  });
+
+  // CHANGE 1's own subject. With change 2 in place a purely-blocked board never reaches `whyStuck`, so the
+  // sentence is only observable in the MIXED case — without this test, deleting it is an equivalent mutant.
+  it('does not claim a blocked task stops the project from finishing, in the mixed case', () => {
+    const cards = [task('E-001', 'blocked'), card('E-009', 'engineering', 'triage', 20, [])];
+    const detail = detailOf(decideTick(input({ cards })));
+    expect(detail).toContain('E-001');
+    expect(detail).not.toContain('cannot report itself finished');
   });
 });

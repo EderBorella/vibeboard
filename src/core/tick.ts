@@ -9,8 +9,14 @@ import {
 import { shapeProblems } from './autopilot-cover.js';
 import type { AutopilotState } from './autopilot-state.js';
 import type { CardProblem } from './board.js';
-import { creatingRoundSpent } from './bounds.js';
-import { allSettled, hasUnfinishedChildren } from './derived-status.js';
+import {
+  creatingRoundSpent,
+  inconclusiveReviews,
+  latestWorkRun,
+  outstandingVerdict,
+  verdictRun,
+} from './bounds.js';
+import { allSettled, hasUnfinishedChildren, isSettled } from './derived-status.js';
 import { mayDispatch, type StopReason } from './dispatch-gate.js';
 import { liveCards } from './hierarchy.js';
 import { ARCHIVE_SLUG } from './layout.js';
@@ -122,38 +128,37 @@ function partitionStuck(
   ap: AutopilotConfig,
   cards: Card[],
   unfinished: Card[],
-): { blocked: Card[]; waiting: Card[]; rest: Card[] } {
-  const blocked: Card[] = [];
+): { waiting: Card[]; rest: Card[] } {
   const waiting: Card[] = [];
   const rest: Card[] = [];
   for (const card of unfinished) {
-    if (isBlockedColumn(ap, card.board, card.columnSlug)) blocked.push(card);
     // The same rule that kept it from being worked, read back as a reason. A parent stuck behind one
     // blocked grandchild is the ordinary shape of a stalled board, and calling it unroutable — which is
     // what the first version of this message did — sends the reader to edit a routing table that is fine.
-    else if (hasUnfinishedChildren(ap, card, cards)) waiting.push(card);
+    if (hasUnfinishedChildren(ap, card, cards)) waiting.push(card);
     else rest.push(card);
   }
-  return { blocked, waiting, rest };
+  return { waiting, rest };
 }
 
 // Why the remaining work is stuck, per KIND of stuck. One list of ids with one piece of advice named
 // cards the loop had itself blocked and then told the reader to check their routing table — advice that is
 // wrong for them. A message about a condition the reader cannot act on is a worse failure than the condition.
-function whyStuck(ap: AutopilotConfig, cards: Card[], unfinished: Card[]): string {
-  const { blocked, waiting, rest } = partitionStuck(ap, cards, unfinished);
+// `blocked` comes in SEPARATELY rather than out of `unfinished`, and that is decision 45's repeal: a blocked
+// task is settled, so it is no longer part of what stops the project finishing. It is still NAMED, because a
+// reader looking at a stalled board needs to know it is there — but the clause claiming it makes `complete`
+// unreachable for ever is gone, since that is no longer true.
+function whyStuck(ap: AutopilotConfig, cards: Card[], unfinished: Card[], blocked: Card[]): string {
+  const { waiting, rest } = partitionStuck(ap, cards, unfinished);
   const parts: string[] = [];
   if (rest.length > 0) {
     parts.push(
       `Nothing can move ${names(rest)} — check that every column that holds a card is routed, terminal or blocked`,
     );
   }
-  // Deliberate, and stated because it is surprising: one blocked card means this project can never
-  // report `complete` again, since `complete` requires that nothing non-terminal exists anywhere. That
-  // is the honest reading — the work is not done — but the reader has to be told why.
   if (blocked.length > 0) {
     parts.push(
-      `${names(blocked)} ran out of attempts and ${isAre(blocked)} in ${ap.blockedColumn}, so this project cannot report itself finished until ${blocked.length === 1 ? 'it is' : 'they are'} dealt with`,
+      `${names(blocked)} ran out of attempts and ${isAre(blocked)} in ${ap.blockedColumn}, waiting for you`,
     );
   }
   if (waiting.length > 0) {
@@ -181,6 +186,19 @@ function bootstrap(ap: AutopilotConfig, runs: RunRecord[]): TickAction | undefin
   );
 }
 
+// A card that is NOT live and NOT in the archive is a half-finished archive, and it was invisible to every
+// set `complete` is decided from. `archiveCard` stamps the frontmatter and THEN moves the file, so a server
+// killed between those two writes leaves exactly this; so does a hand-edit through `PUT /raw`. The board
+// still renders the card, and auto-pilot called the project finished over work the user can see.
+function halfArchivedStop(cards: Card[]): TickAction | undefined {
+  const half = cards.filter((c) => !liveCards([c]).length && c.columnSlug !== ARCHIVE_SLUG);
+  if (half.length === 0) return undefined;
+  return stop(
+    'stalled',
+    `${names(half)} ${isAre(half)} marked archived but still in a live column, so auto-pilot cannot tell whether ${half.length === 1 ? 'it is' : 'they are'} work or not. Archive ${half.length === 1 ? 'it' : 'them'} properly, or clear the archived field.`,
+  );
+}
+
 // No feature to work on. The three endings that look alike and are not, kept apart because conflating them
 // produced the worst failure on record: success reported over unfinished work.
 //
@@ -189,26 +207,46 @@ function bootstrap(ap: AutopilotConfig, runs: RunRecord[]): TickAction | undefin
 // to nothing, and a fetch that returned nothing all produce the same empty list.
 function nothingToWorkOn(ap: AutopilotConfig, cards: Card[], runs: RunRecord[]): TickAction {
   const live = liveCards(cards);
-  // A card that is NOT live and NOT in the archive is a half-finished archive, and it was invisible to every
-  // set `complete` is decided from. `archiveCard` stamps the frontmatter and THEN moves the file, so a server
-  // killed between those two writes leaves exactly this; so does a hand-edit through `PUT /raw`. The board
-  // still renders the card, and auto-pilot called the project finished over work the user can see.
-  const halfArchived = cards.filter((c) => !liveCards([c]).length && c.columnSlug !== ARCHIVE_SLUG);
-  if (halfArchived.length > 0) {
+  const halfArchived = halfArchivedStop(cards);
+  if (halfArchived) return halfArchived;
+  const blocked = live.filter((c) => isBlockedColumn(ap, c.board, c.columnSlug));
+  // CHANGE 2 of decision 45's repeal: `unfinished` counts what is not SETTLED, so a blocked task leaves it.
+  // Change 1 alone — dropping the sentence — would have left `complete` exactly as unreachable as before,
+  // because `complete`'s condition is computed from this set.
+  const unfinished = live.filter((c) => !isSettled(ap, c));
+  if (unfinished.length > 0) {
     return stop(
       'stalled',
-      `${names(halfArchived)} ${isAre(halfArchived)} marked archived but still in a live column, so auto-pilot cannot tell whether ${halfArchived.length === 1 ? 'it is' : 'they are'} work or not. Archive ${halfArchived.length === 1 ? 'it' : 'them'} properly, or clear the archived field.`,
+      `There is nothing auto-pilot can work on. ${whyStuck(ap, cards, unfinished, blocked)}`,
     );
-  }
-  const unfinished = live.filter((c) => !isTerminalColumn(ap, c.board, c.columnSlug));
-  if (unfinished.length > 0) {
-    return stop('stalled', `There is nothing auto-pilot can work on. ${whyStuck(ap, cards, unfinished)}`);
   }
   if (live.length === 0) {
     if (cards.length === 0) return bootstrap(ap, runs) ?? stop('no-op', 'There is no card on any board.');
     return stop('no-op', `Every one of the ${cards.length} cards on this project is archived.`);
   }
-  return stop('complete');
+  return finished(ap, live, blocked);
+}
+
+// THE ONLY SUCCESS, asserted rather than implied — CHANGE 4, and it exists because the other three open a
+// false success. Positive evidence used to be an IMPLICATION of "nothing unfinished and something live"
+// rather than a test, and taking blocked tasks out of `unfinished` breaks the implication: a board holding
+// nothing but a blocked task would report the project finished.
+function finished(ap: AutopilotConfig, live: Card[], blocked: Card[]): TickAction {
+  if (!live.some((c) => isTerminalColumn(ap, c.board, c.columnSlug))) {
+    const left = blocked.length > 0 ? blocked : live;
+    return stop(
+      'stalled',
+      `${names(left)} ${isAre(left)} all that is left on this project and nothing on it is finished, so there is work outstanding and nothing auto-pilot can do about it.`,
+    );
+  }
+  // AND `complete` SAYS WHAT IT LEFT BEHIND (decision 45). Without the sentence the repeal would be a silent
+  // success over work a person still has to deal with.
+  if (blocked.length === 0) return stop('complete');
+  const count = `${blocked.length} task${blocked.length === 1 ? '' : 's'}`;
+  return stop(
+    'complete',
+    `Auto-pilot finished. ${count} ${isAre(blocked)} blocked and ${blocked.length === 1 ? 'needs' : 'need'} you: ${names(blocked)}.`,
+  );
 }
 
 // The two columns a card sits in on its way INTO the machine. Not read from config: `terminal` says where
@@ -277,9 +315,112 @@ function storyPhase(input: TickInput, story: Card, tasks: Card[]): TickAction | 
     return skipPhase('story-breakdown-skip', story, 'it already has tasks, so its break-down is skipped.');
   }
   if (allSettled(input.ap, tasks)) return dispatchPhase(input, 'story-checkup', story);
-  // The task loop and the review loop, which are Task 9 of the lifecycle plan. Until then a story whose tasks
-  // are still being worked falls through to the honest ending rather than to a phase the machine has not been
-  // taught yet.
+  return taskPhase(input, tasks);
+}
+
+// A phase the loop carries out alone, to a column the CALLER names. The two send-back destinations and the
+// blocked column are not the phase's `exitPass`, so they cannot be read off the table like a skip's.
+const stampTo = (name: PhaseName, card: Card, to: string, why: string): TickAction => ({
+  kind: 'stamp',
+  phase: name,
+  card,
+  to,
+  why,
+});
+
+// ROW P3. A task in `backlog`, or in `in-progress` with no outstanding failed verdict — a crashed dispatch
+// left it there and it has not been sent back, so it is still implement's phase.
+//
+// AT THE CAP IT GOES TO REVIEW ANYWAY, which is the one bound in the machine that neither stops nor blocks:
+// the gates and the reviewer are better placed to judge three failed attempts than a counter is.
+function implementPhase(input: TickInput, task: Card): TickAction | undefined {
+  const skill = phase('task-implement').skill;
+  const to = phase('task-implement').exitPass;
+  if (skill === undefined || to === undefined) return undefined;
+  if (attemptsUsed(input.runs, task.id, skill) < input.ap.attemptCap) {
+    return { kind: 'dispatch', phase: 'task-implement', skill, card: task };
+  }
+  return stampTo(
+    'task-implement',
+    task,
+    to,
+    `it has used all ${input.ap.attemptCap} attempts at ${skill}, so the gates and the reviewer judge it as it stands.`,
+  );
+}
+
+// ROW P5. ONE FIX BUDGET FOR BOTH SEND-BACK KINDS: a task can be sent back by a gate or by the reviewer and
+// both spend the same count. Two budgets would let a task alternate — fail the gates three times, then fail
+// the review three times — and spend twice what the cap says while looking compliant.
+//
+// AT THE CAP IT IS BLOCKED AND THE LOOP CARRIES ON (decision 45). `blocked` means judged unfixable, and it
+// settles the story so the checkup can close it: stopping the project instead means one task nobody can fix
+// costs you every feature after it.
+function fixPhase(input: TickInput, task: Card, carrying: RunRecord): TickAction | undefined {
+  const skill = phase('task-fix').skill;
+  if (skill === undefined) return undefined;
+  if (attemptsUsed(input.runs, task.id, skill) < input.ap.attemptCap) {
+    return { kind: 'dispatch', phase: 'task-fix', skill, card: task, previous: carrying.run };
+  }
+  return stampTo(
+    'task-fix',
+    task,
+    input.ap.blockedColumn,
+    `it has used all ${input.ap.attemptCap} attempts at ${skill} and still cannot pass, so auto-pilot has left it for you and carried on.`,
+  );
+}
+
+// ROWS P4 and P4r. A task in review whose work run ALREADY carries a verdict is re-stamped and never
+// re-judged — "has this already been done", answered from the record rather than paid for twice.
+//
+// The review's bound counts INCONCLUSIVE reviews only, and exhausting it stops the loop naming THE REVIEW
+// rather than blocking the task: `blocked` means judged unfixable, and a review that failed, timed out or
+// crashed produced no verdict at all. Marking its task blocked would put a dead API key on the board
+// permanently as work nobody can fix.
+function reviewPhase(input: TickInput, task: Card): TickAction | undefined {
+  const already = outstandingVerdict(input.runs, task.id);
+  if (already) {
+    const remove = phase('task-review-remove');
+    const to = already.passed ? remove.exitPass : remove.exitFail;
+    if (to === undefined) return undefined;
+    const why = already.passed
+      ? 'it has already passed; only the move was outstanding.'
+      : 'it was already sent back; only the move was outstanding.';
+    return stampTo('task-review-remove', task, to, why);
+  }
+  const skill = phase('task-review').skill;
+  const judging = latestWorkRun(input.runs, task.id);
+  if (skill === undefined || judging === undefined) return undefined;
+  if (inconclusiveReviews(input.runs, task.id) >= input.ap.attemptCap) {
+    return stop(
+      'stalled',
+      `${task.id}'s review has failed to reach a verdict ${input.ap.attemptCap} times. That is a review that cannot complete rather than work nobody can fix, so auto-pilot has stopped: read the review runs — an API key, a disk or a model is the likelier cause than the card.`,
+    );
+  }
+  return { kind: 'dispatch', phase: 'task-review', skill, card: task, previous: judging.run };
+}
+
+const byQueueOrder = (a: Card, b: Card): number =>
+  a.order - b.order || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+
+// ONE TASK AT A TIME, and the first unsettled one by (order, then id). The trace's own shape: a task goes all
+// the way to done before the next is picked up, which is what `AUTOPILOT_CONCURRENCY = 1` means one level in.
+function taskPhase(input: TickInput, tasks: Card[]): TickAction | undefined {
+  const next = [...tasks].sort(byQueueOrder).find((t) => !isSettled(input.ap, t));
+  if (next === undefined) return undefined;
+  if (next.columnSlug === 'review') return reviewPhase(input, next);
+  const verdict = outstandingVerdict(input.runs, next.id);
+  // An OUTSTANDING FAILED verdict is what tells P5 from P3 in the same column: `in-progress` is stamped both
+  // before an implement run and while a fix one runs, and which of the two it means is derived rather than
+  // given a column of its own (ruling 53).
+  if (verdict && !verdict.passed) {
+    const carrying = verdictRun(input.runs, next.id);
+    if (carrying) return fixPhase(input, next, carrying);
+  }
+  if (next.columnSlug === 'backlog' || next.columnSlug === 'in-progress') {
+    return implementPhase(input, next);
+  }
+  // A column the machine has no row for — a folder somebody made, or one removed from the config with cards
+  // still in it. Falling through reports it rather than guessing which phase it meant.
   return undefined;
 }
 

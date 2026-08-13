@@ -30,8 +30,21 @@ const isReviewRun = (run: RunRecord): boolean => phaseForRun(run.skill, run.boar
 // Pass or fail, both: the caller reads `passed`. P3 dispatches when there is no FAILED verdict, P5 when
 // there is one, and P4r re-stamps from whichever it is — three questions, one lookup.
 export function outstandingVerdict(runs: RunRecord[], card: string): Verification | undefined {
-  const judged = runs.filter((r) => r.card === card && isWorkRun(r) && r.verification !== undefined);
-  return latest(judged)?.verification;
+  return verdictRun(runs, card)?.verification;
+}
+
+// THE RUN THAT CARRIES THE VERDICT, which is what a `fix` is handed as `previous`: the findings are on the
+// run, not on the card, and a fix told to go and look for them is a fix guessing. Its own export rather than
+// a second filter at the call site, so "the latest work run that was judged" has one definition.
+export function verdictRun(runs: RunRecord[], card: string): RunRecord | undefined {
+  return latest(runs.filter((r) => r.card === card && isWorkRun(r) && r.verification !== undefined));
+}
+
+// THE RUN UNDER JUDGEMENT, which is what a `review` is handed as `previous`. Not filtered on carrying a
+// verdict — the whole point is that this one has none yet — and the review must be told WHICH run it is
+// judging, or an earlier successful run on the same card becomes the work it grades.
+export function latestWorkRun(runs: RunRecord[], card: string): RunRecord | undefined {
+  return latest(runs.filter((r) => r.card === card && isWorkRun(r)));
 }
 
 // INCONCLUSIVE reviews, not reviews — finding A. `BURNS.success` is true (accounting.ts:98), deliberately,

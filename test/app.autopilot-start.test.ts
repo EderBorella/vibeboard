@@ -190,11 +190,6 @@ describe('pressing start', () => {
   });
 });
 
-// THE DEAD END THIS SLICE ALMOST SHIPPED. `needsCheckup` is set by the startup reconcile, by a crashed loop
-// and by a halt, and `dispatchesSinceCheckup` reaches `checkupEvery` in the ordinary course of a run — so a
-// project that ran ten times, or crashed once, could never dispatch again: Start was accepted and the tick
-// stopped on its first pass, and Restart zeroed the counters and set the flag straight back. Hand-editing the
-// state file was the only exit, and no part of the UI offers it.
 describe('what the browser is told', () => {
   it('is not told the loop’s process group, by ANY route or broadcast', async () => {
     // The pgid and its start time are the reaper's business. Nothing in the browser reads them, and sending a

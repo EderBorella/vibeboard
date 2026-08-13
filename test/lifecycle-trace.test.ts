@@ -1,0 +1,456 @@
+import { chmodSync } from 'node:fs';
+import { appendFile, readFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { describe, expect, it, onTestFinished } from 'vitest';
+import type { DiaryEntry } from '../src/core/diary.js';
+import { skillRel } from '../src/core/layout.js';
+import type { RunRecord } from '../src/core/runs.js';
+import type { BoardName, Card } from '../src/core/types.js';
+import {
+  readAutopilotState,
+  updateAutopilotState,
+  writeAutopilotState,
+} from '../src/server/autopilot-store.js';
+import { type ActDeps, performAction } from '../src/service/act.js';
+import { BoardClient } from '../src/service/board-client.js';
+import { type LoopEnded, runLoop } from '../src/service/loop.js';
+import {
+  injectFetch,
+  makeReady,
+  openTestProject,
+  putFoundation,
+  shimArgsLog,
+  type TestProject,
+} from './helpers.js';
+
+// THE LIFECYCLE, END TO END, against a throwaway project — the trace Part One §4 of the plan states, asserted
+// rather than described. A trace in a document that nothing checks is a trace that will be wrong within a
+// week, and every failure this design was written against was an ORDERING or an absence: a set of
+// individually reasonable events is exactly what a circle looks like.
+//
+// NO MODEL, and none is needed. Every dispatch is served by test/fixtures/fake-agent.mjs, whose behaviour
+// travels in the PROMPT rather than the environment — env is shared with every other test file in the
+// process, and a sibling rewriting it mid-run is what once made Stryker's dry run fail where `npm test`
+// passed. Each skill is seeded with the behaviour this suite wants and needs no other plumbing.
+//
+// WHAT IS READ, and this is the point: the DIARY and the RUN RECORDS, both off disk. A trace asserted against
+// a spy on the loop would pass even if nothing reached the project — it would prove the loop called itself in
+// an order, not that the project moved.
+//
+// The project root comes from `tempDir()`, which mkdtemps inside the run's own root: one per-RUN root removed
+// by test/global-teardown.ts is what stopped 440,653 leaked trees filling the filesystem's inode table, after
+// which one arbitrary test fails per run and looks exactly like flakiness.
+
+const SHIM = join(process.cwd(), 'test', 'fixtures', 'fake-agent.mjs');
+// Stryker runs the suite from a sandbox COPY of the repo, and the copy does not carry the executable bit.
+chmodSync(SHIM, 0o755);
+
+// A gate command that RECORDS EVERY TIME IT RUNS, in the project itself. That is what makes "no gate command
+// was run" assertable from disk rather than from a seam: the loop runs the real `verifyGates` here, through
+// the real shell, exactly as it would on a person's project.
+const GATE_LOG = 'gate-runs.log';
+const SMOKE_LOG = 'smoke-runs.log';
+const tally = (log: string) => `echo ran >> ${log}`;
+
+const gatesDoc = (command: string) =>
+  `---\ngates:\n  - name: tally\n    command: "${command}"\n---\nThe bar every card clears.\n`;
+const testingDoc = `---\nsmoke: "${tally(SMOKE_LOG)}"\n---\nWhat a smoke test means here.\n`;
+
+// How many times a command declared in a foundation document actually ran, counted from what it wrote.
+async function ranTimes(root: string, log: string): Promise<number> {
+  try {
+    return (await readFile(join(root, log), 'utf8')).trim().split('\n').filter(Boolean).length;
+  } catch {
+    return 0; // never ran, so the file was never made
+  }
+}
+
+// The behaviour marker goes into the skill's own body, which `buildRunPrompt` puts at the top of every prompt.
+// APPENDED rather than substituted: the real body travels too, so what the shim is handed is what a model
+// would be handed.
+//
+// `break-down` is deliberately left unseeded by every caller below. Its behaviour comes from the CARD instead
+// — the skill body is above the card section in the prompt, so a marker here would win over the card's — and
+// that is how one chain of creates drives both levels of a break-down with one skill.
+async function seedSkillBodies(root: string, markers: Record<string, string>): Promise<void> {
+  for (const [slug, marker] of Object.entries(markers)) {
+    await appendFile(join(root, skillRel(slug, 'SKILL.md')), `\n${marker}\n`, 'utf8');
+  }
+}
+
+// What the shim reports for every skill the machine dispatches. The two break-downs are absent by design; the
+// rest say what this suite wants of them.
+const HAPPY = {
+  implement: '[[behaviour:success]]',
+  review: '[[behaviour:verdict:done]]',
+  fix: '[[behaviour:success]]',
+  'checkup-story': '[[behaviour:success]]',
+  'checkup-feature': '[[behaviour:success]]',
+};
+
+interface Started {
+  project: TestProject;
+  argsLog: string;
+}
+
+// A project the loop can drive: ready, empty-boarded unless the caller adds cards, with the app LISTENING.
+//
+// It listens because the shim is a real child process: it reads the API base out of its own prompt and POSTs
+// its cards over HTTP, which is the whole point of the `create` behaviour — the endpoint's rules about which
+// board a phase may create on are then genuinely under test. `VIBEBOARD_PORT` is what the prompt's API base
+// is built from, so it is set here and put back afterwards.
+async function start(opts: { gates?: string; skills?: Record<string, string> } = {}): Promise<Started> {
+  const project = await openTestProject({ name: 'T', mode: 'brownfield', runBin: SHIM });
+  await makeReady(project.app, project.root, { cards: false });
+  await putFoundation(project.app, 'CODE-QUALITY.md', gatesDoc(opts.gates ?? tally(GATE_LOG)));
+  await putFoundation(project.app, 'TESTING.md', testingDoc);
+  await seedSkillBodies(project.root, opts.skills ?? HAPPY);
+
+  await project.app.listen({ host: '127.0.0.1', port: 0 });
+  const address = project.app.server.address();
+  if (address === null || typeof address === 'string')
+    throw new Error('the test app is not listening on a port');
+  const port = process.env.VIBEBOARD_PORT;
+  const argsLog = shimArgsLog();
+  const args = process.env.VIBEBOARD_SHIM_ARGS;
+  process.env.VIBEBOARD_PORT = String(address.port);
+  process.env.VIBEBOARD_SHIM_ARGS = argsLog;
+  onTestFinished(() => {
+    // Both are process-wide and shared with every other file in this worker, so they go back exactly as they
+    // were rather than being deleted.
+    if (port === undefined) delete process.env.VIBEBOARD_PORT;
+    else process.env.VIBEBOARD_PORT = port;
+    if (args === undefined) delete process.env.VIBEBOARD_SHIM_ARGS;
+    else process.env.VIBEBOARD_SHIM_ARGS = args;
+  });
+  return { project, argsLog };
+}
+
+// Everything the loop needs, composed the way src/service/main.ts composes it: a real `BoardClient` over
+// `injectFetch`, a real `service` credential from the store the app verifies against, and `performAction` as
+// the executor. Two seams only, and both are outside the machine: git, because a scaffolded temp folder is no
+// repository, and the clock the poll interval reads.
+//
+// `ticks` bounds the run for the tests that are about a prefix of the lifecycle rather than all of it. The
+// state file is the loop's own stop control, so a budget expressed through it stops the loop the way a person
+// pressing Stop does rather than by reaching inside it.
+async function drive(
+  started: Started,
+  opts: { ticks?: number; unreviewedGates?: string[] } = {},
+): Promise<LoopEnded> {
+  const { project } = started;
+  await writeAutopilotState(project.root, {
+    state: 'running',
+    iteration: 0,
+    dispatchesSinceCheckup: 0,
+    needsCheckup: false,
+    ...(opts.unreviewedGates ? { unreviewedGates: opts.unreviewedGates } : {}),
+  });
+  const credential = project.mint('service', 'run-service');
+  const client = new BoardClient({
+    apiBase: 'http://board.test',
+    token: credential.token,
+    fetch: injectFetch(project.app),
+  });
+  const actDeps: ActDeps = {
+    client,
+    root: project.root,
+    branch: 'autopilot/test',
+    now: () => new Date(),
+    state: () => readAutopilotState(project.root, new Date().toISOString()),
+    // A scaffolded temp folder is not a git repository, so the real `commitAll` would refuse and stop the
+    // loop before its first dispatch. `{committed: false}` with no reason is what it answers for a clean tree.
+    commit: async () => ({ committed: false }),
+    settlePollMs: 10,
+    settleTimeoutMs: 60_000,
+  };
+  let ticks = 0;
+  const budget = opts.ticks ?? 60;
+  return await runLoop({
+    client,
+    readState: async () => {
+      const state = await readAutopilotState(project.root, new Date().toISOString());
+      ticks += 1;
+      return ticks > budget ? { ...state, state: 'stopped' } : state;
+    },
+    addToCounters: async (dispatches) => {
+      await updateAutopilotState(project.root, new Date().toISOString(), (current) => ({
+        ...current,
+        iteration: current.iteration + dispatches,
+        dispatchesSinceCheckup: current.dispatchesSinceCheckup + dispatches,
+      }));
+    },
+    act: (action, context) => performAction(actDeps, action, context),
+    // Nothing sleeps: the idle wait is five seconds in production and there is nothing to wait for here.
+    wait: async () => {},
+  });
+}
+
+async function diary(project: TestProject): Promise<DiaryEntry[]> {
+  const res = await project.app.inject({ method: 'GET', url: '/api/log' });
+  expect(res.statusCode).toBe(200);
+  return (res.json() as { entries: DiaryEntry[] }).entries;
+}
+
+async function runs(project: TestProject): Promise<RunRecord[]> {
+  const res = await project.app.inject({ method: 'GET', url: '/api/runs' });
+  expect(res.statusCode).toBe(200);
+  return (res.json() as { runs: RunRecord[] }).runs;
+}
+
+async function board(project: TestProject): Promise<Card[]> {
+  const res = await project.app.inject({ method: 'GET', url: '/api/state' });
+  const snapshot = (res.json() as { snapshot: { boards: Record<BoardName, Card[]> } }).snapshot;
+  return Object.values(snapshot.boards).flat();
+}
+
+const columnOf = async (project: TestProject, id: string): Promise<string | undefined> =>
+  (await board(project)).find((c) => c.id === id)?.columnSlug;
+
+// EVERY CARD MOVEMENT AND EVERY VERDICT, in the order the diary records them — which is the order they
+// happened, because the diary is append-only and one process writes it.
+//
+// A line this does not recognise comes back verbatim, so a new kind of event shows up in the assertion's own
+// diff rather than being silently dropped from the trace.
+function step(entry: DiaryEntry): string {
+  const moved = entry.text.match(/^(\S+) moved to (\S+):/);
+  if (moved) return `move ${entry.board}/${moved[1]} ${moved[2]}`;
+  const setup = entry.text.match(/^(\S+) is this project's scaffolding feature/);
+  if (setup) return `flag ${setup[1]} setup`;
+  const smoke = entry.text.match(/ran the smoke command before (\S+) checkup — it (passed|did not pass)/);
+  if (smoke) return `smoke ${smoke[1]} ${smoke[2] === 'passed' ? 'pass' : 'fail'}`;
+  const gates = entry.text.match(/^(\S+) failed its gates/);
+  if (gates) return `gates ${gates[1]} fail`;
+  const review = entry.text.match(/^Iteration \d+: (\S+)'s review (passed it|sent it back)/);
+  if (review) return `review ${review[1]} ${review[2] === 'passed it' ? 'pass' : 'sent-back'}`;
+  const project = entry.text.match(/^Iteration \d+: (\S+) ran against the project to derive the board/);
+  if (project) return `ran project ${project[1]}`;
+  const ran = entry.text.match(/^Iteration \d+: (\S+) ran (\S+) for its (\S+) phase/);
+  if (ran) return `ran ${ran[1]} ${ran[2]}`;
+  const stopped = entry.text.match(/^Auto-pilot stopped: /);
+  if (stopped) return `stopped ${entry.outcome}`;
+  return `${entry.kind}: ${entry.text}`;
+}
+
+const trace = async (project: TestProject): Promise<string[]> => (await diary(project)).map(step);
+
+// EVERY DISPATCH, in order, WITH THE COLUMN THE CARD WAS IN WHEN THE AGENT READ IT.
+//
+// Read out of the prompts the shim was actually given — the run's report path names the run, and the card
+// section names the file the card was in — so this is the agent's own view of the board rather than the
+// loop's account of it. That is what makes the entry stamp assertable: a loop that dispatched before stamping
+// would hand the agent a card in the column it came from, and every per-task test would still pass.
+async function dispatches(project: TestProject, argsLog: string): Promise<string[]> {
+  const byRun = new Map((await runs(project)).map((r) => [r.run, r]));
+  const lines = (await readFile(argsLog, 'utf8')).trim().split('\n').filter(Boolean);
+  return lines.map((line) => {
+    const { prompt } = JSON.parse(line) as { prompt: string };
+    const runId = prompt.match(/^[\w./-]*\/([\w.-]+)\.report\.md$/m)?.[1];
+    const record = runId === undefined ? undefined : byRun.get(runId);
+    const where = prompt.match(/^File: .*boards\/(\w+)\/([\w-]+)\//m);
+    if (!record) return `dispatch ??? (${runId})`;
+    if (!record.card) return `dispatch project ${record.skill}`;
+    return `dispatch ${record.card} ${record.skill} in ${where?.[1]}/${where?.[2]}`;
+  });
+}
+
+// A card placed by hand, as a person would from the board. Admin-scoped, so none of the loop's own rules
+// about who may create what are involved.
+async function place(
+  project: TestProject,
+  board: BoardName,
+  columnSlug: string,
+  title: string,
+  links: string[] = [],
+): Promise<string> {
+  const res = await project.app.inject({
+    method: 'POST',
+    url: '/api/cards',
+    payload: { board, columnSlug, title },
+  });
+  expect(res.statusCode).toBe(200);
+  const card = res.json() as Card;
+  if (links.length > 0) {
+    const linked = await project.app.inject({
+      method: 'PUT',
+      url: `/api/cards/${board}/${card.id}/links`,
+      payload: { links },
+    });
+    expect(linked.statusCode).toBe(200);
+  }
+  return card.id;
+}
+
+describe('the lifecycle, driven end to end', () => {
+  it('walks a feature from an empty board to complete, in the order Part One §4 states', async () => {
+    const started = await start({
+      // One feature, one story under it, two tasks under that. The chain travels through the cards the shim
+      // creates, so one `break-down` skill serves both levels — and each board is named literally, so the
+      // endpoint's own rule about where a phase may create is what decides, not the shim.
+      skills: { ...HAPPY, 'derive-features': '[[behaviour:create:features:1:product:1:engineering:2]]' },
+    });
+    const ended = await drive(started);
+    expect(ended.reason).toBe('complete');
+
+    expect(await trace(started.project)).toEqual([
+      // The scaffolder's own line, which is the project's first event and is in the same file.
+      'lifecycle: Project T created.',
+      'flag F-001 setup',
+      'ran project derive-features',
+      'move features/F-001 todo',
+      'move features/F-001 in-progress',
+      'ran F-001 break-down',
+      'move product/P-001 todo',
+      'move product/P-001 in-progress',
+      'ran P-001 break-down',
+      'move engineering/E-001 in-progress',
+      'move engineering/E-001 review',
+      'ran E-001 implement',
+      'move engineering/E-001 done',
+      'review E-001 pass',
+      // E-002 the same shape, and only after E-001 is done: one task at a time.
+      'move engineering/E-002 in-progress',
+      'move engineering/E-002 review',
+      'ran E-002 implement',
+      'move engineering/E-002 done',
+      'review E-002 pass',
+      'move product/P-001 done',
+      'ran P-001 checkup-story',
+      'smoke F-001 pass',
+      'move features/F-001 done',
+      'ran F-001 checkup-feature',
+      'stopped complete',
+    ]);
+
+    expect(await dispatches(started.project, started.argsLog)).toEqual([
+      'dispatch project derive-features',
+      'dispatch F-001 break-down in features/todo',
+      'dispatch P-001 break-down in product/todo',
+      'dispatch E-001 implement in engineering/in-progress',
+      'dispatch E-001 review in engineering/review',
+      'dispatch E-002 implement in engineering/in-progress',
+      'dispatch E-002 review in engineering/review',
+      'dispatch P-001 checkup-story in product/in-progress',
+      'dispatch F-001 checkup-feature in features/in-progress',
+    ]);
+
+    // The gates ran once per review, in the loop's own process, and the smoke command once before the feature
+    // checkup. Counted from what the commands themselves wrote.
+    expect(await ranTimes(started.project.root, GATE_LOG)).toBe(2);
+    expect(await ranTimes(started.project.root, SMOKE_LOG)).toBe(1);
+  });
+
+  it('sends a task back through a fix when a gate fails, dispatching no model for the gate', async () => {
+    const started = await start({
+      // The gate fails the first time it runs and passes the second: the test chooses the failure, because the
+      // command comes from foundation/CODE-QUALITY.md.
+      //
+      // NO DOUBLE QUOTES — `gatesDoc` puts the command in a double-quoted YAML scalar, and a `"` inside it
+      // makes the document unparseable. That is not a broken test, it is a PASSING one: an unreadable gate set
+      // is a gates verdict carrying no command, and inside the setup subtree — which every card under the
+      // scaffolding feature is — that is the one case the loop excuses, so the card sails through to its
+      // review. The first draft of this test did exactly that and asserted nothing at all.
+      gates: `echo ran >> ${GATE_LOG}; test $(wc -l < ${GATE_LOG}) -ge 2`,
+      skills: { ...HAPPY, 'derive-features': '[[behaviour:create:features:1:product:1:engineering:1]]' },
+    });
+    const ended = await drive(started);
+    expect(ended.reason).toBe('complete');
+
+    const traced = await trace(started.project);
+    expect(traced.slice(traced.indexOf('ran E-001 implement'))).toEqual([
+      'ran E-001 implement',
+      // No model was asked and no iteration spent: the verdict is the gate's own, and the card goes back.
+      'move engineering/E-001 in-progress',
+      'gates E-001 fail',
+      'move engineering/E-001 review',
+      'ran E-001 fix',
+      'move engineering/E-001 done',
+      'review E-001 pass',
+      'move product/P-001 done',
+      'ran P-001 checkup-story',
+      'smoke F-001 pass',
+      'move features/F-001 done',
+      'ran F-001 checkup-feature',
+      'stopped complete',
+    ]);
+
+    // THE GATE SPENT NOTHING. One review run, not two — the failing gate dispatched no model at all.
+    const all = await runs(started.project);
+    expect(all.filter((r) => r.skill === 'review')).toHaveLength(1);
+    expect(all.filter((r) => r.skill === 'fix')).toHaveLength(1);
+    // Twice: once to fail, once to pass after the fix.
+    expect(await ranTimes(started.project.root, GATE_LOG)).toBe(2);
+  });
+
+  it('runs no gate command and stops while a gate document is unreviewed', async () => {
+    const started = await start({
+      skills: { ...HAPPY, 'derive-features': '[[behaviour:create:features:1:product:1:engineering:1]]' },
+    });
+    // THE DOCUMENT GOES UNREAD MID-SESSION, which is the shape this guard exists for: an agent rewrites
+    // `foundation/CODE-QUALITY.md` while the loop is running, and the commands in it would then run
+    // unsandboxed as this user. Set from the start it would prove less than it looks — `POST /api/runs`
+    // refuses every dispatch while one is unread, so nothing would ever reach a review at all.
+    //
+    // Four ticks: bootstrap, the feature's break-down, the story's, and the implement that leaves E-001 in
+    // review. Both premises are asserted rather than assumed, because a budget that stopped one tick later
+    // would run the gates itself and this test would then be about nothing.
+    const first = await drive(started, { ticks: 4 });
+    expect(first.reason).toBe('stopped');
+    expect(await columnOf(started.project, 'E-001')).toBe('review');
+    expect(await ranTimes(started.project.root, GATE_LOG)).toBe(0);
+
+    const ended = await drive(started, { unreviewedGates: ['foundation/CODE-QUALITY.md'] });
+    expect(ended.reason).toBe('stalled');
+    expect(ended.detail).toContain('will not run a gate command');
+    // NOTHING EXECUTED. The refusal is in front of the shell, not after it.
+    expect(await ranTimes(started.project.root, GATE_LOG)).toBe(0);
+    // And no model was asked either: the review phase never got past its own first step.
+    expect((await runs(started.project)).filter((r) => r.skill === 'review')).toEqual([]);
+  });
+
+  it('blocks a task that cannot be fixed, and still closes its story and its feature', async () => {
+    const started = await start({
+      gates: `echo ran >> ${GATE_LOG}; exit 1`,
+      skills: { ...HAPPY, 'derive-features': '[[behaviour:create:features:1:product:1:engineering:1]]' },
+    });
+    const ended = await drive(started);
+
+    // The loop CARRIES ON past a task nobody can fix (decision 45), and says what it left behind.
+    expect(ended.reason).toBe('complete');
+    expect(ended.detail).toContain('E-001');
+    expect(await columnOf(started.project, 'E-001')).toBe('blocked');
+    expect(await columnOf(started.project, 'P-001')).toBe('done');
+    expect(await columnOf(started.project, 'F-001')).toBe('done');
+    // One fix budget for both send-back kinds: three fixes and no more, then blocked.
+    expect((await runs(started.project)).filter((r) => r.skill === 'fix')).toHaveLength(3);
+  });
+
+  it('stops stalled without dispatching when two features are open', async () => {
+    const started = await start();
+    await place(started.project, 'features', 'todo', 'One');
+    await place(started.project, 'features', 'in-progress', 'Two');
+    const ended = await drive(started, { ticks: 3 });
+
+    expect(ended.reason).toBe('stalled');
+    expect(ended.detail).toContain('F-001');
+    expect(ended.detail).toContain('F-002');
+    // Nothing was dispatched: the position could not be derived, so there was no phase to be in.
+    expect(await runs(started.project)).toEqual([]);
+  });
+
+  it('skips break-down for a feature that arrives with its stories', async () => {
+    // The follow-up-feature shape (decision 50), which is also the crash-and-restart shape.
+    const started = await start();
+    const story = await place(started.project, 'product', 'backlog', 'A story');
+    await place(started.project, 'features', 'backlog', 'A feature', [story]);
+    const ended = await drive(started, { ticks: 2 });
+
+    const traced = await trace(started.project);
+    expect(traced).toContain('move features/F-001 in-progress');
+    expect(traced).not.toContain('ran F-001 break-down');
+    // THE FIRST THING DISPATCHED IS THE STORY'S break-down, not the feature's: the feature was stamped and
+    // passed over, with no run at all, which is what a skip is.
+    expect((await runs(started.project)).map((r) => `${r.card} ${r.skill}`)).toEqual(['P-001 break-down']);
+    expect(ended.iterations).toBe(1);
+  });
+});

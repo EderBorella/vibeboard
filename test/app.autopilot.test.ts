@@ -4,12 +4,12 @@ import type { FastifyInstance } from 'fastify';
 import { describe, expect, it, onTestFinished } from 'vitest';
 import { parse, stringify } from 'yaml';
 import { configPath } from '../src/core/config.js';
-import { FOUNDATION_DIR, skillRel } from '../src/core/layout.js';
+import { skillRel } from '../src/core/layout.js';
 import { buildApp } from '../src/server/app.js';
 import { CredentialStore } from '../src/server/credentials.js';
 import type { Readiness } from '../src/server/routes/autopilot.js';
 import { ProjectSession } from '../src/server/session.js';
-import { openTestProject, tempDir } from './helpers.js';
+import { makeReady, openTestProject, putFoundation, tempDir } from './helpers.js';
 
 const README = `# Timeline\n\n${'A tool that turns a folder of notes into a searchable timeline. '.repeat(4)}\n`;
 
@@ -20,36 +20,6 @@ async function readiness(app: FastifyInstance): Promise<Readiness> {
   const res = await app.inject({ method: 'GET', url: '/api/autopilot/readiness' });
   expect(res.statusCode).toBe(200);
   return res.json() as Readiness;
-}
-
-const putFoundation = (app: FastifyInstance, name: string, content: string) =>
-  app.inject({
-    method: 'PUT',
-    url: '/api/control/file',
-    payload: { path: `${FOUNDATION_DIR}/${name}`, content },
-  });
-
-// Written through the endpoint rather than to disk, because that IS the write path: the OS denies
-// this folder to every agent, so if the editor route stopped accepting it the project could never
-// become ready and nothing else would notice.
-async function makeReady(app: FastifyInstance, root: string, opts: { cards?: boolean } = {}): Promise<void> {
-  await writeFile(join(root, 'README.md'), README, 'utf8');
-  await putFoundation(app, 'STACK.md', 'Node 22, TypeScript.\n');
-  await putFoundation(app, 'CODE-QUALITY.md', GATES);
-  await putFoundation(app, 'TESTING.md', TESTING);
-  await putFoundation(app, 'UX.md', 'One screen, keyboard first.\n');
-  await putFoundation(app, 'DESIGN.md', 'Two typefaces, one accent.\n');
-  // And a card, unless the caller wants the empty board the bootstrap derives from. Readiness includes
-  // having WORK when there is nothing to derive it from — an empty board is a blocker, not a stop, since
-  // otherwise pressing Start ends the loop instantly with `no-op` and looks like nothing happening.
-  // Through the endpoint, like the documents above, because that is the write path.
-  if (opts.cards === false) return;
-  const created = await app.inject({
-    method: 'POST',
-    url: '/api/cards',
-    payload: { board: 'features', columnSlug: 'todo', title: 'Something to do' },
-  });
-  expect(created.statusCode).toBe(200);
 }
 
 describe('GET /api/autopilot/readiness', () => {

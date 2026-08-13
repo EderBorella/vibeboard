@@ -1,12 +1,13 @@
 import { spawn } from 'node:child_process';
 import { mkdtempSync } from 'node:fs';
-import { mkdtemp } from 'node:fs/promises';
+import { mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { FastifyInstance, FastifyServerOptions } from 'fastify';
 import { onTestFinished } from 'vitest';
 import WebSocket from 'ws';
+import { FOUNDATION_DIR } from '../src/core/layout.js';
 import type { Card } from '../src/core/types.js';
 import { buildApp } from '../src/server/app.js';
 import { BoxManager } from '../src/server/box-manager.js';
@@ -228,6 +229,72 @@ export async function openTestProject(
     root,
     mint: (scope, run, card) => credentials.mintRun(scope, run, root, card),
   };
+}
+
+// A `fetch` that speaks to an app instance instead of the network, for the two suites that drive the
+// service's own HTTP client. Everything the client sends — method, headers, body — reaches the real
+// preHandler, so the scope table is genuinely exercised, and what comes back is a real Response.
+//
+// `search` as well as `pathname`: `BoardClient.suggestions` asks for `/suggestions?state=active`, and a seam
+// that dropped the query string would test a different request from the one the loop makes.
+export function injectFetch(app: FastifyInstance): typeof globalThis.fetch {
+  return async (input, init) => {
+    const url = new URL(String(input));
+    const res = await app.inject({
+      method: (init?.method ?? 'GET') as 'GET',
+      url: `${url.pathname}${url.search}`,
+      headers: (init?.headers ?? {}) as Record<string, string>,
+      ...(init?.body === undefined || init?.body === null ? {} : { payload: String(init.body) }),
+    });
+    return new Response(res.body, {
+      status: res.statusCode,
+      headers: { 'content-type': res.headers['content-type'] as string },
+    });
+  };
+}
+
+const READY_README = `# Timeline\n\n${'A tool that turns a folder of notes into a searchable timeline. '.repeat(4)}\n`;
+const READY_GATES = '---\ngates:\n  - name: tests\n    command: npm test\n---\nThe bar every card clears.\n';
+const READY_TESTING = '---\nsmoke: npm run smoke\n---\nWhat a smoke test means here.\n';
+
+// One of the five foundation documents, through the endpoint. That IS the write path: the OS denies this
+// folder to every agent, so if the editor route stopped accepting it, a project could never become ready and
+// nothing else would notice.
+export function putFoundation(app: FastifyInstance, name: string, content: string) {
+  return app.inject({
+    method: 'PUT',
+    url: '/api/control/file',
+    payload: { path: `${FOUNDATION_DIR}/${name}`, content },
+  });
+}
+
+// WHAT A READY PROJECT LOOKS LIKE, in one place: a README, the five foundation documents, and a card. Lifted
+// out of test/app.autopilot.test.ts so the readiness tests and the lifecycle trace set a project up the same
+// way — two copies would drift the first time readiness gained a requirement, and then one suite would be
+// asserting against a project the other would refuse.
+//
+// `cards: false` leaves the board EMPTY, which is a ready project too: it is the state the bootstrap derives
+// the feature list from.
+export async function makeReady(
+  app: FastifyInstance,
+  root: string,
+  opts: { cards?: boolean } = {},
+): Promise<void> {
+  await writeFile(join(root, 'README.md'), READY_README, 'utf8');
+  await putFoundation(app, 'STACK.md', 'Node 22, TypeScript.\n');
+  await putFoundation(app, 'CODE-QUALITY.md', READY_GATES);
+  await putFoundation(app, 'TESTING.md', READY_TESTING);
+  await putFoundation(app, 'UX.md', 'One screen, keyboard first.\n');
+  await putFoundation(app, 'DESIGN.md', 'Two typefaces, one accent.\n');
+  if (opts.cards === false) return;
+  const created = await app.inject({
+    method: 'POST',
+    url: '/api/cards',
+    payload: { board: 'features', columnSlug: 'todo', title: 'Something to do' },
+  });
+  if (created.statusCode !== 200) {
+    throw new Error(`makeReady could not create a card: ${created.statusCode} ${created.body}`);
+  }
 }
 
 export interface WsTestClient<M> {

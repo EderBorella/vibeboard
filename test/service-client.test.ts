@@ -6,7 +6,7 @@ import { writeAutopilotState } from '../src/server/autopilot-store.js';
 import type { BoardView } from '../src/service/board-client.js';
 import { BoardClient } from '../src/service/board-client.js';
 import { type ActResult, type LoopDeps, runLoop } from '../src/service/loop.js';
-import { openTestProject } from './helpers.js';
+import { injectFetch, openTestProject } from './helpers.js';
 
 // The loop's HTTP surface, against a REAL app with a REAL minted service credential — the same store the
 // app verifies against, so a token this suite accepts is one the server would.
@@ -14,24 +14,6 @@ import { openTestProject } from './helpers.js';
 // `app.inject` rather than a listening socket: Fastify's injection runs the whole request lifecycle,
 // including the auth preHandler, so the scope table is genuinely exercised. The client takes its `fetch`
 // injected for exactly this.
-
-// A `fetch` that speaks to an app instance instead of the network. Everything the client sends — method,
-// headers, body — reaches the real preHandler, and what comes back is a real Response.
-function injectFetch(app: Awaited<ReturnType<typeof openTestProject>>['app']): typeof globalThis.fetch {
-  return async (input, init) => {
-    const url = new URL(String(input));
-    const res = await app.inject({
-      method: (init?.method ?? 'GET') as 'GET',
-      url: url.pathname,
-      headers: (init?.headers ?? {}) as Record<string, string>,
-      ...(init?.body === undefined || init?.body === null ? {} : { payload: String(init.body) }),
-    });
-    return new Response(res.body, {
-      status: res.statusCode,
-      headers: { 'content-type': res.headers['content-type'] as string },
-    });
-  };
-}
 
 async function connected(scope: 'service' | 'work' = 'service') {
   const project = await openTestProject();

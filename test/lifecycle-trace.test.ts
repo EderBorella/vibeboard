@@ -254,17 +254,22 @@ async function dispatches(project: TestProject, argsLog: string): Promise<string
 
 // A card placed by hand, as a person would from the board. Admin-scoped, so none of the loop's own rules
 // about who may create what are involved.
+//
+// THE BODY IS PART OF IT, because `break-down` is the one skill this file never seeds: its behaviour travels
+// in the CARD (see `seedSkillBodies`), so a hand-placed story with no marker is a break-down that creates
+// nothing — which is exactly the run that produced decision 45's correction.
 async function place(
   project: TestProject,
   board: BoardName,
   columnSlug: string,
   title: string,
   links: string[] = [],
+  body?: string,
 ): Promise<string> {
   const res = await project.app.inject({
     method: 'POST',
     url: '/api/cards',
-    payload: { board, columnSlug, title },
+    payload: { board, columnSlug, title, ...(body === undefined ? {} : { body }) },
   });
   expect(res.statusCode).toBe(200);
   const card = res.json() as Card;
@@ -610,6 +615,84 @@ for (const mode of MODES) {
         'move engineering/E-002 review',
         'ran E-002 implement',
       ]);
+      await assertHierarchy(started.project);
+    });
+
+    // THE RUN THAT PRODUCED DECISION 45's 2026-08-13 CORRECTION, driven end to end. P-001 was delivered and
+    // closed, and then P-002 — the same story under a second title — could not be broken down, three times,
+    // because P-001's tasks had already satisfied it. Every attempt reported the truth: there is nothing to
+    // create here. The loop refused to advance a creating phase that created nothing (decision 43,
+    // correctly), burned the attempts, and then STOPPED THE ENTIRE PROJECT over one redundant story.
+    //
+    // ASSERTED HERE rather than only in test/tick.test.ts because the bug was not in any one half: the cap
+    // path, the position and the checkup trigger are each individually reasonable, and only walking from one
+    // to the next shows that a story nobody can break down used to take the whole board with it.
+    //
+    // The two titles are the real ones. The OVERLAP that caused it is a separate finding and belongs to
+    // `break-down`'s prompt: no deterministic check can see that these are one story, which is why the
+    // checkups are where over-scope has to be noticed.
+    it('blocks a story that cannot be broken down, and carries on with the next one', async () => {
+      const started = await start();
+      // One feature with two stories, placed by hand: the feature arrives with its stories, so its own
+      // break-down is skipped and each story's is what this test is about. The FIRST carries a create
+      // marker and delivers a task; the SECOND carries none, so its break-down creates nothing — three
+      // times, which is `attemptCap`.
+      const first = await place(
+        started.project,
+        'product',
+        'backlog',
+        'npm test is configured and working',
+        [],
+        `Make the test command real.\n${creates(mode, 'engineering:1')}\n`,
+      );
+      const second = await place(
+        started.project,
+        'product',
+        'backlog',
+        'node:test framework is set up',
+        [],
+        'Already delivered by the story above, though nothing can know that deterministically.\n',
+      );
+      await place(started.project, 'features', 'backlog', 'A test runner', [first, second]);
+
+      const ended = await drive(started);
+
+      // THE RUN DOES NOT STOP. One story nobody can break down must not cost the project what is behind it.
+      expect(ended.reason).toBe('complete');
+      expect(ended.detail).toContain('P-002');
+      expect(await columnOf(started.project, 'P-002')).toBe('blocked');
+      expect(await columnOf(started.project, 'P-001')).toBe('done');
+      expect(await columnOf(started.project, 'F-001')).toBe('done');
+
+      const traced = await trace(started.project);
+      expect(traced.slice(traced.indexOf('move product/P-001 done'))).toEqual([
+        'move product/P-001 done',
+        'ran P-001 checkup-story',
+        // L2 moves on to the sibling, which is where the old behaviour ended the project instead.
+        'move product/P-002 todo',
+        // Three attempts, each of which created nothing — and ONE entry stamp between them, because a retry
+        // whose card is already in `todo` writes no move.
+        'ran P-002 break-down',
+        'ran P-002 break-down',
+        'ran P-002 break-down',
+        // No fourth dispatch: the stamp is the loop's own act, with no run and nothing spent.
+        'move product/P-002 blocked',
+        // And the feature reaches its checkup over a settled story it could not break down, and closes.
+        'smoke F-001 pass',
+        'move features/F-001 done',
+        'ran F-001 checkup-feature',
+        'stopped complete',
+      ]);
+
+      // EXACTLY THREE, from the run records rather than from the trace: the cap is what stops it, and a
+      // fourth attempt would be the loop paying for a judgement it already has three times over.
+      const all = await runs(started.project);
+      expect(all.filter((r) => r.card === 'P-002' && r.skill === 'break-down')).toHaveLength(3);
+      // FINDING F, incidentally proved: the shim's success report CLAIMS `created: [E-041]` and the board
+      // says otherwise, so what refused to advance the card was the board comparison and not the report.
+      expect(all.some((r) => r.card === 'P-002' && r.created?.includes('E-041'))).toBe(true);
+      expect((await board(started.project)).map((c) => c.id)).not.toContain('E-041');
+      // THE BOARD, not the diary: every card the walk produced is hung where the machine can see it.
       await assertHierarchy(started.project);
     });
 

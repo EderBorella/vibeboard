@@ -425,6 +425,48 @@ describe('the lifecycle, driven end to end', () => {
     expect((await runs(started.project)).filter((r) => r.skill === 'fix')).toHaveLength(3);
   });
 
+  // THE FEATURE CHECKUP'S OTHER EXIT (the L1 loop). A checkup that created stories has not finished its
+  // feature: it stays OPEN and L2 walks what appeared under it. Stamped `done` regardless, those stories are
+  // ORPHANS — `derivePosition` picks a feature only out of `todo` or `in-progress`, so a closed feature is
+  // never re-entered and nothing would ever pick them up.
+  //
+  // ASSERTED END TO END rather than in a unit fixture, because the failure is not in either half: the stamp
+  // and the derivation are each individually reasonable, and only walking from one to the other shows that
+  // what one produced the other cannot see.
+  it('leaves a feature open when its checkup creates a story, and walks that story', async () => {
+    const started = await start({
+      skills: {
+        ...HAPPY,
+        'derive-features': '[[behaviour:create:features:1:product:1:engineering:1]]',
+        // The checkup finds something missing and creates one story for it, carrying a task of its own.
+        'checkup-feature': '[[behaviour:create:product:1:engineering:1]]',
+      },
+    });
+    // Eight ticks: bootstrap, the feature's break-down, the story's, E-001's implement, its review, P-001's
+    // checkup, the feature checkup that creates P-002, and P-002's own break-down. Stopped there because the
+    // seeded checkup creates on EVERY run, so left to itself this project never closes — which is decision
+    // 47's own bound and is asserted in test/tick.test.ts rather than paid for here.
+    const ended = await drive(started, { ticks: 8 });
+    expect(ended.reason).toBe('stopped');
+
+    const traced = await trace(started.project);
+    expect(traced.slice(traced.indexOf('ran P-001 checkup-story'))).toEqual([
+      'ran P-001 checkup-story',
+      'smoke F-001 pass',
+      // No `move features/F-001 done` before it, and none after: the checkup created work, so its feature
+      // is not finished.
+      'ran F-001 checkup-feature',
+      // L2, over the story that checkup created.
+      'move product/P-002 todo',
+      'move product/P-002 in-progress',
+      'ran P-002 break-down',
+    ]);
+    expect(traced).not.toContain('move features/F-001 done');
+    expect(await columnOf(started.project, 'F-001')).toBe('in-progress');
+    // And the story it created is real work with a task under it, not a card nothing will ever reach.
+    expect(await columnOf(started.project, 'E-002')).toBe('backlog');
+  });
+
   it('stops stalled without dispatching when two features are open', async () => {
     const started = await start();
     await place(started.project, 'features', 'todo', 'One');

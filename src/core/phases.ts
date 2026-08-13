@@ -119,6 +119,14 @@ export const PHASES: readonly Phase[] = [
   },
   // `creates: product` on a `features` card: a feature checkup's product is stories under the feature
   // it ran on, which is why `creates` is declared apart from `board`.
+  //
+  // `exitPass` IS ONLY ONE OF ITS TWO EXITS, and it is the CLOSING one. A feature checkup that created
+  // stories has not finished its feature: it stays open, L2 walks what was created, and the checkup
+  // after that work closes it (the L1 loop, bounded to one creating round by decision 47). Which of the
+  // two happened is not a property of the table — it is whether the board grew while the run went — so
+  // the executor holds the card open and this column is stamped only when it created nothing. Stamped
+  // unconditionally, the stories a checkup creates are ORPHANS: `derivePosition` picks a feature only
+  // from `todo` or `in-progress`, so a closed feature is never re-entered.
   {
     name: 'feature-checkup',
     skill: 'checkup-feature',

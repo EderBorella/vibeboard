@@ -1172,6 +1172,57 @@ describe('a creating run that created nothing', () => {
   });
 });
 
+// THE FEATURE CHECKUP'S TWO EXITS (the L1 loop). Created stories → the feature stays OPEN and L2 walks them;
+// created nothing → `done`. Stamped `done` regardless, everything a checkup creates is an ORPHAN:
+// `derivePosition` picks a feature only out of `todo` or `in-progress`, so a closed feature is never
+// re-entered — and `creatingRoundSpent`, which bounds the second round, is then unreachable through the loop.
+describe('a feature checkup that created work', () => {
+  const feature = { ...CARD('F-001', 'features'), columnSlug: 'in-progress', links: ['P-001'] };
+  const story = CARD('P-001', 'product');
+  const CHECKUP: TickAction = {
+    kind: 'dispatch',
+    phase: 'feature-checkup',
+    skill: 'checkup-feature',
+    card: feature,
+  };
+
+  it('leaves the feature open when the board grew while it ran', async () => {
+    const r = recorder({ boardBefore: [feature], boardCards: [feature, story] });
+    const result = await performAction(deps(r.client), CHECKUP, context);
+    expect(r.moves).toEqual([]);
+    // Not a failure: the run did what it is for, and what it found is on the board.
+    expect(r.verdicts).toEqual([]);
+    expect(result.dispatches).toBe(1);
+    expect(r.diary.some((d) => d.text.includes('stays open until that work is done'))).toBe(true);
+  });
+
+  it('closes the feature when it created nothing, which is the ordinary case', async () => {
+    const r = recorder({ boardBefore: [feature, story], boardCards: [feature, story] });
+    await performAction(deps(r.client), CHECKUP, context);
+    expect(r.moves).toEqual([{ card: 'F-001', to: 'done' }]);
+  });
+
+  it('closes the feature when the board could not be read, rather than holding it open on no evidence', async () => {
+    // A comparison nobody could make is not evidence that stories were created. Holding the card open on it
+    // would stop the feature closing for as long as the read kept failing.
+    const r = recorder({ board: { ok: false, reason: 'could not reach the board', fatal: false } });
+    await performAction(deps(r.client), CHECKUP, context);
+    expect(r.moves).toEqual([{ card: 'F-001', to: 'done' }]);
+  });
+
+  it('closes a STORY checkup that created siblings, because closing and creating are one act', async () => {
+    // Ruling 54: leaving the story open while its new siblings are worked would mean two open stories, which
+    // is the one invariant the derived position cannot survive.
+    const r = recorder({ boardBefore: [story], boardCards: [story, CARD('P-002', 'product')] });
+    await performAction(
+      deps(r.client),
+      { kind: 'dispatch', phase: 'story-checkup', skill: 'checkup-story', card: story },
+      context,
+    );
+    expect(r.moves).toEqual([{ card: 'P-001', to: 'done' }]);
+  });
+});
+
 // THE CHECKUP'S EVIDENCE, GATHERED BY THE LOOP (ruling 60). Every card run is minted `work` scope, and three of
 // the four facts a checkup needs are unreachable from it. Widening the scope table would grant an agent
 // authority to solve a problem the loop can solve — and the loop already holds every one of them.

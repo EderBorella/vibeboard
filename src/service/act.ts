@@ -266,7 +266,7 @@ async function dispatch(deps: ActDeps, action: Dispatch, context: TickContext): 
   //
   // `undefined` means either "this phase is not judged that way" or "the board could not be read", and both
   // lead to the same place: a comparison that cannot be made is not evidence that nothing happened.
-  const before = CREATING_PHASES.includes(action.phase) ? await liveCount(deps) : undefined;
+  const before = countsTheBoard(action.phase) ? await liveCount(deps) : undefined;
 
   // EVERYTHING A CHECKUP IS TOLD, gathered before the dispatch because it is the dispatch's own input — and for
   // a feature checkup that includes running the smoke command, which is why this is before rather than after.
@@ -301,11 +301,35 @@ async function dispatch(deps: ActDeps, action: Dispatch, context: TickContext): 
 // applied to them, this would refuse every close.
 const CREATING_PHASES: readonly PhaseName[] = ['bootstrap', 'feature-breakdown', 'story-breakdown'];
 
+// AND THE PHASE WHOSE TWO EXITS DIFFER BY THE SAME COMPARISON. A feature checkup that created stories has
+// not finished its feature: it stays OPEN, L2 walks what was created, and the checkup after that work is the
+// one that closes it. Stamping `done` regardless orphans everything a checkup creates — `derivePosition`
+// picks a feature only out of `todo` or `in-progress`, so a closed feature is never re-entered.
+//
+// THE FEATURE AND NOT THE STORY, which is ruling 54: creating siblings and closing the story are one act,
+// because leaving the story open while its new siblings are worked would mean two open stories at once.
+const HOLDS_OPEN_HAVING_CREATED: readonly PhaseName[] = ['feature-checkup'];
+
+// The phases judged on whether the BOARD GREW, for either of the two reasons above. One predicate, so the
+// count is taken exactly when one of them will ask for it.
+const countsTheBoard = (name: PhaseName): boolean =>
+  CREATING_PHASES.includes(name) || HOLDS_OPEN_HAVING_CREATED.includes(name);
+
 // How many live cards the board holds, or `undefined` when it could not be read. A failed read is stated as
 // unknown rather than guessed at: "created no cards" is a verdict, and a failed read is not evidence for it.
 async function liveCount(deps: ActDeps): Promise<number | undefined> {
   const board = await deps.client.board();
   return board.ok ? countLive(board.value.boards) : undefined;
+}
+
+// DID THE BOARD GROW while the run went: `true`, `false`, or `undefined` when the comparison could not be
+// made — the phase is not judged this way, or one of the two reads failed. Unknown is deliberately not
+// folded into either answer: both of this file's callers would take an action on the strength of it, and a
+// comparison nobody could make is not evidence for either.
+async function boardGrew(deps: ActDeps, before: number | undefined): Promise<boolean | undefined> {
+  if (before === undefined) return undefined;
+  const after = await liveCount(deps);
+  return after === undefined ? undefined : !createdNothing(before, after);
 }
 
 // What a card's run earned. DECISION 40: the loop reads its own record of how the run ended — `status`, which
@@ -336,15 +360,22 @@ async function afterCardRun(
   // burned: the agent had its chance (accounting.ts).
   if (producedNothing(settled)) return await recordEmptyRun(deps, action, card, settled, context);
 
-  // AND A CREATING PHASE WHOSE RUN PRODUCED NO CARD has not done its job, whatever it reported (decision 43).
+  // WHETHER THE BOARD GREW, which two different phases ask for two different reasons. Read once: two reads
+  // would be two answers to one question, and the second could disagree with the first.
+  const grew = await boardGrew(deps, before);
+
+  // A CREATING PHASE WHOSE RUN PRODUCED NO CARD has not done its job, whatever it reported (decision 43).
   // A different question from `producedNothing`, and both earn their place: that one asks whether the run left
   // anything behind at all, and this one asks whether the board GREW — which is the only honest measure for a
   // phase whose product goes through the API and therefore changes no files.
-  if (before !== undefined) {
-    const after = await liveCount(deps);
-    if (after !== undefined && createdNothing(before, after)) {
-      return await recordEmptyCreate(deps, action, card, settled, context);
-    }
+  if (grew === false && CREATING_PHASES.includes(action.phase)) {
+    return await recordEmptyCreate(deps, action, card, settled, context);
+  }
+
+  // AND A FEATURE CHECKUP THAT DID GROW IT takes its other exit: the feature stays open and L2 walks the
+  // stories it created (decision 47 allows that once, and `creatingRoundSpent` is what bounds it).
+  if (grew === true && HOLDS_OPEN_HAVING_CREATED.includes(action.phase)) {
+    return await heldOpen(deps, action, card, settled, context);
   }
 
   // THE EXIT STAMP, written because the run COMPLETED, whatever it says about itself.
@@ -361,6 +392,27 @@ async function afterCardRun(
   // The STRUCTURED fields as well as the sentence. `DiaryEntry` carries `iteration`, `card`, `board`, `skill`
   // and `outcome` precisely so the diary's readers do not have to regex prose.
   await deps.client.log('run', runLine(card, action, settled, p.exitPass, context), {
+    iteration: context.iteration + 1,
+    card: card.id,
+    board: card.board,
+    skill: action.skill,
+    outcome: settled.status,
+  });
+  return { dispatches: 1 };
+}
+
+// THE OTHER EXIT OF A CHECKUP THAT CREATED WORK. No verdict and no move: the run did what it is for, and what
+// it found is on the board rather than being a failure of its own. Leaving the card where it is IS the exit —
+// the position derives from the board, so the next tick finds the feature still open and walks what appeared
+// under it.
+async function heldOpen(
+  deps: ActDeps,
+  action: Dispatch,
+  card: Card,
+  settled: RunRecord,
+  context: TickContext,
+): Promise<ActResult> {
+  await deps.client.log('run', heldOpenLine(card, action, settled, context), {
     iteration: context.iteration + 1,
     card: card.id,
     board: card.board,
@@ -802,6 +854,13 @@ function runLine(
 ): string {
   const where = to === undefined ? 'and it stayed where it is' : `so it moved to ${to}`;
   return `Iteration ${context.iteration + 1}: ${card.id} ran ${action.skill} for its ${action.phase} phase; it ended as ${settled.status}, ${where}.${said(settled)}`;
+}
+
+// And about a checkup that created work rather than closing its card. Shaped like `runLine` on purpose — a
+// reader following the trace should not have to learn a second sentence for the same event — and it names the
+// only thing that differs, which is why the card did not move.
+function heldOpenLine(card: Card, action: Dispatch, settled: RunRecord, context: TickContext): string {
+  return `Iteration ${context.iteration + 1}: ${card.id} ran ${action.skill} for its ${action.phase} phase; it ended as ${settled.status} and created work, so ${card.id} stays open until that work is done and the checkup after it closes ${card.id}.${said(settled)}`;
 }
 
 // And about one that left nothing behind. It says the check DID NOT RUN rather than that it failed: a line

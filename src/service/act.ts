@@ -3,6 +3,7 @@ import type { TickAction } from '../core/actions.js';
 import { DEFAULT_AUTOPILOT, isBlockedColumn } from '../core/autopilot.js';
 import type { AutopilotState } from '../core/autopilot-state.js';
 import { unreviewedGatesSentence } from '../core/autopilot-state.js';
+import { latestOwnRun } from '../core/bounds.js';
 import { countLive, createdNothing } from '../core/created.js';
 import { blockedUnder } from '../core/derived-status.js';
 import type { StopReason } from '../core/dispatch-gate.js';
@@ -18,31 +19,53 @@ import type { Answer, BoardClient, DispatchRequest } from './board-client.js';
 import type { ActResult, TickContext } from './loop.js';
 import { stamp } from './stamp.js';
 
-// Carrying ONE action out. The decision was made by `decideTick`; this is the doing, and the order it does
-// things in is the whole of it:
+// Carrying ONE action out. The decision was made by `decideTick`; this is the doing, and it has TWO paths.
+//
+// THE ORDINARY DISPATCH, which is every phase but one:
 //
 //   commit → stamp the entry column → dispatch → wait for the record to settle → stamp the exit column → diary
+//
+// AND THE REVIEW, which is deterministic first (decision 51) and so does not take that path at all:
+//
+//   commit → run the gates HERE, in this process → send-back with the command's own output if they fail
+//          → only if they pass, dispatch a `review` run → write its verdict onto the run it judged → stamp
 //
 // Four rules, each of which is a decision rather than an implementation detail:
 //
 // 1. COMMIT FIRST (step 10). Committing before every dispatch is what makes an aborted, timed-out or plainly
 //    wrong run one command from gone. A commit that FAILS stops the loop: the revert guarantee is the reason
 //    this is safe to run unattended, and dispatching without it would be spending on a tree nobody can undo.
-// 2. NOTHING MOVES ON SELF-ASSESSMENT (decision 3, amended by decision 40). A card advances when its phase's
-//    run COMPLETES — read off `status`, which the RUNNER assigns — and never off the `outcome` the agent
-//    wrote about its own work. What judges the work itself is the `task-review` phase, which is a separate
-//    run with no authority over the card it judges.
+// 2. NOTHING MOVES ON SELF-ASSESSMENT (decision 3, amended by decision 40). What makes that hold is NOT that
+//    the loop reads a status the agent did not write — `withReport` copies `status` straight out of the
+//    agent's `outcome` (core/runs.ts), so for every run that delivered a report they are the same value. It
+//    is three narrower facts:
+//      * the only outcomes an agent MAY write are `success` and `attention`, and this file treats them
+//        identically — it advances on the phase having completed, not on which was claimed, so the claim
+//        cannot change where the card goes;
+//      * VibeBoard OVERRIDES the status on timeout and on cancellation, in the runner, where the agent has
+//        no say;
+//      * a `failed` run NEVER advances its card, which is asserted here on its own (see `recordFailedRun`)
+//        because "it produced nothing" does not cover a run that died after touching one file.
+//    What judges the work itself is the `task-review` phase, which is a separate run with no authority over
+//    the card it judges.
 // 3. THE CARD IS MOVED THROUGH THE ENDPOINT, and so is everything else this writes. The loop holds a
 //    `service` credential and goes through the same validation as an agent (decision 10). Two exceptions,
-//    both deliberate: the gate commands run in this process, because putting arbitrary command execution
-//    behind an HTTP endpoint would be a far larger hole than the one it closes; and git runs here for the
-//    same reason.
+//    both deliberate: the gate and smoke commands run in this process, because putting arbitrary command
+//    execution behind an HTTP endpoint would be a far larger hole than the one it closes; and git runs here
+//    for the same reason.
 // 4. EVERY COLUMN STAMP GOES THROUGH `stamp.ts`, so no second way to move a card can grow here.
 //
-// THERE IS NO VERIFICATION IN THIS FILE YET, and that is correct rather than missing. A dispatch's exit is
-// simply the stamp its phase names: a task's work is judged at the `task-review` phase and a creating run's
-// product by `createdNothing`, both of which arrive with their own tasks. The one verdict written here is for
-// a run that left NOTHING behind, which is a correctness rule rather than a judgement (see `producedNothing`).
+// THE VERIFICATION THAT LIVES HERE, since decision 51 moved the deterministic half of the review into the
+// loop. Three kinds of verdict are written from this file, and the modes are deliberate rather than tidy:
+//
+//   `gates`  — the gate commands, run here, failing closed; and the two correctness refusals that write the
+//              same mode because they are the loop's own check: a run that left NOTHING behind, and a
+//              card-only phase whose board did not grow;
+//   `review` — what the `review` run answered, written onto the run it judged (ruling 57).
+//
+// It also runs the SMOKE command before a feature checkup and hands the result over as evidence (ruling 55).
+// Both commands are refused outright while a gate document is unread — see
+// `refuseWhileGateDocumentUnread`, which is in front of every spawn in this file.
 
 // Committing whatever the last dispatch left behind. Called once when the loop ends, and it is what makes a
 // SECOND session possible: commits happen before each dispatch, so the final agent's edits are uncommitted by
@@ -175,8 +198,12 @@ async function checkupEvidence(
   const children = childrenOf(card, cards).map((child) => ({
     id: child.id,
     column: child.columnSlug,
-    // HOW ITS LAST RUN ENDED — `status`, which the runner assigns, never the `outcome` the agent wrote about
-    // itself (decision 40). Absent rather than invented for a child nothing has run on yet.
+    // HOW ITS OWN WORK LAST ENDED, read off `status` — which VibeBoard writes for a run it killed and which
+    // an agent may only ever set to `success` or `attention` (decision 40). Absent rather than invented for a
+    // child nothing has run on yet.
+    //
+    // ITS OWN WORK, so a REVIEW run is not it: a review's status is how the REVIEWER's turn went, so a task
+    // the reviewer sent back with findings was being described here as having ended `success`.
     ...(runs.ok ? lastOutcome(runs.value.runs, child.id) : {}),
     // Named as a fact rather than left to be derived from the column: which slug means blocked is config, and
     // the checkup has no way to read it.
@@ -242,20 +269,25 @@ async function refuseWhileGateDocumentUnread(deps: ActDeps): Promise<ActResult |
   );
 }
 
-// The latest run on one card, by run id — the same sortable stamp the store reads "latest" off.
+// How this card's own work last ended, or nothing when nothing has run on it. `latestOwnRun` is in bounds.ts
+// with every other "which run answers this" question, and it excludes the REVIEW runs — the whole of what was
+// wrong here — and orders by when a run started rather than by an id whose tie-break is random.
 function lastOutcome(runs: RunRecord[], card: string): { outcome?: string } {
-  const mine = runs.filter((r) => r.card === card).sort((a, b) => a.run.localeCompare(b.run));
-  const last = mine.at(-1);
+  const last = latestOwnRun(runs, card);
   return last === undefined ? {} : { outcome: last.status };
 }
 
 // THE ENTRY STAMP, and only where the phase names one. `task-review` and `task-fix` name none because the
 // card is already where they want it, and a move to where a card already is would be a write for nothing —
 // and a diary line about an event that did not happen. The bootstrap names none because it has no card.
+//
+// AND ONLY WHERE THE CARD IS NOT THERE ALREADY, which the phase table cannot express: a break-down RETRY has
+// the same entry column as the attempt before it, so the card is already in `todo` and this wrote "moved to
+// todo" into the diary for a non-event — which is the very thing the paragraph above says the design avoids.
 async function stampEntry(deps: ActDeps, action: Dispatch): Promise<ActResult | undefined> {
   const card = action.card;
   const entry = phase(action.phase).entry;
-  if (!card || entry === undefined) return undefined;
+  if (!card || entry === undefined || card.columnSlug === entry) return undefined;
   const stamped = await stamp(deps, card, entry, `auto-pilot is starting its ${action.phase} phase.`);
   if (stamped.ok) return undefined;
   return await refused(deps, `could not move ${card.id} to ${entry}`, stamped.reason, stamped.fatal);
@@ -366,8 +398,10 @@ async function boardGrew(deps: ActDeps, before: number | undefined): Promise<boo
   return after === undefined ? undefined : !createdNothing(before, after);
 }
 
-// What a card's run earned. DECISION 40: the loop reads its own record of how the run ended — `status`, which
-// the runner assigns — and never the `outcome` the agent wrote about itself.
+// What a card's run earned. DECISION 40, and precisely: `status` is NOT a value the agent cannot reach —
+// `withReport` copies it out of the agent's own `outcome` — so what stops a run moving its own card is that
+// the only two outcomes it may write are treated identically here, that VibeBoard overrides the status on
+// timeout and cancellation, and that a `failed` run never advances. All three are below.
 async function afterCardRun(
   deps: ActDeps,
   action: Dispatch,

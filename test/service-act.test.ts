@@ -264,6 +264,21 @@ describe('one dispatch, end to end', () => {
     expect(order.slice(0, 3)).toEqual(['commit', 'move:todo', 'dispatch']);
   });
 
+  // A RETRY HAS THE SAME ENTRY COLUMN AS THE ATTEMPT BEFORE IT, so the card is already there — and re-stamping
+  // it put "moved to todo" in the diary for an event that did not happen, which is exactly what the entry
+  // stamp's own comment says the design avoids.
+  it('stamps nothing on entry when the card is already in the entry column', async () => {
+    const already = { ...CARD('F-001', 'features'), columnSlug: 'todo' };
+    const r = recorder({
+      boardBefore: [already],
+      boardCards: [already, CARD('P-001', 'product')],
+    });
+    await performAction(deps(r.client), BREAKDOWN(already), context);
+    // The exit stamp only. Asserted as the whole list, because an extra `todo` in front of it is the defect.
+    expect(r.moves).toEqual([{ card: 'F-001', to: 'in-progress' }]);
+    expect(r.diary.some((d) => d.text.includes('moved to todo'))).toBe(false);
+  });
+
   it('stamps nothing on entry for a phase with no entry column', async () => {
     // A task being fixed is already in `in-progress`; a move to where it is would be a write for nothing — and
     // a diary line about an event that did not happen. Asserted through the ORDER, because the phase does have
@@ -1389,6 +1404,41 @@ describe('a checkup’s evidence', () => {
     expect(children.find((c) => c.id === 'P-001')).toMatchObject({ column: 'done', outcome: 'attention' });
     // Absent rather than invented for a child nothing has run on yet.
     expect(children.find((c) => c.id === 'P-002')?.outcome).toBeUndefined();
+  });
+
+  // A REVIEW'S STATUS IS NOT THE CHILD'S OUTCOME, and with one run per child no fixture could tell the two
+  // apart — the question only exists once there are two runs. A review that ran perfectly and sent the work
+  // back is `status: success` with `verdict: sent-back`, so reading the latest run of any kind described a
+  // task the reviewer had rejected as having succeeded.
+  it('names the child’s own work, not the review that judged it', async () => {
+    const task = { ...CARD('E-001', 'engineering'), columnSlug: 'in-progress' };
+    const story = { ...CARD('P-001', 'product'), columnSlug: 'in-progress', links: ['E-001'] };
+    const r = recorder({ boardCards: [story, task] });
+    r.client.runs = async () => ({
+      ok: true as const,
+      value: {
+        runs: [
+          // The work, which ended saying it could not finish.
+          record({ card: 'E-001', skill: 'implement', status: 'attention', started: '2026-08-06T10:00:00Z' }),
+          // And the review AFTER it, whose own turn went perfectly while it sent the work back.
+          record({
+            card: 'E-001',
+            skill: 'review',
+            status: 'success',
+            verdict: 'sent-back',
+            started: '2026-08-06T10:30:00Z',
+          }),
+        ],
+      },
+    });
+    await performAction(
+      deps(r.client),
+      { kind: 'dispatch', phase: 'story-checkup', skill: 'checkup-story', card: story },
+      context,
+    );
+    expect(r.requests[0]?.checkup?.children).toEqual([
+      { id: 'E-001', column: 'in-progress', outcome: 'attention', blocked: false },
+    ]);
   });
 
   it('marks a blocked child as blocked, so the prompt need not know which slug means it', async () => {

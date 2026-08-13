@@ -1128,6 +1128,13 @@ body {
   font-size: 0.7rem; color: var(--warn, #b8860b); white-space: nowrap;
 }
 
+/* A blocked task somewhere under this card. Danger rather than ochre, and the strongest of the three:
+   a story in Done carrying one has finished with a real failure inside it, which is a different fact
+   from work deliberately left behind. */
+.tile-problem {
+  font-size: 0.7rem; color: var(--danger); white-space: nowrap;
+}
+
 
 /* The ledger lines: what a project or a card has spent, and which cap will stop it. Quiet by
    default — a number you only look at when you are asking — and tabular so digits line up. */

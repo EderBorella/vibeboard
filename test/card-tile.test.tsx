@@ -82,6 +82,72 @@ describe('CardTile open suggestions', () => {
   });
 });
 
+// Decision 46: "a story in Done carrying a blocked task must not look identical to one that finished
+// clean." The card's own state is its column, which the board already shows; what needs saying is what
+// is UNDER it, which is on no tile a person can see from here.
+describe('CardTile carrying a problem', () => {
+  it('marks a card carrying a blocked task', () => {
+    render(
+      <CardTile
+        card={card({ id: 'P-001', board: 'product', columnSlug: 'done' })}
+        miniatureChars={80}
+        carryingAProblem={['E-001']}
+      />,
+    );
+    // The id is in the title, because "carrying a problem" with no name is a badge you cannot act on.
+    expect(screen.getByTitle(/E-001/)).toBeTruthy();
+  });
+
+  it('does not mark a clean card', () => {
+    // The ordinary case is an EMPTY array — the snapshot omits a clean card, but a caller reading a
+    // missing key with `?? []` hands one over, and an empty array is truthy.
+    render(<CardTile card={card()} miniatureChars={80} carryingAProblem={[]} />);
+    expect(screen.queryByTitle(/blocked/i)).toBeNull();
+    cleanup();
+    render(<CardTile card={card()} miniatureChars={80} />);
+    expect(screen.queryByTitle(/blocked/i)).toBeNull();
+  });
+
+  it('names every blocked task in the title, not just the first', () => {
+    render(<CardTile card={card()} miniatureChars={80} carryingAProblem={['E-001', 'E-007']} />);
+    const title = screen.getByTitle(/E-001/).getAttribute('title') ?? '';
+    expect(title).toContain('E-007');
+  });
+
+  it('marks a card in DONE, which is the case the decision is about', () => {
+    render(
+      <CardTile
+        card={card({ id: 'P-001', board: 'product', columnSlug: 'done' })}
+        miniatureChars={80}
+        carryingAProblem={['E-001']}
+      />,
+    );
+    expect(screen.getByTitle(/E-001/)).toBeTruthy();
+  });
+
+  it('renders the badge for a story and for a feature', () => {
+    // Both levels reach the tile: a feature's blocked task is two levels down, and the snapshot
+    // names it against the feature as well as against the story.
+    render(
+      <CardTile
+        card={card({ id: 'P-001', board: 'product', columnSlug: 'done' })}
+        miniatureChars={80}
+        carryingAProblem={['E-001']}
+      />,
+    );
+    expect(screen.getByTitle(/E-001/)).toBeTruthy();
+    cleanup();
+    render(
+      <CardTile
+        card={card({ id: 'F-001', board: 'features', columnSlug: 'done' })}
+        miniatureChars={80}
+        carryingAProblem={['E-001']}
+      />,
+    );
+    expect(screen.getByTitle(/E-001/)).toBeTruthy();
+  });
+});
+
 // The barrier's effect is invisible from the card it sits on: nothing outside this feature's subtree
 // runs until it is finished, so a board that looks stuck is explained by a tile somewhere else.
 describe('CardTile setup badge', () => {

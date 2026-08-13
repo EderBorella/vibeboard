@@ -14,6 +14,10 @@ interface Props {
   // pass every gate and advance with things left behind — the tile has to say so, because the
   // blocker belongs in the artefact a human reviews rather than in a log.
   openSuggestions?: number;
+  // The blocked task ids under this card (decision 46). A card's OWN state is its column, which the
+  // board already shows; this is the part a person cannot see from here — a story in Done carrying a
+  // blocked task must not look identical to one that finished clean.
+  carryingAProblem?: string[];
 }
 
 export function CardTile({
@@ -24,8 +28,12 @@ export function CardTile({
   onDragStart,
   onTag,
   openSuggestions = 0,
+  carryingAProblem,
 }: Props) {
   const summary = miniature(card, miniatureChars);
+  // Non-empty, not merely present: an empty array is truthy, and the clean card is the ordinary case —
+  // a badge on every tile is a badge that says nothing.
+  const blocked = carryingAProblem ?? [];
   return (
     <div
       className="tile"
@@ -55,6 +63,15 @@ export function CardTile({
             title={`${openSuggestions} open ${openSuggestions === 1 ? 'suggestion' : 'suggestions'}`}
           >
             ⚑ {openSuggestions}
+          </span>
+        )}
+        {blocked.length > 0 && (
+          <span
+            className="tile-problem"
+            // Every one of them, not just the first: the ids are what a person goes and looks at.
+            title={`Carrying ${blocked.length === 1 ? 'a blocked task' : `${blocked.length} blocked tasks`}: ${blocked.join(', ')}`}
+          >
+            ⚠ {blocked.length}
           </span>
         )}
         {card.links.length > 0 && (

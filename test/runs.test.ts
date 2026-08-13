@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DOCS_DIR } from '../src/core/layout.js';
 import {
+  asVerification,
   isInFlight,
   isRunId,
   needsResolution,
@@ -472,6 +473,14 @@ describe('a review run verdict', () => {
       'T',
     );
     expect(settled.verdict).toBeUndefined();
+  });
+
+  // The verdict's OTHER home (ruling 57): the judged run carries a `Verification` with `mode: 'review'`, and
+  // `asVerification` drops any mode it does not recognise — so a verdict the loop writes for the review phase
+  // would be silently unreadable until `review` is one of the modes.
+  it('accepts a verification whose mode is review', () => {
+    const verification = asVerification({ mode: 'review', passed: true, at: 'T', by: 'REV-1' });
+    expect(verification).toMatchObject({ mode: 'review', passed: true, by: 'REV-1' });
   });
 });
 

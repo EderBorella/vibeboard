@@ -122,19 +122,20 @@ describe('POST /api/runs', () => {
     await settled(project, project.card, run.run);
   });
 
-  // A critic JUDGES rather than builds, and a person can dispatch one from the card. Without this the
-  // seeded skill said "score it" while the prompt asked for an ordinary report — no `score:` field and no
-  // scale — so the verdict would have been unreadable by the thing that compares it with a bar. The
-  // threshold comes from the project's own config rather than the skill file, so changing it in Settings
-  // does not mean remembering to edit a prompt.
-  it('gives a critic the judging contract, with the project’s own threshold', async () => {
+  // A REVIEW run JUDGES rather than builds, and a person can dispatch one from the card. Without this the
+  // seeded skill said "give a verdict" while the prompt asked for an ordinary report — no `verdict:` field
+  // and no values — so the answer would have been unreadable by the thing that acts on it.
+  //
+  // NO THRESHOLD, and that is the change: the verdict is `done`/`sent-back` rather than a score against a
+  // bar, so there is no number for the prompt to quote.
+  it('gives a review run the judging contract, and no threshold to quote', async () => {
     const argsLog = await recordingShimArgs();
     const project = await projectWithCard();
     const { run } = (
       await project.app.inject({
         method: 'POST',
         url: '/api/runs',
-        payload: { board: 'engineering', card: project.card, skill: 'critic' },
+        payload: { board: 'engineering', card: project.card, skill: 'review' },
       })
     ).json() as { run: RunRecord };
     await settled(project, project.card, run.run);
@@ -142,8 +143,9 @@ describe('POST /api/runs', () => {
 
     const prompt = await promptFrom(argsLog);
     expect(prompt).toContain('## Judging (required)');
-    expect(prompt).toContain('score:');
-    expect(prompt).toMatch(/at or above 0\.6/i);
+    expect(prompt).toContain('verdict: done');
+    expect(prompt).toContain('sent-back');
+    expect(prompt).not.toMatch(/at or above 0\.6/i);
     // And NOT the board-changing contract: a judge told to PATCH its own card and, three lines later,
     // not to, has two required instructions and no reading that satisfies both.
     expect(prompt).not.toContain('## Changing the board (required)');

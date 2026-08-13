@@ -167,8 +167,10 @@ describe('routing-table coverage', () => {
     ap(config).routes[0] = { ...ap(config).routes[0], verify: 'vibes' as never };
     ap(config).attemptCap = 0;
     const problems = coverageProblems(config);
+    // The exact string, not a `toContain`: the LIST is what this message exists to tell the reader, so a
+    // mode added to `VERIFY_MODES` and missing from the sentence is the whole defect.
     expect(problems).toContain(
-      'features: the route on "backlog" verifies with "vibes" — expected gates, critic, smoke.',
+      'features: the route on "backlog" verifies with "vibes" — expected gates, critic, smoke, review.',
     );
     expect(problems).toContain('attemptCap must be a positive whole number; it is 0.');
   });

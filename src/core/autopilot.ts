@@ -8,10 +8,14 @@ import type { BoardName } from './types.js';
 // Columns are SLUGS here. `config.boards[b].columns` holds display names ("In Progress") and
 // slugging is one-way, so every comparison against config goes through `boardColumnSlugs`.
 
-// How a card's work is judged. All three fail closed when what they need is missing: `gates` runs
+// How a card's work is judged. All of them fail closed when what they need is missing: `gates` runs
 // the commands declared in foundation/CODE-QUALITY.md, `critic` dispatches a fresh judging agent
-// that returns a score, `smoke` runs the command declared in foundation/TESTING.md.
-export const VERIFY_MODES = ['gates', 'critic', 'smoke'] as const;
+// that returns a score, `smoke` runs the command declared in foundation/TESTING.md, and `review` is
+// what a `review` run answered about the work it judged (decision 51's second step, ruling 57).
+//
+// `review` is a MODE and not a fourth kind of thing, because a verdict is a verdict: it lands on the
+// run it judged exactly as a gates failure does, carrying `by` — the review run's id — as its evidence.
+export const VERIFY_MODES = ['gates', 'critic', 'smoke', 'review'] as const;
 export type VerifyMode = (typeof VERIFY_MODES)[number];
 
 // The skill a `critic` route dispatches to do its judging. Named once here rather than spelled in the

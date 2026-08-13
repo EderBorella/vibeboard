@@ -70,6 +70,16 @@ export interface PromptInputs {
   // reporting contract with one that asks for a score, and states the threshold that score will be
   // compared against. Absent for every other run, and then nothing about judging appears at all.
   verdict?: { threshold: number };
+  // Present when this run is a REVIEW: decision 51's second step, where a model is asked only for what a
+  // command's exit code cannot express. It replaces the reporting contract with one that asks for a
+  // `verdict`, and carries the two facts about the judgement that ONLY THE LOOP HOLDS — whether the gates it
+  // ran in its own process passed, and whether this card is in the setup subtree, where an absent gate set is
+  // expected because installing the test runner is what that card is for.
+  //
+  // Both are refused from every scope but `service` on the way in (ruling 63): a review agent able to send
+  // `gatesPassed: true` could talk its own reviewer into a pass, which is decision 40 defeated through a
+  // side door.
+  review?: { gatesPassed: boolean; setupSubtree: boolean };
   // Where the agent must write its report, project-root-relative.
   reportPath: string;
   projectRoot: string;
@@ -214,14 +224,17 @@ const CONTRACT_LINES = [
 // Absent for a critic a person dispatches from the card, where there is no run under judgement and the
 // subject really is the card's current state. Named as `undefined` rather than defaulted, because a
 // sentence naming a run that was never passed would be worse than the general one.
-function judgedLines(judged: NonNullable<PromptInputs['previous']>): string[] {
+// `nothingAtAll` is what a run that left nothing behind earns, and it is a parameter because the two judging
+// contracts express the same verdict differently: a score of 0, or a `sent-back`. One set of words about which
+// run is under judgement, so the two cannot drift into disagreeing about it.
+function judgedLines(judged: NonNullable<PromptInputs['previous']>, nothingAtAll: string): string[] {
   return [
     `You are judging ONE run: **${judged.run}** (skill \`${judged.skill}\`), described above. Judge what THAT`,
     'run did, and nothing else.',
     '',
     'An earlier run on this card may have succeeded; its work is not this run’s work and does not count for',
     'it. If the run you are judging left nothing behind at all — it failed AND wrote no report AND produced',
-    'nothing — then the score is 0, however good the card looks otherwise.',
+    `nothing — then ${nothingAtAll}, however good the card looks otherwise.`,
     '',
     'A run that changed no FILES has not necessarily done nothing: cards are created through the API, so a',
     'run whose whole product is cards changes nothing on disk and may be perfectly complete. Judge what it',
@@ -229,13 +242,84 @@ function judgedLines(judged: NonNullable<PromptInputs['previous']>): string[] {
   ];
 }
 
+// The opening of both judging contracts: a judge that fixes what it is judging is grading its own work.
+const JUDGE_PREAMBLE = [
+  'You are judging work that is already done. Change nothing: do not edit the code, do not edit the',
+  'card, and do not move it. Your report IS the verdict, and a judge that fixes what it is judging is',
+  'grading its own work.',
+];
+
+// WHAT THE LOOP ALREADY DID, which the reviewer has to be told or it spends its turn doing it again. Three
+// states and not two: the setup-subtree exception comes FIRST, because a card whose whole purpose is to
+// install the test runner has no gate set to have passed, and telling it the suite is green would be a claim
+// nothing produced.
+function gateEvidence(review: NonNullable<PromptInputs['review']>): string[] {
+  if (review.setupSubtree) {
+    return [
+      'This card is in the project’s SETUP subtree, so there is no gate set yet and that is expected:',
+      'installing the toolchain and the test runner is what this card is for. So the judgement is by reading —',
+      'read what the run left behind and say whether it does what the card asked.',
+    ];
+  }
+  if (review.gatesPassed) {
+    return [
+      'The gates have already passed. Auto-pilot ran every command the project declares, in its own process,',
+      'before dispatching you — so the suite is green and there is no need to run it again. What a gate cannot',
+      'express is the one question left for you: does this do what the card asked.',
+    ];
+  }
+  // Only reachable for a review a person dispatched by hand: the gate result is the loop's own fact and is
+  // refused from every other scope, so there is none. Said plainly rather than left out — a missing sentence
+  // reads as a pass.
+  return [
+    'Nobody has run the gates for this card, so you are judging the work without them. Say so in your report',
+    'if that changes what you can conclude.',
+  ];
+}
+
+// A REVIEW's contract: `done` or `sent back with findings`, and no number anywhere. Decision 51 puts a model
+// here for exactly one question — does this do what the card asked — because a gate proves the suite passes
+// and cannot prove the suite tests the criterion the card states.
+function reviewLines(
+  review: NonNullable<PromptInputs['review']>,
+  judged: PromptInputs['previous'],
+): string[] {
+  return [
+    ...JUDGE_PREAMBLE,
+    '',
+    ...gateEvidence(review),
+    '',
+    ...(judged ? [...judgedLines(judged, 'the verdict is `sent-back`'), ''] : []),
+    'Write your report to:',
+    '',
+    '```',
+    '<REPORT_PATH>',
+    '```',
+    '',
+    '```markdown',
+    '---',
+    'outcome: success        # or: attention, if you could not judge it at all',
+    'verdict: done           # or: sent-back',
+    'summary: one line saying why it got that verdict',
+    '---',
+    '## What I judged',
+    '',
+    'The findings: what the card asked for, what the work does, and where they differ. A `fix` run is handed',
+    'exactly this, so be specific enough that someone could disagree with it.',
+    '```',
+    '',
+    'Judge the work against the CARD, not against what you would have built. Work that does MORE than the',
+    'card asked still passes — say so rather than marking it down, because failing a card for over-delivery',
+    'throws away working code and spends an attempt rebuilding it.',
+    'A report with no `verdict` cannot pass anything, so answer even when the answer is `sent-back`.',
+  ];
+}
+
 function verdictLines(threshold: number, judged: PromptInputs['previous']): string[] {
   return [
-    'You are judging work that is already done. Change nothing: do not edit the code, do not edit the',
-    'card, and do not move it. Your report IS the verdict, and a judge that fixes what it is judging is',
-    'grading its own work.',
+    ...JUDGE_PREAMBLE,
     '',
-    ...(judged ? [...judgedLines(judged), ''] : []),
+    ...(judged ? [...judgedLines(judged, 'the score is 0'), ''] : []),
     'Write your report to:',
     '',
     '```',
@@ -358,6 +442,21 @@ export function assistCredentialSection(apiBase: string, token: string): string 
   ].join('\n');
 }
 
+// ONE CONTRACT, never two — see verdictLines. A run handed both would be told to report an outcome and to
+// judge, and whichever heading it read first would decide what it wrote.
+//
+// Its own function so `buildRunPrompt` stays a flat sequence of sections: a nested conditional inside it costs
+// far more complexity than the length it saves, and flattening beats a suppression.
+function contractFor(input: PromptInputs): { heading: string; lines: string[] } {
+  if (input.review) {
+    return { heading: 'Judging (required)', lines: reviewLines(input.review, input.previous) };
+  }
+  if (input.verdict) {
+    return { heading: 'Judging (required)', lines: verdictLines(input.verdict.threshold, input.previous) };
+  }
+  return { heading: 'Reporting (required)', lines: CONTRACT_LINES };
+}
+
 export function buildRunPrompt(input: PromptInputs): string {
   // Every part is joined by exactly one blank line, so no part carries its own leading or trailing
   // blank — otherwise the heading and the skill body end up four newlines apart.
@@ -396,7 +495,8 @@ export function buildRunPrompt(input: PromptInputs): string {
   if (input.links.length > 0) {
     parts.push(section('Reference links', input.links.map((l) => `- [${l.title}](${l.url})`).join('\n')));
   }
-  if (input.previous) parts.push(previousSection(input.previous, input.verdict !== undefined));
+  const judging = input.verdict !== undefined || input.review !== undefined;
+  if (input.previous) parts.push(previousSection(input.previous, judging));
   // Last of the context and immediately before the contract: the user's words are the most
   // specific instruction in the prompt and must not be buried above the card.
   if (input.userPrompt?.trim()) {
@@ -407,7 +507,7 @@ export function buildRunPrompt(input: PromptInputs): string {
   // was no reading of the prompt that satisfied it.
   if (input.credential) {
     parts.push(
-      input.verdict
+      judging
         ? section('Your credential', judgeCredentialSection(input.credential.apiBase, input.credential.token))
         : section(
             'Changing the board (required)',
@@ -420,10 +520,7 @@ export function buildRunPrompt(input: PromptInputs): string {
           ),
     );
   }
-  // One or the other, never both — see verdictLines.
-  const contract = input.verdict
-    ? { heading: 'Judging (required)', lines: verdictLines(input.verdict.threshold, input.previous) }
-    : { heading: 'Reporting (required)', lines: CONTRACT_LINES };
+  const contract = contractFor(input);
   parts.push(section(contract.heading, contract.lines.join('\n').replace('<REPORT_PATH>', input.reportPath)));
 
   return `${parts.join('\n\n')}\n`;

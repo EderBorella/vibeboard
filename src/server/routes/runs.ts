@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import { attemptsUsed, sumSpend } from '../../core/accounting.js';
-import { CRITIC_SKILL, DEFAULT_AUTOPILOT } from '../../core/autopilot.js';
+import { DEFAULT_AUTOPILOT } from '../../core/autopilot.js';
 import type { AutopilotState } from '../../core/autopilot-state.js';
 import { unreviewedGatesSentence } from '../../core/autopilot-state.js';
 import { boardColumnSlugs, readBoard } from '../../core/board.js';
@@ -10,6 +10,7 @@ import { resolveCopilotSelection } from '../../core/copilot-choice.js';
 import { findCard } from '../../core/find.js';
 import { foundationStatus, readGates } from '../../core/foundation.js';
 import { foundationRel } from '../../core/layout.js';
+import { phase } from '../../core/phases.js';
 import { asVerification, isRunId, type RunRecord, withVerification } from '../../core/runs.js';
 import { BOARDS, type BoardName, type ProjectConfig } from '../../core/types.js';
 import type { DispatchInput } from '../agent-runner.js';
@@ -112,16 +113,20 @@ function everyBoardColumns(config: ProjectConfig): BoardColumns[] {
   });
 }
 
-// A critic JUDGES rather than builds, so it gets the judging contract — including when a person
-// dispatches one by hand from the card. Without this the seeded skill said "score it" while the prompt
-// asked for an ordinary report: no `score:` field, no scale, and a verdict nothing could compare with a
-// bar. The threshold is the project's own rather than the skill file's, so changing it in Settings does
-// not mean remembering to edit a prompt.
+// A REVIEW run JUDGES rather than builds, so it gets the judging contract — including when a person
+// dispatches one by hand from the card. Without this the skill file would say "give a verdict" while the
+// prompt asked for an ordinary report: no `verdict:` field, no values, and an answer nothing could act on.
 //
-// Absent for a project with no lifecycle block: there is no bar to quote, so the run is an ordinary one.
-function verdictFor(slug: string, config: ProjectConfig): { verdict?: { threshold: number } } {
-  const threshold = slug === CRITIC_SKILL ? config.autopilot?.criticThreshold : undefined;
-  return threshold === undefined ? {} : { verdict: { threshold } };
+// COMPUTED HERE rather than accepted, which is ruling 63's own precedent: where the server can work a fact
+// out, it still should. The two facts inside it cannot be — whether the gates passed and whether the card is
+// in the setup subtree are the loop's, so they arrive on the body under a `service` credential and default to
+// the honest "nothing has run for this" for anyone else.
+//
+// The skill name comes from the PHASE TABLE (ruling 52), not a constant of its own: three copies of a slug is
+// three places for it to drift.
+function reviewFor(slug: string): { review?: { gatesPassed: boolean; setupSubtree: boolean } } {
+  if (slug !== phase('task-review').skill) return {};
+  return { review: { gatesPassed: false, setupSubtree: false } };
 }
 
 // Turn a request into everything the runner needs, or into the refusal to send back. Separated from
@@ -256,7 +261,7 @@ async function resolveDispatch(
     input: {
       skill,
       card,
-      ...verdictFor(skill.slug, config),
+      ...reviewFor(skill.slug),
       cardFile,
       linked,
       ...(previous ? { previous: previous.run } : {}),

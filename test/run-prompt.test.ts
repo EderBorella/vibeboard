@@ -536,6 +536,100 @@ describe('the judging contract', () => {
   });
 });
 
+// THE REVIEW CONTRACT. Decision 51's second step: the loop has already run the gates, and a model is asked
+// only for what a command's exit code cannot express — does this do what the card asked.
+//
+// Asserted on the CONTRACT, never on what a neighbouring section happens to render. A review found every
+// assertion about the judging contract satisfied by strings the evidence section produced, which made the
+// contract itself deletable with the suite green.
+describe('the review contract', () => {
+  const reviewing = (over: Partial<NonNullable<PromptInputs['review']>> = {}) =>
+    buildRunPrompt(
+      inputs({
+        review: { gatesPassed: true, setupSubtree: false, ...over },
+        previous: { run: 'RUN-2', skill: 'implement', status: 'success' },
+      }),
+    );
+
+  it('asks a review run for a verdict, and names both values', () => {
+    const prompt = reviewing();
+    expect(prompt).toContain('verdict: done');
+    expect(prompt).toContain('sent-back');
+    // A review that stays silent has decided nothing, and an absent verdict is what the review bound counts.
+    expect(prompt).toContain('A report with no `verdict` cannot pass anything');
+  });
+
+  it('names the ONE run under judgement', () => {
+    expect(reviewing()).toContain('You are judging ONE run: **RUN-2**');
+  });
+
+  // DECISION 51'S TWO STEPS, and the reviewer has to be told the first one happened: a judge that does not
+  // know the suite is already green spends its turn running it again.
+  it('tells the review run the gates have already passed', () => {
+    expect(reviewing()).toContain('gates have already passed');
+  });
+
+  it('states the setup-subtree exception only when the card is in it', () => {
+    // The exception the old spec asserted and never built: `verify` was a property of a route, so it could
+    // not vary per feature. Installing the test runner is what a setup card is FOR, so an absent gate set is
+    // expected there and the judgement is by reading.
+    const inSetup = reviewing({ setupSubtree: true });
+    expect(inSetup).toContain('no gate set yet');
+    expect(inSetup).toContain('the judgement is by reading');
+    const ordinary = reviewing();
+    expect(ordinary).not.toContain('no gate set yet');
+    // And the two are exclusive: a setup card with nothing to run must not also be told the suite is green.
+    expect(inSetup).not.toContain('gates have already passed');
+  });
+
+  // The honest third state. A person dispatching a review by hand gets no gate result, because those two
+  // facts are the loop's and are refused from every other scope (ruling 63) — so the prompt says so rather
+  // than implying a pass nobody produced.
+  it('says plainly when nothing has run the gates', () => {
+    const prompt = reviewing({ gatesPassed: false });
+    expect(prompt).not.toContain('gates have already passed');
+    expect(prompt).toMatch(/nobody has run the gates/i);
+  });
+
+  it('grants a review run nothing on the board', () => {
+    const prompt = buildRunPrompt(
+      inputs({
+        review: { gatesPassed: true, setupSubtree: false },
+        credential: { token: 'T', apiBase: 'http://127.0.0.1:4610', scope: 'work' as const },
+      }),
+    );
+    expect(prompt).toContain('## Your credential');
+    expect(prompt).not.toContain('## Changing the board (required)');
+    expect(prompt).not.toContain('PATCH /api/cards');
+    expect(prompt).not.toContain('POST /api/cards');
+  });
+
+  it('replaces the ordinary reporting contract rather than adding to it', () => {
+    const prompt = reviewing();
+    expect(prompt).toContain('## Judging (required)');
+    expect(prompt).not.toContain('## Reporting (required)');
+  });
+
+  // ONE CONTRACT OR THE OTHER, NEVER BOTH: whichever heading a run read first would decide what it wrote.
+  it('asks an ordinary run for an outcome and never for a verdict', () => {
+    const prompt = buildRunPrompt(inputs());
+    expect(prompt).toContain('outcome: success');
+    expect(prompt).not.toContain('verdict:');
+  });
+
+  it('renders nothing about a review for any other run', () => {
+    const prompt = buildRunPrompt(inputs());
+    expect(prompt).not.toContain('gates have already passed');
+    expect(prompt).not.toContain('no gate set yet');
+  });
+
+  // Over-delivery passes (decision 5). Failing a card for it throws away working code and spends an attempt
+  // rebuilding it.
+  it('tells the reviewer that work doing MORE than the card asked still passes', () => {
+    expect(reviewing()).toMatch(/does MORE/);
+  });
+});
+
 // A run about the PROJECT: no card, and therefore no card section. The absence has to be STATED — a prompt
 // that simply lacks the card heading is indistinguishable from one that lost it, and an agent reading a skill
 // written for a per-card dispatch will otherwise hunt for the card or invent one.

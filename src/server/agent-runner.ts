@@ -60,6 +60,10 @@ export interface DispatchInput {
   // same reason: the threshold is the project's as it was when the dispatch was resolved, not whatever
   // Settings says when a queued run finally starts.
   verdict?: { threshold: number };
+  // Present when this run is a REVIEW: what the loop already established before dispatching it. Carried for
+  // the same reason as `verdict` — a queued review must be told about the gate run that preceded it, not
+  // about whatever the tree looks like when it finally starts.
+  review?: { gatesPassed: boolean; setupSubtree: boolean };
   backend: Backend;
   model: string;
   effort: string;
@@ -362,6 +366,7 @@ export class AgentRunner {
       userPrompt: input.userPrompt,
       foundation: input.foundation,
       verdict: input.verdict,
+      review: input.review,
       reportPath: reportContract(run),
       projectRoot: root,
       credential,

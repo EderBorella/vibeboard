@@ -182,7 +182,7 @@ export interface BoardConfig {
 // about to be refused. config.yaml is where the table is edited.
 // A runtime array as well as a type, so test/mirror.test.ts can compare it with the core list. A hand
 // written union drifts silently; a list can be asserted.
-export const VERIFY_MODES = ['gates', 'critic', 'smoke'] as const;
+export const VERIFY_MODES = ['gates', 'critic', 'smoke', 'review'] as const;
 export type VerifyMode = (typeof VERIFY_MODES)[number];
 export interface Route {
   board: BoardName;

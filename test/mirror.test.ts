@@ -24,6 +24,12 @@ describe('web/shared mirrors src/core', () => {
     expect(web.BOARD_LABELS).toEqual(core.BOARD_LABELS);
   });
 
+  // The Settings hint names these boards on screen, and it named the wrong set for as long as engineering
+  // was the only one: a claim a person reads is exactly where drift is least visible and least forgivable.
+  it('mirrors which boards a card can be left blocked on', () => {
+    expect([...web.BLOCKED_BOARDS]).toEqual([...coreAutopilot.BLOCKED_BOARDS]);
+  });
+
   // Slice D hand-mirrored six types into web/src/api.ts and extended nothing here. `STOP_REASONS` gained
   // `unreadable` DURING that slice, which is precisely the change this guard exists to catch: the TopBar
   // renders an unknown reason as a raw word with neutral styling, so drift is silent on screen too.

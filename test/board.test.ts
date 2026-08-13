@@ -66,7 +66,7 @@ describe('readBoard', () => {
 
   it('maps configured column names to slugs', () => {
     const slugs = boardColumnSlugs(defaultConfig('T'), 'product');
-    expect(slugs).toEqual(['backlog', 'todo', 'in-progress', 'done']);
+    expect(slugs).toEqual(['backlog', 'todo', 'in-progress', 'blocked', 'done']);
   });
 
   // Cards are markdown files, but a column folder is an ordinary directory the user can drop

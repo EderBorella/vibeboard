@@ -19,13 +19,18 @@ export const DEFAULT_MAX_RUNS = 3;
 // Every board opens with a Backlog. Engineering used to start at Todo, which made it the one board
 // an agent could not guess: asked to break a card down "into the right column" it reached for
 // Backlog, found none, and created the folder — putting four cards somewhere the board does not read.
-// Blocked is engineering's alone, and it is NOT last: the closing column is defined as the final one
-// (routes/cards.ts isClosingColumn), so appending Blocked would make blocking a card resolve its
-// runs and leave Done closing nothing. A card that has exhausted its attempts lands here instead of
-// stopping the whole board, which only makes sense one level down from the work being described.
+// Blocked is on PRODUCT AND ENGINEERING, and features has none. A card that has exhausted its attempts
+// lands there instead of stopping the whole board, which is only honest where the card has siblings to
+// carry on with: a story sits among siblings exactly as a task does, while a feature is the top of its own
+// vertical (decision 45, corrected 2026-08-13, after one redundant story stopped a project with three
+// features queued behind it).
+//
+// It is NOT last on either board: the closing column is defined as the final one (routes/cards.ts
+// isClosingColumn), so appending Blocked would make blocking a card resolve its runs and leave Done
+// closing nothing.
 const DEFAULT_COLUMNS: Record<BoardName, string[]> = {
   features: ['Backlog', 'Todo', 'In Progress', 'Done'],
-  product: ['Backlog', 'Todo', 'In Progress', 'Done'],
+  product: ['Backlog', 'Todo', 'In Progress', 'Blocked', 'Done'],
   engineering: ['Backlog', 'In Progress', 'Review', 'Blocked', 'Done'],
 };
 

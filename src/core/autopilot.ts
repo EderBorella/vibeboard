@@ -40,7 +40,9 @@ export interface AutopilotConfig {
   // un-terminalled features and product, whose Done columns had not been touched. Every board must
   // name at least one, or nothing on it could ever finish.
   terminal: Record<BoardName, string[]>;
-  blockedColumn: string; // engineering only
+  // ONE SLUG FOR EVERY BOARD THAT HAS THE COLUMN (`BLOCKED_BOARDS`), not one per board: a card that ran
+  // out of attempts means the same thing wherever it sits, and a second key would be a second answer.
+  blockedColumn: string;
   // NO `setupFeatureFlag`. The barrier is the `setup` frontmatter flag (types.ts), fixed rather than
   // configurable — this key existed, was defaulted, validated and mirrored to the UI, and was read by
   // nothing. Renaming it therefore validated cleanly and lifted the barrier in silence, which is the
@@ -75,11 +77,20 @@ export function isTerminalColumn(ap: AutopilotConfig, board: BoardName, columnSl
 // the lookup here is gone: a project that had removed that route was told by the panel that it could not
 // bootstrap while the loop, reading the table, would have bootstrapped it anyway.
 
-// Engineering's alone. A product or feature card that cannot be broken down after three tries is a
-// project-level problem that stops the run, so `blocked` on those boards would be a column nothing
-// ever puts a card into.
+// WHICH BOARDS HAVE A BLOCKED COLUMN, and features is not one of them.
+//
+// Product is here by decision 45's 2026-08-13 correction. "Engineering's alone" was argued from a
+// break-down that cannot succeed having "nothing below it to carry on with" — true of a feature, and false
+// of a story, which sits among siblings exactly as a task does. One redundant story that could not be
+// broken down burned its attempts and stopped the entire project, with three untouched features queued
+// behind it: the failure decision 45 exists to prevent, one level up.
+//
+// A FEATURE STILL STOPS THE LOOP AND NAMES ITSELF. It is the top of its own vertical, so there is no
+// sibling to carry on with, and blocking it would park every feature after it behind a card nothing reads.
+export const BLOCKED_BOARDS: readonly BoardName[] = ['product', 'engineering'];
+
 export function isBlockedColumn(ap: AutopilotConfig, board: BoardName, columnSlug: string): boolean {
-  return board === 'engineering' && ap.blockedColumn === columnSlug;
+  return BLOCKED_BOARDS.includes(board) && ap.blockedColumn === columnSlug;
 }
 
 // A column IS a folder, so renaming one moves the folder (columns.ts) — and this block names columns
@@ -96,8 +107,12 @@ export function applyRouteRenames(
     ...ap,
     // Only this board's entry: the others' Done columns were not renamed and must stay terminal.
     terminal: { ...ap.terminal, [board]: (ap.terminal[board] ?? []).map(to) },
-    // Engineering's alone, so a rename anywhere else cannot be about it — and applying one would
-    // point the blocked column at a slug on a board that does not have it.
+    // ENGINEERING'S RENAME ONLY, although product has the column too: one key names a slug on both
+    // boards, so following a product rename would point engineering's blocked column at a slug
+    // engineering does not have. Neither direction can be right for both boards, and this one keeps the
+    // key answering for the board whose blocked column cannot be removed at all (autopilot-cover.ts).
+    // A product Blocked column renamed out from under the key stops matching it, and the stamp then
+    // fails closed and says so (core/tick.ts) rather than writing a card into a folder nothing reads.
     blockedColumn: board === 'engineering' ? to(ap.blockedColumn) : ap.blockedColumn,
   };
 }

@@ -5,6 +5,11 @@
 export const BOARDS = ['features', 'product', 'engineering'] as const;
 export type BoardName = (typeof BOARDS)[number];
 
+// Mirrors src/core/autopilot.ts BLOCKED_BOARDS — the boards a card that ran out of attempts can be left
+// on. Here because the Settings hint states it on screen, and a false claim a person reads is worse than
+// no claim: it said "on engineering" while a story could already be blocked on product.
+export const BLOCKED_BOARDS: readonly BoardName[] = ['product', 'engineering'];
+
 export const BOARD_LABELS: Record<BoardName, string> = {
   features: 'Features',
   product: 'Product',

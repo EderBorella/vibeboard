@@ -32,12 +32,23 @@ describe('settled', () => {
   it('counts a done task as settled', () => expect(isSettled(ap, t('E-001', 'done'))).toBe(true));
   it('does not count a task in review as settled', () =>
     expect(isSettled(ap, t('E-001', 'review'))).toBe(false));
-  // Only engineering has a blocked column, so `blocked` elsewhere is a folder nothing puts a card in.
-  it('does not count a product card in a blocked column as settled', () =>
-    expect(isSettled(ap, p('P-001', 'blocked'))).toBe(false));
+  // DECISION 45's 2026-08-13 CORRECTION, at the story's own level: a story nobody can break down has had
+  // every attempt it is allowed, so it settles and its feature carries on with the next story.
+  it('counts a blocked story as settled', () => expect(isSettled(ap, p('P-001', 'blocked'))).toBe(true));
+  // And features has no blocked column at all: a feature has no sibling to carry on with, so a `blocked`
+  // folder on that board is one nothing puts a card in.
+  it('does not count a feature in a blocked column as settled', () =>
+    expect(isSettled(ap, f('F-001', 'blocked'))).toBe(false));
 
   it('settles a story whose tasks are one done and one blocked', () => {
     expect(allSettled(ap, [t('E-001', 'done'), t('E-002', 'blocked')])).toBe(true);
+  });
+
+  // WHAT THE FEATURE CHECKUP'S TRIGGER IS ASKED, one level up: a feature holding a done story and a
+  // blocked one is settled, so the checkup runs and the feature can close carrying the problem. Two
+  // stories, because a fixture of one cannot tell "all settled" from "any settled".
+  it('settles a feature whose stories are one done and one blocked', () => {
+    expect(allSettled(ap, [p('P-001', 'done'), p('P-002', 'blocked')])).toBe(true);
   });
   // A fixture of ONE cannot distinguish "all settled" from "any settled".
   it('does not settle a story with one done task and one in review', () => {
@@ -69,6 +80,26 @@ describe('what is blocked under a card', () => {
       t('E-003', 'blocked'),
     ];
     expect(blockedUnder(ap, cards[0], cards).map((c) => c.id)).toEqual(['E-001', 'E-003']);
+  });
+
+  // DECISION 46 OVER A BLOCKED STORY. A feature carrying a story nobody could break down is carrying a
+  // problem, exactly as one carrying a blocked task is — and the story has no children at all, which is
+  // what a failed break-down leaves behind, so nothing below it could make this list non-empty.
+  it('names a blocked story under its feature', () => {
+    const cards = [f('F-001', 'in-progress', ['P-001', 'P-002']), p('P-001', 'done'), p('P-002', 'blocked')];
+    expect(blockedUnder(ap, cards[0], cards).map((c) => c.id)).toEqual(['P-002']);
+  });
+
+  // A blocked story and a blocked task under the SAME feature, so the walk is not answering with the
+  // first thing it finds — and the story that is blocked has no task under it to be found instead.
+  it('names a blocked story and a blocked task together', () => {
+    const cards = [
+      f('F-001', 'in-progress', ['P-001', 'P-002']),
+      p('P-001', 'done', ['E-001']),
+      t('E-001', 'blocked'),
+      p('P-002', 'blocked'),
+    ];
+    expect(blockedUnder(ap, cards[0], cards).map((c) => c.id)).toEqual(['E-001', 'P-002']);
   });
 });
 

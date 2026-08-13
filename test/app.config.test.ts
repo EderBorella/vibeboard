@@ -147,7 +147,7 @@ describe('PATCH /api/config — column reconciliation', () => {
 
     const cfg = (await app.inject({ method: 'GET', url: '/api/config' })).json();
     expect(cfg.boards.engineering.columns).toEqual(['Backlog', 'In Progress', 'QA', 'Blocked', 'Done']);
-    expect(cfg.boards.product.columns).toEqual(['Backlog', 'Todo', 'In Progress', 'Done']);
+    expect(cfg.boards.product.columns).toEqual(['Backlog', 'Todo', 'In Progress', 'Blocked', 'Done']);
     expect(cfg.boards.features.columns).toEqual(['Backlog', 'Todo', 'In Progress', 'Done']);
   });
 

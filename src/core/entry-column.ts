@@ -1,3 +1,4 @@
+import { isBlockedColumn } from './autopilot.js';
 import { boardColumnSlugs } from './board.js';
 import type { BoardName, ProjectConfig } from './types.js';
 
@@ -25,8 +26,11 @@ export function entryColumn(config: ProjectConfig, board: BoardName): string | u
   if (slug === undefined) return undefined;
   const terminal = config.autopilot?.terminal?.[board];
   if (Array.isArray(terminal) && terminal.includes(slug)) return undefined;
-  // Engineering's alone, like `isBlockedColumn`: a card is put in `blocked` when it has exhausted its
-  // attempts, so a new one created there is work nothing will ever pick up.
-  if (board === 'engineering' && config.autopilot?.blockedColumn === slug) return undefined;
+  // THROUGH `isBlockedColumn`, not a second copy of the rule: which boards have a blocked column is one
+  // fact (`BLOCKED_BOARDS`), and stating it twice is how one path refuses an entry the other allows —
+  // which is the very failure the comment above records for this function's own history. A card is put in
+  // `blocked` when it has exhausted its attempts, so a new one created there is work nothing picks up.
+  const ap = config.autopilot;
+  if (ap && typeof ap.blockedColumn === 'string' && isBlockedColumn(ap, board, slug)) return undefined;
   return slug;
 }

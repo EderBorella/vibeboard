@@ -11,7 +11,7 @@ import { useReadiness } from '../autopilot/useReadiness';
 import { killProjectRequest } from '../confirm/requests';
 import { useConfirm } from '../confirm/useConfirm';
 import { useAccounting } from '../runs/useAccounting';
-import type { AutopilotConfig, ProjectConfig } from '../shared';
+import { type AutopilotConfig, BLOCKED_BOARDS, BOARD_LABELS, type ProjectConfig } from '../shared';
 
 // The lifecycle as it will actually be executed, plus what is stopping it.
 //
@@ -151,7 +151,8 @@ export function AutopilotPanel({
         {Object.entries(ap.terminal)
           .map(([b, c]) => `${b} ${c.join('/')}`)
           .join(', ')}{' '}
-        · blocked cards go to {ap.blockedColumn} on engineering.
+        · blocked cards go to {ap.blockedColumn} on{' '}
+        {`${BLOCKED_BOARDS.map((b) => BOARD_LABELS[b]).join(' and ')}.`}
       </div>
 
       <StartControl state={autopilot} readiness={readiness} refresh={onAutopilotChanged} />

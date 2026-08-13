@@ -74,6 +74,12 @@ describe('scaffoldProject', () => {
     await expect(access(join(root, boardRel('product', ARCHIVE_SLUG)))).resolves.toBeUndefined();
     await expect(access(join(root, boardRel('engineering', ARCHIVE_SLUG)))).resolves.toBeUndefined();
     await expect(access(join(root, CONVENTIONS_FILE))).resolves.toBeUndefined();
+    // A COLUMN IS A FOLDER, so a card the loop blocks has somewhere to land only if the scaffolder made
+    // it. Both boards the machine may block a card on (decision 45, corrected 2026-08-13), asserted as
+    // directories rather than as config: a stamp to a column with no folder writes the card where
+    // `readBoard` does not look — and because column = folder, the write CREATES it rather than failing.
+    await expect(access(join(root, boardRel('product', 'blocked')))).resolves.toBeUndefined();
+    await expect(access(join(root, boardRel('engineering', 'blocked')))).resolves.toBeUndefined();
 
     const claude = await readFile(join(root, CLAUDE_MD), 'utf8');
     expect(claude).toContain(CONVENTIONS_FILE);

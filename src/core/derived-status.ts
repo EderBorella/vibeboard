@@ -8,13 +8,14 @@ import type { Card } from './types.js';
 //   SETTLED (decision 45) — done OR blocked. A blocked task has had every attempt it is allowed and is
 //   waiting for a person, so it unblocks its story: the checkup runs, the story closes, and the machine
 //   carries on. Stopping the project instead means one task nobody can fix costs you every feature after
-//   it.
+//   it. AT BOTH LEVELS since the 2026-08-13 correction: a blocked STORY settles its feature the same way,
+//   so the feature checkup can run over a feature holding one.
 //
 //   UNFINISHED CHILDREN — terminal only, so a blocked child still counts as unfinished. That is the
 //   distinction that makes both functions necessary rather than one of them redundant.
 
-// Settled, not terminal. `isBlockedColumn` already answers engineering-only (autopilot.ts:162-164), so
-// the board question is not re-asked here.
+// Settled, not terminal. `isBlockedColumn` already answers which boards have a blocked column at all
+// (`BLOCKED_BOARDS`), so the board question is not re-asked here.
 export function isSettled(ap: AutopilotConfig, card: Card): boolean {
   return (
     isTerminalColumn(ap, card.board, card.columnSlug) || isBlockedColumn(ap, card.board, card.columnSlug)
@@ -33,9 +34,12 @@ export function allSettled(ap: AutopilotConfig, cards: Card[]): boolean {
 // with no name is one nobody can act on (server/snapshot.ts). Two spellings of one rule is the duplication
 // decision 46 exists to avoid.
 //
-// Every blocked task below this card, through as many levels as there are. Recursion rather than a
-// one-level walk because a feature's problem is two levels down: its story is `done` and the task under
-// that story is what is blocked, so a one-level walk calls the feature clean.
+// Every blocked card below this one, through as many levels as there are. Recursion rather than a
+// one-level walk because a feature's problem is often two levels down: its story is `done` and the task
+// under that story is what is blocked, so a one-level walk calls the feature clean.
+//
+// A BLOCKED STORY IS ONE OF THEM (the 2026-08-13 correction). A feature carrying a story nobody could
+// break down is carrying a problem, exactly as one carrying a blocked task is.
 //
 // DERIVED, NEVER STAMPED. Two reasons, the second mattering more day to day: one fact has one owner, and
 // this SELF-HEALS — the user moves the blocked task to done and the story and the feature stop reporting a

@@ -52,6 +52,24 @@ describe('entryColumn', () => {
     expect(entryColumn(blockedFirst, 'engineering')).toBeUndefined();
   });
 
+  // AND PRODUCT'S, since decision 45's correction gave that board one too. Through `isBlockedColumn`
+  // rather than a second copy of "which boards have a blocked column": a story created into the column
+  // that means "out of attempts" is work nothing will ever pick up, and a break-down creates stories.
+  it('refuses product’s blocked column as well', () => {
+    const base = config(withColumns('product', ['Blocked', 'Todo', 'Done']));
+    const blockedFirst = {
+      ...base,
+      autopilot: { ...base.autopilot, blockedColumn: 'blocked' },
+    } as ProjectConfig;
+    expect(entryColumn(blockedFirst, 'product')).toBeUndefined();
+    // Features has no blocked column, so the same first column there is an ordinary entry: the refusal
+    // follows the rule rather than the word.
+    const onFeatures = config(withColumns('features', ['Blocked', 'Todo', 'Done']));
+    expect(entryColumn({ ...onFeatures, autopilot: base.autopilot } as ProjectConfig, 'features')).toBe(
+      'blocked',
+    );
+  });
+
   it('refuses a board with no columns at all', () => {
     expect(entryColumn(config(withColumns('features', [])), 'features')).toBeUndefined();
   });

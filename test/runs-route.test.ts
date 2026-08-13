@@ -178,7 +178,7 @@ describe('POST /api/runs', () => {
     expect(prompt).toContain(
       [
         '- **features**: Backlog (backlog), Todo (todo), In Progress (in-progress), Done (done)',
-        '- **product**: Backlog (backlog), Todo (todo), In Progress (in-progress), Done (done)',
+        '- **product**: Backlog (backlog), Todo (todo), In Progress (in-progress), Blocked (blocked), Done (done)',
         '- **engineering**: Backlog (backlog), In Progress (in-progress), Review (review), Blocked (blocked), Done (done)',
       ].join('\n'),
     );
@@ -224,7 +224,7 @@ describe('POST /api/runs', () => {
     expect(prompt).not.toContain('Review (review)');
     // The boards that were not patched are still there, and still their own columns.
     expect(prompt).toContain(
-      '- **product**: Backlog (backlog), Todo (todo), In Progress (in-progress), Done (done)',
+      '- **product**: Backlog (backlog), Todo (todo), In Progress (in-progress), Blocked (blocked), Done (done)',
     );
   });
 

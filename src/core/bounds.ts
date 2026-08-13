@@ -67,6 +67,21 @@ export function latestWorkRun(runs: RunRecord[], card: string): RunRecord | unde
   return latest(runs.filter((r) => r.card === card && isWorkRun(r)));
 }
 
+// HOW A CARD'S OWN WORK LAST ENDED, which is what a checkup is told about each of its children (ruling 60).
+//
+// A REVIEW RUN IS EXCLUDED AND NOTHING ELSE IS. A review's `status` is how the REVIEWER'S turn went, not how
+// the work went: a task sent back with findings has a review run that ended `success`, so reading the latest
+// run of any kind described that task to the checkup as having succeeded. Same conflation as the one the
+// review trigger was corrected for, one module over.
+//
+// NOT `latestWorkRun`, which is the right predicate for a task and answers nothing for anything else: it is
+// engineering-only by construction — the phases whose exit is `review` — and a story's own runs are its
+// break-down and its checkup, so filtering to work runs would tell a feature checkup nothing at all about
+// any of its children.
+export function latestOwnRun(runs: RunRecord[], card: string): RunRecord | undefined {
+  return latest(runs.filter((r) => r.card === card && !isReviewRun(r)));
+}
+
 // INCONCLUSIVE reviews, not reviews — finding A. `BURNS.success` is true (accounting.ts:98), deliberately,
 // and `attemptsUsed` filters on `burnsAttempt` — so a cap over every review run would stop the loop
 // `stalled` on a perfectly healthy task after three completed reviews, while the spec's own arithmetic row
@@ -81,6 +96,27 @@ export function inconclusiveReviews(runs: RunRecord[], card: string): number {
   ).length;
 }
 
+// EVERY REVIEW THIS TASK HAS COST, which is the bound the spec's arithmetic row already states: per task at
+// most `attemptCap` fix runs and `attemptCap + 1` review runs.
+//
+// It exists because `inconclusiveReviews` counts one way a review can repeat and the review phase's trigger
+// admits others. The trigger dispatches whenever the LATEST WORK RUN carries no `verification`, so any failure
+// to record a verdict — `POST …/verification` refused non-fatally, for instance — leaves the work run exactly
+// as it was while the review itself answered perfectly. Nothing counts that: the review has a verdict, so it is
+// not inconclusive, and `dispatches: 1` resets the idle counter so `MAX_IDLE_TICKS` never arrives either. The
+// task pays for a full review, every tick, for as long as the write keeps failing.
+//
+// A TOTAL rather than a second special case, chosen deliberately: it catches every way a review can repeat
+// without progress, including the ones nobody has thought of, where counting the unrecordable verdict as
+// inconclusive would blur what that word means and still only cover the one route. And `attemptCap + 1` cannot
+// stall a healthy task, because it is exactly the healthy maximum — implement, then a review and a fix for each
+// of `attemptCap` send-backs, then the review that passes.
+//
+// Filtered on `burnsAttempt`, like `attemptsUsed`: a review you cancelled is not a review the task spent.
+export function reviewsRun(runs: RunRecord[], card: string): number {
+  return runs.filter((r) => r.card === card && isReviewRun(r) && burnsAttempt(r.status)).length;
+}
+
 // Has this checkup point already had its one creating round (decision 47)?
 //
 // READ OFF THE BOARD — ruling 58 and finding F. The obvious version reads the checkup run's own `created`
@@ -89,8 +125,14 @@ export function inconclusiveReviews(runs: RunRecord[], card: string): number {
 // is stamped by the endpoint from the credential, so the question is whether any card on the board names one
 // of this card's own checkup runs as its creator.
 //
-// Every card, not just the live ones: the round was spent whatever became of what it made afterwards, and
-// the other reading hands out a second creating round every time someone archives a story.
+// Every card the caller passed, and the caller is the tick — which means the LIVE board and nothing else,
+// because `readBoard` walks the configured columns only, so an archived card never reaches `decideTick` at
+// all. Stated because the comment here used to claim the other reading "hands out a second creating round
+// every time someone archives a story", which cannot happen through this caller.
+//
+// It is worth knowing rather than fixing: the round was spent whatever became of what it made afterwards, so
+// seeing the archive would be strictly more correct — and a second creating round after a person archives a
+// story is not a failure worth an extra read of the archive on every tick.
 export function creatingRoundSpent(cards: Card[], runs: RunRecord[], card: string, skill: string): boolean {
   const mine = new Set(runs.filter((r) => r.card === card && r.skill === skill).map((r) => r.run));
   return cards.some((c) => c.createdBy !== undefined && mine.has(c.createdBy));

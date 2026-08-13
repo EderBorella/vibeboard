@@ -25,11 +25,15 @@ function card(id: string, board: BoardName, columnSlug: string, order: number, l
 
 let runCount = 0;
 
-// The id SORTS BY THE ORDER THE FIXTURE MADE IT, because that is the one property production run ids have
-// that the loop depends on: `latest` in bounds.ts ranks by id, so "the newest run on this card" is a string
-// comparison. `${cardId}-${skill}-${n}` did not have it — `E-001-fix-2` sorts before `E-001-implement-1`, so
-// a fix made after an implement read as older, and no fixture could tell a real ordering bug from a right
-// answer reached backwards.
+// The id SORTS BY THE ORDER THE FIXTURE MADE IT, and every run here shares one `started` — so the id is
+// what `latest` in bounds.ts ends up comparing. `${cardId}-${skill}-${n}` did not have that property:
+// `E-001-fix-2` sorts before `E-001-implement-1`, so a fix made after an implement read as older, and no
+// fixture could tell a real ordering bug from a right answer reached backwards.
+//
+// In production the id is only the TIE-BREAK — `latest` ranks by `started` first, because a run id is
+// sortable only to the second and its suffix is random. That is asserted in test/bounds.test.ts, where the
+// two can disagree; here they cannot, and a fixture that made them differ would be testing the ordering
+// rather than the tick.
 function run(cardId: string, board: BoardName, skill: string, status: RunStatus): RunRecord {
   runCount += 1;
   return {
@@ -252,8 +256,8 @@ describe('nothing to work on is not the same as nothing left', () => {
     expect(decideTick(input({ cards }))).toMatchObject({ kind: 'stop', reason: 'complete' });
   });
 
-  // THE B3 SHAPE, and the fixture has to be a column that is neither routed, terminal NOR blocked.
-  // `triage` is a folder somebody made, or a column removed from the config with cards still in it.
+  // THE B3 SHAPE, and the fixture has to be a column the phase table has no row for. `triage` is a folder
+  // somebody made, or a column taken out of the board's columns with cards still in it.
   it('stops stalled, naming the cards, when a card sits in a column nothing covers', () => {
     const cards = [
       card('F-001', 'features', 'done', 10, ['P-001']),
@@ -263,8 +267,11 @@ describe('nothing to work on is not the same as nothing left', () => {
     const action = decideTick(input({ cards }));
     expect(action).toMatchObject({ kind: 'stop', reason: 'stalled' });
     expect(detailOf(action)).toContain('E-009');
-    // And this is the one case where the routing advice is the right advice.
-    expect(detailOf(action)).toContain('routed, terminal or blocked');
+    // AND IT NAMES WHAT ACTUALLY PLACES A CARD. Under ruling 52 the phase table is code and a column
+    // dispatches nothing, so the advice this used to give — "check that every column is routed, terminal or
+    // blocked" — sent the reader to a routing table that no longer decides anything.
+    expect(detailOf(action)).toContain('a column the lifecycle has no phase for');
+    expect(detailOf(action)).not.toContain('routed');
   });
 
   // WAS "stops stalled for a card the loop itself blocked". Decision 45 REPEALS that: a blocked task is
@@ -646,6 +653,43 @@ describe('decideTick — the story loop', () => {
     });
   });
 
+  // THE STORY CHECKUP'S CREATING ROUND IS BOUNDED TOO, and it looked as though it needed no bound: ruling 54
+  // makes creating siblings and closing the story ONE act, so there is no second visit to this point — while
+  // the exit stamp succeeds. A REFUSED move leaves the story settled and in `in-progress`, and the next tick
+  // dispatched another checkup with a fresh creating round, up to `attemptCap` of them, each entitled to
+  // create more siblings.
+  it('stops stalled when the story checkup has spent its creating round and still will not close', () => {
+    const creating = run('P-001', 'product', 'checkup-story', 'success');
+    const second = run('P-001', 'product', 'checkup-story', 'attention');
+    const cards = [
+      feature(['P-001']),
+      card('P-001', 'product', 'in-progress', 10, ['F-001', 'E-001']),
+      card('E-001', 'engineering', 'done', 10, ['P-001']),
+      // The sibling that spent the round, stamped by the endpoint with the run that created it, and settled.
+      { ...card('P-002', 'product', 'done', 20, ['F-001']), createdBy: creating.run },
+    ];
+    const action = decideTick(input({ cards, runs: [creating, second] }));
+    expect(action).toMatchObject({ kind: 'stop', reason: 'stalled' });
+    expect(detailOf(action)).toContain('P-001');
+    expect(detailOf(action)).toContain('creating');
+    // The noun matters: this is the story's checkup point, not the feature's.
+    expect(detailOf(action)).toContain('close the story');
+  });
+
+  it('still dispatches the story checkup that follows the creating round, so it can close', () => {
+    const creating = run('P-001', 'product', 'checkup-story', 'success');
+    const cards = [
+      feature(['P-001']),
+      card('P-001', 'product', 'in-progress', 10, ['F-001', 'E-001']),
+      card('E-001', 'engineering', 'done', 10, ['P-001']),
+      { ...card('P-002', 'product', 'done', 20, ['F-001']), createdBy: creating.run },
+    ];
+    expect(decideTick(input({ cards, runs: [creating] }))).toMatchObject({
+      kind: 'dispatch',
+      phase: 'story-checkup',
+    });
+  });
+
   // THE FIXTURE MUST HAVE TWO TASKS: with one, "all settled" and "any settled" are the same answer.
   it('does not dispatch checkup-story while one of two tasks is in review', () => {
     const cards = [
@@ -856,6 +900,32 @@ describe('decideTick — the review loop', () => {
     // perfectly healthy task at three.
     const cards = [...story(['E-001']), task('E-001', 'review')];
     const runs = [work('implement'), answered('done'), answered('sent-back'), answered('done')];
+    expect(decideTick(input({ cards, runs }))).toMatchObject({ kind: 'dispatch', phase: 'task-review' });
+  });
+
+  // A REVIEW WHOSE VERDICT COULD NOT BE RECORDED re-reviews without limit, and the two bounds above both miss
+  // it. The trigger asks whether the latest WORK run carries a verification, so a review that answered and
+  // whose verdict the endpoint refused leaves that run exactly as it was: it is not inconclusive — it HAS a
+  // verdict — and `dispatches: 1` resets the idle counter, so `MAX_IDLE_TICKS` never arrives either. The task
+  // pays for a full review every tick for as long as the write keeps failing.
+  it('stops stalled once a task has had every review its fix budget can justify', () => {
+    const cards = [...story(['E-001']), task('E-001', 'review')];
+    // Four reviews that each answered, and a work run still carrying no verdict: exactly the shape a verdict
+    // that cannot be written leaves behind.
+    const runs = [work('implement'), answered('done'), answered('done'), answered('done'), answered('done')];
+    const action = decideTick(input({ cards, runs }));
+    expect(action).toMatchObject({ kind: 'stop', reason: 'stalled' });
+    expect(detailOf(action)).toContain('E-001');
+    expect(detailOf(action)).toContain('reviews');
+    // NOT blocked: a verdict this server cannot write is not work nobody can fix.
+    expect(detailOf(action)).not.toContain('blocked');
+  });
+
+  it('still allows the review a full fix budget entitles it to', () => {
+    // `attemptCap + 1` is the healthy MAXIMUM rather than a margin — implement, a review and a fix for each
+    // send-back, then the review that passes — so three spent must leave the fourth available.
+    const cards = [...story(['E-001']), task('E-001', 'review')];
+    const runs = [work('implement'), answered('sent-back'), answered('sent-back'), answered('sent-back')];
     expect(decideTick(input({ cards, runs }))).toMatchObject({ kind: 'dispatch', phase: 'task-review' });
   });
 });

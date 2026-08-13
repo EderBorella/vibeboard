@@ -14,6 +14,7 @@ import {
   inconclusiveReviews,
   latestWorkRun,
   outstandingVerdict,
+  reviewsRun,
   verdictRun,
 } from './bounds.js';
 import { allSettled, hasUnfinishedChildren, isSettled } from './derived-status.js';
@@ -152,8 +153,13 @@ function whyStuck(ap: AutopilotConfig, cards: Card[], unfinished: Card[], blocke
   const { waiting, rest } = partitionStuck(ap, cards, unfinished);
   const parts: string[] = [];
   if (rest.length > 0) {
+    // WHAT ACTUALLY PLACES A CARD, which is not a table the reader can edit. Under ruling 52 the phase table
+    // is code and a column dispatches nothing, so "check that every column is routed, terminal or blocked" —
+    // which this said — sent the reader to a routing table that no longer decides anything. What leaves a card
+    // here is its column: one the phase table has no row for, so no phase claims it and every branch falls
+    // through.
     parts.push(
-      `Nothing can move ${names(rest)} — check that every column that holds a card is routed, terminal or blocked`,
+      `Nothing can move ${names(rest)}: ${isAre(rest)} in a column the lifecycle has no phase for — a folder added by hand, or one taken out of the board's columns with cards still in it. Move ${rest.length === 1 ? 'it' : 'them'} to a column the board still has`,
     );
   }
   if (blocked.length > 0) {
@@ -285,36 +291,45 @@ function skipPhase(name: PhaseName, card: Card, why: string): TickAction | undef
   return to === undefined ? undefined : { kind: 'stamp', phase: name, card, to, why };
 }
 
-// THE FEATURE CHECKUP, and the one bound that is not an attempt count. DECISION 47: a checkup point gets ONE
-// round of creation, and after that it may only close the card or stop.
+// EITHER CHECKUP, and the one bound that is not an attempt count. DECISION 47: a checkup point gets ONE round
+// of creation, and after that it may only close the card or stop.
 //
-// The round is read off the BOARD — a card stamped `createdBy` one of this feature's own checkup runs — and
-// never out of the run's own `created` list, which is the agent's claim about itself (ruling 58, finding F).
+// The round is read off the BOARD — a card stamped `createdBy` one of this card's own checkup runs — and never
+// out of the run's own `created` list, which is the agent's claim about itself (ruling 58, finding F).
 //
 // `> 1` because the run that created is itself one of this card's checkup runs: more than one means a checkup
-// has already had its close-or-stop turn and left the feature open. Asking again is asking a model to change
-// its mind, which decision 47 rejects as an exit condition.
-function featureCheckup(input: TickInput, feature: Card): TickAction | undefined {
-  const skill = phase('feature-checkup').skill;
+// has already had its close-or-stop turn and left the card open. Asking again is asking a model to change its
+// mind, which decision 47 rejects as an exit condition.
+//
+// THE STORY'S IS ASKED TOO, and that is a correction. Ruling 54 makes creating siblings and closing the story
+// ONE act, so there looks to be no second visit to bound — but that holds only while the exit stamp SUCCEEDS.
+// A refused move leaves the story settled and in `in-progress`, and the next tick dispatches another checkup
+// with a fresh creating round, up to `attemptCap` of them, each entitled to create more siblings.
+function checkupPhase(
+  input: TickInput,
+  name: 'story-checkup' | 'feature-checkup',
+  card: Card,
+): TickAction | undefined {
+  const skill = phase(name).skill;
   if (skill === undefined) return undefined;
-  const spent = creatingRoundSpent(input.cards, input.runs, feature.id, skill);
-  if (spent && attemptsUsed(input.runs, feature.id, skill) > 1) {
+  const spent = creatingRoundSpent(input.cards, input.runs, card.id, skill);
+  if (spent && attemptsUsed(input.runs, card.id, skill) > 1) {
+    const what = name === 'feature-checkup' ? 'feature' : 'story';
     return stop(
       'stalled',
-      `${feature.id} has already had its one round of creating work, and the checkup after it still did not close the feature. Read its runs: what it believes is missing needs a person now, or belongs in a suggestion.`,
+      `${card.id} has already had its one round of creating work, and the checkup after it still did not close the ${what}. Read its runs: what it believes is missing needs a person now, or belongs in a suggestion.`,
     );
   }
-  return dispatchPhase(input, 'feature-checkup', feature);
+  return dispatchPhase(input, name, card);
 }
 
-// THE STORY LOOP, rows P2, P2s and P6. No creating-round bound: ruling 54 makes creating siblings and closing
-// the story one act, so there is no second visit to this point to bound.
+// THE STORY LOOP, rows P2, P2s and P6.
 function storyPhase(input: TickInput, story: Card, tasks: Card[]): TickAction | undefined {
   if (tasks.length === 0) return dispatchPhase(input, 'story-breakdown', story);
   if (ENTERING.includes(story.columnSlug)) {
     return skipPhase('story-breakdown-skip', story, 'it already has tasks, so its break-down is skipped.');
   }
-  if (allSettled(input.ap, tasks)) return dispatchPhase(input, 'story-checkup', story);
+  if (allSettled(input.ap, tasks)) return checkupPhase(input, 'story-checkup', story);
   return taskPhase(input, tasks);
 }
 
@@ -401,6 +416,22 @@ function reviewPhase(input: TickInput, task: Card): TickAction | undefined {
       `${task.id}'s review has failed to reach a verdict ${input.ap.attemptCap} times. That is a review that cannot complete rather than work nobody can fix, so auto-pilot has stopped: read the review runs — an API key, a disk or a model is the likelier cause than the card.`,
     );
   }
+  // AND A TOTAL, which is the number the spec's arithmetic row already states. The trigger above asks whether
+  // the latest WORK run carries a verification, so a review that answered and whose verdict could not be
+  // WRITTEN leaves that run exactly as it was: it is not inconclusive — it has a verdict — and `dispatches: 1`
+  // resets the idle counter, so neither of the other two bounds ever arrives and the task pays for a full
+  // review every tick for as long as the write keeps failing.
+  //
+  // `attemptCap + 1` is the healthy maximum rather than a margin: implement, then a review and a fix for each
+  // of `attemptCap` send-backs, then the review that passes. So this cannot stall a task that is making
+  // progress, and it stops the loop naming THE REVIEW rather than blocking the task — same distinction as the
+  // bound above, and for the same reason.
+  if (reviewsRun(input.runs, task.id) >= input.ap.attemptCap + 1) {
+    return stop(
+      'stalled',
+      `${task.id} has had ${input.ap.attemptCap + 1} reviews, which is every review its fix budget can justify, and it is still in review. Read the review runs and the run they judged: a verdict that cannot be recorded looks exactly like this, and it is a problem with this server rather than with the card.`,
+    );
+  }
   return { kind: 'dispatch', phase: 'task-review', skill, card: task, previous: judging.run };
 }
 
@@ -447,7 +478,7 @@ function phaseAction(input: TickInput, position: Position): TickAction | undefin
   if (story) return storyPhase(input, story, tasks);
   // No story left to work. Every one of them settled is the checkup's trigger; anything else is a board the
   // machine cannot place, and falling through reports it rather than guessing.
-  return allSettled(input.ap, stories) ? featureCheckup(input, feature) : undefined;
+  return allSettled(input.ap, stories) ? checkupPhase(input, 'feature-checkup', feature) : undefined;
 }
 
 export function decideTick(input: TickInput): TickAction {

@@ -4,6 +4,7 @@ import {
   inconclusiveReviews,
   latestWorkRun,
   outstandingVerdict,
+  reviewsRun,
 } from '../src/core/bounds.js';
 import {
   type ReviewVerdict,
@@ -19,8 +20,10 @@ import type { Verification } from '../src/core/verify.js';
 // never writes, and that is precisely how `producedNothing` shipped dead behind a green suite
 // (src/core/runs.ts:532-537).
 
-// Ids ascend with creation order, because run ids are sortable stamps and the whole codebase reads
-// "latest" off them (src/server/run-store.ts:116-122,172).
+// Every run shares one `started`, so the ID is what decides "latest" here and it ascends with creation
+// order. That is the TIE-BREAK rather than the ordering: `latest` ranks by `started` first, because a run
+// id is only sortable to the second and its suffix is random — see the suite below, which is about
+// exactly that.
 let seq = 0;
 function base(over: Partial<RunRecord> = {}): RunRecord {
   seq += 1;
@@ -186,6 +189,30 @@ describe('inconclusiveReviews', () => {
 
   it('is scoped to the card', () => {
     expect(inconclusiveReviews([died('review', 'E-002')], 'E-001')).toBe(0);
+  });
+});
+
+// EVERY REVIEW A TASK HAS COST, which is the total the spec's arithmetic row states and which
+// `inconclusiveReviews` deliberately does not count. It exists for the reviews that ANSWERED and still left
+// the task in review — a verdict the endpoint refused, for instance.
+describe('reviewsRun', () => {
+  it('counts the reviews that answered, which the inconclusive bound does not', () => {
+    const runs = [rev('done'), rev('sent-back'), rev('done')];
+    expect(reviewsRun(runs, 'E-001')).toBe(3);
+    expect(inconclusiveReviews(runs, 'E-001')).toBe(0);
+  });
+
+  it('counts an inconclusive review too, because it is still a review the task paid for', () => {
+    expect(reviewsRun([died('review'), rev('done')], 'E-001')).toBe(2);
+  });
+
+  it('does not count a cancelled review — you stopped it', () => {
+    const stopped = withoutReport(base({ skill: 'review' }), 'cancelled', 'You stopped it.', 'T');
+    expect(reviewsRun([stopped], 'E-001')).toBe(0);
+  });
+
+  it('does not count the work runs, or another card’s reviews', () => {
+    expect(reviewsRun([work('implement'), work('fix'), rev('done', 'E-002')], 'E-001')).toBe(0);
   });
 });
 

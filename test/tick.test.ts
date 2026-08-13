@@ -60,10 +60,20 @@ const derivation = (status: RunStatus, i: number): RunRecord => ({
   board: undefined,
 });
 
+// The scaffolder's own defaults, as slugs. Product carries a `blocked` column since decision 45's
+// 2026-08-13 correction, and the tick reads this list before stamping one — a column IS a folder, so a
+// stamp to a column the board has not got creates the folder and hides the card.
 const COLUMNS: Record<BoardName, string[]> = {
   features: ['backlog', 'todo', 'in-progress', 'done'],
-  product: ['backlog', 'todo', 'in-progress', 'done'],
+  product: ['backlog', 'todo', 'in-progress', 'blocked', 'done'],
   engineering: ['backlog', 'in-progress', 'review', 'blocked', 'done'],
+};
+
+// A project scaffolded before product had one. There is no migration (ruling 59), so this is the shape of
+// every project that already exists.
+const WITHOUT_PRODUCT_BLOCKED: Record<BoardName, string[]> = {
+  ...COLUMNS,
+  product: ['backlog', 'todo', 'in-progress', 'done'],
 };
 
 const RUNNING: AutopilotState = { state: 'running', iteration: 0 };
@@ -489,8 +499,12 @@ describe('decideTick — the feature loop', () => {
     expect(action).toMatchObject({ kind: 'stop', reason: 'stalled' });
     expect(detailOf(action)).toContain('F-001');
     expect(detailOf(action)).toContain('break-down');
-    // No blocked column above engineering, so a feature nobody can break down is a project-level problem.
-    expect(detailOf(action)).toContain('needs a person');
+    // A feature nobody can break down is a project-level problem: it has no sibling to carry on with, so
+    // there is nothing for the loop to do instead. THE EXACT CLAUSE, and it must not be one the
+    // blocked-column branch also makes — while both said "needs a person", a feature that started being
+    // stamped into a column features has not got produced the other sentence and this passed anyway.
+    expect(detailOf(action)).toContain('there is nothing else auto-pilot can try on it');
+    expect(detailOf(action)).not.toContain('blocked');
   });
 
   it('dispatches checkup-feature once every story is settled', () => {
@@ -603,11 +617,85 @@ describe('decideTick — the story loop', () => {
     });
   });
 
-  it('stops stalled naming the story once its break-down has used every attempt', () => {
+  // DECISION 45's 2026-08-13 CORRECTION, and this test used to assert the stop it replaces. A story that
+  // cannot be broken down is left blocked and the loop carries on: the run that produced this ruling had one
+  // redundant story stop a whole project with three untouched features queued behind it.
+  it('blocks a story whose break-down has used every attempt, rather than stopping the project', () => {
     const cards = [feature(['P-001']), card('P-001', 'product', 'todo', 10, ['F-001'])];
     const action = decideTick(input({ cards, runs: threeRunsOf('P-001', 'product', 'break-down') }));
+    expect(action).toMatchObject({
+      kind: 'stamp',
+      phase: 'story-breakdown',
+      card: { id: 'P-001' },
+      to: 'blocked',
+    });
+    // Not a dispatch and not a stop: the judgement is that three attempts produced nothing, which the
+    // record already carries — there is nothing left to pay a model for.
+    expect(action.kind).toBe('stamp');
+  });
+
+  // AND THE NEXT STORY IS PICKED UP. The whole point of the correction, asserted where the position is
+  // derived: a blocked story is neither open nor queued, so its sibling is next.
+  it('works the next story once one is blocked', () => {
+    const cards = [
+      feature(['P-001', 'P-002']),
+      card('P-001', 'product', 'blocked', 10, ['F-001']),
+      card('P-002', 'product', 'backlog', 20, ['F-001']),
+    ];
+    expect(decideTick(input({ cards }))).toMatchObject({
+      kind: 'dispatch',
+      phase: 'story-breakdown',
+      card: { id: 'P-002' },
+    });
+  });
+
+  // AND THE FEATURE STILL REACHES ITS CHECKUP over a story nobody could break down: blocked settles, so
+  // the feature closes carrying the problem rather than waiting for a story no run can move.
+  it('dispatches checkup-feature when one story is done and another is blocked', () => {
+    const cards = [
+      feature(['P-001', 'P-002']),
+      card('P-001', 'product', 'done', 10, ['F-001']),
+      card('P-002', 'product', 'blocked', 20, ['F-001']),
+    ];
+    expect(decideTick(input({ cards }))).toMatchObject({
+      kind: 'dispatch',
+      phase: 'feature-checkup',
+      skill: 'checkup-feature',
+    });
+  });
+
+  // FAILS CLOSED ON A BOARD WITH NO BLOCKED COLUMN, which is every project scaffolded before this rule
+  // (ruling 59: no migration). A column IS a folder, so a stamp to one the board has not got would create
+  // it and put the story where `readBoard` never looks — the old stop is the honest answer, and it names
+  // what the board is missing rather than the card.
+  it('stops stalled, naming the missing column, when product has no blocked column', () => {
+    const cards = [feature(['P-001']), card('P-001', 'product', 'todo', 10, ['F-001'])];
+    const action = decideTick(
+      input({
+        cards,
+        columns: WITHOUT_PRODUCT_BLOCKED,
+        runs: threeRunsOf('P-001', 'product', 'break-down'),
+      }),
+    );
     expect(action).toMatchObject({ kind: 'stop', reason: 'stalled' });
     expect(detailOf(action)).toContain('P-001');
+    expect(detailOf(action)).toContain('no blocked column');
+    // The remedy, since the block is not editable from Settings: a person has to add the column.
+    expect(detailOf(action)).toContain('Add a blocked column');
+  });
+
+  // AND THE STORY CHECKUP DOES NOT BLOCK ITS CARD. Only a break-down does: a checkup point that will not
+  // close is a judgement about work already delivered, so there is nothing "waiting for a person" about the
+  // story itself. Pinned, or adding a phase to that list later would be a silent change of behaviour.
+  it('stops stalled, rather than blocking the story, when its checkup has used every attempt', () => {
+    const cards = [
+      feature(['P-001']),
+      card('P-001', 'product', 'in-progress', 10, ['F-001', 'E-001']),
+      card('E-001', 'engineering', 'done', 10, ['P-001']),
+    ];
+    const action = decideTick(input({ cards, runs: threeRunsOf('P-001', 'product', 'checkup-story') }));
+    expect(action).toMatchObject({ kind: 'stop', reason: 'stalled' });
+    expect(detailOf(action)).toContain('checkup-story');
   });
 
   it('dispatches checkup-story once every task is settled', () => {

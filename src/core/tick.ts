@@ -263,19 +263,51 @@ function finished(ap: AutopilotConfig, live: Card[], blocked: Card[]): TickActio
 // work ends, and these say a card has been picked up but its children are not being worked yet.
 const ENTERING = ['backlog', 'todo'];
 
-// A card that has used every attempt at one skill, above engineering. There is no blocked column up here —
-// deliberately: a break-down or a checkup that cannot succeed after three tries is a project-level problem
-// with nothing below it to carry on with, so it stops the loop and names itself.
-function capReached(
-  ap: AutopilotConfig,
-  runs: RunRecord[],
-  card: Card,
-  skill: string,
-): TickAction | undefined {
-  if (attemptsUsed(runs, card.id, skill) < ap.attemptCap) return undefined;
-  return stop(
-    'stalled',
-    `${card.id} has used all ${ap.attemptCap} attempts at ${skill}. A ${card.board} card has no blocked column to go to, so this needs a person: read its runs, then move it or change what it asks for.`,
+// THE PHASES THAT LEAVE THEIR CARD BLOCKED RATHER THAN STOPPING THE PROJECT, above engineering.
+//
+// A STORY'S BREAK-DOWN, by decision 45's 2026-08-13 correction. "Tasks only" was argued from a failed
+// break-down having nothing below it to carry on with — true of a feature, false of a story, which sits
+// among siblings exactly as a task does. The run that produced this had P-001 delivered and closed, then
+// P-002 — the same story under another title — could not be broken down three times because P-001's tasks
+// had already satisfied it, and the loop stopped the whole project over it with three features queued
+// behind. Blocked settles the story, the feature carries on with the next one, and the checkups see it.
+//
+// NOT THE FEATURE'S, and not either checkup: a feature has no sibling to carry on with, and a checkup point
+// that will not close is a judgement about work that is already done rather than work nobody could start.
+// Both still stop the loop and name themselves (the spec's own cycle table).
+const BLOCKS_AT_CAP: readonly PhaseName[] = ['story-breakdown'];
+
+// A card that has used every attempt at one skill.
+function capReached(input: TickInput, name: PhaseName, card: Card, skill: string): TickAction | undefined {
+  const { ap } = input;
+  if (attemptsUsed(input.runs, card.id, skill) < ap.attemptCap) return undefined;
+  const used = `${card.id} has used all ${ap.attemptCap} attempts at ${skill}`;
+  if (!BLOCKS_AT_CAP.includes(name)) {
+    // IT DOES NOT SAY "this board has no blocked column", which is what it used to say and is now false for
+    // two of the three phases that reach here: a story checkup's card sits on a board that HAS one, and the
+    // loop declines to use it because the story's own work is already delivered. Nor may the two branches
+    // share a phrase — while they did, planting `feature-breakdown` into the list above changed the answer
+    // for a feature from this sentence to the one below and no test could tell.
+    return stop(
+      'stalled',
+      `${used}, and there is nothing else auto-pilot can try on it: read its runs, then move ${card.id} or change what it asks for.`,
+    );
+  }
+  // FAIL CLOSED WHERE THE STAMP CANNOT LAND. Product gained its blocked column on 2026-08-13 and there is
+  // no migration (ruling 59), so every project scaffolded before that has none — and a column IS a folder,
+  // so stamping one the board does not have does not fail: it CREATES the folder and puts the card where
+  // `readBoard` never looks. The honest answer there is the old one, naming what the board is missing.
+  if (!(input.columns[card.board] ?? []).includes(ap.blockedColumn)) {
+    return stop(
+      'stalled',
+      `${used}, and the ${card.board} board has no ${ap.blockedColumn} column to leave it in, so auto-pilot cannot carry on to the next one. Add a ${ap.blockedColumn} column to that board, or read ${card.id}'s runs and change what it asks for.`,
+    );
+  }
+  return stampTo(
+    name,
+    card,
+    ap.blockedColumn,
+    `it has used all ${ap.attemptCap} attempts at ${skill} and still has nothing under it, so auto-pilot has left it for you and carried on.`,
   );
 }
 
@@ -285,7 +317,7 @@ function capReached(
 function dispatchPhase(input: TickInput, name: PhaseName, card: Card): TickAction | undefined {
   const skill = phase(name).skill;
   if (skill === undefined) return undefined;
-  return capReached(input.ap, input.runs, card, skill) ?? { kind: 'dispatch', phase: name, skill, card };
+  return capReached(input, name, card, skill) ?? { kind: 'dispatch', phase: name, skill, card };
 }
 
 // A phase the loop carries out alone. `exitPass` rather than a column named here: the table already says

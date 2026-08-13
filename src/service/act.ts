@@ -1,12 +1,15 @@
 import { burnsAttempt } from '../core/accounting.js';
 import type { TickAction } from '../core/actions.js';
+import type { AutopilotState } from '../core/autopilot-state.js';
+import { unreviewedGatesSentence } from '../core/autopilot-state.js';
 import type { StopReason } from '../core/dispatch-gate.js';
 import { phase } from '../core/phases.js';
 import { producedNothing, type RunRecord } from '../core/runs.js';
+import { setupSubtreeIds } from '../core/setup-feature.js';
 import { BOARDS, type Card } from '../core/types.js';
 import { unverified, type Verification } from '../core/verify.js';
 import { commitAll } from '../server/git-work.js';
-import type { verifyGates, verifySmoke } from '../server/verifier.js';
+import { verifyGates, type verifySmoke } from '../server/verifier.js';
 import type { Answer, BoardClient, DispatchRequest } from './board-client.js';
 import type { ActResult, TickContext } from './loop.js';
 import { stamp } from './stamp.js';
@@ -56,10 +59,11 @@ export interface ActDeps {
   // caller that ignored an `ensureBranch` refusal cannot commit a person's work under an agent's message.
   branch: string;
   now: () => Date;
-  // What a critic's score must reach, from `autopilot.criticThreshold`. Passed in rather than re-read here:
-  // the loop already holds the config it decided with, and reading it twice would let the bar a card was
-  // judged against differ from the bar the tick compared.
-  threshold: number;
+  // THE GATE-DOCUMENT APPROVAL, read at the moment the commands would run rather than once at start-up. An
+  // agent may rewrite `foundation/CODE-QUALITY.md` mid-session, and a value captured earlier would be a
+  // refusal about a state that has already changed. Required rather than optional: an absent reader would
+  // default to running whatever is in the file, which is the hole this exists to close.
+  state: () => Promise<Pick<AutopilotState, 'unreviewedGates'>>;
   log?: (message: string) => void;
   // Seams, so every branch below is reachable without spawning an agent or running a project's test suite.
   verify?: {
@@ -161,6 +165,19 @@ async function dispatch(deps: ActDeps, action: Dispatch, context: TickContext): 
   if (committed.reason !== undefined) {
     const what = card ? `dispatching ${card.id}` : 'deriving the board';
     return stop(deps, 'stalled', `Auto-pilot stopped before ${what}: ${committed.reason}`);
+  }
+
+  // DECISION 51: the review phase is DETERMINISTIC FIRST, so it does not take the ordinary path at all — its
+  // gates run in this process and a model is dispatched only if they pass. Placed after the commit, because
+  // whatever the last run left behind must be recoverable before anything else happens.
+  if (action.phase === 'task-review' && card) {
+    return await reviewTask(
+      deps,
+      card,
+      action.previous,
+      { setupSubtree: await inSetup(deps, card) },
+      context,
+    );
   }
 
   const refusedEntry = await stampEntry(deps, action);
@@ -300,6 +317,202 @@ async function afterProjectRun(
     outcome: settled.status,
   });
   return { dispatches: 1 };
+}
+
+// WHETHER THIS CARD IS IN THE SETUP SUBTREE, asked of the board the loop can already read. It is the loop's
+// question and not the card's: told by the card, an absent gate set would be something a card could claim.
+//
+// A board it could not read is treated as OUTSIDE the subtree, which is the fail-closed direction — being
+// wrong the other way excuses an absent gate set for a card nobody chose (decision 51).
+async function inSetup(deps: ActDeps, card: Card): Promise<boolean> {
+  const board = await deps.client.board();
+  if (!board.ok) return false;
+  const cards = BOARDS.flatMap((b) => board.value.boards[b] ?? []);
+  return setupSubtreeIds(cards).has(card.id);
+}
+
+// A gates verdict carrying NO command is one where no command was RUN: the set was absent, empty or would not
+// parse (core/verify.ts). That is the only shape the setup exception recognises — a test runner that is
+// installed and red carries its own command and is an ordinary send-back.
+const nothingRan = (gates: Verification): boolean => gates.command === undefined;
+
+// THE REVIEW PHASE, in two steps and in that order (decision 51).
+//
+// 1. THE LOOP RUNS THE GATES, in this process, and they fail closed: a missing or empty gate set fails, and a
+//    gate that cannot run is a failure rather than a skip. A failure is a send-back carrying the command's own
+//    output, with no model dispatched and no tokens spent. A gate is a command with an exit code — the most
+//    deterministic thing in this design — and handing it to an agent would make a settled fact a judgement.
+// 2. ONLY IF THEY PASS, a `review` run judges what they cannot express: does this do what the card asked. A
+//    gate proves the suite passes; it cannot prove the suite tests the criterion the card states.
+//
+// AND THE SECURITY GATE THAT MOVES WITH THE EXECUTION. Until now the only thing between an agent-rewritten
+// `foundation/CODE-QUALITY.md` and its commands running unsandboxed as this user was the refusal on
+// `POST /api/runs`, which worked precisely because gate commands ran AFTER a dispatch the endpoint could
+// refuse. Running them first takes that refusal out from in front of them, so the loop refuses to run any gate
+// command at all while a gate document is unread, and stops saying so.
+export async function reviewTask(
+  deps: ActDeps,
+  card: Card,
+  workRun: string | undefined,
+  opts: { setupSubtree?: boolean },
+  context: TickContext,
+): Promise<ActResult> {
+  const p = phase('task-review');
+  if (workRun === undefined) {
+    // Unreachable through the loop — `decideTick` produces no review action without a run to judge — but a
+    // verdict has to land on a run, and inventing one would be worse than stopping.
+    return stop(
+      deps,
+      'stalled',
+      `${card.id} is in review with no run to judge, so there is nothing auto-pilot can say about it.`,
+    );
+  }
+  const unread = (await deps.state()).unreviewedGates;
+  if (unread && unread.length > 0) {
+    return stop(
+      deps,
+      'stalled',
+      `Auto-pilot will not run a gate command while a gate document is unread. ${unreviewedGatesSentence(unread)}`,
+    );
+  }
+  const gates = await (deps.verify?.gates ?? verifyGates)(deps.root, deps.now().toISOString());
+  // THE ONE NARROW EXCEPTION, narrow in two ways: only in the setup subtree, and only for a gate set that was
+  // never run. Installing the toolchain and the test runner is what a setup card is FOR, so it has no gates to
+  // pass — and the reviewer is told to judge by reading instead.
+  if (!gates.passed && !(opts.setupSubtree === true && nothingRan(gates))) {
+    return await recordVerdict(deps, card, workRun, gates, p.exitFail, {
+      why: 'its gates failed, so it goes back to be fixed.',
+      line: gatesLine(card, gates),
+      dispatches: 0,
+      // NO ITERATION: nothing was dispatched, so the count this line is filed under is the one already spent.
+      iteration: context.iteration,
+    });
+  }
+  return await judge(deps, card, workRun, opts.setupSubtree === true, context);
+}
+
+// The model half, reached only once the deterministic half has passed.
+async function judge(
+  deps: ActDeps,
+  card: Card,
+  workRun: string,
+  setupSubtree: boolean,
+  context: TickContext,
+): Promise<ActResult> {
+  const p = phase('task-review');
+  const skill = p.skill;
+  if (skill === undefined) return { dispatches: 0 };
+  const started = await deps.client.dispatch({
+    board: card.board,
+    card: card.id,
+    skill,
+    previous: workRun,
+    // `gatesPassed` is true for the excused case too: the gate STEP passed, and which of the two happened is
+    // what `setupSubtree` says. The prompt renders the setup wording in preference, so it never claims a
+    // suite is green when there was none to run.
+    review: { gatesPassed: true, setupSubtree },
+  });
+  if (!started.ok) {
+    return await refused(deps, `could not dispatch ${card.id}'s review`, started.reason, started.fatal);
+  }
+  const settled = await settle(deps, started.value.run.run, () => deps.client.cardRuns(card.board, card.id));
+  if (!settled) {
+    return stop(
+      deps,
+      'stalled',
+      `${card.id}'s review did not finish within the time auto-pilot waits for one, so nothing can be said about it and it has been left in review.`,
+    );
+  }
+  // AN INCONCLUSIVE REVIEW: it ended and decided nothing. No verdict to write and no move to make — "no
+  // answer" is not an answer (decision 40), and `decideTick` counts these and is the one place that gives up.
+  if (settled.verdict === undefined) {
+    await deps.client.log('run', inconclusiveLine(card, settled, context), {
+      iteration: context.iteration + 1,
+      card: card.id,
+      board: card.board,
+      skill,
+      outcome: settled.status,
+    });
+    return { dispatches: 1 };
+  }
+  const passed = settled.verdict === 'done';
+  const verification: Verification = {
+    mode: 'review',
+    passed,
+    at: deps.now().toISOString(),
+    // The run that did the judging, so its reasoning is one lookup away rather than a correlation by
+    // timestamp — and its summary, so a `fix` is handed the finding rather than told to go and look.
+    by: settled.run,
+    ...(settled.summary ? { reason: settled.summary } : {}),
+  };
+  return await recordVerdict(deps, card, workRun, verification, passed ? p.exitPass : p.exitFail, {
+    why: passed ? 'its review passed it.' : 'its review sent it back with findings.',
+    line: reviewLine(card, settled, passed, context),
+    dispatches: 1,
+    iteration: context.iteration + 1,
+  });
+}
+
+// A VERDICT WRITTEN ONTO THE RUN IT JUDGES, and then the move that verdict decides. One function for both
+// kinds — a gate's and a reviewer's — because the ORDER is the behaviour and must not be written twice: the
+// verdict is recorded first, so a card that moved is always a card whose reason is on disk.
+async function recordVerdict(
+  deps: ActDeps,
+  card: Card,
+  workRun: string,
+  verification: Verification,
+  to: string | undefined,
+  what: { why: string; line: string; dispatches: number; iteration: number },
+): Promise<ActResult> {
+  const recorded = await deps.client.verdict(card.board, card.id, workRun, verification);
+  if (!recorded.ok) {
+    return refused(
+      deps,
+      `could not record the verdict on ${workRun}`,
+      recorded.reason,
+      recorded.fatal,
+      what.dispatches,
+    );
+  }
+  if (to !== undefined) {
+    const stamped = await stamp(deps, card, to, what.why);
+    if (!stamped.ok) {
+      return refused(
+        deps,
+        `could not move ${card.id} to ${to}`,
+        stamped.reason,
+        stamped.fatal,
+        what.dispatches,
+      );
+    }
+  }
+  await deps.client.log('run', what.line, {
+    iteration: what.iteration,
+    card: card.id,
+    board: card.board,
+    skill: phase('task-review').skill,
+  });
+  return { dispatches: what.dispatches };
+}
+
+// THE GATES' OWN WORDS. The command and how it ended, in the diary, so a person reads why a card went back
+// without opening a run record — and no model was involved, which the line says because a reader would
+// otherwise assume one was.
+function gatesLine(card: Card, gates: Verification): string {
+  const evidence = gates.command === undefined ? '' : ` \`${gates.command}\` is the one that failed.`;
+  const because = gates.reason ? ` ${gates.reason}` : '';
+  return `${card.id} failed its gates, so it goes back to be fixed — no model was asked and no iteration was spent.${evidence}${because}`;
+}
+
+function reviewLine(card: Card, review: RunRecord, passed: boolean, context: TickContext): string {
+  const what = passed ? 'passed it' : 'sent it back';
+  return `Iteration ${context.iteration + 1}: ${card.id}'s review ${what}.${said(review)}`;
+}
+
+// A review that ran and answered nothing. It says so plainly rather than reporting the run's own outcome: a
+// review whose turn went perfectly and which decided nothing has not passed anything.
+function inconclusiveLine(card: Card, review: RunRecord, context: TickContext): string {
+  return `Iteration ${context.iteration + 1}: ${card.id}'s review ended as ${review.status} and reported no verdict, so nothing was decided and it stays in review.${said(review)}`;
 }
 
 // What a person reads afterwards about a bootstrap. The count is what happened; the run's own summary is what

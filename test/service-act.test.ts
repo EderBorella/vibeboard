@@ -1,10 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { TickAction } from '../src/core/actions.js';
-import { DEFAULT_AUTOPILOT } from '../src/core/autopilot.js';
 import type { RunRecord, RunStatus } from '../src/core/runs.js';
 import type { BoardName, Card } from '../src/core/types.js';
 import type { Verification } from '../src/core/verify.js';
-import { type ActDeps, performAction } from '../src/service/act.js';
+import { type ActDeps, performAction, reviewTask } from '../src/service/act.js';
 import type { DispatchRequest } from '../src/service/board-client.js';
 
 // One action, carried out, and this is where the phase table finally has an executor.
@@ -42,13 +41,26 @@ const IMPLEMENT = (card = CARD()): TickAction => ({
   card,
 });
 
-// The phase with NO entry column: the card is already in review, and a move to where it is would be a write
-// for nothing — and a diary line about an event that did not happen.
+// The review phase. It carries the run it is judging, because a verdict lands on a run and there is nothing
+// for one to be written onto otherwise — and it does NOT take the ordinary dispatch path at all: its gates run
+// first, in this process (decision 51).
 const REVIEW = (card = CARD()): TickAction => ({
   kind: 'dispatch',
   phase: 'task-review',
   skill: 'review',
   card,
+  previous: 'IMPL-1',
+});
+
+// The phase with NO entry column that DOES take the ordinary path: a task being fixed is already in
+// `in-progress`, so a move to where it is would be a write for nothing — and a diary line about an event that
+// did not happen.
+const FIX = (card = CARD()): TickAction => ({
+  kind: 'dispatch',
+  phase: 'task-fix',
+  skill: 'fix',
+  card,
+  previous: 'IMPL-1',
 });
 
 const BOOTSTRAP: TickAction = { kind: 'dispatch', phase: 'bootstrap', skill: 'derive-features' };
@@ -90,7 +102,9 @@ function recorder(
   } = {},
 ) {
   const calls: string[] = [];
-  const verdicts: Verification[] = [];
+  // WHICH RUN each verdict landed on, not only what it said: a review verdict belongs on the run it judged
+  // and never on the review run itself, and only the run id can tell those apart.
+  const verdicts: (Verification & { run: string })[] = [];
   const moves: { card: string; to: string }[] = [];
   const diary: { kind: string; text: string }[] = [];
   const dispatched: string[] = [];
@@ -150,7 +164,7 @@ function recorder(
     },
     verdict: async (_b: BoardName, _c: string, run: string, verification: Verification) => {
       calls.push(`verdict:${run}`);
-      verdicts.push(verification);
+      verdicts.push({ ...verification, run });
       return opts.verdict ?? { ok: true as const, value: {} };
     },
     log: async (kind: string, text: string) => {
@@ -173,7 +187,9 @@ function deps(
     root: '/tmp/project',
     branch: 'autopilot/2026-08-06',
     now: () => new Date('2026-08-06T10:05:00Z'),
-    threshold: DEFAULT_AUTOPILOT.criticThreshold,
+    // Nothing unreviewed by default. Injected as a READER rather than a value because the refusal below is
+    // about the state at the moment the commands would run, not at the moment the loop was built.
+    state: async () => ({ unreviewedGates: [] }),
     // Records what it was asked to commit. Ignoring the arguments meant `deps.root` and `deps.branch` could
     // both be wrong and the whole suite still passed — so the promise that a commit cannot land on someone
     // else's branch under an agent's message was held by nothing.
@@ -223,9 +239,9 @@ describe('one dispatch, end to end', () => {
   });
 
   it('stamps nothing on entry for a phase with no entry column', async () => {
-    // `task-review` is already in review; a move to where it is would be a write for nothing — and a diary
-    // line about an event that did not happen. Asserted through the ORDER, because the phase does have an
-    // EXIT column and `moves` being non-empty afterwards is correct.
+    // A task being fixed is already in `in-progress`; a move to where it is would be a write for nothing — and
+    // a diary line about an event that did not happen. Asserted through the ORDER, because the phase does have
+    // an EXIT column and `moves` being non-empty afterwards is correct.
     const order: string[] = [];
     const r = recorder();
     const originalDispatch = r.client.dispatch;
@@ -245,10 +261,10 @@ describe('one dispatch, end to end', () => {
           return { committed: true };
         },
       }),
-      REVIEW(),
+      FIX(),
       context,
     );
-    expect(order).toEqual(['commit', 'dispatch', 'move:done']);
+    expect(order).toEqual(['commit', 'dispatch', 'move:review']);
   });
 
   it('commits the run’s own tree, on the run’s own branch', async () => {
@@ -322,7 +338,7 @@ describe('one dispatch, end to end', () => {
   // tick re-picked the same card and dispatched over work that had already passed — three times over.
   it('reports a dispatch that happened even when the stamp after it was refused', async () => {
     const r = recorder({ move: { ok: false, reason: 'refused with 409', fatal: false } });
-    const result = await performAction(deps(r.client), REVIEW(), context);
+    const result = await performAction(deps(r.client), FIX(), context);
     expect(result.dispatches).toBe(1);
   });
 
@@ -661,5 +677,294 @@ describe('deriving an empty board', () => {
     const result = await performAction(deps(r.client), BOOTSTRAP, context);
     expect(result.dispatches).toBe(0);
     expect(r.diary.some((d) => d.kind === 'note' && d.text.includes('403'))).toBe(true);
+  });
+});
+
+// THE REVIEW PHASE: deterministic first (decision 51). The loop runs the gates in its OWN process, and a
+// model is dispatched only for what a command's exit code cannot express — does this do what the card asked.
+//
+// A gate is a command with an exit code, which is the most deterministic thing in this design; handing it to
+// an agent would make a settled fact a judgement.
+describe('the review phase', () => {
+  const gatesPass = async (): Promise<Verification> => ({ mode: 'gates', passed: true, at: 'T' });
+  const gatesFail = async (): Promise<Verification> => ({
+    mode: 'gates',
+    passed: false,
+    at: 'T',
+    command: 'npm test',
+    output: 'Tests  1 failed | 40 passed',
+    reason: '`npm test` exited with 1.',
+  });
+  // NO COMMAND, because none was run: an absent, empty or unparseable gate set (core/verify.ts). That is the
+  // shape the setup exception recognises, and the only shape it recognises.
+  const noGates = async (): Promise<Verification> => ({
+    mode: 'gates',
+    passed: false,
+    at: 'T',
+    reason: 'foundation/CODE-QUALITY.md declares no gates.',
+  });
+
+  const smoke = async (): Promise<Verification> => ({ mode: 'smoke', passed: true, at: 'T' });
+
+  // Records whether a gate command was even attempted. `ran` empty is a different claim from "the gates
+  // failed", and it is the claim the security refusal makes.
+  const watching = (gates: () => Promise<Verification>, ran: string[]) => ({
+    gates: async (...args: unknown[]) => {
+      ran.push('gates');
+      void args;
+      return await gates();
+    },
+    smoke,
+  });
+
+  const reviewRun = (over: Partial<RunRecord> = {}): RunRecord =>
+    record({ run: 'REV-1', skill: 'review', status: 'success', outcome: 'success', ...over });
+
+  // THE SECURITY GATE, first because it is the one that must never regress. Running the gates BEFORE a
+  // dispatch takes `POST /api/runs`'s refusal out from in front of them, and that refusal was the only thing
+  // between an agent-rewritten gate document and its commands running unsandboxed as the server's user.
+  it('runs NO gate command while a gate document is unreviewed, and stops saying so', async () => {
+    const ran: string[] = [];
+    const r = recorder();
+    const result = await reviewTask(
+      deps(r.client, {
+        state: async () => ({ unreviewedGates: ['CODE-QUALITY.md'] }),
+        verify: watching(gatesPass, ran) as unknown as ActDeps['verify'],
+      }),
+      CARD(),
+      'IMPL-1',
+      {},
+      context,
+    );
+    // NOT "it failed" — it never ran.
+    expect(ran).toEqual([]);
+    expect(result.stop?.reason).toBe('stalled');
+    expect(result.stop?.detail).toContain('I have read the gate commands');
+    expect(r.requests).toHaveLength(0);
+    expect(r.moves).toEqual([]);
+    expect(r.verdicts).toEqual([]);
+  });
+
+  it('runs the gates when nothing is unreviewed', async () => {
+    const ran: string[] = [];
+    const r = recorder({ settle: [reviewRun({ verdict: 'done' })] });
+    const result = await reviewTask(
+      deps(r.client, { verify: watching(gatesPass, ran) as unknown as ActDeps['verify'] }),
+      CARD(),
+      'IMPL-1',
+      {},
+      context,
+    );
+    expect(ran).toEqual(['gates']);
+    expect(result.stop).toBeUndefined();
+  });
+
+  it('sends a task back with the command’s own output when a gate fails, dispatching nothing', async () => {
+    const r = recorder();
+    const result = await reviewTask(
+      deps(r.client, { verify: { gates: gatesFail, smoke } as unknown as ActDeps['verify'] }),
+      CARD(),
+      'IMPL-1',
+      {},
+      context,
+    );
+    // No model, no tokens, no iteration.
+    expect(r.requests).toHaveLength(0);
+    expect(result.dispatches).toBe(0);
+    expect(r.verdicts[0]).toMatchObject({ run: 'IMPL-1', mode: 'gates', passed: false, command: 'npm test' });
+    expect(r.verdicts[0]?.output).toContain('1 failed');
+    expect(r.moves).toEqual([{ card: 'E-001', to: 'in-progress' }]);
+    // And the diary carries the command, so a person reads why without opening a run record.
+    expect(r.diary.find((d) => d.kind === 'run')?.text).toContain('npm test');
+  });
+
+  it('dispatches a review run only when the gates pass', async () => {
+    const r = recorder({ settle: [reviewRun({ verdict: 'done' })] });
+    await reviewTask(
+      deps(r.client, { verify: { gates: gatesPass, smoke } as unknown as ActDeps['verify'] }),
+      CARD(),
+      'IMPL-1',
+      {},
+      context,
+    );
+    expect(r.requests[0]).toMatchObject({ skill: 'review', card: 'E-001', previous: 'IMPL-1' });
+  });
+
+  // FAIL CLOSED (decision 3). Seven of the design review's findings were this one bug, and every one ended
+  // with auto-pilot reporting success over work that never happened.
+  it('fails a task whose project declares no gates', async () => {
+    const r = recorder();
+    await reviewTask(
+      deps(r.client, { verify: { gates: noGates, smoke } as unknown as ActDeps['verify'] }),
+      CARD(),
+      'IMPL-1',
+      {},
+      context,
+    );
+    expect(r.verdicts[0]).toMatchObject({ mode: 'gates', passed: false });
+    expect(r.requests).toHaveLength(0);
+  });
+
+  // THE ONE NARROW EXCEPTION, narrow in two ways at once: only in the setup subtree, and only for a gate set
+  // that is ABSENT. Installing the test runner is what that card is for.
+  it('reviews a setup-subtree card whose gate set is absent, by reading', async () => {
+    const r = recorder({ settle: [reviewRun({ verdict: 'done' })] });
+    await reviewTask(
+      deps(r.client, { verify: { gates: noGates, smoke } as unknown as ActDeps['verify'] }),
+      CARD(),
+      'IMPL-1',
+      { setupSubtree: true },
+      context,
+    );
+    expect(r.requests[0]).toMatchObject({ skill: 'review' });
+    expect(r.verdicts[0]).toMatchObject({ mode: 'review' });
+  });
+
+  it('still sends a setup-subtree card back when a gate EXISTS and fails', async () => {
+    // Absent is expected; failing is not. A runner that is installed and red is a different fact.
+    const r = recorder();
+    await reviewTask(
+      deps(r.client, { verify: { gates: gatesFail, smoke } as unknown as ActDeps['verify'] }),
+      CARD(),
+      'IMPL-1',
+      { setupSubtree: true },
+      context,
+    );
+    expect(r.requests).toHaveLength(0);
+    expect(r.verdicts[0]).toMatchObject({ mode: 'gates', passed: false });
+  });
+
+  it('passes the gate result and the setup subtree through to the prompt', async () => {
+    // Task 11's field, and this is its producer. Read off the dispatch the client received, because that is
+    // the only carrier there is.
+    const r = recorder({ settle: [reviewRun({ verdict: 'done' })] });
+    await reviewTask(
+      deps(r.client, { verify: { gates: noGates, smoke } as unknown as ActDeps['verify'] }),
+      CARD(),
+      'IMPL-1',
+      { setupSubtree: true },
+      context,
+    );
+    expect(r.requests[0]?.review).toEqual({ gatesPassed: true, setupSubtree: true });
+  });
+
+  it('writes the review verdict onto the run it judged, never onto the review run', async () => {
+    const r = recorder({ settle: [reviewRun({ verdict: 'done', summary: 'does what the card asked' })] });
+    await reviewTask(
+      deps(r.client, { verify: { gates: gatesPass, smoke } as unknown as ActDeps['verify'] }),
+      CARD(),
+      'IMPL-1',
+      {},
+      context,
+    );
+    expect(r.verdicts).toHaveLength(1);
+    expect(r.verdicts[0]).toMatchObject({ run: 'IMPL-1', mode: 'review', passed: true, by: 'REV-1' });
+    // The findings travel with the verdict: a `fix` run is handed this, not told to go and look.
+    expect(r.verdicts[0]?.reason).toContain('does what the card asked');
+    expect(r.moves).toEqual([{ card: 'E-001', to: 'done' }]);
+  });
+
+  it('sends a task back on a sent-back verdict', async () => {
+    const r = recorder({ settle: [reviewRun({ verdict: 'sent-back', summary: 'the flag is not parsed' })] });
+    await reviewTask(
+      deps(r.client, { verify: { gates: gatesPass, smoke } as unknown as ActDeps['verify'] }),
+      CARD(),
+      'IMPL-1',
+      {},
+      context,
+    );
+    expect(r.verdicts[0]).toMatchObject({ mode: 'review', passed: false, by: 'REV-1' });
+    expect(r.moves).toEqual([{ card: 'E-001', to: 'in-progress' }]);
+  });
+
+  // RULE 2 (act.ts): `outcome` is what the agent said about its own turn. A review whose turn went perfectly
+  // and which decided nothing has not passed anything.
+  it('advances a task only on the verdict, never on the review run’s own outcome', async () => {
+    const r = recorder({ settle: [reviewRun({ outcome: 'success', verdict: undefined })] });
+    const result = await reviewTask(
+      deps(r.client, { verify: { gates: gatesPass, smoke } as unknown as ActDeps['verify'] }),
+      CARD(),
+      'IMPL-1',
+      {},
+      context,
+    );
+    expect(r.verdicts).toEqual([]);
+    expect(r.moves).toEqual([]);
+    // The dispatch still counts, and the tick's own bound over inconclusive reviews is what gives up.
+    expect(result.dispatches).toBe(1);
+  });
+
+  it('counts the review dispatch against the caps', async () => {
+    // Decision 8: everything a model does counts. A boolean here let every judged card cost one iteration
+    // instead of two.
+    const r = recorder({ settle: [reviewRun({ verdict: 'done' })] });
+    const result = await reviewTask(
+      deps(r.client, { verify: { gates: gatesPass, smoke } as unknown as ActDeps['verify'] }),
+      CARD(),
+      'IMPL-1',
+      {},
+      context,
+    );
+    expect(result.dispatches).toBe(1);
+  });
+
+  it('leaves the task in review and burns no move when the review run does not settle', async () => {
+    const r = recorder({ settle: [reviewRun({ status: 'running' })] });
+    const result = await reviewTask(
+      deps(r.client, { verify: { gates: gatesPass, smoke } as unknown as ActDeps['verify'] }),
+      CARD(),
+      'IMPL-1',
+      {},
+      context,
+    );
+    expect(result.stop?.reason).toBe('stalled');
+    expect(r.moves).toEqual([]);
+    expect(r.verdicts).toEqual([]);
+  });
+
+  // THE WIRING, through the executor rather than the function: a `task-review` dispatch must not go down the
+  // ordinary path, which would spend a model before anything deterministic had run.
+  it('carries a task-review action out through the gates, not through an ordinary dispatch', async () => {
+    const ran: string[] = [];
+    const r = recorder();
+    const result = await performAction(
+      deps(r.client, { verify: watching(gatesFail, ran) as unknown as ActDeps['verify'] }),
+      REVIEW(),
+      context,
+    );
+    expect(ran).toEqual(['gates']);
+    expect(r.requests).toHaveLength(0);
+    expect(result.dispatches).toBe(0);
+  });
+
+  // WHO DECIDES the setup subtree: the loop, off the board it can already read. A `work` credential could not
+  // be asked for it, and being told by the card would make the exception something a card could claim.
+  it('reads the setup subtree off the board rather than being told', async () => {
+    const feature = { ...CARD('F-001', 'features'), setup: true, links: ['P-001'] };
+    const story = { ...CARD('P-001', 'product'), links: ['E-001'] };
+    const r = recorder({
+      settle: [reviewRun({ verdict: 'done' })],
+      boardCards: [feature, story, CARD()],
+    });
+    await performAction(
+      deps(r.client, { verify: { gates: gatesPass, smoke } as unknown as ActDeps['verify'] }),
+      REVIEW(),
+      context,
+    );
+    expect(r.requests[0]?.review).toEqual({ gatesPassed: true, setupSubtree: true });
+  });
+
+  it('treats a board it could not read as outside the setup subtree, which fails closed', async () => {
+    // Being wrong the other way excuses an absent gate set for a card nobody chose.
+    const r = recorder({
+      settle: [reviewRun({ verdict: 'done' })],
+      board: { ok: false, reason: 'could not reach the board', fatal: false },
+    });
+    await performAction(
+      deps(r.client, { verify: { gates: gatesPass, smoke } as unknown as ActDeps['verify'] }),
+      REVIEW(),
+      context,
+    );
+    expect(r.requests[0]?.review).toEqual({ gatesPassed: true, setupSubtree: false });
   });
 });

@@ -94,6 +94,18 @@ interface DispatchBody {
   model?: string;
   effort?: string;
   mode?: string;
+  // WHAT THE LOOP ALREADY DID, for a review run: the gate result and whether the card is in the setup
+  // subtree. `unknown` rather than the shape, because a body is whatever was sent — and refused outright
+  // from every scope but `service` (ruling 63), which is what stops a review agent talking its own reviewer
+  // into a pass.
+  review?: unknown;
+}
+
+// The two booleans, coerced. A `service` caller is the loop, but a body is still JSON: `=== true` is the only
+// reading that cannot turn a string, a number or a missing key into a pass.
+function reviewFacts(given: unknown): { gatesPassed: boolean; setupSubtree: boolean } {
+  const o = (given ?? {}) as Record<string, unknown>;
+  return { gatesPassed: o.gatesPassed === true, setupSubtree: o.setupSubtree === true };
 }
 
 // EVERY board's columns, never just the skill's. `Skill.boards` scopes where a skill may be
@@ -124,9 +136,12 @@ function everyBoardColumns(config: ProjectConfig): BoardColumns[] {
 //
 // The skill name comes from the PHASE TABLE (ruling 52), not a constant of its own: three copies of a slug is
 // three places for it to drift.
-function reviewFor(slug: string): { review?: { gatesPassed: boolean; setupSubtree: boolean } } {
+function reviewFor(
+  slug: string,
+  given: unknown,
+): { review?: { gatesPassed: boolean; setupSubtree: boolean } } {
   if (slug !== phase('task-review').skill) return {};
-  return { review: { gatesPassed: false, setupSubtree: false } };
+  return { review: reviewFacts(given) };
 }
 
 // Turn a request into everything the runner needs, or into the refusal to send back. Separated from
@@ -261,7 +276,7 @@ async function resolveDispatch(
     input: {
       skill,
       card,
-      ...reviewFor(skill.slug),
+      ...reviewFor(skill.slug, body.review),
       cardFile,
       linked,
       ...(previous ? { previous: previous.run } : {}),
@@ -319,6 +334,20 @@ async function dispatchRefusal(
       code: 403,
       error:
         'Only auto-pilot may start a run with no card. Dispatch this skill from a card, or let auto-pilot derive the board.',
+    };
+  }
+  // RULING 63, and it follows the refusal above exactly — including that it refuses the BROWSER too, which is
+  // the only other caller the scope table lets reach this route at all.
+  //
+  // These are facts the loop COMPUTES and hands to a model: that the gates it ran in its own process passed,
+  // and whether the card is in the setup subtree where an absent gate set is expected. A field on this request
+  // is a field its caller can set, so a review able to send `gatesPassed: true` could talk its own reviewer
+  // into a pass — decision 40 defeated through a side door.
+  if (body?.review !== undefined && scope !== 'service') {
+    return {
+      code: 403,
+      error:
+        'Only auto-pilot may say what its gates did: it runs them itself, in its own process, and a run that could claim they passed would be judging its own work. Dispatch the review without it, and it will be told plainly that nobody has run them.',
     };
   }
   return undefined;

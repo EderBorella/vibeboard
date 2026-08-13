@@ -54,10 +54,17 @@ export interface DispatchRequest {
   card?: string;
   project?: true;
   skill: string;
-  // The run this one follows: for a critic, the run it is judging. Without it the judge was told to score
-  // "work that is already done" and had to guess which — and on the first hand-run it guessed the previous,
-  // successful run and passed a card whose actual run had died (run-prompt.ts).
+  // The run this one follows: for a judging run, the run it is judging. Without it the judge was told to
+  // score "work that is already done" and had to guess which — and on the first hand-run it guessed the
+  // previous, successful run and passed a card whose actual run had died (run-prompt.ts).
   previous?: string;
+  // WHAT THE LOOP ALREADY ESTABLISHED before dispatching a review: that the gates it ran in its own process
+  // passed, and whether this card is in the setup subtree, where an absent gate set is expected.
+  //
+  // The first hop of the carrier chain — `DispatchRequest` → `DispatchBody` → `DispatchInput` →
+  // `PromptInputs` — and refused from every scope but this one at the far end (ruling 63): a review agent
+  // able to send `gatesPassed: true` could talk its own reviewer into a pass.
+  review?: { gatesPassed: boolean; setupSubtree: boolean };
 }
 
 export interface ClientOptions {

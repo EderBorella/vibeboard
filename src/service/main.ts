@@ -1,4 +1,3 @@
-import { DEFAULT_AUTOPILOT } from '../core/autopilot.js';
 import { readAutopilotState, updateAutopilotState } from '../server/autopilot-store.js';
 import { startSession } from '../server/git-work.js';
 import { commitTail, performAction } from './act.js';
@@ -37,15 +36,15 @@ const log = (message: string): void => {
   console.log(`[autopilot] ${message}`);
 };
 
-// The branch this session works on, and the bar a critic is judged against, both read once at start-up: the
-// branch because a session commits and switches ONCE (`startSession`) rather than per run; the threshold
-// because the bar a card was judged against must not differ from the bar the tick compared.
+// One read before anything else, as a pre-flight: a loop whose project is not open, or whose credential is
+// already gone, says so here with the server's own sentence rather than dying inside its first tick.
 const board = await client.board();
 if (!board.ok) {
   console.error(`the auto-pilot loop cannot start: ${board.reason}`);
   process.exit(2);
 }
-const ap = board.value.config.autopilot ?? DEFAULT_AUTOPILOT;
+// The branch this session works on, read once at start-up because a session commits and switches ONCE
+// (`startSession`) rather than per run.
 const branchName = `autopilot/${new Date().toISOString().slice(0, 10)}`;
 // Commits whatever was already in the tree, THEN switches. A dirty tree is not a blocker (ruling
 // 2026-08-11): the only moment a person's own edits can be sitting there is the moment they press Start, so
@@ -64,7 +63,10 @@ const actDeps = {
   root,
   branch: branch.branch,
   now: () => new Date(),
-  threshold: ap.criticThreshold,
+  // FRESH ON EVERY READ, not captured here: an agent may rewrite a gate document mid-session, and the loop
+  // refuses to run a gate command while one is unread. A value read at start-up would be a refusal about a
+  // state that has already changed.
+  state: () => readAutopilotState(root, new Date().toISOString()),
 };
 
 const ended = await runLoop({

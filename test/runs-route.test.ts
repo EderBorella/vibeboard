@@ -957,3 +957,99 @@ describe('POST /api/runs with no card', () => {
     expect(prompt).toContain('POST /api/cards');
   }, 30000);
 });
+
+// RULING 63. Evidence the LOOP computes reaches a prompt on a `service`-only field, and the reason is a
+// security one rather than a tidiness one: a field on `POST /api/runs` is a field its caller can set, so a
+// review agent able to send `gatesPassed: true` could talk its own reviewer into a pass — decision 40 defeated
+// through a side door.
+//
+// The precedent is exact and already in this file: `project: true` is refused from every scope but `service`,
+// the browser included. This follows it, including that.
+describe('POST /api/runs — the loop’s own evidence', () => {
+  const REVIEWING = (review: unknown) => ({ skill: 'review', review });
+
+  async function asService(): Promise<TestProject & { card: string; headers: Record<string, string> }> {
+    const project = await projectWithCard();
+    await writeAutopilotState(project.root, { ...IDLE_STATE, state: 'running' });
+    const service = project.mint('service', 'run-svc');
+    return { ...project, headers: { authorization: `Bearer ${service.token}` } };
+  }
+
+  // THE BROWSER, which is the only non-service caller that reaches the handler at all: the scope table already
+  // denies `POST /api/runs` to both working scopes. Asked on an IDLE project so the refusal is this rule's
+  // own — while auto-pilot runs, `dispatchLock` refuses every by-hand dispatch first.
+  it('refuses the gate result from a browser, which does not run the gates', async () => {
+    const project = await projectWithCard();
+    const res = await project.app.inject({
+      method: 'POST',
+      url: '/api/runs',
+      payload: { board: 'engineering', card: project.card, ...REVIEWING({ gatesPassed: true }) },
+    });
+    expect(res.statusCode).toBe(403);
+    // And it says what to do instead, like every refusal in this file.
+    expect(res.json().error).toMatch(/auto-pilot/i);
+  });
+
+  it('refuses it from a work credential too', async () => {
+    // Refused twice over, and deliberately: the scope table denies the whole route to a working scope, and
+    // this rule denies the field. Neither is a substitute for the other — a route the table later widened
+    // would still not carry the loop's own facts.
+    const project = await projectWithCard();
+    const cred = project.mint('work', 'run-w', project.card);
+    const res = await project.app.inject({
+      method: 'POST',
+      url: '/api/runs',
+      headers: { authorization: `Bearer ${cred.token}` },
+      payload: { board: 'engineering', card: project.card, ...REVIEWING({ gatesPassed: true }) },
+    });
+    expect(res.statusCode).toBe(403);
+  });
+
+  it('accepts it from the service credential', async () => {
+    const project = await asService();
+    const res = await project.app.inject({
+      method: 'POST',
+      url: '/api/runs',
+      headers: project.headers,
+      payload: {
+        board: 'engineering',
+        card: project.card,
+        ...REVIEWING({ gatesPassed: true, setupSubtree: false }),
+      },
+    });
+    expect(res.statusCode).toBe(200);
+    await settled(project, project.card, (res.json() as { run: RunRecord }).run.run);
+  }, 30000);
+
+  // THE POINT OF THE REFUSAL, and the half that a status code alone does not prove.
+  it('does not reach the prompt when refused', async () => {
+    const argsLog = await recordingShimArgs();
+    const project = await projectWithCard();
+    const refused = await project.app.inject({
+      method: 'POST',
+      url: '/api/runs',
+      payload: {
+        board: 'engineering',
+        card: project.card,
+        ...REVIEWING({ gatesPassed: true, setupSubtree: true }),
+      },
+    });
+    expect(refused.statusCode).toBe(403);
+
+    // The same dispatch without the field is allowed, and is told the truth about the gates instead.
+    const { run } = (
+      await project.app.inject({
+        method: 'POST',
+        url: '/api/runs',
+        payload: { board: 'engineering', card: project.card, skill: 'review' },
+      })
+    ).json() as { run: RunRecord };
+    await settled(project, project.card, run.run);
+    delete process.env.VIBEBOARD_SHIM_ARGS;
+
+    const prompt = await promptFrom(argsLog);
+    expect(prompt).not.toContain('gates have already passed');
+    expect(prompt).not.toContain('no gate set yet');
+    expect(prompt).toMatch(/nobody has run the gates/i);
+  }, 30000);
+});

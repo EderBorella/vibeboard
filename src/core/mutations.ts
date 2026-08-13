@@ -14,7 +14,9 @@ export interface CreateCardInput {
   title: string;
   description?: string;
   tags?: string[];
-  links?: string[];
+  // NO `links` (ruling 65). It was here, and `createCard` wrote it straight into the new card's frontmatter —
+  // an asymmetric write nothing inspects, because `childrenOf` and `parentOf` both read the PARENT's list. A
+  // create that carries links goes through `createLinkedCard`, which is the only door onto `setCardLinks`.
   group?: string;
   body?: string;
   // The run that created this card (ruling 58). Stamped by the endpoint from the credential it already
@@ -64,7 +66,8 @@ export async function createCard(
     description: input.description,
     order: maxOrder + ORDER_STEP,
     tags: input.tags ?? [],
-    links: input.links ?? [],
+    // Always empty: a link is written after the card exists, by the one writer that also writes the far side.
+    links: [],
     group: input.group,
     created: today,
     createdBy: input.createdBy,

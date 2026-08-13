@@ -5,7 +5,7 @@ import { boardColumnSlugs, readBoard } from '../src/core/board.js';
 import { readConfig } from '../src/core/config.js';
 import { findCard } from '../src/core/find.js';
 import { boardRel } from '../src/core/layout.js';
-import { boardOfId, setCardLinks } from '../src/core/links.js';
+import { boardOfId, createLinkedCard, setCardLinks } from '../src/core/links.js';
 import { type CreateCardInput, createCard } from '../src/core/mutations.js';
 import { scaffoldProject } from '../src/core/scaffold.js';
 import type { Card, ProjectConfig } from '../src/core/types.js';
@@ -132,6 +132,83 @@ describe('setCardLinks (symmetric)', () => {
     const freshA = await findCard(root, 'product', a.id, config);
     await setCardLinks(root, config, freshA!, []);
     expect((await findCard(root, 'engineering', shared.id, config))!.links).toEqual([b.id]);
+  });
+});
+
+// RULING 65, in the data layer. `createCard` took a `links` field and wrote it into the new card's frontmatter
+// itself — one side of a symmetric relation, and the side neither `childrenOf` nor `parentOf` reads.
+describe('createLinkedCard', () => {
+  it('writes the far side, so the new card is a child rather than an orphan', async () => {
+    const { root, config } = await fixture();
+    const parent = await create(root, config, { board: 'features', columnSlug: 'backlog', title: 'F' });
+
+    const made = await createLinkedCard(
+      root,
+      config,
+      { board: 'product', columnSlug: 'todo', title: 'A story' },
+      [parent.id],
+      TODAY,
+    );
+
+    const child = cardFrom(made as Card | 'unknown-column');
+    expect(child.links).toEqual([parent.id]);
+    // THE HALF THAT WAS MISSING, and the one the hierarchy is derived from.
+    const cards = await readBoard(root, 'features', config);
+    expect(cards.find((c) => c.id === parent.id)?.links).toContain(child.id);
+  });
+
+  it('refuses a second parent, and leaves no card behind when it does', async () => {
+    // The far-side check, which is the one the create path can actually trip: the back-reference this writes
+    // lands on cards that already have a parent of their own.
+    const { root, config, engColumn } = await fixture();
+    const story = await create(root, config, { board: 'product', columnSlug: 'todo', title: 'P' });
+    const task = await create(root, config, { board: 'engineering', columnSlug: engColumn, title: 'E' });
+    await setCardLinks(root, config, story, [task.id]);
+
+    const spentBefore = (await readBoard(root, 'product', config)).length;
+    const refused = await createLinkedCard(
+      root,
+      config,
+      { board: 'product', columnSlug: 'todo', title: 'A second parent' },
+      [task.id],
+      TODAY,
+    );
+
+    expect(refused).toMatchObject({ problem: expect.stringContaining('would give it two') });
+    // Taken back off the board: a refused create must not leave a card standing with none of its links.
+    expect((await readBoard(root, 'product', config)).length).toBe(spentBefore);
+    expect((await findCard(root, 'engineering', task.id, config))?.links).toEqual([story.id]);
+  });
+
+  it('leaves the check to the caller when the project allows many parents', async () => {
+    const { root, config, engColumn } = await fixture();
+    const story = await create(root, config, { board: 'product', columnSlug: 'todo', title: 'P' });
+    const task = await create(root, config, { board: 'engineering', columnSlug: engColumn, title: 'E' });
+    await setCardLinks(root, config, story, [task.id]);
+
+    const made = await createLinkedCard(
+      root,
+      config,
+      { board: 'product', columnSlug: 'todo', title: 'Also its parent' },
+      [task.id],
+      TODAY,
+      false,
+    );
+
+    expect(cardFrom(made as Card | 'unknown-column').links).toEqual([task.id]);
+  });
+
+  it('creates nothing at all when the column is not on the board', async () => {
+    const { root, config } = await fixture();
+    expect(
+      await createLinkedCard(
+        root,
+        config,
+        { board: 'product', columnSlug: 'not-a-column', title: 'Phantom' },
+        ['F-001'],
+        TODAY,
+      ),
+    ).toBe('unknown-column');
   });
 });
 

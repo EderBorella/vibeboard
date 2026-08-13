@@ -29,15 +29,14 @@ const create = async (root: string, input: CreateCardInput): Promise<Card> =>
 describe('mutations', () => {
   it('creates a card with the next id and a file on disk', async () => {
     const root = await tempDir();
-    const card = await create(root, {
-      board: 'engineering',
-      columnSlug: ENG_FIRST,
-      title: 'First',
-      links: ['P-001'],
-    });
+    const card = await create(root, { board: 'engineering', columnSlug: ENG_FIRST, title: 'First' });
     expect(card.id).toBe('E-001');
     expect(card.created).toBe(TODAY);
-    expect(card.links).toEqual(['P-001']);
+    // NO LINKS, ever, from this function (ruling 65). It used to take them and write them into the new card's
+    // frontmatter unaccompanied, and `childrenOf`/`parentOf` read the OTHER side — so the card was an orphan
+    // while its own file named its parent. `createLinkedCard` is the door now; the field is gone from the
+    // input, so the type is the enforcement and this is the behaviour under it.
+    expect(card.links).toEqual([]);
     await expect(access(card.filePath)).resolves.toBeUndefined();
 
     const second = await create(root, { board: 'engineering', columnSlug: ENG_FIRST, title: 'Second' });

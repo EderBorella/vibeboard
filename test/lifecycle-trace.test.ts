@@ -281,7 +281,16 @@ async function place(
   return card.id;
 }
 
-describe('the lifecycle, driven end to end', () => {
+// A MINUTE PER TEST, and vitest's 5,000ms default is the wrong number for what these do. Every test here
+// spawns a real HTTP listener, seven to nine real child processes, and real shell commands through
+// `/bin/sh`; in isolation one takes about a second, and inside the whole suite — twenty workers, all of
+// them busy — this file has been measured at 13.6 seconds for eight tests. Under the default that is a
+// timeout on an arbitrary test whenever the machine is loaded, which is indistinguishable from a bug in
+// the code and is what a reviewer chasing the ORDERING flake in here also had to wade through.
+//
+// A timeout is a declaration of how long the work may take, not a retry: no assertion is relaxed by it,
+// and a test that genuinely hangs still fails — one minute later.
+describe('the lifecycle, driven end to end', { timeout: 60_000 }, () => {
   it('walks a feature from an empty board to complete, in the order Part One §4 states', async () => {
     const started = await start({
       // One feature, one story under it, two tasks under that. The chain travels through the cards the shim

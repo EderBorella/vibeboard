@@ -2,10 +2,11 @@ import { burnsAttempt } from '../core/accounting.js';
 import type { TickAction } from '../core/actions.js';
 import type { AutopilotState } from '../core/autopilot-state.js';
 import { unreviewedGatesSentence } from '../core/autopilot-state.js';
+import { countLive, createdNothing } from '../core/created.js';
 import type { StopReason } from '../core/dispatch-gate.js';
-import { phase } from '../core/phases.js';
+import { type PhaseName, phase } from '../core/phases.js';
 import { producedNothing, type RunRecord } from '../core/runs.js';
-import { setupSubtreeIds } from '../core/setup-feature.js';
+import { hasSetupFeature, setupSubtreeIds } from '../core/setup-feature.js';
 import { BOARDS, type Card } from '../core/types.js';
 import { unverified, type Verification } from '../core/verify.js';
 import { commitAll } from '../server/git-work.js';
@@ -183,6 +184,14 @@ async function dispatch(deps: ActDeps, action: Dispatch, context: TickContext): 
   const refusedEntry = await stampEntry(deps, action);
   if (refusedEntry) return refusedEntry;
 
+  // HOW BIG THE BOARD WAS BEFORE, for a phase whose only product is cards. Read here rather than counted from
+  // the run's own `created` list, which is the agent's claim about itself (decision 43): that list would refuse
+  // a break-down which created five cards and forgot to name them, and pass one that named five it never made.
+  //
+  // `undefined` means either "this phase is not judged that way" or "the board could not be read", and both
+  // lead to the same place: a comparison that cannot be made is not evidence that nothing happened.
+  const before = CREATING_PHASES.includes(action.phase) ? await liveCount(deps) : undefined;
+
   const started = await deps.client.dispatch(requestFor(action));
   if (!started.ok) return await refused(deps, `could not dispatch ${whose}`, started.reason, started.fatal);
 
@@ -199,8 +208,21 @@ async function dispatch(deps: ActDeps, action: Dispatch, context: TickContext): 
     );
   }
   return card
-    ? await afterCardRun(deps, action, card, settled, context)
-    : await afterProjectRun(deps, action, settled, context);
+    ? await afterCardRun(deps, action, card, settled, context, before)
+    : await afterProjectRun(deps, action, settled, context, before);
+}
+
+// THE THREE PHASES WHOSE ONLY PRODUCT IS CARDS (decision 43). Named here rather than derived from `creates`,
+// because the two checkups declare a `creates` too and this rule must not touch them: a checkup's product is a
+// REPORT, creating is optional, and a checkup that creates nothing is the ordinary closing case (decision 47) —
+// applied to them, this would refuse every close.
+const CREATING_PHASES: readonly PhaseName[] = ['bootstrap', 'feature-breakdown', 'story-breakdown'];
+
+// How many live cards the board holds, or `undefined` when it could not be read. A failed read is stated as
+// unknown rather than guessed at: "created no cards" is a verdict, and a failed read is not evidence for it.
+async function liveCount(deps: ActDeps): Promise<number | undefined> {
+  const board = await deps.client.board();
+  return board.ok ? countLive(board.value.boards) : undefined;
 }
 
 // What a card's run earned. DECISION 40: the loop reads its own record of how the run ended — `status`, which
@@ -211,6 +233,8 @@ async function afterCardRun(
   card: Card,
   settled: RunRecord,
   context: TickContext,
+  // The live-card count before the dispatch, for a phase whose product is cards. See `CREATING_PHASES`.
+  before: number | undefined,
 ): Promise<ActResult> {
   const p = phase(action.phase);
   // An ending nobody is answerable for: the user cancelled it, or a restart left it stale. No attempt is
@@ -228,6 +252,17 @@ async function afterCardRun(
   // dispatch and are passing now — so the card would advance having implemented nothing. The attempt is still
   // burned: the agent had its chance (accounting.ts).
   if (producedNothing(settled)) return await recordEmptyRun(deps, action, card, settled, context);
+
+  // AND A CREATING PHASE WHOSE RUN PRODUCED NO CARD has not done its job, whatever it reported (decision 43).
+  // A different question from `producedNothing`, and both earn their place: that one asks whether the run left
+  // anything behind at all, and this one asks whether the board GREW — which is the only honest measure for a
+  // phase whose product goes through the API and therefore changes no files.
+  if (before !== undefined) {
+    const after = await liveCount(deps);
+    if (after !== undefined && createdNothing(before, after)) {
+      return await recordEmptyCreate(deps, action, card, settled, context);
+    }
+  }
 
   // THE EXIT STAMP, written because the run COMPLETED, whatever it says about itself.
   if (p.exitPass) {
@@ -249,6 +284,45 @@ async function afterCardRun(
     skill: action.skill,
     outcome: settled.status,
   });
+  return { dispatches: 1 };
+}
+
+// A failing verdict for a creating run whose board did not grow. The card stays where its entry stamp put it
+// and the attempt is burned by the record, exactly as an empty run's is — there is nothing to advance to,
+// because the thing this phase exists to produce does not exist.
+async function recordEmptyCreate(
+  deps: ActDeps,
+  action: Dispatch,
+  card: Card,
+  settled: RunRecord,
+  context: TickContext,
+): Promise<ActResult> {
+  const verification = unverified(
+    'gates',
+    deps.now().toISOString(),
+    `The ${action.skill} run created no card, and cards are the only thing this phase produces — so ${card.id} has not moved. Read its report: it may have decided there was nothing to create, which is a judgement a person needs to see.`,
+  );
+  const recorded = await deps.client.verdict(card.board, card.id, settled.run, verification);
+  if (!recorded.ok) {
+    return refused(
+      deps,
+      `could not record the verdict on ${settled.run}`,
+      recorded.reason,
+      recorded.fatal,
+      1,
+    );
+  }
+  await deps.client.log(
+    'run',
+    `Iteration ${context.iteration + 1}: ${card.id} ran ${action.skill} for its ${action.phase} phase and created no card, so it stayed where it is.${said(settled)}`,
+    {
+      iteration: context.iteration + 1,
+      card: card.id,
+      board: card.board,
+      skill: action.skill,
+      outcome: settled.status,
+    },
+  );
   return { dispatches: 1 };
 }
 
@@ -303,14 +377,24 @@ async function recordEmptyRun(
 // A bootstrap that produced nothing does NOT stop the loop here. The attempt is burned by the record itself,
 // `decideTick` counts those attempts, and it is the one place that decides when to give up — a second opinion
 // here would be a second cap disagreeing with the first.
+//
+// ITS EXIT IS THE SCAFFOLDING FLAG, and this is the only place it is ever written (decision 44).
 async function afterProjectRun(
   deps: ActDeps,
   action: Dispatch,
   settled: RunRecord,
   context: TickContext,
+  before: number | undefined,
 ): Promise<ActResult> {
   const board = await deps.client.board();
-  const created = board.ok ? BOARDS.reduce((n, b) => n + (board.value.boards[b]?.length ?? 0), 0) : undefined;
+  // `countLive`, the same count `createdNothing` is defined over: two ways of counting one board would be two
+  // answers to "did this run produce anything".
+  const created = board.ok ? countLive(board.value.boards) : undefined;
+  // Only where the board actually grew. A bootstrap that produced nothing has no scaffolding feature to name,
+  // and a board that could not be read is not evidence that it did.
+  if (board.ok && before !== undefined && created !== undefined && !createdNothing(before, created)) {
+    await stampSetup(deps, board.value.boards.features ?? []);
+  }
   await deps.client.log('run', bootstrapLine(action.skill, settled, created, context), {
     iteration: context.iteration + 1,
     skill: action.skill,
@@ -318,6 +402,46 @@ async function afterProjectRun(
   });
   return { dispatches: 1 };
 }
+
+// `setup: true` ON THE FIRST FEATURE IN `features/backlog`, by the `order` THE ENDPOINT ASSIGNED — read off the
+// board rather than out of the run's `created` list, which is the agent's claim about itself (finding F).
+//
+// WHICH FEATURE IS THE SCAFFOLDING IS NOT ASKED OF THE MODEL: it is the first one, and the loop stamps it. The
+// skill is told to derive features in the order they must be built and cannot set this flag at all.
+//
+// GUARDED BY `hasSetupFeature` over the live board AND THE ARCHIVE, because "once" is a board fact (decision
+// 50): a feature somebody archived after the bootstrap stamped it must still count, or a second derivation
+// would hand the flag to a card nobody chose — and under decision 51 the flag is what makes an absent gate set
+// expected instead of a failure.
+async function stampSetup(deps: ActDeps, features: Card[]): Promise<void> {
+  const archived = await deps.client.archive('features');
+  // A read that failed is not "no scaffolding feature". Withholding the stamp costs an ordering fact; awarding
+  // it on no evidence switches off a fail-closed check, so this fails the cheaper way.
+  if (!archived.ok) {
+    deps.log?.(`could not read the archive, so the scaffolding flag was left alone: ${archived.reason}`);
+    return;
+  }
+  if (hasSetupFeature([...features, ...archived.value.cards])) return;
+  const first = features.filter((c) => c.columnSlug === 'backlog').sort(byQueueOrder)[0];
+  if (!first) return;
+  const done = await deps.client.flags(first.board, first.id, { setup: true });
+  if (!done.ok) {
+    // NOT FATAL. This is the exit of a run that has already happened; losing the flag costs an ordering fact,
+    // and stopping the loop over it costs the project.
+    deps.log?.(`could not flag ${first.id} as the scaffolding feature: ${done.reason}`);
+    return;
+  }
+  await deps.client.log(
+    'lifecycle',
+    `${first.id} is this project's scaffolding feature: it establishes the toolchain, the test runner and the gate commands, and it is worked first.`,
+    { card: first.id, board: first.board },
+  );
+}
+
+// (order, then id) — the same comparator the queue is ranked by everywhere else. Two features with the same
+// order is a board a person edited, and taking the lower id is at least deterministic.
+const byQueueOrder = (a: Card, b: Card): number =>
+  a.order - b.order || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
 
 // WHETHER THIS CARD IS IN THE SETUP SUBTREE, asked of the board the loop can already read. It is the loop's
 // question and not the card's: told by the card, an absent gate set would be something a card could claim.

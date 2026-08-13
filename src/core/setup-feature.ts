@@ -25,6 +25,19 @@ export function setupFeature(cards: Card[]): Card | undefined {
   return live(cards).find((c) => c.board === 'features' && c.setup === true);
 }
 
+// HAS THIS PROJECT EVER HAD A SCAFFOLDING FEATURE — a different question from `setupFeature` above, and it
+// reads a different set on purpose (decision 50).
+//
+// "Once" is a BOARD FACT, and an archived card is still a fact about this board: a feature somebody archived
+// after the bootstrap stamped it must still count, or a second derivation would hand the flag to a card nobody
+// chose — and under decision 51 that flag is what makes an absent gate set expected instead of a failure.
+//
+// `setupFeature` keeps reading LIVE cards only, because the subtree root the reviewer's exception is scoped to
+// has to be a card that is actually on the board. Two questions, two functions.
+export function hasSetupFeature(cards: Card[]): boolean {
+  return cards.some((c) => c.board === 'features' && c.setup === true);
+}
+
 export function setupSubtreeIds(cards: Card[]): Set<string> {
   const feature = setupFeature(cards);
   if (!feature) return new Set();

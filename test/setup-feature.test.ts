@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_AUTOPILOT } from '../src/core/autopilot.js';
 import { ARCHIVE_SLUG } from '../src/core/layout.js';
-import { setupFeature, setupState, setupSubtreeIds } from '../src/core/setup-feature.js';
+import { hasSetupFeature, setupFeature, setupState, setupSubtreeIds } from '../src/core/setup-feature.js';
 import type { BoardName, Card } from '../src/core/types.js';
 
 function card(id: string, board: BoardName, columnSlug: string, links: string[], setup?: boolean): Card {
@@ -144,5 +144,48 @@ describe('an unreadable card means unknown, not finished', () => {
 
   it('an empty problems list is not a problem', () => {
     expect(setupState(cards(), TERMINAL, [])).toBe('unfinished');
+  });
+});
+
+// "HAS THIS PROJECT EVER HAD A SCAFFOLDING FEATURE" — a different question from "which card is the barrier
+// now", and it has to be, because they read different sets. Decision 50: scaffolding happens ONCE, and once is
+// a board fact including a feature somebody archived afterwards.
+describe('hasSetupFeature', () => {
+  it('sees a setup feature that has been archived', () => {
+    const archived = {
+      ...card('F-001', 'features', ARCHIVE_SLUG, [], true),
+      archived: '2026-08-13T00:00:00Z',
+    };
+    expect(hasSetupFeature([archived])).toBe(true);
+  });
+
+  it('is true for a live flagged feature', () => {
+    // Two cases, because a function that answered `true` for everything would pass the archived one alone.
+    expect(hasSetupFeature([card('F-001', 'features', 'in-progress', [], true)])).toBe(true);
+  });
+
+  it('is false for a board with no flagged card', () => {
+    expect(hasSetupFeature(cards().map((c) => ({ ...c, setup: undefined })))).toBe(false);
+  });
+
+  it('is false for an empty board, which is where the bootstrap starts', () => {
+    expect(hasSetupFeature([])).toBe(false);
+  });
+
+  it('ignores a flag on a card that is not a feature', () => {
+    // The hierarchy starts at features, so a flagged story is not a scaffolding feature — and reading one as
+    // one would withhold the stamp from the feature that should have had it.
+    expect(hasSetupFeature([card('P-001', 'product', 'backlog', [], true)])).toBe(false);
+  });
+
+  it('leaves setupFeature reading LIVE cards only', () => {
+    // Two questions, two functions. The subtree root for the reviewer's gate exception is a LIVE card — an
+    // archived feature confines nothing — and only the "once" question reads the archive.
+    const archived = {
+      ...card('F-001', 'features', ARCHIVE_SLUG, [], true),
+      archived: '2026-08-13T00:00:00Z',
+    };
+    expect(setupFeature([archived])).toBeUndefined();
+    expect(hasSetupFeature([archived])).toBe(true);
   });
 });

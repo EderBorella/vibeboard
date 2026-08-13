@@ -98,7 +98,12 @@ function recorder(
     // What the board holds when it is read back — the bootstrap's only evidence that it worked, since cards
     // are created through the API and a run that made a dozen of them changes no files.
     boardCards?: Card[];
+    // AND WHAT IT HELD BEFORE. A creating phase is judged on the board growing, so a fixture that answers the
+    // same thing twice can only express "created nothing" — which is the failure case, not the ordinary one.
+    boardBefore?: Card[];
     board?: { ok: false; reason: string; fatal: boolean };
+    archive?: Card[];
+    flags?: { ok: false; reason: string; fatal: boolean };
   } = {},
 ) {
   const calls: string[] = [];
@@ -106,6 +111,9 @@ function recorder(
   // and never on the review run itself, and only the run id can tell those apart.
   const verdicts: (Verification & { run: string })[] = [];
   const moves: { card: string; to: string }[] = [];
+  // The two frontmatter flags, which have their own route: the PATCH allow-list is what stops a work agent
+  // flagging its own card, so the loop's stamp cannot go through it.
+  const flags: { board: BoardName; card: string; body: Record<string, boolean> }[] = [];
   const diary: { kind: string; text: string }[] = [];
   const dispatched: string[] = [];
   // The requests themselves, not only the skill names: `previous` — which run a fix is addressing — is
@@ -150,8 +158,12 @@ function recorder(
     board: async () => {
       calls.push('board');
       if (opts.board) return opts.board;
+      // The FIRST read answers `boardBefore` where a test supplied one, every later read `boardCards`. That
+      // is the whole of "a card appeared while the run was going".
+      const reads = calls.filter((c) => c === 'board').length;
+      const showing = reads === 1 && opts.boardBefore ? opts.boardBefore : (opts.boardCards ?? []);
       const boards = { features: [], product: [], engineering: [] } as Record<BoardName, Card[]>;
-      for (const card of opts.boardCards ?? []) boards[card.board].push(card);
+      for (const card of showing) boards[card.board].push(card);
       return {
         ok: true as const,
         value: { config: { boards: {} } as never, boards, problems: [] },
@@ -172,8 +184,17 @@ function recorder(
       diary.push({ kind, text });
       return { ok: true as const, value: {} };
     },
+    archive: async (board: BoardName) => {
+      calls.push(`archive:${board}`);
+      return { ok: true as const, value: { cards: (opts.archive ?? []).filter((c) => c.board === board) } };
+    },
+    flags: async (board: BoardName, card: string, body: Record<string, boolean>) => {
+      calls.push(`flags:${card}`);
+      flags.push({ board, card, body });
+      return opts.flags ?? { ok: true as const, value: {} };
+    },
   };
-  return { client, calls, verdicts, moves, diary, dispatched, requests };
+  return { client, calls, verdicts, moves, diary, dispatched, requests, flags };
 }
 
 const commits: { root: string; message: string; branch?: string }[] = [];
@@ -507,8 +528,13 @@ describe('a run that produced nothing', () => {
   });
 
   it('advances a run whose product was cards rather than files', async () => {
-    // The successful shape of every card-producing skill: cards go through the API, so no file changed.
-    const r = recorder({ settle: [record({ status: 'success', outcome: 'success', filesChanged: 0 })] });
+    // The successful shape of every card-producing skill: cards go through the API, so no file changed. The
+    // board has to GROW in the fixture, because a creating phase is judged on that too — see `createdNothing`.
+    const r = recorder({
+      settle: [record({ status: 'success', outcome: 'success', filesChanged: 0 })],
+      boardBefore: [CARD('F-001', 'features')],
+      boardCards: [CARD('F-001', 'features'), CARD('P-001', 'product')],
+    });
     await performAction(deps(r.client), BREAKDOWN(), context);
     expect(r.moves.at(-1)).toEqual({ card: 'F-001', to: 'in-progress' });
     expect(r.verdicts).toEqual([]);
@@ -966,5 +992,177 @@ describe('the review phase', () => {
       context,
     );
     expect(r.requests[0]?.review).toEqual({ gatesPassed: true, setupSubtree: false });
+  });
+});
+
+// THE BOOTSTRAP'S EXIT (decision 44, corrected). `setup: true` fires here and at NO other time.
+//
+// The first draft made it a board predicate — "cards exist and none is flagged" — which would stamp it on any
+// project whose first feature a person added by hand. That was harmless while the flag only ordered work; under
+// decision 51 it is what makes an ABSENT GATE SET EXPECTED instead of a failure, so auto-stamping would switch
+// off a fail-closed check for a subtree nobody chose.
+describe('the scaffolding stamp', () => {
+  const feature = (id: string, columnSlug = 'backlog', order = 10): Card => ({
+    ...CARD(id, 'features'),
+    columnSlug,
+    order,
+  });
+
+  it('stamps setup on the first backlog feature after a bootstrap run', async () => {
+    const r = recorder({
+      settle: [projectRun()],
+      boardBefore: [],
+      boardCards: [feature('F-001'), feature('F-002', 'backlog', 20)],
+    });
+    await performAction(deps(r.client), BOOTSTRAP, context);
+    expect(r.flags).toEqual([{ board: 'features', card: 'F-001', body: { setup: true } }]);
+    // And it says which card it chose, because a flag nobody recorded is a rule nobody can check afterwards.
+    expect(r.diary.some((d) => d.kind === 'lifecycle' && d.text.includes('F-001'))).toBe(true);
+  });
+
+  it('picks the first feature by the endpoint-assigned order, not by the run’s created list', async () => {
+    // FINDING F: the run reports `created: ['F-005']`, the board says F-001 is first. `RunRecord.created` is
+    // frontmatter the agent wrote about itself; `order` is what the endpoint assigned.
+    const r = recorder({
+      settle: [projectRun({ created: ['F-005', 'F-001'] })],
+      boardBefore: [],
+      boardCards: [feature('F-005', 'backlog', 50), feature('F-001', 'backlog', 10)],
+    });
+    await performAction(deps(r.client), BOOTSTRAP, context);
+    expect(r.flags[0]?.card).toBe('F-001');
+  });
+
+  it('breaks an equal order by id, so the choice is at least deterministic', async () => {
+    const r = recorder({
+      settle: [projectRun()],
+      boardBefore: [],
+      boardCards: [feature('F-005', 'backlog', 10), feature('F-002', 'backlog', 10)],
+    });
+    await performAction(deps(r.client), BOOTSTRAP, context);
+    expect(r.flags[0]?.card).toBe('F-002');
+  });
+
+  it('ignores a feature that is not in backlog', async () => {
+    // The derivation puts every feature in `features/backlog`; anything elsewhere was moved by a person, and
+    // the scaffolding is the first of what this run produced.
+    const r = recorder({
+      settle: [projectRun()],
+      boardBefore: [],
+      boardCards: [feature('F-000', 'in-progress', 5), feature('F-001', 'backlog', 10)],
+    });
+    await performAction(deps(r.client), BOOTSTRAP, context);
+    expect(r.flags[0]?.card).toBe('F-001');
+  });
+
+  it('stamps nothing when the bootstrap created no card', async () => {
+    const r = recorder({ settle: [projectRun()], boardBefore: [], boardCards: [] });
+    await performAction(deps(r.client), BOOTSTRAP, context);
+    expect(r.flags).toEqual([]);
+  });
+
+  it('stamps nothing when a card already carries setup', async () => {
+    const r = recorder({
+      settle: [projectRun()],
+      boardBefore: [],
+      boardCards: [{ ...feature('F-001'), setup: true }, feature('F-002', 'backlog', 20)],
+    });
+    await performAction(deps(r.client), BOOTSTRAP, context);
+    expect(r.flags).toEqual([]);
+  });
+
+  it('stamps nothing when the only flagged feature has been ARCHIVED', async () => {
+    // "Once" is a board fact (decision 50), and an archived card is still a fact about this board. The live
+    // board alone cannot answer it, which is why the archive is read.
+    const r = recorder({
+      settle: [projectRun()],
+      boardBefore: [],
+      boardCards: [feature('F-009')],
+      archive: [{ ...feature('F-001', 'archive'), setup: true, archived: '2026-08-13T00:00:00Z' }],
+    });
+    await performAction(deps(r.client), BOOTSTRAP, context);
+    expect(r.flags).toEqual([]);
+  });
+
+  it('never stamps outside a bootstrap exit', async () => {
+    // THE CORRECTION. A break-down exit on a board of unflagged features must not acquire the flag.
+    const r = recorder({ boardBefore: [], boardCards: [feature('F-001'), CARD('P-001', 'product')] });
+    await performAction(deps(r.client), BREAKDOWN(), context);
+    expect(r.flags).toEqual([]);
+  });
+
+  it('carries on when the flag could not be written, rather than stopping the loop', async () => {
+    // The stamp is the exit of a run that has already happened. Losing it costs an ordering fact; stopping
+    // costs the project.
+    const r = recorder({
+      settle: [projectRun()],
+      boardBefore: [],
+      boardCards: [feature('F-001')],
+      flags: { ok: false, reason: 'refused with 409', fatal: false },
+    });
+    const result = await performAction(deps(r.client), BOOTSTRAP, context);
+    expect(result.stop).toBeUndefined();
+    expect(result.dispatches).toBe(1);
+  });
+});
+
+// `createdNothing`'s FIRST AND ONLY CALLER. A card-creating phase whose run produced no card has not done its
+// job, whatever it reported — and it is counted from the BOARD rather than from `record.created`, which is the
+// agent's claim about itself (decision 43).
+describe('a creating run that created nothing', () => {
+  it('fails a break-down that created no card, and leaves the card where it is', async () => {
+    const r = recorder({ boardBefore: [CARD('F-001', 'features')], boardCards: [CARD('F-001', 'features')] });
+    const result = await performAction(deps(r.client), BREAKDOWN(), context);
+    expect(r.verdicts[0]).toMatchObject({ passed: false });
+    expect(r.verdicts[0]?.reason).toContain('no card');
+    // The ENTRY stamp only: the card is where its phase put it, and the attempt is burned by the record.
+    expect(r.moves).toEqual([{ card: 'F-001', to: 'todo' }]);
+    expect(result.dispatches).toBe(1);
+  });
+
+  it('advances a break-down that created one card even though it changed no files', async () => {
+    // Cards go through the API, so a real derivation legitimately changes nothing on disk — which is why this
+    // is a board comparison and not a file count.
+    const r = recorder({
+      boardBefore: [CARD('F-001', 'features')],
+      boardCards: [CARD('F-001', 'features'), CARD('P-001', 'product')],
+      settle: [record({ status: 'success', outcome: 'success', filesChanged: 0 })],
+    });
+    await performAction(deps(r.client), BREAKDOWN(), context);
+    expect(r.verdicts).toEqual([]);
+    expect(r.moves.at(-1)).toEqual({ card: 'F-001', to: 'in-progress' });
+  });
+
+  it('does not apply to a checkup, whose ordinary case is creating nothing', async () => {
+    // FINDING B, folded into decision 43: a checkup's product is a REPORT. Applied to them this rule would
+    // refuse every close.
+    const story = CARD('P-001', 'product');
+    const r = recorder({ boardBefore: [story], boardCards: [story] });
+    await performAction(
+      deps(r.client),
+      { kind: 'dispatch', phase: 'story-checkup', skill: 'checkup-story', card: story },
+      context,
+    );
+    expect(r.verdicts).toEqual([]);
+    expect(r.moves).toEqual([{ card: 'P-001', to: 'done' }]);
+  });
+
+  it('advances the card when the board could not be read back, rather than failing on no evidence', async () => {
+    // A failed read is not evidence that nothing was created. Being wrong the other way would fail a good run.
+    const r = recorder({ board: { ok: false, reason: 'could not reach the board', fatal: false } });
+    await performAction(deps(r.client), BREAKDOWN(), context);
+    expect(r.verdicts).toEqual([]);
+    expect(r.moves.at(-1)).toEqual({ card: 'F-001', to: 'in-progress' });
+  });
+
+  it('fails a bootstrap that created no card, and burns its attempt', async () => {
+    const r = recorder({ settle: [projectRun()], boardBefore: [], boardCards: [] });
+    const result = await performAction(deps(r.client), BOOTSTRAP, context);
+    // A project run has no card to write a verdict beside, so the record itself is what burns the attempt —
+    // and `decideTick` is the one place that decides when to give up.
+    expect(r.verdicts).toEqual([]);
+    expect(r.flags).toEqual([]);
+    expect(r.diary.some((d) => d.text.includes('the board is still empty'))).toBe(true);
+    expect(result.stop).toBeUndefined();
+    expect(result.dispatches).toBe(1);
   });
 });

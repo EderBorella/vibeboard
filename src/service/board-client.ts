@@ -174,6 +174,20 @@ export class BoardClient {
     return this.#call('POST', `/cards/${board}/${card}/move`, { toColumnSlug });
   }
 
+  // The two frontmatter flags, `setup` and `followUp`, which have a route of their own rather than going
+  // through `PATCH /cards`: that endpoint's allow-list is what stops a work agent flagging its own card, and a
+  // body-dependent exception to it would be a new category the scope table cannot express.
+  flags(board: BoardName, card: string, body: Record<string, boolean>): Promise<Answer<unknown>> {
+    return this.#call('POST', `/cards/${board}/${card}/flags`, body);
+  }
+
+  // One board's archive. Fetched only where it is genuinely needed — the bootstrap's exit, which has to know
+  // whether this project has EVER had a scaffolding feature — because the archive is deliberately not part of
+  // the snapshot every tick reads.
+  archive(board: BoardName): Promise<Answer<{ cards: Card[] }>> {
+    return this.#call('GET', `/archive/${board}`);
+  }
+
   // The verdict on a run, onto the record of the run it judged (decision 18). Through an endpoint rather than
   // by writing the file: decision 10 makes endpoints the only write path, and the loop having a second way in
   // would be the exception that swallows the rule — unlike the state file, whose counters are genuinely the

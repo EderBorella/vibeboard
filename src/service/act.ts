@@ -412,6 +412,17 @@ async function afterCardRun(
     return await heldOpen(deps, action, card, settled, context);
   }
 
+  // AND A `failed` RUN NEVER ADVANCES ITS CARD — decision 40's third clause, asserted on its own because
+  // `producedNothing` does not cover it. A run killed by the clock after touching one file HAS changed a file,
+  // and one whose report claimed success before the clock got it HAS an `outcome`, so neither of that
+  // predicate's other two clauses holds and both reached the exit stamp. The worst case is a checkup, whose
+  // `exitPass` is `done`: a dead run must not be able to close a story or a feature.
+  //
+  // No verdict, deliberately. The attempt is burned by the record (accounting.ts) and the card retries its OWN
+  // phase until that phase's cap gives up — a failed verdict here would send a task to `fix` instead, spending
+  // the fix budget on a run that produced no finding to fix.
+  if (settled.status === 'failed') return await recordFailedRun(deps, action, card, settled, context);
+
   // THE EXIT STAMP, written because the run COMPLETED, whatever it says about itself.
   if (p.exitPass) {
     const stamped = await stamp(deps, card, p.exitPass, `its ${action.skill} run completed.`);
@@ -426,6 +437,25 @@ async function afterCardRun(
   // The STRUCTURED fields as well as the sentence. `DiaryEntry` carries `iteration`, `card`, `board`, `skill`
   // and `outcome` precisely so the diary's readers do not have to regex prose.
   await deps.client.log('run', runLine(card, action, settled, p.exitPass, context), {
+    iteration: context.iteration + 1,
+    card: card.id,
+    board: card.board,
+    skill: action.skill,
+    outcome: settled.status,
+  });
+  return { dispatches: 1 };
+}
+
+// A RUN THAT DIED. The card is held where its phase put it and nothing is judged: what a dead run left behind
+// is not a state anything can have an opinion about, and its own phase will try again under its cap.
+async function recordFailedRun(
+  deps: ActDeps,
+  action: Dispatch,
+  card: Card,
+  settled: RunRecord,
+  context: TickContext,
+): Promise<ActResult> {
+  await deps.client.log('run', failedRunLine(card, action, settled, context), {
     iteration: context.iteration + 1,
     card: card.id,
     board: card.board,
@@ -889,6 +919,12 @@ function runLine(
 // only thing that differs, which is why the card did not move.
 function heldOpenLine(card: Card, action: Dispatch, settled: RunRecord, context: TickContext): string {
   return `Iteration ${context.iteration + 1}: ${card.id} ran ${action.skill} for its ${action.phase} phase; it ended as ${settled.status} and created work, so ${card.id} stays open until that work is done and the checkup after it closes ${card.id}.${said(settled)}`;
+}
+
+// And about one that died. It names the attempt as spent, because a card that has not moved and a card that
+// cost nothing look identical on the board and are not the same thing.
+function failedRunLine(card: Card, action: Dispatch, settled: RunRecord, context: TickContext): string {
+  return `Iteration ${context.iteration + 1}: ${card.id} ran ${action.skill} for its ${action.phase} phase and the run failed, so the attempt is spent and ${card.id} has not moved — a run that died does not advance its card.${said(settled)}`;
 }
 
 // And about one that left nothing behind. It says the check DID NOT RUN rather than that it failed: a line

@@ -525,11 +525,20 @@ describe('a run that produced nothing', () => {
     expect(line).not.toContain('failed the gates');
   });
 
-  it('advances a failed run that changed files, because it may have done real work', async () => {
+  // DECISION 40'S THIRD CLAUSE, and it needs asserting on its own because `producedNothing` does not cover it:
+  // a run killed by the clock after touching one file HAS changed a file, so the predicate is false and the
+  // card reached the exit stamp. Nothing here judges the work, so nothing would ever notice.
+  it('holds a failed run that changed files, because a run that died does not advance its card', async () => {
     const r = recorder({ settle: [empty({ filesChanged: 3 })] });
-    await performAction(deps(r.client), IMPLEMENT(), context);
-    expect(r.moves.at(-1)).toEqual({ card: 'E-001', to: 'review' });
+    const result = await performAction(deps(r.client), IMPLEMENT(), context);
+    // The entry stamp stands and the exit one does not.
+    expect(r.moves).toEqual([{ card: 'E-001', to: 'in-progress' }]);
+    // And no verdict: a dead run left no state anything can have an opinion about, and a failed verdict would
+    // send the task to `fix` instead of retrying its own phase.
     expect(r.verdicts).toEqual([]);
+    // The attempt still counts — the agent had its chance — so the phase's own cap is what gives up.
+    expect(result.dispatches).toBe(1);
+    expect(r.diary.some((d) => d.text.includes('the attempt is spent'))).toBe(true);
   });
 
   it('advances a run whose product was cards rather than files', async () => {
@@ -545,11 +554,45 @@ describe('a run that produced nothing', () => {
     expect(r.verdicts).toEqual([]);
   });
 
-  it('advances when the file count could not be taken at all', async () => {
-    // Absent is not zero: a measurement that could not be taken says nothing about what changed.
+  it('writes no empty-run verdict when the file count could not be taken at all', async () => {
+    // Absent is not zero: a measurement that could not be taken says nothing about what changed, so this run
+    // is NOT `producedNothing` and gets no verdict saying nothing was checked. It is still `failed`, so it is
+    // still held — the two rules answer different questions about the same run.
     const r = recorder({ settle: [record({ status: 'failed', outcome: undefined })] });
     await performAction(deps(r.client), IMPLEMENT(), context);
-    expect(r.moves.at(-1)).toEqual({ card: 'E-001', to: 'review' });
+    expect(r.verdicts).toEqual([]);
+    expect(r.moves).toEqual([{ card: 'E-001', to: 'in-progress' }]);
+  });
+
+  // THE WORST CASE THE CLAUSE NAMES: a checkup's `exitPass` is `done`, so a dead `checkup-feature` closed the
+  // feature and a dead `checkup-story` closed the story.
+  it('does not let a dead checkup close its feature', async () => {
+    const feature = { ...CARD('F-001', 'features'), columnSlug: 'in-progress', links: [] };
+    const r = recorder({
+      settle: [empty({ card: 'F-001', board: 'features', filesChanged: 1 })],
+      boardBefore: [feature],
+      boardCards: [feature],
+    });
+    await performAction(
+      deps(r.client),
+      { kind: 'dispatch', phase: 'feature-checkup', skill: 'checkup-feature', card: feature },
+      context,
+    );
+    expect(r.moves).toEqual([]);
+  });
+
+  it('does not let a dead checkup close its story', async () => {
+    const story = { ...CARD('P-001', 'product'), columnSlug: 'in-progress', links: [] };
+    const r = recorder({
+      settle: [empty({ card: 'P-001', board: 'product', filesChanged: 1 })],
+      boardCards: [story],
+    });
+    await performAction(
+      deps(r.client),
+      { kind: 'dispatch', phase: 'story-checkup', skill: 'checkup-story', card: story },
+      context,
+    );
+    expect(r.moves).toEqual([]);
   });
 });
 

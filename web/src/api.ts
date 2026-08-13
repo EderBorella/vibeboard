@@ -509,6 +509,9 @@ export interface RunRecord {
   // is meant to be reviewable, and a field the UI cannot see is a verdict that only exists on disk.
   score?: number;
   overshoot?: string;
+  // What a review run answered about the run it judged: `done` or `sent-back`. Absent means it decided
+  // nothing, which is a different fact from sending the work back.
+  verdict?: 'done' | 'sent-back';
   verification?: Verification;
   report: string;
 }
@@ -558,6 +561,7 @@ export const RUN_RECORD_KEYS = [
   'filesChanged',
   'score',
   'overshoot',
+  'verdict',
   'verification',
   'report',
 ] as const;

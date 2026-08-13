@@ -424,6 +424,57 @@ describe('a run that produced nothing', () => {
   });
 });
 
+// The RECORD half of the review verdict. Moved here from Task 11 by the ruling of 2026-08-13, because
+// core/bounds.ts counts inconclusive reviews and could not compile without it: a data field lands before
+// its readers.
+describe('a review run verdict', () => {
+  it('parses a verdict of done and of sent-back', () => {
+    for (const verdict of ['done', 'sent-back'] as const) {
+      expect(parseRun(serializeRun(record({ skill: 'review', verdict })))?.verdict, verdict).toBe(verdict);
+    }
+  });
+
+  it('drops a verdict that is neither', () => {
+    // `verdict: maybe` is not an answer, and guessing at `done` would advance a card on a word nobody
+    // defined. Absent is what an inconclusive review looks like, which is exactly the fact the bound counts.
+    const raw = serializeRun(record({ skill: 'review' })).replace(
+      'skill: review',
+      'skill: review\nverdict: maybe',
+    );
+    expect(parseRun(raw)?.verdict).toBeUndefined();
+  });
+
+  it('round-trips verdict through serializeRun and parseRun', () => {
+    const judged = record({ skill: 'review', status: 'success', outcome: 'success', verdict: 'sent-back' });
+    expect(parseRun(serializeRun(judged))?.verdict).toBe('sent-back');
+  });
+
+  it('is absent from the file when the review reported none', () => {
+    expect(parseRun(serializeRun(record({ skill: 'review' })))).not.toHaveProperty('verdict');
+  });
+
+  it("folds the agent's verdict onto the record through withReport", () => {
+    const settled = withReport(
+      record({ skill: 'review', status: 'running' }),
+      { outcome: 'success', summary: 'does what the card asked', verdict: 'done', body: '## Judgement' },
+      'T',
+    );
+    // `outcome` and `verdict` are DIFFERENT facts: the review's own turn went fine, and its answer is
+    // about somebody else's work. A review that ran perfectly and sent the work back is success/sent-back.
+    expect(settled.outcome).toBe('success');
+    expect(settled.verdict).toBe('done');
+  });
+
+  it('leaves verdict absent when the report carried none', () => {
+    const settled = withReport(
+      record({ skill: 'review', status: 'running' }),
+      { outcome: 'success', body: 'I had a look' },
+      'T',
+    );
+    expect(settled.verdict).toBeUndefined();
+  });
+});
+
 describe('the suggestion count on a run record', () => {
   it('survives a round trip through the file', () => {
     const withCount = { ...record(), suggestions: 3 };

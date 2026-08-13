@@ -26,6 +26,15 @@ export type RunStatus = (typeof RUN_STATUSES)[number];
 export const RUN_OUTCOMES = ['success', 'attention'] as const;
 export type RunOutcome = (typeof RUN_OUTCOMES)[number];
 
+// What a REVIEW run answered about the run it judged. Two values and no third: a report with no `verdict`
+// cannot pass anything, so "no answer" is an absence rather than a member here — which is what makes an
+// inconclusive review countable (see `inconclusiveReviews` in core/bounds.ts).
+//
+// Distinct from `RunOutcome`, which is how the review run's OWN turn went: a review that ran perfectly and
+// sent the work back is `outcome: success` with `verdict: sent-back`.
+export const REVIEW_VERDICTS = ['done', 'sent-back'] as const;
+export type ReviewVerdict = (typeof REVIEW_VERDICTS)[number];
+
 // What the turn cost. Every field is optional and every one may legitimately be zero — a free model
 // really does cost nothing — so absence and zero are different facts and are kept apart.
 //
@@ -106,6 +115,11 @@ export interface RunRecord {
   // a critic that judged the work worthless, which is a verdict rather than a gap.
   score?: number;
   overshoot?: string;
+  // What a REVIEW run itself answered, on the review run's own record — the same split as `score` above:
+  // the judging run holds what it said, the judged run holds what came of it as `verification`. Absent
+  // rather than defaulted when a review reported none, because that absence IS the fact the review bound
+  // counts (decision 40: "no answer" is not an answer).
+  verdict?: ReviewVerdict;
   report: string; // the body: the agent's report, verbatim
 }
 
@@ -121,6 +135,9 @@ export interface AgentReport {
   // judging. Absent from every other report, and absent rather than 0 when the critic did not answer.
   score?: number;
   overshoot?: string;
+  // A REVIEW run's answer. Absent when it wrote none, which is a review that decided nothing rather than
+  // one that passed the work — the direction that matters, since the other would invent a pass.
+  verdict?: ReviewVerdict;
   body: string;
 }
 
@@ -230,6 +247,12 @@ function isOutcome(value: unknown): value is RunOutcome {
   return typeof value === 'string' && (RUN_OUTCOMES as readonly string[]).includes(value);
 }
 
+// Anything that is not one of the two is DROPPED rather than read as either. `verdict: maybe` is not an
+// answer, and the direction that guesses at `done` advances a card on a word nobody defined.
+function isVerdict(value: unknown): value is ReviewVerdict {
+  return typeof value === 'string' && (REVIEW_VERDICTS as readonly string[]).includes(value);
+}
+
 // A run id that sorts chronologically as a string: the store lists a card's runs by filename, so
 // ordering must not depend on reading every file. `at` is the caller's clock — nothing here reads
 // the time, so a test can pin it.
@@ -291,6 +314,7 @@ const DETAIL_KEYS = [
   // read in a diff, and the verdict is the thing you look for at the bottom.
   'score',
   'overshoot',
+  'verdict',
   'verification',
 ] as const;
 
@@ -367,6 +391,7 @@ function optionalFields(d: Record<string, unknown>): Partial<RunRecord> {
     if (typeof n === 'number' && Number.isInteger(n) && n >= min) out[key] = n;
   }
   if (isOutcome(d.outcome)) out.outcome = d.outcome;
+  if (isVerdict(d.verdict)) out.verdict = d.verdict;
   const usage = asUsage(d.usage);
   if (usage !== undefined) out.usage = usage;
   const verification = asVerification(d.verification);
@@ -437,6 +462,8 @@ export function parseAgentReport(content: string): AgentReport {
     // rather than clamped: a 4 is not a judgement, and clamping it to 1 would invent a pass.
     ...(score === undefined ? {} : { score }),
     ...(asText(d.overshoot) ? { overshoot: asText(d.overshoot) } : {}),
+    // A review's answer, dropped unless it is one of the two. Absent is what an inconclusive review is.
+    ...(isVerdict(d.verdict) ? { verdict: d.verdict } : {}),
     body: parsed.content.trim(),
   };
 }
@@ -457,6 +484,9 @@ export function withReport(record: RunRecord, report: AgentReport, finished: str
     // being judged, as `verification` — one fact, one home, on each side.
     ...(report.score === undefined ? {} : { score: report.score }),
     ...(report.overshoot ? { overshoot: report.overshoot } : {}),
+    // Same split, one level along: the review's own record carries what it SAID, and the run it judged
+    // carries what came of it as `verification`.
+    ...(report.verdict === undefined ? {} : { verdict: report.verdict }),
     report: report.body,
   };
 }

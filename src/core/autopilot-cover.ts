@@ -54,14 +54,6 @@ function checkNumbers(ap: AutopilotConfig, out: string[]): void {
   if (typeof ap.budgetUsd !== 'number' || !Number.isFinite(ap.budgetUsd) || ap.budgetUsd < 0) {
     out.push(`budgetUsd must be zero or more; it is ${JSON.stringify(ap.budgetUsd)}.`);
   }
-  // A fraction above zero. Zero would pass a critic that judged the work worthless — a gate wired to
-  // nothing — and above one is a bar no score can clear, which blocks every critic-verified card.
-  const threshold = ap.criticThreshold;
-  if (typeof threshold !== 'number' || !Number.isFinite(threshold) || threshold <= 0 || threshold > 1) {
-    out.push(
-      `criticThreshold must be a fraction above 0 and no more than 1; it is ${JSON.stringify(threshold)}.`,
-    );
-  }
 }
 
 // SIX ROUTING CHECKS WENT WITH THE TABLE: every column is routed/terminal/blocked, a route's columns

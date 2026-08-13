@@ -4,7 +4,7 @@ import { useEffect, useRef } from 'react';
 //
 // Written to answer the four questions a person actually has in front of a play button: what will it do,
 // what stops it, what it will not do without me, and where the money goes. Every claim here is a
-// behaviour enforced in code — the routing table in config.yaml, the verification gate, the caps
+// behaviour enforced in code — the phase table in core/phases.ts, the verification gate, the caps
 // compared between dispatches — because instructions that describe an intention rather than the build
 // are how a control that changes nothing gets trusted.
 export function AutopilotHelp({ onClose }: { onClose: () => void }) {
@@ -31,23 +31,24 @@ export function AutopilotHelp({ onClose }: { onClose: () => void }) {
         <div className="modal-body ap-help-body">
           <h3>The loop</h3>
           <p>
-            Auto-pilot walks your three boards on its own. Each pass it picks one card sitting in a{' '}
-            <strong>routed column</strong>, dispatches that column's skill against it, checks the result, and
-            moves the card on <em>only if the check passes</em>. Then it does it again. It stops by itself
-            when there is nothing left it can legitimately do.
+            Auto-pilot walks your three boards on its own. Each pass it works out{' '}
+            <strong>where the project is</strong> from the board itself — which feature is open, which story
+            under it, which task — and looks up the one thing to do next. It does that thing, checks the
+            result, and moves the card on <em>only if the check passes</em>. Then it does it again. It stops
+            by itself when there is nothing left it can legitimately do.
           </p>
           <p>
-            Which column runs which skill is the <strong>routing table</strong>, in{' '}
-            <code>.vibeboard/config.yaml</code> and shown in Settings. A column that is not in the table is a
-            column auto-pilot never touches — that is how you keep work for yourself.
+            The sequence of phases is <strong>fixed</strong> and is not a setting: a lifecycle a person can
+            edit is one that can be edited into something that never finishes. What you can change is in
+            Settings — the caps, which columns mean finished, and where a blocked card goes.
           </p>
 
           <h3>Nothing advances on its own word</h3>
           <p>
-            An agent finishing is not an agent succeeding. Every route names how its work is{' '}
-            <strong>verified</strong>: <code>gates</code> runs the project's own commands (tests, lint, a
-            build), <code>smoke</code> runs the one command that proves the thing works end to end, and{' '}
-            <code>critic</code> dispatches a second agent to score the first one's work against a threshold.
+            An agent finishing is not an agent succeeding. Work is <strong>verified</strong> three ways:{' '}
+            <code>gates</code> runs the project's own commands (tests, lint, a build), <code>smoke</code> runs
+            the one command that proves the thing works end to end, and <code>review</code> asks a second
+            agent only what a command's exit code cannot express — and only once the gates have passed.
           </p>
           <p>
             The card moves on the <em>verdict</em>, never on the run's own report of itself. A run that claims
@@ -101,16 +102,15 @@ export function AutopilotHelp({ onClose }: { onClose: () => void }) {
           <p>
             The strip tells you what is missing and refuses with a sentence rather than a greyed-out button.
             Typically: a README with something in it, the foundation documents, at least one gate command, a
-            smoke command, and a routing table whose skills and columns all exist.
+            smoke command, and a skill on disk for every phase that dispatches one.
           </p>
 
           <h3>Where to watch it</h3>
           <p>
             <strong>Details</strong> on the strip shows what is running now. The <strong>Execution</strong>{' '}
             tab has every run, what it cost and what it changed; the <strong>Project Log</strong> is the
-            narrative, one line per dispatch and per checkup. Every so many dispatches a{' '}
-            <strong>checkup</strong> reads the board and the log and judges whether the project is going in
-            circles.
+            narrative, one line per dispatch and per checkup. A <strong>checkup</strong> runs when a story or
+            a feature has nothing unfinished left under it, and it is what closes the card.
           </p>
         </div>
       </div>

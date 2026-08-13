@@ -187,27 +187,6 @@ describe('a block that is not the shape it claims', () => {
   });
 });
 
-// The critic's bar, and the skill that answers it. Both are new in slice C1: `verify: critic` was a
-// mode nothing executed until then, so neither the number nor the skill had to exist.
-describe('the critic threshold', () => {
-  // A fraction, and NOT zero: a threshold of 0 passes a critic that scored the work worthless, which
-  // is a gate wired to nothing — the AutoGPT shape this whole design is written against. Above one is
-  // a bar no score can clear, which blocks every critic-verified card instead.
-  it.each([0, -1, 1.5, Number.NaN, 'high', undefined])('refuses %s', (value) => {
-    const config = fresh();
-    ap(config).criticThreshold = value as number;
-    expect(coverageProblems(config).join(' ')).toMatch(/criticThreshold/);
-  });
-
-  it('accepts a fraction above zero and up to one', () => {
-    for (const value of [0.01, 0.6, 1]) {
-      const config = fresh();
-      ap(config).criticThreshold = value;
-      expect(coverageProblems(config).join(' ')).not.toMatch(/criticThreshold/);
-    }
-  });
-});
-
 // The four cases that pinned `skillProblems`'s route reading and its `critic` special case are gone with
 // the function: the question is no longer which skill a ROUTE names but which one a PHASE names, and the
 // phase table has no verifier to look up — a review is a phase of its own. See the describe above.

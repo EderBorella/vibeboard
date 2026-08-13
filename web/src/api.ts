@@ -508,10 +508,6 @@ export interface RunRecord {
   usage?: RunUsage; // what it cost, when the backend said
   suggestions?: number; // how many findings it filed; absent means the count could not be taken
   filesChanged?: number; // measured from git; absent means there was no answer, never zero
-  // What a critic run itself answered, and what was decided about THIS run (decision 18). The verdict
-  // is meant to be reviewable, and a field the UI cannot see is a verdict that only exists on disk.
-  score?: number;
-  overshoot?: string;
   // What a review run answered about the run it judged: `done` or `sent-back`. Absent means it decided
   // nothing, which is a different fact from sending the work back.
   verdict?: 'done' | 'sent-back';
@@ -519,20 +515,16 @@ export interface RunRecord {
   report: string;
 }
 
-// Mirrors src/core/verify.ts. A verdict and the evidence behind it: the failing command and its output
-// for `gates`/`smoke`, or the score AND the threshold it was judged against for `critic` — a score with
-// no threshold beside it means nothing to a reader later.
+// Mirrors src/core/verify.ts. A verdict and the evidence behind it: the failing command and its output for
+// `gates`/`smoke`, or the run that did the judging for `review`.
 export interface Verification {
   mode: VerifyMode;
   passed: boolean;
   at: string;
   command?: string;
   output?: string;
-  score?: number;
-  threshold?: number;
   reason?: string;
-  by?: string; // the critic run that judged this one
-  overshoot?: string;
+  by?: string; // the judging run that decided this one
 }
 
 // What the UI carries, as data. Compared against the server's own list in test/mirror.test.ts, because a
@@ -562,8 +554,6 @@ export const RUN_RECORD_KEYS = [
   'usage',
   'suggestions',
   'filesChanged',
-  'score',
-  'overshoot',
   'verdict',
   'verification',
   'report',
@@ -623,7 +613,7 @@ export interface Spend {
 }
 
 // One card's line in the ledger: what it cost, and how many attempts each skill has used against the
-// cap. Per skill because that is how the cap is counted — a critic run must not inflate the tally of
+// cap. Per skill because that is how the cap is counted — a judging run must not inflate the tally of
 // the skill doing the work.
 export interface CardLedgerData {
   spend: Spend;

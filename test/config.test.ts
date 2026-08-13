@@ -228,7 +228,7 @@ describe('ensureBoards', () => {
   });
 });
 
-// A project written before a key existed. Slice C1 added `criticThreshold` to the autopilot block, and
+// A project written before a key existed. Slice C1 added a key to the autopilot block, and
 // without this backfill EVERY previously-valid config became invalid — so the Settings modal, which
 // always sends `boards`, could no longer save any setting at all. That is the class the 2026-08-03 fix
 // addressed for a different key ("the refusal spoke about columns while the user was changing their
@@ -237,9 +237,9 @@ describe('ensureAutopilotKeys', () => {
   it('fills a key the project predates, and says it changed something', () => {
     const config = defaultConfig('T');
     const ap = config.autopilot as unknown as Record<string, unknown>;
-    delete ap.criticThreshold;
+    delete ap.blockedColumn;
     expect(ensureAutopilotKeys(config)).toBe(true);
-    expect(config.autopilot?.criticThreshold).toBe(DEFAULT_AUTOPILOT.criticThreshold);
+    expect(config.autopilot?.blockedColumn).toBe(DEFAULT_AUTOPILOT.blockedColumn);
   });
 
   it('is a no-op on a config that already has every key', () => {
@@ -260,9 +260,9 @@ describe('ensureAutopilotKeys', () => {
   // Backfilling over it would silently overwrite a hand-edit with our own number.
   it('leaves a key that is present and invalid alone, for the validator to name', () => {
     const config = defaultConfig('T');
-    (config.autopilot as unknown as Record<string, unknown>).criticThreshold = 5;
+    (config.autopilot as unknown as Record<string, unknown>).attemptCap = -5;
     expect(ensureAutopilotKeys(config)).toBe(false);
-    expect(config.autopilot?.criticThreshold).toBe(5);
+    expect(config.autopilot?.attemptCap).toBe(-5);
   });
 
   // Generalised on purpose: C2, C3 and C4 each add keys, and this is what stops each of them breaking

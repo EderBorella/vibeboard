@@ -53,11 +53,3 @@ describe('the autopilot block', () => {
     expect(applyRouteRenames(DEFAULT_AUTOPILOT, 'engineering', [])).toBe(DEFAULT_AUTOPILOT);
   });
 });
-
-describe('the critic threshold default', () => {
-  // 0.6 because that is what OpenHands ships for the same mechanism — the only prior art this design
-  // has for the number itself, rather than a figure we made up.
-  it('is the number the prior art ships', () => {
-    expect(DEFAULT_AUTOPILOT.criticThreshold).toBe(0.6);
-  });
-});

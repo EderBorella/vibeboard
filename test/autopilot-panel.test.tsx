@@ -354,79 +354,11 @@ describe('the stop controls', () => {
 // The critic's bar, on screen. It decides every card that has nothing runnable to check — the weaker
 // half of this design by its own admission — so a number hidden in code would be a decision nobody
 // could argue with.
-describe('the critic threshold field', () => {
-  const field = (label: string): HTMLInputElement =>
-    screen.getByText(label).closest('label')?.querySelector('input') as HTMLInputElement;
-
-  it('shows the project’s value and reports an edit up', async () => {
-    const onCaps = vi.fn();
-    api.getReadiness.mockResolvedValue(readiness());
-    render(panel(configWith(true), { onCaps }));
-    await settled();
-    const box = field('Critic passes at');
-    expect(box.value).toBe('0.6');
-    fireEvent.change(box, { target: { value: '0.8' } });
-    expect(onCaps).toHaveBeenCalledWith(expect.objectContaining({ criticThreshold: 0.8 }));
-  });
-
-  // A fraction, so `min` alone is not enough: a typed 5 is a bar no score can clear, which blocks every
-  // critic-verified card. Clamped in the box rather than refused by the server, like every other cap.
-
-  // The review's HIGH, and the direction is the whole point. For a CAP, falling back to the minimum is
-  // the safe direction — a smaller budget stops sooner. For a BAR it is the opposite: the weakest
-  // allowed threshold passes a critic that scored the work 0.05, which is the gate-wired-to-nothing the
-  // validator refuses 0 for. So an unparseable box commits NOTHING and keeps what the project has.
-  it('does not report a bar for a value it cannot parse', async () => {
-    const onCaps = vi.fn();
-    api.getReadiness.mockResolvedValue(readiness());
-    render(panel(configWith(true), { onCaps }));
-    await settled();
-    const box = field('Critic passes at');
-
-    // `5` is here rather than clamped to 1: a bar the server would refuse is not a bar, and clamping it
-    // would save a number the box is not showing. Left uncommitted, the project keeps what it has and
-    // the box falls back to it on blur.
-    for (const typed of ['', '0', '0.', 'abc', '-', '5']) {
-      onCaps.mockClear();
-      fireEvent.change(box, { target: { value: typed } });
-      // Nothing about the threshold is reported up. Anything else the user edited in this session is
-      // still reported, so this must be checked per call rather than by "was not called at all".
-      for (const call of onCaps.mock.calls) {
-        expect(call[0]).not.toHaveProperty('criticThreshold');
-      }
-    }
-  });
-
-  // Mid-typing is the reachable version of the above: `0.8` passes through `0` and `0.`, and both used
-  // to commit 0.05 on the way. The box has to show what was typed while committing only a real bar.
-  it('keeps what is typed on the way to a valid bar, and commits the bar', async () => {
-    const onCaps = vi.fn();
-    api.getReadiness.mockResolvedValue(readiness());
-    render(panel(configWith(true), { onCaps }));
-    await settled();
-    const box = field('Critic passes at');
-
-    // `0.` cannot be OBSERVED here, and that is a DOM fact rather than a test artefact: an
-    // `<input type="number">` sanitises a value that is not a valid floating-point number to the empty
-    // string, so a browser shows "0." while `.value` reads "". Either way what matters is what is
-    // committed — nothing — which the test above covers for both spellings.
-    fireEvent.change(box, { target: { value: '0.8' } });
-    expect(box.value).toBe('0.8');
-    expect(onCaps).toHaveBeenLastCalledWith(expect.objectContaining({ criticThreshold: 0.8 }));
-  });
-
-  // A project created before the key existed is upgraded on open, so the panel always has a number to
-  // show. The empty box it rendered before was an uncontrolled input — absence indistinguishable from a
-  // cleared field, and React warning about it on the first keystroke.
-  it('shows a number even for a config written before the key existed', async () => {
-    api.getReadiness.mockResolvedValue(readiness());
-    const config = configWith(true);
-    delete (config.autopilot as unknown as Record<string, unknown>).criticThreshold;
-    render(panel(config, {}));
-    await settled();
-    expect(field('Critic passes at').value).toBe('0.6');
-  });
-});
+// NO CRITIC THRESHOLD FIELD. Its four cases went with the number (decision 40), and the finding they
+// recorded is worth keeping in one sentence because it applies to any field added here later: falling back
+// to `min` is right for a CAP and wrong for a BAR. A smaller budget stops the run sooner; the weakest
+// allowed bar passes work nobody judged. This panel now edits caps only, and `edit` above clamps them
+// upward to their minimum for exactly that reason.
 
 describe('the gate acknowledgement, in Settings', () => {
   // This panel has its own Start button, listed the blocker, and had NO way to clear it — while the only

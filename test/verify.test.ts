@@ -2,12 +2,12 @@ import { describe, expect, it } from 'vitest';
 import type { CommandResult, Verification } from '../src/core/verify.js';
 import {
   commandVerification,
-  criticPassed,
-  criticVerification,
   failedVerification,
   firstFailure,
+  isVerifyMode,
   MAX_OUTPUT,
   tail,
+  unverified,
 } from '../src/core/verify.js';
 
 // The verdict, as data. Every fail-closed case here is a project that would otherwise pass every card
@@ -47,63 +47,6 @@ describe('an empty gate set', () => {
     const v = commandVerification('gates', 'AT', []);
     expect(v.passed).toBe(false);
     expect(v.reason).toMatch(/no commands/i);
-  });
-});
-
-describe('the critic', () => {
-  it('passes at the threshold and above, and fails below it', () => {
-    expect(criticPassed(0.6, 0.6)).toBe(true);
-    expect(criticPassed(0.61, 0.6)).toBe(true);
-    expect(criticPassed(0.59, 0.6)).toBe(false);
-  });
-
-  // Absence is not a low score and it is not a pass: it is a critic that did not answer.
-  it('fails when no score came back', () => {
-    expect(criticPassed(undefined, 0.6)).toBe(false);
-  });
-
-  // Zero is a real verdict — the critic judged the work worthless — and must not be read as absence.
-  it('treats a zero score as a judgement, not as a gap', () => {
-    expect(criticPassed(0, 0.6)).toBe(false);
-    expect(criticVerification('AT', { score: 0, threshold: 0.6, by: 'R1' }).score).toBe(0);
-  });
-
-  it('records the score, the threshold and the run that judged it', () => {
-    const v = criticVerification('AT', {
-      score: 0.8,
-      threshold: 0.6,
-      reason: 'Meets the criterion; tests name the behaviour.',
-      by: '20260805-1200-abcd',
-      overshoot: 'Also added a settings screen nobody asked for.',
-    });
-    expect(v).toEqual({
-      mode: 'critic',
-      passed: true,
-      at: 'AT',
-      score: 0.8,
-      threshold: 0.6,
-      reason: 'Meets the criterion; tests name the behaviour.',
-      by: '20260805-1200-abcd',
-      overshoot: 'Also added a settings screen nobody asked for.',
-    });
-  });
-
-  // A score with no threshold beside it means nothing to a later reader: 0.55 is a pass or a failure
-  // depending on a number that has to be recorded WITH it, not looked up from config months later.
-  it('records the threshold even when the score is missing', () => {
-    const v = criticVerification('AT', { threshold: 0.6, by: 'R1' });
-    expect(v.threshold).toBe(0.6);
-    expect(v.score).toBeUndefined();
-    expect(v.passed).toBe(false);
-    expect(v.reason).toMatch(/did not report a score/i);
-  });
-
-  // Decision 5: over-delivery PASSES and is recorded. Failing a card for doing too much discards
-  // working code and burns one of three attempts to rebuild it.
-  it('passes a run that overshot, and keeps the note', () => {
-    const v = criticVerification('AT', { score: 0.9, threshold: 0.6, by: 'R1', overshoot: 'gold-plated' });
-    expect(v.passed).toBe(true);
-    expect(v.overshoot).toBe('gold-plated');
   });
 });
 
@@ -156,29 +99,30 @@ describe('the sentence a failure carries', () => {
     expect(v.reason).toMatch(/could not be run at all/);
     expect(v.reason).not.toMatch(/-1/);
   });
+});
 
-  // A failing critic verdict must read like a failing gate: with a reason. The fallback used to fire only
-  // when the score was ABSENT, so a low score with no summary produced a failure with nothing to read.
-  it('says why a low score failed, even when the critic wrote no words', () => {
-    const v = criticVerification('AT', { score: 0.2, threshold: 0.6, by: 'R1' });
-    expect(v.passed).toBe(false);
-    expect(v.reason).toContain('0.2');
-    expect(v.reason).toContain('0.6');
+// THE CRITIC IS GONE (decision 40), and this is what holds its absence rather than a comment claiming it.
+// A TypeScript-only field removal is invisible at runtime once every producer of it is gone, so the mode
+// list is the thing with teeth: a verdict read back off disk carrying `mode: 'critic'` is a verdict
+// nothing in this machine could have written, and reading it as one would revive the retired path through
+// the parser.
+describe('the retired critic mode', () => {
+  it('is not a verify mode, so a verdict claiming it cannot be read back', () => {
+    expect(isVerifyMode('critic')).toBe(false);
+    // The three that ARE, so a list that had emptied itself would not pass this.
+    expect(isVerifyMode('gates')).toBe(true);
+    expect(isVerifyMode('smoke')).toBe(true);
+    expect(isVerifyMode('review')).toBe(true);
   });
 
-  it('prefers the critic’s own words when it wrote any', () => {
-    const v = criticVerification('AT', {
-      score: 0.2,
-      threshold: 0.6,
-      by: 'R1',
-      reason: 'Missed the criterion.',
+  it('leaves `review` as the mode a judged verdict wears', () => {
+    const v = unverified('review', 'AT', 'The run produced nothing, so there was nothing to review.');
+    expect(v).toEqual({
+      mode: 'review',
+      passed: false,
+      at: 'AT',
+      reason: 'The run produced nothing, so there was nothing to review.',
     });
-    expect(v.reason).toBe('Missed the criterion.');
-  });
-
-  // A pass needs no sentence: the score and the threshold beside it already say everything.
-  it('says nothing extra about a verdict that passed', () => {
-    expect(criticVerification('AT', { score: 0.9, threshold: 0.6, by: 'R1' }).reason).toBeUndefined();
   });
 });
 

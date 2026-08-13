@@ -795,7 +795,9 @@ describe('AgentRunner.dispatch', () => {
     const argsLog = join(await tempDir(), 'args.log');
     process.env.VIBEBOARD_SHIM_ARGS = argsLog;
     const { instance } = runner(root);
-    const { run } = await instance.dispatch(input(root, { previous, verdict: { threshold: 0.6 } }));
+    const { run } = await instance.dispatch(
+      input(root, { previous, review: { gatesPassed: true, setupSubtree: false } }),
+    );
     await settled(root, run);
     delete process.env.VIBEBOARD_SHIM_ARGS;
 

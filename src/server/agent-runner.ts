@@ -56,13 +56,9 @@ export interface DispatchInput {
   // Read at dispatch, like boardColumns and for the same reason: a queued run must be bound by the
   // documents the project had when it was resolved, not by whatever they say when it finally starts.
   foundation?: { paths: string[]; codeQuality?: string };
-  // Present when this run JUDGES rather than builds — a critic. Carried like `foundation`, and for the
-  // same reason: the threshold is the project's as it was when the dispatch was resolved, not whatever
-  // Settings says when a queued run finally starts.
-  verdict?: { threshold: number };
-  // Present when this run is a REVIEW: what the loop already established before dispatching it. Carried for
-  // the same reason as `verdict` — a queued review must be told about the gate run that preceded it, not
-  // about whatever the tree looks like when it finally starts.
+  // Present when this run is a REVIEW: what the loop already established before dispatching it. Carried like
+  // `foundation`, and for the same reason — a queued review must be told about the gate run that preceded it,
+  // not about whatever the tree looks like when it finally starts.
   review?: { gatesPassed: boolean; setupSubtree: boolean };
   // Present when this run is a CHECKUP: everything the loop gathered about what is under its card (ruling 60).
   // Carried like `foundation` and for the same reason — a queued checkup must be told about the board and the
@@ -372,7 +368,6 @@ export class AgentRunner {
       ...(input.previous ? { previous: narrowPrevious(input.previous) } : {}),
       userPrompt: input.userPrompt,
       foundation: input.foundation,
-      verdict: input.verdict,
       review: input.review,
       checkup: input.checkup,
       reportPath: reportContract(run),

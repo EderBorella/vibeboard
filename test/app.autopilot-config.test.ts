@@ -252,7 +252,7 @@ describe('a project created before a key existed', () => {
   it('can still save an unrelated setting', async () => {
     const { app, root } = await openTestProject();
     const config = await readConfig(root);
-    delete (config.autopilot as unknown as Record<string, unknown>).criticThreshold;
+    delete (config.autopilot as unknown as Record<string, unknown>).blockedColumn;
     await writeConfig(root, config);
     // Reopening is what upgrades it — the same path that backfills missing boards.
     const opened = await app.inject({ method: 'POST', url: '/api/project/open', payload: { path: root } });
@@ -270,17 +270,17 @@ describe('a project created before a key existed', () => {
   it('has the key on disk afterwards, so the upgrade is durable rather than per-request', async () => {
     const { app, root } = await openTestProject();
     const config = await readConfig(root);
-    delete (config.autopilot as unknown as Record<string, unknown>).criticThreshold;
+    delete (config.autopilot as unknown as Record<string, unknown>).blockedColumn;
     await writeConfig(root, config);
     await app.inject({ method: 'POST', url: '/api/project/open', payload: { path: root } });
-    expect((await readConfig(root)).autopilot?.criticThreshold).toBe(0.6);
+    expect((await readConfig(root)).autopilot?.blockedColumn).toBe('blocked');
   });
 
   // The refusal still fires for a value that IS there and is wrong — the backfill covers absence only.
   it('is still refused when the key is present and invalid', async () => {
     const { app, root } = await openTestProject();
     const config = await readConfig(root);
-    (config.autopilot as unknown as Record<string, unknown>).criticThreshold = 5;
+    (config.autopilot as unknown as Record<string, unknown>).attemptCap = -5;
     await writeConfig(root, config);
     await app.inject({ method: 'POST', url: '/api/project/open', payload: { path: root } });
     const res = await app.inject({
@@ -289,6 +289,6 @@ describe('a project created before a key existed', () => {
       payload: { boards: config.boards, miniatureChars: 99 },
     });
     expect(res.statusCode).toBe(400);
-    expect(res.json().error).toMatch(/criticThreshold/);
+    expect(res.json().error).toMatch(/attemptCap/);
   });
 });

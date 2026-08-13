@@ -3,8 +3,8 @@ import { VERIFY_MODES, type VerifyMode } from './autopilot.js';
 // Did the work pass? A pure decision over evidence — no disk, no clock, no processes — so every
 // boundary is assertable and the fail-closed cases can be watched failing.
 //
-// ALL THREE MODES FAIL CLOSED. An empty gate set fails, a critic that returned no score fails, and a
-// missing smoke command fails. Seven of the design review's findings were that one bug, and every one
+// EVERY MODE FAILS CLOSED. An empty gate set fails, a missing smoke command fails, and a review that
+// answered nothing is not a pass. Seven of the design review's findings were that one bug, and every one
 // of them ended with auto-pilot reporting success over work that never happened.
 
 // One command, as it ended. `code: null` is a command that was KILLED — a timeout, or a signal — and
@@ -19,21 +19,19 @@ export interface CommandResult {
 
 // What a verdict leaves behind (decision 18). "Verification failed" with nothing behind it is the same
 // silence this design exists to remove, so the evidence is part of the verdict rather than a log line
-// somewhere else: the failing command AND its output for the two command modes; the score AND the
-// threshold it was judged against for the critic, because a score without one means nothing to a later
-// reader; and the run that did the judging, so its reasoning is one lookup away rather than a
-// correlation by timestamp.
+// somewhere else: the failing command AND its output for the two command modes; and the run that did the
+// judging, so its reasoning is one lookup away rather than a correlation by timestamp.
+//
+// NO `score`, `threshold` or `overshoot`. They were the critic's, which is now a review answering
+// done/sent-back (ruling 57) — a verdict rather than a number to compare against a bar.
 export interface Verification {
   mode: VerifyMode;
   passed: boolean;
   at: string;
   command?: string; // gates/smoke: the one that failed
   output?: string;
-  score?: number; // critic: what it answered
-  threshold?: number;
-  reason?: string; // why this could not pass, or the critic's own words
-  by?: string; // the critic run's id
-  overshoot?: string; // decision 5: over-delivery passes, and is recorded rather than punished
+  reason?: string; // why this could not pass, or the judge's own words
+  by?: string; // the judging run's id
 }
 
 // Here rather than beside the modes themselves, because this is the only kind of caller that needs it:
@@ -59,12 +57,6 @@ export const commandFailed = (result: CommandResult): boolean => result.code !==
 // the cause rather than its consequences.
 export function firstFailure(results: CommandResult[]): CommandResult | undefined {
   return results.find(commandFailed);
-}
-
-// A score at or above the threshold. `undefined` is not a low score — it is a critic that did not
-// answer — and it fails for the same reason an empty gate set does.
-export function criticPassed(score: number | undefined, threshold: number): boolean {
-  return score !== undefined && score >= threshold;
 }
 
 export function failedVerification(mode: VerifyMode, at: string, reason: string): Verification {
@@ -99,55 +91,12 @@ function commandReason(failure: CommandResult): string {
   return `\`${failure.command}\` exited with ${failure.code ?? 'no code'}.`;
 }
 
-interface CriticInput {
-  score?: number;
-  threshold: number;
-  reason?: string;
-  // The critic run's id. OPTIONAL, because there is a real case with no run to name: a critic that could not
-  // be dispatched at all has judged nothing, and inventing an id for it would be worse than the absence.
-  by?: string;
-  overshoot?: string;
-}
-
-// The critic's own words where it wrote any, and otherwise a sentence saying what the numbers mean. A
-// passing verdict needs neither, so it gets nothing rather than a sentence stating the obvious.
-function reasonFor(input: CriticInput): { reason?: string } {
-  if (input.reason) return { reason: input.reason };
-  if (input.score === undefined) {
-    return { reason: 'The critic did not report a score, so it cannot have judged the work.' };
-  }
-  if (criticPassed(input.score, input.threshold)) return {};
-  return {
-    reason: `The critic scored this ${input.score} against a threshold of ${input.threshold}, and reported no reason.`,
-  };
-}
-
-// A verdict for work that was never done, recorded WITHOUT running the route's verifier — see
-// `producedNothing` in core/runs.ts for why a verifier must not be consulted at all in this case.
+// A verdict for work that was never done, recorded WITHOUT running the verifier — see `producedNothing`
+// in core/runs.ts for why a verifier must not be consulted at all in this case.
 //
-// It wears the route's own mode rather than a fourth one. `VerifyMode` is what a route's `verify:` accepts, so
-// a `none` added here would become a verifier a project could configure, and "this card is checked by nothing"
-// is not a check. The reason says plainly that the check did not run, which is the fact a reader needs.
+// It wears the phase's own mode rather than a fourth one: a `none` added here would read as a verifier,
+// and "this card is checked by nothing" is not a check. The reason says plainly that the check did not
+// run, which is the fact a reader needs.
 export function unverified(mode: VerifyMode, at: string, why: string): Verification {
   return { mode, passed: false, at, reason: why };
-}
-
-export function criticVerification(at: string, input: CriticInput): Verification {
-  return {
-    mode: 'critic',
-    passed: criticPassed(input.score, input.threshold),
-    at,
-    // Written whenever it exists, ZERO INCLUDED: zero is a critic that judged the work worthless, and
-    // omitting it would make that indistinguishable from a critic that never answered.
-    ...(input.score === undefined ? {} : { score: input.score }),
-    // Always, even with no score: 0.55 is a pass or a failure depending on a number that has to be
-    // recorded beside it rather than looked up from config months later.
-    threshold: input.threshold,
-    // A failing verdict always carries a sentence, like every gates failure does. The fallback used to
-    // fire only when the score was ABSENT, so a critic that scored 0.2 against 0.6 and wrote no summary
-    // produced a failure with nothing to read — the silence this design exists to remove.
-    ...reasonFor(input),
-    by: input.by,
-    ...(input.overshoot ? { overshoot: input.overshoot } : {}),
-  };
 }

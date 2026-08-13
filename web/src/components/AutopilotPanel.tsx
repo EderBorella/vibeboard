@@ -81,20 +81,9 @@ export function AutopilotPanel({
   // which `JSON.stringify` puts on the wire as `null`, and `min={0}` on the input does not stop a typed
   // `-5` — so the user cleared a box and got a 400 about column routing. A box that cannot express an
   // invalid value needs no refusal.
-  // Falling back to `min` is right for a CAP and wrong for a BAR, and that asymmetry is why the
-  // threshold does not come through here. A smaller budget or iteration cap stops the run SOONER, so an
-  // unparseable box erring downwards is safe. The weakest allowed critic threshold does the opposite: it
-  // passes work scored 0.05, which is the gate-wired-to-nothing the validator refuses 0 for. See
-  // `ThresholdField` below, which commits nothing until what was typed is a real bar.
   const edit = (key: keyof AutopilotConfig, value: number, min: number, max?: number): void => {
     const clamped = Number.isFinite(value) ? Math.max(min, value) : min;
     const next = { ...caps, [key]: max === undefined ? clamped : Math.min(max, clamped) };
-    setCaps(next);
-    onCaps?.(next);
-  };
-
-  const editThreshold = (value: number): void => {
-    const next = { ...caps, criticThreshold: value };
     setCaps(next);
     onCaps?.(next);
   };
@@ -157,13 +146,6 @@ export function AutopilotPanel({
           hangs every time must not retry for ever.
         </span>
       </label>
-      <ThresholdField
-        // A project written before this key existed is upgraded when it opens (ensureAutopilotKeys), so
-        // there is always a number to show. The `??` is for the render that happens before that lands.
-        current={ap.criticThreshold ?? DEFAULT_CRITIC_THRESHOLD}
-        onChange={editThreshold}
-      />
-
       <div className="settings-hint">
         Finished at:{' '}
         {Object.entries(ap.terminal)
@@ -189,53 +171,6 @@ export function AutopilotPanel({
         </ul>
       )}
     </>
-  );
-}
-
-// The bar a critic's score must clear, and the one field here that keeps what was TYPED rather than a
-// number parsed from it.
-//
-// Every other cap can fall back to its minimum, because for a cap that is the safe direction. This one
-// cannot: `0.8` is typed through `0` and `0.`, and both parse to a number: 0 clamps to the weakest bar
-// allowed and was committed on the way past, so a user typing a stricter threshold briefly saved the
-// loosest one — and clearing the box saved it outright. So the text is the state, and a bar is committed
-// only once what is in the box IS one.
-//
-// Local text, not lifted: the value that leaves here is always valid, so the modal above never has to
-// know that a half-typed number existed.
-const DEFAULT_CRITIC_THRESHOLD = 0.6;
-
-function ThresholdField({ current, onChange }: { current: number; onChange: (value: number) => void }) {
-  const [typed, setTyped] = useState<string | null>(null);
-
-  const change = (text: string): void => {
-    setTyped(text);
-    const value = Number(text);
-    // The same window the server enforces (`autopilot-cover.ts`): above zero, no more than one. Anything
-    // else — empty, `0.`, `abc`, `5` — commits nothing at all, so the project keeps the bar it has.
-    if (text.trim() !== '' && Number.isFinite(value) && value > 0 && value <= 1) onChange(value);
-  };
-
-  return (
-    <label className="field">
-      <span>Critic passes at</span>
-      <input
-        type="number"
-        min={0.05}
-        max={1}
-        step={0.05}
-        value={typed ?? current}
-        onChange={(e) => change(e.target.value)}
-        // What was typed is dropped when the box is left, so it shows the bar that is actually saved
-        // rather than a fragment that never was.
-        onBlur={() => setTyped(null)}
-      />
-      <span className="field-hint">
-        How good a critic’s score will have to be for a card to advance. Cards with nothing runnable to check
-        advance on one model’s opinion, judged by another — this is the number that decides it. It binds once
-        auto-pilot runs the loop; nothing dispatches a critic yet.
-      </span>
-    </label>
   );
 }
 

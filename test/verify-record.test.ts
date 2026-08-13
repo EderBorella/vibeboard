@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { parseRun, type RunRecord, serializeRun, withVerification } from '../src/core/runs.js';
 import type { Verification } from '../src/core/verify.js';
 
-// What a run carries about the verdict passed on it (decision 18), and what it carries about a verdict
-// it PASSED on something else. Two different fields on purpose: `verification` is what was decided
-// about this run, `score` is what this run answered when it was the critic.
+// What a run carries about the verdict passed on it (decision 18), and what it carries about a verdict it
+// PASSED on something else. Two different fields on purpose: `verification` is what was decided about this
+// run, `verdict` is what this run answered when it was the review.
 
 const base: RunRecord = {
   run: '20260805-1200-abcd',
@@ -78,44 +78,20 @@ describe('verification on a run record', () => {
     expect(parseRun(serializeRun(withVerification(base, broken)))?.verification).toBeUndefined();
   });
 
-  it('keeps a passing verification with nothing else on it', () => {
-    const passed: Verification = {
-      mode: 'critic',
-      passed: true,
-      at: 'AT',
-      score: 0.7,
-      threshold: 0.6,
-      by: 'R',
-    };
+  it('keeps a passing review verdict, naming the run that judged it', () => {
+    const passed: Verification = { mode: 'review', passed: true, at: 'AT', by: 'R' };
     expect(parseRun(serializeRun(withVerification(base, passed)))?.verification).toEqual(passed);
   });
 
-  it('keeps a critic score of zero on the verdict it produced', () => {
-    const judged: Verification = {
-      mode: 'critic',
+  it('keeps a failing review verdict with the reviewer’s own findings on it', () => {
+    const sentBack: Verification = {
+      mode: 'review',
       passed: false,
       at: 'AT',
-      score: 0,
-      threshold: 0.6,
       by: 'R',
+      reason: 'The card asks for a refusal on an unreadable file and there is none.',
     };
-    expect(parseRun(serializeRun(withVerification(base, judged)))?.verification?.score).toBe(0);
-  });
-
-  // The whole verdict, not just the number. For a critic the score and the threshold ARE the verdict —
-  // a 4 clears every bar there is — so a verdict carrying one is damaged rather than merely incomplete.
-  // A malformed `command` or `output` is different: those are evidence a verdict can lack and still mean
-  // something, and they are dropped field by field.
-  it('drops the whole verdict when its score is not a fraction', () => {
-    const judged = {
-      mode: 'critic',
-      passed: true,
-      at: 'AT',
-      score: 4,
-      threshold: 0.6,
-      by: 'R',
-    } as Verification;
-    expect(parseRun(serializeRun(withVerification(base, judged)))?.verification).toBeUndefined();
+    expect(parseRun(serializeRun(withVerification(base, sentBack)))?.verification).toEqual(sentBack);
   });
 
   it('still drops a malformed detail field on its own, keeping the verdict', () => {
@@ -148,62 +124,23 @@ describe('the captured output', () => {
   });
 });
 
-describe('a verdict that contradicts its own evidence', () => {
-  // Every field was validated on its own and nothing checked them against each other, so a hand-edited
-  // file could carry a PASS whose score is below its own threshold — and `passed` is the field the loop
-  // will act on. Dropped whole rather than recomputed: recomputing would quietly overwrite what the file
-  // says, and this is the one field where inventing a decision is the failure being guarded against.
-  it('is dropped, rather than believed', () => {
-    const lying = { mode: 'critic', passed: true, at: 'AT', score: 0.1, threshold: 0.9 } as Verification;
-    expect(parseRun(serializeRun(withVerification(base, lying)))?.verification).toBeUndefined();
+// WHAT A RUN CARRYING RETIRED FIELDS DOES NOW. `score` and `overshoot` came off RunRecord and off
+// AgentReport with the critic, so a record still holding them on disk must round-trip WITHOUT them rather
+// than carrying an orphan field the exhaustiveness check at core/runs.ts never sees.
+describe('a record written before the critic retired', () => {
+  it('round-trips without the score and the overshoot it used to carry', () => {
+    const old = { ...base, skill: 'critic', score: 0.9, overshoot: 'built a settings screen' } as RunRecord;
+    const back = parseRun(serializeRun(old));
+    expect(back).toBeDefined();
+    // Everything else survives — this is a drop, not a refusal: a run record is the project's history.
+    expect(back?.run).toBe(base.run);
+    expect(back?.status).toBe('success');
+    expect(back && 'score' in back).toBe(false);
+    expect(back && 'overshoot' in back).toBe(false);
   });
 
-  it('is dropped the other way round too — a failure that cleared its own bar', () => {
-    const lying = { mode: 'critic', passed: false, at: 'AT', score: 0.95, threshold: 0.6 } as Verification;
-    expect(parseRun(serializeRun(withVerification(base, lying)))?.verification).toBeUndefined();
-  });
-
-  it('keeps one whose score and threshold agree with its verdict', () => {
-    for (const v of [
-      { mode: 'critic', passed: true, at: 'AT', score: 0.6, threshold: 0.6 },
-      { mode: 'critic', passed: false, at: 'AT', score: 0.59, threshold: 0.6 },
-    ] as Verification[]) {
-      expect(parseRun(serializeRun(withVerification(base, v)))?.verification).toEqual(v);
-    }
-  });
-
-  // Only checkable when BOTH numbers are there. A verdict with one of them is the ordinary case for the
-  // two command modes, and for a critic that never answered.
-  it('is left alone when there is nothing to check it against', () => {
-    const v: Verification = { mode: 'critic', passed: false, at: 'AT', threshold: 0.6, reason: 'no score' };
-    expect(parseRun(serializeRun(withVerification(base, v)))?.verification).toEqual(v);
-  });
-
-  // A threshold outside the window config enforces is not a bar at all, and it is what the consistency
-  // check above compares against — so it is range-checked like the score.
-  it('drops a threshold config could never have produced', () => {
-    const v = { mode: 'critic', passed: true, at: 'AT', score: 0.5, threshold: 99 } as Verification;
-    expect(parseRun(serializeRun(withVerification(base, v)))?.verification).toBeUndefined();
-  });
-});
-
-describe('what a critic run itself reported', () => {
-  // The critic's OWN record: what it answered, not what was decided about it.
-  it('keeps a score of zero, and drops one that is not a fraction', () => {
-    const critic: RunRecord = { ...base, skill: 'critic', score: 0 };
-    expect(parseRun(serializeRun(critic))?.score).toBe(0);
-    expect(parseRun(serializeRun({ ...critic, score: 4 }))?.score).toBeUndefined();
-    expect(parseRun(serializeRun({ ...critic, score: -1 }))?.score).toBeUndefined();
-  });
-
-  it('keeps the overshoot it noticed', () => {
-    const critic: RunRecord = { ...base, skill: 'critic', score: 0.9, overshoot: 'built a settings screen' };
-    expect(parseRun(serializeRun(critic))?.overshoot).toBe('built a settings screen');
-  });
-
-  it('has neither on an ordinary run', () => {
-    const back = parseRun(serializeRun(base));
-    expect(back?.score).toBeUndefined();
-    expect(back?.overshoot).toBeUndefined();
+  it('drops a verdict claiming the retired mode, rather than reading it as one', () => {
+    const stale = { mode: 'critic', passed: true, at: 'AT', by: 'R' } as unknown as Verification;
+    expect(parseRun(serializeRun(withVerification(base, stale)))?.verification).toBeUndefined();
   });
 });

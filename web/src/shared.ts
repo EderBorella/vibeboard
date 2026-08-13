@@ -231,14 +231,13 @@ export interface BoardConfig {
 // would be a second statement of the machine with nothing to compare it against.
 // A runtime array as well as a type, so test/mirror.test.ts can compare it with the core list. A hand
 // written union drifts silently; a list can be asserted.
-export const VERIFY_MODES = ['gates', 'critic', 'smoke', 'review'] as const;
+export const VERIFY_MODES = ['gates', 'smoke', 'review'] as const;
 export type VerifyMode = (typeof VERIFY_MODES)[number];
 export interface AutopilotConfig {
   maxIterations: number;
   budgetUsd: number;
   runTimeoutMs: number;
   attemptCap: number;
-  criticThreshold: number; // what a critic's score must reach for a card to advance
   terminal: Record<BoardName, string[]>; // per board: a column belongs to one
   blockedColumn: string;
 }
@@ -257,7 +256,6 @@ export const AUTOPILOT_CONFIG_KEYS = [
   'budgetUsd',
   'runTimeoutMs',
   'attemptCap',
-  'criticThreshold',
   'terminal',
   'blockedColumn',
 ] as const;

@@ -72,10 +72,6 @@ export interface PromptInputs {
   // Absent when the project has no foundation yet, and then the section is left out entirely rather
   // than promising a folder with nothing in it.
   foundation?: { paths: string[]; codeQuality?: string };
-  // Present when this run is JUDGING finished work rather than doing it — the critic. It replaces the
-  // reporting contract with one that asks for a score, and states the threshold that score will be
-  // compared against. Absent for every other run, and then nothing about judging appears at all.
-  verdict?: { threshold: number };
   // Present when this run is a REVIEW: decision 51's second step, where a model is asked only for what a
   // command's exit code cannot express. It replaces the reporting contract with one that asks for a
   // `verdict`, and carries the two facts about the judgement that ONLY THE LOOP HOLDS — whether the gates it
@@ -291,14 +287,14 @@ const CONTRACT_LINES = [
   'Write ONLY that file for your report; the run record itself belongs to VibeBoard.',
 ];
 
-// A judging run reports a SCORE, not a pass. A binary verdict yields no distribution, and the promise
-// to judge the critic itself from data later needs the numbers to have been written down (S9).
+// A JUDGING RUN ANSWERS done OR sent-back, and that contract is an ALTERNATIVE to CONTRACT_LINES rather
+// than an addition: both present, the run would be told to report an outcome AND to judge, and whichever
+// heading it read first would decide what it wrote.
 //
-// The threshold is stated in the prompt deliberately: a judge that does not know the bar cannot
-// calibrate to it, and a bar nobody can see is one nobody can argue with afterwards.
-//
-// It is an ALTERNATIVE to CONTRACT_LINES, never an addition. Both present, the run would be told to
-// report an outcome and to score, and whichever heading it read first would decide what it wrote.
+// It used to ask for a SCORE against a stated threshold, on the argument that a binary verdict yields no
+// distribution to judge the critic by later (S9). Decision 40 rules the other way: the number was a model's
+// opinion of its own project dressed as a measurement, and the gates the loop runs in its own process are
+// the measurement. A review is asked only for what an exit code cannot express.
 // WHICH RUN, and this is the first hand-run's finding (2026-08-06). Told only "judge work that is already
 // done", a critic dispatched after a `break-down` run that had died with `[opencode failed: fetch failed]`
 // went looking for work to judge, found the PREVIOUS run's five derived cards, scored them 1 and said so in
@@ -306,20 +302,21 @@ const CONTRACT_LINES = [
 // The card advanced on a run that exited 1, wrote no report and changed no files — the failure decision 3
 // exists to prevent, arriving through the judge rather than through the agent.
 //
-// Absent for a critic a person dispatches from the card, where there is no run under judgement and the
+// Absent for a review a person dispatches from the card, where there is no run under judgement and the
 // subject really is the card's current state. Named as `undefined` rather than defaulted, because a
 // sentence naming a run that was never passed would be worse than the general one.
-// `nothingAtAll` is what a run that left nothing behind earns, and it is a parameter because the two judging
-// contracts express the same verdict differently: a score of 0, or a `sent-back`. One set of words about which
-// run is under judgement, so the two cannot drift into disagreeing about it.
-function judgedLines(judged: NonNullable<PromptInputs['previous']>, nothingAtAll: string): string[] {
+//
+// The verdict a run that left nothing behind earns is written straight in now. It was a parameter while
+// there were two judging contracts wording it differently — a score of 0, or a `sent-back` — and the
+// critic's is gone.
+function judgedLines(judged: NonNullable<PromptInputs['previous']>): string[] {
   return [
     `You are judging ONE run: **${judged.run}** (skill \`${judged.skill}\`), described above. Judge what THAT`,
     'run did, and nothing else.',
     '',
     'An earlier run on this card may have succeeded; its work is not this run’s work and does not count for',
     'it. If the run you are judging left nothing behind at all — it failed AND wrote no report AND produced',
-    `nothing — then ${nothingAtAll}, however good the card looks otherwise.`,
+    'nothing — then the verdict is `sent-back`, however good the card looks otherwise.',
     '',
     'A run that changed no FILES has not necessarily done nothing: cards are created through the API, so a',
     'run whose whole product is cards changes nothing on disk and may be perfectly complete. Judge what it',
@@ -374,7 +371,7 @@ function reviewLines(
     '',
     ...gateEvidence(review),
     '',
-    ...(judged ? [...judgedLines(judged, 'the verdict is `sent-back`'), ''] : []),
+    ...(judged ? [...judgedLines(judged), ''] : []),
     'Write your report to:',
     '',
     '```',
@@ -397,36 +394,6 @@ function reviewLines(
     'card asked still passes — say so rather than marking it down, because failing a card for over-delivery',
     'throws away working code and spends an attempt rebuilding it.',
     'A report with no `verdict` cannot pass anything, so answer even when the answer is `sent-back`.',
-  ];
-}
-
-function verdictLines(threshold: number, judged: PromptInputs['previous']): string[] {
-  return [
-    ...JUDGE_PREAMBLE,
-    '',
-    ...(judged ? [...judgedLines(judged, 'the score is 0'), ''] : []),
-    'Write your report to:',
-    '',
-    '```',
-    '<REPORT_PATH>',
-    '```',
-    '',
-    '```markdown',
-    '---',
-    'outcome: success        # or: attention, if you could not judge it at all',
-    `score: 0.0              # 0 to 1. At or above ${threshold} passes this card.`,
-    'summary: one line saying why it scored that',
-    'overshoot: one line     # only if the work did MORE than the card asked for',
-    '---',
-    '## What I judged',
-    '',
-    'The reasoning: what the card asked for, what the work does, and where they differ.',
-    '```',
-    '',
-    'Score the work against the CARD, not against what you would have built. Work that does more than',
-    'the card asked still passes — note it under `overshoot` rather than marking it down, because',
-    'failing a card for over-delivery throws away working code and spends an attempt rebuilding it.',
-    'A report with no `score` cannot pass anything, so answer even when the answer is 0.',
   ];
 }
 
@@ -559,17 +526,14 @@ export function assistCredentialSection(apiBase: string, token: string): string 
   ].join('\n');
 }
 
-// ONE CONTRACT, never two — see verdictLines. A run handed both would be told to report an outcome and to
-// judge, and whichever heading it read first would decide what it wrote.
+// ONE CONTRACT, never two. A run handed both would be told to report an outcome and to judge, and whichever
+// heading it read first would decide what it wrote.
 //
 // Its own function so `buildRunPrompt` stays a flat sequence of sections: a nested conditional inside it costs
 // far more complexity than the length it saves, and flattening beats a suppression.
 function contractFor(input: PromptInputs): { heading: string; lines: string[] } {
   if (input.review) {
     return { heading: 'Judging (required)', lines: reviewLines(input.review, input.previous) };
-  }
-  if (input.verdict) {
-    return { heading: 'Judging (required)', lines: verdictLines(input.verdict.threshold, input.previous) };
   }
   return { heading: 'Reporting (required)', lines: CONTRACT_LINES };
 }
@@ -614,7 +578,7 @@ export function buildRunPrompt(input: PromptInputs): string {
   }
   // After the linked cards and before the contract: this IS the checkup's subject.
   parts.push(...checkupSections(input.checkup));
-  const judging = input.verdict !== undefined || input.review !== undefined;
+  const judging = input.review !== undefined;
   if (input.previous) parts.push(previousSection(input.previous, judging));
   // Last of the context and immediately before the contract: the user's words are the most
   // specific instruction in the prompt and must not be buried above the card.

@@ -180,7 +180,9 @@ describe('the instructions', () => {
     const dialog = screen.getByRole('dialog', { name: /how auto-pilot works/i });
     // The claims a person needs before pressing play: what advances a card, and what stops the loop.
     expect(dialog.textContent).toMatch(/only if the check passes/i);
-    expect(dialog.textContent).toMatch(/routing table/i);
+    // The lifecycle is fixed and is not a setting (ruling 52). This used to assert `routing table`, which
+    // is the claim that stopped being true.
+    expect(dialog.textContent).toMatch(/is not a setting/i);
     expect(dialog.textContent).toMatch(/attempt cap/i);
     expect(dialog.textContent).toMatch(/cannot dispatch other agents/i);
 

@@ -107,15 +107,7 @@ export interface RunRecord {
   // settled, by whatever verified it — so it is ABSENT on every record until something has judged it,
   // which is not the same fact as failing.
   verification?: Verification;
-  // What a CRITIC run itself answered: its score, and any over-delivery it noticed. Distinct from
-  // `verification` above, which is what was decided about the run being judged — the critic's own
-  // record holds what it said, the judged run holds what came of it.
-  //
-  // Absent on every other kind of run, and absent rather than 0 when a critic did not answer: zero is
-  // a critic that judged the work worthless, which is a verdict rather than a gap.
-  score?: number;
-  overshoot?: string;
-  // What a REVIEW run itself answered, on the review run's own record — the same split as `score` above:
+  // What a REVIEW run itself answered, on the review run's own record — a deliberate split:
   // the judging run holds what it said, the judged run holds what came of it as `verification`. Absent
   // rather than defaulted when a review reported none, because that absence IS the fact the review bound
   // counts (decision 40: "no answer" is not an answer).
@@ -131,10 +123,6 @@ export interface AgentReport {
   summary?: string;
   options?: string[];
   created?: string[];
-  // A JUDGING run only — the critic. Its score, and any over-delivery it noticed in the work it was
-  // judging. Absent from every other report, and absent rather than 0 when the critic did not answer.
-  score?: number;
-  overshoot?: string;
   // A REVIEW run's answer. Absent when it wrote none, which is a review that decided nothing rather than
   // one that passed the work — the direction that matters, since the other would invent a pass.
   verdict?: ReviewVerdict;
@@ -163,16 +151,9 @@ function asUsage(value: unknown): RunUsage | undefined {
   return Object.keys(usage).length > 0 ? usage : undefined;
 }
 
-// A score is a fraction of one, and zero is a real answer — a critic that judged the work worthless.
-// Anything outside that range is not a judgement at all: a 4 would clear every threshold, which is the
-// direction that turns a broken critic into a pass.
-function asFraction(value: unknown): number | undefined {
-  return typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 1 ? value : undefined;
-}
-
 // Fields of a verdict that are plain sentences. A table rather than five near-identical guards: the
 // only thing that differs is the key, and flattening keeps this under the complexity ceiling.
-const VERIFICATION_TEXT = ['command', 'reason', 'by', 'overshoot'] as const;
+const VERIFICATION_TEXT = ['command', 'reason', 'by'] as const;
 
 // A verdict read back off disk, or nothing. Field by field, because a run file is something a person
 // may edit and one bad key must not cost the record — but `mode`, `passed` and `at` are REQUIRED and a
@@ -180,8 +161,12 @@ const VERIFICATION_TEXT = ['command', 'reason', 'by', 'overshoot'] as const;
 // invents a decision nobody made, and the direction that invents a pass is how work advances on
 // nothing at all; a verdict with no timestamp is one nobody can place in the sequence.
 // Exported for the endpoint that writes a verdict onto a run. Reused rather than re-derived, deliberately:
-// it is the check that refuses a critic score which does not agree with the threshold it claims to have been
-// judged against, and a second validator would eventually disagree with this one.
+// a second validator would eventually disagree with this one.
+//
+// THE `score`/`threshold` AGREEMENT CHECK GOES WITH THE CRITIC. It refused a verdict whose score sat below
+// its own bar, which was worth having because `passed` is the field the loop acts on and for a critic the
+// numbers WERE the verdict. A review's verdict has no such pair to contradict itself with: `passed` is what
+// the review said, and there is nothing beside it to disagree with.
 export function asVerification(value: unknown): Verification | undefined {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
   const d = value as Record<string, unknown>;
@@ -197,40 +182,7 @@ export function asVerification(value: unknown): Verification | undefined {
   // entirely. "The command printed nothing" is evidence about a failure, and losing it leaves a reader
   // wondering whether it printed nothing or nobody looked.
   if (typeof d.output === 'string') out.output = d.output;
-  const numbers = criticNumbers(d, out.passed);
-  if (numbers === DAMAGED) return undefined;
-  return { ...out, ...numbers };
-}
-
-const DAMAGED = Symbol('a verdict contradicting its own evidence');
-
-// A critic verdict's two numbers, or `DAMAGED`.
-//
-// For a critic these ARE the verdict rather than decoration around it, so a present-but-invalid one
-// damages the whole thing: a score of 4 clears every bar there is, and a threshold of 99 is one the
-// config validator could never have produced. A malformed `command` or `output` is different and is
-// dropped field by field — those are evidence a verdict can lack and still mean something.
-//
-// And the two are checked against the VERDICT. Every field used to be validated on its own with nothing
-// comparing them, so a file could carry a pass whose score sat below its own bar — and `passed` is the
-// field the loop acts on. Dropped rather than recomputed: recomputing would quietly overwrite what the
-// file says, and inventing a decision is the failure this whole guard exists to prevent.
-//
-// Extracted from `asVerification` rather than inlined: the same checks nested there put it past the
-// complexity ceiling, and the metric is measuring depth — as is the reader.
-function criticNumbers(
-  d: Record<string, unknown>,
-  passed: boolean,
-): { score?: number; threshold?: number } | typeof DAMAGED {
-  const score = asFraction(d.score);
-  const threshold = asFraction(d.threshold);
-  if (d.score !== undefined && score === undefined) return DAMAGED;
-  if (d.threshold !== undefined && threshold === undefined) return DAMAGED;
-  if (score !== undefined && threshold !== undefined && passed !== score >= threshold) return DAMAGED;
-  return {
-    ...(score === undefined ? {} : { score }),
-    ...(threshold === undefined ? {} : { threshold }),
-  };
+  return out;
 }
 
 function asText(value: unknown): string | undefined {
@@ -312,8 +264,6 @@ const DETAIL_KEYS = [
   'filesChanged',
   // Last, and in this order: what the run answered, then what was decided about it. A run file is
   // read in a diff, and the verdict is the thing you look for at the bottom.
-  'score',
-  'overshoot',
   'verdict',
   'verification',
 ] as const;
@@ -358,15 +308,7 @@ export function withFilesChanged(record: RunRecord, count: number | undefined): 
 // Fields that are simply absent when unset, rather than present and empty. Gathered in loops
 // rather than a chain of conditional spreads: same behaviour, and a dozen ternaries in one
 // expression is what pushed parseRun past the complexity gate.
-const TEXT_OPTIONALS = [
-  'finished',
-  'resolved',
-  'previous',
-  'prompt',
-  'summary',
-  'note',
-  'overshoot',
-] as const;
+const TEXT_OPTIONALS = ['finished', 'resolved', 'previous', 'prompt', 'summary', 'note'] as const;
 const LIST_OPTIONALS = ['attached', 'options', 'created'] as const;
 
 // Whole-number fields, each with the smallest value it may legitimately hold. One table rather than a
@@ -396,8 +338,6 @@ function optionalFields(d: Record<string, unknown>): Partial<RunRecord> {
   if (usage !== undefined) out.usage = usage;
   const verification = asVerification(d.verification);
   if (verification !== undefined) out.verification = verification;
-  const score = asFraction(d.score);
-  if (score !== undefined) out.score = score;
   for (const key of TEXT_OPTIONALS) {
     const value = asText(d[key]);
     if (value !== undefined) out[key] = value;
@@ -452,16 +392,11 @@ export function parseAgentReport(content: string): AgentReport {
     return { outcome: 'attention', body: content.trim() };
   }
   const d = parsed.data as Record<string, unknown>;
-  const score = asFraction(d.score);
   return {
     outcome: isOutcome(d.outcome) ? d.outcome : 'attention',
     ...(asText(d.summary) ? { summary: asText(d.summary) } : {}),
     ...(asStrings(d.options) ? { options: asStrings(d.options) } : {}),
     ...(asStrings(d.created) ? { created: asStrings(d.created) } : {}),
-    // A judging run's two extra fields. Absent everywhere else, and a score outside 0..1 is dropped
-    // rather than clamped: a 4 is not a judgement, and clamping it to 1 would invent a pass.
-    ...(score === undefined ? {} : { score }),
-    ...(asText(d.overshoot) ? { overshoot: asText(d.overshoot) } : {}),
     // A review's answer, dropped unless it is one of the two. Absent is what an inconclusive review is.
     ...(isVerdict(d.verdict) ? { verdict: d.verdict } : {}),
     body: parsed.content.trim(),
@@ -480,12 +415,8 @@ export function withReport(record: RunRecord, report: AgentReport, finished: str
     ...(report.summary ? { summary: report.summary } : {}),
     ...(report.options ? { options: report.options } : {}),
     ...(report.created ? { created: report.created } : {}),
-    // A critic's own answer, kept on the critic's own record. What came OF it is written to the run
-    // being judged, as `verification` — one fact, one home, on each side.
-    ...(report.score === undefined ? {} : { score: report.score }),
-    ...(report.overshoot ? { overshoot: report.overshoot } : {}),
-    // Same split, one level along: the review's own record carries what it SAID, and the run it judged
-    // carries what came of it as `verification`.
+    // The review's own record carries what it SAID; the run it judged carries what came of it as
+    // `verification` — one fact, one home, on each side.
     ...(report.verdict === undefined ? {} : { verdict: report.verdict }),
     report: report.body,
   };

@@ -385,21 +385,12 @@ describe('the foundation section', () => {
   });
 });
 
-// A run asked to JUDGE rather than to build. `inputs(over)` above is this file's fixture function.
+// A run asked to JUDGE rather than to build, and WHICH RUN it is judging. `inputs(over)` above is this
+// file's fixture function. The critic's own half of this describe — a score, and the threshold stated for it
+// to calibrate against — went with decision 40; everything here is about the judged-run section and the
+// preamble, which the surviving review contract shares.
 describe('the judging contract', () => {
-  const judging = () => buildRunPrompt(inputs({ verdict: { threshold: 0.6 } }));
-
-  it('is told to report a score, and what it will be compared against', () => {
-    const text = judging();
-    expect(text).toContain('score:');
-    // The bar is stated because a judge that does not know it cannot calibrate to it — and a bar
-    // nobody can see is one nobody can argue with afterwards.
-    expect(text).toMatch(/at or above 0\.6/i);
-  });
-
-  it('asks an ordinary run for no score at all', () => {
-    expect(buildRunPrompt(inputs())).not.toContain('score:');
-  });
+  const judging = () => buildRunPrompt(inputs({ review: { gatesPassed: true, setupSubtree: false } }));
 
   // The judge must not fix what it is judging, or the verdict becomes an opinion about its own work.
   it('tells a judging run to change nothing', () => {
@@ -425,7 +416,7 @@ describe('the judging contract', () => {
   const judgingRun = (over: Partial<NonNullable<PromptInputs['previous']>> = {}) =>
     buildRunPrompt(
       inputs({
-        verdict: { threshold: 0.6 },
+        review: { gatesPassed: true, setupSubtree: false },
         previous: { run: 'R-JUDGED', skill: 'break-down', status: 'failed', ...over },
       }),
     );
@@ -454,13 +445,12 @@ describe('the judging contract', () => {
   // The rule that would have caught the hand-run — but as a CONJUNCTION. Written as "it failed, it wrote no
   // report, or it changed no files", it told a judge to score 0 whenever the judged run changed no files, and
   // zero files is the SUCCESSFUL shape of every card-producing skill: cards go through the API, so
-  // derive-features, break-down and design all legitimately touch nothing on disk. Five of the seven default
-  // routes, and every critic-verified one, would have had to score 0. Caught in review; the exact bytes are
-  // asserted, because this is a rule whose meaning turns on one word.
-  it('tells it to score nothing at all as zero, and only nothing at all', () => {
+  // derive-features and break-down all legitimately touch nothing on disk. Caught in review; the exact bytes
+  // are asserted, because this is a rule whose meaning turns on one word.
+  it('tells it to send back nothing at all, and only nothing at all', () => {
     const text = judgingRun();
     expect(text).toContain(
-      'it failed AND wrote no report AND produced\nnothing — then the score is 0, however good the card looks otherwise.',
+      'it failed AND wrote no report AND produced\nnothing — then the verdict is `sent-back`, however good the card looks otherwise.',
     );
     expect(text).not.toMatch(/or it changed no/i);
   });
@@ -483,7 +473,7 @@ describe('the judging contract', () => {
     expect(text).toContain('It wrote no report.');
   });
 
-  // A critic a person dispatches from the card has no run under judgement, and the general wording is right
+  // A review a person dispatches from the card has no run under judgement, and the general wording is right
   // for it. A sentence naming a run that was never passed would be worse than no sentence.
   it('names no run when there is none, rather than inventing one', () => {
     const text = judging();
@@ -491,28 +481,14 @@ describe('the judging contract', () => {
     expect(text).toMatch(/change nothing/i);
   });
 
-  // The review's HIGH. A judging run was handed BOTH required contracts: "Changing the board" granting
-  // PATCH and POST on cards, then "Judging" saying do not edit the card. The exclusivity that was
-  // claimed held only between the two REPORTING contracts, and the judging test supplied no credential,
-  // so nothing noticed. A judge needs no write endpoint at all — it reads the work and reports a score.
-  it('is not also told how to change the board', () => {
-    const text = buildRunPrompt(
-      inputs({
-        verdict: { threshold: 0.6 },
-        credential: { token: 'T', apiBase: 'http://127.0.0.1:4610', scope: 'work' as const },
-      }),
-    );
-    expect(text).not.toContain('## Changing the board (required)');
-    expect(text).not.toContain('POST /api/cards');
-    expect(text).not.toContain('PATCH /api/cards');
-  });
-
   // The token is still named, because the run has one and an agent that finds a credential in its
-  // environment with no explanation is an agent that will experiment with it.
+  // environment with no explanation is an agent that will experiment with it. The half of this that
+  // asserted a judge is NOT also handed "Changing the board" lives in the review contract's own
+  // 'grants a review run nothing on the board' — one statement of it, not two.
   it('says what its credential is for, and that changing the board is not it', () => {
     const text = buildRunPrompt(
       inputs({
-        verdict: { threshold: 0.6 },
+        review: { gatesPassed: true, setupSubtree: false },
         credential: { token: 'T', apiBase: 'http://127.0.0.1:4610', scope: 'work' as const },
       }),
     );
@@ -527,13 +503,6 @@ describe('the judging contract', () => {
     );
     expect(text).toContain('## Changing the board (required)');
     expect(text).toContain('POST /api/cards');
-  });
-
-  // A score of 0 is the answer to "this does not meet the card", and the contract has to ask for it
-  // explicitly: a judge that stays silent when the work is bad produces an absent score, which fails
-  // closed but says nothing anyone can act on.
-  it('asks for an answer even when the answer is zero', () => {
-    expect(judging()).toMatch(/even when the answer is 0/);
   });
 });
 

@@ -55,6 +55,14 @@ export function SuggestionsPane({ suggestions, failed, onRefresh, onApply }: Pro
     }
   }
 
+  // Both notices are about the suggestion they happened to, and the actions follow whichever row is
+  // picked — so carrying either across a pick would put a true sentence beside the wrong finding.
+  function pick(id: string): void {
+    setPickedId(id);
+    setBecame(null);
+    setError(null);
+  }
+
   function dismiss(id: string): void {
     setBecame(null);
     // Trimmed to undefined rather than sent empty: the server keeps a reason for a dismissal alone, and
@@ -140,7 +148,7 @@ export function SuggestionsPane({ suggestions, failed, onRefresh, onApply }: Pro
                 key={s.id}
                 data-state={s.state}
               >
-                <button type="button" className="suggestions-pick" onClick={() => setPickedId(s.id)}>
+                <button type="button" className="suggestions-pick" onClick={() => pick(s.id)}>
                   <span className="filed-title">{s.title}</span>
                   <span className="filed-meta">
                     <time dateTime={s.created}>{when(s.created)}</time>

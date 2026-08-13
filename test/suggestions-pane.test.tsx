@@ -124,6 +124,21 @@ describe('the Suggestions pane', () => {
     expect(onRefresh).toHaveBeenCalled();
   });
 
+  // Both notices are about the suggestion they happened to, and the actions move to whichever row is
+  // picked — so a stale "carded as P-004" or a stale refusal beside a different finding is a lie.
+  it('clears what it said about one suggestion when another is picked', async () => {
+    api.cardSuggestion.mockResolvedValue({
+      card: { id: 'P-004' },
+      suggestion: suggestion({ state: 'actioned', became: 'P-004' }),
+    });
+    render(pane({ suggestions: [suggestion(), suggestion({ id: 's-2', title: 'The gate has no timeout' })] }));
+    fireEvent.click(screen.getByRole('button', { name: /make a card/i }));
+    expect(await screen.findByText(/P-004/)).toBeTruthy();
+
+    fireEvent.click(screen.getByText('The gate has no timeout'));
+    expect(screen.queryByText(/P-004/)).toBeNull();
+  });
+
   it('acts on the suggestion the user picked, not always the first', async () => {
     api.patchSuggestion.mockResolvedValue(suggestion({ id: 's-2', state: 'dismissed' }));
     render(pane({ suggestions: [suggestion(), suggestion({ id: 's-2', title: 'The gate has no timeout' })] }));

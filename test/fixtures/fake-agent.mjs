@@ -15,7 +15,8 @@
 //   spawner   — starts a child of its own, narrates its pid, then hangs: the grandchild case
 //   reporthang— writes a SUCCESS report and then hangs: a run stopped after it claimed victory
 //   verdict:v — writes a success report carrying `verdict: v`, for a review run
-//   create:…  — creates cards through the API, one POST per card. See `createCards` below.
+//   create:…  — creates cards through the API, one POST per card, then PUTs its own link list
+//   createlinks:… — the same cards, but with `links` on the POST and no PUT. See `createCards` below.
 //
 // The report path is read from the prompt it was given, exactly as a real agent would: that means
 // these tests fail if the prompt stops naming the path.
@@ -102,19 +103,29 @@ async function api(method, path, body) {
 }
 
 // CREATING CARDS, the way the seeded skills tell a real agent to: `POST /api/cards` ONE CALL PER CARD, never
-// a batch and never a shell loop whose result cannot be checked (decision 43), then `PUT …/links` to attach
-// them to this run's own card, because the hierarchy is derived from the parent's links.
+// a batch and never a shell loop whose result cannot be checked (decision 43).
 //
-// The marker is `create:<board>:<n>[:<board>:<n>…]` — pairs. The FIRST pair is what this run creates; the rest
-// is written into each new card's body as its own marker, so one chain drives every level of a break-down:
-// `create:features:1:product:1:engineering:2` derives one feature whose break-down creates one story whose
-// break-down creates two tasks. The board is passed LITERALLY, so the endpoint's own rule about which board a
-// phase may create on is under test rather than agreed with here.
-async function createCards(args) {
+// TWO MODES, because the API admits at least three routes to "created and linked" and a COMPLIANT shim written
+// from the same mental model as the code can only confirm that model. `create` posts each card and then PUTs its
+// own complete link list, which is what the seeded skill used to instruct; `createlinks` sends `links` ON THE
+// POST, which is what `POST /api/cards` used to advertise — and that route is the one that shipped two orphans,
+// because the field was written into the new card's frontmatter with nothing on the far side. Every trace runs
+// under both, so what is asserted is the API's surface rather than one path through it.
+//
+// The marker is `<mode>:<board>:<n>[:<board>:<n>…]` — pairs. The FIRST pair is what this run creates; the rest
+// is written into each new card's body as its own marker, CARRYING THE MODE, so one chain drives every level of
+// a break-down: `create:features:1:product:1:engineering:2` derives one feature whose break-down creates one
+// story whose break-down creates two tasks. The board is passed LITERALLY, so the endpoint's own rule about
+// which board a phase may create on is under test rather than agreed with here.
+async function createCards(mode, args) {
   const board = args[0];
   const count = Number(args[1] ?? 1);
   const rest = args.slice(2);
-  const childMarker = rest.length > 0 ? `\n[[behaviour:create:${rest.join(':')}]]\n` : '';
+  const childMarker = rest.length > 0 ? `\n[[behaviour:${mode}:${rest.join(':')}]]\n` : '';
+  // The parent an agent would name if it named one: its own card. Wrong for a story checkup, which creates
+  // siblings — deliberately left wrong, because the server decides the parent and this is what a model sending
+  // its best guess looks like.
+  const onPost = mode === 'createlinks' && myId !== undefined ? { links: [myId] } : {};
   const created = [];
   for (let n = 1; n <= count; n++) {
     const card = await api('POST', '/api/cards', {
@@ -124,10 +135,12 @@ async function createCards(args) {
       columnSlug: 'backlog',
       title: `${board} ${n} of ${count}`,
       body: `Made by the shim.\n${childMarker}`,
+      ...onPost,
     });
     created.push(card.id);
   }
-  if (myId !== undefined) {
+  // In `createlinks` mode the POST was the whole of it: no second call, which is the point of the mode.
+  if (mode === 'create' && myId !== undefined) {
     // The COMPLETE list, which is what the endpoint takes — so this run's existing links have to survive it.
     // Read off the board rather than out of the prompt: `GET /api/state` is unrestricted, and a parent link
     // dropped here would orphan the card above this one.
@@ -145,10 +158,10 @@ async function createCards(args) {
   return created;
 }
 
-if (behaviour === 'create') {
+if (behaviour === 'create' || behaviour === 'createlinks') {
   // A creating run: it changes no files at all, so what it produced is only visible on the board — which is
   // exactly why `createdNothing` compares the board before and after rather than reading this report.
-  const created = await createCards(behaviourArgs);
+  const created = await createCards(behaviour, behaviourArgs);
   if (match) {
     const path = join(process.cwd(), match[0]);
     mkdirSync(dirname(path), { recursive: true });

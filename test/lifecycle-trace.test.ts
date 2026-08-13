@@ -3,6 +3,7 @@ import { appendFile, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it, onTestFinished } from 'vitest';
 import type { DiaryEntry } from '../src/core/diary.js';
+import { childrenOf, isLive, parentBoardOf, parentOf } from '../src/core/hierarchy.js';
 import { skillRel } from '../src/core/layout.js';
 import type { RunRecord } from '../src/core/runs.js';
 import type { BoardName, Card } from '../src/core/types.js';
@@ -278,6 +279,65 @@ async function place(
   return card.id;
 }
 
+// THE TWO CREATE MODES the API admits, and the whole trace runs under each. `create` POSTs a card and then PUTs
+// its own link list; `createlinks` sends `links` on the POST, the way `POST /api/cards` used to advertise. The
+// shim is COMPLIANT either way, which is the problem this closes: written from the same mental model as the code,
+// it could only ever confirm that model, and the route it did not take is the one that shipped orphans.
+const MODES = ['create', 'createlinks'] as const;
+type Mode = (typeof MODES)[number];
+
+// `<mode>:<board>:<n>[…]` — the chain travels through the cards the shim creates, carrying the mode with it, so
+// one marker drives every level of a break-down in the mode the suite is running.
+const creates = (mode: Mode, chain: string): string => `[[behaviour:${mode}:${chain}]]`;
+
+// THE BOARD'S SHAPE, and its absence is what let the orphan ship. Everything above reads the DIARY and the run
+// records — the loop's own account of what it did, which is true of a project whose every card is an orphan: the
+// two tasks that produced this ruling were created, echoed their parent's id back, and were invisible to the
+// machine in both directions.
+//
+// TWO CLAIMS, and the second is why the first is not enough. No live card below the top board is an orphan; and
+// each parent's children are EXACTLY the cards its runs created — attributed from `Card.createdBy`, which the
+// endpoint stamps from the credential, so nothing here trusts a run's own report of what it made. Claim one alone
+// passes on a card hung under the wrong parent, which is what "link to the run's own card" does to a checkup's
+// sibling.
+async function assertHierarchy(project: TestProject): Promise<void> {
+  const cards = (await board(project)).filter(isLive);
+  const byRun = new Map((await runs(project)).map((r) => [r.run, r]));
+  const madeByRun = (card: Card): boolean => card.createdBy !== undefined;
+
+  // NO ORPHANS. A feature is the top of its own vertical and has nobody above it; everything else must be
+  // reachable downwards from one, because `childrenOf` is the only way the machine walks.
+  expect(
+    cards.filter((c) => c.board !== 'features' && parentOf(c, cards) === undefined).map((c) => c.id),
+  ).toEqual([]);
+
+  // Where a run-created card BELONGS: the card on the board above what its run's phase creates — the run's own
+  // card when it sits there, and the card above THAT when the phase created on its own board (a checkup's
+  // siblings). Derived here from the boards rather than from the endpoint's code, so the two have to agree.
+  const want: Record<string, string[]> = {};
+  const actual: Record<string, string[]> = {};
+  for (const parent of cards) {
+    want[parent.id] = [];
+    actual[parent.id] = childrenOf(parent, cards)
+      .filter(madeByRun)
+      .map((c) => c.id)
+      .sort();
+  }
+  for (const card of cards.filter(madeByRun)) {
+    const run = byRun.get(card.createdBy as string);
+    // A project run has no card: the bootstrap's features sit under nothing, by design.
+    if (run?.card === undefined) continue;
+    const own = cards.find((c) => c.id === run.card);
+    const above = parentBoardOf(card.board);
+    const parent =
+      own === undefined || above === undefined ? undefined : own.board === above ? own : parentOf(own, cards);
+    expect(parent, `${card.id}, created by a run on ${run.card}, belongs under something`).toBeDefined();
+    want[(parent as Card).id].push(card.id);
+  }
+  for (const ids of Object.values(want)) ids.sort();
+  expect(actual).toEqual(want);
+}
+
 // A MINUTE PER TEST, and vitest's 5,000ms default is the wrong number for what these do. Every test here
 // spawns a real HTTP listener, seven to nine real child processes, and real shell commands through
 // `/bin/sh`; in isolation one takes about a second, and inside the whole suite — twenty workers, all of
@@ -287,250 +347,303 @@ async function place(
 //
 // A timeout is a declaration of how long the work may take, not a retry: no assertion is relaxed by it,
 // and a test that genuinely hangs still fails — one minute later.
-describe('the lifecycle, driven end to end', { timeout: 60_000 }, () => {
-  it('walks a feature from an empty board to complete, in the order Part One §4 states', async () => {
-    const started = await start({
-      // One feature, one story under it, two tasks under that. The chain travels through the cards the shim
-      // creates, so one `break-down` skill serves both levels — and each board is named literally, so the
-      // endpoint's own rule about where a phase may create is what decides, not the shim.
-      skills: { ...HAPPY, 'derive-features': '[[behaviour:create:features:1:product:1:engineering:2]]' },
+for (const mode of MODES) {
+  describe(`the lifecycle, driven end to end — ${mode}`, { timeout: 60_000 }, () => {
+    it('walks a feature from an empty board to complete, in the order Part One §4 states', async () => {
+      const started = await start({
+        // One feature, one story under it, two tasks under that. The chain travels through the cards the shim
+        // creates, so one `break-down` skill serves both levels — and each board is named literally, so the
+        // endpoint's own rule about where a phase may create is what decides, not the shim.
+        skills: { ...HAPPY, 'derive-features': creates(mode, 'features:1:product:1:engineering:2') },
+      });
+      const ended = await drive(started);
+      expect(ended.reason).toBe('complete');
+
+      expect(await trace(started.project)).toEqual([
+        // The scaffolder's own line, which is the project's first event and is in the same file.
+        'lifecycle: Project T created.',
+        'flag F-001 setup',
+        'ran project derive-features',
+        'move features/F-001 todo',
+        'move features/F-001 in-progress',
+        'ran F-001 break-down',
+        'move product/P-001 todo',
+        'move product/P-001 in-progress',
+        'ran P-001 break-down',
+        'move engineering/E-001 in-progress',
+        'move engineering/E-001 review',
+        'ran E-001 implement',
+        'move engineering/E-001 done',
+        'review E-001 pass',
+        // E-002 the same shape, and only after E-001 is done: one task at a time.
+        'move engineering/E-002 in-progress',
+        'move engineering/E-002 review',
+        'ran E-002 implement',
+        'move engineering/E-002 done',
+        'review E-002 pass',
+        'move product/P-001 done',
+        'ran P-001 checkup-story',
+        'smoke F-001 pass',
+        'move features/F-001 done',
+        'ran F-001 checkup-feature',
+        'stopped complete',
+      ]);
+
+      expect(await dispatches(started.project, started.argsLog)).toEqual([
+        'dispatch project derive-features',
+        'dispatch F-001 break-down in features/todo',
+        'dispatch P-001 break-down in product/todo',
+        'dispatch E-001 implement in engineering/in-progress',
+        'dispatch E-001 review in engineering/review',
+        'dispatch E-002 implement in engineering/in-progress',
+        'dispatch E-002 review in engineering/review',
+        'dispatch P-001 checkup-story in product/in-progress',
+        'dispatch F-001 checkup-feature in features/in-progress',
+      ]);
+
+      // The gates ran once per review, in the loop's own process, and the smoke command once before the feature
+      // checkup. Counted from what the commands themselves wrote.
+      expect(await ranTimes(started.project.root, GATE_LOG)).toBe(2);
+      expect(await ranTimes(started.project.root, SMOKE_LOG)).toBe(1);
+      // THE BOARD, not the diary: every card the walk produced is hung where the machine can see it.
+      await assertHierarchy(started.project);
     });
-    const ended = await drive(started);
-    expect(ended.reason).toBe('complete');
 
-    expect(await trace(started.project)).toEqual([
-      // The scaffolder's own line, which is the project's first event and is in the same file.
-      'lifecycle: Project T created.',
-      'flag F-001 setup',
-      'ran project derive-features',
-      'move features/F-001 todo',
-      'move features/F-001 in-progress',
-      'ran F-001 break-down',
-      'move product/P-001 todo',
-      'move product/P-001 in-progress',
-      'ran P-001 break-down',
-      'move engineering/E-001 in-progress',
-      'move engineering/E-001 review',
-      'ran E-001 implement',
-      'move engineering/E-001 done',
-      'review E-001 pass',
-      // E-002 the same shape, and only after E-001 is done: one task at a time.
-      'move engineering/E-002 in-progress',
-      'move engineering/E-002 review',
-      'ran E-002 implement',
-      'move engineering/E-002 done',
-      'review E-002 pass',
-      'move product/P-001 done',
-      'ran P-001 checkup-story',
-      'smoke F-001 pass',
-      'move features/F-001 done',
-      'ran F-001 checkup-feature',
-      'stopped complete',
-    ]);
+    it('sends a task back through a fix when a gate fails, dispatching no model for the gate', async () => {
+      const started = await start({
+        // The gate fails the first time it runs and passes the second: the test chooses the failure, because the
+        // command comes from foundation/CODE-QUALITY.md.
+        //
+        // NO DOUBLE QUOTES — `gatesDoc` puts the command in a double-quoted YAML scalar, and a `"` inside it
+        // makes the document unparseable. That is not a broken test, it is a PASSING one: an unreadable gate set
+        // is a gates verdict carrying no command, and inside the setup subtree — which every card under the
+        // scaffolding feature is — that is the one case the loop excuses, so the card sails through to its
+        // review. The first draft of this test did exactly that and asserted nothing at all.
+        gates: `echo ran >> ${GATE_LOG}; test $(wc -l < ${GATE_LOG}) -ge 2`,
+        skills: { ...HAPPY, 'derive-features': creates(mode, 'features:1:product:1:engineering:1') },
+      });
+      const ended = await drive(started);
+      expect(ended.reason).toBe('complete');
 
-    expect(await dispatches(started.project, started.argsLog)).toEqual([
-      'dispatch project derive-features',
-      'dispatch F-001 break-down in features/todo',
-      'dispatch P-001 break-down in product/todo',
-      'dispatch E-001 implement in engineering/in-progress',
-      'dispatch E-001 review in engineering/review',
-      'dispatch E-002 implement in engineering/in-progress',
-      'dispatch E-002 review in engineering/review',
-      'dispatch P-001 checkup-story in product/in-progress',
-      'dispatch F-001 checkup-feature in features/in-progress',
-    ]);
+      const traced = await trace(started.project);
+      expect(traced.slice(traced.indexOf('ran E-001 implement'))).toEqual([
+        'ran E-001 implement',
+        // No model was asked and no iteration spent: the verdict is the gate's own, and the card goes back.
+        'move engineering/E-001 in-progress',
+        'gates E-001 fail',
+        'move engineering/E-001 review',
+        'ran E-001 fix',
+        'move engineering/E-001 done',
+        'review E-001 pass',
+        'move product/P-001 done',
+        'ran P-001 checkup-story',
+        'smoke F-001 pass',
+        'move features/F-001 done',
+        'ran F-001 checkup-feature',
+        'stopped complete',
+      ]);
 
-    // The gates ran once per review, in the loop's own process, and the smoke command once before the feature
-    // checkup. Counted from what the commands themselves wrote.
-    expect(await ranTimes(started.project.root, GATE_LOG)).toBe(2);
-    expect(await ranTimes(started.project.root, SMOKE_LOG)).toBe(1);
-  });
+      // THE GATE SPENT NOTHING. One review run, not two — the failing gate dispatched no model at all.
+      const all = await runs(started.project);
+      expect(all.filter((r) => r.skill === 'review')).toHaveLength(1);
+      expect(all.filter((r) => r.skill === 'fix')).toHaveLength(1);
+      // Twice: once to fail, once to pass after the fix.
+      expect(await ranTimes(started.project.root, GATE_LOG)).toBe(2);
+      // THE BOARD, not the diary: every card the walk produced is hung where the machine can see it.
+      await assertHierarchy(started.project);
+    });
 
-  it('sends a task back through a fix when a gate fails, dispatching no model for the gate', async () => {
-    const started = await start({
-      // The gate fails the first time it runs and passes the second: the test chooses the failure, because the
-      // command comes from foundation/CODE-QUALITY.md.
+    it('runs no gate command and stops while a gate document is unreviewed', async () => {
+      const started = await start({
+        skills: { ...HAPPY, 'derive-features': creates(mode, 'features:1:product:1:engineering:1') },
+      });
+      // THE DOCUMENT GOES UNREAD MID-SESSION, which is the shape this guard exists for: an agent rewrites
+      // `foundation/CODE-QUALITY.md` while the loop is running, and the commands in it would then run
+      // unsandboxed as this user. Set from the start it would prove less than it looks — `POST /api/runs`
+      // refuses every dispatch while one is unread, so nothing would ever reach a review at all.
       //
-      // NO DOUBLE QUOTES — `gatesDoc` puts the command in a double-quoted YAML scalar, and a `"` inside it
-      // makes the document unparseable. That is not a broken test, it is a PASSING one: an unreadable gate set
-      // is a gates verdict carrying no command, and inside the setup subtree — which every card under the
-      // scaffolding feature is — that is the one case the loop excuses, so the card sails through to its
-      // review. The first draft of this test did exactly that and asserted nothing at all.
-      gates: `echo ran >> ${GATE_LOG}; test $(wc -l < ${GATE_LOG}) -ge 2`,
-      skills: { ...HAPPY, 'derive-features': '[[behaviour:create:features:1:product:1:engineering:1]]' },
+      // Four ticks: bootstrap, the feature's break-down, the story's, and the implement that leaves E-001 in
+      // review. Both premises are asserted rather than assumed, because a budget that stopped one tick later
+      // would run the gates itself and this test would then be about nothing.
+      const first = await drive(started, { ticks: 4 });
+      expect(first.reason).toBe('stopped');
+      expect(await columnOf(started.project, 'E-001')).toBe('review');
+      expect(await ranTimes(started.project.root, GATE_LOG)).toBe(0);
+
+      const ended = await drive(started, { unreviewedGates: ['foundation/CODE-QUALITY.md'] });
+      expect(ended.reason).toBe('stalled');
+      expect(ended.detail).toContain('will not run a gate command');
+      // NOTHING EXECUTED. The refusal is in front of the shell, not after it.
+      expect(await ranTimes(started.project.root, GATE_LOG)).toBe(0);
+      // And no model was asked either: the review phase never got past its own first step.
+      expect((await runs(started.project)).filter((r) => r.skill === 'review')).toEqual([]);
+      // THE BOARD, not the diary: every card the walk produced is hung where the machine can see it.
+      await assertHierarchy(started.project);
     });
-    const ended = await drive(started);
-    expect(ended.reason).toBe('complete');
 
-    const traced = await trace(started.project);
-    expect(traced.slice(traced.indexOf('ran E-001 implement'))).toEqual([
-      'ran E-001 implement',
-      // No model was asked and no iteration spent: the verdict is the gate's own, and the card goes back.
-      'move engineering/E-001 in-progress',
-      'gates E-001 fail',
-      'move engineering/E-001 review',
-      'ran E-001 fix',
-      'move engineering/E-001 done',
-      'review E-001 pass',
-      'move product/P-001 done',
-      'ran P-001 checkup-story',
-      'smoke F-001 pass',
-      'move features/F-001 done',
-      'ran F-001 checkup-feature',
-      'stopped complete',
-    ]);
-
-    // THE GATE SPENT NOTHING. One review run, not two — the failing gate dispatched no model at all.
-    const all = await runs(started.project);
-    expect(all.filter((r) => r.skill === 'review')).toHaveLength(1);
-    expect(all.filter((r) => r.skill === 'fix')).toHaveLength(1);
-    // Twice: once to fail, once to pass after the fix.
-    expect(await ranTimes(started.project.root, GATE_LOG)).toBe(2);
-  });
-
-  it('runs no gate command and stops while a gate document is unreviewed', async () => {
-    const started = await start({
-      skills: { ...HAPPY, 'derive-features': '[[behaviour:create:features:1:product:1:engineering:1]]' },
-    });
-    // THE DOCUMENT GOES UNREAD MID-SESSION, which is the shape this guard exists for: an agent rewrites
-    // `foundation/CODE-QUALITY.md` while the loop is running, and the commands in it would then run
-    // unsandboxed as this user. Set from the start it would prove less than it looks — `POST /api/runs`
-    // refuses every dispatch while one is unread, so nothing would ever reach a review at all.
+    // THE SAME HOLE, ONE DOCUMENT OVER. `foundation/TESTING.md` carries the `smoke:` command and is in the same
+    // EXECUTED set as `foundation/CODE-QUALITY.md` (server/routes/control.ts) — both run through `/bin/sh`
+    // unsandboxed as this user. The refusal guarded only the gates, so a copilot could rewrite `TESTING.md`, the
+    // loop would reach a feature checkup, and the new command would execute before the dispatch that would have
+    // been refused.
     //
-    // Four ticks: bootstrap, the feature's break-down, the story's, and the implement that leaves E-001 in
-    // review. Both premises are asserted rather than assumed, because a budget that stopped one tick later
-    // would run the gates itself and this test would then be about nothing.
-    const first = await drive(started, { ticks: 4 });
-    expect(first.reason).toBe('stopped');
-    expect(await columnOf(started.project, 'E-001')).toBe('review');
-    expect(await ranTimes(started.project.root, GATE_LOG)).toBe(0);
+    // Counted from what the command itself WROTE, exactly as the gate case is: a seam would prove the loop
+    // called something in an order, not that no shell ran.
+    it('runs no smoke command and stops while a gate document is unreviewed', async () => {
+      const started = await start({
+        skills: { ...HAPPY, 'derive-features': creates(mode, 'features:1:product:1:engineering:1') },
+      });
+      // Six ticks: bootstrap, the feature's break-down, the story's, E-001's implement, its review, and P-001's
+      // checkup — which leaves F-001 open with every story of it settled, one tick short of its own checkup.
+      // Both premises are asserted rather than assumed: a budget one tick longer would run the smoke command
+      // itself and this test would then be about nothing.
+      const first = await drive(started, { ticks: 6 });
+      expect(first.reason).toBe('stopped');
+      expect(await columnOf(started.project, 'P-001')).toBe('done');
+      expect(await columnOf(started.project, 'F-001')).toBe('in-progress');
+      expect(await ranTimes(started.project.root, SMOKE_LOG)).toBe(0);
 
-    const ended = await drive(started, { unreviewedGates: ['foundation/CODE-QUALITY.md'] });
-    expect(ended.reason).toBe('stalled');
-    expect(ended.detail).toContain('will not run a gate command');
-    // NOTHING EXECUTED. The refusal is in front of the shell, not after it.
-    expect(await ranTimes(started.project.root, GATE_LOG)).toBe(0);
-    // And no model was asked either: the review phase never got past its own first step.
-    expect((await runs(started.project)).filter((r) => r.skill === 'review')).toEqual([]);
-  });
-
-  // THE SAME HOLE, ONE DOCUMENT OVER. `foundation/TESTING.md` carries the `smoke:` command and is in the same
-  // EXECUTED set as `foundation/CODE-QUALITY.md` (server/routes/control.ts) — both run through `/bin/sh`
-  // unsandboxed as this user. The refusal guarded only the gates, so a copilot could rewrite `TESTING.md`, the
-  // loop would reach a feature checkup, and the new command would execute before the dispatch that would have
-  // been refused.
-  //
-  // Counted from what the command itself WROTE, exactly as the gate case is: a seam would prove the loop
-  // called something in an order, not that no shell ran.
-  it('runs no smoke command and stops while a gate document is unreviewed', async () => {
-    const started = await start({
-      skills: { ...HAPPY, 'derive-features': '[[behaviour:create:features:1:product:1:engineering:1]]' },
+      const ended = await drive(started, { unreviewedGates: ['TESTING.md'] });
+      expect(ended.reason).toBe('stalled');
+      expect(ended.detail).toContain('will not run a gate command');
+      // NOTHING EXECUTED. The refusal is in front of the shell, not after it.
+      expect(await ranTimes(started.project.root, SMOKE_LOG)).toBe(0);
+      // And no checkup was asked either: the loop stopped before the dispatch the endpoint would have refused.
+      expect((await runs(started.project)).filter((r) => r.skill === 'checkup-feature')).toEqual([]);
+      expect(await columnOf(started.project, 'F-001')).toBe('in-progress');
+      // THE BOARD, not the diary: every card the walk produced is hung where the machine can see it.
+      await assertHierarchy(started.project);
     });
-    // Six ticks: bootstrap, the feature's break-down, the story's, E-001's implement, its review, and P-001's
-    // checkup — which leaves F-001 open with every story of it settled, one tick short of its own checkup.
-    // Both premises are asserted rather than assumed: a budget one tick longer would run the smoke command
-    // itself and this test would then be about nothing.
-    const first = await drive(started, { ticks: 6 });
-    expect(first.reason).toBe('stopped');
-    expect(await columnOf(started.project, 'P-001')).toBe('done');
-    expect(await columnOf(started.project, 'F-001')).toBe('in-progress');
-    expect(await ranTimes(started.project.root, SMOKE_LOG)).toBe(0);
 
-    const ended = await drive(started, { unreviewedGates: ['TESTING.md'] });
-    expect(ended.reason).toBe('stalled');
-    expect(ended.detail).toContain('will not run a gate command');
-    // NOTHING EXECUTED. The refusal is in front of the shell, not after it.
-    expect(await ranTimes(started.project.root, SMOKE_LOG)).toBe(0);
-    // And no checkup was asked either: the loop stopped before the dispatch the endpoint would have refused.
-    expect((await runs(started.project)).filter((r) => r.skill === 'checkup-feature')).toEqual([]);
-    expect(await columnOf(started.project, 'F-001')).toBe('in-progress');
-  });
+    it('blocks a task that cannot be fixed, and still closes its story and its feature', async () => {
+      const started = await start({
+        gates: `echo ran >> ${GATE_LOG}; exit 1`,
+        skills: { ...HAPPY, 'derive-features': creates(mode, 'features:1:product:1:engineering:1') },
+      });
+      const ended = await drive(started);
 
-  it('blocks a task that cannot be fixed, and still closes its story and its feature', async () => {
-    const started = await start({
-      gates: `echo ran >> ${GATE_LOG}; exit 1`,
-      skills: { ...HAPPY, 'derive-features': '[[behaviour:create:features:1:product:1:engineering:1]]' },
+      // The loop CARRIES ON past a task nobody can fix (decision 45), and says what it left behind.
+      expect(ended.reason).toBe('complete');
+      expect(ended.detail).toContain('E-001');
+      expect(await columnOf(started.project, 'E-001')).toBe('blocked');
+      expect(await columnOf(started.project, 'P-001')).toBe('done');
+      expect(await columnOf(started.project, 'F-001')).toBe('done');
+      // One fix budget for both send-back kinds: three fixes and no more, then blocked.
+      expect((await runs(started.project)).filter((r) => r.skill === 'fix')).toHaveLength(3);
+      // THE BOARD, not the diary: every card the walk produced is hung where the machine can see it.
+      await assertHierarchy(started.project);
     });
-    const ended = await drive(started);
 
-    // The loop CARRIES ON past a task nobody can fix (decision 45), and says what it left behind.
-    expect(ended.reason).toBe('complete');
-    expect(ended.detail).toContain('E-001');
-    expect(await columnOf(started.project, 'E-001')).toBe('blocked');
-    expect(await columnOf(started.project, 'P-001')).toBe('done');
-    expect(await columnOf(started.project, 'F-001')).toBe('done');
-    // One fix budget for both send-back kinds: three fixes and no more, then blocked.
-    expect((await runs(started.project)).filter((r) => r.skill === 'fix')).toHaveLength(3);
-  });
+    // THE FEATURE CHECKUP'S OTHER EXIT (the L1 loop). A checkup that created stories has not finished its
+    // feature: it stays OPEN and L2 walks what appeared under it. Stamped `done` regardless, those stories are
+    // ORPHANS — `derivePosition` picks a feature only out of `todo` or `in-progress`, so a closed feature is
+    // never re-entered and nothing would ever pick them up.
+    //
+    // ASSERTED END TO END rather than in a unit fixture, because the failure is not in either half: the stamp
+    // and the derivation are each individually reasonable, and only walking from one to the other shows that
+    // what one produced the other cannot see.
+    it('leaves a feature open when its checkup creates a story, and walks that story', async () => {
+      const started = await start({
+        skills: {
+          ...HAPPY,
+          'derive-features': creates(mode, 'features:1:product:1:engineering:1'),
+          // The checkup finds something missing and creates one story for it, carrying a task of its own.
+          'checkup-feature': creates(mode, 'product:1:engineering:1'),
+        },
+      });
+      // Eight ticks: bootstrap, the feature's break-down, the story's, E-001's implement, its review, P-001's
+      // checkup, the feature checkup that creates P-002, and P-002's own break-down. Stopped there because the
+      // seeded checkup creates on EVERY run, so left to itself this project never closes — which is decision
+      // 47's own bound and is asserted in test/tick.test.ts rather than paid for here.
+      const ended = await drive(started, { ticks: 8 });
+      expect(ended.reason).toBe('stopped');
 
-  // THE FEATURE CHECKUP'S OTHER EXIT (the L1 loop). A checkup that created stories has not finished its
-  // feature: it stays OPEN and L2 walks what appeared under it. Stamped `done` regardless, those stories are
-  // ORPHANS — `derivePosition` picks a feature only out of `todo` or `in-progress`, so a closed feature is
-  // never re-entered and nothing would ever pick them up.
-  //
-  // ASSERTED END TO END rather than in a unit fixture, because the failure is not in either half: the stamp
-  // and the derivation are each individually reasonable, and only walking from one to the other shows that
-  // what one produced the other cannot see.
-  it('leaves a feature open when its checkup creates a story, and walks that story', async () => {
-    const started = await start({
-      skills: {
-        ...HAPPY,
-        'derive-features': '[[behaviour:create:features:1:product:1:engineering:1]]',
-        // The checkup finds something missing and creates one story for it, carrying a task of its own.
-        'checkup-feature': '[[behaviour:create:product:1:engineering:1]]',
-      },
+      const traced = await trace(started.project);
+      expect(traced.slice(traced.indexOf('ran P-001 checkup-story'))).toEqual([
+        'ran P-001 checkup-story',
+        'smoke F-001 pass',
+        // No `move features/F-001 done` before it, and none after: the checkup created work, so its feature
+        // is not finished.
+        'ran F-001 checkup-feature',
+        // L2, over the story that checkup created.
+        'move product/P-002 todo',
+        'move product/P-002 in-progress',
+        'ran P-002 break-down',
+      ]);
+      expect(traced).not.toContain('move features/F-001 done');
+      expect(await columnOf(started.project, 'F-001')).toBe('in-progress');
+      // And the story it created is real work with a task under it, not a card nothing will ever reach.
+      expect(await columnOf(started.project, 'E-002')).toBe('backlog');
+      // THE BOARD, not the diary: every card the walk produced is hung where the machine can see it.
+      await assertHierarchy(started.project);
     });
-    // Eight ticks: bootstrap, the feature's break-down, the story's, E-001's implement, its review, P-001's
-    // checkup, the feature checkup that creates P-002, and P-002's own break-down. Stopped there because the
-    // seeded checkup creates on EVERY run, so left to itself this project never closes — which is decision
-    // 47's own bound and is asserted in test/tick.test.ts rather than paid for here.
-    const ended = await drive(started, { ticks: 8 });
-    expect(ended.reason).toBe('stopped');
 
-    const traced = await trace(started.project);
-    expect(traced.slice(traced.indexOf('ran P-001 checkup-story'))).toEqual([
-      'ran P-001 checkup-story',
-      'smoke F-001 pass',
-      // No `move features/F-001 done` before it, and none after: the checkup created work, so its feature
-      // is not finished.
-      'ran F-001 checkup-feature',
-      // L2, over the story that checkup created.
-      'move product/P-002 todo',
-      'move product/P-002 in-progress',
-      'ran P-002 break-down',
-    ]);
-    expect(traced).not.toContain('move features/F-001 done');
-    expect(await columnOf(started.project, 'F-001')).toBe('in-progress');
-    // And the story it created is real work with a task under it, not a card nothing will ever reach.
-    expect(await columnOf(started.project, 'E-002')).toBe('backlog');
+    // A STORY CHECKUP THAT CREATES, which nothing anywhere drove — and it is the one phase whose parent is NOT
+    // the run's own card: it creates SIBLINGS on its own board, whose parent is the feature above. Nobody had
+    // noticed the shim's own parent choice is wrong for it, because no test ever made it choose.
+    //
+    // The sibling joins L2's queue (decision 47) rather than reopening anything, so what proves the link is the
+    // loop WALKING it: an orphan sibling is invisible to `derivePosition`, which finds a story only among the
+    // current feature's children.
+    it('walks a story a story checkup creates, hung off the feature and not off its sibling', async () => {
+      const started = await start({
+        skills: {
+          ...HAPPY,
+          'derive-features': creates(mode, 'features:1:product:1:engineering:1'),
+          // The checkup finds a criterion that was missed and cards it as a sibling story, with a task of its own.
+          'checkup-story': creates(mode, 'product:1:engineering:1'),
+        },
+      });
+      const ended = await drive(started, { ticks: 8 });
+      expect(ended.reason).toBe('stopped');
+
+      const traced = await trace(started.project);
+      expect(traced.slice(traced.indexOf('ran P-001 checkup-story'))).toEqual([
+        'ran P-001 checkup-story',
+        // P-001 closes and the sibling joins the queue: L2 walks it, which it can only do if the feature owns it.
+        'move product/P-002 todo',
+        'move product/P-002 in-progress',
+        'ran P-002 break-down',
+        // And L3 under that, on the task the sibling's own break-down produced — the whole vertical below a card
+        // no phase would ever have reached if it were hung off its sibling.
+        'move engineering/E-002 in-progress',
+        'move engineering/E-002 review',
+        'ran E-002 implement',
+      ]);
+      await assertHierarchy(started.project);
+    });
+
+    it('stops stalled without dispatching when two features are open', async () => {
+      const started = await start();
+      await place(started.project, 'features', 'todo', 'One');
+      await place(started.project, 'features', 'in-progress', 'Two');
+      const ended = await drive(started, { ticks: 3 });
+
+      expect(ended.reason).toBe('stalled');
+      expect(ended.detail).toContain('F-001');
+      expect(ended.detail).toContain('F-002');
+      // Nothing was dispatched: the position could not be derived, so there was no phase to be in.
+      expect(await runs(started.project)).toEqual([]);
+      // THE BOARD, not the diary: every card the walk produced is hung where the machine can see it.
+      await assertHierarchy(started.project);
+    });
+
+    it('skips break-down for a feature that arrives with its stories', async () => {
+      // The follow-up-feature shape (decision 50), which is also the crash-and-restart shape.
+      const started = await start();
+      const story = await place(started.project, 'product', 'backlog', 'A story');
+      await place(started.project, 'features', 'backlog', 'A feature', [story]);
+      const ended = await drive(started, { ticks: 2 });
+
+      const traced = await trace(started.project);
+      expect(traced).toContain('move features/F-001 in-progress');
+      expect(traced).not.toContain('ran F-001 break-down');
+      // THE FIRST THING DISPATCHED IS THE STORY'S break-down, not the feature's: the feature was stamped and
+      // passed over, with no run at all, which is what a skip is.
+      expect((await runs(started.project)).map((r) => `${r.card} ${r.skill}`)).toEqual(['P-001 break-down']);
+      expect(ended.iterations).toBe(1);
+      // THE BOARD, not the diary: every card the walk produced is hung where the machine can see it.
+      await assertHierarchy(started.project);
+    });
   });
-
-  it('stops stalled without dispatching when two features are open', async () => {
-    const started = await start();
-    await place(started.project, 'features', 'todo', 'One');
-    await place(started.project, 'features', 'in-progress', 'Two');
-    const ended = await drive(started, { ticks: 3 });
-
-    expect(ended.reason).toBe('stalled');
-    expect(ended.detail).toContain('F-001');
-    expect(ended.detail).toContain('F-002');
-    // Nothing was dispatched: the position could not be derived, so there was no phase to be in.
-    expect(await runs(started.project)).toEqual([]);
-  });
-
-  it('skips break-down for a feature that arrives with its stories', async () => {
-    // The follow-up-feature shape (decision 50), which is also the crash-and-restart shape.
-    const started = await start();
-    const story = await place(started.project, 'product', 'backlog', 'A story');
-    await place(started.project, 'features', 'backlog', 'A feature', [story]);
-    const ended = await drive(started, { ticks: 2 });
-
-    const traced = await trace(started.project);
-    expect(traced).toContain('move features/F-001 in-progress');
-    expect(traced).not.toContain('ran F-001 break-down');
-    // THE FIRST THING DISPATCHED IS THE STORY'S break-down, not the feature's: the feature was stamped and
-    // passed over, with no run at all, which is what a skip is.
-    expect((await runs(started.project)).map((r) => `${r.card} ${r.skill}`)).toEqual(['P-001 break-down']);
-    expect(ended.iterations).toBe(1);
-  });
-});
+}

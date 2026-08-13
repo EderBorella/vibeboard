@@ -1274,18 +1274,6 @@ body {
   text-transform: lowercase;
   color: var(--muted);
 }
-/* The stop's own sentence, beside the chip. Truncated with an ellipsis rather than wrapped: the top bar is one
-   line and a three-card list would push the tabs off it — the full text stays in the title, and the panel is
-   where someone goes to act on it. `min-width: 0` because a flex child will not shrink below its content
-   without it, and the ellipsis then never appears. */
-.ap-detail {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 0.68rem;
-  color: var(--muted);
-}
 /* Amber while it works, teal for the one stop that means the work is done, red for a halt. There is
    no success token in the palette and `complete` must not borrow the working colour: they are the two
    states a glance most needs to tell apart. */

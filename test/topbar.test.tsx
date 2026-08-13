@@ -203,37 +203,29 @@ describe('the auto-pilot chip', () => {
   });
 
   const chip = (): HTMLElement | null => document.querySelector('.ap-chip');
-  // BY TEST ID, which is the stable contract the component states. The queries used the CSS class, so the
-  // `data-testid` was referenced by nothing and a rename of either could have gone unnoticed.
-  const detail = (): HTMLElement | null => document.querySelector('[data-testid="ap-stop-detail"]');
+  const header = (): HTMLElement | null => document.querySelector('header.topbar');
 
-  // `whyStuck` works hard to name WHICH cards are stuck and why, and all of it used to live in a `title`
-  // attribute: unreachable on a touch device, and invisible to anyone who does not know to hover.
-  it('shows the sentence for a stop the loop decided, not only the word', () => {
+  // The sentence belongs to `ap-bar-detail`, which wraps it under the auto-pilot bar's row for every state
+  // that has one. The header once carried a second copy, as an unbounded flex sibling that pushed the tabs
+  // and the buttons right. Asserted on the header's TEXT rather than on the old test id, so bringing the
+  // duplicate back under any class or id fails this.
+  it('does not repeat the stop sentence in the header, whatever the stop was', () => {
     const said = 'Nothing can move E-004, E-007 — check that every column that holds a card is routed.';
-    render(<TopBar {...props} autopilot={state({ state: 'stopped', reason: 'stalled', detail: said })} />);
-    expect(detail()?.textContent).toBe(said);
+    for (const reason of STOP_REASONS) {
+      cleanup();
+      render(<TopBar {...props} autopilot={state({ state: 'stopped', reason, detail: said })} />);
+      expect(header()?.textContent).not.toContain(said);
+    }
+    cleanup();
+    render(<TopBar {...props} autopilot={state({ state: 'halted', detail: said })} />);
+    expect(header()?.textContent).not.toContain(said);
   });
 
-  it('says nothing extra for a stop a person asked for', () => {
-    // A soft stop needs no explaining: whoever pressed it knows why.
-    render(
-      <TopBar
-        {...props}
-        autopilot={state({ state: 'stopped', reason: 'stopped', detail: 'You stopped it.' })}
-      />,
-    );
-    expect(detail()).toBeNull();
-  });
-
-  it('and nothing at all while it is running', () => {
-    // WITH a detail in the fixture, deliberately. Without one the `state === 'stopped'` clause was deletable —
-    // a running state with no detail renders nothing either way — so a review could remove it with the suite
-    // green. A stale sentence from the previous run is exactly what this clause is here to withhold.
-    render(
-      <TopBar {...props} autopilot={state({ state: 'running', reason: 'stalled', detail: 'From last time.' })} />,
-    );
-    expect(detail()).toBeNull();
+  // The chip keeping the sentence as its `title` is already asserted by 'carries the detail as its tooltip'
+  // below, which predates this fix and needs no second copy. What had no cover is the fallback.
+  it('falls back to the chip word when the stop said nothing', () => {
+    render(<TopBar {...props} autopilot={state({ state: 'stopped', reason: 'exhausted' })} />);
+    expect(chip()?.getAttribute('title')).toBe('exhausted');
   });
 
 

@@ -79,15 +79,13 @@ export function TopBar({
           {chip.label}
         </span>
       )}
-      {/* The sentence, not only the word. `whyStuck` works hard to name WHICH cards are stuck and why, and all
-          of it used to live in a `title` attribute — unreachable on a touch device, and invisible to anyone who
-          does not know to hover. Shown for a stop the loop decided (`stalled`, `capped`, `exhausted`, `no-op`,
-          `complete`) and not for one a person asked for, which needs no explaining. A halt has the overlay. */}
-      {autopilot?.state === 'stopped' && autopilot.reason !== 'stopped' && autopilot.detail && (
-        <span className="ap-detail" data-testid="ap-stop-detail" title={autopilot.detail}>
-          {autopilot.detail}
-        </span>
-      )}
+      {/* The SENTENCE is not here, and the reasoning that put it here is worth keeping because it was true when
+          it was written: `whyStuck` names WHICH cards are stuck and why, and all of it once lived in a `title`
+          attribute — unreachable on a touch device, invisible to anyone who does not know to hover. What made
+          that false is `ap-bar-detail`, which renders the same string below the auto-pilot bar's row, wrapping,
+          for every state that has one. So a second copy bought nothing and cost the layout: an unbounded flex
+          sibling, so one long sentence shoved the tabs and the buttons right. The chip's `title` keeps it as a
+          supplement — a supplement is fine, a duplicate that moves the tabs is not. */}
       {showProject && (
         <div className="topbar-tabs" role="group" aria-label="View">
           {TABS.map(({ value, label }) => (

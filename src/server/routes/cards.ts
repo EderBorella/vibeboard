@@ -15,6 +15,7 @@ import {
   restoreTarget,
   updateCard,
 } from '../../core/mutations.js';
+import { phaseForRun } from '../../core/phases.js';
 import { slugify } from '../../core/slug.js';
 import { BOARDS, type BoardName, type CardFrontmatter, type ProjectConfig } from '../../core/types.js';
 import { type AppCtx, ensureOpen, nowIso, today } from '../route-context.js';
@@ -60,142 +61,135 @@ async function place(
 // because decision 10 makes endpoints the only write path — so this is the one place that cannot be talked
 // out of by a prompt.
 //
-// THE LOOP THIS CLOSES, from the first hand-run: `derive-features` created five feature cards in
-// `features/backlog` — the column whose own route dispatches `derive-features`. Each was then dispatched
-// `derive-features` in turn, reported "nothing needed to be created", was passed by the critic, and ADVANCED
-// FOR DOING NOTHING. Two iterations per card, for ever, on a board that grows as it goes. The skill was told
-// where to put them; a skill instruction is a request, and this is the rule.
+// THE BASIS IS THE PHASE, NOT THE COLUMN (ruling 56). A run may create a card only on the board its phase's
+// `creates` names, and `phaseForRun` needs the run's own board as well as its skill: `break-down` is TWO
+// phases with different `creates`, so a story's break-down resolved on the skill alone would carry the
+// authority to create features.
 //
-// Stated as a general property rather than as a special case for one skill: **a run may not create a card in
-// a column that dispatches the skill the run is doing.** Any such card is work the phase makes for itself.
+// THE LOOP THE OLD RULE CLOSED IS CLOSED BY THE MACHINE. It asked which column dispatches which skill, and
+// under this machine a column dispatches nothing — so the question has no answer, while `feature-breakdown` is
+// now chosen from the position rather than from a column and cannot be re-entered by a card appearing in one.
 //
-// It fires for a hand dispatch too, and deliberately: the loop is the same one whoever pressed the button.
-//
-// ON THE RUN'S OWN BOARD ONLY, and that is a review's correction (2026-08-06). A card created on ANOTHER board
-// has its column decided by `stampForRun` below, so there is nothing here to refuse — and refusing anyway
-// deadlocked a legal config: where the entry column of the board one level down happens to dispatch the same
-// skill, the stamp put the card there and this function then rejected it, with a message the agent could not
-// act on. A route table that sends the level below back through the same phase is a CONFIG defect; it belongs
-// in the cover check, not in a refusal aimed at an agent that did nothing wrong.
-function wrongColumnForRun(
+// It fires for a hand dispatch too, and deliberately: a skill no phase names creates nothing, because there is
+// no `creates` to infer for it and inventing one would be guessing on the caller's behalf.
+function wrongBoardForRun(
   config: ProjectConfig,
   cred: { board?: BoardName; skill?: string },
   input: CreateCardInput,
 ): string | undefined {
-  const routes = config.autopilot?.routes;
-  // A project with no lifecycle has no phases to make work for themselves. `Array.isArray` because
-  // `autopilot` is parsed YAML, and a hand-edited block reaches here as whatever was in the file.
-  if (!Array.isArray(routes) || !cred.skill) return undefined;
-  // A run with NO BOARD is a project run — the bootstrap — and it is checked on every board rather than
-  // excused. It is the caller most able to walk into this loop and the one with nothing to stop it: it has no
-  // card, so `stampForRun` corrects nothing for it, and the skill it runs is by definition the one the first
-  // features column dispatches. Derive features into that column and every card it made is sent back through
-  // the phase that made it.
-  if (cred.board !== undefined && cred.board !== input.board) return undefined;
-  const loop = routes.find(
-    (r) => isRoute(r) && r.board === input.board && r.column === input.columnSlug && r.skill === cred.skill,
-  );
-  if (!loop) return undefined;
-  return `A ${cred.skill} run may not create a card in ${input.board}/${input.columnSlug}: that column dispatches ${cred.skill}, so the card you just made would be sent straight back through the phase that made it. ${whereItGoes(config, routes, input.board, loop.next)}`;
+  if (!cred.skill) return undefined;
+  const creates = phaseForRun(cred.skill, cred.board)?.creates;
+  // A phase with no `creates`, and a skill no phase names, may create nothing. The work it found is real; it
+  // is just not a card this run gets to make, so the refusal names the surface that exists for it.
+  if (creates === undefined) {
+    return `A ${cred.skill} run may not create cards: that phase's product is its own work, and a card it made would be work no phase picks up. Anything real you found that does not belong to this card goes to POST /api/suggestions instead.`;
+  }
+  if (creates !== input.board) {
+    return `A ${cred.skill} run on ${cred.board ?? 'the project'} may create cards on ${creates} only, not on ${input.board}: which board a run may create on is decided by its phase. ${whereItGoes(config, creates)}`;
+  }
+  return undefined;
 }
 
-// Every ELEMENT guarded, not only the array: a hand-edited `routes:` may hold a `null` or a bare string, and
-// reading `.board` off one of those is a 500 handed to the caller least able to interpret it.
-function isRoute(r: unknown): r is { board: string; column: string; skill: string; next: string } {
-  return typeof r === 'object' && r !== null;
+// The remediation sentence, DERIVED rather than assumed. It used to name a route's `next` — where the run's own
+// card goes when it passes, which is not where a NEW card belongs — and a review enumerated the default table
+// to show what that advised: a column with no route (the card parked for ever), two TERMINAL ones (and
+// `complete` reads a live card in a terminal column as its positive evidence, so a compliant agent could
+// manufacture a false success), and one that handed a new card straight to a verifier.
+//
+// With no `next` there is nothing to derive: a new card enters at the top of its board, which is the same
+// column `entryColumn` stamps. Naming it twice would be two answers to one question.
+function whereItGoes(config: ProjectConfig, board: BoardName): string {
+  const entry = entryColumn(config, board);
+  return entry === undefined
+    ? `A new card enters that board at its first column, and that board's first column is one nothing can continue from — fix its column order in Settings.`
+    : `Create it in ${board}/${entry} instead — that is where a new card enters that board.`;
 }
 
-// The remediation sentence, DERIVED rather than assumed. It used to name `loop.next` — where the run's own card
-// goes when it passes, which is not where a NEW card belongs — and a review enumerated the default table to
-// show what that advises: `product/in-progress` (no route, and a childless card never rolls up, so the card is
-// parked for ever — the exact placement `stampForRun` exists to prevent), `engineering/done` and
-// `features/done` (TERMINAL, and `complete` reads a live card in a terminal column as its positive evidence, so
-// a compliant agent could manufacture a false success), and `engineering/review` (a new card handed straight to
-// `test`). It was right for exactly one route, by coincidence.
-//
-// So `next` is offered only where a new card could actually continue from it: routed, and not terminal.
-// Otherwise the honest answer is that the card does not belong on this board — and a refusal must still say
-// what to do instead, which is why this is a sentence rather than an omission.
-function whereItGoes(
-  config: ProjectConfig,
-  routes: readonly unknown[],
-  board: BoardName,
-  next: string,
-): string {
-  const terminal = config.autopilot?.terminal?.[board];
-  const isTerminal = Array.isArray(terminal) && terminal.includes(next);
-  const isRouted = routes.some((r) => isRoute(r) && r.board === board && r.column === next);
-  return isRouted && !isTerminal
-    ? `Create it in ${board}/${next} instead — that is where such a card goes next.`
-    : `A card for the work below this one belongs on the next board down, and this endpoint puts it in that board's first column for you.`;
-}
-
-// The vertical a run's new card belongs to: the id of the feature at the top of it. Stamped by the server
-// rather than asked of the agent, for the reason every other field on a run record is stamped — a value the
-// caller supplies is a value the caller can get wrong, and one mistyped group silently splits a vertical in
-// two.
-//
-// The rule reads off the boards: a card created on a DIFFERENT board from the run's own card is a level down
-// (a feature's user story, a story's task), so it inherits its parent's vertical — the parent's own group, or
-// the parent's id when the parent IS the feature. A card created on the SAME board is a sibling, not a child:
-// that is `derive-features` making features, and a feature is the root of its own vertical rather than part of
-// another one.
-// AND THE COLUMN IT ENTERS AT, which is the second thing the first hand-run got wrong. `break-down` created
-// its three user stories in `product/in-progress` — a column with no route, whose only way out is a rollup,
-// and a childless card never rolls up. Three real stories, correctly written and correctly linked, parked
-// where nothing could ever move them; the loop's next honest answer would have been to stop `stalled`.
-//
-// So a card a run creates ON ANOTHER BOARD enters that board's FIRST column, whatever the caller asked for.
-// A level down means entering the pipeline at the top: any other column skips the phases before it. The
-// scaffolder already relies on the same fact — "every board opens with a Backlog" — because an agent told to
-// use "the right column" and given none reached for `backlog` and created a folder no column mapped to.
-//
-// Stamped rather than refused, because unlike the loop above there is nothing wrong with the CARD: the work
-// is real, the link is right, and only the column was a guess. Refusing would throw away a good card and one
-// of three attempts.
-// WHERE A BOARD IS ENTERED. The first column that has a route and is not terminal, and only then the first
-// column positionally.
+// WHERE A BOARD IS ENTERED: its first column, POSITIONALLY, and `undefined` rather than a fallback when that
+// column is one nothing can continue from. The loop stamps `todo` itself when it starts a break-down (decision
+// 37 superseded), so `backlog` — the top of the board — is where a created card belongs.
 //
 // "Every board opens with a Backlog" is a SCAFFOLDER DEFAULT, not an invariant: columns can be renamed and
-// reordered, and a review pointed out that on a board whose first column happened to be terminal or unrouted
-// this stamp would put every child card exactly where it exists to stop one going — parked, or worse, standing
-// as a live card in a terminal column, which is the positive evidence `complete` reads.
+// reordered, and a review pointed out that on a board whose first column happened to be terminal this stamp
+// would put every child card exactly where it exists to stop one going — standing as a live card in a
+// terminal column, which is the positive evidence `complete` reads. Refused rather than worked around,
+// because there is no other column a card can be said to enter at.
 //
-// The positional fallback is deliberate rather than a refusal: a board with no routed column at all is a
-// project whose lifecycle is incomplete, and readiness refuses to start auto-pilot on one. Losing a card
-// because of it would be the wrong trade.
+// `Array.isArray` and the string compare because `autopilot` is parsed YAML: a hand-edited block arrives as
+// whatever was in the file, and reading a member off it is a 500 handed to the caller least able to interpret
+// one.
 function entryColumn(config: ProjectConfig, board: BoardName): string | undefined {
-  const slugs = boardColumnSlugs(config, board);
-  const routes = config.autopilot?.routes;
+  const slug = boardColumnSlugs(config, board)[0];
+  if (slug === undefined) return undefined;
   const terminal = config.autopilot?.terminal?.[board];
-  const isTerminal = (slug: string): boolean => Array.isArray(terminal) && terminal.includes(slug);
-  const routed = Array.isArray(routes)
-    ? slugs.find(
-        (slug) =>
-          !isTerminal(slug) && routes.some((r) => isRoute(r) && r.board === board && r.column === slug),
-      )
-    : undefined;
-  return routed ?? slugs[0];
+  if (Array.isArray(terminal) && terminal.includes(slug)) return undefined;
+  // Engineering's alone, like `isBlockedColumn`: a card is put in `blocked` when it has exhausted its
+  // attempts, so a new one created there is work nothing will ever pick up.
+  if (board === 'engineering' && config.autopilot?.blockedColumn === slug) return undefined;
+  return slug;
 }
 
+// What the server decides about a card a run is creating, or why it will not create one: the column it enters,
+// the vertical it belongs to, and which run made it. RULING 58 and RULING 61 both land here, beside the group —
+// which is already where "a value the caller supplies is a value the caller can get wrong" is acted on.
+//
+// THE VERTICAL is the id of the feature at the top of it, stamped for the reason every other field on a run
+// record is stamped: a value the caller supplies is a value the caller can get wrong, and one mistyped group
+// silently splits a vertical in two. It is the group of the card the run is ABOUT — that card's own group, or
+// its id when it IS the feature — so a level down inherits its parent's vertical and a checkup's sibling stays
+// in the same one it was created beside (ruling 61).
+//
+// AND THE COLUMN IT ENTERS AT, which is the second thing the first hand-run got wrong. `break-down` created
+// its three user stories in `product/in-progress` — a column with no route then, whose only way out was a
+// rollup, and a childless card never rolled up. Three real stories, correctly written and correctly linked,
+// parked where nothing could ever move them; the loop's next honest answer would have been to stop `stalled`.
+//
+// So a card a run creates enters its board's FIRST column, whatever the caller asked for: entering the pipeline
+// at the top is what a new card means, and any other column skips the phases before it. The scaffolder already
+// relies on the same fact — "every board opens with a Backlog" — because an agent told to use "the right
+// column" and given none reached for `backlog` and created a folder no column mapped to.
+//
+// Stamped rather than refused, because unlike the board rule above there is nothing wrong with the CARD: the
+// work is real, the link is right, and only the column was a guess. Refusing would throw away a good card and
+// one of three attempts.
 async function stampForRun(
   ctx: AppCtx,
-  cred: { board?: BoardName; card?: string },
+  cred: { board?: BoardName; card?: string; skill?: string; run?: string },
   input: CreateCardInput,
-): Promise<Partial<CreateCardInput>> {
+): Promise<{ patch: Partial<CreateCardInput> } | { error: string }> {
   const { root, config } = ctx.session as { root: string; config: ProjectConfig };
-  // Same board is a sibling, not a child: `derive-features` making features. Nothing to stamp — where it may
-  // go is the loop rule's business, and a feature is the root of its own vertical.
-  if (!cred.board || !cred.card || cred.board === input.board) return {};
+  // RULING 58: which run made this card, from the credential the server minted — never from the body, and on
+  // every card a run creates, the bootstrap's features included. It is what makes "has this already been
+  // done?" answerable from the board with nothing to trust.
+  const creator = { createdBy: cred.run };
+  // THE ONE SURVIVING SAME-BOARD SKIP (ruling 61). It used to cover every same-board create, because the only
+  // one was `derive-features` making features; decision 47 added a second — a story checkup creating sibling
+  // stories on product — and unstamped those get no entry column and no group, so they could be created
+  // straight into `product/done` and become `complete`'s positive evidence.
+  if (cred.skill !== undefined && phaseForRun(cred.skill, cred.board)?.name === 'bootstrap') {
+    return { patch: creator };
+  }
   const entry = entryColumn(config, input.board);
-  const parent = await findCard(root, cred.board, cred.card, config);
+  if (entry === undefined) {
+    const first = boardColumnSlugs(config, input.board)[0];
+    return {
+      error: `A run cannot create a card on ${input.board}: a new card enters a board at its first column, and that board opens with ${first === undefined ? 'no column at all' : `"${first}"`}, which nothing can continue from. Reorder that board's columns in Settings.`,
+    };
+  }
+  const parent = cred.card ? await findCard(root, cred.board ?? input.board, cred.card, config) : undefined;
   return {
-    ...(entry ? { columnSlug: entry } : {}),
-    // ALWAYS decided here, `undefined` included. No parent found is not an error — the run's card may have
-    // been archived under it, and refusing real work over a label would be the wrong trade — but the card then
-    // has NO group rather than whatever the agent sent. A review found the agent's own value surviving this
-    // branch, which is the one thing the stamp exists to prevent: a vertical labelled by a guess.
-    group: parent ? (parent.group ?? parent.id) : undefined,
+    patch: {
+      ...creator,
+      columnSlug: entry,
+      // ALWAYS decided here, `undefined` included. No parent found is not an error — the run's card may have
+      // been archived under it, and refusing real work over a label would be the wrong trade — but the card
+      // then has NO group rather than whatever the agent sent. A review found the agent's own value surviving
+      // this branch, which is the one thing the stamp exists to prevent: a vertical labelled by a guess.
+      //
+      // The group of the card the run is ABOUT, not that card's parent's (ruling 61): a checkup's sibling
+      // belongs to the same vertical as the card it was created beside.
+      group: parent ? (parent.group ?? parent.id) : undefined,
+    },
   };
 }
 
@@ -233,19 +227,22 @@ export async function registerCardRoutes(api: FastifyInstance, ctx: AppCtx): Pro
     // handed to the caller least able to interpret one. Decision 10 says the board is validated;
     // it was not.
     if (!BOARDS.includes(input?.board)) return reply.code(400).send({ error: 'Unknown board' });
-    // A run is held to the lifecycle; a person at the browser is not. The stamp comes FIRST and the refusal
-    // judges what will actually be written: a cross-board card's column is decided here, so refusing on the
-    // column the agent guessed would refuse a card this endpoint was about to correct.
+    // A run is held to the lifecycle; a person at the browser is not.
     //
-    // The stamp wins over anything the caller sent, like every other field the server knows better than the
-    // agent does.
-    const effective = req.credential?.run
-      ? { ...input, ...(await stampForRun(ctx, req.credential, input)) }
-      : input;
+    // THE BOARD IS JUDGED BEFORE THE STAMP, which is a change of order: the refusal used to read the column
+    // the agent guessed, so the stamp had to correct it first. It now reads the board alone, and asking which
+    // board a run may write to before working out where on it the card goes is the order that cannot produce a
+    // sentence about the wrong board.
+    let effective = input;
     if (req.credential?.run) {
       // 409 rather than 400: the request is well formed, and it is the project's lifecycle that makes it wrong.
-      const wrong = wrongColumnForRun(ctx.session.config, req.credential, effective);
+      const wrong = wrongBoardForRun(ctx.session.config, req.credential, input);
       if (wrong) return reply.code(409).send({ error: wrong });
+      const stamped = await stampForRun(ctx, req.credential, input);
+      if ('error' in stamped) return reply.code(409).send({ error: stamped.error });
+      // The stamp wins over anything the caller sent, like every other field the server knows better than the
+      // agent does.
+      effective = { ...input, ...stamped.patch };
     }
     const card = await createCard(ctx.session.root, ctx.session.config, effective, today());
     if (card === 'unknown-column') return reply.code(400).send({ error: 'Unknown column' });

@@ -82,13 +82,13 @@ function retableAndCheck(current: ProjectConfig, merged: ProjectConfig, renames:
     return {
       code: 400,
       error:
-        'That would remove the autopilot block, and with it every check that keeps a card from being stranded in a column nothing routes to. Edit `autopilot` in .vibeboard/config.yaml if you mean to change the lifecycle.',
+        'That would remove the autopilot block, and with it the caps that bound a run and the columns that tell auto-pilot a card is finished. Edit `autopilot` in .vibeboard/config.yaml if you mean to change the lifecycle.',
     };
   }
   if (!merged.autopilot) return null;
-  // Before the renames, not after: applyRouteRenames indexes into `routes` and `terminal`, so a
-  // hand-edited block missing either threw a TypeError and the request became a 500 with no
-  // explanation. The shape has to be answerable before anything reads it.
+  // Before the renames, not after: applyRouteRenames indexes into `terminal`, so a hand-edited block
+  // missing it threw a TypeError and the request became a 500 with no explanation. The shape has to be
+  // answerable before anything reads it.
   const malformed = shapeProblems(merged.autopilot);
   if (malformed.length > 0) return { code: 400, error: malformed.join(' ') };
   for (const r of renames) {
@@ -96,21 +96,21 @@ function retableAndCheck(current: ProjectConfig, merged: ProjectConfig, renames:
   }
   const problems = coverageProblems(merged);
   if (problems.length === 0) return null;
-  // The remedy, not just the refusal. A message about a condition the user cannot see and cannot act
-  // on is a worse failure than the condition — and the routing table is not editable from the UI yet,
-  // so without this sentence the only way forward is to guess which file to open.
+  // The remedy, not just the refusal. A message about a condition the user cannot see and cannot act on is
+  // a worse failure than the condition — and this block is not editable from the UI, so without this
+  // sentence the only way forward is to guess which file to open.
   //
-  // But it is the remedy for a ROUTING problem, and it used to be appended to every problem including
-  // the pure numbers: a cleared cap box was answered with `budgetUsd must be zero or more; it is null.`
-  // followed by an instruction about column routing. Same shape as the bug this file already records as
-  // fixed — the refusal spoke about columns while the user was changing something else.
+  // But it is the remedy for a BLOCK problem, and it used to be appended to every problem including the
+  // pure numbers: a cleared cap box was answered with `budgetUsd must be zero or more; it is null.` followed
+  // by an instruction about column routing. Same shape as the bug this file already records as fixed — the
+  // refusal spoke about columns while the user was changing something else.
   const numeric = new Set(merged.autopilot ? numberProblems(merged.autopilot) : []);
   if (problems.every((p) => numeric.has(p))) {
     return { code: 400, error: `${problems.join(' ')} Correct it in Settings.` };
   }
   return {
     code: 400,
-    error: `${problems.join(' ')} Edit \`autopilot\` in .vibeboard/config.yaml so every column is routed, terminal or blocked.`,
+    error: `${problems.join(' ')} Edit \`autopilot\` in .vibeboard/config.yaml — that block is not editable from Settings.`,
   };
 }
 

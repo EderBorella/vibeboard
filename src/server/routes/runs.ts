@@ -422,8 +422,8 @@ export async function registerRunRoutes(api: FastifyInstance, ctx: AppCtx): Prom
   //
   // Service-scoped. Neither working scope may reach it, and that is the whole of decision 3: a run that
   // could write its own verification would be a run advancing itself on self-assessment, which is the one
-  // thing this design exists to prevent. The verdict is validated on the way in by `asVerification`, which
-  // drops a critic score that does not agree with its own threshold.
+  // thing this design exists to prevent. The verdict is validated on the way in by `asVerification`, so a
+  // body that is not one — including one claiming a mode this machine no longer has — is refused here.
   api.post('/runs/:board/:card/:run/verification', async (req, reply) => {
     if (!ensureOpen(ctx.session, reply)) return;
     const { board, card, run } = req.params as { board: string; card: string; run: string };

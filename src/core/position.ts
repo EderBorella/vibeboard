@@ -8,11 +8,10 @@ import type { Card } from './types.js';
 // Three things this must not do, each because leaving one out has a named failure:
 //   it never reads a column to ask what happens NEXT — a column is a state the loop stamped
 //     (decision 38), and the phase comes from this position plus the run records;
-//   it ranks the backlog queue by (order, then id), the same ordering `featureRanks` uses today
-//     (src/core/eligibility.ts:160) — two orderings is two answers to "which feature is next";
+//   it ranks the backlog queue by (order, then id), which was the ordering the retired `featureRanks`
+//     used — two orderings is two answers to "which feature is next";
 //   `childrenOf` reads the PARENT's links, the same side `parentOf` reads, because a hand-edited board
-//     where the two directions disagree once had the rollup calling a card a child while the pick could
-//     not find its feature.
+//     where the two directions disagree once had two readers disagreeing about whose child a card was.
 
 // A card the loop is in the middle of. Not read from config: `terminal` says where work ENDS, and these
 // two say a card is being worked — the invariant below is about at most one of them at a time.

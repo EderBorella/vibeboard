@@ -497,8 +497,8 @@ function credentialSection(apiBase: string, token: string, scope: Scope, cardId?
 // edit the card" — and saying nothing at all leaves an agent to find a live token in its prompt with no
 // explanation, which is an agent that will experiment with it.
 //
-// The scope itself is still `work` today, because a critic is dispatched down the ordinary run path.
-// Narrowing that is C2's, where the critic is actually dispatched; this is the half that can be true now.
+// The scope itself is `work`, because a review is dispatched down the ordinary run path like any other card
+// run. What stops it changing the board is that it is handed no board-changing endpoints at all.
 function judgeCredentialSection(apiBase: string, token: string): string {
   return [
     `Your credential: \`${token}\`. Send it as \`Authorization: Bearer <credential>\` to \`${apiBase}\`.`,

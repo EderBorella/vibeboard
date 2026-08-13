@@ -55,8 +55,8 @@ export function derivedStatus(ap: AutopilotConfig, card: Card, cards: Card[]): C
 // A universal quantifier, so it passes vacuously for a childless card — deliberately: a card nobody has
 // broken down yet is exactly what the break-down phase is for.
 //
-// RULING 62: moved here from eligibility.ts, which slice 3 deletes. It had no test of its own anywhere,
-// so deleting that file wholesale would have removed its only cover.
+// RULING 62: moved here before slice 3 deleted eligibility.ts, where it lived with no test of its own
+// anywhere — so deleting that file wholesale would have removed its only cover.
 export function hasUnfinishedChildren(ap: AutopilotConfig, card: Card, cards: Card[]): boolean {
   return childrenOf(card, cards).some((child) => !isTerminalColumn(ap, child.board, child.columnSlug));
 }

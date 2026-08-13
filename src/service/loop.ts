@@ -50,11 +50,11 @@ export interface TickContext {
 }
 
 // What an action did, as far as the loop needs to know. `dispatched` is what moves the counters — decision
-// 8: everything a model does counts, so a critic and a checkup increment them exactly as work does.
+// 8: everything a model does counts, so a review and a checkup increment them exactly as work does.
 export interface ActResult {
-  // HOW MANY runs this action started, not whether it started one. A `critic` route dispatches the work and
-  // then a judge, and decision 8 says everything a model does counts against every cap — so a boolean here
-  // would have let every critic-verified card cost one iteration instead of two.
+  // HOW MANY runs this action started, not whether it started one. A review dispatches the work and then a
+  // judge, and decision 8 says everything a model does counts against every cap — so a boolean here would
+  // have let every judged card cost one iteration instead of two.
   dispatches: number;
   // A reason to stop, when carrying the action out revealed one. `act` never decides to stop on its own —
   // it reports, and the next tick's `decideTick` sees the world the action left behind.
@@ -71,10 +71,10 @@ export interface LoopEnded {
 
 // A hard bound on how many times a tick may do nothing before the loop calls it stuck.
 //
-// A `wait`, a `rollup` and a `block` all consume NO iteration and NO budget, so neither of the loop's two
-// caps bounds them: an action that cannot land — a card the endpoint refuses to move, a blocked column that
-// does not exist — would otherwise repeat for ever at one tick per interval, for ever being the operative
-// word. The caps count dispatches, so this counts everything else.
+// A `wait` and a `stamp` both consume NO iteration and NO budget, so neither of the loop's two caps bounds
+// them: an action that cannot land — a card the endpoint refuses to move, a column that does not exist —
+// would otherwise repeat for ever at one tick per interval, for ever being the operative word. The caps
+// count dispatches, so this counts everything else.
 const MAX_IDLE_TICKS = 240;
 
 // How long to wait after a tick that dispatched nothing. Long enough not to spin on a board that is waiting
@@ -167,7 +167,7 @@ async function carryOut(
         progress.iterations,
       );
     }
-    // EVERY non-dispatching tick, not only a `wait`. A rollup or block whose move is refused non-fatally came
+    // EVERY non-dispatching tick, not only a `wait`. A `stamp` whose move is refused non-fatally came
     // straight back round, so the backstop below was reached in seconds rather than the interval it implies —
     // and each pass wrote another `note`, flooding the diary the checkup has to read.
     await deps.wait(IDLE_WAIT_MS);

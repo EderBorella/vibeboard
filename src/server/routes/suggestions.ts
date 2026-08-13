@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { rm } from 'node:fs/promises';
 import type { FastifyInstance } from 'fastify';
 import { readBoard } from '../../core/board.js';
 import { entryColumn } from '../../core/entry-column.js';
@@ -81,6 +82,33 @@ async function mayBeCarded(
   return { suggestion };
 }
 
+// HOW TO TAKE BACK A WRITE THAT ALREADY HAPPENED. Every reason to REFUSE is considered before the first
+// create (see `cardFrom`), and no check can see a write that THROWS — so each write records how to undo
+// itself and a failure runs the ledger in reverse before answering. Without it, one unwritable folder left
+// a flagged follow-up standing on the board with no story under it, which decision 50 forbids and which the
+// next tick picks up as a feature to break down: a model spent on boilerplate nobody asked for.
+type Undo = () => Promise<void>;
+
+// Reverse order, and a failing step is swallowed: a compensation that threw would replace the original
+// failure's sentence with its own, and it has nothing to add — the disk that refused the write is the disk
+// refusing to unwind it.
+async function undoAll(steps: Undo[]): Promise<void> {
+  for (const step of steps.reverse()) {
+    try {
+      await step();
+    } catch {
+      // Nothing to say here that the sentence below does not already say.
+    }
+  }
+}
+
+// NO HOST PATH AND NO STACK. An unhandled throw here answered a raw 500 whose body was
+// `EACCES: permission denied, open '<the server's own filesystem>'` — nothing the reader can act on, and
+// the project's paths handed to the browser. It also has to say the finding survived, because that is the
+// one thing this whole channel exists to guarantee.
+const PARTIAL_WRITE =
+  'Carding that suggestion failed part way through. Everything it had created has been removed and the suggestion is still open, so nothing was lost — check the project folder is writable and try again.';
+
 // ONE ENDPOINT, NOT THREE CALLS (decision 50), and this is the half that writes: find the open follow-up
 // or make one, create the story under it, link both sides.
 //
@@ -93,6 +121,9 @@ async function cardFrom(
   config: ProjectConfig,
   level: Level,
   suggestion: Suggestion,
+  // Appended to, never read here: what to undo is known where the write happens, and running it is the
+  // caller's job because the last write of all — retiring the suggestion — is outside this function.
+  undo: Undo[],
 ): Promise<{ card: Card } | { error: string }> {
   const made = { title: suggestion.title, body: suggestion.body };
   if (level === 'feature') {
@@ -100,7 +131,9 @@ async function cardFrom(
     if (entry === undefined) return { error: noEntry('features') };
     const card = await createCard(root, config, { ...made, board: 'features', columnSlug: entry }, today());
     // Features are the top level, so there is no parent to link and no dialog to ask about one.
-    return card === 'unknown-column' ? { error: noEntry('features') } : { card };
+    if (card === 'unknown-column') return { error: noEntry('features') };
+    undo.push(() => rm(card.filePath, { force: true }));
+    return { card };
   }
 
   const storyEntry = entryColumn(config, 'product');
@@ -124,9 +157,20 @@ async function cardFrom(
       today(),
     );
     if (created === 'unknown-column') return { error: noEntry('features') };
+    // Recorded BEFORE the flag is written, because that write can fail too: an unflagged follow-up is one
+    // `openFollowUp` cannot see, so the next attempt would make a second.
+    undo.push(() => rm(created.filePath, { force: true }));
     // The flag is what makes "the open follow-up" a fact rather than a guess from a title.
     follow = await updateCard(root, created, { followUp: true });
   }
+
+  // `setCardLinks` writes BOTH sides, so taking the story back means putting the parent's list back with
+  // it — otherwise the follow-up keeps a link to a file that is gone.
+  const parent = follow;
+  const parentLinks = parent.links;
+  undo.push(async () => {
+    await updateCard(root, parent, { links: parentLinks });
+  });
 
   const story = await createCard(
     root,
@@ -135,9 +179,51 @@ async function cardFrom(
     today(),
   );
   if (story === 'unknown-column') return { error: noEntry('product') };
+  undo.push(() => rm(story.filePath, { force: true }));
   // SYMMETRIC, through the one writer that does both sides: the hierarchy is derived from the PARENT's
   // links, so a story that merely names its feature is a story the machine never walks to.
   return { card: await setCardLinks(root, config, story, [follow.id]) };
+}
+
+// ALL OF IT OR NONE, which is what makes this one endpoint rather than three calls (decision 50). Two of the
+// ways it can fail are invisible to every check above: a write that throws, and a suggestion that cannot be
+// re-read after it was retired.
+async function cardAndRetire(
+  root: string,
+  config: ProjectConfig,
+  level: Level,
+  // The id from the URL, not the one in the record: they are the same in every file this server writes, but
+  // a hand-edited one where they disagree is read by filename and must be written back the same way.
+  id: string,
+  suggestion: Suggestion,
+): Promise<{ card: Card; suggestion: Suggestion } | { code: number; error: string }> {
+  const undo: Undo[] = [];
+  try {
+    const made = await cardFrom(root, config, level, suggestion, undo);
+    if ('error' in made) {
+      // A refusal cannot currently arrive after a create — both entry columns are answered first — but
+      // "all of it or none" must not depend on that staying true.
+      await undoAll(undo);
+      return { code: 409, error: made.error };
+    }
+    const updated = await setSuggestionState(root, id, 'actioned', { became: made.card.id });
+    // `null` IS a partial failure, and it used to answer 200 with `suggestion: null`: the card exists, the
+    // suggestion is still `active` — so one finding could be carded twice — and the browser reads `.id` off
+    // it and throws a TypeError dressed as the server's refusal. Thrown rather than returned so there is one
+    // compensation path for every way this can end badly.
+    if (!updated) throw new Error('the suggestion could not be re-read after it was retired');
+    return { card: made.card, suggestion: updated };
+  } catch {
+    // The error itself is deliberately not read. It is an ENOENT or an EACCES naming a path on the server,
+    // and the sentence a person needs does not vary by which write it was.
+    //
+    // This is also the answer for the losers of a concurrent carding: three at once currently answer
+    // [200, 500, 500], because the one-open-follow-up invariant fails closed on the id allocator's `wx`
+    // flag — the two that lose that race created nothing, so their ledgers are empty and the sentence is
+    // the whole of what they owe.
+    await undoAll(undo);
+    return { code: 500, error: PARTIAL_WRITE };
+  }
 }
 
 export async function registerSuggestionRoutes(api: FastifyInstance, ctx: AppCtx): Promise<void> {
@@ -210,9 +296,8 @@ export async function registerSuggestionRoutes(api: FastifyInstance, ctx: AppCtx
     const { level } = (req.body ?? {}) as { level?: unknown };
     const ready = await mayBeCarded(root, id, level);
     if ('error' in ready) return reply.code(ready.code).send({ error: ready.error });
-    const made = await cardFrom(root, config, level as Level, ready.suggestion);
-    if ('error' in made) return reply.code(409).send({ error: made.error });
-    const updated = await setSuggestionState(root, id, 'actioned', { became: made.card.id });
-    return { card: made.card, suggestion: updated };
+    const done = await cardAndRetire(root, config, level as Level, id, ready.suggestion);
+    if ('error' in done) return reply.code(done.code).send({ error: done.error });
+    return { card: done.card, suggestion: done.suggestion };
   });
 }

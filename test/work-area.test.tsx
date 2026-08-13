@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 // The children fetch on mount (Project Control's file list, a card's runs, the model list). None of
@@ -17,8 +17,9 @@ const api = vi.hoisted(() => ({
   }),
   listResources: vi.fn(async () => []),
   listDiary: vi.fn(async () => []),
-  // The Project Log is a split now: the diary tab reads what agents filed as well.
-  listSuggestions: vi.fn(async () => []),
+  // The Project Log is a split now, and the dock has a Suggestions pane: both read this. Typed, because
+  // an inferred `never[]` makes every `mockResolvedValue` in this file a compile error.
+  listSuggestions: vi.fn(async (): Promise<Suggestion[]> => []),
   listSkills: vi.fn(async () => ({ skills: [], invalid: [] })),
   listModels: vi.fn(async () => []),
   getModelStatus: vi.fn(async () => ({ up: true })),
@@ -42,7 +43,7 @@ vi.mock('../web/src/api', () => api);
 
 const { WorkArea } = await import('../web/src/components/WorkArea.js');
 import type { MainTab } from '../web/src/components/TopBar.js';
-import type { BoardName, Card, ProjectConfig, ProjectSnapshot } from '../web/src/shared.js';
+import type { BoardName, Card, ProjectConfig, ProjectSnapshot, Suggestion } from '../web/src/shared.js';
 
 afterEach(cleanup);
 
@@ -230,6 +231,36 @@ describe('WorkArea', () => {
       />,
     );
     expect(document.querySelector('.dock-badge')?.textContent).toBe('2');
+  });
+
+  // The dock's second occupant (decision 48). `UtilityDock` carries no knowledge of any particular pane,
+  // so this is one descriptor plus one component — which is what the comment above the pane list predicted.
+  it('leaves the Cards pane the first pane', async () => {
+    render(<WorkArea {...props} dock={{ ...props.dock, pane: null } as typeof props.dock} />);
+    // `activePane` falls back to the FIRST, so the order in that list is what a person sees on open.
+    const tabs = [...document.querySelectorAll('.dock-tab')].map((t) => t.textContent);
+    expect(tabs[0]).toContain('Cards');
+    expect(tabs[1]).toContain('Suggestions');
+    expect(document.querySelector('.dock-pane')?.querySelector('.cards-pane')).toBeTruthy();
+    // Awaited, so the pane's own fetch resolves inside the test rather than after it.
+    await waitFor(() => expect(api.listSuggestions).toHaveBeenCalled());
+  });
+
+  it('badges the Suggestions pane with the active count, and not with zero', async () => {
+    // "Suggestions 0" is noise, exactly as "Cards 0" is.
+    render(<WorkArea {...props} />);
+    await waitFor(() => expect(api.listSuggestions).toHaveBeenCalled());
+    expect(document.querySelectorAll('.dock-badge')).toHaveLength(0);
+    cleanup();
+
+    api.listSuggestions.mockResolvedValue([
+      { id: 's-1', state: 'active', created: '2026-08-05T10:00:00.000Z', title: 'one', body: '' },
+      { id: 's-2', state: 'active', created: '2026-08-05T10:00:00.000Z', title: 'two', body: '' },
+    ]);
+    render(<WorkArea {...props} />);
+    // The badge is on the SUGGESTIONS tab: with no card open, it is the only badge on the strip.
+    await waitFor(() => expect(document.querySelector('.dock-badge')?.textContent).toBe('2'));
+    api.listSuggestions.mockResolvedValue([]);
   });
 
   it('shows the copilot only when it is open', () => {

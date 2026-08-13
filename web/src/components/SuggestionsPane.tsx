@@ -1,0 +1,161 @@
+import { useState } from 'react';
+import { cardSuggestion, patchSuggestion } from '../api';
+import type { Suggestion, SuggestionLevel } from '../shared';
+import { SUGGESTION_LEVELS } from '../shared';
+
+// The dock's second occupant (decision 48): what agents filed, and the two things a person may do with
+// one. `UtilityDock` knows nothing about any particular pane, so this is one descriptor in WorkArea plus
+// this component.
+//
+// TWO ACTIONS, FIXED (decision 49). Dismiss, with a reason; and Make a card, at a level the user picks.
+// Nothing is ever DISPATCHED from a suggestion: the answer to one is only ever "this is real work" or
+// "no", and dispatching an implementation skill at one produced work with no card to report against,
+// outside the lifecycle entirely.
+//
+// The list is WorkArea's, because the dock's badge needs the count whether or not this pane is on screen.
+// The two writes are this pane's own, like SignInPanel's: it holds its busy state, shows the server's
+// refusal, and hands back the record as the server saved it.
+interface Props {
+  suggestions: Suggestion[];
+  failed: boolean;
+  onRefresh: () => void;
+  // The updated record, so the list stops showing a row whose buttons would now do nothing.
+  onApply: (suggestion: Suggestion) => void;
+}
+
+function when(at: string): string {
+  const date = new Date(at);
+  return Number.isNaN(date.getTime()) ? at : date.toLocaleString();
+}
+
+export function SuggestionsPane({ suggestions, failed, onRefresh, onApply }: Props) {
+  const [pickedId, setPickedId] = useState<string | null>(null);
+  const [level, setLevel] = useState<SuggestionLevel>('story');
+  const [reason, setReason] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [became, setBecame] = useState<string | null>(null);
+
+  // The picked one, else the first — the same fallback the dock uses for panes, so the actions always
+  // belong to a row that is on screen even after the list changes under them.
+  const picked = suggestions.find((s) => s.id === pickedId) ?? suggestions[0];
+
+  async function act(what: () => Promise<Suggestion>): Promise<void> {
+    setBusy(true);
+    setError(null);
+    try {
+      onApply(await what());
+      setReason('');
+    } catch (e) {
+      // A control whose refusal is invisible is a dead end. The server's words win: it knows whether the
+      // suggestion was already carded, and as what.
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function dismiss(id: string): void {
+    setBecame(null);
+    // Trimmed to undefined rather than sent empty: the server keeps a reason for a dismissal alone, and
+    // an empty string recorded as one would read as "we said why" when nobody did.
+    const why = reason.trim() === '' ? undefined : reason.trim();
+    void act(() => patchSuggestion(id, 'dismissed', why));
+  }
+
+  function make(id: string): void {
+    void act(async () => {
+      const { card, suggestion } = await cardSuggestion(id, level);
+      // Which card it became is only in this answer: the row is about to leave the list.
+      setBecame(card.id);
+      return suggestion;
+    });
+  }
+
+  if (failed) {
+    return (
+      <div className="suggestions-pane">
+        <div className="diary-empty">
+          <p>Could not read what agents filed.</p>
+          <button type="button" className="btn-secondary" onClick={onRefresh}>
+            Try again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="suggestions-pane">
+      {picked === undefined ? (
+        // Said out loud: an empty pane reads as a broken one, and this is the surface a person opens
+        // precisely to find out whether anything is waiting.
+        <div className="diary-empty">
+          <p>Nothing has been filed in this project yet.</p>
+        </div>
+      ) : (
+        <>
+          {/* The actions at the top, on the picked suggestion, and Dismiss in its own colour. */}
+          <div className="suggestions-actions">
+            <button type="button" className="btn-danger" disabled={busy} onClick={() => dismiss(picked.id)}>
+              Dismiss
+            </button>
+            <input
+              aria-label="Why not?"
+              className="suggestions-reason"
+              placeholder="Why not? (kept, so a checkup does not raise it again)"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+            />
+            <select
+              aria-label="Level"
+              value={level}
+              onChange={(e) => setLevel(e.target.value as SuggestionLevel)}
+            >
+              {/* Feature and story, and never task: a task needs a story to belong to, so carding one
+                  either hunts for a parent or makes an orphan the machine never walks to. */}
+              {SUGGESTION_LEVELS.map((l) => (
+                <option key={l} value={l}>
+                  {l}
+                </option>
+              ))}
+            </select>
+            <button type="button" className="btn-primary" disabled={busy} onClick={() => make(picked.id)}>
+              {busy ? 'Working…' : 'Make a card'}
+            </button>
+            <button type="button" className="btn-secondary" onClick={onRefresh}>
+              Refresh
+            </button>
+          </div>
+          {/* `assertive`: the action did NOT happen, and the row is still there. */}
+          <div aria-live="assertive">
+            {error && <p className="diary-error">{error}</p>}
+            {became && <p className="suggestions-became">Carded as {became}.</p>}
+          </div>
+
+          <ol className="suggestions-list">
+            {suggestions.map((s) => (
+              <li
+                className={`suggestions-row${s.id === picked.id ? ' picked' : ''}`}
+                key={s.id}
+                data-state={s.state}
+              >
+                <button type="button" className="suggestions-pick" onClick={() => setPickedId(s.id)}>
+                  <span className="filed-title">{s.title}</span>
+                  <span className="filed-meta">
+                    <time dateTime={s.created}>{when(s.created)}</time>
+                    {/* Which run filed it, and the card it was filed FROM. Only what is there: a
+                        project-level finding has no card. */}
+                    {s.run && <span className="diary-chip">{s.run}</span>}
+                    {s.card && <span className="diary-chip">{s.card}</span>}
+                  </span>
+                  {s.body && <span className="filed-text">{s.body}</span>}
+                </button>
+              </li>
+            ))}
+          </ol>
+        </>
+      )}
+    </div>
+  );
+}

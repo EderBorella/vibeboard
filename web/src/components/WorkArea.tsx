@@ -6,6 +6,7 @@ import type { useCardTabs } from '../dock/useCardTabs';
 import type { Dock } from '../dock/useDock';
 import type { BoardName, Card, CardFrontmatterPatch, ProjectSnapshot } from '../shared';
 import { DEFAULT_CONTEXT_BUDGET } from '../shared';
+import { useSuggestions } from '../suggestions/useSuggestions';
 import type { TagCount } from '../viewmodel';
 import { BoardsView } from './BoardsView';
 import { CardsPane } from './CardsPane';
@@ -13,6 +14,7 @@ import { DiaryView } from './DiaryView';
 import { ExecutionView } from './ExecutionView';
 import { ExplorerView } from './ExplorerView';
 import { ProjectControl } from './ProjectControl';
+import { SuggestionsPane } from './SuggestionsPane';
 import type { MainTab } from './TopBar';
 import { UtilityDock } from './UtilityDock';
 
@@ -75,9 +77,12 @@ export interface WorkAreaProps {
 // rather than the smaller ones tried first.
 export function WorkArea(props: WorkAreaProps) {
   const { snapshot, tab, allCards, runs, skills, cards, dock, copilot, dispatch, boards } = props;
+  // HERE rather than inside the pane, because the dock's badge needs the count whether or not that pane
+  // is the one on screen — and a badge nobody can see until they click the tab is no badge.
+  const filed = useSuggestions(props.bump, 'active');
 
-  // The dock's occupants. Cards is the only one today; a terminal would be one more entry here and
-  // one more component, with no change to UtilityDock.
+  // The dock's occupants. A terminal would be one more entry here and one more component, with no
+  // change to UtilityDock.
   const panes: DockPane[] = [
     {
       id: 'cards',
@@ -108,6 +113,20 @@ export function WorkArea(props: WorkAreaProps) {
           }}
           trigger={snapshot}
           onMove={props.onMoveCard}
+        />
+      ),
+    },
+    {
+      id: 'suggestions',
+      label: 'Suggestions',
+      // No badge at zero, like Cards: "Suggestions 0" is noise.
+      badge: filed.suggestions.length || undefined,
+      render: () => (
+        <SuggestionsPane
+          suggestions={filed.suggestions}
+          failed={filed.failed}
+          onRefresh={filed.refresh}
+          onApply={filed.apply}
         />
       ),
     },

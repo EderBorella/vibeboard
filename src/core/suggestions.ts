@@ -25,8 +25,33 @@ export interface Suggestion {
   // Why it was rejected. Two states would have lost this, and "we looked at it and said no" is the
   // part a later checkup needs in order not to re-raise the same thing.
   reason?: string;
+  // The card it BECAME when it was carded (decision 49). It cannot reuse `card` above, which already
+  // means the card it was filed FROM — one field for both would make "which card is this about"
+  // unanswerable.
+  became?: string;
   body: string;
 }
+
+// The field set as data, so a mirror test can compare the web copy with this one and a round-trip test
+// can assert the parser carries every field. An interface has no runtime keys.
+export const SUGGESTION_KEYS = [
+  'id',
+  'state',
+  'created',
+  'title',
+  'run',
+  'card',
+  'board',
+  'reason',
+  'became',
+  'body',
+] as const;
+
+// `never` when every field is listed; otherwise this line fails to compile and names the one missed.
+type UnlistedSuggestionField = Exclude<keyof Suggestion, (typeof SUGGESTION_KEYS)[number]>;
+const _everySuggestionFieldIsListed: UnlistedSuggestionField extends never ? true : UnlistedSuggestionField =
+  true;
+void _everySuggestionFieldIsListed;
 
 function asText(value: unknown): string | undefined {
   if (typeof value !== 'string') return undefined;
@@ -66,6 +91,7 @@ export function parseSuggestion(content: string): Suggestion | null {
     ...(asText(d.card) ? { card: asText(d.card) } : {}),
     ...(asText(d.board) ? { board: asText(d.board) as BoardName } : {}),
     ...(asText(d.reason) ? { reason: asText(d.reason) } : {}),
+    ...(asText(d.became) ? { became: asText(d.became) } : {}),
     body: parsed.content.trim(),
   };
 }

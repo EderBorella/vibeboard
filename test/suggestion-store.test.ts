@@ -36,11 +36,24 @@ describe('the suggestion store', () => {
   it('records the reason when dismissing, and none when actioning', async () => {
     const root = await tempDir();
     await writeSuggestion(root, make('1'));
-    expect((await setSuggestionState(root, '1', 'dismissed', 'out of scope'))?.reason).toBe('out of scope');
+    expect((await setSuggestionState(root, '1', 'dismissed', { reason: 'out of scope' }))?.reason).toBe(
+      'out of scope',
+    );
     await writeSuggestion(root, make('2'));
     const actioned = await setSuggestionState(root, '2', 'actioned');
     expect(actioned?.state).toBe('actioned');
     expect(actioned).not.toHaveProperty('reason');
+  });
+
+  // The slot carding needs. Without it a `became` passed anywhere is a field written nowhere: this
+  // rebuilds the record from `...rest`, so what it does not name it drops.
+  it('records the card an actioned suggestion became', async () => {
+    const root = await tempDir();
+    await writeSuggestion(root, make('1', { card: 'E-001' }));
+    const actioned = await setSuggestionState(root, '1', 'actioned', { became: 'P-004' });
+    expect(actioned?.became).toBe('P-004');
+    // On disk, not merely in the answer — and the card it was filed FROM is untouched.
+    expect((await listSuggestions(root, 'actioned'))[0]).toMatchObject({ became: 'P-004', card: 'E-001' });
   });
 
   it('drops a stale reason when a dismissed suggestion is reopened', async () => {

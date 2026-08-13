@@ -118,7 +118,10 @@ function whereItGoes(config: ProjectConfig, board: BoardName): string {
 // `Array.isArray` and the string compare because `autopilot` is parsed YAML: a hand-edited block arrives as
 // whatever was in the file, and reading a member off it is a 500 handed to the caller least able to interpret
 // one.
-function entryColumn(config: ProjectConfig, board: BoardName): string | undefined {
+// EXPORTED for the suggestions route, which cards a finding onto features or product and needs the same
+// answer. One home rather than two: a second copy is how one path refuses a terminal first column and
+// the other quietly creates a card in it.
+export function entryColumn(config: ProjectConfig, board: BoardName): string | undefined {
   const slug = boardColumnSlugs(config, board)[0];
   if (slug === undefined) return undefined;
   const terminal = config.autopilot?.terminal?.[board];

@@ -38,6 +38,28 @@ export function hasSetupFeature(cards: Card[]): boolean {
   return cards.some((c) => c.board === 'features' && c.setup === true);
 }
 
+// THE ONE OPEN FOLLOW-UP (decision 50): a live features card carrying the flag whose column is not
+// terminal. At most one at a time, and that invariant is the server's — a browser holding it would only
+// hold it until two tabs did the same thing.
+//
+// The FLAG, never the title: a user can rename a card, and a card called "Follow-up 1" without the flag
+// is a card somebody made by hand. When a feature checkup closes one, the next story carded out of a
+// suggestion starts a new one rather than reopening a card recorded as finished.
+//
+// `terminal` rather than the whole autopilot block, like `setupState`: a project written before the
+// lifecycle has no block, and this must still answer.
+export function openFollowUp(cards: Card[], terminal: Record<BoardName, string[]>): Card | undefined {
+  return live(cards).find(
+    (c) => c.board === 'features' && c.followUp === true && !(terminal.features ?? []).includes(c.columnSlug),
+  );
+}
+
+// How many follow-ups this board has had, so the next one can say which wave it is. Counted from the
+// FLAG for the same reason as above; a card titled like one but never flagged is nobody's wave.
+export function followUpCount(cards: Card[]): number {
+  return live(cards).filter((c) => c.board === 'features' && c.followUp === true).length;
+}
+
 export function setupSubtreeIds(cards: Card[]): Set<string> {
   const feature = setupFeature(cards);
   if (!feature) return new Set();

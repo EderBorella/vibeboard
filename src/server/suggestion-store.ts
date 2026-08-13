@@ -99,23 +99,27 @@ export async function listSuggestions(root: string, state?: SuggestionState): Pr
 
 // Triage. `reason` belongs to `dismissed` alone — an actioned suggestion explains itself through
 // the card it became, and carrying a reason on it would invite two records of the same fact.
+//
+// An OPTIONS object rather than a fifth positional: four was already the limit of what reads at a call
+// site, and `(root, id, state, undefined, 'P-004')` says nothing about which field is which.
 export async function setSuggestionState(
   root: string,
   id: string,
   state: SuggestionState,
-  reason?: string,
+  what: { reason?: string; became?: string } = {},
 ): Promise<Suggestion | null> {
   const existing = await readSuggestion(root, id);
   if (!existing) return null;
   const { reason: _dropped, ...rest } = existing;
   const updated: Suggestion = {
     ...rest,
+    ...(what.became ? { became: what.became } : {}),
     // The id we were ASKED for, not the one in the frontmatter. They are the same in every file
     // this module writes — but a hand-edited one where they disagree was read by filename and
     // written back by frontmatter id, which duplicated the suggestion instead of updating it.
     id,
     state,
-    ...(state === 'dismissed' && reason ? { reason } : {}),
+    ...(state === 'dismissed' && what.reason ? { reason: what.reason } : {}),
   };
   await writeSuggestion(root, updated);
   return updated;

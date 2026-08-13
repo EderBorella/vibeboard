@@ -240,13 +240,6 @@ export interface Route {
   verify: VerifyMode;
   next: string; // slug
 }
-export interface Rollup {
-  board: BoardName;
-  column: string; // slug
-  when: 'all-children-terminal';
-  action: 'advance' | 'eligible';
-  next?: string; // `advance` only
-}
 export interface AutopilotConfig {
   maxIterations: number;
   budgetUsd: number;
@@ -255,7 +248,6 @@ export interface AutopilotConfig {
   checkupEvery: number;
   criticThreshold: number; // what a critic's score must reach for a card to advance
   routes: Route[];
-  rollup: Rollup[];
   terminal: Record<BoardName, string[]>; // per board: a column belongs to one
   blockedColumn: string;
 }
@@ -277,7 +269,6 @@ export const AUTOPILOT_CONFIG_KEYS = [
   'checkupEvery',
   'criticThreshold',
   'routes',
-  'rollup',
   'terminal',
   'blockedColumn',
 ] as const;

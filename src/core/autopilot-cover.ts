@@ -1,12 +1,4 @@
-import {
-  type AutopilotConfig,
-  isBlockedColumn,
-  isTerminalColumn,
-  ROLLUP_ACTIONS,
-  type Rollup,
-  type Route,
-  VERIFY_MODES,
-} from './autopilot.js';
+import { type AutopilotConfig, isTerminalColumn, type Route, VERIFY_MODES } from './autopilot.js';
 import { boardColumnSlugs } from './board.js';
 import { LIFECYCLE_SKILLS, PHASES } from './phases.js';
 import { BOARDS, type BoardName, type ProjectConfig } from './types.js';
@@ -30,7 +22,6 @@ import { BOARDS, type BoardName, type ProjectConfig } from './types.js';
 export function shapeProblems(ap: AutopilotConfig): string[] {
   const out: string[] = [];
   if (!Array.isArray(ap.routes)) out.push('autopilot.routes must be a list of routes.');
-  if (!Array.isArray(ap.rollup)) out.push('autopilot.rollup must be a list of rules.');
   if (!Array.isArray(ap.terminal) && (typeof ap.terminal !== 'object' || ap.terminal === null)) {
     out.push('autopilot.terminal must name the terminal columns of each board.');
   } else if (Array.isArray(ap.terminal)) {
@@ -157,47 +148,12 @@ function checkOneRoutePerPhase(ap: AutopilotConfig, out: string[]): void {
   }
 }
 
-// The same rule for rollups, plus the pairing that must not happen. `eligible` and a route belong
-// together — that IS the close-out shape, where the rollup gates the route rather than replacing it.
-// `advance` and a route on one column contradict each other: the card would be dispatched for its
-// skill and simultaneously moved to done for free, and which happened would depend on tick order.
-function checkOneRollupPerPhase(ap: AutopilotConfig, out: string[]): void {
-  const seen = new Set<string>();
-  for (const rule of ap.rollup) {
-    const key = `${rule.board}/${rule.column}`;
-    if (seen.has(key)) {
-      out.push(`${key} has more than one rollup rule; a column rolls up exactly one way.`);
-    }
-    seen.add(key);
-    if (rule.action !== 'advance') continue;
-    if (ap.routes.some((r) => r.board === rule.board && r.column === rule.column)) {
-      out.push(
-        `${key} both advances by rollup and runs a skill, so whether the card is dispatched or moved to done would depend on tick order.`,
-      );
-    }
-  }
-}
-
-// The four ways a card in a column can be acted on. `advance` is the fourth: a product card in
-// In Progress is moved by the rollup and by no route, so without this it reads as unreachable.
-// `eligible` deliberately does NOT count — it gates a route rather than replacing one, and a column
-// covered only by an eligibility rule is a column whose cards become eligible for nothing.
-function checkCover(ap: AutopilotConfig, columns: Record<BoardName, string[]>, out: string[]): void {
-  for (const board of BOARDS) {
-    for (const slug of columns[board]) {
-      const routed = ap.routes.some((r) => r.board === board && r.column === slug);
-      const rolledUp = ap.rollup.some(
-        (r) => r.board === board && r.column === slug && r.action === 'advance',
-      );
-      if (routed || rolledUp || isTerminalColumn(ap, board, slug) || isBlockedColumn(ap, board, slug)) {
-        continue;
-      }
-      out.push(
-        `${board}: the column "${slug}" is neither routed, terminal nor blocked — cards there would never become eligible.`,
-      );
-    }
-  }
-}
+// NO `checkCover`. It asked whether every column was routed, terminal or blocked — the gate for the
+// worst failure on record, where an unrouted `engineering/in-progress` made "nothing eligible" into
+// STOP `complete`. It goes with the rollup because a rollup `advance` was the only cover
+// `product/in-progress` ever had, and it is safe to go because the failure is structurally absent: a
+// column no longer decides anything, the position is derived from the phase table (core/phases.ts),
+// and `phaseSkillProblems` below is what now refuses a lifecycle that cannot run.
 
 function checkTerminal(ap: AutopilotConfig, columns: Record<BoardName, string[]>, out: string[]): void {
   for (const board of BOARDS) {
@@ -240,76 +196,6 @@ function checkNamedColumns(ap: AutopilotConfig, columns: Record<BoardName, strin
   }
 }
 
-// A card that advances has to arrive somewhere finished. Advancing into a live column would move it
-// out of the reach of its own rollup and back into a phase it has already been through.
-function checkAdvanceTarget(
-  ap: AutopilotConfig,
-  rule: Rollup,
-  here: string[],
-  where: string,
-  out: string[],
-): void {
-  if (rule.next === undefined) {
-    out.push(`The rollup rule on ${where} advances a card but names no column to advance it to.`);
-    return;
-  }
-  if (!here.includes(rule.next)) {
-    out.push(`The rollup rule on ${where} advances to "${rule.next}", which is not a column on that board.`);
-    return;
-  }
-  if (!isTerminalColumn(ap, rule.board, rule.next)) {
-    out.push(`The rollup rule on ${where} advances to "${rule.next}", which is not terminal.`);
-  }
-}
-
-function checkRollupRule(
-  ap: AutopilotConfig,
-  rule: Rollup,
-  columns: Record<BoardName, string[]>,
-  out: string[],
-): void {
-  if (!(BOARDS as readonly string[]).includes(rule.board)) {
-    out.push(`A rollup rule names the board "${rule.board}", which does not exist.`);
-    return;
-  }
-  const here = columns[rule.board];
-  const where = `${rule.board}/${rule.column}`;
-  if (!here.includes(rule.column)) {
-    out.push(`A rollup rule names the column "${rule.column}", which the ${rule.board} board does not have.`);
-  }
-  if (rule.when !== 'all-children-terminal') {
-    out.push(
-      `The rollup rule on ${where} says when: "${rule.when}" — the only condition is all-children-terminal.`,
-    );
-  }
-  if (!(ROLLUP_ACTIONS as readonly string[]).includes(rule.action)) {
-    out.push(
-      `The rollup rule on ${where} says action: "${rule.action}" — expected ${ROLLUP_ACTIONS.join(' or ')}.`,
-    );
-    return;
-  }
-  if (rule.action === 'advance') checkAdvanceTarget(ap, rule, here, where, out);
-  // `eligible` gates a route rather than replacing one, so a rule on an unrouted column makes a card
-  // eligible for nothing — silently, and only under auto-pilot.
-  if (
-    rule.action === 'eligible' &&
-    !ap.routes.some((r) => r.board === rule.board && r.column === rule.column)
-  ) {
-    out.push(
-      `The rollup rule on ${where} makes a card eligible, but that column has no route to become eligible for.`,
-    );
-  }
-  // A `next` left behind after changing `action:` from advance to eligible. The reading of the rules
-  // ignores it — a card is made eligible and never advanced — so this is a config that says something
-  // the loop will not do, and the two readings of one rule would eventually be reconciled by someone
-  // guessing which was meant.
-  if (rule.action === 'eligible' && rule.next !== undefined) {
-    out.push(
-      `The rollup rule on ${where} makes a card eligible AND names next: "${rule.next}". An eligible rule admits the card to its route rather than moving it, so remove next — or change the action to advance if moving it is what you meant.`,
-    );
-  }
-}
-
 // The number checks alone. Exported so a refusal can tell a bad number from an unroutable board and
 // offer the right remedy: appending "edit the routing table so every column is routed" to "budgetUsd is
 // null" sent a user who had cleared a box in Settings to hand-edit YAML about columns.
@@ -337,11 +223,8 @@ export function coverageProblems(config: ProjectConfig): string[] {
     checkAdvanceIntoBlocked(ap, route, out);
   }
   checkOneRoutePerPhase(ap, out);
-  checkOneRollupPerPhase(ap, out);
-  checkCover(ap, columns, out);
   checkNamedColumns(ap, columns, out);
   checkReachesTerminal(ap, columns, out);
-  for (const rule of ap.rollup) checkRollupRule(ap, rule, columns, out);
   return out;
 }
 

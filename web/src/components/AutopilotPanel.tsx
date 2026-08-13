@@ -60,15 +60,6 @@ const CAPS = [
   },
 ];
 
-// The condition, in words, keyed by the value it renders. A LOOKUP rather than the sentence written straight
-// into the cell: the cell held a literal translation of the only `when` there is today, so a second condition
-// would have been shown as the first one — a routing table nobody can see is this panel's whole subject, and a
-// table that shows the wrong rule is worse than one that shows none. Unknown values fall through to the raw
-// string rather than rendering blank.
-const WHEN_LABELS: Record<string, string> = {
-  'all-children-terminal': 'every card under it is finished',
-};
-
 export function AutopilotPanel({
   config,
   onCaps,
@@ -160,45 +151,6 @@ export function AutopilotPanel({
           </tbody>
         </table>
       </div>
-      {/* The other half of the lifecycle, and it was rendered nowhere. A parent does not complete by running
-          anything — it completes from its children — so a reader looking at the routes table alone cannot see
-          how a product card ever reaches Done, or why a feature earns one close-out run rather than advancing
-          for free. The panel's own header says a routing table nobody can see is the same failure as a gate
-          nobody has watched fail. */}
-      {ap.rollup.length > 0 && (
-        <>
-          <div className="settings-section">Completing from children</div>
-          <div className="settings-hint">
-            A parent card finishes when every card under it is finished, without a run of its own.{' '}
-            <strong>Advance</strong> moves it straight there; <strong>eligible</strong> only admits it to its
-            column's skill, so a feature still earns one final run that exercises it end to end.
-          </div>
-          <div className="routes-wrap">
-            <table className="routes">
-              <thead>
-                <tr>
-                  <th>Board</th>
-                  <th>Column</th>
-                  <th>When</th>
-                  <th>Then</th>
-                </tr>
-              </thead>
-              <tbody>
-                {ap.rollup.map((r) => (
-                  <tr key={`${r.board}/${r.column}`}>
-                    <td>{BOARD_LABELS[r.board]}</td>
-                    <td>{r.column}</td>
-                    <td>{WHEN_LABELS[r.when] ?? r.when}</td>
-                    <td>
-                      {r.action === 'advance' ? `advance to ${r.next}` : 'becomes eligible for its skill'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </>
-      )}
       <div className="settings-section">Caps</div>
       <div className="settings-hint">
         {/* S10: the number that will actually stop this project, in words. A dollar dial beside a

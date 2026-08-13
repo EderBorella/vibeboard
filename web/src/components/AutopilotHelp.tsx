@@ -55,12 +55,12 @@ export function AutopilotHelp({ onClose }: { onClose: () => void }) {
             output recorded on the run.
           </p>
 
-          <h3>Parents finish from their children</h3>
+          <h3>Parents finish by a checkup, not for free</h3>
           <p>
-            A feature does not complete by running something. It completes when every card beneath it is
-            finished — the rollup rules in Settings. Some columns <strong>advance</strong> straight through;
-            others become <strong>eligible</strong>, meaning the parent still earns one final run that
-            exercises the whole thing before it is done.
+            A story or a feature becomes eligible to close once every card beneath it is settled, but it does
+            not close for free: it earns one final <strong>checkup</strong> run that looks at what was
+            actually built. A checkup may create the work it finds missing once, and after that it may only
+            close or say why it cannot.
           </p>
 
           <h3>What stops it</h3>

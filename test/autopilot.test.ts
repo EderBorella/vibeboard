@@ -75,20 +75,6 @@ describe('the autopilot routing table', () => {
     expect(renamed.terminal.engineering).toEqual(['done']);
   });
 
-  it('renames the columns a rollup rule names, on both of its sides', () => {
-    const renamed = applyRouteRenames(DEFAULT_AUTOPILOT, 'product', [
-      { from: 'in-progress', to: 'building' },
-      { from: 'done', to: 'shipped' },
-    ]);
-    const product = renamed.rollup.find((r) => r.board === 'product');
-    expect(product).toMatchObject({ column: 'building', next: 'shipped' });
-    // Board-scoped: the features rule keeps its own column, and keeps having no `next` at all —
-    // an `eligible` rule that grew one would be claiming to move a card it only unlocks.
-    const features = renamed.rollup.find((r) => r.board === 'features');
-    expect(features).toMatchObject({ column: 'in-progress', action: 'eligible' });
-    expect(features && 'next' in features).toBe(false);
-  });
-
   it('returns the table unchanged when nothing was renamed', () => {
     expect(applyRouteRenames(DEFAULT_AUTOPILOT, 'engineering', [])).toBe(DEFAULT_AUTOPILOT);
   });

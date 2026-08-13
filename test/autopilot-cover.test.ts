@@ -19,17 +19,6 @@ describe('routing-table coverage', () => {
     expect(coverageProblems(fresh())).toEqual([]);
   });
 
-  // Review blocker B3, verbatim: the exact hole that reported success over unfinished work.
-  it('names a configured column that is neither routed, terminal nor blocked', () => {
-    const config = fresh();
-    ap(config).routes = ap(config).routes.filter(
-      (r) => !(r.board === 'engineering' && r.column === 'backlog'),
-    );
-    expect(coverageProblems(config)).toEqual([
-      'engineering: the column "backlog" is neither routed, terminal nor blocked — cards there would never become eligible.',
-    ]);
-  });
-
   it('refuses a route whose next column does not exist', () => {
     const config = fresh();
     ap(config).routes[0] = { ...ap(config).routes[0], next: 'shipped' };
@@ -67,10 +56,6 @@ describe('routing-table coverage', () => {
     ap(config).blockedColumn = 'stuck';
     const problems = coverageProblems(config);
     expect(problems).toContain('blockedColumn is "stuck", which is not a column on the engineering board.');
-    // And "blocked" is now covered by nothing, which is the real consequence.
-    expect(problems).toContain(
-      'engineering: the column "blocked" is neither routed, terminal nor blocked — cards there would never become eligible.',
-    );
   });
 
   it('refuses a blocked column that is also routed or terminal', () => {
@@ -102,57 +87,6 @@ describe('routing-table coverage', () => {
     const config = fresh();
     ap(config).terminal.engineering = ['done', 'blocked'];
     expect(coverageProblems(config).join(' ')).toMatch(/report blocked work as done/);
-  });
-
-  // The column a product card advances FROM is moved by the rollup and by no route. Without rollup
-  // counting as cover, the default table would fail its own validator.
-  it('counts an advancing rollup as cover, and an eligibility rule as no cover at all', () => {
-    const config = fresh();
-    expect(coverageProblems(config)).toEqual([]);
-    ap(config).rollup = ap(config).rollup.map((r) =>
-      r.board === 'product' ? { ...r, action: 'eligible' as const, next: undefined } : r,
-    );
-    const problems = coverageProblems(config);
-    expect(problems).toContain(
-      'product: the column "in-progress" is neither routed, terminal nor blocked — cards there would never become eligible.',
-    );
-    expect(problems).toContain(
-      'The rollup rule on product/in-progress makes a card eligible, but that column has no route to become eligible for.',
-    );
-  });
-
-  // Changing `action:` from advance to eligible and leaving `next:` behind. `rollupOutcomes` ignores it
-  // — the card is made eligible and never advanced — so the config would state something the loop does
-  // not do, and the next reader would have to guess which of the two was meant.
-  it('refuses an eligibility rule that still names a next column', () => {
-    const config = fresh();
-    expect(coverageProblems(config)).toEqual([]);
-    ap(config).rollup = ap(config).rollup.map((r) => (r.board === 'features' ? { ...r, next: 'done' } : r));
-    expect(coverageProblems(config)).toContain(
-      'The rollup rule on features/in-progress makes a card eligible AND names next: "done". An eligible rule admits the card to its route rather than moving it, so remove next — or change the action to advance if moving it is what you meant.',
-    );
-  });
-
-  it('refuses an advancing rollup with nowhere terminal to advance to', () => {
-    const missing = fresh();
-    ap(missing).rollup[0] = { ...ap(missing).rollup[0], next: undefined };
-    expect(coverageProblems(missing)).toContain(
-      'The rollup rule on product/in-progress advances a card but names no column to advance it to.',
-    );
-
-    const live = fresh();
-    ap(live).rollup[0] = { ...ap(live).rollup[0], next: 'todo' };
-    expect(coverageProblems(live)).toContain(
-      'The rollup rule on product/in-progress advances to "todo", which is not terminal.',
-    );
-  });
-
-  it('refuses a rollup rule on a column that board does not have', () => {
-    const config = fresh();
-    ap(config).rollup[0] = { ...ap(config).rollup[0], column: 'shipping' };
-    expect(coverageProblems(config)).toContain(
-      'A rollup rule names the column "shipping", which the product board does not have.',
-    );
   });
 
   it('refuses two routes on one phase — that is a half-landed edit, not a tie to break', () => {
@@ -278,7 +212,6 @@ describe('routing-table coverage — holes found in review', () => {
     config.autopilot = { maxIterations: 10 } as unknown as AutopilotConfig;
     const problems = coverageProblems(config);
     expect(problems).toContain('autopilot.routes must be a list of routes.');
-    expect(problems).toContain('autopilot.rollup must be a list of rules.');
     expect(problems).toContain('autopilot.terminal must name the terminal columns of each board.');
     // Shape problems come back ALONE: the checks below them all index into the block.
     expect(problems.every((p) => p.startsWith('autopilot.'))).toBe(true);
@@ -316,9 +249,8 @@ describe('a block that is not the shape it claims', () => {
     expect(malformed({ blockedColumn: 42 })).toEqual(['autopilot.blockedColumn must be a column slug.']);
   });
 
-  it('refuses routes and rollup that are not lists', () => {
+  it('refuses routes that are not a list', () => {
     expect(malformed({ routes: 'implement' })).toEqual(['autopilot.routes must be a list of routes.']);
-    expect(malformed({ rollup: null })).toEqual(['autopilot.rollup must be a list of rules.']);
   });
 
   it('refuses a terminal block that is absent, or the flat list it used to be', () => {
@@ -338,40 +270,6 @@ describe('a block that is not the shape it claims', () => {
     expect(malformed({ routes: 'implement', attemptCap: 0 })).toEqual([
       'autopilot.routes must be a list of routes.',
     ]);
-  });
-});
-
-describe('rollup rules that contradict each other', () => {
-  it('refuses two rollup rules on one column', () => {
-    const config = fresh();
-    ap(config).rollup.push({ ...ap(config).rollup[0], next: 'todo' });
-    expect(coverageProblems(config)).toContain(
-      'product/in-progress has more than one rollup rule; a column rolls up exactly one way.',
-    );
-  });
-
-  it('refuses a column that both advances by rollup and runs a skill', () => {
-    const config = fresh();
-    ap(config).routes.push({
-      board: 'product',
-      column: 'in-progress',
-      skill: 'design',
-      verify: 'critic',
-      next: 'done',
-    });
-    expect(coverageProblems(config)).toContain(
-      'product/in-progress both advances by rollup and runs a skill, so whether the card is dispatched or moved to done would depend on tick order.',
-    );
-  });
-
-  // The pairing that MUST stay legal: a feature in in-progress has a close-out route, and the
-  // eligibility rule gates it rather than replacing it. Refusing this would break the default table.
-  it('allows an eligibility rule on a column that has a route — that is the close-out shape', () => {
-    const config = fresh();
-    const features = ap(config).rollup.find((r) => r.board === 'features');
-    expect(features?.action).toBe('eligible');
-    expect(ap(config).routes.some((r) => r.board === 'features' && r.column === features?.column)).toBe(true);
-    expect(coverageProblems(config)).toEqual([]);
   });
 });
 

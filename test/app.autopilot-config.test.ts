@@ -37,25 +37,6 @@ describe('PATCH /api/config and the routing table', () => {
     expect((await readDisk(root)).autopilot?.routes.some((r) => r.column === 'qa')).toBe(true);
   });
 
-  it('refuses a column edit that would leave a column with nothing to do', async () => {
-    const { app } = await openTestProject({ name: 'A', mode: 'brownfield' });
-    // Adding a column is the easy way to open a hole: nothing routes to or from it.
-    const res = await app.inject({
-      method: 'PATCH',
-      url: '/api/config',
-      payload: {
-        boards: {
-          engineering: { columns: ['Backlog', 'In Progress', 'Review', 'Blocked', 'Staging', 'Done'] },
-        },
-      },
-    });
-    expect(res.statusCode).toBe(400);
-    expect(res.json().error).toContain('"staging" is neither routed, terminal nor blocked');
-    // Not half-applied: the config still has the old columns.
-    const config = (await app.inject({ method: 'GET', url: '/api/config' })).json();
-    expect(config.boards.engineering.columns).toEqual(ENGINEERING);
-  });
-
   // The Settings modal sends all three boards on every save, so a refusal has to be able to arrive
   // AFTER another board's folders would have been renamed. Reading config.yaml cannot see this —
   // it is written last, so it is always unchanged on a refusal — which is why this asserts on the
@@ -71,7 +52,10 @@ describe('PATCH /api/config and the routing table', () => {
       payload: {
         boards: {
           features: { columns: ['Backlog', 'Planned', 'In Progress', 'Done'] }, // Todo -> Planned
-          engineering: { columns: [...ENGINEERING.slice(0, 4), 'Staging', 'Done'] }, // unroutable
+          // Dropping Blocked leaves `blockedColumn` naming a column engineering does not have, which
+          // is refused by the lifecycle check rather than by the folders — and refused AFTER features'
+          // rename has been planned, which is the ordering this case exists for.
+          engineering: { columns: ['Backlog', 'In Progress', 'Review', 'Done'] },
         },
       },
     });
@@ -255,10 +239,11 @@ describe('refusing a cap, and saying the right thing about it', () => {
     expect(error).toContain('Settings');
   });
 
-  // The other half: a real routing problem must still carry the remedy that names the file, because the
-  // routing table genuinely is not editable from the UI.
-  it('still names config.yaml when the problem really is the routing table', async () => {
-    const error = await patchCap({ routes: [] });
+  // The other half: a real lifecycle problem must still carry the remedy that names the file, because
+  // the block genuinely is not editable from the UI. The trigger used to be `routes: []`, which the
+  // retired cover check refused; a board with no terminal column is the same class and still refused.
+  it('still names config.yaml when the problem is the lifecycle rather than a cap', async () => {
+    const error = await patchCap({ terminal: { features: [], product: ['done'], engineering: ['done'] } });
     expect(error).toContain('.vibeboard/config.yaml');
   });
 });

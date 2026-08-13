@@ -1,4 +1,4 @@
-import { burnsAttempt, type Spend } from './accounting.js';
+import { attemptsUsed, burnsAttempt, type Spend } from './accounting.js';
 import type { TickAction } from './actions.js';
 import {
   AUTOPILOT_CONCURRENCY,
@@ -9,11 +9,12 @@ import {
 import { shapeProblems } from './autopilot-cover.js';
 import type { AutopilotState } from './autopilot-state.js';
 import type { CardProblem } from './board.js';
-import { hasUnfinishedChildren } from './derived-status.js';
+import { creatingRoundSpent } from './bounds.js';
+import { allSettled, hasUnfinishedChildren } from './derived-status.js';
 import { mayDispatch, type StopReason } from './dispatch-gate.js';
 import { liveCards } from './hierarchy.js';
 import { ARCHIVE_SLUG } from './layout.js';
-import { phase } from './phases.js';
+import { type PhaseName, phase } from './phases.js';
 import { derivePosition, type Position } from './position.js';
 import { isProjectRun, type RunRecord } from './runs.js';
 import type { BoardName, Card } from './types.js';
@@ -210,14 +211,97 @@ function nothingToWorkOn(ap: AutopilotConfig, cards: Card[], runs: RunRecord[]):
   return stop('complete');
 }
 
-// WHICH PHASE THE POSITION IS IN, and what to do about it. Tasks 8 and 9 of the lifecycle plan fill this in
-// with the feature loop, the story loop, the task loop and the review loop; until then a derived position
-// falls through to the same ending as no position at all, which reports the board honestly rather than
-// dispatching something the machine has not been taught yet.
+// The two columns a card sits in on its way INTO the machine. Not read from config: `terminal` says where
+// work ends, and these say a card has been picked up but its children are not being worked yet.
+const ENTERING = ['backlog', 'todo'];
+
+// A card that has used every attempt at one skill, above engineering. There is no blocked column up here —
+// deliberately: a break-down or a checkup that cannot succeed after three tries is a project-level problem
+// with nothing below it to carry on with, so it stops the loop and names itself.
+function capReached(
+  ap: AutopilotConfig,
+  runs: RunRecord[],
+  card: Card,
+  skill: string,
+): TickAction | undefined {
+  if (attemptsUsed(runs, card.id, skill) < ap.attemptCap) return undefined;
+  return stop(
+    'stalled',
+    `${card.id} has used all ${ap.attemptCap} attempts at ${skill}. A ${card.board} card has no blocked column to go to, so this needs a person: read its runs, then move it or change what it asks for.`,
+  );
+}
+
+// A dispatching phase, bounded. The skill comes from the TABLE rather than the call site, so the one place
+// that says which skill a phase runs is the table — and `undefined` falls through rather than throwing,
+// because a phase with no skill is one the loop carries out alone and never dispatches.
+function dispatchPhase(input: TickInput, name: PhaseName, card: Card): TickAction | undefined {
+  const skill = phase(name).skill;
+  if (skill === undefined) return undefined;
+  return capReached(input.ap, input.runs, card, skill) ?? { kind: 'dispatch', phase: name, skill, card };
+}
+
+// A phase the loop carries out alone. `exitPass` rather than a column named here: the table already says
+// where a skipped break-down lands, and naming it twice is two places for it to disagree.
+function skipPhase(name: PhaseName, card: Card, why: string): TickAction | undefined {
+  const to = phase(name).exitPass;
+  return to === undefined ? undefined : { kind: 'stamp', phase: name, card, to, why };
+}
+
+// THE FEATURE CHECKUP, and the one bound that is not an attempt count. DECISION 47: a checkup point gets ONE
+// round of creation, and after that it may only close the card or stop.
 //
-// Its own function so those tasks add branches without touching the sequence above.
-function phaseAction(_input: TickInput, _position: Position): TickAction | undefined {
+// The round is read off the BOARD — a card stamped `createdBy` one of this feature's own checkup runs — and
+// never out of the run's own `created` list, which is the agent's claim about itself (ruling 58, finding F).
+//
+// `> 1` because the run that created is itself one of this card's checkup runs: more than one means a checkup
+// has already had its close-or-stop turn and left the feature open. Asking again is asking a model to change
+// its mind, which decision 47 rejects as an exit condition.
+function featureCheckup(input: TickInput, feature: Card): TickAction | undefined {
+  const skill = phase('feature-checkup').skill;
+  if (skill === undefined) return undefined;
+  const spent = creatingRoundSpent(input.cards, input.runs, feature.id, skill);
+  if (spent && attemptsUsed(input.runs, feature.id, skill) > 1) {
+    return stop(
+      'stalled',
+      `${feature.id} has already had its one round of creating work, and the checkup after it still did not close the feature. Read its runs: what it believes is missing needs a person now, or belongs in a suggestion.`,
+    );
+  }
+  return dispatchPhase(input, 'feature-checkup', feature);
+}
+
+// THE STORY LOOP, rows P2, P2s and P6. No creating-round bound: ruling 54 makes creating siblings and closing
+// the story one act, so there is no second visit to this point to bound.
+function storyPhase(input: TickInput, story: Card, tasks: Card[]): TickAction | undefined {
+  if (tasks.length === 0) return dispatchPhase(input, 'story-breakdown', story);
+  if (ENTERING.includes(story.columnSlug)) {
+    return skipPhase('story-breakdown-skip', story, 'it already has tasks, so its break-down is skipped.');
+  }
+  if (allSettled(input.ap, tasks)) return dispatchPhase(input, 'story-checkup', story);
+  // The task loop and the review loop, which are Task 9 of the lifecycle plan. Until then a story whose tasks
+  // are still being worked falls through to the honest ending rather than to a phase the machine has not been
+  // taught yet.
   return undefined;
+}
+
+// WHICH PHASE THE POSITION IS IN, and what to do about it. The order is the machine: a feature enters before
+// its stories are worked, and L2 drains before L1 advances — a feature with an unsettled story must not reach
+// its own checkup.
+function phaseAction(input: TickInput, position: Position): TickAction | undefined {
+  const { feature, story, stories, tasks } = position;
+  if (stories.length === 0) return dispatchPhase(input, 'feature-breakdown', feature);
+  // DECISION 50: a card that already has children skips its break-down, or a follow-up feature — which
+  // arrives with its stories already attached — would get a second set of them.
+  if (ENTERING.includes(feature.columnSlug)) {
+    return skipPhase(
+      'feature-breakdown-skip',
+      feature,
+      'it already has stories, so its break-down is skipped.',
+    );
+  }
+  if (story) return storyPhase(input, story, tasks);
+  // No story left to work. Every one of them settled is the checkup's trigger; anything else is a board the
+  // machine cannot place, and falling through reports it rather than guessing.
+  return allSettled(input.ap, stories) ? featureCheckup(input, feature) : undefined;
 }
 
 export function decideTick(input: TickInput): TickAction {

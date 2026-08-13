@@ -272,26 +272,30 @@ describe('nothing to work on is not the same as nothing left', () => {
     expect(detailOf(action)).toContain('E-009 ran out of attempts');
   });
 
+  // ORPHANED WORK UNDER A CLOSED FEATURE, which is what it takes to reach this sentence at all now: anything
+  // under an OPEN feature is a position the machine picks up, so the only unplaceable work is what sits below
+  // a feature somebody has already moved to Done.
+  const orphaned = (): Card[] => [
+    card('F-001', 'features', 'done', 10, ['P-001']),
+    card('P-001', 'product', 'in-progress', 10, ['F-001', 'E-001']),
+    card('E-001', 'engineering', 'blocked', 10, ['P-001']),
+  ];
+
   // THE SETUP BARRIER'S SENTENCE IS GONE WITH THE BARRIER (decision 44). Nothing can be "waiting for the
   // setup feature" any more, and a message about a rule that no longer exists is worse than none.
   it('never says a card is waiting for the setup feature', () => {
-    const cards = [
-      { ...card('F-001', 'features', 'in-progress', 10, ['P-001']), setup: true },
-      card('P-001', 'product', 'in-progress', 10, ['F-001', 'E-001']),
-      card('E-001', 'engineering', 'blocked', 10, ['P-001']),
-    ];
-    expect(detailOf(decideTick(input({ cards })))).not.toContain('waiting for the setup feature');
+    const cards = orphaned();
+    cards[0] = { ...cards[0], setup: true };
+    const detail = detailOf(decideTick(input({ cards })));
+    // The fixture really does reach the stalled sentence, so the assertion below is not vacuous.
+    expect(detail).toContain('E-001');
+    expect(detail).not.toContain('waiting for the setup feature');
   });
 
   it('says a parent is waiting for its own cards further down', () => {
-    const cards = [
-      card('F-001', 'features', 'in-progress', 10, ['P-001']),
-      card('P-001', 'product', 'in-progress', 10, ['F-001', 'E-001']),
-      card('E-001', 'engineering', 'blocked', 10, ['P-001']),
-    ];
-    const detail = detailOf(decideTick(input({ cards })));
+    const detail = detailOf(decideTick(input({ cards: orphaned() })));
     expect(detail).toMatch(/E-001 ran out of attempts/);
-    expect(detail).toMatch(/F-001, P-001 are waiting for their own cards further down/);
+    expect(detail).toMatch(/P-001 is waiting for its own cards further down/);
     // Nothing in this fixture is unroutable, so the routing advice must not appear at all.
     expect(detail).not.toMatch(/routed, terminal or blocked/);
   });
@@ -461,6 +465,215 @@ describe('the state guard', () => {
     expect(decideTick(input({ state: state({ state: 'idle' }) }))).toMatchObject({
       kind: 'stop',
       reason: 'stopped',
+    });
+  });
+});
+
+// The two `it already has children` helpers: a feature with a story, a story with a task.
+const threeRunsOf = (cardId: string, board: BoardName, skill: string): RunRecord[] =>
+  Array.from({ length: DEFAULT_AUTOPILOT.attemptCap }, () => run(cardId, board, skill, 'failed'));
+
+describe('decideTick — the feature loop', () => {
+  it('stamps a backlog feature into todo and dispatches break-down', () => {
+    // ONE action: the entry stamp is part of carrying the dispatch out, not a tick of its own — otherwise
+    // every dispatch costs an idle tick and MAX_IDLE_TICKS would bound a healthy loop.
+    const action = decideTick(input({ cards: [card('F-001', 'features', 'backlog', 10, [])] }));
+    expect(action).toMatchObject({ kind: 'dispatch', phase: 'feature-breakdown', skill: 'break-down' });
+    expect(action.kind === 'dispatch' && action.card?.id).toBe('F-001');
+  });
+
+  // DECISION 50, and it is what makes the machine idempotent across a crash or a restart: a follow-up feature
+  // arrives with its stories already attached, so a break-down would create a second set of them.
+  it('skips break-down for a feature that already has a story', () => {
+    const cards = [
+      card('F-001', 'features', 'todo', 10, ['P-001']),
+      card('P-001', 'product', 'backlog', 10, ['F-001']),
+    ];
+    expect(decideTick(input({ cards }))).toMatchObject({
+      kind: 'stamp',
+      phase: 'feature-breakdown-skip',
+      to: 'in-progress',
+    });
+  });
+
+  it('stops stalled naming the feature once break-down has used every attempt', () => {
+    const cards = [card('F-001', 'features', 'todo', 10, [])];
+    const action = decideTick(input({ cards, runs: threeRunsOf('F-001', 'features', 'break-down') }));
+    expect(action).toMatchObject({ kind: 'stop', reason: 'stalled' });
+    expect(detailOf(action)).toContain('F-001');
+    expect(detailOf(action)).toContain('break-down');
+    // No blocked column above engineering, so a feature nobody can break down is a project-level problem.
+    expect(detailOf(action)).toContain('needs a person');
+  });
+
+  it('dispatches checkup-feature once every story is settled', () => {
+    const cards = [
+      card('F-001', 'features', 'in-progress', 10, ['P-001']),
+      card('P-001', 'product', 'done', 10, ['F-001']),
+    ];
+    expect(decideTick(input({ cards }))).toMatchObject({
+      kind: 'dispatch',
+      phase: 'feature-checkup',
+      skill: 'checkup-feature',
+    });
+  });
+
+  // A blocked task under a story is settled, so the story closed and the feature still reaches its checkup
+  // (decision 45). Without this, one task nobody can fix costs you every feature after it.
+  it('dispatches checkup-feature when a story closed carrying a blocked task', () => {
+    const cards = [
+      card('F-001', 'features', 'in-progress', 10, ['P-001']),
+      card('P-001', 'product', 'done', 10, ['F-001', 'E-001']),
+      card('E-001', 'engineering', 'blocked', 10, ['P-001']),
+    ];
+    expect(decideTick(input({ cards }))).toMatchObject({
+      kind: 'dispatch',
+      phase: 'feature-checkup',
+      skill: 'checkup-feature',
+    });
+  });
+
+  it('stops stalled once checkup-feature has used every attempt', () => {
+    const cards = [
+      card('F-001', 'features', 'in-progress', 10, ['P-001']),
+      card('P-001', 'product', 'done', 10, ['F-001']),
+    ];
+    const action = decideTick(input({ cards, runs: threeRunsOf('F-001', 'features', 'checkup-feature') }));
+    expect(action).toMatchObject({ kind: 'stop', reason: 'stalled' });
+    expect(detailOf(action)).toContain('checkup-feature');
+  });
+
+  // DECISION 47: one creating round per checkup point, and the round is read off the BOARD by `createdBy`
+  // rather than out of the run's own report. Once it is spent, a checkup that has already had its
+  // close-or-stop turn and left the feature open has answered — asking again is asking a model to change
+  // its mind, which is no exit condition.
+  it('stops stalled when the feature checkup has spent its creating round and still will not close', () => {
+    const creating = run('F-001', 'features', 'checkup-feature', 'success');
+    const second = run('F-001', 'features', 'checkup-feature', 'attention');
+    const cards = [
+      card('F-001', 'features', 'in-progress', 10, ['P-001', 'P-002']),
+      card('P-001', 'product', 'done', 10, ['F-001']),
+      // The card that spent the round, stamped by the endpoint with the run that created it, and now settled.
+      { ...card('P-002', 'product', 'done', 20, ['F-001']), createdBy: creating.run },
+    ];
+    const action = decideTick(input({ cards, runs: [creating, second] }));
+    expect(action).toMatchObject({ kind: 'stop', reason: 'stalled' });
+    expect(detailOf(action)).toContain('F-001');
+    expect(detailOf(action)).toContain('creating');
+  });
+
+  it('still dispatches the checkup that follows the creating round, so it can close', () => {
+    // The other half of decision 47: what it created is settled, and THIS visit may close the feature. Only
+    // once this one has come back without closing it is the point exhausted.
+    const creating = run('F-001', 'features', 'checkup-feature', 'success');
+    const cards = [
+      card('F-001', 'features', 'in-progress', 10, ['P-001', 'P-002']),
+      card('P-001', 'product', 'done', 10, ['F-001']),
+      { ...card('P-002', 'product', 'done', 20, ['F-001']), createdBy: creating.run },
+    ];
+    expect(decideTick(input({ cards, runs: [creating] }))).toMatchObject({
+      kind: 'dispatch',
+      phase: 'feature-checkup',
+    });
+  });
+
+  it('does not spend the round on a card the checkup only CLAIMED to create', () => {
+    // Finding F: `created` is the agent's own claim. A run reporting a card that is not on the board has
+    // spent no round, so its checkup point is still open for business.
+    const claimed = { ...run('F-001', 'features', 'checkup-feature', 'success'), created: ['P-009'] };
+    const second = run('F-001', 'features', 'checkup-feature', 'attention');
+    const cards = [
+      card('F-001', 'features', 'in-progress', 10, ['P-001']),
+      card('P-001', 'product', 'done', 10, ['F-001']),
+    ];
+    expect(decideTick(input({ cards, runs: [claimed, second] }))).toMatchObject({
+      kind: 'dispatch',
+      phase: 'feature-checkup',
+    });
+  });
+});
+
+describe('decideTick — the story loop', () => {
+  const feature = (links: string[]) => card('F-001', 'features', 'in-progress', 10, links);
+
+  it('stamps a backlog story into todo and dispatches break-down', () => {
+    const cards = [feature(['P-001']), card('P-001', 'product', 'backlog', 10, ['F-001'])];
+    const action = decideTick(input({ cards }));
+    expect(action).toMatchObject({ kind: 'dispatch', phase: 'story-breakdown', skill: 'break-down' });
+    expect(action.kind === 'dispatch' && action.card?.id).toBe('P-001');
+  });
+
+  it('skips break-down for a story that already has a task', () => {
+    const cards = [
+      feature(['P-001']),
+      card('P-001', 'product', 'todo', 10, ['F-001', 'E-001']),
+      card('E-001', 'engineering', 'backlog', 10, ['P-001']),
+    ];
+    expect(decideTick(input({ cards }))).toMatchObject({
+      kind: 'stamp',
+      phase: 'story-breakdown-skip',
+      to: 'in-progress',
+    });
+  });
+
+  it('stops stalled naming the story once its break-down has used every attempt', () => {
+    const cards = [feature(['P-001']), card('P-001', 'product', 'todo', 10, ['F-001'])];
+    const action = decideTick(input({ cards, runs: threeRunsOf('P-001', 'product', 'break-down') }));
+    expect(action).toMatchObject({ kind: 'stop', reason: 'stalled' });
+    expect(detailOf(action)).toContain('P-001');
+  });
+
+  it('dispatches checkup-story once every task is settled', () => {
+    const cards = [
+      feature(['P-001']),
+      card('P-001', 'product', 'in-progress', 10, ['F-001', 'E-001', 'E-002']),
+      card('E-001', 'engineering', 'done', 10, ['P-001']),
+      card('E-002', 'engineering', 'blocked', 20, ['P-001']),
+    ];
+    expect(decideTick(input({ cards }))).toMatchObject({
+      kind: 'dispatch',
+      phase: 'story-checkup',
+      skill: 'checkup-story',
+    });
+  });
+
+  // THE FIXTURE MUST HAVE TWO TASKS: with one, "all settled" and "any settled" are the same answer.
+  it('does not dispatch checkup-story while one of two tasks is in review', () => {
+    const cards = [
+      feature(['P-001']),
+      card('P-001', 'product', 'in-progress', 10, ['F-001', 'E-001', 'E-002']),
+      card('E-001', 'engineering', 'done', 10, ['P-001']),
+      card('E-002', 'engineering', 'review', 20, ['P-001']),
+    ];
+    const action = decideTick(input({ cards }));
+    expect(action.kind === 'dispatch' && action.phase).not.toBe('story-checkup');
+  });
+
+  // L2 DRAINS BEFORE L1 ADVANCES. A feature with an unsettled story must not reach its own checkup.
+  it('works the story loop before the feature checkup', () => {
+    const cards = [
+      feature(['P-001', 'P-002']),
+      card('P-001', 'product', 'done', 10, ['F-001']),
+      card('P-002', 'product', 'backlog', 20, ['F-001']),
+    ];
+    expect(decideTick(input({ cards }))).toMatchObject({
+      kind: 'dispatch',
+      phase: 'story-breakdown',
+      card: { id: 'P-002' },
+    });
+  });
+
+  // And the feature's own entry comes before either: a feature whose stories are being worked must not still
+  // sit in Backlog, or the board says one thing and the machine another.
+  it('stamps the feature out of backlog before working its stories', () => {
+    const cards = [
+      card('F-001', 'features', 'backlog', 10, ['P-001']),
+      card('P-001', 'product', 'backlog', 10, ['F-001']),
+    ];
+    expect(decideTick(input({ cards }))).toMatchObject({
+      kind: 'stamp',
+      phase: 'feature-breakdown-skip',
+      card: { id: 'F-001' },
     });
   });
 });

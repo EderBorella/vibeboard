@@ -7,6 +7,7 @@ import { latestOwnRun } from '../core/bounds.js';
 import { countLive, createdNothing } from '../core/created.js';
 import { blockedUnder } from '../core/derived-status.js';
 import type { StopReason } from '../core/dispatch-gate.js';
+import { HARNESS_FEATURE } from '../core/harness-feature.js';
 import { childrenOf } from '../core/hierarchy.js';
 import { type PhaseName, phase } from '../core/phases.js';
 import { producedNothing, type RunRecord } from '../core/runs.js';
@@ -611,7 +612,15 @@ async function recordEmptyRun(
 // `decideTick` counts those attempts, and it is the one place that decides when to give up — a second opinion
 // here would be a second cap disagreeing with the first.
 //
-// ITS EXIT IS THE SCAFFOLDING FLAG, and this is the only place it is ever written (decision 44).
+// ITS EXIT IS THE SCAFFOLDING FLAG AND THE SMOKE-HARNESS FEATURE, and this is the only place either happens
+// (decision 44, ruling 66). Both are board writes the loop makes about a derivation that has already finished,
+// and both are the loop's rather than the agent's for the same reason: a fact that decides what gets built
+// must not be a fact an agent can forget to state.
+//
+// THE FLAG FIRST, THEN THE CARD, and the order is load-bearing: `stampSetup` picks the FIRST feature in
+// `features/backlog`, and the harness is created after the derivation so that it sorts last. Creating it first
+// would make it a candidate for a flag that means the opposite — the scaffolding is built first, the harness
+// last.
 async function afterProjectRun(
   deps: ActDeps,
   action: Dispatch,
@@ -627,6 +636,7 @@ async function afterProjectRun(
   // and a board that could not be read is not evidence that it did.
   if (board.ok && before !== undefined && created !== undefined && !createdNothing(before, created)) {
     await stampSetup(deps, board.value.boards.features ?? []);
+    await createHarnessFeature(deps);
   }
   await deps.client.log('run', bootstrapLine(action.skill, settled, created, context), {
     iteration: context.iteration + 1,
@@ -668,6 +678,42 @@ async function stampSetup(deps: ActDeps, features: Card[]): Promise<void> {
     'lifecycle',
     `${first.id} is this project's scaffolding feature: it establishes the toolchain, the test runner and the gate commands, and it is worked first.`,
     { card: first.id, board: first.board },
+  );
+}
+
+// THE SMOKE-HARNESS FEATURE (ruling 66), created here and nowhere else. The card is canned — its title and its
+// body are in core/harness-feature.ts, with the argument for each — and this function is only the write.
+//
+// LAST BY CONSTRUCTION rather than by asking for a position: the endpoint gives a new card the next order in
+// `features/backlog`, and this runs after the derivation has already filled it. That is what makes the harness
+// the last feature built, which is the only order it can be built in — there is nothing to smoke test before the
+// product exists.
+//
+// NOT FATAL, exactly like the flag above. This is the exit of a run that has already happened, and stopping the
+// loop over it would cost the project the whole derivation. What it costs instead is bounded: `complete` refuses
+// while the smoke command is still one of the gates (core/tick.ts), so a project that lost this card is a project
+// that says why it will not report itself finished rather than one that quietly does.
+//
+// AND A CREATE THAT WAS REFUSED IS ALSO NOT FATAL, which covers the one case worth naming: a second bootstrap on
+// a board that already holds the card is refused by the endpoint's duplicate-title rule, and being told "that
+// card already exists" is the answer this wanted.
+async function createHarnessFeature(deps: ActDeps): Promise<void> {
+  const made = await deps.client.create({
+    board: 'features',
+    // The column the endpoint stamps anyway, sent because the request takes one. A card a run creates enters its
+    // board's first column whatever it asked for.
+    columnSlug: 'backlog',
+    title: HARNESS_FEATURE.title,
+    body: HARNESS_FEATURE.body,
+  });
+  if (!made.ok) {
+    deps.log?.(`could not create the smoke-harness feature: ${made.reason}`);
+    return;
+  }
+  await deps.client.log(
+    'lifecycle',
+    `${made.value.id} is this project's smoke harness: it makes the product runnable the way the README describes, with a command that is not one of the gates, and it is built last because there is nothing to smoke test before the product exists.`,
+    { card: made.value.id, board: 'features' },
   );
 }
 

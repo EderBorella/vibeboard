@@ -3,6 +3,7 @@ import type { Spend } from '../src/core/accounting.js';
 import type { TickAction } from '../src/core/actions.js';
 import { DEFAULT_AUTOPILOT } from '../src/core/autopilot.js';
 import type { AutopilotState } from '../src/core/autopilot-state.js';
+import type { DeclaredCommands } from '../src/core/foundation.js';
 import { type RunRecord, type RunStatus, withVerification } from '../src/core/runs.js';
 import { decideTick, type TickInput } from '../src/core/tick.js';
 import type { BoardName, Card } from '../src/core/types.js';
@@ -87,6 +88,8 @@ const base = (): Card[] => [
   card('P-001', 'product', 'backlog', 10, ['F-001']),
 ];
 
+const DISTINCT_COMMANDS: DeclaredCommands = { gates: ['gate one', 'gate two'], smoke: 'use the thing' };
+
 const input = (over: Partial<TickInput> = {}): TickInput => ({
   ap: DEFAULT_AUTOPILOT,
   state: RUNNING,
@@ -96,6 +99,9 @@ const input = (over: Partial<TickInput> = {}): TickInput => ({
   spend: NO_SPEND,
   inFlight: [],
   problems: [],
+  // A GATE AND A SMOKE COMMAND THAT DIFFER, which is the ordinary project and the only fixture under which
+  // `complete` is reachable at all (ruling 66). Every test about the collision names its own pair.
+  commands: DISTINCT_COMMANDS,
   ...over,
 });
 
@@ -1043,6 +1049,110 @@ describe('decideTick — finding D: complete with a blocked task', () => {
     const detail = detailOf(decideTick(input({ cards })));
     expect(detail).toContain('E-001');
     expect(detail).not.toContain('cannot report itself finished');
+  });
+});
+
+// RULING 66. `complete` is computed from more than one place — the clean ending and the one that names what it
+// left behind — so each is asserted on its own here, and the two together. The project that produced the ruling
+// declared `npm test` as both its gate and its smoke command: four features closed, sixteen tasks delivered,
+// `complete` reported, and the product had no main and printed nothing.
+describe('decideTick — a smoke command that is also a gate', () => {
+  const SAME = 'npm test';
+  const collides: DeclaredCommands = { gates: [SAME], smoke: SAME };
+
+  const done = (extra: Card[] = []): Card[] => [
+    card('F-001', 'features', 'done', 10, ['P-001']),
+    card('P-001', 'product', 'done', 10, ['F-001', 'E-001']),
+    task('E-001', 'done'),
+    ...extra,
+  ];
+
+  it('refuses to report the project finished, and says what has not been run', () => {
+    const action = decideTick(input({ cards: done(), commands: collides }));
+    expect(action).toMatchObject({ kind: 'stop', reason: 'stalled' });
+    // THE COMMAND ITSELF, because "your smoke command is wrong" sends a reader to look for which one.
+    expect(detailOf(action)).toContain(SAME);
+    expect(detailOf(action)).toContain('foundation/TESTING.md');
+    expect(detailOf(action)).toContain('the way its README describes');
+  });
+
+  it('reports complete once a distinct smoke command is declared', () => {
+    const commands: DeclaredCommands = { gates: [SAME], smoke: 'node dist/cli.js --help' };
+    expect(decideTick(input({ cards: done(), commands }))).toMatchObject({
+      kind: 'stop',
+      reason: 'complete',
+    });
+  });
+
+  it('compares against EVERY gate, not only the first', () => {
+    // One string comparison per gate. Against the first alone, a project whose second gate is its smoke
+    // command passes this — and `npm test` is as likely to be the second row as the first.
+    const commands: DeclaredCommands = { gates: ['npm run lint', SAME], smoke: SAME };
+    expect(decideTick(input({ cards: done(), commands }))).toMatchObject({
+      kind: 'stop',
+      reason: 'stalled',
+    });
+  });
+
+  it('does not refuse a project that declares no gates at all', () => {
+    // POINT 7's honest direction. A CODE-QUALITY.md that declares nothing has no gate for the smoke command to
+    // collide with, and `readGates` answers such a project with a reason rather than a list — so
+    // `declaredCommands` carries no commands and there is nothing to compare. A refusal here would name a
+    // command nobody wrote. What that project fails is the review's own gate check, which fails closed.
+    const commands: DeclaredCommands = { gates: [], smoke: SAME };
+    expect(decideTick(input({ cards: done(), commands }))).toMatchObject({
+      kind: 'stop',
+      reason: 'complete',
+    });
+  });
+
+  it('does not refuse a project whose smoke command could not be read, which readiness owns', () => {
+    // Stated because it looks like a hole: `smoke.ok` is a readiness BLOCKER, so a project with no readable
+    // smoke command cannot be STARTED — a second refusal here would be about a state the loop cannot reach.
+    const commands: DeclaredCommands = { gates: [SAME] };
+    expect(decideTick(input({ cards: done(), commands }))).toMatchObject({
+      kind: 'stop',
+      reason: 'complete',
+    });
+  });
+
+  // DECISION 45's ARGUMENT, ONE LEVEL OUT. A card that ran out of attempts has had every attempt it is allowed,
+  // so a project holding one is not held hostage over a command no run can now change: the ending is `complete`
+  // and it names BOTH facts, because naming it is what makes carrying on safe.
+  // TWO TESTS OVER ONE FIXTURE, deliberately: the guard that lets the ending through and the clause that names
+  // why are separate edits, and one test asserting both would fail for either — so neither would be pinned by
+  // cover of its own.
+  it('finishes anyway when something is blocked, rather than holding the project hostage', () => {
+    const cards = done([task('E-002', 'blocked', 20)]);
+    expect(decideTick(input({ cards, commands: collides }))).toMatchObject({
+      kind: 'stop',
+      reason: 'complete',
+    });
+  });
+
+  it('names both facts in that ending — the blocked card and the unrun smoke test', () => {
+    const cards = done([task('E-002', 'blocked', 20)]);
+    const detail = detailOf(decideTick(input({ cards, commands: collides })));
+    expect(detail).toContain('E-002');
+    expect(detail).toContain(SAME);
+  });
+
+  it('says nothing about the smoke command in that sentence when there is no collision', () => {
+    // Without this the clause could be a constant appended to every blocked ending, and the test above would
+    // pass just as well.
+    const cards = done([task('E-002', 'blocked', 20)]);
+    const action = decideTick(input({ cards }));
+    expect(detailOf(action)).toContain('E-002');
+    expect(detailOf(action)).not.toContain('README describes');
+  });
+
+  it('is not what stops a project with outstanding work, which is stalled for its own reason', () => {
+    // The refusal belongs to the ONE ending it guards. A board with work left never reaches it, and a
+    // collision must not change the sentence a person gets about the work that is actually outstanding.
+    const cards = [card('E-009', 'engineering', 'triage', 20, [])];
+    const action = decideTick(input({ cards, commands: collides }));
+    expect(action).toMatchObject({ kind: 'stop', reason: 'stalled' });
+    expect(detailOf(action)).not.toContain('README describes');
   });
 });
 

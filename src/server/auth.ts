@@ -59,8 +59,14 @@ const RULES: Record<string, Rule> = {
   // linked its children left orphans. The parent link is now the server's to assert, from the credential it is
   // already holding, which is where the column, the group and the creating run come from too. `PUT …/links`
   // stays for the run's own card: it is confined to it, and parent↔child is the only link a run can mean.
+  //
+  // AND `service`, which is the loop (ruling 66). It creates exactly one card: the smoke-harness feature, at the
+  // bootstrap's exit, because a mandatory feature that depends on an agent remembering is one that will
+  // sometimes be missing. Every rule this endpoint enforces for a run still applies to it — the credential
+  // carries a run id, so `lifecycleRulesForCreate` runs — and the loop is already the caller that stamps
+  // `setup: true` and moves cards, so this grants no authority it does not have one door along.
   'POST /api/cards': {
-    scopes: ['work', ...BOARD_SCOPES],
+    scopes: ['work', 'service', ...BOARD_SCOPES],
     describe:
       '`{ board, columnSlug, title, description?, body? }` — create a card. The id is assigned by the server; never choose one. `columnSlug` must be a column that already exists, because naming one that does not CREATES the folder and the card then vanishes from the board while keeping its id.',
   },

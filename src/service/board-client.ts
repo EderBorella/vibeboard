@@ -191,6 +191,22 @@ export class BoardClient {
     return this.#call('POST', `/cards/${board}/${card}/move`, { toColumnSlug });
   }
 
+  // ONE CARD, through the same endpoint an agent creates through. The loop creates exactly one card in the whole
+  // lifecycle — the smoke-harness feature at the bootstrap's exit (ruling 66) — and it goes this way rather than
+  // by writing a file for the reason decision 10 gives: the id, the entry column and the `createdBy` stamp are
+  // all the endpoint's to assign, and a second write path would be a second answer to each of them.
+  //
+  // NO `links` AND NO `columnSlug` CHOICE WORTH MAKING (ruling 65, and `stampForRun`): a feature is the top of
+  // its own vertical, and a card a run creates enters its board's first column whatever the caller asked for.
+  create(input: {
+    board: BoardName;
+    columnSlug: string;
+    title: string;
+    body?: string;
+  }): Promise<Answer<Card>> {
+    return this.#call('POST', '/cards', input);
+  }
+
   // The two frontmatter flags, `setup` and `followUp`, which have a route of their own rather than going
   // through `PATCH /cards`: that endpoint's allow-list is what stops a work agent flagging its own card, and a
   // body-dependent exception to it would be a new category the scope table cannot express.

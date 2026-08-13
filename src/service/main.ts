@@ -1,3 +1,4 @@
+import { declaredCommands } from '../core/foundation.js';
 import { readAutopilotState, updateAutopilotState } from '../server/autopilot-store.js';
 import { startSession } from '../server/git-work.js';
 import { commitTail, performAction } from './act.js';
@@ -74,6 +75,9 @@ const ended = await runLoop({
   // Decision 20's carve-out: the state file directly, not over HTTP. `GET /autopilot/state` is admin-only,
   // and the counters below are the loop's own.
   readState: () => readAutopilotState(root, new Date().toISOString()),
+  // The same carve-out, for the same reason: the foundation documents are on disk and no route serves them to a
+  // `service` credential.
+  commands: () => declaredCommands(root),
   addToCounters: async (dispatches) => {
     await updateAutopilotState(root, new Date().toISOString(), (current) => ({
       ...current,

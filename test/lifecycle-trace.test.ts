@@ -3,6 +3,8 @@ import { appendFile, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it, onTestFinished } from 'vitest';
 import type { DiaryEntry } from '../src/core/diary.js';
+import { declaredCommands } from '../src/core/foundation.js';
+import { HARNESS_FEATURE } from '../src/core/harness-feature.js';
 import { childrenOf, isLive, parentBoardOf, parentOf } from '../src/core/hierarchy.js';
 import { skillRel } from '../src/core/layout.js';
 import type { RunRecord } from '../src/core/runs.js';
@@ -55,7 +57,12 @@ const tally = (log: string) => `echo ran >> ${log}`;
 
 const gatesDoc = (command: string) =>
   `---\ngates:\n  - name: tally\n    command: "${command}"\n---\nThe bar every card clears.\n`;
-const testingDoc = `---\nsmoke: "${tally(SMOKE_LOG)}"\n---\nWhat a smoke test means here.\n`;
+const testingDoc = (command: string) => `---\nsmoke: "${command}"\n---\nWhat a smoke test means here.\n`;
+
+// THE HARNESS FEATURE'S BREAK-DOWN, which no card body can drive: the loop creates that card with a canned body
+// (ruling 66), so its chain has to come from the SKILL — scoped to F-002, which is the id the harness takes in
+// every test below that derives exactly one feature. Every other break-down still reads its own card.
+const HARNESS_CHAIN = (mode: Mode) => `[[behaviour@F-002:${mode}:product:1:engineering:1]]`;
 
 // How many times a command declared in a foundation document actually ran, counted from what it wrote.
 async function ranTimes(root: string, log: string): Promise<number> {
@@ -70,9 +77,13 @@ async function ranTimes(root: string, log: string): Promise<number> {
 // APPENDED rather than substituted: the real body travels too, so what the shim is handed is what a model
 // would be handed.
 //
-// `break-down` is deliberately left unseeded by every caller below. Its behaviour comes from the CARD instead
-// — the skill body is above the card section in the prompt, so a marker here would win over the card's — and
-// that is how one chain of creates drives both levels of a break-down with one skill.
+// `break-down`'s behaviour comes from the CARD rather than from here — the skill body is above the card section
+// in the prompt, so an unscoped marker here would win over every card's — and that is how one chain of creates
+// drives both levels of a break-down with one skill.
+//
+// THE ONE EXCEPTION is a marker SCOPED to a single card (`[[behaviour@F-002:…]]`, see the shim), which the
+// callers below use for the smoke-harness feature: the loop creates that card with a canned body, so there is no
+// card body to put its chain in. Every other card still reads its own.
 async function seedSkillBodies(root: string, markers: Record<string, string>): Promise<void> {
   for (const [slug, marker] of Object.entries(markers)) {
     await appendFile(join(root, skillRel(slug, 'SKILL.md')), `\n${marker}\n`, 'utf8');
@@ -100,11 +111,15 @@ interface Started {
 // its cards over HTTP, which is the whole point of the `create` behaviour — the endpoint's rules about which
 // board a phase may create on are then genuinely under test. `VIBEBOARD_PORT` is what the prompt's API base
 // is built from, so it is set here and put back afterwards.
-async function start(opts: { gates?: string; skills?: Record<string, string> } = {}): Promise<Started> {
+async function start(
+  opts: { gates?: string; smoke?: string; skills?: Record<string, string> } = {},
+): Promise<Started> {
   const project = await openTestProject({ name: 'T', mode: 'brownfield', runBin: SHIM });
   await makeReady(project.app, project.root, { cards: false });
   await putFoundation(project.app, 'CODE-QUALITY.md', gatesDoc(opts.gates ?? tally(GATE_LOG)));
-  await putFoundation(project.app, 'TESTING.md', testingDoc);
+  // A SMOKE COMMAND THAT IS NOT THE GATE, unless a test says otherwise: `complete` refuses while the two are the
+  // same command (ruling 66), so this is the ordinary project rather than a detail of the fixture.
+  await putFoundation(project.app, 'TESTING.md', testingDoc(opts.smoke ?? tally(SMOKE_LOG)));
   await seedSkillBodies(project.root, opts.skills ?? HAPPY);
 
   await project.app.listen({ host: '127.0.0.1', port: 0 });
@@ -178,6 +193,9 @@ async function drive(
         iteration: current.iteration + dispatches,
       }));
     },
+    // OFF DISK, exactly as main.ts wires it: the collision refusal (ruling 66) reads what the foundation
+    // documents declare, and every test here writes real ones through `putFoundation`.
+    commands: () => declaredCommands(project.root),
     act: (action, context) => performAction(actDeps, action, context),
     // Nothing sleeps: the idle wait is five seconds in production and there is nothing to wait for here.
     wait: async () => {},
@@ -215,6 +233,8 @@ function step(entry: DiaryEntry): string {
   if (moved) return `move ${entry.board}/${moved[1]} ${moved[2]}`;
   const setup = entry.text.match(/^(\S+) is this project's scaffolding feature/);
   if (setup) return `flag ${setup[1]} setup`;
+  const harness = entry.text.match(/^(\S+) is this project's smoke harness/);
+  if (harness) return `harness ${harness[1]}`;
   const smoke = entry.text.match(/ran the smoke command before (\S+) checkup — it (passed|did not pass)/);
   if (smoke) return `smoke ${smoke[1]} ${smoke[2] === 'passed' ? 'pass' : 'fail'}`;
   const gates = entry.text.match(/^(\S+) failed its gates/);
@@ -359,7 +379,11 @@ for (const mode of MODES) {
         // One feature, one story under it, two tasks under that. The chain travels through the cards the shim
         // creates, so one `break-down` skill serves both levels — and each board is named literally, so the
         // endpoint's own rule about where a phase may create is what decides, not the shim.
-        skills: { ...HAPPY, 'derive-features': creates(mode, 'features:1:product:1:engineering:2') },
+        skills: {
+          ...HAPPY,
+          'derive-features': creates(mode, 'features:1:product:1:engineering:2'),
+          'break-down': HARNESS_CHAIN(mode),
+        },
       });
       const ended = await drive(started);
       expect(ended.reason).toBe('complete');
@@ -368,6 +392,9 @@ for (const mode of MODES) {
         // The scaffolder's own line, which is the project's first event and is in the same file.
         'lifecycle: Project T created.',
         'flag F-001 setup',
+        // RULING 66: the loop's own second write at the bootstrap's exit, after the flag and before the diary
+        // line about the run. One derived feature, so the harness is F-002 and it sorts last.
+        'harness F-002',
         'ran project derive-features',
         'move features/F-001 todo',
         'move features/F-001 in-progress',
@@ -391,6 +418,24 @@ for (const mode of MODES) {
         'smoke F-001 pass',
         'move features/F-001 done',
         'ran F-001 checkup-feature',
+        // AND THEN THE HARNESS FEATURE, walked as an ordinary feature and LAST — which is the only order it can
+        // be built in, because there was nothing to smoke test until the work above it existed.
+        'move features/F-002 todo',
+        'move features/F-002 in-progress',
+        'ran F-002 break-down',
+        'move product/P-002 todo',
+        'move product/P-002 in-progress',
+        'ran P-002 break-down',
+        'move engineering/E-003 in-progress',
+        'move engineering/E-003 review',
+        'ran E-003 implement',
+        'move engineering/E-003 done',
+        'review E-003 pass',
+        'move product/P-002 done',
+        'ran P-002 checkup-story',
+        'smoke F-002 pass',
+        'move features/F-002 done',
+        'ran F-002 checkup-feature',
         'stopped complete',
       ]);
 
@@ -404,12 +449,18 @@ for (const mode of MODES) {
         'dispatch E-002 review in engineering/review',
         'dispatch P-001 checkup-story in product/in-progress',
         'dispatch F-001 checkup-feature in features/in-progress',
+        'dispatch F-002 break-down in features/todo',
+        'dispatch P-002 break-down in product/todo',
+        'dispatch E-003 implement in engineering/in-progress',
+        'dispatch E-003 review in engineering/review',
+        'dispatch P-002 checkup-story in product/in-progress',
+        'dispatch F-002 checkup-feature in features/in-progress',
       ]);
 
-      // The gates ran once per review, in the loop's own process, and the smoke command once before the feature
+      // The gates ran once per review, in the loop's own process, and the smoke command once before each feature
       // checkup. Counted from what the commands themselves wrote.
-      expect(await ranTimes(started.project.root, GATE_LOG)).toBe(2);
-      expect(await ranTimes(started.project.root, SMOKE_LOG)).toBe(1);
+      expect(await ranTimes(started.project.root, GATE_LOG)).toBe(3);
+      expect(await ranTimes(started.project.root, SMOKE_LOG)).toBe(2);
       // THE BOARD, not the diary: every card the walk produced is hung where the machine can see it.
       await assertHierarchy(started.project);
     });
@@ -425,13 +476,20 @@ for (const mode of MODES) {
         // scaffolding feature is — that is the one case the loop excuses, so the card sails through to its
         // review. The first draft of this test did exactly that and asserted nothing at all.
         gates: `echo ran >> ${GATE_LOG}; test $(wc -l < ${GATE_LOG}) -ge 2`,
-        skills: { ...HAPPY, 'derive-features': creates(mode, 'features:1:product:1:engineering:1') },
+        skills: {
+          ...HAPPY,
+          'derive-features': creates(mode, 'features:1:product:1:engineering:1'),
+          'break-down': HARNESS_CHAIN(mode),
+        },
       });
       const ended = await drive(started);
       expect(ended.reason).toBe('complete');
 
       const traced = await trace(started.project);
-      expect(traced.slice(traced.indexOf('ran E-001 implement'))).toEqual([
+      // TO THE END OF THE FIRST FEATURE only. The harness feature is walked after it — its own trace is the
+      // subject of the test above — and this one is about the send-back, which happens once.
+      const upTo = traced.indexOf('ran F-001 checkup-feature');
+      expect(traced.slice(traced.indexOf('ran E-001 implement'), upTo + 1)).toEqual([
         'ran E-001 implement',
         // No model was asked and no iteration spent: the verdict is the gate's own, and the card goes back.
         'move engineering/E-001 in-progress',
@@ -445,15 +503,15 @@ for (const mode of MODES) {
         'smoke F-001 pass',
         'move features/F-001 done',
         'ran F-001 checkup-feature',
-        'stopped complete',
       ]);
 
-      // THE GATE SPENT NOTHING. One review run, not two — the failing gate dispatched no model at all.
+      // THE GATE SPENT NOTHING. One review run for E-001, not two — the failing gate dispatched no model at
+      // all — and exactly one fix in the whole project, because the gate passes from its second run onwards.
       const all = await runs(started.project);
-      expect(all.filter((r) => r.skill === 'review')).toHaveLength(1);
+      expect(all.filter((r) => r.card === 'E-001' && r.skill === 'review')).toHaveLength(1);
       expect(all.filter((r) => r.skill === 'fix')).toHaveLength(1);
-      // Twice: once to fail, once to pass after the fix.
-      expect(await ranTimes(started.project.root, GATE_LOG)).toBe(2);
+      // Three: E-001 fails, E-001 passes after the fix, and the harness feature's own task passes first time.
+      expect(await ranTimes(started.project.root, GATE_LOG)).toBe(3);
       // THE BOARD, not the diary: every card the walk produced is hung where the machine can see it.
       await assertHierarchy(started.project);
     });
@@ -523,18 +581,28 @@ for (const mode of MODES) {
     it('blocks a task that cannot be fixed, and still closes its story and its feature', async () => {
       const started = await start({
         gates: `echo ran >> ${GATE_LOG}; exit 1`,
-        skills: { ...HAPPY, 'derive-features': creates(mode, 'features:1:product:1:engineering:1') },
+        skills: {
+          ...HAPPY,
+          'derive-features': creates(mode, 'features:1:product:1:engineering:1'),
+          'break-down': HARNESS_CHAIN(mode),
+        },
       });
       const ended = await drive(started);
 
-      // The loop CARRIES ON past a task nobody can fix (decision 45), and says what it left behind.
+      // The loop CARRIES ON past a task nobody can fix (decision 45), and says what it left behind. Both of
+      // them: this gate fails for everything, so the harness feature's own task is blocked too — which is the
+      // limitation ruling 66 records rather than a surprise. The harness cannot verify itself.
       expect(ended.reason).toBe('complete');
       expect(ended.detail).toContain('E-001');
+      expect(ended.detail).toContain('E-002');
       expect(await columnOf(started.project, 'E-001')).toBe('blocked');
       expect(await columnOf(started.project, 'P-001')).toBe('done');
       expect(await columnOf(started.project, 'F-001')).toBe('done');
-      // One fix budget for both send-back kinds: three fixes and no more, then blocked.
-      expect((await runs(started.project)).filter((r) => r.skill === 'fix')).toHaveLength(3);
+      expect(await columnOf(started.project, 'F-002')).toBe('done');
+      // One fix budget for both send-back kinds: three fixes and no more per task, then blocked.
+      const fixes = (await runs(started.project)).filter((r) => r.skill === 'fix');
+      expect(fixes.filter((r) => r.card === 'E-001')).toHaveLength(3);
+      expect(fixes.filter((r) => r.card === 'E-002')).toHaveLength(3);
       // THE BOARD, not the diary: every card the walk produced is hung where the machine can see it.
       await assertHierarchy(started.project);
     });
@@ -694,6 +762,69 @@ for (const mode of MODES) {
       expect((await board(started.project)).map((c) => c.id)).not.toContain('E-041');
       // THE BOARD, not the diary: every card the walk produced is hung where the machine can see it.
       await assertHierarchy(started.project);
+    });
+
+    // RULING 66, END TO END, and the two halves are asserted apart. THE CARD: the bootstrap produces the derived
+    // features PLUS the harness feature, and the harness is last — which is load-bearing rather than incidental,
+    // because a harness built before the product verifies nothing.
+    it('derives the features and then the harness feature, which sorts last', async () => {
+      const started = await start({
+        // Two features, so "last" is a position rather than the only one there is.
+        skills: { ...HAPPY, 'derive-features': creates(mode, 'features:2') },
+      });
+      // ONE TICK: the bootstrap and its exit, and nothing after it. A longer budget would break the first
+      // feature down and this test would be about the walk instead.
+      const first = await drive(started, { ticks: 1 });
+      expect(first.reason).toBe('stopped');
+
+      const features = (await board(started.project))
+        .filter((c) => c.board === 'features')
+        .sort((a, b) => a.order - b.order);
+      expect(features.map((c) => c.title)).toEqual([
+        'features 1 of 2',
+        'features 2 of 2',
+        HARNESS_FEATURE.title,
+      ]);
+      // THE SCAFFOLDING IS FIRST AND THE HARNESS IS NOT IT. Two flags that mean opposite things about when a
+      // card is built, so the one thing that must not happen is the loop putting both on one card.
+      expect(features.filter((c) => c.setup === true).map((c) => c.id)).toEqual([features[0]?.id]);
+      expect(features.at(-1)?.setup).toBeUndefined();
+      // In the queue, like every other feature: nothing about it skips the phases in front of it.
+      expect(features.at(-1)?.columnSlug).toBe('backlog');
+      await assertHierarchy(started.project);
+    });
+
+    // AND THE REFUSAL, both directions on one board. The project that produced the ruling declared `npm test` as
+    // its gate and as its smoke command: four features closed, sixteen tasks delivered, `complete` reported, and
+    // the product had no main and printed nothing.
+    it('does not report complete while the smoke command is the gate, and does once it is not', async () => {
+      const started = await start({
+        // ONE COMMAND FOR BOTH, exactly as a person reaching for the obvious answer would write it.
+        smoke: tally(GATE_LOG),
+        skills: {
+          ...HAPPY,
+          'derive-features': creates(mode, 'features:1:product:1:engineering:1'),
+          'break-down': HARNESS_CHAIN(mode),
+        },
+      });
+      const refused = await drive(started);
+
+      // Every card done — the harness feature included, because delivering that card is not what this checks —
+      // and still not `complete`.
+      expect(refused.reason).toBe('stalled');
+      expect(refused.detail).toContain(tally(GATE_LOG));
+      expect(refused.detail).toContain('foundation/TESTING.md');
+      expect(await columnOf(started.project, 'F-001')).toBe('done');
+      expect(await columnOf(started.project, 'F-002')).toBe('done');
+
+      // THE ONE THING THAT CHANGES is the document. Nothing on the board moves, no run is dispatched, and the
+      // same loop over the same project now finishes.
+      await putFoundation(started.project.app, 'TESTING.md', testingDoc(tally(SMOKE_LOG)));
+      const before = (await runs(started.project)).length;
+      const ended = await drive(started);
+      expect(ended.reason).toBe('complete');
+      expect(ended.detail).toBeUndefined();
+      expect((await runs(started.project)).length).toBe(before);
     });
 
     it('stops stalled without dispatching when two features are open', async () => {

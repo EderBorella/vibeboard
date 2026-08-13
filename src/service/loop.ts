@@ -3,6 +3,7 @@ import { DEFAULT_AUTOPILOT } from '../core/autopilot.js';
 import type { AutopilotState } from '../core/autopilot-state.js';
 import { boardColumnSlugs } from '../core/board.js';
 import { type StopReason, stopSentence } from '../core/dispatch-gate.js';
+import type { DeclaredCommands } from '../core/foundation.js';
 import { decideTick, type TickAction } from '../core/tick.js';
 import { BOARDS, type BoardName, type Card } from '../core/types.js';
 import type { BoardClient, Failed } from './board-client.js';
@@ -36,6 +37,11 @@ export interface LoopDeps {
   // Add to the loop's OWN counters, inside a read-modify-write. RELATIVE rather than absolute so a value the
   // server has just reset cannot be resurrected from a state this tick read before the reset.
   addToCounters: (dispatches: number) => Promise<void>;
+  // What the foundation documents declare they run, read off disk like the state above and for the same reason:
+  // the tick compares two of these strings (ruling 66) and there is no route that serves them to a `service`
+  // credential. FRESH EVERY TICK, never captured — an agent rewrites both documents while the loop runs, and
+  // the whole point of the comparison is to see what the project says NOW.
+  commands: () => Promise<DeclaredCommands>;
   // Carrying out one action. Task 8's `act.ts`; injected so this file's sequencing is testable on its own,
   // and so the loop cannot quietly grow a second place where work happens.
   act: (action: TickAction, context: TickContext) => Promise<ActResult>;
@@ -214,6 +220,9 @@ async function gather(
         .filter((r) => r.status === 'queued' || r.status === 'running')
         .map((r) => ({ ...(r.card === undefined ? {} : { card: r.card }), skill: r.skill })),
       problems: board.value.problems,
+      // Read in the same gather as the board, so the commands the tick compares are the ones declared while
+      // this board was true.
+      commands: await deps.commands(),
     },
   };
 }

@@ -215,6 +215,9 @@ describe('the loop’s sequencing', () => {
       addToCounters: async (dispatches) => {
         added.push(dispatches);
       },
+      // Nothing declared. Every test in this file is about SEQUENCING — which tick read the state, what was
+      // dispatched — and reaches no ending that compares a smoke command to a gate.
+      commands: async () => ({ gates: [] }),
       act: async (action): Promise<ActResult> => {
         acted.push(action);
         return { dispatches: action.kind === 'dispatch' ? 1 : 0 };

@@ -129,3 +129,25 @@ export async function readSmokeCommand(root: string): Promise<SmokeResult> {
   if (!command) return { ok: false, reason: 'foundation/TESTING.md declares no `smoke:` command.' };
   return { ok: true, command };
 }
+
+// WHAT THIS PROJECT DECLARES IT RUNS, as strings, for the one question that is about the commands rather than
+// about their result: is the smoke command the same command as a gate (ruling 66)? The two readers above answer
+// four states each, and a caller comparing commands needs neither the reason nor the verdict.
+//
+// A COMMAND SET THAT COULD NOT BE READ IS AN EMPTY ONE HERE, and that is the honest direction for this
+// question alone: "absence is never a pass" is the rule for judging WORK, and every caller that judges work
+// goes through `verifyGates`/`verifySmoke`, which still fail closed on the reader's own sentence. Nothing can
+// collide with a gate a project never declared, so reporting a collision from an unreadable file would name a
+// command nobody wrote.
+export interface DeclaredCommands {
+  gates: string[];
+  smoke?: string;
+}
+
+export async function declaredCommands(root: string): Promise<DeclaredCommands> {
+  const [gates, smoke] = await Promise.all([readGates(root), readSmokeCommand(root)]);
+  return {
+    gates: gates.ok ? gates.gates.map((g) => g.command) : [],
+    ...(smoke.ok ? { smoke: smoke.command } : {}),
+  };
+}

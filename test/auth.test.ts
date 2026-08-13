@@ -79,7 +79,10 @@ describe('the scope table', () => {
     ['/api/config', 'GET', true, true, true],
     ['/api/archive/:board', 'GET', true, true, true],
     ['/api/cards/:board/:id/raw', 'GET', true, true, true],
-    ['/api/cards', 'POST', true, true, false],
+    // The service creates ONE card in the whole lifecycle — the smoke-harness feature at the bootstrap's exit
+    // (ruling 66) — because a mandatory feature that depends on an agent remembering it is one that will
+    // sometimes be missing. PATCH and links stay refused: it has no card of its own to edit.
+    ['/api/cards', 'POST', true, true, true],
     ['/api/cards/:board/:id', 'PATCH', true, true, false],
     ['/api/cards/:board/:id/links', 'PUT', true, true, false],
     ['/api/cards/:board/:id/move', 'POST', false, true, true],

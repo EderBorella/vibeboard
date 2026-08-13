@@ -19,6 +19,7 @@ import {
 } from './bounds.js';
 import { allSettled, hasUnfinishedChildren, isSettled } from './derived-status.js';
 import { mayDispatch, type StopReason } from './dispatch-gate.js';
+import type { DeclaredCommands } from './foundation.js';
 import { liveCards } from './hierarchy.js';
 import { ARCHIVE_SLUG } from './layout.js';
 import { type PhaseName, phase } from './phases.js';
@@ -66,6 +67,13 @@ export interface TickInput {
   // `card` is absent for a project run (the bootstrap), which counts towards the limit and belongs to no card.
   inFlight: { card?: string; skill: string }[];
   problems: CardProblem[]; // whatever `readBoard` could not parse — required, never optional
+  // THE COMMANDS THE FOUNDATION DOCUMENTS DECLARE, gathered by the loop off disk. Required for the same reason
+  // `problems` is: an absent field reads as "nothing to say", which is the fail-open default the one check
+  // below exists to close.
+  //
+  // Only `finished` reads them, and only to compare two strings — the RESULT of running either is not the
+  // tick's business, and nothing here spawns anything.
+  commands: DeclaredCommands;
 }
 
 // How many unfinished cards a stalled stop names before it stops listing them. Long enough to be
@@ -205,13 +213,40 @@ function halfArchivedStop(cards: Card[]): TickAction | undefined {
   );
 }
 
+// RULING 66. A gate and a smoke command that are the SAME COMMAND are one check, and the project that produced
+// this ruling declared `npm test` as both: four features closed, sixteen tasks delivered, and the product had no
+// main and printed nothing. Every link behaved: the gate is whatever CODE-QUALITY.md declares, the tests were
+// written by the agents that wrote the code and only import its exported functions, and the smoke result the
+// loop hands the feature checkup (ruling 55) carried no information the gate had not already given.
+//
+// ONE STRING COMPARISON, in code, because the durable half of the remedy — the checkup asked whether the thing
+// can be used the way the README describes — is a judgement, and the harness feature is a card an agent has to
+// deliver. This is the part that cannot be talked out of, and it is what makes that feature non-optional rather
+// than merely present.
+//
+// A COLLISION, never "no smoke command declared": a project with no gates has nothing for the smoke command to
+// collide with, and one with no readable smoke command cannot be STARTED at all — `smoke.ok` is a readiness
+// blocker (server/routes/autopilot.ts), so a second refusal here would be about a state the loop cannot reach.
+// That is also how a project whose CODE-QUALITY.md declares nothing fails in the honest direction: `readGates`
+// answers with a reason rather than a list, `declaredCommands` carries no commands, and nothing collides.
+function smokeIsAGate(commands: DeclaredCommands): string | undefined {
+  const smoke = commands.smoke;
+  if (smoke === undefined || !commands.gates.includes(smoke)) return undefined;
+  return `Every card on this project is done, but the smoke command is the same command as one of its gates (\`${smoke}\`), so nothing has ever run this project the way its README describes — the gates were written beside the code they judge, and they pass over a product with no way to run it. Declare a smoke command in foundation/TESTING.md that exercises the product from outside, and auto-pilot will finish.`;
+}
+
 // No feature to work on. The three endings that look alike and are not, kept apart because conflating them
 // produced the worst failure on record: success reported over unfinished work.
 //
 // `complete` requires that no non-terminal card exists anywhere AND positive evidence that finished work
 // does. Absence of unfinished work is not presence of finished work: an empty board, a board archived down
 // to nothing, and a fetch that returned nothing all produce the same empty list.
-function nothingToWorkOn(ap: AutopilotConfig, cards: Card[], runs: RunRecord[]): TickAction {
+function nothingToWorkOn(
+  ap: AutopilotConfig,
+  cards: Card[],
+  runs: RunRecord[],
+  commands: DeclaredCommands,
+): TickAction {
   const live = liveCards(cards);
   const halfArchived = halfArchivedStop(cards);
   if (halfArchived) return halfArchived;
@@ -230,14 +265,19 @@ function nothingToWorkOn(ap: AutopilotConfig, cards: Card[], runs: RunRecord[]):
     if (cards.length === 0) return bootstrap(ap, runs) ?? stop('no-op', 'There is no card on any board.');
     return stop('no-op', `Every one of the ${cards.length} cards on this project is archived.`);
   }
-  return finished(ap, live, blocked);
+  return finished(ap, live, blocked, commands);
 }
 
 // THE ONLY SUCCESS, asserted rather than implied — CHANGE 4, and it exists because the other three open a
 // false success. Positive evidence used to be an IMPLICATION of "nothing unfinished and something live"
 // rather than a test, and taking blocked tasks out of `unfinished` breaks the implication: a board holding
 // nothing but a blocked task would report the project finished.
-function finished(ap: AutopilotConfig, live: Card[], blocked: Card[]): TickAction {
+function finished(
+  ap: AutopilotConfig,
+  live: Card[],
+  blocked: Card[],
+  commands: DeclaredCommands,
+): TickAction {
   if (!live.some((c) => isTerminalColumn(ap, c.board, c.columnSlug))) {
     const left = blocked.length > 0 ? blocked : live;
     return stop(
@@ -245,6 +285,12 @@ function finished(ap: AutopilotConfig, live: Card[], blocked: Card[]): TickActio
       `${names(left)} ${isAre(left)} all that is left on this project and nothing on it is finished, so there is work outstanding and nothing auto-pilot can do about it.`,
     );
   }
+  const unexercised = smokeIsAGate(commands);
+  // NOT WHILE SOMETHING IS BLOCKED, which is decision 45's argument unchanged one level out: a card that ran out
+  // of attempts has had every attempt it is allowed, and a project holding one must not be held hostage over a
+  // command no run can now change. So the ending is `complete` and it names BOTH facts — what it left behind and
+  // that nothing exercised the product — because naming it is what makes carrying on safe.
+  if (unexercised !== undefined && blocked.length === 0) return stop('stalled', unexercised);
   // AND `complete` SAYS WHAT IT LEFT BEHIND (decision 45). Without the sentence the repeal would be a silent
   // success over work a person still has to deal with.
   if (blocked.length === 0) return stop('complete');
@@ -255,7 +301,7 @@ function finished(ap: AutopilotConfig, live: Card[], blocked: Card[]): TickActio
   const count = `${blocked.length} card${blocked.length === 1 ? '' : 's'}`;
   return stop(
     'complete',
-    `Auto-pilot finished. ${count} ${isAre(blocked)} blocked and ${blocked.length === 1 ? 'needs' : 'need'} you: ${names(blocked)}.`,
+    `Auto-pilot finished. ${count} ${isAre(blocked)} blocked and ${blocked.length === 1 ? 'needs' : 'need'} you: ${names(blocked)}.${unexercised === undefined ? '' : ` ${unexercised}`}`,
   );
 }
 
@@ -518,7 +564,7 @@ function phaseAction(input: TickInput, position: Position): TickAction | undefin
 }
 
 export function decideTick(input: TickInput): TickAction {
-  const { ap, state, cards, runs, spend, inFlight, problems } = input;
+  const { ap, state, cards, runs, spend, inFlight, problems, commands } = input;
   if (state.state !== 'running') return notRunning(state);
 
   // The keys the tick INDEXES rather than compares — `terminal`, `blockedColumn`. Same reason as the numbers
@@ -548,5 +594,5 @@ export function decideTick(input: TickInput): TickAction {
     const action = phaseAction(input, found.position);
     if (action) return action;
   }
-  return nothingToWorkOn(ap, cards, runs);
+  return nothingToWorkOn(ap, cards, runs, commands);
 }

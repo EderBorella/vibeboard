@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { foundationStatus, readGates, readSmokeCommand } from '../src/core/foundation.js';
+import { declaredCommands, foundationStatus, readGates, readSmokeCommand } from '../src/core/foundation.js';
 import { FOUNDATION_DIR } from '../src/core/layout.js';
 import { tempDir } from './helpers.js';
 
@@ -139,5 +139,46 @@ describe('the foundation documents', () => {
       ok: false,
       reason: 'foundation/TESTING.md declares no `smoke:` command.',
     });
+  });
+});
+
+// What the loop hands the tick for the ONE question that is about the commands rather than their result
+// (ruling 66): is the smoke command the same command as a gate?
+describe('the commands a project declares', () => {
+  it('answers with the gate commands and the smoke command, as strings', async () => {
+    const root = await tempDir();
+    await write(
+      root,
+      'CODE-QUALITY.md',
+      '---\ngates:\n  - name: types\n    command: npm run typecheck\n  - name: tests\n    command: npm test\n---\n',
+    );
+    await write(root, 'TESTING.md', '---\nsmoke: node dist/cli.js --help\n---\n');
+    expect(await declaredCommands(root)).toEqual({
+      gates: ['npm run typecheck', 'npm test'],
+      smoke: 'node dist/cli.js --help',
+    });
+  });
+
+  // THE HONEST DIRECTION FOR THIS QUESTION, and it is the opposite of `verifyGates`' — deliberately. "Absence
+  // is never a pass" is the rule for judging WORK, and every caller that judges work still goes through the
+  // verifier, which fails closed on the reader's own sentence. Nothing can COLLIDE with a gate a project never
+  // declared, so an unreadable file must not produce a refusal naming a command nobody wrote.
+  it('carries no commands at all for a project that declares none, rather than a reason', async () => {
+    const root = await tempDir();
+    expect(await declaredCommands(root)).toEqual({ gates: [] });
+    await write(root, 'CODE-QUALITY.md', '---\ngates: [unclosed\n---\n');
+    await write(root, 'TESTING.md', '---\nsmoke: [unclosed\n---\n');
+    expect(await declaredCommands(root)).toEqual({ gates: [] });
+  });
+
+  // Trimmed on both sides by the readers, which is what makes the comparison a comparison: `npm test` and
+  // `npm test ` are one command, and a YAML author cannot see the difference.
+  it('reads the two files as declaring the same command when they do, whitespace aside', async () => {
+    const root = await tempDir();
+    await write(root, 'CODE-QUALITY.md', '---\ngates:\n  - name: all\n    command: "npm test "\n---\n');
+    await write(root, 'TESTING.md', '---\nsmoke: " npm test"\n---\n');
+    const { gates, smoke } = await declaredCommands(root);
+    expect(smoke).toBe('npm test');
+    expect(gates).toEqual(['npm test']);
   });
 });

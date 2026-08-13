@@ -185,6 +185,35 @@ describe('the phase skills the phase table names', () => {
     expect(content).toContain('CODE-QUALITY.md');
   });
 
+  // RULING 66, in the two skills that write foundation/TESTING.md. The deterministic half is in the tick, and
+  // this is the half that stops the collision being written in the first place — an OBLIGATION about what the
+  // run must produce, never a claim about which commands are declared right now (ruling 64): that is the
+  // prompt's to state, and the project it happens to be running on decides it.
+  // Pinned per skill and as exact bytes, because the two obligations are about different things and the
+  // difference is the behaviour: break-down writes the CARD that will ask for the command, implement writes the
+  // FILE. A shared substring would pass over either one drifting into the other's job.
+  //
+  // AND THE EXACT BYTES ARE WHAT HOLDS RULING 64 here, rather than a second test grepping for a forbidden
+  // phrase. Both sentences open with a CONDITION — "If a card you create declares…", "If this card asks you
+  // to…" — so neither claims what either document declares right now, which is the prompt's to state and this
+  // project's to decide. A negative grep was tried and was weak: restating the obligation as the fact "the
+  // smoke command in foundation/TESTING.md is not one of the gate commands" slips past every phrase worth
+  // banning, and fails this pin immediately. Verified by planting exactly that.
+  it('tells both skills that write TESTING.md that the smoke command is not a gate command', () => {
+    expect(SEED_SKILLS.find((s) => s.slug === 'break-down')?.content).toContain(
+      "**If a card you create declares the project's `smoke:` command** in\nfoundation/TESTING.md, that command must not be one of the gate commands\nfoundation/CODE-QUALITY.md declares, and the card must say so.",
+    );
+    expect(SEED_SKILLS.find((s) => s.slug === 'implement')?.content).toContain(
+      "**If this card asks you to declare the project's `smoke:` command** in\nfoundation/TESTING.md, it must not be one of the gate commands\nfoundation/CODE-QUALITY.md declares.",
+    );
+    // And the reason, which both carry: a reader told only "not that one" has no way to choose the next one.
+    for (const slug of ['break-down', 'implement']) {
+      expect(SEED_SKILLS.find((s) => s.slug === slug)?.content, slug).toContain(
+        'are one check, not two: gates are written',
+      );
+    }
+  });
+
   it('keeps the manual skills a person already had', () => {
     expect(SEED_SKILLS.map((s) => s.slug)).toEqual(
       expect.arrayContaining(['execute', 'research', 'review', 'summarise']),

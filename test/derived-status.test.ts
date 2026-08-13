@@ -1,12 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_AUTOPILOT } from '../src/core/autopilot.js';
-import {
-  allSettled,
-  blockedUnder,
-  derivedStatus,
-  hasUnfinishedChildren,
-  isSettled,
-} from '../src/core/derived-status.js';
+import { allSettled, blockedUnder, hasUnfinishedChildren, isSettled } from '../src/core/derived-status.js';
 import type { BoardName, Card } from '../src/core/types.js';
 
 const ap = DEFAULT_AUTOPILOT;
@@ -53,50 +47,15 @@ describe('settled', () => {
   it('does not settle a card with no children at all', () => expect(allSettled(ap, [])).toBe(false));
 });
 
-describe('derived status', () => {
-  it('says a story is carrying a problem when a task under it is blocked', () => {
-    const cards = [p('P-001', 'in-progress', ['E-001']), t('E-001', 'blocked')];
-    expect(derivedStatus(ap, cards[0], cards)).toBe('carrying-a-problem');
-  });
-
-  it('says a feature is carrying a problem when a story under it is', () => {
-    // Two levels: F-001 -> P-001 -> E-001 blocked. A one-level walk calls the feature clean.
-    const cards = [
-      f('F-001', 'in-progress', ['P-001']),
-      p('P-001', 'done', ['E-001']),
-      t('E-001', 'blocked'),
-    ];
-    expect(derivedStatus(ap, cards[0], cards)).toBe('carrying-a-problem');
-  });
-
-  it('says a story is clean when every task is done', () => {
-    const cards = [p('P-001', 'done', ['E-001', 'E-002']), t('E-001', 'done'), t('E-002', 'done')];
-    expect(derivedStatus(ap, cards[0], cards)).toBe('clean');
-  });
-
-  it('says a childless card is clean', () => {
-    const cards = [p('P-001', 'backlog')];
-    expect(derivedStatus(ap, cards[0], cards)).toBe('clean');
-  });
-
-  // IT SELF-HEALS, which is the second and more important reason for deriving it (decision 46).
-  it('reports clean again once the blocked task is moved to done', () => {
-    const blocked = [
-      f('F-001', 'in-progress', ['P-001']),
-      p('P-001', 'done', ['E-001']),
-      t('E-001', 'blocked'),
-    ];
-    expect(derivedStatus(ap, blocked[0], blocked)).toBe('carrying-a-problem');
-    const fixed = [f('F-001', 'in-progress', ['P-001']), p('P-001', 'done', ['E-001']), t('E-001', 'done')];
-    expect(derivedStatus(ap, fixed[0], fixed)).toBe('clean');
-  });
-
+// THE ONE HOME FOR DECISION 46 (there was a `derivedStatus` beside it answering an enum over the same walk,
+// with no caller: the wire needs the IDS, not a status, because a badge nobody can name a card in is one
+// nobody can act on). Its six cases went with it; every case here is about the list.
+describe('what is blocked under a card', () => {
   it('ignores an archived blocked task', () => {
     const cards = [
       p('P-001', 'done', ['E-001']),
       { ...t('E-001', 'blocked'), archived: '2026-08-13T00:00:00Z' },
     ];
-    expect(derivedStatus(ap, cards[0], cards)).toBe('clean');
     expect(blockedUnder(ap, cards[0], cards)).toEqual([]);
   });
 
@@ -110,13 +69,6 @@ describe('derived status', () => {
       t('E-003', 'blocked'),
     ];
     expect(blockedUnder(ap, cards[0], cards).map((c) => c.id)).toEqual(['E-001', 'E-003']);
-  });
-
-  // The blocked task IS the fact (decision 46): a parent derives its problem from it, and a field on the
-  // task saying so about itself would be the copy that can disagree with the board.
-  it('does not call a blocked task itself carrying a problem', () => {
-    const cards = [t('E-001', 'blocked')];
-    expect(derivedStatus(ap, cards[0], cards)).toBe('clean');
   });
 });
 

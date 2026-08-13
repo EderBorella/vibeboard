@@ -27,11 +27,21 @@ export function allSettled(ap: AutopilotConfig, cards: Card[]): boolean {
   return cards.length > 0 && cards.every((c) => isSettled(ap, c));
 }
 
-export type CardStatus = 'clean' | 'carrying-a-problem';
-
+// THE ONE HOME FOR DECISION 46, and the emptiness of this list IS the status. There was a `derivedStatus`
+// beside it answering `clean` / `carrying-a-problem` over the same walk, and nothing called it: the wire
+// computes the fact from here because it needs the IDS, not an enum — a badge saying "carrying a problem"
+// with no name is one nobody can act on (server/snapshot.ts). Two spellings of one rule is the duplication
+// decision 46 exists to avoid.
+//
 // Every blocked task below this card, through as many levels as there are. Recursion rather than a
 // one-level walk because a feature's problem is two levels down: its story is `done` and the task under
 // that story is what is blocked, so a one-level walk calls the feature clean.
+//
+// DERIVED, NEVER STAMPED. Two reasons, the second mattering more day to day: one fact has one owner, and
+// this SELF-HEALS — the user moves the blocked task to done and the story and the feature stop reporting a
+// problem with nothing to remember to update.
+//
+// About what is UNDER the card, so a blocked task is not itself carrying a problem: it IS the fact.
 //
 // Terminates because `childrenOf` reads strictly down the fixed board order (hierarchy.ts:12-16).
 export function blockedUnder(ap: AutopilotConfig, card: Card, cards: Card[]): Card[] {
@@ -41,15 +51,6 @@ export function blockedUnder(ap: AutopilotConfig, card: Card, cards: Card[]): Ca
     found.push(...blockedUnder(ap, child, cards));
   }
   return found;
-}
-
-// Derived, never stamped (decision 46). Two reasons, the second mattering more day to day: one fact has
-// one owner, and this SELF-HEALS — the user moves the blocked task to done and the story and feature stop
-// reporting a problem with nothing to remember to update.
-//
-// About what is UNDER the card. A blocked task is not itself carrying a problem: it IS the fact.
-export function derivedStatus(ap: AutopilotConfig, card: Card, cards: Card[]): CardStatus {
-  return blockedUnder(ap, card, cards).length > 0 ? 'carrying-a-problem' : 'clean';
 }
 
 // A universal quantifier, so it passes vacuously for a childless card — deliberately: a card nobody has

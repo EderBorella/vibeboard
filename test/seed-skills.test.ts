@@ -285,6 +285,37 @@ describe('the lifecycle skills', () => {
     // decides what it means rather than being blocked by it.
     expect(body('checkup-feature')).toMatch(/evidence/i);
   });
+
+  // RULING 64: a skill file states OBLIGATIONS, never facts the prompt owns. What is true right now — which
+  // gates ran, what the reviewer said, which children are blocked — is the loop's to compute and the prompt's
+  // to state, and a body that repeats it contradicts the prompt wrapped around it.
+  it('does not tell review that auto-pilot ran the gates, which is false for a hand dispatch', () => {
+    // The prompt says nobody ran them when nobody did. The obligation — read what it says — survives; the
+    // claim about what happened does not.
+    expect(body('review')).not.toMatch(/auto-pilot runs the gates/i);
+    expect(body('review')).toContain('This prompt tells you what the gates did');
+    expect(body('review')).toContain('Do not assume');
+  });
+
+  it('does not tell either checkup to close its own card while also telling it not to move one', () => {
+    // Two required contracts, one of which cannot be carried out: the loop stamps the column, and a checkup
+    // has no authority to close anything. What it owes is a report saying the work is finished.
+    for (const slug of ['checkup-story', 'checkup-feature']) {
+      expect(body(slug), slug).not.toMatch(/close it\b/i);
+      expect(body(slug), slug).toContain('**say so in your report**');
+      // And the obligation it replaced is still there, so this did not delete the rule with the wording.
+      expect(body(slug), slug).toMatch(/is finished/i);
+    }
+    expect(body('checkup-feature')).not.toMatch(/you may close the feature/i);
+  });
+
+  it('promises the feature checkup the blocked list it is actually rendered', () => {
+    // `checkupSection` renders ONE flat list of everything blocked beneath the card, at any depth. The body
+    // promised each story's blocked descendants per story, which is a fact the prompt does not carry — so the
+    // run either invents the attribution or reports that it could not.
+    expect(body('checkup-feature')).toContain('ONE list of everything blocked');
+    expect(body('checkup-feature')).toContain('not broken down per story');
+  });
 });
 
 // THE THREE HAND-DISPATCH SKILLS the lifecycle never uses. Frozen as exact bytes, because "untouched" is a

@@ -62,11 +62,11 @@ noted about it and how many files it changed. Judge what THAT run did. An earlie
 run on this card may have succeeded; its work is not this run's work and does not
 count for it.
 
-Auto-pilot runs the gates itself, in its own process, before dispatching you, and
-**this prompt tells you what they did** — whether they passed, or whether there
-were none to run because this card is the one that installs them. Do not assume
-either; read it. Your question is the one no command can answer: **does this do
-what the card asked?** Not "is it good", not "is it what I would have built".
+**This prompt tells you what the gates did** — whether they passed, whether there
+were none to run because this card is the one that installs them, or whether
+nobody ran them at all. Do not assume; read it. Your question is the one no
+command can answer: **does this do what the card asked?** Not "is it good", not
+"is it what I would have built".
 
 Change nothing. Not the code, not the card, not where it sits — your credential
 grants you nothing on the board, and a judge that fixes what it is judging is
@@ -319,8 +319,8 @@ Three tasks can each pass their own gates and the story they compose not work.
 That is the question here, and it is the only one no command can answer.
 
 A blocked task is **settled**, not outstanding. If every task of this story is
-done or blocked, the story is finished: close it and name the blocked ones in
-your report. Do not create work to get past a blocked task —
+done or blocked, the story is finished: **say so in your report** and name the
+blocked ones. Do not create work to get past a blocked task —
 it has already had every attempt it is allowed, and it is waiting for a person.
 
 So: create work for what was MISSED, never for what was attempted and blocked.
@@ -345,10 +345,12 @@ boards: [features]
 Decide whether the stories under the card below compose into a working feature.
 
 Everything you need is in this prompt: every story under this feature with the
-column it is in and what is carrying a problem beneath it, the blocked cards
-named, the open suggestions, and what the smoke command did. You cannot fetch any
-of it and do not need to — your credential does not reach those endpoints, and
-auto-pilot already holds every one of those facts.
+column it is in and how its last run ended, then ONE list of everything blocked
+beneath this feature at any depth, the open suggestions, and what the smoke
+command did. The blocked list is not broken down per story — if you need to know
+which story a blocked card sits under, say so in your report rather than guessing.
+You cannot fetch any of it and do not need to: your credential does not reach
+those endpoints, and auto-pilot already holds every one of those facts.
 
 Three stories can each close and the feature not work. That is why this phase
 exists, and it is the only question here that no command can answer.
@@ -358,16 +360,16 @@ its own process before dispatching you: you are told what it did, and what it
 means is yours to decide.
 
 A blocked task is **settled**, not outstanding. If every story of this feature is
-done, the feature is finished: close it and name what was left behind in your
-report. Do not create work to get past a blocked task —
+done, the feature is finished: **say so in your report** and name what was left
+behind. Do not create work to get past a blocked task —
 it has already had every attempt it is allowed, and it is waiting for a person.
 A story carrying a blocked task is settled too, and is not work to attack.
 
 So: create work for what was MISSED, never for what was attempted and blocked.
 **Read the board first**, and create stories through \`POST /api/cards\`,
 one card per call. You get ONE round of creating at this feature: when what you
-created is settled and you run here again, you may close the feature or stop and
-say why — and anything still missing goes to \`POST /api/suggestions\`.
+created is settled and you run here again, either report the feature as finished
+or say why it is not — and anything still missing goes to \`POST /api/suggestions\`.
 
 You do not move or archive any card. Auto-pilot stamps the column when this run
 finishes.

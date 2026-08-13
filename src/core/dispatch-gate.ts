@@ -54,7 +54,13 @@ const SENTENCES: Record<StopReason, string> = {
   // NOT "by a restart". This reason covers three endings — a server that died under a running loop, a loop
   // killed from outside, and a loop that crashed — and the detail beside it says which. Naming one of them in
   // the canned sentence told a user whose loop had been SIGKILLed that they had restarted something.
-  interrupted: 'Auto-pilot stopped before it could finish, so it owes this project a checkup.',
+  //
+  // AND NOT "it owes this project a checkup", which is what it used to say. `needsCheckup` retired with the
+  // periodic checkup (decision 47) and so did the refusal that made the promise true — `stateConflict` no
+  // longer returns a 409 for an owed one, so pressing Start resumes at whatever phase the board derives.
+  // Nothing owes, tracks or enforces a checkup, and a sentence promising one is a dead end.
+  interrupted:
+    'Auto-pilot stopped before it could finish. Its position is re-derived from the board when it resumes.',
   unreadable:
     'This project is halted because VibeBoard could not read its auto-pilot state. Restart it to start again from idle.',
 };

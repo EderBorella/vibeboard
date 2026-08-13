@@ -60,7 +60,7 @@ export class AutopilotRuntime {
 
   // Called when a project opens. Reads the state, reconciles it, and writes back only if the
   // reconcile changed something: a `running` state found on disk had its children die with the
-  // server that wrote it, so it becomes `stopped` and owes the project a checkup.
+  // server that wrote it, so it becomes `stopped` and `interrupted`.
   async load(): Promise<AutopilotState> {
     const root = this.#opts.root();
     if (!root) {
@@ -74,7 +74,10 @@ export class AutopilotRuntime {
       await writeAutopilotState(root, next);
       this.#opts.log?.warn(
         { iteration: next.iteration },
-        'auto-pilot was running when this server stopped; it owes this project a checkup',
+        // NOT "it owes this project a checkup". Nothing owes one: `needsCheckup` and the refusal that
+        // enforced it retired with the periodic checkup (decision 47), and the position is derived from
+        // the board on every tick rather than remembered.
+        'auto-pilot was running when this server stopped; its position is re-derived from the board on resume',
       );
     }
     // A reconcile that changed anything took the loop's authority away, so its credential goes too — the

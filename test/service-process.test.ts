@@ -316,7 +316,7 @@ describe('starting the loop', () => {
 });
 
 describe('when the loop dies without stopping first', () => {
-  it('records stopped, says how it died, and owes the project a checkup', async () => {
+  it('records stopped, says how it died, and promises no checkup it does not owe', async () => {
     const { root, service } = await harness({ behaviour: 'exit:3' });
     await service.start();
 
@@ -331,11 +331,17 @@ describe('when the loop dies without stopping first', () => {
     // The canned half no longer names a restart: this reason covers a server that died, a loop killed from
     // outside and a loop that crashed, and the detail beside it says which. It used to tell someone whose loop
     // had been SIGKILLed that they had restarted something.
+    //
+    // AND NEITHER HALF PROMISES A CHECKUP. Both did, and nothing owed, tracked or enforced one: the flag
+    // retired with the periodic checkup (decision 47) and `stateConflict` stopped refusing an interrupted
+    // project with it, so pressing Start resumes at whatever phase the board derives. What is true is that
+    // the run was interrupted and the position is re-derived.
     expect(state.detail).toBe(
-      'Auto-pilot stopped before it could finish, so it owes this project a checkup. The auto-pilot service exited with code 3 without stopping first, so this project owes a checkup before it resumes.',
+      'Auto-pilot stopped before it could finish. Its position is re-derived from the board when it resumes. The auto-pilot service exited with code 3 without stopping first, and the work it was in the middle of is unfinished.',
     );
-    // And no checkup flag with it (decision 47). The guard it bought is structural now: the position is
-    // re-derived every tick, so a loop that died mid-dispatch cannot resume on an assumption.
+    expect(state.detail).not.toContain('checkup');
+    // And no checkup flag with it either (decision 47). The guard it bought is structural now: the position
+    // is re-derived every tick, so a loop that died mid-dispatch cannot resume on an assumption.
     expect('needsCheckup' in state).toBe(false);
   });
 

@@ -318,7 +318,10 @@ export class ServiceProcess {
           reason: 'interrupted',
           detail: stopSentence(
             'interrupted',
-            `The auto-pilot service ${how} without stopping first, so this project owes a checkup before it resumes.`,
+            // NOT "so this project owes a checkup before it resumes". Nothing owed one even when it said
+            // so: `stateConflict` stopped refusing an interrupted project when the periodic checkup
+            // retired (decision 47), so Start resumes at whatever phase the board derives.
+            `The auto-pilot service ${how} without stopping first, and the work it was in the middle of is unfinished.`,
           ),
           at,
           // The group is GONE, so the number must go with it. Left behind it named a process that no

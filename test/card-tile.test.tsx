@@ -112,10 +112,21 @@ describe('CardTile carrying a problem', () => {
     expect(screen.queryByTitle(/blocked/i)).toBeNull();
   });
 
-  it('names every blocked task in the title, not just the first', () => {
+  it('names every blocked card in the title, not just the first', () => {
     render(<CardTile card={card()} miniatureChars={80} carryingAProblem={['E-001', 'E-007']} />);
     const title = screen.getByTitle(/E-001/).getAttribute('title') ?? '';
     expect(title).toContain('E-007');
+  });
+
+  // "CARD" AND NOT "TASK", because what a feature carries can be a story nobody could break down since
+  // decision 45's 2026-08-13 correction. The tile reads neither board nor column, so this is a claim about
+  // the WORD it puts on screen rather than about the kind of card — which is exactly why it needs saying:
+  // a tooltip naming the wrong kind of thing is a false claim a person reads.
+  it('does not call what it is carrying a task', () => {
+    render(<CardTile card={card({ id: 'F-001', board: 'features' })} miniatureChars={80} carryingAProblem={['P-002']} />);
+    const title = screen.getByTitle(/P-002/).getAttribute('title') ?? '';
+    expect(title).toContain('a blocked card');
+    expect(title).not.toContain('task');
   });
 
 });

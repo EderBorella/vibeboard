@@ -274,4 +274,32 @@ export interface ProjectSnapshot {
   // Open suggestions per card id. Optional here because a snapshot from an older server has none,
   // and the tile treats absent as zero rather than rendering NaN.
   openSuggestions?: Record<string, number>;
+  // Card id → the blocked task ids under it (decision 46). Optional for the same reason, and a card
+  // with nothing blocked under it is absent rather than an empty array.
+  carryingAProblem?: Record<string, string[]>;
 }
+
+// The snapshot's field set, as data — the same guard the run record and the card frontmatter carry, for
+// the type every tile on the board renders from. Asserted in test/mirror.test.ts.
+export const SNAPSHOT_FIELDS = [
+  'root',
+  'name',
+  'config',
+  'boards',
+  'archivedCounts',
+  'openSuggestions',
+  'carryingAProblem',
+] as const;
+
+// Fields the server puts on the snapshot that the UI deliberately does not carry, with the reason.
+export const SNAPSHOT_NOT_MIRRORED = [
+  // Files in a column folder that could not be read as cards. It has never been on this side: the
+  // board renders cards, and an unreadable file has no tile. Listed rather than quietly absent so the
+  // NEXT omission still fails this guard.
+  'problems',
+] as const;
+
+// `never` when every field is listed; otherwise this line fails to compile and names the one missed.
+type UnlistedSnapshotField = Exclude<keyof ProjectSnapshot, (typeof SNAPSHOT_FIELDS)[number]>;
+const _everySnapshotFieldIsListed: UnlistedSnapshotField extends never ? true : UnlistedSnapshotField = true;
+void _everySnapshotFieldIsListed;

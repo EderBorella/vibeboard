@@ -8,6 +8,7 @@ import { skillRel } from '../src/core/layout.js';
 import * as coreRuns from '../src/core/runs.js';
 import * as coreSkills from '../src/core/skills.js';
 import * as core from '../src/core/types.js';
+import * as serverSnapshot from '../src/server/snapshot.js';
 import * as webApi from '../web/src/api.js';
 import * as webRuns from '../web/src/runs/viewmodel.js';
 import * as web from '../web/src/shared.js';
@@ -65,6 +66,20 @@ describe('web/shared mirrors src/core', () => {
     expect([...web.CARD_FIELDS, ...web.CARD_FIELDS_NOT_MIRRORED].sort()).toEqual(
       [...core.CARD_FRONTMATTER_KEYS].sort(),
     );
+  });
+
+  // A NEW guard: there was no snapshot mirror at all, and the snapshot is what every tile renders from.
+  // It DECLARES the pre-existing drift rather than failing on it — `problems` has never been on the web
+  // side — because a gate that must be bypassed on the day it is written teaches everyone to bypass it.
+  // Same shape as RUN_RECORD_NOT_MIRRORED: the absent fields are listed, so the next omission still fails.
+  it('mirrors every snapshot field, or declares why not', () => {
+    expect([...web.SNAPSHOT_FIELDS, ...web.SNAPSHOT_NOT_MIRRORED].sort()).toEqual(
+      [...serverSnapshot.SNAPSHOT_KEYS].sort(),
+    );
+  });
+
+  it('declares problems as not mirrored, with a reason', () => {
+    expect([...web.SNAPSHOT_NOT_MIRRORED]).toContain('problems');
   });
 
   it('mirrors the diary entry bound', () => {

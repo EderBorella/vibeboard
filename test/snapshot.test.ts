@@ -1,11 +1,37 @@
+import { mkdir, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { serializeCard } from '../src/core/card.js';
+import { boardRel } from '../src/core/layout.js';
 import { scaffoldProject } from '../src/core/scaffold.js';
 import type { Suggestion } from '../src/core/suggestions.js';
+import type { BoardName, CardFrontmatter } from '../src/core/types.js';
 import { buildSnapshot } from '../src/server/snapshot.js';
 import { writeSuggestion } from '../src/server/suggestion-store.js';
 import { tempDir } from './helpers.js';
 
 const TODAY = '2026-07-23';
+
+// Straight onto disk rather than through createCard, so each test states the ids, the columns and the
+// links it is about — the three things the derivation reads.
+async function putCard(
+  root: string,
+  board: BoardName,
+  columnSlug: string,
+  fm: Partial<CardFrontmatter> & { id: string },
+): Promise<void> {
+  const dir = join(root, boardRel(board, columnSlug));
+  await mkdir(dir, { recursive: true });
+  const full: CardFrontmatter = {
+    title: fm.id,
+    order: 10,
+    tags: [],
+    links: [],
+    created: TODAY,
+    ...fm,
+  };
+  await writeFile(join(dir, `${fm.id}.md`), serializeCard(full, ''), 'utf8');
+}
 
 describe('buildSnapshot', () => {
   it('returns project name and all three boards with the sample cards', async () => {
@@ -61,5 +87,59 @@ describe('open suggestions on the snapshot', () => {
     const root = await tempDir();
     await scaffoldProject(root, { name: 'S', mode: 'brownfield', today: '2026-08-02' });
     expect((await buildSnapshot(root)).openSuggestions).toEqual({});
+  });
+});
+
+// Decision 46: the status a person reads off a card is computed from what is under it, and it is
+// computed HERE rather than per tile — the board re-renders on every file change, and a badge that
+// arrives a request later is a badge nobody sees. Ids rather than a boolean, so the tile can name them.
+describe('the derived status on the snapshot', () => {
+  async function empty(): Promise<string> {
+    const root = await tempDir();
+    await scaffoldProject(root, { name: 'S', mode: 'brownfield', today: '2026-08-02' });
+    return root;
+  }
+
+  it('names the blocked task under a story and under its feature', async () => {
+    const root = await empty();
+    await putCard(root, 'features', 'done', { id: 'F-001', links: ['P-001'] });
+    await putCard(root, 'product', 'done', { id: 'P-001', links: ['F-001', 'E-001'] });
+    await putCard(root, 'engineering', 'blocked', { id: 'E-001', links: ['P-001'] });
+    const snapshot = await buildSnapshot(root);
+    expect(snapshot.carryingAProblem).toEqual({ 'P-001': ['E-001'], 'F-001': ['E-001'] });
+  });
+
+  it('is empty for a clean board', async () => {
+    const root = await empty();
+    await putCard(root, 'product', 'done', { id: 'P-001', links: ['E-001'] });
+    await putCard(root, 'engineering', 'done', { id: 'E-001', links: ['P-001'] });
+    // `{}` and NOT absent, which would read as unknown rather than as nothing to report.
+    expect((await buildSnapshot(root)).carryingAProblem).toEqual({});
+  });
+
+  it('ignores an archived blocked task', async () => {
+    const root = await empty();
+    await putCard(root, 'product', 'done', { id: 'P-001', links: ['E-001'] });
+    // Archived by its FIELD while its file still sits in the blocked folder — the half a restore
+    // writes. An archived card neither blocks nor satisfies anything, so the story is clean.
+    await putCard(root, 'engineering', 'blocked', {
+      id: 'E-001',
+      links: ['P-001'],
+      archived: '2026-08-02T10:00:00.000Z',
+    });
+    expect((await buildSnapshot(root)).carryingAProblem).toEqual({});
+  });
+
+  it('omits a card with nothing blocked under it rather than listing an empty array', async () => {
+    const root = await empty();
+    await putCard(root, 'product', 'done', { id: 'P-001', links: ['E-001'] });
+    await putCard(root, 'engineering', 'blocked', { id: 'E-001', links: ['P-001'] });
+    // A second story with nothing wrong under it, and a task of its own so it is not childless.
+    await putCard(root, 'product', 'done', { id: 'P-002', links: ['E-002'] });
+    await putCard(root, 'engineering', 'done', { id: 'E-002', links: ['P-002'] });
+    const { carryingAProblem } = await buildSnapshot(root);
+    expect(Object.keys(carryingAProblem)).toEqual(['P-001']);
+    // An empty array is truthy in the browser, so a tile reading the map would badge every card.
+    expect(carryingAProblem['P-002']).toBeUndefined();
   });
 });

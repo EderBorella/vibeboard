@@ -2,6 +2,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { boardColumnSlugs, type CardProblem, readArchive, readBoard } from '../../core/board.js';
 import { FORBIDDEN_PATCH_KEYS, forbiddenPatchSentence, pickCardPatch } from '../../core/card.js';
+import { entryColumn } from '../../core/entry-column.js';
 import { findCard } from '../../core/find.js';
 import { oneParentProblem } from '../../core/hierarchy.js';
 import { ARCHIVE_SLUG } from '../../core/layout.js';
@@ -103,33 +104,6 @@ function whereItGoes(config: ProjectConfig, board: BoardName): string {
   return entry === undefined
     ? `A new card enters that board at its first column, and that board's first column is one nothing can continue from — fix its column order in Settings.`
     : `Create it in ${board}/${entry} instead — that is where a new card enters that board.`;
-}
-
-// WHERE A BOARD IS ENTERED: its first column, POSITIONALLY, and `undefined` rather than a fallback when that
-// column is one nothing can continue from. The loop stamps `todo` itself when it starts a break-down (decision
-// 37 superseded), so `backlog` — the top of the board — is where a created card belongs.
-//
-// "Every board opens with a Backlog" is a SCAFFOLDER DEFAULT, not an invariant: columns can be renamed and
-// reordered, and a review pointed out that on a board whose first column happened to be terminal this stamp
-// would put every child card exactly where it exists to stop one going — standing as a live card in a
-// terminal column, which is the positive evidence `complete` reads. Refused rather than worked around,
-// because there is no other column a card can be said to enter at.
-//
-// `Array.isArray` and the string compare because `autopilot` is parsed YAML: a hand-edited block arrives as
-// whatever was in the file, and reading a member off it is a 500 handed to the caller least able to interpret
-// one.
-// EXPORTED for the suggestions route, which cards a finding onto features or product and needs the same
-// answer. One home rather than two: a second copy is how one path refuses a terminal first column and
-// the other quietly creates a card in it.
-export function entryColumn(config: ProjectConfig, board: BoardName): string | undefined {
-  const slug = boardColumnSlugs(config, board)[0];
-  if (slug === undefined) return undefined;
-  const terminal = config.autopilot?.terminal?.[board];
-  if (Array.isArray(terminal) && terminal.includes(slug)) return undefined;
-  // Engineering's alone, like `isBlockedColumn`: a card is put in `blocked` when it has exhausted its
-  // attempts, so a new one created there is work nothing will ever pick up.
-  if (board === 'engineering' && config.autopilot?.blockedColumn === slug) return undefined;
-  return slug;
 }
 
 // What the server decides about a card a run is creating, or why it will not create one: the column it enters,

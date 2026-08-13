@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import { readBoard } from '../../core/board.js';
+import { entryColumn } from '../../core/entry-column.js';
 import { setCardLinks } from '../../core/links.js';
 import { createCard, updateCard } from '../../core/mutations.js';
 import { followUpCount, openFollowUp } from '../../core/setup-feature.js';
@@ -14,7 +15,6 @@ import {
   setSuggestionState,
   writeSuggestion,
 } from '../suggestion-store.js';
-import { entryColumn } from './cards.js';
 
 // Agent Suggestions over HTTP.
 //

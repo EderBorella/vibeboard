@@ -22,10 +22,12 @@ const COUNTER_POLL_MS = 4_000;
 // Harmless, because a failure here says nothing by design and `rebindOnSignIn` refetches the moment a
 // credential arrives; noisy enough to look like a real fault when reading either log.
 //
-// THIS CLOSES TWO HOOKS, NOT THE CLASS. `/api/models`, `/api/control/files` and `/api/runs` still fire on
-// a first paint from hooks mounted the same way. The fix for all of them is one guard at the `request()`
-// chokepoint, which would make every real-module test throw without fetching under jsdom, where no hint
-// cookie exists — so it needs its own change and its own test updates rather than riding along here.
+// EVERY MOUNT-TIME FETCH IS GATED THE SAME WAY: this hook, `useSkills`, `useRuns` and both of
+// `useDispatch`'s. Per hook rather than one guard at the `request()` chokepoint, and that is not
+// squeamishness — `probeCredential` calls `/api/state` DELIBERATELY while not signed in, because that is
+// the legacy-token adoption path, so a blanket guard there would break signing in and the only way round
+// it would be a bypass flag. This module's own comment on `discardCredential` records that requests in
+// flight during sign-in are expected and safe; what the gate removes is the noise, not a fault.
 //
 // The SOCKET subscription is deliberately not gated: it declines to open without a credential on its own.
 export function useAutopilot(

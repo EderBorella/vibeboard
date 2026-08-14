@@ -96,3 +96,22 @@ describe('useRuns', () => {
     expect(result.current.runs.map((r) => r.run)).toEqual(['r2']);
   });
 });
+
+// THE CREDENTIAL GATE. React runs every hook on mount, before the render chooses the sign-in screen over
+// the board — so without it this asked for the run list with no cookie and took a 401 on every first load.
+describe('the credential gate', () => {
+  it('asks nothing while disabled, then asks when enabled', async () => {
+    api.listRuns.mockResolvedValue(list('r1'));
+    const { rerender } = renderHook(({ on }) => useRuns(1, on), { initialProps: { on: false } });
+    await new Promise((r) => setTimeout(r, 50));
+    expect(api.listRuns).not.toHaveBeenCalled();
+    rerender({ on: true });
+    await waitFor(() => expect(api.listRuns).toHaveBeenCalled());
+  });
+
+  it('defaults to enabled, so every existing caller is unaffected', async () => {
+    api.listRuns.mockResolvedValue(list('r1'));
+    renderHook(() => useRuns(2));
+    await waitFor(() => expect(api.listRuns).toHaveBeenCalled());
+  });
+});

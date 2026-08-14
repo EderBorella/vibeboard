@@ -86,9 +86,9 @@ export function App() {
   const catalogue = useSkills(snapshot, signin.signedIn);
   // Everything the details step needs. `choice.backend` drives the model list, so switching
   // connector in the form reloads it exactly as it does in the copilot dock.
-  const dispatch = useDispatch(choice.backend, snapshot);
+  const dispatch = useDispatch(choice.backend, snapshot, signin.signedIn);
   // Every run in the project, for the Execution tab and its badge.
-  const allRuns = useRuns(snapshot);
+  const allRuns = useRuns(snapshot, signin.signedIn);
 
   const allCards = snapshot ? BOARDS.flatMap((b) => snapshot.boards[b] ?? []) : [];
   // Chips come from every card, not the filtered set, so the bar does not shrink out from under

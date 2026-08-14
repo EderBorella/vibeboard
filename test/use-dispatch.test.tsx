@@ -218,3 +218,28 @@ describe('useDispatch — running one', () => {
     expect(result.current.error).toBe('gone');
   });
 });
+
+// THE CREDENTIAL GATE, on BOTH fetches. Two endpoints, so a gate applied to one and not the other would
+// still 401 on every first load — which is why this asserts both by name rather than "nothing was called".
+describe('the credential gate', () => {
+  it('asks for neither the models nor the control files while disabled', async () => {
+    api.listModels.mockResolvedValue([]);
+    api.listControlFiles.mockResolvedValue([]);
+    const { rerender } = renderHook(({ on }) => useDispatch('claude-code', 1, on), {
+      initialProps: { on: false },
+    });
+    await new Promise((r) => setTimeout(r, 50));
+    expect(api.listModels).not.toHaveBeenCalled();
+    expect(api.listControlFiles).not.toHaveBeenCalled();
+    rerender({ on: true });
+    await waitFor(() => expect(api.listModels).toHaveBeenCalled());
+    await waitFor(() => expect(api.listControlFiles).toHaveBeenCalled());
+  });
+
+  it('defaults to enabled, so every existing caller is unaffected', async () => {
+    api.listModels.mockResolvedValue([]);
+    api.listControlFiles.mockResolvedValue([]);
+    renderHook(() => useDispatch('claude-code', 2));
+    await waitFor(() => expect(api.listModels).toHaveBeenCalled());
+  });
+});

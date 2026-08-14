@@ -10,9 +10,12 @@ const NO_FILES: string[] = [];
 //
 // The model list and the attachable files are fetched here rather than in the pane so switching
 // card, or opening the form twice, costs no request.
+// `enabled` is the credential, as in useAutopilot and useRuns: both fetches below run on mount, so a
+// first visit asked for the model list and the control files with no cookie and took a 401 each.
 export function useDispatch(
   backend: string,
   trigger: unknown,
+  enabled = true,
 ): {
   models: ModelOption[];
   attachable: string[];
@@ -24,7 +27,7 @@ export function useDispatch(
   const [error, setError] = useState<string | null>(null);
 
   // A failure leaves the picker falling back to showing the current model alone.
-  const { value: models } = useFetched(() => listModels(backend), [backend], NO_MODELS);
+  const { value: models } = useFetched(() => listModels(backend), [backend], NO_MODELS, { enabled });
 
   // Docs and resource files only: instructions steer every turn already, and a skill attaching
   // another skill is a confusion rather than a feature. A failure offers no attachments rather than
@@ -38,6 +41,7 @@ export function useDispatch(
       ),
     [trigger],
     NO_FILES,
+    { enabled },
   );
 
   const run = useCallback(async (request: DispatchRequest): Promise<void> => {

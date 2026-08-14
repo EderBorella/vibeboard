@@ -38,6 +38,12 @@
      secondary rather than a shared amber, so a warning looks like it belongs to the palette it is in. */
   --warn: #f59e0b;
   --ok: #3fb950;
+  /* A FILL is not a TEXT COLOUR, and separating them is what lets a light theme have a pale accent.
+     `--accent` must clear 4.5:1 as ink on the ground (77 rules use it as `color`), which caps how light
+     it can be; `--accent-fill` only ever has `--on-fill` written on top of it, so it is free. For a dark
+     theme the two are the same thing. */
+  --accent-fill: var(--accent);
+  --on-fill: var(--on-accent);
   --glow: 0 0 14px rgba(20, 184, 166, 0.40);
   /* Signature: hazy teal→amber wash behind the boards. */
   --wash:
@@ -75,6 +81,14 @@
      not: #b8860b came out at 3.5:1 against this ground and `--warn` is used as a TEXT colour. */
   --warn: #9a5b12;
   --ok: #1f7a3d;
+  /* THE BABY GREEN, and it lives here because a fill has no legibility bar of its own — only the ink on
+     it does. Dark ink on #9ad4b2 is 7.41:1, and the fill still separates from the near-white panel at
+     1.62:1. `--accent` above stays the readable green: it is a `color` in 77 rules, and lightening it to
+     this would take those to about 1.6:1.
+     Dots, bars and the scrollbar thumb deliberately keep `--accent` — an indicator has to be seen, and a
+     pale green pip on a near-white panel is not. */
+  --accent-fill: #9ad4b2;
+  --on-fill: #123b25;
   /* No glow: a halo on a light ground reads as a smudge rather than as light. */
   --glow: none;
   /* Signature: the pastel, kept where it cannot hurt reading — a baby-green haze at the top left and a
@@ -100,6 +114,8 @@
   --danger: #e06c75;
   --warn: #e6b450;
   --ok: #3fb950;
+  --accent-fill: var(--accent);
+  --on-fill: var(--on-accent);
   --glow: none;
   --wash: none;
   --scan: none;

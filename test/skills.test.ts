@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { defaultConfig } from '../src/core/config.js';
 import { skillRel } from '../src/core/layout.js';
 import {
   dedupeSkills,
@@ -10,6 +9,7 @@ import {
   skillPath,
   skillsForCard,
 } from '../src/core/skills.js';
+import { defaultConfig } from '../src/store/project/config.js';
 
 const config = defaultConfig('T');
 
@@ -62,7 +62,7 @@ describe('parseSkill', () => {
   });
 
   it('names the offending column, checked against the boards the skill claims', () => {
-    // `review` is configured on engineering only (src/core/config.ts DEFAULT_COLUMNS), so a
+    // `review` is configured on engineering only (src/store/project/config.ts DEFAULT_COLUMNS), so a
     // product-only skill asking for it is wrong even though the slug exists elsewhere.
     const r = parseSkill('x', file('name: N\ndescription: D\nboards: [product]\ncolumns: [review]'), config);
     expect(r.ok).toBe(false);

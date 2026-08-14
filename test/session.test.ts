@@ -1,7 +1,6 @@
 import { chmod, mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, onTestFinished } from 'vitest';
-import { boardColumnSlugs } from '../src/core/board.js';
 import {
   AUTOPILOT_STATE_FILE,
   boardRel,
@@ -14,10 +13,11 @@ import {
   RESULTS_DIR,
   RUNS_DIR,
 } from '../src/core/layout.js';
-import { createCard } from '../src/core/mutations.js';
-import { scaffoldProject } from '../src/core/scaffold.js';
 import { isIgnored, ProjectSession } from '../src/server/session.js';
 import type { ProjectSnapshot } from '../src/server/snapshot.js';
+import { boardColumnSlugs } from '../src/store/cards/board.js';
+import { createCard } from '../src/store/cards/mutations.js';
+import { scaffoldProject } from '../src/store/project/scaffold.js';
 import { tempDir } from './helpers.js';
 
 const TODAY = '2026-07-23';

@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { describe, expect, it } from 'vitest';
 import type { RunRecord } from '../src/core/runs.js';
-import { readRun, writeRun } from '../src/server/run-store.js';
+import { readRun, writeRun } from '../src/store/run-store.js';
 import { openTestProject } from './helpers.js';
 
 interface WireCard {

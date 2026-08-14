@@ -1,20 +1,10 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import type { FastifyInstance, FastifyReply } from 'fastify';
-import { boardColumnSlugs, type CardProblem, readArchive, readBoard } from '../../core/board.js';
 import { FORBIDDEN_PATCH_KEYS, forbiddenPatchSentence, pickCardPatch } from '../../core/card.js';
 import { entryColumn } from '../../core/entry-column.js';
 import { findCard } from '../../core/find.js';
 import { oneParentProblem, parentBoardOf, parentOf } from '../../core/hierarchy.js';
 import { ARCHIVE_SLUG } from '../../core/layout.js';
-import { createLinkedCard, setCardLinks } from '../../core/links.js';
-import {
-  archiveCard,
-  type CreateCardInput,
-  placeCard,
-  restoreCard,
-  restoreTarget,
-  updateCard,
-} from '../../core/mutations.js';
 import { phaseForRun } from '../../core/phases.js';
 import { slugify } from '../../core/slug.js';
 import {
@@ -25,8 +15,18 @@ import {
   oneOf,
   type ProjectConfig,
 } from '../../core/types.js';
+import { boardColumnSlugs, type CardProblem, readArchive, readBoard } from '../../store/cards/board.js';
+import { createLinkedCard, setCardLinks } from '../../store/cards/links.js';
+import {
+  archiveCard,
+  type CreateCardInput,
+  placeCard,
+  restoreCard,
+  restoreTarget,
+  updateCard,
+} from '../../store/cards/mutations.js';
+import { resolveCardRuns } from '../../store/run-store.js';
 import { type AppCtx, ensureOpen, nowIso, today } from '../route-context.js';
-import { resolveCardRuns } from '../run-store.js';
 
 // A card in its board's last column is closed, so nothing on it is still waiting for a decision.
 // Which column that is comes from the config rather than a name: "done" is a convention, and a

@@ -6,7 +6,7 @@ import {
   readAutopilotState,
   updateAutopilotState,
   writeAutopilotState,
-} from '../src/server/autopilot-store.js';
+} from '../src/store/autopilot-store.js';
 import { tempDir } from './helpers.js';
 
 const AT = '2026-08-03T12:00:00.000Z';

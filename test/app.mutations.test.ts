@@ -1,8 +1,8 @@
 import { readFile } from 'node:fs/promises';
 import { afterEach, describe, expect, it } from 'vitest';
-import { boardColumnSlugs } from '../src/core/board.js';
-import { defaultConfig } from '../src/core/config.js';
 import { ProjectSession } from '../src/server/session.js';
+import { boardColumnSlugs } from '../src/store/cards/board.js';
+import { defaultConfig } from '../src/store/project/config.js';
 import { openTestProject, testApp } from './helpers.js';
 
 // The scaffold writes the default config, so this is the column the board reads. A card created in

@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_AUTOPILOT } from '../src/core/autopilot.js';
 import { PHASES } from '../src/core/phases.js';
-import { defaultConfig } from '../src/core/config.js';
+import { defaultConfig } from '../src/store/project/config.js';
 
 // The panel also asks for the ledger, to name the cap that will actually stop the run.
 const api = vi.hoisted(() => ({

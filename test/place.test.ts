@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { readBoard } from '../src/core/board.js';
-import { readConfig } from '../src/core/config.js';
-import { type CreateCardInput, createCard, placeCard } from '../src/core/mutations.js';
-import { scaffoldProject } from '../src/core/scaffold.js';
 import type { Card, ProjectConfig } from '../src/core/types.js';
+import { readBoard } from '../src/store/cards/board.js';
+import { type CreateCardInput, createCard, placeCard } from '../src/store/cards/mutations.js';
+import { readConfig } from '../src/store/project/config.js';
+import { scaffoldProject } from '../src/store/project/scaffold.js';
 import { cardFrom, tempDir } from './helpers.js';
 
 const TODAY = '2026-07-25';

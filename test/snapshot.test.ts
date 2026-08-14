@@ -3,11 +3,11 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { serializeCard } from '../src/core/card.js';
 import { boardRel } from '../src/core/layout.js';
-import { scaffoldProject } from '../src/core/scaffold.js';
 import type { Suggestion } from '../src/core/suggestions.js';
 import type { BoardName, CardFrontmatter } from '../src/core/types.js';
 import { buildSnapshot } from '../src/server/snapshot.js';
-import { writeSuggestion } from '../src/server/suggestion-store.js';
+import { scaffoldProject } from '../src/store/project/scaffold.js';
+import { writeSuggestion } from '../src/store/suggestion-store.js';
 import { tempDir } from './helpers.js';
 
 const TODAY = '2026-07-23';

@@ -11,7 +11,7 @@ import {
   readProjectRun,
   resolveProjectRun,
   writeRun,
-} from '../src/server/run-store.js';
+} from '../src/store/run-store.js';
 import { tempDir } from './helpers.js';
 
 // The checkup and pre-flight are about the PROJECT, not a card — and `parseRun` demanding `card` and

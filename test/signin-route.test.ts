@@ -4,10 +4,10 @@ import type { FastifyInstance } from 'fastify';
 import { describe, expect, it, onTestFinished } from 'vitest';
 import { IDLE_STATE } from '../src/core/autopilot-state.js';
 import { buildApp } from '../src/server/app.js';
-import { writeAutopilotState } from '../src/server/autopilot-store.js';
 import { CredentialStore } from '../src/server/credentials.js';
 import { DeviceStore } from '../src/server/devices.js';
 import { ProjectSession } from '../src/server/session.js';
+import { writeAutopilotState } from '../src/store/autopilot-store.js';
 import { TEST_SANDBOX, tempDir, testBoxes } from './helpers.js';
 
 const SHIM = join(process.cwd(), 'test', 'fixtures', 'fake-agent.mjs');

@@ -12,6 +12,15 @@ import {
 import type { Skill } from '../core/skills.js';
 import type { BoardName, Card } from '../core/types.js';
 import type { GitMeasure, GitPoint } from '../exec/git-measure.js';
+import {
+  appendTranscript,
+  foldReport,
+  reportContract,
+  takeAgentReport,
+  transcriptTail,
+  writeRun,
+} from '../store/run-store.js';
+import { countRunSuggestions } from '../store/suggestion-store.js';
 import { type Backend, type RunningTurn, runAgentTurn } from './agent-turn.js';
 import type { BoxService } from './box-service.js';
 import type { ResultStats } from './copilot-events.js';
@@ -20,16 +29,7 @@ import { errorText } from './errors.js';
 import type { Log } from './logging.js';
 import { redact } from './redaction.js';
 import { type BoardColumns, buildRunPrompt, type PromptInputs } from './run-prompt.js';
-import {
-  appendTranscript,
-  foldReport,
-  reportContract,
-  takeAgentReport,
-  transcriptTail,
-  writeRun,
-} from './run-store.js';
 import type { SandboxStatus } from './sandbox.js';
-import { countRunSuggestions } from './suggestion-store.js';
 
 // Runs skills as agents.
 //

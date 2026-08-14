@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { DIARY_HEADER, type DiaryEntry } from '../src/core/diary.js';
 import { PROJECT_LOG_FILE } from '../src/core/layout.js';
-import { appendEntry, diaryPath, readDiary } from '../src/server/diary-store.js';
+import { appendEntry, diaryPath, readDiary } from '../src/store/diary-store.js';
 import { tempDir } from './helpers.js';
 
 // Append-only, and that is the property worth defending rather than asserting once. Everything else in

@@ -1,10 +1,10 @@
 import type { FastifyInstance } from 'fastify';
 import { applyRouteRenames } from '../../core/autopilot.js';
 import { coverageProblems, numberProblems, shapeProblems } from '../../core/autopilot-cover.js';
-import { applyColumnPlan, isRefused, planColumnChanges, validateColumns } from '../../core/columns.js';
-import { writeConfig } from '../../core/config.js';
 import type { BoardName, ProjectConfig } from '../../core/types.js';
 import { BOARD_LABELS, BOARDS } from '../../core/types.js';
+import { applyColumnPlan, isRefused, planColumnChanges, validateColumns } from '../../store/cards/columns.js';
+import { writeConfig } from '../../store/project/config.js';
 import { type AppCtx, ensureOpen } from '../route-context.js';
 
 // Merge `boards` per board and `copilot.backends` per backend, not wholesale: a patch carrying

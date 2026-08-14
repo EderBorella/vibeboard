@@ -1,11 +1,13 @@
 import { sumSpend } from '../core/accounting.js';
 import { DEFAULT_AUTOPILOT } from '../core/autopilot.js';
 import type { AutopilotState } from '../core/autopilot-state.js';
-import { boardColumnSlugs } from '../core/board.js';
+// The PURE definition, not the re-export from the board reader: the loop reaches board state over HTTP and
+// nothing here should give it an edge into the layer that reads the filesystem.
+import { boardColumnSlugs } from '../core/board/columns.js';
 import { type StopReason, stopSentence } from '../core/dispatch-gate.js';
-import type { DeclaredCommands } from '../core/foundation.js';
 import { decideTick, type TickAction } from '../core/tick.js';
 import { BOARDS, type BoardName, type Card } from '../core/types.js';
+import type { DeclaredCommands } from '../store/project/foundation.js';
 import type { BoardClient, Failed } from './board-client.js';
 
 // The loop, and it holds no decisions of its own. Every tick is: read the world, hand it to `decideTick`,

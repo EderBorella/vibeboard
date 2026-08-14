@@ -47,7 +47,7 @@ export interface CopilotBackendConfig {
   effort: string;
 }
 
-// Mirrors DEFAULT_CONTEXT_BUDGET in src/core/config.ts.
+// Mirrors DEFAULT_CONTEXT_BUDGET in src/store/project/config.ts.
 export const DEFAULT_CONTEXT_BUDGET = 200_000;
 
 export interface CopilotConfig {

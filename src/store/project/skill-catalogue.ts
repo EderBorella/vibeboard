@@ -1,8 +1,14 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { SKILLS_DIR, skillRel } from '../core/layout.js';
-import { dedupeSkills, type InvalidSkill, parseSkill, type Skill, type SkillParse } from '../core/skills.js';
-import type { ProjectConfig } from '../core/types.js';
+import { SKILLS_DIR, skillRel } from '../../core/layout.js';
+import {
+  dedupeSkills,
+  type InvalidSkill,
+  parseSkill,
+  type Skill,
+  type SkillParse,
+} from '../../core/skills.js';
+import type { ProjectConfig } from '../../core/types.js';
 
 // Reading the skills folder. It is already a Project Control category (control-files.ts), so the
 // user can create, rename, edit and delete skills with no new file plumbing.

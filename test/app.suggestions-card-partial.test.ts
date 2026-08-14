@@ -1,10 +1,10 @@
 import { chmod, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest';
-import { readBoard } from '../src/core/board.js';
 import { boardRel, SUGGESTIONS_DIR } from '../src/core/layout.js';
 import type { Card, ProjectConfig } from '../src/core/types.js';
-import { listSuggestions } from '../src/server/suggestion-store.js';
+import { readBoard } from '../src/store/cards/board.js';
+import { listSuggestions } from '../src/store/suggestion-store.js';
 import { openTestProject, type TestProject } from './helpers.js';
 
 // POST /api/suggestions/:id/card WHEN A WRITE FAILS PART WAY THROUGH. Every reason to REFUSE is answered
@@ -18,8 +18,8 @@ import { openTestProject, type TestProject } from './helpers.js';
 // here can pass by neutering the thing it is testing.
 const fault = vi.hoisted(() => ({ flagWrite: false, unreadable: false }));
 
-vi.mock('../src/core/mutations.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../src/core/mutations.js')>();
+vi.mock('../src/store/cards/mutations.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../src/store/cards/mutations.js')>();
   return {
     ...actual,
     updateCard: async (...args: Parameters<typeof actual.updateCard>) => {
@@ -31,8 +31,8 @@ vi.mock('../src/core/mutations.js', async (importOriginal) => {
   };
 });
 
-vi.mock('../src/server/suggestion-store.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../src/server/suggestion-store.js')>();
+vi.mock('../src/store/suggestion-store.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../src/store/suggestion-store.js')>();
   return {
     ...actual,
     setSuggestionState: async (...args: Parameters<typeof actual.setSuggestionState>) => {

@@ -2,7 +2,7 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_AUTOPILOT } from '../src/core/autopilot.js';
-import { defaultConfig } from '../src/core/config.js';
+import { defaultConfig } from '../src/store/project/config.js';
 
 const api = vi.hoisted(() => ({
   getSandbox: vi.fn().mockRejectedValue(new Error('no sandbox in this test')),

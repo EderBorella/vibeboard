@@ -1,15 +1,15 @@
 import { chmod, mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { ARCHIVE_SLUG, boardRel } from '../src/core/layout.js';
 import {
   boardColumnSlugs,
   type CardProblem,
   countArchived,
   readArchive,
   readBoard,
-} from '../src/core/board.js';
-import { defaultConfig } from '../src/core/config.js';
-import { ARCHIVE_SLUG, boardRel } from '../src/core/layout.js';
+} from '../src/store/cards/board.js';
+import { defaultConfig } from '../src/store/project/config.js';
 import { tempDir } from './helpers.js';
 
 async function writeCard(root: string, rel: string, body: string) {

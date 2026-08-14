@@ -27,7 +27,7 @@ import type { Verification } from './verify.js';
 // (`…:00Z` and `…:00.500Z`) sort the wrong way round as text, because `Z` is above `.`.
 //
 // EXPORTED because this is not the machine's rule, it is the rule for reading runs in order, and
-// `listRuns` (server/run-store.ts) had the same latent flaw: it sorted newest-first by id alone. No current
+// `listRuns` (store/run-store.ts) had the same latent flaw: it sorted newest-first by id alone. No current
 // consumer of that list is order-sensitive, so nothing was broken by it — but this class has now bitten
 // three times, and a second copy of the comparison is a second thing to get wrong.
 export const startedAt = (run: RunRecord): number => {

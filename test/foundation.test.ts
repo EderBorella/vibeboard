@@ -1,8 +1,13 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { declaredCommands, foundationStatus, readGates, readSmokeCommand } from '../src/core/foundation.js';
 import { FOUNDATION_DIR } from '../src/core/layout.js';
+import {
+  declaredCommands,
+  foundationStatus,
+  readGates,
+  readSmokeCommand,
+} from '../src/store/project/foundation.js';
 import { tempDir } from './helpers.js';
 
 async function write(root: string, name: string, content: string): Promise<void> {

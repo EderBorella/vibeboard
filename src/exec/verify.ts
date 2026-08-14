@@ -1,4 +1,3 @@
-import { readGates, readSmokeCommand } from '../core/foundation.js';
 import {
   type CommandResult,
   commandFailed,
@@ -6,6 +5,7 @@ import {
   failedVerification,
   type Verification,
 } from '../core/verify.js';
+import { readGates, readSmokeCommand } from '../store/project/foundation.js';
 import { runCommand } from './commands.js';
 
 // The two modes that verify by RUNNING something: `gates` (every command CODE-QUALITY.md declares) and

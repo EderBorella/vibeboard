@@ -26,7 +26,7 @@ import {
   resolveControlPath,
   writeControlFile,
   writeResources,
-} from '../src/server/control-files.js';
+} from '../src/store/project/control-files.js';
 import { tempDir } from './helpers.js';
 
 const [CLAUDE_MD, AGENTS_MD] = POINTER_FILES;

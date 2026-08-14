@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { AutopilotConfig } from '../src/core/autopilot.js';
 import { coverageProblems, phaseSkillProblems } from '../src/core/autopilot-cover.js';
-import { defaultConfig } from '../src/core/config.js';
 import { LIFECYCLE_SKILLS } from '../src/core/phases.js';
 import type { ProjectConfig } from '../src/core/types.js';
+import { defaultConfig } from '../src/store/project/config.js';
 
 const fresh = (): ProjectConfig => defaultConfig('T');
 

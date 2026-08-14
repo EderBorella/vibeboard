@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { readConfig } from '../core/config.js';
+import { readConfig } from '../store/project/config.js';
 import type { ProjectSession } from './session.js';
 
 // App-level state, outside any project: what VibeBoard should reopen on start. Without this the

@@ -1,8 +1,8 @@
-import { type CardProblem, countArchived, readBoard } from '../core/board.js';
-import { readConfig } from '../core/config.js';
 import { blockedUnder } from '../core/derived-status.js';
 import { BOARDS, type BoardName, type Card, type ProjectConfig } from '../core/types.js';
-import { listSuggestions } from './suggestion-store.js';
+import { type CardProblem, countArchived, readBoard } from '../store/cards/board.js';
+import { readConfig } from '../store/project/config.js';
+import { listSuggestions } from '../store/suggestion-store.js';
 
 export interface ProjectSnapshot {
   root: string;

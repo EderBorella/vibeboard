@@ -1,9 +1,9 @@
 import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { boardColumnSlugs } from '../src/core/board.js';
-import { defaultConfig } from '../src/core/config.js';
 import { boardRel } from '../src/core/layout.js';
+import { boardColumnSlugs } from '../src/store/cards/board.js';
+import { defaultConfig } from '../src/store/project/config.js';
 import { openTestProject } from './helpers.js';
 
 describe('PUT /cards/:board/:id/links', () => {

@@ -1,11 +1,11 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { boardColumnSlugs } from '../src/core/board.js';
-import { readConfig } from '../src/core/config.js';
 import { boardRel, CONFIG_DIR, INSTRUCTIONS_FILE, POINTER_FILES, SKILLS_DIR } from '../src/core/layout.js';
 import type { DirListing, FileRead } from '../src/server/explorer-list.js';
 import { ProjectSession } from '../src/server/session.js';
+import { boardColumnSlugs } from '../src/store/cards/board.js';
+import { readConfig } from '../src/store/project/config.js';
 import { openTestProject, testApp } from './helpers.js';
 
 const [CLAUDE_MD] = POINTER_FILES;

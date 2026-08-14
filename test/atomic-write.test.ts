@@ -1,8 +1,8 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { describe, expect, it, vi } from 'vitest';
 import { type RunRecord, serializeRun } from '../src/core/runs.js';
-import { listCardRuns, listRuns, recordPath, writeRun } from '../src/server/run-store.js';
-import { writeAtomic } from '../src/server/write-queue.js';
+import { listCardRuns, listRuns, recordPath, writeRun } from '../src/store/run-store.js';
+import { writeAtomic } from '../src/store/write-queue.js';
 import { tempDir } from './helpers.js';
 
 // The temp-name contract between `writeAtomic` and the run store, which nothing tested until the two

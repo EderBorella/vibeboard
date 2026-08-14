@@ -19,6 +19,12 @@ this index exists for the ones whose reason lives somewhere else.
 
 ## `src/core/` — pure decisions, no I/O
 
+Nothing here imports `node:*`. That is checked by resolving the import graph from `core/tick.ts` and
+looking for a `node:` import anywhere it reaches — **not** by grepping this directory, which proves
+nothing: a pure-looking module can reach `node:fs` through three hops, and that is exactly how it used
+to. One value edge upward remains, `find.ts` → `store/cards/board.js`; it is outside the lifecycle
+machine's closure, and it is why the purity gate is still unarmed.
+
 | file | pages | cites |
 |---|---|---|
 | `accounting.ts` | `decisions.md` | `S10` |
@@ -26,23 +32,17 @@ this index exists for the ones whose reason lives somewhere else.
 | `autopilot-state.ts` | `decisions.md`, `security/containment.md` (its `unreviewedGates` comment explains a live rule by naming the dead profile) | `decision 15`, `decision 20`, `decision 47`, `S13`, `C2` |
 | `autopilot.ts` | `decisions.md` | `decision 40`, `decision 42`, `decision 45`, `decision 51`, `decision 52`, `decision 57`, `S5` |
 | `bounds.ts` | `decisions.md` | `decision 46`, `decision 47`, `decision 58`, `decision 60` |
-| `config.ts` | `decisions.md` | `decision 45`, `C1`, `C2`, `C3`, `C4` |
 | `created.ts` | `decisions.md` | `decision 40`, `decision 43`, `decision 47` |
 | `derived-status.ts` | `decisions.md` | `decision 45`, `decision 46`, `decision 62` |
 | `dispatch-gate.ts` | `decisions.md` | `decision 47`, `S10`, `S13` |
 | `entry-column.ts` | `decisions.md` | `decision 37` (superseded — the row says so) |
-| `foundation.ts` | `decisions.md`, `foundation-bootstrap.md` | `decision 66`, `decision 67` |
 | `harness-feature.ts` | `decisions.md`, `foundation-bootstrap.md` | `decision 3`, `decision 44`, `decision 66`, `decision 67` |
 | `layout.ts` | `decisions.md`, `security/containment.md` (`SUGGESTIONS_DIR`'s comment names the dead profile; the rule is now a read-only mount) | `decision 20` |
 | `lifecycle/stop-sentences.ts` | `decisions.md` — the sentences a stop carries, and what each one used to say: most are corrections that named a mechanism the product no longer has | `decision 44`, `decision 45`, `decision 52`, `decision 55`, `decision 66` |
 | `lifecycle/tick.ts` | `decisions.md` — the lifecycle machine; more rulings meet here than anywhere else. `tick.ts` is the re-export barrel and holds no reasoning of its own | `decision 4`, `decision 39`, `decision 42`, `decision 45`, `decision 47`, `decision 50`, `decision 52`, `decision 53`, `decision 54`, `decision 58`, `decision 59` |
-| `links.ts` | `decisions.md` | `decision 65` |
-| `mutations.ts` | `decisions.md` | `decision 58`, `decision 65` |
 | `phases.ts` | `decisions.md` — the phase table itself | `decision 38`, `decision 44`, `decision 47`, `decision 50`, `decision 52`, `decision 56`, `decision 61` |
 | `position.ts` | `decisions.md` | `decision 38`, `decision 39` |
 | `runs/types.ts` | `decisions.md` — the record's shape; `runs.ts` is the re-export barrel and holds no reasoning of its own | `decision 18`, `decision 40`, `S11` |
-| `seed-docs.ts` | `foundation-bootstrap.md` — it is what seeds it | — |
-| `seed-skills.ts` | `decisions.md` — `decision 11` and `decision 64` are cited **only** by `test/seed-skills.test.ts` against these bodies | `decision 51` |
 | `setup-feature.ts` | `decisions.md` | `decision 50`, `decision 51` |
 | `smoke-declaration.ts` | `decisions.md`, `foundation-bootstrap.md` | `decision 3`, `decision 66`, `decision 67` |
 | `suggestions.ts` | `decisions.md` | `decision 49` |
@@ -64,6 +64,36 @@ than it closes, so the code moved to where both callers legitimately sit. Nothin
 | `git-measure.ts` | `decisions.md` | `S11` |
 | `process-group.ts` | `decisions.md` | `decision 13` |
 
+## `src/store/` — the filesystem is the database
+
+There is no database and no ORM. A card is a `.md` file with YAML frontmatter and the column it is in is
+the folder it sits in, so every module that reads or writes that format is a data-access layer, however
+much it looks like domain logic. These modules used to be split between `src/core/`, where they made the
+pure decision layer transitively impure, and `src/server/`, where they made a store look like a server
+internal — which is why the loop reaching one of them read as a layer violation when it was in fact the
+documented state-file carve-out.
+
+Two folders inside, and the rest flat. `cards/` is the card database proper; `project/` is the project's
+own files — its config, its conventions, the documents and skills seeded into it. The `*-store.ts`
+modules stay flat because each is the single owner of one artefact and its name already says which; a
+folder over them would need a noun covering a run report, a chat transcript, a project log, a suggestion
+and the loop's state file, and there isn't an honest one. `write-queue.ts` is flat because all three
+groups write through it.
+
+| file | pages | cites |
+|---|---|---|
+| `cards/links.ts` | `decisions.md` | `decision 65` |
+| `cards/mutations.ts` | `decisions.md` | `decision 58`, `decision 65` |
+| `project/config.ts` | `decisions.md` | `decision 45`, `C1`, `C2`, `C3`, `C4` |
+| `project/control-files.ts` | `security/containment.md` — the path sandbox behind Project Control: the `..` rejection, the symlink realpath walk and the category allow-list. It still reaches `server/fs-sandbox.ts` for the first two halves | — |
+| `project/foundation.ts` | `decisions.md`, `foundation-bootstrap.md` | `decision 66`, `decision 67` |
+| `project/seed-docs.ts` | `foundation-bootstrap.md` — it is what seeds it, and it resolves the bundled folder by **climbing** to the package root rather than counting `..` segments. The count was wrong the moment this file moved, and a wrong path here throws nothing and fails no type check: the reader treats an unreadable source as a packaging problem and carries on. `test/seed-docs.test.ts` asserts the resolved directory exists on disk | — |
+| `project/seed-skills.ts` | `decisions.md` — `decision 11` and `decision 64` are cited **only** by `test/seed-skills.test.ts` against these bodies | `decision 51` |
+| `autopilot-store.ts` | `decisions.md` — the loop's one deliberate direct-write carve-out, and the reason `src/service/main.ts` may import it | `S13` |
+| `run-store.ts` | `decisions.md`, `security/containment.md` — the agent writes a report under `runs/`; this folds it in | `decision 13` |
+| `suggestion-store.ts` | `security/containment.md` — the agent cannot write here, so the endpoint is the only way in | — |
+| `write-queue.ts` | `decisions.md` — the atomic write and the per-path chain everything above goes through | `decision 20`, `C2` |
+
 ## `src/server/` — the Fastify app, auth, credentials, containers, dispatch
 
 | file | pages | cites |
@@ -74,7 +104,6 @@ than it closes, so the code moved to where both callers legitimately sit. Nothin
 | `app.ts` | `decisions.md` | `decision 8`, `decision 13`, `S11` |
 | `auth.ts` | `decisions.md` — `RULES` is the single answer to "who may call this", and a route absent from it is admin-only | `decision 3`, `decision 5`, `decision 10`, `decision 18`, `decision 21`, `decision 44`, `decision 51`, `decision 65`, `decision 66`, `decision 67` |
 | `autopilot-runtime.ts` | `decisions.md` | `decision 12`, `decision 13`, `decision 47` |
-| `autopilot-store.ts` | `decisions.md` | `S13` |
 | `box-manager.ts` | `security/containment.md` — adoption by name **and** spec, and the network rules | — |
 | `box-service.ts` | `security/containment.md`, `decisions.md` | `S2` |
 | `containers.ts` | `security/containment.md` — the mount set, the protected paths, the writable hole, the flags | `S1` |
@@ -92,14 +121,11 @@ than it closes, so the code moved to where both callers legitimately sit. Nothin
 | `prompt/sections.ts` | `decisions.md` — one section per thing the agent is told, and why several of them return nothing rather than a heading over nothing | `decision 55`, `decision 60` |
 | `reaper.ts` | `decisions.md` | `decision 13` |
 | `route-context.ts` | `decisions.md` | `decision 20` |
-| `run-store.ts` | `decisions.md`, `security/containment.md` — the agent writes a report under `runs/`; this folds it in | `decision 13` |
 | `sandbox.ts` | `security/containment.md` — the gate, and why it is a probe | — |
 | `service-process.ts` | `decisions.md`, `security/containment.md` — the loop is deliberately **not** boxed; the scope table is what confines it | `decision 13`, `decision 20`, `decision 47` |
 | `signin-terminal.ts` | `security/containment.md` — the `VIBEBOARD_TOKEN_FILE` warning it prints | — |
 | `signin.ts` | `decisions.md` | `decision 21` |
 | `snapshot.ts` | `decisions.md` | `decision 46` |
-| `suggestion-store.ts` | `security/containment.md` — the agent cannot write here, so the endpoint is the only way in | — |
-| `write-queue.ts` | `decisions.md` | `decision 20`, `C2` |
 | `routes/autopilot.ts` | `decisions.md` | `decision 12`, `decision 47` |
 | `routes/cards.ts` | `decisions.md` — the create rules: the stamp, the parent link, the duplicate-title refusal | `decision 10`, `decision 44`, `decision 56`, `decision 58`, `decision 61`, `decision 65` |
 | `routes/control.ts` | `decisions.md`, `foundation-bootstrap.md` | `decision 3`, `decision 67` |

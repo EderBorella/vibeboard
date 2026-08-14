@@ -72,7 +72,8 @@ describe('the phase table', () => {
   });
 
   // A stamp naming a column that board does not have is a card moved into a folder no column maps to —
-  // the phantom-folder class (src/core/mutations.ts:35-37).
+  // the phantom-folder class (`knownColumn` in src/store/cards/mutations.ts). Named by symbol: this cited
+  // `src/core/mutations.ts:35-37`, and those lines had already drifted off the comment they meant.
   it('stamps only columns the default boards have', () => {
     const columns: Record<string, string[]> = {
       features: ['backlog', 'todo', 'in-progress', 'done'],

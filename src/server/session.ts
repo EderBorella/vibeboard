@@ -1,4 +1,6 @@
 import chokidar, { type FSWatcher } from 'chokidar';
+import { AUTOPILOT_STATE_FILE, CHAT_DIR, PROJECT_LOG_FILE, RUNS_DIR } from '../core/layout.js';
+import type { ProjectConfig } from '../core/types.js';
 import {
   ensureAutopilotKeys,
   ensureBoards,
@@ -7,12 +9,10 @@ import {
   ensureMaxRuns,
   readConfig,
   writeConfig,
-} from '../core/config.js';
-import { ensureControlFiles } from '../core/control.js';
-import { AUTOPILOT_STATE_FILE, CHAT_DIR, PROJECT_LOG_FILE, RUNS_DIR } from '../core/layout.js';
-import type { ProjectConfig } from '../core/types.js';
+} from '../store/project/config.js';
+import { ensureControlFiles } from '../store/project/control.js';
+import { markInterrupted } from '../store/run-store.js';
 import type { Log } from './logging.js';
-import { markInterrupted } from './run-store.js';
 import { buildSnapshot, type ProjectSnapshot } from './snapshot.js';
 
 type SnapshotListener = (snapshot: ProjectSnapshot) => void;

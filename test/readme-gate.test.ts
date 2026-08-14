@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { readmeGate } from '../src/core/readme.js';
+import { readmeGate } from '../src/store/project/readme.js';
 import { tempDir } from './helpers.js';
 
 // Comfortably over the threshold, and prose rather than 200 x's: the check counts non-whitespace

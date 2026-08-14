@@ -7,7 +7,7 @@ import { allows } from '../src/server/auth.js';
 import type { Credential } from '../src/server/credentials.js';
 import { CredentialStore } from '../src/server/credentials.js';
 import { ProjectSession } from '../src/server/session.js';
-import { listSuggestions } from '../src/server/suggestion-store.js';
+import { listSuggestions } from '../src/store/suggestion-store.js';
 import { tempDir } from './helpers.js';
 
 const ADMIN = 'admin-token-for-suggestions';

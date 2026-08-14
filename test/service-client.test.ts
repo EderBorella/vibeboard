@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { IDLE_STATE } from '../src/core/autopilot-state.js';
-import { defaultConfig } from '../src/core/config.js';
 import type { TickAction } from '../src/core/tick.js';
-import { writeAutopilotState } from '../src/server/autopilot-store.js';
 import type { BoardView } from '../src/service/board-client.js';
 import { BoardClient } from '../src/service/board-client.js';
 import { type ActResult, type LoopDeps, runLoop } from '../src/service/loop.js';
+import { writeAutopilotState } from '../src/store/autopilot-store.js';
+import { defaultConfig } from '../src/store/project/config.js';
 import { injectFetch, openTestProject } from './helpers.js';
 
 // The loop's HTTP surface, against a REAL app with a REAL minted service credential — the same store the

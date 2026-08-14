@@ -9,12 +9,12 @@ import {
 import { FOUNDATION_FILES, foundationRel } from '../src/core/layout.js';
 import { buildApp } from '../src/server/app.js';
 import { allows, endpointsFor } from '../src/server/auth.js';
-import { readAutopilotState, writeAutopilotState } from '../src/server/autopilot-store.js';
 import { CopilotAuthority } from '../src/server/copilot-authority.js';
 import { type Credential, CredentialStore, type Scope } from '../src/server/credentials.js';
 import { redactCredential } from '../src/server/redaction.js';
 import { unreviewedGatesRefusal } from '../src/server/routes/runs.js';
 import { ProjectSession } from '../src/server/session.js';
+import { readAutopilotState, writeAutopilotState } from '../src/store/autopilot-store.js';
 import { TEST_SANDBOX, tempDir } from './helpers.js';
 
 // The chat copilot's authority: what the `assist` scope may do, what it may not, and the fact that its

@@ -1,9 +1,9 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { defaultConfig } from '../src/core/config.js';
 import { SKILLS_DIR, skillRel } from '../src/core/layout.js';
-import { readSkills } from '../src/server/skill-catalogue.js';
+import { defaultConfig } from '../src/store/project/config.js';
+import { readSkills } from '../src/store/project/skill-catalogue.js';
 import { tempDir } from './helpers.js';
 
 const config = defaultConfig('T');

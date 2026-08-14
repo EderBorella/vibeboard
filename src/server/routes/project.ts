@@ -1,7 +1,7 @@
 import { dirname, resolve } from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import { DEFAULT_BACKEND } from '../../core/backends.js';
-import { type ScaffoldMode, scaffoldProject } from '../../core/scaffold.js';
+import { type ScaffoldMode, scaffoldProject } from '../../store/project/scaffold.js';
 import { rememberProject } from '../app-state.js';
 import type { BoxBackend } from '../containers.js';
 import { discoverProjects } from '../discover.js';

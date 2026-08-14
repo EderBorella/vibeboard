@@ -4,8 +4,6 @@ import { access, chmod, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { describe, expect, it } from 'vitest';
-import { boardColumnSlugs, readBoard } from '../src/core/board.js';
-import { readConfig } from '../src/core/config.js';
 import { parseDiary } from '../src/core/diary.js';
 import {
   ARCHIVE_SLUG,
@@ -14,8 +12,10 @@ import {
   POINTER_FILES,
   PROJECT_LOG_FILE,
 } from '../src/core/layout.js';
-import { scaffoldProject } from '../src/core/scaffold.js';
-import { appendEntry, readDiary } from '../src/server/diary-store.js';
+import { boardColumnSlugs, readBoard } from '../src/store/cards/board.js';
+import { appendEntry, readDiary } from '../src/store/diary-store.js';
+import { readConfig } from '../src/store/project/config.js';
+import { scaffoldProject } from '../src/store/project/scaffold.js';
 import { tempDir } from './helpers.js';
 
 const TODAY = '2026-07-23';

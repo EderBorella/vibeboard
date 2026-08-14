@@ -3,12 +3,12 @@ import { dirname, join } from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import { describe, expect, it, onTestFinished } from 'vitest';
 import { parse, stringify } from 'yaml';
-import { configPath } from '../src/core/config.js';
 import { boardRel, skillRel } from '../src/core/layout.js';
 import { buildApp } from '../src/server/app.js';
 import { CredentialStore } from '../src/server/credentials.js';
 import type { Readiness } from '../src/server/routes/autopilot.js';
 import { ProjectSession } from '../src/server/session.js';
+import { configPath } from '../src/store/project/config.js';
 import { makeReady, openTestProject, putFoundation, tempDir } from './helpers.js';
 
 const README = `# Timeline\n\n${'A tool that turns a folder of notes into a searchable timeline. '.repeat(4)}\n`;

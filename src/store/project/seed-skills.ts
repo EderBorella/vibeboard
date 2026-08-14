@@ -1,6 +1,6 @@
 import { mkdir, readdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { SKILLS_DIR } from './layout.js';
+import { SKILLS_DIR } from '../../core/layout.js';
 
 // The skills a project starts with. They are ordinary files: the user edits or deletes them like
 // any other, and nothing here is special-cased later.

@@ -1,8 +1,8 @@
 import { randomBytes } from 'node:crypto';
 import { readFile, rename, rm } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
+import { serialise, writeAtomic } from '../store/write-queue.js';
 import { adminTokenFile, constantTimeEqual, sha256Hex } from './credentials.js';
-import { serialise, writeAtomic } from './write-queue.js';
 
 // One credential per browser that has signed in.
 //

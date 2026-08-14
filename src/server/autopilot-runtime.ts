@@ -1,7 +1,7 @@
 import { type AutopilotState, IDLE_STATE, reconcile } from '../core/autopilot-state.js';
 import { type StopReason, stopSentence } from '../core/dispatch-gate.js';
 import { isSameGroup } from '../exec/process-group.js';
-import { readAutopilotState, updateAutopilotState, writeAutopilotState } from './autopilot-store.js';
+import { readAutopilotState, updateAutopilotState, writeAutopilotState } from '../store/autopilot-store.js';
 import type { Log } from './logging.js';
 
 // The three levels of stopping (decision 12), and the live answer to "is this project halted?".

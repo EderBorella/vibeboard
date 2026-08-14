@@ -14,9 +14,9 @@ import {
   RESOURCES_YAML,
   SKILLS_DIR,
   skillRel,
-} from '../core/layout.js';
-import { slugify } from '../core/slug.js';
-import { resolveInRoot } from './fs-sandbox.js';
+} from '../../core/layout.js';
+import { slugify } from '../../core/slug.js';
+import { resolveInRoot } from '../../server/fs-sandbox.js';
 
 // The Project Control tab's file controller. It exposes ONLY the documents that steer the
 // models — instructions, skills, docs, resources — behind a hard path sandbox + allow-list so

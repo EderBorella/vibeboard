@@ -1,9 +1,9 @@
 import type { FastifyInstance } from 'fastify';
 import { type SkillFields, serializeSkill, skillPath } from '../../core/skills.js';
 import { type BoardName, isBoard } from '../../core/types.js';
-import { writeControlFile } from '../control-files.js';
+import { writeControlFile } from '../../store/project/control-files.js';
+import { readSkills } from '../../store/project/skill-catalogue.js';
 import { type AppCtx, ensureOpen } from '../route-context.js';
-import { readSkills } from '../skill-catalogue.js';
 
 // The fields an editor sends. Validated here rather than trusted: this writes a file that decides
 // what the rail offers, and a bad board name would make the skill vanish from it.

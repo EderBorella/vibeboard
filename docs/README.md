@@ -7,7 +7,7 @@ Reasoning that does not fit beside the code it is about.
 | [`by-file.md`](by-file.md) | **Start here if you are holding a `file:line`.** An index keyed on source path: given a file, which pages explain it and which numbered rulings its comments cite. |
 | [`decisions.md`](decisions.md) | The register. Every `decision NN` / `ruling NN` and every `S`/`C` slice reference cited anywhere in `src/`, `web/src/` or `test/`, restated in one sentence, with where it binds. |
 | [`security/containment.md`](security/containment.md) | How agents are confined today: one Docker box per `(project, backend)`, what the read-only bind mounts deny and why, where the writable holes are, and the residual exposures. Read it before trusting any comment that mentions an AppArmor profile — that profile was deleted on 2026-08-09. |
-| [`foundation-bootstrap.md`](foundation-bootstrap.md) | What the five `foundation/` documents must decide, and the two machine contracts inside them that otherwise fail silently-looking checks. Seeded into every project by `src/core/seed-docs.ts`, so it is a **product document** as well as a repository one — edits to it reach every project. |
+| [`foundation-bootstrap.md`](foundation-bootstrap.md) | What the five `foundation/` documents must decide, and the two machine contracts inside them that otherwise fail silently-looking checks. Seeded into every project by `src/store/project/seed-docs.ts`, so it is a **product document** as well as a repository one — edits to it reach every project. |
 
 ---
 

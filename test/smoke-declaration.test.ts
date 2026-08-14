@@ -2,13 +2,13 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import { describe, expect, it, onTestFinished } from 'vitest';
-import { declaredCommands, readSmokeCommand, writeSmokeCommand } from '../src/core/foundation.js';
 import { foundationRel } from '../src/core/layout.js';
 import { checkSmokeCommand } from '../src/core/smoke-declaration.js';
 import { buildApp } from '../src/server/app.js';
 import { allows } from '../src/server/auth.js';
 import { type Credential, CredentialStore } from '../src/server/credentials.js';
 import { ProjectSession } from '../src/server/session.js';
+import { declaredCommands, readSmokeCommand, writeSmokeCommand } from '../src/store/project/foundation.js';
 import { tempDir } from './helpers.js';
 
 // Ruling 67. The deadlock this closes was real and cost a whole run: the mandatory harness feature's card

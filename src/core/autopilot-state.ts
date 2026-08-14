@@ -18,7 +18,7 @@ import { oneOf } from './types.js';
 // to reap, because the service cannot record a pid before it exists — but the ruling's safety argument is
 // "the fields are disjoint and each write is a read-modify-write", so the split has to be written down
 // correctly or the next writer will honour the wrong half.
-// Both go through a read-modify-write (server/autopilot-store.ts), so neither clobbers the other's
+// Both go through a read-modify-write (store/autopilot-store.ts), so neither clobbers the other's
 // fields, and every write is a rename — so a reader sees one whole state or the other, never half.
 //
 // The two processes are NOT serialised against each other, and that was ruled rather than overlooked
@@ -26,7 +26,7 @@ import { oneOf } from './types.js';
 // one window — the server reads the state, the service ticks and writes, the server writes back what it
 // read — and that window is the emergency-stop path, where the service is about to be killed and the
 // value at risk is the iteration count of a run being abandoned. A lockfile would trade that for a stale
-// lock left behind by a killed process, which is the worse failure. See server/write-queue.ts.
+// lock left behind by a killed process, which is the worse failure. See store/write-queue.ts.
 
 export const AUTOPILOT_STATES = ['idle', 'running', 'stopped', 'halted'] as const;
 export type AutopilotStateName = (typeof AUTOPILOT_STATES)[number];

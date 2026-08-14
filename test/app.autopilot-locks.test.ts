@@ -4,10 +4,10 @@ import { fileURLToPath } from 'node:url';
 import { beforeAll, describe, expect, it } from 'vitest';
 import type { AutopilotState } from '../src/core/autopilot-state.js';
 import { IDLE_STATE } from '../src/core/autopilot-state.js';
-import { writeAutopilotState } from '../src/server/autopilot-store.js';
 import type { Scope } from '../src/server/credentials.js';
 import { dispatchLock } from '../src/server/routes/runs.js';
-import { readRun } from '../src/server/run-store.js';
+import { writeAutopilotState } from '../src/store/autopilot-store.js';
+import { readRun } from '../src/store/run-store.js';
 import { openTestProject, shimArgsLog, tempDir, wsClient } from './helpers.js';
 
 // What a halted project and a running auto-pilot refuse, and what each refusal SAYS. A message about a

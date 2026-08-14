@@ -6,8 +6,8 @@ import {
   readAutopilotState,
   updateAutopilotState,
   writeAutopilotState,
-} from '../src/server/autopilot-store.js';
-import { writeRun } from '../src/server/run-store.js';
+} from '../src/store/autopilot-store.js';
+import { writeRun } from '../src/store/run-store.js';
 import { openTestProject, wsClient } from './helpers.js';
 
 // Decision 12: three levels of stopping, and an explicit way back. Each one is a state on disk, so it

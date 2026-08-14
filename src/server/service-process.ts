@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import type { AutopilotState } from '../core/autopilot-state.js';
 import { stopSentence } from '../core/dispatch-gate.js';
 import { groupStartTime, terminateGroup } from '../exec/process-group.js';
-import { updateAutopilotState } from './autopilot-store.js';
+import { updateAutopilotState } from '../store/autopilot-store.js';
 import type { CredentialStore } from './credentials.js';
 import { type AutopilotLogTarget, type Log, openAutopilotLog } from './logging.js';
 

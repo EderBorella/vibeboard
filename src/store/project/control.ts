@@ -1,6 +1,6 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
-import { CONVENTIONS_FILE, INSTRUCTIONS_FILE, POINTER_FILES } from './layout.js';
+import { CONVENTIONS_FILE, INSTRUCTIONS_FILE, POINTER_FILES } from '../../core/layout.js';
 import { seedDocs } from './seed-docs.js';
 import { seedSkills } from './seed-skills.js';
 

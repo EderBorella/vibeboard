@@ -1,9 +1,9 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { defaultConfig } from '../src/core/config.js';
 import { entryColumn } from '../src/core/entry-column.js';
 import type { BoardName, ProjectConfig } from '../src/core/types.js';
+import { defaultConfig } from '../src/store/project/config.js';
 
 // WHERE A BOARD IS ENTERED. It had no test of its own while it lived in `routes/cards.ts` — every
 // assertion about it went through an endpoint — so the refusal that stops a card being created into a

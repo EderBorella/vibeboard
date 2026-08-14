@@ -1,21 +1,21 @@
 import { randomUUID } from 'node:crypto';
 import { rm } from 'node:fs/promises';
 import type { FastifyInstance } from 'fastify';
-import { readBoard } from '../../core/board.js';
 import { entryColumn } from '../../core/entry-column.js';
-import { setCardLinks } from '../../core/links.js';
-import { createCard, updateCard } from '../../core/mutations.js';
 import { followUpCount, openFollowUp } from '../../core/setup-feature.js';
 import { SUGGESTION_STATES, type Suggestion } from '../../core/suggestions.js';
 import { type BoardName, type Card, oneOf, type ProjectConfig } from '../../core/types.js';
-import { type AppCtx, ensureOpen, nowIso, today } from '../route-context.js';
+import { readBoard } from '../../store/cards/board.js';
+import { setCardLinks } from '../../store/cards/links.js';
+import { createCard, updateCard } from '../../store/cards/mutations.js';
 import {
   isSafeId,
   listSuggestions,
   readSuggestion,
   setSuggestionState,
   writeSuggestion,
-} from '../suggestion-store.js';
+} from '../../store/suggestion-store.js';
+import { type AppCtx, ensureOpen, nowIso, today } from '../route-context.js';
 
 // Agent Suggestions over HTTP.
 //

@@ -5,7 +5,7 @@ import {
   listSuggestions,
   setSuggestionState,
   writeSuggestion,
-} from '../src/server/suggestion-store.js';
+} from '../src/store/suggestion-store.js';
 import { tempDir } from './helpers.js';
 
 const make = (id: string, over: Partial<Suggestion> = {}): Suggestion => ({

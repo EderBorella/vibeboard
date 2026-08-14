@@ -1,10 +1,10 @@
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { defaultConfig } from '../src/core/config.js';
 import { skillRel } from '../src/core/layout.js';
-import { SEED_SKILLS, seedSkills } from '../src/core/seed-skills.js';
-import { readSkills } from '../src/server/skill-catalogue.js';
+import { defaultConfig } from '../src/store/project/config.js';
+import { SEED_SKILLS, seedSkills } from '../src/store/project/seed-skills.js';
+import { readSkills } from '../src/store/project/skill-catalogue.js';
 import { tempDir } from './helpers.js';
 
 const config = defaultConfig('T');
@@ -75,7 +75,7 @@ describe('seedSkills', () => {
 
 describe('the two entry points', () => {
   it('scaffolding a project seeds its skills', async () => {
-    const { scaffoldProject } = await import('../src/core/scaffold.js');
+    const { scaffoldProject } = await import('../src/store/project/scaffold.js');
     const root = await tempDir();
     await scaffoldProject(root, { name: 'S', mode: 'greenfield', today: '2026-07-26' });
     const { skills } = await readSkills(root, config);
@@ -85,7 +85,7 @@ describe('the two entry points', () => {
   it('the open-time upgrade path seeds skills into a project that predates them', async () => {
     // ensureControlFiles runs on every project open. A project scaffolded before skills existed
     // has none, and would otherwise show an empty rail forever.
-    const { ensureControlFiles } = await import('../src/core/control.js');
+    const { ensureControlFiles } = await import('../src/store/project/control.js');
     const root = await tempDir();
     await ensureControlFiles(root);
     const { skills } = await readSkills(root, config);

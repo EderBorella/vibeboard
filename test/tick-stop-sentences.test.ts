@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_AUTOPILOT } from '../src/core/autopilot.js';
-import type { DeclaredCommands } from '../src/core/foundation.js';
 import { decideTick } from '../src/core/lifecycle/tick.js';
 import type { Card } from '../src/core/types.js';
+import type { DeclaredCommands } from '../src/store/project/foundation.js';
 import { base, card, detailOf, input, task } from './tick-fixtures.js';
 
 // WHAT A PERSON READS WHEN THE LOOP STOPS — the half of the machine that lives in

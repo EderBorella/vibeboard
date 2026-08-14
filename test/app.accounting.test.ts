@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { describe, expect, it, onTestFinished } from 'vitest';
 import { CONFIG_DIR, CONFIG_FILE } from '../src/core/layout.js';
 import type { RunRecord } from '../src/core/runs.js';
-import { writeRun } from '../src/server/run-store.js';
+import { writeRun } from '../src/store/run-store.js';
 import { openTestProject, tempDir } from './helpers.js';
 
 // The README's admitted gap, closed through an endpoint rather than in the browser: ONE statement of

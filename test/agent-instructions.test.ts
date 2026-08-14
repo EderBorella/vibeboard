@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { VIBEBOARD_DOC } from '../src/core/scaffold.js';
+import { VIBEBOARD_DOC } from '../src/store/project/scaffold.js';
 
 // The two documents every agent turn sees: VIBEBOARD.md, written into the project and reached
 // through the CLAUDE.md/AGENTS.md imports, and the shared mechanics prompt that agent-turn.ts

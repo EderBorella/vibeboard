@@ -5,26 +5,33 @@ import { attemptsUsed, sumSpend } from '../../core/accounting.js';
 import { DEFAULT_AUTOPILOT } from '../../core/autopilot.js';
 import type { AutopilotState } from '../../core/autopilot-state.js';
 import { unreviewedGatesSentence } from '../../core/autopilot-state.js';
-import { boardColumnSlugs, readBoard } from '../../core/board.js';
 import { resolveCopilotSelection } from '../../core/copilot-choice.js';
 import { HALTED_DISPATCH } from '../../core/dispatch-gate.js';
 import { findCard } from '../../core/find.js';
-import { foundationStatus, readGates } from '../../core/foundation.js';
 import { foundationRel } from '../../core/layout.js';
 import { phase } from '../../core/phases.js';
 import { asVerification, isRunId, type RunRecord, withVerification } from '../../core/runs.js';
 import { BOARDS, isBoard, type ProjectConfig } from '../../core/types.js';
+import { boardColumnSlugs, readBoard } from '../../store/cards/board.js';
+import { readResources } from '../../store/project/control-files.js';
+import { foundationStatus, readGates } from '../../store/project/foundation.js';
+import { readSkills } from '../../store/project/skill-catalogue.js';
+import {
+  listCardRuns,
+  listRuns,
+  readRun,
+  resolveProjectRun,
+  resolveRun,
+  writeRun,
+} from '../../store/run-store.js';
 import type { DispatchInput } from '../agent-runner.js';
 import type { Backend } from '../agent-turn.js';
-import { readResources } from '../control-files.js';
 import type { Scope } from '../credentials.js';
 import { errorText } from '../errors.js';
 import { attachedOpencodeUrl } from '../opencode-server.js';
 import { type AppCtx, ensureOpen, nowIso } from '../route-context.js';
 import type { BoardColumns } from '../run-prompt.js';
-import { listCardRuns, listRuns, readRun, resolveProjectRun, resolveRun, writeRun } from '../run-store.js';
 import { agentRefusal } from '../sandbox.js';
-import { readSkills } from '../skill-catalogue.js';
 
 // Dispatching and reading runs.
 //

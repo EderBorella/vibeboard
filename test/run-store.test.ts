@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { boardRel, CONFIG_DIR, CONFIG_FILE, DOCS_DIR, RESULTS_DIR, RUNS_DIR } from '../src/core/layout.js';
 import { type RunRecord, runId } from '../src/core/runs.js';
+import { isIgnored } from '../src/server/session.js';
 import {
   appendTranscript,
   foldReport,
@@ -19,8 +20,7 @@ import {
   takeAgentReport,
   transcriptTail,
   writeRun,
-} from '../src/server/run-store.js';
-import { isIgnored } from '../src/server/session.js';
+} from '../src/store/run-store.js';
 import { tempDir } from './helpers.js';
 
 const record = (over: Partial<RunRecord> = {}): RunRecord => ({
@@ -47,8 +47,8 @@ describe('run records on disk', () => {
     );
     // `results` is not a configured column, so readBoard cannot see it — this is the whole reason
     // the record can live next to the card.
-    const { readBoard } = await import('../src/core/board.js');
-    const { defaultConfig } = await import('../src/core/config.js');
+    const { readBoard } = await import('../src/store/cards/board.js');
+    const { defaultConfig } = await import('../src/store/project/config.js');
     expect(await readBoard(root, 'engineering', defaultConfig('T'))).toEqual([]);
   });
 

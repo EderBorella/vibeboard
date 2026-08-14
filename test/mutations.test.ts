@@ -1,17 +1,17 @@
 import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { boardColumnSlugs, readArchive, readBoard } from '../src/core/board.js';
-import { defaultConfig } from '../src/core/config.js';
 import { ARCHIVE_SLUG, boardRel } from '../src/core/layout.js';
+import type { Card } from '../src/core/types.js';
+import { boardColumnSlugs, readArchive, readBoard } from '../src/store/cards/board.js';
 import {
   archiveCard,
   type CreateCardInput,
   createCard,
   placeCard,
   updateCard,
-} from '../src/core/mutations.js';
-import type { Card } from '../src/core/types.js';
+} from '../src/store/cards/mutations.js';
+import { defaultConfig } from '../src/store/project/config.js';
 import { cardFrom, tempDir } from './helpers.js';
 
 const config = defaultConfig('T');

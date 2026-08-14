@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { boundText, DIARY_KINDS, type DiaryEntry } from '../../core/diary.js';
 import { asText } from '../../core/parse.js';
 import { isBoard, oneOf } from '../../core/types.js';
-import { appendEntry, readDiary } from '../diary-store.js';
+import { appendEntry, readDiary } from '../../store/diary-store.js';
 import { type AppCtx, ensureOpen, nowIso } from '../route-context.js';
 
 // The diary over HTTP, and the only way in.

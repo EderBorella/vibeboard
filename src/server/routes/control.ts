@@ -1,8 +1,7 @@
 import type { FastifyInstance } from 'fastify';
-import { declaredCommands, writeSmokeCommand } from '../../core/foundation.js';
 import { FOUNDATION_FILES, foundationRel } from '../../core/layout.js';
 import { checkSmokeCommand } from '../../core/smoke-declaration.js';
-import { updateAutopilotState } from '../autopilot-store.js';
+import { updateAutopilotState } from '../../store/autopilot-store.js';
 import {
   createControlFile,
   deleteControlFile,
@@ -12,7 +11,8 @@ import {
   renameControlFile,
   writeControlFile,
   writeResources,
-} from '../control-files.js';
+} from '../../store/project/control-files.js';
+import { declaredCommands, writeSmokeCommand } from '../../store/project/foundation.js';
 import type { Scope } from '../credentials.js';
 import { type AppCtx, ensureOpen } from '../route-context.js';
 

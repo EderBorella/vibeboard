@@ -1,7 +1,7 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import matter from 'gray-matter';
-import { FOUNDATION_FILES, foundationRel } from './layout.js';
+import { FOUNDATION_FILES, foundationRel } from '../../core/layout.js';
 
 // Reading the foundation documents. Three readers, one rule: **absence is never a pass.** A project
 // whose test harness was never installed must not pass every card, which is what an empty gate list

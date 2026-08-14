@@ -1,9 +1,9 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { ensureControlFiles, ensurePointerFile } from '../src/core/control.js';
 import { CONVENTIONS_FILE, INSTRUCTIONS_FILE, POINTER_FILES } from '../src/core/layout.js';
-import { scaffoldProject } from '../src/core/scaffold.js';
+import { ensureControlFiles, ensurePointerFile } from '../src/store/project/control.js';
+import { scaffoldProject } from '../src/store/project/scaffold.js';
 import { tempDir } from './helpers.js';
 
 const read = (root: string, name: string): Promise<string> => readFile(join(root, name), 'utf8');

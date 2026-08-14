@@ -5,7 +5,7 @@ import {
   readAutopilotState,
   updateAutopilotState,
   writeAutopilotState,
-} from '../src/server/autopilot-store.js';
+} from '../src/store/autopilot-store.js';
 import { tempDir } from './helpers.js';
 
 // The three stops, driven directly rather than through the app, because the ordering that matters is

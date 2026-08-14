@@ -1,10 +1,10 @@
 import { mkdir, rename, writeFile } from 'node:fs/promises';
 import { basename, join } from 'node:path';
+import { serializeCard, toFrontmatter } from '../../core/card.js';
+import { nextId } from '../../core/ids.js';
+import { ARCHIVE_SLUG, boardRel } from '../../core/layout.js';
+import type { BoardName, Card, CardFrontmatter, ProjectConfig } from '../../core/types.js';
 import { boardColumnSlugs, readBoard, spentIds } from './board.js';
-import { serializeCard, toFrontmatter } from './card.js';
-import { nextId } from './ids.js';
-import { ARCHIVE_SLUG, boardRel } from './layout.js';
-import type { BoardName, Card, CardFrontmatter, ProjectConfig } from './types.js';
 
 const ORDER_STEP = 10;
 
@@ -38,7 +38,9 @@ async function writeCardFile(card: Card, exclusive = false): Promise<void> {
 // maps to, leaving the card invisible to readBoard while still holding its id. Every write that
 // names a column asks here first, so there is one answer to "is this a real column" rather than
 // one per call site: restoreCard checked, create and move did not, and that gap has produced
-// invisible cards twice (see the comments at config.ts:19 and run-prompt.ts:56).
+// invisible cards twice (see the comments on `DEFAULT_COLUMNS` in `project/config.ts` and above
+// `assistCredentialSection` in `server/prompt/credential.ts`). Named by symbol, not by line: the old
+// citation here read `run-prompt.ts:56`, and that file is now a 14-line barrel.
 function knownColumn(config: ProjectConfig, board: BoardName, columnSlug: string): boolean {
   return boardColumnSlugs(config, board).includes(columnSlug);
 }

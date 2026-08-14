@@ -12,9 +12,14 @@ import { type AutopilotConfig, DEFAULT_AUTOPILOT } from '../../core/autopilot.js
 import { coverageProblems, phaseSkillProblems, shapeProblems } from '../../core/autopilot-cover.js';
 import type { AutopilotState } from '../../core/autopilot-state.js';
 import { forClient, unreviewedGatesSentence } from '../../core/autopilot-state.js';
-import { readBoard } from '../../core/board.js';
 import { countLive } from '../../core/created.js';
 import { isStopReason, STOP_REASONS, type StopReason } from '../../core/dispatch-gate.js';
+import { PHASES, phase } from '../../core/phases.js';
+import type { RunRecord } from '../../core/runs.js';
+import type { BoardName, Card, ProjectConfig } from '../../core/types.js';
+import { BOARDS } from '../../core/types.js';
+import { readAutopilotState, updateAutopilotState } from '../../store/autopilot-store.js';
+import { readBoard } from '../../store/cards/board.js';
 import {
   type FoundationStatus,
   foundationStatus,
@@ -22,18 +27,13 @@ import {
   readGates,
   readSmokeCommand,
   type SmokeResult,
-} from '../../core/foundation.js';
-import { PHASES, phase } from '../../core/phases.js';
-import { type ReadmeGate, readmeGate } from '../../core/readme.js';
-import type { RunRecord } from '../../core/runs.js';
-import type { BoardName, Card, ProjectConfig } from '../../core/types.js';
-import { BOARDS } from '../../core/types.js';
-import { readAutopilotState, updateAutopilotState } from '../autopilot-store.js';
+} from '../../store/project/foundation.js';
+import { type ReadmeGate, readmeGate } from '../../store/project/readme.js';
+import { readSkills } from '../../store/project/skill-catalogue.js';
+import { listRuns } from '../../store/run-store.js';
 import { attachedOpencodeUrl } from '../opencode-server.js';
 import { type AppCtx, ensureOpen } from '../route-context.js';
-import { listRuns } from '../run-store.js';
 import { agentRefusal } from '../sandbox.js';
-import { readSkills } from '../skill-catalogue.js';
 
 // "Could auto-pilot start here, and if not, why not?" — answered in ONE place, so the settings tab,
 // the play button and pre-flight all read the same answer rather than each deciding for themselves.

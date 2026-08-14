@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { beforeAll, describe, expect, it, onTestFinished } from 'vitest';
 import { IDLE_STATE } from '../src/core/autopilot-state.js';
 import { foundationRel } from '../src/core/layout.js';
-import { readAutopilotState, writeAutopilotState } from '../src/server/autopilot-store.js';
+import { readAutopilotState, writeAutopilotState } from '../src/store/autopilot-store.js';
 import { openTestProject, testTmp, wsClient } from './helpers.js';
 
 // Pressing start, and every way it refuses. Each refusal has to name the way forward — a control whose

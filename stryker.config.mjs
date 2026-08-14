@@ -42,20 +42,31 @@ export default {
   mutate: [
     'src/core/**/*.ts',
     '!src/core/types.ts',
+    // The store layer, as a DIRECTORY. Eleven of these modules were measured by `src/core/**` and five
+    // more were named individually under `src/server/`; moving them all into `src/store/` would have
+    // dropped sixteen files out of the measurement with nothing to say so, because `.mjs` is invisible
+    // to both biome and tsc and a glob that matches nothing scores green over zero mutants. Verified
+    // against Stryker's own FileMatcher (minimatch over path.resolve) before and after the move, not
+    // assumed: 136 files before, 139 after.
+    //
+    // The three extra are diary-store.ts, suggestion-store.ts and autopilot-store.ts, which each have
+    // their own test file and were simply never listed. This block's rule is "every module that has real
+    // tests, and nothing else", so they belong here; the count going UP is the correction of an omission,
+    // not a widening of scope.
+    //
+    // Two of the individually-named entries this replaces carried reasons worth keeping:
+    // project/control-files.ts is the path sandbox behind Project Control (the `..` rejection, the symlink
+    // realpath walk, the category allow-list) and the closest thing in this tree to a security boundary;
+    // write-queue.ts holds the atomic write that run-store.ts used to have inline, so it is measured for
+    // the same reason redaction.ts is.
+    'src/store/**/*.ts',
     'src/server/routes/**/*.ts',
-    // Server modules with their own tests. control-files.ts first: it is the path sandbox behind
-    // Project Control (the `..` rejection, the symlink realpath walk, the category allow-list)
-    // and the closest thing here to a security boundary.
-    'src/server/control-files.ts',
-    'src/server/skill-catalogue.ts',
+    // Server modules with their own tests.
     'src/server/agent-runner.ts',
-    'src/server/run-store.ts',
-    // Extracted OUT of the two above, so listed with them for the reason the web block below states:
+    // Extracted OUT of agent-runner.ts, so listed with it for the reason the web block below states:
     // moving code out of a mutated file into an unmutated one loses the coverage silently.
-    // redaction.ts is the credential scrub the transcript, the report and the chat all go through;
-    // write-queue.ts now holds the atomic write that run-store.ts used to have inline.
+    // redaction.ts is the credential scrub the transcript, the report and the chat all go through.
     'src/server/redaction.ts',
-    'src/server/write-queue.ts',
     // The dispatch prompt, and the DIRECTORY rather than the barrel. `run-prompt.ts` is now a pure
     // re-export and has nothing to mutate, and no other pattern here reaches `src/server/prompt/` —
     // verified against Stryker's own FileMatcher, not assumed — so naming only the barrel would have
@@ -66,7 +77,6 @@ export default {
     'src/server/copilot-events.ts',
     'src/server/session.ts',
     'src/server/snapshot.ts',
-    'src/server/chat-store.ts',
     'src/server/discover.ts',
     'src/server/app-state.ts',
     'src/server/route-context.ts',

@@ -1,10 +1,16 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { parse, stringify } from 'yaml';
-import { DEFAULT_AUTOPILOT } from './autopilot.js';
-import { BACKEND_DEFAULTS, DEFAULT_BACKEND, defaultBackendMap } from './backends.js';
-import { CONFIG_DIR, CONFIG_FILE } from './layout.js';
-import { BOARDS, type BoardConfig, type BoardName, type CopilotConfig, type ProjectConfig } from './types.js';
+import { DEFAULT_AUTOPILOT } from '../../core/autopilot.js';
+import { BACKEND_DEFAULTS, DEFAULT_BACKEND, defaultBackendMap } from '../../core/backends.js';
+import { CONFIG_DIR, CONFIG_FILE } from '../../core/layout.js';
+import {
+  BOARDS,
+  type BoardConfig,
+  type BoardName,
+  type CopilotConfig,
+  type ProjectConfig,
+} from '../../core/types.js';
 
 // Tokens the copilot context bar treats as full. Per-project rather than hardcoded: context
 // windows differ by an order of magnitude between models, so one baked-in number is wrong for

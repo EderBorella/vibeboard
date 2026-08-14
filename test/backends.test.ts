@@ -2,16 +2,16 @@ import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
 import { BACKEND_DEFAULTS, backendDefaults, DEFAULT_BACKEND } from '../src/core/backends.js';
+import type { ProjectConfig } from '../src/core/types.js';
+import { ProjectSession } from '../src/server/session.js';
 import {
   configPath,
   defaultConfig,
   ensureContextBudget,
   ensureCopilotDefaults,
   writeConfig,
-} from '../src/core/config.js';
-import { scaffoldProject } from '../src/core/scaffold.js';
-import type { ProjectConfig } from '../src/core/types.js';
-import { ProjectSession } from '../src/server/session.js';
+} from '../src/store/project/config.js';
+import { scaffoldProject } from '../src/store/project/scaffold.js';
 import { tempDir } from './helpers.js';
 
 const TODAY = '2026-07-23';

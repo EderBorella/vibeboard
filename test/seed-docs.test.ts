@@ -1,10 +1,11 @@
-import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
+import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { ensureControlFiles } from '../src/core/control.js';
 import { DOCS_DIR } from '../src/core/layout.js';
-import { scaffoldProject } from '../src/core/scaffold.js';
-import { SEED_DOCS, seedDocs } from '../src/core/seed-docs.js';
+import { ensureControlFiles } from '../src/store/project/control.js';
+import { scaffoldProject } from '../src/store/project/scaffold.js';
+import { bundledDocsDir, SEED_DOCS, seedDocs } from '../src/store/project/seed-docs.js';
 import { tempDir } from './helpers.js';
 
 // The documents a person points an agent at.
@@ -90,5 +91,20 @@ describe('the bundled sources', () => {
     const root = await tempDir();
     const seeded = await seedDocs(root);
     expect(seeded).toEqual(SEED_DOCS.map((d) => d.name));
+  });
+
+  // The assertion is that the resolved directory is REALLY THERE, because a wrong path here passes
+  // every other kind of check: it type-checks, and the reader above swallows the failed read as a
+  // packaging problem. This module resolves the directory by climbing from its own location, so the
+  // answer changes whenever the file moves — the previous version counted two `..` segments and would
+  // have pointed at a non-existent `src/docs` the moment it was filed one level deeper.
+  it('resolves a bundled docs directory that exists on disk, whatever depth this module sits at', async () => {
+    const dir = bundledDocsDir();
+
+    expect(existsSync(dir), dir).toBe(true);
+    expect((await stat(dir)).isDirectory()).toBe(true);
+    for (const doc of SEED_DOCS) {
+      expect(existsSync(join(dir, doc.source)), join(dir, doc.source)).toBe(true);
+    }
   });
 });

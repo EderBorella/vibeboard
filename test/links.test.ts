@@ -1,14 +1,14 @@
 import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { boardColumnSlugs, readBoard } from '../src/core/board.js';
-import { readConfig } from '../src/core/config.js';
 import { findCard } from '../src/core/find.js';
 import { boardRel } from '../src/core/layout.js';
-import { boardOfId, createLinkedCard, setCardLinks } from '../src/core/links.js';
-import { type CreateCardInput, createCard } from '../src/core/mutations.js';
-import { scaffoldProject } from '../src/core/scaffold.js';
 import type { Card, ProjectConfig } from '../src/core/types.js';
+import { boardColumnSlugs, readBoard } from '../src/store/cards/board.js';
+import { boardOfId, createLinkedCard, setCardLinks } from '../src/store/cards/links.js';
+import { type CreateCardInput, createCard } from '../src/store/cards/mutations.js';
+import { readConfig } from '../src/store/project/config.js';
+import { scaffoldProject } from '../src/store/project/scaffold.js';
 import { cardFrom, tempDir } from './helpers.js';
 
 const TODAY = '2026-07-23';

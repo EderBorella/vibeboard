@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { describe, expect, it, onTestFinished } from 'vitest';
 import type { DiaryEntry } from '../src/core/diary.js';
 import { PROJECT_LOG_FILE } from '../src/core/layout.js';
-import { readDiary } from '../src/server/diary-store.js';
+import { readDiary } from '../src/store/diary-store.js';
 import { openTestProject, tempDir, wsClient } from './helpers.js';
 
 // The diary over HTTP. Written through an endpoint and never by an agent writing the file: a run already

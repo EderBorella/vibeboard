@@ -2,9 +2,9 @@ import type { Spend } from '../src/core/accounting.js';
 import type { TickAction } from '../src/core/actions.js';
 import { DEFAULT_AUTOPILOT } from '../src/core/autopilot.js';
 import type { AutopilotState } from '../src/core/autopilot-state.js';
-import type { DeclaredCommands } from '../src/core/foundation.js';
 import type { TickInput } from '../src/core/tick.js';
 import type { BoardName, Card } from '../src/core/types.js';
+import type { DeclaredCommands } from '../src/store/project/foundation.js';
 
 // The board the tick is asked about, shared by tick.test.ts and tick-stop-sentences.test.ts. One home
 // rather than two copies: both files drive the machine through `decideTick`, so a fixture that drifted

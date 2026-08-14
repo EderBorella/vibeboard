@@ -1,7 +1,7 @@
+import type { CardProblem } from '../../store/cards/board.js';
+import type { DeclaredCommands } from '../../store/project/foundation.js';
 import type { AutopilotConfig } from '../autopilot.js';
-import type { CardProblem } from '../board.js';
 import { hasUnfinishedChildren } from '../derived-status.js';
-import type { DeclaredCommands } from '../foundation.js';
 import type { Card } from '../types.js';
 
 // WHAT A PERSON READS WHEN THE LOOP STOPS. Split out of the machine because it is a different subject:

@@ -3,20 +3,20 @@ import { appendFile, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it, onTestFinished } from 'vitest';
 import type { DiaryEntry } from '../src/core/diary.js';
-import { declaredCommands } from '../src/core/foundation.js';
 import { HARNESS_FEATURE } from '../src/core/harness-feature.js';
 import { childrenOf, isLive, parentBoardOf, parentOf } from '../src/core/hierarchy.js';
 import { skillRel } from '../src/core/layout.js';
 import type { RunRecord } from '../src/core/runs.js';
 import type { BoardName, Card } from '../src/core/types.js';
+import { type ActDeps, performAction } from '../src/service/act.js';
+import { BoardClient } from '../src/service/board-client.js';
+import { type LoopEnded, runLoop } from '../src/service/loop.js';
 import {
   readAutopilotState,
   updateAutopilotState,
   writeAutopilotState,
-} from '../src/server/autopilot-store.js';
-import { type ActDeps, performAction } from '../src/service/act.js';
-import { BoardClient } from '../src/service/board-client.js';
-import { type LoopEnded, runLoop } from '../src/service/loop.js';
+} from '../src/store/autopilot-store.js';
+import { declaredCommands } from '../src/store/project/foundation.js';
 import {
   injectFetch,
   makeReady,

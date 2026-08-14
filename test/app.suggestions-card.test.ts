@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { readBoard } from '../src/core/board.js';
 import type { Card, ProjectConfig } from '../src/core/types.js';
 import { allows } from '../src/server/auth.js';
 import type { Credential } from '../src/server/credentials.js';
-import { listSuggestions } from '../src/server/suggestion-store.js';
+import { readBoard } from '../src/store/cards/board.js';
+import { listSuggestions } from '../src/store/suggestion-store.js';
 import { openTestProject, type TestProject } from './helpers.js';
 
 // POST /api/suggestions/:id/card — ONE endpoint, not three calls (decision 50). It finds the open

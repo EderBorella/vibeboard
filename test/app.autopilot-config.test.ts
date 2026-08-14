@@ -3,9 +3,9 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { parse, stringify } from 'yaml';
 import { coverageProblems } from '../src/core/autopilot-cover.js';
-import { configPath, readConfig, writeConfig } from '../src/core/config.js';
 import { boardRel } from '../src/core/layout.js';
 import type { ProjectConfig } from '../src/core/types.js';
+import { configPath, readConfig, writeConfig } from '../src/store/project/config.js';
 import { openTestProject } from './helpers.js';
 
 // The routing table names columns by slug on both sides, and a column IS a folder. Renaming one

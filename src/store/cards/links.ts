@@ -1,8 +1,8 @@
 import { rm } from 'node:fs/promises';
+import { oneParentProblem } from '../../core/hierarchy.js';
+import { BOARDS, type BoardName, type Card, type ProjectConfig } from '../../core/types.js';
 import { readBoard, spentIds } from './board.js';
-import { oneParentProblem } from './hierarchy.js';
 import { type CreateCardInput, createCard, updateCard } from './mutations.js';
-import { BOARDS, type BoardName, type Card, type ProjectConfig } from './types.js';
 
 // Link target ids are self-describing: "F-###" feature, "P-###" product, "E-###" engineering.
 export function boardOfId(id: string): BoardName {

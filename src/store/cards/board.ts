@@ -1,13 +1,18 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { boardColumnSlugs } from './board/columns.js';
-import { parseCardContent } from './card.js';
-import { ARCHIVE_SLUG, boardRel } from './layout.js';
-import type { BoardName, Card, ProjectConfig } from './types.js';
+import { boardColumnSlugs } from '../../core/board/columns.js';
+import { parseCardContent } from '../../core/card.js';
+import { ARCHIVE_SLUG, boardRel } from '../../core/layout.js';
+import type { BoardName, Card, ProjectConfig } from '../../core/types.js';
 
-// Re-exported, not redefined. The definition moved to `board/columns.ts` so that a module needing only
-// the column list does not inherit this one's `node:fs` — but everything that already reads the board
-// asks for both from here, and a rename across 20-odd call sites would be churn for nothing.
+// Re-exported, not redefined. The definition lives in `core/board/columns.ts` — and now in a different
+// LAYER, which is the point: it is pure config reading, so a module needing only the column list must not
+// inherit this one's `node:fs`. Everything that already reads the board asks for both from here, and a
+// rename across 20-odd call sites would be churn for nothing.
+//
+// Two callers deliberately do NOT come through here and go straight to the pure module instead:
+// `src/service/loop.ts`, because the loop must gain no edge into this layer, and the pure `core/`
+// modules that only ever wanted the list.
 export { boardColumnSlugs };
 
 // Every id this board has spent, taken from FILENAMES rather than from parsed cards. A card is

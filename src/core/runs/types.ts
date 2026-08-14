@@ -5,7 +5,7 @@ import type { Verification } from '../verify.js';
 // Its frontmatter is VibeBoard's record of what was dispatched and how it ended; its body is the
 // agent's report, verbatim.
 //
-// `readBoard` only reads folders named by configured columns (core/board.ts), so a `results/` folder
+// `readBoard` only reads folders named by configured columns (store/cards/board.ts), so a `results/` folder
 // is invisible to the board with no exclusion logic — which is why the card's run history can live
 // next to the card without appearing on it.
 

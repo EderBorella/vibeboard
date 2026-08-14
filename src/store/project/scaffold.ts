@@ -2,10 +2,7 @@ import { execFile } from 'node:child_process';
 import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
-import { boardColumnSlugs } from './board.js';
-import { defaultConfig, writeConfig } from './config.js';
-import { ensurePointerFile, INSTRUCTIONS_DOC } from './control.js';
-import { entryBlock } from './diary.js';
+import { entryBlock } from '../../core/diary.js';
 import {
   ARCHIVE_SLUG,
   BOARDS_DIR,
@@ -15,12 +12,15 @@ import {
   INSTRUCTIONS_FILE,
   POINTER_FILES,
   PROJECT_LOG_FILE,
-} from './layout.js';
-import { setCardLinks } from './links.js';
-import { type CreateCardInput, createCard } from './mutations.js';
+} from '../../core/layout.js';
+import { BOARDS, type BoardName, type Card, type ProjectConfig } from '../../core/types.js';
+import { boardColumnSlugs } from '../cards/board.js';
+import { setCardLinks } from '../cards/links.js';
+import { type CreateCardInput, createCard } from '../cards/mutations.js';
+import { defaultConfig, writeConfig } from './config.js';
+import { ensurePointerFile, INSTRUCTIONS_DOC } from './control.js';
 import { seedDocs } from './seed-docs.js';
 import { seedSkills } from './seed-skills.js';
-import { BOARDS, type BoardName, type Card, type ProjectConfig } from './types.js';
 
 export type ScaffoldMode = 'greenfield' | 'brownfield';
 

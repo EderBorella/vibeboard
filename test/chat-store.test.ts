@@ -1,11 +1,11 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { defaultConfig } from '../src/core/config.js';
 import { CHAT_DIR } from '../src/core/layout.js';
 import type { ProjectConfig } from '../src/core/types.js';
-import { ChatStore } from '../src/server/chat-store.js';
 import type { CopilotEvent } from '../src/server/copilot-events.js';
+import { ChatStore } from '../src/store/chat-store.js';
+import { defaultConfig } from '../src/store/project/config.js';
 import { tempDir } from './helpers.js';
 
 interface Ref {

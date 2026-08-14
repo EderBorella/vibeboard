@@ -1,3 +1,5 @@
+import type { CardProblem } from '../../store/cards/board.js';
+import type { DeclaredCommands } from '../../store/project/foundation.js';
 import { attemptsUsed, burnsAttempt, type Spend } from '../accounting.js';
 import type { TickAction } from '../actions.js';
 import {
@@ -9,7 +11,6 @@ import {
 import { shapeProblems } from '../autopilot-cover.js';
 import type { AutopilotState } from '../autopilot-state.js';
 import { byQueueOrder } from '../board/ordering.js';
-import type { CardProblem } from '../board.js';
 import {
   creatingRoundSpent,
   inconclusiveReviews,
@@ -20,7 +21,6 @@ import {
 } from '../bounds.js';
 import { allSettled, isSettled } from '../derived-status.js';
 import { mayDispatch, type StopReason } from '../dispatch-gate.js';
-import type { DeclaredCommands } from '../foundation.js';
 import { liveCards } from '../hierarchy.js';
 import { ARCHIVE_SLUG } from '../layout.js';
 import { type PhaseName, phase } from '../phases.js';

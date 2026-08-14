@@ -1,9 +1,9 @@
 import type { FastifyReply } from 'fastify';
 import type { ProjectConfig } from '../core/types.js';
+import type { ChatStore } from '../store/chat-store.js';
 import type { AgentRunner } from './agent-runner.js';
 import type { AutopilotRuntime } from './autopilot-runtime.js';
 import type { BoxService } from './box-service.js';
-import type { ChatStore } from './chat-store.js';
 import type { CopilotSession } from './copilot.js';
 import type { CopilotAuthority } from './copilot-authority.js';
 import type { CredentialStore } from './credentials.js';

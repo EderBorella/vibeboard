@@ -8,14 +8,8 @@ import type { Skill } from '../src/core/skills.js';
 import type { BoardName, Card } from '../src/core/types.js';
 import { AgentRunner, type DispatchInput, type RunnerOptions } from '../src/server/agent-runner.js';
 import { type Credential, CredentialStore, type Scope } from '../src/server/credentials.js';
-import {
-  listCardRuns,
-  readProjectRun,
-  readRun,
-  reportPath,
-  transcriptTail,
-} from '../src/server/run-store.js';
-import { countRunSuggestions, writeSuggestion } from '../src/server/suggestion-store.js';
+import { listCardRuns, readProjectRun, readRun, reportPath, transcriptTail } from '../src/store/run-store.js';
+import { countRunSuggestions, writeSuggestion } from '../src/store/suggestion-store.js';
 import { tempDir } from './helpers.js';
 
 const SHIM = join(process.cwd(), 'test', 'fixtures', 'fake-agent.mjs');
@@ -966,7 +960,7 @@ describe('the run credential', () => {
   it('revokes the credential when settling itself throws', async () => {
     const root = await tempDir();
     const store = new RecordingStore('admin');
-    const runStore = await import('../src/server/run-store.js');
+    const runStore = await import('../src/store/run-store.js');
     vi.spyOn(runStore, 'foldReport').mockRejectedValue(new Error('disk went away mid-settle'));
 
     const { instance } = runner(root, { credentials: store });

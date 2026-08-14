@@ -1,8 +1,8 @@
 import { mkdir, readdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { reconcileColumns, validateColumns } from '../src/core/columns.js';
 import { ARCHIVE_SLUG, boardRel } from '../src/core/layout.js';
+import { reconcileColumns, validateColumns } from '../src/store/cards/columns.js';
 import { tempDir } from './helpers.js';
 
 async function board(root: string, slugs: string[], cards: Record<string, string[]> = {}): Promise<void> {

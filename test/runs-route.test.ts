@@ -5,9 +5,9 @@ import { describe, expect, it } from 'vitest';
 import { IDLE_STATE } from '../src/core/autopilot-state.js';
 import { boardRel, FOUNDATION_DIR, RESULTS_DIR, RUNS_DIR } from '../src/core/layout.js';
 import type { RunRecord } from '../src/core/runs.js';
-import { writeAutopilotState } from '../src/server/autopilot-store.js';
-import { readProjectRun, readRun, writeRun } from '../src/server/run-store.js';
 import { ProjectSession } from '../src/server/session.js';
+import { writeAutopilotState } from '../src/store/autopilot-store.js';
+import { readProjectRun, readRun, writeRun } from '../src/store/run-store.js';
 import { openTestProject, shimArgsLog, type TestProject, testApp, wsClient } from './helpers.js';
 
 const SHIM = join(process.cwd(), 'test', 'fixtures', 'fake-agent.mjs');

@@ -5,7 +5,7 @@ import {
   isBlockedColumn,
   isTerminalColumn,
 } from '../src/core/autopilot.js';
-import { defaultConfig } from '../src/core/config.js';
+import { defaultConfig } from '../src/store/project/config.js';
 
 describe('the autopilot block', () => {
   it('treats terminal and blocked as explicit facts, never as the absence of a route', () => {

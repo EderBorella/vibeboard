@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { boardColumnSlugs } from '../src/core/board.js';
 import { ProjectSession } from '../src/server/session.js';
+import { boardColumnSlugs } from '../src/store/cards/board.js';
 import { openTestProject, testApp, wsClient } from './helpers.js';
 
 interface WsMessage {

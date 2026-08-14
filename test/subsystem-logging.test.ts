@@ -4,7 +4,6 @@ import { join } from 'node:path';
 import { Writable } from 'node:stream';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CONFIG_DIR, CONFIG_FILE } from '../src/core/layout.js';
-import { ChatStore } from '../src/server/chat-store.js';
 import type { CopilotEvent } from '../src/server/copilot-events.js';
 import { installCrashHandlers, type Log } from '../src/server/logging.js';
 import { modelStatus } from '../src/server/models.js';
@@ -16,6 +15,7 @@ import {
   stopOpencodeServer,
 } from '../src/server/opencode-server.js';
 import { ProjectSession } from '../src/server/session.js';
+import { ChatStore } from '../src/store/chat-store.js';
 import { openTestProject, tempDir, testApp, wsClient } from './helpers.js';
 
 // Everything here is about failures that used to happen in silence: they are all deliberately

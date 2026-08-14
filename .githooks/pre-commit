@@ -1,24 +1,47 @@
 #!/usr/bin/env bash
 #
-# VibeBoard pre-commit gate. Runs the checks that are cheap enough to afford on every commit:
-# formatting, all three typechecks, and the full test suite. Roughly 4-5 seconds.
+# VibeBoard pre-commit gate: formatting, all three typechecks, lint, and the full test suite.
+# Roughly 45 seconds — 40 of it the 3,786 tests.
 #
 # Installed by the `prepare` script in package.json (git config core.hooksPath .githooks), so a
 # fresh clone gets it from `npm install` rather than from remembering to run something.
 #
+# EVERY CHECK RUNS AGAINST THE INDEX, NOT THE WORKING TREE. That distinction is the whole design,
+# and both halves of getting it wrong were reproduced against this hook before it was rewritten:
+#
+#   * an untracked file holding one type error blocked a commit that did not contain it — and the
+#     only way past was `--no-verify`, which is how a gate stops being a gate;
+#   * staged broken content PASSED, because the working tree had already been fixed, so a commit
+#     that does not typecheck would have landed with six green ticks above it.
+#
+# `git checkout-index` rather than `git stash --keep-index`: the stash trick is the usual advice
+# and it can lose unstaged work when the pop conflicts. A hook that can eat your edits is worse
+# than no hook. This copies OUT of the index and never touches the working tree at all.
+#
 # Bypass with `git commit --no-verify` when you genuinely need to (a WIP checkpoint, a commit that
-# only exists to be amended). That escape hatch is the reason this can afford to be strict.
+# only exists to be amended). That escape hatch is the reason this can afford to be strict — and
+# needing it routinely is a bug in this file, not in your workflow.
 #
 # Deliberately NOT here: `npm run mutate`. Mutation testing is minutes, not seconds, and it answers
 # a question ("would anyone notice if this broke") that does not need answering on every commit.
 
 set -uo pipefail
-cd "$(git rev-parse --show-toplevel)" || exit 1
+REPO=$(git rev-parse --show-toplevel) || exit 1
+cd "$REPO" || exit 1
 
-BIOME=./node_modules/.bin/biome
-VITEST=./node_modules/.bin/vitest
-LOGS=$(mktemp -d)
-trap 'rm -rf "$LOGS"' EXIT
+LOGS=$(mktemp -d) || exit 1
+SNAP=""
+# The symlink is unlinked by name before the recursive delete. `rm -rf` would not follow it anyway,
+# but node_modules is 400 MB of other people's work and the cost of being wrong about that once is
+# not worth the two saved characters.
+cleanup() {
+  rm -rf "$LOGS"
+  if [ -n "$SNAP" ]; then
+    rm -f "$SNAP/node_modules"
+    rm -rf "$SNAP"
+  fi
+}
+trap cleanup EXIT
 fail=0
 
 dim() { printf '\033[2m%s\033[0m\n' "$1"; }
@@ -30,20 +53,41 @@ bad() {
 
 # A commit touching only markdown or images cannot break a typecheck or a test. Skipping those
 # keeps card edits and doc commits instant, which is most of what this repo's own board produces.
-code_staged=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '\.(ts|tsx|json|jsonc|mjs|js)$' || true)
+#
+# `D` belongs in the filter: deleting the last importer of a module, or a fixture a test reads, is a
+# commit that breaks the build while touching no surviving line. Without it such a commit read as
+# "no code staged" and skipped every check — verified by staging a deletion of src/core/money.ts,
+# which the old filter waved through and this one blocks.
+code_staged=$(git diff --cached --name-only --diff-filter=ACMRD | grep -E '\.(ts|tsx|json|jsonc|mjs|js)$' || true)
 if [ -z "$code_staged" ]; then
   dim "pre-commit: no code staged, skipping typecheck and tests"
   exit 0
 fi
 
-if [ ! -x "$BIOME" ] || [ ! -x "$VITEST" ]; then
-  printf '\033[31m✗\033[0m dependencies missing — run `npm install` (looked for %s)\n' "$BIOME"
+if [ ! -x "$REPO/node_modules/.bin/biome" ] || [ ! -x "$REPO/node_modules/.bin/vitest" ]; then
+  printf '\033[31m✗\033[0m dependencies missing — run `npm install`\n'
   exit 1
 fi
 
+# ---- the snapshot -----------------------------------------------------------------------------
+# 511 files, ~40 ms. node_modules is symlinked rather than copied, which is the only reason this is
+# affordable; everything else the checks read is tracked, verified by running the whole suite in
+# here (3,786 passed) rather than by assuming it.
+SNAP=$(mktemp -d) || exit 1
+if ! git checkout-index --all --prefix="$SNAP/" 2>"$LOGS/snap.log"; then
+  printf '\033[31m✗\033[0m could not read the staged tree\n'
+  cat "$LOGS/snap.log"
+  exit 1
+fi
+ln -s "$REPO/node_modules" "$SNAP/node_modules" || exit 1
+cd "$SNAP" || exit 1
+
+VITEST=./node_modules/.bin/vitest
+
 # ---- formatting -------------------------------------------------------------------------------
-# Checks the whole tree, not just staged files: formatting drift anywhere is a one-command fix and
-# leaving it to rot is how a formatter stops being trusted.
+# Checks every staged file, not only the ones this commit touches: formatting drift anywhere in the
+# committed tree is a one-command fix, and leaving it to rot is how a formatter stops being trusted.
+# Unstaged drift is none of this commit's business and no longer reaches here.
 if npm run format:check --silent >"$LOGS/format.log" 2>&1; then
   ok "format"
 else

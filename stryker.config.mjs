@@ -82,11 +82,19 @@ export default {
     // git-measure.ts at 90.6%. Worst: act/sentences.ts at 58.7% and commands.ts at 61.0%. The 205
     // survivors are the point of having done this and are not fixed here.
     'src/service/**/*.ts',
-    // EXCLUDED WITH A MEASURED REASON, not a guess: three test files name it — service-process,
-    // lifecycle-trace and the fake-service fixture — but every one of them SPAWNS it as a child
-    // process, so no mutant in it is ever executed in the runner. It scored 0.00% on 52 mutants, all
-    // "no coverage", which is exactly the case this list's rule excludes: it drags the total down
-    // while reporting a gap already known. Same category as src/server/main.ts above.
+    // EXCLUDED because a mutant in a CHILD PROCESS is never executed in the runner: its behaviour is an
+    // exit code, so test/service-main.test.ts spawns it for real through tsx, and mutation testing
+    // cannot follow. It scored 0.00% on 52 mutants, every one "no coverage" — the case this list's rule
+    // excludes, since it drags the total down while reporting a gap nothing here can close. Same
+    // category as src/server/main.ts above.
+    //
+    // CORRECTION (2026-08-14): this row first said three test files named it and each spawned it, so the
+    // 0% was the tool's blind spot rather than a gap. Two of the three do not run it at all —
+    // service-process.test.ts spawns `fixtures/fake-service.mjs`, and lifecycle-trace.test.ts calls
+    // `runLoop` and `performAction` "composed the way src/service/main.ts composes it", which is a copy
+    // of the wiring — so the file had NO test of any kind, and its two refusals (a missing environment
+    // variable, a project no longer open) were unguarded. test/service-main.test.ts is that test, and
+    // the sentence above is only true now that it exists.
     '!src/service/main.ts',
     'src/exec/**/*.ts',
     // EVERY ROUTE MODULE, BY THE CONVENTION THAT NAMES IT, and this replaces `src/server/routes/**/*.ts`.

@@ -6,7 +6,7 @@ import { normaliseRel, resolveInRoot } from './fs-sandbox.js';
 // Changing the project from the Explorer tab. Same boundary as reading it (fs-sandbox.ts) and the
 // same absence of an allow-list: any path under the root is fair game.
 
-export type WriteResult = 'ok' | 'not-text' | 'invalid';
+type WriteResult = 'ok' | 'not-text' | 'invalid';
 
 // Save a text file. Refuses to write over a file the app could not show — a binary or oversized file
 // never reached the editor as text, so whatever is in the buffer is not a version of it.
@@ -68,9 +68,9 @@ async function isDir(abs: string): Promise<boolean> {
 
 const DEFAULT_NAMES = { file: 'Untitled.md', dir: 'New folder' } as const;
 
-export type NewKind = keyof typeof DEFAULT_NAMES;
+type NewKind = keyof typeof DEFAULT_NAMES;
 
-export function isNewKind(k: unknown): k is NewKind {
+function isNewKind(k: unknown): k is NewKind {
   return k === 'file' || k === 'dir';
 }
 
@@ -181,7 +181,7 @@ async function describe(root: string, rel: string): Promise<FsNode> {
 
 // --- Deleting ---------------------------------------------------------------
 
-export type DeleteResult = 'ok' | 'not-empty' | 'wrong-name' | 'invalid';
+type DeleteResult = 'ok' | 'not-empty' | 'wrong-name' | 'invalid';
 
 // Delete one entry: a file, a symlink, or an empty folder. Resolved with follow:false so deleting a
 // symlink removes the link rather than what it points at — including one pointing out of the project,

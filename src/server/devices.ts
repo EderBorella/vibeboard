@@ -25,7 +25,7 @@ import { adminTokenFile, constantTimeEqual, sha256Hex } from './credentials.js';
 // live secrets out of its memory whatever is on disk. This narrows the at-rest surface. It does not
 // make the server's memory safe, and nothing in this file could.
 
-export interface DeviceRecord {
+interface DeviceRecord {
   // A name, never a secret. It appears in the device list, in logs, and in the URL of the revoke
   // call, and none of that would be safe if holding it were worth anything.
   id: string;
@@ -44,7 +44,7 @@ export interface DeviceRecord {
 
 // What the browser is allowed to see. No `hash`: a digest on screen is a digest in a screenshot, and
 // it tells the user nothing they can act on.
-export interface DeviceView {
+interface DeviceView {
   id: string;
   label: string;
   address: string;
@@ -109,7 +109,7 @@ function parse(content: string): DeviceRecord[] | 'unreadable' {
   return devices as DeviceRecord[];
 }
 
-export interface DeviceStoreOptions {
+interface DeviceStoreOptions {
   file?: string;
   now?: () => Date;
 }

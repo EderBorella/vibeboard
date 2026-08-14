@@ -14,7 +14,7 @@ import { join } from 'node:path';
 
 // Exported so the sandbox suite can assert this stays writable: the profile denies the admin token
 // by name rather than denying `~/.vibeboard/`, because both CLIs write their config in here.
-export function copilotHome(): string {
+function copilotHome(): string {
   return process.env.VIBEBOARD_COPILOT_HOME ?? join(homedir(), '.vibeboard', 'copilot');
 }
 
@@ -45,7 +45,7 @@ export function claudeConfigDir(): string {
 //    several containers and the user on one file as concurrent writers.
 //
 // So each project gets its own, named by a digest of its path for the same reason a box is.
-export function projectStateDir(projectRoot: string): string {
+function projectStateDir(projectRoot: string): string {
   const digest = createHash('sha256').update(projectRoot).digest('hex').slice(0, 12);
   return join(copilotHome(), 'projects', digest);
 }

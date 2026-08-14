@@ -64,7 +64,7 @@ export function constantTimeEqual(a: string, b: string): boolean {
 // What a signed-in browser's credential is checked against. A narrow interface rather than the
 // DeviceStore type, because devices.ts imports this module for the token path — naming the class here
 // would make that a cycle.
-export interface DeviceAuthority {
+interface DeviceAuthority {
   verify(token: string): string | null;
   touch(id: string): Promise<void>;
 }

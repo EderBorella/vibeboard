@@ -2,7 +2,7 @@ import type { RunRecord, RunStatus } from '../api';
 
 // How the dashboard groups runs. Three columns, because there are three things a person wants to
 // know: what is happening, what is waiting for me, and what came back.
-export type RunGroup = 'active' | 'attention' | 'done';
+type RunGroup = 'active' | 'attention' | 'done';
 
 const GROUPS: Record<RunStatus, RunGroup> = {
   queued: 'active',

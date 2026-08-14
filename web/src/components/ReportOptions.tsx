@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-export interface ColumnChoice {
+interface ColumnChoice {
   slug: string;
   name: string;
 }

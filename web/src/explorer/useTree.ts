@@ -32,7 +32,7 @@ export function flatten(
   return rows;
 }
 
-export interface Tree {
+interface Tree {
   rows: TreeRow[];
   busy: boolean;
   error: string | null;

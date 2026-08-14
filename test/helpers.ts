@@ -74,7 +74,7 @@ export function shimArgsLog(): string {
   return join(mkdtempSync(join(testTmp(), 'vibeboard-shim-')), 'args.log');
 }
 
-export const TEST_ADMIN_TOKEN = 'test-admin-token';
+const TEST_ADMIN_TOKEN = 'test-admin-token';
 
 // Every agent needs a sandbox, so every test that dispatches one needs a status that says so. The
 // suite still travels the REAL wrapping — `wrapCommand` builds a genuine `docker exec` argv and the
@@ -106,7 +106,7 @@ const fakeDockerRun: DockerRun = async (args) => {
   return { code: 0, stdout: '', stderr: '' };
 };
 
-export interface TestAppOpts {
+interface TestAppOpts {
   runBin?: string;
   serviceCommand?: () => ServiceCommand;
   logger?: FastifyServerOptions['logger'];
@@ -287,7 +287,7 @@ export async function makeReady(
   }
 }
 
-export interface WsTestClient<M> {
+interface WsTestClient<M> {
   ws: WebSocket;
   messages: M[];
   open: Promise<void>;

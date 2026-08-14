@@ -20,7 +20,7 @@ import { UtilityDock } from './UtilityDock';
 
 // Grouped rather than spread across twenty loose props: each of these is one concern the work area
 // passes through, and naming them keeps the call site readable.
-export interface WorkAreaProps {
+interface WorkAreaProps {
   snapshot: ProjectSnapshot;
   tab: MainTab;
   // App's project counter. Threaded rather than defaulted, so the diary refetches on a project switch —

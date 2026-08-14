@@ -35,7 +35,7 @@ export function onUnauthorized(fn: () => void): void {
   unauthorizedHandler = fn;
 }
 
-export interface RequestOptions {
+interface RequestOptions {
   // What to say when the server sends no `error` of its own. The server's words win where it has any.
   fallback?: string;
   // Statuses that are a normal answer for this endpoint rather than a failure, handed back to the

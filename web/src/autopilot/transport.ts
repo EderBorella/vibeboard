@@ -10,7 +10,7 @@ import { type AutopilotState, isSuccessReason, type Readiness, type RunList, typ
 export type Tone = 'idle' | 'running' | 'stopped' | 'complete' | 'halted';
 
 // One thing an agent is doing right now, named the way a person would name it.
-export interface ActiveWork {
+interface ActiveWork {
   run: string;
   label: string;
   skill: string;
@@ -19,7 +19,7 @@ export interface ActiveWork {
   waiting: boolean;
 }
 
-export interface TransportModel {
+interface TransportModel {
   // The one big button. `kind` is what it does, not what it looks like.
   control: { kind: 'play' | 'stop'; disabled: boolean; label: string; title: string };
   // Always a sentence, never blank: a strip that says nothing is a strip nobody trusts.

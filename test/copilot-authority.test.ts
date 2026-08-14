@@ -15,7 +15,7 @@ import { CopilotAuthority } from '../src/server/copilot/copilot-authority.js';
 import { redactCredential } from '../src/server/redaction.js';
 import { unreviewedGatesRefusal } from '../src/server/runs/routes.js';
 import { readAutopilotState, writeAutopilotState } from '../src/store/autopilot-store.js';
-import { TEST_SANDBOX, tempDir } from './helpers.js';
+import { fixedSandbox, TEST_SANDBOX, tempDir } from './helpers.js';
 
 // The chat copilot's authority: what the `assist` scope may do, what it may not, and the fact that its
 // credential dies with the conversation.
@@ -40,7 +40,7 @@ async function open(): Promise<Ctx> {
   // A real sandbox, because otherwise `agentRefusal` answers every auto-pilot start with 412 BEFORE
   // readiness is consulted — which made the block-on-unreviewed-gates assertion below pass with the
   // entire feature deleted.
-  const app = buildApp(session, { credentials: store, logger: false, sandbox: TEST_SANDBOX });
+  const app = buildApp(session, { credentials: store, logger: false, sandbox: fixedSandbox(TEST_SANDBOX) });
   const root = await tempDir();
   onTestFinished(async () => {
     await app.close();

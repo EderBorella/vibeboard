@@ -24,7 +24,7 @@ import { countRunSuggestions } from '../../store/suggestion-store.js';
 import { type Backend, type RunningTurn, runAgentTurn } from '../agent-turn.js';
 import type { Credential, CredentialStore } from '../auth/credentials.js';
 import type { BoxService } from '../boxes/box-service.js';
-import type { SandboxStatus } from '../boxes/sandbox.js';
+import { type LiveSandbox, NOT_REQUESTED } from '../boxes/sandbox.js';
 import type { ResultStats } from '../copilot-events.js';
 import { errorText } from '../errors.js';
 import type { Log } from '../logging.js';
@@ -93,7 +93,8 @@ export interface RunnerOptions {
   bin?: string;
   // Confines every run this runner dispatches. Absent means unconfined, which is what a test about
   // something else wants; the composition root passes the probe's answer.
-  sandbox?: SandboxStatus;
+  // Live, resolved in #spawn. A runner is constructed with the app and dispatches for hours after.
+  sandbox?: LiveSandbox;
   // Where a run actually executes. Resolved per dispatch rather than held, because the box belongs to
   // the PROJECT and the open project changes — and because a box can be removed underneath us by a
   // prune or an image rebuild, so the answer has to be asked for again each time.
@@ -379,7 +380,7 @@ export class AgentRunner {
       effort: input.effort,
       timeoutMs,
       bin: this.#opts.bin,
-      sandbox: this.#opts.sandbox,
+      sandbox: this.#opts.sandbox ? await this.#opts.sandbox() : NOT_REQUESTED,
       ...(box ? { box } : {}),
       onEvent: (event) => {
         // Chained, not fired and forgotten. Two reasons, both real: concurrent appends of one line

@@ -53,7 +53,7 @@ export function createCopilotTurns(ctx: AppCtx): {
   // complexity budget, and flattening beats suppressing the rule.
   const sendRefusal = async (): Promise<string | undefined> => {
     // The chat is an agent too, and it auto-approves its own tool calls. Same gate, same reason.
-    const refusal = agentRefusal(ctx.sandbox, attachedOpencodeUrl());
+    const refusal = agentRefusal(await ctx.sandbox(), attachedOpencodeUrl());
     if (refusal) return refusal;
     // Decision 12: while halted the chat "says plainly that the project is halted". Refused HERE, in
     // front of the spawn, rather than left to the lazy-respawn gate deeper down: that one produces a

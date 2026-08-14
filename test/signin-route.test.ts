@@ -8,7 +8,7 @@ import { CredentialStore } from '../src/server/auth/credentials.js';
 import { DeviceStore } from '../src/server/auth/devices.js';
 import { ProjectSession } from '../src/server/boards/session.js';
 import { writeAutopilotState } from '../src/store/autopilot-store.js';
-import { TEST_SANDBOX, tempDir, testBoxes } from './helpers.js';
+import { fixedSandbox, TEST_SANDBOX, tempDir, testBoxes } from './helpers.js';
 
 const SHIM = join(process.cwd(), 'test', 'fixtures', 'fake-agent.mjs');
 // Stryker copies the repo without the executable bit, and a shim that cannot be spawned makes every
@@ -49,7 +49,7 @@ async function open(opts: { mode?: 'greenfield' | 'brownfield' } = {}): Promise<
     // there is no way to make the runner look busy from outside, and a stubbed count would be a test
     // of the stub.
     runBin: SHIM,
-    sandbox: TEST_SANDBOX,
+    sandbox: fixedSandbox(TEST_SANDBOX),
     // Paired with it, as production pairs them: a status that says "confined" and nowhere to be
     // confined IN makes the wrapper throw, which surfaced here as a 409 on the dispatch.
     boxes: testBoxes(),

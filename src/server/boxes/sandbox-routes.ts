@@ -14,19 +14,23 @@ import { agentRefusal } from './sandbox.js';
 export async function registerSandboxRoutes(api: FastifyInstance, ctx: AppCtx): Promise<void> {
   api.get('/sandbox', async () => {
     const attached = attachedOpencodeUrl();
+    // Re-probed per request, not read from a value captured at startup. The whole point of this
+    // endpoint is to answer "can this project run anything RIGHT NOW", and it used to answer
+    // "could it, when the server booted" — which stayed `ok: true` after the image was deleted.
+    const sandbox = await ctx.sandbox();
     return {
-      ok: ctx.sandbox.ok,
+      ok: sandbox.ok,
       // The image, where this used to be the AppArmor profile name. Same job — name the thing that
       // is doing the confining, so the UI can show it and a person can check it.
-      profile: ctx.sandbox.ok ? ctx.sandbox.image : undefined,
-      reason: ctx.sandbox.ok ? undefined : ctx.sandbox.reason,
+      profile: sandbox.ok ? sandbox.image : undefined,
+      reason: sandbox.ok ? undefined : sandbox.reason,
       // Reported even when the sandbox is fine, because it is the other half of whether auto-pilot
       // may start — and the UI shows a different action for each.
       backend: attached ? ('attached' as const) : ('managed' as const),
       attachedUrl: attached,
       // Computed here, once, so the UI never has to re-derive the rule and drift from the loop.
       // The same gate dispatch uses, not a second opinion about it.
-      agentRefusal: agentRefusal(ctx.sandbox, attached),
+      agentRefusal: agentRefusal(sandbox, attached),
     };
   });
 

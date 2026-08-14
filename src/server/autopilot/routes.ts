@@ -255,7 +255,7 @@ async function registerControls(api: FastifyInstance, ctx: AppCtx): Promise<void
     // THE SANDBOX FIRST, and 412 rather than 403: the request is fine, the machine is not in a state to
     // serve it. Auto-pilot is the one caller for which this is mandatory rather than advisable — it
     // dispatches unattended, so the confinement cannot be something a person decides to skip this once.
-    const refusal = agentRefusal(ctx.sandbox, attachedOpencodeUrl());
+    const refusal = agentRefusal(await ctx.sandbox(), attachedOpencodeUrl());
     if (refusal) return reply.code(412).send({ error: refusal });
 
     // Then the project. A project whose lifecycle has a hole — a phase with no skill to dispatch, a board

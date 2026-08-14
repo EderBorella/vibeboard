@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, onTestFinished } from 'vitest';
 import { buildApp } from '../src/server/app.js';
 import { CredentialStore } from '../src/server/auth/credentials.js';
 import { ProjectSession } from '../src/server/boards/session.js';
-import { NOT_REQUESTED, type SandboxStatus } from '../src/server/boxes/sandbox.js';
+import { fixedSandbox, NOT_REQUESTED, type SandboxStatus } from '../src/server/boxes/sandbox.js';
 import { TEST_SANDBOX, tempDir } from './helpers.js';
 
 const TEST_IMAGE = 'vibeboard-agent:test';
@@ -22,7 +22,7 @@ async function open(
   const store = new CredentialStore(ADMIN);
   // buildApp directly, not testApp: testApp fills the admin header in on every request, which is
   // exactly what the 403 assertions here must not have.
-  const app = buildApp(session, { credentials: store, logger: false, sandbox });
+  const app = buildApp(session, { credentials: store, logger: false, sandbox: fixedSandbox(sandbox) });
   const root = await tempDir();
   onTestFinished(async () => {
     await app.close();

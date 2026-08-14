@@ -15,7 +15,7 @@ import { ProjectSession } from '../src/server/boards/session.js';
 import { BoxManager } from '../src/server/boxes/box-manager.js';
 import { BoxService } from '../src/server/boxes/box-service.js';
 import type { DockerRun } from '../src/server/boxes/containers.js';
-import { type SandboxStatus, wrapCommand } from '../src/server/boxes/sandbox.js';
+import { fixedSandbox, type SandboxStatus, wrapCommand } from '../src/server/boxes/sandbox.js';
 
 // Every temp directory the suite makes goes inside the run's own root (vitest.config.ts), which is
 // removed when the run ends. Before that, each of these leaked forever: 440,653 of them accumulated
@@ -85,6 +85,9 @@ const TEST_ADMIN_TOKEN = 'test-admin-token';
 // What is deliberately NOT simulated is the isolation itself. That is checked against a real
 // container in test/box-integration.test.ts, which skips when docker or the image is absent.
 export const TEST_SANDBOX: SandboxStatus = { ok: true, image: 'vibeboard-agent:test' };
+// Re-exported so a test that builds its own app does not need a second import path for the one
+// wrapper it needs alongside TEST_SANDBOX.
+export { fixedSandbox };
 
 // A BoxService whose docker is the stand-in: `ensure` answers with a real box name, computed the real
 // way, without a daemon. Tests that dispatch an agent pass this alongside TEST_SANDBOX.
@@ -130,7 +133,10 @@ export function testApp(session: ProjectSession, opts: TestAppOpts = {}): Fastif
   // over a spread default. That silently disabled every dispatch in the suite.
   const app = buildApp(session, {
     ...opts,
-    sandbox: opts.sandbox ?? TEST_SANDBOX,
+    // Wrapped here rather than in every caller: a test says what the sandbox IS, and buildApp now
+    // wants a live probe because production's can change under it. Tests have no daemon and no
+    // reason to change their mind, so a fixed one is the honest equivalent.
+    sandbox: fixedSandbox(opts.sandbox ?? TEST_SANDBOX),
     // Paired with the sandbox for the same reason it is in production: a status that says "confined"
     // and no box to be confined IN makes `wrapCommand` throw. Coupling them here means a test cannot
     // accidentally build the one without the other.

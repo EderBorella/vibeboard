@@ -325,7 +325,7 @@ async function dispatchRefusal(
 ): Promise<{ code: number; error: string } | undefined> {
   // A run that cannot be confined is a run that does not start. 412 rather than 403 — the request is fine, the
   // machine is not in a state to serve it.
-  const refusal = agentRefusal(ctx.sandbox, attachedOpencodeUrl());
+  const refusal = agentRefusal(await ctx.sandbox(), attachedOpencodeUrl());
   if (refusal) return { code: 412, error: refusal };
   // Then the project's own state. Halted means nothing dispatches at all; running means auto-pilot
   // owns this project, and S6 is the reason — the runner, the concurrency cap and the queue are

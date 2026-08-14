@@ -8,7 +8,7 @@ import { listenOnApiSocket, removeApiSocketFile } from './boxes/api-socket.js';
 import { BoxService } from './boxes/box-service.js';
 import { DEFAULT_IMAGE } from './boxes/containers.js';
 import { stopOpencodeServer } from './boxes/opencode-server.js';
-import { probeSandbox } from './boxes/sandbox.js';
+import { liveSandbox, probeSandbox } from './boxes/sandbox.js';
 import { installCrashHandlers, serverLogger } from './logging.js';
 import { restoreLastProject } from './settings/app-state.js';
 import { registerStatic } from './static.js';
@@ -46,12 +46,16 @@ const boxes = new BoxService();
 // Probed once, here, because the answer cannot change while the process runs and every agent this
 // server starts is confined identically. The banner says which mode we are in: a sandbox nobody can
 // see the state of is a sandbox nobody trusts.
+// One shot for the BANNER, which is a statement about this moment and is printed once.
 const sandbox = await probeSandbox(boxes, DEFAULT_IMAGE);
+// And a live one for the app, because an image can be built or removed while the server runs and the
+// startup answer then gates every dispatch with something that stopped being true.
+const sandboxNow = liveSandbox(boxes, DEFAULT_IMAGE);
 const app = buildApp(session, {
   logger: logging.options,
   credentials: new CredentialStore(admin, devices),
   devices,
-  sandbox,
+  sandbox: sandboxNow,
   boxes,
 });
 // Anything that rejects or throws outside a request used to end the process in silence. Node exits

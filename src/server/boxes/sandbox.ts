@@ -28,6 +28,61 @@ interface SandboxProbe {
   probe(): Promise<{ ok: true } | { ok: false; reason: string }>;
 }
 
+// A LIVE answer, because the startup one was wrong the moment anybody touched Docker.
+//
+// `route-context.ts` used to say the status "cannot change while the process runs, so a function would
+// only invite callers to wonder whether it might". It can, and it did: an image removed from under a
+// running server left `GET /api/sandbox` answering `ok: true` for the life of the process. Demonstrated
+// rather than reasoned about — tag an alias, start a server on it, `docker rmi` the tag, ask again.
+//
+// That is not merely a stale label. The same value is what `agentRefusal` consults at the three gates
+// (a dispatch, a chat turn, auto-pilot starting), so a stale `ok` lets a run through to fail at
+// container creation as a raw Docker error — the exact confusion this module's opening comment says the
+// probe exists to prevent. And a stale `false` is what would make a "build the image" button appear to
+// do nothing.
+//
+// TTL rather than a probe per call: the two `docker` calls cost 30-40ms measured, which is affordable
+// per request but not per call when three gates and a route ask within one interaction. One second is
+// far shorter than the interval between a human action and its consequence, and far longer than a burst.
+export const SANDBOX_TTL_MS = 1_000;
+
+export interface LiveSandbox {
+  // The current status, re-probed when the cached one is older than the TTL.
+  (): Promise<SandboxStatus>;
+}
+
+// A LiveSandbox that never changes its mind. For tests, which are about something other than Docker, and
+// for the `NOT_REQUESTED` default — both want the call shape without the daemon.
+export function fixedSandbox(status: SandboxStatus): LiveSandbox {
+  return async () => status;
+}
+
+export function liveSandbox(
+  service: SandboxProbe,
+  image: string,
+  opts: { ttlMs?: number; now?: () => number } = {},
+): LiveSandbox {
+  const ttl = opts.ttlMs ?? SANDBOX_TTL_MS;
+  const now = opts.now ?? Date.now;
+  let cached: { at: number; status: SandboxStatus } | undefined;
+  // The in-flight probe is shared, so a burst of callers makes ONE pair of docker calls rather than one
+  // each. Without this the three gates in a single dispatch would each spawn their own.
+  let inFlight: Promise<SandboxStatus> | undefined;
+  return async () => {
+    if (cached && now() - cached.at < ttl) return cached.status;
+    if (inFlight) return await inFlight;
+    inFlight = probeSandbox(service, image)
+      .then((status) => {
+        cached = { at: now(), status };
+        return status;
+      })
+      .finally(() => {
+        inFlight = undefined;
+      });
+    return await inFlight;
+  };
+}
+
 // Injected rather than constructed, so this stays a pure decision and the tests need no daemon.
 export async function probeSandbox(service: SandboxProbe, image: string): Promise<SandboxStatus> {
   const res = await service.probe();

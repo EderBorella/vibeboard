@@ -3,7 +3,7 @@ import { describe, expect, it, onTestFinished } from 'vitest';
 import { buildApp } from '../src/server/app.js';
 import { CredentialStore } from '../src/server/auth/credentials.js';
 import { ProjectSession } from '../src/server/boards/session.js';
-import { TEST_SANDBOX, tempDir } from './helpers.js';
+import { fixedSandbox, TEST_SANDBOX, tempDir } from './helpers.js';
 
 // Where a RUN may create a card, what vertical it belongs to, and which run made it — all three enforced at
 // the endpoint, because decision 10 makes endpoints the only write path and a prompt is a request rather than
@@ -21,7 +21,7 @@ async function open(): Promise<{ app: FastifyInstance; store: CredentialStore; r
   const store = new CredentialStore(ADMIN);
   // The sandbox gate refuses every dispatch before the request is even resolved, so a test about what a
   // DISPATCH does has to satisfy it first — otherwise the answer is 412 about the machine, not about the rule.
-  const app = buildApp(session, { credentials: store, logger: false, sandbox: TEST_SANDBOX });
+  const app = buildApp(session, { credentials: store, logger: false, sandbox: fixedSandbox(TEST_SANDBOX) });
   const root = await tempDir();
   onTestFinished(async () => {
     await app.close();

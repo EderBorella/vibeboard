@@ -8,7 +8,7 @@ import {
   runAgentTurn,
 } from '../agent-turn.js';
 import type { BoxService } from '../boxes/box-service.js';
-import { NOT_REQUESTED, type SandboxStatus } from '../boxes/sandbox.js';
+import { fixedSandbox, type LiveSandbox, NOT_REQUESTED } from '../boxes/sandbox.js';
 import type { CopilotEvent } from '../copilot-events.js';
 
 // Re-exported so existing importers (copilot-turns.ts, the routes, the tests) keep their import
@@ -48,11 +48,13 @@ export class CopilotSession {
   // The chat is an agent too, and it auto-approves its own tool calls — so it is confined on the
   // same terms as a run. Held on the session rather than passed per send: it is a fact about the
   // process, and threading it through every caller of `send` would invite one of them to forget.
-  readonly #sandbox: SandboxStatus;
+  // The live probe, not a snapshot: this object is built once with the app and outlives any number of
+  // Docker changes. Resolved where the turn is assembled, which is the last moment before the spawn.
+  readonly #sandbox: LiveSandbox;
   readonly #boxes: BoxService | undefined;
 
-  constructor(opts: { sandbox?: SandboxStatus; boxes?: BoxService } = {}) {
-    this.#sandbox = opts.sandbox ?? NOT_REQUESTED;
+  constructor(opts: { sandbox?: LiveSandbox; boxes?: BoxService } = {}) {
+    this.#sandbox = opts.sandbox ?? fixedSandbox(NOT_REQUESTED);
     this.#boxes = opts.boxes;
   }
 
@@ -106,7 +108,7 @@ export class CopilotSession {
       effort: opts.effort || defaults.effort,
       sessionId: this.#sessionId,
       timeoutMs: copilotTimeoutMs(),
-      sandbox: this.#sandbox,
+      sandbox: await this.#sandbox(),
       ...(box ? { box } : {}),
       // The chat's own bookkeeping, kept here rather than in the shared turn: a skill run has no
       // session to remember, so watching for it is this class's concern alone.

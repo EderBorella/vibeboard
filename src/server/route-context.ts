@@ -8,7 +8,7 @@ import type { AutopilotRuntime } from './autopilot/autopilot-runtime.js';
 import type { ServiceProcess } from './autopilot/service-process.js';
 import type { ProjectSession } from './boards/session.js';
 import type { BoxService } from './boxes/box-service.js';
-import type { SandboxStatus } from './boxes/sandbox.js';
+import type { LiveSandbox } from './boxes/sandbox.js';
 import type { CopilotSession } from './copilot/copilot.js';
 import type { CopilotAuthority } from './copilot/copilot-authority.js';
 import type { Log } from './logging.js';
@@ -56,9 +56,12 @@ export interface AppCtx {
   // Answers how many it closed. Lives on the context because revocation happens in a route and the
   // socket registry belongs to the WS layer, and neither should have to reach into the other.
   closeDevice: (device: string | null) => number;
-  // Whether agents are confined, and to what. Probed once by main.ts: it cannot change while the
-  // process runs, so a function would only invite callers to wonder whether it might.
-  sandbox: SandboxStatus;
+  // Whether agents are confined, and to what. A FUNCTION, and the comment it replaces is why: it used
+  // to say the status "cannot change while the process runs, so a function would only invite callers to
+  // wonder whether it might". It can — an image can be built or removed under a running server — and
+  // because this same value gates every dispatch, believing otherwise let a run start against an image
+  // that was no longer there. Live, TTL-cached; see `liveSandbox`.
+  sandbox: LiveSandbox;
   // Where agents run. Optional because a test about something else neither has docker nor needs it.
   boxes?: BoxService;
   broadcast: (msg: unknown) => void;

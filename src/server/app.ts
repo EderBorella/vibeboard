@@ -25,7 +25,7 @@ import {
   attachProjectRoot,
   stopOpencodeServer,
 } from './boxes/opencode-server.js';
-import { NOT_REQUESTED, type SandboxStatus } from './boxes/sandbox.js';
+import { fixedSandbox, type LiveSandbox, NOT_REQUESTED } from './boxes/sandbox.js';
 import { registerSandboxRoutes } from './boxes/sandbox-routes.js';
 import { registerToolchainRoutes } from './boxes/toolchain-routes.js';
 import { registerControlRoutes } from './content/control-routes.js';
@@ -86,7 +86,7 @@ export function buildApp(
     devices?: DeviceStore;
     // Probed once, by main.ts, before the app exists — every agent this app starts is confined the
     // same way, and re-probing per turn would put a process spawn in front of every dispatch.
-    sandbox?: SandboxStatus;
+    sandbox?: LiveSandbox;
     // Where agents actually run. Optional for the same reason `sandbox` is: a test about something
     // else neither has docker nor needs it, and without a sandbox no box is ever asked for.
     boxes?: BoxService;
@@ -254,7 +254,9 @@ export function buildApp(
     closeDevice,
     broadcast,
     log,
-    sandbox: opts.sandbox ?? NOT_REQUESTED,
+    // A test about something else has no docker and asks for none; `NOT_REQUESTED` is the same
+    // answer it always gave, now behind the same call shape as the real one.
+    sandbox: opts.sandbox ?? fixedSandbox(NOT_REQUESTED),
     boxes: opts.boxes,
   };
   const turns = createCopilotTurns(ctx);

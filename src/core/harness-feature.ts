@@ -1,5 +1,5 @@
 // THE SMOKE-HARNESS FEATURE, ruling 66's remedy: every project gets one, and the LOOP creates it at the
-// bootstrap's exit (src/service/act.ts) rather than `derive-features` being told to.
+// bootstrap's exit (src/service/act/bootstrap.ts) rather than `derive-features` being told to.
 //
 // NOT A PROMPT INSTRUCTION, and that is the whole point. The run that produced this ruling has direct evidence
 // of `derive-features` not following its instructions reliably — ten features where five were derived, two

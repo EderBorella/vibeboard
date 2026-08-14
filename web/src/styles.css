@@ -152,8 +152,30 @@ body {
 .board-archive:hover { color: var(--accent); border-color: var(--accent); }
 .board-archive.active { color: var(--accent); border-color: var(--accent); box-shadow: var(--glow); }
 
+/* A GRID OF `--max-cols` TRACKS, not a flex row, so every board's columns are the same width and their
+   edges line up down the page. The boards are stacked and read as one table; three independently-flexing
+   rows put a 79px step between them (measured: Features 383px, Product and Engineering 304px).
+   `minmax(var(--col-w), 1fr)` keeps the basis as a floor and shares the slack, so there is no void at a
+   wide viewport and a many-column project still overflows into the scroll this container already had.
+   A board with fewer columns than the widest simply leaves its last tracks empty, which is honest — the
+   Features board really does have one fewer column than the other two. */
 .board-columns {
-  display: flex;
+  display: grid;
+  /* THE FLOOR IS THE SMALLER OF WHAT WE WANT AND WHAT FITS.
+     `minmax(var(--col-w), 1fr)` alone forced a horizontal scroll in the DEFAULT configuration: with the
+     copilot open the board area is 1200px, and five tracks at the 288px floor the `min-width: 1160`
+     query sets need 1284px before gaps. That query was written for a fixed flex row, where a wider
+     column cost nothing; against a shared track count it raises the floor exactly when there are more
+     tracks to fit.
+     `--track-fit` is what one track can actually have at this width. Clamping between a readable 200px
+     and `--col-w` means: fit exactly when it fits, grow past it via `1fr` when there is slack, and
+     scroll only once a track would be too narrow to read — which is the one case where scrolling is
+     the right answer rather than a symptom. */
+  --track-fit: calc((100% - (var(--max-cols, 4) - 1) * 0.7rem) / var(--max-cols, 4));
+  grid-template-columns: repeat(
+    var(--max-cols, 4),
+    minmax(clamp(200px, var(--track-fit), var(--col-w)), 1fr)
+  );
   gap: 0.7rem;
   align-items: flex-start;
   overflow-x: auto;
@@ -213,8 +235,12 @@ body {
      820 before and after; that void is what the before shows.
      `min-width` keeps the basis as a floor, so a project with many columns still overflows into a
      horizontal scroll rather than crushing every column to unreadable slivers. */
-  flex: 1 1 var(--col-w);
-  min-width: var(--col-w);
+  /* NO `flex` HERE ANY MORE: the parent is a grid and the track sizes this box, so a flex basis would be
+     a line that looks live and decides nothing. `minmax(var(--col-w), 1fr)` on the track carries both
+     halves of what this used to say — a floor and a share of the slack. `min-width: 0` because a grid
+     item's automatic minimum is its content, which would otherwise let a long unbroken card title push
+     its track past the share the grid gave it. */
+  min-width: 0;
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: var(--radius);

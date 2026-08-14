@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react';
 import type { BoardName, Card, ProjectSnapshot } from '../shared';
 import { BOARD_LABELS, BOARDS } from '../shared';
 import type { TagCount } from '../viewmodel';
@@ -37,8 +38,22 @@ export function BoardsView({
   onDragStart,
   onDrop,
 }: Props) {
+  // ONE COLUMN WIDTH ACROSS ALL THREE BOARDS. They are stacked vertically and read as a single grid, so
+  // their column edges have to line up — and with each board flexing independently they did not: measured
+  // at 1600px with the copilot hidden, Features (4 columns) grew to 383px while Product and Engineering
+  // (5 each) sat at 304px, a 79px step between rows of what looks like one table. With the copilot open
+  // the growth reached Features alone and the other two still overflowed.
+  //
+  // The widest board decides the track count, so every board lays out on the same tracks and a board with
+  // fewer columns simply ends early. Derived from the CONFIG rather than from the rendered columns, so a
+  // collapsed board still contributes its width and expanding one does not reflow the others.
+  const maxColumns = Math.max(
+    1,
+    ...BOARDS.map((board) => snapshot.config.boards[board]?.columns.length ?? 0),
+  );
+
   return (
-    <main className="boards">
+    <main className="boards" style={{ '--max-cols': maxColumns } as CSSProperties}>
       <TagFilter tags={tags} active={activeTags} onToggle={onTag} onClear={onClearTags} />
       {BOARDS.map((board) => (
         <Board

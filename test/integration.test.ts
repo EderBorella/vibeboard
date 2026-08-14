@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import {
-  archiveCard,
-  boardColumnSlugs,
-  createCard,
-  placeCard,
-  readBoard,
-  readConfig,
-  scaffoldProject,
-} from '../src/index.js';
+// Imported from the modules that own these functions, not from a root barrel. The barrel existed so
+// that VibeBoard COULD be consumed as a library; nothing consumed it, and this file was its only
+// importer — see `decision 68`. Naming the real homes also makes the layering visible: one pure
+// module in `core/`, five in `store/`, and not a line of `server/` in an end-to-end lifecycle test.
+import { boardColumnSlugs } from '../src/core/board/columns.js';
+import { readBoard } from '../src/store/cards/board.js';
+import { archiveCard, createCard, placeCard } from '../src/store/cards/mutations.js';
+import { readConfig } from '../src/store/project/config.js';
+import { scaffoldProject } from '../src/store/project/scaffold.js';
 import { cardFrom, tempDir } from './helpers.js';
 
 const TODAY = '2026-07-23';

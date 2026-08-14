@@ -122,7 +122,11 @@ const registered = () => {
 // A DELETED FILE NAMED AS DELETED IS NOT ROT, which is why this needs an allow-list rather than a bare
 // existence check. `decision 42`'s row says the rollup "and `src/core/rollup.ts` are gone with it" — the
 // path is the subject of the sentence and must stay. Anything else absent is a stale pointer.
-const GONE_ON_PURPOSE = new Set(['src/core/rollup.ts', 'src/core/eligibility.ts']);
+const GONE_ON_PURPOSE = new Set([
+  'src/core/rollup.ts',
+  'src/core/eligibility.ts',
+  'src/index.ts', // `decision 68` — the root barrel, deleted; the row exists so it is not re-added
+]);
 const PATH_IN_ROW = /`((?:src|web\/src|test|tools)\/[\w./-]+\.(?:ts|tsx|mjs|js|css|md))`/g;
 
 // `decisions.md` writes full paths in prose. `by-file.md` is a set of TABLES under a heading that

@@ -78,6 +78,41 @@ starts at 38 deliberately.
 | `decision 65` | The **server** writes the parent link, derived from the run's vertical; `links?` comes off the create contract for a run, and every create path goes through `setCardLinks` so the far side is written. | `src/store/cards/links.ts` (`createLinkedCard`), `src/server/boards/cards-routes.ts`, `src/store/cards/mutations.ts`, `src/server/auth/auth.ts` |
 | `decision 66` | A gate command and a smoke command that are the **same command** are one check, so every project gets a mandatory smoke-harness feature created by the loop, sorted last, and `complete` refuses while the two are identical. | `src/core/harness-feature.ts` (`HARNESS_FEATURE`), `src/core/tick.ts` (`smokeIsAGate`), `src/core/smoke-declaration.ts`, `src/service/act.ts` |
 | `decision 67` | A run may declare the `smoke:` command through `POST /api/foundation/smoke`, and that is the **only** foundation write any run may make; the write refuses a command that collides with a gate. | `src/store/project/foundation.ts` (`writeSmokeCommand`), `src/core/smoke-declaration.ts`, `src/server/auth/auth.ts`, `src/server/content/control-routes.ts` |
+| `decision 68` | VibeBoard is an **application, not a library**: the root barrel `src/index.ts` is deleted and no published surface replaces it. Consuming it as a package was studied and deferred — see *Shipping VibeBoard as a library* below for what it would take and what is already true. | Nothing in production. The one importer was `test/integration.test.ts`, which now names the modules that own each function |
+
+---
+
+## Shipping VibeBoard as a library — studied, deferred
+
+`src/index.ts` was a twelve-line barrel of `export *` lines fronting **77 symbols** from seven
+`core/` modules and five `store/` ones. It looked like a public API and was not one: its only
+importer in the whole repository was `test/integration.test.ts`, and it granted no visibility —
+every symbol it re-exported was already `export`ed by its own module, so the barrel was a second
+home for a surface rather than a surface. `decision 68` deletes it.
+
+What was checked, so that reopening this starts from facts rather than from scratch:
+
+- **The compiler is already ready.** `tsconfig.json` sets `declaration: true`, `outDir: dist`,
+  `rootDir: src`, `module`/`moduleResolution` `NodeNext`. `npm run build` therefore already emits
+  `.js` alongside `.d.ts` in the layout a package needs.
+- **The manifest is not.** `package.json` declares no `main`, no `module`, no `exports`, no `types`
+  and no `files` — all five are absent, so `npm pack` today would ship the entire working tree with
+  no entry point. Those five keys, plus `"type": "module"` staying as it is, are the whole
+  mechanical cost.
+- **The natural surface is `core/` + `store/`, and only those.** `core/` is pure and `store/` is the
+  filesystem-is-the-database layer; between them they export **317 symbols**. `server/`, `exec/` and
+  `service/` are an application — a Fastify app, a process spawner and a supervised loop — and
+  belong behind a binary, never behind an import.
+- **The real cost is the contract, not the plumbing.** All 317 exports exist for this application's
+  own convenience and change whenever it is convenient. A published surface means choosing which of
+  them are promises, and a barrel is the wrong instrument for that choice because `export *` makes
+  the decision by omission: a module that stops exporting a symbol narrows the package's API
+  silently, with nothing red anywhere.
+
+**Deferred because nothing consumes it.** The trigger to build it is a second program that needs to
+read a VibeBoard project — at that point the surface is defined by what that program asks for, which
+is a far better constraint than guessing. Until then a hand-picked `exports` map is a maintenance
+cost paid for a consumer that does not exist.
 
 ---
 

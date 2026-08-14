@@ -215,24 +215,46 @@ export const PRIVATE_RANGES = ['10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16', 
 // The alternative was for the box to set its own rules at startup and then drop privileges. It fails
 // for a subtle reason worth recording: `docker exec` takes its capabilities from the CONTAINER's spec,
 // not from PID 1, so dropping them in an entrypoint does not constrain any later exec at all.
-// REPLIES ARE NOT REQUESTS, and leaving that out broke a whole backend.
+// ONE REPLY PATH, AND ONLY ONE. A box must be able to answer the question the SERVER asks it on its
+// published port, and must be able to do nothing else toward a private address.
 //
-// The rejects below carry no connection-state match, so they refuse every packet to a private range —
-// including the second half of a conversation somebody else started. Docker's own bridge gateway lives
-// in `172.16.0.0/12`, so when the host asked the box a question on a published port, the box's ANSWER
-// was rejected on the way out. From the host the port simply hung.
+// The bug this closes: the rejects below carry no state match, so they refused the second half of a
+// conversation the host had started. Docker's bridge gateway is inside `172.16.0.0/12`, so the box's
+// ANSWER on its published port was rejected on the way out and the port hung. It cost the OpenCode
+// backend's whole model list — `listBackendModels` reads `/config/providers` over that port, the fetch
+// aborts after 8s (`copilot/models.ts`), and `cached()` folds the failure into an empty array, so the
+// PICKER showed nothing. The server log did say why; only the UI was silent.
 //
-// What that cost: the OpenCode backend's model list. `listBackendModels` reads the running server's
-// `/config/providers` over the box's published port, the fetch timed out at 60s, and `cached()` folded
-// the failure into an empty array — so the picker showed no OpenCode models at all and said nothing
-// about why. Inside the box that same URL answers 200. It stayed hidden while `VIBEBOARD_OPENCODE_URL`
-// pointed at a server on the host, which is the shape of a bug that only bites a fresh machine.
+// WHY THIS RULE IS NARROW, and the first version of it was not. A bare
+// `--ctstate ESTABLISHED,RELATED -j ACCEPT` was wrong in three ways, all three measured by a review
+// rather than reasoned about:
 //
-// The property is unchanged: a box still cannot OPEN a connection to the LAN or to this machine's own
-// services, which is the whole of what these rules promise. `ESTABLISHED,RELATED` matches only a flow
-// that already exists, and nothing an agent does inside the box can conjure one — it has to have been
-// accepted inbound first, and inbound is Docker's to decide, not the agent's.
-const ESTABLISHED = 'iptables -A OUTPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT';
+//  1. IT GRANDFATHERED FLOWS OPENED BEFORE THE RULES LANDED. `docker run -d` returns once the container
+//     exists, so PID 1 is already running when `#applyNetworkRules` fires 0.12–0.14s later. A flow
+//     opened in that window is ESTABLISHED, and a bare accept keeps it alive — conntrack's TCP timeout
+//     is five days, refreshed by traffic. The reject-only rules SEVERED such a flow, which is the
+//     property that version silently traded away while claiming it had not. `--ctdir REPLY` restores
+//     it: an agent-initiated flow's outbound packets are the ORIGINAL direction, so they never match.
+//  2. IT LICENSED EVERY PORT THE AGENT CHOSE TO LISTEN ON. `-p 127.0.0.1::4096` governs the host
+//     loopback mapping, not the container's own address — which every container on the bridge, and the
+//     host, can reach on ANY port. Reproduced: an unpublished listener on `0.0.0.0:8099` was
+//     unreachable under reject-only rules and answered a bridge peer under the bare accept. `--sport`
+//     confines the exemption to the one port VibeBoard published.
+//  3. `RELATED` BOUGHT NOTHING AND COST A CATEGORY. Only ESTABLISHED is needed for a reply. `RELATED`
+//     additionally matches conntrack helper expectations, so an outbound connection to a hostile public
+//     server whose payload makes a helper expect a PRIVATE address would match — which is exactly the
+//     "conjured from inside" this rule is supposed to make impossible. No helper modules are loaded on
+//     this machine; that is not a property of the code.
+//
+// What remains true, and now narrowly: a box cannot OPEN a connection to a private address, and the one
+// thing it may send there is a TCP reply, from the published port, on a flow something outside started.
+const OPENCODE_PORT = 4096;
+const REPLY_ONLY = [
+  'iptables -A OUTPUT -p tcp',
+  `--sport ${OPENCODE_PORT}`,
+  '-m conntrack --ctstate ESTABLISHED --ctdir REPLY',
+  '-j ACCEPT',
+].join(' ');
 
 export function netRuleArgs(box: string, image: string): string[] {
   // `&&`, never `;`. A `;`-joined script exits with the status of the LAST command alone, so three
@@ -242,7 +264,7 @@ export function netRuleArgs(box: string, image: string): string[] {
   // FIRST, and the order is the behaviour: iptables takes the first matching rule in a chain, so an
   // accept placed after the rejects would never be reached for exactly the addresses that need it.
   const script = [
-    ESTABLISHED,
+    REPLY_ONLY,
     ...PRIVATE_RANGES.map((cidr) => `iptables -A OUTPUT -d ${cidr} -j REJECT`),
   ].join(' && ');
   return [

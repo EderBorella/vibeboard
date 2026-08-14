@@ -226,6 +226,10 @@ describe('exec argv', () => {
 describe('the network rules', () => {
   const args = netRuleArgs('vibeboard-abc-claude-code', 'vibeboard-agent:latest');
   const joined = args.join(' ');
+  // THE SCRIPT ALONE, which is the last argument. `joined` carries the `docker run … -c` prefix too, so
+  // splitting it on ` && ` puts that prefix inside the first "rule" — an assertion anchored with `^`
+  // then fails on correct code, which is how this was found.
+  const rules = (args.at(-1) ?? '').split(' && ');
 
   it('runs in a THROWAWAY container sharing the box’s network, not in the box', () => {
     // If these ran inside the box, the box would need NET_ADMIN — and then its own privileged
@@ -246,31 +250,46 @@ describe('the network rules', () => {
     expect(PRIVATE_RANGES).toHaveLength(4);
   });
 
-  // THE REPLY PATH, and its absence cost a whole backend. The rejects carry no state match, so they
-  // refused the box's ANSWER to a question the host had asked on a published port — Docker's bridge
-  // gateway is inside 172.16.0.0/12. `listBackendModels` timed out reading OpenCode's
-  // `/config/providers`, `cached()` folded that into an empty array, and the picker showed no OpenCode
-  // models with no hint why, while the same URL answered 200 from inside the box.
-  it('accepts an already-established flow, so a box can answer what it was asked', () => {
-    expect(joined).toContain('-m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT');
+  // EVERY RULE IS AN APPEND TO OUTPUT. This one assertion is worth more than the three below it: a
+  // review applied four mutants that fully restore the original bug — rejects switched to `-I`, the
+  // accept moved to the INPUT chain, and both together — and ALL FOUR passed every assertion this file
+  // had, including one named "or the accept is unreachable". The ordering test compared positions in the
+  // SCRIPT STRING, which says nothing about position in the CHAIN, and nothing pinned the verb at all.
+  it('appends every rule to OUTPUT, so neither the chain nor the order can be swapped', () => {
+    expect(rules.length).toBeGreaterThan(1);
+    for (const rule of rules) expect(rule).toMatch(/^iptables -A OUTPUT /);
   });
 
-  // iptables takes the FIRST matching rule, so an accept after the rejects is never reached for the
-  // addresses that need it. This ordering IS the fix; asserting only that both lines exist would pass
-  // over the version that does nothing.
-  it('accepts the established flow BEFORE the rejects, or the accept is unreachable', () => {
-    expect(joined.indexOf('ESTABLISHED,RELATED')).toBeLessThan(joined.indexOf('-j REJECT'));
+  // THE REPLY PATH, and its absence cost a whole backend: the rejects carry no state match, so they
+  // refused the box's ANSWER to a question the host asked on its published port — Docker's bridge
+  // gateway is inside 172.16.0.0/12. The OpenCode model list came back empty because of it.
+  it('accepts a reply on the published port, so a box can answer what it was asked', () => {
+    expect(joined).toContain('--ctstate ESTABLISHED --ctdir REPLY -j ACCEPT');
   });
 
-  // What the accept must NOT do: let the agent OPEN something to the LAN. `ESTABLISHED,RELATED` cannot
-  // be conjured from inside — a flow has to have been accepted inbound first, which is Docker's
-  // decision and not the agent's — so a NEW outbound to a private range is still refused.
+  // THE THREE WAYS THE FIRST VERSION OF THAT ACCEPT WAS TOO WIDE, each measured by a review:
+  //
+  //  * no `--ctdir` — it grandfathered any flow opened in the 0.12–0.14s between `docker run -d`
+  //    returning and the rules landing, and conntrack then kept it alive for days. An agent-initiated
+  //    flow is the ORIGINAL direction, so REPLY is what excludes it.
+  //  * no `--sport` — `-p 127.0.0.1::4096` governs the host loopback mapping, NOT the container's own
+  //    address, which every bridge peer can reach on any port. An unpublished listener on :8099 became
+  //    reachable.
+  //  * `RELATED` — matches conntrack helper expectations, so a hostile public server's payload could
+  //    have a helper expect a private address and the box would then be allowed to open it.
+  it('confines that accept to TCP, to the published port, and to the reply direction only', () => {
+    const accept = rules.find((r) => r.includes('ACCEPT')) ?? '';
+    expect(accept).toContain('-p tcp');
+    expect(accept).toContain('--sport 4096');
+    expect(accept).toContain('--ctdir REPLY');
+    expect(accept).not.toContain('RELATED');
+  });
+
   it('still refuses a NEW outbound connection to every private range', () => {
     expect(joined).not.toContain('--ctstate NEW');
     // PER RULE, because the script is one string of `&&`-joined rules: a pattern like
     // /ACCEPT.*-d 10\./ lets `.*` run across the separator and matches the accept in one rule against
     // a range in another. It failed on correct code, which is how it was caught.
-    const rules = joined.split(' && ');
     const acceptsARange = rules.filter((r) => r.includes('ACCEPT') && /-d \d/.test(r));
     expect(acceptsARange).toEqual([]);
   });

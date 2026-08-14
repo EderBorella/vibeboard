@@ -11,7 +11,14 @@ import {
 import type { Skill } from '../src/core/skills.js';
 import type { BoardName, Card } from '../src/core/types.js';
 import type { Verification } from '../src/core/verify.js';
-import { type BoardColumns, buildRunPrompt, type PromptInputs } from '../src/server/run-prompt.js';
+import { allows, endpointsFor } from '../src/server/auth.js';
+import type { Credential, Scope } from '../src/server/credentials.js';
+import {
+  assistCredentialSection,
+  type BoardColumns,
+  buildRunPrompt,
+  type PromptInputs,
+} from '../src/server/run-prompt.js';
 
 const ROOT = '/p';
 
@@ -333,6 +340,94 @@ describe('the run credential', () => {
       inputs({ credential: { token: 'tok', apiBase: 'http://x', scope: 'work' as const } }),
     );
     expect(text).toContain('E-010');
+  });
+});
+
+// THE ASSEMBLED PROMPT AGAINST THE SCOPE TABLE, which nothing else in the tree checks. Two tests come
+// close and neither covers it: `test/copilot-authority.test.ts` asserts `endpointsFor`'s output without
+// ever building a prompt, and `test/lifecycle-trace.test.ts` drives the loop end to end without reading
+// one. So a section dropped from the assembly, or the wrong `scope` handed to the generator, changes the
+// list of endpoints an agent is TOLD it may call and nothing fails.
+//
+// It is not privilege escalation — `allows()` still fails closed on every request — which is exactly what
+// makes it hard to find. The agent is told it may call something it may not, tries it, gets a 403 it reads
+// as a broken tool, and falls back to writing card files into folders no column maps to.
+//
+// Asserted in BOTH directions, and the two are different questions. FORWARDS through `allows()`, the
+// enforcement function itself, so every endpoint the prompt names is one the table would really permit.
+// BACKWARDS against `endpointsFor` as exact bytes in order, so a row the scope holds and the prompt omits
+// fails too: a catalogue that is merely a subset denies a run authority it was minted with, and an agent
+// denied the endpoint does the job by writing files instead.
+describe('the endpoint catalogue the assembled prompt hands an agent', () => {
+  // The generated catalogue is the only place the prompt puts a method and a route inside one backtick
+  // pair at the head of a list item. Anchored for that reason: `GET /api/state` is also named in the
+  // prose sentence below the list, and counting that as a granted row would make the comparison lie.
+  const CATALOGUE_LINE = /^- `([A-Z]+) (\/\S*)` — /;
+  const catalogue = (prompt: string): string[] =>
+    prompt.split('\n').filter((line) => CATALOGUE_LINE.test(line));
+
+  // The scopes a RUN can be dispatched under. `assist` is the copilot's, which has its own section below,
+  // and `admin` is a person rather than a run.
+  const RUN_SCOPES: Scope[] = ['work', 'checkup', 'service'];
+
+  const cred = (scope: Scope, card?: string): Credential => ({ token: 'T', scope, project: ROOT, card });
+
+  const withCredential = (scope: Scope, over: Partial<PromptInputs> = {}): PromptInputs =>
+    inputs({ credential: { token: 'T', apiBase: 'http://127.0.0.1:4610', scope }, ...over });
+
+  for (const scope of RUN_SCOPES) {
+    it(`hands a ${scope} run exactly the rows the table grants it, in the table's own order`, () => {
+      const lines = catalogue(buildRunPrompt(withCredential(scope)));
+      // An empty catalogue satisfies every per-line assertion below vacuously, and losing the section is
+      // the regression this whole describe exists for — so the count is asserted first, every time.
+      expect(lines.length).toBeGreaterThan(0);
+      expect(lines).toEqual(endpointsFor(scope, 'E-010'));
+    });
+
+    it(`names a ${scope} run nothing the table would refuse it`, () => {
+      const lines = catalogue(buildRunPrompt(withCredential(scope)));
+      expect(lines.length).toBeGreaterThan(0);
+      for (const line of lines) {
+        const [, method, url] = CATALOGUE_LINE.exec(line) as RegExpExecArray;
+        expect(allows(cred(scope, 'E-010'), method, url, ROOT, 'E-010'), `${scope}: ${line}`).toBe(true);
+      }
+    });
+  }
+
+  // A PROJECT run is `work` scope with no card at all, and `allows` denies the own-card rows to a
+  // credential minted without one. So they are left out rather than listed unconfined, and this asserts
+  // the omission is exactly the table's — not one row more, not one fewer.
+  it('drops the card-confined rows for a project run, and only those', () => {
+    const { card: _card, cardFile: _cardFile, ...rest } = withCredential('work');
+    const lines = catalogue(buildRunPrompt(rest as PromptInputs));
+    expect(lines.length).toBeGreaterThan(0);
+    expect(lines).toEqual(endpointsFor('work', undefined));
+    for (const line of lines) {
+      const [, method, url] = CATALOGUE_LINE.exec(line) as RegExpExecArray;
+      expect(allows(cred('work'), method, url, ROOT, undefined), line).toBe(true);
+    }
+  });
+
+  // A judging run goes down the ordinary run path and is minted `work` like any other card run. What stops
+  // it changing the board is that it is handed NO catalogue at all — so the empty list IS the property, and
+  // one line appearing here is a judge told it may edit the thing it is judging.
+  it('hands a judging run no endpoint whatsoever', () => {
+    const prompt = buildRunPrompt(
+      withCredential('work', { review: { gatesPassed: true, setupSubtree: false } }),
+    );
+    expect(catalogue(prompt)).toEqual([]);
+  });
+
+  // The copilot's section, the same generator's fourth caller and the only one reaching the foundation
+  // write. Asserted the same way in both directions, because its authority is a row in the same table.
+  it('hands the copilot exactly what the assist scope grants, and nothing it would be refused', () => {
+    const lines = catalogue(assistCredentialSection('http://127.0.0.1:4610', 'T'));
+    expect(lines.length).toBeGreaterThan(0);
+    expect(lines).toEqual(endpointsFor('assist'));
+    for (const line of lines) {
+      const [, method, url] = CATALOGUE_LINE.exec(line) as RegExpExecArray;
+      expect(allows(cred('assist', 'E-010'), method, url, ROOT, 'E-010'), line).toBe(true);
+    }
   });
 });
 

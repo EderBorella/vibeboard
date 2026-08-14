@@ -52,7 +52,12 @@ export default {
     // write-queue.ts now holds the atomic write that run-store.ts used to have inline.
     'src/server/redaction.ts',
     'src/server/write-queue.ts',
-    'src/server/run-prompt.ts',
+    // The dispatch prompt, and the DIRECTORY rather than the barrel. `run-prompt.ts` is now a pure
+    // re-export and has nothing to mutate, and no other pattern here reaches `src/server/prompt/` —
+    // verified against Stryker's own FileMatcher, not assumed — so naming only the barrel would have
+    // silently dropped ~600 lines out of the measurement. That is the same trap the block above warns
+    // about, arriving through a split instead of an extraction.
+    'src/server/prompt/**/*.ts',
     'src/server/agent-turn.ts',
     'src/server/copilot-events.ts',
     'src/server/session.ts',

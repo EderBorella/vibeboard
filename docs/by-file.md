@@ -73,9 +73,12 @@ this index exists for the ones whose reason lives somewhere else.
 | `logging.ts` | `decisions.md` | `decision 20` |
 | `opencode-server.ts` | `decisions.md`, `security/containment.md` — the server is the box's main process, one box per project | `decision 12` |
 | `process-group.ts` | `decisions.md` | `decision 13` |
+| `prompt/contracts.ts` | `decisions.md` — what a run is asked to produce, and why a judging run's contract REPLACES the reporting one rather than adding to it | `decision 3`, `decision 40`, `decision 51`, `S9` |
+| `prompt/credential.ts` | `decisions.md` (`decision 10`'s scope table), `security/containment.md` — the only part of the prompt that reaches `auth.ts`. The agent's permitted endpoint list is GENERATED from that table, and `test/run-prompt.test.ts` asserts the assembled prompt's catalogue against it in both directions | — |
+| `prompt/index.ts` | `decisions.md` — the input contract, and the order the sections are assembled in; `run-prompt.ts` is the re-export barrel and holds no reasoning of its own | `decision 18`, `decision 40`, `decision 51`, `decision 55`, `decision 60`, `decision 63` |
+| `prompt/sections.ts` | `decisions.md` — one section per thing the agent is told, and why several of them return nothing rather than a heading over nothing | `decision 55`, `decision 60` |
 | `reaper.ts` | `decisions.md` | `decision 13` |
 | `route-context.ts` | `decisions.md` | `decision 20` |
-| `run-prompt.ts` | `decisions.md` — it generates the agent's permitted endpoint list from `auth.ts` | `decision 3`, `decision 18`, `decision 40`, `decision 51`, `decision 55`, `decision 60`, `decision 63`, `S9` |
 | `run-store.ts` | `decisions.md`, `security/containment.md` — the agent writes a report under `runs/`; this folds it in | `decision 13` |
 | `sandbox.ts` | `security/containment.md` — the gate, and why it is a probe | — |
 | `service-process.ts` | `decisions.md`, `security/containment.md` — the loop is deliberately **not** boxed; the scope table is what confines it | `decision 13`, `decision 20`, `decision 47` |

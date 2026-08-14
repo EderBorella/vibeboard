@@ -18,7 +18,7 @@ import type { Verification } from '../src/core/verify.js';
 
 // COMPOSED THROUGH THE REAL FUNCTIONS, never hand-built. A hand-built `report: ''` is a shape the runner
 // never writes, and that is precisely how `producedNothing` shipped dead behind a green suite
-// (src/core/runs.ts:532-537).
+// (`producedNothing` in src/core/runs/predicates.ts, whose comment records the whole failure).
 
 // Every run shares one `started`, so the ID is what decides "latest" here and it ascends with creation
 // order. That is the TIE-BREAK rather than the ordering: `latest` ranks by `started` first, because a run

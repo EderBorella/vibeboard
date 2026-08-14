@@ -38,7 +38,7 @@ this index exists for the ones whose reason lives somewhere else.
 | `mutations.ts` | `decisions.md` | `decision 58`, `decision 65` |
 | `phases.ts` | `decisions.md` — the phase table itself | `decision 38`, `decision 44`, `decision 47`, `decision 50`, `decision 52`, `decision 56`, `decision 61` |
 | `position.ts` | `decisions.md` | `decision 38`, `decision 39` |
-| `runs.ts` | `decisions.md` | `decision 18`, `decision 40`, `S11` |
+| `runs/types.ts` | `decisions.md` — the record's shape; `runs.ts` is the re-export barrel and holds no reasoning of its own | `decision 18`, `decision 40`, `S11` |
 | `seed-docs.ts` | `foundation-bootstrap.md` — it is what seeds it | — |
 | `seed-skills.ts` | `decisions.md` — `decision 11` and `decision 64` are cited **only** by `test/seed-skills.test.ts` against these bodies | `decision 51` |
 | `setup-feature.ts` | `decisions.md` | `decision 50`, `decision 51` |

@@ -8,10 +8,10 @@ import { BOARDS, type BoardName, type Card } from './types.js';
 // SUCCESSFUL derivation too. Both predicates are needed and both earn their place.
 //
 // COUNTED FROM THE BOARD, never from `record.created`. That list is frontmatter the agent wrote about
-// itself (`parseAgentReport`, runs.ts:435, copied onto the record at :455), so trusting it would make the
-// loop's one deterministic check depend on a self-report — the failure decision 40 exists to prevent. It
-// would refuse a break-down that created five cards and forgot to list them, and pass one that listed five
-// it never made.
+// itself (`parseAgentReport` in core/runs/parse.ts, copied onto the record by `withReport`), so trusting it
+// would make the loop's one deterministic check depend on a self-report — the failure decision 40 exists to
+// prevent. It would refuse a break-down that created five cards and forgot to list them, and pass one that
+// listed five it never made.
 //
 // IT DOES NOT APPLY TO THE CHECKUPS. Their product is a report; creating is optional, and a checkup that
 // creates nothing is the ordinary closing case (decision 47), so applied to them this rule would refuse

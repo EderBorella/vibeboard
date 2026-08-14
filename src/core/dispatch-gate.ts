@@ -100,7 +100,7 @@ function invalidCap(ap: AutopilotConfig): string | undefined {
   return undefined;
 }
 
-export interface GateInput {
+interface GateInput {
   ap: AutopilotConfig;
   iteration: number; // dispatches so far this run
   spend: Spend; // summed from every run record in the project, card and project runs alike

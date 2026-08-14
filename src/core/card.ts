@@ -91,13 +91,13 @@ export function serializeCard(fm: CardFrontmatter, body: string): string {
 //   links        symmetric, so they go through the links endpoint that writes the far side too
 //   setup        the project-level barrier — a work agent able to flag its own card would make its
 //                own subtree the only eligible work in the project
-export type CardPatch = Pick<CardFrontmatter, 'title' | 'description' | 'tags' | 'group'> & { body?: string };
+type CardPatch = Pick<CardFrontmatter, 'title' | 'description' | 'tags' | 'group'> & { body?: string };
 
 // Rejected fields come back rather than being dropped, so the route can refuse instead of answering
 // 200 over a card it did not change. An agent that sends `tags: "urgent"` — a plausible mistake, since
 // the prose says "tags" and the frontmatter key is a list — was told it succeeded and had no reason to
 // retry. The doctrine here is that a 403 is informative and a silent success is not.
-export interface PickedPatch {
+interface PickedPatch {
   patch: Partial<CardPatch>;
   rejected: string[];
 }

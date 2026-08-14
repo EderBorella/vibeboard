@@ -31,7 +31,7 @@
 // so this exists only to stop a runaway generation writing a novel into a YAML scalar.
 const MAX_COMMAND = 500;
 
-export type SmokeRefusal = string;
+type SmokeRefusal = string;
 
 // Refuses with the sentence the agent is shown, or returns the command to write. The sentences name what to
 // do next rather than what was wrong: an agent reading "that is one of the gates" still has to be told that

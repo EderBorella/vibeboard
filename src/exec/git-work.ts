@@ -132,7 +132,7 @@ function git(
   });
 }
 
-export interface BranchOk {
+interface BranchOk {
   ok: true;
   branch: string;
   created: boolean;
@@ -141,7 +141,7 @@ export interface Refused {
   ok: false;
   reason: string;
 }
-export type BranchResult = BranchOk | Refused;
+type BranchResult = BranchOk | Refused;
 
 // Whether this project can be committed at all.
 //
@@ -303,7 +303,7 @@ export async function startSession(root: string, name: string, opts: GitOptions 
   return await ensureBranch(root, name, opts);
 }
 
-export interface CommitResult {
+interface CommitResult {
   committed: boolean;
   // Present ONLY when the commit failed, or when the tree holds changes git could not record. A clean
   // tree is `{committed: false}` with no reason, and the caller has to be able to tell those apart:

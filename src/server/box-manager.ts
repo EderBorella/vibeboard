@@ -26,7 +26,7 @@ const run = promisify(execFile);
 
 // Talking to docker. One function, injectable, because everything above it is then testable without a
 // daemon — and because the tests must not depend on a machine that happens to have docker.
-export const spawnDocker: DockerRun = async (args, opts): Promise<DockerResult> => {
+const spawnDocker: DockerRun = async (args, opts): Promise<DockerResult> => {
   try {
     const { stdout, stderr } = await run(dockerBin(), args, { timeout: opts?.timeoutMs ?? 30_000 });
     return { code: 0, stdout, stderr };

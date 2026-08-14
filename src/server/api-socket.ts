@@ -46,7 +46,7 @@ function inUse(path: string): Promise<boolean> {
   });
 }
 
-export interface ApiSocket {
+interface ApiSocket {
   path: string;
   close: () => Promise<void>;
 }

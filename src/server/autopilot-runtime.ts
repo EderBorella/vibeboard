@@ -40,7 +40,7 @@ export interface AutopilotRuntimeOptions {
 
 // Why an action was refused, or nothing when it was performed. A sentence rather than a code: the
 // refusals reach a person, and every one of them has to say what to do instead.
-export type ControlResult = { ok: true; state: AutopilotState } | { ok: false; error: string };
+type ControlResult = { ok: true; state: AutopilotState } | { ok: false; error: string };
 
 const HALTED_FIRST =
   'This project is halted. Restart it from the auto-pilot panel before doing anything else here.';

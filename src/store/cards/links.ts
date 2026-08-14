@@ -69,7 +69,8 @@ export async function createLinkedCard(
   links: string[],
   today: string,
   // The links route's policy, decided by the caller because it turns on the credential: many-to-many is
-  // legitimate when a person means it, and only rollup cannot survive it.
+  // legitimate when a person means it, and only the DERIVED HIERARCHY cannot survive it — two parents make
+  // "whose child is this" unanswerable, and that is the question the checkup asks before it advances one.
   enforceOneParent = true,
 ): Promise<Card | 'unknown-column' | { problem: string }> {
   const card = await createCard(projectRoot, config, input, today);

@@ -294,9 +294,10 @@ const isFlag = oneOf(FLAGS);
 // offers it keeps inviting the bug.
 type CreateCardBody = CreateCardInput & { links?: string[] };
 
-// Always for a run credential: rollup derives the hierarchy from links, and an agent has no way to know which
-// of two links a person meant as "see also". For the browser and the copilot it is the project's choice —
-// many-to-many is legitimate when someone means it, and only rollup cannot survive it.
+// Always for a run credential: the machine derives the hierarchy from links — the position it works from and
+// the checkup that advances a parent once its children are settled — and an agent has no way to know which of
+// two links a person meant as "see also". For the browser and the copilot it is the project's choice:
+// many-to-many is legitimate when someone means it, and only the derived hierarchy cannot survive it.
 //
 // ONE HOME for the two writers that need it. The create path grew the same check (ruling 65), and two copies
 // would drift into a project where a link the create refuses an edit allows.

@@ -258,9 +258,10 @@ async function registerControls(api: FastifyInstance, ctx: AppCtx): Promise<void
     const refusal = agentRefusal(ctx.sandbox, attachedOpencodeUrl());
     if (refusal) return reply.code(412).send({ error: refusal });
 
-    // Then the project. A run whose routing table has a hole, or whose foundation documents are not
-    // written, would dispatch into a lifecycle that cannot finish — and the gate commands ARE those
-    // documents, so a missing one is a verification that fails closed on every card.
+    // Then the project. A project whose lifecycle has a hole — a phase with no skill to dispatch, a board
+    // with no terminal column — or whose foundation documents are not written, would dispatch into a
+    // lifecycle that cannot finish, and the gate commands ARE those documents, so a missing one is a
+    // verification that fails closed on every card.
     const readiness = await readReadiness(ctx.session.root, ctx.session.config);
     if (!readiness.ok) {
       return reply.code(412).send({

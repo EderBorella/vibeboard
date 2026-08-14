@@ -120,8 +120,8 @@ describe('POST /cards with links', () => {
   });
 
   it('lets the browser hang a card off two features by default', async () => {
-    // Same trade as the links route: many-to-many is legitimate when a person means it, and only rollup cannot
-    // survive it — so the switch, not the create, is what decides.
+    // Same trade as the links route: many-to-many is legitimate when a person means it, and only the derived
+    // hierarchy cannot survive it — so the switch, not the create, is what decides.
     const { app } = await openTestProject({ name: 'L' });
     await create(app, { board: 'features', columnSlug: 'todo', title: 'Second feature' }); // F-002
     const made = await create(app, {
@@ -172,8 +172,8 @@ describe('a link target whose file cannot be read', () => {
   });
 });
 
-// Rollup advances a parent when all its children are terminal, and the hierarchy it reads is these
-// links. Two parents means a "see also" can finish an unrelated card.
+// A parent advances once all its children are settled — the machine sends it into its checkup phase — and the
+// hierarchy that walk reads is these links. Two parents means a "see also" can finish an unrelated card.
 describe('one parent per card', () => {
   // A second feature to be the second parent, and a product card to hang them off.
   async function twoFeatures(): Promise<{

@@ -11,8 +11,10 @@ import type { BoardName, Card } from './types.js';
 // its linked cards on engineering.
 //
 // An ARCHIVED card is excluded entirely — it neither blocks nor satisfies. A subtree whose children
-// were all archived is the childless case, and a childless card does not roll up. Both that rule and
-// the direction of the walk come from hierarchy.ts, which rollup and eligibility read too.
+// were all archived is the childless case, and a childless card does not advance: `allSettled` answers
+// false for an empty list rather than treating it as finished (core/derived-status.ts). Both that rule and
+// the direction of the walk come from hierarchy.ts, which the position derivation and the checkup walk
+// read too.
 
 const live = liveCards;
 

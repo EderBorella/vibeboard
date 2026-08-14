@@ -315,7 +315,7 @@ describe('the API boundary', () => {
     });
 
     // The switch below is off by default and is the human's choice; a run is held to the rule either
-    // way. Rollup reads the hierarchy off these links, and an agent has no way to mean "see also".
+    // way. The machine reads the hierarchy off these links, and an agent has no way to mean "see also".
     it('is refused a second parent even with the project switch off', async () => {
       const { app, mint } = await open();
       // A second feature to be the second parent. Created as admin: a work run may create cards, but

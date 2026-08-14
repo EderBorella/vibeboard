@@ -5,9 +5,11 @@ import { BOARDS, type BoardName, type Card } from './types.js';
 // direction cannot come from a link itself — it comes from the fixed board order, and that is what
 // makes a feature's children its product links and a product card's its engineering links.
 //
-// The rule below exists because rollup ADVANCES a parent when all its children are terminal. With an
-// arbitrary graph a card can have two parents, and a "see also" link silently adopts an unrelated
-// card — so a wrong edge does not merely look untidy, it finishes the wrong card.
+// The rule below exists because a card's CHILDREN decide when it advances: once they are all settled the
+// machine sends the parent into its checkup phase (`allSettled` over `childrenOf`, in
+// core/lifecycle/tick.ts). With an arbitrary graph a card can have two parents, and a "see also" link
+// silently adopts an unrelated card — so a wrong edge does not merely look untidy, it finishes the wrong
+// card.
 
 const PARENT: Record<BoardName, BoardName | undefined> = {
   features: undefined, // the top of the hierarchy
@@ -20,19 +22,21 @@ export function parentBoardOf(board: BoardName): BoardName | undefined {
 }
 
 // The other direction, DERIVED from the table above rather than written out a second time: two
-// hand-kept tables are two places for the hierarchy to disagree with itself, and a rollup reading one
+// hand-kept tables are two places for the hierarchy to disagree with itself, and a checkup reading one
 // while the link check reads the other would advance a card from children nobody calls its children.
 export function childBoardOf(board: BoardName): BoardName | undefined {
   return BOARDS.find((b) => PARENT[b] === board);
 }
 
 // A card auto-pilot can see. An ARCHIVED card neither blocks nor satisfies anything — it is excluded
-// from the tree entirely, so a parent whose children were all archived is the CHILDLESS case, which
-// rolls up to nothing. Both halves are checked because they are written by different paths: the folder
-// is what the board reads a card's state from, and the field is what a restore puts it back with.
+// from the tree entirely, so a parent whose children were all archived is the CHILDLESS case, and
+// `allSettled` answers false for it (core/derived-status.ts) rather than advancing a card whose children
+// have all gone. Both halves are checked because they are written by different paths: the folder is what
+// the board reads a card's state from, and the field is what a restore puts it back with.
 //
-// One home, because three readers need the same answer (the setup barrier, rollup, eligibility) and a
-// second copy is how a card ends up live for one of them and gone for another.
+// One home, because the position derivation, the setup barrier and the live-card count the loop and
+// readiness share all need the same answer, and a second copy is how a card ends up live for one of them
+// and gone for another.
 export function isLive(card: Card): boolean {
   return card.columnSlug !== ARCHIVE_SLUG && card.archived === undefined;
 }

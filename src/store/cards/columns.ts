@@ -21,9 +21,11 @@ import type { BoardName } from '../../core/types.js';
 
 // Planning and applying are separate because a caller may need to know what an edit WOULD do before
 // any folder moves. A column edit can be refused by something the folders know nothing about — the
-// routing table, in server/boards/config-routes.ts — and a patch carrying several boards renamed one board's
-// folders before the next board's check rejected the request, leaving the cards in a folder no
-// column mapped to and the config still describing the old one. Plan every board, decide, then move.
+// autopilot block's coverage check, which a rename can leave naming a column that no longer exists
+// (`coverageProblems` in core/autopilot-cover.ts, called from server/boards/config-routes.ts) — and a
+// patch carrying several boards renamed one board's folders before the next board's check rejected the
+// request, leaving the cards in a folder no column mapped to and the config still describing the old
+// one. Plan every board, decide, then move.
 interface ColumnsChanged {
   renamed: { from: string; to: string }[];
 }

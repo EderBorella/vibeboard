@@ -38,8 +38,9 @@ function isRefusal(r: Refusal | { plans: BoardPlan[] }): r is Refusal {
 // A column is a folder, so a column edit has to move folders too — otherwise the renamed column's
 // cards stay in the old folder and silently vanish from the board.
 //
-// PLANS the moves; it does not make them. Nothing on disk may change until every reason to refuse
-// has been considered, and one of those reasons — the routing table — lives outside this function.
+// PLANS the moves; it does not make them. Nothing on disk may change until every reason to refuse has
+// been considered, and one of those reasons — the autopilot block's coverage check, which a rename can
+// leave naming a column that no longer exists — lives outside this function, in `retableAndCheck`.
 // The Settings modal sends all three boards on every save, so renaming one board's columns and then
 // refusing the request over another board's left the cards in a folder no column mapped to, invisible
 // to the board and with their ids released for reuse. Reproduced before this was split.

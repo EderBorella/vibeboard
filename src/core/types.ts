@@ -128,8 +128,9 @@ export interface ProjectConfig {
   // silent half-upgrade against a shape still moving.
   autopilot?: AutopilotConfig;
   // "Enforce 1-to-many relations on boards". Off by default: many-to-many linking is legitimate when
-  // a person means it. Run credentials are held to it regardless (core/hierarchy.ts), because rollup
-  // reads the hierarchy off these links and an agent cannot mean "see also".
+  // a person means it. Run credentials are held to it regardless (core/hierarchy.ts), because the machine
+  // derives the hierarchy off these links — the position it works from, and the checkup that advances a
+  // parent once its children are settled — and an agent cannot mean "see also".
   enforceOneParent?: boolean;
   copilot: CopilotConfig;
 }

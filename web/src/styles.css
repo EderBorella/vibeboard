@@ -631,12 +631,20 @@ body {
   color: var(--muted); cursor: pointer; font-size: 0.85rem; padding: 0 0.3rem;
 }
 .dock-collapse:hover { color: var(--accent); }
-/* SIZED BY ITS CONTENT, capped at 38vh. It was `height: 38vh` outright, so the dock reserved 38% of
-   the viewport whatever was in it — 414px of empty panel to display the words "No card open." on a
-   1000px-tall screen, while the boards above it had 471px for content needing 1438px.
-   The cap is what it always was, so a full pane is unchanged; only the empty and near-empty cases
-   give their space back. Panes scroll inside themselves, so hitting the cap still behaves. */
+/* SIZED BY ITS CONTENT, capped at 38vh — EXCEPT where a pane exists to be filled.
+   It was `height: 38vh` outright, so the dock reserved 38% of the viewport whatever was in it: 414px of
+   empty panel to display the words "No card open." on a 1000px-tall screen, while the boards above had
+   471px for content needing 1438px.
+   Content-sizing alone was not enough, and the shortfall is worth stating because it is not obvious. A
+   flex child asking for `flex: 1` needs a parent with a DEFINITE height to take a share of. Under
+   `height: 38vh` the raw card editor filled the dock; under `max-height` there is nothing to
+   distribute, so it collapsed to exactly its `min-height` — measured at 128px holding 289px of text,
+   inside a dock body of 230px, with 250px of the cap going spare. The pane wanted to fill the box and
+   the box wanted to fit the pane.
+   So a pane whose whole job is to be filled says so, and gets the definite height back. Everything else
+   — the one-line empty states, the short lists — still gives its space away. */
 .dock-body { max-height: 38vh; min-height: 0; display: flex; }
+.dock-body:has(.raw-pane), .dock-body:has(.control-editor) { height: 38vh; }
 /* Spelled out: the UA rule for [hidden] loses to the display declarations above, so a hidden pane
    would still be laid out. Both levels matter — the body when folded, a pane when another is up. */
 .dock-body[hidden], .dock-pane[hidden] { display: none; }
@@ -722,7 +730,10 @@ body {
 
 /* Raw pane (the card's file, inside the dock) */
 .raw-pane { flex: 1; display: flex; flex-direction: column; gap: 0.4rem; min-height: 0; }
-.raw-pane .raw-area { flex: 1; min-height: 8rem; }
+/* 8rem was the floor a collapsed flex parent left it sitting on. It is the FLOOR, not the size — the
+   `flex: 1` above is what makes it fill — but a floor you can actually edit in is worth having for any
+   context where the parent has no height to give. */
+.raw-pane .raw-area { flex: 1; min-height: 14rem; }
 .raw-foot { display: flex; align-items: center; justify-content: flex-end; gap: 0.6rem; }
 .raw-error { color: var(--danger); font-size: 0.78rem; margin-right: auto; }
 .cards-raw {

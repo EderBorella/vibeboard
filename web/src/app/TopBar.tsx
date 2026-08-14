@@ -75,6 +75,16 @@ export function TopBar({
     <header className="topbar">
       <span className="brand">VibeBoard</span>
       {showProject && <span className="project-name">{projectName}</span>}
+      {/* Beside the project name rather than at the far right, and labelled. A 9px dot at the end of a row
+          of buttons is the last thing anyone looks at, and it is the one thing that says whether ANYTHING
+          else on the page is still true: without this socket the board is a snapshot frozen whenever the
+          connection dropped, and nothing else on screen says so. The state is spelled out because a colour
+          alone cannot distinguish `closed` from `unauthorized` — they are different problems with different
+          fixes, and until now both rendered as a grey dot with only a `title` to tell them apart. */}
+      <span className={`conn-status conn-${conn}`} title={`WebSocket ${conn}`}>
+        <span className="conn" />
+        <span className="conn-text">{conn}</span>
+      </span>
       {showProject && chip && (
         <span className={`ap-chip ap-${chip.tone}`} title={autopilot?.detail ?? chip.label}>
           {chip.label}
@@ -132,7 +142,6 @@ export function TopBar({
             {copilotOpen ? 'Hide copilot' : 'Copilot'}
           </button>
         )}
-        <span className={`conn conn-${conn}`} title={`WebSocket ${conn}`} />
       </div>
     </header>
   );

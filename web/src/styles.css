@@ -30,10 +30,19 @@ body {
    scrolled out of reach. Screenshotted at 820px, which is where it was found.
    Wrapping makes this two rows when it has to be. A taller header at a narrow width is a cost; an
    unreachable control is a dead end. */
+/* BASELINE, not centre. The bar is a row of text at four different sizes — brand 16px, project name
+   13.6px, connection state 11.52px, tab labels 12.48px — and `align-items: center` centres each item's
+   LINE BOX. A line box scales with its font, so centring boxes of different sizes puts their baselines at
+   different heights, which is what the eye actually reads. Measured with a zero-size inline probe (whose
+   bottom margin edge sits exactly on the baseline it joins): brand 28.09, name 26.59, state 26.59, tabs
+   27.09 — three distinct baselines within 1.5px, enough to read as "not quite lined up" without being
+   obviously broken.
+   The controls on the right stay centred: a <select> has a baseline of its own that has nothing to do with
+   the text beside it, and aligning to it drags the whole cluster. See .topbar-right below. */
 .topbar {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
+  align-items: baseline;
   gap: 0.75rem;
   padding: 0.55rem 1rem;
   background: linear-gradient(var(--panel), var(--panel));
@@ -65,8 +74,18 @@ body {
   white-space: nowrap;
 }
 
-/* `flex: 0 0 auto` so the escape hatches are the LAST thing to give way, never squeezed to nothing. */
-.topbar-right { margin-left: auto; display: flex; align-items: center; gap: 0.6rem; flex: 0 0 auto; }
+/* `flex: 0 0 auto` so the escape hatches are the LAST thing to give way, never squeezed to nothing.
+   `align-self: center` opts this cluster out of the bar's baseline alignment: these are controls, not
+   prose, and a flex container donates its FIRST item's baseline — here a <select>, whose baseline is a
+   UA-defined thing unrelated to the words beside it. */
+.topbar-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  align-self: center;
+  gap: 0.6rem;
+  flex: 0 0 auto;
+}
 .theme-select, .switch-btn {
   background: var(--panel-2);
   color: var(--text);
@@ -78,10 +97,43 @@ body {
 }
 .switch-btn:hover, .theme-select:hover { border-color: var(--accent); }
 .switch-btn.active { border-color: var(--accent); color: var(--accent); box-shadow: var(--glow); }
-.conn { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); }
-.conn-open { background: var(--accent); box-shadow: var(--glow); }
-.conn-connecting { background: var(--accent-2); }
-.conn-closed { background: var(--danger); }
+/* The live-connection indicator: dot plus the state in words.
+   FIXED WIDTH, and that is the whole reason the label sits in its own element. The four states are
+   `open`, `closed`, `connecting` and `unauthorized`, so the text swings between 4 and 12 characters —
+   and this sits to the LEFT of the tabs, so every one of those changes would shove the tab row sideways
+   while you were aiming at it. `12ch` is the longest state name, stated in the unit that makes the number
+   mean something: widen this only if a fifth, longer state is added to ConnState in web/src/ws.ts.
+   `ch` is the advance of "0", and lowercase letters are narrower, so it has margin without measuring. */
+/* `align-items: baseline` here, with the DOT opted out — and the order matters for a reason that is not
+   visual. A flex container donates the baseline of its first BASELINE-ALIGNED item, and the dot comes
+   first in the DOM. The dot is an empty span, so its "baseline" is its bottom edge; leaving it
+   baseline-aligned would hand that to the top bar and hang the whole indicator off a circle. Centring the
+   dot removes it from the calculation, so `.conn-text` becomes the first baseline-aligned item and the
+   word lines up with the project name and the tabs, which is the point. */
+.conn-status {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  flex: 0 0 auto;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+.conn-text { width: 12ch; white-space: nowrap; }
+.conn {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--muted);
+  flex: 0 0 auto;
+  align-self: center;
+}
+/* The state class is on the WRAPPER, so it can tint the dot and the word together. */
+.conn-open .conn { background: var(--accent); box-shadow: var(--glow); }
+.conn-connecting .conn { background: var(--accent-2); }
+.conn-closed .conn { background: var(--danger); }
+.conn-closed .conn-text { color: var(--danger); }
+.conn-unauthorized .conn-text { color: var(--warn); }
 
 .empty { margin: auto; color: var(--muted); padding: 3rem; }
 

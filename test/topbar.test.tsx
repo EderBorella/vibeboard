@@ -113,9 +113,52 @@ describe('TopBar', () => {
 
   it('exposes the socket state as a class and a title', () => {
     const { container } = render(<TopBar {...props} conn="closed" />);
-    const dot = container.querySelector('.conn');
-    expect(dot?.className).toContain('conn-closed');
-    expect(dot?.getAttribute('title')).toBe('WebSocket closed');
+    // The state class is on the WRAPPER, not the dot: it tints the dot and the word together, and the
+    // dot itself is now a plain `.conn` with no state of its own.
+    const status = container.querySelector('.conn-status');
+    expect(status?.className).toContain('conn-closed');
+    expect(status?.getAttribute('title')).toBe('WebSocket closed');
+    expect(container.querySelector('.conn')).toBeTruthy();
+  });
+
+  // A colour cannot say WHICH failure this is, and two of the four states are failures with different
+  // fixes — `closed` means reconnect, `unauthorized` means sign in. Before the word was rendered they
+  // were the same grey dot, distinguishable only by a `title` nobody hovers.
+  it.each(['open', 'connecting', 'closed', 'unauthorized'])(
+    'writes the state "%s" beside the dot',
+    (state) => {
+      const { container } = render(<TopBar {...props} conn={state} />);
+      expect(container.querySelector('.conn-text')?.textContent).toBe(state);
+    },
+  );
+
+  // The indicator sits LEFT of the tabs, so a label that resized with its text would shove the tab row
+  // sideways on every reconnect — which is the entire reason the width is fixed.
+  //
+  // ASSERTED AGAINST THE STYLESHEET SOURCE, not through jsdom. jsdom loads no CSS and computes no
+  // layout, so `getComputedStyle(...).width` answers '' whatever the rule says: a test written that way
+  // passes with the declaration deleted, which is worse than no test. Reading the file is the only thing
+  // here that fails when the property goes.
+  //
+  // `process.cwd()` rather than `import.meta.url`: this file runs under jsdom, where import.meta.url is
+  // an HTTP URL, so a path built from it reaches readFileSync as `http://localhost/...` and throws. The
+  // same trap is called out in vitest.config.ts for the same reason.
+  it('reserves a fixed width for the label, so a state change cannot move the tabs', () => {
+    const css = readFileSync(join(process.cwd(), 'web', 'src', 'styles.css'), 'utf8');
+    const rule = /\.conn-text\s*\{([^}]*)\}/.exec(css);
+    expect(rule, '.conn-text rule not found in web/src/styles.css').toBeTruthy();
+    expect(rule?.[1]).toMatch(/width:\s*12ch/);
+  });
+
+  // The number 12 is not arbitrary and must not drift from what it is sized for. If a fifth state is
+  // added to ConnState, or one is renamed longer, the label starts truncating or the width stops being
+  // the longest name — silently, because nothing about a CSS length says what it was measured against.
+  it('sizes that width to the longest state name the socket can report', () => {
+    const ws = readFileSync(join(process.cwd(), 'web', 'src', 'ws.ts'), 'utf8');
+    const declared = /export type ConnState =([^;]+);/.exec(ws)?.[1] ?? '';
+    const states = [...declared.matchAll(/'([a-z]+)'/g)].map((m) => m[1]);
+    expect(states.length).toBeGreaterThan(1);
+    expect(Math.max(...states.map((s) => s.length))).toBe(12);
   });
 });
 

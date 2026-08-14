@@ -69,7 +69,7 @@ export function reportPath(root: string, run: string): string {
   return join(root, RUNS_DIR, `${run}.report.md`);
 }
 
-export function transcriptPath(root: string, run: string): string {
+function transcriptPath(root: string, run: string): string {
   return join(root, RUNS_DIR, `${run}.log.jsonl`);
 }
 

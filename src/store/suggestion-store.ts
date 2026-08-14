@@ -59,7 +59,7 @@ export async function readSuggestion(root: string, id: string): Promise<Suggesti
 // bump it, so triage — which rewrites a file — busts the cache explicitly below.
 let cache: { root: string; mtimeMs: number; items: Suggestion[] } | undefined;
 
-export function forgetSuggestions(): void {
+function forgetSuggestions(): void {
   cache = undefined;
 }
 

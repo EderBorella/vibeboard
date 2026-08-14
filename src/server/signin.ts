@@ -37,7 +37,7 @@ export const MIN_GAP_MS = 10_000;
 export const MAX_PER_HOUR = 10;
 const HOUR_MS = 3_600_000;
 
-export type RequestState = 'pending' | 'approved' | 'refused';
+type RequestState = 'pending' | 'approved' | 'refused';
 
 interface Pending {
   id: string;
@@ -54,7 +54,7 @@ interface Pending {
 }
 
 // What a signed-in browser is shown. No token, ever: this list is broadcast to every open socket.
-export interface PendingView {
+interface PendingView {
   id: string;
   label: string;
   address: string;
@@ -63,9 +63,9 @@ export interface PendingView {
 
 // The label and address come back with the id so the WAITING browser can show what the person
 // deciding will see. Without it the user is asked to match a prompt against nothing.
-export type OpenResult = { id: string; label: string; address: string } | 'too-many' | 'rate-limited';
+type OpenResult = { id: string; label: string; address: string } | 'too-many' | 'rate-limited';
 
-export type CollectResult =
+type CollectResult =
   | { state: 'pending' }
   | { state: 'refused' }
   | { state: 'approved'; token: string }
@@ -74,7 +74,7 @@ export type CollectResult =
   // would confirm that an id it guessed once existed.
   | { state: 'expired' };
 
-export interface PendingOptions {
+interface PendingOptions {
   // Mints the credential. Injected rather than reached for, so this class does no crypto and no IO
   // and its state machine can be tested without a device store on disk.
   mint: (label: string, address: string) => Promise<string>;

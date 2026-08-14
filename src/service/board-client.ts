@@ -15,7 +15,7 @@ import type { Accounting } from '../server/routes/autopilot.js';
 // any sense — a 401 means this loop's authority is gone and no amount of retrying will bring it back,
 // while a connection refused means the server is restarting and the next tick may well succeed.
 
-export interface Ok<T> {
+interface Ok<T> {
   ok: true;
   value: T;
 }
@@ -38,7 +38,7 @@ export interface BoardView {
   problems: { path: string; reason: string }[];
 }
 
-export interface DiaryDetails {
+interface DiaryDetails {
   iteration?: number;
   card?: string;
   board?: BoardName;
@@ -77,7 +77,7 @@ export interface DispatchRequest {
   };
 }
 
-export interface ClientOptions {
+interface ClientOptions {
   apiBase: string;
   token: string;
   // Injected so a test can point the loop at a real app instance without a listening socket, and so a

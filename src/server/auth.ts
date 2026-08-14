@@ -184,6 +184,23 @@ const RULES: Record<string, Rule> = {
   // Refused to every autonomous scope on purpose. These documents hold the gates a run is judged
   // against, so a run able to amend one could lower the bar until its own work passed — decision 3's
   // subject. The copilot is different only because a person is reading its answer as it types.
+  // ONE KEY OF ONE DOCUMENT, and the only foundation write an autonomous run may make (ruling 67). The row
+  // below refuses every foundation document to `work` for a reason that holds — a run able to edit `gates:`
+  // can lower the bar until its own work passes — and that refusal was ALSO refusing the write the mandatory
+  // smoke-harness feature exists to make, which deadlocked the feature: its card asks for a declaration in
+  // TESTING.md, and nothing dispatched by the loop could ever make it.
+  //
+  // The distinction the two rows draw is direction, not document. `gates:` is the bar a run is judged
+  // against, so a run editing it is marking its own homework. `smoke:` is a check that must FAIL when the
+  // product cannot be run, and auto-pilot refuses to report a project finished until one exists that is not
+  // already a gate. A run cannot weaken itself with it; the validation in core/smoke-declaration.ts is what
+  // keeps it to that.
+  'POST /api/foundation/smoke': {
+    scopes: ['work', 'checkup', 'service', 'assist'],
+    describe:
+      '`{ command }` — declare the shell command that runs this project’s smoke test, written into the `smoke:` key of foundation/TESTING.md and nothing else in that file. Refused if it is empty, longer than one line, or the same command as one of the gates in foundation/CODE-QUALITY.md — a gate and a smoke command that are the same command are one check rather than two.',
+  },
+
   'PUT /api/control/foundation/:name': {
     scopes: ['assist'],
     describe: `\`{ content }\` — write one foundation document. \`:name\` is one of ${FOUNDATION_FILES.map((f) => f.name).join(', ')} and nothing else. CODE-QUALITY.md carries the \`gates:\` list and TESTING.md the \`smoke:\` command, both in YAML frontmatter; changing either blocks auto-pilot until a person has reviewed them.`,

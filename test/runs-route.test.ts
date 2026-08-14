@@ -809,7 +809,12 @@ describe('POST /api/runs — the foundation', () => {
     const project = await projectWithCard();
     await dispatch(project);
     // An empty heading is the same lie as a wrong path.
-    expect(await promptFrom(argsLog)).not.toContain('foundation');
+    //
+    // THE HEADING, NOT THE WORD. This asserted `not.toContain('foundation')` until ruling 67 added
+    // `POST /api/foundation/smoke` to the scope table, whose one-line description names both foundation
+    // documents — and the endpoint catalogue is generated into EVERY prompt. The bare word was a proxy that
+    // happened to be unique, so a legitimate mention elsewhere in the prompt failed a test about the section.
+    expect(await promptFrom(argsLog)).not.toContain("## The project's foundation");
   }, 30000);
 
   it('sends the documents that exist, with the gates in full and the missing ones absent', async () => {
@@ -832,9 +837,11 @@ describe('POST /api/runs — the foundation', () => {
     expect(prompt).toContain(`- ${FOUNDATION_DIR}/STACK.md`);
     expect(prompt).toContain(`- ${FOUNDATION_DIR}/CODE-QUALITY.md`);
     expect(prompt).toContain('command: npm test'); // in full, not by reference
-    // The three nobody wrote are not listed: these paths are exact or they are useless.
-    expect(prompt).not.toContain('DESIGN.md');
-    expect(prompt).not.toContain('TESTING.md');
+    // The three nobody wrote are not LISTED: these paths are exact or they are useless. Scoped to the list
+    // itself for the same reason as the test above — the endpoint catalogue names foundation/TESTING.md in
+    // the description of the route that declares the smoke command (ruling 67), which is not this list.
+    expect(prompt).not.toContain(`- ${FOUNDATION_DIR}/DESIGN.md`);
+    expect(prompt).not.toContain(`- ${FOUNDATION_DIR}/TESTING.md`);
   }, 30000);
 
   it('does not claim to carry gates when the document declares none', async () => {

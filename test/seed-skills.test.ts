@@ -199,13 +199,23 @@ describe('the phase skills the phase table names', () => {
   // project's to decide. A negative grep was tried and was weak: restating the obligation as the fact "the
   // smoke command in foundation/TESTING.md is not one of the gate commands" slips past every phrase worth
   // banning, and fails this pin immediately. Verified by planting exactly that.
-  it('tells both skills that write TESTING.md that the smoke command is not a gate command', () => {
+  it('tells both skills that declare the smoke command that it is not a gate command', () => {
     expect(SEED_SKILLS.find((s) => s.slug === 'break-down')?.content).toContain(
-      "**If a card you create declares the project's `smoke:` command** in\nfoundation/TESTING.md, that command must not be one of the gate commands\nfoundation/CODE-QUALITY.md declares, and the card must say so.",
+      "**If a card you create declares the project's `smoke:` command**, say on the card\nthat the way to declare it is `POST /api/foundation/smoke` with `{ command }`.",
     );
     expect(SEED_SKILLS.find((s) => s.slug === 'implement')?.content).toContain(
-      "**If this card asks you to declare the project's `smoke:` command** in\nfoundation/TESTING.md, it must not be one of the gate commands\nfoundation/CODE-QUALITY.md declares.",
+      "**If this card asks you to declare the project's `smoke:` command**, declare it\nwith `POST /api/foundation/smoke` and a body of `{ command }`.",
     );
+    // RULING 67, and the reason this pin is worth its exactness. Both sentences used to send the agent to
+    // foundation/TESTING.md, which decision 3 refuses to every autonomous scope and `protectedPaths` mounts
+    // read-only — so the instruction named a file no run could write, and the mandatory harness feature
+    // deadlocked on it for three reviews before the bound stopped auto-pilot. If either sentence drifts back
+    // to naming the file as the thing to edit, this fails.
+    for (const slug of ['break-down', 'implement']) {
+      const content = SEED_SKILLS.find((s) => s.slug === slug)?.content ?? '';
+      expect(content, slug).toContain('POST /api/foundation/smoke');
+      expect(content, slug).toContain('read-only');
+    }
     // And the reason, which both carry: a reader told only "not that one" has no way to choose the next one.
     for (const slug of ['break-down', 'implement']) {
       expect(SEED_SKILLS.find((s) => s.slug === slug)?.content, slug).toContain(

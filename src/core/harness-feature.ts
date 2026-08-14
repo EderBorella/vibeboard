@@ -16,6 +16,13 @@
 // a command-line tool — is `break-down`'s decision later, from the README and foundation/STACK.md. A technology
 // chosen here would be a technology chosen before anyone read the project.
 //
+// HOW IT IS DECLARED IS PART OF THE CARD (ruling 67), and it has to be. The first version of this body said
+// the command "is declared as `smoke:` in foundation/TESTING.md" and stopped there — which is true of where
+// the value ends up and false about how anything gets it there. A real run built a working smoke script, then
+// spent three reviews being sent back for failing to edit a file that decision 3 refuses to every autonomous
+// scope and that `protectedPaths` mounts read-only. A mandatory card whose acceptance criterion no dispatched
+// run can satisfy stops the loop, and it stopped it.
+//
 // WHAT IT CANNOT DO, stated so no comment overclaims it: this feature's OWN tasks are judged by the same weak
 // gate as everything else, so it closes the hole for every other feature and cannot close it for itself. You
 // cannot bootstrap verification from nothing. The refusal in core/tick.ts is what stops the weakest version of
@@ -25,7 +32,11 @@ export const HARNESS_FEATURE = {
   title: 'The product can be run the way the README describes',
   body: `This project has a smoke test that exercises the product from OUTSIDE — started the
 way the README describes starting it, used the way the README describes using it —
-and its command is declared as \`smoke:\` in foundation/TESTING.md.
+and its command is declared as this project's \`smoke:\` command.
+
+Declare it with \`POST /api/foundation/smoke\`, body \`{ command }\`. That endpoint is
+the only way: foundation/TESTING.md is read-only to every run, and a card asking a
+run to edit it is asking for something no run can do.
 
 **That command must not be one of the gate commands** foundation/CODE-QUALITY.md
 declares. A gate and a smoke command that are the same command are one check, not

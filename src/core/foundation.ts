@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import matter from 'gray-matter';
 import { FOUNDATION_FILES, foundationRel } from './layout.js';
@@ -150,4 +150,41 @@ export async function declaredCommands(root: string): Promise<DeclaredCommands> 
     gates: gates.ok ? gates.gates.map((g) => g.command) : [],
     ...(smoke.ok ? { smoke: smoke.command } : {}),
   };
+}
+
+// THE ONE WRITE INTO A FOUNDATION DOCUMENT THAT IS NOT A PERSON'S (ruling 67, and core/smoke-declaration.ts
+// carries the argument). It sets `smoke:` and nothing else: the prose is read back out of the parsed file and
+// re-emitted, and every other frontmatter key travels with it.
+//
+// READ-MODIFY-WRITE RATHER THAN A TEMPLATE, because TESTING.md is a document a person wrote about what
+// testing means on this project, and replacing it with a generated file to change one scalar would delete
+// their words to record a command. A file that will not parse is refused for the same reason — the safe move
+// on an unreadable document is to leave it alone and say so, not to overwrite it with a guess.
+export async function writeSmokeCommand(
+  root: string,
+  command: string,
+): Promise<{ ok: true } | { ok: false; reason: string }> {
+  const path = join(root, foundationRel('TESTING.md'));
+  let raw: string;
+  try {
+    raw = await readFile(path, 'utf8');
+  } catch {
+    return {
+      ok: false,
+      reason: 'foundation/TESTING.md does not exist, so there is nothing to declare the smoke command in.',
+    };
+  }
+  let parsed: matter.GrayMatterFile<string>;
+  try {
+    parsed = matter(raw, { language: 'yaml' });
+  } catch {
+    return {
+      ok: false,
+      reason:
+        'foundation/TESTING.md has frontmatter that will not parse, so the smoke command cannot be declared without discarding what is there.',
+    };
+  }
+  const data = { ...(parsed.data as Record<string, unknown>), smoke: command };
+  await writeFile(path, matter.stringify(parsed.content, data), 'utf8');
+  return { ok: true };
 }

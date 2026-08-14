@@ -1,5 +1,7 @@
 import type { FastifyInstance } from 'fastify';
+import { declaredCommands, writeSmokeCommand } from '../../core/foundation.js';
 import { FOUNDATION_FILES, foundationRel } from '../../core/layout.js';
+import { checkSmokeCommand } from '../../core/smoke-declaration.js';
 import { updateAutopilotState } from '../autopilot-store.js';
 import {
   createControlFile,
@@ -97,6 +99,37 @@ export async function registerControlRoutes(api: FastifyInstance, ctx: AppCtx): 
 
   // Create with a default, collision-free name ("New doc", "New doc 2", …). The UI renames it
   // in place afterwards, so there is no browser dialog in the flow.
+  // THE SMOKE COMMAND, AND ONE KEY OF ONE DOCUMENT (ruling 67; core/smoke-declaration.ts holds the argument
+  // for why this is not decision 3 reopened). The route the harness feature needs in order to be finishable
+  // at all: the card asks for a declaration in a file every autonomous scope is refused, and before this
+  // existed the only honest thing an agent could do was report that it could not comply.
+  //
+  // NOT `PUT /control/foundation/:name` WITH A WIDER SCOPE, which would hand the same credential the `gates:`
+  // list. The narrowness is the safety: one key, one validated single-line string, the prose and every other
+  // key preserved by `writeSmokeCommand`.
+  //
+  // NO `noteGateChange`. Marking TESTING.md unreviewed here would stop auto-pilot in the middle of the run
+  // that just fixed itself, and would do it for the write that ADDS the check rather than the one that could
+  // weaken it — the escalation exists for the second and this is unambiguously the first.
+  api.post('/foundation/smoke', async (req, reply) => {
+    if (!ensureOpen(ctx.session, reply)) return;
+    const root = ctx.session.root;
+    if (!root) return reply.code(409).send({ error: 'No project is open' });
+    const { command } = (req.body ?? {}) as { command?: unknown };
+    const { gates } = await declaredCommands(root);
+    const checked = checkSmokeCommand(command, gates);
+    if (!checked.ok) return reply.code(400).send({ error: checked.reason });
+    const written = await writeSmokeCommand(root, checked.command);
+    if (!written.ok) return reply.code(400).send({ error: written.reason });
+    // Loud on purpose: this is the one command a person did not choose that the server will later run, so the
+    // project's own log is where they find out it happened and what it says.
+    ctx.log.warn(
+      { command: checked.command, scope: req.credential?.scope },
+      'a run declared this project’s smoke command',
+    );
+    return { ok: true, command: checked.command };
+  });
+
   api.post('/control/create', async (req, reply) => {
     if (!ensureOpen(ctx.session, reply)) return;
     const { category } = req.body as { category?: string };

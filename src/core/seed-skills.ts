@@ -157,12 +157,17 @@ rule that keeps the project a proof of concept rather than a product.
   \`POST /api/suggestions\`, not into a bigger card and not into an extra one.
   Nothing is blocked and nothing is lost.
 
-**If a card you create declares the project's \`smoke:\` command** in
-foundation/TESTING.md, that command must not be one of the gate commands
-foundation/CODE-QUALITY.md declares, and the card must say so. A gate and a smoke
-command that are the same command are one check, not two: gates are written
-alongside the code they judge, so they pass over a product with no way to run it.
-The smoke command has to exercise the product from OUTSIDE.
+**If a card you create declares the project's \`smoke:\` command**, say on the card
+that the way to declare it is \`POST /api/foundation/smoke\` with \`{ command }\`.
+The foundation documents are read-only to every run — that endpoint is the only way
+in, and it writes that one key. A card telling a later run to edit
+foundation/TESTING.md is asking for something no run can do.
+
+That command must not be one of the gate commands foundation/CODE-QUALITY.md
+declares, and the card must say so. A gate and a smoke command that are the same
+command are one check, not two: gates are written alongside the code they judge, so
+they pass over a product with no way to run it. The smoke command has to exercise
+the product from OUTSIDE.
 
 List every card you created in your report, by id.
 `,
@@ -184,13 +189,18 @@ quoted here in full. Run them yourself before you finish: auto-pilot runs them
 again the moment you are done, and a run that leaves them failing has not
 delivered.
 
-**If this card asks you to declare the project's \`smoke:\` command** in
-foundation/TESTING.md, it must not be one of the gate commands
-foundation/CODE-QUALITY.md declares. A gate and a smoke command that are the same
-command are one check, not two: gates are written alongside the code they judge, so
-they pass over a product with no way to run it. Make the smoke command start the
-product the way the README describes starting it, and use it the way the README
-describes using it.
+**If this card asks you to declare the project's \`smoke:\` command**, declare it
+with \`POST /api/foundation/smoke\` and a body of \`{ command }\`. Do NOT try to edit
+foundation/TESTING.md: the foundation documents are read-only to every run, that
+endpoint is the only way to declare this, and it writes that one key and nothing
+else. If the card tells you to edit the file, this is what it means.
+
+The command must not be one of the gate commands foundation/CODE-QUALITY.md
+declares — the endpoint refuses that outright. A gate and a smoke command that are
+the same command are one check, not two: gates are written alongside the code they
+judge, so they pass over a product with no way to run it. Make the smoke command
+start the product the way the README describes starting it, and use it the way the
+README describes using it.
 
 Do the one thing the card asks. Anything else you find — an unrelated bug, a
 missing dependency, work the card implies but does not say — goes to

@@ -26,10 +26,15 @@ export default {
   //   test/mirror.test.ts instead.
   // - web/src/api.ts: every test that touches it mocks it or imports only its types, so no
   //   mutant there can be killed.
-  // - the React components with no test (Board, Column, the copilot panels, …) —
-  //   see notes/quality-backlog.md.
-  // - CardTile.tsx: test/card-tile.test.tsx covers its tag row only, deliberately. The rest is
-  //   the drag/render shell that item 5 of notes/quality-backlog.md has yet to rule on.
+  // - the React components with no test — App, Board, Column, CardTile, ArchiveDrawer, the two
+  //   control-file editors, ProjectControl, ProjectGate, ResourcesEditor, SettingsModal and the four
+  //   copilot panels. They are largely presentational: the decision logic was already extracted into
+  //   viewmodel.ts and the hooks, which ARE tested and measured here, so the reward is much lower
+  //   than the file count suggests and most of what is left would be asserting on markup.
+  // - CardTile.tsx: test/card-tile.test.tsx covers its tag row only, deliberately. The rest is the
+  //   drag/render shell, and it is the same open judgement as the render-heavy panes below — whether
+  //   JSX string and attribute mutants are worth chasing anywhere. Nothing has ruled on it, and the
+  //   answer should be applied consistently rather than file by file.
   mutate: [
     'src/core/**/*.ts',
     '!src/core/types.ts',

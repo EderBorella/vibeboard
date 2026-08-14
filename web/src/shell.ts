@@ -9,9 +9,9 @@
 // Testing this by mounting the shell would mean mocking a dozen hooks to assert on markup; testing it
 // here costs four booleans.
 
-export type ShellContent = 'signin' | 'loading' | 'gate' | 'empty' | 'work';
+type ShellContent = 'signin' | 'loading' | 'gate' | 'empty' | 'work';
 
-export interface ShellState {
+interface ShellState {
   signedIn: boolean;
   // Whether the first `getState` has answered. Meaningless before signing in, which is why the order
   // below never consults it first.

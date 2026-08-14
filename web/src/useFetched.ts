@@ -13,7 +13,7 @@ import { type Dispatch, type SetStateAction, useEffect, useRef, useState } from 
 //    different facts, and only the second is a cue to ask again.
 //  - clear — the value is a menu of choices rather than a record, and a stale menu offers something
 //    that may no longer be there.
-export interface FetchedOptions {
+interface FetchedOptions {
   // False asks nothing. Note this is not the same as clearing: see `onDisabled`.
   enabled?: boolean;
   onFailure?: 'keep' | 'clear';

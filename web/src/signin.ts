@@ -39,7 +39,7 @@ export interface SigninDeps {
 // Polled rather than pushed: this browser has no credential, so it cannot hold the socket the pushes
 // go over. Two seconds is fast enough to feel immediate and slow enough that the request's own
 // two-minute TTL is 60 polls, not thousands.
-export const POLL_MS = 2_000;
+const POLL_MS = 2_000;
 export const POLL_LIMIT = 70; // a little past the server's 120s TTL, so the timeout is the server's
 
 const REFUSED = 'That was refused on the browser you asked. Nothing was signed in.';

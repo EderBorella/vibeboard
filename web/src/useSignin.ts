@@ -23,7 +23,7 @@ export function once(run: () => Promise<boolean>): Promise<boolean> {
   return inFlight;
 }
 
-export interface Signin {
+interface Signin {
   signedIn: boolean;
   phase: SigninPhase;
   // Offered only where trying again could work — never after a refusal, which is a decision.

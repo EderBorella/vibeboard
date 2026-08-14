@@ -12,9 +12,9 @@ import { errorText } from './errors';
 
 // A panel with two buttons keys `busy` to WHICH one was pressed, so only that one spins. Where there
 // is one button there is one key, and it is `true`.
-export type ActionKey<K> = [K] extends [true] ? [] : [key: K];
+type ActionKey<K> = [K] extends [true] ? [] : [key: K];
 
-export interface Action<K> {
+interface Action<K> {
   busy: K | null;
   error: string | null;
   // Resolves true when the call landed. The work that follows a success belongs INSIDE `fn` — it must

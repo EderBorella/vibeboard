@@ -842,6 +842,22 @@ describe('decideTick — the task loop', () => {
     expect(decideTick(input({ cards }))).toMatchObject({ kind: 'dispatch', card: { id: 'E-002' } });
   });
 
+  // THE OTHER HALF OF THE NAME ABOVE, and it was missing. That test varies `order` alone, so the
+  // comparator's tie-break was held by nothing here: inverting it left this file green while
+  // `position.test.ts` and `service-act.test.ts` both went red. A test named for two rules has to
+  // exercise both, or the half nobody wrote is the half that regresses.
+  //
+  // Equal `order` is not a contrived fixture: the endpoint assigns the next order to every card a run
+  // creates, and a break-down that creates two tasks in one round gives them the same number.
+  it('breaks an equal order by id, so the queue is not left to sort stability', () => {
+    // THE PRE-SORT ORDER COMES FROM THE PARENT'S `links`, not from this array: `childrenOf` maps over
+    // `card.links`. So the story lists E-002 first, which is what makes a comparator returning 0 pick
+    // E-002 and the id tie-break pick E-001. Listing the task cards in a different order proves
+    // nothing — the first version of this test did exactly that and passed with the tie-break deleted.
+    const cards = [...story(['E-002', 'E-001']), task('E-001', 'backlog', 10), task('E-002', 'backlog', 10)];
+    expect(decideTick(input({ cards }))).toMatchObject({ kind: 'dispatch', card: { id: 'E-001' } });
+  });
+
   it('finishes one task before starting the next', () => {
     // The trace's own shape: E-001 goes all the way to done before E-002 is picked up.
     const cards = [...story(['E-001', 'E-002']), task('E-001', 'review', 10), task('E-002', 'backlog', 20)];

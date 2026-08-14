@@ -369,9 +369,9 @@ describe('the loop’s sequencing', () => {
   });
 
   it('stops rather than going round in circles for ever', async () => {
-    // A `wait`, a `rollup` and a `block` consume no iteration and no budget, so NEITHER cap bounds them: an
-    // action that cannot land would repeat at one tick per interval indefinitely. This is the only thing that
-    // bounds it.
+    // A `wait` and a `stamp` — which is what a block is — consume no iteration and no budget, so NEITHER cap
+    // bounds them: an action that cannot land would repeat at one tick per interval indefinitely. This is the
+    // only thing that bounds it.
     // Counted here rather than through the harness's recorder, because this test replaces `act` — the
     // harness's list would stay empty and the assertion would pass on nothing.
     let tried = 0;

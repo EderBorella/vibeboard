@@ -12,12 +12,16 @@ import { GROUP_GRACE_MS, terminateGroup } from './process-group.js';
 //    read-only along with the rest of `.vibeboard/`. A command read from a card, a
 //    report or a run's output would be an agent choosing what this process executes — never do that.
 //
-//    Stated exactly, because the OS deny is not the whole chain: pre-flight AUTHORS those documents
-//    (decision 7), so the real sequence is agent-proposed text → explicit human approval → this shell,
-//    unsandboxed, as the server user, inheriting the server's environment. The approval gate is what
-//    carries the weight, and it is C4's to build. `opts.env` exists so a caller can narrow that
-//    environment; nothing passes it yet, and `RunOne` in verify.ts does not offer it — worth closing
-//    when C4 makes the gate real rather than pretending it is closed now.
+//    Stated exactly, because the read-only mount is not the whole chain: pre-flight AUTHORS those
+//    documents (decision 7), so the real sequence is agent-proposed text → explicit human approval → this
+//    shell, unsandboxed, as the server user, inheriting the server's environment. The approval gate is
+//    what carries the weight, and it is BUILT (C4): a document an agent rewrote sets `unreviewedGates`,
+//    every dispatch is refused while it is non-empty, the loop refuses to run any foundation-declared
+//    command at all, and only `POST /api/autopilot/gates-reviewed` clears it.
+//
+//    The environment is the part still open: `opts.env` exists so a caller can narrow it, nothing passes
+//    it, and `RunOne` in verify.ts does not offer it — so a gate command inherits the server's whole
+//    environment. Worth closing; do not read the approval gate as having closed it.
 //
 // 2. IT NEVER THROWS. The caller is a loop, and an exception here would end the run rather than the
 //    verification. A command that cannot start is a failure carrying the reason.

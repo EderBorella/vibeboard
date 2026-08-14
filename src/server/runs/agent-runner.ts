@@ -210,10 +210,6 @@ export class AgentRunner {
     return this.#active.size + this.#starting.size >= this.#opts.maxConcurrent();
   }
 
-  // Stop a run, whether it is running or still waiting. A running one becomes `cancelled` on the
-  // turn's own completion path, not here — the child has to actually die before the run is over, and
-  // pretending otherwise would leave a finished record with a live process behind it. A queued one
-  // has no process, so it ends immediately.
   // Every run, for shutdown. A spawned agent does NOT die with the server that started it — it is an
   // ordinary child process, and on the way out we are the only thing that will stop it. Left
   // running it keeps working, and keeps spending, against a board nobody is watching.
@@ -227,6 +223,10 @@ export class AgentRunner {
     return ids.length;
   }
 
+  // Stop a run, whether it is running or still waiting. A running one becomes `cancelled` on the turn's
+  // own completion path, not here — the child has to actually die before the run is over, and pretending
+  // otherwise would leave a finished record with a live process behind it. A queued one has no process, so
+  // it ends immediately.
   cancel(run: string): boolean {
     const active = this.#active.get(run);
     if (active) {
@@ -432,7 +432,6 @@ export class AgentRunner {
     void this.#settle(root, run, record, turn, minted?.token);
   }
 
-  // A slot freed. Take the oldest waiting run, mark it running on disk, and spawn it.
   // A slot freed. Take the oldest waiting run and spawn it.
   //
   // It does NOT write the record here. It used to — `void writeRun(running)` immediately followed by

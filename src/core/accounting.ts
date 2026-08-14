@@ -108,7 +108,7 @@ export function burnsAttempt(status: RunStatus): boolean {
 }
 
 // Attempts are DERIVED, never stored: no new frontmatter field, and a card's state stays in its path.
-// Filtered to one skill, so a critic or checkup run on the same card does not inflate the tally.
+// Filtered to one skill, so a review or checkup run on the same card does not inflate the tally.
 //
 // Card id alone identifies the card (ids are board-prefixed). A hand-written duplicate id would merge
 // two cards' tallies and reach the cap sooner, which is the harmless direction to be wrong in.
@@ -127,9 +127,9 @@ export type CapName = 'budget' | 'iterations';
 // from its iteration cap with a cent spent — true of the dial, false of the run. Whichever cap is
 // PROPORTIONALLY nearer is the one that will actually trip, so that is the one named.
 //
-// Future tense throughout, deliberately: slice D builds the gate and slice C is what calls it, so the
-// present indicative would describe behaviour that does not exist yet — which is the AutoGPT/AgentGPT
-// shape this design is written against.
+// The gate this answers for EXISTS: `mayDispatch` in core/dispatch-gate.ts, called from the lifecycle
+// machine before every dispatch. So "will actually trip" above is future tense about a future dispatch,
+// not about unwritten code — describe what this does in the present indicative.
 export function governingCap(
   ap: AutopilotConfig,
   spend: Spend,
@@ -181,7 +181,7 @@ export interface CardAccount {
   board: BoardName;
   card: string;
   spend: Spend;
-  // Attempts that BURNED, per skill. Per skill because that is how the cap is counted — a critic or
+  // Attempts that BURNED, per skill. Per skill because that is how the cap is counted — a review or
   // checkup run on the same card must not inflate the tally of the skill doing the work.
   attempts: Record<string, number>;
 }

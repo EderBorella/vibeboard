@@ -164,11 +164,23 @@ describe('parseAgentReport', () => {
     });
   });
 
-  it('keeps the whole text when the frontmatter is malformed', () => {
-    const bad = '---\noutcome: [unclosed\n---\nstill worth reading\n';
-    const report = parseAgentReport(bad);
+  // ASSERTION CHANGED DELIBERATELY, 2026-08-14. This used to expect the WHOLE text as the body, the
+  // frontmatter block included. That was the mechanism rather than the intent: the intent is in the
+  // fixture's own words — "still worth reading" — and a live run showed what the mechanism cost. A report
+  // whose YAML threw had its `---` block rendered to the user as prose in the run record, which is noise
+  // the block was never meant to be. The readable half survives; the machine half no longer leaks.
+  //
+  // A block only counts as one when the text opens with `---` AND closes it. Anything else keeps the whole
+  // text, as the case below shows, so nothing readable is dropped on a guess about shape.
+  it('keeps the readable body when the frontmatter is malformed, and drops only the block', () => {
+    const report = parseAgentReport('---\noutcome: [unclosed\n---\nstill worth reading\n');
     expect(report.outcome).toBe('attention');
-    expect(report.body).toBe(bad.trim());
+    expect(report.body).toBe('still worth reading');
+  });
+
+  it('keeps the whole text when there is no closing delimiter to find', () => {
+    const bad = '---\noutcome: [unclosed\nstill worth reading\n';
+    expect(parseAgentReport(bad).body).toBe(bad.trim());
   });
 
   it('accepts success only when the agent says so exactly', () => {
@@ -244,3 +256,59 @@ describe('the suggestion count on a run record', () => {
 // fold onto the critic's own record. Both fields came off AgentReport and RunRecord with the critic, and
 // what replaces them is `verdict`, which the review suite above already pins ("drops a verdict that is
 // neither") and test/verify-record.test.ts pins on the record.
+
+// THE COLON THAT COST A PROJECT. From a live run: a review answered `verdict: done` and summarised the
+// work as `formats pairs as "word: count" strings`. YAML read `word` as a nested key inside the summary,
+// threw, and the whole report was discarded — so the verdict vanished, the outcome silently became
+// `attention`, and the loop saw a review that decided nothing. Three of those and auto-pilot stopped the
+// project saying "an API key, a disk or a model is the likelier cause than the card".
+//
+// Nothing was wrong with the key, the disk, the model or the card. The agent had answered correctly and
+// the machine could not hear it — the third bug of that shape in one day, and the only one that could
+// stall a healthy project indefinitely.
+describe('a report whose frontmatter YAML refuses', () => {
+  const report = (summary: string, verdict = 'done'): string =>
+    `---\noutcome: success\nverdict: ${verdict}\nsummary: ${summary}\n---\n\n## What I judged\n\nThe detail.\n`;
+
+  it('still reads the verdict when a colon-space breaks the YAML', () => {
+    const r = parseAgentReport(report('formats pairs as "word: count" strings'));
+    expect(r.verdict).toBe('done');
+    expect(r.outcome).toBe('success');
+    expect(r.summary).toBe('formats pairs as "word: count" strings');
+  });
+
+  it('reads sent-back the same way, so a rescue cannot only ever pass work', () => {
+    // The dangerous asymmetry: a rescue that recovered `done` and not `sent-back` would silently pass
+    // work a reviewer rejected. Both directions, or neither.
+    expect(parseAgentReport(report('found a bug: the count is off', 'sent-back')).verdict).toBe('sent-back');
+  });
+
+  it('keeps the frontmatter out of the body', () => {
+    // What the run record on disk actually showed: the report's own `---` block rendered as prose,
+    // because the throw left `matter` with nothing and the raw content became the body.
+    const r = parseAgentReport(report('a: b'));
+    expect(r.body).toBe('## What I judged\n\nThe detail.');
+    expect(r.body).not.toContain('outcome: success');
+  });
+
+  it('is not fooled into inventing a verdict that was never written', () => {
+    // Absence must still be absence. A rescue that defaulted would turn every unparseable report into
+    // a passing one, which is the opposite of "silence is not success".
+    const r = parseAgentReport('---\noutcome: success\nsummary: has a colon: here\n---\n\nbody\n');
+    expect(r.verdict).toBeUndefined();
+    expect(r.outcome).toBe('success');
+  });
+
+  it('does not let the line reader override YAML that parsed', () => {
+    // A properly quoted summary is YAML's to read, and it can carry things the line reader cannot.
+    const r = parseAgentReport(
+      '---\noutcome: success\nverdict: done\nsummary: "quoted: fine"\n---\n\nbody\n',
+    );
+    expect(r.summary).toBe('quoted: fine');
+    expect(r.verdict).toBe('done');
+  });
+
+  it('still refuses a verdict that is not one of the two', () => {
+    expect(parseAgentReport(report('a: b', 'maybe')).verdict).toBeUndefined();
+  });
+});

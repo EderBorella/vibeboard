@@ -154,16 +154,79 @@ export function parseRun(content: string): RunRecord | null {
   };
 }
 
+// THE FRONTMATTER BLOCK, READ A LINE AT A TIME, for when YAML has refused it.
+//
+// One colon-space in an unquoted scalar is enough. A review answered `verdict: done` and wrote
+// `summary: formats pairs as "word: count" strings`; YAML read `word` as a nested key, threw, and the
+// WHOLE report was discarded — the verdict with it. The loop then saw a review that decided nothing,
+// counted three of them, and stopped the project saying "an API key, a disk or a model is the likelier
+// cause than the card". Nothing was wrong with the key, the disk, the model or the card: the agent had
+// answered correctly and the machine could not hear it.
+//
+// So this exists because THE ANSWER MATTERS MORE THAN ITS SYNTAX. The keys the machine acts on are a
+// closed set of flat scalars, and `key: rest-of-line` needs no YAML at all. Nested structure — a
+// report's `options:` list — is not recoverable this way and is not attempted: what this rescues is the
+// three fields that decide whether a card moves.
+//
+// Deliberately NOT a fix in the prompt alone. Telling agents to quote the summary lowers the odds and
+// cannot close it, and a rule that depends on every future model getting YAML right is the kind of
+// thing that fails silently a month later, on one card, in a run nobody is watching.
+const RESCUED = ['outcome', 'verdict', 'summary'] as const;
+
+function rescueFrontmatter(content: string): Record<string, string> {
+  const lines = content.split('\n');
+  if (lines[0]?.trim() !== '---') return {};
+  const end = lines.indexOf('---', 1);
+  if (end === -1) return {};
+  const out: Record<string, string> = {};
+  for (const line of lines.slice(1, end)) {
+    const at = line.indexOf(':');
+    if (at <= 0) continue;
+    const key = line.slice(0, at).trim();
+    if (!(RESCUED as readonly string[]).includes(key)) continue;
+    // Surrounding quotes stripped, because a value that WAS quoted is the one YAML would have read.
+    out[key] = line
+      .slice(at + 1)
+      .trim()
+      .replace(/^(['"])(.*)\1$/, '$2');
+  }
+  return out;
+}
+
 // Parse what the agent wrote. A missing or unreadable outcome counts as `attention`: the contract
 // says say so explicitly, and silence is not success.
+//
+// TWO READERS, IN ORDER: YAML first, because a well-formed report is the normal case and its `options:`
+// list only exists there; the line reader second, for the fields above when YAML has thrown or when it
+// parsed but lost them.
 export function parseAgentReport(content: string): AgentReport {
-  let parsed: matter.GrayMatterFile<string>;
+  let parsed: matter.GrayMatterFile<string> | undefined;
   try {
     parsed = matter(content);
   } catch {
-    return { outcome: 'attention', body: content.trim() };
+    parsed = undefined;
   }
-  const d = parsed.data as Record<string, unknown>;
+  const rescued = rescueFrontmatter(content);
+  // The body is what follows the frontmatter. With YAML thrown, `matter` gives nothing, so the block is
+  // dropped here instead — leaving it in would show the reader the frontmatter as prose, which is what
+  // the run record on disk did.
+  const bodyAfterBlock = (): string => {
+    const lines = content.split('\n');
+    const end = lines[0]?.trim() === '---' ? lines.indexOf('---', 1) : -1;
+    return (end === -1 ? content : lines.slice(end + 1).join('\n')).trim();
+  };
+  if (parsed === undefined) {
+    const outcome = isOutcome(rescued.outcome) ? rescued.outcome : 'attention';
+    return {
+      outcome,
+      ...(asText(rescued.summary) ? { summary: asText(rescued.summary) } : {}),
+      ...(isVerdict(rescued.verdict) ? { verdict: rescued.verdict } : {}),
+      body: bodyAfterBlock(),
+    };
+  }
+  // YAML WINS WHERE IT SPOKE. It read a quoted scalar correctly and can carry a multi-line one, which the
+  // line reader cannot; the rescued values only fill keys YAML did not produce.
+  const d = { ...rescued, ...parsed.data } as Record<string, unknown>;
   return {
     outcome: isOutcome(d.outcome) ? d.outcome : 'attention',
     ...(asText(d.summary) ? { summary: asText(d.summary) } : {}),

@@ -246,6 +246,35 @@ describe('the network rules', () => {
     expect(PRIVATE_RANGES).toHaveLength(4);
   });
 
+  // THE REPLY PATH, and its absence cost a whole backend. The rejects carry no state match, so they
+  // refused the box's ANSWER to a question the host had asked on a published port — Docker's bridge
+  // gateway is inside 172.16.0.0/12. `listBackendModels` timed out reading OpenCode's
+  // `/config/providers`, `cached()` folded that into an empty array, and the picker showed no OpenCode
+  // models with no hint why, while the same URL answered 200 from inside the box.
+  it('accepts an already-established flow, so a box can answer what it was asked', () => {
+    expect(joined).toContain('-m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT');
+  });
+
+  // iptables takes the FIRST matching rule, so an accept after the rejects is never reached for the
+  // addresses that need it. This ordering IS the fix; asserting only that both lines exist would pass
+  // over the version that does nothing.
+  it('accepts the established flow BEFORE the rejects, or the accept is unreachable', () => {
+    expect(joined.indexOf('ESTABLISHED,RELATED')).toBeLessThan(joined.indexOf('-j REJECT'));
+  });
+
+  // What the accept must NOT do: let the agent OPEN something to the LAN. `ESTABLISHED,RELATED` cannot
+  // be conjured from inside — a flow has to have been accepted inbound first, which is Docker's
+  // decision and not the agent's — so a NEW outbound to a private range is still refused.
+  it('still refuses a NEW outbound connection to every private range', () => {
+    expect(joined).not.toContain('--ctstate NEW');
+    // PER RULE, because the script is one string of `&&`-joined rules: a pattern like
+    // /ACCEPT.*-d 10\./ lets `.*` run across the separator and matches the accept in one rule against
+    // a range in another. It failed on correct code, which is how it was caught.
+    const rules = joined.split(' && ');
+    const acceptsARange = rules.filter((r) => r.includes('ACCEPT') && /-d \d/.test(r));
+    expect(acceptsARange).toEqual([]);
+  });
+
   it('leaves the public internet alone — the agent still has to reach the model', () => {
     expect(joined).not.toMatch(/-A OUTPUT -j (REJECT|DROP)/);
     expect(joined).not.toContain('0.0.0.0/0');

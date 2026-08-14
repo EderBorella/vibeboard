@@ -215,11 +215,36 @@ export const PRIVATE_RANGES = ['10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16', 
 // The alternative was for the box to set its own rules at startup and then drop privileges. It fails
 // for a subtle reason worth recording: `docker exec` takes its capabilities from the CONTAINER's spec,
 // not from PID 1, so dropping them in an entrypoint does not constrain any later exec at all.
+// REPLIES ARE NOT REQUESTS, and leaving that out broke a whole backend.
+//
+// The rejects below carry no connection-state match, so they refuse every packet to a private range —
+// including the second half of a conversation somebody else started. Docker's own bridge gateway lives
+// in `172.16.0.0/12`, so when the host asked the box a question on a published port, the box's ANSWER
+// was rejected on the way out. From the host the port simply hung.
+//
+// What that cost: the OpenCode backend's model list. `listBackendModels` reads the running server's
+// `/config/providers` over the box's published port, the fetch timed out at 60s, and `cached()` folded
+// the failure into an empty array — so the picker showed no OpenCode models at all and said nothing
+// about why. Inside the box that same URL answers 200. It stayed hidden while `VIBEBOARD_OPENCODE_URL`
+// pointed at a server on the host, which is the shape of a bug that only bites a fresh machine.
+//
+// The property is unchanged: a box still cannot OPEN a connection to the LAN or to this machine's own
+// services, which is the whole of what these rules promise. `ESTABLISHED,RELATED` matches only a flow
+// that already exists, and nothing an agent does inside the box can conjure one — it has to have been
+// accepted inbound first, and inbound is Docker's to decide, not the agent's.
+const ESTABLISHED = 'iptables -A OUTPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT';
+
 export function netRuleArgs(box: string, image: string): string[] {
   // `&&`, never `;`. A `;`-joined script exits with the status of the LAST command alone, so three
   // failed rules and one that worked was indistinguishable from success — and this gate's whole
   // promise is that a box whose rules did not apply is destroyed rather than served.
-  const script = PRIVATE_RANGES.map((cidr) => `iptables -A OUTPUT -d ${cidr} -j REJECT`).join(' && ');
+  //
+  // FIRST, and the order is the behaviour: iptables takes the first matching rule in a chain, so an
+  // accept placed after the rejects would never be reached for exactly the addresses that need it.
+  const script = [
+    ESTABLISHED,
+    ...PRIVATE_RANGES.map((cidr) => `iptables -A OUTPUT -d ${cidr} -j REJECT`),
+  ].join(' && ');
   return [
     'run',
     '--rm',

@@ -21,7 +21,8 @@
 // beyond the single `smoke:` key.
 //
 // THE VALIDATION IS THE POINT. This is a narrow write, not a foundation editor: one key, validated here,
-// with the prose and every other key left exactly as they were. `smokeIsAGate` in core/tick.ts still stands
+// with the prose and every other key left exactly as they were. `smokeIsAGate` in
+// core/lifecycle/stop-sentences.ts still stands
 // as the refusal at the end of the project — this check merely moves the same rule to the moment of the
 // write, where it can be explained to the agent that can still fix it, instead of surfacing hours later as a
 // project that will not close.

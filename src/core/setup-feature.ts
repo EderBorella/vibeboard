@@ -77,6 +77,6 @@ export function setupSubtreeIds(cards: Card[]): Set<string> {
 }
 
 // NO `setupState`. Its three-valued answer — finished / unfinished / unknown — existed for the
-// eligibility filter, whose only caller was eligibility.ts:101. The `unknown` case it was written for is
+// eligibility filter, whose only caller was the deleted eligibility.ts. The `unknown` case it was written for is
 // NOT lost: any unreadable card still stops the loop, from the tick itself (core/tick.ts's
 // `unreadableSentence`, finding C), which is the one route by which a broken file has to fail closed.

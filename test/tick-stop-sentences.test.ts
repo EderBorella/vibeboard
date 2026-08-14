@@ -219,3 +219,38 @@ describe('decideTick — a smoke command that is also a gate', () => {
     expect(detailOf(action)).not.toContain('README describes');
   });
 });
+
+// THE TRUNCATION, WHICH NOTHING REACHED. `names` shows at most `NAMED` ids and appends "(and N more)", and
+// no fixture in the suite had a sixth unfinished card — so both the cap and the arithmetic were unmeasured.
+// Flagged by the batch that split this module out: once these sentences are measured as their own file, an
+// untested branch here is a live equivalent-mutant candidate rather than a theoretical one.
+//
+// Six cards in a column the lifecycle has no phase for, which is the B3 shape above with one more card.
+describe('a stop that would name too many cards', () => {
+  const stuck = (n: number): Card[] => [
+    card('F-001', 'features', 'done', 10, ['P-001']),
+    card('P-001', 'product', 'done', 10, ['F-001']),
+    ...Array.from({ length: n }, (_, i) =>
+      card(`E-${String(i + 1).padStart(3, '0')}`, 'engineering', 'triage', 10, []),
+    ),
+  ];
+
+  it('names five and counts the rest', () => {
+    const detail = detailOf(decideTick(input({ cards: stuck(6) })));
+    // The first five by the order they were listed, then the count of what is left — not a sixth id.
+    expect(detail).toContain('E-001, E-002, E-003, E-004, E-005 (and 1 more)');
+    expect(detail).not.toContain('E-006');
+  });
+
+  it('counts correctly when many are left, not just one', () => {
+    // A fixture of exactly six could not tell `cards.length - NAMED` from a hard-coded 1.
+    expect(detailOf(decideTick(input({ cards: stuck(9) })))).toContain('(and 4 more)');
+  });
+
+  it('names all five and adds nothing when the list is exactly at the cap', () => {
+    const detail = detailOf(decideTick(input({ cards: stuck(5) })));
+    expect(detail).toContain('E-005');
+    // The off-by-one that a `>=` here would produce: "(and 0 more)" on a list that fits.
+    expect(detail).not.toContain('more)');
+  });
+});

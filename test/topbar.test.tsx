@@ -6,6 +6,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { STOP_REASONS } from '../src/core/dispatch-gate.js';
 import type { AutopilotState } from '../web/src/api.js';
+import { LIGHT_STATES, type LightState } from '../web/src/app/connection-light.js';
 import type { MainTab } from '../web/src/app/TopBar.js';
 import { TopBar } from '../web/src/app/TopBar.js';
 
@@ -23,7 +24,8 @@ const props = {
   onSettings: vi.fn(),
   onSwitchProject: vi.fn(),
   attentionCount: 0,
-  conn: 'open',
+  light: 'online' as LightState,
+  lightTitle: 'Connected.',
 };
 
 describe('TopBar', () => {
@@ -112,7 +114,7 @@ describe('TopBar', () => {
   });
 
   it('exposes the socket state as a class and a title', () => {
-    const { container } = render(<TopBar {...props} conn="closed" />);
+    const { container } = render(<TopBar {...props} light="closed" lightTitle="WebSocket closed" />);
     // The state class is on the WRAPPER, not the dot: it tints the dot and the word together, and the
     // dot itself is now a plain `.conn` with no state of its own.
     const status = container.querySelector('.conn-status');
@@ -124,13 +126,10 @@ describe('TopBar', () => {
   // A colour cannot say WHICH failure this is, and two of the four states are failures with different
   // fixes — `closed` means reconnect, `unauthorized` means sign in. Before the word was rendered they
   // were the same grey dot, distinguishable only by a `title` nobody hovers.
-  it.each(['open', 'connecting', 'closed', 'unauthorized'])(
-    'writes the state "%s" beside the dot',
-    (state) => {
-      const { container } = render(<TopBar {...props} conn={state} />);
-      expect(container.querySelector('.conn-text')?.textContent).toBe(state);
-    },
-  );
+  it.each(LIGHT_STATES)('writes the state "%s" beside the dot', (state) => {
+    const { container } = render(<TopBar {...props} light={state} />);
+    expect(container.querySelector('.conn-text')?.textContent).toBe(state);
+  });
 
   // The indicator sits LEFT of the tabs, so a label that resized with its text would shove the tab row
   // sideways on every reconnect — which is the entire reason the width is fixed.
@@ -153,12 +152,12 @@ describe('TopBar', () => {
   // The number 12 is not arbitrary and must not drift from what it is sized for. If a fifth state is
   // added to ConnState, or one is renamed longer, the label starts truncating or the width stops being
   // the longest name — silently, because nothing about a CSS length says what it was measured against.
-  it('sizes that width to the longest state name the socket can report', () => {
-    const ws = readFileSync(join(process.cwd(), 'web', 'src', 'ws.ts'), 'utf8');
-    const declared = /export type ConnState =([^;]+);/.exec(ws)?.[1] ?? '';
-    const states = [...declared.matchAll(/'([a-z]+)'/g)].map((m) => m[1]);
-    expect(states.length).toBeGreaterThan(1);
-    expect(Math.max(...states.map((s) => s.length))).toBe(12);
+  // Against LIGHT_STATES, the DISPLAYED vocabulary, not ConnState. It read ConnState until `offline`
+  // was added — a word the light shows that the socket has never heard of — at which point the test was
+  // measuring the wrong set and would have passed while the label truncated.
+  it('sizes that width to the longest state name the light can report', () => {
+    expect(LIGHT_STATES.length).toBeGreaterThan(1);
+    expect(Math.max(...LIGHT_STATES.map((s) => s.length))).toBe(12);
   });
 });
 
@@ -234,7 +233,7 @@ describe('TopBar visibility and labels', () => {
   });
 
   it('reflects the connection state in a title and a class', () => {
-    render(<TopBar {...withProps({ conn: 'closed' })} />);
+    render(<TopBar {...withProps({ light: 'closed', lightTitle: 'WebSocket closed' })} />);
     const dot = screen.getByTitle('WebSocket closed');
     expect(dot.className).toContain('conn-closed');
   });

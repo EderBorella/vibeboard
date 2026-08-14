@@ -1,4 +1,5 @@
 import { type AutopilotState, isSuccessReason } from '../api';
+import type { LightState } from './connection-light';
 
 // Add a theme here after adding its [data-theme] block in themes.css.
 const THEMES: { value: string; label: string }[] = [
@@ -52,7 +53,11 @@ interface Props {
   onSwitchProject: () => void;
   // Absent until the first answer, and absent for a project with nothing to say.
   autopilot?: AutopilotState | null;
-  conn: string;
+  // Already decided by `lightFor` — this component renders the answer and does not compute it. The
+  // precedence between a dead socket and a project that cannot run is a rule, and a rule living in JSX
+  // is a rule nothing can test on its own.
+  light: LightState;
+  lightTitle: string;
 }
 
 export function TopBar({
@@ -68,7 +73,8 @@ export function TopBar({
   onSettings,
   onSwitchProject,
   autopilot,
-  conn,
+  light,
+  lightTitle,
 }: Props) {
   const chip = autopilot ? chipFor(autopilot) : null;
   return (
@@ -77,13 +83,15 @@ export function TopBar({
       {showProject && <span className="project-name">{projectName}</span>}
       {/* Beside the project name rather than at the far right, and labelled. A 9px dot at the end of a row
           of buttons is the last thing anyone looks at, and it is the one thing that says whether ANYTHING
-          else on the page is still true: without this socket the board is a snapshot frozen whenever the
-          connection dropped, and nothing else on screen says so. The state is spelled out because a colour
-          alone cannot distinguish `closed` from `unauthorized` — they are different problems with different
-          fixes, and until now both rendered as a grey dot with only a `title` to tell them apart. */}
-      <span className={`conn-status conn-${conn}`} title={`WebSocket ${conn}`}>
+          else on the page is still true.
+          The state is spelled out because a colour cannot say WHICH problem this is, and the five it can
+          report need four different responses: reconnect, sign in, wait, or install a missing dependency.
+          `offline` is the last of those — the project is reachable but cannot run anything — and it was
+          previously visible only as a refusal at the moment you tried to work, or two clicks deep in a
+          settings dialog nobody opens before they need it. */}
+      <span className={`conn-status conn-${light}`} title={lightTitle}>
         <span className="conn" />
-        <span className="conn-text">{conn}</span>
+        <span className="conn-text">{light}</span>
       </span>
       {showProject && chip && (
         <span className={`ap-chip ap-${chip.tone}`} title={autopilot?.detail ?? chip.label}>

@@ -128,12 +128,22 @@ body {
   flex: 0 0 auto;
   align-self: center;
 }
-/* The state class is on the WRAPPER, so it can tint the dot and the word together. */
-.conn-open .conn { background: var(--accent); box-shadow: var(--glow); }
+/* The state class is on the WRAPPER, so it can tint the dot and the word together.
+   `online`, not `open`: the four socket states are transport words, and `open` describes a WebSocket
+   rather than anything a person is trying to do. `online`/`offline` is the pair that means something at
+   a glance — and `offline` is the one that is NOT about the connection at all: the server is right
+   there, the project simply cannot run anything because a dependency is missing. */
+.conn-online .conn { background: var(--accent); box-shadow: var(--glow); }
 .conn-connecting .conn { background: var(--accent-2); }
 .conn-closed .conn { background: var(--danger); }
 .conn-closed .conn-text { color: var(--danger); }
 .conn-unauthorized .conn-text { color: var(--warn); }
+/* Amber rather than red, and both halves tinted. A red dot beside a working board reads as "it is
+   broken"; this is "it is here, and it cannot do the thing it exists for", which is a different alarm
+   and a milder one. Distinguished from `connecting` — the other amber — by the word, which is exactly
+   why the word is there. */
+.conn-offline .conn { background: var(--warn); }
+.conn-offline .conn-text { color: var(--warn); }
 
 .empty { margin: auto; color: var(--muted); padding: 3rem; }
 

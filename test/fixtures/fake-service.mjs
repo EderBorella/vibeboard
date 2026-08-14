@@ -9,7 +9,7 @@
 //
 //   argv[2]  where to write the record
 //   argv[3]  'exit:<code>' to end immediately, or 'sleep' (the default) to stay alive
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const [, , logPath, behaviour = 'sleep'] = process.argv;
@@ -57,8 +57,14 @@ function stateAtStart() {
 }
 
 if (logPath) {
+  // Written to a sibling and renamed into place, because the reader polls `existsSync` and then parses.
+  // `writeFileSync` creates the file before it finishes filling it, so under load the reader caught a
+  // partial record and died on `Unexpected end of JSON input` — a flake indistinguishable from a real
+  // failure of the thing under test. A rename is atomic within a filesystem, so existence now implies
+  // completeness. The temp name is a sibling, not /tmp, so it cannot cross a device boundary.
+  const partial = `${logPath}.partial`;
   writeFileSync(
-    logPath,
+    partial,
     `${JSON.stringify({
       argv: process.argv.slice(2),
       cwd: process.cwd(),
@@ -77,6 +83,7 @@ if (logPath) {
       isGroupLeader: process.pid === processGroup(),
     })}\n`,
   );
+  renameSync(partial, logPath);
 }
 
 // One line on each stream, always. The real loop writes to both — `console.error` for the three refusals

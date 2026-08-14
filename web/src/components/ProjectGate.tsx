@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { listProjects, openProject, type ProjectRef, scaffoldProject } from '../api';
-import { errorText } from '../errors';
+import { useAction } from '../useAction';
 import { slugify } from '../viewmodel';
 
 interface Props {
@@ -38,8 +38,7 @@ export function ProjectGate({ onOpened }: Props) {
   const [projects, setProjects] = useState<ProjectRef[]>([]);
   const [newParent, setNewParent] = useState('');
   const [newName, setNewName] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+  const { busy, error, run: attempt } = useAction();
 
   const nameSlug = slugify(newName);
   const parent = newParent.replace(/\/+$/, '');
@@ -51,17 +50,13 @@ export function ProjectGate({ onOpened }: Props) {
       .catch(() => setProjects([]));
   }, []);
 
+  // Both buttons end the same way: the gate is dismissed only once the server says the project is
+  // open, so a refusal leaves the list on screen with the reason under it.
   async function run(fn: () => Promise<unknown>): Promise<void> {
-    setBusy(true);
-    setError(null);
-    try {
+    await attempt(async () => {
       await fn();
       onOpened();
-    } catch (e) {
-      setError(errorText(e));
-    } finally {
-      setBusy(false);
-    }
+    });
   }
 
   return (
@@ -73,7 +68,7 @@ export function ProjectGate({ onOpened }: Props) {
           <ul className="gate-list">
             {projects.map((p) => (
               <li key={p.path}>
-                <button disabled={busy} onClick={() => run(() => openProject(p.path))}>
+                <button disabled={busy !== null} onClick={() => run(() => openProject(p.path))}>
                   <span className="gate-list-name">{p.name}</span>
                   <span className="gate-list-path">{p.path}</span>
                 </button>
@@ -106,7 +101,7 @@ export function ProjectGate({ onOpened }: Props) {
               onChange={(e) => setNewName(toNamePattern(e.target.value))}
             />
             <button
-              disabled={busy || !targetPath}
+              disabled={busy !== null || !targetPath}
               onClick={() => run(() => scaffoldProject(targetPath, nameSlug))}
             >
               Create

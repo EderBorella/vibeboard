@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { cardSuggestion, patchSuggestion } from '../api';
-import { errorText } from '../errors';
 import type { Suggestion, SuggestionLevel } from '../shared';
 import { SUGGESTION_LEVELS } from '../shared';
+import { useAction } from '../useAction';
 
 // The dock's second occupant (decision 48): what agents filed, and the two things a person may do with
 // one. `UtilityDock` knows nothing about any particular pane, so this is one descriptor in WorkArea plus
@@ -33,27 +33,20 @@ export function SuggestionsPane({ suggestions, failed, onRefresh, onApply }: Pro
   const [pickedId, setPickedId] = useState<string | null>(null);
   const [level, setLevel] = useState<SuggestionLevel>('story');
   const [reason, setReason] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [became, setBecame] = useState<string | null>(null);
+  // A control whose refusal is invisible is a dead end. The server's words win: it knows whether the
+  // suggestion was already carded, and as what.
+  const { busy, error, run, setError } = useAction();
 
   // The picked one, else the first — the same fallback the dock uses for panes, so the actions always
   // belong to a row that is on screen even after the list changes under them.
   const picked = suggestions.find((s) => s.id === pickedId) ?? suggestions[0];
 
   async function act(what: () => Promise<Suggestion>): Promise<void> {
-    setBusy(true);
-    setError(null);
-    try {
+    await run(async () => {
       onApply(await what());
       setReason('');
-    } catch (e) {
-      // A control whose refusal is invisible is a dead end. The server's words win: it knows whether the
-      // suggestion was already carded, and as what.
-      setError(errorText(e));
-    } finally {
-      setBusy(false);
-    }
+    });
   }
 
   // Both notices are about the suggestion they happened to, and the actions follow whichever row is
@@ -106,7 +99,12 @@ export function SuggestionsPane({ suggestions, failed, onRefresh, onApply }: Pro
         <>
           {/* The actions at the top, on the picked suggestion, and Dismiss in its own colour. */}
           <div className="suggestions-actions">
-            <button type="button" className="btn-danger" disabled={busy} onClick={() => dismiss(picked.id)}>
+            <button
+              type="button"
+              className="btn-danger"
+              disabled={busy !== null}
+              onClick={() => dismiss(picked.id)}
+            >
               Dismiss
             </button>
             <input
@@ -129,7 +127,12 @@ export function SuggestionsPane({ suggestions, failed, onRefresh, onApply }: Pro
                 </option>
               ))}
             </select>
-            <button type="button" className="btn-primary" disabled={busy} onClick={() => make(picked.id)}>
+            <button
+              type="button"
+              className="btn-primary"
+              disabled={busy !== null}
+              onClick={() => make(picked.id)}
+            >
               {busy ? 'Working…' : 'Make a card'}
             </button>
             <button type="button" className="btn-secondary" onClick={onRefresh}>

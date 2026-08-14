@@ -1,6 +1,9 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { listSuggestions } from '../api';
 import type { Suggestion, SuggestionState } from '../shared';
+import { useFetched } from '../useFetched';
+
+const EMPTY: Suggestion[] = [];
 
 // What agents filed, as the two surfaces that show it see it. Mirrors `useDiary`: the endpoint answers on
 // mount, `bump` is a project switch, and `refresh` is an explicit ask.
@@ -21,30 +24,18 @@ export function useSuggestions(
   // without this the row went on showing the state it had before the click.
   apply: (suggestion: Suggestion) => void;
 } {
-  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
-  const [failed, setFailed] = useState(false);
   const [asked, setAsked] = useState(0);
 
-  // `bump` is a new project and `asked` is an explicit refresh; neither is read inside the effect, and
-  // both must refetch. Same idiom as useDiary and useCardRuns.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: deliberate triggers
-  useEffect(() => {
-    let live = true;
-    listSuggestions(state)
-      .then((next) => {
-        if (!live) return;
-        setFailed(false);
-        setSuggestions(next);
-      })
-      .catch(() => {
-        // Said out loud rather than shown as an empty list. "Nothing has been filed" and "we could not
-        // find out what was filed" are different facts, and only the second is a cue to ask again.
-        if (live) setFailed(true);
-      });
-    return () => {
-      live = false;
-    };
-  }, [bump, asked, state]);
+  // `bump` is a new project and `asked` is an explicit refresh; neither is read by the fetch, and both
+  // must refetch.
+  //
+  // A failure is said out loud rather than shown as an empty list. "Nothing has been filed" and "we
+  // could not find out what was filed" are different facts, and only the second is a cue to ask again.
+  const {
+    value: suggestions,
+    failed,
+    setValue: setSuggestions,
+  } = useFetched<Suggestion[]>(() => listSuggestions(state), [bump, asked, state], EMPTY);
 
   const refresh = useCallback(() => setAsked((n) => n + 1), []);
   const apply = useCallback(
@@ -58,7 +49,7 @@ export function useSuggestions(
         }),
       );
     },
-    [state],
+    [state, setSuggestions],
   );
   return { suggestions, failed, refresh, apply };
 }

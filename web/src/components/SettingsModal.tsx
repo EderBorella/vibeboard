@@ -9,7 +9,6 @@ import {
 } from '../api';
 import type { Confirmer } from '../confirm/useConfirm';
 import { clampToCaps, resolveChoice } from '../copilot/choice';
-import { errorText } from '../errors';
 import {
   type AutopilotConfig,
   BOARD_LABELS,
@@ -21,6 +20,9 @@ import {
   DEFAULT_CONTEXT_BUDGET,
   type ProjectConfig,
 } from '../shared';
+import { useAction } from '../useAction';
+import { useFetched } from '../useFetched';
+import { parseCsv } from '../viewmodel';
 import { AutopilotPanel } from './AutopilotPanel';
 import { DiagnosticsPanel } from './DiagnosticsPanel';
 import { ModelPicker } from './ModelPicker';
@@ -50,12 +52,7 @@ interface Props {
 // A number box left blank, or holding something that is not a number, means "leave this as it was".
 const orKeep = (text: string | number, current: number): number => Number(text) || current;
 
-function parseCsv(text: string): string[] {
-  return text
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean);
-}
+const NO_MODELS: ModelOption[] = [];
 
 export function SettingsModal({ config, onClose, onSaved, autopilot, onAutopilotChanged, confirm }: Props) {
   const [backend, setBackend] = useState(resolveChoice(config.copilot, {}).backend);
@@ -87,26 +84,16 @@ export function SettingsModal({ config, onClose, onSaved, autopilot, onAutopilot
   const [idPadding, setIdPadding] = useState(config.idPadding);
   const [keepChats, setKeepChats] = useState(config.keepChats ?? 20);
   const [contextBudget, setContextBudget] = useState(config.contextBudget ?? DEFAULT_CONTEXT_BUDGET);
-  const [models, setModels] = useState<ModelOption[]>([]);
   const [sandbox, setSandbox] = useState<SandboxState | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { busy, error, run } = useAction();
   const caps = backendCaps(backend);
 
-  // Models depend on the chosen backend (claude aliases vs `opencode models`).
-  useEffect(() => {
-    let live = true;
-    listModels(backend)
-      .then((m) => {
-        if (live) setModels(m);
-      })
-      .catch(() => {
-        if (live) setModels([]);
-      });
-    return () => {
-      live = false;
-    };
-  }, [backend]);
+  // Models depend on the chosen backend (claude aliases vs `opencode models`). Emptied on a failure
+  // rather than kept: the picker is a menu of what can be chosen now, and one backend's aliases are
+  // not offerable under the other.
+  const { value: models } = useFetched(() => listModels(backend), [backend], NO_MODELS, {
+    onFailure: 'clear',
+  });
 
   // Refetched on demand as well as on open: restarting the server or taking one over changes what
   // this panel is reporting, and a stale "attached" line would keep offering an action that already
@@ -119,9 +106,7 @@ export function SettingsModal({ config, onClose, onSaved, autopilot, onAutopilot
   useEffect(loadSandbox, [loadSandbox]);
 
   async function save(): Promise<void> {
-    setBusy(true);
-    setError(null);
-    try {
+    await run(async () => {
       const boards = {} as ProjectConfig['boards'];
       for (const b of BOARDS) boards[b] = { columns: parseCsv(columns[b]) };
       await patchConfig({
@@ -146,11 +131,7 @@ export function SettingsModal({ config, onClose, onSaved, autopilot, onAutopilot
           : {}),
       });
       onSaved();
-    } catch (e) {
-      setError(errorText(e));
-    } finally {
-      setBusy(false);
-    }
+    });
   }
 
   return (
@@ -311,10 +292,10 @@ export function SettingsModal({ config, onClose, onSaved, autopilot, onAutopilot
         </div>
 
         <div className="modal-foot">
-          <button className="btn-secondary" onClick={onClose} disabled={busy}>
+          <button className="btn-secondary" onClick={onClose} disabled={busy !== null}>
             Cancel
           </button>
-          <button className="btn-primary" onClick={save} disabled={busy}>
+          <button className="btn-primary" onClick={save} disabled={busy !== null}>
             Save
           </button>
         </div>

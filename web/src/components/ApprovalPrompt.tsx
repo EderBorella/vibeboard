@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { approveSignin, refuseSignin, type SigninPending } from '../api';
-import { errorText } from '../errors';
+import { useAction } from '../useAction';
 
 interface Props {
   pending: SigninPending[];
@@ -23,7 +23,11 @@ interface Props {
 //     any of those. Where the request came from is the only part that narrows anything down.
 //   - No "allow all". One decision per browser.
 export function ApprovalPrompt({ pending, onError }: Props) {
-  const [busy, setBusy] = useState<string | null>(null);
+  // Keyed to the request being decided, and the failure goes UP: this dialog has no banner of its
+  // own, and only a message is ever reported — the list refreshes itself over the socket.
+  const { busy, run } = useAction<string>((message) => {
+    if (message !== null) onError?.(message);
+  });
   const refuseRef = useRef<HTMLButtonElement>(null);
   const first = pending[0];
   const focusId = first?.id;
@@ -38,14 +42,9 @@ export function ApprovalPrompt({ pending, onError }: Props) {
   if (!first) return null;
 
   async function decide(id: string, allow: boolean): Promise<void> {
-    setBusy(id);
-    try {
+    await run(async () => {
       await (allow ? approveSignin(id) : refuseSignin(id));
-    } catch (e) {
-      onError?.(errorText(e));
-    } finally {
-      setBusy(null);
-    }
+    }, id);
   }
 
   return (

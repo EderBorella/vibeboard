@@ -1,6 +1,5 @@
-import { useState } from 'react';
 import { restartOpencodeServer, type SandboxState, takeOverOpencodeServer } from '../api';
-import { errorText } from '../errors';
+import { useAction } from '../useAction';
 
 interface Props {
   state: SandboxState;
@@ -16,20 +15,15 @@ interface Props {
 // Its own component rather than more markup inside SettingsModal: it owns a fetch, two async
 // actions and their error state, and it is the part of Settings most worth testing directly.
 export function SandboxPanel({ state, backend, onChanged }: Props) {
-  const [busy, setBusy] = useState<'restart' | 'takeover' | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  // Keyed to which button was pressed: both are on screen at once in some states, and a shared
+  // boolean would spin the wrong one.
+  const { busy, error, run } = useAction<'restart' | 'takeover'>();
 
   async function act(which: 'restart' | 'takeover'): Promise<void> {
-    setBusy(which);
-    setError(null);
-    try {
+    await run(async () => {
       await (which === 'restart' ? restartOpencodeServer() : takeOverOpencodeServer());
       onChanged();
-    } catch (e) {
-      setError(errorText(e));
-    } finally {
-      setBusy(null);
-    }
+    }, which);
   }
 
   const opencode = backend === 'opencode';

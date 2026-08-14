@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { type AutopilotState, restartAutopilot } from '../api';
-import { errorText } from '../errors';
+import { useAction } from '../useAction';
 
 // The project is halted: everything in it was killed, and nothing will start again until someone says
 // so. Decision 12 asks for an overlay that STATES THE REASON AND THE TIMESTAMP and carries the way
@@ -26,8 +26,7 @@ function readable(state: AutopilotState): string {
 }
 
 export function HaltOverlay({ state, onRestarted }: { state: AutopilotState; onRestarted: () => void }) {
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { busy, error, run } = useAction();
   const restartRef = useRef<HTMLButtonElement>(null);
 
   // Focus moves in and stays in. The backdrop blocks the pointer, but Tab reached the TopBar behind it
@@ -47,16 +46,10 @@ export function HaltOverlay({ state, onRestarted }: { state: AutopilotState; onR
   }, []);
 
   async function restart(): Promise<void> {
-    setBusy(true);
-    setError(null);
-    try {
+    await run(async () => {
       await restartAutopilot();
       onRestarted();
-    } catch (e) {
-      setError(errorText(e));
-    } finally {
-      setBusy(false);
-    }
+    });
   }
 
   return (
@@ -77,7 +70,7 @@ export function HaltOverlay({ state, onRestarted }: { state: AutopilotState; onR
           type="button"
           className="btn-primary"
           onClick={() => void restart()}
-          disabled={busy}
+          disabled={busy !== null}
         >
           {busy ? 'Restarting…' : 'Restart project'}
         </button>

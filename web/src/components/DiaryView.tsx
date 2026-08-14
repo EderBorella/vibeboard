@@ -1,9 +1,9 @@
 import { memo, useMemo, useState } from 'react';
 import { addDiaryEntry, type DiaryEntry } from '../api';
 import { useDiary } from '../diary/useDiary';
-import { errorText } from '../errors';
 import { MAX_ENTRY_TEXT, type Suggestion } from '../shared';
 import { useSuggestions } from '../suggestions/useSuggestions';
+import { useAction } from '../useAction';
 
 // The diary, and the permanent way to add to it.
 //
@@ -133,15 +133,12 @@ function FiledColumn({ bump }: { bump: number }) {
 export function DiaryView({ bump }: { bump: number }) {
   const { entries, failed, refresh, add: onWritten } = useDiary(bump);
   const [draft, setDraft] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { busy, error, run } = useAction();
 
   const text = draft.trim();
 
   async function add(): Promise<void> {
-    setBusy(true);
-    setError(null);
-    try {
+    await run(async () => {
       // The server's copy, not the draft: it carries the timestamp and whatever the server made of the rest,
       // so showing our own guess would put a different entry on screen from the one on disk.
       // `note`, not `lifecycle`. That class is the spec's own for pre-flight, approval and every stop with
@@ -151,11 +148,7 @@ export function DiaryView({ bump }: { bump: number }) {
       // Cleared only AFTER the write lands. Clearing first loses whatever was typed the moment the post
       // fails, and a paragraph somebody wrote about why they did something is not recoverable from anywhere.
       setDraft('');
-    } catch (e) {
-      setError(errorText(e));
-    } finally {
-      setBusy(false);
-    }
+    });
   }
 
   return (
@@ -193,7 +186,7 @@ export function DiaryView({ bump }: { bump: number }) {
           <button
             type="button"
             className="btn-primary"
-            disabled={busy || text === ''}
+            disabled={busy !== null || text === ''}
             onClick={() => void add()}
           >
             {busy ? 'Adding…' : 'Add entry'}

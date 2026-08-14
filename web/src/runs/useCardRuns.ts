@@ -1,6 +1,14 @@
-import { useEffect, useState } from 'react';
 import { type CardLedgerData, listCardRuns, type RunRecord } from '../api';
 import type { BoardName } from '../shared';
+import { useFetched } from '../useFetched';
+
+// Null until the first answer, and kept through a failure: a total that flickers to zero and back
+// reads as money having disappeared.
+const EMPTY: { runs: RunRecord[]; account: CardLedgerData | null } = { runs: [], account: null };
+
+// Never called — `enabled` is false in the branch that supplies it — but a fetcher is not optional,
+// and a rejecting one would look like a failure rather than like a question nobody asked.
+const NEVER_ASKED = (): Promise<typeof EMPTY> => new Promise(() => {});
 
 // One card's runs, oldest first, with that card's ledger line — refetched whenever `trigger` changes.
 //
@@ -12,30 +20,13 @@ export function useCardRuns(
   card: string | undefined,
   trigger: unknown,
 ): { runs: RunRecord[]; account: CardLedgerData | null } {
-  const [runs, setRuns] = useState<RunRecord[]>([]);
-  // Null until the first answer, and kept through a failure: a total that flickers to zero and back
-  // reads as money having disappeared.
-  const [account, setAccount] = useState<CardLedgerData | null>(null);
-  // biome-ignore lint/correctness/useExhaustiveDependencies: deliberate trigger
-  useEffect(() => {
-    if (!board || !card) {
-      setRuns([]);
-      setAccount(null);
-      return;
-    }
-    let live = true;
-    listCardRuns(board, card)
-      .then((body) => {
-        if (!live) return;
-        setRuns(body.runs);
-        setAccount(body.account);
-      })
-      .catch(() => {
-        /* keep what we had; the next trigger retries */
-      });
-    return () => {
-      live = false;
-    };
-  }, [board, card, trigger]);
-  return { runs, account };
+  const open = board !== undefined && card !== undefined;
+  return useFetched(
+    open ? () => listCardRuns(board, card) : NEVER_ASKED,
+    [board, card, trigger],
+    EMPTY,
+    // With no card open there is nothing to ask about — and the runs of the card you just closed
+    // must not linger under the next thing you open.
+    { enabled: open, onDisabled: 'clear' },
+  ).value;
 }

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { getRaw, putRaw } from '../api';
 import { errorText } from '../errors';
 import type { Card } from '../shared';
+import { useAction } from '../useAction';
 
 interface Props {
   card: Card;
@@ -15,8 +16,7 @@ export function RawPane({ card }: Props) {
   const [loading, setLoading] = useState(true);
   const [draft, setDraft] = useState('');
   const [onDisk, setOnDisk] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+  const { busy, error, run, setError } = useAction();
 
   useEffect(() => {
     let live = true;
@@ -38,19 +38,15 @@ export function RawPane({ card }: Props) {
     return () => {
       live = false;
     };
-  }, [card.board, card.id]);
+    // `setError` comes from `useAction`; a useState setter's identity is stable, so it is in the list
+    // for the exhaustive-dependency check rather than because it can change.
+  }, [card.board, card.id, setError]);
 
   async function save(): Promise<void> {
-    setBusy(true);
-    setError(null);
-    try {
+    await run(async () => {
       await putRaw(card.board, card.id, draft);
       setOnDisk(draft);
-    } catch (e) {
-      setError(errorText(e));
-    } finally {
-      setBusy(false);
-    }
+    });
   }
 
   return (
@@ -67,7 +63,7 @@ export function RawPane({ card }: Props) {
         <button
           type="button"
           className="btn-primary"
-          disabled={busy || loading || draft === onDisk}
+          disabled={busy !== null || loading || draft === onDisk}
           onClick={save}
         >
           Save file

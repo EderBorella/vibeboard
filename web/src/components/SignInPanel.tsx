@@ -3,6 +3,7 @@ import { getSigninState, revokeDevice, type SigninDevice, signOutEverything } fr
 import { revokeDeviceRequest, signOutEverythingRequest } from '../confirm/requests';
 import type { Confirmer } from '../confirm/useConfirm';
 import { errorText } from '../errors';
+import { useAction } from '../useAction';
 
 interface Props {
   // Asked before either irreversible thing here. Both sign a browser out of a live session, and one
@@ -23,8 +24,9 @@ interface Props {
 export function SignInPanel({ confirm }: Props) {
   const [devices, setDevices] = useState<SigninDevice[]>([]);
   const [thisDevice, setThisDevice] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState<string | null>(null);
+  // Keyed to the row that was pressed: every listed browser has its own button, and one boolean
+  // would grey out all of them and spin none.
+  const { busy, error, run, setError } = useAction<string>();
 
   const load = useCallback((): void => {
     getSigninState()
@@ -32,22 +34,16 @@ export function SignInPanel({ confirm }: Props) {
         setDevices(s.devices);
         setThisDevice(s.thisDevice);
       })
-      .catch((e) => setError(errorText(e)));
-  }, []);
+      .catch((e: unknown) => setError(errorText(e)));
+  }, [setError]);
 
   useEffect(load, [load]);
 
   async function act(key: string, fn: () => Promise<unknown>): Promise<void> {
-    setBusy(key);
-    setError(null);
-    try {
+    await run(async () => {
       await fn();
       load();
-    } catch (e) {
-      setError(errorText(e));
-    } finally {
-      setBusy(null);
-    }
+    }, key);
   }
 
   const others = devices.filter((d) => d.id !== thisDevice);

@@ -1,6 +1,10 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { type DispatchRequest, dispatchRun, listControlFiles, listModels, type ModelOption } from '../api';
 import { errorText } from '../errors';
+import { useFetched } from '../useFetched';
+
+const NO_MODELS: ModelOption[] = [];
+const NO_FILES: string[] = [];
 
 // What the details step needs from the server, and the state of the last dispatch.
 //
@@ -16,46 +20,25 @@ export function useDispatch(
   error: string | null;
   run: (request: DispatchRequest) => Promise<void>;
 } {
-  const [models, setModels] = useState<ModelOption[]>([]);
-  const [attachable, setAttachable] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let live = true;
-    listModels(backend)
-      .then((list) => {
-        if (live) setModels(list);
-      })
-      .catch(() => {
-        /* the picker falls back to showing the current model alone */
-      });
-    return () => {
-      live = false;
-    };
-  }, [backend]);
+  // A failure leaves the picker falling back to showing the current model alone.
+  const { value: models } = useFetched(() => listModels(backend), [backend], NO_MODELS);
 
   // Docs and resource files only: instructions steer every turn already, and a skill attaching
-  // another skill is a confusion rather than a feature.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: deliberate trigger
-  useEffect(() => {
-    let live = true;
-    listControlFiles()
-      .then((groups) => {
-        if (!live) return;
-        setAttachable(
-          groups
-            .filter((g) => g.key === 'docs' || g.key === 'resources')
-            .flatMap((g) => g.files.map((f) => f.path)),
-        );
-      })
-      .catch(() => {
-        /* no attachments offered rather than a broken form */
-      });
-    return () => {
-      live = false;
-    };
-  }, [trigger]);
+  // another skill is a confusion rather than a feature. A failure offers no attachments rather than
+  // a broken form.
+  const { value: attachable } = useFetched(
+    () =>
+      listControlFiles().then((groups) =>
+        groups
+          .filter((g) => g.key === 'docs' || g.key === 'resources')
+          .flatMap((g) => g.files.map((f) => f.path)),
+      ),
+    [trigger],
+    NO_FILES,
+  );
 
   const run = useCallback(async (request: DispatchRequest): Promise<void> => {
     setBusy(true);

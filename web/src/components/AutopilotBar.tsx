@@ -11,7 +11,7 @@ import { transportModel } from '../autopilot/transport';
 import { useReadiness } from '../autopilot/useReadiness';
 import { killProjectRequest } from '../confirm/requests';
 import { useConfirm } from '../confirm/useConfirm';
-import { errorText } from '../errors';
+import { useAction } from '../useAction';
 import { AutopilotHelp } from './AutopilotHelp';
 
 interface Props {
@@ -44,8 +44,9 @@ interface Props {
 //    It is on the bar now, LAST in the row, so that when it disappears nothing else moves.
 export function AutopilotBar({ state, runs, bump, onChanged, onSettings }: Props) {
   const [open, setOpen] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // The server's own words on a refusal. A refusal names what is missing, and swallowing it turns the
+  // button into one that does nothing for no stated reason.
+  const { busy, error, run } = useAction();
   const [helpOpen, setHelpOpen] = useState(false);
   // Re-asked whenever the project changes or the loop's state does: fixing a blocker and pressing play
   // should not require a reload, and stopping may have been caused by one.
@@ -54,18 +55,13 @@ export function AutopilotBar({ state, runs, bump, onChanged, onSettings }: Props
   const [reviewed, setReviewed] = useState(0);
   const { confirm, dialog } = useConfirm();
   const { readiness } = useReadiness(`${bump}:${state?.state ?? 'none'}:${reviewed}`);
-  const model = transportModel({ state, runs, readiness, starting: busy });
+  const model = transportModel({ state, runs, readiness, starting: busy !== null });
 
   function act(): void {
-    setBusy(true);
-    setError(null);
-    const call = model.control.kind === 'stop' ? softStopAutopilot() : startAutopilot();
-    void call
-      .then(() => onChanged())
-      // The server's own words. A refusal names what is missing, and swallowing it turns the button
-      // into one that does nothing for no stated reason.
-      .catch((e: unknown) => setError(errorText(e)))
-      .finally(() => setBusy(false));
+    void run(async () => {
+      await (model.control.kind === 'stop' ? softStopAutopilot() : startAutopilot());
+      onChanged();
+    });
   }
 
   // The emergency stop. Asks first, with a dialog that names what dies — including the part people do
@@ -73,12 +69,10 @@ export function AutopilotBar({ state, runs, bump, onChanged, onSettings }: Props
   function kill(): void {
     void confirm(killProjectRequest()).then((ok) => {
       if (!ok) return;
-      setBusy(true);
-      setError(null);
-      void killAutopilot('You stopped everything from the auto-pilot bar.')
-        .then(() => onChanged())
-        .catch((e: unknown) => setError(errorText(e)))
-        .finally(() => setBusy(false));
+      void run(async () => {
+        await killAutopilot('You stopped everything from the auto-pilot bar.');
+        onChanged();
+      });
     });
   }
 
@@ -102,7 +96,7 @@ export function AutopilotBar({ state, runs, bump, onChanged, onSettings }: Props
         <button
           type="button"
           className="ap-kill"
-          disabled={model.emergency.disabled || busy}
+          disabled={model.emergency.disabled || busy !== null}
           title={model.emergency.title}
           data-testid="ap-kill"
           onClick={kill}

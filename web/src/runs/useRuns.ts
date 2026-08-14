@@ -1,24 +1,11 @@
-import { useEffect, useState } from 'react';
 import { listRuns, type RunList } from '../api';
+import { useFetched } from '../useFetched';
+
+const EMPTY: RunList = { runs: [], active: [], queued: [] };
 
 // Every run in the project, refetched whenever `trigger` changes. Like useCardRuns, this needs no
 // socket handling of its own: records live in board folders, so a status change already pushes a
-// snapshot.
+// snapshot. A failed fetch keeps the last good list; the next trigger retries.
 export function useRuns(trigger: unknown): RunList {
-  const [state, setState] = useState<RunList>({ runs: [], active: [], queued: [] });
-  // biome-ignore lint/correctness/useExhaustiveDependencies: deliberate trigger
-  useEffect(() => {
-    let live = true;
-    listRuns()
-      .then((r) => {
-        if (live) setState(r);
-      })
-      .catch(() => {
-        /* keep the last good list; the next trigger retries */
-      });
-    return () => {
-      live = false;
-    };
-  }, [trigger]);
-  return state;
+  return useFetched(listRuns, [trigger], EMPTY).value;
 }

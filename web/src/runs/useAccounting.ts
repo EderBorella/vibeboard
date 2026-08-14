@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
 import { type Accounting, getAccounting } from '../api';
+import { useFetched } from '../useFetched';
 
 // What the project has spent, refetched whenever `trigger` changes.
 //
@@ -10,20 +10,5 @@ import { type Accounting, getAccounting } from '../api';
 // Null until the first answer, and kept through a failure: a total that flickers to nothing and back
 // reads as money having disappeared.
 export function useAccounting(trigger: unknown): Accounting | null {
-  const [accounting, setAccounting] = useState<Accounting | null>(null);
-  // biome-ignore lint/correctness/useExhaustiveDependencies: deliberate trigger
-  useEffect(() => {
-    let live = true;
-    getAccounting()
-      .then((next) => {
-        if (live) setAccounting(next);
-      })
-      .catch(() => {
-        /* keep what we had; the next trigger retries */
-      });
-    return () => {
-      live = false;
-    };
-  }, [trigger]);
-  return accounting;
+  return useFetched<Accounting | null>(getAccounting, [trigger], null).value;
 }

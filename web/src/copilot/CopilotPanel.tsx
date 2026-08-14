@@ -2,12 +2,15 @@ import { useEffect, useRef, useState } from 'react';
 import { getModelStatus, listModels, type ModelOption, type ModelStatus } from '../api';
 import { useConfirm } from '../confirm/useConfirm';
 import { backendCaps, backendDefaults } from '../shared';
+import { useFetched } from '../useFetched';
 import { ChatSwitcher } from './ChatSwitcher';
 import { CopilotControls } from './CopilotControls';
 import { CopilotReadout } from './CopilotReadout';
 import { clampToCaps } from './choice';
 import { BACKENDS } from './format';
 import type { CopilotMode, EffortLevel, useCopilot } from './useCopilot';
+
+const NO_MODELS: ModelOption[] = [];
 
 interface Props {
   copilot: ReturnType<typeof useCopilot>;
@@ -59,7 +62,6 @@ export function CopilotPanel({
   } = copilot;
   const { confirm, dialog } = useConfirm();
   const [draft, setDraft] = useState('');
-  const [models, setModels] = useState<ModelOption[]>([]);
   const [status, setStatus] = useState<ModelStatus | null>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
 
@@ -69,23 +71,15 @@ export function CopilotPanel({
   const caps = backendCaps(backend);
   const { mode: effMode, effort: effEffort } = clampToCaps({ backend, model, effort }, mode);
 
+  // Model choices depend on the configured backend (claude aliases vs opencode models). Emptied on a
+  // failure rather than kept: this is a menu of what can be chosen now, and one backend's aliases are
+  // not offerable under the other.
+  const { value: models } = useFetched(() => listModels(backend), [backend], NO_MODELS, {
+    onFailure: 'clear',
+  });
+
   // Warn when the chosen model can't call tools — the copilot can't touch cards without them.
   const noTools = models.find((m) => m.id === model)?.caps?.toolCall === false;
-
-  // Model choices depend on the configured backend (claude aliases vs opencode models).
-  useEffect(() => {
-    let live = true;
-    listModels(backend)
-      .then((m) => {
-        if (live) setModels(m);
-      })
-      .catch(() => {
-        if (live) setModels([]);
-      });
-    return () => {
-      live = false;
-    };
-  }, [backend]);
 
   // Live status/uptime for the selected model (OpenRouter only; null otherwise).
   useEffect(() => {

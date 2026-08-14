@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
 import { getReadiness, type Readiness } from '../api';
+import { useFetched } from '../useFetched';
 
 // "Could auto-pilot start here, and if not, why not?" — asked in one place because two callers now need
 // it: the transport strip in the header and the panel in Settings. Two copies of the fetch would be two
@@ -15,28 +15,10 @@ export function useReadiness(
   trigger: unknown,
   enabled = true,
 ): { readiness: Readiness | null; failed: boolean } {
-  const [readiness, setReadiness] = useState<Readiness | null>(null);
-  const [failed, setFailed] = useState(false);
-
-  // biome-ignore lint/correctness/useExhaustiveDependencies: `trigger` is a deliberate refetch signal
-  useEffect(() => {
-    if (!enabled) return;
-    let live = true;
-    getReadiness()
-      .then((r) => {
-        if (!live) return;
-        setReadiness(r);
-        setFailed(false); // a good answer clears an earlier failure
-      })
-      .catch(() => {
-        // `readiness` is left as it was rather than reset: a failed refetch must not erase a good
-        // answer, and null is already "not asked", which renders as no claim either way.
-        if (live) setFailed(true);
-      });
-    return () => {
-      live = false;
-    };
-  }, [trigger, enabled]);
-
+  // A failed refetch leaves the last good answer where it was — and while disabled, likewise: not
+  // asking is not the same as being told nothing is there.
+  const { value: readiness, failed } = useFetched<Readiness | null>(getReadiness, [trigger], null, {
+    enabled,
+  });
   return { readiness, failed };
 }

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { type AutopilotState, getAutopilotState } from './api';
+import { useFetched } from './useFetched';
 import { useSharedWs } from './ws';
 
 // Auto-pilot's state, as this tab sees it.
@@ -19,33 +20,24 @@ export function useAutopilot(bump: number): {
   state: AutopilotState | null;
   refresh: () => void;
 } {
-  const [state, setState] = useState<AutopilotState | null>(null);
   const [asked, setAsked] = useState(0);
   const ws = useSharedWs(bump);
 
-  // `bump` is a new project and `asked` is an explicit refresh; neither is read inside the effect, and
-  // both must refetch. Same idiom as useCardRuns.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: deliberate triggers
-  useEffect(() => {
-    let live = true;
-    getAutopilotState()
-      .then((next) => {
-        if (live) setState(next);
-      })
-      .catch(() => {
-        /* no project open, or nothing answered; the socket or the next refresh will say */
-      });
-    return () => {
-      live = false;
-    };
-  }, [bump, asked]);
+  // `bump` is a new project and `asked` is an explicit refresh; neither is read by the fetch, and
+  // both must refetch. A failure says nothing: there may be no project open, and the socket or the
+  // next refresh will report anything that matters.
+  const { value: state, setValue: setState } = useFetched<AutopilotState | null>(
+    getAutopilotState,
+    [bump, asked],
+    null,
+  );
 
   useEffect(
     () =>
       ws.subscribe((msg) => {
         if (msg.type === 'autopilot:state') setState(msg.state as AutopilotState);
       }),
-    [ws],
+    [ws, setState],
   );
 
   // POLLED WHILE RUNNING, and only while running. The loop writes `iteration` straight to
@@ -66,7 +58,9 @@ export function useAutopilot(bump: number): {
         });
     }, COUNTER_POLL_MS);
     return () => clearInterval(timer);
-  }, [state?.state]);
+    // `setState` is the setter from `useFetched`, and a useState setter's identity is stable — it is
+    // in the list to satisfy the exhaustive-dependency check, not because it can change.
+  }, [state?.state, setState]);
 
   // For the controls: they already receive the new state in their response, but a refresh keeps this
   // hook the single place the answer comes from rather than two paths that can disagree.

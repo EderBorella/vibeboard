@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { type FileRead, putFsFile, readFsFile } from '../api';
 import type { EditorView } from '../components/EditorShell';
 import { errorText } from '../errors';
+import { useAction } from '../useAction';
 
 // The one file the Explorer has open: what it is, the editor buffer, and the two calls that move
 // bytes. Split from ExplorerView so the buffer's rules — never clobber unsaved typing, never save a
@@ -28,47 +29,41 @@ export function useOpenFile(trigger: unknown): OpenFile {
   const [draft, setDraft] = useState('');
   const [dirty, setDirty] = useState(false);
   const [view, setView] = useState<EditorView>('edit');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { busy, error, run, setError } = useAction();
 
-  const open = useCallback(async (path: string): Promise<void> => {
-    setError(null);
-    try {
-      const read = await readFsFile(path);
-      setFile(read);
-      setDraft(read.kind === 'text' ? read.content : '');
-      setDirty(false);
-    } catch (e) {
-      setFile(null);
-      setError(errorText(e));
-    }
-  }, []);
+  const open = useCallback(
+    async (path: string): Promise<void> => {
+      setError(null);
+      try {
+        const read = await readFsFile(path);
+        setFile(read);
+        setDraft(read.kind === 'text' ? read.content : '');
+        setDirty(false);
+      } catch (e) {
+        setFile(null);
+        setError(errorText(e));
+      }
+    },
+    [setError],
+  );
 
   const close = useCallback((): void => {
     setFile(null);
     setDraft('');
     setDirty(false);
     setError(null);
-  }, []);
+  }, [setError]);
 
   const save = useCallback(async (): Promise<boolean> => {
     if (file?.kind !== 'text') return false;
-    setBusy(true);
-    setError(null);
-    try {
+    // On a refusal the buffer stays dirty on purpose: the edit is still unsaved, and clearing the
+    // flag would disable Save and strand the text. `run` reports whether it landed.
+    return run(async () => {
       await putFsFile(file.path, draft);
       setDirty(false);
       await open(file.path);
-      return true;
-    } catch (e) {
-      // The buffer stays dirty on purpose: the edit is still unsaved, and clearing the flag would
-      // disable Save and strand the text.
-      setError(errorText(e));
-      return false;
-    } finally {
-      setBusy(false);
-    }
-  }, [file, draft, open]);
+    });
+  }, [file, draft, open, run]);
 
   // Follow the file on disk while the buffer is clean, so an agent's edit appears — and never while
   // it is dirty. `trigger` is a signal, not an input; the effect reads the current file from the
@@ -83,5 +78,5 @@ export function useOpenFile(trigger: unknown): OpenFile {
     setDirty(true);
   }, []);
 
-  return { file, draft, dirty, view, busy, error, setView, edit, open, close, save };
+  return { file, draft, dirty, view, busy: busy !== null, error, setView, edit, open, close, save };
 }

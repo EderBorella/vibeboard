@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { type AppSettings, getAppSettings, setDebugLog } from '../api';
 import { errorText } from '../errors';
+import { useAction } from '../useAction';
 
 // WHERE TO LOOK WHEN SOMETHING GOES WRONG, and the one switch that changes what is there.
 //
@@ -13,32 +14,27 @@ import { errorText } from '../errors';
 // VibeBoard is installed and the filename on today's date, so neither is guessable.
 export function DiagnosticsPanel() {
   const [settings, setSettings] = useState<AppSettings | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+  const { busy, error, run, setError } = useAction();
 
+  // Read once, on open. Not `useFetched`: there is no trigger and so no late answer to drop, and the
+  // banner wants the server's words rather than the bare fact that the read failed.
   useEffect(() => {
     getAppSettings()
       .then(setSettings)
-      .catch((e) => setError(errorText(e)));
-  }, []);
+      .catch((e: unknown) => setError(errorText(e)));
+  }, [setError]);
 
   async function toggle(on: boolean): Promise<void> {
     // Not only `disabled` on the control. Until the first answer arrives there is no value to change, so a
     // click in that window would send one read off a default rather than off the server — and `disabled` is
     // presentation: it is what a browser honours, not what this function does. jsdom dispatches the change
     // anyway, which is how the gap showed itself.
-    if (settings === null || busy) return;
-    setBusy(true);
-    setError(null);
-    try {
+    if (settings === null || busy !== null) return;
+    await run(async () => {
       // The SERVER'S answer, not the value that was sent: the checkbox must show what was saved, so a
       // refused write leaves it where it was rather than showing a state the next start will not honour.
       setSettings(await setDebugLog(on));
-    } catch (e) {
-      setError(errorText(e));
-    } finally {
-      setBusy(false);
-    }
+    });
   }
 
   return (
@@ -54,7 +50,7 @@ export function DiagnosticsPanel() {
         <input
           type="checkbox"
           checked={settings?.debugLog ?? false}
-          disabled={settings === null || busy}
+          disabled={settings === null || busy !== null}
           onChange={(e) => void toggle(e.target.checked)}
         />
         <span>Verbose auto-pilot log</span>

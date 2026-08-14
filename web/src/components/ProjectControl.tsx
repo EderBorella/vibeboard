@@ -15,6 +15,7 @@ import { useConfirm } from '../confirm/useConfirm';
 import { errorText } from '../errors';
 import type { ProjectSnapshot } from '../shared';
 import { useSkills } from '../skills/useSkills';
+import { useAction } from '../useAction';
 import { ControlFileEditor, type ControlView, type OpenFile } from './ControlFileEditor';
 import { ControlFileList, RESOURCES_SENTINEL } from './ControlFileList';
 import { ResourcesEditor } from './ResourcesEditor';
@@ -41,8 +42,9 @@ export function ProjectControl({ snapshot }: Props) {
   const [draft, setDraft] = useState('');
   const [dirty, setDirty] = useState(false);
   const [view, setView] = useState<ControlView>('edit');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // One busy flag and one banner for every write this pane makes: the reads below (`refreshGroups`,
+  // `loadFile`) report into the same banner without claiming a button.
+  const { busy, error, run, setError } = useAction();
   const { confirm, dialog } = useConfirm();
   // Path currently being renamed in the list, plus its in-progress text. Set right after a
   // create so the new file lands with its name selected and ready to type over.
@@ -58,21 +60,24 @@ export function ProjectControl({ snapshot }: Props) {
     } catch (e) {
       setError(errorText(e));
     }
-  }, []);
+  }, [setError]);
 
-  const loadFile = useCallback(async (path: string) => {
-    setError(null);
-    try {
-      const f = await getControlFile(path);
-      setFile(f);
-      setDraft(f.content);
-      setDirty(false);
-      // A skill opens as fields; anything else is text.
-      setView(f.category === 'skills' ? 'fields' : 'edit');
-    } catch (e) {
-      setError(errorText(e));
-    }
-  }, []);
+  const loadFile = useCallback(
+    async (path: string) => {
+      setError(null);
+      try {
+        const f = await getControlFile(path);
+        setFile(f);
+        setDraft(f.content);
+        setDirty(false);
+        // A skill opens as fields; anything else is text.
+        setView(f.category === 'skills' ? 'fields' : 'edit');
+      } catch (e) {
+        setError(errorText(e));
+      }
+    },
+    [setError],
+  );
 
   // Initial load + live refresh: refetch the list whenever the project changes on disk, and
   // reload the open file's content when the editor has no unsaved edits.
@@ -141,18 +146,14 @@ export function ProjectControl({ snapshot }: Props) {
 
   async function save(): Promise<void> {
     if (!file) return;
-    setBusy(true);
-    setError(null);
-    try {
+    await run(async () => {
       await putControlFile(file.path, draft);
       setDirty(false);
+      // Both AFTER the write lands: the list carries the size and the editor re-reads what the server
+      // actually stored, neither of which is known until it has.
       await refreshGroups();
       await loadFile(file.path);
-    } catch (e) {
-      setError(errorText(e));
-    } finally {
-      setBusy(false);
-    }
+    });
   }
 
   async function remove(): Promise<void> {
@@ -164,18 +165,12 @@ export function ProjectControl({ snapshot }: Props) {
       danger: true,
     });
     if (!ok) return;
-    setBusy(true);
-    setError(null);
-    try {
+    await run(async () => {
       await deleteControlFile(file.path);
       setFile(null);
       setSelected(null);
       await refreshGroups();
-    } catch (e) {
-      setError(errorText(e));
-    } finally {
-      setBusy(false);
-    }
+    });
   }
 
   // The fields view for a skill: the parsed skill when it is valid, and the reason when it is not —
@@ -188,19 +183,13 @@ export function ProjectControl({ snapshot }: Props) {
           key={valid.slug}
           skill={valid}
           config={snapshot.config}
-          busy={busy}
+          busy={busy !== null}
           onSave={async (fields) => {
-            setBusy(true);
-            setError(null);
-            try {
+            await run(async () => {
               await putSkill(valid.slug, fields);
               await loadFile(open.path);
               await refreshGroups();
-            } catch (e) {
-              setError(errorText(e));
-            } finally {
-              setBusy(false);
-            }
+            });
           }}
         />
       );
@@ -241,7 +230,7 @@ export function ProjectControl({ snapshot }: Props) {
             draft={draft}
             dirty={dirty}
             view={view}
-            busy={busy}
+            busy={busy !== null}
             onView={setView}
             onDraft={(v) => {
               setDraft(v);

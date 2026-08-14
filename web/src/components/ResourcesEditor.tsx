@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { getResources, putResources, type ResourceLink } from '../api';
 import { errorText } from '../errors';
+import { useAction } from '../useAction';
 
 // The links registry (.vibeboard/resources.yaml) — a small editable table of external
 // references the user (and copilot) can consult. It owns its own rows and dirty flag because
@@ -14,7 +15,8 @@ const withId = (l: ResourceLink): Row => ({ ...l, rowId: `r${seq++}` });
 export function ResourcesEditor({ onError }: { onError: (e: string | null) => void }) {
   const [links, setLinks] = useState<Row[]>([]);
   const [dirty, setDirty] = useState(false);
-  const [busy, setBusy] = useState(false);
+  // This pane has no banner of its own: only errors are handed back up to the shared one.
+  const { busy, run } = useAction(onError);
 
   useEffect(() => {
     let live = true;
@@ -45,18 +47,12 @@ export function ResourcesEditor({ onError }: { onError: (e: string | null) => vo
   };
 
   async function save(): Promise<void> {
-    setBusy(true);
-    onError(null);
-    try {
+    await run(async () => {
       const clean = links.filter((l) => l.title.trim() || l.url.trim());
       await putResources(clean.map(({ title, url }) => ({ title, url })));
       setLinks(clean);
       setDirty(false);
-    } catch (e) {
-      onError(errorText(e));
-    } finally {
-      setBusy(false);
-    }
+    });
   }
 
   return (
@@ -67,7 +63,7 @@ export function ResourcesEditor({ onError }: { onError: (e: string | null) => vo
           <button className="btn-secondary" onClick={add}>
             ＋ Add link
           </button>
-          <button className="btn-primary" disabled={busy || !dirty} onClick={save}>
+          <button className="btn-primary" disabled={busy !== null || !dirty} onClick={save}>
             Save
           </button>
         </div>

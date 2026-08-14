@@ -1,5 +1,6 @@
 import type { AutopilotConfig } from './autopilot.js';
 import { isProjectRun, type RunRecord, type RunStatus } from './runs.js';
+import type { BoardName } from './types.js';
 
 // What a project has spent, and how many attempts a card has used. Both are QUERIES over the run
 // records already on disk — no new state, no counter to drift out of step with the files.
@@ -162,3 +163,34 @@ export function governingCap(
 }
 
 const lower = (sentence: string): string => sentence.charAt(0).toLowerCase() + sentence.slice(1);
+
+// What this project and each of its cards have spent, and which cap is actually bounding the run —
+// the shape `GET /api/accounting` answers with.
+//
+// Computed on the server rather than in the browser, so there is ONE statement of the arithmetic: the
+// UI renders it, and the auto-pilot service reads the same numbers over the same endpoint to decide
+// whether it may dispatch. Two copies of "what has this cost" would eventually disagree, and the one
+// that enforces the budget is the one that must be right.
+//
+// The SHAPE lives here and the assembly stays in the route, which is the way round it has to be. The
+// loop is a separate process that reaches the board over HTTP (decision 20), and it needs this type to
+// read the answer — so while it was declared in a route module, `src/service/board-client.ts` had to
+// import from `src/server/`, the one import edge left pointing the wrong way up the layers. Nothing
+// about the type is a server concern: it is Spend plus a cap name, both of which are already here.
+export interface CardAccount {
+  board: BoardName;
+  card: string;
+  spend: Spend;
+  // Attempts that BURNED, per skill. Per skill because that is how the cap is counted — a critic or
+  // checkup run on the same card must not inflate the tally of the skill doing the work.
+  attempts: Record<string, number>;
+}
+
+export interface Accounting {
+  project: Spend; // every run, card and project runs alike: everything a model did counts
+  cards: CardAccount[];
+  attemptCap: number;
+  // Absent for a project with no auto-pilot block: there is no cap, so there is no cap to name. The UI
+  // renders nothing rather than a number nobody set.
+  cap?: { cap: CapName; why: string };
+}

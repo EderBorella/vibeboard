@@ -5,7 +5,7 @@ import { serializeCard } from '../src/core/card.js';
 import { boardRel } from '../src/core/layout.js';
 import type { Suggestion } from '../src/core/suggestions.js';
 import type { BoardName, CardFrontmatter } from '../src/core/types.js';
-import { buildSnapshot } from '../src/server/snapshot.js';
+import { buildSnapshot } from '../src/server/boards/snapshot.js';
 import { scaffoldProject } from '../src/store/project/scaffold.js';
 import { writeSuggestion } from '../src/store/suggestion-store.js';
 import { tempDir } from './helpers.js';

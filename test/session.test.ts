@@ -13,8 +13,8 @@ import {
   RESULTS_DIR,
   RUNS_DIR,
 } from '../src/core/layout.js';
-import { isIgnored, ProjectSession } from '../src/server/session.js';
-import type { ProjectSnapshot } from '../src/server/snapshot.js';
+import { isIgnored, ProjectSession } from '../src/server/boards/session.js';
+import type { ProjectSnapshot } from '../src/server/boards/snapshot.js';
 import { boardColumnSlugs } from '../src/store/cards/board.js';
 import { createCard } from '../src/store/cards/mutations.js';
 import { scaffoldProject } from '../src/store/project/scaffold.js';

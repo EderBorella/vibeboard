@@ -46,7 +46,7 @@ container the equivalent question is *"is it mounted?"*, and the answer is usual
 
 ## Where the boundary is drawn
 
-Everything below is asserted by pure functions in `src/server/containers.ts`, deliberately, so the
+Everything below is asserted by pure functions in `src/server/boxes/containers.ts`, deliberately, so the
 security boundary can be tested without a daemon:
 
 - `PROTECTED_PATHS` / `protectedPaths()` — what is pinned read-only.
@@ -54,8 +54,8 @@ security boundary can be tested without a daemon:
 - `boxMounts()` — the whole mount set.
 - `createArgs()` / `netRuleArgs()` — the flags and the network rules.
 
-`src/server/box-manager.ts` owns the docker verbs; `src/server/box-service.ts` decides what a box is
-*for* a given project and backend; `src/server/sandbox.ts` holds the gate that every agent entry
+`src/server/boxes/box-manager.ts` owns the docker verbs; `src/server/boxes/box-service.ts` decides what a box is
+*for* a given project and backend; `src/server/boxes/sandbox.ts` holds the gate that every agent entry
 point calls first.
 
 ### The read-only mounts, and what each one denies
@@ -142,8 +142,8 @@ enforces scope; it is not the same as isolation.
 - **The CLI writes its own session transcript into `/state`**, which the copilot and every run in
   that box share. A run's credential dies in minutes; the copilot's lives for a conversation, which
   is why it is ended eagerly on every chat and project change. This is the reason credentials are
-  redacted out of anything VibeBoard persists (`src/server/copilot-authority.ts`,
-  `src/server/agent-runner.ts`) — the redaction is what keeps a token out of the chat and run
+  redacted out of anything VibeBoard persists (`src/server/copilot/copilot-authority.ts`,
+  `src/server/runs/agent-runner.ts`) — the redaction is what keeps a token out of the chat and run
   transcripts, and it has to survive the fact that the box is shared.
 - **Credentials travel on stdin, never in argv.** `/proc/<pid>/cmdline` is world-readable for as long
   as the process lives, so a command-line argument would let any other agent on the machine lift
@@ -184,7 +184,7 @@ rather than served.
 
 - **The auto-pilot service process.** It is not sandboxed, and that is correct: it writes
   `autopilot-state.json` — the counters are its own — it runs no model, and it executes nothing a
-  card asked for. What confines it is the **scope table in `src/server/auth.ts`**, not the
+  card asked for. What confines it is the **scope table in `src/server/auth/auth.ts`**, not the
   filesystem. (A comment that explains this by saying "the profile denies exactly that to every
   confined process" is naming a dead mechanism for a live rule.)
 - **Gate and smoke commands.** They run in the loop's own process, through `/bin/sh`, as the server's
@@ -200,7 +200,7 @@ rather than served.
 
 ## The gate, and why it is a probe
 
-One function decides whether any agent may start (`agentRefusal` in `src/server/sandbox.ts`), it is
+One function decides whether any agent may start (`agentRefusal` in `src/server/boxes/sandbox.ts`), it is
 called before every dispatch, every chat turn and every auto-pilot start, and it fails closed.
 
 It is asked **before** dispatch and never inferred from a failure, because `docker exec` into a

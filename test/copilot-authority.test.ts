@@ -8,12 +8,12 @@ import {
 } from '../src/core/autopilot-state.js';
 import { FOUNDATION_FILES, foundationRel } from '../src/core/layout.js';
 import { buildApp } from '../src/server/app.js';
-import { allows, endpointsFor } from '../src/server/auth.js';
-import { CopilotAuthority } from '../src/server/copilot-authority.js';
-import { type Credential, CredentialStore, type Scope } from '../src/server/credentials.js';
+import { allows, endpointsFor } from '../src/server/auth/auth.js';
+import { type Credential, CredentialStore, type Scope } from '../src/server/auth/credentials.js';
+import { ProjectSession } from '../src/server/boards/session.js';
+import { CopilotAuthority } from '../src/server/copilot/copilot-authority.js';
 import { redactCredential } from '../src/server/redaction.js';
-import { unreviewedGatesRefusal } from '../src/server/routes/runs.js';
-import { ProjectSession } from '../src/server/session.js';
+import { unreviewedGatesRefusal } from '../src/server/runs/routes.js';
 import { readAutopilotState, writeAutopilotState } from '../src/store/autopilot-store.js';
 import { TEST_SANDBOX, tempDir } from './helpers.js';
 
@@ -614,7 +614,7 @@ describe('what reaches the transcript versus the model', () => {
   });
 });
 
-// Authorising is admin-only by absence from the scope table, which routes/copilot.ts calls "the point".
+// Authorising is admin-only by absence from the scope table, which server/copilot/routes.ts calls "the point".
 // A row nobody exercises is a row that does not work.
 describe('authorising the copilot', () => {
   it('is refused to the copilot itself', async () => {

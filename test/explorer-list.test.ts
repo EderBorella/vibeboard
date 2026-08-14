@@ -2,7 +2,7 @@ import { mkdir, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { BOARDS_DIR, boardRel, CONFIG_DIR, CONFIG_FILE, RUNS_DIR } from '../src/core/layout.js';
-import { listDir, MAX_EDIT_BYTES, MAX_ENTRIES, readFileNode } from '../src/server/explorer-list.js';
+import { listDir, MAX_EDIT_BYTES, MAX_ENTRIES, readFileNode } from '../src/server/explorer/explorer-list.js';
 import { tempDir } from './helpers.js';
 
 async function tree(spec: Record<string, string | null>): Promise<string> {

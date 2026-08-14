@@ -1,16 +1,16 @@
 import { networkInterfaces } from 'node:os';
-import { listenOnApiSocket, removeApiSocketFile } from './api-socket.js';
 import { buildApp } from './app.js';
-import { restoreLastProject } from './app-state.js';
-import { BoxService } from './box-service.js';
-import { DEFAULT_IMAGE } from './containers.js';
-import { adminToken, CredentialStore } from './credentials.js';
-import { DeviceStore } from './devices.js';
+import { adminToken, CredentialStore } from './auth/credentials.js';
+import { DeviceStore } from './auth/devices.js';
+import { installBreakGlass, signinBanner } from './auth/signin-terminal.js';
+import { ProjectSession } from './boards/session.js';
+import { listenOnApiSocket, removeApiSocketFile } from './boxes/api-socket.js';
+import { BoxService } from './boxes/box-service.js';
+import { DEFAULT_IMAGE } from './boxes/containers.js';
+import { stopOpencodeServer } from './boxes/opencode-server.js';
+import { probeSandbox } from './boxes/sandbox.js';
 import { installCrashHandlers, serverLogger } from './logging.js';
-import { stopOpencodeServer } from './opencode-server.js';
-import { probeSandbox } from './sandbox.js';
-import { ProjectSession } from './session.js';
-import { installBreakGlass, signinBanner } from './signin-terminal.js';
+import { restoreLastProject } from './settings/app-state.js';
 import { registerStatic } from './static.js';
 
 // Load ./.env if the user has one, so `npm start` and `npm run dev` pick up local config with

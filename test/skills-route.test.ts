@@ -2,7 +2,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { skillRel } from '../src/core/layout.js';
-import { ProjectSession } from '../src/server/session.js';
+import { ProjectSession } from '../src/server/boards/session.js';
 import { openTestProject, testApp } from './helpers.js';
 
 describe('GET /api/skills', () => {

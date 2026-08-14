@@ -2,9 +2,9 @@ import type { FastifyInstance } from 'fastify';
 import { describe, expect, it, onTestFinished } from 'vitest';
 import WebSocket from 'ws';
 import { buildApp } from '../src/server/app.js';
-import { CredentialStore } from '../src/server/credentials.js';
-import { DeviceStore } from '../src/server/devices.js';
-import { ProjectSession } from '../src/server/session.js';
+import { CredentialStore } from '../src/server/auth/credentials.js';
+import { DeviceStore } from '../src/server/auth/devices.js';
+import { ProjectSession } from '../src/server/boards/session.js';
 import { tempDir } from './helpers.js';
 
 // The approval prompt has to REACH a screen someone is looking at, and a revoke has to reach the

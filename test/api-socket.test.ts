@@ -3,10 +3,10 @@ import { request } from 'node:http';
 import { createServer } from 'node:net';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { apiSocketPath, listenOnApiSocket, removeApiSocketFile } from '../src/server/api-socket.js';
 import { buildApp } from '../src/server/app.js';
-import { CredentialStore } from '../src/server/credentials.js';
-import { ProjectSession } from '../src/server/session.js';
+import { CredentialStore } from '../src/server/auth/credentials.js';
+import { ProjectSession } from '../src/server/boards/session.js';
+import { apiSocketPath, listenOnApiSocket, removeApiSocketFile } from '../src/server/boxes/api-socket.js';
 import { tempDir } from './helpers.js';
 
 // The socket is the ONLY way an agent in a container reaches this server, so these assert the two

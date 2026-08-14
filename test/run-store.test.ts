@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { boardRel, CONFIG_DIR, CONFIG_FILE, DOCS_DIR, RESULTS_DIR, RUNS_DIR } from '../src/core/layout.js';
 import { type RunRecord, runId } from '../src/core/runs.js';
-import { isIgnored } from '../src/server/session.js';
+import { isIgnored } from '../src/server/boards/session.js';
 import {
   appendTranscript,
   foldReport,

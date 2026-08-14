@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process';
 import { describe, expect, it, vi } from 'vitest';
 import type { RunRecord } from '../src/core/runs.js';
 import { groupStartTime } from '../src/exec/process-group.js';
-import { groupsOf, reapGroups } from '../src/server/reaper.js';
+import { groupsOf, reapGroups } from '../src/server/runs/reaper.js';
 import { markInterrupted, writeRun } from '../src/store/run-store.js';
 import { tempDir } from './helpers.js';
 

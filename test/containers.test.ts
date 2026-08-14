@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CONFIG_DIR, RUNS_DIR } from '../src/core/layout.js';
-import { BoxManager } from '../src/server/box-manager.js';
+import { BoxManager } from '../src/server/boxes/box-manager.js';
 import {
   BACKEND_LABEL,
   BOX_LABEL,
@@ -21,7 +21,7 @@ import {
   protectedPaths,
   specDigest,
   WORK_DIR,
-} from '../src/server/containers.js';
+} from '../src/server/boxes/containers.js';
 
 const PROJECT = '/data/projects/demo';
 const PATHS = { projectRoot: PROJECT, stateDir: '/home/u/.vibeboard/copilot/abc' };

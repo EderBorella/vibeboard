@@ -182,8 +182,8 @@ describe('who may write the diary', () => {
   // A real app with no auth-injecting wrapper: every request presents exactly the credential it is given.
   async function openBare() {
     const { buildApp } = await import('../src/server/app.js');
-    const { CredentialStore } = await import('../src/server/credentials.js');
-    const { ProjectSession } = await import('../src/server/session.js');
+    const { CredentialStore } = await import('../src/server/auth/credentials.js');
+    const { ProjectSession } = await import('../src/server/boards/session.js');
     const session = new ProjectSession();
     const store = new CredentialStore('admin-token');
     const app = buildApp(session, { credentials: store, logger: false });

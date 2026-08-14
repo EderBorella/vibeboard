@@ -9,13 +9,13 @@ import WebSocket from 'ws';
 import { FOUNDATION_DIR } from '../src/core/layout.js';
 import type { Card } from '../src/core/types.js';
 import { buildApp } from '../src/server/app.js';
-import { BoxManager } from '../src/server/box-manager.js';
-import { BoxService } from '../src/server/box-service.js';
-import type { DockerRun } from '../src/server/containers.js';
-import { type Credential, CredentialStore } from '../src/server/credentials.js';
-import { type SandboxStatus, wrapCommand } from '../src/server/sandbox.js';
-import type { ServiceCommand } from '../src/server/service-process.js';
-import { ProjectSession } from '../src/server/session.js';
+import { type Credential, CredentialStore } from '../src/server/auth/credentials.js';
+import type { ServiceCommand } from '../src/server/autopilot/service-process.js';
+import { ProjectSession } from '../src/server/boards/session.js';
+import { BoxManager } from '../src/server/boxes/box-manager.js';
+import { BoxService } from '../src/server/boxes/box-service.js';
+import type { DockerRun } from '../src/server/boxes/containers.js';
+import { type SandboxStatus, wrapCommand } from '../src/server/boxes/sandbox.js';
 
 // Every temp directory the suite makes goes inside the run's own root (vitest.config.ts), which is
 // removed when the run ends. Before that, each of these leaked forever: 440,653 of them accumulated

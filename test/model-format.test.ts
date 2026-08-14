@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { ModelOption } from '../web/src/api.js';
-import { fmtCtx, fmtPrice, loadFavs, providerOf, saveFavs } from '../web/src/components/model-format.js';
+import { fmtCtx, fmtPrice, loadFavs, providerOf, saveFavs } from '../web/src/models/model-format.js';
 
 const model = (over: Partial<ModelOption>): ModelOption => ({ id: 'x/y', free: false, ...over });
 

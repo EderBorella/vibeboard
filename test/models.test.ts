@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mergeModels, modelsFromProvider } from '../src/server/models.js';
+import { mergeModels, modelsFromProvider } from '../src/server/copilot/models.js';
 
 describe('mergeModels', () => {
   it('dedupes by id and lists free models first', () => {

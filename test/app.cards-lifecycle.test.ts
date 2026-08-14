@@ -1,8 +1,8 @@
 import type { FastifyInstance } from 'fastify';
 import { describe, expect, it, onTestFinished } from 'vitest';
 import { buildApp } from '../src/server/app.js';
-import { CredentialStore } from '../src/server/credentials.js';
-import { ProjectSession } from '../src/server/session.js';
+import { CredentialStore } from '../src/server/auth/credentials.js';
+import { ProjectSession } from '../src/server/boards/session.js';
 import { TEST_SANDBOX, tempDir } from './helpers.js';
 
 // Where a RUN may create a card, what vertical it belongs to, and which run made it — all three enforced at

@@ -3,9 +3,9 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DOCS_DIR, RESOURCES_DIR, skillRel } from '../src/core/layout.js';
 import type { CardLedgerData, RunRecord } from '../web/src/api.js';
-import { ActiveReport } from '../web/src/components/ActiveReport.js';
-import { CardReports } from '../web/src/components/CardReports.js';
-import { ReportPane } from '../web/src/components/ReportPane.js';
+import { ActiveReport } from '../web/src/runs/ActiveReport.js';
+import { CardReports } from '../web/src/runs/CardReports.js';
+import { ReportPane } from '../web/src/runs/ReportPane.js';
 import type { Card, ProjectConfig } from '../web/src/shared.js';
 
 afterEach(cleanup);

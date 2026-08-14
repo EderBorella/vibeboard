@@ -5,9 +5,9 @@ import { fileURLToPath } from 'node:url';
 import { beforeAll, describe, expect, it, onTestFinished } from 'vitest';
 import { IDLE_STATE } from '../src/core/autopilot-state.js';
 import { isSameGroup } from '../src/exec/process-group.js';
-import { CredentialStore } from '../src/server/credentials.js';
+import { CredentialStore } from '../src/server/auth/credentials.js';
+import { defaultServiceCommand, ServiceProcess } from '../src/server/autopilot/service-process.js';
 import type { Log } from '../src/server/logging.js';
-import { defaultServiceCommand, ServiceProcess } from '../src/server/service-process.js';
 import { readAutopilotState, writeAutopilotState } from '../src/store/autopilot-store.js';
 import { tempDir, testTmp } from './helpers.js';
 
@@ -454,10 +454,16 @@ describe('the default command', () => {
     const entry = command.args.at(-1) ?? '';
     expect(entry).toMatch(/[\\/]service[\\/]main\.(ts|js)$/);
     expect(entry.startsWith('/')).toBe(true);
-    // AND IT IS THERE. The resolution is a string rewrite, so a renamed file or a moved directory would
-    // otherwise be found by the first hand-run rather than by the suite — and the failure it produces is a
-    // spawn error with no obvious cause.
+    // AND IT IS THERE. This is the assertion that carries the whole check, because the resolution is a
+    // path built from strings: a renamed file or a module filed one directory deeper would otherwise be
+    // caught by the first hand-run rather than by the suite, and the failure it produces is a spawn
+    // error nowhere near its cause. It earned that reputation — the derivation used to hard-code both
+    // the directory this module sat in and its own filename, so filing it under `autopilot/` made it
+    // answer with its OWN path. Nothing else here fails on that: the path is absolute, it exists, and
+    // only the shape above and this existence check tell it apart from the real entry.
     expect(existsSync(entry), `${entry} does not exist`).toBe(true);
+    // Not the caller's own module, which is exactly what a derivation that matched nothing produced.
+    expect(entry).not.toContain('service-process');
     for (const flag of process.execArgv) expect(command.args).toContain(flag);
   });
 });

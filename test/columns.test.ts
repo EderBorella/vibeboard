@@ -12,7 +12,7 @@ import {
 import { tempDir } from './helpers.js';
 
 // The module deliberately exposes planning and applying separately, because the only production
-// caller (routes/config.ts) plans every board, decides, and only then moves a folder. These cases
+// caller (server/boards/config-routes.ts) plans every board, decides, and only then moves a folder. These cases
 // are about what a plan does to the disk, so they need both halves; this is the single-board slice
 // of that same sequence, kept here rather than in the module so no caller can skip the decision.
 async function planAndApply(

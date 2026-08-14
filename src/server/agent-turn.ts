@@ -4,12 +4,12 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { INSTRUCTIONS_FILE } from '../core/layout.js';
 import { groupStartTime, terminateGroup } from '../exec/process-group.js';
-import { boxEnvFor } from './containers.js';
-import { claudeConfigDir, isolationEnabled } from './copilot-env.js';
+import { boxEnvFor } from './boxes/containers.js';
+import { claudeConfigDir, isolationEnabled } from './boxes/copilot-env.js';
+import { opencodeTurn } from './boxes/opencode-client.js';
+import { NOT_REQUESTED, type SandboxStatus, wrapCommand } from './boxes/sandbox.js';
 import { type CopilotEvent, parseCopilotLine, type ResultStats } from './copilot-events.js';
 import { errorText } from './errors.js';
-import { opencodeTurn } from './opencode-client.js';
-import { NOT_REQUESTED, type SandboxStatus, wrapCommand } from './sandbox.js';
 
 // ONE agent turn: build the command, run it, stream its events, report how it ended.
 //

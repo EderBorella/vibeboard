@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { afterEach, describe, expect, it } from 'vitest';
-import { ProjectSession } from '../src/server/session.js';
+import { ProjectSession } from '../src/server/boards/session.js';
 import { boardColumnSlugs } from '../src/store/cards/board.js';
 import { defaultConfig } from '../src/store/project/config.js';
 import { openTestProject, testApp } from './helpers.js';

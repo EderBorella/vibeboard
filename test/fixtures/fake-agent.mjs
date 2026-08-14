@@ -100,7 +100,7 @@ REPORTS.leaky = `---\noutcome: success\nsummary: called the API\n---\n## What I 
 REPORTS.verdict = `---\noutcome: success\nsummary: judged the run against its card\nverdict: ${behaviourArgs[0] ?? 'done'}\n---\n## What I judged\n\nThe run, against the card that asked for it.\n`;
 
 // The API base and the credential, out of the PROMPT — the same sentence a real agent reads them from
-// (`credentialSection`, src/server/run-prompt.ts). Nothing here comes from the environment.
+// (`credentialSection`, src/server/runs/prompt/credential.ts). Nothing here comes from the environment.
 const apiBase = (prompt.match(/Send it as .* to `([^`]+)`/) ?? [])[1];
 const myId = (prompt.match(/^## The card: (\S+)$/m) ?? [])[1];
 

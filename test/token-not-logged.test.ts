@@ -1,9 +1,9 @@
 import { PassThrough } from 'node:stream';
 import { describe, expect, it, onTestFinished } from 'vitest';
 import { buildApp } from '../src/server/app.js';
-import { CredentialStore } from '../src/server/credentials.js';
+import { CredentialStore } from '../src/server/auth/credentials.js';
+import { ProjectSession } from '../src/server/boards/session.js';
 import { stripSecrets } from '../src/server/logging.js';
-import { ProjectSession } from '../src/server/session.js';
 
 // The admin token has no expiry and survives restarts by design, so one line in a log file is a
 // permanent full-authority credential. It reaches the server in a query string twice — the launch

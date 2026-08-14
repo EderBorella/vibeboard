@@ -5,46 +5,46 @@ import { REAL_GIT } from '../exec/git-measure.js';
 import { ChatStore } from '../store/chat-store.js';
 import { DEFAULT_MAX_RUNS } from '../store/project/config.js';
 import { listRuns } from '../store/run-store.js';
-import { AgentRunner } from './agent-runner.js';
-import { debugLogging } from './app-state.js';
-import { registerAuth } from './auth.js';
-import { AutopilotRuntime } from './autopilot-runtime.js';
-import type { BoxService } from './box-service.js';
-import { CopilotSession } from './copilot.js';
-import { CopilotAuthority } from './copilot-authority.js';
-import { createCopilotTurns } from './copilot-turns.js';
-import { CredentialStore } from './credentials.js';
-import { DeviceStore } from './devices.js';
-import { type Log, serverLogger, stripSecrets, withRedaction } from './logging.js';
+import { registerAuth } from './auth/auth.js';
+import { CredentialStore } from './auth/credentials.js';
+import { DeviceStore } from './auth/devices.js';
+import { PendingRequests } from './auth/signin.js';
+import { registerAuthRoutes, registerSigninRoutes } from './auth/signin-routes.js';
+import { AutopilotRuntime } from './autopilot/autopilot-runtime.js';
+import { registerAutopilotRoutes } from './autopilot/routes.js';
+import { type ServiceCommand, ServiceProcess } from './autopilot/service-process.js';
+import { registerCardRoutes } from './boards/cards-routes.js';
+import { registerConfigRoutes } from './boards/config-routes.js';
+import { registerProjectRoutes } from './boards/project-routes.js';
+import type { ProjectSession } from './boards/session.js';
+import type { BoxService } from './boxes/box-service.js';
 import {
   attachBoxes,
   attachHaltGate,
   attachOpencodeLogger,
   attachProjectRoot,
   stopOpencodeServer,
-} from './opencode-server.js';
-import { groupsOf, reapGroups } from './reaper.js';
+} from './boxes/opencode-server.js';
+import { NOT_REQUESTED, type SandboxStatus } from './boxes/sandbox.js';
+import { registerSandboxRoutes } from './boxes/sandbox-routes.js';
+import { registerToolchainRoutes } from './boxes/toolchain-routes.js';
+import { registerControlRoutes } from './content/control-routes.js';
+import { registerSkillRoutes } from './content/skills-routes.js';
+import { CopilotSession } from './copilot/copilot.js';
+import { CopilotAuthority } from './copilot/copilot-authority.js';
+import { createCopilotTurns } from './copilot/copilot-turns.js';
+import { registerModelRoutes } from './copilot/models-routes.js';
+import { registerCopilotRoutes } from './copilot/routes.js';
+import { registerDiaryRoutes } from './diary/routes.js';
+import { registerExplorerRoutes } from './explorer/routes.js';
+import { type Log, serverLogger, stripSecrets, withRedaction } from './logging.js';
 import type { AppCtx } from './route-context.js';
-import { registerAutopilotRoutes } from './routes/autopilot.js';
-import { registerCardRoutes } from './routes/cards.js';
-import { registerConfigRoutes } from './routes/config.js';
-import { registerControlRoutes } from './routes/control.js';
-import { registerCopilotRoutes } from './routes/copilot.js';
-import { registerDiaryRoutes } from './routes/diary.js';
-import { registerExplorerRoutes } from './routes/explorer.js';
-import { registerModelRoutes } from './routes/models.js';
-import { registerProjectRoutes } from './routes/project.js';
-import { registerRunRoutes } from './routes/runs.js';
-import { registerSandboxRoutes } from './routes/sandbox.js';
-import { registerSettingsRoutes } from './routes/settings.js';
-import { registerAuthRoutes, registerSigninRoutes } from './routes/signin.js';
-import { registerSkillRoutes } from './routes/skills.js';
-import { registerSuggestionRoutes } from './routes/suggestions.js';
-import { registerToolchainRoutes } from './routes/toolchain.js';
-import { NOT_REQUESTED, type SandboxStatus } from './sandbox.js';
-import { type ServiceCommand, ServiceProcess } from './service-process.js';
-import type { ProjectSession } from './session.js';
-import { PendingRequests } from './signin.js';
+import { AgentRunner } from './runs/agent-runner.js';
+import { groupsOf, reapGroups } from './runs/reaper.js';
+import { registerRunRoutes } from './runs/routes.js';
+import { debugLogging } from './settings/app-state.js';
+import { registerSettingsRoutes } from './settings/routes.js';
+import { registerSuggestionRoutes } from './suggestions/routes.js';
 import { createBroadcaster, registerWs } from './ws.js';
 
 declare module 'fastify' {

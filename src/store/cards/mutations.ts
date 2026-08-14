@@ -39,7 +39,7 @@ async function writeCardFile(card: Card, exclusive = false): Promise<void> {
 // names a column asks here first, so there is one answer to "is this a real column" rather than
 // one per call site: restoreCard checked, create and move did not, and that gap has produced
 // invisible cards twice (see the comments on `DEFAULT_COLUMNS` in `project/config.ts` and above
-// `assistCredentialSection` in `server/prompt/credential.ts`). Named by symbol, not by line: the old
+// `assistCredentialSection` in `server/runs/prompt/credential.ts`). Named by symbol, not by line: the old
 // citation here read `run-prompt.ts:56`, and that file is now a 14-line barrel.
 function knownColumn(config: ProjectConfig, board: BoardName, columnSlug: string): boolean {
   return boardColumnSlugs(config, board).includes(columnSlug);

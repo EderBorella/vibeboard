@@ -75,7 +75,9 @@ describe('POST /api/cards/:board/:id/flags', () => {
   });
 
   it('allows the browser, because admin bypasses the table', async () => {
-    // `allows` returns true for admin before it consults RULES (src/server/auth.ts:240), which is what
+    // `allows` returns true for admin before it consults RULES (its first line, in
+    // src/server/auth/auth.ts — named by symbol because the line number it used to give had already
+    // rotted onto `bearerToken`), which is what
     // lets the carding endpoint set followUp without a second row.
     const { app, url } = await project();
     const res = await app.inject({ method: 'POST', url, payload: { followUp: true } });

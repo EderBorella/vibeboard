@@ -2,7 +2,7 @@ import { chmodSync, existsSync, readFileSync, rmSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
-import { type CopilotMode, CopilotSession } from '../src/server/copilot.js';
+import { type CopilotMode, CopilotSession } from '../src/server/copilot/copilot.js';
 import type { CopilotEvent } from '../src/server/copilot-events.js';
 import { shimArgsLog } from './helpers.js';
 

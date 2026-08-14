@@ -1,9 +1,9 @@
 import type { FastifyInstance } from 'fastify';
 import { describe, expect, it, onTestFinished } from 'vitest';
-import { BoxManager } from '../src/server/box-manager.js';
-import { BoxService } from '../src/server/box-service.js';
-import type { DockerRun } from '../src/server/containers.js';
-import { INSTALL_HELPER } from '../src/server/containers.js';
+import { BoxManager } from '../src/server/boxes/box-manager.js';
+import { BoxService } from '../src/server/boxes/box-service.js';
+import type { DockerRun } from '../src/server/boxes/containers.js';
+import { INSTALL_HELPER } from '../src/server/boxes/containers.js';
 import { openTestProject } from './helpers.js';
 
 // The brokered install. What matters here is not that apt works — that is checked against a real

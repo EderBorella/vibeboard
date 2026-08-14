@@ -103,7 +103,7 @@ async function smokeFor(
 // commands ran AFTER a dispatch the endpoint could refuse.
 //
 // BOTH DOCUMENTS, and that is the correction. `foundation/CODE-QUALITY.md` carries `gates:` and
-// `foundation/TESTING.md` carries `smoke:`; they are the same `EXECUTED` set in routes/control.ts and both run
+// `foundation/TESTING.md` carries `smoke:`; they are the same `EXECUTED` set in server/content/control-routes.ts and both run
 // through `/bin/sh` as the server's own user. Guarding only the gates left the hole open one document over: a
 // copilot rewrites `TESTING.md`, the loop reaches a feature checkup, and the new command executes before the
 // dispatch that would have been refused.

@@ -6,7 +6,7 @@ import {
   PendingRequests,
   REQUEST_TTL_MS,
   signinClosed,
-} from '../src/server/signin.js';
+} from '../src/server/auth/signin.js';
 
 // The state machine behind "a browser already signed in allows this one". Its limits are not tidiness:
 // the attack on this path is PROMPT FATIGUE — a caller that can raise a dialog as often as it likes

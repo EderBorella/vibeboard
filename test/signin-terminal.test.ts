@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BREAK_GLASS, installBreakGlass, signinBanner } from '../src/server/signin-terminal.js';
+import { BREAK_GLASS, installBreakGlass, signinBanner } from '../src/server/auth/signin-terminal.js';
 
 // main.ts is top-level-await script code — importing it starts a server — so the banner's words and the
 // signal's effect live here, as plain functions of their inputs.

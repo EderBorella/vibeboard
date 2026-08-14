@@ -3,13 +3,13 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 // Mocked before the app is imported: the real implementations reach OpenRouter and a running
 // `opencode serve`. These routes are pure wiring, so what matters is the argument each handler
 // derives from the query and the shape it wraps the answer in.
-vi.mock('../src/server/models.js', () => ({
+vi.mock('../src/server/copilot/models.js', () => ({
   listBackendModels: vi.fn(async (backend: string) => [{ id: `${backend}/m`, free: true }]),
   modelStatus: vi.fn(async () => ({ up: true, uptime: 99, endpoints: 2 })),
 }));
 
-import { listBackendModels, modelStatus } from '../src/server/models.js';
-import { ProjectSession } from '../src/server/session.js';
+import { ProjectSession } from '../src/server/boards/session.js';
+import { listBackendModels, modelStatus } from '../src/server/copilot/models.js';
 import { testApp } from './helpers.js';
 
 // These routes need no project open, so a bare session is enough.

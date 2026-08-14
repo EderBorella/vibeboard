@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { WORK_DIR } from '../src/server/containers.js';
-import { agentRefusal, NOT_REQUESTED, probeSandbox, wrapCommand } from '../src/server/sandbox.js';
+import { WORK_DIR } from '../src/server/boxes/containers.js';
+import { agentRefusal, NOT_REQUESTED, probeSandbox, wrapCommand } from '../src/server/boxes/sandbox.js';
 
 // The gate, as a decision. What it decides ABOUT — that a container really does deny what it claims —
 // is checked against a real one in box-integration.test.ts, which needs docker and skips without it.

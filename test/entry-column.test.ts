@@ -1,13 +1,14 @@
 import { readdir, readFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { dirname, join, relative, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { entryColumn } from '../src/core/entry-column.js';
 import type { BoardName, ProjectConfig } from '../src/core/types.js';
 import { defaultConfig } from '../src/store/project/config.js';
 
-// WHERE A BOARD IS ENTERED. It had no test of its own while it lived in `routes/cards.ts` — every
-// assertion about it went through an endpoint — so the refusal that stops a card being created into a
-// terminal column was held by a 409 in one route's suite and nothing else.
+// WHERE A BOARD IS ENTERED. It had no test of its own while it lived in the card routes (now
+// `server/boards/cards-routes.ts`) — every assertion about it went through an endpoint — so the
+// refusal that stops a card being created into a terminal column was held by a 409 in one route's
+// suite and nothing else.
 
 const config = (over: (c: ProjectConfig) => ProjectConfig = (c) => c): ProjectConfig =>
   over(defaultConfig('T'));
@@ -82,24 +83,32 @@ describe('entryColumn', () => {
   });
 });
 
-// A ROUTE MUST NOT IMPORT A ROUTE. `routes/suggestions.ts` imported `entryColumn` from
-// `routes/cards.ts`, which is how one derivation ends up with two homes: the only alternative anybody
-// reaches for is a second copy, and a second copy is how one path refuses a terminal first column
-// while the other quietly creates a card in it.
+// A ROUTE MUST NOT IMPORT A ROUTE. `suggestions/routes.ts` imported `entryColumn` from
+// `boards/cards-routes.ts`, which is how one derivation ends up with two homes: the only alternative
+// anybody reaches for is a second copy, and a second copy is how one path refuses a terminal first
+// column while the other quietly creates a card in it.
 //
-// Asserted over the DIRECTORY rather than over the one pair that was wrong, so the next one is caught
-// when it is written rather than at the next review.
+// Asserted over EVERY route module rather than over the one pair that was wrong, so the next one is
+// caught when it is written rather than at the next review.
+//
+// It used to read one flat `src/server/routes/` directory and flag a `./sibling.js` import. The routes
+// now sit in their feature folders, so a route reaching another route is a `../other-feature/routes.js`
+// — a specifier the old pattern could not see, in a directory that no longer exists. The premise guard
+// is what reported that rather than letting the whole assertion pass over an empty list.
+const ROUTE_MODULE = /(^|[\\/])(routes|[\w-]+-routes)\.ts$/;
+
 describe('the route layer', () => {
   it('has no route importing another route', async () => {
-    const dir = join(process.cwd(), 'src', 'server', 'routes');
-    const files = (await readdir(dir)).filter((f) => f.endsWith('.ts'));
-    // The premise: a directory this read as empty would make the assertion below vacuous.
+    const dir = join(process.cwd(), 'src', 'server');
+    const files = (await readdir(dir, { recursive: true })).filter((f) => ROUTE_MODULE.test(f));
+    // The premise: a list this read as empty would make the assertion below vacuous.
     expect(files.length).toBeGreaterThan(10);
     const offenders: string[] = [];
     for (const file of files) {
       const source = await readFile(join(dir, file), 'utf8');
-      for (const match of source.matchAll(/from '\.\/([\w.-]+)\.js'/g)) {
-        offenders.push(`${file} imports ./${match[1]}.js`);
+      for (const match of source.matchAll(/from '(\.[^']*)'/g)) {
+        const target = resolve(dirname(join(dir, file)), match[1].replace(/\.js$/, '.ts'));
+        if (ROUTE_MODULE.test(relative(dir, target))) offenders.push(`${file} imports ${match[1]}`);
       }
     }
     expect(offenders).toEqual([]);

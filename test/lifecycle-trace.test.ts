@@ -545,7 +545,7 @@ for (const mode of MODES) {
     });
 
     // THE SAME HOLE, ONE DOCUMENT OVER. `foundation/TESTING.md` carries the `smoke:` command and is in the same
-    // EXECUTED set as `foundation/CODE-QUALITY.md` (server/routes/control.ts) — both run through `/bin/sh`
+    // EXECUTED set as `foundation/CODE-QUALITY.md` (server/content/control-routes.ts) — both run through `/bin/sh`
     // unsandboxed as this user. The refusal guarded only the gates, so a copilot could rewrite `TESTING.md`, the
     // loop would reach a feature checkup, and the new command would execute before the dispatch that would have
     // been refused.

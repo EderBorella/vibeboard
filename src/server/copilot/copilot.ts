@@ -1,0 +1,135 @@
+import { backendDefaults, DEFAULT_BACKEND } from '../../core/backends.js';
+import {
+  type AgentTurnOptions,
+  type Backend,
+  type CopilotMode,
+  type EffortLevel,
+  type RunningTurn,
+  runAgentTurn,
+} from '../agent-turn.js';
+import type { BoxService } from '../boxes/box-service.js';
+import { NOT_REQUESTED, type SandboxStatus } from '../boxes/sandbox.js';
+import type { CopilotEvent } from '../copilot-events.js';
+
+// Re-exported so existing importers (copilot-turns.ts, the routes, the tests) keep their import
+// path: these types describe the copilot channel, and agent-turn.ts is an implementation detail.
+export type { Backend, CopilotMode, EffortLevel };
+
+interface CopilotState {
+  running: boolean;
+  sessionId: string | undefined;
+  model: string | undefined;
+}
+
+interface SendOptions {
+  cwd: string;
+  text: string;
+  mode: CopilotMode;
+  backend?: Backend; // default claude-code
+  model?: string; // claude: alias/full name · opencode: provider/model
+  effort?: EffortLevel; // claude: --effort scale · opencode: --variant scale
+  onEvent: (event: CopilotEvent) => void;
+}
+
+function copilotTimeoutMs(): number {
+  return Number(process.env.VIBEBOARD_COPILOT_TIMEOUT_MS ?? 180000);
+}
+
+// The CHAT copilot: one turn at a time, resumed across turns by session id, run in the open
+// project's directory so its file edits flow back through the board watcher.
+//
+// The one-at-a-time rule is this class's own, not the CLI's — a chat is a single conversation. Skill
+// runs deliberately do not come through here; they call runAgentTurn directly, which is what lets
+// several run at once without touching the chat's session.
+export class CopilotSession {
+  #sessionId: string | undefined;
+  #model: string | undefined;
+  #turn: RunningTurn | undefined;
+  // The chat is an agent too, and it auto-approves its own tool calls — so it is confined on the
+  // same terms as a run. Held on the session rather than passed per send: it is a fact about the
+  // process, and threading it through every caller of `send` would invite one of them to forget.
+  readonly #sandbox: SandboxStatus;
+  readonly #boxes: BoxService | undefined;
+
+  constructor(opts: { sandbox?: SandboxStatus; boxes?: BoxService } = {}) {
+    this.#sandbox = opts.sandbox ?? NOT_REQUESTED;
+    this.#boxes = opts.boxes;
+  }
+
+  get state(): CopilotState {
+    return {
+      running: this.#turn !== undefined,
+      sessionId: this.#sessionId,
+      model: this.#model,
+    };
+  }
+
+  // Start a brand-new conversation on the next send (drops the resumable session id).
+  newSession(): void {
+    this.cancel();
+    this.#sessionId = undefined;
+    this.#model = undefined;
+  }
+
+  // Point the next send at a previous conversation (used when reopening a stored chat whose
+  // backend matches the current one). No-op while a turn is in flight.
+  resume(sessionId: string | undefined, model: string | undefined): void {
+    if (this.#turn) return;
+    this.#sessionId = sessionId;
+    this.#model = model;
+  }
+
+  cancel(): void {
+    this.#turn?.cancel();
+    this.#turn = undefined;
+  }
+
+  async send(opts: SendOptions): Promise<void> {
+    if (this.#turn) throw new Error('Copilot is busy');
+    const backend: Backend = opts.backend ?? (DEFAULT_BACKEND as Backend);
+    // Belt and braces, deliberately kept after resolveCopilotSelection landed: this guards a
+    // caller that bypasses the route layer entirely (a raw WebSocket client, or an
+    // unmigrated config), where nothing has resolved a default yet. Pinned by
+    // test/copilot.test.ts ('spawns with a real model and effort when the caller names
+    // neither') and test/opencode-variant.test.ts.
+    const defaults = backendDefaults(backend);
+    // Ensured before the turn, like a run's. The copilot SHARES the project's box with every run on
+    // the same backend — S1: its rights are identical, only its credential differs — so this is
+    // usually one `docker inspect` against a container that is already up.
+    const box = this.#boxes ? (await this.#boxes.ensure(opts.cwd, backend)).name : undefined;
+    const turnOptions: AgentTurnOptions = {
+      cwd: opts.cwd,
+      text: opts.text,
+      mode: opts.mode,
+      backend,
+      model: opts.model || defaults.model,
+      effort: opts.effort || defaults.effort,
+      sessionId: this.#sessionId,
+      timeoutMs: copilotTimeoutMs(),
+      sandbox: this.#sandbox,
+      ...(box ? { box } : {}),
+      // The chat's own bookkeeping, kept here rather than in the shared turn: a skill run has no
+      // session to remember, so watching for it is this class's concern alone.
+      onEvent: (event) => {
+        if (event.kind === 'init') {
+          this.#sessionId = event.sessionId;
+          this.#model = event.model;
+        } else if (event.kind === 'result' && event.sessionId) {
+          this.#sessionId = event.sessionId;
+        }
+        opts.onEvent(event);
+      },
+    };
+    // OpenCode reports its model only on return, so state shows the requested one meanwhile.
+    if (backend === 'opencode') this.#model = turnOptions.model;
+
+    const turn = runAgentTurn(turnOptions);
+    this.#turn = turn;
+    try {
+      const result = await turn.done;
+      if (result.sessionId) this.#sessionId = result.sessionId;
+    } finally {
+      this.#turn = undefined;
+    }
+  }
+}

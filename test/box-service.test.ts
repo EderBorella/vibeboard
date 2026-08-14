@@ -2,8 +2,8 @@ import { existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { CONFIG_DIR, RUNS_DIR } from '../src/core/layout.js';
-import { boxPathsForBackend } from '../src/server/box-service.js';
-import { boxMounts, WORK_DIR } from '../src/server/containers.js';
+import { boxPathsForBackend } from '../src/server/boxes/box-service.js';
+import { boxMounts, WORK_DIR } from '../src/server/boxes/containers.js';
 import { tempDir } from './helpers.js';
 
 // What a box gets FOR a project and backend. The mount set is the containment boundary, and two of its

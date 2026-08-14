@@ -2,7 +2,7 @@
 // transitions that produce a new record, and the questions asked about one.
 //
 // THIS FILE SURVIVES AS THE BARREL AND MUST. NodeNext has no directory-index resolution, so the
-// twenty-odd modules that `import … from '../core/runs.js'` cannot be pointed at `runs/index.js` —
+// twenty-odd modules that `import … from './runs.js'` cannot be pointed at `runs/index.js` —
 // it is a `TS2307`, verified. Keeping the specifier is what made the split cost no importer a change.
 //
 // Re-export everything the split modules export. A symbol added there and missing here is invisible

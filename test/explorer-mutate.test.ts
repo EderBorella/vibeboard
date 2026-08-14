@@ -2,7 +2,7 @@ import { lstat, mkdir, readFile, readlink, symlink, writeFile } from 'node:fs/pr
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { SKILLS_DIR, skillRel } from '../src/core/layout.js';
-import { listDir, MAX_EDIT_BYTES } from '../src/server/explorer-list.js';
+import { listDir, MAX_EDIT_BYTES } from '../src/server/explorer/explorer-list.js';
 import {
   createNode,
   deleteNode,
@@ -11,7 +11,7 @@ import {
   renameNode,
   validName,
   writeFileNode,
-} from '../src/server/explorer-mutate.js';
+} from '../src/server/explorer/explorer-mutate.js';
 import { tempDir } from './helpers.js';
 
 const read = (root: string, rel: string): Promise<string> => readFile(join(root, rel), 'utf8');

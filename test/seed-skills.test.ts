@@ -159,7 +159,7 @@ describe('the phase skills the phase table names', () => {
   });
 
   // WEAKENED DELIBERATELY, because the instruction stopped being the mechanism. The endpoint stamps `group`
-  // now (server/routes/cards.ts), so "this card's own group if it has one, and otherwise this card's id" is a
+  // now (server/boards/cards-routes.ts), so "this card's own group if it has one, and otherwise this card's id" is a
   // rule the agent no longer carries out — and asserting it would pin an instruction that cannot be wrong.
   // What survives is that the body NAMES the field, so an agent reading a value it did not set is not
   // surprised by it and does not try to correct it.

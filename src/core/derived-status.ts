@@ -31,7 +31,7 @@ export function allSettled(ap: AutopilotConfig, cards: Card[]): boolean {
 // THE ONE HOME FOR DECISION 46, and the emptiness of this list IS the status. There was a `derivedStatus`
 // beside it answering `clean` / `carrying-a-problem` over the same walk, and nothing called it: the wire
 // computes the fact from here because it needs the IDS, not an enum — a badge saying "carrying a problem"
-// with no name is one nobody can act on (server/snapshot.ts). Two spellings of one rule is the duplication
+// with no name is one nobody can act on (server/boards/snapshot.ts). Two spellings of one rule is the duplication
 // decision 46 exists to avoid.
 //
 // Every blocked card below this one, through as many levels as there are. Recursion rather than a

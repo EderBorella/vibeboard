@@ -117,8 +117,8 @@ describe('who may read the ledger', () => {
   // given. The scope table is the rule, and this is the boundary that applies it.
   async function openBare() {
     const { buildApp } = await import('../src/server/app.js');
-    const { CredentialStore } = await import('../src/server/credentials.js');
-    const { ProjectSession } = await import('../src/server/session.js');
+    const { CredentialStore } = await import('../src/server/auth/credentials.js');
+    const { ProjectSession } = await import('../src/server/boards/session.js');
     const session = new ProjectSession();
     const store = new CredentialStore('admin-token');
     const app = buildApp(session, { credentials: store, logger: false });

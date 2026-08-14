@@ -2,6 +2,7 @@ import { chmodSync, closeSync, mkdirSync, readdirSync, readFileSync, writeFileSy
 import { join } from 'node:path';
 import { Writable } from 'node:stream';
 import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest';
+import { ProjectSession } from '../src/server/boards/session.js';
 import {
   type AutopilotLogTarget,
   autopilotLogFileFor,
@@ -16,7 +17,6 @@ import {
   resolveLevel,
   serverLogger,
 } from '../src/server/logging.js';
-import { ProjectSession } from '../src/server/session.js';
 import { tempDir, testApp } from './helpers.js';
 
 describe('resolveLevel', () => {

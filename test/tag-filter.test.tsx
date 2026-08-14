@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { TagFilter } from '../web/src/components/TagFilter.js';
+import { TagFilter } from '../web/src/board/TagFilter.js';
 
 afterEach(cleanup);
 

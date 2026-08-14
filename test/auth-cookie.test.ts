@@ -2,11 +2,11 @@ import type { FastifyInstance } from 'fastify';
 import { describe, expect, it, onTestFinished } from 'vitest';
 import WebSocket from 'ws';
 import { buildApp } from '../src/server/app.js';
-import { sameOrigin } from '../src/server/auth.js';
-import { CREDENTIAL_COOKIE, HINT_COOKIE } from '../src/server/cookies.js';
-import { CredentialStore } from '../src/server/credentials.js';
-import { DeviceStore } from '../src/server/devices.js';
-import { ProjectSession } from '../src/server/session.js';
+import { sameOrigin } from '../src/server/auth/auth.js';
+import { CREDENTIAL_COOKIE, HINT_COOKIE } from '../src/server/auth/cookies.js';
+import { CredentialStore } from '../src/server/auth/credentials.js';
+import { DeviceStore } from '../src/server/auth/devices.js';
+import { ProjectSession } from '../src/server/boards/session.js';
 import { tempDir } from './helpers.js';
 
 // THE COOKIE TRANSPORT AT THE BOUNDARY, and every request here presents exactly what the test gives

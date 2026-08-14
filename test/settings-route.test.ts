@@ -2,9 +2,9 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, onTestFinished } from 'vitest';
 import { buildApp } from '../src/server/app.js';
-import { CredentialStore } from '../src/server/credentials.js';
-import type { AppSettings } from '../src/server/routes/settings.js';
-import { ProjectSession } from '../src/server/session.js';
+import { CredentialStore } from '../src/server/auth/credentials.js';
+import { ProjectSession } from '../src/server/boards/session.js';
+import type { AppSettings } from '../src/server/settings/routes.js';
 import { tempDir } from './helpers.js';
 
 // VibeBoard's OWN settings, as opposed to a project's. Through `buildApp` directly rather than the test

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { messageToEvents, splitModel } from '../src/server/opencode-client.js';
+import { messageToEvents, splitModel } from '../src/server/boxes/opencode-client.js';
 
 describe('splitModel', () => {
   it('splits provider/model on the first slash (modelID may contain slashes)', () => {

@@ -1,9 +1,9 @@
 import type { FastifyInstance } from 'fastify';
 import { describe, expect, it, onTestFinished } from 'vitest';
 import { buildApp } from '../src/server/app.js';
-import { allows, bearerToken } from '../src/server/auth.js';
-import { type Credential, CredentialStore, type Scope } from '../src/server/credentials.js';
-import { ProjectSession } from '../src/server/session.js';
+import { allows, bearerToken } from '../src/server/auth/auth.js';
+import { type Credential, CredentialStore, type Scope } from '../src/server/auth/credentials.js';
+import { ProjectSession } from '../src/server/boards/session.js';
 import { tempDir } from './helpers.js';
 
 const ADMIN = 'admin-token';

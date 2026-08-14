@@ -15,7 +15,7 @@ const api = vi.hoisted(() => ({
 vi.mock('../web/src/api.js', () => api);
 vi.mock('../web/src/api', () => api);
 
-const { CardsPane } = await import('../web/src/components/CardsPane.js');
+const { CardsPane } = await import('../web/src/cards/CardsPane.js');
 
 import type { CardRef } from '../web/src/dock/tabs.js';
 import type { Card, ProjectConfig } from '../web/src/shared.js';

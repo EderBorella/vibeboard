@@ -9,7 +9,7 @@ import * as coreRuns from '../src/core/runs.js';
 import * as coreSkills from '../src/core/skills.js';
 import * as coreSuggestions from '../src/core/suggestions.js';
 import * as core from '../src/core/types.js';
-import * as serverSnapshot from '../src/server/snapshot.js';
+import * as serverSnapshot from '../src/server/boards/snapshot.js';
 import * as webApi from '../web/src/api.js';
 import * as webRuns from '../web/src/runs/viewmodel.js';
 import * as web from '../web/src/shared.js';

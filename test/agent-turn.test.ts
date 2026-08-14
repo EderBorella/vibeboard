@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 // The OpenCode half talks HTTP to a spawned server; the client is the seam, so it is mocked and
 // every assertion about that backend is about what agent-turn ASKS of it.
 const client = vi.hoisted(() => ({ opencodeTurn: vi.fn() }));
-vi.mock('../src/server/opencode-client.js', () => client);
+vi.mock('../src/server/boxes/opencode-client.js', () => client);
 
 const { runAgentTurn } = await import('../src/server/agent-turn.js');
 

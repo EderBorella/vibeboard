@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { attachHaltGate, opencodeBaseUrl } from '../src/server/opencode-server.js';
+import { attachHaltGate, opencodeBaseUrl } from '../src/server/boxes/opencode-server.js';
 
 // The lazy respawn is what makes a halt real. Decision 12: while halted "nothing dispatches, NOTHING
 // RESPAWNS LAZILY, and the chat says plainly that the project is halted" — without the second clause

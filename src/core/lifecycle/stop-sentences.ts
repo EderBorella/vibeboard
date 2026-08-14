@@ -121,7 +121,7 @@ export function whyStuck(ap: AutopilotConfig, cards: Card[], unfinished: Card[],
 //
 // A COLLISION, never "no smoke command declared": a project with no gates has nothing for the smoke command to
 // collide with, and one with no readable smoke command cannot be STARTED at all — `smoke.ok` is a readiness
-// blocker (server/routes/autopilot.ts), so a second refusal here would be about a state the loop cannot reach.
+// blocker (server/autopilot/routes.ts), so a second refusal here would be about a state the loop cannot reach.
 // That is also how a project whose CODE-QUALITY.md declares nothing fails in the honest direction: `readGates`
 // answers with a reason rather than a list, `declaredCommands` carries no commands, and nothing collides.
 export function smokeIsAGate(commands: DeclaredCommands): string | undefined {

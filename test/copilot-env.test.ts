@@ -1,7 +1,7 @@
 import { existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { claudeConfigDir, isolationEnabled, opencodeConfigHome } from '../src/server/copilot-env.js';
+import { claudeConfigDir, isolationEnabled, opencodeConfigHome } from '../src/server/boxes/copilot-env.js';
 import { tempDir } from './helpers.js';
 
 const savedIsolate = process.env.VIBEBOARD_COPILOT_ISOLATE;

@@ -5,9 +5,9 @@ import { describe, expect, it, onTestFinished } from 'vitest';
 import { parse, stringify } from 'yaml';
 import { boardRel, skillRel } from '../src/core/layout.js';
 import { buildApp } from '../src/server/app.js';
-import { CredentialStore } from '../src/server/credentials.js';
-import type { Readiness } from '../src/server/routes/autopilot.js';
-import { ProjectSession } from '../src/server/session.js';
+import { CredentialStore } from '../src/server/auth/credentials.js';
+import type { Readiness } from '../src/server/autopilot/routes.js';
+import { ProjectSession } from '../src/server/boards/session.js';
 import { configPath } from '../src/store/project/config.js';
 import { makeReady, openTestProject, putFoundation, tempDir } from './helpers.js';
 

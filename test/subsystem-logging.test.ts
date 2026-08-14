@@ -4,17 +4,17 @@ import { join } from 'node:path';
 import { Writable } from 'node:stream';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CONFIG_DIR, CONFIG_FILE } from '../src/core/layout.js';
-import type { CopilotEvent } from '../src/server/copilot-events.js';
-import { installCrashHandlers, type Log } from '../src/server/logging.js';
-import { modelStatus } from '../src/server/models.js';
-import { opencodeTurn } from '../src/server/opencode-client.js';
+import { ProjectSession } from '../src/server/boards/session.js';
+import { opencodeTurn } from '../src/server/boxes/opencode-client.js';
 import {
   attachBoxes,
   capStartupLog,
   opencodeBaseUrl,
   stopOpencodeServer,
-} from '../src/server/opencode-server.js';
-import { ProjectSession } from '../src/server/session.js';
+} from '../src/server/boxes/opencode-server.js';
+import { modelStatus } from '../src/server/copilot/models.js';
+import type { CopilotEvent } from '../src/server/copilot-events.js';
+import { installCrashHandlers, type Log } from '../src/server/logging.js';
 import { ChatStore } from '../src/store/chat-store.js';
 import { openTestProject, tempDir, testApp, wsClient } from './helpers.js';
 

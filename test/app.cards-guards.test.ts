@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { boardRel } from '../src/core/layout.js';
-import { ProjectSession } from '../src/server/session.js';
+import { ProjectSession } from '../src/server/boards/session.js';
 import { openTestProject, testApp } from './helpers.js';
 
 // The guard rails on the card routes: every handler checks that a project is open and that the

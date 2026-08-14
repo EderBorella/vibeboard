@@ -10,7 +10,7 @@ const api = vi.hoisted(() => ({
 vi.mock('../web/src/api.js', () => api);
 vi.mock('../web/src/api', () => api);
 
-const { RawPane } = await import('../web/src/components/RawPane.js');
+const { RawPane } = await import('../web/src/cards/RawPane.js');
 
 afterEach(cleanup);
 beforeEach(() => {

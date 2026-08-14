@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { InlineField } from '../web/src/components/InlineField.js';
+import { InlineField } from '../web/src/ui/InlineField.js';
 
 afterEach(cleanup);
 

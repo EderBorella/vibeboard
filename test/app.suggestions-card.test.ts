@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Card, ProjectConfig } from '../src/core/types.js';
-import { allows } from '../src/server/auth.js';
-import type { Credential } from '../src/server/credentials.js';
+import { allows } from '../src/server/auth/auth.js';
+import type { Credential } from '../src/server/auth/credentials.js';
 import { readBoard } from '../src/store/cards/board.js';
 import { listSuggestions } from '../src/store/suggestion-store.js';
 import { openTestProject, type TestProject } from './helpers.js';

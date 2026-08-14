@@ -34,7 +34,7 @@ describe('the autopilot block', () => {
     expect(boards.product.columns).toContain('Blocked');
     expect(boards.engineering.columns).toContain('Blocked');
     expect(boards.features.columns).not.toContain('Blocked');
-    // NOT LAST on either: the closing column is the final one (routes/cards.ts), so a Blocked column
+    // NOT LAST on either: the closing column is the final one (server/boards/cards-routes.ts), so a Blocked column
     // appended after Done would resolve a blocked card's runs and leave Done closing nothing.
     expect(boards.product.columns.at(-1)).toBe('Done');
     expect(boards.engineering.columns.at(-1)).toBe('Done');

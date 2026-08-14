@@ -11,14 +11,10 @@ import {
 import type { Skill } from '../src/core/skills.js';
 import type { BoardName, Card } from '../src/core/types.js';
 import type { Verification } from '../src/core/verify.js';
-import { allows, endpointsFor } from '../src/server/auth.js';
-import type { Credential, Scope } from '../src/server/credentials.js';
-import {
-  assistCredentialSection,
-  type BoardColumns,
-  buildRunPrompt,
-  type PromptInputs,
-} from '../src/server/run-prompt.js';
+import { allows, endpointsFor } from '../src/server/auth/auth.js';
+import type { Credential, Scope } from '../src/server/auth/credentials.js';
+import { assistCredentialSection } from '../src/server/runs/prompt/credential.js';
+import { type BoardColumns, buildRunPrompt, type PromptInputs } from '../src/server/runs/prompt/index.js';
 
 const ROOT = '/p';
 

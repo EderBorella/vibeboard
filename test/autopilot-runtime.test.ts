@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { IDLE_STATE } from '../src/core/autopilot-state.js';
-import { AutopilotRuntime, type AutopilotRuntimeOptions } from '../src/server/autopilot-runtime.js';
+import { AutopilotRuntime, type AutopilotRuntimeOptions } from '../src/server/autopilot/autopilot-runtime.js';
 import {
   readAutopilotState,
   updateAutopilotState,

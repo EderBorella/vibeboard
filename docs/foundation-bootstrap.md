@@ -5,7 +5,7 @@ five documents auto-pilot refuses to start without, what each one has to decide,
 machine contracts that will otherwise fail silently-looking checks.
 
 Everything here is derived from the code that reads these files — `src/store/project/foundation.ts`,
-`src/store/project/readme.ts` and the readiness composer in `src/server/routes/autopilot.ts`. If a rule below
+`src/store/project/readme.ts` and the readiness composer in `src/server/autopilot/routes.ts`. If a rule below
 disagrees with those, they win and this file is stale.
 
 ---

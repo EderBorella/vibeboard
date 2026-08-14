@@ -3,10 +3,10 @@ import { join } from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import { describe, expect, it, onTestFinished } from 'vitest';
 import { buildApp } from '../src/server/app.js';
-import { allows } from '../src/server/auth.js';
-import type { Credential } from '../src/server/credentials.js';
-import { CredentialStore } from '../src/server/credentials.js';
-import { ProjectSession } from '../src/server/session.js';
+import { allows } from '../src/server/auth/auth.js';
+import type { Credential } from '../src/server/auth/credentials.js';
+import { CredentialStore } from '../src/server/auth/credentials.js';
+import { ProjectSession } from '../src/server/boards/session.js';
 import { listSuggestions } from '../src/store/suggestion-store.js';
 import { tempDir } from './helpers.js';
 

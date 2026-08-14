@@ -4,6 +4,7 @@ import { dirname, join } from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import { afterEach, beforeEach, describe, expect, it, onTestFinished } from 'vitest';
 import { CONFIG_DIR } from '../src/core/layout.js';
+import { ProjectSession } from '../src/server/boards/session.js';
 import {
   debugLogging,
   readState,
@@ -12,8 +13,7 @@ import {
   setDebugLogging,
   stateFile,
   writeState,
-} from '../src/server/app-state.js';
-import { ProjectSession } from '../src/server/session.js';
+} from '../src/server/settings/app-state.js';
 import { tempDir, testApp } from './helpers.js';
 
 let session: ProjectSession | undefined;

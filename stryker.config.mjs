@@ -60,25 +60,40 @@ export default {
     // write-queue.ts holds the atomic write that run-store.ts used to have inline, so it is measured for
     // the same reason redaction.ts is.
     'src/store/**/*.ts',
-    'src/server/routes/**/*.ts',
+    // EVERY ROUTE MODULE, BY THE CONVENTION THAT NAMES IT, and this replaces `src/server/routes/**/*.ts`.
+    // The flat `routes/` directory is gone: each route module now sits in its feature folder, named
+    // `routes.ts` where the feature has one HTTP surface and `<subject>-routes.ts` where it has several.
+    // A pattern that still said `routes/**` would match nothing and score green over zero mutants —
+    // exactly the trap the block above warns about — so these two were verified against Stryker's own
+    // FileMatcher (minimatch over path.resolve, dot:false) against `git ls-files`, not assumed: 139 files
+    // measured before the move and 139 after, the same 139.
+    //
+    // Better than what it replaces, as well as equal to it: a route added inside a feature folder is
+    // picked up by the convention, where the old glob only worked for as long as one flat directory
+    // held every route.
+    'src/server/**/routes.ts',
+    'src/server/**/*-routes.ts',
     // Server modules with their own tests.
-    'src/server/agent-runner.ts',
+    'src/server/runs/agent-runner.ts',
     // Extracted OUT of agent-runner.ts, so listed with it for the reason the web block below states:
     // moving code out of a mutated file into an unmutated one loses the coverage silently.
-    // redaction.ts is the credential scrub the transcript, the report and the chat all go through.
+    // redaction.ts is the credential scrub the transcript, the report and the chat all go through. It
+    // stays flat in `src/server/` because three features reach it, which is also why it is not in
+    // `runs/` beside the runner it came out of.
     'src/server/redaction.ts',
-    // The dispatch prompt, and the DIRECTORY rather than the barrel. `run-prompt.ts` is now a pure
-    // re-export and has nothing to mutate, and no other pattern here reaches `src/server/prompt/` —
-    // verified against Stryker's own FileMatcher, not assumed — so naming only the barrel would have
-    // silently dropped ~600 lines out of the measurement. That is the same trap the block above warns
-    // about, arriving through a split instead of an extraction.
-    'src/server/prompt/**/*.ts',
+    // The dispatch prompt, as a DIRECTORY. It is now filed under the feature that dispatches, and the
+    // `run-prompt.ts` barrel that used to stand in front of it is gone — nothing else here reaches
+    // `src/server/runs/prompt/`, verified against the FileMatcher rather than assumed, so a pattern left
+    // pointing at the old path would have silently dropped ~600 lines out of the measurement.
+    'src/server/runs/prompt/**/*.ts',
+    // The shared agent-process layer, flat in `src/server/` because both dispatch and the chat go
+    // through it: one turn of an agent, and the parser for what that process writes back.
     'src/server/agent-turn.ts',
     'src/server/copilot-events.ts',
-    'src/server/session.ts',
-    'src/server/snapshot.ts',
-    'src/server/discover.ts',
-    'src/server/app-state.ts',
+    'src/server/boards/session.ts',
+    'src/server/boards/snapshot.ts',
+    'src/server/boards/discover.ts',
+    'src/server/settings/app-state.ts',
     'src/server/route-context.ts',
     'src/server/logging.ts',
     // Web modules with their own tests. The shared helpers first: moving code out of a mutated file
@@ -114,32 +129,32 @@ export default {
     'web/src/useLocalPrefs.ts',
     'web/src/useCopilotChoice.ts',
     'web/src/copilot/useCopilot.ts',
-    'web/src/components/CardView.tsx',
-    'web/src/components/CardLinks.tsx',
-    'web/src/components/InlineField.tsx',
-    'web/src/components/LinkPicker.tsx',
-    'web/src/components/RawPane.tsx',
-    'web/src/components/CardsPane.tsx',
-    'web/src/components/CardsBody.tsx',
-    'web/src/components/BoardsView.tsx',
+    'web/src/cards/CardView.tsx',
+    'web/src/cards/CardLinks.tsx',
+    'web/src/ui/InlineField.tsx',
+    'web/src/cards/LinkPicker.tsx',
+    'web/src/cards/RawPane.tsx',
+    'web/src/cards/CardsPane.tsx',
+    'web/src/cards/CardsBody.tsx',
+    'web/src/board/BoardsView.tsx',
     'web/src/components/WorkArea.tsx',
-    'web/src/components/ActiveReport.tsx',
-    'web/src/components/CardSkills.tsx',
-    'web/src/components/DispatchPane.tsx',
-    'web/src/components/CardReports.tsx',
-    'web/src/components/CardTabs.tsx',
-    'web/src/components/ReportPane.tsx',
-    'web/src/components/ReportOptions.tsx',
-    'web/src/components/ExecutionView.tsx',
-    'web/src/components/SkillEditor.tsx',
+    'web/src/runs/ActiveReport.tsx',
+    'web/src/skills/CardSkills.tsx',
+    'web/src/runs/DispatchPane.tsx',
+    'web/src/runs/CardReports.tsx',
+    'web/src/cards/CardTabs.tsx',
+    'web/src/runs/ReportPane.tsx',
+    'web/src/runs/ReportOptions.tsx',
+    'web/src/runs/ExecutionView.tsx',
+    'web/src/skills/SkillEditor.tsx',
     'web/src/components/UtilityDock.tsx',
     // ModelPicker.tsx is deliberately NOT here. Its decision logic — which models to show and in
     // what order — was lifted into model-filter.ts, which IS measured; what is left is a modal of
     // chips, and its residue was 85 unreached JSX string and attribute mutants. Owner's ruling
     // (2026-07-27): test the small shells, exclude this one and say why.
-    'web/src/components/model-filter.ts',
-    'web/src/components/model-format.ts',
-    'web/src/components/TagFilter.tsx',
+    'web/src/models/model-filter.ts',
+    'web/src/models/model-format.ts',
+    'web/src/board/TagFilter.tsx',
     'web/src/components/TopBar.tsx',
   ],
 

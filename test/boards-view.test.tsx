@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { BoardsView } from '../web/src/components/BoardsView.js';
+import { BoardsView } from '../web/src/board/BoardsView.js';
 import type { BoardName, Card, ProjectConfig, ProjectSnapshot } from '../web/src/shared.js';
 
 afterEach(cleanup);

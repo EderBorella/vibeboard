@@ -1,9 +1,9 @@
 import type { FastifyInstance } from 'fastify';
 import { afterEach, describe, expect, it, onTestFinished } from 'vitest';
 import { buildApp } from '../src/server/app.js';
-import { CredentialStore } from '../src/server/credentials.js';
-import { NOT_REQUESTED, type SandboxStatus } from '../src/server/sandbox.js';
-import { ProjectSession } from '../src/server/session.js';
+import { CredentialStore } from '../src/server/auth/credentials.js';
+import { ProjectSession } from '../src/server/boards/session.js';
+import { NOT_REQUESTED, type SandboxStatus } from '../src/server/boxes/sandbox.js';
 import { TEST_SANDBOX, tempDir } from './helpers.js';
 
 const TEST_IMAGE = 'vibeboard-agent:test';

@@ -4,9 +4,9 @@ import { createServer, type Server } from 'node:http';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { BoxManager } from '../src/server/box-manager.js';
-import { BoxService } from '../src/server/box-service.js';
-import type { DockerRun } from '../src/server/containers.js';
+import { BoxManager } from '../src/server/boxes/box-manager.js';
+import { BoxService } from '../src/server/boxes/box-service.js';
+import type { DockerRun } from '../src/server/boxes/containers.js';
 import {
   attachBoxes,
   attachedOpencodeUrl,
@@ -16,8 +16,8 @@ import {
   opencodeDirectory,
   restartOpencodeServer,
   stopOpencodeServer,
-} from '../src/server/opencode-server.js';
-import { agentRefusal } from '../src/server/sandbox.js';
+} from '../src/server/boxes/opencode-server.js';
+import { agentRefusal } from '../src/server/boxes/sandbox.js';
 import { testTmp } from './helpers.js';
 
 const here = dirname(fileURLToPath(import.meta.url));

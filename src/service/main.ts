@@ -5,7 +5,7 @@ import { commitTail, performAction } from './act.js';
 import { BoardClient } from './board-client.js';
 import { runLoop } from './loop.js';
 
-// The auto-pilot loop, as a process. Spawned by the server (`src/server/service-process.ts`), which hands it
+// The auto-pilot loop, as a process. Spawned by the server (`src/server/autopilot/service-process.ts`), which hands it
 // everything below in its environment and supervises it.
 //
 // This file is WIRING ONLY, deliberately: the decisions are in `src/core/tick.ts` (pure), the sequencing is

@@ -1,7 +1,7 @@
 import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { ProjectSession } from '../src/server/session.js';
+import { ProjectSession } from '../src/server/boards/session.js';
 import { scaffoldProject } from '../src/store/project/scaffold.js';
 import { openTestProject, tempDir, testApp } from './helpers.js';
 

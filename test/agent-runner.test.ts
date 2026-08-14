@@ -6,8 +6,8 @@ import { boardRel, DOCS_DIR, skillRel } from '../src/core/layout.js';
 import { type RunRecord, withSuggestions } from '../src/core/runs.js';
 import type { Skill } from '../src/core/skills.js';
 import type { BoardName, Card } from '../src/core/types.js';
-import { AgentRunner, type DispatchInput, type RunnerOptions } from '../src/server/agent-runner.js';
-import { type Credential, CredentialStore, type Scope } from '../src/server/credentials.js';
+import { type Credential, CredentialStore, type Scope } from '../src/server/auth/credentials.js';
+import { AgentRunner, type DispatchInput, type RunnerOptions } from '../src/server/runs/agent-runner.js';
 import { listCardRuns, readProjectRun, readRun, reportPath, transcriptTail } from '../src/store/run-store.js';
 import { countRunSuggestions, writeSuggestion } from '../src/store/suggestion-store.js';
 import { tempDir } from './helpers.js';
@@ -1030,7 +1030,7 @@ describe('the run credential', () => {
     // but a mint outside a try is the wrong shape whether or not today's inputs can reach it.
     const root = await tempDir();
     const store = new RecordingStore('admin');
-    const runPrompt = await import('../src/server/run-prompt.js');
+    const runPrompt = await import('../src/server/runs/prompt/index.js');
     vi.spyOn(runPrompt, 'buildRunPrompt').mockImplementation(() => {
       throw new Error('prompt could not be built');
     });

@@ -2,7 +2,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { CONFIG_DIR, CONFIG_FILE } from '../src/core/layout.js';
-import { discoverProjects } from '../src/server/discover.js';
+import { discoverProjects } from '../src/server/boards/discover.js';
 import { scaffoldProject } from '../src/store/project/scaffold.js';
 import { tempDir } from './helpers.js';
 

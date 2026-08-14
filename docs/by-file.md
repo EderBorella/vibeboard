@@ -27,7 +27,7 @@ machine's closure, and it is why the purity gate is still unarmed.
 
 | file | pages | cites |
 |---|---|---|
-| `accounting.ts` | `decisions.md` | `S10` |
+| `accounting.ts` | `decisions.md` — the spend arithmetic, and the SHAPE `GET /api/accounting` answers with (`Accounting`, `CardAccount`). The shape lived in the autopilot route module until it was the last thing making `src/service/` import from `src/server/`; the loop needs the type to read the answer, and nothing about it is a server concern | `S10` |
 | `autopilot-cover.ts` | `decisions.md` | `decision 45`, `decision 52`, `decision 59` |
 | `autopilot-state.ts` | `decisions.md`, `security/containment.md` (its `unreviewedGates` comment explains a live rule by naming the dead profile) | `decision 15`, `decision 20`, `decision 47`, `S13`, `C2` |
 | `autopilot.ts` | `decisions.md` | `decision 40`, `decision 42`, `decision 45`, `decision 51`, `decision 52`, `decision 57`, `S5` |
@@ -94,47 +94,70 @@ groups write through it.
 | `suggestion-store.ts` | `security/containment.md` — the agent cannot write here, so the endpoint is the only way in | — |
 | `write-queue.ts` | `decisions.md` — the atomic write and the per-path chain everything above goes through | `decision 20`, `C2` |
 
-## `src/server/` — the Fastify app, auth, credentials, containers, dispatch
+## `src/server/` — the Fastify app, grouped by feature
+
+One folder per feature, each holding its implementation AND its HTTP surface, so the answer to "where
+does this endpoint's logic live" is "beside it". The route module is `routes.ts` where a feature has one
+HTTP surface and `<subject>-routes.ts` where it has several; there is no `routes/` directory any more,
+and `test/entry-column.test.ts` still enforces that no route imports another route — over every route
+module by that naming convention rather than over one flat directory.
+
+**What is flat, and why.** `app.ts` and `main.ts` are the app and the process. `route-context.ts`,
+`logging.ts`, `errors.ts`, `redaction.ts`, `static.ts`, `ws.ts` and `fs-sandbox.ts` are mechanisms every
+feature reaches through, and a mechanism shared by two features belongs to neither — the same rule that
+keeps `store/write-queue.ts` flat. `fs-sandbox.ts` says so in its own header: the path rule is shared by
+Project Control's allow-listed documents and the Explorer's whole tree, deliberately as one copy.
+`agent-turn.ts` and `copilot-events.ts` are flat for exactly that reason too, and it is worth stating
+because their names suggest otherwise: one turn of an agent process and the parser for what it writes
+back are what BOTH dispatch and the chat go through, so filing them under either would mislead whoever
+arrives from the other. `copilot-system-prompt.md` is flat because `agent-turn.ts` reads it as a
+sibling, and `package.json`'s build step copies it to the matching place in `dist/`.
+
+**`boxes/` is the container an agent runs in and the backend process inside it** — the box verbs, the
+spec, the gate, the socket, the OpenCode server and its client, and the config home that server is
+given. **`copilot/` is the chat**, and the model catalogue its picker offers. **`content/`, `diary/` and
+`suggestions/` hold routes only**: what they read and write is a store, and the stores live in
+`src/store/`.
 
 | file | pages | cites |
 |---|---|---|
-| `agent-runner.ts` | `decisions.md`, `security/containment.md` (credential redaction, and why stdin rather than argv) | `decision 8`, `decision 18`, `decision 60`, `S1`, `S11` |
-| `agent-turn.ts` | `security/containment.md` | — |
-| `api-socket.ts` | `security/containment.md` — the socket **directory** is what is mounted, read-only | — |
 | `app.ts` | `decisions.md` | `decision 8`, `decision 13`, `S11` |
-| `auth.ts` | `decisions.md` — `RULES` is the single answer to "who may call this", and a route absent from it is admin-only | `decision 3`, `decision 5`, `decision 10`, `decision 18`, `decision 21`, `decision 44`, `decision 51`, `decision 65`, `decision 66`, `decision 67` |
-| `autopilot-runtime.ts` | `decisions.md` | `decision 12`, `decision 13`, `decision 47` |
-| `box-manager.ts` | `security/containment.md` — adoption by name **and** spec, and the network rules | — |
-| `box-service.ts` | `security/containment.md`, `decisions.md` | `S2` |
-| `containers.ts` | `security/containment.md` — the mount set, the protected paths, the writable hole, the flags | `S1` |
-| `copilot-authority.ts` | `security/containment.md` — why a credential is redacted out of anything persisted | — |
-| `copilot-env.ts` | `security/containment.md`, `decisions.md` — per-project, per-backend state, and why | `S2` |
-| `copilot-turns.ts` | `decisions.md`, `security/containment.md` — the shared box, the session transcript, and the eager end of a chat credential | `decision 12` |
-| `copilot.ts` | `security/containment.md` — the copilot shares the project's box | `S1` |
-| `credentials.ts` | `decisions.md`, `security/containment.md` — `~/.vibeboard/` is not among the mounts; `VIBEBOARD_TOKEN_FILE` is the exception | `decision 10` |
-| `devices.ts` | `security/containment.md` — why a hash is stored, and why the `token-` prefix survives its old reason | — |
+| `agent-turn.ts` | `security/containment.md` | — |
 | `logging.ts` | `decisions.md` | `decision 20` |
-| `opencode-server.ts` | `decisions.md`, `security/containment.md` — the server is the box's main process, one box per project | `decision 12` |
-| `prompt/contracts.ts` | `decisions.md` — what a run is asked to produce, and why a judging run's contract REPLACES the reporting one rather than adding to it | `decision 3`, `decision 40`, `decision 51`, `S9` |
-| `prompt/credential.ts` | `decisions.md` (`decision 10`'s scope table), `security/containment.md` — the only part of the prompt that reaches `auth.ts`. The agent's permitted endpoint list is GENERATED from that table, and `test/run-prompt.test.ts` asserts the assembled prompt's catalogue against it in both directions | — |
-| `prompt/index.ts` | `decisions.md` — the input contract, and the order the sections are assembled in; `run-prompt.ts` is the re-export barrel and holds no reasoning of its own | `decision 18`, `decision 40`, `decision 51`, `decision 55`, `decision 60`, `decision 63` |
-| `prompt/sections.ts` | `decisions.md` — one section per thing the agent is told, and why several of them return nothing rather than a heading over nothing | `decision 55`, `decision 60` |
-| `reaper.ts` | `decisions.md` | `decision 13` |
 | `route-context.ts` | `decisions.md` | `decision 20` |
-| `sandbox.ts` | `security/containment.md` — the gate, and why it is a probe | — |
-| `service-process.ts` | `decisions.md`, `security/containment.md` — the loop is deliberately **not** boxed; the scope table is what confines it | `decision 13`, `decision 20`, `decision 47` |
-| `signin-terminal.ts` | `security/containment.md` — the `VIBEBOARD_TOKEN_FILE` warning it prints | — |
-| `signin.ts` | `decisions.md` | `decision 21` |
-| `snapshot.ts` | `decisions.md` | `decision 46` |
-| `routes/autopilot.ts` | `decisions.md` | `decision 12`, `decision 47` |
-| `routes/cards.ts` | `decisions.md` — the create rules: the stamp, the parent link, the duplicate-title refusal | `decision 10`, `decision 44`, `decision 56`, `decision 58`, `decision 61`, `decision 65` |
-| `routes/control.ts` | `decisions.md`, `foundation-bootstrap.md` | `decision 3`, `decision 67` |
-| `routes/diary.ts` | `security/containment.md` — the "profile denies the file" comment is stale; the read-only mount is what does it now | — |
-| `routes/project.ts` | `decisions.md` | `S7` |
-| `routes/runs.ts` | `decisions.md` | `decision 3`, `decision 5`, `decision 12`, `decision 18`, `decision 40`, `decision 52`, `decision 60`, `decision 63`, `S6`, `C2` |
-| `routes/sandbox.ts` | `security/containment.md` — `profile` in the payload is now the image name | — |
-| `routes/suggestions.ts` | `decisions.md` | `decision 49`, `decision 50` |
-| `routes/toolchain.ts` | `security/containment.md` — the brokered install, the privileged half | — |
+| `auth/auth.ts` | `decisions.md` — `RULES` is the single answer to "who may call this", and a route absent from it is admin-only. It moved as ONE WHOLE FILE and its contents are not divided: a per-feature fragment that failed to register would silently remove rows, and `endpointsFor` iterates the table in declaration order because that order is the endpoint list every agent is given | `decision 3`, `decision 5`, `decision 10`, `decision 18`, `decision 21`, `decision 44`, `decision 51`, `decision 65`, `decision 66`, `decision 67` |
+| `auth/credentials.ts` | `decisions.md`, `security/containment.md` — `~/.vibeboard/` is not among the mounts; `VIBEBOARD_TOKEN_FILE` is the exception | `decision 10` |
+| `auth/devices.ts` | `security/containment.md` — why a hash is stored, and why the `token-` prefix survives its old reason | — |
+| `auth/signin.ts` | `decisions.md` | `decision 21` |
+| `auth/signin-terminal.ts` | `security/containment.md` — the `VIBEBOARD_TOKEN_FILE` warning it prints | — |
+| `autopilot/autopilot-runtime.ts` | `decisions.md` | `decision 12`, `decision 13`, `decision 47` |
+| `autopilot/service-process.ts` | `decisions.md`, `security/containment.md` — the loop is deliberately **not** boxed; the scope table is what confines it. It resolves the loop's entry by **climbing** to whichever ancestor holds `service/main<ext>`, not by rewriting its own path: the old derivation hard-coded both the directory it sat in and its own filename, so filing it here made it answer with its OWN path — and nothing type-checks a string. `test/service-process.test.ts` asserts the resolved path exists on disk | `decision 13`, `decision 20`, `decision 47` |
+| `autopilot/routes.ts` | `decisions.md` — the readiness composer, and the accounting endpoint whose SHAPE lives in `core/accounting.ts` | `decision 12`, `decision 47` |
+| `boards/snapshot.ts` | `decisions.md` | `decision 46` |
+| `boards/cards-routes.ts` | `decisions.md` — the create rules: the stamp, the parent link, the duplicate-title refusal | `decision 10`, `decision 44`, `decision 56`, `decision 58`, `decision 61`, `decision 65` |
+| `boards/project-routes.ts` | `decisions.md` | `S7` |
+| `boxes/api-socket.ts` | `security/containment.md` — the socket **directory** is what is mounted, read-only | — |
+| `boxes/box-manager.ts` | `security/containment.md` — adoption by name **and** spec, and the network rules | — |
+| `boxes/box-service.ts` | `security/containment.md`, `decisions.md` | `S2` |
+| `boxes/containers.ts` | `security/containment.md` — the mount set, the protected paths, the writable hole, the flags | `S1` |
+| `boxes/copilot-env.ts` | `security/containment.md`, `decisions.md` — per-project, per-backend state, and why | `S2` |
+| `boxes/opencode-server.ts` | `decisions.md`, `security/containment.md` — the server is the box's main process, one box per project | `decision 12` |
+| `boxes/sandbox.ts` | `security/containment.md` — the gate, and why it is a probe | — |
+| `boxes/sandbox-routes.ts` | `security/containment.md` — `profile` in the payload is now the image name | — |
+| `boxes/toolchain-routes.ts` | `security/containment.md` — the brokered install, the privileged half | — |
+| `content/control-routes.ts` | `decisions.md`, `foundation-bootstrap.md` | `decision 3`, `decision 67` |
+| `copilot/copilot.ts` | `security/containment.md` — the copilot shares the project's box | `S1` |
+| `copilot/copilot-authority.ts` | `security/containment.md` — why a credential is redacted out of anything persisted | — |
+| `copilot/copilot-turns.ts` | `decisions.md`, `security/containment.md` — the shared box, the session transcript, and the eager end of a chat credential | `decision 12` |
+| `diary/routes.ts` | `security/containment.md` — the "profile denies the file" comment is stale; the read-only mount is what does it now | — |
+| `runs/agent-runner.ts` | `decisions.md`, `security/containment.md` (credential redaction, and why stdin rather than argv) | `decision 8`, `decision 18`, `decision 60`, `S1`, `S11` |
+| `runs/reaper.ts` | `decisions.md` | `decision 13` |
+| `runs/routes.ts` | `decisions.md` | `decision 3`, `decision 5`, `decision 12`, `decision 18`, `decision 40`, `decision 52`, `decision 60`, `decision 63`, `S6`, `C2` |
+| `runs/prompt/index.ts` | `decisions.md` — the input contract, and the order the sections are assembled in. It also records why the `run-prompt.ts` barrel that used to front this directory is gone: NodeNext has no directory-index resolution, so a barrel is what makes a SPLIT cost its importers nothing — and filing the directory under `runs/` changed the specifier for all four importers anyway, leaving a file whose only job was to keep a path stable that nobody could still use | `decision 18`, `decision 40`, `decision 51`, `decision 55`, `decision 60`, `decision 63` |
+| `runs/prompt/contracts.ts` | `decisions.md` — what a run is asked to produce, and why a judging run's contract REPLACES the reporting one rather than adding to it | `decision 3`, `decision 40`, `decision 51`, `S9` |
+| `runs/prompt/credential.ts` | `decisions.md` (`decision 10`'s scope table), `security/containment.md` — the only part of the prompt that reaches `auth/auth.ts`. The agent's permitted endpoint list is GENERATED from that table, and `test/run-prompt.test.ts` asserts the assembled prompt's catalogue against it in both directions | — |
+| `runs/prompt/sections.ts` | `decisions.md` — one section per thing the agent is told, and why several of them return nothing rather than a heading over nothing | `decision 55`, `decision 60` |
+| `suggestions/routes.ts` | `decisions.md` | `decision 49`, `decision 50` |
 
 ## `src/service/` — the auto-pilot loop, a separate process
 
@@ -162,9 +185,9 @@ groups write through it.
 | `styles.css` | `decisions.md` | `decision 48` |
 | `useAutopilot.ts` | `decisions.md` | `decision 20` |
 | `components/AutopilotPanel.tsx` | `decisions.md` | `decision 52`, `S10`, `C2`, `C4` |
-| `components/CardTile.tsx` | `decisions.md` | `decision 45`, `decision 46` |
+| `board/CardTile.tsx` | `decisions.md` | `decision 45`, `decision 46` |
 | `components/DiaryView.tsx` | `decisions.md` | `decision 48` |
-| `components/ExecutionView.tsx` | `decisions.md` | `S10` |
+| `runs/ExecutionView.tsx` | `decisions.md` | `S10` |
 | `components/HaltOverlay.tsx` | `decisions.md` | `decision 12` |
 | `components/SandboxPanel.tsx` | `security/containment.md` — it renders what is confining agents | — |
 | `components/SettingsModal.tsx` | `decisions.md` | `decision 52` |

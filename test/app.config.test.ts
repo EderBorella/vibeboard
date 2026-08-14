@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ProjectSession } from '../src/server/session.js';
+import { ProjectSession } from '../src/server/boards/session.js';
 import { boardColumnSlugs } from '../src/store/cards/board.js';
 import { openTestProject, testApp, wsClient } from './helpers.js';
 
@@ -12,7 +12,7 @@ describe('PATCH /api/config', () => {
   // Regression: the "Save does nothing" bug when switching backend. PATCH /config pushes a
   // snapshot itself rather than waiting on the watcher — instant and race-free for the
   // backend toggle. (The watcher DOES also see .vibeboard/config.yaml since c318024; only
-  // .vibeboard/chat is ignored — see isIgnored in src/server/session.ts.)
+  // .vibeboard/chat is ignored — see isIgnored in src/server/boards/session.ts.)
   it('broadcasts an updated snapshot so clients see the new backend', async () => {
     const { app } = await openTestProject({ name: 'Cfg' });
 

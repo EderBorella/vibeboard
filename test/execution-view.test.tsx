@@ -15,7 +15,7 @@ vi.mock('../web/src/api.js', async (importOriginal) => ({
   },
 }));
 
-import { ExecutionView } from '../web/src/components/ExecutionView.js';
+import { ExecutionView } from '../web/src/runs/ExecutionView.js';
 import type { Card } from '../web/src/shared.js';
 
 afterEach(cleanup);

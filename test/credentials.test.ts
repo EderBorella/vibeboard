@@ -1,7 +1,7 @@
 import { readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { adminToken, adminTokenFile, CredentialStore } from '../src/server/credentials.js';
+import { adminToken, adminTokenFile, CredentialStore } from '../src/server/auth/credentials.js';
 import { tempDir } from './helpers.js';
 
 const ADMIN = 'admin-token-for-tests';

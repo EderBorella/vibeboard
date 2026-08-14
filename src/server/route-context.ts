@@ -1,18 +1,18 @@
 import type { FastifyReply } from 'fastify';
 import type { ProjectConfig } from '../core/types.js';
 import type { ChatStore } from '../store/chat-store.js';
-import type { AgentRunner } from './agent-runner.js';
-import type { AutopilotRuntime } from './autopilot-runtime.js';
-import type { BoxService } from './box-service.js';
-import type { CopilotSession } from './copilot.js';
-import type { CopilotAuthority } from './copilot-authority.js';
-import type { CredentialStore } from './credentials.js';
-import type { DeviceStore } from './devices.js';
+import type { CredentialStore } from './auth/credentials.js';
+import type { DeviceStore } from './auth/devices.js';
+import type { PendingRequests } from './auth/signin.js';
+import type { AutopilotRuntime } from './autopilot/autopilot-runtime.js';
+import type { ServiceProcess } from './autopilot/service-process.js';
+import type { ProjectSession } from './boards/session.js';
+import type { BoxService } from './boxes/box-service.js';
+import type { SandboxStatus } from './boxes/sandbox.js';
+import type { CopilotSession } from './copilot/copilot.js';
+import type { CopilotAuthority } from './copilot/copilot-authority.js';
 import type { Log } from './logging.js';
-import type { SandboxStatus } from './sandbox.js';
-import type { ServiceProcess } from './service-process.js';
-import type { ProjectSession } from './session.js';
-import type { PendingRequests } from './signin.js';
+import type { AgentRunner } from './runs/agent-runner.js';
 
 // The shared surface every route group and the WS layer needs. Passed explicitly rather
 // than closed over, so each route module is a plain function of its context and can be

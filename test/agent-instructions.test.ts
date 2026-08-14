@@ -20,7 +20,7 @@ describe.each([
   ['the shared system prompt', SHARED_PROMPT],
 ])('%s', (_name, doc) => {
   // INVERTED, and deliberately. This document used to list the endpoints itself — a third copy of a
-  // fact whose home is the RULES table in auth.ts, alongside two in run-prompt.ts. They disagreed:
+  // fact whose home is the RULES table in auth.ts, alongside two in the dispatch prompt. They disagreed:
   // granting a scope a new row told no agent anything, and the move route's payload key was wrong in
   // one copy for as long as it existed. The catalogue is now generated per scope into the credential
   // section, and this file must not grow a copy back.

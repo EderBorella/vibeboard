@@ -2,9 +2,9 @@ import { readFile, stat, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { boxMounts } from '../src/server/containers.js';
-import { adminTokenFile } from '../src/server/credentials.js';
-import { DeviceStore, deviceFile, deviceLabel } from '../src/server/devices.js';
+import { adminTokenFile } from '../src/server/auth/credentials.js';
+import { DeviceStore, deviceFile, deviceLabel } from '../src/server/auth/devices.js';
+import { boxMounts } from '../src/server/boxes/containers.js';
 import { tempDir } from './helpers.js';
 
 // One credential per browser, so the approval prompt can name which one is asking and a Revoke can

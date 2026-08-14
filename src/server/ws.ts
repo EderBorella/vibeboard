@@ -1,7 +1,7 @@
 import websocket from '@fastify/websocket';
 import type { FastifyInstance, preValidationHookHandler } from 'fastify';
-import { bearerToken, sameOrigin } from './auth.js';
-import { CREDENTIAL_COOKIE, CROSS_ORIGIN, readCookie } from './cookies.js';
+import { bearerToken, sameOrigin } from './auth/auth.js';
+import { CREDENTIAL_COOKIE, CROSS_ORIGIN, readCookie } from './auth/cookies.js';
 import type { AppCtx, WsClient } from './route-context.js';
 
 // Fan-out to every connected browser. A send on a closed socket is swallowed: a client that

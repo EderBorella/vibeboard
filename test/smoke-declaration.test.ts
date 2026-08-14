@@ -5,9 +5,9 @@ import { describe, expect, it, onTestFinished } from 'vitest';
 import { foundationRel } from '../src/core/layout.js';
 import { checkSmokeCommand } from '../src/core/smoke-declaration.js';
 import { buildApp } from '../src/server/app.js';
-import { allows } from '../src/server/auth.js';
-import { type Credential, CredentialStore } from '../src/server/credentials.js';
-import { ProjectSession } from '../src/server/session.js';
+import { allows } from '../src/server/auth/auth.js';
+import { type Credential, CredentialStore } from '../src/server/auth/credentials.js';
+import { ProjectSession } from '../src/server/boards/session.js';
 import { declaredCommands, readSmokeCommand, writeSmokeCommand } from '../src/store/project/foundation.js';
 import { tempDir } from './helpers.js';
 

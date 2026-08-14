@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
 import { BACKEND_DEFAULTS, backendDefaults, DEFAULT_BACKEND } from '../src/core/backends.js';
 import type { ProjectConfig } from '../src/core/types.js';
-import { ProjectSession } from '../src/server/session.js';
+import { ProjectSession } from '../src/server/boards/session.js';
 import {
   configPath,
   defaultConfig,

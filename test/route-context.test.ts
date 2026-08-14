@@ -1,7 +1,7 @@
 import type { FastifyReply } from 'fastify';
 import { describe, expect, it, vi } from 'vitest';
+import type { ProjectSession } from '../src/server/boards/session.js';
 import { ensureOpen, nowIso, today } from '../src/server/route-context.js';
-import type { ProjectSession } from '../src/server/session.js';
 
 // ensureOpen is exercised through every route's 409 test, but only ever with BOTH root and config
 // absent. Its own contract is narrower than that: it is a type predicate that must refuse when

@@ -8,7 +8,7 @@ import {
   HINT_COOKIE,
   readCookie,
   serialiseCookie,
-} from '../src/server/cookies.js';
+} from '../src/server/auth/cookies.js';
 
 // The two ten-line functions the whole transport rests on, asserted directly rather than through a
 // route — an attribute that is silently wrong makes sign-in look like it worked and every request

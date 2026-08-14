@@ -7,8 +7,8 @@ import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 // Spied, not replaced: the real implementation still runs, so this cannot pass by neutering the
 // thing it is testing.
 const spy = vi.hoisted(() => ({ statuses: [] as unknown[], boxes: [] as (string | undefined)[] }));
-vi.mock('../src/server/sandbox.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../src/server/sandbox.js')>();
+vi.mock('../src/server/boxes/sandbox.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../src/server/boxes/sandbox.js')>();
   return {
     ...actual,
     // EVERY argument forwarded, deliberately. An earlier version of this spy took only the first
@@ -22,7 +22,7 @@ vi.mock('../src/server/sandbox.js', async (importOriginal) => {
   };
 });
 
-import type { SandboxStatus } from '../src/server/sandbox.js';
+import type { SandboxStatus } from '../src/server/boxes/sandbox.js';
 import { openTestProject, shimArgsLog, TEST_SANDBOX, wsClient } from './helpers.js';
 
 const here = dirname(fileURLToPath(import.meta.url));

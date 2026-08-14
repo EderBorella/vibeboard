@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { opencodePidFile, reapOrphanServer } from '../src/server/opencode-server.js';
+import { opencodePidFile, reapOrphanServer } from '../src/server/boxes/opencode-server.js';
 import { tempDir } from './helpers.js';
 
 // The shutdown handlers in main.ts cover catchable signals. SIGKILL, an OOM kill and a crashed host

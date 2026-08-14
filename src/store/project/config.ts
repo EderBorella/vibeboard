@@ -31,7 +31,7 @@ export const DEFAULT_MAX_RUNS = 3;
 // vertical (decision 45, corrected 2026-08-13, after one redundant story stopped a project with three
 // features queued behind it).
 //
-// It is NOT last on either board: the closing column is defined as the final one (routes/cards.ts
+// It is NOT last on either board: the closing column is defined as the final one (boards/cards-routes.ts
 // isClosingColumn), so appending Blocked would make blocking a card resolve its runs and leave Done
 // closing nothing.
 const DEFAULT_COLUMNS: Record<BoardName, string[]> = {

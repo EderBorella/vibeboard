@@ -8,7 +8,7 @@ import {
   POINTER_FILES,
   skillRel,
 } from '../src/core/layout.js';
-import { ProjectSession } from '../src/server/session.js';
+import { ProjectSession } from '../src/server/boards/session.js';
 import { openTestProject, testApp } from './helpers.js';
 
 const [CLAUDE_MD, AGENTS_MD] = POINTER_FILES;

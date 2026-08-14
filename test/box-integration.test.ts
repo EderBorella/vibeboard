@@ -4,9 +4,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { BoxManager } from '../src/server/box-manager.js';
-import { DEFAULT_IMAGE, type DockerRun, SOCKET_DIR } from '../src/server/containers.js';
-import { wrapCommand } from '../src/server/sandbox.js';
+import { BoxManager } from '../src/server/boxes/box-manager.js';
+import { DEFAULT_IMAGE, type DockerRun, SOCKET_DIR } from '../src/server/boxes/containers.js';
+import { wrapCommand } from '../src/server/boxes/sandbox.js';
 
 // The boundary itself, against a real container — not the argv that asks for it.
 //

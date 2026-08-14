@@ -1,8 +1,8 @@
+import type { Accounting } from '../core/accounting.js';
 import type { DiaryKind } from '../core/diary.js';
 import type { RunRecord } from '../core/runs.js';
 import type { BoardName, Card, ProjectConfig } from '../core/types.js';
 import type { Verification } from '../core/verify.js';
-import type { Accounting } from '../server/routes/autopilot.js';
 
 // The loop's whole view of the board, and it is the SAME HTTP surface an agent uses. Decision 20: the
 // service consumes the existing server rather than reaching into the project itself, so every write it
@@ -56,7 +56,7 @@ export interface DispatchRequest {
   skill: string;
   // The run this one follows: for a judging run, the run it is judging. Without it the judge was told to
   // score "work that is already done" and had to guess which — and on the first hand-run it guessed the
-  // previous, successful run and passed a card whose actual run had died (run-prompt.ts).
+  // previous, successful run and passed a card whose actual run had died (`previousSection` in `src/server/runs/prompt/sections.ts`).
   previous?: string;
   // WHAT THE LOOP ALREADY ESTABLISHED before dispatching a review: that the gates it ran in its own process
   // passed, and whether this card is in the setup subtree, where an absent gate set is expected.

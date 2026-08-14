@@ -34,7 +34,7 @@ export const BACKEND_LABEL = 'io.vibeboard.backend';
 // box with no `.git/hooks` pin — and if the agent then runs `git init`, that directory is writable
 // and a `pre-commit` hook it writes runs on the HOST at the user's next commit. Recomputing the
 // digest each time means the box is rebuilt as soon as the set changes.
-export const SPEC_LABEL = 'io.vibeboard.spec';
+const SPEC_LABEL = 'io.vibeboard.spec';
 
 export const DEFAULT_IMAGE = process.env.VIBEBOARD_AGENT_IMAGE ?? 'vibeboard-agent:latest';
 
@@ -84,7 +84,7 @@ export function boxName(projectRoot: string, backend: BoxBackend): string {
   return `vibeboard-${digest}-${backend}`;
 }
 
-export interface MountSpec {
+interface MountSpec {
   source: string;
   target: string;
   readOnly?: boolean;
@@ -119,7 +119,7 @@ export interface BoxPaths {
 // commit, entirely outside the box. `.git/config` reaches the same end by other means — `core.hooksPath`
 // repoints hooks somewhere writable. The old AppArmor profile denied both, and a container that only
 // covered `.vibeboard` would have quietly handed them back.
-export const PROTECTED_PATHS = [CONFIG_DIR, '.git/hooks', '.git/config'] as const;
+const PROTECTED_PATHS = [CONFIG_DIR, '.git/hooks', '.git/config'] as const;
 
 // The ONE place inside `.vibeboard/` an agent must be able to write: where its report goes.
 //
@@ -187,7 +187,7 @@ export function boxMounts(paths: BoxPaths): MountSpec[] {
   return mounts;
 }
 
-export interface CreateArgs {
+interface CreateArgs {
   name: string;
   image: string;
   projectRoot: string;
@@ -312,9 +312,9 @@ export interface DockerResult {
 
 export type DockerRun = (args: string[], opts?: { timeoutMs?: number }) => Promise<DockerResult>;
 
-export type BoxState = 'running' | 'stopped' | 'absent';
+type BoxState = 'running' | 'stopped' | 'absent';
 
-export interface BoxInspection {
+interface BoxInspection {
   state: BoxState;
   // The spec digest the box was created with, or '' for one made before this label existed.
   spec: string;

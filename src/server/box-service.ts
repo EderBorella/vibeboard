@@ -54,7 +54,7 @@ export function boxPathsForBackend(
   return boxPathsFor(projectRoot, extra, exists);
 }
 
-export interface EnsuredBox {
+interface EnsuredBox {
   name: string;
   hostPort?: number;
 }

@@ -48,15 +48,15 @@ export function boxPathsFor(
 }
 
 // Why a box was thrown away and remade — the digest it had, and the one it needed.
-export type RebuildNotice = (name: string, was: string, now: string) => void;
+type RebuildNotice = (name: string, was: string, now: string) => void;
 
-export interface BoxHandle {
+interface BoxHandle {
   name: string;
   // Only for a box that publishes one — OpenCode's, whose server VibeBoard reaches over HTTP.
   hostPort?: number;
 }
 
-export interface EnsureOptions {
+interface EnsureOptions {
   projectRoot: string;
   backend: BoxBackend;
   paths: BoxPaths;

@@ -5,6 +5,7 @@ import * as coreBackends from '../src/core/backends.js';
 import * as coreDiary from '../src/core/diary.js';
 import * as coreGate from '../src/core/dispatch-gate.js';
 import { skillRel } from '../src/core/layout.js';
+import * as coreMoney from '../src/core/money.js';
 import * as coreRuns from '../src/core/runs.js';
 import * as coreSkills from '../src/core/skills.js';
 import * as coreSuggestions from '../src/core/suggestions.js';
@@ -160,5 +161,38 @@ describe('web/shared mirrors src/core', () => {
       const record = { status } as Parameters<typeof coreRuns.needsResolution>[0];
       expect(webRuns.groupOf(status) === 'attention').toBe(coreRuns.needsResolution(record));
     }
+  });
+});
+
+// THE MONEY RULE, on both sides of a boundary neither side can cross. `src/core/money.ts` formats the
+// figures in sentences the SERVER generates (the auto-pilot budget line, rendered verbatim in the bar);
+// `web/src/format.ts` formats every figure the browser computes. One rule, two homes, because `web/` is
+// bundler-resolved and `src/` is NodeNext.
+//
+// This exists because the divergence already happened twice: two web formatters once rendered $0.50 as
+// `$0.5000` and `$0.500` on adjacent screens, and core's sentence printed a raw `$13.570517` a line below
+// a correctly formatted `$13.57`. Asserted over a TABLE spanning every branch — zero, sub-cent, sub-dollar
+// and above — because a single value cannot tell four thresholds apart.
+describe('the money rule is the same on both sides', () => {
+  it('formats every case identically', async () => {
+    const web = await import('../web/src/format.js');
+    for (const amount of coreMoney.MONEY_CASES) {
+      expect(web.formatCost(amount), `at ${amount}`).toBe(coreMoney.formatUsd(amount));
+    }
+  });
+
+  it('covers each branch of the rule, so the table cannot go thin unnoticed', () => {
+    // Guards the FIXTURE rather than the code: drop the sub-cent case and three of these fail.
+    const shown = coreMoney.MONEY_CASES.map((n) => coreMoney.formatUsd(n));
+    expect(shown).toContain('$0');
+    expect(shown.some((s) => s.split('.')[1]?.length === 4)).toBe(true);
+    expect(shown.some((s) => s.split('.')[1]?.length === 3)).toBe(true);
+    expect(shown.some((s) => s.split('.')[1]?.length === 2)).toBe(true);
+  });
+
+  it('answers a non-number rather than throwing, on both sides', async () => {
+    const web = await import('../web/src/format.js');
+    expect(coreMoney.formatUsd(null as unknown as number)).toBe('not a number');
+    expect(web.formatCost(null as unknown as number)).toBe('not a number');
   });
 });

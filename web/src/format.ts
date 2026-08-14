@@ -11,6 +11,12 @@ export function isMoney(n: number | undefined): n is number {
   return Number.isFinite(n);
 }
 
+// MIRRORED FROM `src/core/money.ts`, and pinned to it by test/mirror.test.ts over a shared table of
+// amounts. The rule lives on both sides because neither can import the other — `web/` is
+// bundler-resolved, `src/` is NodeNext with mandatory `.js` extensions — and it lives in core at all
+// because core GENERATES sentences carrying figures (the auto-pilot budget line) that the browser renders
+// verbatim. Change the rule here and you must change it there; the guard is what makes that a failure
+// rather than a discrepancy nobody notices.
 export function formatCost(usd: number): string {
   // `null`, not `undefined`, is what an overflowing total becomes on the wire: JSON cannot carry
   // Infinity. The web mirror declares `costUsd?: number` and every guard tests `=== undefined`, which

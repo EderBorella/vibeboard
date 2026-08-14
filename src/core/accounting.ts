@@ -1,4 +1,5 @@
 import type { AutopilotConfig } from './autopilot.js';
+import { formatUsd } from './money.js';
 import { isProjectRun, type RunRecord, type RunStatus } from './runs.js';
 import type { BoardName } from './types.js';
 
@@ -152,7 +153,7 @@ export function governingCap(
   }
   const budget = {
     cap: 'budget' as const,
-    why: `Auto-pilot will stop when this project's runs have cost $${ap.budgetUsd}; they have cost $${spend.costUsd}.`,
+    why: `Auto-pilot will stop when this project's runs have cost ${formatUsd(ap.budgetUsd)}; they have cost ${formatUsd(spend.costUsd)}.`,
   };
   // Both can bind, so the nearer one wins. A guard rather than a bare ratio because `maxIterations` is
   // validated in the gate, not here, and dividing by a zero that reached us anyway would answer NaN —

@@ -1,0 +1,246 @@
+import { describe, expect, it } from 'vitest';
+import type { TickAction } from '../src/core/actions.js';
+import type { Verification } from '../src/core/verify.js';
+import { type ActDeps, performAction } from '../src/service/act.js';
+import { BREAKDOWN, CARD, context, deps, record, recorder } from './service-act-fixtures.js';
+
+// THE CHECKUP'S EVIDENCE, GATHERED BY THE LOOP (ruling 60). Every card run is minted `work` scope, and three of
+// the four facts a checkup needs are unreachable from it. Widening the scope table would grant an agent
+// authority to solve a problem the loop can solve — and the loop already holds every one of them.
+describe('a checkup’s evidence', () => {
+  const smokePass = async (): Promise<Verification> => ({
+    mode: 'smoke',
+    passed: true,
+    at: 'T',
+  });
+  const smokeFail = async (): Promise<Verification> => ({
+    mode: 'smoke',
+    passed: false,
+    at: 'T',
+    command: 'npm run smoke',
+    output: 'exited 1',
+    reason: '`npm run smoke` exited with 1.',
+  });
+  const gates = async (): Promise<Verification> => ({ mode: 'gates', passed: true, at: 'T' });
+
+  const verify = (smoke: () => Promise<Verification>) => ({ gates, smoke }) as unknown as ActDeps['verify'];
+
+  // F-001 → P-001, P-002. P-001 → E-001 (blocked). Two stories, so "all of them" can be told from "one of
+  // them", and a blocked grandchild so `blockedUnder` has something to find two levels down.
+  const feature = { ...CARD('F-001', 'features'), columnSlug: 'in-progress', links: ['P-001', 'P-002'] };
+  const story = { ...CARD('P-001', 'product'), columnSlug: 'done', links: ['E-001'] };
+  const story2 = { ...CARD('P-002', 'product'), columnSlug: 'done', links: [] };
+  const task = { ...CARD('E-001', 'engineering'), columnSlug: 'blocked' };
+
+  const FEATURE_CHECKUP: TickAction = {
+    kind: 'dispatch',
+    phase: 'feature-checkup',
+    skill: 'checkup-feature',
+    card: feature,
+  };
+  const STORY_CHECKUP: TickAction = {
+    kind: 'dispatch',
+    phase: 'story-checkup',
+    skill: 'checkup-story',
+    card: story,
+  };
+
+  const board = () => [feature, story, story2, task];
+
+  it('runs the smoke command before dispatching checkup-feature, and hands the result over', async () => {
+    const order: string[] = [];
+    const r = recorder({ boardCards: board() });
+    const original = r.client.dispatch;
+    r.client.dispatch = async (input) => {
+      order.push('dispatch');
+      return original(input);
+    };
+    await performAction(
+      deps(r.client, {
+        verify: {
+          gates,
+          smoke: async () => {
+            order.push('smoke');
+            return await smokePass();
+          },
+        } as unknown as ActDeps['verify'],
+      }),
+      FEATURE_CHECKUP,
+      context,
+    );
+    expect(order).toEqual(['smoke', 'dispatch']);
+    expect(r.requests[0]?.checkup?.smoke).toMatchObject({ mode: 'smoke', passed: true });
+  });
+
+  it('does not run the smoke command for a story checkup', async () => {
+    // A story has no end-to-end command of its own; the one `foundation/TESTING.md` declares is the feature's.
+    let ran = 0;
+    const r = recorder({ boardCards: board() });
+    await performAction(
+      deps(r.client, {
+        verify: {
+          gates,
+          smoke: async () => {
+            ran += 1;
+            return await smokePass();
+          },
+        } as unknown as ActDeps['verify'],
+      }),
+      STORY_CHECKUP,
+      context,
+    );
+    expect(ran).toBe(0);
+    expect(r.requests[0]?.checkup?.smoke).toBeUndefined();
+  });
+
+  it('dispatches the checkup even when the smoke command failed', async () => {
+    // EVIDENCE, NOT A GATE (ruling 55). A feature whose smoke command fails is exactly what a person needs
+    // told about, and blocking there would stop the project instead of reporting it.
+    const r = recorder({ boardCards: board() });
+    await performAction(deps(r.client, { verify: verify(smokeFail) }), FEATURE_CHECKUP, context);
+    expect(r.requests).toHaveLength(1);
+    expect(r.requests[0]?.checkup?.smoke).toMatchObject({ passed: false, command: 'npm run smoke' });
+  });
+
+  it('assembles the children and the blocked list from the board it already read', async () => {
+    const r = recorder({ boardCards: board() });
+    await performAction(deps(r.client, { verify: verify(smokePass) }), FEATURE_CHECKUP, context);
+    const evidence = r.requests[0]?.checkup;
+    // A feature's children are its STORIES, one board down — not its tasks.
+    expect(evidence?.children.map((c) => c.id)).toEqual(['P-001', 'P-002']);
+    // And the blocked list reaches through as many levels as there are: E-001 is under P-001, which is done,
+    // so a one-level walk would call this feature clean.
+    expect(evidence?.blocked).toEqual(['E-001']);
+  });
+
+  it('names each child’s column and how its last run ended', async () => {
+    const r = recorder({ boardCards: board() });
+    // A run on P-001, which is the fact `GET /api/runs` would otherwise have been asked for.
+    r.client.runs = async () => ({
+      ok: true as const,
+      value: {
+        runs: [record({ card: 'P-001', board: 'product', skill: 'break-down', status: 'attention' })],
+      },
+    });
+    await performAction(deps(r.client, { verify: verify(smokePass) }), FEATURE_CHECKUP, context);
+    const children = r.requests[0]?.checkup?.children ?? [];
+    expect(children.find((c) => c.id === 'P-001')).toMatchObject({ column: 'done', outcome: 'attention' });
+    // Absent rather than invented for a child nothing has run on yet.
+    expect(children.find((c) => c.id === 'P-002')?.outcome).toBeUndefined();
+  });
+
+  // A REVIEW'S STATUS IS NOT THE CHILD'S OUTCOME, and with one run per child no fixture could tell the two
+  // apart — the question only exists once there are two runs. A review that ran perfectly and sent the work
+  // back is `status: success` with `verdict: sent-back`, so reading the latest run of any kind described a
+  // task the reviewer had rejected as having succeeded.
+  it('names the child’s own work, not the review that judged it', async () => {
+    const task = { ...CARD('E-001', 'engineering'), columnSlug: 'in-progress' };
+    const story = { ...CARD('P-001', 'product'), columnSlug: 'in-progress', links: ['E-001'] };
+    const r = recorder({ boardCards: [story, task] });
+    r.client.runs = async () => ({
+      ok: true as const,
+      value: {
+        runs: [
+          // The work, which ended saying it could not finish.
+          record({ card: 'E-001', skill: 'implement', status: 'attention', started: '2026-08-06T10:00:00Z' }),
+          // And the review AFTER it, whose own turn went perfectly while it sent the work back.
+          record({
+            card: 'E-001',
+            skill: 'review',
+            status: 'success',
+            verdict: 'sent-back',
+            started: '2026-08-06T10:30:00Z',
+          }),
+        ],
+      },
+    });
+    await performAction(
+      deps(r.client),
+      { kind: 'dispatch', phase: 'story-checkup', skill: 'checkup-story', card: story },
+      context,
+    );
+    expect(r.requests[0]?.checkup?.children).toEqual([
+      { id: 'E-001', column: 'in-progress', outcome: 'attention', blocked: false },
+    ]);
+  });
+
+  it('marks a blocked child as blocked, so the prompt need not know which slug means it', async () => {
+    const r = recorder({ boardCards: board() });
+    await performAction(deps(r.client), STORY_CHECKUP, context);
+    expect(r.requests[0]?.checkup?.children).toEqual([{ id: 'E-001', column: 'blocked', blocked: true }]);
+  });
+
+  it('fetches the suggestions with its OWN service credential, not the checkup’s', async () => {
+    // `GET /api/suggestions` is open to `service` (auth.ts), which the loop holds and a `work` run does not.
+    const r = recorder({
+      boardCards: board(),
+      suggestions: [{ id: 'S-1', title: 'the config loader has no tests' }],
+    });
+    await performAction(deps(r.client, { verify: verify(smokePass) }), FEATURE_CHECKUP, context);
+    expect(r.calls).toContain('suggestions');
+    expect(r.requests[0]?.checkup?.suggestions).toEqual([
+      { id: 'S-1', title: 'the config loader has no tests' },
+    ]);
+  });
+
+  it('dispatches with an empty suggestion list rather than none when that read failed', async () => {
+    // A failed read must not become "there is nothing outstanding": that is how a checkup concludes a project
+    // is clean. It is dispatched anyway, because the checkup's own subject is the cards.
+    const r = recorder({ boardCards: board() });
+    r.client.suggestions = (async () => ({
+      ok: false as const,
+      reason: 'refused with 500',
+      fatal: false,
+    })) as unknown as typeof r.client.suggestions;
+    await performAction(deps(r.client, { verify: verify(smokePass) }), FEATURE_CHECKUP, context);
+    expect(r.requests).toHaveLength(1);
+    expect(r.requests[0]?.checkup?.suggestions).toEqual([]);
+  });
+
+  // THE GATE-DOCUMENT REFUSAL IN FRONT OF THE SMOKE COMMAND TOO (decision 51). `foundation/TESTING.md` carries
+  // `smoke:` and is in the same EXECUTED set as `foundation/CODE-QUALITY.md`; both run through `/bin/sh`
+  // unsandboxed as the server's user. Guarded only on the gates, the hole stayed open one document over.
+  it('runs no smoke command and dispatches nothing while a gate document is unread', async () => {
+    let ran = 0;
+    const r = recorder({ boardCards: board() });
+    const result = await performAction(
+      deps(r.client, {
+        state: async () => ({ unreviewedGates: ['TESTING.md'] }),
+        verify: {
+          gates,
+          smoke: async () => {
+            ran += 1;
+            return await smokePass();
+          },
+        } as unknown as ActDeps['verify'],
+      }),
+      FEATURE_CHECKUP,
+      context,
+    );
+    expect(ran).toBe(0);
+    expect(r.dispatched).toEqual([]);
+    expect(r.moves).toEqual([]);
+    expect(result.stop?.reason).toBe('stalled');
+    expect(result.stop?.detail).toContain('will not run a gate command');
+    expect(result.stop?.detail).toContain('foundation/TESTING.md');
+  });
+
+  it('runs a story checkup while a gate document is unread, because it spawns nothing', async () => {
+    // The refusal is about EXECUTION, not about checkups: a story checkup has no command of its own, so
+    // refusing it would cost the project for a risk that is not there.
+    const r = recorder({ boardCards: board() });
+    const result = await performAction(
+      deps(r.client, { state: async () => ({ unreviewedGates: ['TESTING.md'] }) }),
+      STORY_CHECKUP,
+      context,
+    );
+    expect(r.dispatched).toEqual(['checkup-story']);
+    expect(result.stop).toBeUndefined();
+  });
+
+  it('sends no checkup evidence with any other phase', async () => {
+    const r = recorder({ boardBefore: [], boardCards: [CARD('P-001', 'product')] });
+    await performAction(deps(r.client), BREAKDOWN(), context);
+    expect(r.requests[0]?.checkup).toBeUndefined();
+  });
+});

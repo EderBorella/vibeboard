@@ -102,7 +102,14 @@ this index exists for the ones whose reason lives somewhere else.
 
 | file | pages | cites |
 |---|---|---|
-| `act.ts` | `decisions.md` | `decision 3`, `decision 8`, `decision 10`, `decision 40`, `decision 43`, `decision 44`, `decision 47`, `decision 50`, `decision 51`, `decision 54`, `decision 55`, `decision 57`, `decision 60`, `decision 66` |
+| `act/index.ts` | `decisions.md` — the two paths one action can take, and the four rules the order carries; `act.ts` is the re-export barrel and holds no reasoning of its own | `decision 3`, `decision 10`, `decision 40`, `decision 43`, `decision 51`, `decision 55`, `decision 57` |
+| `act/bootstrap.ts` | `decisions.md` — the tail of the one run with no card: the scaffolding flag, then the harness feature | `decision 44`, `decision 50`, `decision 51`, `decision 66` |
+| `act/checkup.ts` | `decisions.md` — what a checkup is told, and the gate-document refusal in front of the smoke command | `decision 40`, `decision 51`, `decision 55`, `decision 60` |
+| `act/outcomes.ts` | `decisions.md` — what a settled card run earned, and the four endings that take no exit stamp | `decision 40`, `decision 43`, `decision 47`, `decision 51`, `decision 54` |
+| `act/refusals.ts` | `decisions.md` — why a refused write still reports the dispatch that happened | `decision 8` |
+| `act/review.ts` | `decisions.md` — the gates first, in this process, and the model only after them | `decision 40`, `decision 51` |
+| `act/sentences.ts` | `decisions.md` — every sentence a person reads afterwards, including the run summary agents cannot append themselves | `decision 10` |
+| `act/settle.ts` | — the wait for a dispatched run, and the clamps that make it terminate | — |
 | `board-client.ts` | `decisions.md` — the loop reaches the board over HTTP and nowhere else | `decision 10`, `decision 18`, `decision 20`, `decision 60`, `decision 63`, `decision 65`, `decision 66` |
 | `loop.ts` | `decisions.md` | `decision 8`, `decision 20`, `decision 66` |
 | `main.ts` | `decisions.md` — also carries a **date-stamped** ruling (`2026-08-11`), which the register does not cover | `decision 20` |

@@ -2,7 +2,7 @@ import { phase } from '../../core/phases.js';
 import { setupSubtreeIds } from '../../core/setup-feature.js';
 import { BOARDS, type Card } from '../../core/types.js';
 import type { Verification } from '../../core/verify.js';
-import { verifyGates } from '../../server/verifier.js';
+import { verifyGates } from '../../exec/verify.js';
 import type { ActResult, TickContext } from '../loop.js';
 import { stamp } from '../stamp.js';
 import { refuseWhileGateDocumentUnread } from './checkup.js';

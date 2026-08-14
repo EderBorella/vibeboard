@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { describe, expect, it } from 'vitest';
 import { AUTOPILOT_STATE_FILE, CONFIG_DIR } from '../src/core/layout.js';
-import { COMMAND_TIMEOUT_MS } from '../src/server/commands.js';
+import { COMMAND_TIMEOUT_MS } from '../src/exec/commands.js';
 import {
   commitAll,
   ensureBranch,
@@ -12,7 +12,7 @@ import {
   PROBE_TIMEOUT_MS,
   startSession,
   WORK_TIMEOUT_MS,
-} from '../src/server/git-work.js';
+} from '../src/exec/git-work.js';
 import { tempDir } from './helpers.js';
 
 const exec = promisify(execFile);

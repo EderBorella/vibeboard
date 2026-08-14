@@ -1,6 +1,6 @@
 import { declaredCommands } from '../core/foundation.js';
+import { startSession } from '../exec/git-work.js';
 import { readAutopilotState, updateAutopilotState } from '../server/autopilot-store.js';
-import { startSession } from '../server/git-work.js';
 import { commitTail, performAction } from './act.js';
 import { BoardClient } from './board-client.js';
 import { runLoop } from './loop.js';

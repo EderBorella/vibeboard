@@ -7,7 +7,7 @@ import type { PhaseName } from '../../core/phases.js';
 import type { RunRecord } from '../../core/runs.js';
 import { BOARDS, type Card } from '../../core/types.js';
 import type { Verification } from '../../core/verify.js';
-import { verifySmoke } from '../../server/verifier.js';
+import { verifySmoke } from '../../exec/verify.js';
 import type { DispatchRequest } from '../board-client.js';
 import type { ActResult, TickContext } from '../loop.js';
 import type { ActDeps, Dispatch } from './index.js';

@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { describe, expect, it } from 'vitest';
-import { groupStartTime, isSameGroup, killGroup, terminateGroup } from '../src/server/process-group.js';
+import { groupStartTime, isSameGroup, killGroup, terminateGroup } from '../src/exec/process-group.js';
 
 // The grandchild is the whole point. Every assertion below fails against `child.kill()`, which is what
 // the code did before this: 16 leaked processes were measured on the development machine, 15 of them

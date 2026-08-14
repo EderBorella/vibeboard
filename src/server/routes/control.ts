@@ -18,7 +18,7 @@ import { type AppCtx, ensureOpen } from '../route-context.js';
 
 // The two documents whose contents are EXECUTED. `CODE-QUALITY.md` carries the `gates:` commands and
 // `TESTING.md` the `smoke:` command, and both run through `/bin/sh` unsandboxed as the server's own
-// user (server/commands.ts). The other three foundation documents are prose and carry no such risk.
+// user (exec/commands.ts). The other three foundation documents are prose and carry no such risk.
 const EXECUTED = new Set(['CODE-QUALITY.md', 'TESTING.md']);
 
 // Record that an AGENT rewrote a document whose commands the server will later run, so auto-pilot can

@@ -329,7 +329,7 @@ async function dispatchRefusal(
   if (locked) return { code: 409, error: locked };
   // AND THE GATES NOBODY HAS READ. Blocking `POST /autopilot/start` alone was not enough: a loop that
   // is ALREADY running dispatches without passing through start, and the verifier re-reads
-  // foundation/CODE-QUALITY.md fresh for every card (server/verifier.ts) — so an authorised copilot
+  // foundation/CODE-QUALITY.md fresh for every card (exec/verify.ts) — so an authorised copilot
   // rewriting it mid-run had its commands executed on the next dispatch, outside the sandbox, as the
   // server's user. "The write is allowed; the execution waits" was false in exactly that window,
   // which is the window an agent is most able to reach.

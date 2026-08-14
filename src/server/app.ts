@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastify';
 import { forClient } from '../core/autopilot-state.js';
 import { DEFAULT_MAX_RUNS } from '../core/config.js';
+import { REAL_GIT } from '../exec/git-measure.js';
 import { AgentRunner } from './agent-runner.js';
 import { debugLogging } from './app-state.js';
 import { registerAuth } from './auth.js';
@@ -13,7 +14,6 @@ import { CopilotAuthority } from './copilot-authority.js';
 import { createCopilotTurns } from './copilot-turns.js';
 import { CredentialStore } from './credentials.js';
 import { DeviceStore } from './devices.js';
-import { REAL_GIT } from './git-measure.js';
 import { type Log, serverLogger, stripSecrets, withRedaction } from './logging.js';
 import {
   attachBoxes,

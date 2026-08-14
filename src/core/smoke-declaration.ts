@@ -14,7 +14,7 @@
 // was the thing preventing the bar from existing.
 //
 // AND IT GRANTS NO EXECUTION THE AGENT LACKED. The objection to an agent-chosen command string is that
-// server/commands.ts runs it through `/bin/sh` as the server's own user. But the gate commands already run
+// exec/commands.ts runs it through `/bin/sh` as the server's own user. But the gate commands already run
 // agent-written test files the same way — `npm test` executes whatever the run put in `test/`. The door to
 // host execution is open by design, through the contents rather than the string, so a validated one-line
 // string adds nothing to it. What this module refuses is the thing that would be genuinely new: any reach

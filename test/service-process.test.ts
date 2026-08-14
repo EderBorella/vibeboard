@@ -4,10 +4,10 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { beforeAll, describe, expect, it, onTestFinished } from 'vitest';
 import { IDLE_STATE } from '../src/core/autopilot-state.js';
+import { isSameGroup } from '../src/exec/process-group.js';
 import { readAutopilotState, writeAutopilotState } from '../src/server/autopilot-store.js';
 import { CredentialStore } from '../src/server/credentials.js';
 import type { Log } from '../src/server/logging.js';
-import { isSameGroup } from '../src/server/process-group.js';
 import { defaultServiceCommand, ServiceProcess } from '../src/server/service-process.js';
 import { tempDir, testTmp } from './helpers.js';
 

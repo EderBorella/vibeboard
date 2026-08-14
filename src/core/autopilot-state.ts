@@ -51,7 +51,7 @@ export interface AutopilotState {
   //
   // `foundation/CODE-QUALITY.md` and `foundation/TESTING.md` do not merely describe the gates — they
   // carry the commands, and those run through `/bin/sh` UNSANDBOXED, as the server's own user
-  // (server/commands.ts). So an agent that writes one has chosen code that will later execute outside
+  // (exec/commands.ts). So an agent that writes one has chosen code that will later execute outside
   // the confinement everything else about it is built on.
   //
   // The write is allowed; the EXECUTION waits. Auto-pilot refuses to start while this is non-empty,

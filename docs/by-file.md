@@ -49,6 +49,21 @@ this index exists for the ones whose reason lives somewhere else.
 | `types.ts` | `decisions.md` | `decision 50`, `decision 58` |
 | `verify.ts` | `decisions.md` | `decision 18`, `decision 57` |
 
+## `src/exec/` — spawns a process against the working tree
+
+Below `src/server/` and shared with it by `src/service/`, which is a separate process. That sharing is
+the reason this layer exists: running a project's gate commands and writing its git history are
+deliberate, documented trust decisions taken in the loop's OWN process, not server internals the loop
+reaches around. Putting arbitrary command execution behind an HTTP endpoint would be a far larger hole
+than it closes, so the code moved to where both callers legitimately sit. Nothing here imports
+`src/server/`.
+
+| file | pages | cites |
+|---|---|---|
+| `commands.ts` | `decisions.md`, `security/containment.md` — gate commands run unsandboxed in the loop's own process, deliberately | `decision 7`, `decision 13`, `C4` |
+| `git-measure.ts` | `decisions.md` | `S11` |
+| `process-group.ts` | `decisions.md` | `decision 13` |
+
 ## `src/server/` — the Fastify app, auth, credentials, containers, dispatch
 
 | file | pages | cites |
@@ -62,7 +77,6 @@ this index exists for the ones whose reason lives somewhere else.
 | `autopilot-store.ts` | `decisions.md` | `S13` |
 | `box-manager.ts` | `security/containment.md` — adoption by name **and** spec, and the network rules | — |
 | `box-service.ts` | `security/containment.md`, `decisions.md` | `S2` |
-| `commands.ts` | `decisions.md`, `security/containment.md` — gate commands run unsandboxed in the loop's own process, deliberately | `decision 7`, `decision 13`, `C4` |
 | `containers.ts` | `security/containment.md` — the mount set, the protected paths, the writable hole, the flags | `S1` |
 | `copilot-authority.ts` | `security/containment.md` — why a credential is redacted out of anything persisted | — |
 | `copilot-env.ts` | `security/containment.md`, `decisions.md` — per-project, per-backend state, and why | `S2` |
@@ -70,10 +84,8 @@ this index exists for the ones whose reason lives somewhere else.
 | `copilot.ts` | `security/containment.md` — the copilot shares the project's box | `S1` |
 | `credentials.ts` | `decisions.md`, `security/containment.md` — `~/.vibeboard/` is not among the mounts; `VIBEBOARD_TOKEN_FILE` is the exception | `decision 10` |
 | `devices.ts` | `security/containment.md` — why a hash is stored, and why the `token-` prefix survives its old reason | — |
-| `git-measure.ts` | `decisions.md` | `S11` |
 | `logging.ts` | `decisions.md` | `decision 20` |
 | `opencode-server.ts` | `decisions.md`, `security/containment.md` — the server is the box's main process, one box per project | `decision 12` |
-| `process-group.ts` | `decisions.md` | `decision 13` |
 | `prompt/contracts.ts` | `decisions.md` — what a run is asked to produce, and why a judging run's contract REPLACES the reporting one rather than adding to it | `decision 3`, `decision 40`, `decision 51`, `S9` |
 | `prompt/credential.ts` | `decisions.md` (`decision 10`'s scope table), `security/containment.md` — the only part of the prompt that reaches `auth.ts`. The agent's permitted endpoint list is GENERATED from that table, and `test/run-prompt.test.ts` asserts the assembled prompt's catalogue against it in both directions | — |
 | `prompt/index.ts` | `decisions.md` — the input contract, and the order the sections are assembled in; `run-prompt.ts` is the re-export barrel and holds no reasoning of its own | `decision 18`, `decision 40`, `decision 51`, `decision 55`, `decision 60`, `decision 63` |

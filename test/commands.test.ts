@@ -1,7 +1,7 @@
 import { mkdir, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { COMMAND_TIMEOUT_MS, runCommand } from '../src/server/commands.js';
+import { COMMAND_TIMEOUT_MS, runCommand } from '../src/exec/commands.js';
 import { tempDir } from './helpers.js';
 
 // The only part of verification that spawns anything, and the only part that can hang. Every claim here

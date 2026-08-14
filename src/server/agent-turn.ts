@@ -3,12 +3,12 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { INSTRUCTIONS_FILE } from '../core/layout.js';
+import { groupStartTime, terminateGroup } from '../exec/process-group.js';
 import { boxEnvFor } from './containers.js';
 import { claudeConfigDir, isolationEnabled } from './copilot-env.js';
 import { type CopilotEvent, parseCopilotLine, type ResultStats } from './copilot-events.js';
 import { errorText } from './errors.js';
 import { opencodeTurn } from './opencode-client.js';
-import { groupStartTime, terminateGroup } from './process-group.js';
 import { NOT_REQUESTED, type SandboxStatus, wrapCommand } from './sandbox.js';
 
 // ONE agent turn: build the command, run it, stream its events, report how it ended.
@@ -67,7 +67,7 @@ export interface RunningTurn {
   done: Promise<AgentTurnResult>;
   cancel: () => void;
   // The turn's own process group, and when its leader started. Recorded on the run so a LATER server
-  // can reap what this one leaves behind, and paired because pids are reused — see process-group.ts.
+  // can reap what this one leaves behind, and paired because pids are reused — see exec/process-group.ts.
   //
   // Absent for OpenCode: that backend is an HTTP request to a managed server, so a turn has no process
   // of its own. The server itself is covered by its pid file.

@@ -9,7 +9,7 @@ import {
   type GitPoint,
   gitPoint,
   parseStatus,
-} from '../src/server/git-measure.js';
+} from '../src/exec/git-measure.js';
 import { tempDir } from './helpers.js';
 
 // S11: "files-changed becomes a new RunRecord field, measured from git around each dispatch". It is a

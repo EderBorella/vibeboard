@@ -83,7 +83,7 @@ export function commandVerification(mode: VerifyMode, at: string, results: Comma
 // Why this command counts as a failure, in a sentence a person can act on. Three endings, not two: a
 // command that never STARTED reported `exited with -1`, which is not what happened and sends the reader
 // looking for an exit code that does not exist. `code: -1` is this module's own marker for "could not be
-// spawned", set where the spawn fails (server/commands.ts).
+// spawned", set where the spawn fails (exec/commands.ts).
 function commandReason(failure: CommandResult): string {
   if (failure.timedOut) return `\`${failure.command}\` was still running when it was stopped.`;
   if (failure.code === -1) return `\`${failure.command}\` could not be run at all.`;

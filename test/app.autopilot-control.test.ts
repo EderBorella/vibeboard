@@ -1,12 +1,12 @@
 import { spawn } from 'node:child_process';
 import { describe, expect, it } from 'vitest';
 import { IDLE_STATE } from '../src/core/autopilot-state.js';
+import { groupStartTime } from '../src/exec/process-group.js';
 import {
   readAutopilotState,
   updateAutopilotState,
   writeAutopilotState,
 } from '../src/server/autopilot-store.js';
-import { groupStartTime } from '../src/server/process-group.js';
 import { writeRun } from '../src/server/run-store.js';
 import { openTestProject, wsClient } from './helpers.js';
 

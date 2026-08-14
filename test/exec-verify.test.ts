@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { FOUNDATION_DIR } from '../src/core/layout.js';
 import type { CommandResult } from '../src/core/verify.js';
-import { verifyGates, verifySmoke } from '../src/server/verifier.js';
+import { verifyGates, verifySmoke } from '../src/exec/verify.js';
 import { tempDir } from './helpers.js';
 
 // Composition: the readers, the runner and the pure verdict. What is asserted here is the WIRING —

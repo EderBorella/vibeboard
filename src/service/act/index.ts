@@ -1,8 +1,8 @@
 import type { TickAction } from '../../core/actions.js';
 import type { AutopilotState } from '../../core/autopilot-state.js';
 import { phase } from '../../core/phases.js';
-import { commitAll } from '../../server/git-work.js';
-import type { verifyGates, verifySmoke } from '../../server/verifier.js';
+import { commitAll } from '../../exec/git-work.js';
+import type { verifyGates, verifySmoke } from '../../exec/verify.js';
 import type { BoardClient, DispatchRequest } from '../board-client.js';
 import type { ActResult, TickContext } from '../loop.js';
 import { stamp } from '../stamp.js';

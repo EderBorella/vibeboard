@@ -16,7 +16,7 @@ import { GROUP_GRACE_MS, terminateGroup } from './process-group.js';
 //    (decision 7), so the real sequence is agent-proposed text → explicit human approval → this shell,
 //    unsandboxed, as the server user, inheriting the server's environment. The approval gate is what
 //    carries the weight, and it is C4's to build. `opts.env` exists so a caller can narrow that
-//    environment; nothing passes it yet, and `RunOne` in verifier.ts does not offer it — worth closing
+//    environment; nothing passes it yet, and `RunOne` in verify.ts does not offer it — worth closing
 //    when C4 makes the gate real rather than pretending it is closed now.
 //
 // 2. IT NEVER THROWS. The caller is a loop, and an exception here would end the run rather than the

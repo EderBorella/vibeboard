@@ -1,6 +1,6 @@
 import type { RunRecord } from '../core/runs.js';
+import { groupStartTime, isSameGroup, terminateGroup } from '../exec/process-group.js';
 import type { Log } from './logging.js';
-import { groupStartTime, isSameGroup, terminateGroup } from './process-group.js';
 
 // Process groups recorded on disk that nothing is watching any more.
 //

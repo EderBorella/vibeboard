@@ -11,12 +11,12 @@ import {
 } from '../core/runs.js';
 import type { Skill } from '../core/skills.js';
 import type { BoardName, Card } from '../core/types.js';
+import type { GitMeasure, GitPoint } from '../exec/git-measure.js';
 import { type Backend, type RunningTurn, runAgentTurn } from './agent-turn.js';
 import type { BoxService } from './box-service.js';
 import type { ResultStats } from './copilot-events.js';
 import type { Credential, CredentialStore } from './credentials.js';
 import { errorText } from './errors.js';
-import type { GitMeasure, GitPoint } from './git-measure.js';
 import type { Log } from './logging.js';
 import { redact } from './redaction.js';
 import { type BoardColumns, buildRunPrompt, type PromptInputs } from './run-prompt.js';

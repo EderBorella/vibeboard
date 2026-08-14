@@ -14,7 +14,7 @@ import { join } from 'node:path';
 
 const [, , logPath, behaviour = 'sleep'] = process.argv;
 
-// Node exposes no getpgrp, so the group comes from /proc the same way src/server/process-group.ts reads
+// Node exposes no getpgrp, so the group comes from /proc the same way src/exec/process-group.ts reads
 // it: everything after the LAST ')', because the command field is parenthesised and may contain spaces.
 // Field 5 (pgrp) is index 2 of what is left.
 function processGroup() {

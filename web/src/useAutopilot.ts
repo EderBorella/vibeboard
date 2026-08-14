@@ -16,7 +16,17 @@ import { useSharedWs } from './ws';
 // the snapshot traffic. A dispatch takes minutes, so this is already far finer than the thing it reports.
 const COUNTER_POLL_MS = 4_000;
 
-export function useAutopilot(bump: number): {
+// `enabled` is the credential, not a preference. React runs every hook on mount, before the render
+// decides to show the sign-in screen instead of the board — so on a first visit this fetched auto-pilot
+// state with no cookie set yet and took a 401, once per load, in the browser console and the server log.
+// Harmless, because a failure here says nothing by design and `rebindOnSignIn` refetches the moment a
+// credential arrives; noisy enough to look like a real fault when reading either log.
+//
+// The SOCKET subscription is deliberately not gated: it declines to open without a credential on its own.
+export function useAutopilot(
+  bump: number,
+  enabled = true,
+): {
   state: AutopilotState | null;
   refresh: () => void;
 } {
@@ -30,6 +40,7 @@ export function useAutopilot(bump: number): {
     getAutopilotState,
     [bump, asked],
     null,
+    { enabled },
   );
 
   useEffect(

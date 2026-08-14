@@ -61,7 +61,7 @@ export function App() {
   const { snapshot, conn } = useSnapshot(bump);
   // Auto-pilot's state: the chip in the bar, and the overlay when the project is halted. From the
   // endpoint on mount and from the socket after that, so a kill in another tab raises the overlay here.
-  const autopilot = useAutopilot(bump);
+  const autopilot = useAutopilot(bump, signin.signedIn);
 
   // Copilot state lives here (not in the panel) so the transcript + socket survive
   // closing/reopening the dock. The server-side session persists regardless.
@@ -83,7 +83,7 @@ export function App() {
   const [collapsed, toggleBoard] = useCollapsedBoards();
   // Refetched on every snapshot, so a SKILL.md written by the user or an agent reaches the rail
   // without a reload.
-  const catalogue = useSkills(snapshot);
+  const catalogue = useSkills(snapshot, signin.signedIn);
   // Everything the details step needs. `choice.backend` drives the model list, so switching
   // connector in the form reloads it exactly as it does in the copilot dock.
   const dispatch = useDispatch(choice.backend, snapshot);

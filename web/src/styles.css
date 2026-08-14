@@ -23,8 +23,16 @@ body {
 .app-shell { height: 100vh; height: 100dvh; overflow: hidden; display: flex; flex-direction: column; }
 
 /* ---------- Top bar ---------- */
+/* WRAPS RATHER THAN PUSHING ITS CONTROLS OFF THE EDGE.
+   It was one non-wrapping row, so at 820px the whole right-hand group — the theme select, the settings
+   gear, Switch project and the COPILOT TOGGLE — was simply off-screen. That is circular: the copilot
+   takes half the width at that size, and the one control that would give the board its space back had
+   scrolled out of reach. Screenshotted at 820px, which is where it was found.
+   Wrapping makes this two rows when it has to be. A taller header at a narrow width is a cost; an
+   unreachable control is a dead end. */
 .topbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.75rem;
   padding: 0.55rem 1rem;
@@ -40,9 +48,20 @@ body {
   color: var(--text);
 }
 .brand::before { content: "▚ "; color: var(--accent); }
-.project-name { color: var(--muted); font-size: 0.85rem; letter-spacing: 0.02em; }
+/* Truncates rather than forcing the row to wrap. A long project name is the most likely thing to make
+   the bar overflow, and it is the least important thing on it. */
+.project-name {
+  color: var(--muted);
+  font-size: 0.85rem;
+  letter-spacing: 0.02em;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
-.topbar-right { margin-left: auto; display: flex; align-items: center; gap: 0.6rem; }
+/* `flex: 0 0 auto` so the escape hatches are the LAST thing to give way, never squeezed to nothing. */
+.topbar-right { margin-left: auto; display: flex; align-items: center; gap: 0.6rem; flex: 0 0 auto; }
 .theme-select, .switch-btn {
   background: var(--panel-2);
   color: var(--text);
@@ -182,7 +201,15 @@ body {
 
 /* ---------- Column ---------- */
 .column {
-  flex: 0 0 var(--col-w);
+  /* GROWS to share the width, never shrinks below `--col-w`.
+     It was `0 0 var(--col-w)` — fixed basis, no grow — so four columns at 288px used 1152px of
+     whatever was available and left the rest empty: ~400px of void on a 1600px viewport, and hiding
+     the copilot bought nothing because the freed space could not be taken. Screenshotted at 1600 and
+     820 before and after; that void is what the before shows.
+     `min-width` keeps the basis as a floor, so a project with many columns still overflows into a
+     horizontal scroll rather than crushing every column to unreadable slivers. */
+  flex: 1 1 var(--col-w);
+  min-width: var(--col-w);
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -573,7 +600,12 @@ body {
   color: var(--muted); cursor: pointer; font-size: 0.85rem; padding: 0 0.3rem;
 }
 .dock-collapse:hover { color: var(--accent); }
-.dock-body { height: 38vh; min-height: 0; display: flex; }
+/* SIZED BY ITS CONTENT, capped at 38vh. It was `height: 38vh` outright, so the dock reserved 38% of
+   the viewport whatever was in it — 414px of empty panel to display the words "No card open." on a
+   1000px-tall screen, while the boards above it had 471px for content needing 1438px.
+   The cap is what it always was, so a full pane is unchanged; only the empty and near-empty cases
+   give their space back. Panes scroll inside themselves, so hitting the cap still behaves. */
+.dock-body { max-height: 38vh; min-height: 0; display: flex; }
 /* Spelled out: the UA rule for [hidden] loses to the display declarations above, so a hidden pane
    would still be laid out. Both levels matter — the body when folded, a pane when another is up. */
 .dock-body[hidden], .dock-pane[hidden] { display: none; }

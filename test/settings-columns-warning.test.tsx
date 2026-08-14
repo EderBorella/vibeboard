@@ -29,7 +29,7 @@ const api = vi.hoisted(() => ({
 }));
 vi.mock('../web/src/api.js', () => api);
 
-const { SettingsModal } = await import('../web/src/components/SettingsModal.js');
+const { SettingsModal } = await import('../web/src/settings/SettingsModal.js');
 
 import type { ProjectConfig } from '../web/src/shared.js';
 

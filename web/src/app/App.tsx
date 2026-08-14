@@ -8,33 +8,33 @@ import {
   placeCard,
   resolveRunRecord,
   setLinks,
-} from './api';
-import { AutopilotBar } from './autopilot/AutopilotBar';
-import { HaltOverlay } from './autopilot/HaltOverlay';
-import { ProjectGate } from './components/ProjectGate';
-import { SettingsModal } from './components/SettingsModal';
-import { type MainTab, TopBar } from './components/TopBar';
-import { WorkArea } from './components/WorkArea';
-import { archiveCardRequest, stopRunRequest } from './confirm/requests';
-import { useConfirm } from './confirm/useConfirm';
-import { type CopilotMode, useCopilot } from './copilot/useCopilot';
-import { useCardTabs } from './dock/useCardTabs';
-import { useDock } from './dock/useDock';
-import { useDispatch } from './runs/useDispatch';
-import { useRuns } from './runs/useRuns';
-import { needsAttention } from './runs/viewmodel';
-import { BOARDS, type BoardName, type Card, type CardFrontmatterPatch } from './shared';
+} from '../api';
+import { AutopilotBar } from '../autopilot/AutopilotBar';
+import { HaltOverlay } from '../autopilot/HaltOverlay';
+import { archiveCardRequest, stopRunRequest } from '../confirm/requests';
+import { useConfirm } from '../confirm/useConfirm';
+import { type CopilotMode, useCopilot } from '../copilot/useCopilot';
+import { useCardTabs } from '../dock/useCardTabs';
+import { useDock } from '../dock/useDock';
+import { useDispatch } from '../runs/useDispatch';
+import { useRuns } from '../runs/useRuns';
+import { needsAttention } from '../runs/viewmodel';
+import { SettingsModal } from '../settings/SettingsModal';
+import { BOARDS, type BoardName, type Card, type CardFrontmatterPatch } from '../shared';
+import { ApprovalPrompt } from '../signin/ApprovalPrompt';
+import { SignIn } from '../signin/SignIn';
+import { useSkills } from '../skills/useSkills';
+import { useAutopilot } from '../useAutopilot';
+import { useCopilotChoice } from '../useCopilotChoice';
+import { useCollapsedBoards, useTheme } from '../useLocalPrefs';
+import { usePendingSignins } from '../usePendingSignins';
+import { useSignin } from '../useSignin';
+import { useSnapshot } from '../useSnapshot';
+import { canPlace, presentTags, tagCounts, toggleTag } from '../viewmodel';
+import { ProjectGate } from './ProjectGate';
 import { chooseContent, rebindOnSignIn } from './shell';
-import { ApprovalPrompt } from './signin/ApprovalPrompt';
-import { SignIn } from './signin/SignIn';
-import { useSkills } from './skills/useSkills';
-import { useAutopilot } from './useAutopilot';
-import { useCopilotChoice } from './useCopilotChoice';
-import { useCollapsedBoards, useTheme } from './useLocalPrefs';
-import { usePendingSignins } from './usePendingSignins';
-import { useSignin } from './useSignin';
-import { useSnapshot } from './useSnapshot';
-import { canPlace, presentTags, tagCounts, toggleTag } from './viewmodel';
+import { type MainTab, TopBar } from './TopBar';
+import { WorkArea } from './WorkArea';
 
 export function App() {
   const [bump, setBump] = useState(0);

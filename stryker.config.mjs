@@ -137,7 +137,7 @@ export default {
     'web/src/cards/CardsPane.tsx',
     'web/src/cards/CardsBody.tsx',
     'web/src/board/BoardsView.tsx',
-    'web/src/components/WorkArea.tsx',
+    'web/src/app/WorkArea.tsx',
     'web/src/runs/ActiveReport.tsx',
     'web/src/skills/CardSkills.tsx',
     'web/src/runs/DispatchPane.tsx',
@@ -155,7 +155,7 @@ export default {
     'web/src/models/model-filter.ts',
     'web/src/models/model-format.ts',
     'web/src/board/TagFilter.tsx',
-    'web/src/components/TopBar.tsx',
+    'web/src/app/TopBar.tsx',
   ],
 
   // perTest runs only the tests that actually cover each mutant, which is what keeps this in

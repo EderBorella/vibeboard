@@ -9,7 +9,7 @@ const api = vi.hoisted(() => ({
 vi.mock('../web/src/api.js', () => api);
 vi.mock('../web/src/api', () => api);
 
-const { ResourcesEditor } = await import('../web/src/components/ResourcesEditor.js');
+const { ResourcesEditor } = await import('../web/src/control/ResourcesEditor.js');
 
 afterEach(() => {
   cleanup();

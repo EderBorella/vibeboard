@@ -4,8 +4,8 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { STOP_REASONS } from '../src/core/dispatch-gate.js';
 import type { AutopilotState } from '../web/src/api.js';
-import type { MainTab } from '../web/src/components/TopBar.js';
-import { TopBar } from '../web/src/components/TopBar.js';
+import type { MainTab } from '../web/src/app/TopBar.js';
+import { TopBar } from '../web/src/app/TopBar.js';
 
 afterEach(cleanup);
 

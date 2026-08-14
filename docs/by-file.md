@@ -189,8 +189,8 @@ given. **`copilot/` is the chat**, and the model catalogue its picker offers. **
 | `diary/DiaryView.tsx` | `decisions.md` | `decision 48` |
 | `runs/ExecutionView.tsx` | `decisions.md` | `S10` |
 | `autopilot/HaltOverlay.tsx` | `decisions.md` | `decision 12` |
-| `components/SandboxPanel.tsx` | `security/containment.md` — it renders what is confining agents | — |
-| `components/SettingsModal.tsx` | `decisions.md` | `decision 52` |
+| `settings/SandboxPanel.tsx` | `security/containment.md` — it renders what is confining agents | — |
+| `settings/SettingsModal.tsx` | `decisions.md` | `decision 52` |
 | `suggestions/SuggestionsPane.tsx` | `decisions.md` | `decision 48`, `decision 49` |
 
 ## Repository configuration

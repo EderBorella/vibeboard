@@ -1,6 +1,7 @@
 import type { DispatchRequest, InvalidSkill, ModelOption, RunList, RunRecord, Skill } from '../api';
 import { BoardsView } from '../board/BoardsView';
 import { CardsPane } from '../cards/CardsPane';
+import { ProjectControl } from '../control/ProjectControl';
 import { CopilotPanel } from '../copilot/CopilotPanel';
 import type { useCopilot } from '../copilot/useCopilot';
 import { DiaryView } from '../diary/DiaryView';
@@ -15,7 +16,6 @@ import { DEFAULT_CONTEXT_BUDGET } from '../shared';
 import { SuggestionsPane } from '../suggestions/SuggestionsPane';
 import { useSuggestions } from '../suggestions/useSuggestions';
 import type { TagCount } from '../viewmodel';
-import { ProjectControl } from './ProjectControl';
 import type { MainTab } from './TopBar';
 
 // Grouped rather than spread across twenty loose props: each of these is one concern the work area

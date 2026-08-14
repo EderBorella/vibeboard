@@ -13,7 +13,7 @@ const api = vi.hoisted(() => ({
   setDebugLog: vi.fn(),
 }));
 vi.mock('../web/src/api.js', () => api);
-const { DiagnosticsPanel } = await import('../web/src/components/DiagnosticsPanel.js');
+const { DiagnosticsPanel } = await import('../web/src/settings/DiagnosticsPanel.js');
 
 afterEach(cleanup);
 beforeEach(() => {

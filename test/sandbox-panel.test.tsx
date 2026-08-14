@@ -8,7 +8,7 @@ const api = vi.hoisted(() => ({
 }));
 vi.mock('../web/src/api.js', () => api);
 
-const { SandboxPanel } = await import('../web/src/components/SandboxPanel.js');
+const { SandboxPanel } = await import('../web/src/settings/SandboxPanel.js');
 
 import type { SandboxState } from '../web/src/api.js';
 

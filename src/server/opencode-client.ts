@@ -21,7 +21,7 @@ interface OcPart {
 // Only `name` and `data.message` are read for the transcript; the rest of whatever the provider sent
 // is kept, because that is the part worth logging — a bare "Streaming response failed" is not a
 // diagnosis. Indexed rather than closed: the shape differs per provider and per failure.
-export interface OcError {
+interface OcError {
   name?: string;
   message?: string;
   data?: { message?: string } & Record<string, unknown>;
@@ -41,7 +41,7 @@ interface OcMessageResponse {
   parts?: OcPart[];
 }
 
-export interface MessageEvents {
+interface MessageEvents {
   events: CopilotEvent[];
   // Threaded out rather than logged here: this function is pure and has no logger, and the caller
   // that does (opencodeTurn) is one frame up. Everything but the message used to die on this line.

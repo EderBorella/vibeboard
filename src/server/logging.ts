@@ -14,7 +14,7 @@ import type { FastifyRequest, FastifyServerOptions } from 'fastify';
 // a board project's folder is the user's content, not ours to write app logs into.
 
 export const LOG_LEVELS = ['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'] as const;
-export type LogLevel = (typeof LOG_LEVELS)[number];
+type LogLevel = (typeof LOG_LEVELS)[number];
 export const DEFAULT_LOG_LEVEL: LogLevel = 'info';
 export const DEFAULT_LOG_KEEP = 14;
 
@@ -89,7 +89,7 @@ export function pruneLogs(dir: string, keep: number): string[] {
   return stale;
 }
 
-export interface ServerLogger {
+interface ServerLogger {
   options: FastifyServerOptions['logger'];
   /** Where the lines are going, when that is a file. Reported in the startup banner. */
   file?: string;

@@ -136,7 +136,7 @@ export function capStartupLog(out: string, chunk: string): string {
 // before the container exists, so the OS cannot be the one to choose it — but the HOST port still is:
 // `-p 127.0.0.1::4096` lets docker pick, and a fixed host port would collide the moment two projects
 // were open.
-export const OPENCODE_CONTAINER_PORT = 4096;
+const OPENCODE_CONTAINER_PORT = 4096;
 
 // How long to wait for `opencode serve` to answer inside a fresh box. Generous: this covers a cold
 // container start as well as the server's own boot.

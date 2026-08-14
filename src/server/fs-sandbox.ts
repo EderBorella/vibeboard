@@ -5,7 +5,7 @@ import { dirname, relative, resolve, sep } from 'node:path';
 // allow-listed documents and the Explorer's whole-project tree. Deliberately one copy — two copies
 // of a check like this drift, and the one that drifts is the one nobody re-reads.
 
-export interface ResolvedPath {
+interface ResolvedPath {
   abs: string;
   rel: string; // normalised, root-relative, POSIX
 }
@@ -21,7 +21,7 @@ export function normaliseRel(rel: unknown): string | null {
   return parts.join('/');
 }
 
-export interface ResolveOptions {
+interface ResolveOptions {
   // Act on the project root itself. Off by default: reading or removing the root is never what a
   // caller meant unless it says so.
   allowRoot?: boolean;

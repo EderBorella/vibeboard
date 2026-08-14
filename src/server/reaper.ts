@@ -13,7 +13,7 @@ import type { Log } from './logging.js';
 // else entirely by now, and killing a stranger's process group would be far worse than leaving the
 // orphan alone. Nothing is signalled unless the group can be shown to be the one recorded.
 
-export interface ReapTarget {
+interface ReapTarget {
   pgid: number;
   // When the group's leader started. Its ABSENCE is a real case — a record written before this field
   // existed, or a platform where /proc could not be read — and it is treated as "cannot be
@@ -22,7 +22,7 @@ export interface ReapTarget {
   what: string; // for the log line: nothing should be killed anonymously
 }
 
-export interface ReapDeps {
+interface ReapDeps {
   // Injected so the decision is testable without spawning fifteen processes. The defaults are the
   // real thing, so a caller that passes nothing behaves in production.
   isSame?: (pgid: number, started: number) => boolean;
@@ -31,7 +31,7 @@ export interface ReapDeps {
   log?: Log;
 }
 
-export interface ReapResult {
+interface ReapResult {
   reaped: number;
   skipped: number;
 }

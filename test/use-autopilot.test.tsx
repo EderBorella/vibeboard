@@ -156,3 +156,71 @@ describe('useAutopilot', () => {
     }
   });
 });
+
+// THE CREDENTIAL GATE, which had no test at all until a review said so. React runs every hook on mount,
+// before the render decides to show the sign-in screen instead of the board — so without this the hook
+// asked for auto-pilot state with no cookie set and took a 401 on every first load.
+describe('the credential gate', () => {
+  beforeEach(() => {
+    api.getAutopilotState.mockReset();
+  });
+
+  it('asks nothing while disabled', async () => {
+    api.getAutopilotState.mockResolvedValue({ state: 'idle', iteration: 0 });
+    renderHook(() => useAutopilot(0, false));
+    // A short wait rather than an immediate assertion: the fetch is in an effect, so "did not happen"
+    // has to survive the effect actually running.
+    await new Promise((r) => setTimeout(r, 50));
+    expect(api.getAutopilotState).not.toHaveBeenCalled();
+  });
+
+  it('asks as soon as it is enabled, without remounting', async () => {
+    api.getAutopilotState.mockResolvedValue({ state: 'idle', iteration: 0 });
+    const { rerender } = renderHook(({ on }) => useAutopilot(0, on), {
+      initialProps: { on: false },
+    });
+    await new Promise((r) => setTimeout(r, 50));
+    expect(api.getAutopilotState).not.toHaveBeenCalled();
+    rerender({ on: true });
+    await waitFor(() => expect(api.getAutopilotState).toHaveBeenCalled());
+  });
+
+  it('defaults to enabled, so every existing caller is unaffected', async () => {
+    api.getAutopilotState.mockResolvedValue({ state: 'idle', iteration: 0 });
+    renderHook(() => useAutopilot(0));
+    await waitFor(() => expect(api.getAutopilotState).toHaveBeenCalled());
+  });
+
+  // THE HALF THAT MATTERED, and the review had to reason it because no fixture could produce it: the
+  // 4-second counter poll is a separate effect keyed on `state.state === 'running'`. `onDisabled: 'keep'`
+  // retains the last state when the credential goes — deliberately, so nothing flickers — so the poll
+  // kept firing every four seconds from the sign-in screen, 401ing each time. Once per four seconds
+  // forever is worse than the once-per-load this flag was added to remove.
+  it('stops the counter poll when the credential goes, not just the first fetch', async () => {
+    vi.useFakeTimers();
+    try {
+      api.getAutopilotState.mockResolvedValue({ state: 'running', iteration: 3 });
+      const { rerender } = renderHook(({ on }) => useAutopilot(0, on), {
+        initialProps: { on: true },
+      });
+      // Let the first fetch land so the hook is holding `running` — which is what arms the poll.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(10);
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(9_000);
+      });
+      const whileEnabled = api.getAutopilotState.mock.calls.length;
+      expect(whileEnabled).toBeGreaterThan(1); // the poll is genuinely running
+
+      rerender({ on: false });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(20_000);
+      });
+      // Not "fewer calls" — NONE. Five poll intervals passed with no credential.
+      expect(api.getAutopilotState.mock.calls.length).toBe(whileEnabled);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});

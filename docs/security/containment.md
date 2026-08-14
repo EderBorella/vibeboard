@@ -159,11 +159,34 @@ enforces scope; it is not the same as isolation.
   real improvement on the profile era, where all of `~/.claude/` was writable by any agent — but it
   is one file, not zero.
 - **The network boundary is not exfiltration control.** The box reaches the internet (it has to, to
-  reach the model) and is blocked from RFC 1918 and link-local addresses, so it cannot reach the
-  unauthenticated services on this machine or the rest of the LAN. Nothing at this layer stops an
-  agent sending code somewhere.
+  reach the model) and cannot OPEN a connection to RFC 1918 or link-local addresses, so it cannot
+  reach the unauthenticated services on this machine or the rest of the LAN. Nothing at this layer
+  stops an agent sending code somewhere.
+- **One exemption, and it is narrow.** A box may send a TCP packet to a private address when it is a
+  reply, from the published OpenCode port, on a flow something outside started
+  (`--sport 4096 --ctstate ESTABLISHED --ctdir REPLY`). Without it the box could not answer the
+  server's own request on the port Docker published for it, and the OpenCode model list came back
+  empty. `--ctdir REPLY` is what keeps this from covering a flow the AGENT opened, and `--sport`
+  is what keeps it from covering a port the agent chose.
+- **There is a window before the rules land, and this is the reason for `--ctdir`.** `docker run -d`
+  returns once the container exists, so the box's PID 1 is already executing when the rules are
+  installed 0.12–0.14s later — longer on a cold or loaded machine. A flow opened in that window is
+  ESTABLISHED, and conntrack would hold it for days. An earlier version of the exemption matched
+  ESTABLISHED in either direction and so kept such a flow alive; the reject-only rules that preceded
+  it severed one. The real fix is to install the rules before the box's command can send a packet,
+  which is not what happens today.
+- **A published port is not the box's whole inbound surface.** `-p 127.0.0.1::4096` maps a host
+  loopback port. The container's own address stays reachable on every port from the host and from
+  every container on the same bridge, so what an agent chooses to LISTEN on matters. The rejects give
+  it no way to answer, which is why the exemption above is scoped to one port rather than to
+  established flows in general.
 - **The rules are IPv4 only.** `ip6tables` is never invoked; Docker ships IPv6 off by default, so
   this is latent rather than live.
+- **A box's identity does not include its firewall.** `specDigest` covers image, mounts, env, publish
+  and command — not the rule script — and rules are applied only on create and on start-from-stopped.
+  A running box adopted mid-session keeps whatever rules it was born with. Today `sweepOldBoxes`
+  destroys every labelled box at startup, which hides this; that coupling is load-bearing and
+  untested, and it is what would silently swallow the next tightening of these rules.
 - **A container is not a VM.** Genuinely untrusted code wants stronger isolation than this.
 
 ### Why the two-level design is safe

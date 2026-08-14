@@ -49,12 +49,17 @@ body {
 }
 .brand::before { content: "▚ "; color: var(--accent); }
 /* Truncates rather than forcing the row to wrap. A long project name is the most likely thing to make
-   the bar overflow, and it is the least important thing on it. */
+   the bar overflow, and it is the least important thing on it.
+   `max-width` is what makes that true, and the first version omitted it: measured with a 240-character
+   name at 1100px, the name truncated AND the bar still grew from 85px to 105px, because nothing stopped
+   it claiming 1068 of the 1100 first. `flex-wrap` resolves before shrinking, so without a cap the two
+   changes in that commit worked against each other. */
 .project-name {
   color: var(--muted);
   font-size: 0.85rem;
   letter-spacing: 0.02em;
   min-width: 0;
+  max-width: 22ch;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

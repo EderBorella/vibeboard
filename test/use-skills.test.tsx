@@ -102,3 +102,30 @@ describe('useSkills', () => {
     expect(result.current).toEqual({ skills: [], invalid: [] });
   });
 });
+
+// THE CREDENTIAL GATE. Same reason as useAutopilot: hooks run on mount before the render chooses the
+// sign-in screen, so this asked for the catalogue with no cookie and took a 401 on every first load.
+// A disabled fetch KEEPS the last catalogue rather than clearing it — an empty rail reads as "this
+// project has no skills", which is the lie the hook's own comment exists to prevent.
+describe('the credential gate', () => {
+  it('asks nothing while disabled, and keeps what it already had', async () => {
+    api.listSkills.mockResolvedValue({ skills: [{ slug: 'implement' }], invalid: [] });
+    const { result, rerender } = renderHook(({ on }) => useSkills(1, on), {
+      initialProps: { on: true },
+    });
+    await waitFor(() => expect(result.current.skills).toHaveLength(1));
+    const asked = api.listSkills.mock.calls.length;
+
+    rerender({ on: false });
+    await new Promise((r) => setTimeout(r, 50));
+    expect(api.listSkills.mock.calls.length).toBe(asked);
+    // Kept, not cleared.
+    expect(result.current.skills).toHaveLength(1);
+  });
+
+  it('defaults to enabled, so every existing caller is unaffected', async () => {
+    api.listSkills.mockResolvedValue({ skills: [], invalid: [] });
+    renderHook(() => useSkills(2));
+    await waitFor(() => expect(api.listSkills).toHaveBeenCalled());
+  });
+});

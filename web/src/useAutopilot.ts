@@ -22,6 +22,11 @@ const COUNTER_POLL_MS = 4_000;
 // Harmless, because a failure here says nothing by design and `rebindOnSignIn` refetches the moment a
 // credential arrives; noisy enough to look like a real fault when reading either log.
 //
+// THIS CLOSES TWO HOOKS, NOT THE CLASS. `/api/models`, `/api/control/files` and `/api/runs` still fire on
+// a first paint from hooks mounted the same way. The fix for all of them is one guard at the `request()`
+// chokepoint, which would make every real-module test throw without fetching under jsdom, where no hint
+// cookie exists — so it needs its own change and its own test updates rather than riding along here.
+//
 // The SOCKET subscription is deliberately not gated: it declines to open without a credential on its own.
 export function useAutopilot(
   bump: number,
@@ -59,8 +64,14 @@ export function useAutopilot(
   //
   // Every other state change still arrives on the socket; this exists for the counter alone, which is why
   // it stops the moment the run does.
+  // GATED TOO, and this is the half that mattered. `onDisabled: 'keep'` retains the last state when the
+  // credential goes — deliberately, so nothing flickers — which means `state.state` stays `'running'` and
+  // this interval kept calling every four seconds from the sign-in screen, 401ing each time. That is the
+  // noise the `enabled` flag was added to remove, in its worst form: once per four seconds forever rather
+  // than once per load. Found by review; it needs a project that was running at the moment the credential
+  // was lost, which is why no fixture caught it.
   useEffect(() => {
-    if (state?.state !== 'running') return;
+    if (!enabled || state?.state !== 'running') return;
     const timer = setInterval(() => {
       getAutopilotState()
         .then(setState)
@@ -71,7 +82,7 @@ export function useAutopilot(
     return () => clearInterval(timer);
     // `setState` is the setter from `useFetched`, and a useState setter's identity is stable — it is
     // in the list to satisfy the exhaustive-dependency check, not because it can change.
-  }, [state?.state, setState]);
+  }, [enabled, state?.state, setState]);
 
   // For the controls: they already receive the new state in their response, but a refresh keeps this
   // hook the single place the answer comes from rather than two paths that can disagree.

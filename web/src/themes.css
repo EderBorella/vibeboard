@@ -54,9 +54,11 @@
  * only as a fill), the amber failed on both panels, and the border was invisible against the ground.
  * Worst ratio now 1.55 on borders, which only have to be visible, and no text pair below 4.55.
  *
- * The blue therefore reads mid-tone rather than baby-pastel: it has to clear 4.5 as ink on beige AND
- * carry white on top of it as a fill. The pastel lives in the GROUND and the wash instead, which is
- * where it can be soft without costing legibility.
+ * The green therefore reads mid-tone rather than baby-pastel: it has to clear 4.5 as ink on beige AND
+ * carry white on top of it as a fill. Nine candidates were measured and #2f7a50 is the LIGHTEST that
+ * clears both — a true baby green tops out around 3.0 as text, which is unreadable at the sizes this
+ * token is used at. The pastel lives in the GROUND and the wash instead, where it can be as soft as it
+ * likes without costing legibility.
  */
 :root[data-theme="marshmallow"] {
   --bg: #f6f1e7;            /* warm beige paper */
@@ -65,7 +67,7 @@
   --border: #cfc3ad;
   --text: #3b3833;          /* warm ink, not black — black on beige reads as a scan of a document */
   --muted: #746d60;
-  --accent: #256b8c;        /* light-blue family, dark enough to be text */
+  --accent: #2f7a50;        /* green, and the LIGHTEST one that still reads as text — see below */
   --accent-2: #8a6420;      /* warm ochre, the beige's own accent rather than a second hue */
   --on-accent: #ffffff;
   --danger: #c0392f;
@@ -75,10 +77,11 @@
   --ok: #1f7a3d;
   /* No glow: a halo on a light ground reads as a smudge rather than as light. */
   --glow: none;
-  /* Signature: the pastel, kept where it cannot hurt reading — a blue haze at the top left and a
-     marshmallow pink at the bottom right, both barely there. */
+  /* Signature: the pastel, kept where it cannot hurt reading — a baby-green haze at the top left and a
+     marshmallow pink at the bottom right, both barely there. This is where the soft green actually
+     lives; the accent above only borrows its hue. */
   --wash:
-    radial-gradient(1100px 460px at 12% -12%, rgba(122, 176, 209, 0.22), transparent 60%),
+    radial-gradient(1100px 460px at 12% -12%, rgba(154, 208, 170, 0.26), transparent 60%),
     radial-gradient(900px 460px at 104% 112%, rgba(226, 178, 178, 0.20), transparent 55%);
   --scan: none;
 }

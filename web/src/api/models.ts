@@ -16,7 +16,6 @@ export interface ModelOption {
   promptPerM?: number;
   completionPerM?: number;
   contextLength?: number;
-  outputLimit?: number;
   caps?: ModelCaps;
 }
 

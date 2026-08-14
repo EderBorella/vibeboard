@@ -18,7 +18,6 @@ export interface ModelOption {
   promptPerM?: number; // USD per 1M input tokens
   completionPerM?: number; // USD per 1M output tokens
   contextLength?: number; // max context tokens
-  outputLimit?: number; // max output tokens
   caps?: ModelCaps;
 }
 
@@ -148,7 +147,6 @@ function optionFromDef(id: string, m: OcModelDef): ModelOption {
     promptPerM: cost.input,
     completionPerM: cost.output,
     contextLength: m.limit?.context,
-    outputLimit: m.limit?.output,
     caps: {
       toolCall: cap.toolcall,
       reasoning: cap.reasoning,

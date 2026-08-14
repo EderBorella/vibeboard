@@ -12,13 +12,12 @@ import {
   attachedOpencodeUrl,
   attachOpencodeLogger,
   attachProjectRoot,
-  attachSandbox,
   opencodeBaseUrl,
   opencodeDirectory,
   restartOpencodeServer,
   stopOpencodeServer,
 } from '../src/server/opencode-server.js';
-import { agentRefusal, NOT_REQUESTED } from '../src/server/sandbox.js';
+import { agentRefusal } from '../src/server/sandbox.js';
 import { testTmp } from './helpers.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -74,7 +73,6 @@ const saved = new Map(ENV_KEYS.map((k) => [k, process.env[k]]));
 
 afterEach(() => {
   stopOpencodeServer();
-  attachSandbox(NOT_REQUESTED);
   attachBoxes(undefined);
   delete process.env.VIBEBOARD_FAKE_DOCKER_LOGS;
   stub?.close();

@@ -168,16 +168,3 @@ export async function applyColumnPlan(
     if (await folderExists(dir(r.from))) await rename(dir(r.from), dir(r.to));
   }
 }
-
-// Plan and apply in one step, for callers with nothing to decide in between.
-export async function reconcileColumns(
-  projectRoot: string,
-  board: BoardName,
-  oldNames: string[],
-  newNames: string[],
-): Promise<ReconcileResult> {
-  const plan = await planColumnChanges(projectRoot, board, oldNames, newNames);
-  if (isRefused(plan)) return plan;
-  await applyColumnPlan(projectRoot, board, plan);
-  return plan;
-}

@@ -5,7 +5,7 @@ import { findCard } from '../src/core/find.js';
 import { boardRel } from '../src/core/layout.js';
 import type { Card, ProjectConfig } from '../src/core/types.js';
 import { boardColumnSlugs, readBoard } from '../src/store/cards/board.js';
-import { boardOfId, createLinkedCard, setCardLinks } from '../src/store/cards/links.js';
+import { createLinkedCard, setCardLinks } from '../src/store/cards/links.js';
 import { type CreateCardInput, createCard } from '../src/store/cards/mutations.js';
 import { readConfig } from '../src/store/project/config.js';
 import { scaffoldProject } from '../src/store/project/scaffold.js';
@@ -27,14 +27,6 @@ async function fixture(): Promise<{ root: string; config: ProjectConfig; engColu
   const config = await readConfig(root);
   return { root, config, engColumn: boardColumnSlugs(config, 'engineering')[0] };
 }
-
-describe('boardOfId', () => {
-  it('maps id prefixes to boards', () => {
-    expect(boardOfId('F-001')).toBe('features');
-    expect(boardOfId('P-003')).toBe('product');
-    expect(boardOfId('E-012')).toBe('engineering');
-  });
-});
 
 describe('setCardLinks (symmetric)', () => {
   it('links two product cards on both sides', async () => {

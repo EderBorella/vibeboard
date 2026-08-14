@@ -3,7 +3,6 @@ import { mkdtempSync } from 'node:fs';
 import { mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import type { FastifyInstance, FastifyServerOptions } from 'fastify';
 import { onTestFinished } from 'vitest';
 import WebSocket from 'ws';
@@ -86,15 +85,6 @@ export const TEST_ADMIN_TOKEN = 'test-admin-token';
 // What is deliberately NOT simulated is the isolation itself. That is checked against a real
 // container in test/box-integration.test.ts, which skips when docker or the image is absent.
 export const TEST_SANDBOX: SandboxStatus = { ok: true, image: 'vibeboard-agent:test' };
-
-// The path to the stand-in, resolved from this file so it survives whatever the cwd is.
-export const FAKE_DOCKER = fileURLToPath(new URL('./fake-docker.mjs', import.meta.url));
-
-// Point the whole process at it. Called from the suite's setup file, once, rather than per test —
-// process-wide state set in a beforeEach races every other file sharing the worker.
-export function useFakeDocker(): void {
-  process.env.VIBEBOARD_DOCKER_BIN = FAKE_DOCKER;
-}
 
 // A BoxService whose docker is the stand-in: `ensure` answers with a real box name, computed the real
 // way, without a daemon. Tests that dispatch an agent pass this alongside TEST_SANDBOX.

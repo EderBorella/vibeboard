@@ -21,7 +21,6 @@ import {
   attachHaltGate,
   attachOpencodeLogger,
   attachProjectRoot,
-  attachSandbox,
   stopOpencodeServer,
 } from './opencode-server.js';
 import { groupsOf, reapGroups } from './reaper.js';
@@ -124,8 +123,6 @@ export function buildApp(
   // Same reason for the OpenCode backend: the spawned `opencode serve` and the turns that run
   // through it are module singletons, and both only speak with no request in flight.
   attachOpencodeLogger(log.child({ component: 'opencode' }));
-  // Same singleton, same reason: the managed server is spawned lazily, long after this runs.
-  attachSandbox(opts.sandbox ?? NOT_REQUESTED);
   // The managed OpenCode server runs INSIDE a box, so the singleton needs one to start it in.
   attachBoxes(opts.boxes);
   // Which project's box. The singleton outlives any one project, so this is read per start.

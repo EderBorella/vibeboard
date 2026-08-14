@@ -6,7 +6,6 @@ import type { BoxService } from './box-service.js';
 import { dockerBin, WORK_DIR } from './containers.js';
 import { isolationEnabled, opencodeConfigHome } from './copilot-env.js';
 import type { Log } from './logging.js';
-import { NOT_REQUESTED, type SandboxStatus } from './sandbox.js';
 
 // A single managed `opencode serve` process, started lazily and reused for every turn.
 // We talk to it over HTTP (see opencode-client) — `opencode run` per turn hangs at init on
@@ -20,13 +19,6 @@ function opencodeBin(): string {
 let child: ChildProcess | undefined;
 let urlPromise: Promise<string> | undefined;
 let log: Log | undefined;
-// Kept for `attachSandbox`, which the composition root still calls and tests still assert on. The
-// unboxed spawn below no longer reads it: confinement is the box now, and a spawn with no box is not
-// confined at all — saying so plainly beats a variable that implies otherwise.
-let sandbox: SandboxStatus = NOT_REQUESTED;
-export function opencodeSandbox(): SandboxStatus {
-  return sandbox;
-}
 let boxes: BoxService | undefined;
 // The `docker logs -f` follower for the boxed server, so it can be replaced on restart and stopped
 // on shutdown rather than outliving the thing it is reading.
@@ -40,20 +32,13 @@ let projectRoot: () => string = () => process.cwd();
 // process-wide singleton and the answer changes while it runs.
 let halted: () => boolean = () => false;
 
-// Set by buildApp, alongside the logger and for the same reason: this server is a process-wide
-// singleton started lazily, long after the app was built.
-//
-// CORRECTED 2026-08-09. This used to say "one confinement covers every run in every project it
-// serves … switching projects needs no restart", which was true of the AppArmor profile (globs, not
-// paths) and is now false in a way that caused a real bug: containment is a container per project,
-// and the server's URL points into ONE of them. `opencodeBaseUrl` keys its cache by project for
-// exactly that reason.
-export function attachSandbox(status: SandboxStatus): void {
-  sandbox = status;
-}
-
 // The box the managed server runs INSIDE. Unlike Claude, this backend is not a command to wrap: it is
 // a long-lived server, so containment here is lifecycle and port discovery rather than an exec prefix.
+//
+// There is no companion `attachSandbox`: confinement here IS the box. A `SandboxStatus` was pushed in
+// alongside it until 2026-08-14, but nothing had read it since the boxed spawn replaced the unboxed
+// one, so it described a guarantee this module no longer made. `agentRefusal` in sandbox.ts is the
+// gate that reads the status, and it is called before any agent starts.
 export function attachBoxes(next: BoxService | undefined): void {
   boxes = next;
 }

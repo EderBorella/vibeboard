@@ -40,7 +40,6 @@ describe('modelsFromProvider', () => {
         promptPerM: 0.14,
         completionPerM: 0.28,
         contextLength: 1000000,
-        outputLimit: 384000,
         caps: { toolCall: true, reasoning: true, vision: false, attachment: false },
       },
     ]);

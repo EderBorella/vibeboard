@@ -2,8 +2,30 @@ import { mkdir, readdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { ARCHIVE_SLUG, boardRel } from '../src/core/layout.js';
-import { reconcileColumns, validateColumns } from '../src/store/cards/columns.js';
+import type { BoardName } from '../src/core/types.js';
+import {
+  applyColumnPlan,
+  isRefused,
+  planColumnChanges,
+  validateColumns,
+} from '../src/store/cards/columns.js';
 import { tempDir } from './helpers.js';
+
+// The module deliberately exposes planning and applying separately, because the only production
+// caller (routes/config.ts) plans every board, decides, and only then moves a folder. These cases
+// are about what a plan does to the disk, so they need both halves; this is the single-board slice
+// of that same sequence, kept here rather than in the module so no caller can skip the decision.
+async function planAndApply(
+  root: string,
+  board: BoardName,
+  oldNames: string[],
+  newNames: string[],
+): Promise<{ renamed: { from: string; to: string }[] } | { error: string }> {
+  const plan = await planColumnChanges(root, board, oldNames, newNames);
+  if (isRefused(plan)) return plan;
+  await applyColumnPlan(root, board, plan);
+  return plan;
+}
 
 async function board(root: string, slugs: string[], cards: Record<string, string[]> = {}): Promise<void> {
   for (const slug of [...slugs, ARCHIVE_SLUG]) {
@@ -47,12 +69,12 @@ describe('validateColumns', () => {
   });
 });
 
-describe('reconcileColumns — rename', () => {
+describe('planning and applying a column change — rename', () => {
   it('renames the folder so cards follow the column', async () => {
     const root = await tempDir();
     await board(root, ['backlog', 'todo', 'done'], { todo: ['P-001', 'P-002'] });
 
-    const result = await reconcileColumns(
+    const result = await planAndApply(
       root,
       'product',
       ['Backlog', 'Todo', 'Done'],
@@ -67,7 +89,7 @@ describe('reconcileColumns — rename', () => {
   it('handles two renames at once', async () => {
     const root = await tempDir();
     await board(root, ['todo', 'done'], { todo: ['P-001'] });
-    const result = await reconcileColumns(root, 'product', ['Todo', 'Done'], ['Next', 'Shipped']);
+    const result = await planAndApply(root, 'product', ['Todo', 'Done'], ['Next', 'Shipped']);
     expect(result).toEqual({
       renamed: [
         { from: 'todo', to: 'next' },
@@ -80,7 +102,7 @@ describe('reconcileColumns — rename', () => {
   it('is a no-op when nothing changed', async () => {
     const root = await tempDir();
     await board(root, ['todo', 'done']);
-    expect(await reconcileColumns(root, 'product', ['Todo', 'Done'], ['Todo', 'Done'])).toEqual({
+    expect(await planAndApply(root, 'product', ['Todo', 'Done'], ['Todo', 'Done'])).toEqual({
       renamed: [],
     });
   });
@@ -88,7 +110,7 @@ describe('reconcileColumns — rename', () => {
   it('treats an identical set in a new order as a pure reorder — no folder touched', async () => {
     const root = await tempDir();
     await board(root, ['backlog', 'todo'], { todo: ['P-001'] });
-    const result = await reconcileColumns(root, 'product', ['Backlog', 'Todo'], ['Todo', 'Backlog']);
+    const result = await planAndApply(root, 'product', ['Backlog', 'Todo'], ['Todo', 'Backlog']);
     expect(result).toEqual({ renamed: [] });
     expect(await dirs(root)).toEqual(['archive', 'backlog', 'todo']);
     expect(await readdir(join(root, boardRel('product', 'todo')))).toEqual(['P-001.md']);
@@ -98,30 +120,30 @@ describe('reconcileColumns — rename', () => {
     const root = await tempDir();
     await board(root, ['backlog', 'todo'], { todo: ['P-001'] });
     // Todo -> Next AND the two swapped position: intent is ambiguous.
-    const result = await reconcileColumns(root, 'product', ['Backlog', 'Todo'], ['Next', 'Backlog']);
+    const result = await planAndApply(root, 'product', ['Backlog', 'Todo'], ['Next', 'Backlog']);
     expect(result).toHaveProperty('error');
     expect((result as { error: string }).error).toMatch(/one change at a time|ambiguous/i);
     expect(await dirs(root)).toEqual(['archive', 'backlog', 'todo']); // untouched
   });
 });
 
-describe('reconcileColumns — add and remove', () => {
+describe('planning and applying a column change — add and remove', () => {
   it('allows adding a column (folder is created lazily by the first card)', async () => {
     const root = await tempDir();
     await board(root, ['todo']);
-    expect(await reconcileColumns(root, 'product', ['Todo'], ['Todo', 'Review'])).toEqual({ renamed: [] });
+    expect(await planAndApply(root, 'product', ['Todo'], ['Todo', 'Review'])).toEqual({ renamed: [] });
   });
 
   it('allows removing an EMPTY column', async () => {
     const root = await tempDir();
     await board(root, ['todo', 'review']);
-    expect(await reconcileColumns(root, 'product', ['Todo', 'Review'], ['Todo'])).toEqual({ renamed: [] });
+    expect(await planAndApply(root, 'product', ['Todo', 'Review'], ['Todo'])).toEqual({ renamed: [] });
   });
 
   it('refuses to remove a column that still holds cards, naming it and the count', async () => {
     const root = await tempDir();
     await board(root, ['todo', 'review'], { review: ['P-001', 'P-002'] });
-    const result = await reconcileColumns(root, 'product', ['Todo', 'Review'], ['Todo']);
+    const result = await planAndApply(root, 'product', ['Todo', 'Review'], ['Todo']);
     expect(result).toHaveProperty('error');
     expect((result as { error: string }).error).toMatch(/Review/);
     expect((result as { error: string }).error).toMatch(/2 card/);
@@ -136,7 +158,7 @@ describe('reconcileColumns — add and remove', () => {
     const root = await tempDir();
     await board(root, ['todo', 'next'], { todo: ['P-001'], next: ['P-002'] });
     // "Todo" -> "Next" would merge into an existing folder.
-    const result = await reconcileColumns(root, 'product', ['Todo', 'Next'], ['Next', 'Next 2']);
+    const result = await planAndApply(root, 'product', ['Todo', 'Next'], ['Next', 'Next 2']);
     expect(result).toHaveProperty('error');
     expect((await readdir(join(root, boardRel('product', 'todo')))).sort()).toEqual(['P-001.md']);
   });
@@ -150,7 +172,7 @@ describe('reconcileColumns — add and remove', () => {
     await board(root, ['todo'], { todo: ['P-001'] });
     await mkdir(join(root, boardRel('product', 'review')), { recursive: true });
 
-    const result = await reconcileColumns(root, 'product', ['Todo'], ['Review']);
+    const result = await planAndApply(root, 'product', ['Todo'], ['Review']);
     expect(result).toEqual({
       error:
         'A folder for "Review" already exists. Rename it to something else, or merge the cards yourself.',
@@ -162,7 +184,7 @@ describe('reconcileColumns — add and remove', () => {
   it('says "1 card", not "1 cards", when refusing to remove a column holding one', async () => {
     const root = await tempDir();
     await board(root, ['todo', 'review'], { review: ['P-001'] });
-    const result = await reconcileColumns(root, 'product', ['Todo', 'Review'], ['Todo']);
+    const result = await planAndApply(root, 'product', ['Todo', 'Review'], ['Todo']);
     expect(result).toEqual({
       error: '"Review" still has 1 card. Move or archive them before removing the column.',
     });
@@ -171,7 +193,7 @@ describe('reconcileColumns — add and remove', () => {
   it('names the column and an exact count when refusing to remove a populated one', async () => {
     const root = await tempDir();
     await board(root, ['todo', 'review'], { review: ['P-001', 'P-002'] });
-    const result = await reconcileColumns(root, 'product', ['Todo', 'Review'], ['Todo']);
+    const result = await planAndApply(root, 'product', ['Todo', 'Review'], ['Todo']);
     expect(result).toEqual({
       error: '"Review" still has 2 cards. Move or archive them before removing the column.',
     });
@@ -184,20 +206,20 @@ describe('reconcileColumns — add and remove', () => {
     await writeFile(join(root, boardRel('product', 'review', '.DS_Store')), '', 'utf8');
     await writeFile(join(root, boardRel('product', 'review', 'notes.txt')), 'x', 'utf8');
 
-    expect(await reconcileColumns(root, 'product', ['Todo', 'Review'], ['Todo'])).toEqual({ renamed: [] });
+    expect(await planAndApply(root, 'product', ['Todo', 'Review'], ['Todo'])).toEqual({ renamed: [] });
   });
 
   it('removes a column whose folder was never created', async () => {
     const root = await tempDir();
     await board(root, ['todo']); // "Review" is configured but has no folder yet
-    expect(await reconcileColumns(root, 'product', ['Todo', 'Review'], ['Todo'])).toEqual({ renamed: [] });
+    expect(await planAndApply(root, 'product', ['Todo', 'Review'], ['Todo'])).toEqual({ renamed: [] });
   });
 
   it('renames a column that has no folder yet without failing', async () => {
     const root = await tempDir();
     await board(root, ['todo']);
     // "Review" was added but never received a card, so there is nothing on disk to move.
-    expect(await reconcileColumns(root, 'product', ['Todo', 'Review'], ['Todo', 'Done'])).toEqual({
+    expect(await planAndApply(root, 'product', ['Todo', 'Review'], ['Todo', 'Done'])).toEqual({
       renamed: [{ from: 'review', to: 'done' }],
     });
     expect(await dirs(root)).toEqual(['archive', 'todo']);

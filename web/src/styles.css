@@ -603,12 +603,6 @@ body {
   cursor: pointer; font-size: 0.7rem; padding: 0.18rem 0.4rem;
 }
 .cards-tab-x:hover { color: var(--danger); }
-.cards-edit {
-  margin-left: auto; flex: 0 0 auto;
-  background: var(--panel-2); color: var(--text); border: 1px solid var(--border);
-  border-radius: 6px; padding: 0.18rem 0.7rem; cursor: pointer; font-size: 0.76rem;
-}
-.cards-edit:hover { border-color: var(--accent); color: var(--accent); }
 .cards-main { flex: 1; min-height: 0; display: flex; }
 .cards-body { flex: 1; min-width: 0; overflow-y: auto; padding: 0.7rem 1rem; }
 .cards-gone { color: var(--muted); font-size: 0.82rem; font-style: italic; padding: 1rem 0; }
@@ -1250,20 +1244,6 @@ body {
   text-transform: lowercase;
   white-space: nowrap;
 }
-/* Revealed only on click, and selectable so it can be moved without being retyped. */
-.signin-token {
-  display: block;
-  margin-top: 0.4rem;
-  padding: 0.5rem 0.65rem;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-  word-break: break-all;
-  user-select: all;
-}
-
 /* The state chip in the top bar. `complete` is the only stop that reads as a success. */
 .ap-chip {
   padding: 0.1rem 0.45rem;

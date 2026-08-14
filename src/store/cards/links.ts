@@ -1,15 +1,8 @@
 import { rm } from 'node:fs/promises';
 import { oneParentProblem } from '../../core/hierarchy.js';
-import { BOARDS, type BoardName, type Card, type ProjectConfig } from '../../core/types.js';
+import { BOARDS, type Card, type ProjectConfig } from '../../core/types.js';
 import { readBoard, spentIds } from './board.js';
 import { type CreateCardInput, createCard, updateCard } from './mutations.js';
-
-// Link target ids are self-describing: "F-###" feature, "P-###" product, "E-###" engineering.
-export function boardOfId(id: string): BoardName {
-  if (id.startsWith('F')) return 'features';
-  if (id.startsWith('P')) return 'product';
-  return 'engineering';
-}
 
 // Set `card`'s links to exactly `desired` and keep the relationship symmetric: every
 // desired target gains this card's id, and any live card that referenced this card but is

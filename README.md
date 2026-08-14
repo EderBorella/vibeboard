@@ -181,7 +181,7 @@ network: not your LAN, and not the other services running on your machine, which
 password. Those rules are applied from outside the box and cannot be removed from within it. This is
 not exfiltration control, and nothing at this layer is.
 
-The mounts are in `src/server/containers.ts`, and they are short enough to read.
+The mounts are in `src/server/boxes/containers.ts`, and they are short enough to read.
 
 ### ⚠️ Security
 

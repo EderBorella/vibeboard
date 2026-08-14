@@ -29,4 +29,25 @@ either is a dangling one in every clone, which is exactly the defect `decisions.
 if any identifier has no row in `decisions.md`. It runs the source through a line-flattening pass
 first, because citations wrap (`// … (decision` / `// 45)`) and a grep misses those.
 
-Adding `decision 68` to a comment means adding a row. So does adding a slice reference.
+Adding `decision 99` to a comment means adding a row. So does adding a slice reference.
+
+## There is no comment-ratio target
+
+An earlier plan set one — *"get `src/` below 15%"* — and it is withdrawn. Two reasons, and the second
+is the real one.
+
+It was measured with a broken instrument: the script that produced the 24.9% it was reducing *from*
+counted trailing `// why` comments after real code as comment lines, and missed `*` continuations
+inside block comments. A target expressed against a number nobody can reproduce is not a target.
+
+The corrected census, for the record rather than as a goal — `src/` is **12,448 code lines to 6,760
+comment-only lines**, so 35% of its non-blank lines are comments, against 17% in `web/src/` and 13.5%
+in `test/`. One line in three. That is high by any general standard and it is not, on its own,
+evidence of anything: most of those comments carry the *incident* that produced the code — the red CI
+run, the mutant that survived, the fixture too thin to distinguish two outcomes — and a ratio cannot
+tell that apart from padding.
+
+So the judgement is per comment, and the questions are the ones a ratio cannot ask: does this say
+**why**, or restate the line below it? Would deleting it make the code below look pointless or
+deletable? Is it still true? A comment that fails the last question is worse than none, and no
+percentage will ever find it.

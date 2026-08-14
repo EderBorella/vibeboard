@@ -149,7 +149,7 @@ given. **`copilot/` is the chat**, and the model catalogue its picker offers. **
 | `copilot/copilot.ts` | `security/containment.md` — the copilot shares the project's box | `S1` |
 | `copilot/copilot-authority.ts` | `security/containment.md` — why a credential is redacted out of anything persisted | — |
 | `copilot/copilot-turns.ts` | `decisions.md`, `security/containment.md` — the shared box, the session transcript, and the eager end of a chat credential | `decision 12` |
-| `diary/routes.ts` | `security/containment.md` — the "profile denies the file" comment is stale; the read-only mount is what does it now | — |
+| `diary/routes.ts` | `security/containment.md` — the file is inside `.vibeboard/`, mounted read-only in every box, so the endpoint is the only way in | — |
 | `runs/agent-runner.ts` | `decisions.md`, `security/containment.md` (credential redaction, and why stdin rather than argv) | `decision 8`, `decision 18`, `decision 60`, `S1`, `S11` |
 | `runs/reaper.ts` | `decisions.md` | `decision 13` |
 | `runs/routes.ts` | `decisions.md` | `decision 3`, `decision 5`, `decision 12`, `decision 18`, `decision 40`, `decision 52`, `decision 60`, `decision 63`, `S6`, `C2` |

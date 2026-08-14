@@ -123,25 +123,13 @@ const PROTECTED_PATHS = [CONFIG_DIR, '.git/hooks', '.git/config'] as const;
 
 // The ONE place inside `.vibeboard/` an agent must be able to write: where its report goes.
 //
-// This was a regression, and an instructive one. The AppArmor profile containment replaced denied the
-// `.vibeboard` directory entry and then each governed path BY NAME — boards, config.yaml, skills,
-// foundation, project-runs, the diary, the state file — with a comment on the first line reading
-// "`runs/` stays writable, which the suite pins". Replacing that enumerated list with one blanket
-// read-only mount took away the only directory an agent is REQUIRED to write to.
+// A writable mount NESTED inside the read-only one, never a return to an enumerated deny list. That is
+// what keeps the default at DENY: anything added to `.vibeboard/` later is refused without anyone having
+// to remember to name it. `RUNS_DIR` and not `RESULTS_DIR` — the report is the agent's, and the run
+// records under `boards/…/results/` are the server's and stay read-only.
 //
-// What it looked like: `derive-features` did its work, created ten cards through the API, and came back
-// `attention` — "finished without writing a report". The critic could not write its verdict either, so
-// it could not judge. Two runs, real money, no way to record either. The agent diagnosed it in its own
-// thinking: "the directory is read-only. This seems like a system-level issue."
-//
-// How it was missed: the plan checked `RESULTS_DIR` — `boards/…/results/`, which the SERVER writes —
-// concluded the folder was safe to deny wholesale, and never looked at `RUNS_DIR`, the report path and a
-// different constant entirely.
-//
-// A writable mount nested inside the read-only one, rather than a return to an enumerated deny list.
-// That keeps the default at DENY: anything added to `.vibeboard/` later is refused without anyone having
-// to remember to name it, which is the failure mode the enumerated version carried. Measured: the report
-// lands, and boards, foundation and the `.vibeboard` root itself all still refuse.
+// The regression that this hole exists to close, and how the audit that caused it missed this path, are
+// in docs/security/containment.md.
 export const AGENT_WRITABLE_PATHS = [RUNS_DIR] as const;
 
 // Which of the protected paths actually exist. `exists` is injected so this is testable without a

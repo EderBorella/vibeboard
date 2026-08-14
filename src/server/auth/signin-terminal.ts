@@ -10,8 +10,9 @@ interface SigninBannerState {
   empty: boolean;
   devices: number;
   pid: number;
-  // VIBEBOARD_TOKEN_FILE is set, so the credential files are somewhere the AppArmor profile has never
-  // heard of.
+  // VIBEBOARD_TOKEN_FILE is set, so the credential files are somewhere nothing here checks. Keep them
+  // outside every project root: inside one, they are inside a box's mount
+  // (docs/security/containment.md).
   relocated: boolean;
   sandboxOk: boolean;
 }
@@ -30,8 +31,8 @@ export function signinBanner(state: SigninBannerState): string[] {
   );
   // Printed always, because the moment it is needed is the moment the UI cannot be reached to read it.
   lines.push(`  → locked out? kill -USR2 ${state.pid} ${BREAK_GLASS}, and the next page load starts over`);
-  // `probeSandbox` answers "ok" for a relocated token file, because it checks the profile and not
-  // where the secrets went. Nothing else detects this, so it is said out loud.
+  // `probeSandbox` answers "ok" for a relocated token file, because it asks whether a box is possible
+  // and not where the secrets went. Nothing else detects this, so it is said out loud.
   if (state.relocated && state.sandboxOk) {
     lines.push('  → VIBEBOARD_TOKEN_FILE puts the credentials somewhere nothing here checks. An agent’s');
     lines.push(

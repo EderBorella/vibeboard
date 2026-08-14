@@ -58,9 +58,11 @@ export interface AutopilotState {
   // naming the files, and `POST /api/autopilot/gates-reviewed` clears it. Set only when the writer was
   // not the admin — editing your own gates in Project Control blocks nothing.
   //
-  // It lives here because this file is server-owned machine state that the profile already denies to
-  // every agent. A new file would NOT be denied: the profile's own comment says denying the folder
-  // "does not deny creating things inside it — those are mediated on their own paths".
+  // It lives here because this file is server-owned machine state no agent can write: `.vibeboard/` is
+  // mounted read-only in every box, so the whole folder is denied by default rather than path by path
+  // (docs/security/containment.md). Under the profile this placement was load-bearing rather than
+  // merely tidy — an enumerated deny list did not cover a NEW file inside a denied folder, so a fresh
+  // one would have been writable by the very agent whose rewrite it records.
   unreviewedGates?: string[];
 }
 

@@ -57,8 +57,8 @@ export const PROJECT_RUNS_DIR = `${CONFIG_DIR}/project-runs`;
 export const AUTOPILOT_STATE_FILE = `${CONFIG_DIR}/autopilot-state.json`;
 
 // Agent Suggestions: what an agent found but must not act on. Machine state like chat/ and runs/,
-// written only through the endpoint — the profile denies the agent this path, so the file layer is
-// not a second way in.
+// written only through the endpoint — every agent box mounts `.vibeboard/` read-only, so the file layer
+// is not a second way in (docs/security/containment.md).
 export const SUGGESTIONS_DIR = `${CONFIG_DIR}/suggestions`;
 // The implementation diary: one line per event, appended through an endpoint rather than written
 // by an agent.

@@ -12,8 +12,9 @@ import { join } from 'node:path';
 //  - Claude: CLAUDE_CONFIG_DIR → a dir with ONLY a symlink to the real credentials.
 //  - OpenCode: XDG_CONFIG_HOME → an empty dir (auth/db live in XDG_DATA_HOME, untouched).
 
-// Exported so the sandbox suite can assert this stays writable: the profile denies the admin token
-// by name rather than denying `~/.vibeboard/`, because both CLIs write their config in here.
+// Both CLIs write their config in here, which under the profile is why the admin token had to be denied
+// BY NAME rather than `~/.vibeboard/` as a whole. In a box the question does not arise: none of
+// `~/.vibeboard/` is among the mounts (docs/security/containment.md).
 function copilotHome(): string {
   return process.env.VIBEBOARD_COPILOT_HOME ?? join(homedir(), '.vibeboard', 'copilot');
 }

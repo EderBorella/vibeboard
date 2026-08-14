@@ -10,7 +10,8 @@ import {
 
 // Suggestions on disk, one file each under `.vibeboard/suggestions/`.
 //
-// The agent never writes here — the profile denies it — so everything arrives through the endpoint
+// The agent never writes here — `.vibeboard/` is read-only in every box
+// (docs/security/containment.md) — so everything arrives through the endpoint
 // and this module is the only writer. Same seam as run-store: what an agent says goes in a payload,
 // and what is recorded is ours to stamp.
 

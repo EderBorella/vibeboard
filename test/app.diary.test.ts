@@ -8,8 +8,9 @@ import { openTestProject, tempDir, wsClient } from './helpers.js';
 
 // The diary over HTTP. Written through an endpoint and never by an agent writing the file: a run already
 // reports a one-line summary that auto-pilot appends, so an agent with a pen here would be a second path
-// to the same fact. The AppArmor profile denies the file (test/sandbox.test.ts) and this is the other half
-// — the endpoint that exists instead, and who may reach it.
+// to the same fact. Every agent box mounts `.vibeboard/` read-only, so the file itself is denied
+// (test/box-integration.test.ts) and this is the other half — the endpoint that exists instead, and who
+// may reach it.
 
 const post = (app: Awaited<ReturnType<typeof openTestProject>>['app'], payload: Record<string, unknown>) =>
   app.inject({ method: 'POST', url: '/api/log', payload });

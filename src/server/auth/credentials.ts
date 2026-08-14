@@ -82,8 +82,9 @@ export function adminTokenFile(): string {
 // nothing to deny, because there is nothing to reach. Before containment the separation here was
 // a plan rather than a protection, which is why auto-pilot refuses to start there.
 //
-// VIBEBOARD_TOKEN_FILE moves the token somewhere the profile has never heard of, and nothing
-// detects that: `probeSandbox` still answers "ok". If you relocate it, deny the new path too.
+// VIBEBOARD_TOKEN_FILE relocates it, and nothing detects that: `probeSandbox` asks whether a box is
+// possible, not where the secrets went. Keep the new path OUTSIDE every project root — inside one it is
+// inside a box's mount (docs/security/containment.md).
 export async function adminToken(): Promise<string> {
   const file = adminTokenFile();
   try {

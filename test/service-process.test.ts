@@ -142,15 +142,16 @@ describe('starting the loop', () => {
     expect(got.cwd).toBe(root);
   });
 
-  // NOT a nice-to-have, and not an oversight: every agent runs inside the AppArmor profile, and the
-  // service must not, because it WRITES `autopilot-state.json` — the counters are its own — and the
-  // profile denies that to every confined process. What confines the loop is the scope table.
+  // NOT a nice-to-have, and not an oversight: every agent runs inside a Docker box, and the service must
+  // not, because it WRITES `autopilot-state.json` — the counters are its own — and `.vibeboard/` is
+  // mounted read-only in every box. What confines the loop is the scope table
+  // (docs/security/containment.md).
   //
   // Asserted from `/proc/self/attr/current`, because the obvious probe does not work: this test used to
   // check that `argv0` did not contain `aa-exec`, and a reviewer wrapped the real spawn in `aa-exec` and
   // watched it stay green. `aa-exec` EXECS its target, so a confined child sees `node` in `argv0` exactly
   // as an unconfined one does. The label is the thing that actually differs.
-  it('spawns the loop unsandboxed, because it writes the state file the profile denies', async () => {
+  it('spawns the loop unsandboxed, because it writes the state file a box denies', async () => {
     const { service, log } = await harness();
     await service.start();
     const got = await recorded(log);

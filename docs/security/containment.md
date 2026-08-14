@@ -92,7 +92,13 @@ anyone having to remember to name it. The enumerated version is what caused the 
 exists to fix — replacing a named deny-list with one blanket read-only mount took away the only
 directory an agent must write to, and `derive-features` created ten cards through the API and came
 back *"finished without writing a report"*. The critic could not write its verdict either, so it
-could not judge.
+could not judge. Two runs, real money, no way to record either; the agent diagnosed it in its own
+thinking — *"the directory is read-only. This seems like a system-level issue."*
+
+**How it was missed is worth keeping, because it is a mistake anyone auditing this would repeat.** The
+change checked `RESULTS_DIR` — `boards/…/results/`, which the **server** writes — concluded the folder
+was safe to deny wholesale, and never looked at `RUNS_DIR`. The report path is a different constant
+entirely, and the two read alike.
 
 The grant is **directory-wide, not per-run**, and that is a known weakening carried over from the
 profile era: report files are claimed by run id, so a concurrent run could in principle write another

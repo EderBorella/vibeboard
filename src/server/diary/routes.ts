@@ -9,8 +9,8 @@ import { type AppCtx, ensureOpen, nowIso } from '../route-context.js';
 //
 // `POST` is the `service` scope alone. Both working scopes are absent from the table deliberately: a run
 // already reports a one-line summary that auto-pilot appends after the dispatch, so an agent writing here
-// would be a second path to the same fact — and the AppArmor profile denies the file itself, so this
-// endpoint is what exists instead.
+// would be a second path to the same fact — and the file itself sits in `.vibeboard/`, which every agent
+// box mounts read-only (docs/security/containment.md), so this endpoint is what exists instead.
 //
 // `GET` is in no scope at all, admin-only by absence, like triaging a suggestion. Nothing an agent does
 // needs the project's narrative, and an agent reading how the last ten runs went is an agent reasoning

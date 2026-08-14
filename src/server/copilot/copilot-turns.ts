@@ -101,22 +101,19 @@ export function createCopilotTurns(ctx: AppCtx): {
       await chats.recordUser(text);
       // THE TRANSCRIPT GETS THE PERSON'S WORDS; THE MODEL GETS THE CREDENTIAL TOO.
       //
-      // Two statements, and the separation is the security property: `.vibeboard/chat/` is denied to
-      // every agent for WRITING, but every deny in the profile is `wl` and reads are unrestricted — so
-      // a token recorded here would be readable by any agent on the machine, for as long as the chat
-      // file exists.
+      // Two statements, and the separation is the security property: the token never enters
+      // `.vibeboard/chat/`. A chat file is readable inside the project's box for as long as it exists,
+      // so a token recorded here would be readable by every agent working that project.
       //
       // On stdin, in the prompt, rather than argv: `--append-system-prompt` is a command-line argument
       // and /proc/<pid>/cmdline is world-readable, which agent-turn.ts refuses credentials for by name.
       //
-      // NOT A CLOSED LEAK, AND SAYING SO: the CLI writes its own session transcript under
-      // CLAUDE_CONFIG_DIR (~/.vibeboard/copilot), and the AppArmor profile denies READ only for
-      // `~/.vibeboard/token*` — every other path there is readable by every confined agent, which all
-      // run as the same uid. So a `work` agent can lift this credential out of the copilot's session
-      // file. Runs have the same exposure and survive it because their tokens die in minutes; this one
-      // lives for a conversation, which is the argument for ending it eagerly on every chat and project
-      // change rather than only on a send. Closing it properly needs a second profile that denies the
-      // session directory to everything except the copilot, and one profile is all there is today.
+      // NOT A CLOSED LEAK, AND SAYING SO: the CLI writes its own session transcript into the box's
+      // `/state`, which every agent on the same (project, backend) shares — so a `work` agent can lift
+      // this credential out of the copilot's session file. Runs have the same exposure and survive it
+      // because their tokens die in minutes; this one lives for a conversation, which is the argument
+      // for ending it eagerly on every chat and project change rather than only on a send. The
+      // exposure and its limits are stated in full in docs/security/containment.md.
       const credential = await turnCredential(root);
       const modelText = credential ? withCredential(credential.token, text) : text;
       copilotState(); // running flips true only once send starts; announce optimistically

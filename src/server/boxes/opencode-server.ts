@@ -352,8 +352,8 @@ function trackFailure(p: Promise<string>): Promise<string> {
 }
 
 // Stop the managed server and start a fresh one, confined by whatever is in force now. Its everyday
-// justification is a hung or stale server; it also covers one started before the profile was
-// installed, which would otherwise keep serving unconfined until the app restarted.
+// justification is a hung or stale server; it also covers one started while no box could be made, which
+// would otherwise keep serving unconfined until the app restarted.
 export async function restartOpencodeServer(): Promise<string> {
   stopOpencodeServer();
   // Boxed, a restart REMOVES the container rather than killing a child: the server is the container's

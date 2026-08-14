@@ -18,11 +18,11 @@ import { type AutopilotLogTarget, type Log, openAutopilotLog } from '../logging.
 //
 // THREE decisions worth stating, because each one is the opposite of what the code around it does:
 //
-// 1. NOT SANDBOXED. Every agent runs inside the AppArmor profile; the service must not, because it
-//    writes `autopilot-state.json` — the counters are its own — and the profile denies exactly that to
-//    every confined process. The service runs no model and executes nothing a card asked for: it reads
-//    the board, asks a pure function what to do, and calls endpoints. The confinement that matters for
-//    it is the SCOPE TABLE, not the filesystem.
+// 1. NOT SANDBOXED. Every agent runs inside a Docker box; the service must not, because it writes
+//    `autopilot-state.json` — the counters are its own — and `.vibeboard/` is mounted READ-ONLY in
+//    every box. The service runs no model and executes nothing a card asked for: it reads the board,
+//    asks a pure function what to do, and calls endpoints. The confinement that matters for it is the
+//    SCOPE TABLE in auth/auth.ts, not the filesystem. See docs/security/containment.md.
 // 2. DETACHED, so it leads its own process group and an emergency stop can take down whatever it
 //    started along with it (decision 13). The pgid and its start time are written to the state file,
 //    because the reaper that needs them may be in a later server process than the one that spawned it.

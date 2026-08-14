@@ -70,6 +70,22 @@ const lineOf = (text, offset) => {
   return line;
 };
 
+// One file's citations, in both notations. Split out of `scan` for the NESTING, not the length: two
+// notations inside a file inside a directory is four levels of loop, and depth is what the complexity
+// metric punishes. Flattening the walk was worth 3 points; extracting the record helper was worth 0.
+const citationsInFile = (file, shown, record) => {
+  const text = readFileSync(file, 'utf8');
+  const { flat, offsets } = flatten(text);
+  for (const match of flat.matchAll(CITE)) {
+    const line = lineOf(text, offsets[match.index] ?? 0);
+    record(`decision ${match[1]}`, shown, line);
+    for (const extra of (match[2] ?? '').matchAll(CONTINUED)) record(`decision ${extra[0]}`, shown, line);
+  }
+  for (const match of flat.matchAll(SLICE)) {
+    record(match[1], shown, lineOf(text, offsets[match.index] ?? 0));
+  }
+};
+
 const scan = () => {
   const found = new Map();
   const record = (id, file, line) => {
@@ -77,19 +93,7 @@ const scan = () => {
     found.get(id).push(`${file}:${line}`);
   };
   for (const dir of CORPUS) {
-    for (const file of walk(join(ROOT, dir))) {
-      const text = readFileSync(file, 'utf8');
-      const { flat, offsets } = flatten(text);
-      const shown = relative(ROOT, file);
-      for (const match of flat.matchAll(CITE)) {
-        const line = lineOf(text, offsets[match.index] ?? 0);
-        record(`decision ${match[1]}`, shown, line);
-        for (const extra of (match[2] ?? '').matchAll(CONTINUED)) record(`decision ${extra[0]}`, shown, line);
-      }
-      for (const match of flat.matchAll(SLICE)) {
-        record(match[1], shown, lineOf(text, offsets[match.index] ?? 0));
-      }
-    }
+    for (const file of walk(join(ROOT, dir))) citationsInFile(file, relative(ROOT, file), record);
   }
   return found;
 };

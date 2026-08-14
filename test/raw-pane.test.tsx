@@ -87,7 +87,10 @@ describe('RawPane', () => {
     // decorates the new card with the old one's error.
     let failFirst: ((e: Error) => void) | undefined;
     api.getRaw.mockImplementationOnce(
-      () => new Promise<string>((_resolve, reject) => { failFirst = reject; }),
+      () =>
+        new Promise<string>((_resolve, reject) => {
+          failFirst = reject;
+        }),
     );
     api.getRaw.mockImplementationOnce(async () => 'contents of E-002');
 
@@ -121,7 +124,10 @@ describe('RawPane', () => {
   it('shows the loading placeholder with an empty box until the file arrives', async () => {
     let release: ((text: string) => void) | undefined;
     api.getRaw.mockImplementationOnce(
-      () => new Promise<string>((resolve) => { release = resolve; }),
+      () =>
+        new Promise<string>((resolve) => {
+          release = resolve;
+        }),
     );
     render(<RawPane card={card()} />);
     expect(area().value).toBe('');
@@ -138,7 +144,10 @@ describe('RawPane', () => {
     // card — the first file lands in the second card's pane.
     let releaseFirst: ((text: string) => void) | undefined;
     api.getRaw.mockImplementationOnce(
-      () => new Promise<string>((resolve) => { releaseFirst = resolve; }),
+      () =>
+        new Promise<string>((resolve) => {
+          releaseFirst = resolve;
+        }),
     );
     api.getRaw.mockImplementationOnce(async () => 'contents of E-002');
 
@@ -159,7 +168,10 @@ describe('RawPane', () => {
   it('disables the button while the write is in flight, so it cannot be sent twice', async () => {
     let finish: (() => void) | undefined;
     api.putRaw.mockImplementationOnce(
-      () => new Promise<undefined>((resolve) => { finish = () => resolve(undefined); }),
+      () =>
+        new Promise<undefined>((resolve) => {
+          finish = () => resolve(undefined);
+        }),
     );
     await act(async () => {
       render(<RawPane card={card()} />);
@@ -180,5 +192,4 @@ describe('RawPane', () => {
     const { container } = await act(async () => render(<RawPane card={card()} />));
     expect(container.querySelector('.raw-error')).toBeNull();
   });
-
 });

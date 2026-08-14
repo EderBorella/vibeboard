@@ -39,7 +39,12 @@ describe('UtilityDock', () => {
   it('marks the active tab and reports a click on another', () => {
     const onPane = vi.fn();
     render(
-      <UtilityDock {...props} onPane={onPane} panes={[pane('cards'), pane('terminal')]} activeId="terminal" />,
+      <UtilityDock
+        {...props}
+        onPane={onPane}
+        panes={[pane('cards'), pane('terminal')]}
+        activeId="terminal"
+      />,
     );
     const [cards, terminal] = screen.getAllByRole('tab');
     expect(terminal.getAttribute('aria-selected')).toBe('true');
@@ -73,9 +78,7 @@ describe('UtilityDock', () => {
 
   it('reports the collapse toggle and labels it by what it will do', () => {
     const onCollapse = vi.fn();
-    const { rerender } = render(
-      <UtilityDock {...props} onCollapse={onCollapse} panes={[pane('cards')]} />,
-    );
+    const { rerender } = render(<UtilityDock {...props} onCollapse={onCollapse} panes={[pane('cards')]} />);
     const toggle = screen.getByTitle('Collapse the dock');
     expect(toggle.getAttribute('aria-expanded')).toBe('true');
     expect(toggle.textContent).toBe('▾'); // points the way it will move

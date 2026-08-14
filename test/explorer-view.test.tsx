@@ -156,9 +156,11 @@ describe('ExplorerView', () => {
   });
 
   it('marks a link out of the project and refuses to open it', async () => {
-    api.listDir.mockResolvedValue(listing('', [
-      { path: 'escape', name: 'escape', kind: 'other', symlink: true, escapes: true, target: '/etc' },
-    ]));
+    api.listDir.mockResolvedValue(
+      listing('', [
+        { path: 'escape', name: 'escape', kind: 'other', symlink: true, escapes: true, target: '/etc' },
+      ]),
+    );
     render(<ExplorerView snapshot={snapshot} />);
     await waitFor(() => expect(screen.getByText('escape')).toBeTruthy());
     expect(within(row('escape')).getByText('outside')).toBeTruthy();
@@ -264,7 +266,12 @@ describe('ExplorerView — creating and renaming', () => {
     api.listDir.mockImplementation((path: string) =>
       Promise.resolve(path === '' ? listing('', [dir('docs')]) : listing('docs', [])),
     );
-    api.createFsNode.mockResolvedValue({ path: 'docs/Untitled.md', name: 'Untitled.md', kind: 'file', size: 0 });
+    api.createFsNode.mockResolvedValue({
+      path: 'docs/Untitled.md',
+      name: 'Untitled.md',
+      kind: 'file',
+      size: 0,
+    });
     api.readFsFile.mockResolvedValue(text('docs/Untitled.md', ''));
     render(<ExplorerView snapshot={snapshot} />);
     await waitFor(() => expect(screen.getByText('docs')).toBeTruthy());
@@ -338,9 +345,7 @@ describe('ExplorerView — creating and renaming', () => {
     fireEvent.doubleClick(row('a.md'));
     fireEvent.change(screen.getByDisplayValue('a.md'), { target: { value: 'b.md' } });
     fireEvent.keyDown(screen.getByDisplayValue('b.md'), { key: 'Enter' });
-    await waitFor(() =>
-      expect(screen.getByText('Something with that name is already there')).toBeTruthy(),
-    );
+    await waitFor(() => expect(screen.getByText('Something with that name is already there')).toBeTruthy());
   });
 
   it('surfaces a refused create', async () => {
@@ -643,8 +648,6 @@ describe('ExplorerView — dragging to move', () => {
     await waitFor(() => expect(screen.getByText('a.md')).toBeTruthy());
 
     dragTo(row('a.md'), row('docs'));
-    await waitFor(() =>
-      expect(screen.getByText('Something with that name is already there')).toBeTruthy(),
-    );
+    await waitFor(() => expect(screen.getByText('Something with that name is already there')).toBeTruthy());
   });
 });

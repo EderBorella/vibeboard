@@ -9,7 +9,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "typecheck:web": "tsc --noEmit -p web/tsconfig.json",
     "typecheck:test": "tsc --noEmit -p tsconfig.test.json",
-    "lint": "biome check",
+    "lint": "biome check --error-on-warnings",
     "check:citations": "node tools/check-citations.mjs",
     "lint:fix": "biome check --write",
     "format": "biome format --write",

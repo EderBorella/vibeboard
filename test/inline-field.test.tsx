@@ -94,12 +94,7 @@ describe('InlineField', () => {
 
   it('renders a value through the display function it is given', () => {
     const { container } = render(
-      <InlineField
-        value="**bold**"
-        label="body"
-        onCommit={vi.fn()}
-        display={() => <em>rendered</em>}
-      />,
+      <InlineField value="**bold**" label="body" onCommit={vi.fn()} display={() => <em>rendered</em>} />,
     );
     expect(container.querySelector('em')?.textContent).toBe('rendered');
   });

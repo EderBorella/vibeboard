@@ -43,7 +43,10 @@ describe('the Suggestions pane', () => {
   it('lists the active suggestions with their run and their date', () => {
     render(
       pane({
-        suggestions: [suggestion(), suggestion({ id: 's-2', title: 'The gate has no timeout', run: 'run-9' })],
+        suggestions: [
+          suggestion(),
+          suggestion({ id: 's-2', title: 'The gate has no timeout', run: 'run-9' }),
+        ],
       }),
     );
     expect(screen.getByText('The card query is linear')).toBeTruthy();
@@ -139,7 +142,9 @@ describe('the Suggestions pane', () => {
       card: { id: 'P-004' },
       suggestion: suggestion({ state: 'actioned', became: 'P-004' }),
     });
-    render(pane({ suggestions: [suggestion(), suggestion({ id: 's-2', title: 'The gate has no timeout' })] }));
+    render(
+      pane({ suggestions: [suggestion(), suggestion({ id: 's-2', title: 'The gate has no timeout' })] }),
+    );
     fireEvent.click(screen.getByRole('button', { name: /make a card/i }));
     expect(await screen.findByText(/P-004/)).toBeTruthy();
 
@@ -149,7 +154,9 @@ describe('the Suggestions pane', () => {
 
   it('acts on the suggestion the user picked, not always the first', async () => {
     api.patchSuggestion.mockResolvedValue(suggestion({ id: 's-2', state: 'dismissed' }));
-    render(pane({ suggestions: [suggestion(), suggestion({ id: 's-2', title: 'The gate has no timeout' })] }));
+    render(
+      pane({ suggestions: [suggestion(), suggestion({ id: 's-2', title: 'The gate has no timeout' })] }),
+    );
     fireEvent.click(screen.getByText('The gate has no timeout'));
     fireEvent.click(screen.getByRole('button', { name: /dismiss/i }));
     await waitFor(() => expect(api.patchSuggestion).toHaveBeenCalledWith('s-2', 'dismissed', undefined));

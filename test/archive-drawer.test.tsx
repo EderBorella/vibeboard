@@ -10,6 +10,7 @@ vi.mock('../web/src/api.js', () => api);
 vi.mock('../web/src/api', () => api);
 
 const { ArchiveDrawer } = await import('../web/src/components/ArchiveDrawer.js');
+
 import type { ArchivedCard, ProjectConfig } from '../web/src/shared.js';
 
 afterEach(() => {

@@ -34,9 +34,7 @@ const skill = (over: Partial<Skill> = {}): Skill => ({
   ...over,
 });
 
-const actions = (): HTMLButtonElement[] => [
-  ...document.querySelectorAll<HTMLButtonElement>('.cs-action'),
-];
+const actions = (): HTMLButtonElement[] => [...document.querySelectorAll<HTMLButtonElement>('.cs-action')];
 
 describe('CardSkills', () => {
   it('offers one action per skill, labelled and hinted by the file', () => {
@@ -59,11 +57,7 @@ describe('CardSkills', () => {
       skill({ slug: 'done', name: 'Done only', columns: ['done'] }),
     ];
     render(
-      <CardSkills
-        card={card({ board: 'engineering', columnSlug: 'todo' })}
-        skills={skills}
-        invalid={[]}
-      />,
+      <CardSkills card={card({ board: 'engineering', columnSlug: 'todo' })} skills={skills} invalid={[]} />,
     );
     expect(actions().map((b) => b.textContent)).toEqual(['Anywhere']);
   });
@@ -81,9 +75,7 @@ describe('CardSkills', () => {
     // be nowhere for the result to show.
     render(<CardSkills card={card()} skills={[skill()]} invalid={[]} />);
     expect(actions().every((b) => b.disabled)).toBe(true);
-    expect(actions()[0].getAttribute('title')).toBe(
-      'Implement the card — archived cards cannot be run',
-    );
+    expect(actions()[0].getAttribute('title')).toBe('Implement the card — archived cards cannot be run');
   });
 
   it('enables the actions when a run handler is given', () => {
@@ -94,9 +86,7 @@ describe('CardSkills', () => {
   it('says so when no skill fits this column, and where to add one', () => {
     render(<CardSkills card={card()} skills={[skill({ boards: ['product'] })]} invalid={[]} />);
     expect(actions()).toHaveLength(0);
-    expect(
-      screen.getByText('No skills for this column. Add one in Project Control → Skills.'),
-    ).toBeTruthy();
+    expect(screen.getByText('No skills for this column. Add one in Project Control → Skills.')).toBeTruthy();
   });
 
   it('shows no empty state when the card does have skills', () => {
@@ -117,13 +107,7 @@ describe('CardSkills', () => {
   });
 
   it('says "file" not "files" for one', () => {
-    render(
-      <CardSkills
-        card={card()}
-        skills={[skill()]}
-        invalid={[{ slug: 'a', path: 'p', reason: 'r' }]}
-      />,
-    );
+    render(<CardSkills card={card()} skills={[skill()]} invalid={[{ slug: 'a', path: 'p', reason: 'r' }]} />);
     expect(screen.getByText('⚠ 1 skill file invalid')).toBeTruthy();
   });
 

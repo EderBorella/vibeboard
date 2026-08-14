@@ -82,7 +82,8 @@ say({
 });
 
 const REPORTS = {
-  success: '---\noutcome: success\nsummary: did the thing\ncreated: [E-041]\n---\n## What I did\n\nAll of it.\n',
+  success:
+    '---\noutcome: success\nsummary: did the thing\ncreated: [E-041]\n---\n## What I did\n\nAll of it.\n',
   attention:
     '---\noutcome: attention\nsummary: bigger than one card\noptions:\n  - Split it in two\n  - Do the store only\n---\n## What I found\n\nThree cards, not one.\n',
   garbage: '---\noutcome: [unclosed\n---\nI tried\n',

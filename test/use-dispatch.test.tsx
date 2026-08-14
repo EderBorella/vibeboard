@@ -53,17 +53,13 @@ describe('useDispatch — the model list', () => {
   });
 
   it('refetches when the backend changes — a model id belongs to one backend', async () => {
-    api.listModels
-      .mockResolvedValueOnce(models('sonnet'))
-      .mockResolvedValueOnce(models('opencode/nemotron'));
+    api.listModels.mockResolvedValueOnce(models('sonnet')).mockResolvedValueOnce(models('opencode/nemotron'));
     const { result, rerender } = renderHook(({ b }) => useDispatch(b, 0), {
       initialProps: { b: 'claude' },
     });
     await waitFor(() => expect(result.current.models.map((m) => m.id)).toEqual(['sonnet']));
     rerender({ b: 'opencode' });
-    await waitFor(() =>
-      expect(result.current.models.map((m) => m.id)).toEqual(['opencode/nemotron']),
-    );
+    await waitFor(() => expect(result.current.models.map((m) => m.id)).toEqual(['opencode/nemotron']));
   });
 
   it('does not refetch the models when only the trigger moves', async () => {
@@ -102,9 +98,7 @@ describe('useDispatch — the model list', () => {
       initialProps: { b: 'claude' },
     });
     rerender({ b: 'opencode' });
-    await waitFor(() =>
-      expect(result.current.models.map((m) => m.id)).toEqual(['opencode/nemotron']),
-    );
+    await waitFor(() => expect(result.current.models.map((m) => m.id)).toEqual(['opencode/nemotron']));
 
     await act(async () => {
       landFirst(models('sonnet'));

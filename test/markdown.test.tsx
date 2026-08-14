@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
-import { describe, it, expect, afterEach } from 'vitest';
-import { render, cleanup, screen } from '@testing-library/react';
+
+import { cleanup, render, screen } from '@testing-library/react';
+import { afterEach, describe, expect, it } from 'vitest';
 import { renderMarkdown } from '../web/src/markdown.js';
 
 // The same contract the string-based renderer was characterised against, now asserted on the DOM
@@ -129,10 +130,7 @@ describe('renderMarkdown escaping', () => {
   });
 
   it('normalises CRLF', () => {
-    expect([...md('one\r\n\r\ntwo').querySelectorAll('p')].map((p) => p.textContent)).toEqual([
-      'one',
-      'two',
-    ]);
+    expect([...md('one\r\n\r\ntwo').querySelectorAll('p')].map((p) => p.textContent)).toEqual(['one', 'two']);
   });
 });
 

@@ -20,6 +20,7 @@ vi.mock('../web/src/api.js', () => api);
 vi.mock('../web/src/api', () => api);
 
 const { AutopilotPanel } = await import('../web/src/components/AutopilotPanel.js');
+
 import type { Readiness } from '../web/src/api.js';
 import type { ProjectConfig } from '../web/src/shared.js';
 
@@ -139,7 +140,6 @@ describe('the start control', () => {
 });
 
 describe('the auto-pilot panel', () => {
-
   // There is no table any more, and its absence is the claim: a lifecycle a person can edit is a lie
   // waiting to happen (ruling 52), so the panel says the machine is fixed rather than showing a table
   // that could disagree with the code. A stale table left rendering half a retired config would be

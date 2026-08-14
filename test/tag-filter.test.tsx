@@ -20,9 +20,7 @@ describe('TagFilter', () => {
   it('renders nothing at all when no card is tagged', () => {
     // Not an empty bar: the group itself must be absent, or the boards lose a row of height
     // to chrome that can never do anything.
-    const { container } = render(
-      <TagFilter tags={[]} active={[]} onToggle={vi.fn()} onClear={vi.fn()} />,
-    );
+    const { container } = render(<TagFilter tags={[]} active={[]} onToggle={vi.fn()} onClear={vi.fn()} />);
     expect(container.innerHTML).toBe('');
   });
 
@@ -46,9 +44,7 @@ describe('TagFilter', () => {
 
   it('offers Clear only while something is filtered', () => {
     const onClear = vi.fn();
-    const { rerender } = render(
-      <TagFilter tags={tags} active={[]} onToggle={vi.fn()} onClear={onClear} />,
-    );
+    const { rerender } = render(<TagFilter tags={tags} active={[]} onToggle={vi.fn()} onClear={onClear} />);
     expect(screen.queryByText('Clear filter')).toBeNull();
 
     rerender(<TagFilter tags={tags} active={['bug']} onToggle={vi.fn()} onClear={onClear} />);

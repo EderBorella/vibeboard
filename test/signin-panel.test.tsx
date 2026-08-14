@@ -109,7 +109,9 @@ describe('signing another browser out', () => {
 
     await waitFor(() => expect(api.revokeDevice).toHaveBeenCalledWith('dev_other'));
     // Named by its label, because the id means nothing to the person deciding.
-    expect(yes.mock.calls.at(-1)?.[0]).toMatchObject({ body: expect.stringContaining('Safari on the phone') });
+    expect(yes.mock.calls.at(-1)?.[0]).toMatchObject({
+      body: expect.stringContaining('Safari on the phone'),
+    });
   });
 
   it('does nothing when the question is answered no', async () => {

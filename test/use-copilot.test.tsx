@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
+
+import { act, renderHook } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // A stand-in for the shared socket: keeps the subscribers so a test can push events, and records
 // what the hook sends. vi.hoisted because vi.mock's factory runs before the module body.
@@ -180,7 +181,9 @@ describe('useCopilot sending', () => {
   it('sends a turn with its options and echoes the user message', () => {
     const { result } = renderHook(() => useCopilot(0));
     act(() => result.current.send('do it', { mode: 'plan', backend: 'opencode' }));
-    expect(fake.sent).toMatchObject([{ type: 'copilot:send', text: 'do it', mode: 'plan', backend: 'opencode' }]);
+    expect(fake.sent).toMatchObject([
+      { type: 'copilot:send', text: 'do it', mode: 'plan', backend: 'opencode' },
+    ]);
     expect(result.current.items).toMatchObject([{ kind: 'user', text: 'do it' }]);
   });
 
@@ -318,7 +321,11 @@ describe('useCopilot wire payloads', () => {
   it('clears the transcript and stats on a new session', () => {
     const { result } = renderHook(() => useCopilot(0));
     event({ kind: 'text', text: 'old' });
-    event({ kind: 'result', sessionId: 's', stats: { ok: true, text: '', costUsd: 1, durationMs: 2, turns: 1, contextTokens: 3, outputTokens: 4 } });
+    event({
+      kind: 'result',
+      sessionId: 's',
+      stats: { ok: true, text: '', costUsd: 1, durationMs: 2, turns: 1, contextTokens: 3, outputTokens: 4 },
+    });
     expect(result.current.items).toHaveLength(1);
 
     act(() => result.current.newSession());

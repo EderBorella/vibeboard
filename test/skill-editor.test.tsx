@@ -152,7 +152,11 @@ describe('SkillEditor', () => {
   it('adds a column without losing the ones already ticked', () => {
     const onSave = saver();
     render(
-      <SkillEditor {...props} onSave={onSave} skill={skill({ boards: ['engineering'], columns: ['todo'] })} />,
+      <SkillEditor
+        {...props}
+        onSave={onSave}
+        skill={skill({ boards: ['engineering'], columns: ['todo'] })}
+      />,
     );
     fireEvent.click(box('Review'));
     fireEvent.click(screen.getByText('Save skill'));
@@ -164,7 +168,11 @@ describe('SkillEditor', () => {
     // not drop it. A prune that cleared everything would pass the narrowing test and fail here.
     const onSave = saver();
     render(
-      <SkillEditor {...props} onSave={onSave} skill={skill({ boards: ['engineering'], columns: ['done'] })} />,
+      <SkillEditor
+        {...props}
+        onSave={onSave}
+        skill={skill({ boards: ['engineering'], columns: ['done'] })}
+      />,
     );
     fireEvent.click(box('Product'));
     fireEvent.click(screen.getByText('Save skill'));

@@ -88,11 +88,7 @@ describe('BoardsView', () => {
     );
     // The count each board head shows: 1, 0, 2 — a mutant handing every board the same list makes
     // all three equal, which a single-board assertion would not notice.
-    expect([...document.querySelectorAll('.board-count')].map((e) => e.textContent)).toEqual([
-      '1',
-      '0',
-      '2',
-    ]);
+    expect([...document.querySelectorAll('.board-count')].map((e) => e.textContent)).toEqual(['1', '0', '2']);
   });
 
   it('survives a snapshot with a board missing entirely', () => {
@@ -104,11 +100,7 @@ describe('BoardsView', () => {
     expect(boardLabels()).toEqual(['Features', 'Product', 'Engineering']);
     // Empty, not "one card": the fallback has to be an empty list, and a board rendering a phantom
     // card is worse than one rendering none.
-    expect([...document.querySelectorAll('.board-count')].map((e) => e.textContent)).toEqual([
-      '0',
-      '0',
-      '0',
-    ]);
+    expect([...document.querySelectorAll('.board-count')].map((e) => e.textContent)).toEqual(['0', '0', '0']);
   });
 
   it('narrows every board to the cards carrying all the active tags', () => {
@@ -126,11 +118,7 @@ describe('BoardsView', () => {
       />,
     );
     // Both tags required, not either: F-002 and P-001 each carry one and must be filtered out.
-    expect([...document.querySelectorAll('.board-count')].map((e) => e.textContent)).toEqual([
-      '1',
-      '0',
-      '1',
-    ]);
+    expect([...document.querySelectorAll('.board-count')].map((e) => e.textContent)).toEqual(['1', '0', '1']);
   });
 
   it('passes each board its own archived count', () => {
@@ -165,9 +153,7 @@ describe('BoardsView', () => {
 
   it('shows a board as collapsed when the shell says it is', () => {
     render(<BoardsView {...props} collapsed={new Set<BoardName>(['product'])} />);
-    const heads = [...document.querySelectorAll('.board-label')].map((e) =>
-      e.getAttribute('aria-expanded'),
-    );
+    const heads = [...document.querySelectorAll('.board-label')].map((e) => e.getAttribute('aria-expanded'));
     expect(heads).toEqual(['true', 'false', 'true']);
   });
 

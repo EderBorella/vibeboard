@@ -47,58 +47,58 @@ if (verb === 'logs') {
 if (verb !== 'exec') {
   // Nothing further to do; the branches above either exited or are streaming.
 } else {
-let i = 1;
-const env = { ...process.env };
-let cwd;
-// Whether `-i` was passed. THE DOUBLE HONOURS THIS, and it must: real `docker exec` discards stdin
-// without it, and a double that forwarded stdin regardless would be kinder than the real thing — which
-// is exactly how a missing `-i` shipped. Everything an agent is asked to do arrives on stdin, so the
-// bug was total and the suite could not see it, because nothing here could fail without the flag.
-let interactive = false;
-while (i < argv.length) {
-  const flag = argv[i];
-  if (flag === '-e') {
-    const [key, ...rest] = argv[i + 1].split('=');
-    env[key] = rest.join('=');
-    i += 2;
-  } else if (flag === '-w') {
-    // NOT applied: the container path (`/work`) does not exist on the host. Recorded so a test can
-    // assert it was passed, which is the part that matters.
-    env.VIBEBOARD_FAKE_DOCKER_WORKDIR = argv[i + 1];
-    i += 2;
-  } else if (flag === '-u') {
-    env.VIBEBOARD_FAKE_DOCKER_USER = argv[i + 1];
-    i += 2;
-  } else if (flag === '-i') {
-    interactive = true;
-    i += 1;
-  } else {
-    break;
+  let i = 1;
+  const env = { ...process.env };
+  let cwd;
+  // Whether `-i` was passed. THE DOUBLE HONOURS THIS, and it must: real `docker exec` discards stdin
+  // without it, and a double that forwarded stdin regardless would be kinder than the real thing — which
+  // is exactly how a missing `-i` shipped. Everything an agent is asked to do arrives on stdin, so the
+  // bug was total and the suite could not see it, because nothing here could fail without the flag.
+  let interactive = false;
+  while (i < argv.length) {
+    const flag = argv[i];
+    if (flag === '-e') {
+      const [key, ...rest] = argv[i + 1].split('=');
+      env[key] = rest.join('=');
+      i += 2;
+    } else if (flag === '-w') {
+      // NOT applied: the container path (`/work`) does not exist on the host. Recorded so a test can
+      // assert it was passed, which is the part that matters.
+      env.VIBEBOARD_FAKE_DOCKER_WORKDIR = argv[i + 1];
+      i += 2;
+    } else if (flag === '-u') {
+      env.VIBEBOARD_FAKE_DOCKER_USER = argv[i + 1];
+      i += 2;
+    } else if (flag === '-i') {
+      interactive = true;
+      i += 1;
+    } else {
+      break;
+    }
   }
-}
 
-env.VIBEBOARD_FAKE_DOCKER_BOX = argv[i];
-const bin = argv[i + 1];
-const rest = argv.slice(i + 2);
+  env.VIBEBOARD_FAKE_DOCKER_BOX = argv[i];
+  const bin = argv[i + 1];
+  const rest = argv.slice(i + 2);
 
-if (!bin) {
-  process.stderr.write('fake-docker: no command after the container name\n');
-  process.exit(2);
-}
+  if (!bin) {
+    process.stderr.write('fake-docker: no command after the container name\n');
+    process.exit(2);
+  }
 
-const child = spawn(bin, rest, {
-  // stdin only when asked, exactly as docker behaves. stdout/stderr always, because `docker exec`
-  // always returns those.
-  stdio: [interactive ? 'inherit' : 'ignore', 'inherit', 'inherit'],
-  env,
-  cwd,
-});
-child.on('error', (err) => {
-  process.stderr.write(`fake-docker: ${err.message}\n`);
-  process.exit(127);
-});
-child.on('close', (code, signal) => {
-  if (signal) process.kill(process.pid, signal);
-  else process.exit(code ?? 0);
-});
+  const child = spawn(bin, rest, {
+    // stdin only when asked, exactly as docker behaves. stdout/stderr always, because `docker exec`
+    // always returns those.
+    stdio: [interactive ? 'inherit' : 'ignore', 'inherit', 'inherit'],
+    env,
+    cwd,
+  });
+  child.on('error', (err) => {
+    process.stderr.write(`fake-docker: ${err.message}\n`);
+    process.exit(127);
+  });
+  child.on('close', (code, signal) => {
+    if (signal) process.kill(process.pid, signal);
+    else process.exit(code ?? 0);
+  });
 }

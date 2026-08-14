@@ -153,7 +153,7 @@ export class PendingRequests {
   async approve(id: string): Promise<'ok' | 'unknown'> {
     this.#sweep();
     const p = this.#byId.get(id);
-    if (!p || p.state !== 'pending' || p.minting) return 'unknown';
+    if (p?.state !== 'pending' || p.minting) return 'unknown';
     // Set BEFORE the await. Two clicks on one prompt would otherwise both mint, and the second device
     // would exist with nobody holding its credential — a phantom row in the device list forever.
     p.minting = true;
@@ -178,7 +178,7 @@ export class PendingRequests {
   refuse(id: string): boolean {
     this.#sweep();
     const p = this.#byId.get(id);
-    if (!p || p.state !== 'pending') return false;
+    if (p?.state !== 'pending') return false;
     p.state = 'refused';
     this.#opts.onChange?.();
     return true;

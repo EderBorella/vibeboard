@@ -123,12 +123,17 @@ describe('CardTile carrying a problem', () => {
   // the WORD it puts on screen rather than about the kind of card — which is exactly why it needs saying:
   // a tooltip naming the wrong kind of thing is a false claim a person reads.
   it('does not call what it is carrying a task', () => {
-    render(<CardTile card={card({ id: 'F-001', board: 'features' })} miniatureChars={80} carryingAProblem={['P-002']} />);
+    render(
+      <CardTile
+        card={card({ id: 'F-001', board: 'features' })}
+        miniatureChars={80}
+        carryingAProblem={['P-002']}
+      />,
+    );
     const title = screen.getByTitle(/P-002/).getAttribute('title') ?? '';
     expect(title).toContain('a blocked card');
     expect(title).not.toContain('task');
   });
-
 });
 
 // The barrier's effect is invisible from the card it sits on: nothing outside this feature's subtree

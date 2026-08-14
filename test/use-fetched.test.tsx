@@ -10,10 +10,7 @@ import { useFetched } from '../web/src/useFetched.js';
 
 describe('useFetched — what a rejection does', () => {
   it('keeps the last good value by default, and says it failed', async () => {
-    const fetcher = vi
-      .fn()
-      .mockResolvedValueOnce('first')
-      .mockRejectedValueOnce(new Error('offline'));
+    const fetcher = vi.fn().mockResolvedValueOnce('first').mockRejectedValueOnce(new Error('offline'));
     const { result, rerender } = renderHook(({ t }) => useFetched(fetcher, [t], 'blank'), {
       initialProps: { t: 0 },
     });
@@ -26,10 +23,7 @@ describe('useFetched — what a rejection does', () => {
   it('empties back to the initial value when the caller asked for that', async () => {
     // A menu of what can be chosen now, rather than a record: keeping one backend's model aliases
     // on screen after a failed read offers a choice that may no longer exist.
-    const fetcher = vi
-      .fn()
-      .mockResolvedValueOnce(['sonnet'])
-      .mockRejectedValueOnce(new Error('offline'));
+    const fetcher = vi.fn().mockResolvedValueOnce(['sonnet']).mockRejectedValueOnce(new Error('offline'));
     const empty: string[] = [];
     const { result, rerender } = renderHook(
       ({ t }) => useFetched(fetcher, [t], empty, { onFailure: 'clear' }),
@@ -41,10 +35,7 @@ describe('useFetched — what a rejection does', () => {
   });
 
   it('clears an earlier failure when a good answer arrives', async () => {
-    const fetcher = vi
-      .fn()
-      .mockRejectedValueOnce(new Error('offline'))
-      .mockResolvedValueOnce('second');
+    const fetcher = vi.fn().mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce('second');
     const { result, rerender } = renderHook(({ t }) => useFetched(fetcher, [t], 'blank'), {
       initialProps: { t: 0 },
     });
@@ -58,10 +49,9 @@ describe('useFetched — what a rejection does', () => {
 describe('useFetched — what not asking does', () => {
   it('asks nothing while disabled, and keeps what it had', async () => {
     const fetcher = vi.fn().mockResolvedValue('answer');
-    const { result, rerender } = renderHook(
-      ({ on }) => useFetched(fetcher, [0], 'blank', { enabled: on }),
-      { initialProps: { on: true } },
-    );
+    const { result, rerender } = renderHook(({ on }) => useFetched(fetcher, [0], 'blank', { enabled: on }), {
+      initialProps: { on: true },
+    });
     await waitFor(() => expect(result.current.value).toBe('answer'));
     rerender({ on: false });
     expect(result.current.value).toBe('answer');

@@ -2,6 +2,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { skillRel } from '../src/core/layout.js';
+
 const api = vi.hoisted(() => ({
   getRaw: vi.fn(async () => 'file of the active card'),
   putRaw: vi.fn(async () => undefined),
@@ -15,6 +16,7 @@ vi.mock('../web/src/api.js', () => api);
 vi.mock('../web/src/api', () => api);
 
 const { CardsPane } = await import('../web/src/components/CardsPane.js');
+
 import type { CardRef } from '../web/src/dock/tabs.js';
 import type { Card, ProjectConfig } from '../web/src/shared.js';
 
@@ -77,7 +79,11 @@ const props = {
 // The endpoint's shape, so a test naming runs does not have to restate the ledger every time.
 const cardRuns = (...runs: unknown[]) => ({
   runs,
-  account: { spend: { runs: runs.length, withCost: 0, withoutCost: runs.length }, attempts: {}, attemptCap: 3 },
+  account: {
+    spend: { runs: runs.length, withCost: 0, withoutCost: runs.length },
+    attempts: {},
+    attemptCap: 3,
+  },
 });
 
 describe('CardsPane', () => {
@@ -199,9 +205,7 @@ describe('CardsPane', () => {
 
   it('offers the Raw toggle for the active card, and not when there is no card', () => {
     const live = [card('E-001')];
-    const { rerender } = render(
-      <CardsPane {...props} tabs={[ref('E-001')]} activeId="E-001" live={live} />,
-    );
+    const { rerender } = render(<CardsPane {...props} tabs={[ref('E-001')]} activeId="E-001" live={live} />);
     const toggle = screen.getByText('Raw');
     expect(toggle.getAttribute('aria-pressed')).toBe('false');
     expect(toggle.className).toBe('cards-raw');
@@ -222,9 +226,7 @@ describe('CardsPane', () => {
     expect(screen.getByText('Raw').className).toBe('cards-raw active');
     expect(screen.getByText('Raw').getAttribute('aria-pressed')).toBe('true');
     expect(container.querySelector('.cardview')).toBeNull();
-    expect((screen.getByLabelText('card file') as HTMLTextAreaElement).value).toBe(
-      'file of the active card',
-    );
+    expect((screen.getByLabelText('card file') as HTMLTextAreaElement).value).toBe('file of the active card');
 
     await act(async () => {
       fireEvent.click(screen.getByText('Raw'));
@@ -236,9 +238,7 @@ describe('CardsPane', () => {
   it('reports an inline edit against the card it belongs to', () => {
     const onPatch = vi.fn();
     const live = [card('E-001')];
-    render(
-      <CardsPane {...props} onPatch={onPatch} tabs={[ref('E-001')]} activeId="E-001" live={live} />,
-    );
+    render(<CardsPane {...props} onPatch={onPatch} tabs={[ref('E-001')]} activeId="E-001" live={live} />);
     fireEvent.click(screen.getByTitle('Edit title'));
     fireEvent.change(screen.getByLabelText('title'), { target: { value: 'renamed' } });
     fireEvent.blur(screen.getByLabelText('title'));
@@ -248,9 +248,7 @@ describe('CardsPane', () => {
   it('reports a link change against the card it belongs to', () => {
     const onLinks = vi.fn();
     const live = [card('E-001'), card('E-002')];
-    render(
-      <CardsPane {...props} onLinks={onLinks} tabs={[ref('E-001')]} activeId="E-001" live={live} />,
-    );
+    render(<CardsPane {...props} onLinks={onLinks} tabs={[ref('E-001')]} activeId="E-001" live={live} />);
     fireEvent.click(screen.getByText('Change'));
     fireEvent.click(screen.getByText('E-002').closest('label')?.querySelector('input') as HTMLElement);
     expect(onLinks.mock.calls).toEqual([[live[0], ['E-002']]]);
@@ -322,13 +320,7 @@ describe('CardsPane', () => {
       },
     ];
     const { container } = render(
-      <CardsPane
-        {...props}
-        skills={skills}
-        tabs={[ref('E-001')]}
-        activeId="E-001"
-        live={[card('E-001')]}
-      />,
+      <CardsPane {...props} skills={skills} tabs={[ref('E-001')]} activeId="E-001" live={[card('E-001')]} />,
     );
     fireEvent.click(screen.getByText('Execute'));
     expect(screen.getByLabelText('Run Execute on E-001')).toBeTruthy();
@@ -423,8 +415,8 @@ describe('CardsPane', () => {
   });
 
   it('lists the card’s runs, and opens one in place of the card', async () => {
-    api.listCardRuns.mockResolvedValueOnce(cardRuns(
-      {
+    api.listCardRuns.mockResolvedValueOnce(
+      cardRuns({
         run: '20260726-143012-a1b2',
         card: 'E-001',
         board: 'engineering',
@@ -438,8 +430,8 @@ describe('CardsPane', () => {
         mode: 'bypassPermissions',
         summary: 'did the thing',
         report: '## What I did',
-      },
-    ));
+      }),
+    );
     const { container } = render(
       <CardsPane {...props} tabs={[ref('E-001')]} activeId="E-001" live={[card('E-001')]} />,
     );
@@ -526,8 +518,8 @@ describe('CardsPane', () => {
         prompt: 'p',
       },
     ];
-    api.listCardRuns.mockResolvedValueOnce(cardRuns(
-      {
+    api.listCardRuns.mockResolvedValueOnce(
+      cardRuns({
         run: '20260726-141000-9f3e',
         card: 'E-001',
         board: 'engineering',
@@ -543,8 +535,8 @@ describe('CardsPane', () => {
         summary: 'bigger than one card',
         options: ['Split it in two'],
         report: '## What I found',
-      },
-    ));
+      }),
+    );
     const onRun = vi.fn(async () => {});
     render(
       <CardsPane
@@ -563,9 +555,7 @@ describe('CardsPane', () => {
     fireEvent.click(screen.getByText('Split it in two'));
 
     expect(screen.getByLabelText('Run Execute on E-001')).toBeTruthy();
-    expect((screen.getByLabelText('Anything to add?') as HTMLTextAreaElement).value).toBe(
-      'Split it in two',
-    );
+    expect((screen.getByLabelText('Anything to add?') as HTMLTextAreaElement).value).toBe('Split it in two');
     await act(async () => {
       fireEvent.click(screen.getByText('Run Execute'));
     });
@@ -577,8 +567,8 @@ describe('CardsPane', () => {
   it('resolves the run as well as moving the card when you ignore and close', async () => {
     // The bug this fixes: closing the card left the run sitting under "Requires attention" for ever,
     // because a status is written once and nothing said "answered". Both calls, or it comes back.
-    api.listCardRuns.mockResolvedValueOnce(cardRuns(
-      {
+    api.listCardRuns.mockResolvedValueOnce(
+      cardRuns({
         run: '20260726-141000-9f3e',
         card: 'E-001',
         board: 'engineering',
@@ -591,17 +581,11 @@ describe('CardsPane', () => {
         mode: 'bypassPermissions',
         summary: 'bigger than one card',
         report: 'x',
-      },
-    ));
+      }),
+    );
     const onMove = vi.fn();
     render(
-      <CardsPane
-        {...props}
-        onMove={onMove}
-        tabs={[ref('E-001')]}
-        activeId="E-001"
-        live={[card('E-001')]}
-      />,
+      <CardsPane {...props} onMove={onMove} tabs={[ref('E-001')]} activeId="E-001" live={[card('E-001')]} />,
     );
     await waitFor(() => expect(screen.getByText('bigger than one card')).toBeTruthy());
     await act(async () => {
@@ -620,8 +604,8 @@ describe('CardsPane', () => {
   it('still moves the card when resolving the run fails', async () => {
     // The move is the user's instruction; a failed write of our own bookkeeping must not swallow it.
     api.resolveRun.mockRejectedValueOnce(new Error('offline'));
-    api.listCardRuns.mockResolvedValueOnce(cardRuns(
-      {
+    api.listCardRuns.mockResolvedValueOnce(
+      cardRuns({
         run: '20260726-141000-9f3e',
         card: 'E-001',
         board: 'engineering',
@@ -634,17 +618,11 @@ describe('CardsPane', () => {
         mode: 'bypassPermissions',
         summary: 'bigger than one card',
         report: 'x',
-      },
-    ));
+      }),
+    );
     const onMove = vi.fn();
     render(
-      <CardsPane
-        {...props}
-        onMove={onMove}
-        tabs={[ref('E-001')]}
-        activeId="E-001"
-        live={[card('E-001')]}
-      />,
+      <CardsPane {...props} onMove={onMove} tabs={[ref('E-001')]} activeId="E-001" live={[card('E-001')]} />,
     );
     await waitFor(() => expect(screen.getByText('bigger than one card')).toBeTruthy());
     await act(async () => {
@@ -659,8 +637,8 @@ describe('CardsPane', () => {
   it('refuses to continue a run whose skill has been deleted, and says so', async () => {
     // Without this the options would be live and the click would silently do nothing, since the
     // pane cannot build a dispatch without the skill.
-    api.listCardRuns.mockResolvedValueOnce(cardRuns(
-      {
+    api.listCardRuns.mockResolvedValueOnce(
+      cardRuns({
         run: '20260726-141000-9f3e',
         card: 'E-001',
         board: 'engineering',
@@ -674,8 +652,8 @@ describe('CardsPane', () => {
         summary: 'needs a decision',
         options: ['Do the other thing'],
         report: 'x',
-      },
-    ));
+      }),
+    );
     render(
       <CardsPane {...props} skills={[]} tabs={[ref('E-001')]} activeId="E-001" live={[card('E-001')]} />,
     );
@@ -709,5 +687,4 @@ describe('CardsPane', () => {
     );
     expect(container.querySelector('.inline-view')).toBeNull();
   });
-
 });

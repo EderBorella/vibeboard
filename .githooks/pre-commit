@@ -77,7 +77,10 @@ fi
 # `npm run lint` is `biome check`, the SAME command CI runs — not `biome lint`. That distinction
 # cost a red CI run: `check` also reports assists (import organisation), which neither `biome lint`
 # nor `biome format` mentions, so the hook passed 87 findings straight through to the pipeline.
-# Warnings alone do not fail it; biome exits 0 on those.
+#
+# `npm run lint` carries --error-on-warnings as of the commit that reached zero diagnostics, so a
+# warning now blocks too. Bare `biome check` exits 0 on warnings, which is how 2 useOptionalChain
+# findings sat in src/server/signin.ts for a day with the gate reporting green.
 if npm run lint --silent >"$LOGS/lint.log" 2>&1; then
   ok "lint"
 else

@@ -67,10 +67,7 @@ describe('CardView', () => {
       />,
     );
     expect(container.querySelector('.cv-group')?.textContent).toBe('Platform');
-    expect([...container.querySelectorAll('.cv-tags .tag')].map((t) => t.textContent)).toEqual([
-      'bug',
-      'ui',
-    ]);
+    expect([...container.querySelectorAll('.cv-tags .tag')].map((t) => t.textContent)).toEqual(['bug', 'ui']);
     expect(container.querySelector('.cv-desc')?.textContent).toBe('a summary');
   });
 
@@ -94,9 +91,7 @@ describe('CardView', () => {
 
   it('lists linked cards by id and title, dropping ids nothing resolves', () => {
     const other = card({ id: 'E-001', board: 'engineering', title: 'Wire the tab' });
-    render(
-      <CardView card={card({ links: ['E-001', 'GONE-9'] })} config={config} allCards={[other]} />,
-    );
+    render(<CardView card={card({ links: ['E-001', 'GONE-9'] })} config={config} allCards={[other]} />);
     expect(screen.getByText('E-001')).toBeTruthy();
     expect(screen.getByText('Wire the tab')).toBeTruthy();
     expect(screen.queryByText('GONE-9')).toBeNull();
@@ -181,10 +176,7 @@ describe('CardView editing', () => {
 
   it('shows tags as chips and the body as markdown while not editing', () => {
     const { container } = editable({ tags: ['ui', 'bug'], body: '## Plan' });
-    expect([...container.querySelectorAll('.cv-tags .tag')].map((t) => t.textContent)).toEqual([
-      'ui',
-      'bug',
-    ]);
+    expect([...container.querySelectorAll('.cv-tags .tag')].map((t) => t.textContent)).toEqual(['ui', 'bug']);
     expect(container.querySelector('.cv-body h2')?.textContent).toBe('Plan');
   });
 
@@ -220,9 +212,7 @@ describe('CardView field wiring', () => {
     // Only the title is required — a card with no name is unfindable everywhere it is listed.
     expect(patchOf({ title: 'kept' }, 'title', '   ')).not.toHaveBeenCalled();
     cleanup();
-    expect(patchOf({ description: 'gone' }, 'description', '').mock.calls).toEqual([
-      [{ description: '' }],
-    ]);
+    expect(patchOf({ description: 'gone' }, 'description', '').mock.calls).toEqual([[{ description: '' }]]);
   });
 
   it('names each empty field by what it would add', () => {

@@ -36,15 +36,15 @@ describe('LinkPicker', () => {
   });
 
   it('ticks the cards already linked and no others', () => {
-    render(
-      <LinkPicker
-        linkable={[card('E-001'), card('E-002')]}
-        links={['E-002']}
-        onToggle={vi.fn()}
-      />,
-    );
-    const ticked = (id: string): boolean =>
-      (screen.getByText(id).closest('label')?.querySelector('input') as HTMLInputElement).checked;
+    render(<LinkPicker linkable={[card('E-001'), card('E-002')]} links={['E-002']} onToggle={vi.fn()} />);
+    // The cast used to sit outside the `?.`, so a card rendered without its enclosing label read
+    // `undefined.checked` and the case failed as an anonymous TypeError rather than naming the id
+    // whose checkbox went missing. Narrow instead of asserting: this is the fixture's own contract.
+    const ticked = (id: string): boolean => {
+      const box = screen.getByText(id).closest('label')?.querySelector('input');
+      if (!(box instanceof HTMLInputElement)) throw new Error(`no checkbox in the label beside ${id}`);
+      return box.checked;
+    };
     expect(ticked('E-002')).toBe(true);
     expect(ticked('E-001')).toBe(false);
   });

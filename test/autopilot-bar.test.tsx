@@ -49,7 +49,14 @@ const GATES_UNREVIEWED: Readiness = {
   unreviewedGates: ['CODE-QUALITY.md', 'TESTING.md'],
 };
 
-const show = (over: { state?: AutopilotState | null; runs?: RunList; onChanged?: () => void; onSettings?: () => void } = {}) =>
+const show = (
+  over: {
+    state?: AutopilotState | null;
+    runs?: RunList;
+    onChanged?: () => void;
+    onSettings?: () => void;
+  } = {},
+) =>
   render(
     <AutopilotBar
       state={over.state === undefined ? IDLE : over.state}
@@ -88,7 +95,9 @@ describe('the transport control', () => {
   // THE REFUSAL IS THE FEATURE. The server answers a start on an unready project with a sentence naming
   // what is missing; swallowing it leaves a button that does nothing for no stated reason.
   it('shows the server’s refusal verbatim', async () => {
-    api.startAutopilot.mockRejectedValue(new Error('README has almost no content, so there is nothing to derive'));
+    api.startAutopilot.mockRejectedValue(
+      new Error('README has almost no content, so there is nothing to derive'),
+    );
     show();
 
     fireEvent.click(screen.getByRole('button', { name: 'Start' }));
@@ -107,7 +116,9 @@ describe('the transport control', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Start' }));
 
-    await waitFor(() => expect((screen.getByRole('button', { name: 'Starting…' }) as HTMLButtonElement).disabled).toBe(true));
+    await waitFor(() =>
+      expect((screen.getByRole('button', { name: 'Starting…' }) as HTMLButtonElement).disabled).toBe(true),
+    );
     settle();
   });
 });
@@ -135,7 +146,9 @@ describe('the status line', () => {
         queued: [],
       },
     });
-    await waitFor(() => expect(screen.getByTestId('ap-status').textContent).toBe('4 dispatches · E-004 · implement'));
+    await waitFor(() =>
+      expect(screen.getByTestId('ap-status').textContent).toBe('4 dispatches · E-004 · implement'),
+    );
   });
 });
 
@@ -147,7 +160,11 @@ describe('the details drawer', () => {
   });
 
   it('opens on the blockers when the project is not ready', async () => {
-    api.getReadiness.mockResolvedValue({ ...READY, ok: false, blockers: ['README is empty', 'no gate commands'] });
+    api.getReadiness.mockResolvedValue({
+      ...READY,
+      ok: false,
+      blockers: ['README is empty', 'no gate commands'],
+    });
     show();
 
     fireEvent.click(await screen.findByTestId('ap-expand'));

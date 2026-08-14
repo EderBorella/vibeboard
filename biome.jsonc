@@ -13,8 +13,15 @@
       "web/src/**/*.ts",
       "web/src/**/*.tsx",
       "test/**/*.ts",
+      "test/**/*.tsx",
       "vitest.config.ts",
-      "web/vite.config.ts"
+      "web/vite.config.ts",
+      // .mjs is invisible to tsc as well as to biome by default, so these files had NO automated
+      // reader at all: the harness stand-ins the suite spawns, the citation gate `npm run check`
+      // runs, and stryker.config.mjs, whose stale paths would score green over zero mutants.
+      "test/**/*.mjs",
+      "tools/**/*.mjs",
+      "stryker.config.mjs"
     ]
   },
 
@@ -56,7 +63,13 @@
       // so flattening a conditional almost always beats extracting a function.
       "complexity": {
         "noExcessiveCognitiveComplexity": { "level": "error", "options": { "maxAllowedComplexity": 15 } }
-      }
+      },
+      // Raised from its default because that default is `info`, and biome exits 0 on info-level
+      // diagnostics EVEN WITH --error-on-warnings (verified by planting one). So an info rule is not
+      // gated by anything: three of these sat in the .mjs shims, unread, for as long as those files
+      // were outside `files.includes`. Any rule whose default severity is info has to be named here
+      // at warn or above to be enforced at all.
+      "style": { "useTemplate": "warn" }
     }
   },
 

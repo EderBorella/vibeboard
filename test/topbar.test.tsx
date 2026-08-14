@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
-import { describe, it, expect, afterEach, vi } from 'vitest';
-import { render, cleanup, fireEvent, screen } from '@testing-library/react';
+
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { STOP_REASONS } from '../src/core/dispatch-gate.js';
-import type { MainTab } from '../web/src/components/TopBar.js';
 import type { AutopilotState } from '../web/src/api.js';
+import type { MainTab } from '../web/src/components/TopBar.js';
 import { TopBar } from '../web/src/components/TopBar.js';
 
 afterEach(cleanup);
@@ -227,7 +228,6 @@ describe('the auto-pilot chip', () => {
     render(<TopBar {...props} autopilot={state({ state: 'stopped', reason: 'exhausted' })} />);
     expect(chip()?.getAttribute('title')).toBe('exhausted');
   });
-
 
   it('says nothing at all while the project is idle', () => {
     render(<TopBar {...props} autopilot={state({ state: 'idle' })} />);

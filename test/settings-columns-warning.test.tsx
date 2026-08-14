@@ -15,9 +15,7 @@ const api = vi.hoisted(() => ({
   getAccounting: vi.fn().mockRejectedValue(new Error('not what this test is about')),
   // The panel also carries the stop controls, which read auto-pilot's state. Idle here: this file is
   // about the columns warning and the caps, and an idle project is the state with nothing to stop.
-  getAutopilotState: vi
-    .fn()
-    .mockResolvedValue({ state: 'idle', iteration: 0 }),
+  getAutopilotState: vi.fn().mockResolvedValue({ state: 'idle', iteration: 0 }),
   softStopAutopilot: vi.fn(),
   killAutopilot: vi.fn(),
   // And the sign-in panel, which lists the browsers that have signed in. Rejected for the same reason
@@ -32,6 +30,7 @@ const api = vi.hoisted(() => ({
 vi.mock('../web/src/api.js', () => api);
 
 const { SettingsModal } = await import('../web/src/components/SettingsModal.js');
+
 import type { ProjectConfig } from '../web/src/shared.js';
 
 afterEach(cleanup);
@@ -152,7 +151,9 @@ describe('saving the caps', () => {
   // dial that silently did nothing.
   it('shows the server’s refusal rather than swallowing it', async () => {
     api.patchConfig.mockRejectedValue(
-      new Error('engineering: the column "review" is not routed. Edit `autopilot` in .vibeboard/config.yaml.'),
+      new Error(
+        'engineering: the column "review" is not routed. Edit `autopilot` in .vibeboard/config.yaml.',
+      ),
     );
     show(true);
     fireEvent.change(field('Max dispatches'), { target: { value: '3' } });

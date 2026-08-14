@@ -43,11 +43,7 @@ describe('CardLinks', () => {
   it('opens a link when it can, and leaves it a plain row when it cannot', () => {
     const onOpenCard = vi.fn();
     const { rerender } = render(
-      <CardLinks
-        card={card('E-001', { links: ['P-002'] })}
-        allCards={[other]}
-        onOpenCard={onOpenCard}
-      />,
+      <CardLinks card={card('E-001', { links: ['P-002'] })} allCards={[other]} onOpenCard={onOpenCard} />,
     );
     fireEvent.click(screen.getByTitle('Open P-002'));
     expect(onOpenCard.mock.calls).toEqual([[other]]);
@@ -71,11 +67,7 @@ describe('CardLinks', () => {
     const onLinks = vi.fn();
     const third = card('F-003', { board: 'features' });
     render(
-      <CardLinks
-        card={card('E-001', { links: ['P-002'] })}
-        allCards={[other, third]}
-        onLinks={onLinks}
-      />,
+      <CardLinks card={card('E-001', { links: ['P-002'] })} allCards={[other, third]} onLinks={onLinks} />,
     );
     fireEvent.click(screen.getByText('Change'));
     fireEvent.click(boxFor('F-003')); // unticked; ticking it must not drop P-002

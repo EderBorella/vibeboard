@@ -22,9 +22,7 @@ const props = {
   canContinue: true,
 };
 
-const buttons = (): HTMLButtonElement[] => [
-  ...document.querySelectorAll<HTMLButtonElement>('.option-btn'),
-];
+const buttons = (): HTMLButtonElement[] => [...document.querySelectorAll<HTMLButtonElement>('.option-btn')];
 
 describe('ReportOptions', () => {
   it('offers the agent’s options first, then the fixed ones', () => {
@@ -82,12 +80,7 @@ describe('ReportOptions', () => {
     const select = screen.getByLabelText('Column to close the card into') as HTMLSelectElement;
     expect(select.value).toBe('done');
     // Every column is offered by display name, in board order.
-    expect([...select.options].map((o) => o.textContent)).toEqual([
-      'Todo',
-      'In Progress',
-      'Review',
-      'Done',
-    ]);
+    expect([...select.options].map((o) => o.textContent)).toEqual(['Todo', 'In Progress', 'Review', 'Done']);
 
     fireEvent.change(select, { target: { value: 'review' } });
     fireEvent.click(screen.getByText('Close card'));

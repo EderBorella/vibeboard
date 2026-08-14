@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { DiaryEntry } from '../web/src/api.js';
 import { MAX_ENTRY_TEXT } from '../src/core/diary.js';
+import type { DiaryEntry } from '../web/src/api.js';
 import type { Suggestion } from '../web/src/shared.js';
 
 const api = vi.hoisted(() => ({

@@ -58,7 +58,9 @@ const run = (over: Partial<RunRecord> = {}): RunRecord => ({
 
 describe('CardReports', () => {
   it('renders nothing at all for a card that has never been run', () => {
-    const { container } = render(<CardReports runs={[]} account={null} onOpen={vi.fn()} onCancel={vi.fn()} />);
+    const { container } = render(
+      <CardReports runs={[]} account={null} onOpen={vi.fn()} onCancel={vi.fn()} />,
+    );
     expect(container.innerHTML).toBe('');
   });
 
@@ -142,7 +144,12 @@ describe('CardReports', () => {
 
   it('shows a free run as $0 rather than as unknown', () => {
     render(
-      <CardReports runs={[run({ usage: { costUsd: 0 } })]} account={null} onOpen={vi.fn()} onCancel={vi.fn()} />,
+      <CardReports
+        runs={[run({ usage: { costUsd: 0 } })]}
+        account={null}
+        onOpen={vi.fn()}
+        onCancel={vi.fn()}
+      />,
     );
     expect(document.querySelector('.report-cost')?.textContent).toBe('$0');
   });
@@ -252,7 +259,9 @@ describe('CardReports', () => {
   it('opens the report it was clicked on', () => {
     const onOpen = vi.fn();
     const first = run({ run: 'a' });
-    render(<CardReports runs={[first, run({ run: 'b' })]} account={null} onOpen={onOpen} onCancel={vi.fn()} />);
+    render(
+      <CardReports runs={[first, run({ run: 'b' })]} account={null} onOpen={onOpen} onCancel={vi.fn()} />,
+    );
     fireEvent.click(document.querySelectorAll<HTMLElement>('.report-open')[1]);
     expect(onOpen.mock.calls).toEqual([[first]]);
   });
@@ -335,9 +344,7 @@ describe('ReportPane', () => {
   it('links only the created cards that actually exist', () => {
     // An id the agent claims to have created may not be there; a dead link is worse than none.
     const created = card({ id: 'E-041', title: 'Split one' });
-    render(
-      <ReportPane {...props} record={run({ created: ['E-041', 'E-999'] })} createdCards={[created]} />,
-    );
+    render(<ReportPane {...props} record={run({ created: ['E-041', 'E-999'] })} createdCards={[created]} />);
     expect(screen.getByTitle('Open E-041')).toBeTruthy();
     expect(screen.queryByTitle('Open E-999')).toBeNull();
   });
@@ -359,9 +366,7 @@ describe('ReportPane', () => {
 
   it('defaults the move to a Review column where the board has one', () => {
     render(<ReportPane {...props} record={run()} />);
-    expect((screen.getByLabelText('Column to move the card to') as HTMLSelectElement).value).toBe(
-      'review',
-    );
+    expect((screen.getByLabelText('Column to move the card to') as HTMLSelectElement).value).toBe('review');
   });
 
   it('preselects nothing on a board with no Review column', () => {
@@ -436,9 +441,7 @@ describe('ReportPane', () => {
     // has been dealt with as well, which is what stops it asking again from the dashboard.
     const onMove = vi.fn();
     const onClose = vi.fn();
-    render(
-      <ReportPane {...props} onMove={onMove} onClose={onClose} record={run({ status: 'attention' })} />,
-    );
+    render(<ReportPane {...props} onMove={onMove} onClose={onClose} record={run({ status: 'attention' })} />);
     fireEvent.click(screen.getByText('Close card'));
     expect(onClose.mock.calls).toEqual([['done']]);
     expect(onMove).not.toHaveBeenCalled();
@@ -452,10 +455,7 @@ describe('ReportPane', () => {
 
   it('drops the options once the run has been dealt with, and says when', () => {
     render(
-      <ReportPane
-        {...props}
-        record={run({ status: 'attention', resolved: '2026-07-26T21:30:00.000Z' })}
-      />,
+      <ReportPane {...props} record={run({ status: 'attention', resolved: '2026-07-26T21:30:00.000Z' })} />,
     );
     expect(screen.queryByLabelText('What next')).toBeNull();
     expect(screen.getByText('Dealt with')).toBeTruthy();
@@ -596,11 +596,7 @@ describe('ActiveReport', () => {
 
   it('cannot continue a run whose skill has gone', () => {
     render(
-      <ActiveReport
-        {...props}
-        skills={[]}
-        record={run({ status: 'attention', options: ['Split it'] })}
-      />,
+      <ActiveReport {...props} skills={[]} record={run({ status: 'attention', options: ['Split it'] })} />,
     );
     expect((screen.getByText('Split it') as HTMLButtonElement).disabled).toBe(true);
   });

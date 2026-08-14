@@ -87,7 +87,9 @@ describe('when it stopped', () => {
   // A refusal is a decision somebody made. Offering a retry beside it invites arguing with them, and
   // the server would rate-limit the argument anyway.
   it('offers nothing after a refusal', () => {
-    render(<SignIn phase={{ phase: 'stopped', reason: 'That was refused.', retry: false }} onRetry={() => {}} />);
+    render(
+      <SignIn phase={{ phase: 'stopped', reason: 'That was refused.', retry: false }} onRetry={() => {}} />,
+    );
     expect(screen.getByText('That was refused.')).toBeTruthy();
     expect(screen.queryByRole('button')).toBeNull();
   });

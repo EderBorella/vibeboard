@@ -42,6 +42,7 @@ vi.mock('../web/src/api.js', () => api);
 vi.mock('../web/src/api', () => api);
 
 const { WorkArea } = await import('../web/src/components/WorkArea.js');
+
 import type { MainTab } from '../web/src/components/TopBar.js';
 import type { BoardName, Card, ProjectConfig, ProjectSnapshot, Suggestion } from '../web/src/shared.js';
 
@@ -224,10 +225,15 @@ describe('WorkArea', () => {
       <WorkArea
         {...props}
         allCards={[card('E-001'), card('E-002')]}
-        cards={{ ...props.cards, tabs: [
-          { board: 'engineering', id: 'E-001' },
-          { board: 'engineering', id: 'E-002' },
-        ] } as typeof props.cards}
+        cards={
+          {
+            ...props.cards,
+            tabs: [
+              { board: 'engineering', id: 'E-001' },
+              { board: 'engineering', id: 'E-002' },
+            ],
+          } as typeof props.cards
+        }
       />,
     );
     expect(document.querySelector('.dock-badge')?.textContent).toBe('2');

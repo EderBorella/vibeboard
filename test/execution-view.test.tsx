@@ -14,6 +14,7 @@ vi.mock('../web/src/api.js', async (importOriginal) => ({
     return accounting.current;
   },
 }));
+
 import { ExecutionView } from '../web/src/components/ExecutionView.js';
 import type { Card } from '../web/src/shared.js';
 
@@ -285,7 +286,10 @@ describe('the project ledger on the dashboard', () => {
   // S10: a project bounded by iterations must not be shown a dollar figure as its limit.
   it('names iterations when that is the cap that binds', async () => {
     accounting.current = ledger({
-      cap: { cap: 'iterations', why: 'This project has no dollar budget, so auto-pilot stops after 250 iterations.' },
+      cap: {
+        cap: 'iterations',
+        why: 'This project has no dollar budget, so auto-pilot stops after 250 iterations.',
+      },
     });
     render(<ExecutionView {...props} />);
     expect(await screen.findByText(/250 iterations/)).toBeTruthy();

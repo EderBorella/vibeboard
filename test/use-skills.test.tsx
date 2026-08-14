@@ -42,9 +42,7 @@ describe('useSkills', () => {
   });
 
   it('refetches when the trigger changes, so a skill written on disk shows up', async () => {
-    api.listSkills
-      .mockResolvedValueOnce(catalogue('execute'))
-      .mockResolvedValueOnce(catalogue('review'));
+    api.listSkills.mockResolvedValueOnce(catalogue('execute')).mockResolvedValueOnce(catalogue('review'));
     const { result, rerender } = renderHook(({ t }) => useSkills(t), { initialProps: { t: 0 } });
     await waitFor(() => expect(result.current.skills.map((s) => s.slug)).toEqual(['execute']));
     rerender({ t: 1 });
@@ -63,9 +61,7 @@ describe('useSkills', () => {
   it('keeps the last good catalogue when a refetch fails', async () => {
     // An empty rail would read as "this project has no skills"; the previous list is the least
     // misleading thing to show until the next trigger retries.
-    api.listSkills
-      .mockResolvedValueOnce(catalogue('execute'))
-      .mockRejectedValueOnce(new Error('offline'));
+    api.listSkills.mockResolvedValueOnce(catalogue('execute')).mockRejectedValueOnce(new Error('offline'));
     const { result, rerender } = renderHook(({ t }) => useSkills(t), { initialProps: { t: 0 } });
     await waitFor(() => expect(result.current.skills.map((s) => s.slug)).toEqual(['execute']));
     rerender({ t: 1 });

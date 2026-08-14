@@ -40,6 +40,7 @@ vi.mock('../web/src/api', () => api);
 
 const { ProjectControl } = await import('../web/src/components/ProjectControl.js');
 const { CopilotPanel } = await import('../web/src/copilot/CopilotPanel.js');
+
 import type { ProjectConfig, ProjectSnapshot } from '../web/src/shared.js';
 
 afterEach(cleanup);

@@ -30,15 +30,7 @@ const suggestion = (over: Partial<Suggestion> = {}): Suggestion => ({
 // Rendered through a probe rather than poked at as an object: `apply` is a state setter, so what matters is
 // what a consumer would see afterwards. Both fields of every row, because "the row left" and "the row is
 // still there showing the state it had before the click" are the two outcomes being told apart.
-function Probe({
-  bump,
-  state,
-  updated,
-}: {
-  bump: number;
-  state?: SuggestionState;
-  updated: Suggestion;
-}) {
+function Probe({ bump, state, updated }: { bump: number; state?: SuggestionState; updated: Suggestion }) {
   const { suggestions, failed, apply } = useSuggestions(bump, state);
   return (
     <div>
@@ -70,9 +62,7 @@ describe('useSuggestions', () => {
   // own test asserts the mock was called with the right record, which passes while the row stays put.
   it('drops a row the surface no longer asked for, so an actioned one leaves a list of active ones', async () => {
     api.listSuggestions.mockResolvedValue([suggestion(), suggestion({ id: 's-2' })]);
-    render(
-      <Probe bump={0} state="active" updated={suggestion({ state: 'actioned', became: 'P-004' })} />,
-    );
+    render(<Probe bump={0} state="active" updated={suggestion({ state: 'actioned', became: 'P-004' })} />);
     await waitFor(() => expect(rows()).toBe('s-1:active,s-2:active'));
 
     apply();

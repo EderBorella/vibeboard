@@ -165,9 +165,7 @@ describe('useTree', () => {
   it('drops a folder that has gone without raising a banner, and collapses it', async () => {
     // An agent deleting a folder is routine. The row disappearing says it; a red error would not.
     // In call order: the root lists, then the folder being opened has already gone.
-    api.listDir
-      .mockResolvedValueOnce(listing('', [dir('gone')]))
-      .mockRejectedValueOnce(new Error('nope'));
+    api.listDir.mockResolvedValueOnce(listing('', [dir('gone')])).mockRejectedValueOnce(new Error('nope'));
     const { result } = renderHook(() => useTree(0));
     await waitFor(() => expect(result.current.rows).toHaveLength(1));
 
@@ -177,9 +175,7 @@ describe('useTree', () => {
     // exactly how this flaked once under full-suite load. Toggling sets `expanded: true` immediately
     // and the failed listing collapses it back, so the row is the only thing that changes twice.
     await waitFor(() =>
-      expect(result.current.rows).toEqual([
-        { kind: 'node', node: dir('gone'), depth: 0, expanded: false },
-      ]),
+      expect(result.current.rows).toEqual([{ kind: 'node', node: dir('gone'), depth: 0, expanded: false }]),
     );
     expect(result.current.error).toBeNull();
   });

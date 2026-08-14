@@ -59,7 +59,7 @@ function stateAtStart() {
 if (logPath) {
   writeFileSync(
     logPath,
-    JSON.stringify({
+    `${JSON.stringify({
       argv: process.argv.slice(2),
       cwd: process.cwd(),
       pid: process.pid,
@@ -75,7 +75,7 @@ if (logPath) {
       // Its own process group means the leader is itself. `detached: true` is what makes this true, and
       // an emergency stop depends on it.
       isGroupLeader: process.pid === processGroup(),
-    }) + '\n',
+    })}\n`,
   );
 }
 

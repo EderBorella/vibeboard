@@ -49,8 +49,7 @@ const props = {
   onBackend: vi.fn(),
 };
 
-const dispatched = (fn: ReturnType<typeof vi.fn>): DispatchRequest =>
-  fn.mock.calls[0][0] as DispatchRequest;
+const dispatched = (fn: ReturnType<typeof vi.fn>): DispatchRequest => fn.mock.calls[0][0] as DispatchRequest;
 
 describe('DispatchPane', () => {
   it('names the skill and the card it will run against', () => {
@@ -119,9 +118,7 @@ describe('DispatchPane', () => {
 
   it('attaches only what was ticked', () => {
     const onDispatch = vi.fn();
-    render(
-      <DispatchPane {...props} attachable={[API, SPEC]} onDispatch={onDispatch} />,
-    );
+    render(<DispatchPane {...props} attachable={[API, SPEC]} onDispatch={onDispatch} />);
     fireEvent.click(screen.getByText(SPEC));
     fireEvent.click(screen.getByText('Run Execute'));
     expect(dispatched(onDispatch).attachments).toEqual([SPEC]);
@@ -176,9 +173,7 @@ describe('DispatchPane', () => {
       <DispatchPane {...props} previous={previous} initialPrompt="Split it in two" onDispatch={onDispatch} />,
     );
     // The chosen option arrives as an editable starting point, not a fixed instruction.
-    expect((screen.getByLabelText('Anything to add?') as HTMLTextAreaElement).value).toBe(
-      'Split it in two',
-    );
+    expect((screen.getByLabelText('Anything to add?') as HTMLTextAreaElement).value).toBe('Split it in two');
     expect(screen.getByText(/Continues run 20260726-141000-9f3e/)).toBeTruthy();
     fireEvent.click(screen.getByText('Run Execute'));
     expect(dispatched(onDispatch).previous).toBe('20260726-141000-9f3e');

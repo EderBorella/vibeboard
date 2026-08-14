@@ -46,10 +46,8 @@ interface SandboxProbe {
 // far shorter than the interval between a human action and its consequence, and far longer than a burst.
 export const SANDBOX_TTL_MS = 1_000;
 
-export interface LiveSandbox {
-  // The current status, re-probed when the cached one is older than the TTL.
-  (): Promise<SandboxStatus>;
-}
+// The current status, re-probed when the cached one is older than the TTL.
+export type LiveSandbox = () => Promise<SandboxStatus>;
 
 // A LiveSandbox that never changes its mind. For tests, which are about something other than Docker, and
 // for the `NOT_REQUESTED` default — both want the call shape without the daemon.

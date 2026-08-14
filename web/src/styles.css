@@ -110,15 +110,33 @@ body {
    baseline-aligned would hand that to the top bar and hang the whole indicator off a circle. Centring the
    dot removes it from the calculation, so `.conn-text` becomes the first baseline-aligned item and the
    word lines up with the project name and the tabs, which is the point. */
+/* The anchor for the balloon. `position: relative` on a wrapper rather than on the button, so the popup
+   is positioned against the whole control and is not clipped by the button's own box. */
+.conn-wrap { position: relative; display: inline-flex; align-self: baseline; flex: 0 0 auto; }
+/* A BUTTON now, so the browser's own resets have to be undone: a UA stylesheet gives it a background, a
+   border, a centred `align-items` and — the one that matters here — its own font, which would have
+   thrown it straight back off the baseline the bar was just aligned to. */
 .conn-status {
   display: inline-flex;
   align-items: baseline;
   gap: 0.4rem;
   flex: 0 0 auto;
   font-size: 0.72rem;
+  font-family: inherit;
   letter-spacing: 0.04em;
   color: var(--muted);
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  /* A button centres its text by UA default, and `.conn-text` is a fixed 12ch box — so the word sat
+     24px in from where the dot leaves off, and shuffled sideways as the state name changed length.
+     The fixed width exists to stop the TABS moving, not to make the label wander inside it. */
+  text-align: left;
 }
+.conn-status:hover .conn-text { color: var(--text); }
+.conn-status:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 3px; }
 .conn-text { width: 12ch; white-space: nowrap; }
 .conn {
   width: 12px;
@@ -144,6 +162,57 @@ body {
    why the word is there. */
 .conn-offline .conn { background: var(--warn); }
 .conn-offline .conn-text { color: var(--warn); }
+
+/* The balloon. Anchored under the light, left-aligned to it, and deliberately NOT a modal: this
+   explains the state of the page, so covering the page to say it would be self-defeating.
+   `max-width` in `ch` because the longest thing in here is a sentence — the server's refusal — and a
+   measure is the unit prose is read in. Wide enough not to become a column, narrow enough to stay
+   readable at the top of a wide screen. */
+.conn-pop {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  left: 0;
+  z-index: 20;
+  width: max-content;
+  max-width: 46ch;
+  padding: 0.7rem 0.85rem;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  text-align: left;
+  letter-spacing: normal;
+}
+/* The pointer, drawn as a rotated square so it inherits the panel's own background and border and
+   cannot drift out of sync with the theme. Two layers: the border square sits one pixel higher. */
+.conn-pop::before {
+  content: '';
+  position: absolute;
+  top: -5px;
+  left: 14px;
+  width: 8px;
+  height: 8px;
+  background: var(--panel-2);
+  border-left: 1px solid var(--border);
+  border-top: 1px solid var(--border);
+  transform: rotate(45deg);
+}
+.conn-pop-head {
+  margin: 0 0 0.35rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: 0.01em;
+}
+.conn-pop-detail, .conn-pop-next {
+  margin: 0;
+  font-size: 0.76rem;
+  line-height: 1.45;
+  color: var(--muted);
+}
+/* Separated from the detail above it, because they have different authors: the detail is the server's
+   sentence and this is our advice about it. */
+.conn-pop-next { margin-top: 0.5rem; color: var(--text); opacity: 0.75; }
 
 .empty { margin: auto; color: var(--muted); padding: 3rem; }
 

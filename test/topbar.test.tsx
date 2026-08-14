@@ -26,6 +26,7 @@ const props = {
   attentionCount: 0,
   light: 'online' as LightState,
   lightTitle: 'Connected.',
+  agentRefusal: null as string | null,
 };
 
 describe('TopBar', () => {
@@ -144,9 +145,24 @@ describe('TopBar', () => {
   // same trap is called out in vitest.config.ts for the same reason.
   it('reserves a fixed width for the label, so a state change cannot move the tabs', () => {
     const css = readFileSync(join(process.cwd(), 'web', 'src', 'styles.css'), 'utf8');
-    const rule = /\.conn-text\s*\{([^}]*)\}/.exec(css);
+    // ANCHORED TO THE START OF A LINE. Unanchored, `\.conn-text\s*\{` also matches the tail of
+    // `.conn-status:hover .conn-text {`, and once that rule was added the test began reading its
+    // `color` declaration and failing — a false alarm from a regex that matched the wrong rule.
+    const rule = /^\.conn-text\s*\{([^}]*)\}/m.exec(css);
     expect(rule, '.conn-text rule not found in web/src/styles.css').toBeTruthy();
     expect(rule?.[1]).toMatch(/width:\s*12ch/);
+  });
+
+  // The label is LEFT-aligned inside that fixed box, and this is not cosmetic pedantry: a <button>
+  // centres its text by UA default, so when the light became one the word jumped 24px away from the dot
+  // and then shuffled about as the state name changed length. Measured in a real browser — the gap
+  // between the dot's right edge and the first glyph went from an intended 6.4px to 30.7px. jsdom
+  // computes no layout, so the stylesheet is again the only place this can be held.
+  it('left-aligns the label inside its fixed box, which a button does not do by default', () => {
+    const css = readFileSync(join(process.cwd(), 'web', 'src', 'styles.css'), 'utf8');
+    const rule = /^\.conn-status\s*\{([^}]*)\}/m.exec(css);
+    expect(rule, '.conn-status rule not found').toBeTruthy();
+    expect(rule?.[1]).toMatch(/text-align:\s*left/);
   });
 
   // The number 12 is not arbitrary and must not drift from what it is sized for. If a fifth state is

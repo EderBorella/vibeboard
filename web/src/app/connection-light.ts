@@ -28,6 +28,56 @@ export function lightFor(conn: ConnState, agentRefusal: string | null | undefine
   return agentRefusal ? 'offline' : 'online';
 }
 
+// What the balloon says when you click the light: what is wrong, and what you can do about it.
+//
+// SPLIT INTO THREE FIELDS rather than one paragraph, because they have different authors. `heading` and
+// `next` are ours and are about the person; `detail` for `offline` is the SERVER's sentence, verbatim,
+// for the same reason the tooltip is. Blending them into one string would make it impossible to tell
+// which half is the enforced rule and which is our advice about it.
+export interface LightAdvice {
+  heading: string;
+  detail: string;
+  // What to do. Absent when there is nothing to do — `online` needs no instruction, and inventing one
+  // would imply the state is a problem.
+  next?: string;
+}
+
+export function lightAdvice(light: LightState, agentRefusal: string | null | undefined): LightAdvice {
+  if (light === 'offline') {
+    return {
+      heading: 'Docker is not ready',
+      // The server's own words. See lightTitle below.
+      detail: agentRefusal ?? 'This project cannot run agents.',
+      next: 'The board, the Project Log and the Explorer all keep working — it is agents and the copilot that cannot start.',
+    };
+  }
+  if (light === 'closed') {
+    return {
+      heading: 'Not connected',
+      detail:
+        'What you see is whatever was true when the connection dropped. Nothing on this page is updating.',
+      next: 'It keeps retrying on its own. If it does not come back, the server has probably stopped.',
+    };
+  }
+  if (light === 'connecting') {
+    return {
+      heading: 'Reconnecting',
+      detail: 'Trying to reach the server. Anything on screen may be a moment out of date.',
+    };
+  }
+  if (light === 'unauthorized') {
+    return {
+      heading: 'This browser is not signed in',
+      detail: 'Without a credential every button here fails, whatever the board appears to show.',
+      next: 'Open the board on a browser that is already signed in and approve this one.',
+    };
+  }
+  return {
+    heading: 'Everything is running',
+    detail: 'Connected to the server, and this project has what it needs to run agents.',
+  };
+}
+
 // The tooltip. For `offline` it is the server's OWN sentence — `agentRefusal`, computed by the same
 // function the dispatch gate calls (src/server/boxes/sandbox.ts), so the light cannot describe a rule
 // the gate does not apply. Re-wording it here would be a second opinion about whether agents can run,

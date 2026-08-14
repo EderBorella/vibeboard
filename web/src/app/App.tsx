@@ -275,6 +275,7 @@ export function App() {
         autopilot={autopilot.state}
         light={light}
         lightTitle={lightTitle(light, sandbox?.agentRefusal)}
+        agentRefusal={sandbox?.agentRefusal}
       />
 
       {/* Stacked under the header, only with a project open: transport for the thing the whole app is

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { LIGHT_STATES, lightFor, lightTitle } from '../web/src/app/connection-light.js';
+import { LIGHT_STATES, lightAdvice, lightFor, lightTitle } from '../web/src/app/connection-light.js';
 import type { ConnState } from '../web/src/ws.js';
 
 const REFUSAL = 'Agents are disabled: the agent image vibeboard-agent:latest is not built.';
@@ -44,6 +44,44 @@ describe('what the light says', () => {
       ]),
     );
     for (const a of answers) expect(LIGHT_STATES).toContain(a);
+  });
+});
+
+describe('what the balloon says', () => {
+  // FIVE DISTINCT HEADINGS, asserted as a set. The weaker version of this test compared the whole
+  // rendered text of two states and passed while a mutant gave every state the heading "Not connected" —
+  // because the details still differed underneath. The heading is the line a person actually reads, and
+  // a wrong one sends them to fix the wrong thing.
+  it('gives every state its own heading', () => {
+    const headings = LIGHT_STATES.map((s) => lightAdvice(s, REFUSAL).heading);
+    expect(new Set(headings).size).toBe(LIGHT_STATES.length);
+  });
+
+  it('names Docker in the offline heading, since that is the thing to go and fix', () => {
+    expect(lightAdvice('offline', REFUSAL).heading.toLowerCase()).toContain('docker');
+  });
+
+  // Same rule as the tooltip: the refusal is the server's, verbatim, and the balloon is where it is
+  // shown IN FULL rather than truncated into a title attribute.
+  it('carries the server’s refusal as the offline detail, unchanged', () => {
+    expect(lightAdvice('offline', REFUSAL).detail).toBe(REFUSAL);
+  });
+
+  // A missing refusal must still produce a usable balloon rather than an empty one — the light can only
+  // reach `offline` with a refusal in hand, but `lightAdvice` is a pure function anyone may call.
+  it('still says something when offline arrives with no sentence attached', () => {
+    const advice = lightAdvice('offline', null);
+    expect(advice.detail.length).toBeGreaterThan(0);
+  });
+
+  it('offers no instruction for online, because there is nothing to do', () => {
+    expect(lightAdvice('online', null).next).toBeUndefined();
+  });
+
+  it('offers one for every state that IS a problem', () => {
+    for (const state of ['offline', 'closed', 'unauthorized'] as const) {
+      expect(lightAdvice(state, REFUSAL).next, state).toBeTruthy();
+    }
   });
 });
 

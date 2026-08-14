@@ -1,4 +1,5 @@
 import { type AutopilotState, isSuccessReason } from '../api';
+import { ConnectionLight } from './ConnectionLight';
 import type { LightState } from './connection-light';
 
 // Add a theme here after adding its [data-theme] block in themes.css.
@@ -58,6 +59,8 @@ interface Props {
   // is a rule nothing can test on its own.
   light: LightState;
   lightTitle: string;
+  // Passed through to the balloon, which shows the server's refusal in full where the tooltip truncates.
+  agentRefusal: string | null | undefined;
 }
 
 export function TopBar({
@@ -75,6 +78,7 @@ export function TopBar({
   autopilot,
   light,
   lightTitle,
+  agentRefusal,
 }: Props) {
   const chip = autopilot ? chipFor(autopilot) : null;
   return (
@@ -89,10 +93,7 @@ export function TopBar({
           `offline` is the last of those — the project is reachable but cannot run anything — and it was
           previously visible only as a refusal at the moment you tried to work, or two clicks deep in a
           settings dialog nobody opens before they need it. */}
-      <span className={`conn-status conn-${light}`} title={lightTitle}>
-        <span className="conn" />
-        <span className="conn-text">{light}</span>
-      </span>
+      <ConnectionLight light={light} title={lightTitle} agentRefusal={agentRefusal} />
       {showProject && chip && (
         <span className={`ap-chip ap-${chip.tone}`} title={autopilot?.detail ?? chip.label}>
           {chip.label}

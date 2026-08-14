@@ -34,6 +34,8 @@ this index exists for the ones whose reason lives somewhere else.
 | `foundation.ts` | `decisions.md`, `foundation-bootstrap.md` | `decision 66`, `decision 67` |
 | `harness-feature.ts` | `decisions.md`, `foundation-bootstrap.md` | `decision 3`, `decision 44`, `decision 66`, `decision 67` |
 | `layout.ts` | `decisions.md`, `security/containment.md` (`SUGGESTIONS_DIR`'s comment names the dead profile; the rule is now a read-only mount) | `decision 20` |
+| `lifecycle/stop-sentences.ts` | `decisions.md` — the sentences a stop carries, and what each one used to say: most are corrections that named a mechanism the product no longer has | `decision 44`, `decision 45`, `decision 52`, `decision 55`, `decision 66` |
+| `lifecycle/tick.ts` | `decisions.md` — the lifecycle machine; more rulings meet here than anywhere else. `tick.ts` is the re-export barrel and holds no reasoning of its own | `decision 4`, `decision 39`, `decision 42`, `decision 45`, `decision 47`, `decision 50`, `decision 52`, `decision 53`, `decision 54`, `decision 58`, `decision 59` |
 | `links.ts` | `decisions.md` | `decision 65` |
 | `mutations.ts` | `decisions.md` | `decision 58`, `decision 65` |
 | `phases.ts` | `decisions.md` — the phase table itself | `decision 38`, `decision 44`, `decision 47`, `decision 50`, `decision 52`, `decision 56`, `decision 61` |
@@ -44,7 +46,6 @@ this index exists for the ones whose reason lives somewhere else.
 | `setup-feature.ts` | `decisions.md` | `decision 50`, `decision 51` |
 | `smoke-declaration.ts` | `decisions.md`, `foundation-bootstrap.md` | `decision 3`, `decision 66`, `decision 67` |
 | `suggestions.ts` | `decisions.md` | `decision 49` |
-| `tick.ts` | `decisions.md` — the lifecycle machine; more rulings meet here than anywhere else | `decision 4`, `decision 39`, `decision 42`, `decision 44`, `decision 45`, `decision 47`, `decision 50`, `decision 52`, `decision 53`, `decision 54`, `decision 55`, `decision 58`, `decision 59`, `decision 66` |
 | `types.ts` | `decisions.md` | `decision 50`, `decision 58` |
 | `verify.ts` | `decisions.md` | `decision 18`, `decision 57` |
 

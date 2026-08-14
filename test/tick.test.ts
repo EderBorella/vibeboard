@@ -1,28 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import type { Spend } from '../src/core/accounting.js';
-import type { TickAction } from '../src/core/actions.js';
 import { DEFAULT_AUTOPILOT } from '../src/core/autopilot.js';
-import type { AutopilotState } from '../src/core/autopilot-state.js';
-import type { DeclaredCommands } from '../src/core/foundation.js';
+import { decideTick, type TickInput } from '../src/core/lifecycle/tick.js';
 import { type RunRecord, type RunStatus, withVerification } from '../src/core/runs.js';
-import { decideTick, type TickInput } from '../src/core/tick.js';
 import type { BoardName, Card } from '../src/core/types.js';
 import type { Verification } from '../src/core/verify.js';
+import { base, COLUMNS, card, detailOf, input, state, task } from './tick-fixtures.js';
 
-function card(id: string, board: BoardName, columnSlug: string, order: number, links: string[]): Card {
-  return {
-    id,
-    title: id,
-    order,
-    tags: [],
-    links,
-    created: '2026-08-05',
-    board,
-    columnSlug,
-    body: '',
-    filePath: `/tmp/${id}.md`,
-  };
-}
+// WHICH ACTION THE MACHINE ANSWERS WITH — the phase router in src/core/lifecycle/tick.ts. The sentences
+// those stops carry are asserted in test/tick-stop-sentences.test.ts instead, against the module that
+// generates them; what is here is the order of the guards and the phase each position lands in.
 
 let runCount = 0;
 
@@ -61,53 +48,12 @@ const derivation = (status: RunStatus, i: number): RunRecord => ({
   board: undefined,
 });
 
-// The scaffolder's own defaults, as slugs. Product carries a `blocked` column since decision 45's
-// 2026-08-13 correction, and the tick reads this list before stamping one — a column IS a folder, so a
-// stamp to a column the board has not got creates the folder and hides the card.
-const COLUMNS: Record<BoardName, string[]> = {
-  features: ['backlog', 'todo', 'in-progress', 'done'],
-  product: ['backlog', 'todo', 'in-progress', 'blocked', 'done'],
-  engineering: ['backlog', 'in-progress', 'review', 'blocked', 'done'],
-};
-
 // A project scaffolded before product had one. There is no migration (ruling 59), so this is the shape of
 // every project that already exists.
 const WITHOUT_PRODUCT_BLOCKED: Record<BoardName, string[]> = {
   ...COLUMNS,
   product: ['backlog', 'todo', 'in-progress', 'done'],
 };
-
-const RUNNING: AutopilotState = { state: 'running', iteration: 0 };
-
-const NO_SPEND: Spend = { runs: 0, withCost: 0, withoutCost: 0 };
-
-// One feature being worked, with one story under it. ONE open feature, because two is a refusal now
-// (decision 39's invariant) and a fixture that trips it would answer every test with the same stop.
-const base = (): Card[] => [
-  card('F-001', 'features', 'todo', 10, ['P-001']),
-  card('P-001', 'product', 'backlog', 10, ['F-001']),
-];
-
-const DISTINCT_COMMANDS: DeclaredCommands = { gates: ['gate one', 'gate two'], smoke: 'use the thing' };
-
-const input = (over: Partial<TickInput> = {}): TickInput => ({
-  ap: DEFAULT_AUTOPILOT,
-  state: RUNNING,
-  cards: base(),
-  columns: COLUMNS,
-  runs: [],
-  spend: NO_SPEND,
-  inFlight: [],
-  problems: [],
-  // A GATE AND A SMOKE COMMAND THAT DIFFER, which is the ordinary project and the only fixture under which
-  // `complete` is reachable at all (ruling 66). Every test about the collision names its own pair.
-  commands: DISTINCT_COMMANDS,
-  ...over,
-});
-
-const state = (over: Partial<AutopilotState>): AutopilotState => ({ ...RUNNING, ...over });
-
-const detailOf = (action: TickAction): string => (action.kind === 'stop' ? (action.detail ?? '') : '');
 
 describe('the caps come first', () => {
   it('stops capped at the iteration cap', () => {
@@ -135,16 +81,6 @@ describe('the caps come first', () => {
     const action = decideTick(input({ ap }));
     expect(action).toMatchObject({ kind: 'stop', reason: 'stalled' });
     expect(action).toHaveProperty('detail', expect.stringContaining('maxIterations'));
-  });
-
-  // MOVED HERE FROM eligibility.ts WITH THE COMPARISON IT GUARDS. The new tick counts every bound itself —
-  // the bootstrap's attempts, and every phase's — so a cap that is not a number would delete the limit here
-  // rather than in a module nothing calls any more. `used >= NaN` is false, so it fails open.
-  it('stops stalled and names attemptCap when it is not a usable number', () => {
-    const ap = { ...DEFAULT_AUTOPILOT, attemptCap: Number.NaN };
-    const action = decideTick(input({ ap }));
-    expect(action).toMatchObject({ kind: 'stop', reason: 'stalled' });
-    expect(action).toHaveProperty('detail', expect.stringContaining('attemptCap'));
   });
 
   // BOTH BRANCHES ARMED, which is what makes this about the ORDER rather than about either branch: an empty
@@ -198,37 +134,6 @@ describe('the shape of the config, not just its numbers', () => {
   });
 });
 
-// FINDING C, and it is a CARRIED guard rather than a new one. An unreadable card used to reach the loop only
-// through eligibility.ts, which slice 3 deletes — so without this branch that deletion would silently remove
-// the fail-closed refusal, and the sentence a user reads with it.
-describe('a card that will not parse stops everything', () => {
-  it('stops stalled naming the file and the reason', () => {
-    const problems = [{ path: 'boards/features/todo/F-002.md', reason: 'bad YAML' }];
-    const action = decideTick(input({ problems }));
-    expect(action).toMatchObject({ kind: 'stop', reason: 'stalled' });
-    expect(detailOf(action)).toContain('F-002.md');
-    expect(detailOf(action)).toContain('bad YAML');
-  });
-
-  it('says how many more there are without listing all of them', () => {
-    const problems = [
-      { path: 'a.md', reason: 'bad YAML' },
-      { path: 'b.md', reason: 'bad YAML' },
-      { path: 'c.md', reason: 'bad YAML' },
-    ];
-    expect(detailOf(decideTick(input({ problems })))).toContain('2 more');
-  });
-
-  // BEFORE the position is derived, because the broken file could BE the open feature — or a child that
-  // would change which story is next. A position derived from a board that will not fully parse is a guess.
-  it('refuses before deriving a position, even when the readable cards look fine', () => {
-    const problems = [{ path: 'boards/product/backlog/P-002.md', reason: 'bad indentation' }];
-    const action = decideTick(input({ cards: base(), problems }));
-    expect(action).toMatchObject({ kind: 'stop', reason: 'stalled' });
-    expect(detailOf(action)).toContain('P-002.md');
-  });
-});
-
 // DECISION 39's INVARIANT, reaching the loop. The position refuses rather than guessing, and the tick's job
 // is to carry that refusal out with the sentence intact.
 describe('two open cards of the same kind stop the loop', () => {
@@ -267,24 +172,6 @@ describe('nothing to work on is not the same as nothing left', () => {
     expect(decideTick(input({ cards }))).toMatchObject({ kind: 'stop', reason: 'complete' });
   });
 
-  // THE B3 SHAPE, and the fixture has to be a column the phase table has no row for. `triage` is a folder
-  // somebody made, or a column taken out of the board's columns with cards still in it.
-  it('stops stalled, naming the cards, when a card sits in a column nothing covers', () => {
-    const cards = [
-      card('F-001', 'features', 'done', 10, ['P-001']),
-      card('P-001', 'product', 'done', 10, ['F-001']),
-      card('E-009', 'engineering', 'triage', 10, []),
-    ];
-    const action = decideTick(input({ cards }));
-    expect(action).toMatchObject({ kind: 'stop', reason: 'stalled' });
-    expect(detailOf(action)).toContain('E-009');
-    // AND IT NAMES WHAT ACTUALLY PLACES A CARD. Under ruling 52 the phase table is code and a column
-    // dispatches nothing, so the advice this used to give — "check that every column is routed, terminal or
-    // blocked" — sent the reader to a routing table that no longer decides anything.
-    expect(detailOf(action)).toContain('a column the lifecycle has no phase for');
-    expect(detailOf(action)).not.toContain('routed');
-  });
-
   // WAS "stops stalled for a card the loop itself blocked". Decision 45 REPEALS that: a blocked task is
   // settled, so a board whose only outstanding card is one reports `complete` and names it. The finding-D
   // block at the end of this file is where that behaviour is pinned, both directions.
@@ -297,32 +184,6 @@ describe('nothing to work on is not the same as nothing left', () => {
     const action = decideTick(input({ cards }));
     expect(action).toMatchObject({ kind: 'stop', reason: 'complete' });
     expect(detailOf(action)).toContain('E-009');
-  });
-
-  // ORPHANED WORK UNDER A CLOSED FEATURE, which is what it takes to reach this sentence at all now: anything
-  // under an OPEN feature is a position the machine picks up, so the only unplaceable work is what sits below
-  // a feature somebody has already moved to Done.
-  const orphaned = (): Card[] => [
-    card('F-001', 'features', 'done', 10, ['P-001']),
-    card('P-001', 'product', 'in-progress', 10, ['F-001', 'E-001']),
-    card('E-001', 'engineering', 'blocked', 10, ['P-001']),
-  ];
-
-  // THE SETUP BARRIER'S SENTENCE IS GONE WITH THE BARRIER (decision 44). Nothing can be "waiting for the
-  // setup feature" any more, and a message about a rule that no longer exists is worse than none.
-  it('never says a card is waiting for the setup feature', () => {
-    const cards = orphaned();
-    cards[0] = { ...cards[0], setup: true };
-    const detail = detailOf(decideTick(input({ cards })));
-    // The fixture really does reach the stalled sentence, so the assertion below is not vacuous.
-    expect(detail).toContain('E-001');
-    expect(detail).not.toContain('waiting for the setup feature');
-  });
-
-  it('says a parent is waiting for its own cards further down', () => {
-    const detail = detailOf(decideTick(input({ cards: orphaned() })));
-    expect(detail).toMatch(/E-001 ran out of attempts/);
-    expect(detail).toMatch(/P-001 is waiting for its own cards further down/);
   });
 
   // The ordinary resume path, and the one stop reason with no test of its own otherwise: `reconcile` writes
@@ -488,11 +349,7 @@ describe('decideTick — the feature loop', () => {
   // DECISION 50, and it is what makes the machine idempotent across a crash or a restart: a follow-up feature
   // arrives with its stories already attached, so a break-down would create a second set of them.
   it('skips break-down for a feature that already has a story', () => {
-    const cards = [
-      card('F-001', 'features', 'todo', 10, ['P-001']),
-      card('P-001', 'product', 'backlog', 10, ['F-001']),
-    ];
-    expect(decideTick(input({ cards }))).toMatchObject({
+    expect(decideTick(input({ cards: base() }))).toMatchObject({
       kind: 'stamp',
       phase: 'feature-breakdown-skip',
       to: 'in-progress',
@@ -825,9 +682,6 @@ const story = (taskIds: string[]): Card[] => [
   card('P-001', 'product', 'in-progress', 10, ['F-001', ...taskIds]),
 ];
 
-const task = (id: string, columnSlug: string, order = 10): Card =>
-  card(id, 'engineering', columnSlug, order, ['P-001']);
-
 describe('decideTick — the task loop', () => {
   it('stamps a backlog task into in-progress and dispatches implement', () => {
     const cards = [...story(['E-001']), task('E-001', 'backlog')];
@@ -1056,119 +910,6 @@ describe('decideTick — finding D: complete with a blocked task', () => {
       task('E-001', 'blocked'),
     ];
     expect(decideTick(input({ cards }))).toMatchObject({ kind: 'stop', reason: 'stalled' });
-  });
-
-  // CHANGE 1's own subject. With change 2 in place a purely-blocked board never reaches `whyStuck`, so the
-  // sentence is only observable in the MIXED case — without this test, deleting it is an equivalent mutant.
-  it('does not claim a blocked task stops the project from finishing, in the mixed case', () => {
-    const cards = [task('E-001', 'blocked'), card('E-009', 'engineering', 'triage', 20, [])];
-    const detail = detailOf(decideTick(input({ cards })));
-    expect(detail).toContain('E-001');
-    expect(detail).not.toContain('cannot report itself finished');
-  });
-});
-
-// RULING 66. `complete` is computed from more than one place — the clean ending and the one that names what it
-// left behind — so each is asserted on its own here, and the two together. The project that produced the ruling
-// declared `npm test` as both its gate and its smoke command: four features closed, sixteen tasks delivered,
-// `complete` reported, and the product had no main and printed nothing.
-describe('decideTick — a smoke command that is also a gate', () => {
-  const SAME = 'npm test';
-  const collides: DeclaredCommands = { gates: [SAME], smoke: SAME };
-
-  const done = (extra: Card[] = []): Card[] => [
-    card('F-001', 'features', 'done', 10, ['P-001']),
-    card('P-001', 'product', 'done', 10, ['F-001', 'E-001']),
-    task('E-001', 'done'),
-    ...extra,
-  ];
-
-  it('refuses to report the project finished, and says what has not been run', () => {
-    const action = decideTick(input({ cards: done(), commands: collides }));
-    expect(action).toMatchObject({ kind: 'stop', reason: 'stalled' });
-    // THE COMMAND ITSELF, because "your smoke command is wrong" sends a reader to look for which one.
-    expect(detailOf(action)).toContain(SAME);
-    expect(detailOf(action)).toContain('foundation/TESTING.md');
-    expect(detailOf(action)).toContain('the way its README describes');
-  });
-
-  it('reports complete once a distinct smoke command is declared', () => {
-    const commands: DeclaredCommands = { gates: [SAME], smoke: 'node dist/cli.js --help' };
-    expect(decideTick(input({ cards: done(), commands }))).toMatchObject({
-      kind: 'stop',
-      reason: 'complete',
-    });
-  });
-
-  it('compares against EVERY gate, not only the first', () => {
-    // One string comparison per gate. Against the first alone, a project whose second gate is its smoke
-    // command passes this — and `npm test` is as likely to be the second row as the first.
-    const commands: DeclaredCommands = { gates: ['npm run lint', SAME], smoke: SAME };
-    expect(decideTick(input({ cards: done(), commands }))).toMatchObject({
-      kind: 'stop',
-      reason: 'stalled',
-    });
-  });
-
-  it('does not refuse a project that declares no gates at all', () => {
-    // POINT 7's honest direction. A CODE-QUALITY.md that declares nothing has no gate for the smoke command to
-    // collide with, and `readGates` answers such a project with a reason rather than a list — so
-    // `declaredCommands` carries no commands and there is nothing to compare. A refusal here would name a
-    // command nobody wrote. What that project fails is the review's own gate check, which fails closed.
-    const commands: DeclaredCommands = { gates: [], smoke: SAME };
-    expect(decideTick(input({ cards: done(), commands }))).toMatchObject({
-      kind: 'stop',
-      reason: 'complete',
-    });
-  });
-
-  it('does not refuse a project whose smoke command could not be read, which readiness owns', () => {
-    // Stated because it looks like a hole: `smoke.ok` is a readiness BLOCKER, so a project with no readable
-    // smoke command cannot be STARTED — a second refusal here would be about a state the loop cannot reach.
-    const commands: DeclaredCommands = { gates: [SAME] };
-    expect(decideTick(input({ cards: done(), commands }))).toMatchObject({
-      kind: 'stop',
-      reason: 'complete',
-    });
-  });
-
-  // DECISION 45's ARGUMENT, ONE LEVEL OUT. A card that ran out of attempts has had every attempt it is allowed,
-  // so a project holding one is not held hostage over a command no run can now change: the ending is `complete`
-  // and it names BOTH facts, because naming it is what makes carrying on safe.
-  // TWO TESTS OVER ONE FIXTURE, deliberately: the guard that lets the ending through and the clause that names
-  // why are separate edits, and one test asserting both would fail for either — so neither would be pinned by
-  // cover of its own.
-  it('finishes anyway when something is blocked, rather than holding the project hostage', () => {
-    const cards = done([task('E-002', 'blocked', 20)]);
-    expect(decideTick(input({ cards, commands: collides }))).toMatchObject({
-      kind: 'stop',
-      reason: 'complete',
-    });
-  });
-
-  it('names both facts in that ending — the blocked card and the unrun smoke test', () => {
-    const cards = done([task('E-002', 'blocked', 20)]);
-    const detail = detailOf(decideTick(input({ cards, commands: collides })));
-    expect(detail).toContain('E-002');
-    expect(detail).toContain(SAME);
-  });
-
-  it('says nothing about the smoke command in that sentence when there is no collision', () => {
-    // Without this the clause could be a constant appended to every blocked ending, and the test above would
-    // pass just as well.
-    const cards = done([task('E-002', 'blocked', 20)]);
-    const action = decideTick(input({ cards }));
-    expect(detailOf(action)).toContain('E-002');
-    expect(detailOf(action)).not.toContain('README describes');
-  });
-
-  it('is not what stops a project with outstanding work, which is stalled for its own reason', () => {
-    // The refusal belongs to the ONE ending it guards. A board with work left never reaches it, and a
-    // collision must not change the sentence a person gets about the work that is actually outstanding.
-    const cards = [card('E-009', 'engineering', 'triage', 20, [])];
-    const action = decideTick(input({ cards, commands: collides }));
-    expect(action).toMatchObject({ kind: 'stop', reason: 'stalled' });
-    expect(detailOf(action)).not.toContain('README describes');
   });
 });
 

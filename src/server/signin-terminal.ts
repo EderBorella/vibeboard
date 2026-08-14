@@ -4,7 +4,7 @@
 // test can import — running it starts a server. Everything here is a plain function of its inputs, so
 // the banner's words and the signal's effect are both under test.
 
-export interface SigninBannerState {
+interface SigninBannerState {
   // Whether any browser has ever signed in. Drives the whole message: with none, the next page load
   // signs itself in and there is nothing for the user to do.
   empty: boolean;
@@ -41,7 +41,7 @@ export function signinBanner(state: SigninBannerState): string[] {
   return lines;
 }
 
-export interface BreakGlassDeps {
+interface BreakGlassDeps {
   on: (signal: 'SIGUSR2', handler: () => void) => void;
   out: (line: string) => void;
   clear: () => Promise<void>;

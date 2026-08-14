@@ -28,15 +28,15 @@ import { type AutopilotLogTarget, type Log, openAutopilotLog } from './logging.j
 // 3. NOT AWAITED. `start` returns once the child exists and the state says `running`. Waiting for the
 //    loop would be waiting for the whole project to finish.
 
-export interface ServiceStartOk {
+interface ServiceStartOk {
   ok: true;
   state: AutopilotState;
 }
-export interface ServiceStartFailed {
+interface ServiceStartFailed {
   ok: false;
   error: string;
 }
-export type ServiceStartResult = ServiceStartOk | ServiceStartFailed;
+type ServiceStartResult = ServiceStartOk | ServiceStartFailed;
 
 // What to run, and where the loop should call back to. Injected as a whole so a test can put a shim in
 // place of the real entry point and read back exactly what the process was given — the same way the
@@ -46,7 +46,7 @@ export interface ServiceCommand {
   args: string[];
 }
 
-export interface ServiceProcessOptions {
+interface ServiceProcessOptions {
   root: () => string | undefined;
   now: () => Date;
   credentials: CredentialStore;

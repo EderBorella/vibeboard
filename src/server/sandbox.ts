@@ -24,7 +24,7 @@ export type SandboxStatus = { ok: true; image: string } | { ok: false; reason: s
 
 export const NOT_REQUESTED: SandboxStatus = { ok: false, reason: 'not requested' };
 
-export interface SandboxProbe {
+interface SandboxProbe {
   probe(): Promise<{ ok: true } | { ok: false; reason: string }>;
 }
 

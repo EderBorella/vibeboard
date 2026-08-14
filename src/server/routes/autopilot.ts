@@ -132,7 +132,7 @@ function blockersFrom(
   ];
 }
 
-export function composeReadiness(config: ProjectConfig, skillSlugs: string[], read: Read): Readiness {
+function composeReadiness(config: ProjectConfig, skillSlugs: string[], read: Read): Readiness {
   const lifecycleProblems = lifecycleProblemsFor(config, skillSlugs);
   // BOTH facts, and the skill one is not a formality: a project with no `derive-features` skill has nothing
   // to bootstrap with, and telling it to go and write its README would send the reader to fix the wrong file.
@@ -322,7 +322,7 @@ async function registerControls(api: FastifyInstance, ctx: AppCtx): Promise<void
 // UI renders it, and the auto-pilot service reads the same numbers over the same endpoint to decide
 // whether it may dispatch. Two copies of "what has this cost" would eventually disagree, and the one
 // that enforces the budget is the one that must be right.
-export interface CardAccount {
+interface CardAccount {
   board: BoardName;
   card: string;
   spend: Spend;
@@ -340,11 +340,7 @@ export interface Accounting {
   cap?: { cap: CapName; why: string };
 }
 
-export function composeAccounting(
-  runs: RunRecord[],
-  ap: AutopilotConfig | undefined,
-  iteration = 0,
-): Accounting {
+function composeAccounting(runs: RunRecord[], ap: AutopilotConfig | undefined, iteration = 0): Accounting {
   const project = sumSpend(runs);
   const cards: CardAccount[] = [];
   for (const [key, spend] of spendByCard(runs)) {

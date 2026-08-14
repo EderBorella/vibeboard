@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { getSigninState, revokeDevice, type SigninDevice, signOutEverything } from '../api';
 import { revokeDeviceRequest, signOutEverythingRequest } from '../confirm/requests';
 import type { Confirmer } from '../confirm/useConfirm';
+import { errorText } from '../errors';
 
 interface Props {
   // Asked before either irreversible thing here. Both sign a browser out of a live session, and one
@@ -31,7 +32,7 @@ export function SignInPanel({ confirm }: Props) {
         setDevices(s.devices);
         setThisDevice(s.thisDevice);
       })
-      .catch((e) => setError(e instanceof Error ? e.message : String(e)));
+      .catch((e) => setError(errorText(e)));
   }, []);
 
   useEffect(load, [load]);
@@ -43,7 +44,7 @@ export function SignInPanel({ confirm }: Props) {
       await fn();
       load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorText(e));
     } finally {
       setBusy(null);
     }

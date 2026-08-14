@@ -2,6 +2,7 @@ import { resolveCopilotSelection } from '../core/copilot-choice.js';
 import type { Backend, CopilotMode, EffortLevel } from './copilot.js';
 import { redactCredential } from './copilot-authority.js';
 import type { Credential } from './credentials.js';
+import { errorText } from './errors.js';
 import { attachedOpencodeUrl } from './opencode-server.js';
 import type { AppCtx, WsClient } from './route-context.js';
 import { assistCredentialSection } from './run-prompt.js';
@@ -142,7 +143,7 @@ export function createCopilotTurns(ctx: AppCtx): {
         },
       });
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
+      const message = errorText(err);
       chats.recordError(message);
       broadcast({ type: 'copilot:error', error: message });
     } finally {

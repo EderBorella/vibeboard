@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { approveSignin, refuseSignin, type SigninPending } from '../api';
+import { errorText } from '../errors';
 
 interface Props {
   pending: SigninPending[];
@@ -41,7 +42,7 @@ export function ApprovalPrompt({ pending, onError }: Props) {
     try {
       await (allow ? approveSignin(id) : refuseSignin(id));
     } catch (e) {
-      onError?.(e instanceof Error ? e.message : String(e));
+      onError?.(errorText(e));
     } finally {
       setBusy(null);
     }

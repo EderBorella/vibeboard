@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { type AutopilotState, restartAutopilot } from '../api';
+import { errorText } from '../errors';
 
 // The project is halted: everything in it was killed, and nothing will start again until someone says
 // so. Decision 12 asks for an overlay that STATES THE REASON AND THE TIMESTAMP and carries the way
@@ -52,7 +53,7 @@ export function HaltOverlay({ state, onRestarted }: { state: AutopilotState; onR
       await restartAutopilot();
       onRestarted();
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorText(e));
     } finally {
       setBusy(false);
     }

@@ -13,6 +13,7 @@ import { coverageProblems, phaseSkillProblems, shapeProblems } from '../../core/
 import type { AutopilotState } from '../../core/autopilot-state.js';
 import { forClient, unreviewedGatesSentence } from '../../core/autopilot-state.js';
 import { readBoard } from '../../core/board.js';
+import { countLive } from '../../core/created.js';
 import { STOP_REASONS, type StopReason } from '../../core/dispatch-gate.js';
 import {
   type FoundationStatus,
@@ -25,7 +26,7 @@ import {
 import { PHASES, phase } from '../../core/phases.js';
 import { type ReadmeGate, readmeGate } from '../../core/readme.js';
 import type { RunRecord } from '../../core/runs.js';
-import type { BoardName, ProjectConfig } from '../../core/types.js';
+import type { BoardName, Card, ProjectConfig } from '../../core/types.js';
 import { BOARDS } from '../../core/types.js';
 import { readAutopilotState, updateAutopilotState } from '../autopilot-store.js';
 import { attachedOpencodeUrl } from '../opencode-server.js';
@@ -169,12 +170,14 @@ export function composeReadiness(config: ProjectConfig, skillSlugs: string[], re
 // Takes the root and config rather than the context: `ensureOpen` is a type predicate over the SESSION,
 // and its narrowing does not survive being passed through a function boundary. Asking for what it needs
 // keeps the check at the call site where the 409 is sent.
-// Live cards across all three boards. ARCHIVED ONES DO NOT COUNT: `readBoard` walks the configured
-// columns and the archive is not one of them, which is the distinction that matters here — a project
-// whose every card is archived has nothing to pick up either, and the loop says so separately.
+// Live cards across all three boards, THROUGH `countLive` — the same predicate the loop counts with.
+// `readBoard(...).length` was not the same answer: it excludes the archive folder and nothing else,
+// while `isLive` is two clauses, the folder AND the `archived` field, because those are written by
+// different paths. A card marked archived but still in a live column therefore counted as work here and
+// as nothing to the loop — the state core/tick.ts's half-archived stop exists precisely to name.
 async function countLiveCards(root: string, config: ProjectConfig): Promise<number> {
-  const counts = await Promise.all(BOARDS.map(async (b) => (await readBoard(root, b, config)).length));
-  return counts.reduce((total, n) => total + n, 0);
+  const boards = await Promise.all(BOARDS.map(async (b) => [b, await readBoard(root, b, config)] as const));
+  return countLive(Object.fromEntries(boards) as Record<BoardName, Card[]>);
 }
 
 async function readReadiness(root: string, config: ProjectConfig): Promise<Readiness> {

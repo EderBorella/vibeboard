@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { restartOpencodeServer, type SandboxState, takeOverOpencodeServer } from '../api';
+import { errorText } from '../errors';
 
 interface Props {
   state: SandboxState;
@@ -25,7 +26,7 @@ export function SandboxPanel({ state, backend, onChanged }: Props) {
       await (which === 'restart' ? restartOpencodeServer() : takeOverOpencodeServer());
       onChanged();
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorText(e));
     } finally {
       setBusy(null);
     }

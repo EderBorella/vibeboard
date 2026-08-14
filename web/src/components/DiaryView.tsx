@@ -1,6 +1,7 @@
 import { memo, useMemo, useState } from 'react';
 import { addDiaryEntry, type DiaryEntry } from '../api';
 import { useDiary } from '../diary/useDiary';
+import { errorText } from '../errors';
 import { MAX_ENTRY_TEXT, type Suggestion } from '../shared';
 import { useSuggestions } from '../suggestions/useSuggestions';
 
@@ -151,7 +152,7 @@ export function DiaryView({ bump }: { bump: number }) {
       // fails, and a paragraph somebody wrote about why they did something is not recoverable from anywhere.
       setDraft('');
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorText(e));
     } finally {
       setBusy(false);
     }

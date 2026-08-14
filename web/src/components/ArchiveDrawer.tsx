@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { listArchive, restoreCard } from '../api';
+import { errorText } from '../errors';
 import type { ArchivedCard, BoardName, ProjectConfig } from '../shared';
 import { columnSlugs } from '../viewmodel';
 
@@ -40,8 +41,8 @@ export function ArchiveDrawer({ board, config, count, onOpen }: Props) {
           setError(null);
         }
       })
-      .catch((e: Error) => {
-        if (live) setError(e.message);
+      .catch((e: unknown) => {
+        if (live) setError(errorText(e));
       });
     return () => {
       live = false;
@@ -54,7 +55,7 @@ export function ArchiveDrawer({ board, config, count, onOpen }: Props) {
       // The watcher's snapshot bumps `count`, which refetches — but do it now so the tile
       // disappears immediately rather than a filesystem event later.
       .then(() => listArchive(board).then(setCards))
-      .catch((e: Error) => setError(e.message));
+      .catch((e: unknown) => setError(errorText(e)));
   };
 
   if (error) return <div className="archive-drawer archive-error">{error}</div>;

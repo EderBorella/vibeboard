@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { getRaw, putRaw } from '../api';
+import { errorText } from '../errors';
 import type { Card } from '../shared';
 
 interface Props {
@@ -29,7 +30,7 @@ export function RawPane({ card }: Props) {
       })
       .catch((e) => {
         if (!live) return;
-        setError(e instanceof Error ? e.message : String(e));
+        setError(errorText(e));
         setLoading(false);
       });
     // The card can change under a slow read (a tab switch); applying the first file to the second
@@ -46,7 +47,7 @@ export function RawPane({ card }: Props) {
       await putRaw(card.board, card.id, draft);
       setOnDisk(draft);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorText(e));
     } finally {
       setBusy(false);
     }

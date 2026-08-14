@@ -6,6 +6,7 @@ import { INSTRUCTIONS_FILE } from '../core/layout.js';
 import { boxEnvFor } from './containers.js';
 import { claudeConfigDir, isolationEnabled } from './copilot-env.js';
 import { type CopilotEvent, parseCopilotLine, type ResultStats } from './copilot-events.js';
+import { errorText } from './errors.js';
 import { opencodeTurn } from './opencode-client.js';
 import { groupStartTime, terminateGroup } from './process-group.js';
 import { NOT_REQUESTED, type SandboxStatus, wrapCommand } from './sandbox.js';
@@ -197,7 +198,7 @@ function startOpencode(opts: AgentTurnOptions): RunningTurn {
       if (!timedOut)
         opts.onEvent({
           kind: 'text',
-          text: `\n[opencode failed: ${err instanceof Error ? err.message : String(err)}]`,
+          text: `\n[opencode failed: ${errorText(err)}]`,
         });
       return { model: opts.model, exitCode: 1, timedOut, stats };
     } finally {

@@ -12,6 +12,7 @@ import {
   renameControlFile,
 } from '../api';
 import { useConfirm } from '../confirm/useConfirm';
+import { errorText } from '../errors';
 import type { ProjectSnapshot } from '../shared';
 import { useSkills } from '../skills/useSkills';
 import { ControlFileEditor, type ControlView, type OpenFile } from './ControlFileEditor';
@@ -55,7 +56,7 @@ export function ProjectControl({ snapshot }: Props) {
     try {
       setGroups(await listControlFiles());
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorText(e));
     }
   }, []);
 
@@ -69,7 +70,7 @@ export function ProjectControl({ snapshot }: Props) {
       // A skill opens as fields; anything else is text.
       setView(f.category === 'skills' ? 'fields' : 'edit');
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorText(e));
     }
   }, []);
 
@@ -106,7 +107,7 @@ export function ProjectControl({ snapshot }: Props) {
       setRenaming(created.path);
       setRenameDraft(editableName(created.name));
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorText(e));
     }
   }
 
@@ -134,7 +135,7 @@ export function ProjectControl({ snapshot }: Props) {
       setSelected(updated.path);
       await loadFile(updated.path);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorText(e));
     }
   }
 
@@ -148,7 +149,7 @@ export function ProjectControl({ snapshot }: Props) {
       await refreshGroups();
       await loadFile(file.path);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorText(e));
     } finally {
       setBusy(false);
     }
@@ -171,7 +172,7 @@ export function ProjectControl({ snapshot }: Props) {
       setSelected(null);
       await refreshGroups();
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorText(e));
     } finally {
       setBusy(false);
     }
@@ -196,7 +197,7 @@ export function ProjectControl({ snapshot }: Props) {
               await loadFile(open.path);
               await refreshGroups();
             } catch (e) {
-              setError(e instanceof Error ? e.message : String(e));
+              setError(errorText(e));
             } finally {
               setBusy(false);
             }

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { listProjects, openProject, type ProjectRef, scaffoldProject } from '../api';
+import { errorText } from '../errors';
 import { slugify } from '../viewmodel';
 
 interface Props {
@@ -57,7 +58,7 @@ export function ProjectGate({ onOpened }: Props) {
       await fn();
       onOpened();
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorText(e));
     } finally {
       setBusy(false);
     }

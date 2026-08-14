@@ -10,6 +10,7 @@ import {
 import { useReadiness } from '../autopilot/useReadiness';
 import { killProjectRequest } from '../confirm/requests';
 import { useConfirm } from '../confirm/useConfirm';
+import { errorText } from '../errors';
 import { useAccounting } from '../runs/useAccounting';
 import { type AutopilotConfig, BLOCKED_BOARDS, BOARD_LABELS, type ProjectConfig } from '../shared';
 
@@ -218,7 +219,7 @@ function StartControl({
             setStarting(true);
             void startAutopilot()
               .then(() => refresh())
-              .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
+              .catch((e: unknown) => setError(errorText(e)))
               .finally(() => setStarting(false));
           }}
         >
@@ -257,7 +258,7 @@ function StartControl({
               setError(null);
               void acknowledgeGates()
                 .then(() => refresh())
-                .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)));
+                .catch((e: unknown) => setError(errorText(e)));
             }}
           >
             I have read the gate commands
@@ -286,7 +287,7 @@ function StopControls({ state, refresh }: { state: AutopilotState | null; refres
       await fn();
       refresh();
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorText(e));
     }
   };
 

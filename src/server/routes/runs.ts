@@ -17,6 +17,7 @@ import type { DispatchInput } from '../agent-runner.js';
 import type { Backend } from '../agent-turn.js';
 import { readResources } from '../control-files.js';
 import type { Scope } from '../credentials.js';
+import { errorText } from '../errors.js';
 import { attachedOpencodeUrl } from '../opencode-server.js';
 import { type AppCtx, ensureOpen, nowIso } from '../route-context.js';
 import type { BoardColumns } from '../run-prompt.js';
@@ -412,7 +413,7 @@ export async function registerRunRoutes(api: FastifyInstance, ctx: AppCtx): Prom
       return { run: await ctx.runner.dispatch(resolved.input) };
     } catch (err) {
       // The cap, today. Phase 5 replaces it with a queue, at which point this stops being a refusal.
-      return reply.code(409).send({ error: err instanceof Error ? err.message : String(err) });
+      return reply.code(409).send({ error: errorText(err) });
     }
   });
 

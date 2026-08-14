@@ -12,9 +12,8 @@ export function backendLabel(b: string): string {
   return BACKENDS.find((x) => x.value === b)?.label ?? b;
 }
 
-export function fmtUsd(n: number): string {
-  return `$${n.toFixed(n < 1 ? 4 : 2)}`;
-}
+// Money is NOT here: it is `formatCost` in web/src/format.ts, shared with the runs pane. This module
+// held a second, unguarded formatter that rounded to different places than that one.
 export function fmtK(n: number): string {
   return n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n);
 }

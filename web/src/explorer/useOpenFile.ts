@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { type FileRead, putFsFile, readFsFile } from '../api';
 import type { EditorView } from '../components/EditorShell';
+import { errorText } from '../errors';
 
 // The one file the Explorer has open: what it is, the editor buffer, and the two calls that move
 // bytes. Split from ExplorerView so the buffer's rules — never clobber unsaved typing, never save a
@@ -39,7 +40,7 @@ export function useOpenFile(trigger: unknown): OpenFile {
       setDirty(false);
     } catch (e) {
       setFile(null);
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorText(e));
     }
   }, []);
 
@@ -62,7 +63,7 @@ export function useOpenFile(trigger: unknown): OpenFile {
     } catch (e) {
       // The buffer stays dirty on purpose: the edit is still unsaved, and clearing the flag would
       // disable Save and strand the text.
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorText(e));
       return false;
     } finally {
       setBusy(false);

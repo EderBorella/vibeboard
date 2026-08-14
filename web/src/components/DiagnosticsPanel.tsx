@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { type AppSettings, getAppSettings, setDebugLog } from '../api';
+import { errorText } from '../errors';
 
 // WHERE TO LOOK WHEN SOMETHING GOES WRONG, and the one switch that changes what is there.
 //
@@ -18,7 +19,7 @@ export function DiagnosticsPanel() {
   useEffect(() => {
     getAppSettings()
       .then(setSettings)
-      .catch((e) => setError(e instanceof Error ? e.message : String(e)));
+      .catch((e) => setError(errorText(e)));
   }, []);
 
   async function toggle(on: boolean): Promise<void> {
@@ -34,7 +35,7 @@ export function DiagnosticsPanel() {
       // refused write leaves it where it was rather than showing a state the next start will not honour.
       setSettings(await setDebugLog(on));
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorText(e));
     } finally {
       setBusy(false);
     }

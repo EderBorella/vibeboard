@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { BACKENDS, backendLabel, fmtK, fmtUsd, relTime } from '../web/src/copilot/format.js';
+import { BACKENDS, backendLabel, fmtK, relTime } from '../web/src/copilot/format.js';
 
 afterEach(() => vi.useRealTimers());
 
@@ -21,20 +21,8 @@ describe('backendLabel', () => {
   });
 });
 
-describe('fmtUsd', () => {
-  // Sub-dollar turns need four places to be meaningful at all; above a dollar two is plenty.
-  it.each([
-    [0, '$0.0000'],
-    [0.0001, '$0.0001'],
-    [0.1234, '$0.1234'],
-    [0.9999, '$0.9999'],
-    [1, '$1.00'],
-    [1.005, '$1.00'],
-    [12.3456, '$12.35'],
-  ])('formats %p as %p', (n, expected) => {
-    expect(fmtUsd(n)).toBe(expected);
-  });
-});
+// The money formatter that used to live here is gone: the dock and the runs pane render the same number
+// and rounded it to different places, so both now go through `formatCost` — see test/format.test.ts.
 
 describe('fmtK', () => {
   it.each([

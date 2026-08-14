@@ -78,7 +78,7 @@ export function secondParentProblem(card: Card, links: string[], cards: Card[]):
   // would be a refusal naming one card as both halves of the conflict.
   const parents = [...new Set(links)].filter((id) => byId.get(id)?.board === parentBoard);
   if (parents.length < 2) return null;
-  return `${card.id} would have two parents on the ${parentBoard} board: ${parents.slice(0, 2).join(' and ')}. The hierarchy auto-pilot rolls up is derived from links, so a card has one.`;
+  return `${card.id} would have two parents on the ${parentBoard} board: ${parents.slice(0, 2).join(' and ')}. The hierarchy is derived from links alone, so a card has one parent.`;
 }
 
 // The other direction, and the one that made the rule above advisory. Links are SYMMETRIC: writing
@@ -102,7 +102,7 @@ export function farSideParentProblem(card: Card, links: string[], cards: Card[])
       .filter((id) => id !== card.id)
       .filter((id) => cards.find((c) => c.id === id)?.board === card.board);
     if (existing.length === 0) continue;
-    return `${target.id} already has a parent on the ${card.board} board (${existing[0]}), so linking it to ${card.id} would give it two. The hierarchy auto-pilot rolls up is derived from links, so a card has one.`;
+    return `${target.id} already has a parent on the ${card.board} board (${existing[0]}), so linking it to ${card.id} would give it two. The hierarchy is derived from links alone, so a card has one parent.`;
   }
   return null;
 }

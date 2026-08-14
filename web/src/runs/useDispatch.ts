@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { type DispatchRequest, dispatchRun, listControlFiles, listModels, type ModelOption } from '../api';
+import { errorText } from '../errors';
 
 // What the details step needs from the server, and the state of the last dispatch.
 //
@@ -62,7 +63,7 @@ export function useDispatch(
     try {
       await dispatchRun(request);
     } catch (e) {
-      const message = e instanceof Error ? e.message : String(e);
+      const message = errorText(e);
       setError(message);
       throw e; // the pane stays open on a refusal; the shell keeps the reason
     } finally {

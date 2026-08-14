@@ -14,6 +14,7 @@ import { type Backend, type RunningTurn, runAgentTurn } from './agent-turn.js';
 import type { BoxService } from './box-service.js';
 import type { ResultStats } from './copilot-events.js';
 import type { Credential, CredentialStore } from './credentials.js';
+import { errorText } from './errors.js';
 import type { GitMeasure, GitPoint } from './git-measure.js';
 import type { Log } from './logging.js';
 import { type BoardColumns, buildRunPrompt, type PromptInputs } from './run-prompt.js';
@@ -483,7 +484,7 @@ export class AgentRunner {
   // moment it is picked, so a throw with no handler here loses it silently: the board shows nothing
   // running, nothing queued, and no failure — the worst of the three possible wrong answers.
   async #failToStart(root: string, record: RunRecord, err: unknown): Promise<void> {
-    const reason = err instanceof Error ? err.message : String(err);
+    const reason = errorText(err);
     this.#opts.log?.error({ err, run: record.run }, 'a run could not be started');
     const failed = withoutReport(
       record,
@@ -577,7 +578,7 @@ export class AgentRunner {
       final = withoutReport(
         record,
         'failed',
-        `The run could not be completed: ${err instanceof Error ? err.message : String(err)}`,
+        `The run could not be completed: ${errorText(err)}`,
         this.#opts.now().toISOString(),
       );
       await writeRun(root, final);

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { getResources, putResources, type ResourceLink } from '../api';
+import { errorText } from '../errors';
 
 // The links registry (.vibeboard/resources.yaml) — a small editable table of external
 // references the user (and copilot) can consult. It owns its own rows and dirty flag because
@@ -24,7 +25,7 @@ export function ResourcesEditor({ onError }: { onError: (e: string | null) => vo
           setDirty(false);
         }
       })
-      .catch((e) => onError(e.message));
+      .catch((e: unknown) => onError(errorText(e)));
     return () => {
       live = false;
     };
@@ -52,7 +53,7 @@ export function ResourcesEditor({ onError }: { onError: (e: string | null) => vo
       setLinks(clean);
       setDirty(false);
     } catch (e) {
-      onError(e instanceof Error ? e.message : String(e));
+      onError(errorText(e));
     } finally {
       setBusy(false);
     }

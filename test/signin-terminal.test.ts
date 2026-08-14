@@ -42,23 +42,27 @@ describe('the banner', () => {
     }
   });
 
-  // `probeSandbox` answers "ok" for a relocated token file, because it checks whether the profile is
-  // loaded and not where the secrets went. Nothing else detects it, so silence here would mean a
-  // machine reporting itself sandboxed while its credentials sat in a folder no rule covers.
-  it('warns when VIBEBOARD_TOKEN_FILE has moved the credentials outside the profile', () => {
+  // `probeSandbox` answers "ok" for a relocated token file, because it asks whether a container can be
+  // run and not where the secrets went. Nothing else detects it, so silence here would mean a machine
+  // reporting itself sandboxed while its credentials sat somewhere an agent's box has mounted.
+  it('warns when VIBEBOARD_TOKEN_FILE has moved the credentials somewhere unchecked', () => {
     const lines = signinBanner({ ...state, relocated: true }).join('\n');
     expect(lines).toContain('VIBEBOARD_TOKEN_FILE');
-    expect(lines).toContain('agents on this machine can read them');
+    // The mechanism as it is, not as it was: containment is what the box mounts, and the default token
+    // directory is not among those mounts. The banner told the reader to add a deny rule to a profile
+    // Docker replaced outright, which is an instruction that cannot be carried out.
+    expect(lines).not.toMatch(/deny/i);
+    expect(lines).toContain('outside every project');
   });
 
   it('does not warn about it when there is no sandbox to be outside of', () => {
-    // With no profile loaded the banner already says agents are unconfined, and a second warning about
-    // one deny rule among many would be noise on top of a bigger statement.
+    // With no container the banner already says agents cannot run at all, and a warning about where one
+    // of them might read a file is noise on top of a bigger statement.
     const lines = signinBanner({ ...state, relocated: true, sandboxOk: false }).join('\n');
     expect(lines).not.toContain('VIBEBOARD_TOKEN_FILE');
   });
 
-  it('does not warn when the credentials are where the profile expects them', () => {
+  it('does not warn when the credentials are in the default place', () => {
     expect(signinBanner(state).join('\n')).not.toContain('VIBEBOARD_TOKEN_FILE');
   });
 });

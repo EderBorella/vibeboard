@@ -9,6 +9,7 @@ import {
 } from '../api';
 import type { Confirmer } from '../confirm/useConfirm';
 import { clampToCaps, resolveChoice } from '../copilot/choice';
+import { errorText } from '../errors';
 import {
   type AutopilotConfig,
   BOARD_LABELS,
@@ -146,7 +147,7 @@ export function SettingsModal({ config, onClose, onSaved, autopilot, onAutopilot
       });
       onSaved();
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorText(e));
     } finally {
       setBusy(false);
     }

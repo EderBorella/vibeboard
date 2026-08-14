@@ -1,10 +1,10 @@
-import { readFile, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import { describe, expect, it, onTestFinished } from 'vitest';
 import { parse, stringify } from 'yaml';
 import { configPath } from '../src/core/config.js';
-import { skillRel } from '../src/core/layout.js';
+import { boardRel, skillRel } from '../src/core/layout.js';
 import { buildApp } from '../src/server/app.js';
 import { CredentialStore } from '../src/server/credentials.js';
 import type { Readiness } from '../src/server/routes/autopilot.js';
@@ -156,6 +156,36 @@ describe('GET /api/autopilot/readiness', () => {
 
     const r = await readiness(app);
     expect(r.ok).toBe(false);
+    expect(r.blockers).toContain(
+      'There is no card on any board, and nothing auto-pilot could derive one from. Add a card, or write the README so it can derive the feature list from it.',
+    );
+  });
+
+  // A card marked archived but still sitting in a live column. `isLive` is TWO clauses — the folder and
+  // the field — because they are written by different paths, and readiness counted only the folder: it
+  // read the column folders and took the length. So this card was work to the panel and not work to the
+  // loop, which is exactly the state core/tick.ts's half-archived stop exists to name. Readiness now
+  // counts through `countLive`, so both sides read the same card the same way.
+  it('does not count a card marked archived in a live column as work to do', async () => {
+    const { app, root } = await openTestProject({ name: 'A', mode: 'brownfield' });
+    await makeReady(app, root, { cards: false });
+    const deleted = await app.inject({
+      method: 'DELETE',
+      url: `/api/control/file?path=${encodeURIComponent(skillRel('derive-features', 'SKILL.md'))}`,
+    });
+    expect(deleted.statusCode).toBe(200);
+
+    // Written to disk rather than through the API, because PATCH refuses `archived` outright — the
+    // state arrives from a hand-edited file or a half-finished archive, which is why it is real.
+    const file = join(root, boardRel('engineering', 'backlog', 'E-001.md'));
+    await mkdir(dirname(file), { recursive: true });
+    await writeFile(
+      file,
+      "---\nid: E-001\ntitle: Half archived\norder: 10\ncreated: 2026-08-01\narchived: '2026-08-13T10:00:00Z'\n---\nbody\n",
+      'utf8',
+    );
+
+    const r = await readiness(app);
     expect(r.blockers).toContain(
       'There is no card on any board, and nothing auto-pilot could derive one from. Add a card, or write the README so it can derive the feature list from it.',
     );

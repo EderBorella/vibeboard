@@ -56,7 +56,11 @@ export default {
     'src/server/app-state.ts',
     'src/server/route-context.ts',
     'src/server/logging.ts',
-    // Web modules with their own tests.
+    // Web modules with their own tests. The two shared helpers first: moving code out of a mutated file
+    // into an unmutated one loses the coverage silently, and both of these were extracted from files
+    // already in this list.
+    'web/src/format.ts',
+    'web/src/errors.ts',
     'web/src/markdown.tsx',
     'web/src/viewmodel.ts',
     'web/src/ws.ts',

@@ -1,31 +1,14 @@
 import type { RunUsage } from '../api';
+import { formatCost, isMoney } from '../format';
 
 // What a run cost, as a person reads it. Kept out of the components so the arithmetic can be tested
 // and mutation-measured directly — the same reason model-filter.ts exists.
 //
 // Every value is optional and every one may legitimately be zero: a free model really costs nothing,
 // so "absent" and "zero" must never render the same way.
-
-// Sub-cent runs are the normal case, and $0.00 for four different runs tells you nothing — so small
-// amounts keep four decimals. Above a dollar the cents are what matter.
-// A predicate, not a boolean check: `Number.isFinite` narrows nothing, and the alternative is a non-null
-// assertion at every use site — the same mistake repeated rather than one guard written correctly.
-export function isMoney(n: number | undefined): n is number {
-  return Number.isFinite(n);
-}
-
-export function formatCost(usd: number): string {
-  // `null`, not `undefined`, is what an overflowing total becomes on the wire: JSON cannot carry
-  // Infinity. The web mirror declares `costUsd?: number` and every guard tests `=== undefined`, which
-  // `null` sails through — and `null.toFixed` throws inside render, taking the dashboard with it. What
-  // makes this worth a guard rather than a shrug is that it is the web layer trusting the wire
-  // completely; the trigger being absurd does not make the trust sound.
-  if (!isMoney(usd)) return 'not a number';
-  if (usd === 0) return '$0';
-  if (usd < 0.01) return `$${usd.toFixed(4)}`;
-  if (usd < 1) return `$${usd.toFixed(3)}`;
-  return `$${usd.toFixed(2)}`;
-}
+//
+// The money formatter itself is in web/src/format.ts, because the copilot dock renders the same number
+// and had written its own.
 
 // Thousands as `48.2k`; below that, exact. Token counts are read for magnitude, not precision.
 export function formatTokens(n: number): string {

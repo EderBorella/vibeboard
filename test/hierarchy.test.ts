@@ -40,7 +40,7 @@ describe('one parent per card', () => {
 
   it('refuses a second parent, naming both', () => {
     expect(secondParentProblem(card('P-003', 'product'), ['F-001', 'F-002'], all)).toBe(
-      'P-003 would have two parents on the features board: F-001 and F-002. The hierarchy auto-pilot rolls up is derived from links, so a card has one.',
+      'P-003 would have two parents on the features board: F-001 and F-002. The hierarchy is derived from links alone, so a card has one parent.',
     );
   });
 
@@ -84,7 +84,7 @@ describe('the parent side', () => {
     // P-002 gains no parent of its own here, so the child-side check passes it.
     expect(secondParentProblem(card('P-002', 'product'), ['E-001'], withParent)).toBeNull();
     expect(farSideParentProblem(card('P-002', 'product'), ['E-001'], withParent)).toBe(
-      'E-001 already has a parent on the product board (P-001), so linking it to P-002 would give it two. The hierarchy auto-pilot rolls up is derived from links, so a card has one.',
+      'E-001 already has a parent on the product board (P-001), so linking it to P-002 would give it two. The hierarchy is derived from links alone, so a card has one parent.',
     );
   });
 

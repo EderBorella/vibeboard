@@ -10,6 +10,7 @@ import {
   renameFsNode,
 } from '../api';
 import { useConfirm } from '../confirm/useConfirm';
+import { errorText } from '../errors';
 import { formatBytes } from '../explorer/format';
 import { nameOf, parentOf } from '../explorer/paths';
 import { deleteEmptyFolderRequest, deleteEntryRequest, deleteFolderRequest } from '../explorer/requests';
@@ -80,7 +81,7 @@ export function ExplorerView({ snapshot }: Props) {
       setRenameDraft(node.name);
       if (kind === 'file') await open.open(node.path);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorText(e));
     }
   }
 
@@ -96,7 +97,7 @@ export function ExplorerView({ snapshot }: Props) {
       const folder = node.kind === 'dir' && !node.symlink;
       if (folder ? await removeFolder(node) : await removeEntry(node)) await afterDelete(node);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorText(e));
     }
   }
 
@@ -146,7 +147,7 @@ export function ExplorerView({ snapshot }: Props) {
       setSelected(moved);
       if (open.file?.path === node.path) await open.open(moved.path);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorText(e));
     }
   }
 
@@ -169,7 +170,7 @@ export function ExplorerView({ snapshot }: Props) {
       // The open file just changed path underneath the editor; re-open it under its new name.
       if (open.file?.path === path) await open.open(moved.path);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorText(e));
     }
   }
 

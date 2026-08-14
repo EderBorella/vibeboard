@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { cardSuggestion, patchSuggestion } from '../api';
+import { errorText } from '../errors';
 import type { Suggestion, SuggestionLevel } from '../shared';
 import { SUGGESTION_LEVELS } from '../shared';
 
@@ -49,7 +50,7 @@ export function SuggestionsPane({ suggestions, failed, onRefresh, onApply }: Pro
     } catch (e) {
       // A control whose refusal is invisible is a dead end. The server's words win: it knows whether the
       // suggestion was already carded, and as what.
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorText(e));
     } finally {
       setBusy(false);
     }

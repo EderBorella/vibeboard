@@ -1,4 +1,5 @@
-import { fmtK, fmtUsd } from './format';
+import { formatCost } from '../format';
+import { fmtK } from './format';
 import type { CopilotStats } from './useCopilot';
 
 // The footer readout: cumulative cost, turn count, last turn's duration, and context occupancy.
@@ -10,7 +11,7 @@ export function CopilotReadout({ stats, budget }: { stats: CopilotStats; budget:
 
   return (
     <div className="copilot-readout">
-      <span title="cumulative session cost">{fmtUsd(stats.costUsd)}</span>
+      <span title="cumulative session cost">{formatCost(stats.costUsd)}</span>
       <span>{stats.turns} turns</span>
       <span>{(stats.lastDurationMs / 1000).toFixed(1)}s</span>
       <span

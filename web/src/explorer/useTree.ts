@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { type DirListing, type FsNode, listDir } from '../api';
+import { errorText } from '../errors';
 
 // The Explorer's tree state: which directories have been listed, which are open, and the flat list
 // of rows that comes out of the two. Listings are per-directory and lazy — an eager walk would
@@ -67,7 +68,7 @@ export function useTree(trigger?: unknown): Tree {
         expanded.current.delete(path);
         // A subdirectory that has gone is fully described by no longer being in the tree — an agent
         // deleting a folder must not raise a banner. The root failing is a different matter.
-        if (path === '') setError(e instanceof Error ? e.message : String(e));
+        if (path === '') setError(errorText(e));
       }
       rebuild();
     },

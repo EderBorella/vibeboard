@@ -11,6 +11,7 @@ import { transportModel } from '../autopilot/transport';
 import { useReadiness } from '../autopilot/useReadiness';
 import { killProjectRequest } from '../confirm/requests';
 import { useConfirm } from '../confirm/useConfirm';
+import { errorText } from '../errors';
 import { AutopilotHelp } from './AutopilotHelp';
 
 interface Props {
@@ -63,7 +64,7 @@ export function AutopilotBar({ state, runs, bump, onChanged, onSettings }: Props
       .then(() => onChanged())
       // The server's own words. A refusal names what is missing, and swallowing it turns the button
       // into one that does nothing for no stated reason.
-      .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
+      .catch((e: unknown) => setError(errorText(e)))
       .finally(() => setBusy(false));
   }
 
@@ -76,7 +77,7 @@ export function AutopilotBar({ state, runs, bump, onChanged, onSettings }: Props
       setError(null);
       void killAutopilot('You stopped everything from the auto-pilot bar.')
         .then(() => onChanged())
-        .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
+        .catch((e: unknown) => setError(errorText(e)))
         .finally(() => setBusy(false));
     });
   }
@@ -137,7 +138,7 @@ export function AutopilotBar({ state, runs, bump, onChanged, onSettings }: Props
           type="button"
           className="ap-settings-link"
           onClick={onSettings}
-          title="Caps, routing table, stops"
+          title="Caps, the columns that mean finished, and where a blocked card goes"
         >
           Settings
         </button>

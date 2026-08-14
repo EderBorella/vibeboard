@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { debugLogging, setDebugLogging } from '../app-state.js';
+import { errorText } from '../errors.js';
 import { autopilotLogFileFor, logDir, logFileFor } from '../logging.js';
 
 // The app's own settings, as opposed to a project's. Two things live here and they belong together: the
@@ -49,9 +50,7 @@ export async function registerSettingsRoutes(api: FastifyInstance): Promise<void
     } catch (err) {
       // Said out loud rather than swallowed: this file lives in the home directory, and a save that failed
       // silently would leave the switch showing a state the next start will not honour.
-      return reply
-        .code(500)
-        .send({ error: `Could not save that setting: ${err instanceof Error ? err.message : String(err)}` });
+      return reply.code(500).send({ error: `Could not save that setting: ${errorText(err)}` });
     }
     return settings(body.debugLog, new Date());
   });

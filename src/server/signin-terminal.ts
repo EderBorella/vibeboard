@@ -33,8 +33,10 @@ export function signinBanner(state: SigninBannerState): string[] {
   // `probeSandbox` answers "ok" for a relocated token file, because it checks the profile and not
   // where the secrets went. Nothing else detects this, so it is said out loud.
   if (state.relocated && state.sandboxOk) {
-    lines.push('  → VIBEBOARD_TOKEN_FILE moves the credentials outside the sandbox profile’s deny rules, so');
-    lines.push('    agents on this machine can read them. Deny the new path, or unset it.');
+    lines.push('  → VIBEBOARD_TOKEN_FILE puts the credentials somewhere nothing here checks. An agent’s');
+    lines.push(
+      '    container mounts the project it works on, so keep them outside every project, or unset it.',
+    );
   }
   return lines;
 }

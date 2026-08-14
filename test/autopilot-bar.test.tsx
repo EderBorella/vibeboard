@@ -211,6 +211,11 @@ describe('the way through to the rest', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
 
     expect(onSettings).toHaveBeenCalledTimes(1);
+    // What is actually behind it. It used to promise a routing table, which retired with ruling 52, and
+    // the stops it also named are on this bar now — so the label named two things that were not there.
+    const title = screen.getByRole('button', { name: 'Settings' }).getAttribute('title') ?? '';
+    expect(title).not.toMatch(/routing table/i);
+    expect(title).toMatch(/caps/i);
     for (const b of screen.getAllByRole('button')) {
       expect(b.textContent?.toLowerCase()).not.toContain('kill');
     }

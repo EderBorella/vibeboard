@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react';
 import type { RunRecord } from '../api';
 import type { Card } from '../shared';
 import { costLabel, usageTotal } from './format';
@@ -44,7 +45,7 @@ export function ExecutionView({ runs, active, queued, cards, now, onOpenCard, on
   const accounting = useAccounting(runs);
 
   return (
-    <main className="execution">
+    <main className="execution" style={{ '--exec-cols': COLUMNS.length } as CSSProperties}>
       {accounting && (
         <p className="exec-ledger">
           <span className="exec-ledger-total">{usageTotal(accounting.project)}</span>

@@ -1,6 +1,6 @@
-import { writeFile } from 'node:fs/promises';
+import { chmod, mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, onTestFinished } from 'vitest';
 import { boardColumnSlugs } from '../src/core/board.js';
 import {
   AUTOPILOT_STATE_FILE,
@@ -175,4 +175,62 @@ describe('ProjectSession lifecycle', () => {
     expect(snaps.length).toBeLessThan(3); // debounced, not one per write
     await s.close();
   }, 10000);
+});
+
+// A REAL CRASH, from a real run. An agent building the "error handling and edge cases" feature wrote a
+// fixture named `temp-unreadable.txt` with mode 000 — exactly the right way to test unreadable-file
+// handling. chokidar tried to watch it, failed with EACCES, and emitted `error`; nothing was listening,
+// so the EventEmitter threw, the rejection was unhandled, and the SERVER EXITED at iteration 67 of a
+// project it was in the middle of building. The auto-pilot loop died with it.
+//
+// The shape of the bug is what makes it worth a test: a project's own agents, doing legitimate work
+// inside the sandbox they were given, could kill the server that dispatched them — with nothing wrong
+// on the board and nothing wrong in the config.
+describe('a path the watcher cannot read', () => {
+  it('does not take the process down, and the session stays open', async () => {
+    const root = await tempDir();
+    await scaffoldProject(root, { name: 'Unwatchable', mode: 'brownfield', today: TODAY });
+
+    // A mode-000 DIRECTORY, not a mode-000 file, and the difference is the whole test. chmod 000 on a
+    // file you own does not stop you watching it — the first version of this test used one, and it
+    // passed with the fix removed. A directory with no `r` and no `x` genuinely denies its owner, so
+    // chokidar's readdir fails and it emits `error` exactly as it did in the crash. Root is exempt
+    // from both, so skip there rather than assert something that cannot happen.
+    if (process.getuid?.() === 0) return;
+    const shut = join(root, 'unreadable-dir');
+    await mkdir(shut, { recursive: true });
+    await writeFile(join(shut, 'f.txt'), 'x', 'utf8');
+    await chmod(shut, 0o000);
+    onTestFinished(async () => {
+      await chmod(shut, 0o755).catch(() => {});
+    });
+
+    const rejections: unknown[] = [];
+    const onRejection = (e: unknown): void => {
+      rejections.push(e);
+    };
+    process.on('unhandledRejection', onRejection);
+    onTestFinished(() => {
+      process.off('unhandledRejection', onRejection);
+    });
+
+    session = new ProjectSession();
+    await session.open(root);
+
+    // The watcher reports asynchronously; give it a moment to fail if it is going to.
+    await new Promise((r) => setTimeout(r, 300));
+
+    expect(rejections).toEqual([]);
+    expect(session.isOpen).toBe(true);
+    // And the rest of the project is still watched — a card write still reaches a subscriber.
+    const seen: ProjectSnapshot[] = [];
+    session.subscribe((snap) => seen.push(snap));
+    await writeFile(
+      join(root, boardRel('product', 'todo', 'P-950.md')),
+      '---\nid: P-950\ntitle: t\norder: 10\ntags: []\nlinks: []\ncreated: 2026-07-25\n---\n',
+      'utf8',
+    );
+    await new Promise((r) => setTimeout(r, 400));
+    expect(seen.length).toBeGreaterThan(0);
+  }, 15000);
 });

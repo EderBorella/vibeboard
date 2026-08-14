@@ -99,6 +99,23 @@ export class ProjectSession {
       ignored: (p: string) => isIgnored(p),
     });
     watcher.on('all', () => this.#scheduleBroadcast());
+    // A FILE THE SERVER CANNOT WATCH IS NOT A REASON TO EXIT, and without this listener it was one.
+    // chokidar emits `error`, and an EventEmitter `error` with nothing listening throws — which
+    // arrived as an unhandled rejection and took the whole process down, the auto-pilot loop with it.
+    //
+    // Found in a live run: an agent building the "error handling" feature wrote a fixture named
+    // `temp-unreadable.txt` with mode 000, which is exactly the right way to test unreadable-file
+    // handling. Watching it failed with EACCES and the server died mid-project. So ANY project
+    // containing a file its own agents legitimately created could kill the server that dispatched
+    // them, and nothing in the board or the config was wrong.
+    //
+    // Logged rather than swallowed: losing watch coverage of one path means the board may stop
+    // updating live for it, which is worth a line. Everything else stays watched, and every read
+    // path still goes to disk — the watcher only decides when to PUSH a snapshot, so the cost of
+    // dropping one is a stale tab, not a wrong answer.
+    watcher.on('error', (err) => {
+      this.#log?.warn({ err }, 'a path could not be watched; the rest of the project still is');
+    });
     await new Promise<void>((resolve) => watcher.once('ready', () => resolve()));
     this.#watcher = watcher;
     return this.snapshot();

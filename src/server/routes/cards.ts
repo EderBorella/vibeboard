@@ -22,6 +22,7 @@ import {
   type BoardName,
   type Card,
   type CardFrontmatter,
+  oneOf,
   type ProjectConfig,
 } from '../../core/types.js';
 import { type AppCtx, ensureOpen, nowIso, today } from '../route-context.js';
@@ -283,6 +284,7 @@ async function lifecycleRulesForCreate(
 // A body with neither is a 400, not a 200: a request that changed nothing would tell the loop its stamp
 // landed, and the bootstrap's exit is the one deterministic act decision 44 rests on.
 const FLAGS = ['setup', 'followUp'] as const;
+const isFlag = oneOf(FLAGS);
 
 // WHAT THE BODY OF A CREATE MAY SAY, and `links` is a PERSON'S field alone (ruling 65). A `work` credential is
 // confined to its own card for `PUT …/links`, so the only link a run may legitimately write is parent↔child —
@@ -304,7 +306,7 @@ function enforcesOneParent(config: ProjectConfig, scope?: string): boolean {
 
 function pickFlags(body: unknown): { patch: Partial<CardFrontmatter>; error?: string } {
   const o = (body ?? {}) as Record<string, unknown>;
-  const unknown = Object.keys(o).filter((k) => !(FLAGS as readonly string[]).includes(k));
+  const unknown = Object.keys(o).filter((k) => !isFlag(k));
   if (unknown.length > 0) {
     return { patch: {}, error: `Cannot set ${unknown.join(', ')} here: this route sets setup and followUp.` };
   }

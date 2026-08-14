@@ -1,3 +1,4 @@
+import { HALTED_DISPATCH } from '../core/dispatch-gate.js';
 import {
   parseAgentReport,
   type RunRecord,
@@ -17,6 +18,7 @@ import type { Credential, CredentialStore } from './credentials.js';
 import { errorText } from './errors.js';
 import type { GitMeasure, GitPoint } from './git-measure.js';
 import type { Log } from './logging.js';
+import { redact } from './redaction.js';
 import { type BoardColumns, buildRunPrompt, type PromptInputs } from './run-prompt.js';
 import {
   appendTranscript,
@@ -176,12 +178,6 @@ function narrowPrevious(previous: RunRecord): NonNullable<Parameters<typeof buil
   };
 }
 
-// Transcripts live under `.vibeboard/` where every agent can read them, and a run's credential is
-// only its own while it stays out of them. An agent that echoes the token — quoting the prompt back,
-// pasting a failed curl — would otherwise hand a concurrent run a working key.
-const redact = (line: string, token?: string): string =>
-  token ? line.replaceAll(token, '[credential redacted]') : line;
-
 export class AgentRunner {
   #opts: RunnerOptions;
   #active = new Map<string, Active>();
@@ -260,11 +256,7 @@ export class AgentRunner {
   // the caller can answer immediately; the outcome lands later through onUpdate.
   async dispatch(input: DispatchInput): Promise<RunRecord> {
     // Before the record exists, so a refused dispatch leaves nothing behind on disk to explain.
-    if (this.#opts.halted?.()) {
-      throw new Error(
-        'This project is halted, so nothing can be dispatched. Restart it from the auto-pilot panel first.',
-      );
-    }
+    if (this.#opts.halted?.()) throw new Error(HALTED_DISPATCH);
     const { now, suffix } = this.#opts;
     const root = this.#opts.root();
     const startedAt = now();
@@ -601,7 +593,7 @@ export class AgentRunner {
   async #takeEvidence(root: string, run: string, secret?: string): Promise<string | undefined> {
     const raw = await takeAgentReport(root, run);
     if (raw === null) return undefined;
-    const text = secret ? raw.replaceAll(secret, '[credential redacted]') : raw;
+    const text = redact(raw, secret);
     // The prose only. `outcome` is deliberately ignored — that is the whole point — and its
     // frontmatter would be noise in a pane showing why a run was stopped.
     return parseAgentReport(text).body;

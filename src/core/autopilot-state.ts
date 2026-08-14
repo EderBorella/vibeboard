@@ -1,5 +1,6 @@
-import type { StopReason } from './dispatch-gate.js';
-import { STOP_REASONS } from './dispatch-gate.js';
+import { isStopReason, type StopReason } from './dispatch-gate.js';
+import { asText } from './parse.js';
+import { oneOf } from './types.js';
 
 // Auto-pilot's own state, persisted (decision 15). It is the service's file, not board state, and the
 // service is its single writer for the counters — so it is written directly rather than through the
@@ -75,17 +76,7 @@ function counter(value: unknown): number | undefined {
   return typeof value === 'number' && Number.isInteger(value) && value >= 0 ? value : undefined;
 }
 
-function isState(value: unknown): value is AutopilotStateName {
-  return typeof value === 'string' && (AUTOPILOT_STATES as readonly string[]).includes(value);
-}
-
-function isReason(value: unknown): value is StopReason {
-  return typeof value === 'string' && (STOP_REASONS as readonly string[]).includes(value);
-}
-
-function text(value: unknown): string | undefined {
-  return typeof value === 'string' && value.trim() !== '' ? value : undefined;
-}
+const isState = oneOf(AUTOPILOT_STATES);
 
 // `'unreadable'` rather than a default, because the caller must be able to tell an absent file from a
 // damaged one: the first starts fresh and the second halts (S13). A single return type carrying both
@@ -113,9 +104,12 @@ export function parseState(content: string): AutopilotState | 'unreadable' {
     iteration,
     // Dropped, not refused: the reason is what the overlay SHOWS, and losing the label is a far
     // better outcome than losing the halt it labels.
-    ...(isReason(d.reason) ? { reason: d.reason } : {}),
-    ...(text(d.detail) ? { detail: text(d.detail) } : {}),
-    ...(text(d.at) ? { at: text(d.at) } : {}),
+    ...(isStopReason(d.reason) ? { reason: d.reason } : {}),
+    // TRIMMED, which this file's own copy of `asText` was not. A `detail` written with padding — a
+    // hand-edited state file, or a sentence assembled with a stray space — reached the halt overlay
+    // carrying it, while every other reader of an optional string field in the codebase stripped it.
+    ...(asText(d.detail) ? { detail: asText(d.detail) } : {}),
+    ...(asText(d.at) ? { at: asText(d.at) } : {}),
     ...(typeof pgid === 'number' && Number.isInteger(pgid) && pgid > 1 ? { servicePgid: pgid } : {}),
     ...(typeof d.servicePgstart === 'number' && Number.isInteger(d.servicePgstart) && d.servicePgstart > 0
       ? { servicePgstart: d.servicePgstart }

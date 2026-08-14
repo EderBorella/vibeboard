@@ -6,6 +6,25 @@ import type { AutopilotConfig } from './autopilot.js';
 export const BOARDS = ['features', 'product', 'engineering'] as const;
 export type BoardName = (typeof BOARDS)[number];
 
+// "Is this one of these?", as a type PREDICATE rather than a boolean, built once from the list itself.
+//
+// Every value union in this codebase is a `const` array plus a `[number]` type, and every reader of one
+// off disk or off the wire needs the same three-part check: it is a string, it is in the list, and the
+// compiler should know it afterwards. That was written out by hand a dozen times, in four modules for
+// `BoardName` alone. A predicate rather than a boolean because narrowing is the point — a caller that
+// gets `true` back and then casts has gained nothing, and the cast is where the wrong list gets used.
+//
+// `unknown` in, not `string` in: these guards are what stands between JSON somebody posted and a typed
+// value, so refusing the wrong TYPE is half of what they are for. The cast inside is the one place the
+// widening is done, and it is safe by construction — `includes` is only being asked whether a string is
+// in a list of strings.
+export function oneOf<T extends string>(values: readonly T[]): (value: unknown) => value is T {
+  return (value: unknown): value is T =>
+    typeof value === 'string' && (values as readonly string[]).includes(value);
+}
+
+export const isBoard = oneOf(BOARDS);
+
 // Human-facing labels for each board.
 export const BOARD_LABELS: Record<BoardName, string> = {
   features: 'Features',

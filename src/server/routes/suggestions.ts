@@ -6,8 +6,8 @@ import { entryColumn } from '../../core/entry-column.js';
 import { setCardLinks } from '../../core/links.js';
 import { createCard, updateCard } from '../../core/mutations.js';
 import { followUpCount, openFollowUp } from '../../core/setup-feature.js';
-import { SUGGESTION_STATES, type Suggestion, type SuggestionState } from '../../core/suggestions.js';
-import type { BoardName, Card, ProjectConfig } from '../../core/types.js';
+import { SUGGESTION_STATES, type Suggestion } from '../../core/suggestions.js';
+import { type BoardName, type Card, oneOf, type ProjectConfig } from '../../core/types.js';
 import { type AppCtx, ensureOpen, nowIso, today } from '../route-context.js';
 import {
   isSafeId,
@@ -30,23 +30,20 @@ import {
 // how a run scoped to one card talks itself into fixing five, which is the scope spiral the design
 // exists to prevent. The checkup reads them; a work agent only adds.
 
-function isState(value: unknown): value is SuggestionState {
-  return typeof value === 'string' && (SUGGESTION_STATES as readonly string[]).includes(value);
-}
+const isState = oneOf(SUGGESTION_STATES);
 
 // THE TWO LEVELS A SUGGESTION MAY BECOME, and a task is deliberately not one of them (decision 49). It
 // looked like the most useful and it is the one that cannot work: a task needs a story to belong to, so
 // carding one either makes the user hunt for a parent or creates an orphan the machine never walks to.
 const LEVELS = ['feature', 'story'] as const;
 type Level = (typeof LEVELS)[number];
+const isLevel = oneOf(LEVELS);
 
 function levelProblem(value: unknown): string | undefined {
   if (value === 'task') {
     return 'A suggestion cannot become a task: a task needs a story to belong to, and one carded on its own is work no phase picks up. Card it as a story — a suggestion small enough to be a single task is a story with one criterion, and break-down produces that task from it.';
   }
-  if (typeof value !== 'string' || !(LEVELS as readonly string[]).includes(value)) {
-    return `level must be one of ${LEVELS.join(', ')}`;
-  }
+  if (!isLevel(value)) return `level must be one of ${LEVELS.join(', ')}`;
   return undefined;
 }
 

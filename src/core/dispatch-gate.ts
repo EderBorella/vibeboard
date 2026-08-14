@@ -1,5 +1,6 @@
 import type { Spend } from './accounting.js';
 import type { AutopilotConfig } from './autopilot.js';
+import { oneOf } from './types.js';
 
 // May the loop dispatch? Asked BETWEEN dispatches, in backend code, over numbers summed from disk.
 //
@@ -35,6 +36,21 @@ export const STOP_REASONS = [
   'unreadable',
 ] as const;
 export type StopReason = (typeof STOP_REASONS)[number];
+
+// Beside the list, because the one caller that needs it is agent-reachable: a loop reports its own stop
+// over HTTP, and an unrecognised reason would render in the overlay as a raw word with no sentence
+// behind it.
+export const isStopReason = oneOf(STOP_REASONS);
+
+// The refusal a halted project gives, wherever it is given.
+//
+// TWO GUARDS PRODUCE IT AND BOTH STAY: the route refuses before the record exists, and the runner
+// refuses again on the far side of every await, because a kill landing in that gap left a run to start
+// milliseconds after the project was recorded halted. That is deliberate defence in depth. What is
+// shared is the SENTENCE — two literals drifting apart would mean the same refusal read differently
+// depending on which layer caught it, and the one the user sees is decided by a race.
+export const HALTED_DISPATCH =
+  'This project is halted, so nothing can be dispatched. Restart it from the auto-pilot panel first.';
 
 // One reason, and it is not the two that look like it. An exhausted budget and a reached cap both
 // end tidily and neither means the work is done — rendering either as success is the failure this

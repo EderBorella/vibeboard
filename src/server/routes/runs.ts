@@ -7,12 +7,13 @@ import type { AutopilotState } from '../../core/autopilot-state.js';
 import { unreviewedGatesSentence } from '../../core/autopilot-state.js';
 import { boardColumnSlugs, readBoard } from '../../core/board.js';
 import { resolveCopilotSelection } from '../../core/copilot-choice.js';
+import { HALTED_DISPATCH } from '../../core/dispatch-gate.js';
 import { findCard } from '../../core/find.js';
 import { foundationStatus, readGates } from '../../core/foundation.js';
 import { foundationRel } from '../../core/layout.js';
 import { phase } from '../../core/phases.js';
 import { asVerification, isRunId, type RunRecord, withVerification } from '../../core/runs.js';
-import { BOARDS, type BoardName, type ProjectConfig } from '../../core/types.js';
+import { BOARDS, isBoard, type ProjectConfig } from '../../core/types.js';
 import type { DispatchInput } from '../agent-runner.js';
 import type { Backend } from '../agent-turn.js';
 import { readResources } from '../control-files.js';
@@ -57,9 +58,7 @@ const NOT_A_RUN_ID = 'That is not a run id.';
 export function dispatchLock(state: AutopilotState, scope: Scope | undefined): string | undefined {
   // First, and for everyone. Halted is the state a person has to leave deliberately (decision 12); a loop
   // that could still dispatch inside it would make the emergency stop a suggestion.
-  if (state.state === 'halted') {
-    return 'This project is halted, so nothing can be dispatched. Restart it from the auto-pilot panel first.';
-  }
+  if (state.state === 'halted') return HALTED_DISPATCH;
   // The service's authority is CO-TERMINOUS WITH `running`, stated as what is allowed rather than as what
   // is refused. Written the other way round — "not a by-hand caller while running" — it admitted the loop
   // while `idle` and while `stopped`, and `stopped` is what a soft stop produces: the runtime writes it
@@ -73,10 +72,6 @@ export function dispatchLock(state: AutopilotState, scope: Scope | undefined): s
     return 'Auto-pilot is running this project, so it owns the runner. Soft-stop it first if you want to dispatch a run by hand.';
   }
   return undefined;
-}
-
-function isBoard(value: unknown): value is BoardName {
-  return typeof value === 'string' && (BOARDS as readonly string[]).includes(value);
 }
 
 interface DispatchBody {

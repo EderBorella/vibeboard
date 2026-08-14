@@ -88,18 +88,3 @@ export class CopilotAuthority {
     return undefined;
   }
 }
-
-// A copilot event on its way to `.vibeboard/chat/`, with the credential taken out.
-//
-// The same treatment `agent-runner.ts` gives a run's transcript and report, and for the same reason:
-// that folder is denied to agents for WRITING, but every deny in the profile is `wl` — reads are
-// unrestricted, so anything persisted there is readable by every agent on the machine.
-//
-// Whole-event rather than per-field: the token can appear in assistant prose, in a tool result, or in
-// an error, and enumerating the fields it might reach is the kind of list that goes stale.
-export function redactCredential<T>(event: T, token: string | undefined): T {
-  if (!token) return event;
-  const raw = JSON.stringify(event);
-  if (!raw.includes(token)) return event;
-  return JSON.parse(raw.replaceAll(token, '[credential redacted]')) as T;
-}

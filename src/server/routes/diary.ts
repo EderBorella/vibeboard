@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
-import { boundText, DIARY_KINDS, type DiaryEntry, type DiaryKind } from '../../core/diary.js';
-import { BOARDS, type BoardName } from '../../core/types.js';
+import { boundText, DIARY_KINDS, type DiaryEntry } from '../../core/diary.js';
+import { asText } from '../../core/parse.js';
+import { isBoard, oneOf } from '../../core/types.js';
 import { appendEntry, readDiary } from '../diary-store.js';
 import { type AppCtx, ensureOpen, nowIso } from '../route-context.js';
 
@@ -17,24 +18,12 @@ import { type AppCtx, ensureOpen, nowIso } from '../route-context.js';
 //
 // There is no `PATCH` and no `DELETE`, and that absence is the whole enforcement of append-only.
 
-function isKind(value: unknown): value is DiaryKind {
-  return typeof value === 'string' && (DIARY_KINDS as readonly string[]).includes(value);
-}
-
-function isBoard(value: unknown): value is BoardName {
-  return typeof value === 'string' && (BOARDS as readonly string[]).includes(value);
-}
+const isKind = oneOf(DIARY_KINDS);
 
 // A whole number of dispatches, or nothing. `Number('three')` is NaN, which would reach the format as
 // `iteration NaN` and read back as an event nobody can place in the sequence.
 function asIteration(value: unknown): number | undefined {
   return typeof value === 'number' && Number.isInteger(value) && value >= 0 ? value : undefined;
-}
-
-function asText(value: unknown): string | undefined {
-  if (typeof value !== 'string') return undefined;
-  const text = value.trim();
-  return text === '' ? undefined : text;
 }
 
 // Everything about the entry that is optional. Extracted from the handler rather than spread inline: five

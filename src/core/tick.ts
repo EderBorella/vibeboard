@@ -8,6 +8,7 @@ import {
 } from './autopilot.js';
 import { shapeProblems } from './autopilot-cover.js';
 import type { AutopilotState } from './autopilot-state.js';
+import { byQueueOrder } from './board/ordering.js';
 import type { CardProblem } from './board.js';
 import {
   creatingRoundSpent,
@@ -516,9 +517,6 @@ function reviewPhase(input: TickInput, task: Card): TickAction | undefined {
   }
   return { kind: 'dispatch', phase: 'task-review', skill, card: task, previous: judging.run };
 }
-
-const byQueueOrder = (a: Card, b: Card): number =>
-  a.order - b.order || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
 
 // ONE TASK AT A TIME, and the first unsettled one by (order, then id). The trace's own shape: a task goes all
 // the way to done before the next is picked up, which is what `AUTOPILOT_CONCURRENCY = 1` means one level in.

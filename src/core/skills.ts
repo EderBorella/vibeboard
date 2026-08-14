@@ -1,8 +1,8 @@
 import matter from 'gray-matter';
-import { boardColumnSlugs } from './board.js';
+import { boardColumnSlugs } from './board/columns.js';
 import { skillRel } from './layout.js';
 import { slugify } from './slug.js';
-import { BOARDS, type BoardName, type ProjectConfig } from './types.js';
+import { BOARDS, type BoardName, isBoard, type ProjectConfig } from './types.js';
 
 // A skill is a file: `<skills dir>/<slug>/SKILL.md` (core/layout.ts), frontmatter plus a prompt body.
 //
@@ -39,10 +39,6 @@ export function skillPath(slug: string): string {
 // Predicates, not booleans: they narrow, so the caller needs no cast to BoardName. The array form
 // is what lets one guard narrow the whole list — filtering afterwards would be a second pass that
 // can never remove anything, since the guard has already returned.
-function isBoard(value: string): value is BoardName {
-  return (BOARDS as readonly string[]).includes(value);
-}
-
 function areBoards(values: string[]): values is BoardName[] {
   return values.every(isBoard);
 }

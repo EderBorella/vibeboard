@@ -1,5 +1,6 @@
 import matter from 'gray-matter';
-import type { BoardName } from './types.js';
+import { asText } from './parse.js';
+import { type BoardName, oneOf } from './types.js';
 import { isVerifyMode, type Verification } from './verify.js';
 
 // A run is a file: `<board>/results/<CARD-ID>/<runId>.md` inside the boards folder (core/layout.ts).
@@ -185,25 +186,13 @@ export function asVerification(value: unknown): Verification | undefined {
   return out;
 }
 
-function asText(value: unknown): string | undefined {
-  if (typeof value !== 'string') return undefined;
-  const text = value.trim();
-  return text === '' ? undefined : text;
-}
+const isStatus = oneOf(RUN_STATUSES);
 
-function isStatus(value: unknown): value is RunStatus {
-  return typeof value === 'string' && (RUN_STATUSES as readonly string[]).includes(value);
-}
-
-function isOutcome(value: unknown): value is RunOutcome {
-  return typeof value === 'string' && (RUN_OUTCOMES as readonly string[]).includes(value);
-}
+const isOutcome = oneOf(RUN_OUTCOMES);
 
 // Anything that is not one of the two is DROPPED rather than read as either. `verdict: maybe` is not an
 // answer, and the direction that guesses at `done` advances a card on a word nobody defined.
-function isVerdict(value: unknown): value is ReviewVerdict {
-  return typeof value === 'string' && (REVIEW_VERDICTS as readonly string[]).includes(value);
-}
+const isVerdict = oneOf(REVIEW_VERDICTS);
 
 // A run id that sorts chronologically as a string: the store lists a card's runs by filename, so
 // ordering must not depend on reading every file. `at` is the caller's clock — nothing here reads

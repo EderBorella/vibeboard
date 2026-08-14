@@ -1,5 +1,5 @@
 import { type AutopilotConfig, BLOCKED_BOARDS, isTerminalColumn } from './autopilot.js';
-import { boardColumnSlugs } from './board.js';
+import { boardColumnSlugs } from './board/columns.js';
 import { LIFECYCLE_SKILLS, PHASES } from './phases.js';
 import { BOARDS, type BoardName, type ProjectConfig } from './types.js';
 

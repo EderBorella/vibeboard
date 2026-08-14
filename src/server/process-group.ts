@@ -74,7 +74,12 @@ export function killGroup(pgid: number, signal: NodeJS.Signals): boolean {
 
 // Ask, then insist. A CLI given SIGTERM writes what it has and exits; one that ignores it — or whose
 // children do — is killed after the grace period.
-export function terminateGroup(pgid: number, graceMs = GROUP_GRACE_MS): boolean {
+//
+// `stillWanted` is an EXTRA condition on the escalation, never a replacement for the identity check
+// below. commands.ts had its own copy of this shape guarding only on a `settled` flag — a process that
+// exited inside the grace period and had its pid reused was still a SIGKILL waiting to land on a
+// stranger — so it now calls this and passes its flag in. Absent means "nothing else to ask".
+export function terminateGroup(pgid: number, graceMs = GROUP_GRACE_MS, stillWanted?: () => boolean): boolean {
   // Sampled BEFORE the TERM, because it is the only moment the group is known to be the right one. The
   // escalation two seconds later is exactly the situation this module exists for: the group may have
   // exited inside the grace period and a new leader may have inherited its pid, in which case the
@@ -86,6 +91,7 @@ export function terminateGroup(pgid: number, graceMs = GROUP_GRACE_MS): boolean 
   // `unref`ed, so a pending kill never holds the process open. Without it a server shutting down — or
   // a test worker finishing — would wait out the grace period of every run it stopped.
   setTimeout(() => {
+    if (stillWanted?.() === false) return;
     // No start time means we could not identify the group even at TERM time; escalating blind is the
     // one thing worse than leaving it, since by now the pid may be anyone's.
     if (started !== undefined && isSameGroup(pgid, started)) killGroup(pgid, 'SIGKILL');

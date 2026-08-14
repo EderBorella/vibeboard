@@ -46,6 +46,12 @@ export default {
     'src/server/skill-catalogue.ts',
     'src/server/agent-runner.ts',
     'src/server/run-store.ts',
+    // Extracted OUT of the two above, so listed with them for the reason the web block below states:
+    // moving code out of a mutated file into an unmutated one loses the coverage silently.
+    // redaction.ts is the credential scrub the transcript, the report and the chat all go through;
+    // write-queue.ts now holds the atomic write that run-store.ts used to have inline.
+    'src/server/redaction.ts',
+    'src/server/write-queue.ts',
     'src/server/run-prompt.ts',
     'src/server/agent-turn.ts',
     'src/server/copilot-events.ts',

@@ -1,4 +1,4 @@
-import { BOARDS, type BoardName } from './types.js';
+import { type BoardName, isBoard, oneOf } from './types.js';
 
 // The diary: `.vibeboard/PROJECT-LOG.md`, append-only, one line per event.
 //
@@ -128,13 +128,7 @@ const LINE = /^- `(\d{4}-\d{2}-\d{2}T[\d:.]+Z)` \*\*([a-z]+)\*\*(.*)$/;
 // wrote in the structure position and is ignored rather than guessed at.
 const FIELD = /^(iteration|card|skill|outcome) (.+)$/;
 
-function isKind(value: string): value is DiaryKind {
-  return (DIARY_KINDS as readonly string[]).includes(value);
-}
-
-function isBoard(value: string): value is BoardName {
-  return (BOARDS as readonly string[]).includes(value);
-}
+const isKind = oneOf(DIARY_KINDS);
 
 // `null` for anything this module did not write. The checkup reasons about what comes back, so a
 // hand-typed line becoming an event would be a fact nobody stated.

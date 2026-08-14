@@ -57,7 +57,13 @@ export function serialise<T>(key: string, fn: () => Promise<T>): Promise<T> {
 // next write rather than staying open forever.
 //
 // autopilot-store.ts and run-store.ts each grew their own copy of this before it lived anywhere; they
-// predate it rather than disagree with it, and adopting this one is a tidy-up on its own.
+// predated it rather than disagreed with it, and both now call this one.
+//
+// THE TEMPORARY NAME MUST NOT END IN THE EXTENSION THE CALLER'S READERS FILTER ON, and for the run
+// store that extension is `.md`: an interrupted write must leave something its listers ignore rather
+// than something that half-parses as a run. `.tmp` satisfies that for every caller there is, and
+// test/atomic-write.test.ts pins it — the requirement arrived here with a caller whose own copy
+// carried the reason, and a shared helper that silently lost it would take a store's invariant with it.
 let writeSeq = 0;
 export async function writeAtomic(path: string, content: string, mode?: number): Promise<void> {
   await mkdir(dirname(path), { recursive: true });

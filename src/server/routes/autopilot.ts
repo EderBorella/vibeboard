@@ -14,7 +14,7 @@ import type { AutopilotState } from '../../core/autopilot-state.js';
 import { forClient, unreviewedGatesSentence } from '../../core/autopilot-state.js';
 import { readBoard } from '../../core/board.js';
 import { countLive } from '../../core/created.js';
-import { STOP_REASONS, type StopReason } from '../../core/dispatch-gate.js';
+import { isStopReason, STOP_REASONS, type StopReason } from '../../core/dispatch-gate.js';
 import {
   type FoundationStatus,
   foundationStatus,
@@ -291,7 +291,7 @@ async function registerControls(api: FastifyInstance, ctx: AppCtx): Promise<void
     const { reason, detail } = (req.body ?? {}) as { reason?: unknown; detail?: unknown };
     // Validated against the shared list rather than trusted: this is agent-reachable input, and an
     // unrecognised reason would render in the overlay as a raw word with no sentence behind it.
-    if (typeof reason !== 'string' || !(STOP_REASONS as readonly string[]).includes(reason)) {
+    if (!isStopReason(reason)) {
       return reply.code(400).send({ error: `reason must be one of ${STOP_REASONS.join(', ')}` });
     }
     // The two a LOOP cannot claim about itself. `killed` belongs to the emergency stop and `stopped` to

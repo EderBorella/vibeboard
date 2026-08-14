@@ -1,13 +1,14 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { boardColumnSlugs } from './board/columns.js';
 import { parseCardContent } from './card.js';
 import { ARCHIVE_SLUG, boardRel } from './layout.js';
-import { slugify } from './slug.js';
 import type { BoardName, Card, ProjectConfig } from './types.js';
 
-export function boardColumnSlugs(config: ProjectConfig, board: BoardName): string[] {
-  return config.boards[board].columns.map(slugify);
-}
+// Re-exported, not redefined. The definition moved to `board/columns.ts` so that a module needing only
+// the column list does not inherit this one's `node:fs` — but everything that already reads the board
+// asks for both from here, and a rename across 20-odd call sites would be churn for nothing.
+export { boardColumnSlugs };
 
 // Every id this board has spent, taken from FILENAMES rather than from parsed cards. A card is
 // `<id>.md` by construction, so the filename is the id — and it is still the id when the card's

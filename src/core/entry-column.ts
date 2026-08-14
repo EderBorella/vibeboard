@@ -1,5 +1,5 @@
 import { isBlockedColumn } from './autopilot.js';
-import { boardColumnSlugs } from './board.js';
+import { boardColumnSlugs } from './board/columns.js';
 import type { BoardName, ProjectConfig } from './types.js';
 
 // WHERE A BOARD IS ENTERED: its first column, POSITIONALLY, and `undefined` rather than a fallback when that

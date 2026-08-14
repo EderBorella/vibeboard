@@ -1,5 +1,6 @@
 import { type ChildProcess, spawn } from 'node:child_process';
 import { type CommandResult, tail } from '../core/verify.js';
+import { GROUP_GRACE_MS, terminateGroup } from './process-group.js';
 
 // Running one command a project declared as its own gate.
 //
@@ -41,9 +42,14 @@ const MAX_HELD = 16_000;
 // sitting unread, short enough that a command leaving a background child is not waited on.
 const FLUSH_MS = 50;
 
-// How long a timed-out command has to clean up after SIGTERM before SIGKILL. Long enough for a test
-// runner to remove its temp directories, short enough that a hung one is not waited on.
-const GRACE_MS = 2000;
+// How long a timed-out command has to clean up after SIGTERM before SIGKILL — long enough for a test
+// runner to remove its temp directories, short enough that a hung one is not waited on — is
+// `GROUP_GRACE_MS`, which this module used to state again as its own 2000.
+//
+// Reconciled explicitly rather than merged blind: the two constants were written independently, for
+// two audiences (a CLI agent flushing its report, a test runner cleaning up), and they turned out to be
+// the same 2 seconds. So adopting the shared one changes no timing. If they had differed, the merge
+// would have silently changed how long a hung `npm test` gets.
 
 export function runCommand(
   command: string,
@@ -80,29 +86,22 @@ export function runCommand(
     child.stdout?.on('data', capture);
     child.stderr?.on('data', capture);
 
-    // TERM first, KILL after a grace — decision 13's shape, and it is not ceremony here either: a test
-    // runner killed outright leaves its temp directories behind, and this project has already lost four
-    // weeks of runs to a filesystem whose inode table filled with exactly that kind of litter.
-    const signalGroup = (signal: 'SIGTERM' | 'SIGKILL'): void => {
-      try {
-        // Negative pid: the group. A pid of 0 or 1 would be our own group or init, and `detached: true`
-        // means the child IS the leader — but the guard costs nothing and the mistake is unrecoverable.
-        if (child.pid !== undefined && child.pid > 1) process.kill(-child.pid, signal);
-      } catch {
-        /* already gone, which is the ending we wanted anyway */
-      }
-    };
     const timer = setTimeout(() => {
       // Nothing to time out once the command has ended. Without this guard a process that exited at
       // t-1ms could still be recorded as `timedOut`, and `commandFailed` treats that as a failure on its
       // own — a verdict contradicting the exit code it is carrying.
       if (settled) return;
       timedOut = true;
-      signalGroup('SIGTERM');
-      // Unref'd: a command that took the hint must not hold the process open waiting to be shot.
-      setTimeout(() => {
-        if (!settled) signalGroup('SIGKILL');
-      }, GRACE_MS).unref();
+      // TERM first, KILL after a grace — decision 13's shape, and it is not ceremony here either: a test
+      // runner killed outright leaves its temp directories behind, and this project has already lost four
+      // weeks of runs to a filesystem whose inode table filled with exactly that kind of litter.
+      //
+      // `terminateGroup` rather than the copy of it that used to be here. `detached: true` makes the
+      // child its own group leader, so its pid IS the pgid. What the shared one adds is the check this
+      // copy never had: it samples the group's start time before the TERM and re-checks identity before
+      // escalating, so a command that exits inside the grace period and has its pid reused cannot get a
+      // stranger SIGKILLed. `settled` is passed in as a SECOND condition, not as the only one.
+      if (child.pid !== undefined) terminateGroup(child.pid, GROUP_GRACE_MS, () => !settled);
     }, timeoutMs);
     // Unref'd so a pending timer cannot hold the process open after everything else has finished.
     timer.unref();

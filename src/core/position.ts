@@ -1,3 +1,4 @@
+import { byQueueOrder } from './board/ordering.js';
 import { childrenOf, liveCards } from './hierarchy.js';
 import type { Card } from './types.js';
 
@@ -29,9 +30,6 @@ export interface Position {
 // `complete`, `no-op` or `stalled`, and it has the facts to tell them apart. Answering it here would be a
 // second opinion on the one thing this design has got wrong most often.
 export type PositionResult = { position: Position } | { problem: string } | { empty: true };
-
-const byQueueOrder = (a: Card, b: Card): number =>
-  a.order - b.order || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
 
 const andList = (cards: Card[]): string => {
   const ids = cards.map((c) => c.id);

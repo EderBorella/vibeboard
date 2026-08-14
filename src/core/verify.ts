@@ -1,4 +1,5 @@
 import { VERIFY_MODES, type VerifyMode } from './autopilot.js';
+import { oneOf } from './types.js';
 
 // Did the work pass? A pure decision over evidence — no disk, no clock, no processes — so every
 // boundary is assertable and the fail-closed cases can be watched failing.
@@ -36,9 +37,7 @@ export interface Verification {
 
 // Here rather than beside the modes themselves, because this is the only kind of caller that needs it:
 // something reading a verdict back off disk, where the mode is whatever a person left in the file.
-export function isVerifyMode(value: unknown): value is VerifyMode {
-  return typeof value === 'string' && (VERIFY_MODES as readonly string[]).includes(value);
-}
+export const isVerifyMode = oneOf(VERIFY_MODES);
 
 // The tail, because a failing suite prints its diagnosis last. Marked rather than silently cut: a
 // reader must not take a fragment for the whole output and go looking for a cause that was dropped.

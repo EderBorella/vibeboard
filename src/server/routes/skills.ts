@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { type SkillFields, serializeSkill, skillPath } from '../../core/skills.js';
-import { BOARDS, type BoardName } from '../../core/types.js';
+import { type BoardName, isBoard } from '../../core/types.js';
 import { writeControlFile } from '../control-files.js';
 import { type AppCtx, ensureOpen } from '../route-context.js';
 import { readSkills } from '../skill-catalogue.js';
@@ -18,7 +18,7 @@ function toFields(body: unknown): SkillFields | string {
   const asList = (value: unknown): string[] =>
     Array.isArray(value) ? value.map((v) => String(v).trim()).filter((v) => v !== '') : [];
   const boards = asList(b.boards);
-  const unknown = boards.find((x) => !(BOARDS as readonly string[]).includes(x));
+  const unknown = boards.find((x) => !isBoard(x));
   if (unknown !== undefined) return `Unknown board "${unknown}"`;
   return { name, description, boards: boards as BoardName[], columns: asList(b.columns), prompt };
 }

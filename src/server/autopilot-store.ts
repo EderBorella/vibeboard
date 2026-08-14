@@ -1,9 +1,9 @@
-import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { type AutopilotState, IDLE_STATE, parseState, serializeState } from '../core/autopilot-state.js';
 import { stopSentence } from '../core/dispatch-gate.js';
 import { AUTOPILOT_STATE_FILE } from '../core/layout.js';
-import { serialise } from './write-queue.js';
+import { serialise, writeAtomic } from './write-queue.js';
 
 // Auto-pilot's state on disk. One file per project, written by the service for its counters and by the
 // main server for the stops (the ownership split is in core/autopilot-state.ts).
@@ -74,20 +74,13 @@ const queueKey = (root: string): string => `autopilot:${root}`;
 
 // Unserialised, and private for that reason: `merge` runs INSIDE the critical section already, so calling
 // the public wrapper from there would wait on a chain that cannot finish until it returns — a deadlock.
-let writeSeq = 0;
-async function write(root: string, state: AutopilotState): Promise<void> {
-  const path = autopilotStatePath(root);
-  await mkdir(dirname(path), { recursive: true });
-  // Unique per WRITE, not per project: two overlapping writes sharing one temp name race for it, and the
-  // loser's rename finds the file already gone. The run store learned this the same way.
-  const temp = `${path}.${process.pid}.${++writeSeq}.tmp`;
-  try {
-    await writeFile(temp, serializeState(state), 'utf8');
-    await rename(temp, path);
-  } catch (err) {
-    await rm(temp, { force: true }).catch(() => {});
-    throw err;
-  }
+//
+// `writeAtomic` rather than an inline copy of it, which is what this used to be — it predated the shared
+// one rather than disagreeing with it. What this file needs from it is the temp name being unique per
+// WRITE and not per project: two overlapping writes sharing one temp name race for it, and the loser's
+// rename finds the file already gone. The run store learned this the same way.
+function write(root: string, state: AutopilotState): Promise<void> {
+  return writeAtomic(autopilotStatePath(root), serializeState(state));
 }
 
 // Read-modify-write, so a caller that owns `state` cannot clobber the `iteration` the service owns.

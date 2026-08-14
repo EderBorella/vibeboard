@@ -1,5 +1,6 @@
 import matter from 'gray-matter';
-import type { BoardName } from './types.js';
+import { asText } from './parse.js';
+import { type BoardName, oneOf } from './types.js';
 
 // Agent Suggestions: a durable side-channel for what an agent discovers but must not act on.
 //
@@ -53,15 +54,7 @@ const _everySuggestionFieldIsListed: UnlistedSuggestionField extends never ? tru
   true;
 void _everySuggestionFieldIsListed;
 
-function asText(value: unknown): string | undefined {
-  if (typeof value !== 'string') return undefined;
-  const text = value.trim();
-  return text === '' ? undefined : text;
-}
-
-function isState(value: unknown): value is SuggestionState {
-  return typeof value === 'string' && (SUGGESTION_STATES as readonly string[]).includes(value);
-}
+const isState = oneOf(SUGGESTION_STATES);
 
 // Returns null for anything that is not a suggestion — the folder is ordinary disk, and a stray
 // note in it must not become a phantom entry in the checkup's queue.

@@ -3,6 +3,7 @@ import type { TickAction } from '../core/actions.js';
 import { DEFAULT_AUTOPILOT, isBlockedColumn } from '../core/autopilot.js';
 import type { AutopilotState } from '../core/autopilot-state.js';
 import { unreviewedGatesSentence } from '../core/autopilot-state.js';
+import { byQueueOrder } from '../core/board/ordering.js';
 import { latestOwnRun } from '../core/bounds.js';
 import { countLive, createdNothing } from '../core/created.js';
 import { blockedUnder } from '../core/derived-status.js';
@@ -716,11 +717,6 @@ async function createHarnessFeature(deps: ActDeps): Promise<void> {
     { card: made.value.id, board: 'features' },
   );
 }
-
-// (order, then id) — the same comparator the queue is ranked by everywhere else. Two features with the same
-// order is a board a person edited, and taking the lower id is at least deterministic.
-const byQueueOrder = (a: Card, b: Card): number =>
-  a.order - b.order || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
 
 // WHETHER THIS CARD IS IN THE SETUP SUBTREE, asked of the board the loop can already read. It is the loop's
 // question and not the card's: told by the card, an absent gate set would be something a card could claim.

@@ -67,6 +67,26 @@ describe('the state record', () => {
     expect(parseState('{"state":"running","servicePgid":0}')).toMatchObject({ state: 'running' });
     expect(parseState('{"state":"running","servicePgid":-9}')).not.toMatchObject({ servicePgid: -9 });
   });
+
+  // A BEHAVIOUR CHANGE, made deliberately when the four copies of trim-to-undefined became one.
+  //
+  // This module's copy tested `value.trim() !== ''` and then returned the UNTRIMMED value, so a
+  // `detail` with padding reached the halt overlay carrying it while every other reader of an optional
+  // string field in the codebase stripped it. `core/parse.ts`'s `asText` is the other three's
+  // behaviour, and it is now this one's. Exact strings rather than `toContain`, because the padding IS
+  // the behaviour under test.
+  it('trims a detail and a timestamp rather than carrying the padding into the overlay', () => {
+    expect(
+      parseState('{"state":"halted","detail":"  everything stopped  ","at":" 2026-08-03T09:00:00.000Z "}'),
+    ).toMatchObject({ detail: 'everything stopped', at: '2026-08-03T09:00:00.000Z' });
+  });
+
+  // The half of the rule that did not change: blank is the same answer as absent, so a field somebody
+  // started and did not finish is dropped rather than carried as ''.
+  it('drops a detail that is nothing but whitespace', () => {
+    const parsed = parseState('{"state":"halted","detail":"   "}');
+    expect(parsed === 'unreadable' || 'detail' in parsed).toBe(false);
+  });
 });
 
 describe('reconciling a state found on disk at startup', () => {

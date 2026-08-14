@@ -60,6 +60,25 @@ export default {
     // write-queue.ts holds the atomic write that run-store.ts used to have inline, so it is measured for
     // the same reason redaction.ts is.
     'src/store/**/*.ts',
+    // THE LOOP AND THE PROCESS LAYER. Neither directory appeared in this list at all — not excluded with
+    // a reason, simply never added — so the code that decides whether a card moves had no mutation
+    // coverage while thirty React components did. Every module in both has its own test file, which is
+    // this block's rule; the pairing was checked module by module rather than assumed.
+    //
+    // The exclusion this does NOT make: the note above says spawn lifecycles produce timeouts rather than
+    // insight, and that prior was simply wrong here. Measured per module, git-work.ts — 419 lines driving
+    // real git in scratch repos — produced 242 mutants, 204 killed and ZERO timeouts, the best behaved
+    // file of the five; commands.ts also zero. The timeouts were in the two SMALL pure-ish modules and
+    // were an artefact of the old 30s budget, which is fixed in timeoutMS below rather than by dropping
+    // files.
+    //
+    // One line of src/exec/process-group.ts carries a `Stryker disable` comment, and it is the one place
+    // in this repository where a mutant is genuinely unsafe to run rather than merely uninformative:
+    // removing the `pgid <= 1` guard lets a test's deliberate `0` reach `process.kill(-0)`, which signals
+    // the worker's own process group — Stryker's. It killed two whole runs at 94% with exit 143 before it
+    // was understood. Disabled at the line, so the module's other ~90 mutants stay measured.
+    'src/service/**/*.ts',
+    'src/exec/**/*.ts',
     // EVERY ROUTE MODULE, BY THE CONVENTION THAT NAMES IT, and this replaces `src/server/routes/**/*.ts`.
     // The flat `routes/` directory is gone: each route module now sits in its feature folder, named
     // `routes.ts` where the feature has one HTTP surface and `<subject>-routes.ts` where it has several.
@@ -176,9 +195,29 @@ export default {
   // nothing when output is piped to a file or a CI log.
   reporters: ['progress-append-only', 'clear-text', 'html'],
 
-  // Some mutants in the filesystem and watcher paths turn a guard into an await that never settles.
-  // 30s is enough to let a genuinely slow test finish while still killing those as timeouts.
-  timeoutMS: 30000,
+  // 120s, RAISED FROM 30s BECAUSE 30s WAS MEASURING THE MACHINE AND CALLING IT COVERAGE.
+  //
+  // Mutants in the filesystem and watcher paths do turn a guard into an await that never settles, and a
+  // timeout is the only thing that catches those. But at 30s with 19 workers the timeout was also firing
+  // on mutants that cannot hang at all — one per line, scattered across `changedPaths` and `parseStatus`
+  // in git-measure.ts, both of them pure functions over two objects.
+  //
+  // Measured on that one file, three ways, same code:
+  //
+  //   19 workers / 30s    72 timeout   33 killed    1 survived
+  //    4 workers / 30s     2 timeout   94 killed   10 survived
+  //   19 workers / 120s    2 timeout   94 killed   10 survived     <- this setting
+  //
+  // Stryker counts a timeout as a detection, so the 30s run did not merely add uncertainty: it credited
+  // 70 phantom kills AND HID NINE REAL SURVIVORS, i.e. it was wrong in the flattering direction. The two
+  // timeouts that survive both fixes are the genuine article — `i -= 1` on the two manual loop
+  // increments, which really do not terminate.
+  //
+  // Raising the timeout rather than lowering concurrency, because the two give the identical verdict and
+  // this one keeps the parallelism: both runs above took ~3 minutes. The cost is that a genuinely
+  // hanging mutant now occupies a worker for two minutes instead of thirty seconds, and there are two of
+  // them in 106.
+  timeoutMS: 120000,
 
   // Static mutants (module-level constants and regexes) re-run the WHOLE suite per mutant, and
   // with one worker per core that contention alone blows the timeout — so they were scoring as
@@ -192,6 +231,8 @@ export default {
   // that reaches the target, not pointed at a backlog that has to be bypassed.
   thresholds: { high: 95, low: 85, break: null },
 
-  // concurrency is left at Stryker's default (cpuCount - 1) on purpose — pinning it low is the
-  // easiest way to make this look slower than it is.
+  // concurrency is left at Stryker's default (cpuCount - 1, so 19 here) on purpose. It used to say
+  // "pinning it low is the easiest way to make this look slower than it is", which was true and beside
+  // the point: the default was silently corrupting the verdict, and the fix belonged in timeoutMS. See
+  // the measurement there before changing either.
 };

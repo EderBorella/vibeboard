@@ -1,4 +1,3 @@
-import { chmodSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -10,11 +9,10 @@ import { writeAutopilotState } from '../src/store/autopilot-store.js';
 import { readProjectRun, readRun, writeRun } from '../src/store/run-store.js';
 import { openTestProject, shimArgsLog, type TestProject, testApp, wsClient } from './helpers.js';
 
+// The executable bit a sandbox copy does not carry is restored for every stub at once in
+// test/global-teardown.ts — it used to be restored for this one file here, which is why the other six
+// stubs stayed unspawnable.
 const SHIM = join(process.cwd(), 'test', 'fixtures', 'fake-agent.mjs');
-// Stryker runs the suite from a sandbox COPY of the repo, and the copy does not carry the executable
-// bit — so the shim could not be spawned there and every run was recorded as failed, which failed
-// the dry run before any mutant existed. Restoring it here costs nothing and works either way.
-chmodSync(SHIM, 0o755);
 
 // The shim is passed to the app rather than set in the environment, and its behaviour travels in the
 // dispatch prompt: env is shared with every other test file in the process, and a sibling rewriting

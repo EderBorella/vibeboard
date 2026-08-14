@@ -63,6 +63,17 @@ export function isSameGroup(pgid: number, started: number): boolean {
 export function killGroup(pgid: number, signal: NodeJS.Signals): boolean {
   // A pgid of 0 or 1 would be catastrophic: `kill(0, ...)` signals our own process group, and pid 1 is
   // init. Neither can be a run we spawned, so neither is worth risking a typo over.
+  //
+  // THE MUTANTS OF THIS LINE ARE EXCLUDED BECAUSE THEY KILL THE MUTATION RUN ITSELF, and that is the
+  // strongest evidence this guard is load-bearing that anything could produce. Removing it lets the `0`
+  // in test/process-group.test.ts's "refuses pgids that could never be a run" reach `process.kill(-0)`
+  // — and `-0 === 0`, so the vitest worker signals its whole process group, which under Stryker is
+  // Stryker. Measured twice before it was understood: both runs died at 94% with exit 143 (SIGTERM),
+  // no summary and no report, which reads exactly like flaky infrastructure.
+  //
+  // Excluded here rather than by dropping the file from stryker.config.mjs, so the other 90-odd mutants
+  // in this module stay measured.
+  // Stryker disable next-line all: mutating this guard makes the test runner SIGTERM its own process group
   if (!Number.isInteger(pgid) || pgid <= 1) return false;
   try {
     process.kill(-pgid, signal);

@@ -96,6 +96,27 @@ function git(
       execFile(
         'git',
         args,
+        // THE `{}` MUTANT OF THIS OBJECT RUNS GIT AGAINST WHATEVER REPOSITORY THE TEST PROCESS IS
+        // STANDING IN, so it is excluded — the second mutant in this codebase with effects outside its
+        // own test, after the `pgid <= 1` guard in process-group.ts that SIGTERMed the runner.
+        //
+        // Dropping this object drops `cwd`, and git then uses the process's own directory. Both halves of
+        // that have happened, hours apart, in this repository:
+        //
+        //   * from a Stryker sandbox under `.stryker-tmp/`, git CLIMBED out and `ensureBranch(dir,
+        //     'autopilot/run-1')` created that branch here and checked it out mid-session — 2026-08-14
+        //     17:54:46, explicable only from the reflog;
+        //   * from a plain `vitest` run, whose worker cwd IS the repository root, `commitAll` ran
+        //     `git add -A` here and left 2 files staged plus a `.git/index.lock`, with a hung
+        //     `git commit -q -m "autopilot: before E-001"` behind it — 21:21 the same day.
+        //
+        // `GIT_CEILING_DIRECTORIES` in vitest.config.ts closes the first and CANNOT close the second: a
+        // ceiling stops the upward search, and when cwd is already the root there is no search to stop
+        // (verified both ways). Hence a barrier there AND this exclusion here. Neither is redundant.
+        //
+        // The next destructive call reached this way would not move a pointer — `commitAll`, a reset, a
+        // checkout of a path — it would write or discard real work.
+        // Stryker disable next-line ObjectLiteral: dropping cwd runs git on the developer's own repository
         {
           cwd,
           timeout: opts.timeoutMs,

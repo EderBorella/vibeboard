@@ -122,10 +122,21 @@ describe('GET /api/suggestions', () => {
       headers: bearer(work.token),
       payload: { title: 'two' },
     });
-    const [first] = await listSuggestions(root);
+    // BY TITLE, never by position. Suggestion ids are `<timestamp>-<random 8>` and allSuggestions sorts by
+    // filename, so two posts landing in the SAME MILLISECOND are ordered by the random half — measured at
+    // 1004/2000, a coin flip. This read used to take `[0]`, dismiss whichever it got, and assert 'two'
+    // survived. It passed because the two injects normally straddle a millisecond; under Stryker's 19
+    // workers they stop doing so, it dismissed 'two', and `expected ['one'] to deeply equal ['two']`
+    // failed the DRY RUN before any mutant existed — which reads exactly like a bug in the code under test.
+    //
+    // Not a defect in the store: `randomUUID` is there so two same-millisecond posts cannot overwrite each
+    // other (see the id comment in server/suggestions/routes.ts), and list order is a promise nothing else
+    // relies on. It was this test depending on luck.
+    const dismissed = (await listSuggestions(root)).find((s) => s.title === 'one');
+    if (!dismissed) throw new Error("the suggestion titled 'one' was not written");
     await app.inject({
       method: 'PATCH',
-      url: `/api/suggestions/${first.id}`,
+      url: `/api/suggestions/${dismissed.id}`,
       headers: admin,
       payload: { state: 'dismissed', reason: 'no' },
     });

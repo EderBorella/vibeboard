@@ -11,7 +11,7 @@
 // flattened — newline plus the next line's comment marker collapses to one space — with an index map
 // back to the original offsets, so a match still reports the line it started on.
 
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -107,9 +107,36 @@ const registered = () => {
   return rows;
 };
 
+// THE OTHER HALF OF "THE REGISTER RESOLVES A CITATION": every source path it names must EXIST.
+//
+// The rows are hand-written prose, so nothing stopped them rotting — and they rotted the same day they
+// were written. A refactor moved eleven modules into `src/store/` and four large files into directories,
+// and three rows were left pointing at paths that no longer resolve. A register whose "where it binds"
+// column is wrong is worse than no register: it sends a reader who trusted it to the wrong file.
+//
+// A DELETED FILE NAMED AS DELETED IS NOT ROT, which is why this needs an allow-list rather than a bare
+// existence check. `decision 42`'s row says the rollup "and `src/core/rollup.ts` are gone with it" — the
+// path is the subject of the sentence and must stay. Anything else absent is a stale pointer.
+const GONE_ON_PURPOSE = new Set(['src/core/rollup.ts', 'src/core/eligibility.ts']);
+const PATH_IN_ROW = /`((?:src|web\/src|test|tools)\/[\w./-]+\.(?:ts|tsx|mjs|js|css|md))`/g;
+
+const stalePaths = () => {
+  const text = readFileSync(join(ROOT, REGISTER), 'utf8');
+  const stale = new Map();
+  text.split('\n').forEach((line, i) => {
+    for (const match of line.matchAll(PATH_IN_ROW)) {
+      const path = match[1];
+      if (GONE_ON_PURPOSE.has(path)) continue;
+      if (!existsSync(join(ROOT, path))) stale.set(path, i + 1);
+    }
+  });
+  return stale;
+};
+
 const found = scan();
 const rows = registered();
 const missing = [...found.keys()].filter((id) => !rows.has(id.toLowerCase())).sort();
+const stale = stalePaths();
 
 const total = [...found.values()].reduce((sum, sites) => sum + sites.length, 0);
 console.log(`citations: ${found.size} distinct, ${total} references across ${CORPUS.join(', ')}`);
@@ -124,4 +151,12 @@ if (missing.length > 0) {
   process.exit(1);
 }
 
-console.log(`all ${found.size} identifiers have a row in ${REGISTER}`);
+if (stale.size > 0) {
+  console.error(`\n${stale.size} path(s) in ${REGISTER} that no longer exist:\n`);
+  for (const [path, line] of [...stale].sort()) console.error(`  ${path} — ${REGISTER}:${line}`);
+  console.error(`\nRetarget each to where the code lives now, or add it to GONE_ON_PURPOSE if the row is`);
+  console.error(`about its deletion.`);
+  process.exit(1);
+}
+
+console.log(`all ${found.size} identifiers have a row in ${REGISTER}, and every path in it resolves`);

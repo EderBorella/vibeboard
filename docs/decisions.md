@@ -21,8 +21,8 @@ independent design efforts each numbered their findings `S1`, `S2`, `S3`, and bo
 in the code.
 
 **Not registered here:** a handful of rulings are cited by DATE rather than by number — *"ruling
-2026-08-11"* in `src/service/main.ts`, *"the shape ruling of 2026-08-13"* in `test/run-prompt.ts`,
-*"ruling of 2026-…"* in `test/runs.test.ts`. They are a different notation, they carry no numeric
+2026-08-11"* in `src/service/main.ts`, *"the shape ruling of 2026-08-13"* in `test/run-prompt.test.ts`,
+*"the ruling of 2026-08-13"* in `test/runs-parse.test.ts`. They are a different notation, they carry no numeric
 identifier, and the gate does not scan for them.
 
 ---

@@ -197,7 +197,7 @@ given. **`copilot/` is the chat**, and the model catalogue its picker offers. **
 
 | file | pages |
 |---|---|
-| `src/server/auth.ts` | the scope table is a security property in its own right — see `decisions.md`, `decision 21` |
+| `src/server/auth/auth.ts` | the scope table is a security property in its own right — see `decisions.md`, `decision 21` |
 | `stryker.config.mjs` | its exclusions carry their own reasoning inline; it is invisible to both biome and tsc, so a stale path there scores green over zero mutants |
 | `tools/check-citations.mjs` | the gate behind `decisions.md` — `npm run check:citations` |
 | `tools/docker/` | the image, the relay, the entrypoint and the install helper — see `security/containment.md` |

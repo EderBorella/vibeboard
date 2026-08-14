@@ -147,7 +147,7 @@ export default {
     'web/src/runs/ReportOptions.tsx',
     'web/src/runs/ExecutionView.tsx',
     'web/src/skills/SkillEditor.tsx',
-    'web/src/components/UtilityDock.tsx',
+    'web/src/dock/UtilityDock.tsx',
     // ModelPicker.tsx is deliberately NOT here. Its decision logic — which models to show and in
     // what order — was lifted into model-filter.ts, which IS measured; what is left is a modal of
     // chips, and its residue was 85 unreached JSX string and attribute mutants. Owner's ruling

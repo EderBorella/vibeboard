@@ -7,7 +7,7 @@ const api = vi.hoisted(() => ({ restartAutopilot: vi.fn() }));
 vi.mock('../web/src/api.js', () => api);
 vi.mock('../web/src/api', () => api);
 
-const { HaltOverlay } = await import('../web/src/components/HaltOverlay.js');
+const { HaltOverlay } = await import('../web/src/autopilot/HaltOverlay.js');
 
 afterEach(() => {
   cleanup();

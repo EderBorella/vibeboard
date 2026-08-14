@@ -9,12 +9,10 @@ import {
   resolveRunRecord,
   setLinks,
 } from './api';
-import { ApprovalPrompt } from './components/ApprovalPrompt';
-import { AutopilotBar } from './components/AutopilotBar';
-import { HaltOverlay } from './components/HaltOverlay';
+import { AutopilotBar } from './autopilot/AutopilotBar';
+import { HaltOverlay } from './autopilot/HaltOverlay';
 import { ProjectGate } from './components/ProjectGate';
 import { SettingsModal } from './components/SettingsModal';
-import { SignIn } from './components/SignIn';
 import { type MainTab, TopBar } from './components/TopBar';
 import { WorkArea } from './components/WorkArea';
 import { archiveCardRequest, stopRunRequest } from './confirm/requests';
@@ -27,6 +25,8 @@ import { useRuns } from './runs/useRuns';
 import { needsAttention } from './runs/viewmodel';
 import { BOARDS, type BoardName, type Card, type CardFrontmatterPatch } from './shared';
 import { chooseContent, rebindOnSignIn } from './shell';
+import { ApprovalPrompt } from './signin/ApprovalPrompt';
+import { SignIn } from './signin/SignIn';
 import { useSkills } from './skills/useSkills';
 import { useAutopilot } from './useAutopilot';
 import { useCopilotChoice } from './useCopilotChoice';

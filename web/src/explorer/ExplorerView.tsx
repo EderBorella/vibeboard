@@ -11,14 +11,14 @@ import {
 } from '../api';
 import { useConfirm } from '../confirm/useConfirm';
 import { errorText } from '../errors';
-import { formatBytes } from '../explorer/format';
-import { nameOf, parentOf } from '../explorer/paths';
-import { deleteEmptyFolderRequest, deleteEntryRequest, deleteFolderRequest } from '../explorer/requests';
-import { useOpenFile } from '../explorer/useOpenFile';
-import { useTree } from '../explorer/useTree';
 import type { ProjectSnapshot } from '../shared';
 import { EditorBody, EditorShell } from '../ui/EditorShell';
 import { FileTree } from './FileTree';
+import { formatBytes } from './format';
+import { nameOf, parentOf } from './paths';
+import { deleteEmptyFolderRequest, deleteEntryRequest, deleteFolderRequest } from './requests';
+import { useOpenFile } from './useOpenFile';
+import { useTree } from './useTree';
 
 interface Props {
   // Bumps whenever the project changes on disk, so the tree and the open file follow along.

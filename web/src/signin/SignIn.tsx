@@ -1,4 +1,4 @@
-import type { SigninPhase } from '../signin';
+import type { SigninPhase } from './driver';
 
 interface Props {
   phase: SigninPhase;

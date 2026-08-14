@@ -10,7 +10,7 @@ const api = vi.hoisted(() => ({ patchSuggestion: vi.fn(), cardSuggestion: vi.fn(
 vi.mock('../web/src/api.js', () => api);
 vi.mock('../web/src/api', () => api);
 
-const { SuggestionsPane } = await import('../web/src/components/SuggestionsPane.js');
+const { SuggestionsPane } = await import('../web/src/suggestions/SuggestionsPane.js');
 
 afterEach(() => {
   cleanup();

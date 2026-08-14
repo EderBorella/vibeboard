@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import type { FsNode } from '../api';
-import { formatBytes } from '../explorer/format';
-import { canDropInto } from '../explorer/paths';
-import type { TreeRow } from '../explorer/useTree';
+import { formatBytes } from './format';
+import { canDropInto } from './paths';
+import type { TreeRow } from './useTree';
 
 interface Props {
   rows: TreeRow[];

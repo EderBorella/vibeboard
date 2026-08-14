@@ -19,7 +19,7 @@ const api = vi.hoisted(() => ({
 vi.mock('../web/src/api.js', () => api);
 vi.mock('../web/src/api', () => api);
 
-const { AutopilotPanel } = await import('../web/src/components/AutopilotPanel.js');
+const { AutopilotPanel } = await import('../web/src/autopilot/AutopilotPanel.js');
 
 import type { Readiness } from '../web/src/api.js';
 import type { ProjectConfig } from '../web/src/shared.js';

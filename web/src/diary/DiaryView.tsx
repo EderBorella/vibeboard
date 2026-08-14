@@ -1,9 +1,9 @@
 import { memo, useMemo, useState } from 'react';
 import { addDiaryEntry, type DiaryEntry } from '../api';
-import { useDiary } from '../diary/useDiary';
 import { MAX_ENTRY_TEXT, type Suggestion } from '../shared';
 import { useSuggestions } from '../suggestions/useSuggestions';
 import { useAction } from '../useAction';
+import { useDiary } from './useDiary';
 
 // The diary, and the permanent way to add to it.
 //

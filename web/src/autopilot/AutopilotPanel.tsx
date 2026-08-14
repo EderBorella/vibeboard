@@ -7,12 +7,12 @@ import {
   softStopAutopilot,
   startAutopilot,
 } from '../api';
-import { useReadiness } from '../autopilot/useReadiness';
 import { killProjectRequest } from '../confirm/requests';
 import { useConfirm } from '../confirm/useConfirm';
 import { errorText } from '../errors';
 import { useAccounting } from '../runs/useAccounting';
 import { type AutopilotConfig, BLOCKED_BOARDS, BOARD_LABELS, type ProjectConfig } from '../shared';
+import { useReadiness } from './useReadiness';
 
 // The lifecycle as it will actually be executed, plus what is stopping it.
 //

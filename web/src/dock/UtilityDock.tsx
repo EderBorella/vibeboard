@@ -1,4 +1,4 @@
-import { activePane, type DockPane } from '../dock/panes';
+import { activePane, type DockPane } from './panes';
 
 interface Props {
   panes: DockPane[];

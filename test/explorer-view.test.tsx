@@ -17,7 +17,7 @@ const api = vi.hoisted(() => ({
 vi.mock('../web/src/api.js', () => api);
 vi.mock('../web/src/api', () => api);
 
-const { ExplorerView } = await import('../web/src/components/ExplorerView.js');
+const { ExplorerView } = await import('../web/src/explorer/ExplorerView.js');
 
 afterEach(cleanup);
 // A rejecting mock must be `...Once` here — see the note in explorer-tree.test.tsx.

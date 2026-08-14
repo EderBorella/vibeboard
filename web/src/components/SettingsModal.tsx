@@ -7,6 +7,7 @@ import {
   patchConfig,
   type SandboxState,
 } from '../api';
+import { AutopilotPanel } from '../autopilot/AutopilotPanel';
 import type { Confirmer } from '../confirm/useConfirm';
 import { clampToCaps, resolveChoice } from '../copilot/choice';
 import { ModelPicker } from '../models/ModelPicker';
@@ -21,13 +22,12 @@ import {
   DEFAULT_CONTEXT_BUDGET,
   type ProjectConfig,
 } from '../shared';
+import { SignInPanel } from '../signin/SignInPanel';
 import { useAction } from '../useAction';
 import { useFetched } from '../useFetched';
 import { parseCsv } from '../viewmodel';
-import { AutopilotPanel } from './AutopilotPanel';
 import { DiagnosticsPanel } from './DiagnosticsPanel';
 import { SandboxPanel } from './SandboxPanel';
-import { SignInPanel } from './SignInPanel';
 
 const BACKENDS: { value: string; label: string }[] = [
   { value: 'claude-code', label: 'Claude Code' },

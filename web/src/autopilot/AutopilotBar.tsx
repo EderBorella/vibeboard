@@ -7,12 +7,12 @@ import {
   softStopAutopilot,
   startAutopilot,
 } from '../api';
-import { transportModel } from '../autopilot/transport';
-import { useReadiness } from '../autopilot/useReadiness';
 import { killProjectRequest } from '../confirm/requests';
 import { useConfirm } from '../confirm/useConfirm';
 import { useAction } from '../useAction';
 import { AutopilotHelp } from './AutopilotHelp';
+import { transportModel } from './transport';
+import { useReadiness } from './useReadiness';
 
 interface Props {
   state: AutopilotState | null;

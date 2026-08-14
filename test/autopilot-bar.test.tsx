@@ -14,7 +14,7 @@ const api = vi.hoisted(() => ({
 }));
 vi.mock('../web/src/api.js', () => api);
 
-const { AutopilotBar } = await import('../web/src/components/AutopilotBar.js');
+const { AutopilotBar } = await import('../web/src/autopilot/AutopilotBar.js');
 
 const IDLE: AutopilotState = { state: 'idle', iteration: 0 };
 const NO_RUNS: RunList = { runs: [], active: [], queued: [] };

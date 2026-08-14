@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { UtilityDock } from '../web/src/components/UtilityDock.js';
 import type { DockPane } from '../web/src/dock/panes.js';
+import { UtilityDock } from '../web/src/dock/UtilityDock.js';
 
 afterEach(cleanup);
 

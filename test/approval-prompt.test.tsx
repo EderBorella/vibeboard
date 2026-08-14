@@ -8,7 +8,7 @@ const api = vi.hoisted(() => ({
 }));
 vi.mock('../web/src/api.js', () => api);
 
-const { ApprovalPrompt } = await import('../web/src/components/ApprovalPrompt.js');
+const { ApprovalPrompt } = await import('../web/src/signin/ApprovalPrompt.js');
 
 afterEach(cleanup);
 beforeEach(() => {

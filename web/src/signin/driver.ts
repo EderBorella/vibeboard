@@ -1,4 +1,4 @@
-import { ApiError, type SigninCollected, type SigninRequestOpened } from './api';
+import { ApiError, type SigninCollected, type SigninRequestOpened } from '../api';
 
 // The browser's half of signing in, as a plain driver with its calls and its clock injected — so the
 // whole flow is testable without a DOM, and the component below it renders one of three states and

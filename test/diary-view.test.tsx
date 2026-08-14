@@ -56,7 +56,7 @@ const ws = vi.hoisted(() => {
 vi.mock('../web/src/ws.js', () => ({ useSharedWs: ws.useSharedWs }));
 vi.mock('../web/src/ws', () => ({ useSharedWs: ws.useSharedWs }));
 
-const { DiaryView } = await import('../web/src/components/DiaryView.js');
+const { DiaryView } = await import('../web/src/diary/DiaryView.js');
 
 afterEach(() => {
   cleanup();

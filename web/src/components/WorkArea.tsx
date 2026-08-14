@@ -3,20 +3,20 @@ import { BoardsView } from '../board/BoardsView';
 import { CardsPane } from '../cards/CardsPane';
 import { CopilotPanel } from '../copilot/CopilotPanel';
 import type { useCopilot } from '../copilot/useCopilot';
+import { DiaryView } from '../diary/DiaryView';
 import type { DockPane } from '../dock/panes';
+import { UtilityDock } from '../dock/UtilityDock';
 import type { useCardTabs } from '../dock/useCardTabs';
 import type { Dock } from '../dock/useDock';
+import { ExplorerView } from '../explorer/ExplorerView';
 import { ExecutionView } from '../runs/ExecutionView';
 import type { BoardName, Card, CardFrontmatterPatch, ProjectSnapshot } from '../shared';
 import { DEFAULT_CONTEXT_BUDGET } from '../shared';
+import { SuggestionsPane } from '../suggestions/SuggestionsPane';
 import { useSuggestions } from '../suggestions/useSuggestions';
 import type { TagCount } from '../viewmodel';
-import { DiaryView } from './DiaryView';
-import { ExplorerView } from './ExplorerView';
 import { ProjectControl } from './ProjectControl';
-import { SuggestionsPane } from './SuggestionsPane';
 import type { MainTab } from './TopBar';
-import { UtilityDock } from './UtilityDock';
 
 // Grouped rather than spread across twenty loose props: each of these is one concern the work area
 // passes through, and naming them keeps the call site readable.

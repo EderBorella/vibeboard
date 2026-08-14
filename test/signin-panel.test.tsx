@@ -30,7 +30,7 @@ const api = vi.hoisted(() => ({
   signOutEverything: vi.fn().mockResolvedValue({ ok: true }),
 }));
 vi.mock('../web/src/api.js', () => api);
-const { SignInPanel } = await import('../web/src/components/SignInPanel.js');
+const { SignInPanel } = await import('../web/src/signin/SignInPanel.js');
 
 afterEach(cleanup);
 beforeEach(() => {

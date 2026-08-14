@@ -184,14 +184,14 @@ given. **`copilot/` is the chat**, and the model catalogue its picker offers. **
 | `shared.ts` | `decisions.md` — a deliberate hand-mirror of `src/core/`, guarded by `test/mirror.test.ts`; never deduplicated | `decision 46`, `decision 49`, `decision 52` |
 | `styles.css` | `decisions.md` | `decision 48` |
 | `useAutopilot.ts` | `decisions.md` | `decision 20` |
-| `components/AutopilotPanel.tsx` | `decisions.md` | `decision 52`, `S10`, `C2`, `C4` |
+| `autopilot/AutopilotPanel.tsx` | `decisions.md` | `decision 52`, `S10`, `C2`, `C4` |
 | `board/CardTile.tsx` | `decisions.md` | `decision 45`, `decision 46` |
-| `components/DiaryView.tsx` | `decisions.md` | `decision 48` |
+| `diary/DiaryView.tsx` | `decisions.md` | `decision 48` |
 | `runs/ExecutionView.tsx` | `decisions.md` | `S10` |
-| `components/HaltOverlay.tsx` | `decisions.md` | `decision 12` |
+| `autopilot/HaltOverlay.tsx` | `decisions.md` | `decision 12` |
 | `components/SandboxPanel.tsx` | `security/containment.md` — it renders what is confining agents | — |
 | `components/SettingsModal.tsx` | `decisions.md` | `decision 52` |
-| `components/SuggestionsPane.tsx` | `decisions.md` | `decision 48`, `decision 49` |
+| `suggestions/SuggestionsPane.tsx` | `decisions.md` | `decision 48`, `decision 49` |
 
 ## Repository configuration
 

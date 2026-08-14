@@ -77,7 +77,17 @@ export default {
     // removing the `pgid <= 1` guard lets a test's deliberate `0` reach `process.kill(-0)`, which signals
     // the worker's own process group — Stryker's. It killed two whole runs at 94% with exit 143 before it
     // was understood. Disabled at the line, so the module's other ~90 mutants stay measured.
+    // Measured baseline for these eighteen files, 2026-08-14, 37 minutes: 74.88% total / 82.45% of
+    // covered code — 947 killed, 205 survived, 16 timeout, 118 never executed. Best: stamp.ts at 100%,
+    // git-measure.ts at 90.6%. Worst: act/sentences.ts at 58.7% and commands.ts at 61.0%. The 205
+    // survivors are the point of having done this and are not fixed here.
     'src/service/**/*.ts',
+    // EXCLUDED WITH A MEASURED REASON, not a guess: three test files name it — service-process,
+    // lifecycle-trace and the fake-service fixture — but every one of them SPAWNS it as a child
+    // process, so no mutant in it is ever executed in the runner. It scored 0.00% on 52 mutants, all
+    // "no coverage", which is exactly the case this list's rule excludes: it drags the total down
+    // while reporting a gap already known. Same category as src/server/main.ts above.
+    '!src/service/main.ts',
     'src/exec/**/*.ts',
     // EVERY ROUTE MODULE, BY THE CONVENTION THAT NAMES IT, and this replaces `src/server/routes/**/*.ts`.
     // The flat `routes/` directory is gone: each route module now sits in its feature folder, named

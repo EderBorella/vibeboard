@@ -110,9 +110,11 @@ body {
    baseline-aligned would hand that to the top bar and hang the whole indicator off a circle. Centring the
    dot removes it from the calculation, so `.conn-text` becomes the first baseline-aligned item and the
    word lines up with the project name and the tabs, which is the point. */
-/* The anchor for the balloon. `position: relative` on a wrapper rather than on the button, so the popup
-   is positioned against the whole control and is not clipped by the button's own box. */
-.conn-wrap { position: relative; display: inline-flex; align-self: baseline; flex: 0 0 auto; }
+/* The anchor for any popover. `position: relative` on a wrapper rather than on the button, so the panel
+   is positioned against the whole control and is not clipped by the button's own box.
+   `align-self: baseline` because the one in the top bar sits in a baseline-aligned row; it is harmless
+   anywhere else, since align-self only means anything to a flex or grid child. */
+.pop-wrap { position: relative; display: inline-flex; align-self: baseline; flex: 0 0 auto; }
 /* A BUTTON now, so the browser's own resets have to be undone: a UA stylesheet gives it a background, a
    border, a centred `align-items` and — the one that matters here — its own font, which would have
    thrown it straight back off the baseline the bar was just aligned to. */
@@ -163,12 +165,12 @@ body {
 .conn-offline .conn { background: var(--warn); }
 .conn-offline .conn-text { color: var(--warn); }
 
-/* The balloon. Anchored under the light, left-aligned to it, and deliberately NOT a modal: this
-   explains the state of the page, so covering the page to say it would be self-defeating.
-   `max-width` in `ch` because the longest thing in here is a sentence — the server's refusal — and a
-   measure is the unit prose is read in. Wide enough not to become a column, narrow enough to stay
-   readable at the top of a wide screen. */
-.conn-pop {
+/* The panel. Anchored under its trigger, left-aligned to it, and deliberately NOT a modal: these
+   explain or adjust the thing they hang off, so the context has to stay visible behind them.
+   `max-width` in `ch` because the longest thing in one is usually a sentence, and a measure is the unit
+   prose is read in. Wide enough not to become a column, narrow enough to stay readable on a wide
+   screen. A caller that needs different dimensions passes its own class alongside. */
+.popover {
   position: absolute;
   top: calc(100% + 0.5rem);
   left: 0;
@@ -184,8 +186,8 @@ body {
   letter-spacing: normal;
 }
 /* The pointer, drawn as a rotated square so it inherits the panel's own background and border and
-   cannot drift out of sync with the theme. Two layers: the border square sits one pixel higher. */
-.conn-pop::before {
+   cannot drift out of sync with the theme. */
+.popover::before {
   content: '';
   position: absolute;
   top: -5px;

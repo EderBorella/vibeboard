@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
 
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { STOP_REASONS } from '../src/core/dispatch-gate.js';
@@ -166,8 +168,26 @@ describe('TopBar visibility and labels', () => {
     expect([...select.options].map((o) => [o.value, o.text])).toEqual([
       ['cyberpunk', 'Cyberpunk'],
       ['classic-dark', 'Classic Dark'],
+      ['marshmallow', 'Marshmallow'],
     ]);
     expect(select.value).toBe('classic-dark');
+  });
+
+  // THE PICKER AND THE STYLESHEET ARE TWO HOMES FOR ONE FACT, and neither knows about the other. A theme
+  // offered here with no `[data-theme]` block in themes.css does not fail — it silently renders the
+  // DEFAULT palette, so the user picks "Marshmallow" and gets Cyberpunk with no error anywhere. A block
+  // with no entry here is simply unreachable. The file's own header says to do both by hand, which is
+  // exactly the instruction that gets half-followed.
+  it('offers exactly the themes themes.css defines', () => {
+    // `process.cwd()`, not `import.meta.url`: this file runs under jsdom, where import.meta.url is an
+    // http URL and any file API on it throws — the same trap vitest.config.ts records for the docker shim.
+    const css = readFileSync(join(process.cwd(), 'web', 'src', 'themes.css'), 'utf8');
+    const defined = new Set([...css.matchAll(/\[data-theme="([a-z-]+)"\]/g)].map((m) => m[1]));
+    render(<TopBar {...withProps({})} />);
+    const offered = new Set(
+      [...(screen.getByTitle('Theme') as HTMLSelectElement).options].map((o) => o.value),
+    );
+    expect([...offered].sort()).toEqual([...defined].sort());
   });
 
   it('reflects the connection state in a title and a class', () => {

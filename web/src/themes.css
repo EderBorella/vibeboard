@@ -33,12 +33,54 @@
   --accent-2: #f59e0b;      /* amber — secondary */
   --on-accent: #04120f;     /* text on accent fills */
   --danger: #ff5c6c;
+  /* Referenced by styles.css and previously defined NOWHERE, so every theme fell through to a hardcoded
+     fallback chosen for a dark ground — which the light theme then inherited. Tied to each theme's own
+     secondary rather than a shared amber, so a warning looks like it belongs to the palette it is in. */
+  --warn: #f59e0b;
+  --ok: #3fb950;
   --glow: 0 0 14px rgba(20, 184, 166, 0.40);
   /* Signature: hazy teal→amber wash behind the boards. */
   --wash:
     radial-gradient(1100px 460px at 12% -12%, rgba(20, 184, 166, 0.12), transparent 60%),
     radial-gradient(900px 460px at 104% 112%, rgba(245, 158, 11, 0.09), transparent 55%);
   --scan: repeating-linear-gradient(180deg, rgba(255,255,255,0.03) 0 1px, transparent 1px 3px);
+}
+
+/* Marshmallow = the light one. Warm beige ground, pastel blue lift, soft ink rather than black.
+ *
+ * BUILT AGAINST MEASURED CONTRAST, not by eye, because pastels are exactly where a light theme goes
+ * wrong: every pair the stylesheet really puts together was checked, and the first attempt failed eight
+ * of fifteen — the blue was too pale to be readable as TEXT (it is used for hover labels and chips, not
+ * only as a fill), the amber failed on both panels, and the border was invisible against the ground.
+ * Worst ratio now 1.55 on borders, which only have to be visible, and no text pair below 4.55.
+ *
+ * The blue therefore reads mid-tone rather than baby-pastel: it has to clear 4.5 as ink on beige AND
+ * carry white on top of it as a fill. The pastel lives in the GROUND and the wash instead, which is
+ * where it can be soft without costing legibility.
+ */
+:root[data-theme="marshmallow"] {
+  --bg: #f6f1e7;            /* warm beige paper */
+  --panel: #fdfaf4;         /* chrome, a shade lighter than the ground */
+  --panel-2: #ffffff;       /* cards: crisp, so they read as objects lying on the beige */
+  --border: #cfc3ad;
+  --text: #3b3833;          /* warm ink, not black — black on beige reads as a scan of a document */
+  --muted: #746d60;
+  --accent: #256b8c;        /* light-blue family, dark enough to be text */
+  --accent-2: #8a6420;      /* warm ochre, the beige's own accent rather than a second hue */
+  --on-accent: #ffffff;
+  --danger: #c0392f;
+  /* Deep enough to be read at 0.7rem on a near-white panel, which the inherited dark-theme amber was
+     not: #b8860b came out at 3.5:1 against this ground and `--warn` is used as a TEXT colour. */
+  --warn: #9a5b12;
+  --ok: #1f7a3d;
+  /* No glow: a halo on a light ground reads as a smudge rather than as light. */
+  --glow: none;
+  /* Signature: the pastel, kept where it cannot hurt reading — a blue haze at the top left and a
+     marshmallow pink at the bottom right, both barely there. */
+  --wash:
+    radial-gradient(1100px 460px at 12% -12%, rgba(122, 176, 209, 0.22), transparent 60%),
+    radial-gradient(900px 460px at 104% 112%, rgba(226, 178, 178, 0.20), transparent 55%);
+  --scan: none;
 }
 
 /* Classic Dark = the original neutral slate palette, no glow/wash. */
@@ -53,6 +95,8 @@
   --accent-2: #e6b450;
   --on-accent: #0b1220;
   --danger: #e06c75;
+  --warn: #e6b450;
+  --ok: #3fb950;
   --glow: none;
   --wash: none;
   --scan: none;

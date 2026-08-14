@@ -4,6 +4,7 @@ import { type AutopilotState, isSuccessReason } from '../api';
 const THEMES: { value: string; label: string }[] = [
   { value: 'cyberpunk', label: 'Cyberpunk' },
   { value: 'classic-dark', label: 'Classic Dark' },
+  { value: 'marshmallow', label: 'Marshmallow' },
 ];
 
 // The tabs, in the order they are read. A table rather than five near-identical buttons: adding the fifth

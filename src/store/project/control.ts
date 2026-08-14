@@ -40,9 +40,6 @@ file rather than those.
 const IMPORTS = [`@${CONVENTIONS_FILE}`, `@${INSTRUCTIONS_FILE}`];
 const POINTER_NOTE = `See ${CONVENTIONS_FILE} for card conventions and ${INSTRUCTIONS_FILE} for project-specific instructions.`;
 
-// Write (greenfield) or upgrade (brownfield/existing) a CLI pointer file so it imports both
-// documents. Greenfield writes a fresh file; otherwise we append only the import lines that are
-// missing, never touching the user's existing content.
 export async function ensurePointerFile(
   projectRoot: string,
   filename: string,
@@ -66,9 +63,7 @@ export async function ensurePointerFile(
   await writeFile(path, `${existing}${sep}\n${missing.join('\n')}\n`, 'utf8');
 }
 
-// Bring an existing (possibly older) project up to the current control-file contract: create the
-// instructions document if missing and ensure both pointer files import it + the conventions.
-// Idempotent; called on every project open (mirrors ensureBoards for config).
+// Idempotent, and called on every project open — mirrors `ensureBoards` for config.
 export async function ensureControlFiles(projectRoot: string): Promise<void> {
   const insPath = join(projectRoot, INSTRUCTIONS_FILE);
   try {

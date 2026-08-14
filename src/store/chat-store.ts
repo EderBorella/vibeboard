@@ -284,7 +284,6 @@ export class ChatStore {
     this.#scheduleWrite();
   }
 
-  // Start a fresh conversation. The previous chat is flushed to disk first (retained).
   async newChat(): Promise<void> {
     this.#rebindIfNeeded();
     await this.flush();

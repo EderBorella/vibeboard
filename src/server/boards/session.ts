@@ -76,9 +76,6 @@ export class ProjectSession {
       // an existing project saving ANY setting, because the cover check runs on every patch that
       // touches `boards` and the modal always sends them.
       ensureAutopilotKeys(config),
-      // Any autopilot key the project predates. Without it, adding a required key to that block stops
-      // an existing project saving ANY setting, because the cover check runs on every patch that
-      // touches `boards` and the modal always sends them.
     ].some(Boolean);
     if (upgraded) await writeConfig(projectRoot, config);
     // Backfill the instructions document + CLI pointer imports for projects created before

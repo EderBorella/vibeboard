@@ -1,5 +1,5 @@
 import type { CardLedgerData, RunRecord, RunStatus } from '../api';
-import { costLabel, usageTotal } from '../runs/format';
+import { costLabel, usageTotal } from './format';
 
 interface Props {
   runs: RunRecord[];

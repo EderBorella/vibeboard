@@ -1,8 +1,8 @@
 import { renderMarkdown } from '../markdown';
 import { BOARD_LABELS, type Card, type CardFrontmatterPatch, type ProjectConfig } from '../shared';
+import { InlineField } from '../ui/InlineField';
 import { cardPlace, csv, parseCsv } from '../viewmodel';
 import { CardLinks } from './CardLinks';
-import { InlineField } from './InlineField';
 
 interface Props {
   card: Card;

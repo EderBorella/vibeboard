@@ -3,12 +3,12 @@ import { type CardLedgerData, cancelRun, type RunRecord, resolveRun, type Skill 
 import { stopRunRequest } from '../confirm/requests';
 import { useConfirm } from '../confirm/useConfirm';
 import type { CardRef } from '../dock/tabs';
+import { ActiveReport } from '../runs/ActiveReport';
+import { CardReports } from '../runs/CardReports';
+import { DispatchPane } from '../runs/DispatchPane';
 import type { Card, CardFrontmatterPatch, ProjectConfig } from '../shared';
-import { ActiveReport } from './ActiveReport';
-import { CardReports } from './CardReports';
 import type { DispatchContext, View } from './CardsPane';
 import { CardView } from './CardView';
-import { DispatchPane } from './DispatchPane';
 import { RawPane } from './RawPane';
 
 interface Props {

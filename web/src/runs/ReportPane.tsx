@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import type { RunRecord } from '../api';
 import { renderMarkdown } from '../markdown';
-import { usageLine } from '../runs/format';
-import { needsAttention } from '../runs/viewmodel';
 import type { Card, ProjectConfig } from '../shared';
 import { slugify } from '../viewmodel';
+import { usageLine } from './format';
 import { ReportOptions } from './ReportOptions';
+import { needsAttention } from './viewmodel';
 
 interface Props {
   record: RunRecord;

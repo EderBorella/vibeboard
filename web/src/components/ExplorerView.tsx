@@ -17,7 +17,7 @@ import { deleteEmptyFolderRequest, deleteEntryRequest, deleteFolderRequest } fro
 import { useOpenFile } from '../explorer/useOpenFile';
 import { useTree } from '../explorer/useTree';
 import type { ProjectSnapshot } from '../shared';
-import { EditorBody, EditorShell } from './EditorShell';
+import { EditorBody, EditorShell } from '../ui/EditorShell';
 import { FileTree } from './FileTree';
 
 interface Props {

@@ -4,7 +4,7 @@ import type { CardRef } from '../dock/tabs';
 import { resolveTab } from '../dock/tabs';
 import { useCardRuns } from '../runs/useCardRuns';
 import type { Card, CardFrontmatterPatch, ProjectConfig } from '../shared';
-import { CardSkills } from './CardSkills';
+import { CardSkills } from '../skills/CardSkills';
 import { CardsBody } from './CardsBody';
 import { CardTabs } from './CardTabs';
 

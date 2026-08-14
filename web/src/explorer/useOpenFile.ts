@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { type FileRead, putFsFile, readFsFile } from '../api';
-import type { EditorView } from '../components/EditorShell';
 import { errorText } from '../errors';
+import type { EditorView } from '../ui/EditorShell';
 import { useAction } from '../useAction';
 
 // The one file the Explorer has open: what it is, the editor buffer, and the two calls that move

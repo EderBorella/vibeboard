@@ -1,6 +1,6 @@
 import type { InvalidSkill, Skill } from '../api';
 import type { Card } from '../shared';
-import { skillsForCard } from '../skills/filter';
+import { skillsForCard } from './filter';
 
 interface Props {
   card: Card;

@@ -9,6 +9,7 @@ import {
 } from '../api';
 import type { Confirmer } from '../confirm/useConfirm';
 import { clampToCaps, resolveChoice } from '../copilot/choice';
+import { ModelPicker } from '../models/ModelPicker';
 import {
   type AutopilotConfig,
   BOARD_LABELS,
@@ -25,7 +26,6 @@ import { useFetched } from '../useFetched';
 import { parseCsv } from '../viewmodel';
 import { AutopilotPanel } from './AutopilotPanel';
 import { DiagnosticsPanel } from './DiagnosticsPanel';
-import { ModelPicker } from './ModelPicker';
 import { SandboxPanel } from './SandboxPanel';
 import { SignInPanel } from './SignInPanel';
 

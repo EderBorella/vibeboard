@@ -14,12 +14,12 @@ import {
 import { useConfirm } from '../confirm/useConfirm';
 import { errorText } from '../errors';
 import type { ProjectSnapshot } from '../shared';
+import { SkillEditor } from '../skills/SkillEditor';
 import { useSkills } from '../skills/useSkills';
 import { useAction } from '../useAction';
 import { ControlFileEditor, type ControlView, type OpenFile } from './ControlFileEditor';
 import { ControlFileList, RESOURCES_SENTINEL } from './ControlFileList';
 import { ResourcesEditor } from './ResourcesEditor';
-import { SkillEditor } from './SkillEditor';
 
 interface Props {
   // Bumps whenever the project changes on disk (shared snapshot stream) so the file list and

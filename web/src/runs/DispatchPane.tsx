@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import type { DispatchRequest, ModelOption, RunRecord, Skill } from '../api';
 import { clampToCaps } from '../copilot/choice';
+import { ModelPicker } from '../models/ModelPicker';
 import { BACKEND_DEFAULTS, backendCaps, type Card } from '../shared';
-import { ModelPicker } from './ModelPicker';
 
 interface Props {
   skill: Skill;

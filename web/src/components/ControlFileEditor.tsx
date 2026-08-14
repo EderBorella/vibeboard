@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import type { ControlFile } from '../api';
-import { EditorBody, EditorShell, type EditorView } from './EditorShell';
+import { EditorBody, EditorShell, type EditorView } from '../ui/EditorShell';
 
 // A control file as opened for editing: its listing metadata plus the content on disk.
 export type OpenFile = ControlFile & { content: string };

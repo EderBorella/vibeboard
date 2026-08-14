@@ -1,5 +1,5 @@
 import type { ModelOption } from '../api';
-import { ModelPicker } from '../components/ModelPicker';
+import { ModelPicker } from '../models/ModelPicker';
 import type { BackendCaps } from '../shared';
 
 interface Props {

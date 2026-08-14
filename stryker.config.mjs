@@ -24,8 +24,12 @@ export default {
   // mutant existed — so the timeouts there are deliberately generous.
   // - types.ts / web/src/shared.ts: type declarations. The src<->web mirror is guarded by
   //   test/mirror.test.ts instead.
-  // - web/src/api.ts: every test that touches it mocks it or imports only its types, so no
-  //   mutant there can be killed.
+  // - web/src/api.ts and all of web/src/api/ EXCEPT http.ts: the twenty-six test files that touch the
+  //   feature modules mock the whole module, and the rest import only its types, so no mutant in them
+  //   can be killed. Verified against Stryker's own FileMatcher after the split rather than assumed —
+  //   no pattern below reaches `web/src/api/`, which is the same trap the block above warns about
+  //   arriving through a split. http.ts is the exception and IS listed with the web block, because
+  //   test/api-honesty.test.ts loads the real module and asserts on the chokepoint itself.
   // - the React components with no test — App, Board, Column, CardTile, ArchiveDrawer, the two
   //   control-file editors, ProjectControl, ProjectGate, ResourcesEditor, SettingsModal and the four
   //   copilot panels. They are largely presentational: the decision logic was already extracted into
@@ -72,6 +76,10 @@ export default {
     // files already in this list.
     'web/src/format.ts',
     'web/src/errors.ts',
+    // The one network chokepoint, split out of web/src/api.ts and measurable for the first time:
+    // test/api-honesty.test.ts drives the real module through a stubbed fetch and pins the `res.ok`
+    // check, the 401 rules and the 409 allowance. The feature modules around it stay excluded above.
+    'web/src/api/http.ts',
     'web/src/useFetched.ts',
     'web/src/useAction.ts',
     'web/src/markdown.tsx',

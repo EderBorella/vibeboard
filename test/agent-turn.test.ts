@@ -584,7 +584,9 @@ describe('runAgentTurn', () => {
 
 describe('the sandbox', () => {
   it('spawns the CLI directly when there is none', async () => {
-    const { result } = await claudeTurn({ sandbox: { ok: false, reason: 'docker is not available' } });
+    const { result } = await claudeTurn({
+      sandbox: { ok: false, reason: 'docker is not available', kind: 'docker' },
+    });
     expect(result.exitCode).toBe(0);
     // No box in the environment means the turn never travelled the wrapper. That is the whole
     // evidence: the wrapper `exec`s the CLI, so its own arguments are gone by the time this runs.

@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { apiSocketDir } from './api-socket.js';
 import { BoxManager, boxPathsFor } from './box-manager.js';
 import type { BoxBackend, BoxPaths } from './containers.js';
@@ -11,7 +11,7 @@ import {
   STATE_DIR,
   WORK_DIR,
 } from './containers.js';
-import { claudeCredentialFile, claudeStateDir, opencodeStateDir } from './copilot-env.js';
+import { claudeStateDir, mirrorClaudeCredential, opencodeStateDir } from './copilot-env.js';
 
 // What a box is FOR a given project and backend: which directories it gets, which credential, and
 // which environment the CLI inside it needs. The manager below it knows docker and nothing about
@@ -21,9 +21,10 @@ import { claudeCredentialFile, claudeStateDir, opencodeStateDir } from './copilo
 // likely to be wrong in a way tests can catch — both are pure functions of (project, backend) here,
 // and neither needs a daemon to assert.
 
-// The mount set for a project and backend. The credential is the whole of S2: a Claude box gets the
-// Claude credential at its own absolute host path (so the symlink in the config dir resolves inside),
-// and an OpenCode box gets nothing of the sort — its credential was copied into its own state dir.
+// The mount set for a project and backend. The credential is the whole of S2: a Claude box gets
+// VibeBoard's mirror of the Claude credential, at its own absolute host path (so the symlink in the
+// config dir resolves inside), and an OpenCode box gets nothing of the sort — its credential was
+// copied into its own state dir.
 export function boxPathsForBackend(
   projectRoot: string,
   backend: BoxBackend,
@@ -44,11 +45,22 @@ export function boxPathsForBackend(
     socketDir: apiSocketDir(),
   };
   if (backend === 'claude-code') {
-    const credential = claudeCredentialFile();
-    if (exists(credential)) {
+    // Refreshed HERE, not only when a box is created, because this runs on every `ensure()` and
+    // `ensure()` runs before every agent turn. That cadence is the fix: the host's token is refreshed
+    // by the user's own Claude Code at times VibeBoard never hears about, and a mirror updated only at
+    // box creation would go stale exactly as the old file mount did. It is two `stat`s when nothing
+    // has changed.
+    const credential = mirrorClaudeCredential();
+    if (credential) {
+      // THE DIRECTORY, never the file, and this is the whole fix. A bind-mounted file pins an inode;
+      // a token refresh is an atomic replace, which makes a new one; so the box read a deleted inode
+      // forever and every turn failed as an expired session. A directory mount follows the rename.
+      // The measurement is on `mirrorClaudeCredential`.
+      //
       // Mounted at its own path, not at a tidy one: the symlink VibeBoard writes into the config dir
       // is absolute, so the path has to mean the same thing on both sides of the boundary.
-      extra.credential = { source: credential, target: credential };
+      const dir = dirname(credential);
+      extra.credential = { source: dir, target: dir };
     }
   }
   return boxPathsFor(projectRoot, extra, exists);

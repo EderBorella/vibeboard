@@ -6,7 +6,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { STOP_REASONS } from '../src/core/dispatch-gate.js';
 import type { AutopilotState } from '../web/src/api.js';
-import { LIGHT_STATES, type LightState } from '../web/src/app/connection-light.js';
+import { LIGHT_STATES, type LightState, type RefusalKind } from '../web/src/app/connection-light.js';
 import type { MainTab } from '../web/src/app/TopBar.js';
 import { TopBar } from '../web/src/app/TopBar.js';
 
@@ -27,6 +27,7 @@ const props = {
   light: 'online' as LightState,
   lightTitle: 'Connected.',
   agentRefusal: null as string | null,
+  refusalKind: null as RefusalKind | null,
 };
 
 describe('TopBar', () => {
@@ -112,6 +113,25 @@ describe('TopBar', () => {
     cleanup();
     render(<TopBar {...props} copilotOpen={false} />);
     expect(screen.getByText('Copilot')).toBeTruthy();
+  });
+
+  // THE WHOLE CHAIN, END TO END. `refusalKind` travels App → TopBar → ConnectionLight → lightAdvice,
+  // and a prop dropped at any hop leaves the balloon telling the old lie with every unit test green.
+  // This is the hop TopBar owns. Both cases carry the SAME refusal sentence, so a component that read
+  // the sentence rather than the kind could not pass both.
+  it('passes the cause of the refusal down to the balloon', () => {
+    const refusal = 'Agents are disabled: something is wrong.';
+    const headingFor = (kind: RefusalKind): string => {
+      render(<TopBar {...props} light="offline" agentRefusal={refusal} refusalKind={kind} />);
+      fireEvent.click(screen.getByTitle(props.lightTitle));
+      const head = screen.getByRole('dialog').querySelector('.conn-pop-head')?.textContent ?? '';
+      const body = screen.getByRole('dialog').textContent ?? '';
+      cleanup();
+      return `${head}||${body}`;
+    };
+    expect(headingFor('credential')).toContain('Rebuild the agent boxes');
+    expect(headingFor('credential').split('||')[0]?.toLowerCase()).not.toContain('docker');
+    expect(headingFor('docker').split('||')[0]).toBe('Docker is not ready');
   });
 
   it('exposes the socket state as a class and a title', () => {

@@ -7,6 +7,7 @@ import { ProjectSession } from './boards/session.js';
 import { listenOnApiSocket, removeApiSocketFile } from './boxes/api-socket.js';
 import { BoxService } from './boxes/box-service.js';
 import { DEFAULT_IMAGE } from './boxes/containers.js';
+import { claudeCredentialCheck } from './boxes/credential-freshness.js';
 import { stopOpencodeServer } from './boxes/opencode-server.js';
 import { liveSandbox, probeSandbox } from './boxes/sandbox.js';
 import { installCrashHandlers, serverLogger } from './logging.js';
@@ -50,7 +51,15 @@ const boxes = new BoxService();
 const sandbox = await probeSandbox(boxes, DEFAULT_IMAGE);
 // And a live one for the app, because an image can be built or removed while the server runs and the
 // startup answer then gates every dispatch with something that stopped being true.
-const sandboxNow = liveSandbox(boxes, DEFAULT_IMAGE);
+//
+// The credential check is composed in HERE and nowhere else, for the same reason: it is the only place
+// that holds both the box layer and the open project. `() => session.root` and not `session.root` —
+// this is built once at startup and the open project changes under it on every switch, so a captured
+// root would go on answering about a box nobody is using. The banner probe above deliberately does not
+// get it: at that moment no project is open, so there is no box to be stale.
+const sandboxNow = liveSandbox(boxes, DEFAULT_IMAGE, {
+  credential: claudeCredentialCheck(() => session.root),
+});
 const app = buildApp(session, {
   logger: logging.options,
   credentials: new CredentialStore(admin, devices),

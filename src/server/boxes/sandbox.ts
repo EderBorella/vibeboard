@@ -20,13 +20,30 @@ import { dockerBin, execArgs } from './containers.js';
 //    weaker guarantee, which is the 2026-08-02 mistake wearing different clothes. No docker, no
 //    agents; the board, the explorer and Settings stay usable and the refusal names the fix.
 
-export type SandboxStatus = { ok: true; image: string } | { ok: false; reason: string };
+// `ok` is "can this project run anything right now", and there is now more than one way for it to be
+// no. `kind` says WHICH, and it exists so nothing downstream has to parse the sentence to find out.
+//
+// A DISCRIMINATOR RATHER THAN A FOURTH GATE, and that is the whole design. A stale credential could
+// have been its own check with its own call sites; it is folded in here instead, because `agentRefusal`
+// below is deliberately ONE function and the last time this codebase had two of them they diverged with
+// a real failure. Widening the status means every gate that already refuses a missing image refuses a
+// dead credential too, automatically, on the day it is added and on every day after.
+export type SandboxStatus =
+  | { ok: true; image: string }
+  | { ok: false; reason: string; kind: 'docker' | 'credential' };
 
-export const NOT_REQUESTED: SandboxStatus = { ok: false, reason: 'not requested' };
+// `docker`, because "not requested" is a statement about the container layer: nothing asked for a box,
+// so nothing probed for one. It is not a credential we looked at and disbelieved.
+export const NOT_REQUESTED: SandboxStatus = { ok: false, reason: 'not requested', kind: 'docker' };
 
 interface SandboxProbe {
   probe(): Promise<{ ok: true } | { ok: false; reason: string }>;
 }
+
+// Whether the box is holding the credential the host currently has. Injected as a bare thunk rather
+// than imported, so this file stays a decision about a status and needs no daemon and no filesystem to
+// test; `credential-freshness.ts` is the implementation and `main.ts` is where the two meet.
+export type CredentialCheck = () => Promise<{ fresh: true } | { fresh: false; reason: string }>;
 
 // A LIVE answer, because the startup one was wrong the moment anybody touched Docker.
 //
@@ -58,7 +75,10 @@ export function fixedSandbox(status: SandboxStatus): LiveSandbox {
 export function liveSandbox(
   service: SandboxProbe,
   image: string,
-  opts: { ttlMs?: number; now?: () => number } = {},
+  // ONE cache for both halves, under the one TTL, behind the one shared in-flight promise. A second
+  // cache for the credential would be a second thing to expire, and the two would then disagree for up
+  // to a second at a time — which is the whole class of bug the live status was introduced to end.
+  opts: { ttlMs?: number; now?: () => number; credential?: CredentialCheck } = {},
 ): LiveSandbox {
   const ttl = opts.ttlMs ?? SANDBOX_TTL_MS;
   const now = opts.now ?? Date.now;
@@ -69,7 +89,7 @@ export function liveSandbox(
   return async () => {
     if (cached && now() - cached.at < ttl) return cached.status;
     if (inFlight) return await inFlight;
-    inFlight = probeSandbox(service, image)
+    inFlight = probeSandbox(service, image, opts.credential)
       .then((status) => {
         cached = { at: now(), status };
         return status;
@@ -82,9 +102,21 @@ export function liveSandbox(
 }
 
 // Injected rather than constructed, so this stays a pure decision and the tests need no daemon.
-export async function probeSandbox(service: SandboxProbe, image: string): Promise<SandboxStatus> {
+export async function probeSandbox(
+  service: SandboxProbe,
+  image: string,
+  credential?: CredentialCheck,
+): Promise<SandboxStatus> {
   const res = await service.probe();
-  return res.ok ? { ok: true, image } : { ok: false, reason: res.reason };
+  // ORDER IS THE BEHAVIOUR, and only the docker answer decides whether the second question is even
+  // asked. A missing daemon or a missing image is the more fundamental fault — the credential check
+  // cannot run without docker anyway, and if it could, "rebuild the agent boxes" is useless advice to
+  // someone whose image was never built. The first message is the one that helps, so it is the one
+  // that survives; the credential fault is still there and is reported the moment docker is.
+  if (!res.ok) return { ok: false, reason: res.reason, kind: 'docker' };
+  const cred = await credential?.();
+  if (cred && !cred.fresh) return { ok: false, reason: cred.reason, kind: 'credential' };
+  return { ok: true, image };
 }
 
 // `aa-exec -p <profile> -- bin args` became `docker exec -w /work <box> bin args`.
@@ -125,6 +157,12 @@ export function agentRefusal(status: SandboxStatus, attachedUrl: string | undefi
     ].join(' ');
   }
   if (!status.ok) {
+    // BRANCHED ON THE CAUSE, because the tail was written when there was only one. "there is none
+    // available here" is true of a missing daemon or an unbuilt image and FALSE of a stale credential —
+    // there the container exists, is running, and is the very thing holding the dead sign-in. The
+    // sentence reaches the user verbatim in the light's balloon, so a clause that contradicts the one
+    // before it sends them to build an image they already have.
+    if (status.kind === 'credential') return `Agents are disabled: ${status.reason}.`;
     return `Agents are disabled: ${status.reason}. VibeBoard runs every agent inside a container, and there is none available here.`;
   }
   return null;

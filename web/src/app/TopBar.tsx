@@ -1,6 +1,6 @@
 import { type AutopilotState, isSuccessReason } from '../api';
 import { ConnectionLight } from './ConnectionLight';
-import type { LightState } from './connection-light';
+import type { LightState, RefusalKind } from './connection-light';
 
 // Add a theme here after adding its [data-theme] block in themes.css.
 const THEMES: { value: string; label: string }[] = [
@@ -61,6 +61,9 @@ interface Props {
   lightTitle: string;
   // Passed through to the balloon, which shows the server's refusal in full where the tooltip truncates.
   agentRefusal: string | null | undefined;
+  // And which cause it is about, so the balloon's heading names the right thing to go and fix. There
+  // is more than one way to be unable to run agents, and "Docker is not ready" is wrong for all but one.
+  refusalKind?: RefusalKind | null;
 }
 
 export function TopBar({
@@ -79,6 +82,7 @@ export function TopBar({
   light,
   lightTitle,
   agentRefusal,
+  refusalKind,
 }: Props) {
   const chip = autopilot ? chipFor(autopilot) : null;
   return (
@@ -93,7 +97,12 @@ export function TopBar({
           `offline` is the last of those — the project is reachable but cannot run anything — and it was
           previously visible only as a refusal at the moment you tried to work, or two clicks deep in a
           settings dialog nobody opens before they need it. */}
-      <ConnectionLight light={light} title={lightTitle} agentRefusal={agentRefusal} />
+      <ConnectionLight
+        light={light}
+        title={lightTitle}
+        agentRefusal={agentRefusal}
+        refusalKind={refusalKind}
+      />
       {showProject && chip && (
         <span className={`ap-chip ap-${chip.tone}`} title={autopilot?.detail ?? chip.label}>
           {chip.label}

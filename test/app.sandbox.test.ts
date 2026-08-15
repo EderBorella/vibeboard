@@ -45,12 +45,14 @@ describe('GET /api/sandbox', () => {
     expect(body.reason).toBeUndefined();
     // Nothing to refuse: sandboxed, and managing its own server.
     expect(body.agentRefusal).toBeNull();
+    expect(body.refusalKind).toBeNull();
   });
 
   it('carries the reason and the refusal when there is no sandbox', async () => {
     const { app } = await open({
       ok: false,
       reason: 'the agent image is not built — run `npm run box:build`',
+      kind: 'docker',
     });
     const body = (await app.inject({ method: 'GET', url: '/api/sandbox', headers: admin })).json();
     expect(body.ok).toBe(false);
@@ -58,6 +60,21 @@ describe('GET /api/sandbox', () => {
     // The refusal repeats the reason rather than saying a bare no. This is the string the UI shows,
     // and a dead end here is worse than the condition it describes.
     expect(body.agentRefusal).toContain('box:build');
+    expect(body.refusalKind).toBe('docker');
+  });
+
+  // WHICH cause, reported alongside the sentence, so the UI titles the balloon without reading the
+  // sentence for keywords. Docker being fine while the box holds a credential the host has replaced is
+  // the case that made "Docker is not ready" a lie.
+  it('reports a stale credential as its own kind, with the credential sentence', async () => {
+    const { app } = await open({
+      ok: false,
+      reason: 'the agent box is holding a sign-in that has been replaced on this machine',
+      kind: 'credential',
+    });
+    const body = (await app.inject({ method: 'GET', url: '/api/sandbox', headers: admin })).json();
+    expect(body.refusalKind).toBe('credential');
+    expect(body.agentRefusal).toContain('replaced');
   });
 
   it('refuses auto-pilot while attached to an external server, sandbox or not', async () => {
@@ -66,6 +83,29 @@ describe('GET /api/sandbox', () => {
     const body = (await app.inject({ method: 'GET', url: '/api/sandbox', headers: admin })).json();
     expect(body).toMatchObject({ ok: true, backend: 'attached', attachedUrl: 'http://127.0.0.1:9999' });
     expect(body.agentRefusal).toContain('VIBEBOARD_OPENCODE_URL');
+    // The attached case OUTRANKS the status, exactly as the refusal does: the sandbox is ok here and
+    // the kind is still not null, because something is still refusing.
+    expect(body.refusalKind).toBe('attached');
+  });
+
+  // THE RELATIONSHIP, ASSERTED RATHER THAN TRUSTED. `agentRefusal` and `refusalKind` are computed by
+  // two different expressions from the same two facts, and nothing but a test stops them drifting into
+  // a state where the UI has a cause with no sentence, or a sentence it cannot title.
+  it('has a kind exactly when it has a refusal, over every combination of the two facts', async () => {
+    const statuses: SandboxStatus[] = [
+      { ok: true, image: TEST_IMAGE },
+      { ok: false, reason: 'the agent image is not built', kind: 'docker' },
+      { ok: false, reason: 'the box is holding a replaced sign-in', kind: 'credential' },
+    ];
+    for (const attached of [undefined, 'http://127.0.0.1:9999']) {
+      for (const status of statuses) {
+        if (attached) process.env.VIBEBOARD_OPENCODE_URL = attached;
+        else delete process.env.VIBEBOARD_OPENCODE_URL;
+        const { app } = await open(status);
+        const body = (await app.inject({ method: 'GET', url: '/api/sandbox', headers: admin })).json();
+        expect(body.refusalKind === null, `${attached} ${status.ok}`).toBe(body.agentRefusal === null);
+      }
+    }
   });
 });
 
@@ -74,6 +114,7 @@ describe('one path: no agent runs without a sandbox', () => {
     const { app } = await open({
       ok: false,
       reason: 'the agent image is not built — run `npm run box:build`',
+      kind: 'docker',
     });
     const res = await app.inject({
       method: 'POST',
@@ -89,13 +130,13 @@ describe('one path: no agent runs without a sandbox', () => {
   it('refuses BEFORE resolving the request, so a bad payload still reports the sandbox', async () => {
     // Otherwise the first thing a user with no sandbox sees is "unknown skill", and they go and
     // fix the wrong thing.
-    const { app } = await open({ ok: false, reason: 'profile not loaded' });
+    const { app } = await open({ ok: false, reason: 'profile not loaded', kind: 'docker' });
     const res = await app.inject({ method: 'POST', url: '/api/runs', headers: admin, payload: {} });
     expect(res.statusCode).toBe(412);
   });
 
   it('still serves the board, so the app is usable while it says what to run', async () => {
-    const { app } = await open({ ok: false, reason: 'profile not loaded' });
+    const { app } = await open({ ok: false, reason: 'profile not loaded', kind: 'docker' });
     expect((await app.inject({ method: 'GET', url: '/api/state', headers: admin })).statusCode).toBe(200);
     expect((await app.inject({ method: 'GET', url: '/api/config', headers: admin })).statusCode).toBe(200);
   });

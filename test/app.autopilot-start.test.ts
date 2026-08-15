@@ -140,7 +140,7 @@ describe('pressing start', () => {
 
   it('refuses without a sandbox, which is mandatory for the one caller that runs unattended', async () => {
     const { app } = await openTestProject({
-      sandbox: { ok: false, reason: 'Docker is not available — no daemon' },
+      sandbox: { ok: false, reason: 'Docker is not available — no daemon', kind: 'docker' },
     });
     const res = await start(app);
     expect(res.statusCode).toBe(412);

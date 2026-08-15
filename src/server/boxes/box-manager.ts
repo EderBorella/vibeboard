@@ -26,7 +26,11 @@ const run = promisify(execFile);
 
 // Talking to docker. One function, injectable, because everything above it is then testable without a
 // daemon — and because the tests must not depend on a machine that happens to have docker.
-const spawnDocker: DockerRun = async (args, opts): Promise<DockerResult> => {
+//
+// Exported because it is the ONLY one. `credential-freshness.ts` needs the same runner and briefly had
+// its own copy; two of these means the `VIBEBOARD_DOCKER_BIN` override the suite depends on has two
+// places to be wrong, and the error-shape mapping below has two places to drift.
+export const spawnDocker: DockerRun = async (args, opts): Promise<DockerResult> => {
   try {
     const { stdout, stderr } = await run(dockerBin(), args, { timeout: opts?.timeoutMs ?? 30_000 });
     return { code: 0, stdout, stderr };

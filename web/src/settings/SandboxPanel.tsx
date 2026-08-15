@@ -1,29 +1,53 @@
-import { restartOpencodeServer, type SandboxState, takeOverOpencodeServer } from '../api';
+import { useState } from 'react';
+import { rebuildBoxes, restartOpencodeServer, type SandboxState, takeOverOpencodeServer } from '../api';
+import { useConfirm } from '../confirm/useConfirm';
 import { useAction } from '../useAction';
 
 interface Props {
   state: SandboxState;
-  // The backend currently selected in Settings. Both actions are OpenCode-only: Claude Code spawns a
-  // process per turn and has no persistent server, so a restart button there would be a lie about
-  // what it does.
+  // The backend currently selected in Settings. The two OpenCode server actions are OpenCode-only:
+  // Claude Code spawns a process per turn and has no persistent server, so a restart button there
+  // would be a lie about what it does. Rebuilding the boxes is not — every project has boxes.
   backend: string;
   onChanged: () => void;
 }
 
-// What the OS enforces on agents, stated plainly, plus the two actions that can change it.
+// Which button is spinning. Keyed rather than a shared boolean because more than one is on screen at
+// once in some states, and a shared flag would spin the wrong one.
+type Pressed = 'restart' | 'takeover' | 'rebuild';
+
+// What the OS enforces on agents, stated plainly, plus the three actions that can change it.
 //
-// Its own component rather than more markup inside SettingsModal: it owns a fetch, two async
+// Its own component rather than more markup inside SettingsModal: it owns a fetch, three async
 // actions and their error state, and it is the part of Settings most worth testing directly.
 export function SandboxPanel({ state, backend, onChanged }: Props) {
-  // Keyed to which button was pressed: both are on screen at once in some states, and a shared
-  // boolean would spin the wrong one.
-  const { busy, error, run } = useAction<'restart' | 'takeover'>();
+  const { busy, error, run } = useAction<Pressed>();
+  const { confirm, dialog } = useConfirm();
+  // What the last rebuild actually removed. Reported rather than swallowed: "done" on a project that
+  // had no boxes reads as "your problem is fixed", and it is not — the drift is somewhere else.
+  const [removed, setRemoved] = useState<number | null>(null);
 
   async function act(which: 'restart' | 'takeover'): Promise<void> {
     await run(async () => {
       await (which === 'restart' ? restartOpencodeServer() : takeOverOpencodeServer());
       onChanged();
     }, which);
+  }
+
+  async function rebuild(): Promise<void> {
+    const ok = await confirm({
+      title: 'Throw this project’s agent boxes away?',
+      body: 'Both containers are removed and anything in flight inside them is lost. The next agent turn builds new ones, which takes seconds. The agent image is not rebuilt — that is `npm run box:build`.',
+      action: 'Throw them away',
+      danger: true,
+    });
+    if (!ok) return;
+    setRemoved(null);
+    await run(async () => {
+      const res = await rebuildBoxes();
+      setRemoved(res.removed);
+      onChanged();
+    }, 'rebuild');
   }
 
   const opencode = backend === 'opencode';
@@ -90,7 +114,31 @@ export function SandboxPanel({ state, backend, onChanged }: Props) {
         </div>
       )}
 
+      {/* For BOTH backends, unlike the two above: a box is where every agent runs, whichever CLI is in
+          it. It is here because `ensure` ADOPTS a healthy box rather than remaking it, so a box that has
+          drifted — a credential file replaced on the host by rename, leaving the mount on a dead inode —
+          survives every restart of VibeBoard and there was no other way to be rid of it. */}
+      <div className="field sandbox-action">
+        <button className="btn-secondary" disabled={busy !== null} onClick={() => void rebuild()}>
+          {busy === 'rebuild' ? 'Throwing away…' : 'Rebuild the agent boxes'}
+        </button>
+        <p className="sandbox-hint">
+          Removes this project's containers. Anything in flight inside them is lost, and the next agent turn
+          builds new ones. The agent <strong>image is not rebuilt</strong> — that is{' '}
+          <code>npm run box:build</code> and it takes minutes. Use this when a box is stale rather than
+          missing: an expired credential it will not pick up, a mount that no longer points anywhere.
+        </p>
+        {removed !== null && (
+          <p className="sandbox-hint">
+            {removed === 0
+              ? 'There were no boxes for this project, so nothing was removed.'
+              : `Removed ${removed} box${removed === 1 ? '' : 'es'}.`}
+          </p>
+        )}
+      </div>
+
       {error && <p className="modal-error">{error}</p>}
+      {dialog}
     </>
   );
 }

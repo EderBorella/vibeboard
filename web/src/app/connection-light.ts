@@ -11,6 +11,12 @@ import type { ConnState } from '../ws';
 export const LIGHT_STATES = ['online', 'offline', 'connecting', 'closed', 'unauthorized'] as const;
 export type LightState = (typeof LIGHT_STATES)[number];
 
+// WHICH kind of refusal the server reported, so the advice can be about the right thing. Structurally
+// the same union as `SandboxState.refusalKind` in api/sandbox.ts and deliberately not imported from
+// there: this module is the display vocabulary and is tested without the API layer, exactly as
+// `LightState` is kept apart from `ConnState` above.
+export type RefusalKind = 'docker' | 'credential' | 'attached';
+
 // THE SOCKET WINS. If the connection is down, the page is a snapshot frozen at whenever it dropped —
 // including whatever it last knew about the project's dependencies. Reporting `offline` then would be
 // stating a fact we cannot currently observe, and reporting `online` would be worse. So a socket
@@ -42,13 +48,46 @@ export interface LightAdvice {
   next?: string;
 }
 
-export function lightAdvice(light: LightState, agentRefusal: string | null | undefined): LightAdvice {
+// A LIE THE HEADING USED TO TELL. `offline` said "Docker is not ready" whatever the cause, from the
+// days when a missing daemon or an unbuilt image was the only cause there was. It is not any more: a
+// box holding a credential the host has since replaced fails every turn while docker is perfectly
+// healthy, and being sent to check the daemon is being sent to the wrong machine entirely. The heading
+// is the line a person actually reads and acts on, so it follows the cause the server named.
+//
+// `detail` does NOT vary — it stays the server's sentence verbatim, for the reason above the interface:
+// the two halves have different authors, and the enforced rule is the server's to word.
+export function lightAdvice(
+  light: LightState,
+  agentRefusal: string | null | undefined,
+  refusalKind?: RefusalKind | null,
+): LightAdvice {
   if (light === 'offline') {
+    // The server's own words, whichever cause this is. See lightTitle below.
+    const detail = agentRefusal ?? 'This project cannot run agents.';
+    // What survives the fault, said once: the board and the reading tools keep working under every one
+    // of these, and that is the sentence that stops a person assuming the whole app is down.
+    const stillWorks =
+      'The board, the Project Log and the Explorer all keep working — it is agents and the copilot that cannot start.';
+    if (refusalKind === 'credential') {
+      return {
+        heading: 'The agent box has a stale sign-in',
+        detail,
+        // Rebuilt, not restarted: the mount is bound to the file when the container is created, so
+        // starting the same box again picks up the same dead one.
+        next: `Open Settings and use "Rebuild the agent boxes" — the next turn builds one against the current sign-in. ${stillWorks}`,
+      };
+    }
+    if (refusalKind === 'attached') {
+      return {
+        heading: 'Agents would run outside the sandbox',
+        detail,
+        next: `Open Settings and take over with a managed server. ${stillWorks}`,
+      };
+    }
     return {
       heading: 'Docker is not ready',
-      // The server's own words. See lightTitle below.
-      detail: agentRefusal ?? 'This project cannot run agents.',
-      next: 'The board, the Project Log and the Explorer all keep working — it is agents and the copilot that cannot start.',
+      detail,
+      next: stillWorks,
     };
   }
   if (light === 'closed') {

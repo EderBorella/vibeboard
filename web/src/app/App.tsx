@@ -276,6 +276,7 @@ export function App() {
         light={light}
         lightTitle={lightTitle(light, sandbox?.agentRefusal)}
         agentRefusal={sandbox?.agentRefusal}
+        refusalKind={sandbox?.refusalKind}
       />
 
       {/* Stacked under the header, only with a project open: transport for the thing the whole app is

@@ -137,6 +137,7 @@ export {
 } from './api/runs';
 export {
   getSandbox,
+  rebuildBoxes,
   restartOpencodeServer,
   type SandboxState,
   takeOverOpencodeServer,

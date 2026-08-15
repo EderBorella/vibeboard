@@ -89,6 +89,28 @@ describe('the light is a button', () => {
     expect(screen.getByRole('dialog').querySelector('.conn-pop-next')).toBeNull();
   });
 
+  // THE CAUSE HAS TO REACH THE BALLOON. The component renders whatever `lightAdvice` returns, so a
+  // `refusalKind` prop that was accepted and then not passed on would leave every offline balloon
+  // saying "Docker is not ready" with every unit test of `lightAdvice` still green.
+  //
+  // Both halves are asserted on the SAME refusal sentence with only the kind changed — a fixture that
+  // varied the sentence too would pass against a component that read the sentence instead of the kind.
+  it('titles the credential fault as a credential fault, not as Docker', () => {
+    render(light({ refusalKind: 'credential' }));
+    fireEvent.click(screen.getByRole('button'));
+    const head = screen.getByRole('dialog').querySelector('.conn-pop-head')?.textContent ?? '';
+    expect(head.toLowerCase()).not.toContain('docker');
+    expect(screen.getByRole('dialog').textContent).toContain('Rebuild the agent boxes');
+  });
+
+  it('still titles a Docker fault as Docker, on that same sentence', () => {
+    render(light({ refusalKind: 'docker' }));
+    fireEvent.click(screen.getByRole('button'));
+    expect(screen.getByRole('dialog').querySelector('.conn-pop-head')?.textContent).toBe(
+      'Docker is not ready',
+    );
+  });
+
   // Each state's balloon has to be about THAT state. One `lightAdvice` returning the same heading for
   // everything would pass every test above.
   it('says something different for a dead socket than for a missing dependency', () => {

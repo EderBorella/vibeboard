@@ -109,11 +109,73 @@ is a manual run racing an auto-pilot one. Note the seam that limits it: the agen
 
 **3. The box's own state directory, at `/state`.** Per project *and* per backend — see below.
 
-**4. Exactly one backend credential.** A Claude box mounts `~/.claude/.credentials.json` at its own
-absolute host path (so the symlink VibeBoard writes into the config home resolves identically inside
-and out), writable, because token refresh writes through it. An OpenCode box mounts nothing of the
-sort; its credential was copied into its own state directory. **Each box sees one backend's
-credential and never the other's** — that is the whole of why `backend` is in the container key.
+**4. Exactly one backend credential.** A Claude box mounts `~/.vibeboard/copilot/creds/claude/` — a
+directory VibeBoard owns, holding only a mirror of `~/.claude/.credentials.json` — at its own absolute
+host path, so the symlink VibeBoard writes into the config home resolves identically inside and out.
+An OpenCode box mounts nothing of the sort; its credential was copied into its own state directory.
+**Each box sees one backend's credential and never the other's** — that is the whole of why `backend`
+is in the container key.
+
+It is a **directory**, and that is not tidiness. See "A mounted file cannot follow a token refresh"
+below.
+
+### A mounted file cannot follow a token refresh
+
+Measured 2026-08-15, and it cost a card. A Claude box used to bind-mount the credential **file**.
+Claude Code refreshes its OAuth token by atomic replace — write a new file, rename over the old — and
+that makes a **new inode**. A bind-mounted file pins the inode it was created with, so the container
+went on reading the old, now-unlinked one forever:
+
+| | inode | link count | mtime |
+|---|---|---|---|
+| host | 5280206 | 1 | Aug 15 20:35 |
+| inside the box | 5303483 | **0** | Aug 14 20:35 |
+
+The box's own `/proc/self/mountinfo` named the source `…/.claude/.credentials.json//deleted`. Every
+agent turn then died in 58 ms with *"Failed to authenticate: OAuth session expired and could not be
+refreshed"*, auto-pilot spent all three of a card's attempts on it, and reported **the card** as
+stalled — the same shape of failure as the missing `-i` flag, and just as silent.
+
+The box cannot repair it from inside either. Reproduced from first principles in a scratch container:
+a rename over a file-mount fails with `EBUSY` (*"Resource busy"*), the same rename inside a
+**directory** mount succeeds, and the file-mount still reads the old bytes afterwards. So a mounted
+file can neither follow the host's refresh nor be refreshed from within. (This is the same inode
+pinning `.git/config` has, where the staleness is accepted; here it is not survivable.)
+
+**Mounting all of `~/.claude` was analysed and rejected**, not overlooked. It is 894 MB and 805
+session transcripts. Read-write is disqualifying on its own: `settings.json` declares hooks that
+execute **on the host** the next time the user starts Claude Code — the escalation `PROTECTED_PATHS`
+already denies for `.git/hooks`, reached by another door. Read-only would still hand every agent in
+every project the full text of every session ever run on this machine, which is the opposite of what
+`copilot-env.ts` exists to do.
+
+So the mount is a directory VibeBoard owns holding **only** the credential, at
+`~/.vibeboard/copilot/creds/claude/`, mirrored from the host file. The mirror is refreshed on every
+`ensure()` — before every agent turn — and skipped when the bytes are unchanged: two `stat`s reject a
+differing size, and otherwise two reads of a file under a kilobyte. The copy is a temp file plus a
+rename: a torn credential is worse than a stale one, and the rename is also the one write the other
+side of a directory mount can see. The precedent is a few lines away — `opencodeStateDir` copies the
+user's `auth.json` into the box's own state directory for a related reason.
+
+The skip compares **content**, not mtime, and that is worth recording because the first version did
+compare mtime and was wrong in a way nothing would have reported. It carried the source's timestamp
+onto the copy with `utimesSync`, which takes a `Date` — and a `Date` holds whole milliseconds while a
+file's mtime holds nanoseconds, so the copy came back rounded up to the next millisecond. Measured:
+2000 of 2000 round trips shifted by one. The skip would never have fired for any real credential, and
+the only symptom would have been a rewrite before every agent turn.
+
+**What this does not fix, stated rather than implied:**
+
+- **Mirroring is one-way**, host → mirror. A refresh performed *inside* the box is overwritten by the
+  next mirror and lost. That costs nothing today, because the `EBUSY` measurement says an in-box
+  refresh is impossible — but a directory mount *is* writable from inside, so the loss becomes
+  reachable the moment the CLI in the box manages one. Newest-mtime-wins is a separate step, and it is
+  deliberately not taken yet.
+- **If nobody ever runs Claude Code on the host**, nothing refreshes the token and the mirror expires
+  exactly when the original does. Mirroring buys freshness; it does not create it.
+- **It is a second copy of a credential at rest.** What protects it is 0700 on the directory and 0600
+  on the file, set with an explicit `chmodSync` rather than left to the umask, and asserted in
+  `test/copilot-env.test.ts`.
 
 ---
 
@@ -126,6 +188,13 @@ every path worth denying.
   per-device hashes. Not among the mounts, so there is nothing to deny — the separation that used to
   be a plan is now a protection. The `token-` prefix survives because it still reads as *"this is a
   credential"*, not because a glob depends on it.
+
+  **This page used to say that *nothing* under `~/.vibeboard/` was mounted, and as of 2026-08-15 that
+  is no longer true.** The credential mirror above lives at `~/.vibeboard/copilot/creds/claude/` and a
+  Claude box mounts it. What keeps the admin token out is therefore no longer "the whole tree is
+  absent" but "the mount set names one leaf directory of it" — a weaker statement, and the reason to
+  write it down. Anything added under `~/.vibeboard/` is still absent from every box by default; only
+  that one path is named.
 - **The rest of `$HOME`, `~/.ssh`, and every other project on the disk.** Under the profile all of
   these were writable and every one of them was readable.
 - **The docker socket.** Nothing brokers docker into a box; the agent goes *in* the box, so there is
@@ -155,9 +224,11 @@ enforces scope; it is not the same as isolation.
   as the process lives, so a command-line argument would let any other agent on the machine lift
   another run's token with `ps`. This is also why `execArgs()` passes `-i`: without it `docker exec`
   discards stdin before the container sees a byte, and `claude -p` exits 1 having been told nothing.
-- **A Claude box can read the user's Claude credential**, because it must. Mounting one file is a
-  real improvement on the profile era, where all of `~/.claude/` was writable by any agent — but it
-  is one file, not zero.
+- **A Claude box can read the user's Claude credential**, because it must. Mounting one directory
+  holding one copied file is a real improvement on the profile era, where all of `~/.claude/` was
+  writable by any agent — but it is one credential, not zero, and the directory around it is now
+  writable from inside, so an agent can also *replace* it. That buys nothing it did not already have:
+  it is the agent's own token, and the blast radius is the next turn's auth failing.
 - **The network boundary is not exfiltration control.** The box reaches the internet (it has to, to
   reach the model) and cannot OPEN a connection to RFC 1918 or link-local addresses, so it cannot
   reach the unauthenticated services on this machine or the rest of the LAN. Nothing at this layer

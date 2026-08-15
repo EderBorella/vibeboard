@@ -18,6 +18,11 @@ export async function registerSandboxRoutes(api: FastifyInstance, ctx: AppCtx): 
     // endpoint is to answer "can this project run anything RIGHT NOW", and it used to answer
     // "could it, when the server booted" — which stayed `ok: true` after the image was deleted.
     const sandbox = await ctx.sandbox();
+    // WHICH cause, so the UI can title the refusal without reading the sentence for keywords. Derived
+    // from exactly the two facts `agentRefusal` derives from, in exactly its order, which is what makes
+    // it null in exactly the cases the refusal is null — a relationship the route test asserts rather
+    // than trusts, because the two are computed by different expressions and could drift apart.
+    const refusalKind = attached ? ('attached' as const) : sandbox.ok ? null : sandbox.kind;
     return {
       ok: sandbox.ok,
       // The image, where this used to be the AppArmor profile name. Same job — name the thing that
@@ -31,6 +36,7 @@ export async function registerSandboxRoutes(api: FastifyInstance, ctx: AppCtx): 
       // Computed here, once, so the UI never has to re-derive the rule and drift from the loop.
       // The same gate dispatch uses, not a second opinion about it.
       agentRefusal: agentRefusal(sandbox, attached),
+      refusalKind,
     };
   });
 

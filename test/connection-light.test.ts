@@ -58,7 +58,54 @@ describe('what the balloon says', () => {
   });
 
   it('names Docker in the offline heading, since that is the thing to go and fix', () => {
-    expect(lightAdvice('offline', REFUSAL).heading.toLowerCase()).toContain('docker');
+    expect(lightAdvice('offline', REFUSAL, 'docker').heading.toLowerCase()).toContain('docker');
+  });
+
+  // THE DEFECT THIS PAIR EXISTS FOR. The offline heading was the constant 'Docker is not ready', from
+  // the days when a missing daemon was the only way to be offline. A box pinned to a credential the
+  // host has since replaced fails every turn with docker in perfect health — measured: three attempts
+  // burned in 58ms each, auto-pilot then blaming the CARD — and sending that person to check their
+  // daemon sends them to the wrong machine.
+  //
+  // A FIXTURE THAT CANNOT TELL THE TWO APART TESTS NEITHER, so this asserts on the SAME sentence with
+  // only the kind changed. A version keying off words in the refusal would pass a test that varied both.
+  it('does not blame Docker when the cause is the credential', () => {
+    const advice = lightAdvice('offline', REFUSAL, 'credential');
+    expect(advice.heading.toLowerCase()).not.toContain('docker');
+    expect(advice.heading.toLowerCase()).toContain('sign-in');
+  });
+
+  it('still blames Docker when the cause IS Docker, on that same sentence', () => {
+    expect(lightAdvice('offline', REFUSAL, 'docker').heading).toBe('Docker is not ready');
+  });
+
+  // The heading changes and the detail does not: the sentence is the server's, and the two halves of
+  // this balloon have different authors on purpose.
+  it('keeps the server’s sentence whichever cause it is about', () => {
+    for (const kind of ['docker', 'credential', 'attached'] as const) {
+      expect(lightAdvice('offline', REFUSAL, kind).detail, kind).toBe(REFUSAL);
+    }
+  });
+
+  // Every cause must say what to do, and none of them may say the same thing — an advice line that is
+  // right for a missing daemon is useless to someone whose box needs rebuilding.
+  it('sends the person somewhere different for each cause', () => {
+    const next = (['docker', 'credential', 'attached'] as const).map(
+      (k) => lightAdvice('offline', REFUSAL, k).next,
+    );
+    expect(next.every((n) => Boolean(n))).toBe(true);
+    expect(new Set(next).size).toBe(3);
+  });
+
+  it('points the credential case at the Settings button that fixes it', () => {
+    expect(lightAdvice('offline', REFUSAL, 'credential').next).toContain('Rebuild the agent boxes');
+  });
+
+  // The answer that has not arrived yet, and the one the server did not label. Neither may produce an
+  // empty balloon, and both fall back to the cause that was the only one for most of this file's life.
+  it('falls back to the Docker heading when no kind was reported', () => {
+    expect(lightAdvice('offline', REFUSAL).heading).toBe('Docker is not ready');
+    expect(lightAdvice('offline', REFUSAL, null).heading).toBe('Docker is not ready');
   });
 
   // Same rule as the tooltip: the refusal is the server's, verbatim, and the balloon is where it is

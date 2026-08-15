@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 const api = vi.hoisted(() => ({
   restartOpencodeServer: vi.fn().mockResolvedValue({ ok: true, url: 'http://127.0.0.1:1' }),
   takeOverOpencodeServer: vi.fn().mockResolvedValue({ ok: true, url: 'http://127.0.0.1:2' }),
+  rebuildBoxes: vi.fn().mockResolvedValue({ ok: true, removed: 2 }),
 }));
 vi.mock('../web/src/api.js', () => api);
 
@@ -16,6 +17,7 @@ afterEach(() => {
   cleanup();
   api.restartOpencodeServer.mockClear();
   api.takeOverOpencodeServer.mockClear();
+  api.rebuildBoxes.mockClear();
 });
 
 const state = (over: Partial<SandboxState> = {}): SandboxState => ({
@@ -23,6 +25,8 @@ const state = (over: Partial<SandboxState> = {}): SandboxState => ({
   profile: 'vibeboard-agent',
   backend: 'managed',
   agentRefusal: null,
+  // `null` exactly when `agentRefusal` is null, which is the contract the field carries.
+  refusalKind: null,
   ...over,
 });
 
@@ -42,7 +46,9 @@ describe('what it says is enforced', () => {
 
   it('carries the reason and the consequence when there is no sandbox', () => {
     show({ ok: false, profile: undefined, reason: 'the agent image is not built — run `npm run box:build`' });
-    expect(screen.getByText(/box:build/)).toBeTruthy();
+    // The REASON's copy of it, not just any `box:build` on the panel: the rebuild hint names the same
+    // command for the opposite purpose, and a bare match would pass with this paragraph missing.
+    expect(screen.getByText(/the agent image is not built — run `npm run box:build`/)).toBeTruthy();
     // Both halves: what still works, and what will not. Either alone misleads.
     // The panel used to say manual runs and chat "still work". After the one-path ruling they are
     // refused, and an affirmative false statement about the security posture is worse than a stale
@@ -103,5 +109,79 @@ describe('the two actions', () => {
     show();
     fireEvent.click(screen.getByRole('button', { name: /restart server/i }));
     expect(await screen.findByText(/opencode serve exited \(1\)/)).toBeTruthy();
+  });
+});
+
+// The escape hatch for a box that has drifted. `ensure` adopts a healthy box rather than remaking it, so
+// there is no other way to be rid of one — and the copy has to be exact about what it costs, because
+// "rebuild" reads as the image build that takes minutes and is not what this does.
+describe('rebuilding the boxes', () => {
+  const press = () => fireEvent.click(screen.getByRole('button', { name: /rebuild the agent boxes/i }));
+  const answer = () => fireEvent.click(screen.getByRole('button', { name: /throw them away/i }));
+
+  it.each(['opencode', 'claude-code'])('is offered for %s — every project has boxes', (backend) => {
+    show({}, backend);
+    expect(screen.getByRole('button', { name: /rebuild the agent boxes/i })).toBeTruthy();
+  });
+
+  it('says what is lost, and that the image is not rebuilt', () => {
+    show();
+    expect(screen.getByText(/Anything in flight inside them is lost/i)).toBeTruthy();
+    expect(screen.getByText(/next agent turn builds new ones/i)).toBeTruthy();
+    // The one people would otherwise assume. `npm run box:build` takes minutes and is a different fix.
+    expect(screen.getByText(/image is not rebuilt/i)).toBeTruthy();
+    expect(screen.getByText(/box:build/)).toBeTruthy();
+  });
+
+  it('asks first, and calls nothing if the question is cancelled', async () => {
+    show();
+    press();
+    fireEvent.click(await screen.findByRole('button', { name: /^cancel$/i }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(api.rebuildBoxes).not.toHaveBeenCalled();
+  });
+
+  it('calls the API once confirmed, refreshes the panel, and says how many went', async () => {
+    const onChanged = vi.fn();
+    render(<SandboxPanel state={state()} backend="opencode" onChanged={onChanged} />);
+    press();
+    answer();
+    await waitFor(() => expect(api.rebuildBoxes).toHaveBeenCalledTimes(1));
+    expect(onChanged).toHaveBeenCalledTimes(1);
+    // The count, not a bare "done": on a project with no boxes this control fixed nothing, and saying
+    // otherwise sends someone away from the real problem.
+    expect(await screen.findByText(/Removed 2 boxes/i)).toBeTruthy();
+    // The three actions sit one above the other and do different things to somebody's session.
+    expect(api.restartOpencodeServer).not.toHaveBeenCalled();
+    expect(api.takeOverOpencodeServer).not.toHaveBeenCalled();
+  });
+
+  it('says plainly when there was nothing to remove', async () => {
+    api.rebuildBoxes.mockResolvedValueOnce({ ok: true, removed: 0 });
+    show();
+    press();
+    answer();
+    expect(await screen.findByText(/no boxes for this project/i)).toBeTruthy();
+  });
+
+  it('spins the button that was pressed, not the one beside it', async () => {
+    // A shared busy flag would put "Restarting…" on screen for this press. Held open by a promise that
+    // never settles, because the busy state is cleared in a `finally` the moment the call returns.
+    api.rebuildBoxes.mockReturnValueOnce(new Promise(() => {}));
+    show();
+    press();
+    answer();
+    expect(await screen.findByRole('button', { name: /throwing away…/i })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /restart server/i })).toBeTruthy();
+  });
+
+  it('shows the server’s refusal rather than failing silently', async () => {
+    api.rebuildBoxes.mockRejectedValueOnce(
+      new Error('1 agent is running on this project, so throwing the boxes away would kill it mid-turn.'),
+    );
+    show();
+    press();
+    answer();
+    expect(await screen.findByText(/1 agent is running on this project/)).toBeTruthy();
   });
 });

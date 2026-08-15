@@ -1,5 +1,5 @@
 import { Popover } from '../ui/Popover';
-import { type LightState, lightAdvice } from './connection-light';
+import { type LightState, lightAdvice, type RefusalKind } from './connection-light';
 
 // The light, as a button that explains itself.
 //
@@ -17,12 +17,16 @@ export function ConnectionLight({
   light,
   title,
   agentRefusal,
+  refusalKind,
 }: {
   light: LightState;
   title: string;
   agentRefusal: string | null | undefined;
+  // Which cause the server named. Carried alongside the sentence rather than sniffed out of it: the
+  // sentence is the server's to word and may be reworded there without this component noticing.
+  refusalKind?: RefusalKind | null;
 }) {
-  const advice = lightAdvice(light, agentRefusal);
+  const advice = lightAdvice(light, agentRefusal, refusalKind);
   return (
     <Popover
       label={advice.heading}

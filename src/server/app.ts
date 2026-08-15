@@ -17,6 +17,7 @@ import { registerCardRoutes } from './boards/cards-routes.js';
 import { registerConfigRoutes } from './boards/config-routes.js';
 import { registerProjectRoutes } from './boards/project-routes.js';
 import type { ProjectSession } from './boards/session.js';
+import { registerBoxRoutes } from './boxes/box-routes.js';
 import type { BoxService } from './boxes/box-service.js';
 import {
   attachBoxes,
@@ -279,6 +280,7 @@ export function buildApp(
       await registerControlRoutes(api, ctx);
       await registerCopilotRoutes(api, ctx);
       await registerSandboxRoutes(api, ctx);
+      await registerBoxRoutes(api, ctx);
       await registerSettingsRoutes(api);
       await registerToolchainRoutes(api, ctx);
       await registerAutopilotRoutes(api, ctx);

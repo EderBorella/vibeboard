@@ -236,7 +236,7 @@ describe('the agent gate', () => {
   });
 
   it('refuses when there is no sandbox, and repeats the reason', () => {
-    const reason = agentRefusal({ ok: false, reason: 'profile not loaded' }, undefined);
+    const reason = agentRefusal({ ok: false, reason: 'profile not loaded', kind: 'docker' }, undefined);
     // The reason travels: a refusal that says "no" without saying which condition failed leaves the
     // user with nothing to act on, and this string reaches the UI verbatim.
     expect(reason).toContain('profile not loaded');

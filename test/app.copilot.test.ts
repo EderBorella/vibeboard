@@ -126,7 +126,7 @@ describe('the chat is an agent too', () => {
     // which makes it the easier of the two to get wrong — and it had no test until this one.
     const { app } = await openTestProject({
       name: 'NoBox',
-      sandbox: { ok: false, reason: 'profile not loaded' },
+      sandbox: { ok: false, reason: 'profile not loaded', kind: 'docker' },
     });
     const address = await app.listen({ port: 0, host: '127.0.0.1' });
     const client = wsClient<Msg>(address);

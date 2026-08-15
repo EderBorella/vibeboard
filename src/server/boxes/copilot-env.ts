@@ -1,7 +1,22 @@
 import { createHash } from 'node:crypto';
-import { copyFileSync, existsSync, mkdirSync, symlinkSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  copyFileSync,
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  readFileSync,
+  readlinkSync,
+  renameSync,
+  rmSync,
+  type Stats,
+  statSync,
+  symlinkSync,
+  unlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 
 // Isolate the copilot from the user's PERSONAL agent config. The copilot should run with
 // only VibeBoard's own context + the project's own files — not the user's global
@@ -13,8 +28,11 @@ import { join } from 'node:path';
 //  - OpenCode: XDG_CONFIG_HOME → an empty dir (auth/db live in XDG_DATA_HOME, untouched).
 
 // Both CLIs write their config in here, which under the profile is why the admin token had to be denied
-// BY NAME rather than `~/.vibeboard/` as a whole. In a box the question does not arise: none of
-// `~/.vibeboard/` is among the mounts (docs/security/containment.md).
+// BY NAME rather than `~/.vibeboard/` as a whole. In a box that stayed true for a long time by accident
+// and no longer is: the credential mirror below is under here and IS mounted, so `~/.vibeboard/` is no
+// longer wholly absent from every box and the admin token is kept out by the mount set naming one
+// subdirectory of it rather than by nothing under it being named at all
+// (docs/security/containment.md).
 function copilotHome(): string {
   return process.env.VIBEBOARD_COPILOT_HOME ?? join(homedir(), '.vibeboard', 'copilot');
 }
@@ -25,10 +43,14 @@ export function isolationEnabled(): boolean {
 
 // Clean Claude config dir. Only the credentials are shared in (via symlink, so token
 // refresh writes through); no CLAUDE.md, plugins, or hooks come along.
+//
+// Points at the user's REAL file, not at the mirror below. This home is used only where the CLI runs
+// on the HOST — unboxed, which since docker became mandatory means tests — and there a refresh
+// writing through the link is the behaviour we want and the mirror would silently swallow it.
 export function claudeConfigDir(): string {
   const dir = join(copilotHome(), 'claude');
   mkdirSync(dir, { recursive: true });
-  linkCredentials(dir);
+  linkCredentials(dir, claudeCredentialFile());
   return dir;
 }
 
@@ -59,13 +81,16 @@ function projectStateDir(projectRoot: string): string {
 // direction was already safe only by accident (Claude's credential is a symlink to a host path an
 // OpenCode box does not mount, so it dangles rather than resolving).
 //
-// The credentials symlink is the load-bearing part: it points at the user's real file by ABSOLUTE
-// path, and the box mounts that same absolute path, so the link resolves identically inside and out.
-// Token refresh writes through it, which is why it is a link and not a copy.
+// The credentials symlink is the load-bearing part: it points at the credential by ABSOLUTE path, and
+// the box mounts that same absolute path, so the link resolves identically inside and out. What it
+// points AT is the mirror, not the user's own file — see `mirrorClaudeCredential` for the measurement
+// that forced that.
 export function claudeStateDir(projectRoot: string): string {
   const dir = join(projectStateDir(projectRoot), 'claude');
   mkdirSync(dir, { recursive: true });
-  linkCredentials(dir);
+  // Before the link, so the link never points at a path that does not exist yet.
+  mirrorClaudeCredential();
+  linkCredentials(dir, boxCredentialPath());
   return dir;
 }
 
@@ -93,23 +118,144 @@ export function opencodeStateDir(projectRoot: string): string {
   return root;
 }
 
-function linkCredentials(dir: string): void {
-  const real = join(homedir(), '.claude', '.credentials.json');
+// AN EXISTING LINK IS REPOINTED, NOT LEFT ALONE, and that is the whole reason this is not three lines.
+// `symlinkSync` fails with EEXIST rather than replacing, so the first version of this simply swallowed
+// it — correct while the target never changed. The target changed when the box stopped mounting
+// `~/.claude`, and every config home written before that carries a link to a path a box no longer
+// mounts: it would dangle inside the container, silently, on machines that had run VibeBoard before
+// and nowhere else.
+function linkCredentials(dir: string, target: string): void {
   const link = join(dir, '.credentials.json');
-  if (!existsSync(real)) return;
+  if (!existsSync(target)) return;
   try {
-    symlinkSync(real, link);
-  } catch (err) {
-    if ((err as NodeJS.ErrnoException).code !== 'EEXIST') {
-      /* auth will fail loudly if this matters */
+    const current = lstatSync(link, { throwIfNoEntry: false });
+    if (current) {
+      if (current.isSymbolicLink() && readlinkSync(link) === target) return;
+      unlinkSync(link);
     }
+    symlinkSync(target, link);
+  } catch {
+    /* auth will fail loudly if this matters */
   }
 }
 
-// The user's real Claude credential. Mounted into a Claude box at this same path so the symlink above
-// resolves, and mounted into nothing else — that is the entire mechanism keeping OpenCode away from it.
+// The user's real Claude credential, on the host. The one the CLI itself refreshes.
 export function claudeCredentialFile(): string {
   return join(homedir(), '.claude', '.credentials.json');
+}
+
+// Where that credential is VISIBLE INSIDE a Claude box — the path the symlink in the config dir points
+// at, and the path the mount makes mean the same thing on both sides of the boundary.
+//
+// Separate from `claudeCredentialFile()` because the two stopped being the same thing. Anything asking
+// "what will the CLI in the box actually read" must use this one.
+export function boxCredentialPath(): string {
+  return join(copilotHome(), 'creds', 'claude', '.credentials.json');
+}
+
+// THE MEASUREMENT THAT FORCED A MIRROR, because the obvious arrangement — mount the user's credential
+// file — is broken in a way that looks like an expired login.
+//
+// A Claude box used to bind-mount the FILE. Claude Code refreshes its OAuth token by atomic replace:
+// write a new file, rename over the old. That makes a NEW INODE, and a bind-mounted file pins the
+// inode it was created with — so the container went on reading the old, now-unlinked one forever.
+// Measured 2026-08-15 on a live box: host inode 5280206, link count 1, mtime 20:35; the same path
+// inside the box inode 5303483, link count 0, mtime a day earlier; and the box's own
+// /proc/self/mountinfo naming the source `…/.claude/.credentials.json//deleted`. Every agent turn then
+// died in 58ms with "Failed to authenticate: OAuth session expired and could not be refreshed",
+// auto-pilot spent all three of a card's attempts on it, and reported the CARD as stalled.
+//
+// The box cannot repair this from inside either. Reproduced from first principles in a scratch
+// container: a rename over a file-mount fails with EBUSY ("Resource busy"); the same rename inside a
+// DIRECTORY mount succeeds; and the file-mount still reads the old bytes afterwards. So a mounted file
+// can neither follow the host's refresh nor be refreshed from within.
+//
+// Mounting all of `~/.claude` was analysed and REJECTED rather than overlooked. It is 894MB and 805
+// session transcripts, and read-write is disqualifying on its own: `settings.json` declares hooks that
+// execute ON THE HOST the next time the user starts Claude Code — the escape `PROTECTED_PATHS` already
+// denies for `.git/hooks`, reached by another door. Read-only still hands every agent in every project
+// the full text of every session ever run on this machine, which is the opposite of what the top of
+// this file exists to do.
+//
+// So: a directory VibeBoard owns, holding ONLY the credential, mounted as a DIRECTORY. A copy at rest
+// has precedent a few functions up — `opencodeStateDir` copies the user's `auth.json` for a related
+// reason.
+//
+// WHAT THIS DOES NOT FIX, stated so the next reader does not have to discover it the way the last one
+// did:
+//
+//  - MIRRORING IS ONE-WAY, host → mirror, and the host is the source of truth. A refresh performed
+//    INSIDE the box is overwritten by the next mirror and lost. That costs nothing today, because the
+//    EBUSY measurement above says an in-box refresh is impossible — but a directory mount is writable
+//    from inside, so the in-box CLI CAN write here now and the loss becomes reachable the moment it
+//    does. The two-way version (newest mtime wins) is a separate step, deliberately not taken here.
+//  - IF NOBODY EVER RUNS CLAUDE CODE ON THE HOST, nothing refreshes the token, and the mirror expires
+//    exactly when the original does. Mirroring buys freshness; it does not create it.
+//  - THIS IS A SECOND COPY OF A CREDENTIAL AT REST, at `~/.vibeboard/copilot/creds/claude/`. What
+//    protects it is 0700 on the directory and 0600 on the file, set with an explicit `chmodSync`
+//    rather than left to the umask, and the fact that the mount names that one subdirectory — the
+//    admin token next door in `~/.vibeboard/` is not in any box.
+//
+// Answers with the mirror's path, or `undefined` when there is no credential to mount.
+export function mirrorClaudeCredential(): string | undefined {
+  const source = claudeCredentialFile();
+  const mirror = boxCredentialPath();
+  const from = statSync(source, { throwIfNoEntry: false });
+  if (from?.isFile() && !mirrored(mirror, source, from)) copyCredential(source, mirror);
+  return existsSync(mirror) ? mirror : undefined;
+}
+
+// SIZE FIRST, THEN THE BYTES. Cheap enough for every `ensure()`, which is what it gets: two `stat`s
+// reject the common case where a refresh changed the length, and otherwise two reads of a file that is
+// under a kilobyte — nothing next to the `docker inspect` the same call is about to do.
+//
+// It compares CONTENT and not mtime, and that is a correction rather than a preference. The first
+// version carried the source's mtime onto the mirror with `utimesSync` and compared the two, which
+// looks exact and is not: `utimesSync` takes a `Date`, a `Date` holds only whole milliseconds, and a
+// file's mtime has nanoseconds — so the copy's timestamp comes back ROUNDED UP to the next whole
+// millisecond. Measured: 2000 out of 2000 round trips shifted by one. The comparison would therefore
+// have failed for every real credential, the skip would never once have fired, and nothing would have
+// said so — the mirror would simply have been rewritten before every agent turn. It was caught only
+// because a test that pinned the skip happened to be run alongside another file, which moved the
+// timing enough to expose it.
+function mirrored(mirror: string, source: string, from: Stats): boolean {
+  const to = statSync(mirror, { throwIfNoEntry: false });
+  if (!to || to.size !== from.size) return false;
+  return readFileSync(mirror).equals(readFileSync(source));
+}
+
+// Temp file in the SAME directory, then rename. Two reasons, and the second is the point of the whole
+// change: a torn credential is worse than a stale one, and a rename is the one write a bind-mounted
+// directory lets the other side of the mount see.
+//
+// Not `writeAtomic` from src/store/write-queue.ts, which does exactly this and is the helper this
+// would otherwise duplicate: it is async, and everything on this path — `claudeStateDir`,
+// `boxPathsForBackend`, the mount set itself — is synchronous and is asserted synchronously by tests
+// that need no daemon. Making the mount set async to reuse eleven lines would be the tail wagging the
+// dog.
+function copyCredential(source: string, mirror: string): void {
+  const dir = dirname(mirror);
+  // `mkdirSync`'s mode applies only where it CREATES, so on its own it leaves a directory that already
+  // existed at 0755 exactly as it found it — with a credential about to be put inside it. The
+  // `chmodSync` below is what closes that, and test/copilot-env.test.ts plants a 0755 directory to
+  // prove it.
+  mkdirSync(dir, { recursive: true, mode: 0o700 });
+  // One writer: this whole path is synchronous, so the only way two temp names collide is two
+  // PROCESSES, and the pid separates those.
+  const temp = `${mirror}.${process.pid}.tmp`;
+  try {
+    chmodSync(dir, 0o700);
+    // The mode is applied by `chmodSync` ALONE, and not also as a `writeFileSync` option, so that it is
+    // reachable by a test: with both, removing the chmod changes nothing an assertion can see, and a
+    // mode nothing can fail is a mode nobody is holding. What covers the moment between the create and
+    // the chmod is the 0700 on the directory above — nothing else can traverse in to find the file.
+    writeFileSync(temp, readFileSync(source));
+    chmodSync(temp, 0o600);
+    renameSync(temp, mirror);
+  } catch {
+    rmSync(temp, { force: true });
+    /* auth will fail loudly if this matters */
+  }
 }
 
 // Clean XDG_CONFIG_HOME for OpenCode — opencode looks in $XDG_CONFIG_HOME/opencode, which

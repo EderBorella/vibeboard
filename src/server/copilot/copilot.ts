@@ -129,7 +129,18 @@ export class CopilotSession {
     this.#turn = turn;
     try {
       const result = await turn.done;
-      if (result.sessionId) this.#sessionId = result.sessionId;
+      // ONLY IF THIS IS STILL THE CURRENT TURN, and that check is the whole fix.
+      //
+      // A cancelled turn still RESOLVES, carrying the session id it had seen. `newSession()` cancels
+      // and then clears the id — and a few hundred milliseconds later this line put it straight back,
+      // so the next message went out with `--resume <the old session>`. The "new" chat silently
+      // continued the old conversation, inherited every message, and grew until it timed out at 180s.
+      // Both chats on disk recorded the same cliSessionId, which is how it was found.
+      //
+      // `#turn` is set to undefined by `cancel()` and in the `finally` below, so identity is exactly
+      // the question "is anyone still listening to this turn" — no counter needed, and it covers a
+      // plain `copilot:cancel` followed by reopening another chat for the same reason.
+      if (this.#turn === turn && result.sessionId) this.#sessionId = result.sessionId;
     } finally {
       this.#turn = undefined;
     }

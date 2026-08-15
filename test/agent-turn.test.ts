@@ -5,7 +5,22 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // The OpenCode half talks HTTP to a spawned server; the client is the seam, so it is mocked and
 // every assertion about that backend is about what agent-turn ASKS of it.
-const client = vi.hoisted(() => ({ opencodeTurn: vi.fn() }));
+//
+// `vi.mock` with a factory REPLACES the module, so every export agent-turn imports has to be listed
+// here — including the error class. Adding `OpencodeTurnFailed` to the real module broke all five
+// tests below with "No export is defined on the mock", which is the useful failure: a mock that
+// silently lacked it would have made the `instanceof` check dead and the session id vanish again.
+const client = vi.hoisted(() => ({
+  opencodeTurn: vi.fn(),
+  OpencodeTurnFailed: class extends Error {
+    readonly sessionId: string;
+    constructor(sessionId: string, cause: unknown) {
+      super(cause instanceof Error ? cause.message : String(cause));
+      this.name = 'OpencodeTurnFailed';
+      this.sessionId = sessionId;
+    }
+  },
+}));
 vi.mock('../src/server/boxes/opencode-client.js', () => client);
 
 const { runAgentTurn } = await import('../src/server/agent-turn.js');

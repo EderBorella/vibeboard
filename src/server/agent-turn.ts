@@ -6,7 +6,7 @@ import { INSTRUCTIONS_FILE } from '../core/layout.js';
 import { groupStartTime, terminateGroup } from '../exec/process-group.js';
 import { boxEnvFor } from './boxes/containers.js';
 import { claudeConfigDir, isolationEnabled } from './boxes/copilot-env.js';
-import { opencodeTurn } from './boxes/opencode-client.js';
+import { OpencodeTurnFailed, opencodeTurn } from './boxes/opencode-client.js';
 import { NOT_REQUESTED, type SandboxStatus, wrapCommand } from './boxes/sandbox.js';
 import { type CopilotEvent, parseCopilotLine, type ResultStats } from './copilot-events.js';
 import { errorText } from './errors.js';
@@ -200,7 +200,11 @@ function startOpencode(opts: AgentTurnOptions): RunningTurn {
           kind: 'text',
           text: `\n[opencode failed: ${errorText(err)}]`,
         });
-      return { model: opts.model, exitCode: 1, timedOut, stats };
+      // The session THIS TURN was working in, carried out of the failure. A turn that created a
+      // session and then failed used to report none, so the chat forgot a conversation that exists on
+      // the server and its next message opened another — losing the thread instead of continuing it.
+      const sessionId = err instanceof OpencodeTurnFailed ? err.sessionId : opts.sessionId;
+      return { ...(sessionId ? { sessionId } : {}), model: opts.model, exitCode: 1, timedOut, stats };
     } finally {
       clearTimeout(timer);
     }

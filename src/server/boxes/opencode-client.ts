@@ -149,6 +149,20 @@ async function postJson(url: string, body: unknown, signal?: AbortSignal): Promi
 // `/work` — the host path does not exist inside a box — so what distinguishes one project from
 // another is now the BOX, not this parameter. `opencodeBaseUrl` therefore has to be per project, and
 // is.
+// Thrown instead of a bare error once a session EXISTS, so a caller whose turn failed can still learn
+// which conversation it was failing in. Without this the id is created and then lost with the
+// exception, the session is orphaned on the OpenCode server, and the chat's next message opens another
+// one — so a failed first turn silently discards the thread rather than continuing it.
+export class OpencodeTurnFailed extends Error {
+  readonly sessionId: string;
+  constructor(sessionId: string, cause: unknown) {
+    super(cause instanceof Error ? cause.message : String(cause));
+    this.name = 'OpencodeTurnFailed';
+    this.sessionId = sessionId;
+    this.cause = cause;
+  }
+}
+
 export async function opencodeTurn(opts: OpencodeTurnOptions): Promise<string> {
   const base = await opencodeBaseUrl();
   const dq = `?directory=${encodeURIComponent(opencodeDirectory(opts.cwd))}`;
@@ -165,11 +179,18 @@ export async function opencodeTurn(opts: OpencodeTurnOptions): Promise<string> {
   if (opts.system) body.system = opts.system;
   // Measured here, around the request, as the fallback for a response that reports no timing.
   const startedAt = Date.now();
-  const data = (await postJson(
-    `${base}/session/${sessionId}/message${dq}`,
-    body,
-    opts.signal,
-  )) as OcMessageResponse;
+  // Wrapped so the session id survives the throw. Everything above this point either used the id the
+  // caller gave us or created one; from here on a failure must not take it with it.
+  let data: OcMessageResponse;
+  try {
+    data = (await postJson(
+      `${base}/session/${sessionId}/message${dq}`,
+      body,
+      opts.signal,
+    )) as OcMessageResponse;
+  } catch (err) {
+    throw new OpencodeTurnFailed(sessionId, err);
+  }
   const { events, error } = messageToEvents(data, Date.now() - startedAt);
   // The transcript gets one short line; the whole error goes to the log, so the next occurrence is
   // readable with: jq 'select(.component == "opencode")' logs/vibeboard-*.log

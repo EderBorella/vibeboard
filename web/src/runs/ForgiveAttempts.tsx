@@ -32,7 +32,7 @@ export function ForgiveAttempts({ board, card, onForgiven }: Props) {
 
   async function clear(): Promise<void> {
     const ok = await confirm({
-      title: `Let ${card} be tried again?`,
+      title: `Clear the failed tries on ${card}?`,
       // WHAT IT DOES AND WHAT IT DOES NOT. The last sentence is the one that has to be there: these
       // runs are cleared most often because they failed for a reason outside the card — a dead
       // credential, a box pointing at a deleted directory — and a dialog that implied the machine was
@@ -40,7 +40,7 @@ export function ForgiveAttempts({ board, card, onForgiven }: Props) {
       body: `The attempts ${card} has spent stop counting against it, so auto-pilot can dispatch it again. Every run stays in the list below — nothing is deleted, and each one is stamped with the time you cleared it. This does not fix whatever made those runs fail: if the cause was outside the card, the next run will hit it too.`,
       // `danger` is deliberately absent, on the same reasoning as archiving a card: nothing is
       // destroyed here, and borrowing the weight of a deletion would make every red button mean less.
-      action: 'Clear the attempts',
+      action: 'Clear them',
     });
     if (!ok) return;
     setForgiven(null);
@@ -54,7 +54,10 @@ export function ForgiveAttempts({ board, card, onForgiven }: Props) {
   return (
     <>
       <button type="button" className="reports-forgive" disabled={busy !== null} onClick={() => void clear()}>
-        {busy !== null ? 'Clearing…' : 'Try this card again'}
+        {/* "Clear failed tries" and not "Try this card again": the button does not RUN anything, and a
+            label promising a retry set up the wrong expectation — what it does is stop the spent tries
+            counting, after which auto-pilot picks the card up on its own schedule. */}
+        {busy !== null ? 'Clearing…' : 'Clear failed tries'}
       </button>
       {forgiven !== null && (
         <span className="reports-forgiven">

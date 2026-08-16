@@ -58,6 +58,7 @@ const props = {
   onOpenCard: vi.fn(),
   onCancel: vi.fn(),
   onResolve: vi.fn(),
+  onForgiven: vi.fn(),
 };
 
 const column = (label: string): HTMLElement => screen.getByLabelText(label);

@@ -1,6 +1,7 @@
 import type { CSSProperties } from 'react';
 import type { RunRecord } from '../api';
 import type { Card } from '../shared';
+import { ForgiveAttempts } from './ForgiveAttempts';
 import { costLabel, usageTotal } from './format';
 import { useAccounting } from './useAccounting';
 import { elapsed, groupRuns, runSubject } from './viewmodel';
@@ -19,6 +20,10 @@ interface Props {
   // Deal with a run without opening its card. The only way to clear an interrupted run whose card
   // has since been closed, and the quick path for one you have already read.
   onResolve: (run: RunRecord) => void;
+  // Refetch after a card's spent tries are cleared. Nothing else brings the new count back: a run
+  // record lives under `results/`, which `readBoard` does not read, so stamping one moves no board
+  // state and the snapshot the run list is keyed on never changes.
+  onForgiven: () => void;
 }
 
 const COLUMNS = [
@@ -39,7 +44,17 @@ function openTitle(record: RunRecord, card: Card | undefined): string {
 // Every run in the project, in three columns: what is happening, what is waiting for a decision,
 // and what came back. Failed and interrupted runs sit under "Requires attention" rather than
 // "Done" — burying a broken run under successes is how it goes unnoticed for a week.
-export function ExecutionView({ runs, active, queued, cards, now, onOpenCard, onCancel, onResolve }: Props) {
+export function ExecutionView({
+  runs,
+  active,
+  queued,
+  cards,
+  now,
+  onOpenCard,
+  onCancel,
+  onResolve,
+  onForgiven,
+}: Props) {
   const grouped = groupRuns(runs);
   // Refetched whenever the run list changes: usage arrives when a run settles, which is a new list.
   const accounting = useAccounting(runs);
@@ -110,6 +125,13 @@ export function ExecutionView({ runs, active, queued, cards, now, onOpenCard, on
                     >
                       Dismiss
                     </button>
+                  )}
+                  {/* BESIDE DISMISS, because the two are the pair of answers to a failed run and this
+                      column is where a person actually meets one. Dismiss says "I have read this";
+                      this says "stop it counting against the card". Offered only for a run that HAS a
+                      card — a project run has no attempt tally to clear. */}
+                  {column.key === 'attention' && record.card && record.board && (
+                    <ForgiveAttempts board={record.board} card={record.card} onForgiven={onForgiven} />
                   )}
                 </div>
               );

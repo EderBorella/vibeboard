@@ -255,6 +255,10 @@ export function App() {
         onResolveRun={(record) => {
           void resolveRunRecord(record).catch(() => {});
         }}
+        // `bump`, the same lever sign-in pulls, because clearing a card's tries changes a number
+        // nothing else refetches: run records live under `results/`, which the board watcher does not
+        // read, so no snapshot arrives and the list the count is derived from is never asked again.
+        onForgiveRun={() => setBump((n) => n + 1)}
       />
     );
 

@@ -154,6 +154,7 @@ const props = {
   onMoveCard: vi.fn(),
   onCancelRun: vi.fn(),
   onResolveRun: vi.fn(),
+  onForgiveRun: vi.fn(),
 };
 
 // Which of the main views is on screen. Exactly one should ever be.
@@ -305,5 +306,80 @@ describe('WorkArea', () => {
       />,
     );
     expect(screen.getByLabelText('Requires attention').querySelectorAll('.exec-run')).toHaveLength(1);
+  });
+
+  // BESIDE DISMISS, which is the whole of the request: the Execution tab is where a person meets a
+  // failed run, and until now the only way to clear its strikes was to find the card and open its
+  // reports. Asserted together with Dismiss, in the same column, because "it renders somewhere on the
+  // page" would pass with the control in the wrong column entirely.
+  it('offers Dismiss and Clear failed tries together on a run that needs attention', () => {
+    render(
+      <WorkArea
+        {...props}
+        tab="execution"
+        allCards={[card('E-001')]}
+        runs={{
+          runs: [
+            {
+              run: 'r1',
+              card: 'E-001',
+              board: 'engineering',
+              skill: 'execute',
+              status: 'attention',
+              started: '2026-07-26T14:30:00.000Z',
+              backend: 'claude-code',
+              model: 'opus',
+              effort: 'high',
+              mode: 'bypassPermissions',
+              report: '',
+            },
+          ],
+          active: [],
+          queued: [],
+        }}
+      />,
+    );
+    const column = screen.getByLabelText('Requires attention');
+    expect(column.querySelector('.report-dismiss')?.textContent).toBe('Dismiss');
+    // The RENAMED label. "Try this card again" promised a retry the button does not perform.
+    expect(column.querySelector('.reports-forgive')?.textContent).toBe('Clear failed tries');
+  });
+
+  // A project run — a checkup or the bootstrap — has no card, so there is no attempt tally to clear
+  // and the control must not appear. Dismiss still does: the run still needs reading.
+  //
+  // WHAT THIS TEST CANNOT SEE, measured by planting it: deleting the `record.card` half of the guard
+  // leaves this green. `card` and `board` are absent TOGETHER on a project run and present together
+  // otherwise — the type says "both or neither, never one" — so no fixture can tell the two clauses
+  // apart. `record.card` is held by the TYPECHECKER instead, which needs it to narrow the prop from
+  // `string | undefined`; delete it and `npm run check` fails. Recorded so the next reader does not
+  // trust this test to cover a clause it cannot reach.
+  it('offers no Clear failed tries on a run that belongs to no card', () => {
+    render(
+      <WorkArea
+        {...props}
+        tab="execution"
+        runs={{
+          runs: [
+            {
+              run: 'r2',
+              skill: 'checkup',
+              status: 'failed',
+              started: '2026-07-26T14:30:00.000Z',
+              backend: 'claude-code',
+              model: 'opus',
+              effort: 'high',
+              mode: 'bypassPermissions',
+              report: '',
+            },
+          ],
+          active: [],
+          queued: [],
+        }}
+      />,
+    );
+    const column = screen.getByLabelText('Requires attention');
+    expect(column.querySelector('.report-dismiss')).toBeTruthy();
+    expect(column.querySelector('.reports-forgive')).toBeNull();
   });
 });

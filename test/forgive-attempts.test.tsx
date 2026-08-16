@@ -64,8 +64,14 @@ const account = (over: Partial<CardLedgerData> = {}): CardLedgerData => ({
 const show = (onForgiven = vi.fn()) =>
   render(<ForgiveAttempts board="product" card="P-011" onForgiven={onForgiven} />);
 
-const press = () => fireEvent.click(screen.getByRole('button', { name: /try this card again/i }));
-const answer = () => fireEvent.click(screen.getByRole('button', { name: /clear the attempts/i }));
+// BY ITS ACCESSIBLE NAME, which is the label a person reads — so a rename lands here rather than
+// passing silently. It was "Try this card again", which promised a retry the button does not perform:
+// nothing is dispatched, the spent tries simply stop counting and auto-pilot picks the card up on its
+// own schedule.
+const press = () => fireEvent.click(screen.getByRole('button', { name: /clear failed tries/i }));
+// The dialog's confirming button. "Clear them" rather than repeating the whole phrase, because the
+// title above it already says which card and what is being cleared.
+const answer = () => fireEvent.click(screen.getByRole('button', { name: /clear them/i }));
 
 describe('where the control appears', () => {
   it('sits on the ledger line, beside the count it clears', () => {

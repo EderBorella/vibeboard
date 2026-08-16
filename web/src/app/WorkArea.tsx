@@ -69,6 +69,8 @@ interface WorkAreaProps {
   onMoveCard: (card: Card, columnSlug: string) => void;
   onCancelRun: (record: RunRecord) => void;
   onResolveRun: (record: RunRecord) => void;
+  // Refetch after a card's spent tries are cleared — see the note on ExecutionView's own prop.
+  onForgiveRun: () => void;
 }
 
 // Everything below the top bar: the active view, the utility dock beneath it, and the copilot beside
@@ -165,6 +167,7 @@ export function WorkArea(props: WorkAreaProps) {
             onOpenCard={props.onOpen}
             onCancel={props.onCancelRun}
             onResolve={props.onResolveRun}
+            onForgiven={props.onForgiveRun}
           />
         )}
         {tab === 'diary' && <DiaryView bump={props.bump} />}

@@ -7,7 +7,8 @@
 //   attention — writes an attention report with options
 //   silent    — writes nothing at all and exits 0 (the case the contract has to survive)
 //   garbage   — writes a report with malformed frontmatter
-//   crash     — exits non-zero without a report
+//   crash     — exits non-zero without a report, having reached a model first
+//   deadbox   — exits non-zero having reached NO model: the dead-credential shape, measured
 //   hang      — never exits, for cancel and timeout
 //   free      — like success, but reports a cost of exactly 0 (a free model)
 //   echo      — quotes its own credential back in its narration, then exits 0
@@ -210,6 +211,31 @@ if (behaviour === 'create' || behaviour === 'createlinks') {
     });
   }
   process.exit(0);
+} else if (behaviour === 'deadbox') {
+  // A RUN THAT NEVER REACHED A MODEL, off the real record written 2026-08-15 by a box holding a
+  // credential whose inode had been replaced on the host. Every number here is that record's:
+  //
+  //   num_turns 1   output_tokens 0   no input tokens at all   duration 57ms   cost 0   exit 1
+  //
+  // `num_turns: 1` is the whole reason this behaviour exists rather than a `crash` with the numbers
+  // edited. The CLI reports a turn for a run that never opened a connection, so a fixture built on
+  // "no turns" would test a shape no failure has ever produced.
+  const failed = 'Failed to authenticate: OAuth session expired and could not be refreshed';
+  say({ type: 'assistant', message: { content: [{ type: 'text', text: failed }] }, session_id: 'shim-run' });
+  say({
+    type: 'result',
+    subtype: 'error',
+    is_error: true,
+    result: failed,
+    num_turns: 1,
+    duration_ms: 57,
+    session_id: 'shim-run',
+    total_cost_usd: 0,
+    // No input or cache tokens: nothing was ever sent, which is what makes contextTokens zero rather
+    // than merely small.
+    usage: { output_tokens: 0 },
+  });
+  process.exit(1);
 } else if (behaviour === 'echo') {
   // How a credential really leaks: the agent narrates the command it is about to run, or quotes the
   // prompt back at itself. The transcript is a file every other agent can read.

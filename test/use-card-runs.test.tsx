@@ -80,6 +80,19 @@ describe('useCardRuns', () => {
     await waitFor(() => expect(result.current.runs.map((r) => r.run)).toEqual(['r1', 'r2']));
   });
 
+  // The trigger above is a snapshot pushed by the watcher, which is right for a run finishing
+  // somewhere else. It is the wrong thing to wait on for a change THIS browser just made: clearing a
+  // card's attempts rewrites its run records, and the count on screen is derived from them, so a
+  // control that waited for a file event, a snapshot rebuild and a socket round-trip to learn its own
+  // result would look broken for as long as that took — and do nothing at all if any link were missing.
+  it('refetches when a caller asks, without waiting for the watcher to come round', async () => {
+    api.listCardRuns.mockResolvedValueOnce(body('r1')).mockResolvedValueOnce(body('r1', 'r2'));
+    const { result } = renderHook(() => useCardRuns('engineering', 'E-001', 0));
+    await waitFor(() => expect(result.current.runs.map((r) => r.run)).toEqual(['r1']));
+    act(() => result.current.refresh());
+    await waitFor(() => expect(result.current.runs.map((r) => r.run)).toEqual(['r1', 'r2']));
+  });
+
   it('does not refetch when nothing changed', async () => {
     api.listCardRuns.mockResolvedValue(body('r1'));
     const { rerender } = renderHook(({ t }) => useCardRuns('engineering', 'E-001', t), {

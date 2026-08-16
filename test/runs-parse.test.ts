@@ -39,6 +39,30 @@ describe('serializeRun / parseRun', () => {
     expect(parseRun(serializeRun(full))).toEqual(full);
   });
 
+  // THE TWO FIELDS THAT ANSWER "does this count", and neither survived the round trip: `serializeRun`
+  // wrote both, `parseRun` read neither, and the fixture above named neither — so every record came
+  // back off disk with the machine's fault erased and a person's clearance undone. A card cleared on
+  // screen was still at its cap the moment anything re-read it.
+  it('round-trips whose fault it was, and that a person cleared it', () => {
+    const excused = record({
+      status: 'failed',
+      fault: 'infrastructure',
+      forgiven: '2026-08-16T09:12:00.000Z',
+      note: 'the credential was refused',
+    });
+    expect(parseRun(serializeRun(excused))).toEqual(excused);
+  });
+
+  it('drops a fault it does not recognise rather than reading it as one', () => {
+    // Fail-safe: an unclassified failure still burns the card's attempt, so a hand-edited record
+    // cannot hand a card unlimited retries by naming a fault nobody defined.
+    const written = serializeRun(record({ status: 'failed' })).replace(
+      'status: failed',
+      'status: failed\nfault: someone-elses-problem',
+    );
+    expect(parseRun(written)?.fault).toBeUndefined();
+  });
+
   it('round-trips a minimal record without inventing fields', () => {
     const min = record();
     const parsed = parseRun(serializeRun(min));

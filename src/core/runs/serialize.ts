@@ -8,7 +8,19 @@ import type { RunRecord } from './types.js';
 // interface and absent from here is one `serializeRun` silently never writes, so it would round-trip as
 // gone. The exhaustiveness check below turns that into a typecheck failure, and `RUN_RECORD_KEYS` lets
 // test/mirror.test.ts hold the web mirror to the same set.
-const IDENTITY_KEYS = ['run', 'card', 'board', 'skill', 'status', 'outcome', 'resolved'] as const;
+// `fault` and `forgiven` sit beside `status` deliberately: all three answer "how did this end, and does
+// it count", and a reader scanning a diff for why a card is blocked should find them together.
+const IDENTITY_KEYS = [
+  'run',
+  'card',
+  'board',
+  'skill',
+  'status',
+  'fault',
+  'forgiven',
+  'outcome',
+  'resolved',
+] as const;
 const DETAIL_KEYS = [
   'started',
   'finished',

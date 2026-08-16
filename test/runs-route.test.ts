@@ -1,10 +1,13 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { Writable } from 'node:stream';
 import { describe, expect, it } from 'vitest';
 import { IDLE_STATE } from '../src/core/autopilot-state.js';
 import { boardRel, FOUNDATION_DIR, RESULTS_DIR, RUNS_DIR } from '../src/core/layout.js';
 import type { RunRecord } from '../src/core/runs.js';
+import { endpointsFor } from '../src/server/auth/auth.js';
 import { ProjectSession } from '../src/server/boards/session.js';
+import { forgiveRefusal } from '../src/server/runs/routes.js';
 import { writeAutopilotState } from '../src/store/autopilot-store.js';
 import { readProjectRun, readRun, writeRun } from '../src/store/run-store.js';
 import { openTestProject, shimArgsLog, type TestProject, testApp, wsClient } from './helpers.js';
@@ -604,6 +607,7 @@ describe('every run route refuses when no project is open', () => {
     ['GET', '/api/runs/engineering/E-001'],
     ['POST', '/api/runs'],
     ['POST', '/api/runs/engineering/E-001/r1/resolve'],
+    ['POST', '/api/runs/engineering/E-001/forgive'],
     ['POST', '/api/runs/r1/cancel'],
   ])('%s %s', async (method, url) => {
     const app = testApp(new ProjectSession());
@@ -729,6 +733,137 @@ describe('POST /api/runs/:board/:card/:run/resolve', () => {
     const res = await app.inject({ method: 'POST', url: '/api/runs/engineering/E-001/r/resolve' });
     expect(res.statusCode).toBe(409);
     await app.close();
+  });
+});
+
+// The way out of a card the machine spent. Attempts are counted from the run records, so a card at the
+// cap stayed there for ever and auto-pilot would not dispatch it — the state the project was actually
+// left in on 2026-08-15, with no remedy but moving files by hand.
+describe('POST /api/runs/:board/:card/forgive', () => {
+  const spent = (card: string, run: string, over: Partial<RunRecord> = {}): RunRecord => ({
+    run,
+    card,
+    board: 'engineering',
+    skill: 'execute',
+    status: 'failed',
+    started: '2026-08-15T09:00:00.000Z',
+    backend: 'claude-code',
+    model: 'opus',
+    effort: 'high',
+    mode: 'bypassPermissions',
+    report: 'the credential was refused',
+    ...over,
+  });
+
+  const forgive = (project: TestProject & { card: string }) =>
+    project.app.inject({ method: 'POST', url: `/api/runs/engineering/${project.card}/forgive` });
+
+  it('clears the card’s attempts, says how many, and leaves the runs on disk', async () => {
+    const project = await projectWithCard();
+    for (const n of [1, 2, 3]) await writeRun(project.root, spent(project.card, `r-${n}`));
+
+    const res = await forgive(project);
+    expect([res.statusCode, res.json()]).toEqual([200, { forgiven: 3 }]);
+    // FROM DISK, and through the ledger the pane actually reads: a reply assembled and never written
+    // is exactly the shape a plant found on the verification route.
+    const account = (
+      await project.app.inject({ method: 'GET', url: `/api/runs/engineering/${project.card}` })
+    ).json() as { runs: RunRecord[]; account: { attempts: Record<string, number> } };
+    expect(account.account.attempts.execute).toBe(0);
+    // The history is the point: three records still there, each stamped and still saying it failed.
+    expect(account.runs).toHaveLength(3);
+    expect(account.runs.map((r) => r.status)).toEqual(['failed', 'failed', 'failed']);
+    expect(account.runs.every((r) => r.forgiven !== undefined)).toBe(true);
+    expect(account.runs[0].report).toBe('the credential was refused');
+  });
+
+  it('says nothing was counting rather than implying it fixed something', async () => {
+    const project = await projectWithCard();
+    const res = await forgive(project);
+    expect([res.statusCode, res.json()]).toEqual([200, { forgiven: 0 }]);
+  });
+
+  it('refuses while a run on the card has not finished, and says why', async () => {
+    // It would settle into an attempt moments later and put the count straight back, which reads as a
+    // button that did nothing.
+    const project = await projectWithCard();
+    await writeRun(project.root, spent(project.card, 'r-done'));
+    await writeRun(project.root, spent(project.card, 'r-live', { status: 'running' }));
+
+    const res = await forgive(project);
+    expect(res.statusCode).toBe(409);
+    expect(res.json().error).toMatch(/has not finished/);
+    // And it refused rather than half-doing it: the finished run is untouched.
+    expect((await readRun(project.root, 'engineering', project.card, 'r-done'))?.forgiven).toBeUndefined();
+  });
+
+  it('refuses a board that is not one, rather than reading a folder by that name', async () => {
+    const project = await projectWithCard();
+    const res = await project.app.inject({ method: 'POST', url: '/api/runs/nonsense/E-001/forgive' });
+    expect([res.statusCode, res.json()]).toEqual([400, { error: 'Unknown board' }]);
+  });
+
+  // A person overruling the machine, so it is written down. This is the one write that makes a card
+  // the caps had stopped dispatchable again, and months later "why did this card get four tries" is a
+  // question nothing else answers.
+  it('writes down who cleared what, and how many', async () => {
+    const lines: Record<string, unknown>[] = [];
+    const stream = new Writable({
+      write(chunk, _enc, cb) {
+        for (const line of String(chunk).split('\n').filter(Boolean)) {
+          lines.push(JSON.parse(line) as Record<string, unknown>);
+        }
+        cb();
+      },
+    });
+    const project = await openTestProject({ runBin: SHIM, logger: { level: 'info', stream } });
+    const state = (await project.app.inject({ method: 'GET', url: '/api/state' })).json() as {
+      snapshot: { boards: { engineering: { id: string }[] } };
+    };
+    const card = state.snapshot.boards.engineering[0].id;
+    await writeRun(project.root, spent(card, 'r-1'));
+    await writeRun(project.root, spent(card, 'r-2'));
+
+    await project.app.inject({ method: 'POST', url: `/api/runs/engineering/${card}/forgive` });
+
+    const line = lines.find((l) => l.msg === "a person cleared a card's attempts");
+    expect(line).toBeDefined();
+    // The card and the count, not merely that something happened: a line saying only "attempts
+    // cleared" leaves the reader with the same question they came with.
+    expect([line?.card, line?.board, line?.forgiven]).toEqual([card, 'engineering', 2]);
+    expect(line?.by).toBe('admin');
+  });
+
+  it('refuses with 409 when no project is open', async () => {
+    const app = testApp(new ProjectSession());
+    const res = await app.inject({ method: 'POST', url: '/api/runs/engineering/E-001/forgive' });
+    expect([res.statusCode, res.json()]).toEqual([409, { error: 'No project open' }]);
+    await app.close();
+  });
+
+  // NOT A TEST OF THE AUTH ROW, and it cannot be: `testApp` fills an admin bearer into every request,
+  // so nothing driven through it can tell an admin-only route from an open one. What is asserted is the
+  // fact the row depends on — that no rule exists for this endpoint — because the scope table's default
+  // is that a route it does not name is admin-only. An agent able to forgive its own card's attempts
+  // would be an agent granting itself unlimited retries.
+  it('is absent from the scope table, which is what makes it admin-only', () => {
+    for (const scope of ['work', 'checkup', 'service', 'assist'] as const) {
+      expect(endpointsFor(scope).join('\n')).not.toContain('forgive');
+    }
+  });
+});
+
+// The sentence is the only part of the refusal a person sees, so it is asserted without a run anywhere
+// near it — the same reason `dispatchLock` is exported.
+describe('forgiveRefusal', () => {
+  it('says nothing when the card is quiet', () => {
+    expect(forgiveRefusal(0)).toBeUndefined();
+  });
+
+  it('names what is still going, and what to do instead', () => {
+    expect(forgiveRefusal(1)).toMatch(/A run on this card has not finished/);
+    expect(forgiveRefusal(1)).toMatch(/stop it from the report list/);
+    expect(forgiveRefusal(3)).toMatch(/^3 runs on this card have not finished/);
   });
 });
 

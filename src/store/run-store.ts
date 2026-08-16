@@ -1,5 +1,6 @@
 import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { burnsAttempt } from '../core/accounting.js';
 import { startedAt } from '../core/bounds.js';
 import { boardRel, PROJECT_RUNS_DIR, RESULTS_DIR, RUNS_DIR } from '../core/layout.js';
 import {
@@ -11,6 +12,7 @@ import {
   parseRun,
   type RunRecord,
   serializeRun,
+  withForgiveness,
   withoutReport,
   withReport,
   withResolution,
@@ -274,6 +276,48 @@ export async function resolveCardRuns(
   const pending = (await listCardRuns(root, board, card)).filter(needsResolution);
   for (const record of pending) await writeRun(root, withResolution(record, at));
   return pending.length;
+}
+
+// Every attempt this card has spent, cleared, so auto-pilot will dispatch it again. Returns how many
+// records were stamped, so a caller can say "there was nothing to clear" rather than implying it
+// fixed something.
+//
+// WHY THERE IS NOTHING TO RESET. Attempts are DERIVED by counting run records (core/accounting.ts) —
+// there is no counter anywhere — so a card that reached the cap stayed at the cap for ever, and the
+// only way out was to move its result files out of the folder by hand. That destroys the account of
+// why the card was blocked, which is the one thing worth keeping, and no user could be expected to
+// know to do it. Measured 2026-08-15: a dead credential failed three runs of P-011 in 58ms each, the
+// cap was reached, and auto-pilot stopped for good.
+//
+// So this STAMPS. Nothing is deleted and nothing else about a record is rewritten — the history is
+// the point, and a forgiven run still reads as the failure it was.
+//
+// FILTERED ON `burnsAttempt` rather than on a status list, which is what makes it exact in two
+// directions at once. A cancelled or interrupted run costs the card nothing already, so stamping it
+// would be a write recording a decision nobody had to take; and an already-forgiven run does not burn
+// either, so a second click cannot rewrite the timestamp the first one wrote.
+export async function forgiveCardRuns(
+  root: string,
+  board: BoardName,
+  card: string,
+  at: string,
+): Promise<number> {
+  // A STRIKE, NOT MERELY A BURN — and the difference is a success.
+  //
+  // `burnsAttempt` alone was the obvious filter and it is wrong. Measured against the real poisoned
+  // card, P-011 in tic-tac-toe: three failed `checkup-story` runs, which are what the user is clearing,
+  // and one `break-down` from hours earlier that SUCCEEDED and produced E-013. Forgiving on `burnsAttempt`
+  // cleared all four, taking `attemptsUsed(runs, 'P-011', 'break-down')` to zero — so the loop would have
+  // been free to break the card down a second time and hang another set of children off it.
+  //
+  // `BURNS.success` is true for a reason accounting.ts states (a card dragged back into a routed column
+  // really has had a run of that skill), and nothing here should undo it. The user is clearing failures;
+  // a run that worked is history, not a strike against the card.
+  const spent = (await listCardRuns(root, board, card)).filter(
+    (r) => burnsAttempt(r) && r.status !== 'success',
+  );
+  for (const record of spent) await writeRun(root, withForgiveness(record, at));
+  return spent.length;
 }
 
 // Fold a finished agent report into the record. Returns the updated record, or null when the agent

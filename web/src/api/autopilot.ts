@@ -25,6 +25,10 @@ export const STOP_REASONS = [
   // absence of unfinished work is not the presence of finished work.
   'no-op',
   'interrupted',
+  // The machine failed, not the work — a dead box or a dead credential, and no card is to blame. Apart
+  // from `stalled` because that one is a statement about the board, which is the accusation this exists
+  // to stop the product making.
+  'infrastructure',
   'unreadable',
 ] as const;
 export type StopReason = (typeof STOP_REASONS)[number];

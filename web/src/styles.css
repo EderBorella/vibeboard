@@ -1386,6 +1386,24 @@ body {
 .reports-attempts {
   opacity: 0.85;
 }
+/* The way out of a card the machine spent, on the same line as the count it clears. Quiet by
+   default — it is an escape hatch, not the thing you came to the card to do — and it borrows the
+   report row's Stop styling rather than inventing a third small button. */
+.reports-forgive {
+  background: var(--panel-2);
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.68rem;
+  padding: 0.1rem 0.4rem;
+}
+.reports-forgive:hover:not(:disabled) { color: var(--text); border-color: var(--accent); }
+.reports-forgive:disabled { cursor: default; opacity: 0.6; }
+.reports-forgiven { flex-basis: 100%; opacity: 0.85; }
+/* The server's refusal, on its own line so it is not read as part of the ledger it sits under. */
+.reports-forgive-error { flex-basis: 100%; color: var(--danger); }
 
 
 /* The halt overlay. Blocking is the easy half — it has to say WHY and offer the way back, or it is a

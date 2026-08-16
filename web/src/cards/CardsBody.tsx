@@ -31,6 +31,9 @@ interface Props {
   onLinks: (card: Card, links: string[]) => void;
   onMove: (card: Card, columnSlug: string) => void;
   onRun: (request: import('../api').DispatchRequest) => void;
+  // Refetch this card's runs and its ledger line, after a person has cleared its spent attempts. The
+  // pane owns the fetch, so the ask has to travel down to the button that changed the answer.
+  onForgiven: () => void;
 }
 
 // The five things the pane's body can be, and nothing else.
@@ -57,6 +60,7 @@ export function CardsBody({
   onLinks,
   onMove,
   onRun,
+  onForgiven,
 }: Props) {
   const toCard = (): void => setView({ kind: 'card' });
   const { confirm, dialog } = useConfirm();
@@ -127,8 +131,10 @@ export function CardsBody({
           onLinks={editable ? (links) => onLinks(card, links) : undefined}
         />
         <CardReports
+          card={card}
           runs={runs}
           account={account}
+          onForgiven={onForgiven}
           onOpen={(r) => setView({ kind: 'report', run: r.run })}
           onCancel={(r) => {
             void confirm(stopRunRequest(r)).then((ok) => {

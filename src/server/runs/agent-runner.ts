@@ -29,6 +29,7 @@ import type { ResultStats } from '../copilot-events.js';
 import { errorText } from '../errors.js';
 import type { Log } from '../logging.js';
 import { redact } from '../redaction.js';
+import { infrastructureNote, neverReachedModel } from './fault.js';
 import { type BoardColumns, buildRunPrompt, type PromptInputs } from './prompt/index.js';
 
 // Runs skills as agents.
@@ -629,7 +630,24 @@ export class AgentRunner {
       status = 'failed';
       note = `The agent exited with code ${result.exitCode ?? 'unknown'} and wrote no report.`;
     }
-    const final = withoutReport(record, status, note, finishedAt, tail);
+    // WHOSE FAILURE IT WAS, asked here because this is the only place that still holds the process's
+    // ending and the transcript together — a minute later the record is all there is, and the record
+    // could not tell a dead box from an agent that gave up. `record` already carries the usage, which
+    // is what makes the question answerable: #settle attaches it before either ending is decided.
+    //
+    // Asked of every ending rather than only inside the exit-code branch, so the predicate owns the
+    // whole rule. It refuses a cancellation and a timeout itself, which keeps the reasons for those two
+    // refusals in fault.ts beside the evidence for them rather than implied by a branch shape here.
+    const ending = {
+      cancelled,
+      timedOut: result.timedOut,
+      exitCode: result.exitCode,
+      ...(record.usage === undefined ? {} : { usage: record.usage }),
+    };
+    const infrastructure = neverReachedModel(ending);
+    if (infrastructure) note = infrastructureNote(ending, tail);
+    const ended = withoutReport(record, status, note, finishedAt, tail);
+    const final = infrastructure ? { ...ended, fault: 'infrastructure' as const } : ended;
     await writeRun(root, final);
     return final;
   }

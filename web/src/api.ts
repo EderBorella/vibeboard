@@ -121,6 +121,7 @@ export {
   cancelRun,
   type DispatchRequest,
   dispatchRun,
+  forgiveCardAttempts,
   getAccounting,
   listCardRuns,
   listRuns,

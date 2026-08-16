@@ -3,6 +3,7 @@ import {
   attemptsUsed,
   burnsAttempt,
   cardKey,
+  consecutiveInfrastructureFailures,
   governingCap,
   spendByCard,
   splitCardKey,
@@ -117,7 +118,29 @@ describe('which endings burn an attempt', () => {
   };
 
   it.each(RUN_STATUSES)('%s', (status) => {
-    expect(burnsAttempt(status)).toBe(expected[status]);
+    expect(burnsAttempt({ status })).toBe(expected[status]);
+  });
+
+  // THE STATUS TABLE ABOVE IS NOT THE WHOLE ANSWER any more, and these are the two ways it is overruled.
+  // Both are written against `failed`, the status that used to decide this on its own and the one every
+  // real case landed in.
+  it('does not burn when the MACHINE failed rather than the work', () => {
+    expect(burnsAttempt({ status: 'failed', fault: 'infrastructure' })).toBe(false);
+  });
+
+  // A person's decision beats every other rule here, including a status nobody disputes. Asserted on
+  // `success` as well as `failed` so this cannot be mistaken for a second way of spelling the line above.
+  it('does not burn once a person has forgiven it, whatever it was', () => {
+    expect(burnsAttempt({ status: 'failed', forgiven: '2026-08-16T00:00:00.000Z' })).toBe(false);
+    expect(burnsAttempt({ status: 'success', forgiven: '2026-08-16T00:00:00.000Z' })).toBe(false);
+    expect(burnsAttempt({ status: 'attention', forgiven: '2026-08-16T00:00:00.000Z' })).toBe(false);
+  });
+
+  // The fail-safe direction, stated as a test because it is a decision and not an accident: a failure
+  // nothing classified still costs the card an attempt. A classifier that misses a case is then merely
+  // unhelpful, where the opposite would let a genuinely failing card retry for ever.
+  it('still burns an UNCLASSIFIED failure', () => {
+    expect(burnsAttempt({ status: 'failed' })).toBe(true);
   });
 
   it('counts a card’s runs of one skill, ignoring the rest', () => {
@@ -203,5 +226,95 @@ describe('which cap is actually bounding this project', () => {
       expect(answer.why).toContain('will stop');
       expect(answer.why).not.toContain('stops when');
     }
+  });
+});
+
+// THE OTHER HALF OF NOT BURNING AN ATTEMPT. Once an infrastructure failure costs a card nothing, the
+// attempt cap can no longer be what stops a project whose credential has died — it would retry the same
+// card until the iteration cap took the whole run down, having done nothing and explained none of it.
+// This is what catches it instead, and it is a fact about the PROJECT rather than about any card.
+describe('consecutiveInfrastructureFailures', () => {
+  const at = (n: number, over: Partial<RunRecord> = {}): RunRecord =>
+    run({ started: `2026-08-15T23:0${n}:00.000Z`, ...over });
+  const broke = (n: number, over: Partial<RunRecord> = {}): RunRecord =>
+    at(n, { status: 'failed', fault: 'infrastructure', ...over });
+
+  it('is empty when nothing has failed that way', () => {
+    expect(consecutiveInfrastructureFailures([at(1), at(2)])).toEqual([]);
+  });
+
+  // ORDERED BY `started`, not by array position. The runs arrive from a directory listing, and a caller
+  // that happened to hand them over newest-first would otherwise read the streak off the wrong end.
+  it('counts from the END of the history however the runs arrive', () => {
+    const runs = [broke(3), at(1), broke(2)];
+    expect(consecutiveInfrastructureFailures(runs)).toHaveLength(2);
+  });
+
+  // The reset, and the reason the word is "consecutive". A project that broke, was fixed, and has been
+  // working since is not a broken project — holding its history against it would leave the loop refusing
+  // to start long after the fault was gone.
+  it('is reset by any run that reached a model', () => {
+    expect(consecutiveInfrastructureFailures([broke(1), broke(2), at(3)])).toEqual([]);
+  });
+
+  // A queued run says nothing either way YET. Breaking on it would hide a streak that is genuinely
+  // there — which is the case that matters, since a dispatch is exactly what is in flight when the
+  // loop asks this question.
+  it('looks past a run still in flight', () => {
+    const streak = consecutiveInfrastructureFailures([broke(1), broke(2), at(3, { status: 'running' })]);
+    expect(streak).toHaveLength(2);
+  });
+
+  it('returns the records themselves, so the stop can quote what went wrong', () => {
+    const streak = consecutiveInfrastructureFailures([broke(1, { note: 'OAuth session expired' })]);
+    expect(streak[0]?.note).toBe('OAuth session expired');
+  });
+});
+
+// THE DEADLOCK THIS FUNCTION WOULD OTHERWISE CREATE, and the reason `since` exists.
+//
+// The streak is read off the END of the history. So once it has stopped the loop, the user fixes the
+// machine and presses Start — and the history still ends with those same failures, so the first tick
+// stops again, identically, for ever. Auto-pilot cannot break its own streak because it never gets to
+// dispatch. The bug is a strictly worse version of the one the streak was added to fix: before, one
+// card was blocked; after, the whole project is, and no button anywhere clears it.
+describe('a streak that must not brick the project it protects', () => {
+  const broke = (n: number): RunRecord =>
+    run({
+      started: `2026-08-15T23:0${n}:00.000Z`,
+      status: 'failed',
+      fault: 'infrastructure',
+    });
+
+  it('ignores the failures that happened BEFORE auto-pilot was started again', () => {
+    const history = [broke(1), broke(2), broke(3)];
+    // The user rebuilt the boxes and pressed Start at 23:05. Everything above is evidence about a
+    // machine that no longer exists.
+    expect(consecutiveInfrastructureFailures(history, '2026-08-15T23:05:00.000Z')).toEqual([]);
+  });
+
+  // And it must still bite if the fix did not work: taking the user at their word costs one run, not
+  // an unbounded number.
+  it('rebuilds immediately when the machine is still broken after the restart', () => {
+    const since = '2026-08-15T23:05:00.000Z';
+    const after = [
+      run({ started: '2026-08-15T23:06:00.000Z', status: 'failed', fault: 'infrastructure' }),
+      run({ started: '2026-08-15T23:07:00.000Z', status: 'failed', fault: 'infrastructure' }),
+    ];
+    expect(consecutiveInfrastructureFailures(after, since)).toHaveLength(2);
+  });
+
+  // The other way out, for the user who forgives a card's runs without restarting the loop.
+  it('is cleared by a person forgiving the run', () => {
+    const history = [
+      broke(1),
+      run({
+        started: '2026-08-15T23:02:00.000Z',
+        status: 'failed',
+        fault: 'infrastructure',
+        forgiven: '2026-08-15T23:04:00.000Z',
+      }),
+    ];
+    expect(consecutiveInfrastructureFailures(history)).toEqual([]);
   });
 });

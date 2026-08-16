@@ -1,12 +1,19 @@
 import type { CardLedgerData, RunRecord, RunStatus } from '../api';
+import type { Card } from '../shared';
+import { ForgiveAttempts } from './ForgiveAttempts';
 import { costLabel, usageTotal } from './format';
 
 interface Props {
+  // The card these runs belong to. The records name it too, but the ledger offers an action ON the
+  // card, and reading its identity out of the first row would make a control depend on a list.
+  card: Card;
   runs: RunRecord[];
   // What this card has cost and how many attempts each skill has used. Null until it arrives.
   account: CardLedgerData | null;
   onOpen: (run: RunRecord) => void;
   onCancel: (run: RunRecord) => void;
+  // Refetch, after the attempts have been cleared — see ForgiveAttempts.
+  onForgiven: () => void;
 }
 
 // How each status reads to a human. The label is not the status word: "attention" is a state, but
@@ -29,7 +36,7 @@ function when(record: RunRecord): string {
 
 // A card's run history. Deliberately not link-shaped: chips, times and one-line summaries, so it
 // cannot be mistaken for the card links above it — a report is not another card.
-export function CardReports({ runs, account, onOpen, onCancel }: Props) {
+export function CardReports({ card, runs, account, onOpen, onCancel, onForgiven }: Props) {
   if (runs.length === 0) return null;
   return (
     <section className="reports" aria-label="Reports">
@@ -66,7 +73,7 @@ export function CardReports({ runs, account, onOpen, onCancel }: Props) {
           )}
         </div>
       ))}
-      {account && <CardLedger account={account} />}
+      {account && <CardLedger card={card} account={account} onForgiven={onForgiven} />}
     </section>
   );
 }
@@ -77,18 +84,37 @@ export function CardReports({ runs, account, onOpen, onCancel }: Props) {
 //
 // Says "usage" rather than "cost": for a subscription-backed model the figure the backend reports is
 // API-equivalent, not what you were billed.
-function CardLedger({ account }: { account: CardLedgerData }) {
+function CardLedger({
+  card,
+  account,
+  onForgiven,
+}: {
+  card: Card;
+  account: CardLedgerData;
+  onForgiven: () => void;
+}) {
   const { spend, attempts, attemptCap } = account;
   const used = Object.entries(attempts).filter(([, n]) => n > 0);
   if (spend.runs === 0) return null;
+  // A `div` and not the `p` this was, because the clear-attempts control brings the confirmation
+  // dialog's backdrop with it and a `div` inside a `p` is closed by the parser before it is reached —
+  // the dialog would be rendered outside the tree React thinks it put it in.
   return (
-    <p className="reports-ledger">
+    <div className="reports-ledger">
       <span>{usageTotal(spend)}</span>
+      {/* The count and the way to clear it, in the same line. Offered from the first spent attempt
+          rather than only at the cap: a card blocked by the machine is worth clearing before it runs
+          out of tries, and a control that appears only once everything has already stopped is one
+          nobody finds in time. Not offered at all where nothing has burned — there is nothing to
+          clear, and a button that can only report "nothing happened" is noise. */}
       {used.length > 0 && (
-        <span className="reports-attempts">
-          {used.map(([skill, n]) => `${skill} ${n} of ${attemptCap}`).join(' · ')}
-        </span>
+        <>
+          <span className="reports-attempts">
+            {used.map(([skill, n]) => `${skill} ${n} of ${attemptCap}`).join(' · ')}
+          </span>
+          <ForgiveAttempts board={card.board} card={card.id} onForgiven={onForgiven} />
+        </>
       )}
-    </p>
+    </div>
   );
 }

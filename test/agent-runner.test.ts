@@ -274,6 +274,33 @@ describe('AgentRunner.dispatch', () => {
 
     expect(final.status).toBe('failed');
     expect(final.note).toBe('The agent exited with code 2 and wrote no report.');
+    // AND IT IS THE CARD'S FAILURE, which is the default and the safe one. `crash` reaches a model and
+    // spends tokens before it dies, so the work had its chance and the attempt is charged.
+    expect(final.fault).toBeUndefined();
+  });
+
+  // WHOSE FAILURE IT WAS, decided at the one moment the process's ending and the transcript are both in
+  // hand. A minute later the record is all there is, and until this landed the record could not tell a
+  // dead box from an agent that gave up: measured 2026-08-15, a replaced credential failed every run in
+  // 58ms, auto-pilot charged all three of one story's attempts to them, and stopped saying that STORY
+  // should be read and changed. Nothing had opened it.
+  //
+  // Composed through the REAL runner rather than asserted on the predicate alone, and the reason is that
+  // the predicate passed every unit test while the classification was computed and then dropped on the
+  // floor — the field never reached `withoutReport`'s output and no test noticed.
+  it('records an infrastructure fault, and the error, for a run that never reached a model', async () => {
+    const root = await tempDir();
+    const { instance } = runner(root);
+    const { run } = await instance.dispatch(input(root, behaving('deadbox')));
+    const final = await settled(root, run);
+
+    expect(final.status).toBe('failed');
+    expect(final.fault).toBe('infrastructure');
+    // THE ERROR ITSELF, not "exited with code 1": one sends a reader to the card and the other sends
+    // them to the one place that can fix it.
+    expect(final.note).toBe(
+      'The agent never reached a model: Failed to authenticate: OAuth session expired and could not be refreshed (exit code 1).',
+    );
   });
 
   // The invariant that replaced a race: the moment a queued run's record says `running` on disk it

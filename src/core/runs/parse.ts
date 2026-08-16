@@ -7,6 +7,7 @@ import { isVerifyMode, type Verification } from '../verify.js';
 import {
   type AgentReport,
   REVIEW_VERDICTS,
+  RUN_FAULTS,
   RUN_OUTCOMES,
   RUN_STATUSES,
   type RunRecord,
@@ -77,10 +78,19 @@ const isOutcome = oneOf(RUN_OUTCOMES);
 // answer, and the direction that guesses at `done` advances a card on a word nobody defined.
 const isVerdict = oneOf(REVIEW_VERDICTS);
 
+// Whose failure it was. Anything else is dropped, which lands on the fail-safe side: an unclassified
+// failure still burns the card's attempt, so a hand-edited `fault: whatever` cannot hand a card
+// unlimited retries.
+const isFault = oneOf(RUN_FAULTS);
+
 // Fields that are simply absent when unset, rather than present and empty. Gathered in loops
 // rather than a chain of conditional spreads: same behaviour, and a dozen ternaries in one
 // expression is what pushed parseRun past the complexity gate.
-const TEXT_OPTIONALS = ['finished', 'resolved', 'previous', 'prompt', 'summary', 'note'] as const;
+// `forgiven` is one of these, and it has to be: it is written by the store and read back by
+// `burnsAttempt`, so a record that serialised it and parsed it away would be a card cleared on screen
+// and still at its cap on the next read. Nothing caught that — the round-trip fixture named neither
+// this field nor `fault` — so both are now in the round trip in test/runs-parse.test.ts.
+const TEXT_OPTIONALS = ['finished', 'forgiven', 'resolved', 'previous', 'prompt', 'summary', 'note'] as const;
 const LIST_OPTIONALS = ['attached', 'options', 'created'] as const;
 
 // Whole-number fields, each with the smallest value it may legitimately hold. One table rather than a
@@ -105,6 +115,7 @@ function optionalFields(d: Record<string, unknown>): Partial<RunRecord> {
     if (typeof n === 'number' && Number.isInteger(n) && n >= min) out[key] = n;
   }
   if (isOutcome(d.outcome)) out.outcome = d.outcome;
+  if (isFault(d.fault)) out.fault = d.fault;
   if (isVerdict(d.verdict)) out.verdict = d.verdict;
   const usage = asUsage(d.usage);
   if (usage !== undefined) out.usage = usage;

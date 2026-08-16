@@ -25,6 +25,7 @@ export {
 export { RUN_RECORD_KEYS, serializeRun } from './runs/serialize.js';
 export {
   withFilesChanged,
+  withForgiveness,
   withoutReport,
   withReport,
   withResolution,

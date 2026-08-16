@@ -25,6 +25,23 @@ export type RunStatus = (typeof RUN_STATUSES)[number];
 export const RUN_OUTCOMES = ['success', 'attention'] as const;
 export type RunOutcome = (typeof RUN_OUTCOMES)[number];
 
+// WHOSE FAILURE IT WAS — the work's, or the machine's.
+//
+// `status` says HOW a run ended and cannot say this: a dead credential, a container that cannot be
+// exec'd into and an agent that genuinely could not do the job all land in `failed`, and until this
+// field existed all three burned the card's attempts identically.
+//
+// The cost of not distinguishing them, measured 2026-08-15: a box holding a replaced credential
+// failed nine runs in 58ms each, auto-pilot spent all three of P-011's attempts on them, and then
+// stopped saying the CARD had used its attempts and the user should "move P-011 or change what it
+// asks for". The card was never read. The same day, a container pointing at a deleted working
+// directory produced "the README may be too thin to derive from" about a README nothing had opened.
+//
+// ABSENT MEANS THE AGENT'S OWN, which is both the common case and the safe default: a run whose fault
+// nothing classified still burns, so a bug in the classifier cannot hand a card unlimited retries.
+export const RUN_FAULTS = ['infrastructure'] as const;
+export type RunFault = (typeof RUN_FAULTS)[number];
+
 // What a REVIEW run answered about the run it judged. Two values and no third: a report with no `verdict`
 // cannot pass anything, so "no answer" is an absence rather than a member here — which is what makes an
 // inconclusive review countable (see `inconclusiveReviews` in core/bounds.ts).
@@ -65,6 +82,16 @@ export interface RunRecord {
   effort: string;
   mode: string;
   outcome?: RunOutcome;
+  // Whose failure it was. Absent means the agent's own — see `RunFault`.
+  fault?: RunFault;
+  // When a person cleared this attempt, so the card can be tried again. ISO, and a TIMESTAMP rather
+  // than a boolean because "who let this card go again, and when" is the sort of thing you want to
+  // read off the record months later; a `true` answers only half of it.
+  //
+  // The run itself is never rewritten beyond this field and never deleted. Before it existed the only
+  // way to un-block a card was to move its result files out of the folder by hand, which destroys the
+  // history that explains why it was blocked in the first place.
+  forgiven?: string;
   finished?: string;
   // When the user dealt with it. `status` says how the run ended, which is a fact about the agent
   // and never changes; this says the decision has been taken, which is a fact about the user. A

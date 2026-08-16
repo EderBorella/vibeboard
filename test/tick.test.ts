@@ -98,6 +98,88 @@ describe('the caps come first', () => {
   });
 });
 
+// THE MACHINE FAILED, NOT THE WORK. Measured 2026-08-15: a box holding a credential whose inode had been
+// replaced on the host failed every run in 58ms, auto-pilot charged all three of one story's attempts to
+// them, and then stopped saying that STORY had used its attempts and somebody should read it and change what
+// it asks for. Nothing had ever opened the card.
+//
+// Two halves, and the second is why this block exists at all: once an infrastructure failure costs a card
+// nothing, a project whose credential has died would retry the same card for ever, so the loop needs a stop
+// that belongs to the PROJECT and blames nothing on the board.
+const DEAD_NOTE =
+  'The agent never reached a model: Failed to authenticate: OAuth session expired and could not be refreshed (exit code 1).';
+
+// A run the runner classified: `failed`, with the fault and the note `#endWithoutReport` now writes.
+const dead = (cardId: string, board: BoardName, skill: string): RunRecord => ({
+  ...run(cardId, board, skill, 'failed'),
+  fault: 'infrastructure',
+  note: DEAD_NOTE,
+});
+
+describe('two runs in a row that never reached a model stop the loop', () => {
+  const twice = (): RunRecord[] => [
+    dead('P-001', 'product', 'break-down'),
+    dead('P-001', 'product', 'break-down'),
+  ];
+
+  it('stops with its own reason rather than stalled', () => {
+    expect(decideTick(input({ runs: twice() }))).toMatchObject({ kind: 'stop', reason: 'infrastructure' });
+  });
+
+  // THE ERROR, QUOTED. A dead credential and a working directory that no longer exists read identically once
+  // the specifics are dropped, and they need different fixes — the day before the run above, a box pointing
+  // at a deleted working directory produced "the README may be too thin to derive from" about a README
+  // nothing had opened.
+  it('quotes what the runs actually said, and points at the one place that can fix it', () => {
+    const detail = detailOf(decideTick(input({ runs: twice() })));
+    expect(detail).toContain('Failed to authenticate: OAuth session expired and could not be refreshed');
+    expect(detail).toContain('Settings');
+    expect(detail).toContain('Rebuild the agent boxes');
+  });
+
+  // NO CARD IS NAMED, which is the whole point of the reason rather than a nicety of its wording: no card was
+  // read, so any card the sentence named would be one the machine never opened. Both fixtures are asserted
+  // because the board carries a feature and a story and either would be a wrong accusation.
+  it('names no card', () => {
+    const detail = detailOf(decideTick(input({ runs: twice() })));
+    expect(detail).not.toContain('P-001');
+    expect(detail).not.toContain('F-001');
+  });
+
+  // TWO, NOT ONE. A single transient failure is worth one retry, and the loop carries on with exactly the
+  // action it would have taken with no runs at all.
+  it('does not stop for a single failure', () => {
+    const runs = [dead('P-001', 'product', 'break-down')];
+    expect(decideTick(input({ runs }))).toMatchObject({ kind: 'stamp', phase: 'feature-breakdown-skip' });
+  });
+
+  // THE ACTUAL BUG, and the contrast is with 'blocks a story whose break-down has used every attempt' further
+  // down: the same board and the same three failed runs, differing only in whose failure they were. Before
+  // `burnsAttempt` took the record instead of the status, this answered `stamp … to: 'blocked'` — a story
+  // left for a person over three runs that never reached a model.
+  //
+  // THE FIXTURE NEEDS A FOURTH RUN and that is not padding: the stop above is checked before any per-card
+  // reasoning, so three infrastructure failures at the END of the history answer `infrastructure` and this
+  // test could never reach the accounting it is about. The fourth is the shape of a recovered project — the
+  // boxes were rebuilt, the card got a real attempt and genuinely failed — and it breaks the streak because
+  // it reached a model. It burns one of the three, leaving two, so the story is dispatched again.
+  it('still dispatches a story whose every attempt so far was an infrastructure failure', () => {
+    const cards = [
+      card('F-001', 'features', 'in-progress', 10, ['P-001']),
+      card('P-001', 'product', 'todo', 10, ['F-001']),
+    ];
+    const runs: RunRecord[] = [
+      ...Array.from({ length: DEFAULT_AUTOPILOT.attemptCap }, () => dead('P-001', 'product', 'break-down')),
+      // Explicitly later, because `consecutiveInfrastructureFailures` orders by `started` and every run this
+      // fixture makes shares one timestamp — leaving the order to the sort's stability would make this test
+      // pass for a reason nobody wrote down.
+      { ...run('P-001', 'product', 'break-down', 'failed'), started: '2026-08-05T11:00:00Z' },
+    ];
+    const action = decideTick(input({ cards, runs }));
+    expect(action).toMatchObject({ kind: 'dispatch', phase: 'story-breakdown', card: { id: 'P-001' } });
+  });
+});
+
 // The keys the tick INDEXES rather than compares. Every scalar it compares is validated because
 // `AutopilotConfig` describes parsed YAML — and these were not, which produced two different failures
 // from one config: with `terminal` absent, a board of childless cards never reached `isTerminalColumn`

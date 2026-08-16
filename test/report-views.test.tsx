@@ -59,7 +59,14 @@ const run = (over: Partial<RunRecord> = {}): RunRecord => ({
 describe('CardReports', () => {
   it('renders nothing at all for a card that has never been run', () => {
     const { container } = render(
-      <CardReports runs={[]} account={null} onOpen={vi.fn()} onCancel={vi.fn()} />,
+      <CardReports
+        card={card()}
+        onForgiven={vi.fn()}
+        runs={[]}
+        account={null}
+        onOpen={vi.fn()}
+        onCancel={vi.fn()}
+      />,
     );
     expect(container.innerHTML).toBe('');
   });
@@ -68,6 +75,8 @@ describe('CardReports', () => {
     // The store lists a card oldest-first (chronological); the reader wants the latest at the top.
     render(
       <CardReports
+        card={card()}
+        onForgiven={vi.fn()}
         runs={[run({ run: 'a', skill: 'research' }), run({ run: 'b', skill: 'execute' })]}
         account={null}
         onOpen={vi.fn()}
@@ -85,6 +94,8 @@ describe('CardReports', () => {
     // string, not a substring: the point is that both halves are there.
     render(
       <CardReports
+        card={card()}
+        onForgiven={vi.fn()}
         runs={[
           run({ run: 'a', status: 'attention' }),
           run({ run: 'b', status: 'attention', resolved: '2026-07-26T21:30:00.000Z' }),
@@ -106,6 +117,8 @@ describe('CardReports', () => {
     // own timestamps are what a person means by "when" — the id is a stamp too, but it is not this.
     render(
       <CardReports
+        card={card()}
+        onForgiven={vi.fn()}
         runs={[run({ started: '2026-07-26T14:30:12.000Z', finished: '2026-07-26T14:41:55.000Z' })]}
         account={null}
         onOpen={vi.fn()}
@@ -118,6 +131,8 @@ describe('CardReports', () => {
   it('falls back to when it started for a run that has not finished', () => {
     render(
       <CardReports
+        card={card()}
+        onForgiven={vi.fn()}
         runs={[run({ status: 'running', started: '2026-07-26T14:30:12.000Z', finished: undefined })]}
         account={null}
         onOpen={vi.fn()}
@@ -130,6 +145,8 @@ describe('CardReports', () => {
   it('shows each run’s cost, and nothing where it is unknown', () => {
     render(
       <CardReports
+        card={card()}
+        onForgiven={vi.fn()}
         runs={[run({ usage: { costUsd: 0.0421 } }), run({ run: 'r2', usage: undefined })]}
         account={null}
         onOpen={vi.fn()}
@@ -145,6 +162,8 @@ describe('CardReports', () => {
   it('shows a free run as $0 rather than as unknown', () => {
     render(
       <CardReports
+        card={card()}
+        onForgiven={vi.fn()}
         runs={[run({ usage: { costUsd: 0 } })]}
         account={null}
         onOpen={vi.fn()}
@@ -157,6 +176,8 @@ describe('CardReports', () => {
   it('leaves the summary blank rather than printing undefined', () => {
     render(
       <CardReports
+        card={card()}
+        onForgiven={vi.fn()}
         runs={[run({ summary: undefined, note: undefined })]}
         account={null}
         onOpen={vi.fn()}
@@ -169,6 +190,8 @@ describe('CardReports', () => {
   it('prefers the agent’s summary, and falls back to VibeBoard’s note', () => {
     render(
       <CardReports
+        card={card()}
+        onForgiven={vi.fn()}
         runs={[
           run({ run: 'a', summary: 'did the thing', note: 'ignored' }),
           run({ run: 'b', summary: undefined, note: 'The agent finished without writing a report.' }),
@@ -196,6 +219,8 @@ describe('CardReports', () => {
     // can only fail, and withholding it from a queued one leaves no way to clear the queue.
     render(
       <CardReports
+        card={card()}
+        onForgiven={vi.fn()}
         runs={[run({ status: status as RunRecord['status'] })]}
         account={null}
         onOpen={vi.fn()}
@@ -208,6 +233,8 @@ describe('CardReports', () => {
   it('names the run each button belongs to, so a card with several is unambiguous', () => {
     render(
       <CardReports
+        card={card()}
+        onForgiven={vi.fn()}
         runs={[run({ status: 'running', skill: 'research' })]}
         account={null}
         onOpen={vi.fn()}
@@ -221,6 +248,8 @@ describe('CardReports', () => {
   it('says what each status means to a person, not what it is called', () => {
     render(
       <CardReports
+        card={card()}
+        onForgiven={vi.fn()}
         runs={[
           run({ run: 'a', status: 'attention' }),
           run({ run: 'b', status: 'success' }),
@@ -243,6 +272,8 @@ describe('CardReports', () => {
   it('shows the summary, or VibeBoard’s note when the agent left none', () => {
     render(
       <CardReports
+        card={card()}
+        onForgiven={vi.fn()}
         runs={[
           run({ run: 'a', summary: 'did the thing' }),
           run({ run: 'b', summary: undefined, note: 'The agent finished without writing a report.' }),
@@ -260,7 +291,14 @@ describe('CardReports', () => {
     const onOpen = vi.fn();
     const first = run({ run: 'a' });
     render(
-      <CardReports runs={[first, run({ run: 'b' })]} account={null} onOpen={onOpen} onCancel={vi.fn()} />,
+      <CardReports
+        card={card()}
+        onForgiven={vi.fn()}
+        runs={[first, run({ run: 'b' })]}
+        account={null}
+        onOpen={onOpen}
+        onCancel={vi.fn()}
+      />,
     );
     fireEvent.click(document.querySelectorAll<HTMLElement>('.report-open')[1]);
     expect(onOpen.mock.calls).toEqual([[first]]);
@@ -269,6 +307,8 @@ describe('CardReports', () => {
   it('offers Stop only while a run is in flight', () => {
     render(
       <CardReports
+        card={card()}
+        onForgiven={vi.fn()}
         runs={[run({ run: 'a', status: 'running' }), run({ run: 'b', status: 'success' })]}
         account={null}
         onOpen={vi.fn()}
@@ -281,7 +321,16 @@ describe('CardReports', () => {
   it('stops the run it was asked to stop', () => {
     const onCancel = vi.fn();
     const live = run({ run: 'a', status: 'running' });
-    render(<CardReports runs={[live]} account={null} onOpen={vi.fn()} onCancel={onCancel} />);
+    render(
+      <CardReports
+        card={card()}
+        onForgiven={vi.fn()}
+        runs={[live]}
+        account={null}
+        onOpen={vi.fn()}
+        onCancel={onCancel}
+      />,
+    );
     fireEvent.click(screen.getByText('Stop'));
     expect(onCancel.mock.calls).toEqual([[live]]);
   });
@@ -613,7 +662,16 @@ describe('a card’s ledger line', () => {
   });
 
   it('shows what the card cost and how close a skill is to its cap', () => {
-    render(<CardReports runs={[run()]} account={account()} onOpen={vi.fn()} onCancel={vi.fn()} />);
+    render(
+      <CardReports
+        card={card()}
+        onForgiven={vi.fn()}
+        runs={[run()]}
+        account={account()}
+        onOpen={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
     const line = document.querySelector('.reports-ledger')?.textContent ?? '';
     expect(line).toContain('$0.420 usage');
     expect(line).toContain('implement 2 of 3');
@@ -624,6 +682,8 @@ describe('a card’s ledger line', () => {
   it('leaves out a skill that has burned nothing', () => {
     render(
       <CardReports
+        card={card()}
+        onForgiven={vi.fn()}
         runs={[run()]}
         account={account({ attempts: { implement: 2, review: 0 } })}
         onOpen={vi.fn()}
@@ -638,6 +698,8 @@ describe('a card’s ledger line', () => {
   it('says the backend reported nothing rather than showing zero', () => {
     render(
       <CardReports
+        card={card()}
+        onForgiven={vi.fn()}
         runs={[run()]}
         account={account({ spend: { runs: 1, withCost: 0, withoutCost: 1 } })}
         onOpen={vi.fn()}
@@ -648,7 +710,16 @@ describe('a card’s ledger line', () => {
   });
 
   it('renders no line at all before the ledger has arrived', () => {
-    render(<CardReports runs={[run()]} account={null} onOpen={vi.fn()} onCancel={vi.fn()} />);
+    render(
+      <CardReports
+        card={card()}
+        onForgiven={vi.fn()}
+        runs={[run()]}
+        account={null}
+        onOpen={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
     expect(document.querySelector('.reports-ledger')).toBeNull();
   });
 });

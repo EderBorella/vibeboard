@@ -70,3 +70,15 @@ export function withVerification(record: RunRecord, verification: Verification):
 export function withResolution(record: RunRecord, at: string): RunRecord {
   return { ...record, resolved: at };
 }
+
+// A person clearing this attempt, so the card can be tried again. Nothing about how the run ended
+// changes — `status`, the report and the timings are all facts about the agent — and `burnsAttempt`
+// stops counting it (core/accounting.ts), which is the whole of the effect.
+//
+// Its own function for the same reason `withResolution` is one: there is ONE statement of what
+// "somebody forgave this" writes. Whether a record SHOULD be stamped is the caller's question and is
+// answered by `burnsAttempt`, because a record that no longer burns must not be re-stamped — that
+// would rewrite the timestamp of a decision taken earlier, and the timestamp is the point.
+export function withForgiveness(record: RunRecord, at: string): RunRecord {
+  return { ...record, forgiven: at };
+}

@@ -96,9 +96,8 @@ export function latestOwnRun(runs: RunRecord[], card: string): RunRecord | undef
 // `blocked` means judged unfixable, and a dead API key or a full disk is an infrastructure failure rather
 // than work nobody can fix — so this bound stops the loop naming THE REVIEW.
 export function inconclusiveReviews(runs: RunRecord[], card: string): number {
-  return runs.filter(
-    (r) => r.card === card && isReviewRun(r) && burnsAttempt(r.status) && r.verdict === undefined,
-  ).length;
+  return runs.filter((r) => r.card === card && isReviewRun(r) && burnsAttempt(r) && r.verdict === undefined)
+    .length;
 }
 
 // EVERY REVIEW THIS TASK HAS COST, which is the bound the spec's arithmetic row already states: per task at
@@ -119,7 +118,7 @@ export function inconclusiveReviews(runs: RunRecord[], card: string): number {
 //
 // Filtered on `burnsAttempt`, like `attemptsUsed`: a review you cancelled is not a review the task spent.
 export function reviewsRun(runs: RunRecord[], card: string): number {
-  return runs.filter((r) => r.card === card && isReviewRun(r) && burnsAttempt(r.status)).length;
+  return runs.filter((r) => r.card === card && isReviewRun(r) && burnsAttempt(r)).length;
 }
 
 // Has this checkup point already had its one creating round (decision 47)?

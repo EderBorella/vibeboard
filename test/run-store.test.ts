@@ -1,12 +1,14 @@
 import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { attemptsUsed } from '../src/core/accounting.js';
 import { boardRel, CONFIG_DIR, CONFIG_FILE, DOCS_DIR, RESULTS_DIR, RUNS_DIR } from '../src/core/layout.js';
 import { type RunRecord, runId } from '../src/core/runs.js';
 import { isIgnored } from '../src/server/boards/session.js';
 import {
   appendTranscript,
   foldReport,
+  forgiveCardRuns,
   listCardRuns,
   listRuns,
   markInterrupted,
@@ -322,6 +324,125 @@ describe('resolveCardRuns', () => {
 
   it('says nothing was waiting for a card with no runs', async () => {
     expect(await resolveCardRuns(await tempDir(), 'engineering', 'E-010', 'T')).toBe(0);
+  });
+});
+
+// The way out of a card the machine spent. Attempts are DERIVED by counting run records, so there is
+// no counter to reset — a card that reached the cap stayed there for ever, and the only remedy was to
+// move its result files out of the folder by hand, which destroys the history explaining why it was
+// blocked. This stamps instead.
+describe('forgiveCardRuns', () => {
+  it('clears the endings the card is answerable for, and counts them', async () => {
+    const root = await tempDir();
+    await writeRun(root, record({ run: 'r-failed', status: 'failed' }));
+    await writeRun(root, record({ run: 'r-attention', status: 'attention' }));
+    await writeRun(root, record({ run: 'r-success', status: 'success' }));
+
+    expect(await forgiveCardRuns(root, 'engineering', 'E-010', 'T')).toBe(2);
+    const byId = new Map((await listCardRuns(root, 'engineering', 'E-010')).map((r) => [r.run, r]));
+    expect(byId.get('r-failed')?.forgiven).toBe('T');
+    // `attention` is the agent finishing and saying it could not do the work — a strike, and exactly
+    // what a person clearing a stuck card means to clear.
+    expect(byId.get('r-attention')?.forgiven).toBe('T');
+    // A SUCCESS IS NOT A STRIKE, and this assertion was the other way round until it was measured
+    // against the real card. Attempts are counted PER SKILL, so leaving a success alone does not keep
+    // the failing skill's tally above zero — it only keeps the successful skill's, which is correct.
+    // Clearing it re-opens work that already worked: on P-011 that was a `break-down` which had
+    // produced E-013, and forgiving it would have let the loop break the card down again and hang a
+    // second set of children off it.
+    expect(byId.get('r-success')?.forgiven).toBeUndefined();
+  });
+
+  // THE ASSERTION THAT MATTERS, and it is made through `attemptsUsed` rather than by reading fields:
+  // what the user needs is a card auto-pilot will dispatch again, and the only statement of that is
+  // the number the gate compares against the cap. A test on `forgiven` alone would pass with the
+  // counting side wired to nothing.
+  it('takes a card at the attempt cap back to zero attempts used', async () => {
+    const root = await tempDir();
+    for (const n of [1, 2, 3]) await writeRun(root, record({ run: `r-${n}`, status: 'failed' }));
+    expect(attemptsUsed(await listCardRuns(root, 'engineering', 'E-010'), 'E-010', 'execute')).toBe(3);
+
+    await forgiveCardRuns(root, 'engineering', 'E-010', 'T');
+    expect(attemptsUsed(await listCardRuns(root, 'engineering', 'E-010'), 'E-010', 'execute')).toBe(0);
+  });
+
+  // MEASURED ON THE REAL POISONED CARD, P-011 in tic-tac-toe: three failed `checkup-story` runs — the
+  // strikes the user is clearing — and one `break-down` from hours earlier that SUCCEEDED and produced
+  // E-013. Forgiving everything `burnsAttempt` accepts cleared all four and took the break-down tally to
+  // zero, which frees the loop to break the card down a second time and hang another set of children off
+  // it. A run that worked is history, not a strike.
+  it('does not forgive a run that SUCCEEDED, only the failures', async () => {
+    const root = await tempDir();
+    await writeRun(root, record({ run: 'r-worked', skill: 'break-down', status: 'success' }));
+    await writeRun(root, record({ run: 'r-failed', skill: 'execute', status: 'failed' }));
+
+    expect(await forgiveCardRuns(root, 'engineering', 'E-010', 'T')).toBe(1);
+    const runs = await listCardRuns(root, 'engineering', 'E-010');
+    expect(runs.find((r) => r.run === 'r-worked')?.forgiven).toBeUndefined();
+    expect(runs.find((r) => r.run === 'r-failed')?.forgiven).toBe('T');
+    // The point of the distinction, stated as the thing that would actually go wrong.
+    expect(attemptsUsed(runs, 'E-010', 'break-down')).toBe(1);
+    expect(attemptsUsed(runs, 'E-010', 'execute')).toBe(0);
+  });
+
+  it('leaves alone the runs that never cost the card anything', async () => {
+    // Neither ending is the card's doing, so neither burns — and stamping one would record a decision
+    // nobody had to take, on a run that was never in the way.
+    const root = await tempDir();
+    await writeRun(root, record({ run: 'r-cancelled', status: 'cancelled' }));
+    await writeRun(root, record({ run: 'r-interrupted', status: 'interrupted' }));
+    // Nor has an in-flight run ended, so there is nothing to forgive about it yet.
+    await writeRun(root, record({ run: 'r-running', status: 'running' }));
+    await writeRun(root, record({ run: 'r-queued', status: 'queued' }));
+    // And an infrastructure failure already costs the card nothing (core/accounting.ts).
+    await writeRun(root, record({ run: 'r-infra', status: 'failed', fault: 'infrastructure' }));
+
+    expect(await forgiveCardRuns(root, 'engineering', 'E-010', 'T')).toBe(0);
+    const runs = await listCardRuns(root, 'engineering', 'E-010');
+    expect(runs.filter((r) => r.forgiven !== undefined)).toEqual([]);
+  });
+
+  it('is a no-op the second time, rather than restamping', async () => {
+    // The stamp says WHO let the card go and WHEN, so a second click must not rewrite the timestamp of
+    // a decision somebody took last week.
+    const root = await tempDir();
+    await writeRun(root, record({ status: 'failed' }));
+    expect(await forgiveCardRuns(root, 'engineering', 'E-010', 'FIRST')).toBe(1);
+    expect(await forgiveCardRuns(root, 'engineering', 'E-010', 'SECOND')).toBe(0);
+    expect((await readRun(root, 'engineering', 'E-010', record().run))?.forgiven).toBe('FIRST');
+  });
+
+  it('keeps the whole record — the history is the point', async () => {
+    // The alternative this replaces was deleting the files, so what must be shown is that nothing else
+    // moved: the status it ended with, the agent's own report, and everything VibeBoard recorded.
+    const root = await tempDir();
+    const failed = record({
+      status: 'failed',
+      outcome: 'attention',
+      finished: 'T0',
+      note: 'the credential was refused',
+      summary: 'could not reach the model',
+      prompt: 'do it',
+      usage: { costUsd: 0.02, turns: 1 },
+      report: '## What happened\n\nAuthentication failed.',
+    });
+    await writeRun(root, failed);
+    await forgiveCardRuns(root, 'engineering', 'E-010', 'T');
+    expect(await readRun(root, 'engineering', 'E-010', failed.run)).toEqual({ ...failed, forgiven: 'T' });
+  });
+
+  it('touches only the card it was asked about', async () => {
+    const root = await tempDir();
+    await writeRun(root, record({ status: 'failed' }));
+    await writeRun(root, record({ card: 'E-011', status: 'failed' }));
+    expect(await forgiveCardRuns(root, 'engineering', 'E-011', 'T')).toBe(1);
+    expect((await readRun(root, 'engineering', 'E-010', record().run))?.forgiven).toBeUndefined();
+  });
+
+  it('says nothing was spent for a card with no runs', async () => {
+    // The count is what lets the UI say "there was nothing to clear" instead of implying it fixed
+    // something — on a card whose problem is somewhere else entirely, that is the whole answer.
+    expect(await forgiveCardRuns(await tempDir(), 'engineering', 'E-010', 'T')).toBe(0);
   });
 });
 

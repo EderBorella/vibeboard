@@ -41,6 +41,12 @@ export interface RunRecord {
   effort: string;
   mode: string;
   outcome?: 'success' | 'attention';
+  // Whose failure it was — the work's, or the machine's. Absent means the agent's own, which is the
+  // common case. Mirrored rather than left server-side because it changes what the UI should SAY: a
+  // run that never reached a model is not a card the user should go and read.
+  fault?: 'infrastructure';
+  // When a person cleared this attempt so the card could be tried again.
+  forgiven?: string;
   finished?: string;
   // When the user dealt with it. `status` is how the run ended; this is the decision taken about it.
   resolved?: string;
@@ -83,6 +89,8 @@ export const RUN_RECORD_KEYS = [
   'board',
   'skill',
   'status',
+  'fault',
+  'forgiven',
   'started',
   'backend',
   'model',
@@ -208,6 +216,15 @@ export function resolveRun(board: BoardName, card: string, run: string): Promise
     `/api/runs/${board}/${encodeURIComponent(card)}/${encodeURIComponent(run)}/resolve`,
     {},
   );
+}
+
+// Clear a card's spent attempts, so auto-pilot will dispatch it again. Answers HOW MANY records were
+// stamped, and the caller has to say so: zero means this card had nothing counting against it, and a
+// control that reported success there would send someone away from the real problem.
+//
+// Nothing is deleted — every run stays in the list, stamped with the time it was cleared.
+export function forgiveCardAttempts(board: BoardName, card: string): Promise<{ forgiven: number }> {
+  return post<{ forgiven: number }>(`/api/runs/${board}/${encodeURIComponent(card)}/forgive`, {});
 }
 
 // The same decision for either kind of run. A project run has no card in its path, so it has its own

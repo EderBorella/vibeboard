@@ -104,8 +104,21 @@ const BURNS: Record<RunStatus, boolean> = {
   interrupted: false, // stale after a restart
 };
 
-export function burnsAttempt(status: RunStatus): boolean {
-  return BURNS[status];
+// THE RECORD, NOT THE STATUS, and the widening is the point: `failed` is not one fact but three, and
+// only one of them is the card's doing. Every caller was made to reconsider rather than given a
+// defaulted parameter, because a call site that silently kept the old meaning is exactly how a card
+// goes on being blamed for a dead credential.
+//
+// Order matters below. A forgiven run is not counted whatever else is true of it — that is a person
+// overruling the machine, and it must not be second-guessed by a status test.
+export function burnsAttempt(run: Pick<RunRecord, 'status' | 'fault' | 'forgiven'>): boolean {
+  if (run.forgiven) return false;
+  // The machine's failure, not the work's. Note the asymmetry with the table below: an UNCLASSIFIED
+  // failure still burns, so the fail-safe direction here is "count it" — a classifier that misses a
+  // case costs a card an attempt it did not deserve, where the reverse would let a genuinely failing
+  // card retry for ever and never reach a person.
+  if (run.fault === 'infrastructure') return false;
+  return BURNS[run.status];
 }
 
 // Attempts are DERIVED, never stored: no new frontmatter field, and a card's state stays in its path.
@@ -114,8 +127,59 @@ export function burnsAttempt(status: RunStatus): boolean {
 // Card id alone identifies the card (ids are board-prefixed). A hand-written duplicate id would merge
 // two cards' tallies and reach the cap sooner, which is the harmless direction to be wrong in.
 export function attemptsUsed(runs: RunRecord[], card: string, skill: string): number {
-  return runs.filter((r) => r.card === card && r.skill === skill && burnsAttempt(r.status)).length;
+  return runs.filter((r) => r.card === card && r.skill === skill && burnsAttempt(r)).length;
 }
+
+// Consecutive infrastructure failures at the END of the run history — the signal that the MACHINE is
+// broken rather than any one card.
+//
+// THIS IS THE OTHER HALF OF NOT BURNING AN ATTEMPT, and without it the fix is worse than the bug. If
+// an infrastructure failure costs a card nothing, a project whose credential has died retries the
+// same card for ever: every tick dispatches, fails in 58ms, counts nothing, and the loop runs until
+// the iteration cap takes it down having done nothing at all and explained none of it.
+//
+// So the attempt cap stops being what catches this, and this is. It is a property of the PROJECT, not
+// of a card — which is exactly the distinction the user is owed: something is wrong with the machine,
+// here is the error it gave, and no card is to blame.
+//
+// TWO, not one: a single transient failure is worth one retry, and both real cases seen so far
+// repeated instantly rather than once. Counted from the end and reset by any run that reached a
+// model, so a project that recovers is not held against its history.
+//
+// `since` IS WHAT STOPS THIS DEADLOCKING, and without it this function bricks a project in a new way.
+// The streak is read off the END of the history and is broken only by a run that reached a model — so
+// after the loop stops, the user fixes the machine and presses Start, the history STILL ends with those
+// failures and the very first tick stops again, with the same sentence, for ever. Nothing auto-pilot
+// can do breaks its own streak, because it never gets to dispatch anything. Found by the agent that
+// built the stop, in its own fixture: its test needed a fourth streak-breaking run to reach the
+// behaviour it was about, which is the same fact wearing a disguise.
+//
+// The caller passes the moment auto-pilot last STARTED (`state.at`, written by the server on the
+// transition and not per tick). Pressing Start is the user saying they have dealt with it; this takes
+// them at their word for exactly one run, and if the machine is still broken the streak rebuilds
+// immediately and stops it again — which costs two 58ms failures rather than a bricked project.
+export function consecutiveInfrastructureFailures(runs: RunRecord[], since?: string): RunRecord[] {
+  const ordered = [...runs]
+    .filter((r) => since === undefined || r.started >= since)
+    .sort((a, b) => a.started.localeCompare(b.started));
+  const streak: RunRecord[] = [];
+  for (let i = ordered.length - 1; i >= 0; i--) {
+    const run = ordered[i];
+    if (run === undefined) break;
+    // In flight, so it says nothing either way yet — skip rather than break, or a queued run would
+    // hide a streak that is genuinely there.
+    if (run.status === 'queued' || run.status === 'running') continue;
+    // A person has already looked at this one and cleared it, so it is no longer evidence of anything.
+    // Belt as well as braces: `since` above is what normally clears a streak, and this covers the user
+    // who forgives the runs without restarting.
+    if (run.forgiven) break;
+    if (run.fault !== 'infrastructure') break;
+    streak.push(run);
+  }
+  return streak;
+}
+
+export const INFRASTRUCTURE_STREAK = 2;
 
 export type CapName = 'budget' | 'iterations';
 

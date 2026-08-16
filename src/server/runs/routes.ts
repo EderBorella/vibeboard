@@ -10,13 +10,14 @@ import { HALTED_DISPATCH } from '../../core/dispatch-gate.js';
 import { findCard } from '../../core/find.js';
 import { foundationRel } from '../../core/layout.js';
 import { phase } from '../../core/phases.js';
-import { asVerification, isRunId, type RunRecord, withVerification } from '../../core/runs.js';
+import { asVerification, isInFlight, isRunId, type RunRecord, withVerification } from '../../core/runs.js';
 import { BOARDS, isBoard, type ProjectConfig } from '../../core/types.js';
 import { boardColumnSlugs, readBoard } from '../../store/cards/board.js';
 import { readResources } from '../../store/project/control-files.js';
 import { foundationStatus, readGates } from '../../store/project/foundation.js';
 import { readSkills } from '../../store/project/skill-catalogue.js';
 import {
+  forgiveCardRuns,
   listCardRuns,
   listRuns,
   readRun,
@@ -372,6 +373,22 @@ async function dispatchRefusal(
   return undefined;
 }
 
+// Why a card's spent attempts cannot be cleared right now, or nothing.
+//
+// A run still in flight settles into this card's history moments from now, and if it settles as an
+// attempt the count the user has just watched go to zero climbs straight back — which reads as a
+// button that did nothing, on the one control they reached for because nothing else was working. So
+// it is refused with the reason rather than answered with a number that will not last.
+//
+// Named and exported for the same reason `dispatchLock` is: the sentence is the only part of this a
+// person ever sees, and it can then be asserted without a run anywhere near the test.
+export function forgiveRefusal(inFlight: number): string | undefined {
+  if (inFlight === 0) return undefined;
+  return inFlight === 1
+    ? 'A run on this card has not finished, and it will land as an attempt of its own — so clearing them now would put the count straight back. Wait for it to end, or stop it from the report list first.'
+    : `${inFlight} runs on this card have not finished, and each will land as an attempt of its own — so clearing them now would put the count straight back. Wait for them to end, or stop them from the report list first.`;
+}
+
 export async function registerRunRoutes(api: FastifyInstance, ctx: AppCtx): Promise<void> {
   // Every run in the project, newest first — the Execution dashboard's list.
   api.get('/runs', async (_req, reply) => {
@@ -467,6 +484,34 @@ export async function registerRunRoutes(api: FastifyInstance, ctx: AppCtx): Prom
     const record = await resolveProjectRun(ctx.session.root, run, nowIso());
     if (!record) return reply.code(404).send({ error: 'No such run' });
     return { run: record };
+  });
+
+  // "This card is not the one that failed." Clears the attempts a card has spent, so auto-pilot will
+  // dispatch it again — the way out of a card the machine itself blocked, which until now had none.
+  //
+  // ADMIN-ONLY BY ABSENCE from the scope table in auth/auth.ts, and here that default is the whole
+  // bound rather than an omission. The attempt cap is what stops a card being retried for ever, so an
+  // agent able to forgive its own card's attempts would be an agent granting itself unlimited retries
+  // — decision 3's subject reached through the counting side instead of through the verdict.
+  //
+  // Board and card in the path like the two routes above: attempts are counted per card, and finding
+  // a card's records without its board would mean walking every results folder.
+  api.post('/runs/:board/:card/forgive', async (req, reply) => {
+    if (!ensureOpen(ctx.session, reply)) return;
+    const { board, card } = req.params as { board: string; card: string };
+    if (!isBoard(board)) return reply.code(400).send({ error: 'Unknown board' });
+    const runs = await listCardRuns(ctx.session.root, board, card);
+    // FROM THE RECORDS, not from `ctx.runner`: the reason to refuse is that a record is about to be
+    // written with an ending, and the records are where that is true. A queued run counts as much as a
+    // running one — it is a dispatch already decided, and it will land the same way a moment later.
+    const refusal = forgiveRefusal(runs.filter((r) => isInFlight(r.status)).length);
+    if (refusal) return reply.code(409).send({ error: refusal });
+    const forgiven = await forgiveCardRuns(ctx.session.root, board, card, nowIso());
+    // A person overruling the machine, so the log says who did what. This is the one write that makes
+    // a card the caps had stopped dispatchable again, and months later "why did this card get four
+    // tries" is a question only this line answers.
+    req.log.info({ board, card, forgiven, by: req.credential?.scope }, "a person cleared a card's attempts");
+    return { forgiven };
   });
 
   api.post('/runs/:run/cancel', async (req, reply) => {

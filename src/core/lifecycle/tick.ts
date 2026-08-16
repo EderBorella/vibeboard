@@ -1,6 +1,12 @@
 import type { CardProblem } from '../../store/cards/board.js';
 import type { DeclaredCommands } from '../../store/project/foundation.js';
-import { attemptsUsed, burnsAttempt, type Spend } from '../accounting.js';
+import {
+  attemptsUsed,
+  burnsAttempt,
+  consecutiveInfrastructureFailures,
+  INFRASTRUCTURE_STREAK,
+  type Spend,
+} from '../accounting.js';
 import type { TickAction } from '../actions.js';
 import {
   AUTOPILOT_CONCURRENCY,
@@ -50,6 +56,9 @@ import {
 //   state       first, so a project somebody killed reports that rather than whatever else is also true;
 //   shape       next, because every branch below indexes the config;
 //   caps        next, so an over-budget project cannot spend one more dispatch deciding it is over budget;
+//   machine     next, and BEFORE anything reads the board: every branch below this line is a claim about
+//               a card, and while the machine is failing every one of them is an accusation aimed at the
+//               wrong thing;
 //   problems    next: a card that will not parse makes the POSITION unknowable, so nothing after this
 //               could be trusted (finding C);
 //   in flight   next, because concurrency is 1 and a tick with nothing it may start need not work out
@@ -112,11 +121,40 @@ function notRunning(state: AutopilotState): TickAction {
 function bootstrap(ap: AutopilotConfig, runs: RunRecord[]): TickAction | undefined {
   const skill = phase('bootstrap').skill;
   if (skill === undefined) return undefined;
-  const tried = runs.filter((r) => isProjectRun(r) && r.skill === skill && burnsAttempt(r.status)).length;
+  const tried = runs.filter((r) => isProjectRun(r) && r.skill === skill && burnsAttempt(r)).length;
   if (tried < ap.attemptCap) return { kind: 'dispatch', phase: 'bootstrap', skill };
   return stop(
     'stalled',
     `The board is empty and ${skill} has used all ${ap.attemptCap} attempts at deriving it from the README. Read its runs: the README may be too thin to derive features from, in which case say more in it, or add the first card by hand.`,
+  );
+}
+
+// THE OTHER HALF OF NOT BURNING AN ATTEMPT, and without it the fix is worse than the bug it fixes. Once an
+// infrastructure failure costs a card nothing, a project whose credential has died retries the same card for
+// ever: every tick dispatches, the run fails in 58ms, the tally does not move, and the loop runs to its
+// iteration cap having done nothing and explained none of it. The attempt cap used to be what caught this —
+// wrongly, by blaming a card — so something else has to, and this is it.
+//
+// A PROPERTY OF THE PROJECT, not of any card, which is exactly the distinction the user is owed and the
+// reason no card id appears in the sentence. The run that produced this reported that one story had used all
+// three of its attempts and somebody should read it and change what it asks for; nothing had ever opened it.
+//
+// The error is QUOTED from the record rather than restated, so the sentence carries whatever the harness
+// actually said — a dead credential and a working directory that no longer exists read identically once the
+// specifics are dropped, and they need different fixes.
+// `since` is when auto-pilot last STARTED, and it is what keeps this from bricking the project it
+// protects — see `consecutiveInfrastructureFailures`. Pressing Start is the user saying they have fixed
+// the machine, and the streak has to be allowed to believe them or nothing can ever get past this guard.
+function machineBroken(runs: RunRecord[], since?: string): TickAction | undefined {
+  const streak = consecutiveInfrastructureFailures(runs, since);
+  if (streak.length < INFRASTRUCTURE_STREAK) return undefined;
+  // The most recent, because `consecutiveInfrastructureFailures` counts back from the end of the history.
+  // A note is what the runner writes when there is no report to speak for the run, so a record without one
+  // is a record classified somewhere that had nothing to say — rare, and no reason to lose the stop.
+  const said = streak[0]?.note ?? 'the run left nothing behind that says why';
+  return stop(
+    'infrastructure',
+    `${streak.length} runs in a row failed before reaching a model: ${said} Nothing on the board caused this, and none of them was charged to a card. Check Settings — the state light reports a stale credential, and "Rebuild the agent boxes" there replaces the boxes these runs are dying in.`,
   );
 }
 
@@ -474,6 +512,13 @@ export function decideTick(input: TickInput): TickAction {
   if (!gate.ok) return stop(gate.reason, gate.message);
   const capProblem = invalidAttemptCap(ap);
   if (capProblem) return stop('stalled', capProblem);
+
+  // BEFORE THE BOARD IS READ AT ALL, which is the whole of what makes this a fix rather than a rewording:
+  // every stop below names a card, and the failure being caught here is one in which no card was ever
+  // opened. It sits after the caps because a project that is over budget is over budget whatever else is
+  // also true, and the bill is a fact about the project too.
+  const machine = machineBroken(runs, state.at);
+  if (machine) return machine;
 
   if (problems.length > 0) return stop('stalled', unreadableSentence(problems));
 

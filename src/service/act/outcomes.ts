@@ -64,12 +64,20 @@ export async function afterCardRun(
   before: number | undefined,
 ): Promise<ActResult> {
   const p = phase(action.phase);
-  // An ending nobody is answerable for: the user cancelled it, or a restart left it stale. No attempt is
-  // burned (accounting.ts), and the card does not move — the work never happened.
-  if (!burnsAttempt(settled.status)) {
+  // An ending nobody is answerable for: the user cancelled it, a restart left it stale, the MACHINE
+  // failed rather than the work, or a person has forgiven it. No attempt is burned (accounting.ts),
+  // and the card does not move — as far as the card is concerned the work never happened.
+  if (!burnsAttempt(settled)) {
+    // Named separately, because these two sentences send the reader to different places. "ended as
+    // failed" invites them to read the card; an infrastructure fault is about the machine and the
+    // card is not worth opening.
+    const why =
+      settled.fault === 'infrastructure'
+        ? `could not run — ${settled.note ?? 'the machine failed, not the work'}`
+        : `ended as ${settled.status}`;
     await deps.client.log(
       'run',
-      `${card.id}: ${action.skill} ended as ${settled.status}, so no attempt was used and the card has not moved.`,
+      `${card.id}: ${action.skill} ${why}, so no attempt was used and the card has not moved.`,
     );
     return { dispatches: 1 };
   }

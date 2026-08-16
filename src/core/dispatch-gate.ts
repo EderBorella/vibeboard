@@ -30,6 +30,12 @@ export const STOP_REASONS = [
   // success for the same reason.
   'no-op',
   'interrupted', // the server died under it; a checkup is owed before it resumes
+  // THE MACHINE FAILED, NOT THE WORK, and no card is to blame. Its own reason rather than a `stalled`
+  // with a different sentence, because `stalled` means "work remains and nothing it can do would move
+  // it" — a statement about the BOARD, which is precisely the accusation this exists to stop making.
+  // Measured 2026-08-15: every run died in 58ms against a replaced credential, and the loop reported
+  // that one card had used all its attempts and somebody should change what it asks for.
+  'infrastructure',
   // Not a stop the loop chose: the state file itself could not be read, so the project is halted
   // until a person says otherwise (S13). Named here so a halt always has a reason with a sentence
   // behind it, rather than an overlay that can only say something went wrong.
@@ -77,6 +83,11 @@ const SENTENCES: Record<StopReason, string> = {
   // Nothing owes, tracks or enforces a checkup, and a sentence promising one is a dead end.
   interrupted:
     'Auto-pilot stopped before it could finish. Its position is re-derived from the board when it resumes.',
+  // NO CARD IS NAMED HERE OR IN THE DETAIL BESIDE IT, and that is the whole point of the reason: the
+  // failure this covers is one in which nothing on the board was ever read, so any card the sentence
+  // named would be a card the machine had never opened.
+  infrastructure:
+    'Auto-pilot stopped because the machine failed, not the work. No card is to blame for this.',
   unreadable:
     'This project is halted because VibeBoard could not read its auto-pilot state. Restart it to start again from idle.',
 };

@@ -27,6 +27,10 @@ import { tempDir } from './helpers.js';
 const savedIsolate = process.env.VIBEBOARD_COPILOT_ISOLATE;
 const savedHome = process.env.VIBEBOARD_COPILOT_HOME;
 const savedUserHome = process.env.HOME;
+// Controlled, not merely inherited. The mirror resolves `XDG_CACHE_HOME` before falling back to
+// `$HOME/.cache`, so on a machine that sets it these tests would write a credential into the
+// developer's REAL cache while every assertion still passed.
+const savedCacheHome = process.env.XDG_CACHE_HOME;
 
 afterEach(() => {
   if (savedIsolate === undefined) delete process.env.VIBEBOARD_COPILOT_ISOLATE;
@@ -35,6 +39,8 @@ afterEach(() => {
   else process.env.VIBEBOARD_COPILOT_HOME = savedHome;
   if (savedUserHome === undefined) delete process.env.HOME;
   else process.env.HOME = savedUserHome;
+  if (savedCacheHome === undefined) delete process.env.XDG_CACHE_HOME;
+  else process.env.XDG_CACHE_HOME = savedCacheHome;
 });
 
 describe('isolationEnabled', () => {
@@ -74,6 +80,7 @@ interface Staged {
   source: string;
   mirror: string;
   dir: string;
+  home: string;
 }
 
 async function stage(content: string): Promise<Staged> {
@@ -81,11 +88,15 @@ async function stage(content: string): Promise<Staged> {
   const copilot = await tempDir();
   process.env.HOME = home;
   process.env.VIBEBOARD_COPILOT_HOME = copilot;
+  // DELETED rather than pointed somewhere, so the fallback these tests are about — `$HOME/.cache` —
+  // is the branch actually exercised. Pointing it at a second temp root would test the override and
+  // leave the default, which is what every real user gets, unasserted.
+  delete process.env.XDG_CACHE_HOME;
   const source = join(home, '.claude', '.credentials.json');
   mkdirSync(dirname(source), { recursive: true });
   writeFileSync(source, content, 'utf8');
   const mirror = boxCredentialPath();
-  return { source, mirror, dir: dirname(mirror) };
+  return { source, mirror, dir: dirname(mirror), home };
 }
 
 // Same LENGTH as the old one, and a mtime a minute on. A refreshed OAuth token is very nearly the same
@@ -99,11 +110,15 @@ function refresh(source: string, content: string): void {
 
 describe('the Claude credential mirror', () => {
   it('copies the host credential into a directory VibeBoard owns', async () => {
-    const { mirror, dir } = await stage('{"token":"one"}');
+    const { mirror, dir, home } = await stage('{"token":"one"}');
 
     expect(mirrorClaudeCredential()).toBe(mirror);
 
-    expect(dir).toBe(join(process.env.VIBEBOARD_COPILOT_HOME as string, 'creds', 'claude'));
+    // OUTSIDE `~/.vibeboard/`, and asserted rather than assumed. The mirror is the only thing here a
+    // box mounts, so putting it in that tree would cost containment.md its flat "none of
+    // `~/.vibeboard/` is mounted" — a guarantee that survives only while it has no exceptions.
+    expect(dir).toBe(join(home, '.cache', 'vibeboard', 'creds', 'claude'));
+    expect(mirror.includes('.vibeboard')).toBe(false);
     expect(readFileSync(mirror, 'utf8')).toBe('{"token":"one"}');
   });
 

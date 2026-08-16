@@ -109,7 +109,7 @@ is a manual run racing an auto-pilot one. Note the seam that limits it: the agen
 
 **3. The box's own state directory, at `/state`.** Per project *and* per backend — see below.
 
-**4. Exactly one backend credential.** A Claude box mounts `~/.vibeboard/copilot/creds/claude/` — a
+**4. Exactly one backend credential.** A Claude box mounts `~/.cache/vibeboard/creds/claude/` — a
 directory VibeBoard owns, holding only a mirror of `~/.claude/.credentials.json` — at its own absolute
 host path, so the symlink VibeBoard writes into the config home resolves identically inside and out.
 An OpenCode box mounts nothing of the sort; its credential was copied into its own state directory.
@@ -150,7 +150,11 @@ every project the full text of every session ever run on this machine, which is 
 `copilot-env.ts` exists to do.
 
 So the mount is a directory VibeBoard owns holding **only** the credential, at
-`~/.vibeboard/copilot/creds/claude/`, mirrored from the host file. The mirror is refreshed on every
+`~/.cache/vibeboard/creds/claude/`, mirrored from the host file. It sits under `XDG_CACHE_HOME` and
+**not** under `~/.vibeboard/`, deliberately: the mirror is the one thing here that a box mounts, and
+putting it in `~/.vibeboard/` would have cost the flat guarantee below that none of that tree is
+mounted at all. A cache directory is also what it honestly is — deletable at any moment, rebuilt from
+`~/.claude` on the next `ensure()`. The mirror is refreshed on every
 `ensure()` — before every agent turn — and skipped when the bytes are unchanged: two `stat`s reject a
 differing size, and otherwise two reads of a file under a kilobyte. The copy is a temp file plus a
 rename: a torn credential is worse than a stale one, and the rename is also the one write the other
@@ -189,12 +193,12 @@ every path worth denying.
   be a plan is now a protection. The `token-` prefix survives because it still reads as *"this is a
   credential"*, not because a glob depends on it.
 
-  **This page used to say that *nothing* under `~/.vibeboard/` was mounted, and as of 2026-08-15 that
-  is no longer true.** The credential mirror above lives at `~/.vibeboard/copilot/creds/claude/` and a
-  Claude box mounts it. What keeps the admin token out is therefore no longer "the whole tree is
-  absent" but "the mount set names one leaf directory of it" — a weaker statement, and the reason to
-  write it down. Anything added under `~/.vibeboard/` is still absent from every box by default; only
-  that one path is named.
+  **Nothing under `~/.vibeboard/` is mounted into any box, and that is a flat statement with no
+  exceptions in it.** The credential mirror was briefly written here during the 2026-08-15 change and
+  was moved to `~/.cache/vibeboard/creds/` before it shipped, precisely to keep this sentence flat: the
+  alternative was "the mount set names one leaf of that tree", which protects the admin token only for
+  as long as everyone who adds a mount remembers which leaf. A rule with no exceptions cannot be got
+  wrong later; a rule with one can.
 - **The rest of `$HOME`, `~/.ssh`, and every other project on the disk.** Under the profile all of
   these were writable and every one of them was readable.
 - **The docker socket.** Nothing brokers docker into a box; the agent goes *in* the box, so there is

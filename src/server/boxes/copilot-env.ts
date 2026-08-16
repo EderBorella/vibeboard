@@ -28,13 +28,24 @@ import { dirname, join } from 'node:path';
 //  - OpenCode: XDG_CONFIG_HOME → an empty dir (auth/db live in XDG_DATA_HOME, untouched).
 
 // Both CLIs write their config in here, which under the profile is why the admin token had to be denied
-// BY NAME rather than `~/.vibeboard/` as a whole. In a box that stayed true for a long time by accident
-// and no longer is: the credential mirror below is under here and IS mounted, so `~/.vibeboard/` is no
-// longer wholly absent from every box and the admin token is kept out by the mount set naming one
-// subdirectory of it rather than by nothing under it being named at all
-// (docs/security/containment.md).
+// BY NAME rather than `~/.vibeboard/` as a whole. In a box the question does not arise: none of
+// `~/.vibeboard/` is among the mounts (docs/security/containment.md).
 function copilotHome(): string {
   return process.env.VIBEBOARD_COPILOT_HOME ?? join(homedir(), '.vibeboard', 'copilot');
+}
+
+// The credential mirror lives OUTSIDE `~/.vibeboard/`, and the line above is the entire reason.
+//
+// The mirror is the one thing here that is mounted into a box. Putting it under `~/.vibeboard/` — where
+// it was first written — would have made "none of `~/.vibeboard/` is among the mounts" false, and the
+// admin token next door would then have been kept out by the mount set naming one leaf of that tree
+// rather than by nothing in it being named at all. The first is a rule someone can get wrong later; the
+// second cannot be got wrong. A different tree costs nothing and keeps the stronger sentence true.
+//
+// `XDG_CACHE_HOME` because that is what it is: a copy that can be deleted at any time and is rebuilt
+// from `~/.claude` on the next `ensure()`. It is also the seam the tests use.
+function credentialHome(): string {
+  return join(process.env.XDG_CACHE_HOME ?? join(homedir(), '.cache'), 'vibeboard', 'creds');
 }
 
 export function isolationEnabled(): boolean {
@@ -150,7 +161,7 @@ export function claudeCredentialFile(): string {
 // Separate from `claudeCredentialFile()` because the two stopped being the same thing. Anything asking
 // "what will the CLI in the box actually read" must use this one.
 export function boxCredentialPath(): string {
-  return join(copilotHome(), 'creds', 'claude', '.credentials.json');
+  return join(credentialHome(), 'claude', '.credentials.json');
 }
 
 // THE MEASUREMENT THAT FORCED A MIRROR, because the obvious arrangement — mount the user's credential
@@ -191,10 +202,10 @@ export function boxCredentialPath(): string {
 //    does. The two-way version (newest mtime wins) is a separate step, deliberately not taken here.
 //  - IF NOBODY EVER RUNS CLAUDE CODE ON THE HOST, nothing refreshes the token, and the mirror expires
 //    exactly when the original does. Mirroring buys freshness; it does not create it.
-//  - THIS IS A SECOND COPY OF A CREDENTIAL AT REST, at `~/.vibeboard/copilot/creds/claude/`. What
+//  - THIS IS A SECOND COPY OF A CREDENTIAL AT REST, at `~/.cache/vibeboard/creds/claude/`. What
 //    protects it is 0700 on the directory and 0600 on the file, set with an explicit `chmodSync`
-//    rather than left to the umask, and the fact that the mount names that one subdirectory — the
-//    admin token next door in `~/.vibeboard/` is not in any box.
+//    rather than left to the umask. It is deliberately not under `~/.vibeboard/` — see
+//    `credentialHome` for why that tree stays wholly absent from every box.
 //
 // Answers with the mirror's path, or `undefined` when there is no credential to mount.
 export function mirrorClaudeCredential(): string | undefined {

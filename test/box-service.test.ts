@@ -19,15 +19,19 @@ import { tempDir, testTmp } from './helpers.js';
 //
 // `boxPathsForBackend` mirrors the Claude credential as a side effect — deliberately, since it runs
 // before every agent turn — so without this the suite would copy the developer's real token into their
-// real `~/.vibeboard`. Set up and torn down once per RUN: a per-test directory here would leak one tree
+// real cache. Set up and torn down once per RUN: a per-test directory here would leak one tree
 // per test, which is how 440,653 of them once filled this filesystem's inode table.
 const savedHome = process.env.HOME;
 const savedCopilot = process.env.VIBEBOARD_COPILOT_HOME;
+// The mirror resolves `XDG_CACHE_HOME` first, so on a machine that sets it — many do — a temp `HOME`
+// alone would not contain this and the real token would be copied into the developer's real cache.
+const savedCacheHome = process.env.XDG_CACHE_HOME;
 let hostHome: string;
 
 beforeAll(() => {
   hostHome = mkdtempSync(join(testTmp(), 'vibeboard-host-'));
   process.env.HOME = hostHome;
+  delete process.env.XDG_CACHE_HOME;
   process.env.VIBEBOARD_COPILOT_HOME = mkdtempSync(join(testTmp(), 'vibeboard-copilot-'));
   mkdirSync(join(hostHome, '.claude'), { recursive: true });
   writeFileSync(join(hostHome, '.claude', '.credentials.json'), '{"token":"host"}', 'utf8');
@@ -38,6 +42,8 @@ afterAll(() => {
   else process.env.HOME = savedHome;
   if (savedCopilot === undefined) delete process.env.VIBEBOARD_COPILOT_HOME;
   else process.env.VIBEBOARD_COPILOT_HOME = savedCopilot;
+  if (savedCacheHome === undefined) delete process.env.XDG_CACHE_HOME;
+  else process.env.XDG_CACHE_HOME = savedCacheHome;
 });
 
 describe('the paths a box is given', () => {

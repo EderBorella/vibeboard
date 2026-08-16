@@ -1,8 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { LIGHT_STATES, lightAdvice, lightFor, lightTitle } from '../web/src/app/connection-light.js';
+import {
+  LIGHT_STATES,
+  lightAdvice,
+  lightFor,
+  lightTitle,
+  type RecentFailure,
+} from '../web/src/app/connection-light.js';
 import type { ConnState } from '../web/src/ws.js';
 
 const REFUSAL = 'Agents are disabled: the agent image vibeboard-agent:latest is not built.';
+const NOTE = 'Failed to authenticate: OAuth session expired.';
+const FAILING: RecentFailure = { runs: 2, note: NOTE, at: '2026-08-16T10:05:00.000Z' };
 
 describe('what the light says', () => {
   it('is online only when the socket is up AND nothing is missing', () => {
@@ -41,9 +49,90 @@ describe('what the light says', () => {
       (['open', 'closed', 'connecting', 'unauthorized'] as ConnState[]).flatMap((c) => [
         lightFor(c, null),
         lightFor(c, REFUSAL),
+        lightFor(c, null, FAILING),
+        lightFor(c, REFUSAL, FAILING),
       ]),
     );
     for (const a of answers) expect(LIGHT_STATES).toContain(a);
+  });
+});
+
+// THE LIE THIS STATE EXISTS TO STOP TELLING. Auto-pilot stopped itself on two runs that never reached a
+// model — a box holding a sign-in the host had replaced — and this light said `online` all morning,
+// because every fact it had answers "may an agent start" and the answer to that was still yes.
+describe('what the light says about runs that already failed', () => {
+  it('is failing when the last runs died and nothing is refusing', () => {
+    expect(lightFor('open', null, FAILING)).toBe('failing');
+  });
+
+  it('is still online when the last runs were healthy', () => {
+    expect(lightFor('open', null)).toBe('online');
+    expect(lightFor('open', null, null)).toBe('online');
+  });
+
+  // A REFUSAL OUTRANKS A PAST FAILURE, because "you cannot run anything" is a harder fact than "the last
+  // thing you ran broke". Asserted with BOTH present — a version that checked the failure first would
+  // pass every test above and send a person whose docker is down to read a run note instead.
+  it('reports the refusal, not the failure, when both are true', () => {
+    expect(lightFor('open', REFUSAL, FAILING)).toBe('offline');
+  });
+
+  // Same rule as `offline` and for the same reason: with the socket down the page is a snapshot, and the
+  // run history in it is as frozen as everything else. The table covers all three so this is proved for
+  // each rather than for a favourite one.
+  it.each(['closed', 'connecting', 'unauthorized'] as ConnState[])(
+    'reports the socket problem "%s" over a recent failure',
+    (conn) => {
+      expect(lightFor(conn, null, FAILING)).toBe(conn);
+      expect(lightFor(conn, REFUSAL, FAILING)).toBe(conn);
+    },
+  );
+
+  // VERBATIM, the same rule the refusal follows. Asserted as the WHOLE detail string rather than with
+  // `toContain`, which would pass against a version that wrapped the harness's sentence in one of ours —
+  // and the wrapping is exactly the failure mode, since a reworded note sends a person to the wrong
+  // machine: a dead credential and a working directory that no longer exists read identically once the
+  // specifics are dropped.
+  it('carries the harness’s note as the detail, unchanged', () => {
+    expect(lightAdvice('failing', null, null, FAILING).detail).toBe(NOTE);
+  });
+
+  // The heading says the runs never STARTED, which is what makes it not the card's fault — and it
+  // deliberately does not repeat the note's own "The agent never reached a model:" prefix, which used to
+  // make the balloon stutter across its two lines.
+  it('says the runs never got started, without repeating the note under it', () => {
+    const advice = lightAdvice('failing', null, null, FAILING);
+    expect(advice.heading.toLowerCase()).toContain('never got started');
+    expect(advice.heading.toLowerCase()).not.toContain('reach');
+  });
+
+  it('counts one failure as one, rather than announcing runs that did not happen', () => {
+    const one = lightAdvice('failing', null, null, { ...FAILING, runs: 1 });
+    expect(one.heading).toContain('The last run ');
+  });
+
+  // THE OTHER HALF OF NOT BEING A GATE. Nothing on this path refuses a dispatch, so a balloon telling
+  // someone they are blocked would be describing a gate that does not exist — while auto-pilot really has
+  // stopped on its own and will not restart until somebody presses the button. Both halves, because
+  // either one alone leaves the person with the wrong model of what happened.
+  it('says agents still run by hand, and that auto-pilot stopped itself', () => {
+    const next = lightAdvice('failing', null, null, FAILING).next ?? '';
+    expect(next).toContain('still be started');
+    expect(next).toContain('Auto-pilot stopped itself');
+    expect(next).toContain('Start');
+  });
+
+  // `lightAdvice` is pure and anyone may call it, so the state has to survive arriving with no record —
+  // exactly as `offline` survives arriving with no refusal.
+  it('still says something when failing arrives with no record attached', () => {
+    expect(lightAdvice('failing', null).detail.length).toBeGreaterThan(0);
+    expect(lightAdvice('failing', null).heading.length).toBeGreaterThan(0);
+  });
+
+  it('quotes the note in the tooltip too, beside the count', () => {
+    const title = lightTitle('failing', null, FAILING);
+    expect(title).toContain(NOTE);
+    expect(title).toContain('2 runs in a row');
   });
 });
 
@@ -126,7 +215,7 @@ describe('what the balloon says', () => {
   });
 
   it('offers one for every state that IS a problem', () => {
-    for (const state of ['offline', 'closed', 'unauthorized'] as const) {
+    for (const state of ['offline', 'failing', 'closed', 'unauthorized'] as const) {
       expect(lightAdvice(state, REFUSAL).next, state).toBeTruthy();
     }
   });

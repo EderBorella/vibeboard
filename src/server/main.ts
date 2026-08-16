@@ -52,13 +52,19 @@ const sandbox = await probeSandbox(boxes, DEFAULT_IMAGE);
 // And a live one for the app, because an image can be built or removed while the server runs and the
 // startup answer then gates every dispatch with something that stopped being true.
 //
-// The credential check is composed in HERE and nowhere else, for the same reason: it is the only place
-// that holds both the box layer and the open project. `() => session.root` and not `session.root` —
-// this is built once at startup and the open project changes under it on every switch, so a captured
-// root would go on answering about a box nobody is using. The banner probe above deliberately does not
-// get it: at that moment no project is open, so there is no box to be stale.
+// The credential check is composed in HERE and nowhere else, because this is the only place that holds
+// both the box layer and the app. It takes no project: it reads the HOST's Claude credential and asks
+// whether the token is still alive, which is a fact about the machine rather than about any one box —
+// see credential-freshness.ts for why gating on the box's own copy would deadlock. It used to be handed
+// `() => session.root` to name a container to exec into; nothing execs any more. The banner probe above
+// deliberately still does not get it: it is a statement about Docker at startup.
 const sandboxNow = liveSandbox(boxes, DEFAULT_IMAGE, {
-  credential: claudeCredentialCheck(() => session.root),
+  // The BACKEND is passed and the project root is not, which is the whole of what this check still cares
+  // about: the credential is Claude's, an OpenCode project authenticates from another file entirely, and
+  // refusing one because the other expired is a refusal for a cause that cannot touch it. A thunk, not a
+  // value, for the same reason the root used to be one — the open project changes under a server that is
+  // built once.
+  credential: claudeCredentialCheck({ backend: () => session.config?.copilot.backend }),
 });
 const app = buildApp(session, {
   logger: logging.options,

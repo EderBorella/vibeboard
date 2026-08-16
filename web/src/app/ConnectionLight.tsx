@@ -1,5 +1,5 @@
 import { Popover } from '../ui/Popover';
-import { type LightState, lightAdvice, type RefusalKind } from './connection-light';
+import { type LightState, lightAdvice, type RecentFailure, type RefusalKind } from './connection-light';
 
 // The light, as a button that explains itself.
 //
@@ -18,6 +18,7 @@ export function ConnectionLight({
   title,
   agentRefusal,
   refusalKind,
+  recentFailure,
 }: {
   light: LightState;
   title: string;
@@ -25,8 +26,11 @@ export function ConnectionLight({
   // Which cause the server named. Carried alongside the sentence rather than sniffed out of it: the
   // sentence is the server's to word and may be reworded there without this component noticing.
   refusalKind?: RefusalKind | null;
+  // What already went wrong, so the balloon can quote the harness. Carried for the same reason as
+  // `refusalKind` and refusing nothing — see `lightFor`.
+  recentFailure?: RecentFailure | null;
 }) {
-  const advice = lightAdvice(light, agentRefusal, refusalKind);
+  const advice = lightAdvice(light, agentRefusal, refusalKind, recentFailure);
   return (
     <Popover
       label={advice.heading}

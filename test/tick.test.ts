@@ -126,15 +126,38 @@ describe('two runs in a row that never reached a model stop the loop', () => {
     expect(decideTick(input({ runs: twice() }))).toMatchObject({ kind: 'stop', reason: 'infrastructure' });
   });
 
-  // THE ERROR, QUOTED. A dead credential and a working directory that no longer exists read identically once
-  // the specifics are dropped, and they need different fixes — the day before the run above, a box pointing
-  // at a deleted working directory produced "the README may be too thin to derive from" about a README
-  // nothing had opened.
-  it('quotes what the runs actually said, and points at the one place that can fix it', () => {
+  // THE ERROR, QUOTED FROM THE RECORD. A dead credential and a working directory that no longer exists read
+  // identically once the specifics are dropped, and they need different fixes — the day before the run above,
+  // a box pointing at a deleted working directory produced "the README may be too thin to derive from" about a
+  // README nothing had opened. TWO NOTES over one board, because a single fixture cannot tell a sentence that
+  // quotes the record from one that hard-codes the error it happened to be written against.
+  it('quotes whatever the runs actually said', () => {
+    expect(detailOf(decideTick(input({ runs: twice() })))).toContain(DEAD_NOTE);
+    const gone = 'The agent never reached a model: chdir /work: no such file or directory (exit code 1).';
+    const elsewhere = twice().map((r) => ({ ...r, note: gone }));
+    expect(detailOf(decideTick(input({ runs: elsewhere })))).toContain(gone);
+  });
+
+  // IT PRESCRIBES NO REMEDY, and this is a regression rather than a preference about wording. The sentence used
+  // to end `Check Settings — the state light reports a stale credential, and "Rebuild the agent boxes" there
+  // replaces the boxes these runs are dying in`, and on 2026-08-16 both halves of that were false at once: the
+  // OAuth session had expired and could not be refreshed, so nothing was wrong with the box and rebuilding it
+  // would have fixed nothing, and the light was reporting the project online. The user read the contradiction
+  // and did not press the button — the right call, reached only by distrusting us.
+  it('does not tell the reader to rebuild the agent boxes', () => {
     const detail = detailOf(decideTick(input({ runs: twice() })));
-    expect(detail).toContain('Failed to authenticate: OAuth session expired and could not be refreshed');
-    expect(detail).toContain('Settings');
-    expect(detail).toContain('Rebuild the agent boxes');
+    expect(detail).not.toContain('Rebuild the agent boxes');
+    expect(detail).not.toContain('stale credential');
+  });
+
+  // WHERE THE EVIDENCE IS, which is all this stop can honestly offer: it knows that nothing reached a model and
+  // not which part of the machine is at fault. And what to do afterwards, because the streak is measured from
+  // when auto-pilot last STARTED — without that clause the stop describes a state with no way out of it.
+  it('points at the runs and the light, and says to press Start afterwards', () => {
+    const detail = detailOf(decideTick(input({ runs: twice() })));
+    expect(detail).toContain('the runs themselves');
+    expect(detail).toContain('the light in the top bar');
+    expect(detail).toContain('Press Start');
   });
 
   // NO CARD IS NAMED, which is the whole point of the reason rather than a nicety of its wording: no card was

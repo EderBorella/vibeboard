@@ -1,9 +1,11 @@
 import type { FastifyInstance } from 'fastify';
 import { afterEach, describe, expect, it, onTestFinished } from 'vitest';
+import type { RunRecord } from '../src/core/runs.js';
 import { buildApp } from '../src/server/app.js';
 import { CredentialStore } from '../src/server/auth/credentials.js';
 import { ProjectSession } from '../src/server/boards/session.js';
 import { fixedSandbox, NOT_REQUESTED, type SandboxStatus } from '../src/server/boxes/sandbox.js';
+import { writeRun } from '../src/store/run-store.js';
 import { TEST_SANDBOX, tempDir } from './helpers.js';
 
 const TEST_IMAGE = 'vibeboard-agent:test';
@@ -106,6 +108,138 @@ describe('GET /api/sandbox', () => {
         expect(body.refusalKind === null, `${attached} ${status.ok}`).toBe(body.agentRefusal === null);
       }
     }
+  });
+});
+
+// THE MORNING THE LIGHT LIED. Auto-pilot stopped itself with "2 runs in a row failed before reaching a
+// model: Failed to authenticate: OAuth session expired", and this endpoint went on answering `ok: true,
+// agentRefusal: null, refusalKind: null` — checked against the live server while the box held the dead
+// token. Every field it had answers "may an agent start", and the answer to that really was yes; nothing
+// here answered "did the last ones die", so the top bar said `online` all morning.
+//
+// The evidence is the LOOP'S OWN — records stamped `fault: infrastructure`, the same ones `machineBroken`
+// read when it stopped — so the light cannot disagree with the loop about what happened.
+describe('GET /api/sandbox: what already went wrong', () => {
+  const run = (over: Partial<RunRecord> = {}): RunRecord => ({
+    run: '20260816-100000-aaaa',
+    card: 'E-001',
+    board: 'engineering',
+    skill: 'implement',
+    status: 'success',
+    started: '2026-08-16T10:00:00.000Z',
+    backend: 'claude-code',
+    model: 'opus',
+    effort: 'high',
+    mode: 'bypassPermissions',
+    report: '',
+    ...over,
+  });
+  const broke = (id: string, started: string, note: string): RunRecord =>
+    run({ run: id, started, status: 'failed', fault: 'infrastructure', note });
+
+  const sandboxBody = async (app: FastifyInstance) =>
+    (await app.inject({ method: 'GET', url: '/api/sandbox', headers: admin })).json();
+
+  // TWO FAILURES WITH DIFFERENT NOTES AND DIFFERENT TIMESTAMPS, so this can tell the most recent from the
+  // oldest and a real count from a hardcoded one. A fixture of one, or of two identical records, would
+  // pass against a route that reported the wrong end of the streak.
+  it('reports how many ran in a row, what the last one said, and when it started', async () => {
+    const { app, root } = await open({ ok: true, image: TEST_IMAGE });
+    await writeRun(root, broke('20260816-100000-aaaa', '2026-08-16T10:00:00.000Z', 'Connection refused.'));
+    await writeRun(
+      root,
+      broke(
+        '20260816-100500-bbbb',
+        '2026-08-16T10:05:00.000Z',
+        'Failed to authenticate: OAuth session expired.',
+      ),
+    );
+    expect((await sandboxBody(app)).recentFailure).toEqual({
+      runs: 2,
+      note: 'Failed to authenticate: OAuth session expired.',
+      at: '2026-08-16T10:05:00.000Z',
+    });
+  });
+
+  // VERBATIM, for the reason the refusal is: a dead credential and a working directory that no longer
+  // exists read identically once the specifics are dropped, and they send a person to two different
+  // machines. Asserted as the whole string — a `toContain` would pass against a route that wrapped the
+  // harness's sentence in one of ours.
+  it('never rewords what the harness said', async () => {
+    const said = 'Failed to authenticate: OAuth session expired. Run `claude setup-token`.';
+    const { app, root } = await open({ ok: true, image: TEST_IMAGE });
+    await writeRun(root, broke('20260816-100000-aaaa', '2026-08-16T10:00:00.000Z', said));
+    expect((await sandboxBody(app)).recentFailure.note).toBe(said);
+  });
+
+  it('says nothing when the last run reached a model', async () => {
+    const { app, root } = await open({ ok: true, image: TEST_IMAGE });
+    await writeRun(root, broke('20260816-100000-aaaa', '2026-08-16T10:00:00.000Z', 'Connection refused.'));
+    await writeRun(root, run({ run: '20260816-100500-bbbb', started: '2026-08-16T10:05:00.000Z' }));
+    expect((await sandboxBody(app)).recentFailure).toBeUndefined();
+  });
+
+  it('says nothing for a project that has never run anything', async () => {
+    const { app } = await open({ ok: true, image: TEST_IMAGE });
+    expect((await sandboxBody(app)).recentFailure).toBeUndefined();
+  });
+
+  // THE ANTI-DEADLOCK ASSERTION, and it is the reason this field exists rather than a gate.
+  //
+  // A gate keyed on HISTORY cannot be cleared, because the run that would clear it is the run the gate
+  // refuses. This codebase has already shipped that deadlock once — the infrastructure streak, read off
+  // the end of the history and breakable only by a run that reached a model, so the first tick after the
+  // user fixed the machine stopped again on the same records, for ever. It was fixed by counting only
+  // runs since auto-pilot last started, and this route deliberately does not pass that boundary because
+  // it is REPORTING rather than DECIDING. That is only safe while it decides nothing, which is what this
+  // holds: the three fields the dispatch gate reads are untouched, and a dispatch still gets through.
+  it('does not refuse anything: a project with a streak can still dispatch', async () => {
+    const { app, root } = await open({ ok: true, image: TEST_IMAGE });
+    await writeRun(root, broke('20260816-100000-aaaa', '2026-08-16T10:00:00.000Z', 'Connection refused.'));
+    await writeRun(
+      root,
+      broke(
+        '20260816-100500-bbbb',
+        '2026-08-16T10:05:00.000Z',
+        'Failed to authenticate: OAuth session expired.',
+      ),
+    );
+
+    const body = await sandboxBody(app);
+    // Reported — so this project really is in the state that used to deadlock.
+    expect(body.recentFailure.runs).toBe(2);
+    // And enforcing nothing. These three are what the gate reads, and a recent failure moves none of them.
+    expect(body.ok).toBe(true);
+    expect(body.agentRefusal).toBeNull();
+    expect(body.refusalKind).toBeNull();
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/runs',
+      headers: admin,
+      payload: { board: 'engineering', card: 'nope-not-a-card', skill: 'execute' },
+    });
+    // 412 is the machine refusing. Anything else means it got past the gate, which is the whole assertion
+    // — the card is deliberately unknown so nothing else about this project has to exist.
+    expect(res.statusCode).not.toBe(412);
+  });
+
+  // The run records live under a project root, and there is none. Every other field here is about docker
+  // and the backend and is answerable either way, so the route must still answer rather than fail.
+  it('answers without it when no project is open', async () => {
+    const session = new ProjectSession();
+    const app = buildApp(session, {
+      credentials: new CredentialStore(ADMIN),
+      logger: false,
+      sandbox: fixedSandbox({ ok: true, image: TEST_IMAGE }),
+    });
+    onTestFinished(async () => {
+      await app.close();
+      await session.close();
+    });
+    const body = await sandboxBody(app);
+    expect(body.ok).toBe(true);
+    expect(body.recentFailure).toBeUndefined();
   });
 });
 

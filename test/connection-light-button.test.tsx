@@ -111,6 +111,48 @@ describe('the light is a button', () => {
     );
   });
 
+  // THE RECORD HAS TO REACH THE BALLOON, the same hop `refusalKind` needed a test for. The component
+  // renders whatever `lightAdvice` returns, so a `recentFailure` prop that was accepted and then not
+  // passed on would leave every failing balloon saying nothing about what actually broke, with every unit
+  // test of `lightAdvice` still green.
+  it('shows the harness’s note when the light is failing', () => {
+    const note = 'Failed to authenticate: OAuth session expired.';
+    render(
+      light({
+        light: 'failing',
+        agentRefusal: null,
+        recentFailure: { runs: 2, note, at: '2026-08-16T10:05:00.000Z' },
+      }),
+    );
+    fireEvent.click(screen.getByRole('button'));
+    expect(screen.getByRole('dialog').querySelector('.conn-pop-detail')?.textContent).toBe(note);
+  });
+
+  // A FIXTURE THAT CANNOT TELL THE TWO APART TESTS NEITHER. `failing` and `offline` are the two states
+  // that are not about the socket, and they mean opposite things about whether you can work — so they are
+  // rendered here from the same component with only the state and its evidence changed, and must not read
+  // alike. A component that fell through to one advice for both would pass everything above.
+  it('says something different for a past failure than for a live refusal', () => {
+    render(
+      light({
+        light: 'failing',
+        agentRefusal: null,
+        recentFailure: { runs: 2, note: 'OAuth session expired.', at: '2026-08-16T10:05:00.000Z' },
+      }),
+    );
+    fireEvent.click(screen.getByRole('button'));
+    const failing = screen.getByRole('dialog').textContent;
+    cleanup();
+    render(light({ light: 'offline', agentRefusal: REFUSAL, refusalKind: 'credential' }));
+    fireEvent.click(screen.getByRole('button'));
+    const offline = screen.getByRole('dialog').textContent;
+    expect(failing).not.toBe(offline);
+    // And specifically: only one of them tells you to go and rebuild the boxes, because only one of them
+    // is a refusal. The other says agents can still be started.
+    expect(offline).toContain('Rebuild the agent boxes');
+    expect(failing).not.toContain('Rebuild the agent boxes');
+  });
+
   // Each state's balloon has to be about THAT state. One `lightAdvice` returning the same heading for
   // everything would pass every test above.
   it('says something different for a dead socket than for a missing dependency', () => {

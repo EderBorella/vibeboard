@@ -20,6 +20,25 @@ export interface SandboxState {
   // gate itself, and this only says which kind of thing it is about. `null` exactly when
   // `agentRefusal` is null.
   refusalKind: 'docker' | 'credential' | 'attached' | null;
+  // WHAT ALREADY WENT WRONG, as distinct from what is wrong NOW — and it does not gate anything.
+  //
+  // Every other field here answers "may an agent start", which is a question about the present and is
+  // enforced. This answers "did the last attempts die before reaching a model", which is a question
+  // about the past, and it is REPORTED ONLY. The distinction is the whole design and it is not
+  // stylistic: a gate keyed on history cannot be cleared, because the run that would clear it is the
+  // run the gate refuses. That deadlock has already been built once in this codebase — the
+  // infrastructure streak, which could never break its own streak — and this is the same shape.
+  //
+  // The evidence is the loop's OWN: runs stamped `fault: infrastructure`, the same records auto-pilot
+  // read when it stopped. Deriving the light from them rather than from a fresh probe means the light
+  // cannot disagree with the loop, and needs nothing to be true that the loop did not already observe.
+  //
+  // Absent when the last runs were healthy, or when there are none.
+  recentFailure?: {
+    runs: number; // how many in a row
+    note: string; // what the harness actually said, from the record — never reworded here
+    at: string; // when the most recent one started, ISO
+  };
 }
 
 export async function getSandbox(): Promise<SandboxState> {

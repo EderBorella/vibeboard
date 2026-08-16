@@ -1,6 +1,6 @@
 import { type AutopilotState, isSuccessReason } from '../api';
 import { ConnectionLight } from './ConnectionLight';
-import type { LightState, RefusalKind } from './connection-light';
+import type { LightState, RecentFailure, RefusalKind } from './connection-light';
 
 // Add a theme here after adding its [data-theme] block in themes.css.
 const THEMES: { value: string; label: string }[] = [
@@ -64,6 +64,9 @@ interface Props {
   // And which cause it is about, so the balloon's heading names the right thing to go and fix. There
   // is more than one way to be unable to run agents, and "Docker is not ready" is wrong for all but one.
   refusalKind?: RefusalKind | null;
+  // And what already broke, so the balloon can quote the harness on runs that died before reaching a
+  // model. Reported, never enforced — nothing on this path refuses a dispatch.
+  recentFailure?: RecentFailure | null;
 }
 
 export function TopBar({
@@ -83,6 +86,7 @@ export function TopBar({
   lightTitle,
   agentRefusal,
   refusalKind,
+  recentFailure,
 }: Props) {
   const chip = autopilot ? chipFor(autopilot) : null;
   return (
@@ -92,16 +96,20 @@ export function TopBar({
       {/* Beside the project name rather than at the far right, and labelled. A 9px dot at the end of a row
           of buttons is the last thing anyone looks at, and it is the one thing that says whether ANYTHING
           else on the page is still true.
-          The state is spelled out because a colour cannot say WHICH problem this is, and the five it can
-          report need four different responses: reconnect, sign in, wait, or install a missing dependency.
-          `offline` is the last of those — the project is reachable but cannot run anything — and it was
-          previously visible only as a refusal at the moment you tried to work, or two clicks deep in a
-          settings dialog nobody opens before they need it. */}
+          The state is spelled out because a colour cannot say WHICH problem this is, and the six it can
+          report need five different responses: reconnect, sign in, wait, install a missing dependency, or
+          go and read what the last runs died of. `offline` is the fourth of those — the project is
+          reachable but cannot run anything — and it was previously visible only as a refusal at the moment
+          you tried to work, or two clicks deep in a settings dialog nobody opens before they need it.
+          `failing` is the fifth and the newest, and it is the only one that is not about the present: the
+          morning it was added, auto-pilot had stopped itself on two runs that never reached a model and
+          this light said `online` throughout, because nothing was refusing anything. */}
       <ConnectionLight
         light={light}
         title={lightTitle}
         agentRefusal={agentRefusal}
         refusalKind={refusalKind}
+        recentFailure={recentFailure}
       />
       {showProject && chip && (
         <span className={`ap-chip ap-${chip.tone}`} title={autopilot?.detail ?? chip.label}>

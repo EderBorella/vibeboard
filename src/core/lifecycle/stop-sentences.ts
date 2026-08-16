@@ -2,6 +2,7 @@ import type { CardProblem } from '../../store/cards/board.js';
 import type { DeclaredCommands } from '../../store/project/foundation.js';
 import type { AutopilotConfig } from '../autopilot.js';
 import { hasUnfinishedChildren } from '../derived-status.js';
+import type { RunRecord } from '../runs.js';
 import type { Card } from '../types.js';
 
 // WHAT A PERSON READS WHEN THE LOOP STOPS. Split out of the machine because it is a different subject:
@@ -28,6 +29,46 @@ const NAMED = 5;
 export function invalidAttemptCap(ap: AutopilotConfig): string | undefined {
   if (Number.isInteger(ap.attemptCap) && ap.attemptCap > 0) return undefined;
   return `attemptCap is ${JSON.stringify(ap.attemptCap)}, which is not a whole number above zero, so no attempt cap can bind. Set it in Settings.`;
+}
+
+// THE MACHINE FAILED, NOT THE WORK — what `machineBroken` in tick.ts says once it has counted the streak.
+// Here rather than there because what the loop DOES about a dead machine is two lines of counting and a
+// comparison, and this paragraph was the rest of that function.
+//
+// IT PRESCRIBES NO REMEDY, and that is the correction this sentence exists in its current form to make. It
+// used to end: `Check Settings — the state light reports a stale credential, and "Rebuild the agent boxes"
+// there replaces the boxes these runs are dying in.` On 2026-08-16 both halves of that were false at once.
+// The OAuth session had expired and could not be refreshed, so nothing was wrong with the box and rebuilding
+// it would have fixed nothing; and the light was reporting the project online rather than reporting a stale
+// credential. The user read the contradiction between the two and did NOT press the button — the right call,
+// arrived at only by distrusting us. Advice naming one fix is correct exactly as long as the cause it guessed
+// is the cause, and this stop is raised precisely because the cause is the one thing the loop cannot see: it
+// knows that nothing reached a model, and nothing more than that.
+//
+// SO IT POINTS AT THE EVIDENCE INSTEAD — the runs, and the light in the top bar, which reports whether agents
+// can run at all and why not. The note is QUOTED rather than restated for the same reason: a dead credential
+// and a box pointing at a working directory that no longer exists read identically once the specifics are
+// dropped, and they need different fixes. The note is the only part of this sentence that knows what happened.
+//
+// AND IT ENDS WITH START, because the streak is measured from when auto-pilot last started
+// (`consecutiveInfrastructureFailures`) — pressing Start is how a person says they have dealt with it, and
+// without that clause the stop describes a state with no way out of it.
+export function machineBrokenSentence(streak: RunRecord[]): string {
+  // The most recent, because `consecutiveInfrastructureFailures` counts back from the end of the history. A
+  // note is what the runner writes when there is no report to speak for the run, so a record without one is a
+  // record classified somewhere that had nothing to say — rare, and no reason to lose the stop. It carries its
+  // own full stop because the sentence continues straight after it.
+  const said =
+    streak[0]?.note ?? 'they left nothing behind that says why, beyond never having reached a model.';
+  // THE LEAD-IN DOES NOT NAME THE FAILURE, because the note it introduces already does — every
+  // infrastructure note is prefixed "The agent never reached a model:" by `infrastructureNote` in
+  // server/runs/fault.ts. Saying it here too produced "…failed before reaching a model: The agent never
+  // reached a model: …", which reads as a stutter and makes the reader distrust the rest of it.
+  //
+  // Fixed on THIS side rather than in the note, deliberately: the note is also shown on its own, on the
+  // run's row in the Execution tab, where that prefix is the only thing saying what kind of failure it
+  // was. A sentence that reads well in two places beats one that reads well here.
+  return `The last ${streak.length} runs all failed the same way: ${said} Nothing on the board caused this, and none of them was charged to a card. Auto-pilot knows only that nothing got as far as a model, not which part of the machine is at fault, so the two places to look are the runs themselves — they carry the whole error — and the light in the top bar, which says whether this server can run agents at all and why not. Press Start when you have dealt with it.`;
 }
 
 // FINDING C. Carried here from the deleted eligibility.ts, whose removal in slice 3 would otherwise take the

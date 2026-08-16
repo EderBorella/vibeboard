@@ -164,6 +164,16 @@ body {
    why the word is there. */
 .conn-offline .conn { background: var(--warn); }
 .conn-offline .conn-text { color: var(--warn); }
+/* `failing` is the only state here that is NOT about the present: the project can run agents, and the last
+   ones it ran died before reaching a model. So it must not look like `online` — that was the bug, a green
+   light over a morning of auto-pilot stopping itself — and it must not look like `offline` either, which
+   means "you cannot run anything" and is a harder claim than this one makes.
+   `--accent-2`, the palette's SECONDARY, rather than `--warn`, which `offline` already owns. Two themes
+   define the two to the same amber and one does not, so where they coincide this is distinguished from
+   `offline` by the word — which is the same bargain `connecting` already strikes with `offline`, and the
+   reason the word is rendered at all. A hex here would be a colour belonging to no theme. */
+.conn-failing .conn { background: var(--accent-2); }
+.conn-failing .conn-text { color: var(--accent-2); }
 
 /* The panel. Anchored under its trigger, left-aligned to it, and deliberately NOT a modal: these
    explain or adjust the thing they hang off, so the context has to stay visible behind them.

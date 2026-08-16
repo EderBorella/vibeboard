@@ -32,9 +32,8 @@ import { useSandbox } from '../useSandbox';
 import { useSignin } from '../useSignin';
 import { useSnapshot } from '../useSnapshot';
 import { canPlace, presentTags, tagCounts, toggleTag } from '../viewmodel';
-import { lightFor, lightTitle } from './connection-light';
 import { ProjectGate } from './ProjectGate';
-import { chooseContent, rebindOnSignIn } from './shell';
+import { chooseContent, lightProps, rebindOnSignIn } from './shell';
 import { type MainTab, TopBar } from './TopBar';
 import { WorkArea } from './WorkArea';
 
@@ -65,7 +64,6 @@ export function App() {
   // used to be reachable from: a missing dependency disables every agent and the copilot, and hiding
   // that two clicks deep meant the first symptom was a refusal at the moment you tried to work.
   const { sandbox } = useSandbox(bump, signin.signedIn);
-  const light = lightFor(conn, sandbox?.agentRefusal);
   // Auto-pilot's state: the chip in the bar, and the overlay when the project is halted. From the
   // endpoint on mount and from the socket after that, so a kill in another tab raises the overlay here.
   const autopilot = useAutopilot(bump, signin.signedIn);
@@ -277,10 +275,7 @@ export function App() {
         onSettings={() => setSettingsOpen(true)}
         onSwitchProject={() => setShowGate(true)}
         autopilot={autopilot.state}
-        light={light}
-        lightTitle={lightTitle(light, sandbox?.agentRefusal)}
-        agentRefusal={sandbox?.agentRefusal}
-        refusalKind={sandbox?.refusalKind}
+        {...lightProps(conn, sandbox)}
       />
 
       {/* Stacked under the header, only with a project open: transport for the thing the whole app is

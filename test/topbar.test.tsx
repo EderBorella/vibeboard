@@ -6,7 +6,12 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { STOP_REASONS } from '../src/core/dispatch-gate.js';
 import type { AutopilotState } from '../web/src/api.js';
-import { LIGHT_STATES, type LightState, type RefusalKind } from '../web/src/app/connection-light.js';
+import {
+  LIGHT_STATES,
+  type LightState,
+  type RecentFailure,
+  type RefusalKind,
+} from '../web/src/app/connection-light.js';
 import type { MainTab } from '../web/src/app/TopBar.js';
 import { TopBar } from '../web/src/app/TopBar.js';
 
@@ -28,6 +33,7 @@ const props = {
   lightTitle: 'Connected.',
   agentRefusal: null as string | null,
   refusalKind: null as RefusalKind | null,
+  recentFailure: null as RecentFailure | null,
 };
 
 describe('TopBar', () => {
@@ -132,6 +138,41 @@ describe('TopBar', () => {
     expect(headingFor('credential')).toContain('Rebuild the agent boxes');
     expect(headingFor('credential').split('||')[0]?.toLowerCase()).not.toContain('docker');
     expect(headingFor('docker').split('||')[0]).toBe('Docker is not ready');
+  });
+
+  // THE SAME HOP, for the other piece of evidence. `recentFailure` travels App → TopBar →
+  // ConnectionLight → lightAdvice, and dropped here the balloon says a run failed without ever saying
+  // what it said — which is the entire content of the state.
+  it('passes what already failed down to the balloon', () => {
+    const note = 'Failed to authenticate: OAuth session expired.';
+    render(
+      <TopBar
+        {...props}
+        light="failing"
+        agentRefusal={null}
+        recentFailure={{ runs: 2, note, at: '2026-08-16T10:05:00.000Z' }}
+      />,
+    );
+    fireEvent.click(screen.getByTitle(props.lightTitle));
+    expect(screen.getByRole('dialog').querySelector('.conn-pop-detail')?.textContent).toBe(note);
+  });
+
+  // A state the stylesheet does not know about is an invisible one: the class is what tints the dot and
+  // the word, and `failing` must not fall through to the default grey — nor borrow either of the two
+  // colours it is there to be distinguished from. Read from the source because jsdom loads no CSS, the
+  // same reason the width assertions below do.
+  it('gives failing a colour of its own, distinct from online and offline', () => {
+    const css = readFileSync(join(process.cwd(), 'web', 'src', 'styles.css'), 'utf8');
+    const varsFor = (state: string): string[] =>
+      [...css.matchAll(new RegExp(`^\\.conn-${state} \\.conn(?:-text)?\\s*\\{([^}]*)\\}`, 'gm'))].flatMap(
+        (m) => [...(m[1] ?? '').matchAll(/var\((--[\w-]+)\)/g)].map((v) => v[1] ?? ''),
+      );
+
+    const failing = varsFor('failing');
+    expect(failing.length, '.conn-failing rules not found in web/src/styles.css').toBeGreaterThan(0);
+    for (const shared of [...varsFor('online'), ...varsFor('offline')]) {
+      expect(failing, `failing must not reuse ${shared}`).not.toContain(shared);
+    }
   });
 
   it('exposes the socket state as a class and a title', () => {

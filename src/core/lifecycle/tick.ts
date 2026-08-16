@@ -36,6 +36,7 @@ import type { BoardName, Card } from '../types.js';
 import {
   invalidAttemptCap,
   isAre,
+  machineBrokenSentence,
   names,
   smokeIsAGate,
   unreadableSentence,
@@ -139,23 +140,18 @@ function bootstrap(ap: AutopilotConfig, runs: RunRecord[]): TickAction | undefin
 // reason no card id appears in the sentence. The run that produced this reported that one story had used all
 // three of its attempts and somebody should read it and change what it asks for; nothing had ever opened it.
 //
-// The error is QUOTED from the record rather than restated, so the sentence carries whatever the harness
-// actually said — a dead credential and a working directory that no longer exists read identically once the
-// specifics are dropped, and they need different fixes.
+// WHAT IT SAYS IS IN stop-sentences.ts, and that split is worth more here than anywhere else in this file:
+// the sentence had to be corrected because it prescribed a remedy — rebuilding the agent boxes — that was the
+// wrong one the morning it mattered, while the branch below, which blames the project rather than a card, was
+// right both times. Wording that has to be argued about does not belong in the guard that raises it.
+//
 // `since` is when auto-pilot last STARTED, and it is what keeps this from bricking the project it
 // protects — see `consecutiveInfrastructureFailures`. Pressing Start is the user saying they have fixed
 // the machine, and the streak has to be allowed to believe them or nothing can ever get past this guard.
 function machineBroken(runs: RunRecord[], since?: string): TickAction | undefined {
   const streak = consecutiveInfrastructureFailures(runs, since);
   if (streak.length < INFRASTRUCTURE_STREAK) return undefined;
-  // The most recent, because `consecutiveInfrastructureFailures` counts back from the end of the history.
-  // A note is what the runner writes when there is no report to speak for the run, so a record without one
-  // is a record classified somewhere that had nothing to say — rare, and no reason to lose the stop.
-  const said = streak[0]?.note ?? 'the run left nothing behind that says why';
-  return stop(
-    'infrastructure',
-    `${streak.length} runs in a row failed before reaching a model: ${said} Nothing on the board caused this, and none of them was charged to a card. Check Settings — the state light reports a stale credential, and "Rebuild the agent boxes" there replaces the boxes these runs are dying in.`,
-  );
+  return stop('infrastructure', machineBrokenSentence(streak));
 }
 
 // A card that is NOT live and NOT in the archive is a half-finished archive, and it was invisible to every

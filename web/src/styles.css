@@ -1296,6 +1296,15 @@ body {
 }
 .exec-card:hover:not(:disabled) { border-color: var(--accent); }
 .exec-card:disabled { cursor: default; opacity: 0.7; }
+/* THE TITLE WRAPS HERE, overriding `.link-title`'s `white-space: nowrap`.
+   `.link-title` (see the link picker) asks for one line with an ellipsis — but it is an inline
+   `<span>`, and `overflow` and `text-overflow` do nothing on an inline box. So the ellipsis never
+   arrived and only the `nowrap` took effect: a long card title rendered as one unbreakable line and
+   ran straight out of its grid track. Measured in chromium against a real title at a 279px track:
+   230px of overhang, and the column's scrollWidth 508 against a client width of 279.
+   Scoped to `.exec-card` rather than fixed on `.link-title`, because the other users of that class
+   sit in a constrained block where truncating really is what is wanted. */
+.exec-card .link-title { white-space: normal; overflow: visible; }
 .exec-summary { margin: 0; color: var(--muted); font-size: 0.74rem; line-height: 1.35; overflow-wrap: anywhere; }
 .tab-badge {
   margin-left: 0.35rem; font-family: var(--font-mono); font-size: 0.62rem;

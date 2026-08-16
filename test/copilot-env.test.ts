@@ -20,7 +20,9 @@ import {
   claudeStateDir,
   isolationEnabled,
   mirrorClaudeCredential,
+  opencodeAuthFile,
   opencodeConfigHome,
+  opencodeStateDir,
 } from '../src/server/boxes/copilot-env.js';
 import { tempDir } from './helpers.js';
 
@@ -229,5 +231,44 @@ describe('the credential symlink a box reads through', () => {
     claudeStateDir(project);
 
     expect(readlinkSync(link)).toBe(mirror);
+  });
+});
+
+// THE OPENCODE AUTH PATH, PINNED AGAINST A LITERAL AND NOT AGAINST ITSELF.
+//
+// `opencodeAuthFile()` is read from two places that must agree — the per-project seed just below, and
+// the OpenCode half of `credentialFreshness`'s check, which refuses a project when this file holds no
+// provider. Every assertion over in test/credential-freshness.test.ts spells the expected path
+// `opencodeAuthFile()`, so it can only prove WHICH function was consulted; repointing the function
+// moves both sides of those comparisons together and not one of them notices. Measured, by planting
+// exactly that defect: with the path changed to `~/.config/opencode/auth.json`, all 29 tests in that
+// file still passed. That is the shape of the inode check this codebase already deleted once — a
+// comparison of a thing with itself — and it does not get to come back through a test.
+//
+// So the literal is here, once, and it is a literal on purpose: the path is not ours to choose. The
+// `opencode` CLI writes it, and if it ever moves, this is the assertion that is supposed to break.
+describe('the OpenCode auth file both the seed and the health check read', () => {
+  const AUTH_UNDER_HOME = ['.local', 'share', 'opencode', 'auth.json'];
+  // Two providers, shaped as the real file is — `{"<provider>":{"type":"api","key":"…"}}` — with
+  // placeholder keys. Nothing here reads a key; the seed copies bytes and the check counts entries.
+  const AUTH = JSON.stringify({
+    someprovider: { type: 'api', key: 'placeholder-not-a-key' },
+    anotherprovider: { type: 'api', key: 'placeholder-not-a-key' },
+  });
+
+  it('is the path the CLI writes, and is what a project box is seeded from', async () => {
+    const home = await tempDir();
+    process.env.HOME = home;
+    process.env.VIBEBOARD_COPILOT_HOME = await tempDir();
+    const real = join(home, ...AUTH_UNDER_HOME);
+    mkdirSync(dirname(real), { recursive: true });
+    writeFileSync(real, AUTH, 'utf8');
+
+    expect(opencodeAuthFile()).toBe(real);
+
+    // And the seed really reaches it. The equality above alone would survive the seed being rewritten
+    // to look somewhere else; this fails if either end moves.
+    const state = opencodeStateDir(await tempDir());
+    expect(readFileSync(join(state, 'data', 'opencode', 'auth.json'), 'utf8')).toBe(AUTH);
   });
 });

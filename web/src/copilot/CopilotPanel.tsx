@@ -3,11 +3,11 @@ import { getModelStatus, listModels, type ModelOption, type ModelStatus } from '
 import { useConfirm } from '../confirm/useConfirm';
 import { backendCaps, backendDefaults } from '../shared';
 import { useFetched } from '../useFetched';
+import { BackendPicker } from './BackendPicker';
 import { ChatSwitcher } from './ChatSwitcher';
 import { CopilotControls } from './CopilotControls';
 import { CopilotReadout } from './CopilotReadout';
 import { clampToCaps } from './choice';
-import { BACKENDS } from './format';
 import type { CopilotMode, EffortLevel, useCopilot } from './useCopilot';
 
 const NO_MODELS: ModelOption[] = [];
@@ -115,19 +115,15 @@ export function CopilotPanel({
     <aside className="copilot">
       <div className="copilot-head">
         <span className="copilot-title">Copilot</span>
-        <div className="backend-toggle" role="group" aria-label="Backend">
-          {BACKENDS.map((b) => (
-            <button
-              key={b.value}
-              className={`bt-btn${backend === b.value ? ' active' : ''}`}
-              disabled={running}
-              title={running ? 'Finish the current turn first' : `Switch to ${b.label} (starts a new chat)`}
-              onClick={() => onBackend(b.value)}
-            >
-              {b.label}
-            </button>
-          ))}
-        </div>
+        <BackendPicker
+          value={backend}
+          disabled={running}
+          label="Backend"
+          titleFor={(b) =>
+            running ? 'Finish the current turn first' : `Switch to ${b.label} (starts a new chat)`
+          }
+          onChange={onBackend}
+        />
         {activeModel && <span className="copilot-model">{activeModel}</span>}
         <button className="copilot-x" onClick={onClose} title="Hide (session keeps running)">
           ✕

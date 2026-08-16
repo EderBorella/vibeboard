@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { boxCredentialPath, claudeCredentialFile } from '../src/server/boxes/copilot-env.js';
-import { claudeCredentialCheck, credentialFreshness } from '../src/server/boxes/credential-freshness.js';
+import {
+  boxCredentialPath,
+  claudeCredentialFile,
+  opencodeAuthFile,
+} from '../src/server/boxes/copilot-env.js';
+import {
+  credentialCheck,
+  credentialFreshness,
+  opencodeAuthPresence,
+} from '../src/server/boxes/credential-freshness.js';
 
 // The check, as a decision. It needs no daemon, no filesystem and no clock: the file read and the
 // current time are both injected, and every fixture below carries PLACEHOLDER token strings — the real
@@ -18,13 +26,20 @@ const MARGIN_MS = 5 * 60_000;
 
 // The whole sentence, not a fragment of it. These reach the user verbatim through `agentRefusal` and the
 // light's balloon, so the bytes are the behaviour — a `toContain` would not notice the clause that says
-// what to DO going missing.
+// what to DO going missing, and it would not notice the clause naming WHICH backend died going missing
+// either, which is the thing this pair was last changed for.
 const REASON_EXPIRED =
-  'the Claude sign-in on this machine has expired, so every agent turn would fail to authenticate. ' +
+  'the Claude Code sign-in on this machine has expired, so every agent turn would fail to authenticate. ' +
+  'This project is set to the Claude Code backend; a project set to OpenCode is unaffected. ' +
   'Run "claude" in a terminal on the host to refresh it';
 const REASON_SIGN_IN_AGAIN =
-  'the Claude sign-in on this machine has expired and its refresh token has expired too, so nothing can ' +
-  'renew it automatically. Run "claude" in a terminal on the host and sign in again';
+  'the Claude Code sign-in on this machine has expired and its refresh token has expired too, so nothing ' +
+  'can renew it automatically. This project is set to the Claude Code backend; a project set to OpenCode ' +
+  'is unaffected. Run "claude" in a terminal on the host and sign in again';
+const REASON_NO_OPENCODE_PROVIDER =
+  'this project is set to the OpenCode backend and no OpenCode provider is configured on this machine, ' +
+  'so every agent turn would fail to authenticate. A project set to Claude Code is unaffected. ' +
+  'Run "opencode auth login" in a terminal on the host to configure a provider';
 
 const TOKEN_PLACEHOLDER = 'placeholder-not-a-token';
 
@@ -186,7 +201,7 @@ describe('the clock and the file are injected, not reached for', () => {
       }),
       [boxCredentialPath()]: credential({ expiresAt: EXPIRED_AT, refreshTokenExpiresAt: REFRESH_GOOD }),
     });
-    const answer = await claudeCredentialCheck({ read: r.read, now: () => DISPATCHED_AT })();
+    const answer = await credentialCheck({ read: r.read, now: () => DISPATCHED_AT })();
     expect(answer).toEqual({ fresh: true });
     // Asserted on the call log as well as the answer: a version that read BOTH and happened to prefer
     // the host would give the same answer today and the wrong one the day the preference is edited.
@@ -194,32 +209,169 @@ describe('the clock and the file are injected, not reached for', () => {
     expect(claudeCredentialFile()).not.toEqual(boxCredentialPath());
   });
 
-  // THE OTHER FALSE REFUSAL, and it is the same mistake as the bug this module was rewritten for, just
-  // pointing the other way. This credential is Claude's: under S2 an OpenCode box never has it mounted
-  // and its runs authenticate from a different file entirely. Refusing an OpenCode project because a
-  // Claude token expired would stop a machine for a cause that cannot reach it — and would present as
-  // the product declining to work with nothing on screen explaining why.
-  it('does not refuse a project whose backend is not Claude', async () => {
-    const r = reader({ [claudeCredentialFile()]: credential({ expiresAt: EXPIRED_AT }) });
-    const answer = await claudeCredentialCheck({
-      read: r.read,
-      now: () => HOST_AFTER_LOGIN,
-      backend: () => 'opencode',
-    })();
-    expect(answer).toEqual({ fresh: true });
-    // It does not even open the file: there is nothing this credential could say that would matter.
-    expect(r.paths).toEqual([]);
-  });
-
   // And the default direction when nobody has said. No project open, or a config not read yet, must not
   // silence a real fault — Claude Code is the default backend, so an unknown one is treated as Claude's.
   it('still refuses when the backend is unknown', async () => {
     const r = reader({ [claudeCredentialFile()]: credential({ expiresAt: EXPIRED_AT }) });
-    const answer = await claudeCredentialCheck({
+    const answer = await credentialCheck({
       read: r.read,
       now: () => HOST_AFTER_LOGIN,
       backend: () => undefined,
     })();
     expect(answer.fresh).toBe(false);
+    expect(r.paths).toEqual([claudeCredentialFile()]);
+  });
+});
+
+// OpenCode's credential is API KEYS AND NOTHING ELSE — measured on the machine this was written on, a
+// flat map of provider entries shaped `{"<provider>":{"type":"api","key":"…"}}`, with no expiry field
+// anywhere in it. So there is no clock in any of these and no fixture carries a date: the only two
+// answers the file can support are "there is a provider" and "there is not". A test asserting that an
+// OpenCode key had EXPIRED would be asserting on a fact the file does not contain, and the check behind
+// it could never answer no — the exact defect the inode comparison was deleted for.
+const OPENCODE_PATH = '/home/someone/.local/share/opencode/auth.json';
+const KEY_PLACEHOLDER = 'placeholder-not-a-key';
+
+// TWO providers, not one, because a fixture too thin cannot distinguish "counts entries" from "looks for
+// one particular provider" — and the real file on the machine this was written on had two.
+const OPENCODE_CONFIGURED = JSON.stringify({
+  deepseek: { type: 'api', key: KEY_PLACEHOLDER },
+  openrouter: { type: 'api', key: KEY_PLACEHOLDER },
+});
+
+const presence = (text: string | undefined) =>
+  opencodeAuthPresence({ path: OPENCODE_PATH, read: () => text });
+
+describe('whether OpenCode has a provider configured at all', () => {
+  it('says nothing about a machine with providers in its auth file', () => {
+    expect(presence(OPENCODE_CONFIGURED)).toEqual({ fresh: true });
+  });
+
+  it('refuses when there is no auth file, and says which backend and what to run', () => {
+    expect(presence(undefined)).toEqual({ fresh: false, reason: REASON_NO_OPENCODE_PROVIDER });
+  });
+
+  // `opencode auth logout` leaves the file behind with nothing in it, so this is the ordinary shape of a
+  // machine that HAD a provider and no longer does — not a contrived one.
+  it('refuses an auth file emptied by a logout', () => {
+    expect(presence('{}')).toEqual({ fresh: false, reason: REASON_NO_OPENCODE_PROVIDER });
+  });
+
+  // FAILS OPEN, unlike the missing file, and the two are asserted side by side because the difference is
+  // the decision. Absent means observed-and-empty; unreadable means not observed — those bytes could be
+  // the very `opencode auth login` the refusal would tell somebody to run, caught mid-write.
+  it('does not invent a missing provider from bytes that are not JSON', () => {
+    expect(presence('{ this is not json')).toEqual({ fresh: true });
+  });
+
+  // `typeof null` is `'object'` and so is an array's, so both would reach `Object.keys` on a value the
+  // guard was not written for. `Object.keys(null)` throws, and a throw inside `liveSandbox` rejects the
+  // sandbox status rather than failing open — it is not a quieter version of the same answer, it is no
+  // answer at all.
+  it('answers rather than throwing when the auth file is not an object', () => {
+    expect(presence('null')).toEqual({ fresh: true });
+    expect(presence('[]')).toEqual({ fresh: true });
+    expect(presence('42')).toEqual({ fresh: true });
+  });
+
+  it('never puts a key out of the file into the sentence it shows', () => {
+    const answer = presence('{}');
+    expect(answer.fresh === false && answer.reason).not.toContain(KEY_PLACEHOLDER);
+  });
+});
+
+// ONE CHECK, AND IT MUST ANSWER FOR THE BACKEND THE PROJECT IS SET TO. This is the reported fault: a
+// person who uses only one of the two CLIs had auto-pilot stopped by the state of the other. Under S2
+// the two credentials are disjoint — an OpenCode box never has Claude's mounted and a Claude box never
+// has OpenCode's — so the state of one says nothing whatever about a project running the other.
+describe('the check answers for the selected backend and no other', () => {
+  const expiredClaude = credential({ expiresAt: EXPIRED_AT, refreshTokenExpiresAt: REFRESH_GOOD });
+
+  // Both files present and both in the SAME reader, so each of these is a claim about which one was
+  // opened as well as which answer came back — a check that read both and preferred one would give
+  // today's answer and the wrong one the day the preference is edited.
+  const both = () =>
+    reader({
+      [claudeCredentialFile()]: expiredClaude,
+      [opencodeAuthFile()]: OPENCODE_CONFIGURED,
+    });
+
+  it('refuses a Claude Code project on an expired Claude token, naming Claude Code', async () => {
+    const r = both();
+    const answer = await credentialCheck({
+      read: r.read,
+      now: () => DISPATCHED_AT,
+      backend: () => 'claude-code',
+    })();
+    expect(answer).toEqual({ fresh: false, reason: REASON_EXPIRED });
+    expect(r.paths).toEqual([claudeCredentialFile()]);
+  });
+
+  // THE SAME EXPIRED TOKEN, THE SAME INSTANT, THE OTHER BACKEND. Nothing about the machine changed
+  // between this test and the one above except which backend the project is set to, which is the whole
+  // of the user's complaint: one CLI expiring must not stop the other's projects.
+  it('does not refuse an OpenCode project on that same expired Claude token', async () => {
+    const r = both();
+    const answer = await credentialCheck({
+      read: r.read,
+      now: () => DISPATCHED_AT,
+      backend: () => 'opencode',
+    })();
+    expect(answer).toEqual({ fresh: true });
+    // It does not even open Claude's file: there is nothing in it that could matter to this project.
+    expect(r.paths).toEqual([opencodeAuthFile()]);
+  });
+
+  // And the mirror image, which is the half that did not exist before: an OpenCode machine with nothing
+  // configured must not be told its Claude sign-in is fine, and a Claude project must not be stopped by
+  // an OpenCode machine that never had a provider.
+  it('refuses an OpenCode project with no provider, naming OpenCode', async () => {
+    const r = reader({
+      [claudeCredentialFile()]: credential({ expiresAt: HOST_AFTER_LOGIN }),
+    });
+    const answer = await credentialCheck({
+      read: r.read,
+      now: () => DISPATCHED_AT,
+      backend: () => 'opencode',
+    })();
+    expect(answer).toEqual({ fresh: false, reason: REASON_NO_OPENCODE_PROVIDER });
+    expect(r.paths).toEqual([opencodeAuthFile()]);
+  });
+
+  it('does not refuse a Claude Code project when OpenCode has no provider', async () => {
+    const r = reader({
+      [claudeCredentialFile()]: credential({
+        expiresAt: HOST_AFTER_LOGIN,
+        refreshTokenExpiresAt: REFRESH_GOOD,
+      }),
+    });
+    const answer = await credentialCheck({
+      read: r.read,
+      now: () => DISPATCHED_AT,
+      backend: () => 'claude-code',
+    })();
+    expect(answer).toEqual({ fresh: true });
+    expect(r.paths).toEqual([claudeCredentialFile()]);
+  });
+
+  // A backend string we cannot interpret is not the same as nobody having said. `undefined` gets Claude's
+  // check because Claude Code is the documented default and a real fault must not be silenced; a value
+  // that is neither backend would have us guessing whose credential decides, so it answers fresh and
+  // reads nothing.
+  it('answers fresh and opens nothing for a backend it does not recognise', async () => {
+    const r = both();
+    const answer = await credentialCheck({
+      read: r.read,
+      now: () => DISPATCHED_AT,
+      backend: () => 'some-future-backend',
+    })();
+    expect(answer).toEqual({ fresh: true });
+    expect(r.paths).toEqual([]);
+  });
+
+  // The three sentences are genuinely three. A copy-paste that made any two of them equal would satisfy
+  // every assertion above, and the user would be told to run the wrong command.
+  it('says something different for each of the three ways a machine can be unauthenticated', () => {
+    expect(new Set([REASON_EXPIRED, REASON_SIGN_IN_AGAIN, REASON_NO_OPENCODE_PROVIDER]).size).toBe(3);
   });
 });

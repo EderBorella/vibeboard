@@ -7,7 +7,7 @@ import { ProjectSession } from './boards/session.js';
 import { listenOnApiSocket, removeApiSocketFile } from './boxes/api-socket.js';
 import { BoxService } from './boxes/box-service.js';
 import { DEFAULT_IMAGE } from './boxes/containers.js';
-import { claudeCredentialCheck } from './boxes/credential-freshness.js';
+import { credentialCheck } from './boxes/credential-freshness.js';
 import { stopOpencodeServer } from './boxes/opencode-server.js';
 import { liveSandbox, probeSandbox } from './boxes/sandbox.js';
 import { installCrashHandlers, serverLogger } from './logging.js';
@@ -53,18 +53,18 @@ const sandbox = await probeSandbox(boxes, DEFAULT_IMAGE);
 // startup answer then gates every dispatch with something that stopped being true.
 //
 // The credential check is composed in HERE and nowhere else, because this is the only place that holds
-// both the box layer and the app. It takes no project: it reads the HOST's Claude credential and asks
-// whether the token is still alive, which is a fact about the machine rather than about any one box —
-// see credential-freshness.ts for why gating on the box's own copy would deadlock. It used to be handed
-// `() => session.root` to name a container to exec into; nothing execs any more. The banner probe above
-// deliberately still does not get it: it is a statement about Docker at startup.
+// both the box layer and the app. It takes no project: it reads the HOST's credential for whichever
+// backend the open project is set to and asks whether that backend could authenticate at all, which is a
+// fact about the machine rather than about any one box — see credential-freshness.ts for why gating on
+// the box's own copy would deadlock. It used to be handed `() => session.root` to name a container to
+// exec into; nothing execs any more. The banner probe above deliberately still does not get it: it is a
+// statement about Docker at startup.
 const sandboxNow = liveSandbox(boxes, DEFAULT_IMAGE, {
   // The BACKEND is passed and the project root is not, which is the whole of what this check still cares
-  // about: the credential is Claude's, an OpenCode project authenticates from another file entirely, and
-  // refusing one because the other expired is a refusal for a cause that cannot touch it. A thunk, not a
-  // value, for the same reason the root used to be one — the open project changes under a server that is
-  // built once.
-  credential: claudeCredentialCheck({ backend: () => session.config?.copilot.backend }),
+  // about: the two backends hold disjoint credentials that fail in different ways, so ONE of them is
+  // consulted and it is the one the project would actually run. A thunk, not a value, for the same reason
+  // the root used to be one — the open project changes under a server that is built once.
+  credential: credentialCheck({ backend: () => session.config?.copilot.backend }),
 });
 const app = buildApp(session, {
   logger: logging.options,

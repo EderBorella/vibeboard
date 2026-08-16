@@ -1,6 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { opencodeAuthFile } from '../boxes/copilot-env.js';
 import { opencodeBaseUrl } from '../boxes/opencode-server.js';
 import type { Log } from '../logging.js';
 
@@ -51,9 +50,14 @@ function claudeAliasOption(id: string): ModelOption {
 }
 
 // OpenCode credentials live here; we read provider names + keys to query the right APIs.
+//
+// THE PATH IS ASKED FOR, NOT SPELT. It was written out here as a literal while two other places derived
+// it, which is three homes for one fact — and the third only came to light because a planted defect
+// repointed the function and this copy went on reading the old location, silently, with every test
+// green. `opencodeAuthFile()` is the one home; a box is seeded from it and the credential check reads it.
 function opencodeAuth(): Record<string, { key?: string; apiKey?: string }> {
   try {
-    return JSON.parse(readFileSync(join(homedir(), '.local/share/opencode/auth.json'), 'utf8'));
+    return JSON.parse(readFileSync(opencodeAuthFile(), 'utf8'));
   } catch {
     return {};
   }

@@ -914,6 +914,10 @@ body {
 .bt-btn:last-child { border-right: none; }
 .bt-btn.active { background: var(--accent-fill); color: var(--on-fill); font-weight: 600; }
 .bt-btn:disabled { opacity: 0.6; cursor: default; }
+/* The same control in a form rather than a dense row. Settings used to render its own button group at
+   this size, from its own list; the scale was the ONLY thing the two copies disagreed about that was
+   deliberate — the label was drift. */
+.backend-toggle-md .bt-btn { padding: 0.25rem 0.45rem; font-size: 0.72rem; }
 
 /* Chat switcher */
 .copilot-chatbar { display: flex; align-items: center; gap: 0.4rem; padding: 0.4rem 0.75rem; border-bottom: 1px solid var(--border); }
@@ -1746,6 +1750,18 @@ body {
   white-space: nowrap;
   color: var(--text);
 }
+
+/* Which agent, and whether it can run. `flex: none` because `.ap-status` above already takes the slack:
+   without it the pair would be squeezed by a long stall message, and the state word is exactly what you
+   need when the message is long. */
+.ap-agent { display: inline-flex; align-items: center; gap: 0.4rem; flex: none; }
+.ap-agent-state { font-size: 0.68rem; white-space: nowrap; }
+/* Only the fault gets a colour. "Ready" and "Checking…" are the states you are not meant to act on, and
+   a permanently coloured badge teaches people to stop reading the bar — the same reason the emergency
+   stop beside it stays grey until you hover it. */
+.ap-agent-ok,
+.ap-agent-unknown { color: var(--muted); }
+.ap-agent-bad { color: var(--danger); font-weight: 600; }
 
 .ap-expand,
 .ap-help-btn,

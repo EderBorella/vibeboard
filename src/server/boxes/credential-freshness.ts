@@ -1,8 +1,8 @@
 import { readFileSync } from 'node:fs';
-import { claudeCredentialFile } from './copilot-env.js';
+import { claudeCredentialFile, opencodeAuthFile } from './copilot-env.js';
 
-// Whether the Claude sign-in this machine holds is still alive, or a corpse every agent turn will die
-// against.
+// Whether the sign-in this machine holds FOR THE BACKEND THE PROJECT IS SET TO is still alive, or a
+// corpse every agent turn will die against.
 //
 // THE FAILURE THIS EXISTS FOR, measured on a live machine 2026-08-16. The credential in use carried
 // `expiresAt` 12:35:50Z; two runs dispatched at 12:32:46 and 12:32:50 each died with "Failed to
@@ -31,6 +31,18 @@ import { claudeCredentialFile } from './copilot-env.js';
 //
 // And it watched the wrong property in any case. An inode answers "is the box looking at the same file";
 // it cannot answer "is the token in that file still alive", which is what killed the runs above.
+//
+// THE TWO BACKENDS CANNOT FAIL THE SAME WAY, AND THIS FILE MUST NOT PRETEND THEY CAN. Claude Code holds
+// an OAuth token with `expiresAt` and `refreshTokenExpiresAt` in epoch ms, so "dead" is arithmetic
+// against a clock and today's incident was exactly that. OpenCode holds API KEYS WITH NO EXPIRY FIELD
+// OF ANY KIND — measured on this machine, `~/.local/share/opencode/auth.json` is a flat map of provider
+// entries shaped `{"<provider>":{"type":"api","key":"…"}}` and carries no timestamp anywhere — so
+// nothing in it can go stale and a key is only known to be bad when a provider rejects a call. The
+// honest OpenCode status is therefore CONFIGURED or NOT CONFIGURED, never "expired". Writing an expiry
+// check for it would produce a gate that cannot answer no, which is precisely the defect the inode
+// comparison above was deleted for; do not add one, and do not reach for the network to make one
+// possible either — a provider round trip on every sandbox probe buys a fact about a key we are not
+// allowed to hold, at the cost of a gate that fails whenever the user's link does.
 
 export type CredentialFreshness = { fresh: true } | { fresh: false; reason: string };
 
@@ -49,23 +61,45 @@ const FRESH: CredentialFreshness = { fresh: true };
 // dispatches that begin inside it.
 const EXPIRY_MARGIN_MS = 5 * 60_000;
 
-// The whole sentence a person reads, twice, because the action is not the same one.
+// The whole sentence a person reads, three times over, because the action is not the same one.
 //
 // A live refresh token means the sign-in itself is intact and one host-side `claude` renews it. A dead
 // one means no automatic renewal can save it and they must authenticate from scratch — same command,
 // different expectation of what it will ask them for. Telling somebody to "refresh" a thing that cannot
 // be refreshed is how a person concludes the message is wrong and stops reading it.
 //
-// Neither of these says to rebuild the agent boxes. That was the old advice, it belonged to the old
-// inode fault, and it is useless here: a rebuilt box mirrors the same expired credential.
+// EVERY ONE OF THEM NAMES THE BACKEND, AND THEN NAMES THE OTHER ONE AS UNAFFECTED. The sentences used to
+// open "the Claude sign-in on this machine has expired", which a person running both CLIs reads as "my
+// machine's agents are down" — and the whole point of this check knowing about backends is that they are
+// not: an expired Claude Code sign-in cannot touch a project set to OpenCode, and an OpenCode machine
+// with no provider configured cannot touch a Claude Code one. A refusal that leaves the reader guessing
+// which half of their setup died sends them to fix the wrong one, and these reach the user verbatim
+// through `agentRefusal` and the light's balloon, where there is no second sentence to correct it.
+//
+// None of them says to rebuild the agent boxes. That was the old advice, it belonged to the old inode
+// fault, and it is useless here: a rebuilt box mirrors the same expired credential.
+//
+// They end on the command and not on the reassurance, because `agentRefusal` renders them as
+// `Agents are disabled: ${reason}.` — the last clause is the one a truncated balloon keeps.
 const REASON_EXPIRED = [
-  'the Claude sign-in on this machine has expired, so every agent turn would fail to authenticate.',
+  'the Claude Code sign-in on this machine has expired, so every agent turn would fail to authenticate.',
+  'This project is set to the Claude Code backend; a project set to OpenCode is unaffected.',
   'Run "claude" in a terminal on the host to refresh it',
 ].join(' ');
 
 const REASON_SIGN_IN_AGAIN = [
-  'the Claude sign-in on this machine has expired and its refresh token has expired too, so nothing can',
-  'renew it automatically. Run "claude" in a terminal on the host and sign in again',
+  'the Claude Code sign-in on this machine has expired and its refresh token has expired too, so nothing',
+  'can renew it automatically. This project is set to the Claude Code backend; a project set to OpenCode',
+  'is unaffected. Run "claude" in a terminal on the host and sign in again',
+].join(' ');
+
+// NOT "expired", AND THE WORD IS THE POINT — see the asymmetry paragraph at the top of this file. There
+// is no expiry in an OpenCode credential to have passed, so the only true thing to say is that there is
+// no provider to authenticate with at all.
+const REASON_NO_OPENCODE_PROVIDER = [
+  'this project is set to the OpenCode backend and no OpenCode provider is configured on this machine,',
+  'so every agent turn would fail to authenticate. A project set to Claude Code is unaffected.',
+  'Run "opencode auth login" in a terminal on the host to configure a provider',
 ].join(' ');
 
 // The credential file as text, or undefined when it cannot be had.
@@ -143,6 +177,45 @@ export function credentialFreshness(opts: {
   return { fresh: false, reason: renewable ? REASON_EXPIRED : REASON_SIGN_IN_AGAIN };
 }
 
+// The OpenCode half: is there a provider to authenticate with at all. No clock, because there is nothing
+// here a clock could judge — see the asymmetry paragraph at the top.
+//
+// ABSENCE IS AN OBSERVATION HERE, WHERE FOR CLAUDE IT IS NOT, and the difference is worth stating because
+// it looks at first like the fail-open rule being applied inconsistently. A missing Claude credential
+// tells us nothing about whether a token is alive; a missing OpenCode `auth.json` IS the answer, because
+// it is the only thing a box can authenticate from. That is a fact about the mount rather than a
+// hopeful reading: `boxEnvFor('opencode')` hands the container two XDG variables and nothing else, and
+// `execArgs` passes `-e` for exactly what that returns, so a provider key exported in the user's shell
+// or in this server's environment never crosses the boundary. An empty object is the same observation
+// wearing different bytes — `opencode auth logout` leaves `{}` behind rather than removing the file.
+//
+// UNPARSEABLE FAILS OPEN, and that is the one place where it differs from missing. Bytes we cannot read
+// are bytes we have not observed: the file could be mid-write by the very `opencode auth login` the
+// refusal would tell somebody to run. The general form of the argument is the long paragraph below
+// `oauthExpiry` — a wrong "no" disables a machine that works and the person cannot overrule it — and it
+// is not restated here.
+export function opencodeAuthPresence(opts: {
+  path: string;
+  read: (path: string) => string | undefined;
+}): CredentialFreshness {
+  const text = opts.read(opts.path);
+  if (text === undefined) return { fresh: false, reason: REASON_NO_OPENCODE_PROVIDER };
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return FRESH;
+  }
+  // `typeof null` is `'object'` and an array's is too, so both are excluded by hand rather than by the
+  // type test — the same trap `oauthExpiry` above was rewritten for after a deleted guard threw a
+  // TypeError inside `liveSandbox`, where a rejection is not a fail-open, it is no status at all.
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return FRESH;
+  // Keys only. The values are API keys, and nothing in this module may bind one to a name, compare one
+  // or return one — the count of entries is the whole of what is read out of this file.
+  if (Object.keys(parsed).length > 0) return FRESH;
+  return { fresh: false, reason: REASON_NO_OPENCODE_PROVIDER };
+}
+
 // The check as the sandbox status wants it: no arguments, current clock, current answer.
 //
 // IT READS THE HOST CREDENTIAL, NOT THE MIRROR THE BOX SEES, AND THAT IS AN ANTI-DEADLOCK RULE RATHER
@@ -158,22 +231,29 @@ export function credentialFreshness(opts: {
 // The project root is gone from the signature. It existed only to name a container to `docker exec`
 // into, and nothing here consults a container any more: one host file, one clock, no daemon, no project.
 //
-// THE BACKEND STAYED, THOUGH, and it is the one dimension that still matters. This credential is Claude's
-// alone — under S2 an OpenCode box never has it mounted and its runs authenticate from a different file
-// entirely — so refusing an OpenCode project because a Claude token expired is a refusal for a reason
-// that cannot affect it. That is precisely the "wrong no" this module's fail-open argument exists to
-// avoid, and it would present to the user as the product declining to work with no visible cause: the
-// same shape as the bug this rewrite is fixing, wearing the other face.
+// ONE CHECK, DISPATCHED ON THE BACKEND THE PROJECT IS SET TO, and the dispatch is the substance rather
+// than a tidying. The two credentials are disjoint — under S2 an OpenCode box never has Claude's mounted
+// and a Claude box never has OpenCode's — so the state of one says nothing whatever about a project
+// running the other. Answering for the wrong one is the "wrong no" this module's fail-open argument
+// exists to avoid, and it presents to the user as the product declining to work for a cause that cannot
+// reach it: the same shape as the bug this rewrite is fixing, wearing the other face. It was reported
+// exactly that way — a person who uses only one of the two CLIs had auto-pilot stopped by the other.
+//
+// A BACKEND WE DO NOT RECOGNISE ANSWERS FRESH, which is not the same as the unknown case below. `undefined`
+// means nobody has said yet — no project open, no config read — and Claude Code is the documented default
+// (`DEFAULT_BACKEND` in src/core/backends.ts), so checking Claude's is answering for the backend that
+// would actually run. A string that is neither is a config we cannot interpret, and picking either check
+// for it would be guessing at whose credential matters; there is no fault to miss by staying quiet,
+// because a backend nothing can dispatch is already refused elsewhere.
 //
 // APPROXIMATE, AND DELIBERATELY SO IN THE SAFE DIRECTION. What is consulted is the project's CONFIGURED
 // backend, while a single turn can be overridden to the other one in the dock. So a project set to
 // OpenCode whose user overrides one turn to Claude Code gets no warning and that turn dies at
 // authentication — which is the fail-open direction, and the one this file takes everywhere else.
-// Unknown backend — no project open, no config yet — is treated as Claude's, because that is the
-// default and because a missing answer must not silence a real fault.
-export function claudeCredentialCheck(
+export function credentialCheck(
   opts: {
-    path?: string;
+    claudePath?: string;
+    opencodePath?: string;
     read?: (path: string) => string | undefined;
     now?: () => number;
     backend?: () => string | undefined;
@@ -183,15 +263,19 @@ export function claudeCredentialCheck(
   // process. This half happens to be a sub-millisecond read of a file under a kilobyte, at most once per
   // sandbox TTL, so it stays synchronous internally and is testable with no clock and no filesystem.
   return async () => {
-    // Asked before the file is opened, so an OpenCode project costs no read at all — and, more to the
-    // point, cannot be refused by a credential it will never use.
+    // Asked before any file is opened, so exactly one credential is ever read and a project is never
+    // refused by one it will not use.
     const backend = opts.backend?.();
+    const read = opts.read ?? readCredential;
+    if (backend === 'opencode') {
+      return opencodeAuthPresence({ path: opts.opencodePath ?? opencodeAuthFile(), read });
+    }
     if (backend !== undefined && backend !== 'claude-code') return FRESH;
     return credentialFreshness({
       // The user's REAL credential — the one the CLI on the host refreshes — and never
-      // `boxCredentialPath()`. See the paragraph above before changing this line.
-      path: opts.path ?? claudeCredentialFile(),
-      read: opts.read ?? readCredential,
+      // `boxCredentialPath()`. See the anti-deadlock paragraph above before changing this line.
+      path: opts.claudePath ?? claudeCredentialFile(),
+      read,
       now: opts.now ?? Date.now,
     });
   };

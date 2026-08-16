@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import type { DispatchRequest, ModelOption, RunRecord, Skill } from '../api';
+import { BackendPicker } from '../copilot/BackendPicker';
 import { clampToCaps } from '../copilot/choice';
 import { ModelPicker } from '../models/ModelPicker';
-import { BACKEND_DEFAULTS, backendCaps, type Card } from '../shared';
+import { backendCaps, type Card } from '../shared';
 
 interface Props {
   skill: Skill;
@@ -88,18 +89,11 @@ export function DispatchPane({
 
       <div className="dispatch-row">
         <span className="dispatch-label">Connector</span>
-        <div className="backend-toggle" role="group" aria-label="Connector">
-          {Object.keys(BACKEND_DEFAULTS).map((name) => (
-            <button
-              key={name}
-              type="button"
-              className={`switch-btn${name === backend ? ' active' : ''}`}
-              onClick={() => onBackend(name)}
-            >
-              {name}
-            </button>
-          ))}
-        </div>
+        {/* THE SHARED PICKER, and the fourth call site to get it. This one built its own group from
+            `BACKEND_DEFAULTS`'s KEYS, so it showed a person the raw id — "claude-code" — where the dock
+            showed "Claude" and Settings showed "Claude Code": one setting with three spellings, two of
+            them written by hand. */}
+        <BackendPicker value={backend} onChange={onBackend} label="Connector" />
       </div>
 
       <div className="dispatch-row">

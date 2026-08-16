@@ -285,7 +285,13 @@ export function App() {
           state={autopilot.state}
           runs={allRuns}
           bump={bump}
+          copilot={snapshot.config.copilot}
+          sandbox={sandbox}
           onChanged={autopilot.refresh}
+          // `bump`, the same lever sign-in and the attempt-clearing button pull. `useSandbox` is keyed
+          // on it, so this is what makes the status beside the selector answer for the backend that was
+          // just chosen rather than the one it replaced.
+          onBackendChanged={() => setBump((n) => n + 1)}
           onSettings={() => setSettingsOpen(true)}
         />
       )}

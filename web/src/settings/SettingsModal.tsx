@@ -9,7 +9,12 @@ import {
 } from '../api';
 import { AutopilotPanel } from '../autopilot/AutopilotPanel';
 import type { Confirmer } from '../confirm/useConfirm';
+import { BackendPicker } from '../copilot/BackendPicker';
 import { clampToCaps, resolveChoice } from '../copilot/choice';
+// The same list the picker renders from, and the reason this file no longer declares its own: the two
+// had drifted to different labels for one backend, so the setting read as "Claude Code" here and
+// "Claude" in the dock that obeys it.
+import { BACKENDS } from '../copilot/format';
 import { ModelPicker } from '../models/ModelPicker';
 import {
   type AutopilotConfig,
@@ -28,11 +33,6 @@ import { useFetched } from '../useFetched';
 import { parseCsv } from '../viewmodel';
 import { DiagnosticsPanel } from './DiagnosticsPanel';
 import { SandboxPanel } from './SandboxPanel';
-
-const BACKENDS: { value: string; label: string }[] = [
-  { value: 'claude-code', label: 'Claude Code' },
-  { value: 'opencode', label: 'OpenCode' },
-];
 
 interface Props {
   config: ProjectConfig;
@@ -148,20 +148,11 @@ export function SettingsModal({ config, onClose, onSaved, autopilot, onAutopilot
           <div className="settings-section">Copilot</div>
           <div className="field">
             <span>Backend</span>
-            <div className="mode-group">
-              {BACKENDS.map((b) => (
-                <button
-                  key={b.value}
-                  className={`mode-btn${backend === b.value ? ' active' : ''}`}
-                  // Only the selected backend changes: each backend's model/effort live in
-                  // their own slot, so switching here reveals that backend's saved choice
-                  // instead of overwriting it with a built-in default.
-                  onClick={() => setBackend(b.value)}
-                >
-                  {b.label}
-                </button>
-              ))}
-            </div>
+            {/* Only the selected backend changes: each backend's model/effort live in their own slot,
+                so switching here reveals that backend's saved choice instead of overwriting it with a
+                built-in default. Nothing is written until Save — unlike the auto-pilot bar's copy of
+                this control, which writes on the click because a bar has no Save button to wait for. */}
+            <BackendPicker value={backend} label="Backend" size="md" onChange={setBackend} />
           </div>
           <div className="field">
             <span>Default model</span>

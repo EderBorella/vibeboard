@@ -112,7 +112,11 @@ describe('DispatchPane', () => {
     // The model list depends on the backend, and the shell owns that fetch.
     const onBackend = vi.fn();
     render(<DispatchPane {...props} onBackend={onBackend} />);
-    fireEvent.click(screen.getByText('opencode'));
+    // BY THE LABEL A PERSON SEES, not the id. This pane used to render `BACKEND_DEFAULTS`'s keys
+    // directly, so the button said "opencode" while the dock said "OpenCode" — the assertion below was
+    // pinning that inconsistency in place. It now uses the shared picker, and the id remains what is
+    // reported upward.
+    fireEvent.click(screen.getByText('OpenCode'));
     expect(onBackend.mock.calls).toEqual([['opencode']]);
   });
 
@@ -156,8 +160,8 @@ describe('DispatchPane', () => {
     // Both are switch rows where only the highlight says which is selected. With none marked, the
     // form silently claims nothing is chosen when something always is.
     render(<DispatchPane {...props} />);
-    expect(screen.getByText('claude-code').className).toContain('active');
-    expect(screen.getByText('opencode').className).not.toContain('active');
+    expect(screen.getByText('Claude').className).toContain('active');
+    expect(screen.getByText('OpenCode').className).not.toContain('active');
     expect(document.querySelectorAll('.mode-btn.active')).toHaveLength(1);
   });
 

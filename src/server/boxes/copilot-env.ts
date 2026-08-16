@@ -112,7 +112,7 @@ export function opencodeStateDir(projectRoot: string): string {
   const root = join(projectStateDir(projectRoot), 'opencode');
   const data = join(root, 'data', 'opencode');
   mkdirSync(data, { recursive: true });
-  const real = join(homedir(), '.local', 'share', 'opencode', 'auth.json');
+  const real = opencodeAuthFile();
   const seeded = join(data, 'auth.json');
   // Copied, not linked, and only once. A copy per project is what keeps "which credential can this
   // box see" answerable by looking at the mounts — and the session database is the thing we are
@@ -153,6 +153,20 @@ function linkCredentials(dir: string, target: string): void {
 // The user's real Claude credential, on the host. The one the CLI itself refreshes.
 export function claudeCredentialFile(): string {
   return join(homedir(), '.claude', '.credentials.json');
+}
+
+// The user's real OpenCode credential, on the host — the file `opencodeStateDir` above seeds each box's
+// copy from, and the ONLY thing that authenticates an OpenCode run.
+//
+// A function rather than a literal repeated at the seed and at the health check, because the two must be
+// the same path or the check is watching a file nothing writes — the quietest possible failure, since a
+// path that exists nowhere reads as "no credential" and a path that is never seeded reads as "fine", and
+// neither says which it is. That the check can rely on this file alone is a fact about the MOUNT and not
+// an assumption: `boxEnvFor('opencode')` in containers.ts passes the box two XDG directory variables and
+// nothing else, and `execArgs` passes `-e` only for what that returns, so no provider key in this
+// server's own environment can reach an agent. Inside a box, this file or nothing.
+export function opencodeAuthFile(): string {
+  return join(homedir(), '.local', 'share', 'opencode', 'auth.json');
 }
 
 // Where that credential is VISIBLE INSIDE a Claude box — the path the symlink in the config dir points

@@ -131,12 +131,15 @@ export function capStartupLog(out: string, chunk: string): string {
   return out.length >= STARTUP_CAP ? out : (out + chunk).slice(0, STARTUP_CAP);
 }
 
-// The container port `opencode serve` binds inside its box. FIXED, where the host-side spawn used
+// The container port `opencode serve` binds inside its box is FIXED, where the host-side spawn used
 // port 0 and read the assignment back from the "listening on" line. Publishing needs a port known
 // before the container exists, so the OS cannot be the one to choose it — but the HOST port still is:
 // `-p 127.0.0.1::4096` lets docker pick, and a fixed host port would collide the moment two projects
 // were open.
-const OPENCODE_CONTAINER_PORT = 4096;
+//
+// The number and the serve command now live in `box-service.ts`, with every other decision about what
+// this backend's box IS. They were here, passed as arguments, and every other caller of `ensure`
+// passed something different for the same box — see `boxShape` for what that cost.
 
 // How long to wait for `opencode serve` to answer inside a fresh box. Generous: this covers a cold
 // container start as well as the server's own boot.
@@ -171,17 +174,7 @@ async function waitForServer(url: string, deadline: number): Promise<void> {
 async function startServerInBox(service: BoxService): Promise<string> {
   const root = projectRoot();
   reapOrphanServer(); // a host-side server from before containment, or from an attached-URL session
-  const handle = await service.ensure(root, 'opencode', OPENCODE_CONTAINER_PORT, [
-    'opencode',
-    'serve',
-    '--port',
-    String(OPENCODE_CONTAINER_PORT),
-    // 0.0.0.0 INSIDE the box, not 127.0.0.1. The container's loopback is its own, so a server bound
-    // there is unreachable from the host — including from VibeBoard. What keeps this off the network
-    // is the published port, which docker binds to the host's 127.0.0.1 and nothing else.
-    '--hostname',
-    '0.0.0.0',
-  ]);
+  const handle = await service.ensure(root, 'opencode');
   if (!handle.hostPort) {
     throw new Error('opencode box started but docker published no port for it');
   }

@@ -2,8 +2,9 @@ import { existsSync, mkdirSync, mkdtempSync, statSync, writeFileSync } from 'nod
 import { dirname, join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { CONFIG_DIR, RUNS_DIR } from '../src/core/layout.js';
-import { boxPathsForBackend } from '../src/server/boxes/box-service.js';
-import { boxMounts, WORK_DIR } from '../src/server/boxes/containers.js';
+import { BoxManager } from '../src/server/boxes/box-manager.js';
+import { BoxService, boxPathsForBackend } from '../src/server/boxes/box-service.js';
+import { boxMounts, type DockerResult, type DockerRun, WORK_DIR } from '../src/server/boxes/containers.js';
 import { boxCredentialPath } from '../src/server/boxes/copilot-env.js';
 import { tempDir, testTmp } from './helpers.js';
 
@@ -118,5 +119,116 @@ describe('the paths a box is given', () => {
     // transcripts and a `settings.json` whose hooks run on the HOST.
     expect(credential?.source.includes('.claude')).toBe(false);
     expect(credential?.source.startsWith(join(hostHome, '.claude'))).toBe(false);
+  });
+});
+
+// ONE BOX PER (PROJECT, BACKEND) — including who asks for it.
+//
+// The OpenCode backend is a long-lived `opencode serve` that IS its box's main process, on a published
+// port. Every other path — dispatching a run, a chat turn, a toolchain install — asked for a box with
+// no port and `sleep infinity`. Adoption is by name AND spec, so those two callers evicted each other's
+// box in turn, for ever: whichever ran last did `docker rm -f` and rebuilt.
+//
+// Measured on a live project on 2026-08-16: `opencode serve is up in its box` on 127.0.0.1:32775 at
+// 22:55:15, the run dispatched at 22:55:40.473, and a container of the same name created 209ms later
+// with `cmd ["sleep","infinity"]` and `ports {}`. VibeBoard was still holding the old URL, so all three
+// attempts died in 449ms with `[opencode failed: fetch failed]` — no model reached, no tokens — and
+// auto-pilot reported that the README was too thin to derive features from.
+describe('a box is the same box whoever asks for it', () => {
+  // Answers as a daemon that holds whatever was created, remembering the spec digest it was created
+  // with. That memory is the whole point: a fake that reports no box can never show an eviction,
+  // which is why the existing helper could not have caught this.
+  const OK: DockerResult = { code: 0, stdout: '', stderr: '' };
+  const SPEC = 'io.vibeboard.spec=';
+
+  function daemon() {
+    const removed: string[] = [];
+    const created: string[][] = [];
+    let present: string | undefined;
+
+    const inspect = (): DockerResult =>
+      present === undefined
+        ? { code: 1, stdout: '', stderr: 'No such object' }
+        : { code: 0, stdout: `true ${present}\n`, stderr: '' };
+
+    const create = (args: string[]): DockerResult => {
+      created.push(args);
+      present = args.find((a) => a.startsWith(SPEC))?.slice(SPEC.length) ?? '';
+      return OK;
+    };
+
+    const remove = (name: string): DockerResult => {
+      removed.push(name);
+      present = undefined;
+      return OK;
+    };
+
+    const docker: DockerRun = async (args) => {
+      if (args[0] === 'inspect') return inspect();
+      if (args[0] === 'rm') return remove(String(args[2]));
+      // `run -d --name <box>` is a create; `run --rm …` is the network sidecar, which is not.
+      if (args[0] === 'run' && args[1] === '-d') return create(args);
+      if (args[0] === 'port') return { code: 0, stdout: '127.0.0.1:32775\n', stderr: '' };
+      return OK;
+    };
+    const boxes = new BoxService({
+      manager: new BoxManager({ docker, user: '1000:1000' }),
+      image: 'vibeboard-agent:test',
+    });
+    return { boxes, removed, created };
+  }
+
+  it('creates the OpenCode box AS the server, however plainly it was asked for', async () => {
+    const root = await tempDir();
+    mkdirSync(join(root, CONFIG_DIR), { recursive: true });
+    const { boxes, created } = daemon();
+
+    // The call agent-runner.ts makes before dispatching a run. It used to produce a box with no port
+    // running `sleep infinity`, which is a box VibeBoard cannot talk to.
+    await boxes.ensure(root, 'opencode');
+
+    expect(created[0].slice(-6)).toEqual(['opencode', 'serve', '--port', '4096', '--hostname', '0.0.0.0']);
+    // Published on the host's loopback only, and on a host port docker picks — a fixed one would
+    // collide the moment two projects were open.
+    expect(created[0]).toContain('127.0.0.1::4096');
+  });
+
+  it('does not evict the box a previous caller created', async () => {
+    const root = await tempDir();
+    mkdirSync(join(root, CONFIG_DIR), { recursive: true });
+    const { boxes, removed, created } = daemon();
+
+    // Two callers, one box. The server starts it; a run then asks for it; a toolchain install after
+    // that. Any `docker rm -f` here is the container being destroyed under whoever was using it.
+    await boxes.ensure(root, 'opencode');
+    await boxes.ensure(root, 'opencode');
+    await boxes.ensure(root, 'opencode');
+
+    expect(removed).toEqual([]);
+    expect(created).toHaveLength(1);
+  });
+
+  it('gives a run the published port the server is listening on', async () => {
+    const root = await tempDir();
+    mkdirSync(join(root, CONFIG_DIR), { recursive: true });
+    const { boxes } = daemon();
+
+    // Asked for plainly, the OpenCode box still has to be the serving one — a box with no port is a
+    // box VibeBoard cannot reach, which is the failure this whole block is about.
+    const box = await boxes.ensure(root, 'opencode');
+
+    expect(box.hostPort).toBe(32775);
+  });
+
+  it("leaves the Claude box alone: no port, and it stays alive to be exec'd into", async () => {
+    const root = await tempDir();
+    mkdirSync(join(root, CONFIG_DIR), { recursive: true });
+    const { boxes, created } = daemon();
+
+    const box = await boxes.ensure(root, 'claude-code');
+
+    expect(box.hostPort).toBeUndefined();
+    expect(created[0].slice(-2)).toEqual(['sleep', 'infinity']);
+    expect(created[0]).not.toContain('-p');
   });
 });

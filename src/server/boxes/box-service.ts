@@ -71,6 +71,47 @@ interface EnsuredBox {
   hostPort?: number;
 }
 
+// The OpenCode server's port INSIDE its box. It lives here rather than beside the server that binds it
+// because the box's shape is decided here, for every caller — and the two disagreeing was the bug.
+export const OPENCODE_CONTAINER_PORT = 4096;
+
+// WHAT A BOX IS CREATED AS, derived from the backend and from nothing else.
+//
+// This used to be the caller's to pass, and the callers disagreed. `opencode-server.ts` asked for a box
+// publishing this port whose main process is `opencode serve`; `agent-runner.ts`, `copilot.ts` and
+// `toolchain-routes.ts` asked for the same box — same project, same backend, same NAME — with no port
+// and `sleep infinity`. Adoption is by name AND spec, so each one's `ensure` found the other's box,
+// saw a different digest, `docker rm -f`'d it and rebuilt. Not once: for ever, alternating.
+//
+// Measured on a live project on 2026-08-16: the server came up on 127.0.0.1:32775, a run dispatched 25
+// seconds later, and a container of the same name was created 209ms after that with `sleep infinity`
+// and no ports. VibeBoard still held the old URL, so three attempts died in 449ms each with
+// `fetch failed`, and auto-pilot told the user their README was too thin to derive features from.
+// Claude never showed it, because there every caller wants this same plain shape.
+//
+// So the shape is a pure function of the backend, and there is no parameter to disagree through.
+function boxShape(backend: BoxBackend): { publishPort?: number; command: string[] } {
+  if (backend === 'opencode') {
+    return {
+      publishPort: OPENCODE_CONTAINER_PORT,
+      command: [
+        'opencode',
+        'serve',
+        '--port',
+        String(OPENCODE_CONTAINER_PORT),
+        // 0.0.0.0 INSIDE the box, not 127.0.0.1: the container's loopback is its own, so a server bound
+        // there is unreachable from the host. What keeps it off the network is the published port,
+        // which docker binds to the host's 127.0.0.1 and nothing else.
+        '--hostname',
+        '0.0.0.0',
+      ],
+    };
+  }
+  // `sleep infinity` otherwise: a box with no agent in it still has to stay alive, because agents
+  // arrive by `docker exec` and a container whose main process has exited cannot be exec'd into.
+  return { command: ['sleep', 'infinity'] };
+}
+
 export class BoxService {
   #manager: BoxManager;
   #image: string;
@@ -92,12 +133,11 @@ export class BoxService {
   // born, but a box can be removed by a `docker system prune`, by an image rebuild, or by the user —
   // and a project whose box vanished must keep working rather than becoming permanently broken. The
   // manager adopts a running box, so the common case is one `docker inspect`.
-  async ensure(
-    projectRoot: string,
-    backend: BoxBackend,
-    publishPort?: number,
-    command?: string[],
-  ): Promise<EnsuredBox> {
+  //
+  // THE SHAPE IS NOT A PARAMETER. It is `boxShape(backend)` above, so that two callers cannot ask for
+  // the same box in two different ways — which they did, and which evicted each other's container.
+  async ensure(projectRoot: string, backend: BoxBackend): Promise<EnsuredBox> {
+    const shape = boxShape(backend);
     // `boxPathsForBackend` creates the state directory as a side effect, which is deliberate: docker
     // would otherwise create a missing bind source itself, root-owned, on the host.
     return this.#manager.ensure({
@@ -106,11 +146,8 @@ export class BoxService {
       paths: boxPathsForBackend(projectRoot, backend),
       env: boxEnvFor(backend),
       image: this.#image,
-      ...(publishPort ? { publishPort } : {}),
-      // `sleep infinity` by default: a box with no agent in it still has to stay alive, because
-      // agents arrive by `docker exec` and a container whose main process has exited cannot be
-      // exec'd into. OpenCode's box overrides it — there, the server IS the main process.
-      command: command ?? ['sleep', 'infinity'],
+      ...(shape.publishPort ? { publishPort: shape.publishPort } : {}),
+      command: shape.command,
     });
   }
 

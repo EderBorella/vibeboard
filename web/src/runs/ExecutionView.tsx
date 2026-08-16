@@ -106,32 +106,40 @@ export function ExecutionView({
                   {(record.summary || record.note) && (
                     <p className="exec-summary">{record.summary ?? record.note}</p>
                   )}
-                  {stoppable && (
-                    <button
-                      type="button"
-                      className="report-stop"
-                      title={`Stop the ${record.skill} run on ${subject}`}
-                      onClick={() => onCancel(record)}
-                    >
-                      Stop
-                    </button>
-                  )}
-                  {column.key === 'attention' && (
-                    <button
-                      type="button"
-                      className="report-dismiss"
-                      title={`Mark the ${record.skill} run on ${subject} dealt with`}
-                      onClick={() => onResolve(record)}
-                    >
-                      Dismiss
-                    </button>
-                  )}
-                  {/* BESIDE DISMISS, because the two are the pair of answers to a failed run and this
-                      column is where a person actually meets one. Dismiss says "I have read this";
-                      this says "stop it counting against the card". Offered only for a run that HAS a
-                      card — a project run has no attempt tally to clear. */}
-                  {column.key === 'attention' && record.card && record.board && (
-                    <ForgiveAttempts board={record.board} card={record.card} onForgiven={onForgiven} />
+                  {/* A ROW OF ITS OWN, because `.exec-run` is a flex COLUMN — every direct child of it
+                      lands on its own line, so two sibling buttons stacked rather than sitting together.
+                      Wrapping, so the result and error lines ForgiveAttempts renders (both
+                      `flex-basis: 100%`) still break underneath the buttons rather than squeezing them. */}
+                  {(stoppable || column.key === 'attention') && (
+                    <div className="exec-actions">
+                      {stoppable && (
+                        <button
+                          type="button"
+                          className="report-stop"
+                          title={`Stop the ${record.skill} run on ${subject}`}
+                          onClick={() => onCancel(record)}
+                        >
+                          Stop
+                        </button>
+                      )}
+                      {column.key === 'attention' && (
+                        <button
+                          type="button"
+                          className="report-dismiss"
+                          title={`Mark the ${record.skill} run on ${subject} dealt with`}
+                          onClick={() => onResolve(record)}
+                        >
+                          Dismiss
+                        </button>
+                      )}
+                      {/* BESIDE DISMISS, because the two are the pair of answers to a failed run and
+                          this column is where a person actually meets one. Dismiss says "I have read
+                          this"; this says "stop it counting against the card". Offered only for a run
+                          that HAS a card — a project run has no attempt tally to clear. */}
+                      {column.key === 'attention' && record.card && record.board && (
+                        <ForgiveAttempts board={record.board} card={record.card} onForgiven={onForgiven} />
+                      )}
+                    </div>
                   )}
                 </div>
               );

@@ -340,9 +340,18 @@ describe('WorkArea', () => {
       />,
     );
     const column = screen.getByLabelText('Requires attention');
-    expect(column.querySelector('.report-dismiss')?.textContent).toBe('Dismiss');
+    const dismiss = column.querySelector('.report-dismiss');
+    const forgive = column.querySelector('.reports-forgive');
+    expect(dismiss?.textContent).toBe('Dismiss');
     // The RENAMED label. "Try this card again" promised a retry the button does not perform.
-    expect(column.querySelector('.reports-forgive')?.textContent).toBe('Clear failed tries');
+    expect(forgive?.textContent).toBe('Clear failed tries');
+
+    // ON ONE LINE, which is a layout fact jsdom cannot measure — it has no layout at all, so a test
+    // that asked for coordinates would be asserting against zeroes. What IS checkable is the structure
+    // the layout rests on: `.exec-run` is a flex column, so two buttons that are its direct children
+    // stack no matter what else is styled. They must share one action row instead.
+    expect(dismiss?.parentElement).toBe(forgive?.parentElement);
+    expect(dismiss?.parentElement?.className).toBe('exec-actions');
   });
 
   // A project run — a checkup or the bootstrap — has no card, so there is no attempt tally to clear

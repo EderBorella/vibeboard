@@ -1277,6 +1277,11 @@ body {
   background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 0.45rem 0.55rem;
 }
 .exec-run-top { display: flex; align-items: baseline; gap: 0.4rem; width: 100%; }
+/* The run's actions, side by side. `.exec-run` is a flex column, so without this every button is its
+   own row — Dismiss and Clear failed tries stacked, which reads as two unrelated controls rather than
+   the pair of answers to one failed run. Wraps, so ForgiveAttempts' result and error lines (both
+   `flex-basis: 100%`) still take a line of their own underneath. */
+.exec-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem; width: 100%; }
 .exec-skill { font-size: 0.78rem; }
 /* Cost takes the push-right when present, so cost and elapsed sit together at the end of the row. */
 .exec-cost { margin-left: auto; color: var(--muted); font-family: var(--font-mono); font-size: 0.66rem; }

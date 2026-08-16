@@ -60,6 +60,9 @@ declare module 'fastify' {
     // The auto-pilot loop's process, so main.ts can take it down on the way out. A detached child
     // survives its parent, so nothing else would.
     service: ServiceProcess;
+    // The chat's own turn, for the same reason as `runner` and for one more: main.ts does not close
+    // the app, so the onClose hook below never fires there.
+    copilot: CopilotSession;
     // Hangs up on a revoked device's sockets, or on every socket for `null`. Exposed for main.ts's
     // SIGUSR2 break-glass: emptying the device store leaves the browsers holding sockets that are
     // still streaming, and an idle tab never makes the HTTP call that would 401.
@@ -308,11 +311,33 @@ export function buildApp(
     return reply.code(404).send({ error: 'Not found' });
   });
 
+  // CLOSING THE APP STOPS THE AGENTS IT STARTED. Until this hook existed, `app.close()` shut the
+  // HTTP server and nothing else, and an agent turn still in flight was simply abandoned.
+  //
+  // Measured 2026-08-16: the suite had left **54 orphaned shim processes** on this machine, the
+  // oldest running for a day and eighteen hours, two more every time the copilot tests ran. Each is a
+  // pair reparented to init — a turn is spawned into its OWN process group (`detached`), which is
+  // what makes the group-kill on cancel work and is also what lets it outlive the worker that made
+  // it. In production the same pair survives a `docker rm` only by accident, because the agent it
+  // wraps dies with the container.
+  //
+  // The hook and not each test's afterEach: a test that throws mid-way never reaches its own cleanup,
+  // and that is exactly when a turn is most likely to be in flight.
+  app.addHook('onClose', async () => {
+    copilot.cancel();
+    runner.cancelAll();
+  });
+
   // Exposed for main.ts's shutdown handlers: a spawned agent outlives the server unless something
-  // stops it, and the composition root is the only place that holds the runner.
+  // stops it, and the composition root is the only place that holds these. main.ts deliberately does
+  // NOT call `app.close()` on a signal — a graceful Fastify close waits for in-flight requests, which
+  // is the wrong thing to do to a Ctrl-C — so it cancels these itself and the hook above does not
+  // fire there. Two callers, one behaviour; that is why the hook is a pair of one-line calls rather
+  // than the place the logic lives.
   app.decorate('runner', runner);
   app.decorate('autopilot', autopilot);
   app.decorate('service', service);
+  app.decorate('copilot', copilot);
   app.decorate('closeDevice', closeDevice);
 
   return app;

@@ -14,6 +14,13 @@ if (process.env.VIBEBOARD_SHIM_ARGS) {
   appendFileSync(process.env.VIBEBOARD_SHIM_ARGS, `${JSON.stringify(args)}\n`);
 }
 
+// Its own pid, so a test can ask the OS whether this process is still alive rather than inferring it
+// from anything this file chooses to print. A turn that is never cancelled leaks a process that
+// outlives the whole test run, and nothing observable from inside the suite can see that happen.
+if (process.env.VIBEBOARD_SHIM_PID) {
+  appendFileSync(process.env.VIBEBOARD_SHIM_PID, `${process.pid}\n`);
+}
+
 const resumed = args.includes('--resume');
 // The id the CLI reports. A resumed turn reports the id it was given, exactly as the real one does —
 // which is what makes a resumed session indistinguishable from a fresh one in the stored record, and

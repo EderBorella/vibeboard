@@ -81,6 +81,10 @@ for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) {
     // them. They would go on working, and spending, on a board nobody is watching.
     const stopped = app.runner.cancelAll();
     if (stopped > 0) console.log(`\n  stopped ${stopped} run${stopped === 1 ? '' : 's'} still in flight`);
+    // The CHAT's turn too, which was missing from this list for as long as the list existed. It is the
+    // same kind of process as a run — spawned into its own group, so nothing else takes it down — and
+    // a three-minute reasoning turn is very often what is in flight when somebody presses Ctrl-C.
+    app.copilot.cancel();
     // And the auto-pilot loop. It is spawned DETACHED, so it is in its own session: a terminal's Ctrl-C
     // never reaches it, SIGHUP never reaches it, and losing its parent only reparents it to init. Without
     // this line it goes on ticking against a port nothing is listening on, and the next server finds a
@@ -103,6 +107,7 @@ for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) {
 }
 process.once('exit', () => {
   app.runner.cancelAll();
+  app.copilot.cancel();
   app.service.stop();
   stopOpencodeServer();
   removeApiSocketFile();

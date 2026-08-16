@@ -1,4 +1,4 @@
-import { dirname, resolve } from 'node:path';
+import { dirname, isAbsolute, resolve } from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import { DEFAULT_BACKEND } from '../../core/backends.js';
 import { type ScaffoldMode, scaffoldProject } from '../../store/project/scaffold.js';
@@ -45,8 +45,28 @@ export async function registerProjectRoutes(api: FastifyInstance, ctx: AppCtx): 
     return 'Auto-pilot is running in this project. Soft-stop it before opening or creating another one.';
   }
 
+  // WHERE A PROJECT IS, said in full or not said at all.
+  //
+  // The New Project form concatenates a free-text parent folder with the name, so one missing leading
+  // slash asked for `data/projects/calculator`. Nothing here made it absolute or refused it, and Node
+  // resolves a relative path against the SERVER's working directory — so the project was created inside
+  // the VibeBoard install. docker then refused its box ("includes invalid characters for a local volume
+  // name": to `-v`, a relative string is a volume NAME), auto-pilot's pre-flight commit ran in
+  // VibeBoard's own repository and stopped a run over a failure in VibeBoard's test suite, and the
+  // project never got the `.git/hooks` pin its box depends on.
+  //
+  // REFUSED RATHER THAN RESOLVED. `resolve()` would have produced exactly that directory, silently, and
+  // the same guess would be made again on the next relative path. From a browser, a relative path means
+  // nobody has said where they meant — so the honest answer is to say so and write nothing.
+  const notAbsolute = (path: unknown): string | undefined =>
+    typeof path === 'string' && isAbsolute(path)
+      ? undefined
+      : `Give an absolute path, starting with "/". A relative one is resolved against VibeBoard's own folder rather than yours.`;
+
   api.post('/project/open', async (req, reply) => {
     const { path } = req.body as { path: string };
+    const badPath = notAbsolute(path);
+    if (badPath) return reply.code(400).send({ error: badPath });
     const refusal = await switchRefusal(path);
     if (refusal) return reply.code(409).send({ error: refusal });
     // The copilot's credential names the project it was minted against, exactly as a run's does. Ended
@@ -68,6 +88,10 @@ export async function registerProjectRoutes(api: FastifyInstance, ctx: AppCtx): 
 
   api.post('/project/scaffold', async (req, reply) => {
     const { path, name, mode } = req.body as { path: string; name: string; mode: ScaffoldMode };
+    // FIRST, because this one writes: `scaffoldProject` creates the folder, the board and the git repo,
+    // and a request refused after that leaves a real project the user has been told does not exist.
+    const badPath = notAbsolute(path);
+    if (badPath) return reply.code(400).send({ error: badPath });
     // Before anything is written: scaffolding creates a project AND opens it, so it is a switch.
     const refusal = await switchRefusal();
     if (refusal) return reply.code(409).send({ error: refusal });

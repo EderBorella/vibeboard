@@ -42,7 +42,17 @@ export function ProjectGate({ onOpened }: Props) {
 
   const nameSlug = slugify(newName);
   const parent = newParent.replace(/\/+$/, '');
-  const targetPath = parent && nameSlug ? `${parent}/${nameSlug}` : '';
+  // A RELATIVE PARENT IS NOT A PLACE. This field is free text and its value is concatenated straight
+  // into a path, so `data/projects` — one missing leading slash — asked the server to create
+  // `data/projects/calculator`, which Node resolved against the SERVER's working directory. The project
+  // landed inside the VibeBoard install: docker refused its box (to `-v`, a relative string is a volume
+  // NAME), auto-pilot's pre-flight commit ran in VibeBoard's own repository and stopped the run over a
+  // failure in VibeBoard's test suite, and the project never got the `.git/hooks` pin its box needs.
+  //
+  // The endpoint refuses this too and that is the enforcement; this is so the answer arrives while the
+  // person is still typing rather than as a 400 afterwards.
+  const relativeParent = parent !== '' && !parent.startsWith('/');
+  const targetPath = parent && nameSlug && !relativeParent ? `${parent}/${nameSlug}` : '';
 
   useEffect(() => {
     listProjects()
@@ -108,6 +118,12 @@ export function ProjectGate({ onOpened }: Props) {
             </button>
           </div>
         </label>
+        {relativeParent && (
+          <div className="gate-preview">
+            Give an absolute path, starting with <code>/</code>. A relative one is resolved against
+            VibeBoard's own folder rather than yours.
+          </div>
+        )}
         {targetPath && (
           <div className="gate-preview">
             Creates <code>{targetPath}</code>

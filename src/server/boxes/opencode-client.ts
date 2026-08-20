@@ -1,3 +1,4 @@
+import { Agent, fetch as undiciFetch } from 'undici';
 import { type CopilotEvent, num } from '../copilot-events.js';
 import { opencodeBaseUrl, opencodeDirectory, opencodeLog } from './opencode-server.js';
 
@@ -130,15 +131,89 @@ interface OpencodeTurnOptions {
   onEvent: (event: CopilotEvent) => void;
 }
 
+// NO TIMEOUT OF ITS OWN, and that is the whole reason this dispatcher exists.
+//
+// Node's `fetch` uses undici, whose default `headersTimeout` is 300 SECONDS. A model that takes longer than
+// that to produce its first byte — ordinary for a free one — makes the request reject with
+// `TypeError: fetch failed`, which is indistinguishable at a glance from a server that is not there.
+//
+// Measured on the calculator project, 2026-08-17: ELEVEN failures at 300.7–300.9 seconds across five cards, in
+// one afternoon. Every one burned an attempt because the request really had been sent; E-002's three `fix` runs
+// took it to its cap; and auto-pilot then reported that the cards could not be done. Nothing was wrong with any
+// card, and `VIBEBOARD_RUN_TIMEOUT_MS` — the bound the product documents — is thirty minutes.
+//
+// So the turn's own timer is the ONE bound: `agent-turn.ts` holds it, with an AbortController that reaches this
+// request through `signal`. A second, shorter, undeclared bound down here is what produced the eleven.
+//
+// `undici` is imported rather than reaching for the global `fetch` because an `Agent` is the only way to set
+// this, and it is the same library Node uses internally — so the error shapes `neverConnected` classifies are
+// unchanged. ONE agent for the process: a new one per request would open a connection pool per turn.
+// Exported as a value because an `Agent` does not expose what it was built with, and "no cap" is the claim
+// worth pinning: the behavioural test proves the dispatcher is wired, and this proves the numbers are zero
+// rather than merely large — a ten-minute cap is the same defect one order of magnitude further out.
+export const OPENCODE_TIMEOUTS = { headersTimeout: 0, bodyTimeout: 0 } as const;
+
+let dispatcher: Agent | undefined;
+export function opencodeDispatcher(): Agent {
+  dispatcher ??= new Agent({ ...OPENCODE_TIMEOUTS });
+  return dispatcher;
+}
+
 async function postJson(url: string, body: unknown, signal?: AbortSignal): Promise<unknown> {
-  const res = await fetch(url, {
+  const res = await undiciFetch(url, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(body),
+    dispatcher: opencodeDispatcher(),
     signal,
   });
+  // A NON-2xx IS NOT AN UNREACHABLE SERVER, and `neverConnected` below depends on this staying an
+  // ordinary Error: the server answered, so it may have spent tokens before it failed.
   if (!res.ok) throw new Error(`opencode ${res.status}: ${(await res.text()).slice(0, 200)}`);
   return res.json();
+}
+
+// THE REQUEST NEVER CROSSED THE WIRE — the one failure where zero usage is a measurement rather than a
+// guess, and therefore the one that lets `fault.ts` call a dead turn the machine's fault.
+//
+// `fault.ts` classifies infrastructure only from usage the backend REPORTED being zero in both
+// directions; absent usage tells us nothing and is deliberately not treated as zero. That left the
+// OpenCode case unclassifiable, and its comment said so. Three records on 2026-08-16 are what this is
+// derived from: a container had been replaced under a live server, so every dispatch rejected in 449ms
+// with `fetch failed`, nothing was charged to any model, and auto-pilot blamed a README nothing had
+// read.
+//
+// THE CAUSE CODE, NEVER THE SURFACE. `TypeError: fetch failed` is what Node throws for a refused
+// connection AND for a server that accepted the request and answered too slowly — measured, a
+// `headersTimeout` fires at 300862ms with exactly that message. Matching the TypeError alone therefore
+// called a five-minute model timeout "never reached a model", which is false twice over: the request
+// was sent and may have spent tokens, and classifying it as the machine's fault stops it burning an
+// attempt, so a card that times out every time would retry for ever without ever reaching a person.
+// The calculator project hit precisely that on 2026-08-16 — every first run died at 5m01s.
+//
+// So the list is connection ESTABLISHMENT failures only, each of which is a measurement that no byte
+// left this process: there was nothing to send it over. A timeout, a reset and an unrecognised cause all
+// fail towards "the agent's own", which costs a card one attempt it did not deserve — where being wrong
+// the other way costs the whole cap and never reaches a person.
+//
+// AN ABORT IS REFUSED FIRST, not merely downstream. A cancelled turn and a timed-out one reject the same
+// fetch, and both are already refused by `neverReachedModel` — but a person's decision to stop a run must
+// not read as the machine breaking, and that reason belongs here rather than two modules away.
+const NEVER_SENT = new Set([
+  'ECONNREFUSED', // nothing listening — a replaced or stopped box
+  'ENOTFOUND', // no such host
+  'EAI_AGAIN', // DNS could not answer
+  'EHOSTUNREACH',
+  'ENETUNREACH',
+  'UND_ERR_CONNECT_TIMEOUT', // the connection itself never came up
+]);
+
+export function neverConnected(err: unknown): boolean {
+  const cause = err instanceof OpencodeTurnFailed ? err.cause : err;
+  if (cause instanceof DOMException && cause.name === 'AbortError') return false;
+  if (!(cause instanceof TypeError)) return false;
+  const code = (cause.cause as { code?: unknown } | undefined)?.code;
+  return typeof code === 'string' && NEVER_SENT.has(code);
 }
 
 // Run one OpenCode turn over the persistent server. Reuses the session id across turns

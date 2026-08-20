@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { messageToEvents, splitModel } from '../src/server/boxes/opencode-client.js';
+import {
+  messageToEvents,
+  neverConnected,
+  OpencodeTurnFailed,
+  splitModel,
+} from '../src/server/boxes/opencode-client.js';
 
 describe('splitModel', () => {
   it('splits provider/model on the first slash (modelID may contain slashes)', () => {
@@ -144,5 +149,107 @@ describe('messageToEvents', () => {
       ).stats;
       expect(stats).not.toHaveProperty('turns');
     });
+  });
+});
+
+// A REQUEST THAT NEVER CROSSED THE WIRE, which is the one thing that makes a dead OpenCode turn
+// classifiable. `fault.ts` will only call a run the machine's fault when the backend REPORTED usage and
+// that usage was zero both ways — absent usage says nothing at all — and its own comment names this as
+// the one known case left unclassified for want of a record to derive it from.
+//
+// There are three now, from the calculator project on 2026-08-16: 449ms each, no turns, no tokens, and
+// a whole transcript of `[opencode failed: fetch failed]`. Auto-pilot burned all three of
+// derive-features' attempts on them and stopped saying the README was too thin to derive features
+// from. Nothing had opened the README.
+//
+// The distinction this pins is the honest one: a connection that was never established moved no
+// tokens, and we know it. A server that ANSWERED — 500, 404, anything — may have done work first, so
+// that stays unclaimed and keeps burning, exactly as before.
+describe('whether the request reached the server at all', () => {
+  it('calls a refused connection unreachable', () => {
+    // What undici throws when nothing is listening: a TypeError whose cause carries the syscall error.
+    // This is the shape the calculator produced against a container that had been removed.
+    const err = new TypeError('fetch failed');
+    (err as Error & { cause?: unknown }).cause = Object.assign(new Error('connect ECONNREFUSED'), {
+      code: 'ECONNREFUSED',
+    });
+
+    expect(neverConnected(err)).toBe(true);
+  });
+
+  it('does not call an HTTP error unreachable, because the server answered it', () => {
+    // `postJson` throws this itself for a non-2xx. The server was reached and may have spent tokens
+    // before failing, so claiming zero usage here would hand a card unlimited retries.
+    expect(neverConnected(new Error('opencode 500: internal error'))).toBe(false);
+  });
+
+  it('sees through the wrapper that carries the session id out of a failed turn', () => {
+    // `opencodeTurn` rewraps so a failed turn does not lose its conversation. The classification has to
+    // read the cause rather than the wrapper, or every unreachable turn reads as an ordinary failure.
+    // Carries a real cause code: the wrapper is what is under test, and a fixture without one now
+    // passes for the wrong reason — it would be refused whether the unwrapping worked or not.
+    const cause = new TypeError('fetch failed');
+    (cause as Error & { cause?: unknown }).cause = Object.assign(new Error('connect ECONNREFUSED'), {
+      code: 'ECONNREFUSED',
+    });
+    const wrapped = new OpencodeTurnFailed('ses_x', cause);
+
+    expect(neverConnected(wrapped)).toBe(true);
+  });
+
+  it('refuses an abort, because a cancelled turn is a person’s decision and not the machine’s fault', () => {
+    // A cancelled or timed-out turn rejects the same fetch. `neverReachedModel` already refuses both,
+    // so this is belt and braces — but it keeps the reason here rather than resting on a guard two
+    // modules away.
+    const abort = new DOMException('This operation was aborted', 'AbortError');
+
+    expect(neverConnected(abort)).toBe(false);
+  });
+});
+
+// THE CASE THAT NEARLY WENT IN WRONG. Measured, not reasoned about: a server that accepts a request and
+// does not answer makes Node's fetch throw `TypeError: fetch failed` after 300862ms with
+// `cause.code = UND_ERR_HEADERS_TIMEOUT`. That is the SAME surface shape as a refused connection, and a
+// predicate that matched TypeError alone called it "never reached a model".
+//
+// It is not. The request was sent; the model may have been working for five minutes and spending tokens
+// the whole time. Worse, classifying it as the machine's fault stops it burning an attempt — so a card
+// that times out every time would retry for ever and never reach a person, which is the one direction
+// `fault.ts` says this must never be wrong in.
+//
+// This is exactly what the calculator project hit on 2026-08-16: every first run against a free model
+// died at 5m01s, the retry succeeded, and each failure cost an attempt.
+describe('a slow server is not an absent one', () => {
+  const undiciError = (code: string, name: string): TypeError => {
+    const err = new TypeError('fetch failed');
+    (err as Error & { cause?: unknown }).cause = Object.assign(new Error(name), { code, name });
+    return err;
+  };
+
+  it('refuses a headers timeout: the request WAS sent', () => {
+    expect(neverConnected(undiciError('UND_ERR_HEADERS_TIMEOUT', 'HeadersTimeoutError'))).toBe(false);
+  });
+
+  it('refuses a body timeout, for the same reason', () => {
+    expect(neverConnected(undiciError('UND_ERR_BODY_TIMEOUT', 'BodyTimeoutError'))).toBe(false);
+  });
+
+  it('refuses a reset connection: it was established, so something may have crossed it', () => {
+    expect(neverConnected(undiciError('ECONNRESET', 'Error'))).toBe(false);
+  });
+
+  it('still accepts the failures that mean nothing was ever sent', () => {
+    // Connection-establishment errors only. Each of these is a measurement that no byte left this
+    // process: there was nothing to send it over.
+    expect(neverConnected(undiciError('ECONNREFUSED', 'Error'))).toBe(true);
+    expect(neverConnected(undiciError('ENOTFOUND', 'Error'))).toBe(true);
+    expect(neverConnected(undiciError('EHOSTUNREACH', 'Error'))).toBe(true);
+    expect(neverConnected(undiciError('UND_ERR_CONNECT_TIMEOUT', 'ConnectTimeoutError'))).toBe(true);
+  });
+
+  it('refuses a TypeError with no cause at all, rather than guessing', () => {
+    // A bug of ours throwing a bare TypeError must not be reported as a dead network — an unclassified
+    // failure costs one attempt, a wrongly-classified one costs the cap.
+    expect(neverConnected(new TypeError('fetch failed'))).toBe(false);
   });
 });

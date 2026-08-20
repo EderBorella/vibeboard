@@ -6,7 +6,7 @@ import { INSTRUCTIONS_FILE } from '../core/layout.js';
 import { groupStartTime, terminateGroup } from '../exec/process-group.js';
 import { boxEnvFor } from './boxes/containers.js';
 import { claudeConfigDir, isolationEnabled } from './boxes/copilot-env.js';
-import { OpencodeTurnFailed, opencodeTurn } from './boxes/opencode-client.js';
+import { neverConnected, OpencodeTurnFailed, opencodeTurn } from './boxes/opencode-client.js';
 import { NOT_REQUESTED, type SandboxStatus, wrapCommand } from './boxes/sandbox.js';
 import { type CopilotEvent, parseCopilotLine, type ResultStats } from './copilot-events.js';
 import { errorText } from './errors.js';
@@ -161,6 +161,52 @@ function claudeCommand(opts: AgentTurnOptions): { bin: string; args: string[] } 
 
 // OpenCode: talk to a persistent `opencode serve` over HTTP (per-turn message, session reused
 // across turns when the caller supplies one). The VibeBoard instructions go in the `system` field.
+// WHAT A TURN THAT NEVER REACHED THE SERVER SPENT: nothing, and we know it rather than assume it.
+//
+// `fault.ts` will only call a dead run the machine's fault from usage the backend REPORTED being zero
+// in both directions — absent usage says nothing at all — so an OpenCode turn that could not open a
+// connection was indistinguishable on disk from an agent that tried and gave up. Three such runs on
+// 2026-08-16 burned every attempt `derive-features` had and produced a stop blaming a README that
+// nothing had opened.
+//
+// `costUsd: 0` is a measurement for the same reason the tokens are: nobody was billed for a request
+// nobody received. `durationMs` is real wall clock and is carried because it is what made these
+// recognisable by eye — 449ms against a healthy run's two minutes — even though `fault.ts` refuses to
+// classify on duration and says why.
+function unreachableStats(startedAt: number): ResultStats {
+  return {
+    ok: false,
+    text: '',
+    costUsd: 0,
+    durationMs: Date.now() - startedAt,
+    contextTokens: 0,
+    outputTokens: 0,
+  };
+}
+
+// How an OpenCode turn that threw is reported. Lifted out of the closure it used to sit in, which the
+// complexity gate refused once this decision joined the two already there — and the three are about
+// different things, which is the better argument for separating them.
+function failedTurn(
+  err: unknown,
+  ctx: { opts: AgentTurnOptions; timedOut: boolean; startedAt: number; stats?: ResultStats },
+): AgentTurnResult {
+  // The session THIS TURN was working in, carried out of the failure. A turn that created a session and
+  // then failed used to report none, so the chat forgot a conversation that exists on the server and
+  // its next message opened another — losing the thread instead of continuing it.
+  const sessionId = err instanceof OpencodeTurnFailed ? err.sessionId : ctx.opts.sessionId;
+  // `ctx.stats ?? …` and never an overwrite: a turn that streamed real numbers and then lost the
+  // connection spent what it spent, and replacing those with zeroes would erase it.
+  const stats = ctx.stats ?? (neverConnected(err) ? unreachableStats(ctx.startedAt) : undefined);
+  return {
+    ...(sessionId ? { sessionId } : {}),
+    model: ctx.opts.model,
+    exitCode: 1,
+    timedOut: ctx.timedOut,
+    ...(stats ? { stats } : {}),
+  };
+}
+
 function startOpencode(opts: AgentTurnOptions): RunningTurn {
   const abort = new AbortController();
   let timedOut = false;
@@ -172,6 +218,11 @@ function startOpencode(opts: AgentTurnOptions): RunningTurn {
     });
     abort.abort();
   }, opts.timeoutMs);
+
+  // Measured around the whole turn, and only ever read on the failure path: a turn that reached the
+  // server reports the server's own timing, which is the better number. This one exists so a turn that
+  // reached nothing can still say how long it took to find that out.
+  const startedAt = Date.now();
 
   // Tapped on the way through rather than returned by the client: the result event is one of the
   // events the caller is already being sent, and a failed turn still reports what it spent.
@@ -195,16 +246,8 @@ function startOpencode(opts: AgentTurnOptions): RunningTurn {
       });
       return { sessionId, model: opts.model, exitCode: 0, timedOut, stats };
     } catch (err) {
-      if (!timedOut)
-        opts.onEvent({
-          kind: 'text',
-          text: `\n[opencode failed: ${errorText(err)}]`,
-        });
-      // The session THIS TURN was working in, carried out of the failure. A turn that created a
-      // session and then failed used to report none, so the chat forgot a conversation that exists on
-      // the server and its next message opened another — losing the thread instead of continuing it.
-      const sessionId = err instanceof OpencodeTurnFailed ? err.sessionId : opts.sessionId;
-      return { ...(sessionId ? { sessionId } : {}), model: opts.model, exitCode: 1, timedOut, stats };
+      if (!timedOut) opts.onEvent({ kind: 'text', text: `\n[opencode failed: ${errorText(err)}]` });
+      return failedTurn(err, { opts, timedOut, startedAt, ...(stats ? { stats } : {}) });
     } finally {
       clearTimeout(timer);
     }

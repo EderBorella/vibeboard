@@ -150,7 +150,7 @@ interface Queued {
 
 // The turn's stats as the record keeps them: `ok` and `text` belong to the turn, not to the ledger,
 // and the numbers are copied verbatim — a zero cost is what a free model really cost, not a gap.
-function usageFromStats(stats: ResultStats | undefined): RunUsage | undefined {
+export function usageFromStats(stats: ResultStats | undefined): RunUsage | undefined {
   if (!stats) return undefined;
   return {
     costUsd: stats.costUsd,

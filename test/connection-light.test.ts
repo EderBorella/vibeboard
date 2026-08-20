@@ -236,3 +236,29 @@ describe('what the light says when you hover it', () => {
     }
   });
 });
+
+// A BACKEND THAT IS NOT ANSWERING is the third refusal, and it needed its own advice or it would have fallen
+// through to "Docker is not ready" — which is both wrong and unactionable when docker is fine.
+//
+// It exists because the two older checks say the machine COULD run an agent, not that the thing it talks to is
+// alive. On 2026-08-16 an OpenCode server was destroyed under a live URL, every dispatch died in 449ms, and
+// this light stayed green because nothing was refusing and nothing had asked.
+describe('the balloon for a backend that is not answering', () => {
+  const refusal =
+    'the OpenCode server for this project is not answering — restart it in Settings › Sandbox, or switch backend';
+
+  it('names the backend rather than Docker, and carries the server’s own sentence', () => {
+    const advice = lightAdvice('offline', refusal, 'backend');
+
+    expect(advice.heading).toMatch(/not answering/i);
+    // The heading must not blame docker: docker is up, and sending someone to rebuild an image they have
+    // is the same class of wrong answer as telling them their README is too thin.
+    expect(advice.heading).not.toMatch(/docker/i);
+    expect(advice.detail).toBe(refusal);
+  });
+
+  it('says what still works, like every other offline branch', () => {
+    // The sentence that stops a person assuming the whole app is down — the reading surfaces are unaffected.
+    expect(lightAdvice('offline', refusal, 'backend').next).toMatch(/board/i);
+  });
+});

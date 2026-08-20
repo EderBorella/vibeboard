@@ -12,6 +12,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 // silently lacked it would have made the `instanceof` check dead and the session id vanish again.
 const client = vi.hoisted(() => ({
   opencodeTurn: vi.fn(),
+  // Mocked as a seam rather than reimplemented: WHAT counts as unreachable is settled in
+  // test/opencode-client.test.ts against undici’s real error shape. What belongs here is that
+  // agent-turn asks the question at all, and what it does with the answer.
+  neverConnected: vi.fn(() => false),
   OpencodeTurnFailed: class extends Error {
     readonly sessionId: string;
     constructor(sessionId: string, cause: unknown) {
@@ -478,6 +482,43 @@ describe('the opencode backend', () => {
     const { result } = await opencodeTurn();
     expect(result.exitCode).toBe(1);
     expect(result.stats).toEqual(stats);
+  });
+
+  it('reports zero usage when the server was never reached, so the run can be classified', async () => {
+    // THE WHOLE POINT OF THE ZEROES. fault.ts calls a run the machine's fault only from usage the
+    // backend REPORTED being zero both ways; reporting nothing leaves it unclassified, which is how
+    // three 449ms runs against a dead container burned every attempt derive-features had and produced
+    // a stop about a README nothing had opened.
+    //
+    // Zero is a MEASUREMENT here, not a default: the connection was never established, so nothing was
+    // sent and nothing came back.
+    client.neverConnected.mockReturnValue(true);
+    const boom = new TypeError('fetch failed');
+    client.opencodeTurn.mockRejectedValue(boom);
+
+    const { result, events } = await opencodeTurn();
+
+    expect(client.neverConnected).toHaveBeenCalledWith(boom);
+    expect(result.exitCode).toBe(1);
+    expect(result.stats?.contextTokens).toBe(0);
+    expect(result.stats?.outputTokens).toBe(0);
+    expect(result.stats?.ok).toBe(false);
+    // And the transcript still says what happened, in the harness's own words — that sentence is what
+    // the stop and both lights quote back to the user.
+    expect(events).toContainEqual({ kind: 'text', text: '\n[opencode failed: fetch failed]' });
+  });
+
+  it('claims nothing when the server ANSWERED and then failed', async () => {
+    // A non-2xx means the request arrived, so tokens may well have been spent. Reporting zeroes here
+    // would tell fault.ts the model was never engaged and hand a genuinely failing card unlimited
+    // retries — the one direction this must never be wrong in.
+    client.neverConnected.mockReturnValue(false);
+    client.opencodeTurn.mockRejectedValue(new Error('opencode 500: internal error'));
+
+    const { result } = await opencodeTurn();
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stats).toBeUndefined();
   });
 
   it('adds the research persona only in research mode, and nothing else', async () => {

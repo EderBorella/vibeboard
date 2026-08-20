@@ -196,3 +196,76 @@ describe('agentRefusal', () => {
     expect(reason).toContain('VIBEBOARD_OPENCODE_URL');
   });
 });
+
+// A BACKEND THAT IS NOT ANSWERING IS ALSO A NOT-OK SANDBOX, and it is the third fault this status carries.
+//
+// Docker being up and the credential being current says the machine COULD run an agent. It does not say the
+// thing an agent talks to is alive. On 2026-08-16 an OpenCode server was destroyed under a live URL and every
+// dispatch died in 449ms with `fetch failed` — three attempts spent in five seconds, and auto-pilot blamed
+// the README. The lights were green throughout, because nothing was refusing and nothing had asked.
+//
+// ASYMMETRIC BY NECESSITY, and this is the decision worth stating: OpenCode is a long-lived server we can ask
+// a question of for nothing, while Claude Code is a process spawned per turn, so there is no equivalent
+// question that does not cost a real spawn. The checks therefore differ per backend — which means this status
+// means slightly different things for the two, and that is better than a symmetric check that either costs
+// money or proves nothing.
+describe('a backend that is not answering', () => {
+  const ok = { probe: async () => ({ ok: true as const }) };
+  const dead = {
+    live: false as const,
+    reason: 'the OpenCode server in this project’s box is not answering — restart it in Settings › Sandbox',
+  };
+
+  it('is reported as not ok, with its own kind and its own sentence', async () => {
+    const status = await liveSandbox(ok, 'img', { now: () => 0, backend: async () => dead })();
+
+    expect(status.ok).toBe(false);
+    expect(status.ok === false && status.kind).toBe('backend');
+    expect(status.ok === false && status.reason).toBe(dead.reason);
+  });
+
+  it('leaves the sandbox ok when the backend answers', async () => {
+    const status = await liveSandbox(ok, 'img', {
+      now: () => 0,
+      backend: async () => ({ live: true }),
+    })();
+
+    expect(status).toEqual({ ok: true, image: 'img' });
+  });
+
+  it('is asked AFTER the credential, so the more fundamental fault is the one reported', async () => {
+    // A dead credential and an unanswering server can be true at once — an expired sign-in is why the
+    // server would be refusing — and "fix your sign-in" is the message that helps. Asking anyway would also
+    // cost a request per probe to a server that cannot work yet.
+    let asked = 0;
+    const status = await liveSandbox(ok, 'img', {
+      now: () => 0,
+      credential: async () => ({ fresh: false as const, reason: 'the sign-in has expired' }),
+      backend: async () => {
+        asked += 1;
+        return dead;
+      },
+    })();
+
+    expect(status.ok === false && status.kind).toBe('credential');
+    expect(asked).toBe(0);
+  });
+
+  it('is not asked about when docker has already said no', async () => {
+    let asked = 0;
+    const status = await liveSandbox(
+      { probe: async () => ({ ok: false as const, reason: 'the agent image is not built' }) },
+      'img',
+      {
+        now: () => 0,
+        backend: async () => {
+          asked += 1;
+          return dead;
+        },
+      },
+    )();
+
+    expect(status.ok === false && status.kind).toBe('docker');
+    expect(asked).toBe(0);
+  });
+});

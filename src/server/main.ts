@@ -5,10 +5,11 @@ import { DeviceStore } from './auth/devices.js';
 import { installBreakGlass, signinBanner } from './auth/signin-terminal.js';
 import { ProjectSession } from './boards/session.js';
 import { listenOnApiSocket, removeApiSocketFile } from './boxes/api-socket.js';
+import { backendCheck } from './boxes/backend-liveness.js';
 import { BoxService } from './boxes/box-service.js';
 import { DEFAULT_IMAGE } from './boxes/containers.js';
 import { credentialCheck } from './boxes/credential-freshness.js';
-import { stopOpencodeServer } from './boxes/opencode-server.js';
+import { knownOpencodeUrl, stopOpencodeServer } from './boxes/opencode-server.js';
 import { liveSandbox, probeSandbox } from './boxes/sandbox.js';
 import { installCrashHandlers, serverLogger } from './logging.js';
 import { restoreLastProject } from './settings/app-state.js';
@@ -65,6 +66,14 @@ const sandboxNow = liveSandbox(boxes, DEFAULT_IMAGE, {
   // consulted and it is the one the project would actually run. A thunk, not a value, for the same reason
   // the root used to be one — the open project changes under a server that is built once.
   credential: credentialCheck({ backend: () => session.config?.copilot.backend }),
+  // AND WHETHER THAT BACKEND IS ANSWERING, which the two checks above cannot say: docker being up and the
+  // credential being current means an agent COULD run, not that the thing it talks to is alive. Asked of the
+  // same backend, for the same reason — and built on `knownOpencodeUrl`, which never starts a server, because
+  // this runs behind the sandbox TTL on a timer.
+  backend: backendCheck({
+    backend: () => session.config?.copilot.backend,
+    url: knownOpencodeUrl,
+  }),
 });
 const app = buildApp(session, {
   logger: logging.options,

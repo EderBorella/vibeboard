@@ -122,6 +122,7 @@ export {
   type DispatchRequest,
   dispatchRun,
   forgiveCardAttempts,
+  forgiveProjectAttempts,
   getAccounting,
   listCardRuns,
   listRuns,

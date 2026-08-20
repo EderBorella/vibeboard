@@ -227,6 +227,14 @@ export function forgiveCardAttempts(board: BoardName, card: string): Promise<{ f
   return post<{ forgiven: number }>(`/api/runs/${board}/${encodeURIComponent(card)}/forgive`, {});
 }
 
+// THE SAME ACTION FOR THE BOOTSTRAP, which has no card to address. Its attempts are counted over the
+// project's own runs, so `forgiveCardAttempts` cannot reach them — measured on 2026-08-16, when an
+// unreachable OpenCode server spent all three of a project's derivation attempts and the only remedy was
+// deleting files out of `project-runs/` by hand.
+export function forgiveProjectAttempts(): Promise<{ forgiven: number }> {
+  return post<{ forgiven: number }>('/api/runs/project/forgive', {});
+}
+
 // The same decision for either kind of run. A project run has no card in its path, so it has its own
 // endpoint — and every caller holds the record rather than the three parts, so the choice belongs
 // here instead of at each button.

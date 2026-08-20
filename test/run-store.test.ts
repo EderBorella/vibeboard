@@ -1,7 +1,7 @@
 import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { attemptsUsed } from '../src/core/accounting.js';
+import { attemptsUsed, burnsAttempt } from '../src/core/accounting.js';
 import { boardRel, CONFIG_DIR, CONFIG_FILE, DOCS_DIR, RESULTS_DIR, RUNS_DIR } from '../src/core/layout.js';
 import { type RunRecord, runId } from '../src/core/runs.js';
 import { isIgnored } from '../src/server/boards/session.js';
@@ -9,7 +9,9 @@ import {
   appendTranscript,
   foldReport,
   forgiveCardRuns,
+  forgiveProjectRuns,
   listCardRuns,
+  listProjectRuns,
   listRuns,
   markInterrupted,
   projectRunPath,
@@ -480,5 +482,75 @@ describe('a run id that is not one', () => {
   it('still builds the path for an id the generator produced', () => {
     const id = runId(new Date('2026-08-04T10:00:00Z'), 'ab12');
     expect(projectRunPath('/tmp/project', id)).toContain(`${id}.md`);
+  });
+});
+
+// THE BOOTSTRAP HAS NO CARD, so none of the above reaches it — and it is the one position that stops the
+// whole project rather than one card.
+//
+// An empty board plus a README is derived by a card-less run of `derive-features`, and its cap is counted
+// over PROJECT runs of that skill (`bootstrap` in core/lifecycle/tick.ts). `forgiveCardRuns` needs a board
+// and a card to find records at all, so there was no supported way back from a bootstrap the machine had
+// spent: on 2026-08-16 the calculator's three attempts were consumed by an unreachable OpenCode server, and
+// clearing them meant deleting files from `project-runs/` by hand — which destroys the account of why the
+// project was stuck, and which nobody could be expected to know to do.
+describe('forgiveProjectRuns', () => {
+  const derivation = (over: Partial<RunRecord> = {}): RunRecord =>
+    record({ card: undefined, board: undefined, skill: 'derive-features', ...over });
+
+  it('clears the card-less endings and counts them', async () => {
+    const root = await tempDir();
+    await writeRun(root, derivation({ run: 'p-1', status: 'failed' }));
+    await writeRun(root, derivation({ run: 'p-2', status: 'attention' }));
+    await writeRun(root, derivation({ run: 'p-3', status: 'success' }));
+
+    expect(await forgiveProjectRuns(root, 'T')).toBe(2);
+    const byId = new Map((await listProjectRuns(root)).map((r) => [r.run, r]));
+    expect(byId.get('p-1')?.forgiven).toBe('T');
+    expect(byId.get('p-2')?.forgiven).toBe('T');
+    // Same rule as the card version, for the same reason: a derivation that WORKED is history. Clearing
+    // it would free the loop to derive the whole board a second time.
+    expect(byId.get('p-3')?.forgiven).toBeUndefined();
+  });
+
+  it('takes the bootstrap tally back to zero, which is the assertion that matters', async () => {
+    // Made through the same expression `bootstrap` uses, not by reading `forgiven`: what the user needs is
+    // a project auto-pilot will derive again, and this is the only statement of that.
+    const root = await tempDir();
+    for (const n of [1, 2, 3]) await writeRun(root, derivation({ run: `p-${n}`, status: 'failed' }));
+    const tally = async () =>
+      (await listProjectRuns(root)).filter((r) => r.skill === 'derive-features' && burnsAttempt(r)).length;
+    expect(await tally()).toBe(3);
+
+    await forgiveProjectRuns(root, 'T');
+
+    expect(await tally()).toBe(0);
+  });
+
+  it('does not touch a card’s runs, which have their own button', async () => {
+    // The two are separate actions on separate positions: clearing a stuck bootstrap must not quietly
+    // re-open every card in the project.
+    const root = await tempDir();
+    await writeRun(root, derivation({ run: 'p-1', status: 'failed' }));
+    await writeRun(root, record({ run: 'c-1', status: 'failed' }));
+
+    expect(await forgiveProjectRuns(root, 'T')).toBe(1);
+    expect(
+      (await listCardRuns(root, 'engineering', 'E-010')).find((r) => r.run === 'c-1')?.forgiven,
+    ).toBeUndefined();
+  });
+
+  it('leaves alone what never cost the project anything, and is a no-op the second time', async () => {
+    const root = await tempDir();
+    await writeRun(root, derivation({ run: 'p-cancelled', status: 'cancelled' }));
+    await writeRun(root, derivation({ run: 'p-running', status: 'running' }));
+    // Already the machine's fault, so it never burned (core/accounting.ts).
+    await writeRun(root, derivation({ run: 'p-infra', status: 'failed', fault: 'infrastructure' }));
+    expect(await forgiveProjectRuns(root, 'T')).toBe(0);
+
+    await writeRun(root, derivation({ run: 'p-failed', status: 'failed' }));
+    expect(await forgiveProjectRuns(root, 'T')).toBe(1);
+    expect(await forgiveProjectRuns(root, 'LATER')).toBe(0);
+    expect((await listProjectRuns(root)).find((r) => r.run === 'p-failed')?.forgiven).toBe('T');
   });
 });

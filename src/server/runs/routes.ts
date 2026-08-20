@@ -18,7 +18,9 @@ import { foundationStatus, readGates } from '../../store/project/foundation.js';
 import { readSkills } from '../../store/project/skill-catalogue.js';
 import {
   forgiveCardRuns,
+  forgiveProjectRuns,
   listCardRuns,
+  listProjectRuns,
   listRuns,
   readRun,
   resolveProjectRun,
@@ -511,6 +513,31 @@ export async function registerRunRoutes(api: FastifyInstance, ctx: AppCtx): Prom
     // a card the caps had stopped dispatchable again, and months later "why did this card get four
     // tries" is a question only this line answers.
     req.log.info({ board, card, forgiven, by: req.credential?.scope }, "a person cleared a card's attempts");
+    return { forgiven };
+  });
+
+  // THE SAME ACTION FOR THE POSITION WITH NO CARD, and it needs its own route because the one above is
+  // addressed by board and card.
+  //
+  // The bootstrap — an empty board derived from the README — runs without a card, so its cap is counted over
+  // PROJECT runs of that skill and `forgiveCardRuns` cannot even find the records. Measured 2026-08-16: an
+  // unreachable OpenCode server spent all three of the calculator's derivation attempts in five seconds, and
+  // the only way back was deleting files out of `project-runs/` by hand.
+  //
+  // NOT `/runs/:board/:card/forgive` with a sentinel card, which was the cheaper shape and the wrong one: a
+  // card id that means "no card" would have to be understood by `listCardRuns`, the results-folder layout and
+  // every reader of a record, and one of them would eventually treat it as a real card.
+  api.post('/runs/project/forgive', async (_req, reply) => {
+    if (!ensureOpen(ctx.session, reply)) return;
+    const runs = await listProjectRuns(ctx.session.root);
+    // Same refusal as the card route, from the records rather than from the runner, and for the same reason:
+    // a dispatch already decided will land as an attempt a moment later and put the count straight back.
+    const refusal = forgiveRefusal(runs.filter((r) => isInFlight(r.status)).length);
+    if (refusal) return reply.code(409).send({ error: refusal });
+    const forgiven = await forgiveProjectRuns(ctx.session.root, nowIso());
+    // A person overruling the machine, so the log says who. This is the write that makes a project the caps
+    // had stopped derivable again.
+    _req.log.info({ forgiven, by: _req.credential?.scope }, "a person cleared the project's attempts");
     return { forgiven };
   });
 

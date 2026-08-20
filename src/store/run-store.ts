@@ -320,6 +320,30 @@ export async function forgiveCardRuns(
   return spent.length;
 }
 
+// THE SAME WAY OUT FOR THE POSITION THAT HAS NO CARD.
+//
+// An empty board plus a README is derived by a CARD-LESS run of the bootstrap skill, and its cap is counted
+// over project runs of that skill (`bootstrap`, core/lifecycle/tick.ts) — `attemptsUsed` counts per card and
+// a project run has none, so that tally is the only one there is. `forgiveCardRuns` needs a board and a card
+// to locate records at all, so a bootstrap the machine had spent had no supported way back at all.
+//
+// Measured 2026-08-16: the calculator's three derivation attempts were consumed by an OpenCode server that
+// could not be reached — 449ms each, no model, no tokens — and auto-pilot stopped saying the README might be
+// too thin. Clearing them meant moving files out of `project-runs/` by hand, which is both undiscoverable
+// and destructive of the only account of why the project was stuck.
+//
+// STOPS AT THE PROJECT'S OWN RUNS, deliberately. Clearing a stuck derivation must not quietly re-open every
+// card in the project: those are a different position with a button of their own.
+export async function forgiveProjectRuns(root: string, at: string): Promise<number> {
+  // Same filter as the card version and for the same two reasons: `burnsAttempt` excludes what never cost
+  // anything (cancelled, interrupted, in flight, already infrastructure, already forgiven), so a second
+  // click cannot restamp; and `!== 'success'` keeps a derivation that WORKED, because forgiving it would
+  // let the loop derive the whole board a second time.
+  const spent = (await listProjectRuns(root)).filter((r) => burnsAttempt(r) && r.status !== 'success');
+  for (const record of spent) await writeRun(root, withForgiveness(record, at));
+  return spent.length;
+}
+
 // Fold a finished agent report into the record. Returns the updated record, or null when the agent
 // wrote nothing — the caller decides what a report-less run means.
 // `secret` is the run's credential, redacted out of the report before it is folded in. The report

@@ -9,13 +9,16 @@ import {
   softStopAutopilot,
   startAutopilot,
 } from '../api';
+import { type LightAdvice, lightAdvice } from '../app/connection-light';
 import { killProjectRequest } from '../confirm/requests';
 import { useConfirm } from '../confirm/useConfirm';
 import { BackendPicker } from '../copilot/BackendPicker';
 import { resolveChoice } from '../copilot/choice';
 import type { CopilotConfig } from '../shared';
+import { Popover } from '../ui/Popover';
 import { useAction } from '../useAction';
 import { AutopilotHelp } from './AutopilotHelp';
+import { ForgiveDerivation } from './ForgiveDerivation';
 import { transportModel } from './transport';
 import { useReadiness } from './useReadiness';
 
@@ -44,10 +47,14 @@ interface Props {
 // which exists so the UI can title a refusal without parsing its sentence, and they are the same
 // vocabulary the connection light's advice uses — one fault should not have two names depending on
 // which corner of the chrome reports it.
-const REFUSAL_WORD: Record<'docker' | 'credential' | 'attached', string> = {
+const REFUSAL_WORD: Record<'docker' | 'credential' | 'attached' | 'backend', string> = {
   docker: 'No Docker',
   credential: 'Stale sign-in',
   attached: 'Not sandboxed',
+  // The third kind, and it needs its own word for the same reason the others have one: without it this fell
+  // through to the generic 'Blocked', which says a fault exists and nothing about which — while the remedy
+  // here is a restart rather than a rebuild.
+  backend: 'No agent server',
 };
 
 // WHETHER THE SELECTED AGENT CAN ACTUALLY RUN, in one word and a colour, with the server's own sentence
@@ -61,22 +68,94 @@ const REFUSAL_WORD: Record<'docker' | 'credential' | 'attached', string> = {
 // `null` is NOT ASKED YET, and must never read as "nothing is wrong". Before the answer arrives the bar
 // says it is asking, which is true — showing reassurance would be a lie for the length of a round trip
 // and showing an alarm would be a worse one.
+// AND WHAT HAS ALREADY GONE WRONG, which this chip could not see at all.
+//
+// It read `agentRefusal` alone — "may an agent start right now" — so on 2026-08-16 it said "Ready" while three
+// runs in a row died before reaching a model and auto-pilot stopped itself over them. Nothing was refusing:
+// the box was healthy, the credential was current, and the server it talked to had been destroyed under a live
+// URL. The only surface that knew was the light in the top bar, which had been given the same streak weeks
+// earlier — and this is the surface with the Start button on it.
+//
+// THE ADVICE COMES FROM `lightAdvice`, the top bar's own function, rather than being written again here. One
+// fault must not have two names depending on which corner of the chrome reports it, and this codebase has
+// twice had two descriptions of one rule drift apart. What is local is the WORD, because a chip has room for
+// one and a balloon does not.
+//
+// A REFUSAL OUTRANKS A STREAK, the same order `lightFor` uses: both are usually true together — a streak is
+// what a refusal was causing — and the one that stops you working now is the one worth the word.
 export function agentStatus(sandbox: SandboxState | null): {
   word: string;
-  tone: 'ok' | 'bad' | 'unknown';
+  tone: 'ok' | 'bad' | 'warn' | 'unknown';
   title: string;
+  advice?: LightAdvice;
 } {
   if (!sandbox) {
     return { word: 'Checking…', tone: 'unknown', title: 'Asking the server whether this agent can run.' };
   }
-  if (!sandbox.agentRefusal) {
-    return { word: 'Ready', tone: 'ok', title: 'This agent has what it needs to run in this project.' };
+  if (sandbox.agentRefusal) {
+    return {
+      word: sandbox.refusalKind ? REFUSAL_WORD[sandbox.refusalKind] : 'Blocked',
+      tone: 'bad',
+      title: sandbox.agentRefusal,
+      advice: lightAdvice('offline', sandbox.agentRefusal, sandbox.refusalKind),
+    };
   }
-  return {
-    word: sandbox.refusalKind ? REFUSAL_WORD[sandbox.refusalKind] : 'Blocked',
-    tone: 'bad',
-    title: sandbox.agentRefusal,
-  };
+  if (sandbox.recentFailure) {
+    return {
+      // NOT 'Ready', and not 'Blocked' either: nothing is refusing, so a word implying a gate would describe
+      // one that does not exist. What is true is that the last runs failed before reaching a model.
+      word: 'Failing',
+      tone: 'warn',
+      title: sandbox.recentFailure.note,
+      advice: lightAdvice('failing', null, null, sandbox.recentFailure),
+    };
+  }
+  return { word: 'Ready', tone: 'ok', title: 'This agent has what it needs to run in this project.' };
+}
+
+// A WORD PLUS A BALLOON, because the word alone cannot carry a remedy — and this is the surface with the Start
+// button on it, so the explanation belongs one click away rather than one surface away. The same pattern, and
+// the same sentences, as the light in the top bar.
+//
+// A healthy agent stays a plain chip: there is nothing to explain, and a balloon that opens onto "everything
+// is fine" teaches people that opening it is not worth it.
+//
+// Its own component because the bar was already at the complexity limit and this is the second conditional
+// rendering in it — the gate refusing the third one is the gate working.
+function AgentChip({ agent }: { agent: ReturnType<typeof agentStatus> }) {
+  const className = `ap-agent-state ap-agent-${agent.tone}`;
+  // A DOT AND THE WORD, like the connection light and like the transport dot two elements to the left. A word
+  // alone is the odd one out on a bar that already says its states with a coloured dot, and the colour is the
+  // part read at a glance — the word is what you read second, once the dot has made you look.
+  const dot = <span className={`ap-agent-dot ap-agent-dot-${agent.tone}`} aria-hidden="true" />;
+  if (!agent.advice) {
+    return (
+      <span className={className} data-testid="ap-agent-state" title={agent.title}>
+        {dot}
+        {agent.word}
+      </span>
+    );
+  }
+  return (
+    <Popover
+      label="What is wrong with this agent"
+      triggerClassName={className}
+      triggerTitle={agent.title}
+      // The id is on the CONTENT rather than on the trigger, so one selector finds this chip whether it is a
+      // plain span or a button with a balloon. A `triggerTestId` prop on the shared Popover would work too,
+      // and is a wider change for one caller's convenience.
+      trigger={
+        <span className="ap-agent-chip" data-testid="ap-agent-state">
+          {dot}
+          {agent.word}
+        </span>
+      }
+    >
+      <strong className="ap-agent-heading">{agent.advice.heading}</strong>
+      <p className="ap-agent-detail">{agent.advice.detail}</p>
+      {agent.advice.next && <p className="ap-agent-next">{agent.advice.next}</p>}
+    </Popover>
+  );
 }
 
 // The transport strip: play, what it is doing, what is missing, and how it works.
@@ -218,13 +297,7 @@ export function AutopilotBar({
             }
             onChange={chooseBackend}
           />
-          <span
-            className={`ap-agent-state ap-agent-${agent.tone}`}
-            data-testid="ap-agent-state"
-            title={agent.title}
-          >
-            {agent.word}
-          </span>
+          <AgentChip agent={agent} />
         </span>
 
         {model.expandable && (
@@ -305,6 +378,20 @@ export function AutopilotBar({
           {model.detail}
         </div>
       )}
+
+      {/*
+        AND THE WAY BACK, beside the sentence that explains the stop.
+        `stalled` is "work remains and nothing it can do would move it", and a spent bootstrap is one way to
+        get there: the calculator's three derivation attempts were consumed by an OpenCode server that could
+        not be reached, and the stop then blamed the README. Cards carry this control beside their own attempt
+        counts; the derivation has no card, so this is the only place it can live.
+        Only on `stalled`, deliberately: on `complete` there is nothing wrong to undo, and while `running` an
+        unfinished run would land as an attempt of its own moments later — which is why the server refuses it
+        too rather than only the button.
+      */}
+      <div className="ap-bar-remedy" data-testid="ap-bar-remedy">
+        <ForgiveDerivation reason={state?.reason} onForgiven={onChanged} />
+      </div>
 
       {open && (
         <div className="ap-drawer" data-testid="ap-drawer">

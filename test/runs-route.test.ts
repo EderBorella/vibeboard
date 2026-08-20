@@ -1285,3 +1285,61 @@ describe('POST /api/runs — a fix run is told what failed', () => {
     expect(prompt).toContain('Tests  1 failed | 40 passed');
   }, 30000);
 });
+
+// THE WAY BACK FROM A SPENT BOOTSTRAP, which is the one position with no card and therefore no button.
+//
+// An empty board plus a README is derived by a card-less run, and its cap is counted over PROJECT runs of
+// that skill. On 2026-08-16 the calculator's three attempts were spent by an OpenCode server that could not
+// be reached — 449ms each, no model, no tokens — and auto-pilot stopped saying the README might be too thin
+// to derive from. Clearing them meant deleting files out of `project-runs/` by hand.
+describe('POST /api/runs/project/forgive', () => {
+  const derivation = (run: string, over: Partial<RunRecord> = {}): RunRecord => ({
+    run,
+    skill: 'derive-features',
+    status: 'failed',
+    started: '2026-08-16T22:55:40.473Z',
+    backend: 'opencode',
+    model: 'opencode/deepseek-v4-flash-free',
+    effort: 'high',
+    mode: 'bypassPermissions',
+    report: '[opencode failed: fetch failed]',
+    ...over,
+  });
+
+  const forgive = (project: TestProject) =>
+    project.app.inject({ method: 'POST', url: '/api/runs/project/forgive' });
+
+  it('clears the derivation’s attempts, says how many, and keeps the records', async () => {
+    const project = await openTestProject({ runBin: SHIM });
+    for (const n of [1, 2, 3]) await writeRun(project.root, derivation(`p-${n}`));
+
+    const res = await forgive(project);
+
+    expect([res.statusCode, res.json()]).toEqual([200, { forgiven: 3 }]);
+    // From disk, and still saying what happened: the history is the point of stamping rather than deleting.
+    const kept = await readProjectRun(project.root, 'p-1');
+    expect(kept?.forgiven).toBeDefined();
+    expect(kept?.status).toBe('failed');
+    expect(kept?.report).toBe('[opencode failed: fetch failed]');
+  });
+
+  it('says nothing was counting rather than implying it fixed something', async () => {
+    const project = await openTestProject({ runBin: SHIM });
+    const res = await forgive(project);
+    expect([res.statusCode, res.json()]).toEqual([200, { forgiven: 0 }]);
+  });
+
+  it('refuses while a derivation has not finished, and touches nothing', async () => {
+    // Same reason as the card route: an in-flight run lands as an attempt of its own moments later, so
+    // clearing now reads as a button that did nothing.
+    const project = await openTestProject({ runBin: SHIM });
+    await writeRun(project.root, derivation('p-done'));
+    await writeRun(project.root, derivation('p-live', { status: 'running' }));
+
+    const res = await forgive(project);
+
+    expect(res.statusCode).toBe(409);
+    expect(res.json().error).toMatch(/has not finished/);
+    expect((await readProjectRun(project.root, 'p-done'))?.forgiven).toBeUndefined();
+  });
+});

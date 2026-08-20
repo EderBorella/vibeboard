@@ -28,9 +28,14 @@ import { dockerBin, execArgs } from './containers.js';
 // below is deliberately ONE function and the last time this codebase had two of them they diverged with
 // a real failure. Widening the status means every gate that already refuses a missing image refuses a
 // dead credential too, automatically, on the day it is added and on every day after.
+// `backend` is the third, and it answers a question the other two cannot: docker being up and the credential
+// being current says the machine COULD run an agent, not that the thing an agent talks to is alive. Measured
+// 2026-08-16: an OpenCode server was destroyed under a live URL, every dispatch died in 449ms with
+// `fetch failed`, three attempts were spent in five seconds — and both lights stayed green, because nothing
+// was refusing and nothing had asked.
 export type SandboxStatus =
   | { ok: true; image: string }
-  | { ok: false; reason: string; kind: 'docker' | 'credential' };
+  | { ok: false; reason: string; kind: 'docker' | 'credential' | 'backend' };
 
 // `docker`, because "not requested" is a statement about the container layer: nothing asked for a box,
 // so nothing probed for one. It is not a credential we looked at and disbelieved.
@@ -44,6 +49,17 @@ interface SandboxProbe {
 // than imported, so this file stays a decision about a status and needs no daemon and no filesystem to
 // test; `credential-freshness.ts` is the implementation and `main.ts` is where the two meet.
 export type CredentialCheck = () => Promise<{ fresh: true } | { fresh: false; reason: string }>;
+
+// WHETHER THE THING AN AGENT TALKS TO IS ANSWERING. Injected as a bare thunk for the same reason the
+// credential check is: this file stays a decision about a status and needs no network to test.
+//
+// ASYMMETRIC BETWEEN THE BACKENDS, deliberately, and the asymmetry is the honest part. OpenCode is a
+// long-lived server, so "are you there?" is one cheap request. Claude Code is a process spawned per turn:
+// there is no equivalent question that does not cost a real spawn, so that backend answers `live` and keeps
+// the credential check as its only forward-looking gate. A symmetric check here would either spend money on
+// every probe or prove nothing — this status therefore means slightly more for one backend than the other,
+// which is worth saying out loud rather than papering over.
+export type BackendCheck = () => Promise<{ live: true } | { live: false; reason: string }>;
 
 // A LIVE answer, because the startup one was wrong the moment anybody touched Docker.
 //
@@ -78,7 +94,7 @@ export function liveSandbox(
   // ONE cache for both halves, under the one TTL, behind the one shared in-flight promise. A second
   // cache for the credential would be a second thing to expire, and the two would then disagree for up
   // to a second at a time — which is the whole class of bug the live status was introduced to end.
-  opts: { ttlMs?: number; now?: () => number; credential?: CredentialCheck } = {},
+  opts: { ttlMs?: number; now?: () => number; credential?: CredentialCheck; backend?: BackendCheck } = {},
 ): LiveSandbox {
   const ttl = opts.ttlMs ?? SANDBOX_TTL_MS;
   const now = opts.now ?? Date.now;
@@ -89,7 +105,7 @@ export function liveSandbox(
   return async () => {
     if (cached && now() - cached.at < ttl) return cached.status;
     if (inFlight) return await inFlight;
-    inFlight = probeSandbox(service, image, opts.credential)
+    inFlight = probeSandbox(service, image, opts.credential, opts.backend)
       .then((status) => {
         cached = { at: now(), status };
         return status;
@@ -106,6 +122,7 @@ export async function probeSandbox(
   service: SandboxProbe,
   image: string,
   credential?: CredentialCheck,
+  backend?: BackendCheck,
 ): Promise<SandboxStatus> {
   const res = await service.probe();
   // ORDER IS THE BEHAVIOUR, and only the docker answer decides whether the second question is even
@@ -116,6 +133,12 @@ export async function probeSandbox(
   if (!res.ok) return { ok: false, reason: res.reason, kind: 'docker' };
   const cred = await credential?.();
   if (cred && !cred.fresh) return { ok: false, reason: cred.reason, kind: 'credential' };
+  // LAST, and the order is the same argument again. A dead credential and an unanswering server are true
+  // together far more often than either is true alone — an expired sign-in is WHY a server would be refusing
+  // — and "fix your sign-in" is the sentence that helps. Asking anyway would also spend a request per probe
+  // on a server that cannot work until the credential is fixed.
+  const live = await backend?.();
+  if (live && !live.live) return { ok: false, reason: live.reason, kind: 'backend' };
   return { ok: true, image };
 }
 

@@ -18,6 +18,13 @@ function opencodeBin(): string {
 
 let child: ChildProcess | undefined;
 let urlPromise: Promise<string> | undefined;
+// THE URL OF A SERVER ALREADY CONFIRMED UP, for anything that wants to ASK a question of it rather than
+// start one. `opencodeBaseUrl` cannot serve that purpose: it spawns on demand, so a liveness probe built on
+// it would create the very server it was checking for — and the sandbox probe runs on a timer.
+//
+// Set only after `waitForServer` has had an answer, and cleared everywhere `urlPromise` is, so it can never
+// outlive the thing it names.
+let liveUrl: string | undefined;
 let log: Log | undefined;
 let boxes: BoxService | undefined;
 // The `docker logs -f` follower for the boxed server, so it can be replaced on restart and stopped
@@ -180,6 +187,7 @@ async function startServerInBox(service: BoxService): Promise<string> {
   }
   const url = `http://127.0.0.1:${handle.hostPort}`;
   await waitForServer(url, Date.now() + BOX_READY_TIMEOUT_MS);
+  liveUrl = url;
   followBoxLog(handle.name);
   log?.info({ url, box: handle.name }, 'opencode serve is up in its box');
   return url;
@@ -276,6 +284,7 @@ function startServer(): Promise<string> {
       if (child === proc) {
         child = undefined;
         urlPromise = undefined;
+        liveUrl = undefined;
       }
       if (!settled) {
         settled = true;
@@ -296,6 +305,17 @@ function startServer(): Promise<string> {
 // take-over action clears it at runtime, and a captured value would keep refusing afterwards.
 export function attachedOpencodeUrl(): string | undefined {
   return process.env.VIBEBOARD_OPENCODE_URL || undefined;
+}
+
+// A SERVER TO ASK, or nothing — and it NEVER starts one.
+//
+// This is what a liveness probe has to be built on. `opencodeBaseUrl` spawns on demand, so a probe using it
+// would create the server it was checking for, on a timer, whether or not anybody wanted a turn.
+//
+// `undefined` means NOBODY HAS STARTED ONE YET, which is not a fault: the server is started by the first
+// turn that needs it. The probe reports nothing wrong in that case, because nothing is.
+export function knownOpencodeUrl(): string | undefined {
+  return attachedOpencodeUrl() ?? liveUrl;
 }
 
 export function opencodeBaseUrl(): Promise<string> {
@@ -339,6 +359,7 @@ function trackFailure(p: Promise<string>): Promise<string> {
     if (urlPromise === p) {
       urlPromise = undefined;
       urlProject = undefined;
+      liveUrl = undefined;
     }
     throw err;
   });
@@ -379,6 +400,7 @@ export function stopOpencodeServer(): void {
   // talking to a server that had been stopped, or to a box that had been removed.
   urlPromise = undefined;
   urlProject = undefined;
+  liveUrl = undefined;
   logs?.kill('SIGTERM');
   logs = undefined;
   if (child) {

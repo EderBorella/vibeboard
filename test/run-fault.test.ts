@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { burnsAttempt } from '../src/core/accounting.js';
 import type { RunUsage } from '../src/core/runs.js';
+import { usageFromStats } from '../src/server/runs/agent-runner.js';
 import {
   agentErrorLine,
   infrastructureNote,
@@ -141,5 +143,46 @@ describe('the note that replaces “exited with code 1 and wrote no report”', 
   it('says so plainly when the transcript explains nothing', () => {
     const note = infrastructureNote(ending(), '{"kind":"usage","contextTokens":0}');
     expect(note).toBe('The agent never reached a model and its transcript does not say why (exit code 1).');
+  });
+});
+
+// THE WHOLE CHAIN, WITH THE REAL FUNCTIONS AT EVERY HOP.
+//
+// Composed rather than asserted hop by hop, because each hop's own test passes while the chain is
+// broken — which is exactly how this bug survived. `producedNothing` in core/runs/predicates.ts carries
+// the same lesson from 2026-08-06: its tests hand-built `report: ''`, a shape the runner never writes,
+// so the refusal was dead in production and green in the suite.
+//
+// The numbers are the ones agent-turn now reports for a server that was never reached, and the
+// question is whether a run recorded from them stops being charged to the card.
+describe('an unreachable OpenCode server, end to end', () => {
+  it('is classified as the machine’s fault and does not burn an attempt', () => {
+    // What `startOpencode` returns when `neverConnected` says the request never crossed the wire.
+    // 449ms is the measured figure from the calculator's three dead runs, kept because it is what made
+    // them recognisable by eye — fault.ts still refuses to classify on it.
+    const stats = { ok: false, text: '', costUsd: 0, durationMs: 449, contextTokens: 0, outputTokens: 0 };
+
+    // The runner's own mapping, exported for this: zeroes must survive it. A `...(x ? {x} : {})` here
+    // would drop them and put the record straight back to "usage absent", which classifies nothing.
+    const usage = usageFromStats(stats);
+    expect(usage?.contextTokens).toBe(0);
+    expect(usage?.outputTokens).toBe(0);
+
+    const ending: RunEnding = { cancelled: false, timedOut: false, exitCode: 1, ...(usage ? { usage } : {}) };
+    expect(neverReachedModel(ending)).toBe(true);
+
+    // And the consequence the user actually feels: three of these in a row no longer exhaust a card.
+    expect(burnsAttempt({ status: 'failed', fault: 'infrastructure' })).toBe(false);
+  });
+
+  it('still burns when the server answered, however badly', () => {
+    // No stats at all — the shape a 500 leaves, since `neverConnected` refuses it and nothing else
+    // reports usage. Absent usage is not zero usage, and an unclassified failure must keep burning or
+    // a card that genuinely cannot be done retries for ever and never reaches a person.
+    const usage = usageFromStats(undefined);
+    expect(usage).toBeUndefined();
+
+    expect(neverReachedModel({ cancelled: false, timedOut: false, exitCode: 1 })).toBe(false);
+    expect(burnsAttempt({ status: 'failed' })).toBe(true);
   });
 });

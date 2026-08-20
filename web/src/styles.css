@@ -1756,12 +1756,61 @@ body {
    need when the message is long. */
 .ap-agent { display: inline-flex; align-items: center; gap: 0.4rem; flex: none; }
 .ap-agent-state { font-size: 0.68rem; white-space: nowrap; }
+/* THE DOT, because a bare word was the odd one out: the transport state two elements to the left says itself
+   with `.ap-dot`, and the connection light in the top bar with `.conn`. Smaller than both at 7px — those two
+   are the primary states of the app and the project, and this is a property of one of them. */
+.ap-agent-state,
+.ap-agent-chip { display: inline-flex; align-items: center; gap: 0.3rem; }
+.ap-agent-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); flex: none; }
+/* `currentColor` for the two faults, so the dot cannot drift from the word it belongs to: the tone class
+   already colours the text, and a second colour declaration is a second thing to keep in step. */
+.ap-agent-dot-bad,
+.ap-agent-dot-warn { background: currentColor; }
+.ap-agent-dot-ok { background: var(--ok, #3fb950); }
 /* Only the fault gets a colour. "Ready" and "Checking…" are the states you are not meant to act on, and
    a permanently coloured badge teaches people to stop reading the bar — the same reason the emergency
    stop beside it stays grey until you hover it. */
 .ap-agent-ok,
 .ap-agent-unknown { color: var(--muted); }
 .ap-agent-bad { color: var(--danger); font-weight: 600; }
+/* BELOW the fault colour, on purpose: "Failing" says the last runs died before reaching a model, which has
+   stopped auto-pilot but refuses nothing you do by hand. Painting it `--danger` would make the two
+   indistinguishable, and they need different actions. */
+.ap-agent-warn { color: var(--warn); font-weight: 600; }
+/* A button, because it opens the balloon — but it must read as the chip it replaced, not as a control.
+   `font-family` ONLY, never the `font` shorthand: `font: inherit` resets font-size too, so the chip grew from
+   10.88px to 13.12px the moment it had something to say and shifted the whole row with it. Measured in a real
+   browser — jsdom has no computed cascade, so the suite cannot see this class of defect at all. */
+button.ap-agent-state {
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  font-family: inherit;
+}
+button.ap-agent-state:hover { text-decoration: underline; }
+.ap-agent-heading { display: block; margin-bottom: 0.35rem; }
+.ap-agent-detail,
+.ap-agent-next { margin: 0.35rem 0 0; }
+.ap-agent-next { color: var(--muted); }
+
+/* THE WAY OUT OF A STALLED PROJECT, sized like the other controls in this bar rather than like the card
+   report list it borrowed from. Measured: it came out at 10.88px with 1.6px of padding against 12.16px and
+   4px for Settings and the expander, so the one action on a stopped project read as a caption. */
+.ap-bar-remedy { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.ap-remedy-btn {
+  flex: none;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.25rem 0.55rem;
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 0.76rem;
+  cursor: pointer;
+}
+.ap-remedy-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.ap-remedy-btn:disabled { color: var(--muted); cursor: default; }
 
 .ap-expand,
 .ap-help-btn,

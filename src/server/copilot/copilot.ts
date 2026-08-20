@@ -31,8 +31,17 @@ interface SendOptions {
   onEvent: (event: CopilotEvent) => void;
 }
 
+// FIFTEEN MINUTES, up from three, and the old number was a guess about how long thinking takes.
+//
+// A reasoning model routinely spends minutes on one turn before its first token — three was already tight
+// when the only cost was a chat message that gave up too early. It became the tightest bound in the system on
+// 2026-08-17, when the HTTP layer's undeclared 300-second cap was removed: `postJson` no longer imposes one,
+// so this timer is what actually ends a chat turn, and a run's own bound is thirty minutes.
+//
+// Still a bound rather than none: a turn that never ends holds the chat's single slot for ever, and the
+// refusal it produces names the model and offers to try again. `VIBEBOARD_COPILOT_TIMEOUT_MS` overrides it.
 function copilotTimeoutMs(): number {
-  return Number(process.env.VIBEBOARD_COPILOT_TIMEOUT_MS ?? 180000);
+  return Number(process.env.VIBEBOARD_COPILOT_TIMEOUT_MS ?? 900_000);
 }
 
 // The CHAT copilot: one turn at a time, resumed across turns by session id, run in the open

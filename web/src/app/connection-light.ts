@@ -15,7 +15,7 @@ export type LightState = (typeof LIGHT_STATES)[number];
 // the same union as `SandboxState.refusalKind` in api/sandbox.ts and deliberately not imported from
 // there: this module is the display vocabulary and is tested without the API layer, exactly as
 // `LightState` is kept apart from `ConnState` above.
-export type RefusalKind = 'docker' | 'credential' | 'attached';
+export type RefusalKind = 'docker' | 'credential' | 'attached' | 'backend';
 
 // WHAT ALREADY WENT WRONG, as distinct from what is wrong now. Structurally the same as
 // `SandboxState.recentFailure` in api/sandbox.ts and deliberately not imported from there, for the reason
@@ -83,6 +83,50 @@ export interface LightAdvice {
 //
 // `detail` does NOT vary — it stays the server's sentence verbatim, for the reason above the interface:
 // the two halves have different authors, and the enforced rule is the server's to word.
+// WHAT SURVIVES THE FAULT, said once: every one of these leaves the reading surfaces working, and that is
+// the sentence that stops a person assuming the whole app is down.
+const STILL_WORKS =
+  'The board, the Project Log and the Explorer all keep working — it is agents and the copilot that cannot start.';
+
+// The four ways a project can be unable to run an agent, each with the action that fixes THAT one. Lifted out
+// of `lightAdvice` when the fourth arrived and the complexity gate refused it — which is the gate doing its
+// job: this is a table of causes, and the function it lived in is a router over light states.
+function offlineAdvice(
+  agentRefusal: string | null | undefined,
+  refusalKind?: RefusalKind | null,
+): LightAdvice {
+  // The server's own words, whichever cause this is. See lightTitle below.
+  const detail = agentRefusal ?? 'This project cannot run agents.';
+  if (refusalKind === 'credential') {
+    return {
+      heading: 'The agent box has a stale sign-in',
+      detail,
+      // Rebuilt, not restarted: the mount is bound to the file when the container is created, so
+      // starting the same box again picks up the same dead one.
+      next: `Open Settings and use "Rebuild the agent boxes" — the next turn builds one against the current sign-in. ${STILL_WORKS}`,
+    };
+  }
+  if (refusalKind === 'attached') {
+    return {
+      heading: 'Agents would run outside the sandbox',
+      detail,
+      next: `Open Settings and take over with a managed server. ${STILL_WORKS}`,
+    };
+  }
+  if (refusalKind === 'backend') {
+    return {
+      // NOT "Docker is not ready", which is where this fell through before the branch existed — and it is
+      // exactly the wrong answer, because docker IS ready. Sending someone to rebuild an image they already
+      // have is the same class of mistake as telling them their README is too thin: a true-sounding sentence
+      // about the wrong layer, which is the whole failure this light exists to stop making.
+      heading: 'The agent server is not answering',
+      detail,
+      next: `Restart it in Settings › Sandbox — the next turn talks to the new one. ${STILL_WORKS}`,
+    };
+  }
+  return { heading: 'Docker is not ready', detail, next: STILL_WORKS };
+}
+
 export function lightAdvice(
   light: LightState,
   agentRefusal: string | null | undefined,
@@ -113,35 +157,7 @@ export function lightAdvice(
       next: 'Agents can still be started by hand. Auto-pilot stopped itself over this — deal with the cause above, then press Start to run it again.',
     };
   }
-  if (light === 'offline') {
-    // The server's own words, whichever cause this is. See lightTitle below.
-    const detail = agentRefusal ?? 'This project cannot run agents.';
-    // What survives the fault, said once: the board and the reading tools keep working under every one
-    // of these, and that is the sentence that stops a person assuming the whole app is down.
-    const stillWorks =
-      'The board, the Project Log and the Explorer all keep working — it is agents and the copilot that cannot start.';
-    if (refusalKind === 'credential') {
-      return {
-        heading: 'The agent box has a stale sign-in',
-        detail,
-        // Rebuilt, not restarted: the mount is bound to the file when the container is created, so
-        // starting the same box again picks up the same dead one.
-        next: `Open Settings and use "Rebuild the agent boxes" — the next turn builds one against the current sign-in. ${stillWorks}`,
-      };
-    }
-    if (refusalKind === 'attached') {
-      return {
-        heading: 'Agents would run outside the sandbox',
-        detail,
-        next: `Open Settings and take over with a managed server. ${stillWorks}`,
-      };
-    }
-    return {
-      heading: 'Docker is not ready',
-      detail,
-      next: stillWorks,
-    };
-  }
+  if (light === 'offline') return offlineAdvice(agentRefusal, refusalKind);
   if (light === 'closed') {
     return {
       heading: 'Not connected',

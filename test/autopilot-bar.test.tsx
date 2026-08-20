@@ -470,9 +470,18 @@ describe('whether that agent can actually run', () => {
     // The heading is ours and comes from `refusalKind`, which exists so a refusal can be titled without
     // parsing its sentence. The sentence itself is untouched.
     expect(badge.textContent).toBe('Stale sign-in');
-    expect(badge.getAttribute('title')).toBe(
+    // ON THE BUTTON, not on the word inside it. The chip became a Popover trigger when the balloon was
+    // added, so the tooltip belongs to the element a person actually points at. The sentence being verbatim
+    // is what this test is about, and it is asserted in both places it now appears.
+    expect(badge.closest('button')?.getAttribute('title')).toBe(
       'Claude Code cannot run: the agent box holds a sign-in that was replaced on this machine.',
     );
+    fireEvent.click(badge);
+    expect(
+      screen.getByText(
+        'Claude Code cannot run: the agent box holds a sign-in that was replaced on this machine.',
+      ),
+    ).toBeTruthy();
   });
 
   it.each([
@@ -521,5 +530,118 @@ describe('why it stopped, readable in full', () => {
     show({ state: { ...IDLE, state: 'running', iteration: 1 } });
     await waitFor(() => expect(api.getReadiness).toHaveBeenCalled());
     expect(screen.queryByTestId('ap-bar-detail')).toBeNull();
+  });
+});
+
+// THE WAY BACK FROM A STALLED PROJECT, offered where the stop is read.
+//
+// `stalled` is "work remains and nothing it can do would move it", and the bootstrap reaching its cap is one
+// of the ways to get there — the calculator's did on 2026-08-16, spent by an OpenCode server that could not
+// be reached. The card positions have their own button beside their own attempt counts; the derivation had
+// none, because it has no card.
+describe('clearing a stalled project’s derivation', () => {
+  const STALLED: AutopilotState = {
+    state: 'stopped',
+    iteration: 3,
+    reason: 'stalled',
+    detail:
+      'The board is empty and derive-features has used all 3 attempts at deriving it from the README. Read its runs: the README may be too thin to derive features from, in which case say more in it, or add the first card by hand.',
+  };
+
+  it('offers the clearance beside the sentence that explains the stop', () => {
+    show({ state: STALLED });
+
+    // The stop text and the remedy in one place: a button elsewhere for a sentence read here is how the
+    // remedy goes unfound.
+    expect(screen.getByTestId('ap-bar-detail').textContent).toMatch(/used all 3 attempts/);
+    expect(screen.getByRole('button', { name: /clear the derivation/i })).toBeTruthy();
+  });
+
+  it('does not offer it while auto-pilot is running', () => {
+    // Nothing to clear, and an in-flight derivation would land as an attempt of its own moments later —
+    // the server refuses it for that reason, so the button must not invite the click.
+    show({ state: { state: 'running', iteration: 2 } });
+
+    expect(screen.queryByRole('button', { name: /clear the derivation/i })).toBeNull();
+  });
+
+  it('does not offer it on a stop that finished the work', () => {
+    // `complete` is the loop having nothing left to do. Offering to clear attempts there would suggest
+    // something went wrong when nothing did.
+    show({ state: { state: 'stopped', iteration: 9, reason: 'complete', detail: 'Auto-pilot finished.' } });
+
+    expect(screen.queryByRole('button', { name: /clear the derivation/i })).toBeNull();
+  });
+});
+
+// WHETHER THE AGENTS ARE HEALTHY, on the surface that starts them.
+//
+// The chip beside the backend picker read only `agentRefusal` — "may an agent start right now" — and was
+// blind to what had already happened. So on 2026-08-16, while three runs in a row died before reaching a model
+// and auto-pilot stopped itself over them, this bar said "Ready" throughout: nothing was refusing, and the
+// only surface that knew better was the light in the top bar.
+//
+// The words and sentences come from `lightAdvice`, the same function the top-bar balloon uses, because one
+// fault must not have two names depending on which corner of the chrome reports it.
+describe('the agent health chip', () => {
+  const STREAK = {
+    runs: 3,
+    note: 'The agent never reached a model: [opencode failed: fetch failed] (exit code 1).',
+    at: '2026-08-16T22:55:40.473Z',
+  };
+
+  it('says the runs are failing, where before it said Ready', () => {
+    show({ sandbox: { ...SANDBOX_OK, recentFailure: STREAK } });
+
+    expect(screen.getByTestId('ap-agent-state').textContent).toMatch(/failing/i);
+  });
+
+  it('carries the server’s own sentence in its balloon, not a reworded one', () => {
+    // Reworded into "some runs failed" it becomes advice about nothing: a dead credential and an unreachable
+    // server read identically once the specifics are dropped, and they send a person to different machines.
+    show({ sandbox: { ...SANDBOX_OK, recentFailure: STREAK } });
+
+    fireEvent.click(screen.getByTestId('ap-agent-state'));
+
+    expect(screen.getByText(/opencode failed: fetch failed/)).toBeTruthy();
+  });
+
+  it('still says Ready when nothing has gone wrong', () => {
+    show();
+    expect(screen.getByTestId('ap-agent-state').textContent).toMatch(/ready/i);
+  });
+
+  it('names an unanswering backend rather than calling it Blocked', () => {
+    // The third refusal kind. Without its own word it fell through to the generic one, which says a fault
+    // exists and nothing about which — and the remedy for this one is a restart, not a rebuild.
+    show({
+      sandbox: {
+        ...SANDBOX_OK,
+        ok: false,
+        agentRefusal:
+          'the OpenCode server for this project is not answering — restart it in Settings › Sandbox',
+        refusalKind: 'backend',
+      },
+    });
+
+    const word = screen.getByTestId('ap-agent-state').textContent ?? '';
+    expect(word).not.toMatch(/blocked/i);
+    expect(word).toMatch(/server/i);
+  });
+
+  it('a refusal outranks a streak, because one stops you and the other has stopped', () => {
+    // Both can be true at once — a streak is usually what a refusal was causing — and the one that prevents
+    // work now is the one worth the word. Same ordering as `lightFor`.
+    show({
+      sandbox: {
+        ...SANDBOX_OK,
+        ok: false,
+        agentRefusal: 'Docker is not running',
+        refusalKind: 'docker',
+        recentFailure: STREAK,
+      },
+    });
+
+    expect(screen.getByTestId('ap-agent-state').textContent).not.toMatch(/failing/i);
   });
 });

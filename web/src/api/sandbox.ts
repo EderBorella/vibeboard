@@ -19,7 +19,7 @@ export interface SandboxState {
   // A discriminator rather than a second sentence: the sentence stays the server's, computed by the
   // gate itself, and this only says which kind of thing it is about. `null` exactly when
   // `agentRefusal` is null.
-  refusalKind: 'docker' | 'credential' | 'attached' | null;
+  refusalKind: 'docker' | 'credential' | 'attached' | 'backend' | null;
   // WHAT ALREADY WENT WRONG, as distinct from what is wrong NOW — and it does not gate anything.
   //
   // Every other field here answers "may an agent start", which is a question about the present and is

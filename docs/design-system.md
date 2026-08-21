@@ -1598,7 +1598,7 @@ No baseline file is involved.
 
 # Part Two — the phases the first six did not cover
 
-**Status: Phase 6 done 2026-08-21; Phases 7–10 planned, not started.** Part One built seven primitives and thirteen gates. It was
+**Status: Phases 6 and 7 done 2026-08-21; Phases 8–10 planned, not started.** Part One built seven primitives and thirteen gates. It was
 reviewed phase by phase and every gate was green. It also missed a whole family of work, and the miss was
 reported by the owner looking at the board rather than by any check — which makes the cause worth stating
 before the phases: **only the button shape has a coverage gate.**
@@ -1610,19 +1610,28 @@ only gate that asks *"how much of this shape is still hand-rolled?"*. Nothing as
 primitives, so their remaining backlog is invisible to every check and to every review that trusts the
 checks.
 
-| primitive | call sites | hand-rolled equivalents left | coverage gate |
-|---|---|---|---|
-| `Button` | 66 | **8** (tabs, labels, chips — the ratchet) | yes |
-| `Panel` | ~20 | **32** panel-shaped rules, including `.tile` | **none** |
-| `Field` | 9 | **~33** raw `input`/`textarea`/`select` across 23 files | **none** |
-| `Chip` | 15 | **9** chip classes | **none** |
-| `Readout` | 45 | **14** hand-rolled `--font-mono` rules | **none** |
-| `Dot` | 3 | 1 | none |
-| `SegmentedControl` | 2 | 0 | none |
+The **gate** column is Phase 7's work and every number in it is now printed by
+`npm run check:shape-coverage` on every run. The *estimated* column is what this table carried when Phase 7
+started; the *measured* column is what the census derives, with the disagreements explained under Phase 7.
 
-Commands: `grep -rn '<Chip' web/src --include=*.tsx | wc -l` and siblings; the panel-shaped count is rules
-declaring a `border: 1px`, a `border-radius` and a `background` together; the control count is
-`grep -rn '<input\|<textarea\|<select' web/src --include=*.tsx`.
+| primitive | call sites | hand-rolled, estimated | hand-rolled, the census's own rule | coverage gate |
+|---|---|---|---|---|
+| `Button` | 66 | **8** (tabs, labels, chips — the ratchet) | 8 | `check:radius-scale`, claim 2 |
+| `Panel` | ~20 | **32** panel-shaped rules, including `.tile` | **32** — agrees exactly | `check:shape-coverage`, panel |
+| `Field` | 9 | **~33** raw `input`/`textarea`/`select` across 23 files | **35** of 42 controls | `check:shape-coverage`, control |
+| `Chip` | 15 | **9** chip classes | **10** — five of his nine, plus five he did not name | `check:shape-coverage`, chip |
+| `Readout` | 45 | **14** hand-rolled `--font-mono` rules | **14** — agrees exactly | `check:shape-coverage`, mono |
+| `Dot` | 3 | 1 | 1, **not gated** — `.copilot-status .status-dot` | none |
+| `SegmentedControl` | 2 | 0 | 0, **not gated** | none |
+
+Commands: `grep -rn '<Chip' web/src --include=*.tsx | wc -l` and siblings for the call sites;
+`npm run check:shape-coverage` for every hand-rolled count, which prints its full list on a passing run.
+
+**Two rows still have no gate and that is a decision rather than an omission.** A census for one hand-rolled
+instance is a gate at a backlog of one, and a census for zero is a gate blocking at zero — which this page
+argues for, but there is nothing to ratchet: the segmented control has no equivalent left, and the Dot's one
+is `.copilot-status .status-dot`, a `50%` circle already named in `check-radius-scale.mjs`'s
+`OFF_SCALE_ON_PURPOSE` with its reason. Both belong to whichever phase touches them.
 
 **The chip family is the one the owner saw**, and it is exactly what an uncovered shape looks like: `.tag`,
 `.tag-btn`, `.tag-chip`, `.tag-chip-count`, `.mp-chip`, `.board-archive`, `.tile-setup`,
@@ -1846,17 +1855,102 @@ under `test/` was touched: `npm run lint` clean over **541** files, `npm test` *
 threaded through `audit.ts`, `SurfaceBaseline` in `fixtures.ts`, `furnish` in `run.mjs`, the `surfaces`
 key in three baseline files, and five lines of `board.spec.ts`.
 
-## Phase 7 — gate every primitive, not only buttons
+## Phase 7 — gate every primitive, not only buttons — **DONE 2026-08-21**
 
-One coverage census per shape, in the style of `check-radius-scale.mjs`: chip-shaped, panel-shaped,
-mono-fact, control-shaped. Each reports its hand-rolled remainder and ratchets it.
-
+`tools/check-shape-coverage.mjs`, wired into `npm run check`: four censuses in the style of
+`check-radius-scale.mjs`, each printing its full list on a passing run and blocking an increase.
 **This is the phase that makes the other three honest**, because a number nobody prints is a number nobody
-reduces.
+reduces. It writes no component, migrates nothing, and **the built CSS bundle is byte-identical** —
+`index-Dopb3WPf.css`, sha256 `93b78775…`, before and after.
+
+### The four rules, each in one sentence, and where they disagree with the estimate
+
+| census | the rule | count | the estimate | why they differ |
+|---|---|---|---|---|
+| chip | a rule outside `primitives.css` declaring a `--t-micro`/`--t-small` `font-size`, a `--r-pill`/`--r-sm` `border-radius` and a `padding` — `.vb-chip`'s own declaration set — **or** a surface class on a `<Chip>` that decides a corner, a padding or a size | **10** | 9 | four of the nine declare NO box, and five boxes the list does not name |
+| panel | a rule declaring a `border`/`border-width` of `1px`, a `border-radius` and a `background` together | **32** | 32 | — |
+| mono | a rule declaring `font-family: var(--font-mono)` outside `primitives.css` | **14** | 14 | — |
+| control | a literal `<input>`/`<textarea>`/`<select>` whose nearest enclosing `<Field>` region does not contain it | **35** of 42 | ~33 | the tree holds 42 controls and 7 are already in a `Field`; the estimate was a line count off a grep |
+
+**The chip disagreement is the interesting one and neither number is wrong.** Five of the owner's nine are
+the same rule — `.tag`, `.tag-chip`, `.mp-chip`, `.board-archive`, `.tile-setup`. **Four of his nine declare
+no box at all**: `.tile-suggestions` and `.tile-problem` are a size, an ink and a `white-space: nowrap`, and
+`.tag-btn` and `.tag-chip-count` are a cursor and an opacity on a box declared elsewhere — so they are chips
+by MEANING, and no shape rule separates a state word from any other coloured word without becoming a list of
+names. Phase 8's own gate is where their three tones are asserted. **Five more draw a chip's box and are not
+on his list**: `.mp-def-tag`, `.control-tag`, `.tab-badge`, `.signin-this` and `.markdown code` — the last
+being inline code in rendered prose, the one member that may legitimately never be a `Chip`, counted rather
+than exempted because over-reporting is loud and harmless while an exemption list is a licence.
+
+**Two of the four numbers reproduce the owner's exactly**, which is what says the two methods are measuring
+the same thing where they overlap.
+
+### Migration-blindness was designed against, and then planted at
+
+**The Phase 3 defect was that the census's POPULATION shrank as the migration succeeded** — the geometry
+ratchet read literal `<button>`, so 27 classes moving onto `<Button>` took it from 50 to 23 and a planted
+`padding` exited 0. Each census here answers it in the way its own subject allows:
+
+- **chip, panel and mono read the CSS**, where a shape can only be hand-rolled in one place. Each finding
+  also names a call site read out of `className` text with **no opinion about the tag**, so a hand-rolled
+  class that lands on `<Chip>`, `<Panel>` or `<ReadoutLine>` is still counted and still located. Proven on
+  all three by planting at an ALREADY-MIGRATED site: a `padding` on `.report-chip` (which lives on
+  `<Chip className>`), the border/corner/ground trio on `.archive-drawer` (`<Panel className>`) and a mono
+  face on `.copilot-readout` (`<ReadoutLine className>`) each exited **1**, naming the primitive's own call
+  site.
+- **the chip census has a second arm for exactly that hole** — a surface class on a `<Chip>` may not decide
+  the box — and it is **at zero today**, which is the half that goes up the moment a chip is migrated
+  carelessly. It is deliberately NOT extended to `<Panel className>`: Phase 4 measured that counting every
+  `Panel` reports `.archive-drawer`, `.exec-column` and `.halt` — three correct designs — as faults.
+- **control reads the JSX and prints its POPULATION beside its findings**, so migration moves a control from
+  one to the other and leaves the population where it was. Proven by wrapping `DiagnosticsPanel`'s checkbox
+  in a `<Field>`: findings **35 → 34**, in-Field **7 → 8**, population **42 unchanged**. The "in a Field"
+  test is per-ELEMENT and never per-file, which is the same defect one level along: a planted raw `<input>`
+  in `SettingsModal.tsx` — a file with nine migrated Fields already — was still counted, exit **1**.
+
+### No count floors, and three self-tests instead
+
+**A floor on a number the sweep exists to reduce fails the run for succeeding**, which has now happened
+twice here. So `cssSelfTest`, `controlSelfTest` and `siteSelfTest` assert the patterns against fixtures the
+tree cannot move, and all three go through the census's own functions. Each fires on a broken pattern AND on
+a wrong expectation, proven eleven ways, each restored: the chip radius list, the panel `1px` test, the mono
+regex, the `<Chip` tag name, `rulesOf`'s brace matcher, `CONTROL_TAGS`, the `<Field` region reader, the
+`className` reader — and a deliberately wrong number in each of the three fixtures' expectations.
+
+**Two findings about the checks themselves came out of writing those self-tests, and both are causes removed
+rather than notes added:**
+
+- **`rulesOf` did not reset its selector cursor at a `{`**, so a rule nested in an `@media` read as
+  `@media (min-width: 1px) { .theta` — and because the at-rule's own body contains every declaration inside
+  it, the shape was ALSO counted a second time under the prelude. `check-radius-scale.mjs` records that
+  double-count as a latent over-report it can live with; a census whose entire output is a count cannot, so
+  this file counts a shape inside an at-rule exactly once and under its own selector.
+- **A self-test that asserts its own argument is the old defect in a new place.** The `<Chip` tag was written
+  literally at both the run's call site and the self-test's, so breaking the run's copy took the second arm
+  blind and the run exited **0** — the same failure as a self-test carrying its own regex. It is one
+  constant now, and re-planting it exits **1**.
+
+**And a third finding about the locator, which is the "verify what a search matched" rule.** The first
+version looked for the class as a bare token anywhere in the corpus and reported `.markdown code` as used at
+`cards/CardView.tsx:1` — the `markdown` MODULE in an import. Scoped to `className` values it reads
+`CardView.tsx:95`, it understands the ternary `.popover` is written with, and it refuses a `title="two
+words"` in the same tag. Three rules print **no literal className** and every one is correct:
+`.inline-view` and `.inline-edit` reach their element through a variable, and `.msg-assistant` is composed at
+run time.
 
 **Gate:** each census blocks an increase, prints its full list on a passing run, and self-tests its parser
-against a fixture rather than against a count floor — the defect that fired twice in Part One.
-**Exit:** the table above, with a gate in every row.
+against a fixture rather than against a count floor. Proven by four planted increases, each exiting **1**
+from `npm run check` and each restored: a pill box on `.tile-suggestions` (chip 11/10), a `background` on
+`.control-tag` (panel 33/32), a mono face on `.exec-skill` (mono 15/14) and a raw `<input>` in
+`SettingsModal.tsx` (control 36/35).
+
+**Exit:** four censuses at **10 / 32 / 14 / 35**, all wired into `npm run check`. Six of the seven rows in
+the table above now have a gate; `Dot` and `SegmentedControl` do not, for the reason recorded there.
+**Every Part One and Phase 6 number is unmoved**: class budget **380/380**, geometry ratchet **8/8**, **136**
+authored `font-size`, **59** authored `border-radius`, harness **93 tests** on three themes, suite **240
+files / 4,271 tests**, `npm run lint` clean over **542** files.
+**Revert:** `tools/check-shape-coverage.mjs`, two `package.json` entries and this section. No stylesheet, no
+component and no test under `test/` is touched by it.
 
 ## Phase 8 — the chip family
 

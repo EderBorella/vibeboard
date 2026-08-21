@@ -9,7 +9,11 @@
 
 :root {
   /* Shared, non-colour tokens (a theme may override these too). */
-  --radius: 10px;
+  /* `--radius: 10px` WAS HERE AND IS GONE. Phase 1 of docs/design-system.md ruled it would be deleted
+   * in the phase where a surface primitive owned its four consumers — `.archive-drawer`, `.column`,
+   * `.exec-column` and `.halt` — because renaming a token while no caller exists buys nothing and
+   * splits the revert. That primitive is `Panel`, and all four are now its `raised` variant, which
+   * spells the same 10px as `--r-lg`. */
   --font-body: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-display: "Roboto Condensed", "Arial Narrow", ui-sans-serif, system-ui, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;

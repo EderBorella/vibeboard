@@ -22,6 +22,7 @@
     "elements": 231,
     "textElements": 124,
     "overflow": 120,
+    "clipping": 35,
     "contrast": 124,
     "tokens": 40,
     "rows": 25,
@@ -30,6 +31,7 @@
   },
   "findings": {
     "overflow": 0,
+    "clipping": 1,
     "contrast": 0,
     "tokens": 1,
     "rows": 0,

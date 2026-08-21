@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { Card } from '../shared';
 import { Button } from '../ui/Button';
+import { Panel } from '../ui/Panel';
 import { linkedCards } from '../viewmodel';
 import { LinkPicker } from './LinkPicker';
 
@@ -48,16 +49,18 @@ export function CardLinks({ card, allCards, onOpenCard, onLinks }: Props) {
       ) : (
         linked.map((c) =>
           onOpenCard ? (
-            <button
+            <Panel
+              as="button"
+              variant="flat"
               key={c.id}
-              type="button"
               className="cv-link cv-link-btn"
+              data-testid="cv-link"
               title={`Open ${c.id}`}
               onClick={() => onOpenCard(c)}
             >
               <span className="link-id">{c.id}</span>
               <span className="link-title">{c.title}</span>
-            </button>
+            </Panel>
           ) : (
             <div key={c.id} className="cv-link">
               <span className="link-id">{c.id}</span>

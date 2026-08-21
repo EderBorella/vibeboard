@@ -3,6 +3,7 @@ import { listArchive, restoreCard } from '../api';
 import { errorText } from '../errors';
 import type { ArchivedCard, BoardName, ProjectConfig } from '../shared';
 import { Button } from '../ui/Button';
+import { Panel } from '../ui/Panel';
 import { columnSlugs } from '../viewmodel';
 
 interface Props {
@@ -59,14 +60,14 @@ export function ArchiveDrawer({ board, config, count, onOpen }: Props) {
       .catch((e: unknown) => setError(errorText(e)));
   };
 
-  if (error) return <div className="archive-drawer archive-error">{error}</div>;
-  if (cards === null) return <div className="archive-drawer archive-empty">Loading the archive…</div>;
+  if (error) return <Panel className="archive-drawer archive-error">{error}</Panel>;
+  if (cards === null) return <Panel className="archive-drawer archive-empty">Loading the archive…</Panel>;
   if (cards.length === 0) {
-    return <div className="archive-drawer archive-empty">Nothing archived on this board.</div>;
+    return <Panel className="archive-drawer archive-empty">Nothing archived on this board.</Panel>;
   }
 
   return (
-    <div className="archive-drawer">
+    <Panel className="archive-drawer" data-testid="archive-drawer">
       {cards.map((c) => (
         <div className="archive-item" key={c.id}>
           <div className="archive-meta">
@@ -99,6 +100,6 @@ export function ArchiveDrawer({ board, config, count, onOpen }: Props) {
           </div>
         </div>
       ))}
-    </div>
+    </Panel>
   );
 }

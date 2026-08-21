@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { approveSignin, refuseSignin, type SigninPending } from '../api';
 import { Button } from '../ui/Button';
+import { Panel } from '../ui/Panel';
 import { useAction } from '../useAction';
 
 interface Props {
@@ -50,7 +51,7 @@ export function ApprovalPrompt({ pending, onError }: Props) {
 
   return (
     <div className="halt-backdrop" role="alertdialog" aria-label="A browser is asking to sign in">
-      <div className="halt">
+      <Panel className="halt">
         <h2 className="halt-title">Allow this browser in?</h2>
         <p className="halt-why">
           Something at <code>{first.address}</code> is asking to use this board. It says it is:
@@ -77,7 +78,7 @@ export function ApprovalPrompt({ pending, onError }: Props) {
             Allow
           </Button>
         </div>
-      </div>
+      </Panel>
     </div>
   );
 }

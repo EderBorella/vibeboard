@@ -3,6 +3,7 @@ import type { RunRecord } from '../api';
 import type { Card } from '../shared';
 import { Button } from '../ui/Button';
 import { Chip } from '../ui/Chip';
+import { Panel } from '../ui/Panel';
 import { ForgiveAttempts } from './ForgiveAttempts';
 import { costLabel, usageTotal } from './format';
 import { useAccounting } from './useAccounting';
@@ -74,7 +75,13 @@ export function ExecutionView({
       {COLUMNS.map((column) => {
         const group = grouped[column.key];
         return (
-          <section key={column.key} className="exec-column" aria-label={column.label}>
+          <Panel
+            key={column.key}
+            as="section"
+            variant="raised"
+            className="exec-column"
+            aria-label={column.label}
+          >
             <h3 className="exec-head">
               {column.label}
               <span className="exec-count">{group.length}</span>
@@ -96,9 +103,11 @@ export function ExecutionView({
                     {costLabel(record.usage) && <span className="exec-cost">{costLabel(record.usage)}</span>}
                     <span className="exec-when">{elapsed(record, now)}</span>
                   </div>
-                  <button
-                    type="button"
+                  <Panel
+                    as="button"
+                    variant="flat"
                     className="exec-card"
+                    data-testid="exec-card"
                     // A run whose card has gone can still be read; there is just nothing to open.
                     disabled={card === undefined}
                     title={openTitle(record, card)}
@@ -106,7 +115,7 @@ export function ExecutionView({
                   >
                     <span className="link-id">{subject}</span>{' '}
                     <span className="link-title">{card?.title ?? (record.card ? '(gone)' : '')}</span>
-                  </button>
+                  </Panel>
                   {(record.summary || record.note) && (
                     <p className="exec-summary">{record.summary ?? record.note}</p>
                   )}
@@ -148,7 +157,7 @@ export function ExecutionView({
                 </div>
               );
             })}
-          </section>
+          </Panel>
         );
       })}
     </main>

@@ -274,6 +274,15 @@ body {
    copilot's space — it docks, it does not overlay. */
 .work-main { flex: 1; min-width: 0; display: flex; flex-direction: column; min-height: 0; }
 
+/* THE BOARD'S ONE SCROLL REGION, and that is the whole of it — vertical AND horizontal.
+   It used to be four: this box scrolled vertically and each `.board-columns` row scrolled sideways on
+   its own. Three independent horizontal scrollers is the worst available arrangement for three rows
+   that are meant to read as one table, because scrolling one row moves its columns out from under the
+   row above — the shared grid the comment on `.board-columns` argues for is only true while every row
+   sits at scroll offset zero. And it was not theoretical: measured at 1440×900 with the copilot open,
+   each row clipped 40px of its own content at the container edge, cutting "Drop a card here" mid-word
+   in the fifth column with no scrollbar of its own in view. At 900px it clipped 580px.
+   One region means one gesture, on the box the reader is already scrolling. */
 .boards {
   flex: 1;
   min-width: 0;
@@ -284,6 +293,10 @@ body {
   gap: 1.1rem;
   background: var(--wash);
   container: vbboards / inline-size;
+  /* Named once so `--track-fit` below cannot disagree with the `gap` it subtracts. It was written out
+     as a literal `0.7rem` in both places, so changing the gap would have silently left the track
+     arithmetic measuring a gap that no longer existed. */
+  --board-gap: 0.7rem;
 }
 
 /* ---------- Board ---------- */
@@ -349,33 +362,54 @@ body {
      query sets need 1284px before gaps. That query was written for a fixed flex row, where a wider
      column cost nothing; against a shared track count it raises the floor exactly when there are more
      tracks to fit.
-     `--track-fit` is what one track can actually have at this width. Clamping between a readable 200px
+     `--track-fit` is what one track can actually have at this width. Clamping between a readable floor
      and `--col-w` means: fit exactly when it fits, grow past it via `1fr` when there is slack, and
      scroll only once a track would be too narrow to read — which is the one case where scrolling is
-     the right answer rather than a symptom. */
-  --track-fit: calc((100% - (var(--max-cols, 4) - 1) * 0.7rem) / var(--max-cols, 4));
+     the right answer rather than a symptom.
+
+     THE FLOOR IS 180px, AND IT IS A COLUMN'S OWN MIN-CONTENT WIDTH ROUNDED UP. Measured in chromium
+     off a `width: min-content` clone: `.column` is 179px, driven by its head at 177px — the title's
+     letter-spacing plus the bracket pseudo-elements, the count and the `+`. A `.tile` is only 93px, so
+     the head is what sets the floor and not the cards.
+     It was 200px, which is above anything on the board needs and was the direct cause of a clipped
+     column at 1440px: five tracks at 200px plus four gaps want 1044.8px and the board area is 1005px
+     with the copilot open, so the grid overflowed by 40px for an 8px-per-track shortfall. At 180px the
+     five columns FIT at 1440px with nothing cut, and scroll as one region at 1200px and 900px, where
+     the board area is 765px and 465px against the 944.8px five legible columns need.
+
+     THIS NUMBER WAS 144px FOR ONE ITERATION AND THAT WAS A MEASUREMENT ERROR WORTH RECORDING, because
+     the instrument that produced it was the very blind spot this phase exists to close. 144px was
+     chosen by sweeping the floor and counting TEXT elements wider than their own box, which reports 0
+     findings at every floor from 144px to 200px — it cannot see this fault at all. What it missed:
+     below 180px the column HEAD overflows its own box, and the `+` button renders outside the
+     column's border in the gutter between columns. A flex container with no text of its own and
+     `overflow: visible` neither clips nor scrolls, so no walk in the harness examined it. Screenshots
+     at 1200px and 900px showed it immediately. Check 9 now asserts the head fits inside the column at
+     all three widths, so this floor cannot be lowered past it again. */
+  --track-fit: calc((100% - (var(--max-cols, 4) - 1) * var(--board-gap)) / var(--max-cols, 4));
   grid-template-columns: repeat(
     var(--max-cols, 4),
-    minmax(clamp(200px, var(--track-fit), var(--col-w)), 1fr)
+    minmax(clamp(180px, var(--track-fit), var(--col-w)), 1fr)
   );
-  gap: 0.7rem;
+  gap: var(--board-gap);
   align-items: flex-start;
-  overflow-x: auto;
-  padding-bottom: var(--s-3);
+  /* NO `overflow-x` AND NO BOTTOM PADDING. Both belonged to the scroller this row used to be: the
+     padding was clearance for a scrollbar of its own. Overflow now reaches `.boards`, which is the
+     board's one scroll region — see there for why three were wrong. */
 }
 
 /* ---------- Archive drawer ---------- */
 /* Deliberately not column-shaped: archived cards have no position, and a row of full tiles
    would read as a fifth column you could drag into. */
+/* A `Panel` with the `raised` variant. The DASH is the one thing it keeps of its own box, and it is
+   the treatment rather than the geometry: a drawer of archived cards is a temporary thing hanging off
+   the board, and the dashed edge says so. A border STYLE cannot shift the row — the width is still the
+   primitive's 1px — which is the same argument the ghost Button's dash rests on. */
 .archive-drawer {
-  display: flex;
-  flex-direction: column;
   gap: var(--s-2);
   max-height: 14rem;
   overflow-y: auto;
-  background: var(--panel);
-  border: 1px dashed var(--border);
-  border-radius: var(--radius);
+  border-style: dashed;
   padding: var(--s-4);
 }
 .archive-empty, .archive-error { color: var(--muted); font-size: var(--t-small); }
@@ -409,34 +443,18 @@ body {
 }
 
 /* ---------- Column ---------- */
-.column {
-  /* GROWS to share the width, never shrinks below `--col-w`.
-     It was `0 0 var(--col-w)` — fixed basis, no grow — so four columns at 288px used 1152px of
-     whatever was available and left the rest empty: ~400px of void on a 1600px viewport, and hiding
-     the copilot bought nothing because the freed space could not be taken. Screenshotted at 1600 and
-     820 before and after; that void is what the before shows.
-     `min-width` keeps the basis as a floor, so a project with many columns still overflows into a
-     horizontal scroll rather than crushing every column to unreadable slivers. */
-  /* NO `flex` HERE ANY MORE: the parent is a grid and the track sizes this box, so a flex basis would be
-     a line that looks live and decides nothing. `minmax(var(--col-w), 1fr)` on the track carries both
-     halves of what this used to say — a floor and a share of the slack. `min-width: 0` because a grid
-     item's automatic minimum is its content, which would otherwise let a long unbroken card title push
-     its track past the share the grid gave it. */
-  min-width: 0;
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  display: flex;
-  flex-direction: column;
-}
+/* `.column` IS A `Panel` WITH THE `raised` VARIANT AND A HEADER, and it has no rule of its own left.
+   What used to be here: a `--panel` ground, `1px solid var(--border)`, `border-radius: var(--radius)`,
+   `display: flex; flex-direction: column` and `min-width: 0`. `Panel`'s `raised` variant is every one
+   of them at the same values, and `.column-head` is `.vb-panel-head`.
+   The two arguments the old comment carried are both still stated, because deleting a rule must not
+   delete its reason: a column GROWS to share the width and never shrinks below a floor — that is
+   `minmax(clamp(...), 1fr)` on the track above, and it replaced a fixed `flex: 0 0 var(--col-w)` basis
+   that left ~400px of void on a 1600px viewport. And `min-width: 0` is there because a grid item's
+   automatic minimum is its content, which would otherwise let a long unbroken card title push its
+   track past the share the grid gave it; that guard now lives on `.vb-panel`, once, for every
+   Panel. */
 .column-over { border-color: var(--accent); box-shadow: var(--glow); }
-.column-head {
-  display: flex;
-  align-items: center;
-  gap: var(--s-4);
-  padding: var(--s-4) 0.65rem;
-  border-bottom: 1px solid var(--border);
-}
 .column-title {
   font-family: var(--font-display);
   font-size: var(--t-body);
@@ -683,11 +701,10 @@ body {
 /* A favourite is already lit; it does not need a hover to say so. `--accent-2` at rest is the colour, and
    `bare`'s muted default is what it overrides. */
 .mp-star { color: var(--accent-2); }
-.mp-pick {
-  flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.15rem;
-  background: transparent; border: none; color: var(--text); cursor: pointer;
-  text-align: left; padding: var(--s-3) var(--s-4); font-size: var(--t-body);
-}
+/* A `Panel` with the `flat` variant. It gains a 1px transparent border it did not have, which is the
+   primitive's whole point — `.mp-item` around it lights on hover, and a row that grew a border only
+   then would move 2px under the pointer. */
+.mp-pick { flex: 1; display: flex; flex-direction: column; gap: 0.15rem; color: var(--text); }
 /* The backend's default is pinned first in the list — mark it so it reads as the safe pick
    rather than just whatever happened to sort to the top. */
 .mp-def { border-left: 2px solid var(--accent); }
@@ -743,15 +760,17 @@ body {
   margin: 0; padding-left: 0.7rem; border-left: 3px solid var(--accent);
   color: var(--text); font-size: var(--t-lead); line-height: 1.5;
 }
-.cv-links { display: flex; flex-direction: column; gap: var(--s-2); }
+/* THE SIZE LIVES ON THE LIST, not on the row. `.cv-link` declared `font-size: var(--t-body)` and it
+   was DEAD on every clickable link: `.cv-link-btn`'s `font: inherit` is written later at the same
+   specificity, so it reset the size, and the button and the plain `<div>` beside it matched only by
+   accident of what they inherited. That is the shape of the 10.88px incident. Stated once, here. */
+.cv-links { display: flex; flex-direction: column; gap: var(--s-2); font-size: var(--t-body); }
 .cv-label { font-size: var(--t-small); color: var(--muted); }
-.cv-link { display: flex; gap: var(--s-4); align-items: baseline; font-size: var(--t-body); }
+.cv-link { display: flex; gap: var(--s-4); align-items: baseline; }
 /* A link is a button wherever it can actually open the card (CardView's onOpenCard). */
-.cv-link-btn {
-  background: transparent; border: 1px solid transparent; border-radius: var(--r-md);
-  color: inherit; cursor: pointer; font: inherit; text-align: left;
-  padding: 0.1rem var(--s-3); width: fit-content;
-}
+/* A `Panel` with the `flat` variant. `width: fit-content` is the one thing left: a link is as wide as
+   its text, unlike every other row here, so the hover border traces the words rather than the column. */
+.cv-link-btn { width: fit-content; }
 .cv-link-btn:hover { border-color: var(--accent); }
 .cv-link-btn:hover .link-title { color: var(--accent); }
 .cv-body { border-top: 1px solid var(--border); padding-top: var(--s-3); }
@@ -938,7 +957,9 @@ body {
 .chat-menu-item { display: flex; align-items: stretch; gap: var(--s-2); border-radius: var(--r-md); }
 .chat-menu-item.active { background: var(--panel-2); }
 .chat-menu-item:hover { background: var(--panel-2); }
-.chat-menu-open { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.1rem; background: transparent; border: none; color: var(--text); text-align: left; padding: var(--s-3) var(--s-4); cursor: pointer; }
+/* A `Panel` with the `flat` variant; the active row's accent left edge is below and still overrides
+   the primitive's transparent border, which is a colour and a width rather than a box. */
+.chat-menu-open { flex: 1; display: flex; flex-direction: column; gap: 0.1rem; color: var(--text); }
 .chat-menu-item.active .chat-menu-open { border-left: 2px solid var(--accent); }
 .chat-menu-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--t-small); }
 /* `Chip pill` owns the box; this keeps the treatment and the two backend colours. `bk-claude-code` and
@@ -1030,11 +1051,9 @@ body {
 /* Accent at rest, not on hover: a `＋` that creates is the affordance of the group head it sits in, and
    a muted one reads as disabled. */
 .control-new { color: var(--accent); }
-.control-item {
-  display: flex; align-items: center; gap: var(--s-3); width: 100%; text-align: left;
-  background: transparent; color: var(--text); border: 1px solid transparent;
-  border-radius: var(--r-md); padding: var(--s-3) var(--s-4); font-size: var(--t-body); cursor: pointer;
-}
+/* A `Panel` with the `flat` variant, and its padding was ALREADY `var(--s-3) var(--s-4)` — which is
+   where the primitive's value comes from: it is the one of the eight that a person had chosen. */
+.control-item { display: flex; align-items: center; gap: var(--s-3); width: 100%; color: var(--text); }
 .control-item:hover { background: var(--panel-2); }
 .control-item.active { background: var(--panel-2); border-color: var(--accent); color: var(--accent); }
 .control-item-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1054,7 +1073,9 @@ body {
    and reading order are the same thing. Wider than the control list: paths run deep. */
 .explorer-list { width: 320px; gap: 0.1rem; }
 .explorer-head { position: sticky; top: -0.75rem; background: var(--wash); z-index: 1; padding-top: 0.15rem; }
-.explorer-item { padding-right: var(--s-3); gap: var(--s-2); }
+/* `Panel`'s `flat` padding is symmetric, and the 2px this rule shaved off the right was not a
+   decision anybody made. `gap` is layout and stays. */
+.explorer-item { gap: var(--s-2); }
 /* Fixed width so names line up whether or not a row has a twisty. */
 .explorer-twist { width: 0.7rem; flex-shrink: 0; color: var(--muted); font-size: var(--t-micro); }
 .explorer-icon { flex-shrink: 0; font-size: var(--t-small); }
@@ -1182,11 +1203,9 @@ body {
 .reports { display: flex; flex-direction: column; gap: var(--s-2); border-top: 1px solid var(--border); padding-top: var(--s-4); }
 .reports-head { margin: 0; font-size: var(--t-small); color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
 .report-row { display: flex; align-items: center; gap: var(--s-3); }
-.report-open {
-  flex: 1; min-width: 0; display: flex; align-items: baseline; gap: var(--s-4);
-  background: transparent; border: 1px solid transparent; border-radius: var(--r-md);
-  color: inherit; cursor: pointer; font: inherit; text-align: left; padding: 0.15rem var(--s-3);
-}
+/* A `Panel` with the `flat` variant. What is left is where the box sits and how it lays its parts out;
+   the undrawn box, the corner, the padding and the inherited type are the primitive's. */
+.report-open { flex: 1; display: flex; align-items: baseline; gap: var(--s-4); }
 .report-open:hover { border-color: var(--accent); }
 /* `Chip pill` owns the box. What is left is this surface's own treatment — mono and uppercase, because
    a status is machine vocabulary — plus `flex: 0 0 auto`, which is the row's decision.
@@ -1281,13 +1300,11 @@ body {
   align-content: start;
   background: var(--wash);
 }
-.exec-column {
-  /* No `flex` basis: the parent is a grid and the track sizes this box. `min-width: 0` so a long
-     unbroken run title cannot push its track past the share the grid gave it — which is what let the
-     titles reach the viewport edge and get cut. */
-  min-width: 0; display: flex; flex-direction: column; gap: var(--s-4);
-  background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: var(--s-4);
-}
+/* A `Panel` with the `raised` variant. No `flex` basis: the parent is a grid and the track sizes this
+   box, and the `min-width: 0` that stops a long unbroken run title pushing its track past its share —
+   the fault that let those titles reach the viewport edge and get cut — is now `.vb-panel`'s, for every
+   Panel rather than for this one. */
+.exec-column { gap: var(--s-4); padding: var(--s-4); }
 .exec-head {
   display: flex; align-items: center; gap: var(--s-4); margin: 0;
   font-family: var(--font-display); font-size: var(--t-small);
@@ -1313,15 +1330,13 @@ body {
    this is a move and not a change — but the descending order read as though the plain rule was meant
    to override it, which is the opposite of what happens. */
 .exec-cost + .exec-when { margin-left: 0; }
-.exec-card {
-  /* WRAPS. A card title is arbitrary user text and several are long file paths with no spaces, so
-     without this they set the column's minimum content width and pushed past the track. */
-  overflow-wrap: anywhere;
-  width: 100%; text-align: left; background: transparent; border: 1px solid transparent;
-  border-radius: var(--r-md); color: inherit; cursor: pointer; font: inherit; font-size: var(--t-body); padding: 0.1rem var(--s-2);
-}
+/* A `Panel` with the `flat` variant. WRAPS: a card title is arbitrary user text and several are long
+   file paths with no spaces, so without this they set the column's minimum content width and pushed
+   past the track. `cursor: default` on a disabled one is the primitive's now; the dimming is this
+   surface's, because it says "already dealt with" rather than "not a control". */
+.exec-card { overflow-wrap: anywhere; width: 100%; }
 .exec-card:hover:not(:disabled) { border-color: var(--accent); }
-.exec-card:disabled { cursor: default; opacity: 0.7; }
+.exec-card:disabled { opacity: 0.7; }
 /* THE TITLE WRAPS HERE, overriding `.link-title`'s `white-space: nowrap`.
    `.link-title` (see the link picker) asks for one line with an ellipsis — but it is an inline
    `<span>`, and `overflow` and `text-overflow` do nothing on an inline box. So the ellipsis never
@@ -1449,15 +1464,13 @@ body {
   background: color-mix(in srgb, var(--bg) 82%, transparent);
   backdrop-filter: blur(3px);
 }
+/* A `Panel` with the `raised` variant. The DANGER border and the drop shadow are what it keeps: a
+   colour and an elevation are the surface's, and this one is the only thing on screen. */
 .halt {
   max-width: 34rem;
-  display: flex;
-  flex-direction: column;
   gap: 0.7rem;
   padding: 1.4rem 1.5rem;
-  border: 1px solid var(--danger);
-  border-radius: var(--radius);
-  background: var(--panel);
+  border-color: var(--danger);
   box-shadow: 0 18px 50px rgb(0 0 0 / 45%);
 }
 .halt-title {
@@ -1637,11 +1650,9 @@ body {
 .suggestions-row { border-left: 2px solid var(--border); }
 /* The one the buttons act on. Marked, because two rows and one action bar is otherwise a guess. */
 .suggestions-row.picked { border-left-color: var(--accent); background: var(--wash); }
-.suggestions-pick {
-  width: 100%; display: flex; flex-direction: column; gap: 0.2rem; align-items: flex-start;
-  padding: var(--s-4) var(--s-4); background: none; border: none; color: inherit; font: inherit;
-  text-align: left; cursor: pointer;
-}
+/* A `Panel` with the `flat` variant. Its padding was `var(--s-4)` all round and is now `var(--s-3)
+   var(--s-4)` — 2px shorter, on the scale, and the same as every other row in the app. */
+.suggestions-pick { width: 100%; display: flex; flex-direction: column; gap: 0.2rem; align-items: flex-start; }
 
 /* THE SPLIT (decision 48). The diary is a 68ch reading column, so the right-hand half costs nothing that
    was being used — and what agents filed belongs beside the narrative rather than behind another tab. */

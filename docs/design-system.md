@@ -1,6 +1,6 @@
 # The design system, and how it lands in phases
 
-**Status: Phases 0–3 done (2026-08-21), Phases 4 and 5 planned.** Phase 0 built the instrument and
+**Status: Phases 0–4 done (2026-08-21), Phase 5 planned.** Phase 0 built the instrument and
 measured, touching no stylesheet; Phase 1 added the 17 tokens and nothing that consumes them; Phase 2
 collapsed the type and space values onto them, which is the first phase that changes rendering. This page is
 the argument and the sequence; the work is phased so each phase ships on its own and can be reverted on its
@@ -181,7 +181,7 @@ hand many times over.
 | `Button` **(built, Phase 3)** | the button cases among the 104 radius rules — `.ap-expand`, `.ap-settings-link`, `.ap-help-btn`, `.reports-forgive`, `.ap-remedy-btn`, and the rest | `primary` \| `default` \| `ghost` \| `danger` \| `bare`, sizes `sm` \| `md` |
 | `Chip` **(built, Phase 3)** | tags, state words, counts, badges | tones `neutral` \| `accent` \| `ok` \| `warn` \| `bad`, optional `pill`, plus `data-state` for a surface vocabulary outside the five |
 | `Dot` **(built, Phase 3)** | `.ap-dot`, `.conn`, `.ap-agent-dot` — three hand-rolled indicators already | tones as `Chip`, sizes `7` \| `8` \| `12`px |
-| `Panel` | board columns, drawers, settings sections, dock panes | `flat` \| `raised`, optional header slot |
+| `Panel` **(built, Phase 4)** | board columns, drawers, the halt card, the nine full-bleed list rows | `flat` \| `raised`, optional header slot, `as` of `div`\|`section`\|`button` |
 | `Readout` | the signature above: every duration, cost, token count, run id | inline \| block |
 | `Field` | `InlineField`, settings inputs, the gate form | label + control + hint + error |
 
@@ -754,15 +754,304 @@ without its method and does not reproduce.
 `styles.css`, three baseline files, `tools/check-radius-scale.mjs` with its two `package.json` scripts, and
 radius conformance returns to reporting.
 
-### Phase 4 — Panel
+### Phase 4 — Panel — **DONE 2026-08-21**
 
 Board columns, drawers, settings sections, dock panes. Higher risk than Phase 3 because these carry
-layout, and layout is where the container queries and the shared column grid live.
+layout, and layout is where the container queries and the shared column grid live — and the risk was
+real: this phase found a pre-existing layout fault the harness could not see, then made a second one
+of its own and found that only by screenshot.
 
-**Gate:** the board's three columns stay on one shared grid at 900/1200/1440px; the dock keeps its
-definite height; nothing overflows. Measured, not eyeballed — these are exactly the faults jsdom cannot
-see.
-**Exit:** panels are one component.
+**`Panel` has two variants and the distinction is whether the box is DRAWN.** `raised` draws a
+`--panel` ground, `1px solid var(--border)` and a `--r-lg` corner — a surface that sits above the wash
+and says where it ends. `flat` draws nothing: no ground, a **1px transparent** border, a `--r-md`
+corner, `var(--s-3) var(--s-4)` of padding and `font: inherit`. The transparent border is the same
+argument the dashed ghost and the bare glyph rest on — a box that gains a border on hover must already
+occupy those 2px, or every row shifts under the pointer. An optional `header` slot is
+`.vb-panel-head`, and `as` is a closed set of `div | section | button`.
+
+**`raised` is a flex column and `flat` is not**, which is not an oversight: every raised consumer
+stacks a head over a scrolling body, and a row's direction is genuinely its own — three of the eight
+stack two lines and four lay their parts out sideways.
+
+**Two things this phase's own brief listed and did NOT take, each with the reason.** *Settings
+sections* turned out not to be panels at all: `.settings-section` is a heading — an uppercase accent
+label with a `border-bottom` — sitting in `.modal-body`, and there is no box round the group. There was
+nothing to migrate. *Dock panes* are the harder call and the answer is that they are **neither
+variant**: `.dock`, `.copilot` and `.raw-pane` are regions of the shell whose separation is one divider
+edge and a ground — `border-top` or `border-left`, no corner and no box. `raised` would draw a border
+round the whole dock and give it a 10px corner it must not have; `flat` would give it corners and take
+its ground away. Forcing either would repaint the shell, which is the one thing *What is NOT wrong*
+puts out of scope. A third variant for "a region with one edge" is a real candidate and it belongs to
+whoever needs a second consumer for it; today it would have one.
+
+**The chat bubbles are left too, and the reason is the composition.** `msg-user` / `-assistant` /
+`-error` are three of the seven classes never named literally, and a bubble is arguably a Panel — but
+its corners are `--r-lg --r-lg --r-sm --r-lg`, three radii and a tail. Panel has one corner per box, so
+`raised` would have to lie about the tail, and taking the bubbles would mean moving the run-time class
+composition at `CopilotPanel.tsx:236` in the same change. Left whole, so the *Risks* allow-list is
+still seven rows.
+
+#### The board's columns: what the right behaviour is, and why
+
+**The columns flex so every row fits, and the board scrolls as ONE region only when a fit would make a
+card illegible.** Both of the two defensible answers are right, in that order. What was wrong was not
+the choice between them; it was the floor and the number of scroll regions.
+
+The reported fault — FEATURES ending at ~x=850 with four columns while PRODUCT and ENGINEERING render
+five, the fifth cut mid-phrase at ~x=1020 — is **two faults, and the visible half is not the one that
+matters.** Measured at 1440×900 with the copilot open:
+
+| what | measured |
+|---|---|
+| board area (`.boards`) | 1005px |
+| `grid-template-columns`, all three rows | `200px 200px 200px 200px 200px` — already identical |
+| each row's `scrollWidth` / `clientWidth` | **1045 / 1005** — every row overflowed its own box by 40px |
+| at 900px | 1045 / 465 — **580px clipped per row** |
+
+So the rows already shared one set of tracks. **The rows ending at different x is the shared grid
+working as designed** and is stated in the CSS: "a board with fewer columns than the widest simply
+leaves its last tracks empty, which is honest — the Features board really does have one fewer column."
+Four columns of five tracks end at four fifths of the row. That part is not a defect.
+
+The two real faults:
+
+1. **`overflow-x: auto` was on `.board-columns`, so there were THREE independent horizontal scrollers,
+   one per board row.** Three rows that read as one table cannot each have their own scroll offset: the
+   shared grid is only true while all three sit at zero. Scroll one row and its columns are no longer
+   under the row above. This is the fault, and it is worse than the clipping it caused.
+2. **The 200px clamp floor was 21px above what a column needs**, so five tracks plus four gaps wanted
+   1044.8px in a 1005px box — the board scrolled at 1440px for an 8px-per-track shortfall.
+
+**Fixed in two lines.** `overflow-x` and `padding-bottom` come off `.board-columns` — the padding was
+clearance for a scrollbar that row no longer has — and the overflow reaches `.boards`, which was
+already the vertical scroller. One region, one gesture, on the box the reader is already scrolling. And
+the floor becomes **180px**: a `.column`'s own min-content width is **179px**, driven by its head at
+**177px**, against a `.tile`'s **93px** — so the head sets the floor, not the cards.
+
+At 180px, measured: **1440px fits with nothing cut**; 1200px (765px of board) and 900px (465px) scroll
+as one region, against the 944.8px five legible columns need. `--board-gap` was also named as a token,
+because `--track-fit` subtracted a literal `0.7rem` that the `gap` beside it repeated — change one and
+the track arithmetic would have gone on measuring a gap that no longer existed.
+
+**Screenshotted at all three widths and read by eye, not only asserted.** At 1440 all five columns are
+whole and the heads sit inside their borders; the FEATURES row ends early at x=819 where the other two
+reach x=1022, and every column edge lines up down the page (18 / 222 / 425 / 628 / 831). At 1200 and
+900 the last visible column is cut by the board area's edge — at the *same* x in all three rows, which
+is the point — with the columns aligned at 20 / 210 / 401 / 592 / 783.
+
+#### The overflow check had a hole, and it was the instrument's fault
+
+**It is a hole, not a legitimate scroll container reporting correctly.** The check asks *"is any TEXT
+wider than its own box?"*, and it examines only elements with a text node of their own — deliberately,
+because an element whose text lives in a child did not size that text. Neither half can see this fault:
+a scroll container has no text of its own, so it was never examined, and the text inside it was not
+overflowing anything — its own box was the size it asked for. The **ancestor** cut it off. The
+document-level claim only ever looked at `documentElement`.
+
+`pageClipping` in `visual/support/audit.ts` closes it: every visible element whose `overflow-x` is not
+`visible` must have `scrollWidth <= clientWidth + 1`. `text-overflow: ellipsis` is skipped for the
+reason it is skipped above — it is a deliberate statement that this text may be cut, and `.ap-status`
+is one, at 211px of content in a 126px box on purpose.
+
+**Proven on the same tree, in one run.** With a wide child planted inside `.column-body` — a box whose
+own text fits, clipped by the scroller above it — the old walk reported **0 findings across 120 text
+elements** while the new one reported **14 across 35 examined** and the run exited 1. That is the hole
+and its repair in one pair of numbers.
+
+**The board area is exempt by name and nothing else is**, matched on the last segment of the element
+path rather than by substring, so a descendant cannot be excused by its ancestor's name. It has to
+scroll below about 1345px. Re-planted after the exemption to prove it had not gone vacuous: the same
+`.column-body` defect still exits 1 with 15 findings.
+
+#### A third kind of overflow, which this phase created and nothing could see
+
+**The floor was 144px for one iteration, and that was a measurement error worth recording** — the
+instrument that produced it was the very blind spot this phase exists to close. 144px was chosen by
+sweeping the floor and counting text elements wider than their own box, which reports **0 findings at
+every floor from 144px to 200px**. It cannot distinguish them at all.
+
+What it missed: below 180px **the column head overflows its own box**, and the `+` button renders
+outside the column's border, in the gutter between columns, at 1200px and 900px. A flex row with no
+text of its own and `overflow: visible` neither clips nor scrolls — its children simply render
+outside it — so no walk in the harness examined it. It was found by looking at the screenshots.
+
+Check 9 now measures it: for every column head, no child may render outside the head's content box.
+Swept again with that instrument, `.vb-panel-head` spills at 144 / 156 / 168 / 176 and stops at
+**180**, which is exactly the min-content measurement. The floor cannot be lowered past it again.
+
+#### Gates
+
+**Check 9 — the three board rows are one shared grid.** At 900 / 1200 / 1440px: every row reports the
+same `grid-template-columns`; column *i* sits at the same x with the same width in every row that has
+one; no track is under the 180px floor; the only thing scrolling sideways is `main.boards`; and every
+column head fits inside its column. **Examined counts asserted**, because a layout assertion that
+matches nothing passes silently: **9 rows, 42 columns and 42 heads** — 3 rows × 3 widths, 4+5+5 columns
+at each, one head per column.
+
+**Check 10 — the dock is content-sized until a pane asks to be filled.** At rest the dock body is
+**76px**, strictly under its 342px cap — asserted strictly, because `height: 38vh` for everything is
+what content-sizing replaced and a regression to it would satisfy "≤ cap". With a raw pane open,
+through the real controls rather than by injecting state, it is **342px exactly = 38vh of 900**.
+
+**Every new assertion proven by planting, each restored:**
+
+| planted | result |
+|---|---|
+| one row given its own `grid-template-columns` | exit **1**: *"the three board rows do not share one set of tracks at 900px"*, printing `["144px…", "180px…"]` |
+| `overflow-x: auto` put back on `.board-columns` — the original fault | exit **1**: *"something other than main.boards scrolls sideways at 900px"*, naming `div.board-columns` three times |
+| the clamp floor lowered to 144px | exit **1**: *"a column track is 144px at 900px, under the 180px floor"* |
+| a head wider than its column (`.column-count { margin-right: 90px }`) | exit **1**: *"Backlog > .vb-btn — renders at 247..275 outside its head's 29..186"*, per column |
+| a wide child clipped inside `.column-body` | exit **1**, 14 findings — and the old text walk reported **0 of 120** on the same tree |
+| `height: 38vh` → `max-height` on the filled dock | exit **1**: *"the dock body is 318px with a raw pane open, and 38vh of 900px is 342px"* |
+| a `padding` on `.exec-card`, reachable only through `<Panel as="button">` | `check:radius-scale` exit **1**, ratchet 14 against a ceiling of 13 |
+| the `as="button"` predicate broken to match nothing | exit **1** from the parser self-test — population 49 → 40 with findings still 13, the exact vacuous green it exists to refuse |
+| the predicate dropped so every `<Panel>` counts | exit **1**, findings 13 → 20 — the qualification is load-bearing in both directions |
+
+Restored, `npm run visual` is **30 passed, exit 0** on all three themes.
+
+**The dock's own shortfall is a RATCHET and not zero, because check 10 found it rather than caused
+it.** The dock body is 342px and the raw pane inside it is **263px**, so 79px of a definite box goes
+unused. The cause is the same one `styles.css` describes, one level further down: `.raw-pane`'s
+`flex: 1` needs a **flex** parent and its parent is `.cards-body`, a scrolling block, so the pane sits
+at its content height floored by `.raw-area`'s `min-height: 14rem` — 224px, large enough to hide the
+collapse. Phase 4's gate is that the dock BODY's height is definite, and it is, exactly. Fixing the
+chain below it is a change to the dock's internals this phase has no business making, so **79 is
+recorded and any increase blocks.**
+
+**The drift was read before it was re-recorded, and it was empty.** Type and radius, all three themes,
+**counts included**: `13px×127 12px×84 11px×19 15px×1` and `6px×240 999px×72 10px×56 50%×12`, byte for
+byte the Phase 3 baseline, at 231 elements. That is the intended result — this phase moves boxes and
+layout and deliberately reproduces every value, and `--radius` → `--r-lg` is the same 10px, so the
+`10px×56` of fourteen columns' corners does not move. The only baseline change is the two new
+`clipping` keys: **35 examined, 1 finding** — `main.boards`, which is the exempt region.
+
+#### A Phase 2 gate was reading its own comments as code
+
+**`npm run check:type-scale` scanned the raw stylesheet with no comment handling**, so any comment
+mentioning `font-size:` or `padding:` in prose was parsed as a declaration and the words after it as
+its value. Phase 4 tripped it with a comment explaining why a `font-size` had been *removed*, and it
+reported `.cv-links { display: flex` as a value off the scale.
+
+Latent since Phase 2, and it had two effects worth separating. It over-reports, which is loud and
+harmless. But the declaration COUNTS it printed included comment text, so **the anti-vacuity floor of
+150 was being satisfied partly by prose** — the quiet half, and the one that matters. Fixed the way
+`tools/check-radius-scale.mjs` has always done it: comments blanked to spaces, not removed, so every
+offset still maps to its real line and a finding's `file:line` stays correct. **Authored `font-size`
+declarations: 204 → 202**, the two being comment text; Phase 2's recorded 233 was measured with the
+same fault and is not comparable.
+
+Proven three ways, each restored: an off-scale `0.81rem` in a real declaration exits **1** naming
+`primitives.css:129`; an off-scale `0.77rem` on the line *after* a comment that mentions
+`font-size: var(--t-body)` in prose exits **1** naming line **132**, which is what says the blanking
+did not blind it and that the offsets survived; and a broken `FONT_SIZE` regex exits **1** with *"only
+0 font-size declaration(s) found, against a floor of 150 — this check is vacuous"*.
+
+#### The ratchet: 22 → 13
+
+**Nine of the ten list rows Phase 3 named are `Panel flat`, and they were one shape under nine names:**
+`.report-open`, `.exec-card`, `.control-item`, `.explorer-item`, `.cv-link`, `.cv-link-btn`,
+`.mp-pick`, `.chat-menu-open`, `.suggestions-pick`. Their stated reason for not being `Button`s —
+*"`default`'s panel-2 fill would draw a box round every row of every list"* — is true of all five
+voices and is exactly what `flat` answers.
+
+**`Panel` may be a `<button>`, and the line between the two primitives is the VOICE.** If it is one of
+`primary`/`default`/`ghost`/`danger`/`bare`, it is a `Button`; if it is a region of the page that
+happens to take a click, it is a `Panel`. A list row is the latter — it has no voice at all, which is
+why all five had to lie about it.
+
+**Four paddings nobody chose became one.** They were `0.1rem var(--s-2)`, `0.1rem var(--s-3)`,
+`0.15rem var(--s-3)`, `var(--s-3) var(--s-4)` and `var(--s-4) var(--s-4)` — the same pathology as the
+27 font sizes, one level up. The primitive takes **`var(--s-3) var(--s-4)`**, which is
+`.control-item`'s existing value: the one of the eight a person had actually chosen.
+
+**The one survivor of the ten, with its reason:** `.archive-title` — its container `.archive-item` is
+already padded and it is `flex: 1` inside it, so `flat`'s padding would pad the row twice and push the
+restore controls off it.
+
+**The other twelve, four kinds, and none of the reasons is "it has its own padding":**
+
+| survivor | which variant would have to lie, and how |
+|---|---|
+| `.board-archive` `.mp-chip` `.tag` `.tag-chip` | **A chip.** `Chip` owns that box; every Panel variant is a rectangle with a corner, and a pill is not. |
+| `.board-label` | **A section header.** Panel's header slot is a bordered row *inside* a panel; this is a collapsible heading *above* one, with a 3px accent left edge. |
+| `.bt-btn` `.mode-btn` | **A cell in a segmented control.** The GROUP owns one border and one radius. |
+| `.cards-tab-label` `.dock-tab` `.tab-btn` | **A tab.** Its selected state is a border on three sides continuous with the panel below it; every variant closes the box. |
+| `.chat-current` `.mp-trigger` | **A select trigger.** A control, not a region that takes a click. |
+
+**The `<Panel as="button">` hole was closed in the same commit that opened it**, which is Phase 3's
+`<Button>` lesson applied before it could cost anything. `tools/check-radius-scale.mjs` reads
+`<Panel` **only when the tag says `as="button"`** — qualified rather than swept in, because an ordinary
+`<Panel>` is a `<div>` or a `<section>` and may legitimately declare its own padding: `.archive-drawer`,
+`.exec-column` and `.halt` all do, since `raised` deliberately has none. Counting every `<Panel>`
+reports those three correct designs as faults (findings 13 → 20); counting none of them leaves
+`.exec-card`'s padding free to come back unseen. Both directions are in the parser's fixture.
+
+**`--radius` is deleted**, which Phase 1 ruled would happen in the phase where a surface primitive
+owned its four consumers — `.archive-drawer`, `.column`, `.exec-column`, `.halt`. All four are now
+`raised`, and `OFF_SCALE_ON_PURPOSE` loses its second entry. Authored `border-radius` declarations:
+**86 → 80**.
+
+#### The characterisation suite, written first, and what it found
+
+`test/panel-boxes.test.tsx` — **25 tests, run green against the code as it was, before any migration.**
+It asserts the box a class list draws, resolved out of the stylesheets with `el.matches()` doing the
+selector work, and resolves the scale tokens to pixels so a rule moving from `var(--radius)` to
+`var(--r-lg)` reads as the same 10px.
+
+**The assertions survived the migration; the fixtures did not**, and saying otherwise would be the
+dishonest version of this note. A row is now built by rendering `Panel` rather than by writing
+`<button class="report-open">`, because the element genuinely carries two more classes. What that buys
+is that the class list is never hand-written: rename `vb-panel-flat` and the fixture moves with it
+instead of quietly testing a dead class.
+
+Three findings:
+
+- **`.cv-link`'s `font-size: var(--t-body)` was DEAD on every clickable card link.** `.cv-link-btn`'s
+  `font: inherit` is written later at the same specificity, so it reset the size — the `<button>` and
+  the plain `<div>` beside it matched only by accident of what they inherited. That is the shape of the
+  10.88px incident exactly. The size now lives on `.cv-links`, once, where the list is.
+- **The suite's own cascade helper was wrong in both directions, and only one of them was red.** Its
+  first version stripped the pseudo-class out and matched what was left, so every `:hover` rule applied
+  at rest: `.control-item`'s hover ground read as its resting ground and failed, while the same bug
+  made the identical claim pass on `.report-open` for the wrong reason. It now requires a rule's states
+  to be a subset of the one asked for, handles `:not(:disabled)`, and is asserted by its own two cases.
+- **Three of the eight rows had `border: none`** — `.mp-pick`, `.chat-menu-open`, `.suggestions-pick` —
+  so they had no box to light at all and depended entirely on a parent's hover. They now carry the
+  primitive's transparent border.
+
+#### Selector migrations
+
+**126 → 127, and it went UP.** Measured with the command recorded at the end of Phase 3. One selector
+was migrated: `test/utility-dock.test.tsx`'s `.dock-body`, now `data-testid="dock-body"`, which check 10
+needs as well. The other four are **this phase's own characterisation suite**, and reporting 125 by
+leaving them out would be laundering the number — a suite that reads the stylesheet is exactly a test
+that breaks when a class is renamed. Two of the four were incidental and went through test ids
+(`.column`, and the chat pick); **two remain because they ARE the subject** — `.board-columns`, whose
+tracks are the claim, and `.column-head, .vb-panel-head`, which asserts the header slot's class moved
+to the primitive. A `data-testid` would answer neither question.
+
+The eight migrated row classes and the four raised surfaces had **no** class-based selectors in the
+suite, which is why 4,135 tests stayed green through the migration; `data-testid` was added at all nine
+Panel call sites anyway, so Phase 5 does not have to invent them.
+
+**Exit:** panels are one component. **Geometry ratchet 22 → 13.** **`--radius` deleted**; authored
+radius declarations **86 → 80**.
+
+**Class selectors: `styles.css` 416 → 414, `primitives.css` 25 → 29 — so 441 → 443 by Phase 3's method,
+and it went UP by two.** Only `.column` and `.column-head` died outright; `Panel` added four
+(`.vb-panel`, `-raised`, `-flat`, `-head` — `button.vb-panel` is a tag qualifier and not a fifth name).
+Nine rows migrated and none of their classes died, for the reason Phase 3 measured: what is left after
+the geometry comes out is a real declaration only the surface can make — `.report-open { flex: 1 }`,
+`.cv-link-btn { width: fit-content }`, `.exec-card { overflow-wrap: anywhere }`.
+**The distinct UNION across both files is 441**, because `vb-btn` and `vb-dot` are named in
+`styles.css` too (`.halt .vb-btn`, the connection light's dot), so the two methods differ by exactly
+those two names. Phase 5's under-150 target is measured against the union.
+
+**Suite: 238 files, 4,135 tests** (`test/panel-boxes.test.tsx` adds 25). **Harness: 30 tests, three
+themes, exit 0.**
+**Revert:** `web/src/ui/Panel.tsx` and the Panel block of `primitives.css`, the **13** components that
+call it, `styles.css`, `themes.css` (`--radius` returns), three baseline files, `check-radius-scale.mjs`
+(TAGS and the ceiling), and checks 9 and 10 with `pageClipping`, `pageGrid` and `pageDock`.
 
 ### Phase 5 — Readout, Field, and the sweep
 
@@ -785,9 +1074,11 @@ numerals are the claim.
 
 ## Risks, and what would stop this
 
-- **Class renames break tests.** There are **126** `querySelector('.class')` calls in the React tests —
-  135 before Phase 3, measured by the command recorded at the end of that phase; the **132** this line
-  carried until 2026-08-21 had no method beside it and does not reproduce. They
+- **Class renames break tests.** There are **127** `querySelector('.class')` calls in the React tests —
+  135 before Phase 3 and 126 after it, measured by the command recorded at the end of that phase; the
+  **132** this line carried until 2026-08-21 had no method beside it and does not reproduce. Phase 4
+  took it UP by one, and deliberately: it migrated one and its own characterisation suite added four,
+  two of which are the classes under test and cannot be a `data-testid`. They
   are the blast radius, and they must be migrated to `data-testid` as each phase touches them, not left
   to a final sweep. A test that selects on a class turns a visual fix into a red suite, which is how a
   suite stops being trusted.

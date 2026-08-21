@@ -3,6 +3,7 @@ import { cardSuggestion, patchSuggestion } from '../api';
 import type { Suggestion, SuggestionLevel } from '../shared';
 import { SUGGESTION_LEVELS } from '../shared';
 import { Button } from '../ui/Button';
+import { Panel } from '../ui/Panel';
 import { useAction } from '../useAction';
 
 // The dock's second occupant (decision 48): what agents filed, and the two things a person may do with
@@ -143,7 +144,13 @@ export function SuggestionsPane({ suggestions, failed, onRefresh, onApply }: Pro
                 key={s.id}
                 data-state={s.state}
               >
-                <button type="button" className="suggestions-pick" onClick={() => pick(s.id)}>
+                <Panel
+                  as="button"
+                  variant="flat"
+                  className="suggestions-pick"
+                  data-testid="suggestions-pick"
+                  onClick={() => pick(s.id)}
+                >
                   <span className="filed-title">{s.title}</span>
                   <span className="filed-meta">
                     <time dateTime={s.created}>{when(s.created)}</time>
@@ -153,7 +160,7 @@ export function SuggestionsPane({ suggestions, failed, onRefresh, onApply }: Pro
                     {s.card && <span className="diary-chip">{s.card}</span>}
                   </span>
                   {s.body && <span className="filed-text">{s.body}</span>}
-                </button>
+                </Panel>
               </li>
             ))}
           </ol>

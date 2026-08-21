@@ -1,4 +1,11 @@
-import { auditFocus, auditStyles, documentOverflow, type Offender } from '../support/audit.js';
+import {
+  auditDock,
+  auditFocus,
+  auditGrid,
+  auditStyles,
+  documentOverflow,
+  type Offender,
+} from '../support/audit.js';
 import { type Baseline, expect, readBaseline, recording, test, writeBaseline } from '../support/fixtures.js';
 
 // The seven checks of docs/design-system.md, per theme.
@@ -36,11 +43,39 @@ const FLOOR = {
   elements: 150,
   text: 80,
   overflow: 70,
+  // Every element with an `overflow-x` other than `visible`. There are far more than this — the board
+  // area, every column body, the card panes — and the floor is set where it catches "the walk stopped
+  // matching" rather than ordinary editing.
+  clipping: 10,
   contrast: 80,
   tokens: 15,
   focus: 30,
   rows: 10,
 };
+
+// THE BOARD AREA IS THE ONE THING ALLOWED TO SCROLL SIDEWAYS, and it is named rather than counted.
+//
+// It has to scroll at 900px and there is no arrangement in which it does not: the board area is 465px
+// wide with the copilot open, and five columns at the 144px legibility floor plus their gaps want
+// 764.8px. What is NOT allowed is what was there before Phase 4 — three separate scrollers, one per
+// board row, each clipping its own content. Three rows that read as one table cannot each have their
+// own scroll offset: the shared grid is only true while every row sits at zero.
+const SCROLL_REGION = 'main.boards';
+
+// THE MEASURED LEGIBILITY FLOOR OF A COLUMN TRACK, from web/src/styles.css: a `.column`'s own
+// min-content width, 179px, rounded up. Asserted so a floor lowered by accident is a failure rather
+// than a silent change of look — and it has already been lowered by accident once, to 144px, which put
+// the column head's `+` button outside the column's border in the gutter. See `headOverflows`.
+const TRACK_FLOOR = 180;
+
+// WHAT THE RAW PANE LEAVES UNUSED INSIDE THE DEFINITE DOCK BODY, at 1440×900: 79px of 342px. A
+// RATCHET and not zero, because it is a fault this check FOUND rather than one Phase 4 introduced —
+// see check 10 for the cause. Drive it down; never raise it.
+const DOCK_SHORTFALL = 79;
+
+// The three widths the board's shared grid is designed around, and the ones the dock's `38vh` is
+// measured against.
+const WIDTHS = [900, 1200, 1440];
 
 // Printed whether or not the count is within the ratchet: a finding list nobody sees is a finding
 // list nobody fixes, and the phases after this one are the ones that have to fix them.
@@ -117,6 +152,7 @@ test('record the baseline', async ({ board, theme }) => {
       elements: styles.elements,
       textElements: styles.textElements,
       overflow: styles.overflow.examined,
+      clipping: styles.clipping.examined,
       contrast: styles.contrast.examined,
       tokens: styles.tokens.examined,
       rows: styles.rows.examined,
@@ -125,6 +161,7 @@ test('record the baseline', async ({ board, theme }) => {
     },
     findings: {
       overflow: styles.overflow.offenders.length,
+      clipping: styles.clipping.offenders.length,
       contrast: styles.contrast.offenders.length,
       tokens: styles.tokens.offenders.length,
       rows: styles.rows.offenders.length,
@@ -241,10 +278,33 @@ test('3. nothing overflows', async ({ board, theme }) => {
     `text elements overflowing their box:\n${lines(styles.overflow.offenders)}`,
   ).toBeLessThanOrEqual(baseline.findings.overflow);
 
+  // AND THE SECOND QUESTION, WHICH THIS CHECK DID NOT ASK UNTIL PHASE 4: is any BOX wider than the box
+  // that clips it? The walk above asks whether text overflows its OWN box, and only of elements with a
+  // text node of their own — so a scroll container, which has no text, was never examined, and the text
+  // inside one is not overflowing anything. Both halves were true and neither was the question.
+  //
+  // What it missed: three `.board-columns` rows, each its own horizontal scroller, each cutting 40px
+  // off its fifth column at 1440×900 and 580px at 900px, with "Drop a card here" clipped mid-word.
+  // This check reported 0 of 120 and the document did not scroll. See `pageClipping` in audit.ts.
+  expect(styles.clipping.examined).toBeGreaterThan(FLOOR.clipping);
+  report(theme, 'clipping', styles.clipping.examined, styles.clipping.offenders);
+  // THE BOARD AREA IS EXEMPT BY NAME, and nothing else is — the same allowance check 9 makes, for the
+  // same reason. It is the board's one scroll region and it has to scroll below about 1345px: five
+  // columns at the 180px legibility floor plus their gaps want 944.8px, and this harness's default
+  // viewport leaves the board area 880px. Matched on the LAST SEGMENT of the path rather than by
+  // substring, so a descendant of the board area cannot be excused by its ancestor's name.
+  const clipped = styles.clipping.offenders.filter(
+    (o) => (o.where.split(' > ').pop() ?? '') !== SCROLL_REGION,
+  );
+  expect(
+    clipped.map((o) => `${o.where} — ${o.detail}`),
+    `boxes clipped by an ancestor that scrolls:\n${lines(styles.clipping.offenders)}`,
+  ).toEqual([]);
+
   // And the document itself, at the three widths the board's shared column grid is designed around.
   // A horizontal scrollbar on a cockpit is the fault that has been reported by eye and that jsdom
   // cannot see: it has no layout engine, so every box it measures is zero by zero.
-  for (const width of [900, 1200, 1440]) {
+  for (const width of WIDTHS) {
     await board.setViewportSize({ width, height: 900 });
     const doc = await documentOverflow(board);
     expect(doc.scrollWidth, `the document scrolls sideways at ${width}px`).toBeLessThanOrEqual(
@@ -408,4 +468,167 @@ test('7. one line where one line is meant', async ({ board, theme }) => {
       `${selector} wrapped: its ${row.count} children span ${row.band}px against a tallest child of ${row.tallest}px`,
     ).toBeLessThanOrEqual(row.tallest + 1);
   }
+});
+
+// CHECK 9 — THE BOARD'S THREE COLUMN ROWS ARE ONE SHARED GRID. Phase 4 of docs/design-system.md.
+//
+// The three boards are stacked and read as one table, so their column edges have to line up down the
+// page. The stylesheet says so — one grid of `--max-cols` tracks per row, the count taken from the
+// widest board's CONFIG — and the claim was still false, in a way nothing in this harness could see.
+//
+// WHAT WAS ACTUALLY WRONG, measured at 1440×900 before this check existed. Every row's tracks were
+// identical, and every row was ALSO its own horizontal scroller: `overflow-x: auto` on
+// `.board-columns`, with the grid 1044.8px wide inside a 1005px box. So each row clipped 40px of its
+// fifth column, cutting "Drop a card here" mid-word, and any row could be scrolled independently of
+// the two above it — which makes "one shared grid" true only while all three sit at offset zero. At
+// 900px each row clipped 580px. Check 3 reported 0 findings across 120 text elements and no document
+// scroll, because it asks whether text overflows its OWN box and this is an ancestor clipping it.
+//
+// So this asserts three separable things, and the first two would each have passed on the old code:
+//   1. every row reports the SAME `grid-template-columns`;
+//   2. column i sits at the same x with the same width in every row that has one;
+//   3. the ONLY thing scrolling sideways is the board area — one region, not three.
+// And a fourth, which is what makes the fit real rather than a fit bought by squeezing: no track is
+// narrower than the measured legibility floor.
+test('9. the three board rows are one shared grid', async ({ board, theme }) => {
+  let rowsExamined = 0;
+  let columnsExamined = 0;
+  let headsExamined = 0;
+  for (const width of WIDTHS) {
+    await board.setViewportSize({ width, height: 900 });
+    const grid = await auditGrid(board);
+    // A FLOOR, because the failure mode of a layout assertion is a selector that matches nothing: a
+    // check that examined no rows agrees with every claim made about them.
+    expect(grid.rows.length, `no .board-columns rows at ${width}px — has the board rendered?`).toBe(3);
+    rowsExamined += grid.rows.length;
+
+    const tracks = new Set(grid.rows.map((r) => r.tracks));
+    expect([...tracks], `the three board rows do not share one set of tracks at ${width}px`).toHaveLength(1);
+
+    // Per COLUMN INDEX rather than per row, because that is the claim a reader makes with their eye:
+    // BACKLOG is above BACKLOG. A row with fewer columns than the widest simply ends early, which is
+    // honest — the Features board really does have one fewer column.
+    const widest = Math.max(...grid.rows.map((r) => r.columns.length));
+    expect(widest, `no columns rendered at ${width}px`).toBeGreaterThan(1);
+    for (let i = 0; i < widest; i += 1) {
+      const seen = grid.rows.map((r) => r.columns[i]).filter((c) => c !== undefined);
+      columnsExamined += seen.length;
+      const places = new Set(seen.map((c) => `${c.x}+${c.width}`));
+      expect([...places], `column ${i} does not line up across the three boards at ${width}px`).toHaveLength(
+        1,
+      );
+    }
+
+    expect(
+      grid.narrowestTrack,
+      `a column track is ${grid.narrowestTrack}px at ${width}px, under the ${TRACK_FLOOR}px floor at ` +
+        `which nothing on the board overflows its own box`,
+    ).toBeGreaterThanOrEqual(TRACK_FLOOR);
+
+    // ONE REGION. The board area may be in this list; nothing else may.
+    expect(
+      grid.scrollers.filter((who) => who !== SCROLL_REGION),
+      `something other than ${SCROLL_REGION} scrolls sideways at ${width}px — three board rows each ` +
+        `scrolling on their own is how the shared grid stopped being shared`,
+    ).toEqual([]);
+
+    // AND THE HEAD FITS INSIDE THE COLUMN. A third kind of overflow, invisible to every other check:
+    // a flex row with no text of its own and `overflow: visible` neither clips nor scrolls, so its
+    // children just render outside it. This is the fault a 144px floor made — the `+` in the gutter
+    // between columns — and the text walk reported 0 findings at every floor from 144px to 200px.
+    expect(
+      grid.headsExamined,
+      `no column heads found at ${width}px — has .vb-panel-head stopped matching?`,
+    ).toBe(14);
+    headsExamined += grid.headsExamined;
+    expect(
+      grid.headOverflows.map((o) => `${o.where} — ${o.detail}`),
+      `column heads whose contents render outside the column at ${width}px`,
+    ).toEqual([]);
+
+    console.log(
+      `[${theme}] grid @${width}: 3 rows, ${widest} tracks, narrowest ${grid.narrowestTrack}px, ` +
+        `${grid.headsExamined} heads, scrollers [${grid.scrollers.join(', ')}]`,
+    );
+  }
+  console.log(
+    `[${theme}] grid: ${rowsExamined} row(s), ${columnsExamined} column(s) and ${headsExamined} head(s) examined`,
+  );
+  // Stated so a run that quietly stopped visiting a width cannot look like a pass: 3 rows × 3 widths,
+  // 4 + 5 + 5 columns at each of them, and one head per column.
+  expect(rowsExamined).toBe(9);
+  expect(columnsExamined).toBe(42);
+  expect(headsExamined).toBe(42);
+});
+
+// CHECK 10 — THE DOCK KEEPS ITS DEFINITE HEIGHT. Phase 4 of docs/design-system.md.
+//
+// `.dock-body` is `max-height: 38vh` — content-sized, so a one-line "No card open." does not reserve
+// 414px of empty panel — EXCEPT where a pane exists to be filled, and those get `height: 38vh` back.
+// The reason is not obvious and is exactly what this pins: a flex child asking for `flex: 1` needs a
+// parent with a DEFINITE height to take a share of. Under `max-height` alone the raw editor collapsed
+// to its own `min-height` — 128px holding 289px of text, inside a dock body of 230px, with 250px of the
+// cap going spare. The pane wanted to fill the box and the box wanted to fit the pane.
+//
+// jsdom cannot see either state: it has no layout engine, so both are zero by zero.
+test('10. the dock is content-sized until a pane asks to be filled', async ({ board, theme }) => {
+  await board.setViewportSize({ width: 1440, height: 900 });
+  const resting = await auditDock(board);
+  expect(resting.pane, 'the dock already had a fillable pane open — this measures the resting case').toBe(
+    null,
+  );
+  const cap = Math.round(resting.viewport * 0.38);
+  expect(resting.bodyHeight, 'the dock body rendered nothing').toBeGreaterThan(0);
+  expect(
+    resting.bodyHeight,
+    `the dock body is ${resting.bodyHeight}px at rest, over its ${cap}px cap`,
+  ).toBeLessThanOrEqual(cap + 1);
+  // STRICTLY under the cap, not merely within it. `height: 38vh` for everything is what this replaced,
+  // and a regression to it would satisfy "≤ cap" exactly.
+  expect(
+    resting.bodyHeight,
+    `the dock body is at its ${cap}px cap with nothing in it that asks to be filled — it is reserving ` +
+      `height for a one-line empty state, which is what content-sizing replaced`,
+  ).toBeLessThan(cap);
+
+  // Open a card, then its file. Through the real controls rather than by injecting state: the pane is
+  // selected by `.dock-body:has(.raw-pane)`, so a fabricated DOM would be measuring a different rule.
+  await board.locator('.tile').first().click();
+  await board.locator('[data-testid="cards-raw"]').click();
+  await board.locator('.raw-pane').waitFor({ state: 'visible' });
+  const filled = await auditDock(board);
+  expect(filled.pane, 'the raw pane did not open').toBe('raw-pane');
+  expect(
+    filled.bodyHeight,
+    `the dock body is ${filled.bodyHeight}px with a raw pane open, and 38vh of ${filled.viewport}px is ` +
+      `${cap}px. A pane that asks to be filled needs a parent with a DEFINITE height to fill.`,
+  ).toBe(cap);
+  // AND WHAT THE PANE DOES WITH IT, WHICH IS A RATCHET AND NOT ZERO — because the first run of this
+  // check found that it does not take all of it, and that is a pre-existing fault rather than
+  // something Phase 4 moved.
+  //
+  // Measured at 1440×900: the dock body is 342px and the raw pane is 263px, so 79px of a definite box
+  // goes unused. The cause is the same one the `height: 38vh` comment in styles.css describes, one
+  // level further down: `.raw-pane`'s `flex: 1` needs a FLEX parent, and its parent is `.cards-body`,
+  // which is a scrolling block. So the pane sits at its own content height, floored by
+  // `.raw-pane .raw-area`'s `min-height: 14rem` — 224px, which is large enough to hide the collapse.
+  // Phase 4's gate is that the dock BODY's height is definite, and it is, exactly. Fixing the chain
+  // below it is a change to the dock's internals that this phase has no business making, so the number
+  // is recorded and any increase blocks.
+  const shortfall = filled.bodyHeight - filled.paneHeight;
+  expect(filled.paneHeight, 'the raw pane rendered nothing').toBeGreaterThan(0);
+  expect(
+    filled.paneHeight,
+    `the raw pane is ${filled.paneHeight}px, taller than the ${filled.bodyHeight}px box it sits in`,
+  ).toBeLessThanOrEqual(filled.bodyHeight);
+  expect(
+    shortfall,
+    `the raw pane leaves ${shortfall}px of a ${filled.bodyHeight}px definite dock body unused, against ` +
+      `${DOCK_SHORTFALL}px when this was measured. Its \`flex: 1\` has no flex parent — .cards-body is a ` +
+      `scrolling block — so it sits at its content height. Do not raise this number.`,
+  ).toBeLessThanOrEqual(DOCK_SHORTFALL);
+  console.log(
+    `[${theme}] dock: ${resting.bodyHeight}px at rest, ${filled.bodyHeight}px with ${filled.pane} ` +
+      `(38vh of ${filled.viewport} = ${cap}), pane ${filled.paneHeight}px`,
+  );
 });

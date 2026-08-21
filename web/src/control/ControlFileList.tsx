@@ -1,5 +1,6 @@
 import type { ControlCategory, ControlFile, ControlGroup } from '../api';
 import { Button } from '../ui/Button';
+import { Panel } from '../ui/Panel';
 
 // A selection that means "the links registry", not a path on disk. It travels through the same
 // `selected` state as a real file path so the list has one notion of what is active.
@@ -55,12 +56,15 @@ export function ControlFileList({
             )}
           </div>
           {g.key === 'resources' && (
-            <button
+            <Panel
+              as="button"
+              variant="flat"
               className={`control-item${selected === RESOURCES_SENTINEL ? ' active' : ''}`}
+              data-testid="control-item"
               onClick={() => onSelect(RESOURCES_SENTINEL)}
             >
               <span className="control-item-name">🔗 Links registry</span>
-            </button>
+            </Panel>
           )}
           {g.files.length === 0 && g.key !== 'resources' && <div className="control-empty">— none —</div>}
           {g.files.map((f) =>
@@ -85,16 +89,19 @@ export function ControlFileList({
                 }}
               />
             ) : (
-              <button
+              <Panel
+                as="button"
+                variant="flat"
                 key={f.path}
                 className={`control-item${selected === f.path ? ' active' : ''}`}
+                data-testid="control-item"
                 title={`${f.path}${f.deletable ? ' · double-click to rename' : ''}`}
                 onClick={() => onSelect(f.path)}
                 onDoubleClick={() => onStartRename(f)}
               >
                 <span className="control-item-name">{f.name}</span>
                 {f.managed && <span className="control-tag">managed</span>}
-              </button>
+              </Panel>
             ),
           )}
         </div>

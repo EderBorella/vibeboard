@@ -47,7 +47,7 @@ export function UtilityDock({ panes, activeId, onPane, collapsed, onCollapse }: 
       {/* Hidden rather than unmounted while collapsed, so a keepMounted pane survives folding the
           dock away as well as switching pane. `.dock-body[hidden]` is spelled out in the CSS: the
           UA rule for [hidden] loses to any display declaration. */}
-      <div className="dock-body" hidden={collapsed}>
+      <div className="dock-body" data-testid="dock-body" hidden={collapsed}>
         {panes
           .filter((p) => p.id === active.id || p.keepMounted)
           .map((p) => (

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { ChatMeta } from '../shared';
 import { Button } from '../ui/Button';
 import { Chip } from '../ui/Chip';
+import { Panel } from '../ui/Panel';
 import { backendLabel, relTime } from './format';
 
 interface Props {
@@ -41,8 +42,11 @@ export function ChatSwitcher({ chats, currentChatId, backend, running, onOpen, o
               {chats.length === 0 && <div className="chat-menu-empty">No saved chats yet</div>}
               {chats.map((c) => (
                 <div key={c.id} className={`chat-menu-item${c.id === currentChatId ? ' active' : ''}`}>
-                  <button
+                  <Panel
+                    as="button"
+                    variant="flat"
                     className="chat-menu-open"
+                    data-testid="chat-menu-open"
                     onClick={() => {
                       onOpen(c.id, backend);
                       setChatMenu(false);
@@ -58,7 +62,7 @@ export function ChatSwitcher({ chats, currentChatId, backend, running, onOpen, o
                     <span className="chat-menu-meta">
                       {relTime(c.updatedAt)} · {c.messageCount} msg
                     </span>
-                  </button>
+                  </Panel>
                   <Button
                     variant="bare"
                     size="sm"

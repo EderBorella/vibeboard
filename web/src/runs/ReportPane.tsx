@@ -4,6 +4,7 @@ import { renderMarkdown } from '../markdown';
 import type { Card, ProjectConfig } from '../shared';
 import { Button } from '../ui/Button';
 import { Chip } from '../ui/Chip';
+import { Panel } from '../ui/Panel';
 import { slugify } from '../viewmodel';
 import { usageLine } from './format';
 import { ReportOptions } from './ReportOptions';
@@ -123,15 +124,17 @@ export function ReportPane({
         <div className="report-created">
           <span className="cv-label">Cards this run created</span>
           {createdCards.map((c) => (
-            <button
+            <Panel
+              as="button"
+              variant="flat"
               key={c.id}
-              type="button"
               className="cv-link-btn"
+              data-testid="cv-link"
               title={`Open ${c.id}`}
               onClick={() => onOpenCard(c)}
             >
               <span className="link-id">{c.id}</span> <span className="link-title">{c.title}</span>
-            </button>
+            </Panel>
           ))}
         </div>
       )}

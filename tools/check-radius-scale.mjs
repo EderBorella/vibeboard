@@ -29,9 +29,10 @@
 // it reports the full list, blocks any INCREASE, and the number below is what it was on the day the
 // primitives landed. Drive it down; never raise it.
 //
-// WHAT CLAIM 2 CATCHES: a `<button className="x">` OR a `<Button className="x">` in a .tsx file whose
-// class `x` is given a `border-radius`, a `padding` (or `padding-top`, `-right`, `-bottom`, `-left`) or
-// a `font-size` by any rule in a stylesheet other than the primitive one.
+// WHAT CLAIM 2 CATCHES: a `<button className="x">`, a `<Button className="x">` or a
+// `<Panel as="button" className="x">` in a .tsx file whose class `x` is given a `border-radius`, a
+// `padding` (or `padding-top`, `-right`, `-bottom`, `-left`) or a `font-size` by any rule in a
+// stylesheet other than the primitive one.
 // WHAT IT DOES NOT CATCH, and none of these is hypothetical:
 //   - a class reaching a button through a variable or a helper, rather than as a literal in the
 //     element's own `className`. It reads the attribute text, not the render — which is why
@@ -41,7 +42,8 @@
 //     invisible to it, and `.copilot-actions button` really is one of them.
 //   - anything about an `<a>`, a `<div role="button">` or an `<input type="submit">`.
 // The `<Button className>` hole USED to be on this list, and reading `<Button>` closed it — see the
-// comment on TAGS. It was not hypothetical either: it opened up the moment 27 classes migrated.
+// comment on TAGS. It was not hypothetical either: it opened up the moment 27 classes migrated, and
+// `<Panel as="button">` is the same hole reopened by Phase 4 and closed in the same commit.
 // It is a real subset of "no rule outside the primitive block declares geometry for a button-shaped
 // element", stated so nobody mistakes it for the whole.
 
@@ -66,13 +68,6 @@ const OFF_SCALE_ON_PURPOSE = new Map([
       '999px would be a claim about a stadium. Owned by the Dot primitive; the one other consumer is ' +
       '`.copilot-status .status-dot`, which Phase 5 folds into Dot.',
   ],
-  [
-    'var(--radius)',
-    'THE SAME 10px AS `--r-lg`, and both names are live on purpose. Phase 1 of docs/design-system.md ' +
-      'ruled that `--radius` is deleted in the phase where a surface primitive owns its four ' +
-      'consumers (.archive-drawer, .column, .exec-column, .halt) — that is Panel, in Phase 4. ' +
-      'Renaming a token while no caller exists buys nothing and splits the revert.',
-  ],
 ]);
 
 // The floor. A REGEX THAT STOPS MATCHING IS THE FAILURE MODE OF A CHECK LIKE THIS: it reports zero
@@ -88,8 +83,26 @@ const OFF_SCALE_ON_PURPOSE = new Map([
 // at 0. Do NOT put a count floor back here.
 const FLOOR = { radius: 60 };
 
-// WHAT CLAIM 2 STANDS AT. 56 before Phase 3; 46 when the primitives landed; **22** after the adoption
-// was finished, which is the number here. The 24 that went in that second pass are `.btn-primary`,
+// WHAT CLAIM 2 STANDS AT. 56 before Phase 3; 46 when the primitives landed; 22 after that adoption was
+// finished; **13** after Phase 4 gave the list rows a `Panel`, which is the number here. The nine that
+// went are `.report-open`, `.exec-card`, `.control-item`, `.explorer-item`, `.cv-link`, `.cv-link-btn`,
+// `.mp-pick`, `.chat-menu-open` and `.suggestions-pick` — all one shape, a full-bleed row with no box
+// until the surface lights it, which is `Panel`'s `flat` variant.
+//
+// The 13 that remain are FOUR kinds and none of the reasons is "it has its own padding":
+//   `.archive-title` — a list row whose CONTAINER is already padded, and which is `flex: 1` inside it.
+//                      `flat`'s padding would pad it twice and push the restore controls off the row.
+//                      The only one of the ten Phase 3 named that Panel could not take.
+//   `.board-archive` `.mp-chip` `.tag` `.tag-chip` — chips. `Chip` owns that box; every Panel variant
+//                      is a rectangle with a corner, and a pill is not.
+//   `.board-label` — a section header. Panel's header slot is a bordered row INSIDE a panel; this is a
+//                      collapsible heading ABOVE one, with a 3px accent left edge.
+//   `.bt-btn` `.mode-btn` — cells in a segmented control: the GROUP owns one border and one radius.
+//   `.cards-tab-label` `.dock-tab` `.tab-btn` — tabs, whose selected state is a border on three sides
+//                      continuous with the panel below them. Every variant closes the box.
+//   `.chat-current` `.mp-trigger` — select triggers. A control, not a region that takes a click.
+//
+// The 24 that went in Phase 3's second pass were `.btn-primary`, The 24 that went in that second pass are `.btn-primary`,
 // `.btn-secondary` and `.btn-danger` (37 call sites between them, and exactly `primary`, `default` and
 // `danger` at `md` under their old names), `.archive-restore`, `.confirm-cancel`, `.chat-new`,
 // `.cards-raw`, `.copilot-reset`, `.cs-action`, `.dispatch-back`, `.option-btn`, `.switch-btn`, and the
@@ -97,10 +110,8 @@ const FLOOR = { radius: 60 };
 // `.cards-tab-x`, `.res-del`, `.chat-del`, `.tile-archive`, `.column-add`, `.control-new`, `.mp-star`,
 // `.dock-collapse`, `.tag-filter-clear`, `.cv-link-edit`.
 //
-// The 22 that remain each have a reason recorded in docs/design-system.md, and they are four kinds:
-// tabs and segmented cells (the group owns the border), select triggers, list rows, and chips. Phases 4
-// and 5 own them. NEVER raise this: a ratchet that moves the wrong way is a gate switched off in place.
-const BUTTON_GEOMETRY_CEILING = 22;
+// NEVER raise this: a ratchet that moves the wrong way is a gate switched off in place.
+const BUTTON_GEOMETRY_CEILING = 13;
 
 const GEOMETRY = [
   'border-radius',
@@ -229,8 +240,15 @@ const FIXTURE = [
   '<button className="alpha beta" onClick={() => x > 1 && go()}>hi</button>',
   // biome-ignore lint/suspicious/noTemplateCurlyInString: the placeholder IS the fixture — this string is JSX source that `classesIn` must blank a `${}` hole out of, so it cannot be a real template.
   '<Button className={`gamma ${tone} delta`}>hi</Button>',
-  // Neither of these is a button, and a pattern that swept them up would inflate the census.
+  // A Panel IS in the population when it says so, and is NOT otherwise. Both directions are in the
+  // fixture because the requirement is the part that can silently invert: a predicate that matched
+  // nothing would drop `.exec-card` out of the census, and one that matched everything would report
+  // `.archive-drawer`'s legitimate padding as a fault.
+  '<Panel as="button" variant="flat" className="eta">x</Panel>',
+  '<Panel variant="raised" className="theta">x</Panel>',
+  // None of these is a button, and a pattern that swept them up would inflate the census.
   '<ButtonRow className="epsilon">x</ButtonRow>',
+  '<PanelHead className="iota">x</PanelHead>',
   '<div className="zeta">x</div>',
 ].join('\n');
 
@@ -240,21 +258,36 @@ const FIXTURE = [
 // refuse, sailing straight past the test meant to refuse it. A self-test that does not call the code
 // under test is decoration.
 function parserSelfTest() {
-  const seen = TAGS.flatMap((tag) => openTagsOf(FIXTURE, tag)).flatMap((t) => classesIn(t.attrs));
-  const want = 'alpha,beta,gamma,delta';
+  const seen = TAGS.flatMap(({ tag, requires }) => shapedTags(FIXTURE, tag, requires)).flatMap((t) =>
+    classesIn(t.attrs),
+  );
+  const want = 'alpha,beta,gamma,delta,eta';
   // Not sorted: TAGS' order is part of what is asserted, so `<button`'s two come before `<Button`'s.
   return seen.join(',') === want ? null : `expected [${want}], parsed [${seen.join(',')}]`;
 }
 
-// BOTH `<button>` AND `<Button>`, and the second half was forced by a hole this check's own header
-// admitted to and the Phase 3 adoption then drove a bus through. It read literal `<button>` only, so
-// migrating 27 classes onto `<Button className="…">` moved every one of them OUT of the population —
-// and a `padding` planted on `.cs-action` after the migration exited **0**. The ratchet would have gone
-// on falling while the geometry it was counting quietly moved somewhere it could not look.
+// THE POPULATION IS BUTTON-SHAPED ELEMENTS, whatever renders them.
 //
-// `<Button>`'s `className` is documented as layout-only. This is what makes that documentation a gate:
-// a class on a `<Button>` is a class on a button-shaped element, and the primitive owns its box.
-const TAGS = ['<button', '<Button'];
+// `<Button>` was added in Phase 3 and it was forced rather than chosen: the check read literal
+// `<button>` only, so migrating 27 classes onto `<Button className="…">` moved every one of them OUT
+// of the population — a `padding` planted on `.cs-action` right after that migration exited **0**. The
+// ratchet would have gone on falling while the geometry it counted quietly moved out of sight.
+//
+// `<Panel as="button">` is Phase 4's version of exactly that hole, and it is qualified rather than
+// swept in. A `Panel` is usually a `<div>` or a `<section>`, and one of those may legitimately declare
+// its own padding — `.archive-drawer`, `.exec-column` and `.halt` all do, because `Panel`'s `raised`
+// variant deliberately has none: a column pads its body and a drawer pads itself. Counting every
+// `<Panel>` would therefore report three correct designs as findings, which is how a check earns the
+// reputation that gets it switched off. Counting none of them would leave `.exec-card`'s padding free
+// to come back through a prop the check cannot see. So the tag carries a REQUIREMENT, read out of the
+// same attribute text: a Panel is in the population when it says `as="button"`.
+//
+// Both primitives document `className` as layout-only. This is what makes that documentation a gate.
+const TAGS = [
+  { tag: '<button', requires: null },
+  { tag: '<Button', requires: null },
+  { tag: '<Panel', requires: /\bas="button"/ },
+];
 
 // Every opening tag of `tag` in `text`, as `{ attrs, line }`. Its own function because the two nested
 // loops it removes cost more in the complexity metric than the whole of the rest of this file — the
@@ -268,12 +301,20 @@ function openTagsOf(text, tag) {
     .map(({ open, end }) => ({ attrs: text.slice(open, end), line: lineOf(text, open) }));
 }
 
+// Every opening tag of `tag` that also satisfies `requires`, which is how `<Panel as="button">` is
+// separated from an ordinary `<Panel>`. Its own function so `parserSelfTest` goes through exactly the
+// code the census does — the first version of that test carried its own regex, had no opinion about
+// `TAGS` at all, and sailed straight past a broken tag name.
+function shapedTags(text, tag, requires) {
+  return openTagsOf(text, tag).filter((t) => requires === null || requires.test(t.attrs));
+}
+
 function buttonClasses() {
   /** @type {Map<string, string[]>} */
   const found = new Map();
   const tags = walk('.tsx').flatMap((file) => {
     const text = readFileSync(join(ROOT, file), 'utf8');
-    return TAGS.flatMap((tag) => openTagsOf(text, tag).map((t) => ({ file, ...t })));
+    return TAGS.flatMap(({ tag, requires }) => shapedTags(text, tag, requires).map((t) => ({ file, ...t })));
   });
   for (const { file, attrs, line } of tags) {
     for (const cls of classesIn(attrs)) {
@@ -309,7 +350,7 @@ console.log(
   `radius scale: ${radiusDecls} border-radius declaration(s) across ${walk('.css').length} file(s) in ${CORPUS}`,
 );
 console.log(
-  `button geometry: ${onButton.size} class(es) literal on a <button> or <Button>, ${geometry.length} of them given geometry outside ${PRIMITIVES}`,
+  `button geometry: ${onButton.size} class(es) literal on a ${TAGS.map((t) => t.tag).join(', ')} (Panel only when it says as="button"), ${geometry.length} of them given geometry outside ${PRIMITIVES}`,
 );
 
 // Before the findings, because a green run on a pattern that matched nothing is the worse failure.

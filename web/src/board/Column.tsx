@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { BoardName, Card } from '../shared';
 import { Button } from '../ui/Button';
+import { Panel } from '../ui/Panel';
 import { CardTile } from './CardTile';
 
 interface Props {
@@ -55,8 +56,27 @@ export function Column({
   };
 
   return (
-    <div
+    <Panel
+      variant="raised"
       className={`column${over ? ' column-over' : ''}`}
+      data-testid="column"
+      header={
+        <>
+          <span className="column-title">{title}</span>
+          <span className="column-count">{cards.length}</span>
+          {onAdd && (
+            <Button
+              variant="bare"
+              size="sm"
+              className="column-add"
+              title="New card"
+              onClick={() => onAdd(board, slug)}
+            >
+              +
+            </Button>
+          )}
+        </>
+      }
       onDragOver={
         onDrop
           ? (e) => {
@@ -77,21 +97,6 @@ export function Column({
       }
       onDrop={onDrop ? release : undefined}
     >
-      <div className="column-head">
-        <span className="column-title">{title}</span>
-        <span className="column-count">{cards.length}</span>
-        {onAdd && (
-          <Button
-            variant="bare"
-            size="sm"
-            className="column-add"
-            title="New card"
-            onClick={() => onAdd(board, slug)}
-          >
-            +
-          </Button>
-        )}
-      </div>
       <div className="column-body">
         {cards.length === 0 && <div className="column-empty">Drop a card here</div>}
         {cards.map((c, i) => (
@@ -126,6 +131,6 @@ export function Column({
         ))}
         {gap !== null && gap >= cards.length && cards.length > 0 && <div className="drop-line" />}
       </div>
-    </div>
+    </Panel>
   );
 }

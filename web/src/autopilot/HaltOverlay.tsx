@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { type AutopilotState, restartAutopilot } from '../api';
 import { Button } from '../ui/Button';
+import { Panel } from '../ui/Panel';
 import { useAction } from '../useAction';
 
 // The project is halted: everything in it was killed, and nothing will start again until someone says
@@ -55,7 +56,7 @@ export function HaltOverlay({ state, onRestarted }: { state: AutopilotState; onR
 
   return (
     <div className="halt-backdrop" role="alertdialog" aria-label="This project is halted">
-      <div className="halt">
+      <Panel className="halt">
         <h2 className="halt-title">This project is halted</h2>
         <p className="halt-why">
           {state.detail ?? 'Everything in this project was stopped.'} Halted {readable(state)}.
@@ -75,7 +76,7 @@ export function HaltOverlay({ state, onRestarted }: { state: AutopilotState; onR
         >
           {busy ? 'Restarting…' : 'Restart project'}
         </Button>
-      </div>
+      </Panel>
     </div>
   );
 }

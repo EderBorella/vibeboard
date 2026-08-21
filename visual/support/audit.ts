@@ -48,6 +48,8 @@ export interface StyleAudit {
   radiusScale: string[];
   radius: Findings;
   overflow: Findings;
+  // THE HOLE IN `overflow`, CLOSED. See `pageClipping`.
+  clipping: Findings;
   contrast: Findings;
   tokens: Findings;
   rows: Findings;
@@ -267,6 +269,179 @@ function pageOverflow(): { textElements: number; fontSizesOnText: Tally; overflo
     });
   }
   return { textElements, fontSizesOnText, overflow: { examined, offenders } };
+}
+
+// CLIPPING — a box wider than the box that clips it. This is a SEPARATE QUESTION from `pageOverflow`
+// above, and the difference is a hole that let a real fault through.
+//
+// `pageOverflow` asks "is any TEXT wider than its own box?" — and it only examines elements with a
+// text node of their own, deliberately, because an element whose text lives in a child is not the
+// element that sized it. That is the right question and it cannot see this one: a scroll container has
+// no text of its own, so it is never examined, and the text INSIDE it is not overflowing anything —
+// its own box is the size it asked for. The ancestor is what cut it off.
+//
+// The fault it missed, measured at 1440×900: each of the three `.board-columns` rows was its own
+// horizontal scroller, each clipping 40px of its fifth column at the container edge, cutting "Drop a
+// card here" mid-word. The overflow check reported **0 findings across 120 text elements** and the
+// document did not scroll sideways at any of 900/1200/1440. Both answers were true; neither was the
+// question. At 900px the same rows clipped 580px each.
+//
+// `text-overflow: ellipsis` is skipped for the reason it is skipped above: it is a DELIBERATE
+// statement that this text may be cut, and counting it would fill the list with the correct cases —
+// `.ap-status` in the auto-pilot bar is one, at 211px of content in a 126px box on purpose.
+function pageClipping(): Findings {
+  function describe(el: Element): string {
+    const parts: string[] = [];
+    for (let node: Element | null = el; node && parts.length < 4; node = node.parentElement) {
+      const id = node.getAttribute('data-testid');
+      const name = typeof node.className === 'string' ? node.className.trim().split(/\s+/)[0] : '';
+      parts.unshift(`${node.tagName.toLowerCase()}${id ? `[${id}]` : name ? `.${name}` : ''}`);
+    }
+    return parts.join(' > ');
+  }
+
+  const offenders: Offender[] = [];
+  let examined = 0;
+  for (const el of Array.from(document.querySelectorAll('*'))) {
+    if (el.tagName === 'SCRIPT' || el.tagName === 'STYLE') continue;
+    const style = getComputedStyle(el);
+    // `visible` means nothing is cut and nothing scrolls, so there is no question to ask.
+    if (style.overflowX === 'visible' || style.textOverflow === 'ellipsis') continue;
+    const b = el.getBoundingClientRect();
+    if (b.width === 0 || b.height === 0) continue;
+    examined += 1;
+    if (el.scrollWidth <= el.clientWidth + 1) continue;
+    offenders.push({
+      where: describe(el),
+      detail: `overflow-x: ${style.overflowX}, scrollWidth ${el.scrollWidth} > clientWidth ${el.clientWidth}`,
+    });
+  }
+  return { examined, offenders };
+}
+
+// THE BOARD'S COLUMN GRID, measured. Phase 4's gate: three boards stacked, reading as one table, so
+// every row must lay out on the SAME tracks — and a row that scrolled on its own would move its
+// columns out from under the row above even with identical tracks, which is why the scroll regions are
+// counted too.
+//
+// Returned as data rather than asserted here, because everything in this file runs inside the page and
+// a failure message belongs where the test is.
+export interface GridAudit {
+  rows: { tracks: string; columns: { x: number; width: number }[] }[];
+  // Every element that scrolls sideways, by the `describe` path. The board area is allowed to be one
+  // of these and nothing else is: see the check.
+  scrollers: string[];
+  // The narrowest track the grid gave out, so a floor lowered by accident is a failure and not a
+  // silent change of look.
+  narrowestTrack: number;
+  // EVERY COLUMN HEAD THAT DOES NOT FIT INSIDE ITS COLUMN, and the count of heads examined beside it.
+  //
+  // This is a THIRD kind of overflow, and none of the walks above can see it. The text walk asks
+  // whether text is wider than its own box; the clipping walk asks whether a box is wider than the box
+  // that clips it. A flex row with no text of its own and `overflow: visible` neither clips nor
+  // scrolls — its children simply render outside it, and every existing check reports zero.
+  //
+  // It is here because it is the fault this phase made and then found by screenshot rather than by
+  // measurement. Lowering the track floor to 144px put the column head's `+` button outside the
+  // column's border, in the gutter between columns, at 1200px and 900px. The text sweep the floor was
+  // chosen from reported 0 findings at every floor from 144px to 200px.
+  headsExamined: number;
+  headOverflows: Offender[];
+}
+
+function pageGrid(): Omit<GridAudit, 'headsExamined' | 'headOverflows'> {
+  const rows = Array.from(document.querySelectorAll('.board-columns')).map((el) => ({
+    tracks: getComputedStyle(el).gridTemplateColumns,
+    columns: Array.from(el.children).map((child) => {
+      const b = child.getBoundingClientRect();
+      // Rounded to the pixel: sub-pixel track arithmetic differs by 0.016px between the first track
+      // and the rest, which is not a misalignment anybody can see and would fail every run.
+      return { x: Math.round(b.x), width: Math.round(b.width) };
+    }),
+  }));
+
+  const scrollers: string[] = [];
+  for (const el of Array.from(document.querySelectorAll('*'))) {
+    const style = getComputedStyle(el);
+    if (style.overflowX === 'visible' || style.textOverflow === 'ellipsis') continue;
+    const b = el.getBoundingClientRect();
+    if (b.width === 0 || b.height === 0) continue;
+    if (el.scrollWidth <= el.clientWidth + 1) continue;
+    const name = typeof el.className === 'string' ? el.className.trim().split(/\s+/)[0] : '';
+    scrollers.push(`${el.tagName.toLowerCase()}${name ? `.${name}` : ''}`);
+  }
+  const widths = rows.flatMap((r) => r.tracks.split(' ')).map((t) => Number.parseFloat(t));
+  return { rows, scrollers, narrowestTrack: widths.length > 0 ? Math.min(...widths) : 0 };
+}
+
+// EVERY COLUMN HEAD THAT DOES NOT FIT INSIDE ITS COLUMN. Its own page walk rather than a branch inside
+// `pageGrid`, for the reason this file's header gives about the other seven: one function doing both
+// scored over the cognitive-complexity gate, and raising the gate to fit it would be the wrong repair.
+// Composed with the grid in node by `auditGrid`.
+function pageHeads(): { headsExamined: number; headOverflows: Offender[] } {
+  // The CONTENT box, which is what a child has to fit inside. Border and padding are subtracted
+  // because `getBoundingClientRect` is the BORDER box, and a child inside the border but outside the
+  // padding is still inside the box.
+  function content(el: Element): { left: number; right: number } {
+    const style = getComputedStyle(el);
+    const box = el.getBoundingClientRect();
+    return {
+      left: box.left + Number.parseFloat(style.borderLeftWidth) + Number.parseFloat(style.paddingLeft),
+      right: box.right - Number.parseFloat(style.borderRightWidth) - Number.parseFloat(style.paddingRight),
+    };
+  }
+
+  // Half a pixel of slack, because a flex gap resolved from a rem lands on fractions.
+  function outside(child: Element, inner: { left: number; right: number }): boolean {
+    const c = child.getBoundingClientRect();
+    if (c.width === 0 || c.height === 0) return false;
+    return c.right > inner.right + 0.5 || c.left < inner.left - 0.5;
+  }
+
+  function name(el: Element): string {
+    return typeof el.className === 'string' ? el.className.trim().split(/\s+/)[0] : '';
+  }
+
+  const headOverflows: Offender[] = [];
+  const heads = Array.from(document.querySelectorAll('.column > .vb-panel-head'));
+  for (const head of heads) {
+    const inner = content(head);
+    const column = head.parentElement?.querySelector('.column-title')?.textContent ?? '?';
+    // Filtered rather than nested with a `continue`, because the complexity metric punishes NESTING
+    // far more than length.
+    for (const child of Array.from(head.children).filter((c) => outside(c, inner))) {
+      const c = child.getBoundingClientRect();
+      headOverflows.push({
+        where: `${column} > .${name(child)}`,
+        detail: `renders at ${Math.round(c.left)}..${Math.round(c.right)} outside its head's ${Math.round(inner.left)}..${Math.round(inner.right)}`,
+      });
+    }
+  }
+  return { headsExamined: heads.length, headOverflows };
+}
+
+// THE DOCK'S HEIGHT, and whether it is DEFINITE. `.dock-body` is `max-height: 38vh` — content-sized —
+// EXCEPT where a pane exists to be filled, and those get `height: 38vh` back. A flex child asking for
+// `flex: 1` needs a parent with a definite height to take a share of, so under `max-height` alone the
+// raw editor collapsed to its own `min-height`: measured at 128px holding 289px of text inside a dock
+// body of 230px, with 250px of the cap going spare. That is the fault this measures, and jsdom cannot
+// see it — every box it reports is zero by zero.
+export interface DockAudit {
+  bodyHeight: number;
+  paneHeight: number;
+  viewport: number;
+  pane: string | null;
+}
+
+function pageDock(): DockAudit {
+  const body = document.querySelector('[data-testid="dock-body"]');
+  const pane = body?.querySelector('.raw-pane, .control-editor') ?? null;
+  return {
+    bodyHeight: body ? Math.round(body.getBoundingClientRect().height) : 0,
+    paneHeight: pane ? Math.round(pane.getBoundingClientRect().height) : 0,
+    viewport: window.innerHeight,
+    pane: pane ? pane.className.trim().split(/\s+/)[0] : null,
+  };
 }
 
 // Contrast, on the pairs the stylesheet actually forms. themes.css states measured ratios in prose;
@@ -532,10 +707,21 @@ export async function auditStyles(page: Page): Promise<StyleAudit> {
   const type = await page.evaluate(pageType, [...TYPE_SCALE]);
   const radius = await page.evaluate(pageRadius, [...RADIUS_SCALE]);
   const text = await page.evaluate(pageOverflow);
+  const clipping = await page.evaluate(pageClipping);
   const contrast = await page.evaluate(pageContrast);
   const tokens = await page.evaluate(pageTokens);
   const rows = await page.evaluate(pageRows);
-  return { ...boxes, ...type, ...radius, ...text, contrast, tokens, rows };
+  return { ...boxes, ...type, ...radius, ...text, clipping, contrast, tokens, rows };
+}
+
+export async function auditGrid(page: Page): Promise<GridAudit> {
+  const grid = await page.evaluate(pageGrid);
+  const heads = await page.evaluate(pageHeads);
+  return { ...grid, ...heads };
+}
+
+export async function auditDock(page: Page): Promise<DockAudit> {
+  return page.evaluate(pageDock);
 }
 
 export async function auditFocus(page: Page): Promise<FocusAudit> {

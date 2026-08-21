@@ -71,9 +71,9 @@ describe('UtilityDock', () => {
 
   it('hides the body when collapsed instead of unmounting it', () => {
     // Unmounting would take a terminal's scrollback with it, so collapse must be presentational.
-    const { container } = render(<UtilityDock {...props} panes={[pane('cards')]} collapsed />);
+    render(<UtilityDock {...props} panes={[pane('cards')]} collapsed />);
     expect(screen.getByTestId('body-cards')).toBeTruthy();
-    expect(container.querySelector('.dock-body')?.hasAttribute('hidden')).toBe(true);
+    expect(screen.getByTestId('dock-body').hasAttribute('hidden')).toBe(true);
   });
 
   it('reports the collapse toggle and labels it by what it will do', () => {

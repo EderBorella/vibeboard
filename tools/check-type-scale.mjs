@@ -98,7 +98,17 @@ let fontSizes = 0;
 let spaces = 0;
 
 for (const file of cssFiles()) {
-  const text = readFileSync(join(ROOT, file), 'utf8');
+  // COMMENTS ARE BLANKED, NOT READ. This check scanned the raw file, so any comment that mentioned
+  // `font-size:` or `padding:` in prose was parsed as a declaration and the words after it as its
+  // value — Phase 4 tripped it with a comment explaining why a `font-size` had been REMOVED, and it
+  // reported `.cv-links { display: flex` as a value off the scale. The counts it printed included
+  // comment text too, so the anti-vacuity floor was being satisfied partly by prose.
+  //
+  // Blanked to spaces rather than removed, so every offset still maps to its real line and the
+  // `file:line` in a finding stays correct. This is the same treatment `rules()` in
+  // tools/check-radius-scale.mjs has always applied, which is why that check never had the fault.
+  const raw = readFileSync(join(ROOT, file), 'utf8');
+  const text = raw.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' '));
   const site = (offset) => `${file}:${lineOf(text, offset)}`;
 
   for (const match of text.matchAll(FONT_SIZE)) {

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { ModelOption } from '../api';
 import { Button } from '../ui/Button';
+import { Panel } from '../ui/Panel';
 import { compareModels, type ModelFilter, matchesFilter } from './model-filter';
 import { fmtCtx, fmtPrice, loadFavs, providerOf, saveFavs } from './model-format';
 
@@ -128,7 +129,13 @@ export function ModelPicker({ models, value, defaultModel, onChange, disabled }:
                   >
                     {favs.has(m.id) ? '★' : '☆'}
                   </Button>
-                  <button className="mp-pick" onClick={() => pick(m.id)}>
+                  <Panel
+                    as="button"
+                    variant="flat"
+                    className="mp-pick"
+                    data-testid="mp-pick"
+                    onClick={() => pick(m.id)}
+                  >
                     <span className="mp-pick-top">
                       <span className="mp-name">{m.name ?? m.id}</span>
                       {m.id === defaultModel && <span className="mp-def-tag">default</span>}
@@ -155,7 +162,7 @@ export function ModelPicker({ models, value, defaultModel, onChange, disabled }:
                         )}
                       </span>
                     </span>
-                  </button>
+                  </Panel>
                 </div>
               ))}
               {filtered.length === 0 && <div className="mp-empty">No models match the current filters.</div>}

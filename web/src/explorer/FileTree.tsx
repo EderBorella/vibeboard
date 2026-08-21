@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { FsNode } from '../api';
 import { Button } from '../ui/Button';
+import { Panel } from '../ui/Panel';
 import { formatBytes } from './format';
 import { canDropInto } from './paths';
 import type { TreeRow } from './useTree';
@@ -77,8 +78,11 @@ function NodeRow(props: NodeRowProps) {
   const { node, depth, expanded, active, droppable, over } = props;
   const twist = expandable(node) ? (expanded ? '▾' : '▸') : '';
   return (
-    <button
+    <Panel
+      as="button"
+      variant="flat"
       className={`control-item explorer-item${active ? ' active' : ''}${over ? ' explorer-over' : ''}`}
+      data-testid="explorer-item"
       style={indent(depth)}
       title={title(node)}
       aria-expanded={expandable(node) ? expanded : undefined}
@@ -117,7 +121,7 @@ function NodeRow(props: NodeRowProps) {
       {node.symlink && <span className="control-tag">link</span>}
       {node.escapes && <span className="control-tag">outside</span>}
       <span className="explorer-size">{formatBytes(node.size)}</span>
-    </button>
+    </Panel>
   );
 }
 

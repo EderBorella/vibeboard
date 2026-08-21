@@ -106,3 +106,33 @@
 .vb-chip-ok { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 50%, var(--border)); }
 .vb-chip-warn { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 50%, var(--border)); }
 .vb-chip-bad { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 55%, var(--border)); }
+
+/* ---------- Panel ---------- */
+/* THE VARIANT SAYS WHETHER THE BOX IS DRAWN. `raised` draws a ground, a border and a 10px corner;
+   `flat` draws nothing and keeps a 1px TRANSPARENT border so its edge can appear on hover without
+   moving the row — the same argument the dashed ghost and the bare glyph rest on.
+   `min-width: 0` on the base rather than at five call sites: a grid or flex item's automatic minimum
+   is its content, which is what let a long unbroken card title push its track past its share. */
+.vb-panel { min-width: 0; }
+/* Every raised consumer stacks a head over a scrolling body, so the column direction is the
+   primitive's. A row's direction is genuinely the row's own and `flat` leaves it alone. */
+.vb-panel-raised {
+  display: flex; flex-direction: column;
+  background: var(--panel); border: 1px solid var(--border); border-radius: var(--r-lg);
+}
+/* `--r-md` and not `--r-lg`, which is Phase 3's ruling about nested boxes reapplied: a row sits inside
+   a raised surface, and a nested box wants the smaller corner.
+   `font: inherit` is the row's whole type claim — a list row is the prose of the list it is in, and
+   four of these carried a `font-size: var(--t-body)` that only ever restated what they inherited. */
+.vb-panel-flat {
+  background: transparent; border: 1px solid transparent; border-radius: var(--r-md);
+  padding: var(--s-3) var(--s-4); color: inherit; font: inherit; text-align: left;
+}
+.vb-panel-head {
+  display: flex; align-items: center; gap: var(--s-4);
+  padding: var(--s-4) 0.65rem; border-bottom: 1px solid var(--border);
+}
+/* A Panel that takes a click is still a control. `:disabled` keeps the box and drops the affordance,
+   which is what `.exec-card` said by hand. */
+button.vb-panel { cursor: pointer; }
+button.vb-panel:disabled { cursor: default; }

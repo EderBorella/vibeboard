@@ -2,6 +2,7 @@ import type { CardLedgerData, RunRecord, RunStatus } from '../api';
 import type { Card } from '../shared';
 import { Button } from '../ui/Button';
 import { Chip } from '../ui/Chip';
+import { Panel } from '../ui/Panel';
 import { ForgiveAttempts } from './ForgiveAttempts';
 import { costLabel, usageTotal } from './format';
 
@@ -45,9 +46,11 @@ export function CardReports({ card, runs, account, onOpen, onCancel, onForgiven 
       <h4 className="reports-head">Reports</h4>
       {[...runs].reverse().map((r) => (
         <div key={r.run} className={`report-row status-${r.status}${r.resolved ? ' resolved' : ''}`}>
-          <button
-            type="button"
+          <Panel
+            as="button"
+            variant="flat"
             className="report-open"
+            data-testid="report-open"
             title={`Open the report from ${r.skill}`}
             onClick={() => onOpen(r)}
           >
@@ -62,7 +65,7 @@ export function CardReports({ card, runs, account, onOpen, onCancel, onForgiven 
             {costLabel(r.usage) && <span className="report-cost">{costLabel(r.usage)}</span>}
             <span className="report-when">{when(r)}</span>
             <span className="report-summary">{r.summary ?? r.note ?? ''}</span>
-          </button>
+          </Panel>
           {(r.status === 'running' || r.status === 'queued') && (
             // Acts — it cancels a live run. `.report-stop` still owns the danger-on-hover colour.
             <Button

@@ -2667,6 +2667,48 @@ flex column in `styles.css`, one line of `vitest.config.ts`, `RUN_TIME_TOKENS` a
 
 ---
 
+# Part Three — the two censuses Part Two left unassigned
+
+**Status: planned 2026-08-21, not started.** Part Two closed six shapes and left two reading *unassigned*
+rather than pretending a phase owned them: **panel 20** and **mono 11**. Both are listed in full by
+`npm run check:shape-coverage`.
+
+## Phase 11 — Panel's twenty, and the Tabs decision that changed
+
+The twenty sort into four kinds, and only the first is a `Panel`:
+
+- **A surface holding content** — `.popover`, `.modal`, `.mp-modal`, `.gate-card`, `.chat-menu`,
+  `.links-list`, `.archive-item`, `.tile`, `.exec-run`, `.msg-assistant`, `.markdown pre`. Eleven.
+- **A tab** — `.dock-tab`, `.cards-tab`, `.tab-btn`, `.control-tabs button`. **Four, not the three Phase 9
+  measured**, which is why the refusal has to be re-taken rather than cited: it was declined on *"two real
+  candidates disagreeing on both decisions a tab primitive would own"*, and four candidates is a different
+  measurement.
+- **A button or control** — `.gate-list button`, `.copilot-actions button`, `.signin-label`.
+- **`InlineField`'s two** — `.inline-view`, `.inline-edit`, ruled out of `Field` by name but still boxes.
+
+`.tile` is the interesting one: it is the most repeated box on the board and it is now a labelled
+`role="group"` with a `tabIndex`, so whatever takes it must keep both.
+
+**Gate:** the panel census falls, with a per-survivor reason of the quality this page has accepted; the
+`Tabs` decision is re-taken against the measurement of four rather than restated from the measurement of
+two; the harness's ten surfaces stay green and `.tile`'s keyboard behaviour is asserted, not assumed.
+
+## Phase 12 — the mono eleven, and the three things still open
+
+- **Mono 11 → 0 or a reason each.** Eleven rules still declare `font-family: var(--font-mono)` outside the
+  primitive. The signature's own claim is that mono means the machine measured it, so every one of these is
+  either a `Readout` or a deliberate exception with its reason written down.
+- **The Project Log's two wrapped `.vb-readout-block` rows.** Ruled on 2026-08-21: check 7 gets no
+  `flex-wrap` exemption, so the fault belongs to the rule. A wrapped figure row is a column of figures that
+  does not align, which is the claim the signature makes.
+- **`npm run build` does not typecheck `web/src`.** A bad prop type on `Field` built clean; `npm run check`
+  and the pre-commit hook both catch it, so this is a gap in one gate rather than in the set.
+
+**Gate:** the mono census at zero or fully reasoned; check 7 at zero on every surface; and a build that
+cannot emit a web type error.
+
+---
+
 ## Risks, and what would stop this
 
 - **Class renames break tests.** There are **106** `querySelector('.class')` calls in the React tests — Phase 9 migrated one and its own characterisation suite added five, all five of which ARE the subject (`.vb-field` and `.vb-label`, whose treatment is the claim), the same shape as Phase 4's; 102 before it, and Phase 8 migrated six, four to `data-testid` and two to a `testId` the primitive takes as a named prop, and moved a seventh assertion off an exact-`className` comparison that a composing primitive would have pinned; 108 before it and unchanged across Phase 5b, which took two out and put two back and says so under *Selector migrations*; 127 before Phase 5, which migrated nineteen —

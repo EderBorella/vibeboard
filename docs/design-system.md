@@ -3131,7 +3131,7 @@ on either is invisible to every gate this repository has.
 
 # Part Four — one state vocabulary
 
-**Status: planned 2026-08-21, not started.** The owner looked at the board and said the state indicators
+**Status: Phase 13 done 2026-08-21.** The owner looked at the board and said the state indicators
 were not substituted. They are right, and the reason is worth stating exactly: **`Chip` was adopted as a
 box and every surface kept its own words and its own colours.**
 
@@ -3180,6 +3180,62 @@ that no rule outside the table decides a state's colour — blocking at whatever
 full. Plus a browser assertion that the same tone renders the same ink on every surface that shows it,
 on all three themes. `test/chip-boxes.test.tsx` already does this for three tones on one surface; the
 claim is the same one widened.
+
+## What Phase 13 did, measured
+
+**The table is `web/src/ui/state-tones.ts` — 26 state names onto five tones, in one object.** The CSS
+half is five rules in `ui/primitives.css` assigning one custom property, `--tone`, and **no stylesheet
+selector anywhere contains `[data-state`**. `npm run check:state-tones` holds both at zero and prints
+the whole table, all nine role declarations and all nine `data-state` sites on a passing run.
+
+| | before | after |
+|---|---|---|
+| rules that decide a state's colour | 26 `[data-state]` + 4 `.ap-bar-*` + 2 `.copilot-status.{ok,down}` + `.msg-error` = **33** | **5** (`.vb-tone-*`, and they assign a property rather than a colour) |
+| independent state vocabularies | 6 named + `.copilot-status.{ok,down}` uncounted = **7** | **1** |
+| mechanisms that show a state | **4** (`Chip state=`, raw `data-state`, `Dot tone=`, a composed class) | **2** (`data-state` + the tone class; a literal `tone=` on `Chip` for markers that are not states) |
+| classes | 374 | **364** — the largest drop of the sweep |
+| dynamic class prefixes | 7 | **6** (`ap-bar-*`, `vb-chip-*`, `vb-dot-*`'s tone half → one `vb-tone-*`) |
+| authored `font-size` declarations | 113 | **112** (`.msg-error`'s restated `.msg`'s own) |
+
+**The measurement that settled the argument the old comments were making.** Three files said in prose
+that these vocabularies "do not fit the five tones", each defending the token its own surface had
+picked. Characterised before the change, per theme, `running` rendered as **`--text` on a report chip,
+`--accent-2` on the top bar's chip and `--accent` on the auto-pilot bar's rail** — one fact, three
+colours, on three surfaces a person reads in one glance. `complete` was `--accent` on the chip and
+`--ok` on the rail. "Good" was `--accent` on four surfaces and `--ok` on one.
+
+**`--ok` is USED.** It was one of `Chip`'s five tone names, referenced by a single rule in `styles.css`
+(behind a dead `var(--ok, #3fb950)` fallback) and by no chip at all. Seven states are `ok` now —
+`online`, `success`, `complete`, `ready`, `actioned`, `available` — and the gate refuses a tone no state
+reaches, so it cannot go back to being a promise nobody kept.
+
+**Both dead fallbacks are gone:** `var(--warn, #b8860b)` on `.filed-entry[data-state='active']`, which
+the comment two hundred lines above it already claimed had been removed, and `var(--ok, #3fb950)` on
+`.ap-bar-complete`, which nothing had noticed.
+
+**Equivalent, and split.** `closed`, `unauthorized`, `failed`, `interrupted`, `cancelled`, `halted`,
+`blocked` and `unavailable` are one tone: each means a thing you wanted did not happen and will not
+without you, and a colour cannot say which of `lightAdvice`'s five remedies applies. `offline`,
+`failing`, `attention` and `active` are one tone: each wants attention while the app keeps working.
+`idle` and `stopped` are one tone, which the transport dot already rendered by omission. **`offline` and
+`closed` stayed apart** — two facts with two remedies, the order `connection-light.ts` argues at length.
+**A backend name is not a state at all**, so `claude-code`/`opencode` have no rows and `.chat-backend`
+is `neutral` with the word doing the work.
+
+**`--accent-2` is not a state token.** That is the ruling on the two tokens that both meant "needs
+attention": `--warn` is the attention token; `--accent-2` is the palette's secondary hue and keeps its
+22 non-state uses.
+
+**Contrast stayed at zero** on all ten surfaces on all three themes, examined counts unchanged, so no
+baseline was re-recorded. Every token in every palette clears 4.5:1 on all three grounds — measured
+before the change rather than discovered after it.
+
+**One collision left for the owner.** `active` is a row in the table (a filed finding nobody has acted
+on) and also this app's selection modifier, on twelve rules — `.tab-btn.active`, `.tag-chip.active`,
+`.control-item.active` and nine more — none of whose elements carries a `data-state`. No cascade
+interaction, but two facts wearing one word. A gate arm for it was written, ran, reported all twelve
+correctly and was removed: a gate that fires on twelve correct rules is a gate that gets switched off.
+Fixing it means renaming one of the two.
 
 ---
 

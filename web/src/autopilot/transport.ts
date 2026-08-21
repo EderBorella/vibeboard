@@ -7,7 +7,11 @@ import { type AutopilotState, isSuccessReason, type Readiness, type RunList, typ
 // asserting directly. Reaching them through a rendered component means mocking four hooks to check a
 // sentence, and the last few defects in this feature all hid behind exactly that.
 
-export type Tone = 'idle' | 'running' | 'stopped' | 'complete' | 'halted';
+// THE STATE THE STRIP IS IN, and it was called `Tone` until Phase 13. These are state names — a tone
+// is one of the five colours in ui/state-tones.ts, and calling the state a tone is what let three
+// surfaces each hold their own translation of it. `AutopilotBar` had a `DOT_TONE` table doing exactly
+// that and disagreeing with the top bar's chip about `complete`.
+export type TransportState = 'idle' | 'running' | 'stopped' | 'complete' | 'halted';
 
 // One thing an agent is doing right now, named the way a person would name it.
 interface ActiveWork {
@@ -24,7 +28,7 @@ interface TransportModel {
   control: { kind: 'play' | 'stop'; disabled: boolean; label: string; title: string };
   // Always a sentence, never blank: a strip that says nothing is a strip nobody trusts.
   status: string;
-  tone: Tone;
+  state: TransportState;
   doing: ActiveWork[];
   missing: string[];
   // Whether opening the drawer would show anything. A disclosure arrow that reveals emptiness is worse
@@ -52,7 +56,7 @@ interface TransportModel {
 const HALTED_TITLE = 'This project is halted. Restart it from the overlay before starting auto-pilot.';
 const NOT_READY = (n: number): string => `${n} thing${n === 1 ? '' : 's'} to fix before it can start`;
 
-function toneOf(state: AutopilotState | null): Tone {
+function stateOf(state: AutopilotState | null): TransportState {
   if (!state || state.state === 'idle') return 'idle';
   if (state.state === 'running') return 'running';
   if (state.state === 'halted') return 'halted';
@@ -146,7 +150,7 @@ export function transportModel(input: {
     control,
     status: statusFor(state, doing, missing),
     detail: detailFor(state),
-    tone: toneOf(state),
+    state: stateOf(state),
     doing,
     missing,
     expandable: doing.length > 0 || missing.length > 0,

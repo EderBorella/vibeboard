@@ -6,6 +6,7 @@ import { Button } from '../ui/Button';
 import { Chip } from '../ui/Chip';
 import { Panel } from '../ui/Panel';
 import { ReadoutLine } from '../ui/Readout';
+import { asState } from '../ui/state-tones';
 import { useAction } from '../useAction';
 
 // The dock's second occupant (decision 48): what agents filed, and the two things a person may do with
@@ -147,7 +148,12 @@ export function SuggestionsPane({ suggestions, failed, onRefresh, onApply }: Pro
               <li
                 className={`suggestions-row${s.id === picked.id ? ' picked' : ''}`}
                 key={s.id}
-                data-state={s.state}
+                // NO TONE CLASS BESIDE IT, and that is deliberate: this rail says which row the action
+                // bar acts on (`.picked`), not what state the finding is in — the state is a word in the
+                // row. So the attribute is a hook for tests and for reading the DOM, and nothing here
+                // decides a colour. See ui/state-tones.ts; the value is `SuggestionState`, every member
+                // of which has a row, so giving it the rail later is one declaration.
+                data-state={asState(s.state)}
               >
                 <Panel
                   as="button"

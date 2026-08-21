@@ -27,8 +27,6 @@
 // `0.1rem var(--s-4)` and `0.22rem var(--s-4)` — which is the same ladder nobody chose that the 27 font
 // sizes were, and the thing this phase exists to collapse. Pinning it would make the suite a description
 // of the old code. What IS pinned is that a chip HAS one, which is what says the box did not vanish.
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { cleanup, render } from '@testing-library/react';
 import type { ComponentProps } from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -36,6 +34,7 @@ import { CardTile } from '../web/src/board/CardTile.js';
 import type { Card } from '../web/src/shared.js';
 import { Chip } from '../web/src/ui/Chip.js';
 import { box } from './css-box.js';
+import { inkIn, inkToken, isColour, THEMES } from './state-ink.js';
 
 afterEach(() => {
   cleanup();
@@ -55,37 +54,10 @@ function mount(html: string): Element {
 }
 
 // ---------------------------------------------------------------------------------------------------
-// The palettes, per theme, so a tone's colour is a measurement rather than a token name.
-// `:root` carries the shared block and each `[data-theme=…]` overrides it, exactly as the cascade does.
-const THEMES_CSS = readFileSync(join(process.cwd(), 'web', 'src', 'themes.css'), 'utf8');
-
-function paletteOf(theme: string): Map<string, string> {
-  const vars = new Map<string, string>();
-  const clean = THEMES_CSS.replace(/\/\*[\s\S]*?\*\//g, '');
-  for (const m of clean.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
-    const selector = m[1];
-    const shared = /(^|,)\s*:root\s*(,|$)/.test(selector);
-    if (!shared && !selector.includes(`[data-theme="${theme}"]`)) continue;
-    for (const decl of m[2].matchAll(/(--[\w-]+)\s*:\s*([^;]+)/g)) vars.set(decl[1], decl[2].trim());
-  }
-  return vars;
-}
-
-// `var(--warn, #b8860b)` is one of these: a fallback is taken only when the name is undefined, which is
-// the browser's rule and the one `.tile-suggestions` was written against.
-function resolveColour(value: string, palette: Map<string, string>): string {
-  let out = value;
-  for (let i = 0; i < 5 && out.includes('var('); i += 1) {
-    out = out.replace(/var\((--[\w-]+)(?:,\s*([^)]*))?\)/g, (whole, name: string, fallback?: string) => {
-      const defined = palette.get(name);
-      if (defined !== undefined) return defined;
-      return fallback ?? whole;
-    });
-  }
-  return out;
-}
-
-const THEMES = ['cyberpunk', 'marshmallow', 'classic-dark'];
+// THE PALETTE AND THE RESOLVER MOVED TO test/state-ink.tsx, where test/state-inks.test.tsx uses the
+// same copy. Both had to grow one indirection in Phase 13: a toned chip's declaration is now
+// `color: var(--tone)` on every surface and the token is a level below it, so a test comparing
+// declaration strings is blind to the difference it exists to measure. `inkToken` reads that level.
 
 // ---------------------------------------------------------------------------------------------------
 // THE FIXTURES ASK `Chip` FOR ITS OWN MARKUP, and the same thing happened here that Phase 4 recorded of
@@ -196,12 +168,15 @@ const chips: {
 describe('the chip family draws one box', () => {
   for (const { name, props, radius, font, ink, ground } of chips) {
     it(`${name} is a chip's box`, () => {
-      const drawn = box(chip(props));
+      const el = chip(props);
+      const drawn = box(el);
       expect(drawn['border-radius']).toBe(radius);
       expect(drawn['font-size']).toBe(font);
       // A padding, not a value: the ten classes carried seven of them and collapsing them is the job.
       expect(drawn.padding ?? drawn['padding-left']).toBeDefined();
-      if (ink) expect(drawn.color).toMatch(ink);
+      // `inkToken` AND NOT `drawn.color`, which is now `var(--tone)` on every toned chip: the token the
+      // surface reaches is one level below the declaration. See test/state-ink.tsx.
+      if (ink) expect(inkToken(el)).toMatch(ink);
       if (ground) expect(drawn.background ?? drawn['background-color']).toBe(ground);
     });
   }
@@ -341,7 +316,7 @@ describe('the three tile state words stay three', () => {
   it('takes each ink from its own token', () => {
     // Asserted as a group rather than one `it` per tone: the claim is about the three together, and
     // three separate passes cannot say that a tile carrying all three shows all three.
-    expect(tileStates().map(({ name, token, el }) => `${name} ${box(el).color?.includes(token)}`)).toEqual([
+    expect(tileStates().map(({ name, token, el }) => `${name} ${inkToken(el).includes(token)}`)).toEqual([
       '.tile-setup true',
       '.tile-suggestions true',
       '.tile-problem true',
@@ -353,19 +328,23 @@ describe('the three tile state words stay three', () => {
   // name different tokens" is not the claim. The claim is that a person looking at a tile can tell the
   // three apart, and that is a claim about resolved colour in a particular palette.
   it.each(THEMES)('renders the three as three distinct colours in %s', (theme) => {
-    const palette = paletteOf(theme);
-    const inks = tileStates().map(({ el }) => resolveColour(box(el).color ?? '', palette));
+    const inks = tileStates().map(({ el }) => inkIn(el, theme));
     // ANTI-VACUITY FIRST: an unresolved `var(--x)` compares unequal to another unresolved one, so a
-    // resolver that silently stopped working would report three "distinct" colours and pass.
-    expect(inks.every((ink) => /^#[0-9a-fA-F]{3,8}$|^rgb/.test(ink))).toBe(true);
+    // resolver that silently stopped working would report three "distinct" colours and pass. It has one
+    // more level to get through since Phase 13 — `color: var(--tone)` then `--tone: var(--warn)` — so
+    // this guard is doing more work than it was.
+    expect(inks.every(isColour)).toBe(true);
     expect(new Set(inks).size).toBe(3);
   });
 
   // THE BORDER IS PART OF THE TONE and it is a second axis a collapse could flatten on its own: the
   // three inks could stay distinct while the three edges became one.
+  // The three edges are now ONE DECLARATION — `color-mix(in srgb, var(--tone) 50%, var(--border))` on
+  // `.vb-chip.vb-chip-tone`, where they were three rules each naming a token. Resolving `--tone` per
+  // element is what keeps this claim about three colours rather than about three strings, and it is
+  // exactly the collapse the assertion is here to refuse.
   it.each(THEMES)('renders the three edges as three in %s', (theme) => {
-    const palette = paletteOf(theme);
-    const edges = tileStates().map(({ el }) => resolveColour(box(el)['border-color'] ?? '', palette));
+    const edges = tileStates().map(({ el }) => inkIn(el, theme, 'border-color'));
     expect(edges.every((edge) => edge.includes('#'))).toBe(true);
     expect(new Set(edges).size).toBe(3);
   });

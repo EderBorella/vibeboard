@@ -1,4 +1,5 @@
 import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { type StateName, stateClass } from './state-tones';
 
 // A button that reveals a small panel anchored under it.
 //
@@ -29,10 +30,11 @@ export function Popover({
   // `.ap-agent-state` is a bare span when the agent is healthy and this button when it is not, and a
   // test that had to know which was asserting on the implementation.
   triggerTestId?: string;
-  // The caller's own state vocabulary, as `data-state`. It replaces a class composed at run time from
-  // a prefix and the state word: those composed names are invisible to a literal grep, which is how 36
-  // live classes came to look dead. See docs/design-system.md, *Risks*.
-  triggerState?: string;
+  // A ROW IN ui/state-tones.ts, and no longer "the caller's own state vocabulary". The trigger gets the
+  // tone class as well as the attribute, so the two surfaces that reach the DOM through this prop — the
+  // connection light and the auto-pilot bar's agent chip — take their colour from the same table a Chip
+  // does rather than from a rule of their own. It was a `string` until Phase 13.
+  triggerState?: StateName;
   className?: string;
   children: ReactNode;
 }) {
@@ -66,7 +68,12 @@ export function Popover({
     <span className="pop-wrap" ref={wrap}>
       <button
         type="button"
-        className={triggerClassName}
+        // `|| undefined` so a trigger with neither prop renders no attribute at all rather than
+        // `class=""` — three popovers pass neither, and an empty attribute is a difference in the DOM
+        // that nothing wanted.
+        className={
+          [triggerClassName, triggerState && stateClass(triggerState)].filter(Boolean).join(' ') || undefined
+        }
         title={triggerTitle}
         data-testid={triggerTestId}
         data-state={triggerState}

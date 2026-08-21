@@ -55,7 +55,11 @@ export function ChatSwitcher({ chats, currentChatId, backend, running, onOpen, o
                     title={c.title}
                   >
                     <span className="chat-menu-title">
-                      <Chip pill state={c.backend} className="chat-backend">
+                      {/* `tone` AND NOT `state`, because a backend name is not a state of anything —
+                          see the ruling at `.chat-backend` in styles.css. It was `state={c.backend}`
+                          against two rules that spent the palette's primary and secondary on which of
+                          two agents this chat ran on. */}
+                      <Chip pill tone="neutral" className="chat-backend">
                         {backendLabel(c.backend)}
                       </Chip>
                       {c.title}

@@ -5,15 +5,66 @@ import { backendCaps, backendDefaults } from '../shared';
 import { Button } from '../ui/Button';
 import { Dot } from '../ui/Dot';
 import { Readout } from '../ui/Readout';
+import { stateClass } from '../ui/state-tones';
 import { useFetched } from '../useFetched';
 import { BackendPicker } from './BackendPicker';
 import { ChatSwitcher } from './ChatSwitcher';
 import { CopilotControls } from './CopilotControls';
 import { CopilotReadout } from './CopilotReadout';
 import { clampToCaps } from './choice';
-import type { CopilotMode, EffortLevel, useCopilot } from './useCopilot';
+import type { CopilotMode, EffortLevel, TranscriptItem, useCopilot } from './useCopilot';
 
 const NO_MODELS: ModelOption[] = [];
+
+// THE FIFTH MECHANISM, AND NO CENSUS COUNTED IT. `.copilot-status.ok` and `.down` were bare class names
+// that picked `--accent` and `--danger` by hand — neither looked like a state, so the six vocabularies
+// docs/design-system.md measured were really seven. `available`/`unavailable` are rows in
+// ui/state-tones.ts now, the word is computed once instead of three times, and the halo is a `Dot` prop
+// rather than a colour rule of its own.
+//
+// Its own component because the panel sits on the cognitive-complexity limit and this is a conditional
+// branch on top of eleven — the gate refusing it inline is the gate working, exactly as it was for
+// `AgentChip` on the auto-pilot bar.
+function BackendStatus({ status }: { status: ModelStatus }) {
+  const state = status.up ? 'available' : 'unavailable';
+  return (
+    <div className={`copilot-status ${stateClass(state)}`} data-state={state}>
+      <Dot testId="copilot-status-dot" glow={status.up} />
+      {state}
+      {status.uptime != null && ` · ${status.uptime.toFixed(1)}% uptime`}
+      {` · ${status.endpoints} provider${status.endpoints === 1 ? '' : 's'}`}
+    </div>
+  );
+}
+
+// ONE CHAT LINE. `data-state` ONLY FOR THE KIND THAT IS A STATE: `msg-user` and `msg-assistant` are
+// bubble GEOMETRY and `msg-thinking`/`msg-running` are quietness — the chat may keep its own shape.
+// `.msg-error` was the one that decided a colour, `--danger`, outside any table; it is the `error` row
+// now and the class is gone.
+//
+// Lifted out of the panel for `BackendStatus`’s reason: two conditionals of its own on a function
+// already at the limit.
+function MessageLine({ item }: { item: TranscriptItem }) {
+  const error = item.kind === 'error';
+  return (
+    <div
+      className={error ? `msg ${stateClass('error')}` : `msg msg-${item.kind}`}
+      data-state={error ? 'error' : undefined}
+    >
+      {item.kind === 'tool' ? (
+        // The name of a tool the agent called is machine vocabulary, and `.msg-tool` said so by hand in
+        // `--t-small` accent mono — which is `Readout` `small` `accent` value for value.
+        <Readout size="small" tone="accent">
+          ⚙ {item.toolName}
+        </Readout>
+      ) : item.kind === 'thinking' ? (
+        <span className="msg-thinking">{item.text}</span>
+      ) : (
+        item.text
+      )}
+    </div>
+  );
+}
 
 interface Props {
   copilot: ReturnType<typeof useCopilot>;
@@ -224,14 +275,7 @@ export function CopilotPanel({
           ⚠ This model can’t use tools — the copilot can’t create or edit cards. Pick a 🔧 model.
         </div>
       )}
-      {status && (
-        <div className={`copilot-status ${status.up ? 'ok' : 'down'}`}>
-          <Dot testId="copilot-status-dot" />
-          {status.up ? 'available' : 'unavailable'}
-          {status.uptime != null && ` · ${status.uptime.toFixed(1)}% uptime`}
-          {` · ${status.endpoints} provider${status.endpoints === 1 ? '' : 's'}`}
-        </div>
-      )}
+      {status && <BackendStatus status={status} />}
 
       <div className="copilot-body" ref={bodyRef}>
         {items.length === 0 && (
@@ -241,19 +285,7 @@ export function CopilotPanel({
           </div>
         )}
         {items.map((it) => (
-          <div key={it.id} className={`msg msg-${it.kind}`}>
-            {it.kind === 'tool' ? (
-              // The name of a tool the agent called is machine vocabulary, and `.msg-tool` said so by
-              // hand in `--t-small` accent mono — which is `Readout` `small` `accent` value for value.
-              <Readout size="small" tone="accent">
-                ⚙ {it.toolName}
-              </Readout>
-            ) : it.kind === 'thinking' ? (
-              <span className="msg-thinking">{it.text}</span>
-            ) : (
-              it.text
-            )}
-          </div>
+          <MessageLine key={it.id} item={it} />
         ))}
         {running && <div className="msg msg-running">…working</div>}
       </div>

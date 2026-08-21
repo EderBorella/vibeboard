@@ -67,24 +67,40 @@
 .vb-btn-bare { background: none; color: var(--muted); }
 .vb-btn-bare:hover:not(:disabled) { color: var(--accent); }
 
+/* ---------- The five tones ---------- */
+/* THE TONE → TOKEN TABLE, AND THE ONLY PLACE IN ANY STYLESHEET THAT DECIDES A STATE'S COLOUR.
+   Five rules where twenty-six `[data-state]` rules across six surfaces used to each pick a token by
+   hand. Which STATE is which tone is in ui/state-tones.ts, where the compiler can check it; what a
+   tone is WORTH is here, where the palette is.
+   Nothing below names a state. A surface's own rule says which PROPERTY the tone lands on — ink,
+   fill, a left rail — and `--tone` is what carries it there, so one tone can legitimately be two
+   properties without being two colours. tools/check-state-tones.mjs holds that at zero. */
+.vb-tone-neutral { --tone: var(--muted); }
+.vb-tone-accent { --tone: var(--accent); }
+.vb-tone-ok { --tone: var(--ok); }
+.vb-tone-warn { --tone: var(--warn); }
+.vb-tone-bad { --tone: var(--danger); }
+
 /* ---------- Dot ---------- */
 /* `50%` and not a token, deliberately: a circle is a circle at any size, and `--r-pill`'s 999px would
-   be a claim about a stadium. The radius conformance check allows `50%` for exactly this. */
-.vb-dot { display: inline-block; flex: none; border-radius: 50%; background: currentColor; }
+   be a claim about a stadium. The radius conformance check allows `50%` for exactly this.
+   THE FILL IS THE ROLE `--tone` PLAYS HERE, and `currentColor` is what it falls back to — which is the
+   idiom `.ap-agent-dot-bad` already used and stated its reason for: the tone colours the word, and a
+   second colour declaration is a second thing to keep in step. A dot inside a toned wrapper takes the
+   wrapper's tone by inheritance, which is how the connection light tints a pip and a word together. */
+.vb-dot { display: inline-block; flex: none; border-radius: 50%; background: var(--tone, currentColor); }
 /* Three sizes, and the hierarchy is the argument: 12px is the connection light (the app's state), 8px
    is the transport (the project's state), 7px is a property of one of them. */
 .vb-dot-7 { width: 7px; height: 7px; }
 .vb-dot-8 { width: 8px; height: 8px; }
 .vb-dot-12 { width: 12px; height: 12px; }
 
-/* THE FIVE TONES, shared with Chip. NO GLOW HERE, and that is measured rather than tidy: `.conn-online
-   .conn` had one and `.ap-dot-running` did not, so a tone that carried it would light a dot that was
-   never lit. A glow is a surface's emphasis, and the connection light keeps its own. */
-.vb-dot-neutral { background: var(--muted); }
-.vb-dot-accent { background: var(--accent); }
-.vb-dot-ok { background: var(--ok); }
-.vb-dot-warn { background: var(--warn); }
-.vb-dot-bad { background: var(--danger); }
+/* THE GLOW IS EMPHASIS AND NOT A TONE, which is measured rather than tidy: `.conn-online .conn` had one
+   and `.ap-dot-running` did not, so a tone that carried it would light a dot that was never lit. It is a
+   PROP on `Dot` now rather than two `[data-state='online']` rules on two surfaces — the two things in
+   the app whose health is worth a halo, said at their call sites. `--glow` is `none` in two of the three
+   themes, which is the other reason it cannot belong to a tone. */
+.vb-dot-glow { box-shadow: var(--glow); }
 
 .vb-dot-pulse { animation: vb-dot-pulse 1.6s ease-in-out infinite; }
 @keyframes vb-dot-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
@@ -116,11 +132,27 @@ button.vb-chip { cursor: pointer; }
 .vb-chip-pill { border-radius: var(--r-pill); }
 /* A count, not a state: a ground rather than an outline. See ui/Chip.tsx for the four it replaces. */
 .vb-chip-fill { background: var(--panel-2); }
-.vb-chip-neutral { color: var(--muted); }
-.vb-chip-accent { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 50%, var(--border)); }
-.vb-chip-ok { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 50%, var(--border)); }
-.vb-chip-warn { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 50%, var(--border)); }
-.vb-chip-bad { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 55%, var(--border)); }
+/* INK AND EDGE, ONCE, for a chip that has a tone by either route — a literal `tone` prop or a `state`
+   resolved through the table. Five rules became one: the five differed only in which token they named,
+   which is exactly the decision that does not belong on a surface.
+   `--danger`'s edge was mixed at 55% and the other four at 50%. One formula now; the 5% was nobody's
+   decision and no test or theme note refers to it.
+   A CHIP WITH NO TONE MUST NOT INHERIT ONE, and that is why this is its own class rather than a
+   declaration on `.vb-chip`: the run-id chips inside a `.filed-entry` sit under that entry's `--tone`,
+   and a base-rule `color: var(--tone)` would turn every one of them amber. */
+/* `.vb-chip.vb-chip-tone` AND NOT `.vb-chip-tone`, AND THE CHARACTERISATION CENSUS IS WHAT FOUND IT.
+   At (0,1,0) this lost to `.vb-readout` — later in this file and also (0,1,0), declaring
+   `color: var(--muted)` — so every report chip rendered grey in all seven of its statuses, which is
+   precisely the silent colour loss the *Risks* section describes: a board that has failed nothing looks
+   perfectly correct. The five rules it replaces were at (0,2,0) on `.report-chip[data-state='…']` and
+   won for that reason without anyone having to know it. (0,2,0) here restores the win, and still loses
+   to `.tag-chip.active`, `.mp-chip.on` and `.board-archive.active`, which are (0,2,0) in styles.css and
+   therefore later. */
+.vb-chip.vb-chip-tone { color: var(--tone); border-color: color-mix(in srgb, var(--tone) 50%, var(--border)); }
+/* `neutral` KEEPS THE PLAIN EDGE, which is what `.vb-chip-neutral` did — it declared an ink and no
+   border-color at all. Mixing `--muted` into `--border` only greys the grey, and `.tag`, `.signin-this`
+   and `.mp-chip` are the boxes that would have moved. */
+.vb-chip.vb-chip-tone.vb-tone-neutral { border-color: var(--border); }
 
 /* ---------- SegmentedControl ---------- */
 /* THE GROUP OWNS ONE BORDER AND ONE CORNER AND CLIPS ITS CELLS, which is exactly why Phases 3 and 4 both

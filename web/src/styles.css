@@ -157,7 +157,12 @@ body {
   font-size: var(--t-small);
   font-family: inherit;
   letter-spacing: 0.04em;
-  color: var(--muted);
+  /* THE ROLE THIS SURFACE GIVES ITS TONE: ink, on the wrapper, so it tints the pip and the word
+     together — which is the one thing nine `[data-state]` rules here agreed about and the only thing
+     left of them. `--muted` is the fallback and is reached by nothing today: `LightState` is never
+     absent, so `Popover` always sets a tone class. It is here so a state added without a row in
+     ui/state-tones.ts renders grey rather than inheriting the bar's ink and looking deliberate. */
+  color: var(--tone, var(--muted));
   background: none;
   border: 0;
   padding: 0;
@@ -170,45 +175,26 @@ body {
 }
 .conn-status:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: var(--r-sm); }
 .conn-text { width: 12ch; white-space: nowrap; }
-/* THE SHAPE IS `Dot`'s NOW — 12px and the circle live in ui/primitives.css. What is left here is what
-   the light's own row needs: it opts out of the bar's baseline alignment (see above), and the colour is
-   the state's, below. */
+/* THE SHAPE IS `Dot`'s NOW — 12px, the circle and the fill all live in ui/primitives.css. What is left
+   here is what the light's own row needs: it opts out of the bar's baseline alignment (see above). */
 .conn { align-self: center; }
-/* The state class is on the WRAPPER, so it can tint the dot and the word together.
+/* NINE `[data-state]` RULES ARE GONE FROM HERE, and they were the largest of the six vocabularies. Six
+   words, four tokens, three of them for three shades of "not right" on one control: `--danger` for
+   `closed`, `--warn` for `offline`, `--accent-2` for `failing`. What each of them decided is now one row
+   in ui/state-tones.ts and the ink declaration on `.conn-status` above.
    `online`, not `open`: the four socket states are transport words, and `open` describes a WebSocket
    rather than anything a person is trying to do. `online`/`offline` is the pair that means something at
    a glance — and `offline` is the one that is NOT about the connection at all: the server is right
-   there, the project simply cannot run anything because a dependency is missing. */
-/* `[data-state]` AND NOT `.conn-<state>`. The six state classes existed ONLY inside the template
-   literal `conn-${light}` in ConnectionLight.tsx, so a literal grep for any of them found nothing and
-   all six read as dead — and deleting them would have removed the colour that says the connection has
-   dropped while leaving a healthy board looking perfect. See docs/design-system.md, *Risks*.
-   The glow stays HERE rather than moving into the `accent` tone: `.ap-dot-running` never had one, so a
-   tone that carried it would light a dot that was never lit. */
-.conn-status[data-state='online'] .vb-dot { background: var(--accent); box-shadow: var(--glow); }
-.conn-status[data-state='connecting'] .vb-dot { background: var(--accent-2); }
-.conn-status[data-state='closed'] .vb-dot { background: var(--danger); }
-.conn-status[data-state='closed'] .conn-text { color: var(--danger); }
-.conn-status[data-state='unauthorized'] .conn-text { color: var(--warn); }
-/* Amber rather than red, and both halves tinted. A red dot beside a working board reads as "it is
-   broken"; this is "it is here, and it cannot do the thing it exists for", which is a different alarm
-   and a milder one. Distinguished from `connecting` — the other amber — by the word, which is exactly
-   why the word is there. */
-.conn-status[data-state='offline'] .vb-dot { background: var(--warn); }
-.conn-status[data-state='offline'] .conn-text { color: var(--warn); }
-/* `failing` is the only state here that is NOT about the present: the project can run agents, and the last
-   ones it ran died before reaching a model. So it must not look like `online` — that was the bug, a green
-   light over a morning of auto-pilot stopping itself — and it must not look like `offline` either, which
-   means "you cannot run anything" and is a harder claim than this one makes.
-   `--accent-2`, the palette's SECONDARY, rather than `--warn`, which `offline` already owns. Two themes
-   define the two to the same amber and one does not, so where they coincide this is distinguished from
-   `offline` by the word — which is the same bargain `connecting` already strikes with `offline`, and the
-   reason the word is rendered at all. A hex here would be a colour belonging to no theme. */
-.conn-status[data-state='failing'] .vb-dot { background: var(--accent-2); }
-.conn-status[data-state='failing'] .conn-text { color: var(--accent-2); }
-/* LAST OF THE `.conn-text` RULES, and the position is the point. At (0,3,0) it outranks every state
-   tint above it and won wherever it was written, so this is a move and not a change — but written
-   first it was a descending-specificity trap: the next person adding a `.conn-<state> .conn-text`
+   there, the project simply cannot run anything because a dependency is missing.
+   THE THREE THAT NOW SHARE A COLOUR ARE DISTINGUISHED BY THE WORD, which is the bargain this control
+   already struck and stated: `--accent-2` and `--warn` are the SAME amber in two of the three themes,
+   so `failing` and `offline` already rendered identically there and the word was already what told them
+   apart. `closed` and `unauthorized` join `--danger` for the same reason — a colour cannot say which of
+   five remedies applies, and `.conn-text` plus the balloon are what do. That is also why `.conn-text` is
+   a fixed 12ch box sized to the longest name the light can report. */
+/* LAST OF THE `.conn-text` RULES, and the position is the point. At (0,2,0) it outranks the wrapper's
+   inherited ink and won wherever it was written, so this is a move and not a change — but written first
+   it was a descending-specificity trap: the next person adding a `.conn-status[data-state] .conn-text`
    above would reasonably expect the later rule to win, and it would not. Hover deliberately drops the
    state colour: while you are pointing at the indicator it is a control, not a status. */
 .conn-status:hover .conn-text { color: var(--text); }
@@ -880,14 +866,17 @@ body {
 .chat-menu-open { flex: 1; display: flex; flex-direction: column; gap: 0.1rem; color: var(--text); }
 .chat-menu-item.active .chat-menu-open { border-left: 2px solid var(--accent); }
 .chat-menu-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--t-small); }
-/* `Chip pill` owns the box; this keeps the treatment and the two backend colours. `bk-claude-code` and
-   `bk-opencode` existed only inside `bk-${c.backend}`, so a literal grep found neither. */
+/* `Chip pill neutral` owns the box AND the colour now; this keeps the treatment.
+   A BACKEND NAME IS NOT A STATE, which is the ruling that removed the two rules that were here. They
+   spent `--accent` and `--accent-2` — the palette's primary and its secondary — on which of two agents
+   a chat ran on, and that is the same category error as `--accent-2` meaning both "the secondary hue"
+   and "needs attention": a whole vocabulary of two, with no row in any table it could have had one in.
+   The WORD says which, in 700-weight uppercase, which is why it is rendered at all. `.conn-status`
+   already rests on exactly that bargain for the three of its states that share a colour. */
 .chat-backend {
   margin-right: 0.4rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
   vertical-align: middle;
 }
-.chat-backend[data-state='claude-code'] { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 50%, transparent); }
-.chat-backend[data-state='opencode'] { color: var(--accent-2); border-color: color-mix(in srgb, var(--accent-2) 50%, transparent); }
 /* `--accent-2` and not `--danger`: deleting a chat is confirmed, and this row already has a red `✕`
    nowhere near it. The distinction was deliberate before the migration and survives it. */
 .chat-del:hover:not(:disabled) { color: var(--accent-2); }
@@ -903,24 +892,32 @@ body {
 /* The row decides how its controls sit; the box is `.vb-input`'s. */
 .copilot-selects > .vb-input { flex: 1; }
 .copilot-selects select:disabled { opacity: 0.5; }
-.copilot-status { display: flex; align-items: center; gap: var(--s-3); padding: var(--s-2) 0.75rem; font-size: var(--t-micro); color: var(--muted); border-bottom: 1px solid var(--border); }
-/* THE LAST HAND-ROLLED DOT, and it is a `Dot` now: the 8px circle and its `50%` corner were the only
-   `border-radius: 50%` left outside the primitive. The wrapper tints it, which is the construction
-   `.conn-status[data-state]` already uses and for its reason — only the wrapper knows the state, and it
-   colours the pip and the word beside it together. The glow is the surface's emphasis, not the tone's:
-   `Dot`'s five tones deliberately carry none. */
-.copilot-status.ok .vb-dot { background: var(--accent); box-shadow: var(--glow); }
-.copilot-status.down .vb-dot { background: var(--danger); }
-.copilot-status.down { color: var(--danger); }
+/* THE ROLE THIS SURFACE GIVES ITS TONE: ink, on the wrapper, so the `Dot` inside takes it through
+   `currentColor` — the construction `.conn-status` uses and for its reason: only the wrapper knows the
+   state, and it colours the pip and the word beside it together.
+   THREE RULES DIED HERE AND THEY WERE THE MECHANISM NOBODY COUNTED. `.ok` and `.down` were bare class
+   names — no `[data-state]`, no tone, nothing that looked like a state — so this pair is missing from
+   the six vocabularies docs/design-system.md measured. `--accent` and `--danger` picked by hand, and the
+   healthy case coloured the pip and not the word, which is the same asymmetry the agent chip had. The
+   halo is a `Dot` prop now: `--glow` is `none` in two of the three themes, so it cannot belong to a
+   tone. */
+.copilot-status { display: flex; align-items: center; gap: var(--s-3); padding: var(--s-2) 0.75rem; font-size: var(--t-micro); color: var(--tone, var(--muted)); border-bottom: 1px solid var(--border); }
 .copilot-body { flex: 1; overflow-y: auto; padding: 0.75rem; display: flex; flex-direction: column; gap: var(--s-4); }
-.msg { font-size: var(--t-body); line-height: 1.45; white-space: pre-wrap; word-break: break-word; }
+/* THE ROLE THIS SURFACE GIVES ITS TONE: ink, and only the `error` kind carries one — see CopilotPanel.
+   `inherit` is the fallback, which is what a bubble with no state has always rendered. Nothing above a
+   `.msg` in the tree sets `--tone`, so this cannot pick one up by accident. */
+.msg { font-size: var(--t-body); line-height: 1.45; white-space: pre-wrap; word-break: break-word; color: var(--tone, inherit); }
 .msg-user { align-self: flex-end; background: var(--accent-fill); color: var(--on-fill); padding: var(--s-3) var(--s-4); border-radius: var(--r-lg) var(--r-lg) var(--r-sm) var(--r-lg); max-width: 85%; }
 .msg-assistant { background: var(--panel-2); border: 1px solid var(--border); padding: var(--s-3) var(--s-4); border-radius: var(--r-lg) var(--r-lg) var(--r-lg) var(--r-sm); max-width: 90%; }
 .msg-thinking { color: var(--muted); font-style: italic; font-size: var(--t-small); }
 /* `.msg-tool` IS GONE: a tool name is machine vocabulary and the rule was `Readout` `small` `accent`
    written out by hand. `msg-tool` still reaches the wrapper through `msg-${it.kind}`, and there is
    nothing left for it to say — the line's only child is the readout. See copilot/CopilotPanel.tsx. */
-.msg-error { color: var(--danger); font-size: var(--t-body); }
+/* `.msg-error` IS GONE. It declared `color: var(--danger)` — a state's colour, chosen on a surface,
+   which is the whole subject of Phase 13 — and a `font-size: var(--t-body)` that restated `.msg`'s own.
+   The line is the `error` row of ui/state-tones.ts now, and it gets its ink from `--tone` through
+   `.vb-tone-bad`. The four other `msg-*` classes stay: a bubble's geometry and a thinking line's
+   quietness are shapes, and the chat may keep its own. */
 .msg-running { color: var(--muted); font-style: italic; }
 /* CENTRED, not baseline-aligned, and the harness is why: `ReadoutLine` aligns on the baseline because
    its parts are text at two sizes — but this row's last item is the context METER, a 5px bar with no
@@ -1122,22 +1119,21 @@ body {
    machine vocabulary, so it says so by naming the primitive rather than by restating `font-family`,
    which is the form `.board-archive`, `.tag-chip` and `.tab-badge` took in Phase 8. What is left is
    the uppercase tracking and `flex: 0 0 auto`, which is the row's decision.
-   THE SEVEN STATUS CLASSES BECAME `[data-state]`. They existed only inside `chip-${status}` at three
-   call sites, so a literal grep found none of them; see docs/design-system.md, *Risks*. They are not
-   `tone`s: `attention` is `--accent-2`, every theme's secondary, which equals `--warn` in two themes
-   and NOT in marshmallow — mapping it onto the `warn` tone would silently repaint the light theme.
-   And `running`/`queued` are `--text`, which is no tone at all. */
+   AND THE FIVE STATE RULES ARE GONE, which is Phase 13. They were the second-largest vocabulary and
+   the argument for keeping them was that the statuses "are not `tone`s" — `attention` was `--accent-2`
+   and `running`/`queued` were `--text`, "which is no tone at all". The measurement is what overturned
+   that: `running` on this chip was `--text` while the same word on the top bar's chip was `--accent-2`
+   and on the auto-pilot bar's rail was `--accent`. Three colours, one fact, three surfaces read
+   together. `attention` takes `--warn` — the attention token — and `running`/`queued` take `--accent`,
+   which is what "in flight" is worth everywhere else in the app. `failed`, `interrupted` and
+   `cancelled` are still one colour and still for the reason that was written here: what they have in
+   common is no report, and stopping a run is a decision rather than a fault but is still an ending that
+   produced nothing. The edge came from `.vb-chip-tone` and is a 50% mix rather than the flat token —
+   see ui/primitives.css. */
 .report-chip {
   flex: 0 0 auto;
   text-transform: uppercase; letter-spacing: 0.06em;
 }
-.report-chip[data-state='success'] { color: var(--accent); border-color: var(--accent); }
-.report-chip[data-state='attention'] { color: var(--accent-2); border-color: var(--accent-2); }
-.report-chip[data-state='failed'], .report-chip[data-state='interrupted'] { color: var(--danger); border-color: var(--danger); }
-.report-chip[data-state='running'], .report-chip[data-state='queued'] { color: var(--text); border-color: var(--text); }
-/* Stopping a run is a decision, not a fault — but it is still an ending that produced nothing, and
-   grey made it disappear into the row. Same red as failed: what they have in common is "no report". */
-.report-chip[data-state='cancelled'] { color: var(--danger); border-color: var(--danger); }
 .report-skill { flex: 0 0 auto; font-size: var(--t-small); }
 /* Money reads as data, not prose: mono, so a card's runs line up down the column. */
 /* The cost and the elapsed time are `Readout`s. What the row still decides is that neither shrinks —
@@ -1417,24 +1413,19 @@ body {
   text-transform: lowercase;
   white-space: nowrap;
 }
-/* The state chip in the top bar. `Chip pill` owns the box; this keeps the treatment and the colours.
-   Amber while it works, teal for the one stop that means the work is done, red for a halt. There is no
-   success token in the palette and `complete` must not borrow the working colour: they are the two
-   states a glance most needs to tell apart — which is why these are `[data-state]` and not `tone`s.
-   `ap-${chip.tone}` built all three names at run time and no grep could see them. */
-.ap-chip { letter-spacing: 0.03em; text-transform: lowercase; color: var(--muted); }
-.ap-chip[data-state='running'] {
-  color: var(--accent-2);
-  border-color: color-mix(in srgb, var(--accent-2) 50%, var(--border));
-}
-.ap-chip[data-state='halted'] {
-  color: var(--danger);
-  border-color: color-mix(in srgb, var(--danger) 55%, var(--border));
-}
-.ap-chip[data-state='complete'] {
-  color: var(--accent);
-  border-color: color-mix(in srgb, var(--accent) 50%, var(--border));
-}
+/* The state chip in the top bar. `Chip pill` owns the box and ui/state-tones.ts owns the colour; this
+   keeps the treatment.
+   THREE STATE RULES ARE GONE AND THE CLAIM UNDER THEM SURVIVES INTACT. It said "there is no success
+   token in the palette and `complete` must not borrow the working colour: they are the two states a
+   glance most needs to tell apart". There IS a success token — `--ok`, defined by all three themes and
+   referenced by one rule in this file — so `complete` is `ok` and `running` is `accent`, and the two are
+   further apart than the amber-and-teal pair they were. What that argument was really protecting is the
+   distinction, and the table keeps it while this file no longer has an opinion about the tokens.
+   `color: var(--muted)` WENT WITH THEM, and it had to: styles.css loads after ui/primitives.css, so at
+   equal specificity this rule beat `.vb-chip-tone` and the chip would have rendered grey in all four
+   states. It was the fallback for `stopped`, which had no rule of its own — and `stopped` is the
+   `neutral` tone, which is that same `--muted`. Nothing is lost. */
+.ap-chip { letter-spacing: 0.03em; text-transform: lowercase; }
 
 .ap-controls {
   display: flex;
@@ -1534,16 +1525,21 @@ body {
 }
 
 .filed-list { list-style: none; display: flex; flex-direction: column; gap: 0.1rem; }
+/* THE ROLE THIS SURFACE GIVES ITS TONE: the left rail, and nothing else — the entry's own text stays
+   `--text` and `--muted`. Three `[data-state]` rules became this one declaration, and the claim they
+   carried is unchanged: an active finding is the one asking for something, and a dismissed one is kept
+   for what its reason says and must not read as still open.
+   `var(--warn, #b8860b)` DIED HERE. It was the last of that fallback in the tree — dead since every
+   theme defined `--warn`, and the comment 200 lines above at `.tile-suggestions` already said it had
+   been removed while it went on living on the next surface along.
+   `dismissed` moves from `--border` to `--muted`, which is the `neutral` tone: a rail the same colour as
+   every other border was not a state, it was the absence of one, and "dismissed" is a decision somebody
+   took. */
 .filed-entry {
   display: flex; flex-direction: column; gap: 0.2rem;
   padding: var(--s-4) 0 var(--s-4) 0.75rem;
-  border-left: 2px solid var(--border);
+  border-left: 2px solid var(--tone, var(--border));
 }
-/* The state in the rail as well as the word. An active finding is the one asking for something; a
-   dismissed one is kept for what its reason says, and it must not read as still open. */
-.filed-entry[data-state='active'] { border-left-color: var(--warn, #b8860b); }
-.filed-entry[data-state='actioned'] { border-left-color: var(--accent); }
-.filed-entry[data-state='dismissed'] { border-left-color: var(--border); }
 .filed-state {
   font-family: var(--font-display); text-transform: uppercase; letter-spacing: 0.1em;
   font-size: var(--t-micro); color: var(--text);
@@ -1564,16 +1560,19 @@ body {
    Stacked directly under the header, so the thing the app is FOR has a control on the page rather than
    four clicks inside a settings modal. Tone-coloured on the left edge only: the strip is present at all
    times, and a full-width colour change on every state would fight the boards for attention. */
+/* THE ROLE THIS SURFACE GIVES ITS TONE: the 3px left rail, and nothing else — the strip is on screen at
+   all times and a full-width colour change on every state would fight the boards for attention.
+   FOUR CLASSES DIED HERE. They were composed as `ap-bar-${model.tone}`, so a literal grep for any of
+   them found nothing — the *Risks* defect — and each named its own token, including the second
+   `var(--ok, #3fb950)` fallback in this file, dead since every theme defined `--ok`. `idle` had no rule
+   at all and fell through to `--border`; it is the `neutral` grey now, which is what the transport dot
+   two elements to the right already was. */
 .ap-bar {
   border-bottom: 1px solid var(--border);
   background: var(--panel);
-  border-left: 3px solid var(--border);
+  border-left: 3px solid var(--tone, var(--border));
   font-size: var(--t-body);
 }
-.ap-bar-running { border-left-color: var(--accent); }
-.ap-bar-halted { border-left-color: var(--danger); }
-.ap-bar-complete { border-left-color: var(--ok, #3fb950); }
-.ap-bar-stopped { border-left-color: var(--muted); }
 
 .ap-bar-row {
   display: flex;
@@ -1619,34 +1618,37 @@ body {
 /* THE DOT, because a bare word was the odd one out: the transport state two elements to the left says itself
    with `.ap-dot`, and the connection light in the top bar with `.conn`. Smaller than both at 7px — those two
    are the primary states of the app and the project, and this is a property of one of them. */
-.ap-agent-state { display: inline-flex; align-items: center; gap: var(--s-2); }
-/* THE DOT IS `Dot` at size 7. `currentColor` is its DEFAULT, which is what `.ap-agent-dot-bad` and
-   `-warn` set by hand and for the reason they gave: the tone already colours the text, and a second
-   colour declaration is a second thing to keep in step. `ok` is the one that differs — a green pip
-   beside grey text — so it is the one case that names a tone.
-   Only the fault gets a colour. "Ready" and "Checking…" are the states you are not meant to act on, and
-   a permanently coloured badge teaches people to stop reading the bar — the same reason the emergency
-   stop beside it stays grey until you hover it. `[data-state]` rather than `ap-agent-${tone}`, for the
-   reason the connection light above gives. */
-.ap-agent-state[data-state='ok'],
-.ap-agent-state[data-state='unknown'] { color: var(--muted); }
-.ap-agent-state[data-state='bad'] { color: var(--danger); font-weight: 600; }
-/* BELOW the fault colour, on purpose: "Failing" says the last runs died before reaching a model, which has
-   stopped auto-pilot but refuses nothing you do by hand. Painting it `--danger` would make the two
-   indistinguishable, and they need different actions. */
-.ap-agent-state[data-state='warn'] { color: var(--warn); font-weight: 600; }
+/* THE ROLE THIS SURFACE GIVES ITS TONE: ink, on the wrapper, so the 7px `Dot` inside it takes the same
+   colour through `currentColor` — which is what `.ap-agent-dot-bad` and `-warn` set by hand and for the
+   reason they gave: a second colour declaration is a second thing to keep in step.
+   FOUR STATE RULES ARE GONE, and with them the vocabulary that was the worst of the six: its values were
+   `ok`, `bad`, `warn` and `unknown` — TONE NAMES used as state names, so `ok` mapped to `--muted` and a
+   reader could not tell whether the word meant a state or a colour. They are `ready`, `blocked`,
+   `failing` and `checking` now, and `failing` is the SAME ROW the connection light uses for the same
+   fact: the last runs died before reaching a model.
+   "ONLY THE FAULT GETS A COLOUR" IS WITHDRAWN, and it is the one change on this bar a person will
+   notice. It was argued as "a permanently coloured badge teaches people to stop reading the bar" — but
+   the `Dot` beside the word was already `--ok` green whenever the agent was ready, so the bar already
+   carried the colour the word was refusing, and the rule was a per-surface vocabulary rather than a
+   quietness policy. `checking` is still quiet: it is the `neutral` tone, the same `--muted` it had. */
+.ap-agent-state { display: inline-flex; align-items: center; gap: var(--s-2); color: var(--tone, var(--muted)); }
 /* A button, because it opens the balloon — but it must read as the chip it replaced, not as a control.
    `font-family` ONLY, never the `font` shorthand: `font: inherit` resets font-size too, so the chip grew from
    10.88px to 13.12px the moment it had something to say and shifted the whole row with it. Measured in a real
    browser — jsdom has no computed cascade, so the suite cannot see this class of defect at all.
    NOT `Button`, deliberately, and this is the counter-example that keeps the primitive honest: the whole
-   point of this element is that it does NOT read as a control. */
+   point of this element is that it does NOT read as a control.
+   AND IT CARRIES THE WEIGHT THE TWO FAULT STATES USED TO NAME. `agentStatus` gives an `advice` balloon to
+   exactly `blocked` and `failing` and to neither of the other two, so this element IS a button precisely
+   when there is something wrong — which says the same thing `[data-state='bad']` and `[data-state='warn']`
+   said, without naming a state and without deciding a colour. */
 button.ap-agent-state {
   background: none;
   border: 0;
   padding: 0;
   cursor: pointer;
   font-family: inherit;
+  font-weight: 600;
 }
 button.ap-agent-state:hover { text-decoration: underline; }
 .ap-agent-heading { display: block; margin-bottom: 0.35rem; }

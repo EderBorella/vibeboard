@@ -5,6 +5,7 @@ import { useSuggestions } from '../suggestions/useSuggestions';
 import { Button } from '../ui/Button';
 import { Chip } from '../ui/Chip';
 import { ReadoutLine } from '../ui/Readout';
+import { stateClass } from '../ui/state-tones';
 import { useAction } from '../useAction';
 import { useDiary } from './useDiary';
 
@@ -80,8 +81,12 @@ function FiledList({ suggestions }: { suggestions: Suggestion[] }) {
   const ordered = useMemo(() => [...suggestions].reverse(), [suggestions]);
   return (
     <ol className="filed-list">
+      {/* `stateClass` beside the attribute, and it is not decoration: React types every `data-*` as
+          `any`, so `data-state={s.state}` alone would compile for a state with no row in the table and
+          the rail would silently take whatever colour it inherited. The call is what the compiler
+          checks — see ui/state-tones.ts. */}
       {ordered.map((s) => (
-        <li className="filed-entry" data-state={s.state} key={s.id}>
+        <li className={`filed-entry ${stateClass(s.state)}`} data-state={s.state} key={s.id}>
           {/* TWO LINES, NOT ONE WRAPPED ONE. This column is 42% of the split and its readout block held
               four figures — a state, a full locale timestamp and up to three id chips, 366px of content
               in a 266px line — so it wrapped, and check 7 read it as what it was: a row of figures that

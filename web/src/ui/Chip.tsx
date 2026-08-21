@@ -1,20 +1,27 @@
 import type { MouseEvent, ReactNode } from 'react';
-import type { Tone } from './Dot';
+import { type StateName, stateClass, type Tone, toneClass } from './state-tones';
 
 // THE CHIP. Tags, state words, counts and badges — the same bordered pill rebuilt by hand at a dozen
 // sites, each with its own radius, padding and font-size.
 //
-// `tone` AND `state` ARE TWO DIFFERENT THINGS, and collapsing them is what would have made this
-// primitive a liar. `tone` is a visual weight from the closed five, and the chip owns the colour.
-// `state` is a surface's OWN vocabulary — a run status, a socket state, a backend name — rendered as
-// `data-state` so the surface can still colour it. Three of those vocabularies do not fit the five
-// tones and must not be forced into them: `--accent-2` is every theme's secondary and equals `--warn`
-// in two of the three themes but NOT in marshmallow (#8a6420 against #9a5b12), so mapping "attention"
-// or "connecting" onto `warn` would silently repaint the light theme. themes.css argues that
-// distinction by name at `.conn-failing`; a primitive is not the place to overrule it.
+// `tone` AND `state` ARE TWO WAYS TO THE SAME FIVE COLOURS, and Phase 13 is where that became true.
+// Until then `state` was a `string` rendered as `data-state` "so the surface can still colour it", and
+// the argument for it was that three vocabularies did not fit the five tones — `attention`, `running`
+// and `connecting` were `--accent-2`, the palette's secondary, which is not `--warn` in marshmallow.
 //
-// What the attribute buys even so: the class is no longer composed at run time, so it is visible to a
-// literal grep. That is the whole defect the *Risks* section of docs/design-system.md describes.
+// THAT ARGUMENT WAS ABOUT THE WRONG THING. It defended the TOKEN each surface had picked, and the
+// measurement is what settled it: `running` came out `--text` on a report chip, `--accent-2` on the top
+// bar's chip and `--accent` on the auto-pilot bar's rail — one fact, three colours, on three surfaces a
+// person reads in one glance. `--accent-2` is the secondary HUE; `--warn` is the attention token; and a
+// state that wants attention takes the attention token wherever it is said. So `state` is a
+// `StateName` now, ui/state-tones.ts maps it to a tone, and a surface has nothing left to choose.
+//
+// `tone` SURVIVES for the markers that are not states of anything: a tag, a count, the three words on a
+// card tile. Both props reach the same five `.vb-tone-*` rules, which is what makes the shared tone set
+// real rather than nominal.
+//
+// `data-state` STAYS ON THE ELEMENT and now decides nothing — it is what a test and a person reading
+// the DOM select on, and it is the name that says which of the five this is.
 //
 // A CHIP MAY BE A `<button>`, and Phases 3, 4 and 5 all said so without making it possible. Each of them
 // listed `.tag`, `.tag-chip`, `.mp-chip` and `.board-archive` as survivors with the same reason — *"a
@@ -37,8 +44,8 @@ interface Props {
   // A CLOSED SET, for `Panel`'s reason: `as` says what the box is in the document — a label or a
   // control — and an open tag would make this a general element factory whose geometry claim is empty.
   as?: ChipTag;
-  // The surface's own state vocabulary. See above.
-  state?: string;
+  // A row in ui/state-tones.ts. See above.
+  state?: StateName;
   title?: string;
   // Layout, and a surface's own non-geometry treatment (mono, uppercase, letter-spacing).
   className?: string;
@@ -70,11 +77,16 @@ export function Chip({
   children,
 }: Props) {
   const Tag = as;
+  // `vb-chip-tone` carries the ink and the edge and the `vb-tone-*` class carries the colour, so a chip
+  // with neither prop keeps `color: inherit` — the run-id chips inside a toned `.filed-entry` would
+  // otherwise take that entry's tone by inheritance. See ui/primitives.css.
   const classes = [
     'vb-chip',
     pill && 'vb-chip-pill',
     fill && 'vb-chip-fill',
-    tone && `vb-chip-${tone}`,
+    (tone || state) && 'vb-chip-tone',
+    tone && toneClass(tone),
+    state && stateClass(state),
     className,
   ];
   // `type="button"` BY DEFAULT for Button's and Panel's reason: a `<button>` inside a `<form>` defaults

@@ -7,14 +7,17 @@
 //   2. How many there are, against a ratchet. BLOCKING on any increase. The target is 183.
 //
 // A NAIVE IMPLEMENTATION OF CLAIM 1 DELETES LIVE CODE, and this is the check docs/design-system.md's
-// *Risks* section was written to stop being written badly. Seven classes are named nowhere as literals:
-// `ap-bar-{running,halted,complete,stopped}`, which tint the auto-pilot bar's left border, and
-// `msg-{user,assistant,error}`, which are the chat bubbles. They are built by `` `ap-bar-${model.tone}` ``
-// and `` `msg-${it.kind}` ``, so a literal grep finds none of them — and deleting them breaks the state
-// colours ONLY in the states a person sees when something has already gone wrong. A board that has not
-// failed anything looks perfectly correct; the colour that says a run halted is the one that has gone.
-// Nothing in the suite would catch it either: the browser harness measures a board in one state, and
-// every React test runs in jsdom.
+// *Risks* section was written to stop being written badly. Classes are named nowhere as literals when
+// they are built from a prefix and a value: `` `msg-${it.kind}` `` makes the chat bubbles, and
+// `` `vb-tone-${tone}` `` makes the five state colours the whole app shares. A literal grep finds none of
+// them — and deleting them breaks the state colours ONLY in the states a person sees when something has
+// already gone wrong. A board that has not failed anything looks perfectly correct; the colour that says
+// a run halted is the one that has gone. Nothing in the suite would catch it either: the browser harness
+// measures a board in one state, and every React test runs in jsdom.
+//
+// `ap-bar-{running,halted,complete,stopped}` was the other half of that sentence until Phase 13, which
+// deleted all four: the bar's rail takes `--tone` from the one table now. `vb-chip-${tone}` and
+// `vb-dot-${tone}` went the same way, so three composing prefixes became one.
 //
 // SO COMPOSITION IS RESOLVED RATHER THAN ALLOWED FOR. The document offers two implementations — resolve
 // the template literals, or keep an explicit allow-list of prefixes with the composing `file:line`
@@ -68,7 +71,13 @@ const SHEETS = [join('web', 'src', 'styles.css'), join('web', 'src', 'ui', 'prim
 // same result Phase 3 measured on its 27 and Phase 8 on its nine.
 // 375 before Phase 12, 374 after it: `.msg-tool` died — a tool name is a `Readout` `small` `accent`, and
 // the rule was that primitive written out by hand.
-const CLASS_CEILING = 374;
+// 374 before Phase 13, 364 after it, and it is the largest single drop of the sweep. Fifteen died:
+// `.ap-bar-{running,halted,complete,stopped}` (the rail is one declaration reading `--tone`),
+// `.vb-chip-{neutral,accent,ok,warn,bad}` and `.vb-dot-{neutral,accent,ok,warn,bad}` (ten rules that
+// each named a token, replaced by five that name it once), and `.msg-error` (a state's colour picked on
+// a surface). Five arrived: `.vb-tone-*`, which IS the table. Plus `.vb-chip-tone` and `.vb-dot-glow`,
+// and `.ok`/`.down` off `.copilot-status` — the fifth mechanism, which no census had counted.
+const CLASS_CEILING = 364;
 const CLASS_TARGET = 183;
 
 // Anti-vacuity floor on the SELECTOR PARSER, not on the class count: a regex that stops matching reports

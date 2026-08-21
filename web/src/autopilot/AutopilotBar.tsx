@@ -16,12 +16,13 @@ import { BackendPicker } from '../copilot/BackendPicker';
 import { resolveChoice } from '../copilot/choice';
 import type { CopilotConfig } from '../shared';
 import { Button } from '../ui/Button';
-import { Dot, type Tone as DotTone } from '../ui/Dot';
+import { Dot } from '../ui/Dot';
 import { Popover } from '../ui/Popover';
+import { stateClass } from '../ui/state-tones';
 import { useAction } from '../useAction';
 import { AutopilotHelp } from './AutopilotHelp';
 import { ForgiveDerivation } from './ForgiveDerivation';
-import { type Tone as TransportTone, transportModel } from './transport';
+import { type TransportState, transportModel } from './transport';
 import { useReadiness } from './useReadiness';
 
 interface Props {
@@ -85,19 +86,26 @@ const REFUSAL_WORD: Record<'docker' | 'credential' | 'attached' | 'backend', str
 //
 // A REFUSAL OUTRANKS A STREAK, the same order `lightFor` uses: both are usually true together — a streak is
 // what a refusal was causing — and the one that stops you working now is the one worth the word.
+//
+// THE FIELD IS `state` AND NOT `tone`, and the values are state names rather than tone names. It used to
+// return `'ok' | 'bad' | 'warn' | 'unknown'` — three of the five TONE names used as this surface's state
+// vocabulary — and `ok` was then painted `--muted` by a rule in styles.css, so the word `ok` meant one
+// thing in this file and another in the stylesheet. `failing` is now literally the same row the
+// connection light uses, which is the point: one fault, one word, one colour, whichever corner of the
+// chrome reports it. See ui/state-tones.ts.
 export function agentStatus(sandbox: SandboxState | null): {
   word: string;
-  tone: 'ok' | 'bad' | 'warn' | 'unknown';
+  state: 'ready' | 'blocked' | 'failing' | 'checking';
   title: string;
   advice?: LightAdvice;
 } {
   if (!sandbox) {
-    return { word: 'Checking…', tone: 'unknown', title: 'Asking the server whether this agent can run.' };
+    return { word: 'Checking…', state: 'checking', title: 'Asking the server whether this agent can run.' };
   }
   if (sandbox.agentRefusal) {
     return {
       word: sandbox.refusalKind ? REFUSAL_WORD[sandbox.refusalKind] : 'Blocked',
-      tone: 'bad',
+      state: 'blocked',
       title: sandbox.agentRefusal,
       advice: lightAdvice('offline', sandbox.agentRefusal, sandbox.refusalKind),
     };
@@ -107,12 +115,12 @@ export function agentStatus(sandbox: SandboxState | null): {
       // NOT 'Ready', and not 'Blocked' either: nothing is refusing, so a word implying a gate would describe
       // one that does not exist. What is true is that the last runs failed before reaching a model.
       word: 'Failing',
-      tone: 'warn',
+      state: 'failing',
       title: sandbox.recentFailure.note,
       advice: lightAdvice('failing', null, null, sandbox.recentFailure),
     };
   }
-  return { word: 'Ready', tone: 'ok', title: 'This agent has what it needs to run in this project.' };
+  return { word: 'Ready', state: 'ready', title: 'This agent has what it needs to run in this project.' };
 }
 
 // A WORD PLUS A BALLOON, because the word alone cannot carry a remedy — and this is the surface with the Start
@@ -125,20 +133,20 @@ export function agentStatus(sandbox: SandboxState | null): {
 // Its own component because the bar was already at the complexity limit and this is the second conditional
 // rendering in it — the gate refusing the third one is the gate working.
 function AgentChip({ agent }: { agent: ReturnType<typeof agentStatus> }) {
-  // THE TONE IS A `data-tone` ATTRIBUTE AND NO LONGER A CLASS NAME BUILT AT RUN TIME. `ap-agent-${tone}`
+  // THE STATE IS AN ATTRIBUTE AND NO LONGER A CLASS NAME BUILT AT RUN TIME. `ap-agent-${tone}`
   // produced four classes no literal grep could see, which is the defect the *Risks* section of
   // docs/design-system.md describes: 36 live classes looked dead, and deleting them would have broken every
   // state colour on this bar in exactly the states a person only reaches once something has gone wrong.
-  // A `data-` value is visible to the same grep that reads the stylesheet's own selector.
   //
-  // ONLY THE FAULT GETS A COLOUR, so `ok` and `unknown` are the muted word with a dot that differs — see
-  // styles.css. The dot's tone is therefore NOT the word's: `ok` is a green pip beside grey text.
-  const dot = <Dot size={7} tone={agent.tone === 'ok' ? 'ok' : undefined} />;
+  // THE DOT HAS NO STATE OF ITS OWN. It used to carry `tone="ok"` while the word beside it was painted
+  // `--muted` — a green pip beside grey text, which was this surface deciding that a healthy agent should
+  // say so in one place and not the other. The wrapper's tone now reaches both through `currentColor`.
+  const dot = <Dot size={7} />;
   if (!agent.advice) {
     return (
       <span
-        className="ap-agent-state"
-        data-state={agent.tone}
+        className={`ap-agent-state ${stateClass(agent.state)}`}
+        data-state={agent.state}
         data-testid="ap-agent-state"
         title={agent.title}
       >
@@ -158,7 +166,7 @@ function AgentChip({ agent }: { agent: ReturnType<typeof agentStatus> }) {
       // every case that has a balloon, because the inner span never carried a tone at all. The tone and
       // the test id now sit on the same element in both shapes, which is what that assertion needed.
       triggerTestId="ap-agent-state"
-      triggerState={agent.tone}
+      triggerState={agent.state}
       trigger={
         <>
           {dot}
@@ -173,24 +181,16 @@ function AgentChip({ agent }: { agent: ReturnType<typeof agentStatus> }) {
   );
 }
 
-// THE TRANSPORT DOT'S TONE, as a table rather than as a class name composed from the state word.
-// `ap-dot-${tone}` created four classes, and only THREE of them existed in the stylesheet: `idle` and
-// `stopped` both fell through to the base rule's grey, which is right — neither is a fault and neither
-// is progress — but it was true by omission, so nothing said so and nothing could check it. Stated here
-// instead, and pinned by test/state-tones.test.tsx, which asserts the pair is one colour on purpose.
+// THE LOCAL `DOT_TONE` TABLE IS GONE. It mapped the five transport states onto five tone names right
+// here, which made this file the third place in the app with an opinion about what `complete` is worth —
+// and it disagreed with the top bar's chip, where the same state was `--accent`. The dot names the state
+// and ui/state-tones.ts answers, exactly as every other indicator now does.
 //
-// `running` is the only one that moves. The pulse belongs to the Dot because the reduced-motion
-// override that switches it off has to sit beside the keyframes.
-const DOT_TONE: Record<TransportTone, DotTone> = {
-  idle: 'neutral',
-  stopped: 'neutral',
-  running: 'accent',
-  halted: 'bad',
-  complete: 'ok',
-};
-
-function ToneDot({ tone }: { tone: TransportTone }) {
-  return <Dot size={8} tone={DOT_TONE[tone]} pulse={tone === 'running'} testId="ap-tone-dot" />;
+// `idle` and `stopped` are still ONE colour and it is now said rather than true by omission — they are
+// both the `neutral` row. `running` is the only one that moves; the pulse belongs to the Dot because the
+// reduced-motion override that switches it off has to sit beside the keyframes.
+function ToneDot({ state }: { state: TransportState }) {
+  return <Dot size={8} state={state} pulse={state === 'running'} testId="ap-tone-dot" />;
 }
 
 // THE ONE BIG BUTTON. Its own component for the reason AgentChip is: the bar sits on the
@@ -316,7 +316,12 @@ export function AutopilotBar({
   }
 
   return (
-    <div className={`ap-bar ap-bar-${model.tone}`} data-testid="ap-bar">
+    // `vb-tone-*` AND NOT `ap-bar-${tone}`. Four classes lived only inside that template literal, which
+    // is the *Risks* defect, and each of them named a token of its own — including `var(--ok, #3fb950)`,
+    // a fallback dead since every theme defined the token. The rail's colour is one declaration on
+    // `.ap-bar` now and the state's tone is the table's. `idle` had no rule at all and fell through to
+    // `--border`; it is the `neutral` grey now, which is what the transport dot beside it already was.
+    <div className={`ap-bar ${stateClass(model.state)}`} data-state={model.state} data-testid="ap-bar">
       <div className="ap-bar-row">
         <Transport control={model.control} onAct={act} />
 
@@ -338,7 +343,7 @@ export function AutopilotBar({
           <span aria-hidden="true">✕</span> Emergency stop
         </Button>
 
-        <ToneDot tone={model.tone} />
+        <ToneDot state={model.state} />
         <span className="ap-status" data-testid="ap-status">
           {model.status}
         </span>

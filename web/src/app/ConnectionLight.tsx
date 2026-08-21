@@ -49,7 +49,11 @@ export function ConnectionLight({
       triggerState={light}
       trigger={
         <>
-          <Dot size={12} className="conn" />
+          {/* NO STATE OF ITS OWN: the trigger carries the tone and the dot's fill inherits it, which
+              is what nine `.conn-status[data-state='…'] .vb-dot` rules used to say one state at a
+              time. The halo stays a property of THIS surface — the app's own health is one of the two
+              things worth one — and it is a prop rather than a tenth state rule. */}
+          <Dot size={12} glow={light === 'online'} className="conn" />
           <span className="conn-text">{light}</span>
         </>
       }

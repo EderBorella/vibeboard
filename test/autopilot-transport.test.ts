@@ -206,7 +206,10 @@ describe('whether the drawer is worth opening', () => {
   });
 });
 
-describe('the tone', () => {
+// `state` AND NOT `tone`, and the values are unchanged: Phase 13 renamed the FIELD because these five
+// are state names — a tone is one of the five colours in web/src/ui/state-tones.ts, and calling the
+// state a tone is what let three surfaces each hold their own translation of it.
+describe('the transport state', () => {
   it.each([
     ['idle', IDLE, 'idle'],
     ['running', { ...IDLE, state: 'running' as const }, 'running'],
@@ -218,10 +221,10 @@ describe('the tone', () => {
     ['a reached cap', { ...IDLE, state: 'stopped' as const, reason: 'capped' as const }, 'stopped'],
     ['a stall', { ...IDLE, state: 'stopped' as const, reason: 'stalled' as const }, 'stopped'],
   ])('reads %s as %s', (_name, state, expected) => {
-    expect(model({ state }).tone).toBe(expected);
+    expect(model({ state }).state).toBe(expected);
   });
 
   it('is idle before the first answer', () => {
-    expect(model({ state: null }).tone).toBe('idle');
+    expect(model({ state: null }).state).toBe('idle');
   });
 });

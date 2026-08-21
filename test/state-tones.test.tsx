@@ -75,14 +75,23 @@ beforeEach(() => {
 // like `.conn-closed .conn` resolves properly rather than by string surgery — and the union is taken
 // over the element AND its ancestors, since that is what the eye gets when a tone is set on a
 // wrapper to tint a dot and a word together.
+//
+// `--tone` IS IN THE LIST AND IT IS THE MOST IMPORTANT ENTRY SINCE PHASE 13. Every toned surface now
+// declares the same string — `color: var(--tone)`, `border-left: 3px solid var(--tone, var(--border))` —
+// and the five `.vb-tone-*` rules are where the difference lives. Without this entry every state on a
+// surface reads as one marker and every distinctness claim below passes vacuously, which is exactly what
+// happened when the property was introduced: eight assertions went red for the right reason and would
+// have gone green again for the wrong one.
 const TINTED = [
   'color',
   'background',
   'background-color',
   'border-color',
   'border',
+  'border-left',
   'border-left-color',
   'box-shadow',
+  '--tone',
 ] as const;
 
 const RULES: { sel: string; body: string }[] = (() => {
@@ -150,6 +159,28 @@ function marker(el: Element | null | undefined): string {
   return [...new Set(found)].sort().join(' | ');
 }
 
+// EVERY STATE IN A GROUP RENDERS THE SAME MARKER, AND NO TWO GROUPS RENDER THE SAME ONE.
+//
+// The shape the report-chip case below already had inline, lifted out because Phase 13 gave it to two
+// more surfaces. It is the only honest shape once states are deliberately equal: `failed`,
+// `interrupted` and `cancelled` were one colour before this phase — "what they have in common is no
+// report" — and `closed`/`unauthorized` and `offline`/`failing` and `idle`/`stopped` are three more
+// pairs now. BOTH halves are load-bearing: "the group is one colour" is what catches a member drifting
+// out, and "the groups differ" is what catches the collapse.
+function expectGroups(what: string, groups: Map<string, Map<string, string>>): void {
+  const oneEach = new Map<string, string>();
+  for (const [group, members] of groups) {
+    const [[first, expected]] = [...members];
+    for (const [state, value] of members) {
+      expect(value, `${what}: ${state} must render exactly what ${first} does — they are one tone`).toBe(
+        expected,
+      );
+    }
+    oneEach.set(group, expected);
+  }
+  expectAllDistinct(what, oneEach);
+}
+
 // Every state produces a marker, and no two states in the list produce the same one.
 function expectAllDistinct(what: string, markers: Map<string, string>): void {
   for (const [state, value] of markers) {
@@ -194,14 +225,37 @@ const AUTOPILOT_STATES: Array<[string, AutopilotState | null]> = [
 ];
 
 describe('the auto-pilot bar says its state in a way a glance can tell apart', () => {
+  // FOUR GROUPS AND NOT FIVE, since Phase 13, and the change is `idle` joining `stopped`.
+  //
+  // The bar's rail was `--border` for `idle` — by OMISSION, since no `.ap-bar-idle` rule existed — and
+  // `--muted` for `stopped`. Two greys, and this assertion is the only thing in the repository that
+  // ever claimed a person could tell them apart. Both are the `neutral` row now: neither is a fault and
+  // neither is progress, which is the reading the transport dot beside them already rendered and which
+  // the test below has recorded as deliberate since Phase 3.
+  //
+  // WHAT DISTINGUISHES THEM INSTEAD IS A PRESENCE RATHER THAN A COLOUR: `chipFor` returns null for
+  // `idle`, so the top bar renders NO chip at all, and renders one for `stopped`. That is asserted by
+  // *gives each auto-pilot state a distinct marker* below, which skips `idle` for exactly that reason.
   it('gives the bar itself a distinct marker per tone', async () => {
-    const markers = new Map<string, string>();
-    for (const [name, state] of AUTOPILOT_STATES) {
-      cleanup();
-      await bar(state);
-      markers.set(name, marker(screen.getByTestId('ap-bar')));
+    const groups = new Map([
+      ['inert', ['idle', 'stopped']],
+      ['running', ['running']],
+      ['halted', ['halted']],
+      ['complete', ['complete']],
+    ]);
+    const measured = new Map<string, Map<string, string>>();
+    for (const [group, names] of groups) {
+      const inGroup = new Map<string, string>();
+      for (const name of names) {
+        cleanup();
+        const found = AUTOPILOT_STATES.find(([n]) => n === name);
+        if (!found) throw new Error(`no auto-pilot state named ${name}`);
+        await bar(found[1]);
+        inGroup.set(name, marker(screen.getByTestId('ap-bar')));
+      }
+      measured.set(group, inGroup);
     }
-    expectAllDistinct('the bar', markers);
+    expectGroups('the bar', measured);
   });
 
   it('gives the transport dot a distinct marker per tone', async () => {
@@ -300,16 +354,44 @@ describe('the top bar chip', () => {
     expectAllDistinct('the top bar chip', markers);
   });
 
-  // The six the light can report need five different responses, and a colour cannot say which. This is
-  // the assertion that stops a state falling through to the default grey.
+  // THE SIX NEED FIVE DIFFERENT RESPONSES AND A COLOUR CANNOT SAY WHICH — which was written here as an
+  // argument for six colours and is, read again, the argument against them. Phase 13 makes it four
+  // groups, and the WORD is what separates the members of a group: `.conn-text` is a fixed 12ch box
+  // sized to the longest name the light can report, and that box exists for precisely this.
+  //
+  // TWO OF THE THREE PAIRS WERE ALREADY ONE COLOUR IN TWO OF THE THREE THEMES. `offline` was `--warn`
+  // and `failing` was `--accent-2`, and themes.css defines those to the same amber in cyberpunk and
+  // classic-dark — the rule for `failing` said so itself: "where they coincide this is distinguished
+  // from `offline` by the word". So the collapse ratifies what two palettes out of three already
+  // rendered, and marshmallow stops being the odd one out.
+  //
+  // `closed` and `unauthorized` join `bad` because both mean nothing you press will work: the page is
+  // frozen, or every button on it fails. The remedy is in `lightAdvice`'s balloon, which writes five
+  // different ones, and never was in the colour.
   it('gives each connection state a distinct marker', () => {
-    const markers = new Map<string, string>();
-    for (const state of LIGHT_STATES) {
-      cleanup();
-      const { container } = render(<TopBar {...props} light={state} />);
-      markers.set(state, marker(container.querySelector('[data-testid="conn-status"]')));
+    const groups = new Map([
+      ['live', ['online']],
+      ['in flight', ['connecting']],
+      // Ordered as `LIGHT_STATES` lists them, so a state added to that union and not to a group here
+      // fails the completeness assertion below rather than being silently unmeasured.
+      ['broken', ['closed', 'unauthorized']],
+      ['needs attention', ['offline', 'failing']],
+    ]);
+    const measured = new Map<string, Map<string, string>>();
+    for (const [group, states] of groups) {
+      const inGroup = new Map<string, string>();
+      for (const state of states) {
+        cleanup();
+        const { container } = render(<TopBar {...props} light={state as (typeof LIGHT_STATES)[number]} />);
+        inGroup.set(state, marker(container.querySelector('[data-testid="conn-status"]')));
+      }
+      measured.set(group, inGroup);
     }
-    expectAllDistinct('the connection light', markers);
+    expectGroups('the connection light', measured);
+    // EVERY STATE THE LIGHT CAN REPORT IS IN A GROUP. Without this the groups are an allow-list: a
+    // seventh state would render whatever it rendered and nothing here would look at it, which is the
+    // same fall-through-to-grey defect the original version of this test was written to catch.
+    expect([...groups.values()].flat().sort()).toEqual([...LIGHT_STATES].sort());
   });
 });
 

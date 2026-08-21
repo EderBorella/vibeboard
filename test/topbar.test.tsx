@@ -14,6 +14,7 @@ import {
 } from '../web/src/app/connection-light.js';
 import type { MainTab } from '../web/src/app/TopBar.js';
 import { TopBar } from '../web/src/app/TopBar.js';
+import { STATE_TONES } from '../web/src/ui/state-tones.js';
 
 afterEach(cleanup);
 
@@ -162,30 +163,28 @@ describe('TopBar', () => {
   // two colours it is there to be distinguished from. Read from the source because jsdom loads no CSS,
   // the same reason the width assertions below do.
   //
-  // `[data-state='…']` AND NOT `.conn-<state>`. Phase 3 of docs/design-system.md moved the six state
-  // classes onto an attribute, because they existed only inside the template literal `conn-${light}` and
-  // so a literal grep for any of them found nothing — 36 live classes read as dead, and the ones here are
-  // the worst of the set: delete them and a board that has failed nothing still looks perfect while the
-  // colour saying the connection dropped is gone. The dot is `.vb-dot` now; the word is still `.conn-text`.
-  it('gives failing a colour of its own, distinct from online and offline', () => {
-    const css = readFileSync(join(process.cwd(), 'web', 'src', 'styles.css'), 'utf8');
-    const varsFor = (state: string): string[] =>
-      [
-        ...css.matchAll(
-          new RegExp(
-            `^\\.conn-status\\[data-state='${state}'\\] \\.(?:vb-dot|conn-text)\\s*\\{([^}]*)\\}`,
-            'gm',
-          ),
-        ),
-      ].flatMap((m) => [...(m[1] ?? '').matchAll(/var\((--[\w-]+)\)/g)].map((v) => v[1] ?? ''));
-
-    const failing = varsFor('failing');
-    expect(
-      failing.length,
-      "no .conn-status[data-state='failing'] rules found in web/src/styles.css",
-    ).toBeGreaterThan(0);
-    for (const shared of [...varsFor('online'), ...varsFor('offline')]) {
-      expect(failing, `failing must not reuse ${shared}`).not.toContain(shared);
+  // `failing` MUST NOT LOOK LIKE `online`, and that half of the original claim is the one that mattered:
+  // the morning it was added, auto-pilot had stopped itself on two runs that never reached a model and
+  // this light said `online` throughout. It said "distinct from online AND offline", and Phase 13
+  // withdraws the second half deliberately — `offline` and `failing` are one tone. Both mean something
+  // wants your attention while the app keeps working, and the light already leaned on the word to tell
+  // them apart in the two themes where `--warn` and `--accent-2` are the same amber, which the deleted
+  // rule said in its own comment.
+  //
+  // READ THROUGH THE TABLE rather than out of the stylesheet, because the stylesheet no longer names a
+  // state at all: nine `.conn-status[data-state='…']` rules became one `color: var(--tone)` declaration
+  // and one row per state in web/src/ui/state-tones.ts. A regex over styles.css would now match nothing
+  // and pass, which is why the assertion moved rather than being deleted.
+  it('separates failing from online, and shares its tone with offline', () => {
+    expect(STATE_TONES.failing).not.toBe(STATE_TONES.online);
+    expect(STATE_TONES.failing).toBe(STATE_TONES.offline);
+    // AND THE WORD IS WHAT DISTINGUISHES THE PAIR, which is a claim about the DOM rather than the table
+    // — without it "they share a tone" would be an admission rather than a design. Asserted for both,
+    // because a shared colour with only one of the two words rendered is the defect.
+    for (const state of ['offline', 'failing'] as const) {
+      cleanup();
+      const { container } = render(<TopBar {...props} light={state} />);
+      expect(container.querySelector('.conn-text')?.textContent).toBe(state);
     }
   });
 

@@ -1,4 +1,5 @@
 import { type AutopilotState, isSuccessReason } from '../api';
+import type { TransportState } from '../autopilot/transport';
 import { Button } from '../ui/Button';
 import { Chip } from '../ui/Chip';
 import { ConnectionLight } from './ConnectionLight';
@@ -30,12 +31,15 @@ export type MainTab = (typeof TABS)[number]['value'];
 // What auto-pilot is doing, in one word. `complete` is the ONLY stop styled as a success: an exhausted
 // budget, a reached cap and a stalled board all end tidily and none of them means the work is done —
 // "an error or an exhausted budget never counts as success".
-function chipFor(state: AutopilotState): { label: string; tone: string } | null {
+// `state` AND NOT `tone`: these four words are rows in ui/state-tones.ts, and the same four the
+// transport strip and its dot use. They were typed `string` and read by a stylesheet that gave
+// `running` the palette's SECONDARY while the bar below gave the same word the primary.
+function chipFor(state: AutopilotState): { label: string; state: TransportState } | null {
   if (state.state === 'idle') return null; // nothing to say, and a chip per tab would be noise
-  if (state.state === 'running') return { label: 'auto-pilot running', tone: 'running' };
-  if (state.state === 'halted') return { label: 'halted', tone: 'halted' };
+  if (state.state === 'running') return { label: 'auto-pilot running', state: 'running' };
+  if (state.state === 'halted') return { label: 'halted', state: 'halted' };
   const reason = state.reason ?? 'stopped';
-  return { label: reason, tone: isSuccessReason(reason) ? 'complete' : 'stopped' };
+  return { label: reason, state: isSuccessReason(reason) ? 'complete' : 'stopped' };
 }
 
 interface Props {
@@ -114,14 +118,15 @@ export function TopBar({
         recentFailure={recentFailure}
       />
       {showProject && chip && (
-        // `state` and not a `tone`, because the palette does not fit the five: `running` is `--accent-2`,
-        // every theme's SECONDARY, which equals `--warn` in two of the three themes and not in
-        // marshmallow (#8a6420 against #9a5b12). Mapping it onto `warn` would silently repaint the light
-        // theme, and themes.css argues that distinction by name. What the attribute buys even so is that
-        // `ap-${chip.tone}` no longer builds three class names no literal grep can see.
+        // `state`, AND IT IS A ROW IN THE TABLE NOW. The note here used to argue that "the palette does
+        // not fit the five" because `running` was `--accent-2`, the palette's secondary, which is not
+        // `--warn` in marshmallow. That defended a token this surface had picked: the same `running`
+        // rendered `--text` on a report chip and `--accent` on the auto-pilot bar's rail, three colours
+        // for one fact. `--warn` is the attention token, `--accent-2` is a hue, and `running` is
+        // `accent` wherever it is said. See ui/state-tones.ts.
         <Chip
           pill
-          state={chip.tone}
+          state={chip.state}
           className="ap-chip"
           testId="ap-chip"
           title={autopilot?.detail ?? chip.label}

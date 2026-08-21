@@ -1,8 +1,9 @@
 # The design system, and how it lands in phases
 
-**Status: Phase 0 done (2026-08-21), Phases 1–5 planned.** Nothing in `web/src/` has changed — Phase 0 built
-the instrument and measured; it did not touch a stylesheet. This page is the argument and the sequence; the
-work is phased so each phase ships on its own and can be reverted on its own.
+**Status: Phases 0 and 1 done (2026-08-21), Phases 2–5 planned.** Phase 0 built the instrument and measured,
+touching no stylesheet; Phase 1 added the 17 tokens and nothing that consumes them. Nothing in `web/src/`
+renders differently yet. This page is the argument and the sequence; the work is phased so each phase ships
+on its own and can be reverted on its own.
 
 ---
 
@@ -197,6 +198,8 @@ no prerequisite left to satisfy. **Verified rather than assumed** when Phase 0 l
 1. **Type conformance** — every element's computed `font-size` is one of the six scale values. This is the
    assertion that would have caught the 10.88px/13.12px defect on the commit that introduced it.
 2. **Radius conformance** — every computed `border-radius` is one of the four, or `50%`.
+
+Checks 1 and 2 each make **two** claims, and they are gated differently — see the split below.
 3. **Nothing overflows** — for every text element, `scrollWidth <= clientWidth + 1`; and the document does
    not scroll horizontally at 900px, 1200px and 1440px.
 4. **Contrast** — the text/ground pairs the stylesheet actually puts together clear 4.5:1. `themes.css`
@@ -206,9 +209,33 @@ no prerequisite left to satisfy. **Verified rather than assumed** when Phase 0 l
 6. **Focus is visible** — every interactive element has a discernible `:focus-visible` style.
 7. **One line where one line is meant** — the action rows that have twice wrapped stay unwrapped.
 
-**A conformance gate starts as REPORTING, not blocking.** There are 27 font sizes today; a blocking gate
-pointed at that backlog would have to be bypassed on every commit, which teaches everyone to ignore it. It
-becomes blocking **in the phase that drives its count to zero**, and not before.
+**Conformance reports; drift blocks.** Checks 1 and 2 make two separable claims, and conflating them is what
+made the first version of this gate worthless.
+
+- **Conformance** — "every computed `font-size` is one of the six", "every radius is one of the four" — is
+  **REPORTING**. There are 15 computed sizes today; a blocking gate pointed at that backlog would have to be
+  bypassed on every commit, which teaches everyone to ignore it. Conformance becomes blocking **in the phase
+  that drives its count to zero** — Phase 2 for type, Phase 3 for radius — and not before.
+- **Drift** — "the set of computed values is exactly the set in `visual/baseline/<theme>.json`" — is
+  **BLOCKING**, on all three themes, since Phase 1. Its count is zero today, which is the same condition
+  that licenses the five ratchets, so this is a gate at zero and not a gate pointed at a backlog.
+
+The split was made because the reporting form had no teeth. A defect planted at `styles.css` — one rule
+consuming `--t-display` — printed `NEW since baseline: 24px` on all three themes and the run still **exited
+0**. A regression therefore reached the commit unless a person read a log line, which is the exact failure
+mode the harness exists to remove: three layout faults in this repository's history were reported by eye and
+missed by the suite.
+
+**NEW and GONE fail symmetrically.** A value disappearing is usually progress, and from Phase 2 on it is the
+normal case — but it is also how a whole surface stops rendering, because a container that collapsed takes
+its text's font sizes with it, and the element floors in the spec are set too low to notice one collapsed
+row. "Zero difference from the baseline" is not a one-directional claim.
+
+**The deliberate update path is `npm run visual:record`, and the failure message names it.** A blocking gate
+with no supported way to move its baseline is a gate that gets deleted the first time somebody legitimately
+needs to move it — and Phase 2 changes 27 font sizes on purpose. The message therefore separates "you broke
+something" from "you meant this, now record it". Verified rather than assumed on 2026-08-21: with a defect in
+place, `visual:record` rewrote all three baseline files and the following `npm run visual` exited 0.
 
 **Each gate must be proven by a planted defect before it is trusted.** A passing check proves the code ran,
 not that anything holds it in place: change one font size to an off-scale value, watch the gate fail, then
@@ -244,17 +271,17 @@ a Playwright assertion can state.
 
 | check | examined | result |
 |---|---|---|
-| 1. type conformance (REPORTING) | 233 visible elements, 124 text-bearing | **15** distinct computed sizes: 10.4, 10.88, 11.2, 11.52, 11.84, 12, 12.16, 12.48, 12.8, 13.12, 13.3333, 13.6, 13.76, 16, 18.4px |
-| 2. radius conformance (REPORTING) | 233 visible elements | **6** distinct values: 6px×108, 999px×68, 10px×56, 8px×56, 50%×12, 3px×4 |
+| 1. type (conformance REPORTING, drift BLOCKING) | 233 visible elements, 124 text-bearing | **15** distinct computed sizes: 10.4, 10.88, 11.2, 11.52, 11.84, 12, 12.16, 12.48, 12.8, 13.12, 13.3333, 13.6, 13.76, 16, 18.4px |
+| 2. radius (conformance REPORTING, drift BLOCKING) | 233 visible elements | **6** distinct values: 6px×108, 999px×68, 10px×56, 8px×56, 50%×12, 3px×4 |
 | 3. nothing overflows | 120 text elements + 3 viewport widths | **0** overflowing; no horizontal document scroll at 900/1200/1440 |
 | 4. contrast ≥ 4.5:1 | 124 text/ground pairs, composited | **0** below 4.5:1 |
 | 5. no unresolved token | 27 referenced custom properties | **2**: `--ink` (referenced at `styles.css:1807`, defined nowhere — a real defect) and `--exec-cols` (supplied by the Execution tab, which this board-only sweep does not visit) |
 | 6. focus is visible | 55 focusable elements (1 disabled, skipped) | **0** without a discernible `:focus-visible` style |
 | 7. one line where one line is meant | 25 flex rows, plus `.ap-bar-row` and `header.topbar` named and blocking | **0** wrapped |
 
-Type and radius **report and do not fail**, as argued above; they also print what is NEW since the baseline,
-which is how a reporting check still names a regression by value. The other five **ratchet** against the
-recorded baseline rather than against zero — four of them sit at zero, so for those the ratchet IS blocking.
+The type and radius **counts** report and do not fail, as argued above; their **drift** from these recorded
+values blocks. The other five **ratchet** against the recorded baseline rather than against zero — four of
+them sit at zero, so for those the ratchet IS blocking.
 
 **Every check was proven by a planted defect**, each reverted: an off-scale `0.5856rem` was named as
 `9.3696px`; a `7px` radius was named as new; a 6px-wide `.tile-id` produced three overflow findings; a
@@ -268,17 +295,39 @@ longer had. **The focus check was vacuous and green before a defect was planted 
 **Revert:** delete `visual/`, one devDependency, `tsconfig.visual.json`, three `package.json` scripts and
 three lines of `biome.jsonc`.
 
-### Phase 1 — add the tokens
+### Phase 1 — add the tokens — **DONE 2026-08-21**
 
-Add the type, space and radius variables to `themes.css`. **Change nothing that consumes them.**
+**17 custom properties** — six type, seven space, four radius — added to the bare `:root` block of
+`themes.css`. All three `[data-theme]` blocks are untouched, deliberately: a theme decides colour, and a
+theme that disagreed about what 12px means is a theme with its own layout. **Nothing consumes them**, which
+is the whole point of doing it as its own phase — a token that changes rendering is a token defined wrong.
 
-Purely additive, so the rendered result is byte-identical.
+**Gate:** the visual harness reports **zero drift** from the Phase 0 baseline on all three themes — 21
+passed, exit 0. This is the phase in which that drift check became **blocking** rather than printed; see
+*Conformance reports; drift blocks* above.
 
-**Gate:** the visual harness reports **zero** difference from the Phase 0 baseline on all three themes.
-That is the whole point of doing it as its own phase — a token that changes rendering is a token defined
-wrong.
-**Exit:** tokens exist and are unused.
-**Revert:** one file.
+**The measured proof: the built CSS bundle differs by exactly the 17 added declarations and nothing else.**
+Both bundles were built and compared declaration by declaration after minification: **2,607 declarations
+before, 2,624 after; 17 added, all in `:root`, 0 removed and 0 changed.**
+
+**The bundle's content hash necessarily changes, and a criterion of "identical hash" is unsatisfiable for an
+additive phase.** The filename went from `index-DrjhdOCp.css` to `index-CycTQdwk.css` and the bundle from
+61,213 to 61,462 bytes, because Vite hashes content and 249 bytes of new declarations are content. The
+earlier phrasing — carried over from Phase 0, where "hashes the same" was true because nothing was added —
+would fail this phase for succeeding. **The declaration-level diff is the real proof, and it is the criterion
+Phase 2 must use too.**
+
+**Browser-resolved, not derived by arithmetic** — `--t-micro` through `--t-display` measured in Chromium at
+the 16px root: **11 / 12 / 13 / 15 / 18 / 24px**. The rem values are chosen to land on whole pixels
+(`0.6875rem` is exactly 11px), which is why they must not be "tidied" to round rems: fractional steps are
+what produced a button at 10.88px inside a 12.16px bar.
+
+**`--r-lg` and the pre-existing `--radius` are both `10px`, and both are live.** `--radius` has **4**
+consumers (`styles.css:339`, `:389`, `:1280`, `:1456`); `--r-lg` has **0**. That duplication is intentional
+for now: `--radius` is deleted in the phase where a surface primitive owns those four sites, because renaming
+a token while no caller exists buys nothing and splits the revert.
+
+**Exit:** tokens exist and are unused. **Revert:** one file.
 
 ### Phase 2 — collapse type and space onto the scale
 

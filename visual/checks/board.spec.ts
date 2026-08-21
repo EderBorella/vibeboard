@@ -3,11 +3,19 @@ import { type Baseline, expect, readBaseline, recording, test, writeBaseline } f
 
 // The seven checks of docs/design-system.md, per theme.
 //
-// TWO OF THEM DO NOT FAIL, AND THAT IS DELIBERATE. Type and radius conformance run in REPORTING mode
-// because there are 27 authored font sizes and 8 radii today: a blocking gate pointed at a backlog
-// that size has to be bypassed on every commit, which teaches everyone to ignore it. They become
-// blocking in the phase that drives their count to zero — Phase 2 for type, Phase 3 for radius — and
-// not before.
+// CHECKS 1 AND 2 MAKE TWO DIFFERENT CLAIMS, AND ONLY ONE OF THEM FAILS.
+//
+// CONFORMANCE — "every computed font-size is one of the six scale values", "every radius is one of
+// the four" — is REPORTING, deliberately. There are 15 computed sizes and 6 radius values today: a
+// blocking gate pointed at a backlog that size has to be bypassed on every commit, which teaches
+// everyone to ignore it. Conformance becomes blocking in the phase that drives its count to zero —
+// Phase 2 for type, Phase 3 for radius — and not before.
+//
+// DRIFT — "the set of computed values is exactly the set in visual/baseline/<theme>.json" — is
+// BLOCKING, on all three themes, because its count is zero today, which is the same condition that
+// licenses the ratchets below. Without it the reporting checks printed a regression by name and the
+// run still exited 0, so a defect reached the commit unless a person read a log line: exactly the
+// failure mode this harness exists to remove.
 //
 // THE OTHER FIVE RATCHET against a recorded baseline rather than against zero, for the same reason
 // pointed the other way: their counts are not zero today either, and a gate that cannot be green is
@@ -39,14 +47,41 @@ function lines(offenders: Offender[]): string {
   return offenders.map((o) => `  ${o.where} — ${o.detail}`).join('\n');
 }
 
-// What moved since the baseline was recorded. This is what gives a REPORTING check teeth without
-// making it blocking: a planted off-scale size shows up here by name on the run that introduced it,
-// and Phase 1's gate — "zero difference from the Phase 0 baseline" — is exactly this line being empty.
-function drift(now: Record<string, number>, then: Record<string, number>): string {
-  const added = Object.keys(now).filter((value) => !(value in then));
-  const gone = Object.keys(then).filter((value) => !(value in now));
-  if (added.length === 0 && gone.length === 0) return 'no change from the baseline';
-  return `NEW since baseline: ${added.join(', ') || 'none'}; GONE: ${gone.join(', ') || 'none'}`;
+// The command that re-records the baseline. Named in the failure message on purpose: a blocking gate
+// with no supported way to update it is a gate that gets deleted the first time somebody legitimately
+// needs to change it, and Phase 2 changes 27 font sizes on purpose. The message has to tell "you
+// broke something" apart from "you meant this, now record it".
+const RECORD = 'npm run visual:record';
+
+// What moved since the baseline was recorded, by value.
+function drift(now: Record<string, number>, then: Record<string, number>): string[] {
+  return [
+    ...Object.keys(now)
+      .filter((value) => !(value in then))
+      .map((value) => `NEW ${value}`),
+    // GONE fails as loudly as NEW. A value disappearing is usually progress — and in Phase 2 it is
+    // the normal case, which is what `visual:record` is for — but it is also how a whole surface
+    // stops rendering: a container that collapsed takes its text's font sizes with it, and the
+    // element floors above are set too low to notice one collapsed row. "Zero difference from the
+    // baseline" is not a one-directional claim, so the gate is symmetric.
+    ...Object.keys(then)
+      .filter((value) => !(value in now))
+      .map((value) => `GONE ${value}`),
+  ];
+}
+
+function driftLine(moved: string[]): string {
+  return moved.length === 0 ? 'no change from the baseline' : `drift: ${moved.join(', ')}`;
+}
+
+// BLOCKING, unlike the conformance count printed beside it. See the header.
+function expectNoDrift(theme: string, check: string, moved: string[]): void {
+  expect(
+    moved,
+    `[${theme}] ${check} values drifted from visual/baseline/${theme}.json.\n` +
+      `  If this was NOT deliberate, the values above are the regression.\n` +
+      `  If it WAS deliberate, re-record the baseline with \`${RECORD}\` and commit it.`,
+  ).toEqual([]);
 }
 
 function tallyLine(tally: Record<string, number>): string {
@@ -93,36 +128,41 @@ test('record the baseline', async ({ board, theme }) => {
   await writeBaseline(theme, baseline);
 });
 
-test('1. type conformance — REPORTING', async ({ board, theme }) => {
+test('1. type — conformance REPORTING, drift BLOCKING', async ({ board, theme }) => {
   const styles = await auditStyles(board);
-  // The floor is the whole assertion here. Nothing else may fail: the count is the finding.
+  // The floor stops the check being vacuous. The conformance COUNT below may not fail; the drift
+  // gate at the end may.
   expect(styles.elements).toBeGreaterThan(FLOOR.elements);
   expect(styles.textElements).toBeGreaterThan(FLOOR.text);
   const sizes = Object.keys(styles.fontSizes);
   const onText = Object.keys(styles.fontSizesOnText);
   const baseline = await readBaseline(theme);
+  const moved = drift(styles.fontSizes, baseline.fontSizes);
   console.log(
     [
       `[${theme}] type: ${sizes.length} distinct computed font-size values across ${styles.elements} visible elements`,
       `  all elements : ${tallyLine(styles.fontSizes)}`,
       `  text-bearing (${styles.textElements} elements, ${onText.length} values): ${tallyLine(styles.fontSizesOnText)}`,
-      `  ${drift(styles.fontSizes, baseline.fontSizes)}`,
+      `  ${driftLine(moved)}`,
     ].join('\n'),
   );
+  expectNoDrift(theme, 'font-size', moved);
 });
 
-test('2. radius conformance — REPORTING', async ({ board, theme }) => {
+test('2. radius — conformance REPORTING, drift BLOCKING', async ({ board, theme }) => {
   const styles = await auditStyles(board);
   expect(styles.elements).toBeGreaterThan(FLOOR.elements);
   const values = Object.keys(styles.radii);
   const baseline = await readBaseline(theme);
+  const moved = drift(styles.radii, baseline.radii);
   console.log(
     [
       `[${theme}] radius: ${values.length} distinct non-zero corner values across ${styles.elements} visible elements`,
       `  ${tallyLine(styles.radii)}`,
-      `  ${drift(styles.radii, baseline.radii)}`,
+      `  ${driftLine(moved)}`,
     ].join('\n'),
   );
+  expectNoDrift(theme, 'border-radius', moved);
 });
 
 test('3. nothing overflows', async ({ board, theme }) => {

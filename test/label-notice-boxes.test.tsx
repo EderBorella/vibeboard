@@ -31,8 +31,9 @@
 //   - the empty states' `font-style`: seven italic, ten not, with nothing distinguishing them;
 //   - the notices' `line-height` (1.45 / 1.5 / 1.55) and the triggers' vertical padding.
 // What IS pinned in each family is the thing a person can see and somebody chose: an ink, a hue, a size.
-import { cleanup } from '@testing-library/react';
+import { cleanup, render } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
+import { Panel } from '../web/src/ui/Panel.js';
 import { box } from './css-box.js';
 
 afterEach(cleanup);
@@ -358,8 +359,15 @@ describe('the archived row', () => {
   // `.archive-title` is the one list row Phase 4's `Panel flat` could not take, and the recorded reason
   // is that its container pads itself. Both halves pinned, because the migration has to move the padding
   // from one to the other without the row's height changing.
+  // THE ASSERTION SURVIVED PHASE 11 AND THE FIXTURE DID NOT. The padding is `.vb-panel-inset`'s now —
+  // and `var(--s-3) var(--s-4)` is `.archive-item`'s OWN value, which is why `inset` took it out of the
+  // eight the ten nested boxes were written with. So the row's height did not move, and the claim this
+  // pins — the container pads itself, so `.archive-title` inside it must not — is unchanged.
   it('.archive-item pads itself', () => {
-    expect(box(label('archive-item', 'div')).padding).toBe('6px 8px');
+    const { container } = render(<Panel variant="inset" className="archive-item" />);
+    const el = container.firstElementChild;
+    if (!el) throw new Error('Panel rendered nothing');
+    expect(box(el).padding).toBe('6px 8px');
   });
 
   it('.archive-title is a full-bleed borderless row inside it', () => {

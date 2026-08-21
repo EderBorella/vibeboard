@@ -1,6 +1,7 @@
 import type { Card } from '../shared';
 import { Button } from '../ui/Button';
 import { Chip } from '../ui/Chip';
+import { Panel } from '../ui/Panel';
 import { Readout } from '../ui/Readout';
 import { miniature } from '../viewmodel';
 
@@ -41,7 +42,8 @@ export function CardTile({
   // a badge on every tile is a badge that says nothing.
   const blocked = carryingAProblem ?? [];
   return (
-    <div
+    <Panel
+      variant="inset"
       className="tile"
       // A REGION IN THE TAB ORDER, NOT A `<button>`, and the markup is a ruling rather than a
       // shortcut. A tile is a card-sized region that CONTAINS controls — a `Chip as="button"` per
@@ -174,6 +176,6 @@ export function CardTile({
           )}
         </div>
       )}
-    </div>
+    </Panel>
   );
 }

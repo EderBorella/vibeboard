@@ -1,6 +1,7 @@
 import type { ModelOption } from '../api';
 import { ModelPicker } from '../models/ModelPicker';
 import type { BackendCaps } from '../shared';
+import { Button } from '../ui/Button';
 import { SegmentedControl } from '../ui/SegmentedControl';
 
 interface Props {
@@ -43,11 +44,12 @@ export function CopilotControls({
           label="Mode"
           disabled={running}
         />
-        <div className="copilot-actions">
-          <button onClick={onCompact} disabled={running} title="Compact the conversation">
-            Compact
-          </button>
-        </div>
+        {/* `Button` `default` `sm`, which `.copilot-actions button` had written out value for value.
+            `push` is all that is left of the wrapper it sat in: a flex row with one child and a gap
+            that separated nothing, whose other declaration was `margin-left: auto`. */}
+        <Button className="push" onClick={onCompact} disabled={running} title="Compact the conversation">
+          Compact
+        </Button>
       </div>
 
       <div className="copilot-selects">

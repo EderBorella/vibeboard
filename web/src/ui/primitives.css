@@ -160,11 +160,17 @@ button.vb-chip { cursor: pointer; }
 /* `--r-md` and not `--r-lg`, which is Phase 3's ruling about nested boxes reapplied: a row sits inside
    a raised surface, and a nested box wants the smaller corner.
    `font: inherit` is the row's whole type claim — a list row is the prose of the list it is in, and
-   four of these carried a `font-size: var(--t-body)` that only ever restated what they inherited. */
-.vb-panel-flat {
-  background: transparent; border: 1px solid transparent; border-radius: var(--r-md);
+   four of these carried a `font-size: var(--t-body)` that only ever restated what they inherited.
+   `inset` IS `flat` WITH THE BOX DRAWN, and that is the whole of the difference: the same corner, the
+   same padding, the same reset — a `--panel-2` ground and a visible edge where `flat` has neither. Which
+   keeps Panel's variant axis exactly one question wide, "is the box drawn?", with `raised` answering it
+   for a surface above the wash and `inset` for a box inside one. See ui/Panel.tsx for the census. */
+.vb-panel-flat, .vb-panel-inset {
+  border: 1px solid transparent; border-radius: var(--r-md);
   padding: var(--s-3) var(--s-4); color: inherit; font: inherit; text-align: left;
 }
+.vb-panel-flat { background: transparent; }
+.vb-panel-inset { background: var(--panel-2); border-color: var(--border); }
 .vb-panel-head {
   display: flex; align-items: center; gap: var(--s-4);
   padding: var(--s-4) 0.65rem; border-bottom: 1px solid var(--border);

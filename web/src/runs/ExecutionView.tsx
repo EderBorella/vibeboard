@@ -101,7 +101,7 @@ export function ExecutionView({
               const subject = runSubject(record);
               const stoppable = active.includes(record.run) || queued.includes(record.run);
               return (
-                <div key={record.run} className="exec-run">
+                <Panel key={record.run} variant="inset" className="exec-run">
                   <div className="exec-run-top">
                     <Chip pill state={record.status} className="report-chip" testId="report-chip">
                       {record.status}
@@ -167,7 +167,7 @@ export function ExecutionView({
                       )}
                     </div>
                   )}
-                </div>
+                </Panel>
               );
             })}
           </Panel>

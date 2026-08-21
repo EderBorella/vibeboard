@@ -394,14 +394,13 @@ body {
   border-style: dashed;
   padding: var(--s-4);
 }
+/* A `Panel` with the `inset` variant — and the one of the ten whose padding the primitive did not move:
+   `var(--s-3) var(--s-4)` is what this row already said, which is why it is the value `inset` took. All
+   that is left is how the row arranges its three cells. */
 .archive-item {
   display: flex;
   align-items: center;
   gap: var(--s-4);
-  background: var(--panel-2);
-  border: 1px solid var(--border);
-  border-radius: var(--r-md);
-  padding: var(--s-3) var(--s-4);
 }
 .archive-meta { display: flex; align-items: baseline; gap: var(--s-4); flex: 0 0 auto; }
 .archive-title {
@@ -457,15 +456,15 @@ body {
 }
 
 /* ---------- Card tile (fixed size) ---------- */
+/* A `Panel` with the `inset` variant. The 2px ACCENT LEFT EDGE stays here and is the one thing about
+   this box the surface decides: it is 2px where the primitive's is 1px, and it is what says which board
+   a card belongs to. `cursor: pointer` is the surface's too — a tile is a `role="group"` rather than a
+   `<button>`, so `button.vb-panel`'s pointer does not reach it. */
 .tile {
   height: var(--tile-h);
   flex: 0 0 var(--tile-h); /* don't let flex shrink the card — overflow into the column scroll instead */
   overflow: hidden;
-  background: var(--panel-2);
-  border: 1px solid var(--border);
   border-left: 2px solid var(--accent);
-  border-radius: var(--r-md);
-  padding: var(--s-4) var(--s-4);
   cursor: pointer;
   display: flex;
   flex-direction: column;
@@ -535,10 +534,12 @@ body {
 .gate-card h2 { margin: 0 0 1rem; font-family: var(--font-display); letter-spacing: 0.04em; }
 .gate-card h3 { margin: 1.5rem 0 0.5rem; font-size: var(--t-lead); color: var(--muted); }
 .gate-list { list-style: none; margin: 0 0 1rem; padding: 0; display: flex; flex-direction: column; gap: var(--s-3); }
+/* A `Panel as="button"` with the `inset` variant. A project in the recents list has no VOICE — it is a
+   region of a list that takes a click, which is the line Phase 4 drew between the two primitives — and
+   it draws its box at rest, which is what `inset` is and `flat` is not. `text-align`, the ink, the
+   pointer and the box are all the primitive's now; the stack of name over path is this list's. */
 .gate-list button {
-  width: 100%; text-align: left; background: var(--panel-2);
-  border: 1px solid var(--border); border-radius: var(--r-md); padding: var(--s-4) 0.7rem;
-  cursor: pointer; color: var(--text); display: flex; flex-direction: column; gap: 0.15rem;
+  width: 100%; display: flex; flex-direction: column; gap: 0.15rem;
 }
 .gate-list button:hover { border-color: var(--accent); }
 .gate-list-name { font-weight: 600; }
@@ -560,11 +561,10 @@ body {
   position: fixed; inset: 0; background: rgba(0, 0, 0, 0.6);
   display: flex; align-items: center; justify-content: center; padding: 1.5rem; z-index: 20;
 }
-.modal {
-  width: 100%; max-width: 620px; max-height: 90vh;
-  background: var(--panel); border: 1px solid var(--border);
-  border-radius: var(--r-lg); display: flex; flex-direction: column;
-}
+/* A `Panel` with the `raised` variant, and it was that variant DECLARATION FOR DECLARATION — the ground,
+   the edge, the 10px corner and the flex column, which is exactly the head-over-scrolling-body stack
+   Phase 4 said every raised consumer wanted. Only the measure is left. */
+.modal { width: 100%; max-width: 620px; max-height: 90vh; }
 .modal-head { display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); }
 .modal-title { font-weight: 600; font-family: var(--font-display); letter-spacing: 0.04em; }
 /* `.modal-close` is gone outright — it was the `bare` variant and nothing else. */
@@ -607,9 +607,13 @@ body {
 
 /* Model picker modal */
 .mp-modal-backdrop { position: fixed; inset: 0; z-index: 60; background: rgba(0,0,0,0.55); display: flex; align-items: center; justify-content: center; padding: 1rem; }
+/* A `Panel` with the `raised` variant. THE ACCENT EDGE IS NOW A `border-color` AND IT WAS THE WHOLE
+   `border` SHORTHAND, which the characterisation suite caught: a shorthand at equal specificity replaces
+   the primitive's width and style as well as its colour, so a Panel that ever moved off 1px would have
+   been silently overruled here. A colour is the surface's to override — the emergency stop's danger
+   hover, `.control-disclaimer`'s prose ink — and the accent says this modal is the one thing on screen. */
 .mp-modal {
-  width: min(560px, 100%); max-height: 80vh; display: flex; flex-direction: column;
-  background: var(--panel); border: 1px solid var(--accent); border-radius: var(--r-lg);
+  width: min(560px, 100%); max-height: 80vh; border-color: var(--accent);
   box-shadow: var(--glow), 0 12px 40px rgba(0,0,0,0.5); overflow: hidden;
 }
 .mp-modal-head { display: flex; align-items: center; padding: 0.7rem 0.9rem; border-bottom: 1px solid var(--border); }
@@ -664,9 +668,10 @@ body {
 }
 
 .copilot-warn { padding: var(--s-3) 0.75rem; font-size: var(--t-small); color: var(--danger); background: color-mix(in srgb, var(--danger) 12%, transparent); border-bottom: 1px solid var(--border); }
+/* A `Panel` with the `inset` variant. It sat on `--bg` where the same box on a `--panel` parent sits on
+   `--panel-2` four times over, and nothing chose the difference. */
 .links-list {
   display: flex; flex-direction: column; gap: var(--s-2); max-height: 180px; overflow-y: auto;
-  border: 1px solid var(--border); border-radius: var(--r-md); padding: var(--s-4); background: var(--bg);
 }
 .links-group { font-size: var(--t-micro); text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 0.3rem 0 0.1rem; }
 .links-group:first-child { margin-top: 0; }
@@ -860,7 +865,11 @@ body {
 /* "+ New" must not break across two lines when the switcher beside it is wide. */
 .chat-new { white-space: nowrap; }
 .chat-menu-backdrop { position: fixed; inset: 0; z-index: 20; }
-.chat-menu { position: absolute; z-index: 21; top: calc(100% + 4px); left: 0; right: 0; max-height: 320px; overflow-y: auto; background: var(--panel); border: 1px solid var(--border); border-radius: var(--r-lg); box-shadow: var(--glow), 0 6px 24px rgba(0,0,0,0.4); padding: var(--s-2); }
+/* A `Panel` with the `raised` variant: the ground, the edge and the 10px corner were that variant's own
+   three values. Its flex column is a no-op here and that is checked rather than assumed — every child of
+   this menu is a full-width block with `margin: 0`, so nothing in it has margins to stop collapsing. The
+   float, the shadow and the inset are what a menu adds to a raised surface. */
+.chat-menu { position: absolute; z-index: 21; top: calc(100% + 4px); left: 0; right: 0; max-height: 320px; overflow-y: auto; box-shadow: var(--glow), 0 6px 24px rgba(0,0,0,0.4); padding: var(--s-2); }
 /* The menu decides its own inset; the line inside it decides nothing. */
 .chat-menu > .vb-empty { padding: var(--s-4); }
 .chat-menu-item { display: flex; align-items: stretch; gap: var(--s-2); border-radius: var(--r-md); }
@@ -884,9 +893,12 @@ body {
 .chat-del:hover:not(:disabled) { color: var(--accent-2); }
 
 .copilot-controls { display: flex; align-items: center; flex-wrap: wrap; gap: var(--s-4); padding: var(--s-4) 0.75rem; border-bottom: 1px solid var(--border); }
-.copilot-actions { margin-left: auto; display: flex; gap: var(--s-2); }
-.copilot-actions button { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); border-radius: var(--r-md); padding: var(--s-2) var(--s-4); font-size: var(--t-small); cursor: pointer; }
-.copilot-actions button:disabled { opacity: 0.5; cursor: default; }
+/* `.copilot-actions` IS GONE and so is the wrapper it named. Its button declared `Button`'s `default`
+   `sm` box value for value — the same `--panel-2` ground, `--text` ink, `--border` edge, `--r-md`
+   corner, `var(--s-2) var(--s-4)` padding, `--t-small` size and the same disabled dimming — so it is
+   that Button now. What was left of the wrapper was `margin-left: auto`, which is `.push`, beside a
+   `display: flex` and a `gap` that had one child to separate from nothing. The button sits directly in
+   `.copilot-controls`, which is already the flex row with the gap. */
 .copilot-selects { display: flex; gap: var(--s-4); padding: 0 0.75rem var(--s-4); border-bottom: 1px solid var(--border); }
 /* The row decides how its controls sit; the box is `.vb-input`'s. */
 .copilot-selects > .vb-input { flex: 1; }
@@ -1197,9 +1209,10 @@ body {
   font-family: var(--font-display); font-size: var(--t-small);
   text-transform: uppercase; letter-spacing: 0.1em;
 }
+/* A `Panel` with the `inset` variant. It is the same object as a `.tile` — a record in a column on a
+   `--panel` parent — and it sat on `--bg` while the tile sat on `--panel-2`, which nobody chose. */
 .exec-run {
   display: flex; flex-direction: column; gap: var(--s-2); align-items: flex-start;
-  background: var(--bg); border: 1px solid var(--border); border-radius: var(--r-md); padding: var(--s-4) var(--s-4);
 }
 .exec-run-top { display: flex; align-items: baseline; gap: var(--s-3); width: 100%; }
 /* The run's actions, side by side. `.exec-run` is a flex column, so without this every button is its
@@ -1352,15 +1365,12 @@ body {
    The approval prompt borrows `.halt`'s backdrop and card: it is the same kind of object — the one
    thing on screen, blocking, explaining itself — and a second look-alike would drift from it. */
 
-/* What the asking browser calls itself. Monospace and wrapping, because it is a User-Agent: long,
-   punctuation-dense, and not prose. `break-all` so a 60-character token-like string cannot widen the
-   dialog past the viewport. */
+/* What the asking browser calls itself. A `Panel` with the `inset` variant — a quoted block of machine
+   text, which is the same object `.markdown pre` is and now the same box. Monospace and wrapping,
+   because it is a User-Agent: long, punctuation-dense, and not prose. `break-all` so a 60-character
+   token-like string cannot widen the dialog past the viewport. The `margin: 0` went with the `<p>`: a
+   Panel is a `<div>` and takes no paragraph margins to cancel. */
 .signin-label {
-  margin: 0;
-  padding: var(--s-4) 0.65rem;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: var(--r-md);
   font-family: var(--font-mono);
   font-size: var(--t-small);
   word-break: break-all;

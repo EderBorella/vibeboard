@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { listProjects, openProject, type ProjectRef, scaffoldProject } from '../api';
 import { Field } from '../ui/Field';
+import { Panel } from '../ui/Panel';
 import { Readout } from '../ui/Readout';
 import { useAction } from '../useAction';
 import { slugify } from '../viewmodel';
@@ -80,10 +81,18 @@ export function ProjectGate({ onOpened }: Props) {
           <ul className="gate-list">
             {projects.map((p) => (
               <li key={p.path}>
-                <button disabled={busy !== null} onClick={() => run(() => openProject(p.path))}>
+                {/* A region of a list that takes a click, with no voice of its own — a `Panel`, not
+                    a `Button`, which is the line Phase 4 drew. `inset` because it draws its box at
+                    rest, where `flat`'s list rows light theirs on hover. */}
+                <Panel
+                  as="button"
+                  variant="inset"
+                  disabled={busy !== null}
+                  onClick={() => run(() => openProject(p.path))}
+                >
                   <span className="gate-list-name">{p.name}</span>
                   <Readout size="small">{p.path}</Readout>
-                </button>
+                </Panel>
               </li>
             ))}
           </ul>

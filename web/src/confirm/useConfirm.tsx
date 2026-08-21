@@ -1,6 +1,7 @@
 import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from '../ui/Button';
 import { Field } from '../ui/Field';
+import { Panel } from '../ui/Panel';
 
 // Ask before doing something that cannot be taken back.
 //
@@ -102,7 +103,7 @@ export function useConfirm(): Confirmer {
         if (e.target === e.currentTarget) settle(false);
       }}
     >
-      <div className="modal confirm" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
+      <Panel className="modal confirm" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
         <div className="modal-head">
           <span className="modal-title" id="confirm-title">
             {request.title}
@@ -146,7 +147,7 @@ export function useConfirm(): Confirmer {
             </Button>
           </div>
         </div>
-      </div>
+      </Panel>
     </div>
   ) : null;
 

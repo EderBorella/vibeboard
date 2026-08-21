@@ -1,5 +1,6 @@
 import { BOARD_LABELS, BOARDS, type Card } from '../shared';
 import { Field } from '../ui/Field';
+import { Panel } from '../ui/Panel';
 import { Readout } from '../ui/Readout';
 
 // The link picker: cards grouped by board, boards with nothing to offer omitted.
@@ -14,7 +15,7 @@ export function LinkPicker({
 }) {
   if (linkable.length === 0) return <div className="vb-hint">No other cards yet to link.</div>;
   return (
-    <div className="links-list">
+    <Panel variant="inset" className="links-list">
       {BOARDS.map((b) => {
         const group = linkable.filter((c) => c.board === b);
         if (group.length === 0) return null;
@@ -40,6 +41,6 @@ export function LinkPicker({
           </div>
         );
       })}
-    </div>
+    </Panel>
   );
 }

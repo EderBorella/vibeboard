@@ -35,6 +35,7 @@
 import { cleanup, render } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { Field } from '../web/src/ui/Field.js';
+import { Panel } from '../web/src/ui/Panel.js';
 import { box } from './css-box.js';
 
 afterEach(cleanup);
@@ -47,6 +48,16 @@ function at(html: string, selector: string): Element {
   host.innerHTML = html;
   const el = host.querySelector(selector);
   if (!el) throw new Error(`no ${selector} in ${html}`);
+  return el;
+}
+
+// A `Panel` AS THE PRIMITIVE RENDERS IT, for the reason test/panel-boxes.test.tsx gives: the class list
+// is never hand-written, so renaming `vb-panel-raised` moves the fixture instead of quietly testing a
+// dead class.
+function panel(className: string): Element {
+  const { container } = render(<Panel className={className} />);
+  const el = container.firstElementChild;
+  if (!el) throw new Error(`Panel rendered nothing for ${className}`);
   return el;
 }
 
@@ -174,7 +185,10 @@ describe('the survivors that differ, and what each one still says', () => {
     // are, and both of those put their boxes on `--bg`.
     expect(box(at('<div class="suggestions-pane"></div>', 'div')).background).toBeUndefined();
     expect(box(at('<div class="dock"></div>', 'div')).background).toBe('var(--panel)');
-    expect(box(at('<div class="modal"></div>', 'div')).background).toBe('var(--panel)');
+    // A `Panel` render rather than a hand-written class list: Phase 11 moved this ground into
+    // `.vb-panel-raised`, and the fixture has to ask the primitive for its own markup or it quietly
+    // tests a class that no longer draws anything. The CLAIM is unchanged.
+    expect(box(panel('modal')).background).toBe('var(--panel)');
     expect(box(at('<div class="gate-card"></div>', 'div')).background).toBe('var(--panel)');
     const el = at('<div class="suggestions-actions"><input class="vb-input"/></div>', 'input');
     expect(box(el).background).toBe(PRIMITIVE.ground);

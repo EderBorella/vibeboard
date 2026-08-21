@@ -2669,32 +2669,235 @@ flex column in `styles.css`, one line of `vitest.config.ts`, `RUN_TIME_TOKENS` a
 
 # Part Three — the two censuses Part Two left unassigned
 
-**Status: planned 2026-08-21, not started.** Part Two closed six shapes and left two reading *unassigned*
-rather than pretending a phase owned them: **panel 20** and **mono 11**. Both are listed in full by
-`npm run check:shape-coverage`.
+**Status: Phase 11 done 2026-08-21. Phase 12 not started.** Part Two closed six shapes and left two
+reading *unassigned* rather than pretending a phase owned them: **panel 20** and **mono 11**. Phase 11
+took the panel row and drove it to **10**; mono is still 11 and still Phase 12's. Both are listed in
+full by `npm run check:shape-coverage`.
 
-## Phase 11 — Panel's twenty, and the Tabs decision that changed
+## Phase 11 — Panel's twenty, and the Tabs decision re-taken on four — **DONE 2026-08-21**
 
-The twenty sort into four kinds, and only the first is a `Panel`:
+**The panel census is 10, from 20**, and the ceiling is 10 in the same commit — `node
+tools/check-shape-coverage.mjs`. Ten of the twenty are the primitive's box now, and the ten that are not
+each carry a reason of the quality this page has accepted: **not one of them is "it has its own
+padding"**, which is the thing being removed.
 
-- **A surface holding content** — `.popover`, `.modal`, `.mp-modal`, `.gate-card`, `.chat-menu`,
-  `.links-list`, `.archive-item`, `.tile`, `.exec-run`, `.msg-assistant`, `.markdown pre`. Eleven.
-- **A tab** — `.dock-tab`, `.cards-tab`, `.tab-btn`, `.control-tabs button`. **Four, not the three Phase 9
-  measured**, which is why the refusal has to be re-taken rather than cited: it was declined on *"two real
-  candidates disagreeing on both decisions a tab primitive would own"*, and four candidates is a different
-  measurement.
-- **A button or control** — `.gate-list button`, `.copilot-actions button`, `.signin-label`.
-- **`InlineField`'s two** — `.inline-view`, `.inline-edit`, ruled out of `Field` by name but still boxes.
+### `Panel` gained a third variant, and it was added by measurement
 
-`.tile` is the interesting one: it is the most repeated box on the board and it is now a labelled
-`role="group"` with a `tabIndex`, so whatever takes it must keep both.
+**`inset` is `flat` with the box DRAWN**, and that is the whole of the difference: the same `--r-md`
+corner, the same `var(--s-3) var(--s-4)` padding, the same `color: inherit; font: inherit; text-align:
+left` reset — a `--panel-2` ground and a `--border` edge where `flat` has a transparent one. Which keeps
+Panel's variant axis exactly one question wide, *is the box drawn?*, with `raised` answering it for a
+surface above the wash and `inset` for a box inside one.
 
-**Gate:** the panel census falls, with a per-survivor reason of the quality this page has accepted; the
-`Tabs` decision is re-taken against the measurement of four rather than restated from the measurement of
-two; the harness's ten surfaces stay green and `.tile`'s keyboard behaviour is asserted, not assumed.
+**TEN RULES, ONE BOX, AND EIGHT PADDINGS.** Every one declared a 1px `--border`, a `--r-md` corner, a
+ground and a padding, and between them they wrote eight values for that padding:
 
-## Phase 12 — the mono eleven, and the three things still open
+| rule | ground | padding |
+|---|---|---|
+| `.tile` | `--panel-2` | `8px 8px` |
+| `.archive-item` | `--panel-2` | `6px 8px` |
+| `.markdown pre` | `--panel-2` | `0.7rem` |
+| `.msg-assistant` | `--panel-2` | `6px 8px` |
+| `.gate-list button` | `--panel-2` | `8px 0.7rem` |
+| `.copilot-actions button` | `--panel-2` | `4px 8px` |
+| `.control-tabs button` | `--panel-2` | `0.2rem 8px` |
+| `.exec-run` | `--bg` | `8px 8px` |
+| `.links-list` | `--bg` | `8px` |
+| `.signin-label` | `--bg` | `8px 0.65rem` |
 
+Eight values for one property on one box is the 27-font-sizes pathology, and the **third** time this page
+has met it one level up — Phase 4's eight list-row paddings, Phase 5's five text-box paddings. That is the
+`SegmentedControl` argument in the same currency: not a consumer count, a multiset. The primitive takes
+`var(--s-3) var(--s-4)`, which is `.archive-item`'s own value and the one `flat` and `.vb-input` already
+landed on for the same reason.
+
+**THE GROUND WAS NOT A DISTINCTION ANYBODY CHOSE, and that is measured rather than asserted.** Six
+`--panel-2` against four `--bg` — and `.tile` and `.exec-run` are the same object, a record in a column on
+a `--panel` parent, answering differently. `--panel-2` is the mode and it is what this system already
+calls a drawn nested fill (`.vb-btn-default`'s ground, `.vb-chip-fill`'s); `--bg` is the ground of a
+control you TYPE in, which Phase 5b settled for the two select triggers on exactly this kind of
+measurement. So `.exec-run`, `.links-list` and `.signin-label` move to `--panel-2`: **three visible
+changes, made on a measurement**, the same form as `.mp-chip`'s 12px → 11px and the six selects' 12px →
+13px. Contrast held at zero on all ten surfaces on all three themes, which is the check that would have
+seen it.
+
+### The ten that migrated
+
+| class | → | call sites |
+|---|---|---|
+| `.modal` | `Panel raised` — that variant **declaration for declaration**: ground, edge, 10px corner and the head-over-scrolling-body flex column | 3 (`AutopilotHelp`, `SettingsModal`, `useConfirm`) |
+| `.mp-modal` | `Panel raised` + its accent edge as a `border-color` | 1 |
+| `.chat-menu` | `Panel raised` | 1 |
+| `.tile` | `Panel inset`, keeping `role="group"`, the label, the `tabIndex`, the `onKeyDown` and the drag | 1 (3 tiles on the harness fixture, 14 on the owner's board) |
+| `.archive-item` | `Panel inset` — the one whose padding did not move | 1 |
+| `.exec-run` | `Panel inset` | 1 |
+| `.links-list` | `Panel inset` | 1 |
+| `.signin-label` | `Panel inset`, a `<div>` rather than a `<p>` | 1 |
+| `.gate-list button` | `Panel as="button" inset` — a region of a list that takes a click, with no voice | 1 |
+| `.copilot-actions button` | `Button default sm`, and the wrapper class died with it | 1 |
+
+**`.copilot-actions button` WAS `Button` `default` `sm` VALUE FOR VALUE** — the same `--panel-2` ground,
+`--text` ink, `--border` edge, `--r-md` corner, `var(--s-2) var(--s-4)` padding, `--t-small` size and the
+same disabled dimming, written out by hand. It gains a hover it did not have. **`.copilot-actions` is the
+one class that died outright**: what was left of the wrapper was `margin-left: auto` — which is `.push` —
+beside a `display: flex` and a `gap` that had one child to separate from nothing, so the button sits
+directly in `.copilot-controls`, which is already the flex row with the gap. That death is what pays for
+`.vb-panel-inset`: the class budget is **375 and did not move** (`styles.css` 327 → 326, `primitives.css`
+61 → 62).
+
+**Nine of the ten classes survive with only what the surface can decide**, which is the result Phase 3
+measured on its 27, Phase 4 on its nine rows and Phase 8 on its nine chips: `.tile`'s **2px accent left
+edge** (2px where the primitive's is 1px, and the one thing that says which board a card is on) and its
+`cursor: pointer` (a `role="group"` is not a `<button>`, so `button.vb-panel`'s pointer does not reach
+it); `.archive-item`'s three-cell row; `.exec-run`'s and `.links-list`'s flex columns; `.mp-modal`'s
+accent edge and shadow; `.chat-menu`'s float, shadow and inset; `.modal`'s measure; `.signin-label`'s
+mono face and `break-all`; `.gate-list button`'s stack of name over path.
+
+### THE TABS DECISION, RE-TAKEN ON FOUR — and refused again, against a wider disagreement
+
+Phase 5b refused `Tabs` on **three candidates of which two were real**, because the two disagreed about
+both things a tab primitive would own. The census lists **four** tab boxes, so the measurement is
+different and the decision was taken again rather than cited. **It is refused again, and the table is
+why: four candidates give three answers to the resting box, four to the face and four to the selected
+state.** Measured by `test/panel-twenty.test.tsx`, which pins the table so that it cannot rot — a tab
+whose face or selected state changes forces the refusal to be re-read rather than inherited.
+
+| | resting box | face | selected |
+|---|---|---|---|
+| `.dock-tab` | transparent / transparent | `--font-display`, uppercase, `0.08em` | `--text` ink, `--border` edge, no glow |
+| `.tab-btn` | transparent / transparent | `--font-display`, **not** uppercase, `0.04em` | `--accent` ink, `--border` edge, **a glow** |
+| `.control-tabs button` | `--panel-2` / `--border` | **none — it inherits the app's** | `--text` ink, `--accent` edge, no glow |
+| `.cards-tab` | `--bg` / `--border` | **none — the face is on the LABEL inside it** | **no ink of its own**, `--accent` edge, a glow |
+
+**Four consumers giving four answers to both of a primitive's decisions is four variants for four
+consumers, which is a name that decides nothing** — the same test that keeps `ghost` at two, refused
+`--t-display` a second consumer and gave `SegmentedControl` its four classes on the opposite evidence.
+Going from two candidates to four made the disagreement **wider, not narrower**, which is the one outcome
+that settles this: at two it was one variant each, and at four it still is.
+
+**Two findings came out of measuring it, and both make the refusal stronger.** `.cards-tab`'s selected
+state changes **no ink at all** — the ink is `.cards-tab.active .cards-tab-label`, one level down on the
+control inside the box — so a primitive owning "selected" would also have to decide which ELEMENT the
+state colours, and the four answer that in two ways as well. And **`.cards-tab` is not a tab button**: it
+declares no padding because the two controls inside it do, which is the mirror of Phase 5b's reading of
+`.cards-tab-label` — that was the label inside a tab and this is the box around one.
+
+### The ten survivors, each with what keeps it out
+
+| survivor | which variant would have to lie, and how |
+|---|---|
+| `.dock-tab` `.tab-btn` `.control-tabs button` `.cards-tab` | **A tab**, refused on four with the table above. |
+| `.popover` `.gate-card` | **A document whose adjacent vertical margins COLLAPSE**, and `raised` is a flex column, where they do not. `.ap-agent-heading`'s `0.35rem` bottom against `.ap-agent-detail`'s `0.35rem` top is 0.35rem of gap in block flow and 0.7rem in a flex column; the gate card's `.gate-list` bottom `1rem` against its `h3` top `1.5rem` is 1.5rem against 2.5rem. Both are boxes `raised` matches exactly in ground, edge and corner — and **neither is rendered by the harness**, so a 5.6px and a 16px spacing change would have shipped unseen. See the owner's decision below. |
+| `.markdown pre` | **There is no element to put a primitive on.** The `<pre>` is emitted by the markdown renderer from a card's own text; no JSX names it, which is why the census prints `CardView.tsx:96` for the whole `.markdown` family. |
+| `.msg-assistant` | **Four corners and a tail** — `--r-lg --r-lg --r-lg --r-sm`. Panel has one corner per box, so every variant would have to lie about the tail. Phase 4's reason, re-measured and unchanged, and the class is still composed at run time from `msg-${role}`. |
+| `.inline-view` `.inline-edit` | **One control in two states, and the two share one box on purpose.** A field that looks like text until it is clicked must not move when it becomes an input, so both declare `0.1rem var(--s-3)`; the control box the system owns is `var(--s-3) var(--s-4)`, which would make the text jump 4px on click. `InlineField`'s commit-on-blur is behaviour and is ruled out of `Field` by name. |
+
+### The characterisation suite, written first, and the three things it found
+
+`test/panel-twenty.test.tsx` — **28 tests, run green against the code as it was**, before any migration,
+resolving each box out of the stylesheets with `test/css-box.tsx`. **What is deliberately NOT pinned is
+the ten paddings**, because pinning a value the phase exists to normalise would make the suite a
+description of the old code; what IS pinned is the ground, the edge and the corner. **Five of its own
+premises were wrong on the first run and three of the five are findings about the code:**
+
+- **`.mp-modal`'s accent edge was the whole `border` SHORTHAND, not a `border-color`.** The distinction is
+  load-bearing for a migration: a shorthand at equal specificity replaces the primitive's width and style
+  as well as its colour, so a Panel that ever moved off 1px would have been silently overruled on this one
+  surface. It is a `border-color` now, the form the emergency stop's danger hover established.
+- **`.conn-pop` IS NAMED AT A CALL SITE AND DEFINED BY NO RULE** — `ConnectionLight.tsx:50` passes it to
+  `Popover` and no stylesheet in the tree contains the string. This is the **mirror** of Phase 5b's
+  `.vb-label-caps`, and neither gate can see this direction: `check-class-budget.mjs` reads CSS → code.
+  Pinned as an equality (`.popover conn-pop` draws exactly what `.popover` draws) so it flips if a rule
+  appears, and left in place rather than deleted, because deleting it is not this phase's subject.
+- **`.cards-tab`'s selected ink lives on its child**, above.
+
+The other two premises were the suite's own arithmetic: the paddings are eight distinct values across ten
+rules and it guessed nine, and the token resolver answers `0.75rem` where the assertion said `12px`.
+
+**THE ASSERTIONS SURVIVED THE MIGRATION AND THE FIXTURES DID NOT**, which is what Phase 4 recorded of
+`panel-boxes` and Phase 8 of `chip-boxes`, and is honest to repeat rather than dress up: thirteen of the
+28 went red once the box moved into the primitive, for the right reason — the element genuinely carries
+two more classes. They are `Panel` renders now, so no class list is hand-written and renaming
+`vb-panel-inset` moves the fixture instead of quietly testing a dead class. **Two fixtures elsewhere
+needed the same treatment in the same commit** — `test/label-notice-boxes.test.tsx`'s *".archive-item pads
+itself"* and `test/control-boxes.test.tsx`'s *"`.modal` is `--panel`"* — and both claims are unchanged.
+
+### Gates
+
+| gate | before | after | planted defect, and what it said |
+|---|---|---|---|
+| panel census | 20/20 | **10/10** | the border/corner/ground trio put back on `.tile`, **which now sits on a `<Panel>`** → exit **1**, *"panel-shaped: 11 … against a ceiling of 10"*, naming `styles.css:463` and `board/CardTile.tsx:47`. That is the Phase 3 migration-blindness defect planted at directly, and the census sees straight through the primitive's tag |
+| `test/card-tile.test.tsx` | 21 pass | 21 pass | `tabIndex` removed → **1 of 21** red (*"expected `matches(FOCUSABLE)` to be true"*); the Enter/Space branch removed → **1** red (*"expected spy to be called 1 times, but got 0"*); the `e.target !== e.currentTarget` guard removed → **2** red, the archive-button and the tag rows; `draggable` removed → **1** red. Each restored |
+| `npm run visual`, check 6 | 0/59 | 0/59 | `tabIndex` removed **in the browser** → exit **1** on all three themes, *"3 of 3 card tiles cannot be reached from the keyboard, and are absent from the 56 elements this check protects"*, with the boards ratchet firing beside it at *"the focus walk examined 56, against 59"* |
+| `test/panel-twenty.test.tsx` | — | **27 pass, new** | `inset`'s ground moved to `--bg` → **6** red; its `border-color` dropped → **6** red; `.tab-btn` given `.dock-tab`'s uppercase `0.08em` face → the tab table red, which is what forces the refusal to be re-read |
+| class budget | 375/375 | **375/375** | a `.vb-panel-planted` added → exit **1**, *"376 class selectors, against a ceiling of 375"* |
+| `check:radius-scale` claim 1 | 41 | **31** | `border-radius: 7px` on `.vb-panel-inset` → exit **1** naming `primitives.css:173` |
+| `npm run lint` | clean/548 | clean/**549** | a duplicate `background` on `.vb-panel-inset` → exit **1**, `lint/suspicious/noDuplicateProperties` |
+| `npm run check` | ok | ok | `'inset'` removed from `PanelVariant` → `typecheck:web` exit **2**, naming all seven call sites |
+| `npm run build` | ok | ok | an unresolvable import used by `Panel.tsx` → exit **1**, *"Could not resolve ./does-not-exist"* |
+
+**The examined ratchet fired on its own before anything was re-recorded**, which is the run that read the
+drift: `npm run visual` exited **1** with **15 failures** — five surfaces × three themes — each naming its
+own count.
+
+### Drift, read before it was re-recorded
+
+**Seven numbers moved per theme and every one has the same single cause: the deleted
+`.copilot-actions` wrapper `<div>`.** Five whole-document surfaces lose one element each because the
+copilot dock is the shell and renders on all of them, and the board's type TALLY loses one `13px` — the
+wrapper itself, which carried no text but inherited `body`'s size and so was in the all-elements walk.
+
+| what | was | now |
+|---|---|---|
+| boards elements | 236 | **235** |
+| execution / diary / control / explorer elements | 146 / 148 / 168 / 127 | **145 / 147 / 167 / 126** |
+| board type tally | `13px×135 12px×64 11px×36 15px×1` | **`13px×134`**, the rest byte-identical |
+
+**Nothing else moved, and it was read surface by surface rather than assumed.** Type and radius
+conformance **0 findings on all ten surfaces on all three themes**; the drift check printed *"no change
+from the baseline"* on both value sets in every theme; the **radius tally is byte-identical** —
+`6px×240 999px×84 10px×56 50%×12 4px×4` — which is what says no corner moved despite ten boxes changing
+hands. Every finding count is where Phase 10 left it: overflow **0/125**, clipping **1/35** (the exempt
+board area), contrast **0/129**, tokens **0/41**, focus **0/59**, rows **0/25**, tiles **3 of 3
+reachable**, grid **9 rows / 42 columns / 42 heads** with only `main.boards` scrolling, dock **81px at
+rest and 342px with a raw pane, pane 287px of a 287px box**, readouts **31**. The Project Log's two
+wrapped `.vb-readout-block` rows are still **2 of 11** and still Phase 12's.
+
+**The five surfaces' finding lists had to be read past their own ratchet to be read at all**, because
+`assertExamined` runs before the per-check ratchets and aborted the test. So the assertion was bypassed in
+a copy of `surfaces.spec.ts`, the run read in full — every check zero on every surface — and the file
+restored from that copy rather than from `git checkout`, which would have reverted the phase instead of
+the plant. Verified with `git status` reporting `visual/` clean before re-recording.
+
+**The primitive-ring populations went UP by one on those same five surfaces** — boards 29 → 30, execution
+16 → 17, diary 14 → 15, control 15 → 16, explorer 15 → 16 — because the Compact button is a `.vb-btn`
+now. Still `N of N`, still **0 without a ring**, in each theme's own accent.
+
+### Exit
+
+**Panel census 20 → 10**, ceiling lowered in the same commit, with a per-survivor reason for the ten.
+`Panel` has a third variant. **Class selectors 375 → 375** (`styles.css` 327 → 326: `.copilot-actions`
+died; `primitives.css` 61 → 62: `.vb-panel-inset`), ceiling held. Authored `font-size` **115 → 114**,
+authored `border-radius` **41 → 31**, both entirely on the scale. **Mono 11/11, control 2/2,
+control-geometry / chip / dot / seg / box-less 0, button geometry 4/4 — every other ceiling unmoved.**
+Suite **244 files / 4,438 tests** (`test/panel-twenty.test.tsx` adds 27). Harness **93 tests, three
+themes, exit 0**. `npm run lint` clean over **549** files. `npm run build` exit 0.
+**`querySelector('.class')` calls in `test/`: 106, unchanged** — the new suite reaches its elements
+through `Panel` renders and a tag selector, and the two migrated fixtures were never class selectors.
+
+**FOR THE OWNER: `raised` IS A FLEX COLUMN, AND THAT IS NOW THE ONLY THING KEEPING TWO BOXES OUT.**
+`.popover` and `.gate-card` match `raised` in ground, edge and corner and are refused solely because a
+flex column stops their children's vertical margins collapsing. The choice is a `layout` axis on `raised`
+(a `block` form, two consumers, which is the bar `ghost` is held to) against leaving two correct designs
+counted as findings. It is not taken here because **neither surface is rendered by the harness**, so a
+spacing change on either is invisible to every gate this repository has.
+
+## Phase 12 — the mono eleven, and the four things still open
+
+- **`raised` is a flex column, and `.popover` and `.gate-card` are refused for that and nothing else.**
+  Phase 11's one open decision, stated at the end of its section: both match `raised` in ground, edge and
+  corner, and neither is rendered by the harness, so a spacing change on either is invisible to every
+  gate here. A `block` layout axis on `raised` has two consumers, which is the bar `ghost` is held to.
 - **Mono 11 → 0 or a reason each.** Eleven rules still declare `font-family: var(--font-mono)` outside the
   primitive. The signature's own claim is that mono means the machine measured it, so every one of these is
   either a `Readout` or a deliberate exception with its reason written down.

@@ -90,7 +90,7 @@ export function ModelPicker({ models, value, defaultModel, onChange, disabled }:
 
       {open && (
         <div className="mp-modal-backdrop" onClick={() => setOpen(false)}>
-          <div className="mp-modal" onClick={(e) => e.stopPropagation()}>
+          <Panel className="mp-modal" onClick={(e) => e.stopPropagation()}>
             <div className="mp-modal-head">
               <span className="mp-modal-title">Choose a model</span>
               <Button variant="bare" size="sm" className="push" onClick={() => setOpen(false)}>
@@ -188,7 +188,7 @@ export function ModelPicker({ models, value, defaultModel, onChange, disabled }:
                 <div className="mp-empty vb-empty">No models match the current filters.</div>
               )}
             </div>
-          </div>
+          </Panel>
         </div>
       )}
     </div>

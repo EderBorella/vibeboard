@@ -11,6 +11,21 @@ import type { ButtonHTMLAttributes, HTMLAttributes, ReactNode } from 'react';
 //              selection, a drop target. This is what a full-bleed list row is, and it is the reason
 //              those ten rows could not be `Button`s: Phase 3's census says "`default`'s panel-2 fill
 //              would draw a box round every row of every list", and that is true of all five voices.
+//   `inset`  — drawn, but NESTED: `flat`'s corner, `flat`'s padding, `flat`'s reset, with a `--panel-2`
+//              ground and a visible edge. A card on a board, an archived row, a run record, a scrolling
+//              list of options, a project in the recents list, a quoted User-Agent.
+//
+// `inset` WAS ADDED BY MEASUREMENT, the way `Button` gained `bare` and `Chip` gained `fill`. Ten rules
+// outside this file declared a 1px `--border`, a `--r-md` corner, a ground and a padding — the same box
+// under ten names — and between them they wrote EIGHT paddings for it: `8px 8px`, `6px 8px`, `0.7rem`,
+// `8px 0.7rem`, `4px 8px`, `0.2rem 8px`, `8px`, `8px 0.65rem`. Eight values for one property is the
+// 27-font-sizes pathology one level up, and it is the third time this document has met it (Phase 4's
+// eight list rows, Phase 5's five text boxes). They disagreed on the ground as well, six `--panel-2`
+// against four `--bg`, and that one is NOT a distinction anybody chose: `.tile` and `.exec-run` are both
+// a record in a column on a `--panel` parent and they answered differently. `--panel-2` is the mode and
+// it is what this system already calls a drawn nested fill — `.vb-btn-default`'s ground and
+// `.vb-chip-fill`'s. `--bg` is the ground of a control you TYPE in, which Phase 5b settled for the two
+// select triggers on the same kind of measurement.
 //
 // THE TRANSPARENT BORDER ON `flat` IS THE SAME ARGUMENT `Button`'s `bare` AND `ghost` REST ON: a box
 // that gains a border on hover must already occupy those 2px, or every row shifts under the pointer.
@@ -25,7 +40,7 @@ import type { ButtonHTMLAttributes, HTMLAttributes, ReactNode } from 'react';
 // the page that happens to take a click, it is a `Panel`. `tools/check-radius-scale.mjs` reads
 // `<Panel` alongside `<button` and `<Button` for exactly this reason: a class on a Panel is a class on
 // a box, and the primitive owns the box.
-export type PanelVariant = 'flat' | 'raised';
+export type PanelVariant = 'flat' | 'inset' | 'raised';
 
 // A CLOSED SET, and closed on purpose. `as` exists to say what this box IS in the document — a
 // region, a landmark, or a control — and an open `keyof JSX.IntrinsicElements` would make Panel a

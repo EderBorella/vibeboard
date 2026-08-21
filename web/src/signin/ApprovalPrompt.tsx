@@ -56,7 +56,9 @@ export function ApprovalPrompt({ pending, onError }: Props) {
         <p className="halt-why">
           Something at <code>{first.address}</code> is asking to use this board. It says it is:
         </p>
-        <p className="signin-label">{first.label}</p>
+        <Panel variant="inset" className="signin-label">
+          {first.label}
+        </Panel>
         <p className="halt-hint">
           Allow it only if that is you, on a device you are holding. Anything allowed here can read this
           board, start agents and edit files in your projects. What it calls itself can be faked — the address

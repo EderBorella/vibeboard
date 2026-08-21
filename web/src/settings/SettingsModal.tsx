@@ -30,6 +30,7 @@ import {
 import { SignInPanel } from '../signin/SignInPanel';
 import { Button } from '../ui/Button';
 import { Field } from '../ui/Field';
+import { Panel } from '../ui/Panel';
 import { useAction } from '../useAction';
 import { useFetched } from '../useFetched';
 import { parseCsv } from '../viewmodel';
@@ -138,7 +139,7 @@ export function SettingsModal({ config, onClose, onSaved, autopilot, onAutopilot
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
+      <Panel className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
           <span className="modal-title">Settings</span>
           <Button variant="bare" size="sm" onClick={onClose}>
@@ -283,7 +284,7 @@ export function SettingsModal({ config, onClose, onSaved, autopilot, onAutopilot
             Save
           </Button>
         </div>
-      </div>
+      </Panel>
     </div>
   );
 }

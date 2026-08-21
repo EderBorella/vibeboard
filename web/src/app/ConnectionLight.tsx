@@ -47,7 +47,6 @@ export function ConnectionLight({
       triggerTitle={title}
       triggerTestId="conn-status"
       triggerState={light}
-      className="conn-pop"
       trigger={
         <>
           <Dot size={12} className="conn" />

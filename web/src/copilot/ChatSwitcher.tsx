@@ -39,7 +39,7 @@ export function ChatSwitcher({ chats, currentChatId, backend, running, onOpen, o
         {chatMenu && (
           <>
             <div className="chat-menu-backdrop" onClick={() => setChatMenu(false)} />
-            <div className="chat-menu" role="menu">
+            <Panel className="chat-menu" role="menu">
               {chats.length === 0 && <div className="vb-empty vb-empty-small">No saved chats yet</div>}
               {chats.map((c) => (
                 <div key={c.id} className={`chat-menu-item${c.id === currentChatId ? ' active' : ''}`}>
@@ -75,7 +75,7 @@ export function ChatSwitcher({ chats, currentChatId, backend, running, onOpen, o
                   </Button>
                 </div>
               ))}
-            </div>
+            </Panel>
           </>
         )}
       </div>

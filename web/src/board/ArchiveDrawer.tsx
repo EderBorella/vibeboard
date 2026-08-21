@@ -71,7 +71,7 @@ export function ArchiveDrawer({ board, config, count, onOpen }: Props) {
   return (
     <Panel className="archive-drawer" data-testid="archive-drawer">
       {cards.map((c) => (
-        <div className="archive-item" key={c.id}>
+        <Panel variant="inset" className="archive-item" key={c.id}>
           <div className="archive-meta">
             <Readout tone="accent">{c.id}</Readout>
             <Readout>{when(c.archived)}</Readout>
@@ -103,7 +103,7 @@ export function ArchiveDrawer({ board, config, count, onOpen }: Props) {
               ))}
             </select>
           </div>
-        </div>
+        </Panel>
       ))}
     </Panel>
   );

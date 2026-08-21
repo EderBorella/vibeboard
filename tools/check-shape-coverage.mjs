@@ -18,7 +18,7 @@
 // measurement is what this page exists to stop. Phase 8 drove the chip census from 10 to ZERO, which is
 // what this instrument was built for and the first time one of these numbers has moved.
 //
-// A CENSUS RATCHETS UNTIL IT REACHES ZERO, AND THEN IT BLOCKS. Three backlogs are left — panel 20, mono
+// A CENSUS RATCHETS UNTIL IT REACHES ZERO, AND THEN IT BLOCKS. Three backlogs are left — panel 10, mono
 // 11 and control 2 — and a gate pointed at a backlog has to be bypassed on every commit, which teaches
 // everyone to ignore it, so each of those prints its FULL list on a passing run and fails only on an
 // increase. Chip, dot, segmented control, the control-geometry arm and the box-less list are AT ZERO and
@@ -112,14 +112,18 @@ const PRIMITIVES = join('web', 'src', 'ui', 'primitives.css');
 // there were eleven. `.report-chip`, `.ap-chip`, `.tag`, `.tile-setup` and the rest decide a face, an
 // ink and a ground, which is the caller's to decide; not one decides the box.
 const CHIP_CEILING = 0;
-// PANEL — 32 as Phase 7 measured it, 28 after Phase 8, 20 after Phase 9. Phase 8's four were chips;
-// PHASE 9'S EIGHT WERE CONTROLS — `.theme-select`, `.archive-column`, `.mp-prov`, `.copilot-selects
-// select`, `.copilot-input textarea`, `.control-textarea`, `.resource-row input` and `.diary-compose
-// textarea` each drew a 1px border, a corner and a ground, which is a control's box and also, by this
-// census's rule, a small panel's. Phase 8 LEFT its ceiling at 32 on the argument that lowering it for a
-// number a different phase moved takes the slack away from the phase that has to work in it; the owner
-// asked for the opposite here, so it is 20. Phase 10 still owns the row. NEVER RAISE IT.
-const PANEL_CEILING = 20;
+// PANEL — 32 as Phase 7 measured it, 28 after Phase 8, 20 after Phase 9, **10 after Phase 11**, which is
+// the phase that finally owned the row. Phase 8's four were chips; Phase 9's eight were controls; Phase
+// 11's ten split in two — three raised surfaces (`.modal`, `.mp-modal`, `.chat-menu`) that were
+// `raised`'s own trio, and seven nested boxes that became Panel's third variant, `inset`, plus
+// `.copilot-actions button`, which was `Button` `default` `sm` written out by hand.
+// THE TEN THAT REMAIN each have a reason in docs/design-system.md, Phase 11, and none of the reasons is
+// "it has its own padding": four are tabs and the refusal was re-taken against four candidates rather
+// than cited from the measurement of two; `.popover` and `.gate-card` are documents whose adjacent
+// vertical margins collapse, which `raised`'s flex column would stop; `.markdown pre` has no element to
+// put a primitive on; `.msg-assistant` has four corners and a tail; and `InlineField`'s two are one
+// control in two states that must share one padding. NEVER RAISE IT.
+const PANEL_CEILING = 10;
 // MONO — 14 as Phase 7 measured it, 11 today, and the three it lost are the same chips: `.board-archive`,
 // `.tag-chip` and `.tab-badge` borrowed the readout's face by hand and now say so with `vb-readout` on the
 // `<Chip>`. Not all eleven are readout facts: a `<pre>`, a `<code>` and three textareas are monospaced
@@ -338,7 +342,7 @@ const censuses = (onChip) => [
     fault: (rule) => chipFault(rule) ?? chipGeometryFault(rule, onChip),
     phase: 'Phase 8',
   },
-  { shape: 'panel', ceiling: PANEL_CEILING, fault: panelFault, phase: 'unassigned' },
+  { shape: 'panel', ceiling: PANEL_CEILING, fault: panelFault, phase: 'Phase 11' },
   { shape: 'mono', ceiling: MONO_CEILING, fault: monoFault, phase: 'unassigned' },
   { shape: 'dot', ceiling: DOT_CEILING, fault: dotFault, phase: 'at zero — blocking' },
   { shape: 'seg', ceiling: SEG_CEILING, fault: segFault, phase: 'at zero — blocking' },

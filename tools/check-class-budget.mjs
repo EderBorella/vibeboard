@@ -37,9 +37,11 @@
 // that never renders. That is a different claim needing a different instrument, and the harness's element
 // census is the closest thing to it.
 
-import { readdirSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { classesOf, rulesOf, shapedRules } from './lib/css.mjs';
+import { codeOf, lineOf, walk as walkFiles } from './lib/source.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const CORPUS = 'web/src';
@@ -73,11 +75,12 @@ const CLASS_TARGET = 183;
 // sweep is driving towards — 183 classes is the goal and 40 is a broken parser.
 const PARSE_FLOOR = 40;
 
-const walk = (ext) =>
-  readdirSync(join(ROOT, CORPUS), { recursive: true })
-    .filter((entry) => typeof entry === 'string' && entry.endsWith(ext))
-    .map((entry) => join(CORPUS, entry))
-    .sort();
+// The walk, the line counter and the comment blanker are `tools/lib/source.mjs`; the rule scanner and
+// the selector reader are `tools/lib/css.mjs`. One copy each — see that file's header.
+// A SMOKE ALARM, NOT A TARGET: two css files and a hundred components, floored an order of magnitude
+// below each so deleting a file never fails the run. See walk() in lib/source.mjs for why it is here.
+const FLOOR = { '.css': 2, '.ts': 10, '.tsx': 20 };
+const walk = (ext) => walkFiles(ROOT, CORPUS, ext, FLOOR[ext] ?? 1);
 
 // THE METHOD IS THE DOCUMENT'S, and it has to be: three different answers have been quoted for this
 // property, and a target expressed against a number nobody can reproduce is not a target. Strip
@@ -85,31 +88,13 @@ const walk = (ext) =>
 // count the DISTINCT names — and the union across both stylesheets, because `vb-btn` and `vb-dot` are
 // named in styles.css too.
 export function classesIn(css) {
-  const text = css.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' '));
-  const selectors = [];
-  let from = 0;
-  for (let i = 0; i < text.length; i += 1) {
-    const c = text[i];
-    if (c === '{') {
-      selectors.push(text.slice(from, i).trim());
-      from = i + 1;
-    } else if (c === '}' || c === ';') from = i + 1;
-  }
+  // `rulesOf` is the brace matcher, `shapedRules` drops the at-rule preludes and `classesOf` reads the
+  // `.name` tokens — the same three the other gates use, so a selector this file counts is a selector
+  // they see. The file name is documentary here: nothing in the returned set carries it.
   const names = new Set();
-  for (const selector of selectors) {
-    if (selector.startsWith('@')) continue;
-    for (const m of selector.matchAll(/\.(-?[_a-zA-Z][\w-]*)/g)) names.add(m[1]);
-  }
+  for (const rule of shapedRules(rulesOf('sheet.css', css)))
+    for (const cls of classesOf(rule.selector)) names.add(cls);
   return names;
-}
-
-// Comments out, so a class named only in a comment is not a reference. Blanked rather than removed so an
-// offset still maps to its line, which is the repair tools/check-type-scale.mjs needed for the same
-// reason. A `//` inside a string literal is not a comment, and a URL is the case that proves it.
-export function codeOf(source) {
-  return source
-    .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' '))
-    .replace(/(^|[^:\w])\/\/[^\n]*/g, (m, lead) => lead + ' '.repeat(m.length - lead.length));
 }
 
 // `prefix-${` inside a template literal: the left-hand half of a composed class name.
@@ -131,8 +116,6 @@ export function vocabularyOf(code) {
   for (const m of code.matchAll(/(?<![\w-])\d+(?![\w-])/g)) out.add(m[0]);
   return out;
 }
-
-const lineOf = (text, offset) => text.slice(0, offset).split('\n').length;
 
 function corpus() {
   return walk('.ts')

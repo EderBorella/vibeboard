@@ -772,7 +772,15 @@ body {
 /* Closing a tab is a small destruction, so it goes red rather than accent. */
 .cards-tab-x:hover:not(:disabled) { color: var(--danger); }
 .cards-main { flex: 1; min-height: 0; display: flex; }
-.cards-body { flex: 1; min-width: 0; overflow-y: auto; padding: 0.7rem 1rem; }
+/* A FLEX COLUMN, AND THAT IS WHAT MAKES A PANE'S `flex: 1` MEAN ANYTHING. It was a scrolling block, so
+   `.raw-pane { flex: 1 }` had no flex parent to grow in and the pane sat at its content height floored
+   by `.raw-area`'s `min-height` — 79px of a definite 342px dock body went unused, and the floor was
+   large enough to hide the collapse. Harness check 10 measures the pane against this box's own content
+   height for that reason: the dock body is definite, and every pixel of it now reaches the pane. */
+.cards-body {
+  flex: 1; min-width: 0; overflow-y: auto; padding: 0.7rem 1rem;
+  display: flex; flex-direction: column;
+}
 .cards-gone { padding: 1rem 0; }
 
 /* Card action rail. Fixed width so the card body keeps a predictable measure whichever card is up. */

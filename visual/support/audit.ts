@@ -51,8 +51,16 @@ export interface StyleAudit {
   // THE HOLE IN `overflow`, CLOSED. See `pageClipping`.
   clipping: Findings;
   contrast: Findings;
-  tokens: Findings;
+  tokens: TokenFindings;
   rows: Findings;
+}
+
+// The token check's own findings, plus what it EXCUSED and why it could. See RUN_TIME_TOKENS.
+export interface TokenFindings extends Findings {
+  // The run-time tokens this surface did not measure, because the view that supplies each one is not
+  // on it. Returned rather than swallowed: the surface that OWNS a token asserts its own name is
+  // absent from this list, which is what stops the excuse becoming a licence.
+  excused: string[];
 }
 
 export interface FocusAudit {
@@ -99,6 +107,50 @@ export const RADIUS_SCALE = ['--r-sm', '--r-md', '--r-lg', '--r-pill'] as const;
 export interface AuditOptions {
   root?: string | null;
 }
+
+// A TOKEN SUPPLIED AT RUN TIME BY THE SURFACE THAT USES IT IS NOT A FINDING, and that is the ruling
+// Phase 10 was asked to make. Phase 0 recorded `--exec-cols` as *"a gap in the harness's coverage
+// rather than a defect"* and Phase 6 closed the coverage half by rendering all ten surfaces; what was
+// left was the question itself, and the honest answer is that there is nothing here to fix. Neither
+// token can be defined in a stylesheet without becoming a lie: `--max-cols` is the number of columns
+// the widest board has and `--exec-cols` is the length of `ExecutionView`'s own `COLUMNS`, so a CSS
+// definition would be a second copy of a fact React already owns — which is exactly the class of
+// defect the `--track-fit` comment in styles.css records. Counting them as findings on the nine
+// surfaces that do not render their view was the instrument mistaking its own scope for a fault, and a
+// gate that reports a correct design gets switched off.
+//
+// SO EACH ONE IS NAMED HERE, WITH THE ELEMENT THAT SUPPLIES IT AND THE SURFACE THAT PROVES IT, and the
+// excuse is worth exactly as much as those two clauses make it:
+//   - `supplier` — the excuse applies ONLY where that element is absent. Render the view and supply
+//     nothing and the token is a finding again, so a React change that dropped the inline style is
+//     caught on the one surface that can see it.
+//   - `owner` — the surface where the supplier IS rendered asserts the token is neither excused nor a
+//     finding there. That is what stops the list rotting into an allow-list: rename the element and
+//     the owner surface stops being able to prove its own token, and fails.
+// A token that no surface supplies is unaffected: `--ink` was referenced at `.ap-remedy-btn`, defined
+// by no theme and supplied by nothing, and rendered the wrong colour for weeks. It is not on this list
+// and nothing like it can be — every entry has to name an element that really sets it.
+export interface RunTimeToken {
+  name: string;
+  supplier: string;
+  owner: string;
+  why: string;
+}
+
+export const RUN_TIME_TOKENS: RunTimeToken[] = [
+  {
+    name: '--max-cols',
+    supplier: 'main.boards',
+    owner: 'boards',
+    why: "The widest board's column count, from BoardsView.tsx: the shared grid's track count cannot disagree with the component's own column list.",
+  },
+  {
+    name: '--exec-cols',
+    supplier: 'main.execution',
+    owner: 'execution',
+    why: "The length of ExecutionView.tsx's own COLUMNS constant, for the same reason: a CSS copy of it would be a second place to change.",
+  },
+];
 
 // Type and radius counts. Every visible element, because every element computes a font size: an
 // off-scale container hands its size to any descendant that does not set one, which is how 94
@@ -484,6 +536,11 @@ function pageHeads(): { headsExamined: number; headOverflows: Offender[] } {
 export interface DockAudit {
   bodyHeight: number;
   paneHeight: number;
+  // The CONTENT height of the box the pane is actually given — its parent's `clientHeight` less that
+  // parent's own padding. The pane can never equal `bodyHeight`: the tab strip and the pane box's inset
+  // are inside the dock body too. This is what "the pane fills what it was given" is measured against,
+  // and it is measured rather than derived so a padding change cannot silently become slack.
+  paneBoxHeight: number;
   viewport: number;
   pane: string | null;
 }
@@ -491,9 +548,15 @@ export interface DockAudit {
 function pageDock(): DockAudit {
   const body = document.querySelector('[data-testid="dock-body"]');
   const pane = body?.querySelector('.raw-pane, .control-editor') ?? null;
+  const host = pane?.parentElement ?? null;
+  const inset = host ? getComputedStyle(host) : null;
   return {
     bodyHeight: body ? Math.round(body.getBoundingClientRect().height) : 0,
     paneHeight: pane ? Math.round(pane.getBoundingClientRect().height) : 0,
+    paneBoxHeight:
+      host && inset
+        ? Math.round(host.clientHeight - parseFloat(inset.paddingTop) - parseFloat(inset.paddingBottom))
+        : 0,
     viewport: window.innerHeight,
     pane: pane ? pane.className.trim().split(/\s+/)[0] : null,
   };
@@ -599,7 +662,7 @@ function pageContrast(root: string | null): Findings {
 // nothing makes the declaration invalid at computed-value time and the property falls back to what
 // it inherited, which looks like a deliberate value. So the reference is checked against the
 // definitions instead, which is the form that can actually fail.
-function pageTokens(root: string | null): Findings {
+function pageTokens({ root, runtime }: { root: string | null; runtime: RunTimeToken[] }): TokenFindings {
   function population(scope: string | null): Element[] {
     if (!scope) return Array.from(document.querySelectorAll('*'));
     const host = document.querySelector(scope);
@@ -629,6 +692,7 @@ function pageTokens(root: string | null): Findings {
   // gap in the harness's coverage; Phase 6 is where it stops being one.
   const elements = population(root);
   const offenders: Offender[] = [];
+  const excused: string[] = [];
   const atRoot = getComputedStyle(document.documentElement);
   for (const name of referenced) {
     if (atRoot.getPropertyValue(name).trim()) continue;
@@ -636,19 +700,31 @@ function pageTokens(root: string | null): Findings {
     // is the fault — `--warn` fell through to a hardcoded fallback that way before it existed.
     if (defined.has(name)) continue;
     // A token may also be supplied at RUN TIME: `--max-cols` arrives as an inline style from React,
-    // so the grid's track count cannot disagree with the component's own column list. Flagging that
-    // reported a correct design as a fault, which is how a check earns the reputation that gets it
-    // switched off. A token supplied that way by a view this harness does not visit still lands in
-    // the finding list — `--exec-cols` belongs to the Execution tab, and Phase 0 measures the board.
-    // That is a gap in the harness's coverage, and it sits in the baseline as one rather than being
-    // silently excluded.
+    // so the grid's track count cannot disagree with the component's own column list. Supplied HERE
+    // and it is no finding — that is a correct design, and flagging it is how a check earns the
+    // reputation that gets it switched off.
     if (elements.some((el) => getComputedStyle(el).getPropertyValue(name).trim())) continue;
+    // NOT SUPPLIED HERE, AND NAMED AS A RUN-TIME TOKEN WHOSE SUPPLIER IS NOT IN THIS WALK'S OWN
+    // POPULATION: excused, and listed. See RUN_TIME_TOKENS for the ruling. The `supplier` clause is what
+    // keeps it honest — if the element that supplies the token IS in the population and still supplies
+    // nothing, the excuse does not apply and the token falls through to a finding below.
+    //
+    // MEASURED AGAINST THE POPULATION AND NOT THE DOCUMENT, which is a distinction the four overlay
+    // surfaces force: the settings modal, the model picker, the confirm dialog and the open card all
+    // render with the board still behind them, so `main.boards` exists in the document while being no
+    // part of what is being measured. Asking the document reported `--max-cols` as a fault on four
+    // surfaces that neither use it nor could supply it.
+    const named = runtime.find((token) => token.name === name);
+    if (named && !elements.some((el) => el.matches(named.supplier))) {
+      excused.push(name);
+      continue;
+    }
     offenders.push({
       where: name,
       detail: 'referenced by a rule, defined by no stylesheet and set by no element',
     });
   }
-  return { examined: referenced.size, offenders };
+  return { examined: referenced.size, offenders, excused };
 }
 
 // One line where one line is meant. A row is a flex container laying children out horizontally;
@@ -800,7 +876,7 @@ export async function auditStyles(page: Page, options: AuditOptions = {}): Promi
   const text = await page.evaluate(pageOverflow, root);
   const clipping = await page.evaluate(pageClipping, root);
   const contrast = await page.evaluate(pageContrast, root);
-  const tokens = await page.evaluate(pageTokens, root);
+  const tokens = await page.evaluate(pageTokens, { root, runtime: RUN_TIME_TOKENS });
   const rows = await page.evaluate(pageRows, root);
   return { ...boxes, ...type, ...radius, ...text, clipping, contrast, tokens, rows };
 }

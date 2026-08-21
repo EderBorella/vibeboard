@@ -22,9 +22,10 @@
 //
 // It is BLOCKING and at zero, because it is a claim about a file rather than about a backlog.
 
-import { readdirSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { lineOf, walk } from './lib/source.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const CORPUS = 'web/src';
@@ -75,22 +76,14 @@ const LENGTH = /\d*\.?\d+(?:px|rem|em|pt|%)/;
 // Its replacement is `parserSelfTest` below, which asserts every pattern here against a fixture the tree
 // cannot move: it works identically at 155 declarations and at 5. Do NOT put a count floor back.
 
-const cssFiles = () =>
-  readdirSync(join(ROOT, CORPUS), { recursive: true })
-    .filter((entry) => typeof entry === 'string' && entry.endsWith('.css'))
-    .map((entry) => join(CORPUS, entry))
-    .sort();
+// The walk and the line counter are `tools/lib/source.mjs` — one copy for all five gates, because
+// `lineOf` was written out four times and every gate's `file:line` depends on it.
+const cssFiles = () => walk(ROOT, CORPUS, '.css', 2);
 
 // The tokens the stylesheet actually defines, so a name can be resolved and not merely recognised.
 const defined = () => {
   const text = readFileSync(join(ROOT, TOKENS_FILE), 'utf8');
   return new Set([...text.matchAll(/^\s*(--[\w-]+)\s*:/gm)].map((m) => m[1]));
-};
-
-const lineOf = (text, offset) => {
-  let line = 1;
-  for (let i = 0; i < offset && i < text.length; i += 1) if (text[i] === '\n') line += 1;
-  return line;
 };
 
 const FONT_SIZE = /font-size:\s*([^;}]+?)\s*(?=[;}])/g;

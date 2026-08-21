@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test';
-import { auditFocus, auditStyles, type Offender } from '../support/audit.js';
+import { auditFocus, auditStyles, type Offender, RUN_TIME_TOKENS } from '../support/audit.js';
 import {
   type Baseline,
   expect,
@@ -245,6 +245,34 @@ for (const surface of SURFACES) {
       styles.tokens.offenders,
       then?.findings.tokens,
     );
+    // EVERY RUN-TIME TOKEN IS PROVEN ON THE ONE SURFACE THAT SUPPLIES IT. `--exec-cols` is excused on
+    // the nine surfaces that do not render `main.execution`; on Execution itself it must actually
+    // resolve, or the excuse would survive the inline style being dropped and the ruling would become
+    // an allow-list. Named in RUN_TIME_TOKENS with the reason; see visual/support/audit.ts.
+    // An `owner` nobody renders proves nothing at all, so the name is checked against the surface list
+    // rather than trusted — the same reason `CHIP_EXEMPT` is keyed on a whole selector.
+    for (const token of RUN_TIME_TOKENS) {
+      expect(
+        SURFACES.map((s) => s.name),
+        `${token.name} names ${token.owner} as the surface that proves it, and there is no such surface`,
+      ).toContain(token.owner);
+    }
+    const owned = RUN_TIME_TOKENS.filter((token) => token.owner === surface.name);
+    for (const token of owned) {
+      // THE SUPPLIER IS ASSERTED PRESENT, because a `supplier` that matches nothing makes the excuse
+      // UNCONDITIONAL everywhere and no other assertion here can see it: on this surface the token
+      // resolves either way, and on the other nine it is excused either way.
+      expect(
+        await board.locator(token.supplier).count(),
+        `[${surface.name}] ${token.name}'s supplier \`${token.supplier}\` matches nothing on the ` +
+          `surface that owns it, so the excuse in RUN_TIME_TOKENS is now unconditional.`,
+      ).toBeGreaterThan(0);
+    }
+    expect(
+      styles.tokens.excused.filter((name) => owned.some((token) => token.name === name)),
+      `[${surface.name}] ${owned.map((t) => t.name).join(', ')} is supplied by this surface, so it must ` +
+        `resolve HERE rather than be excused — the element named in RUN_TIME_TOKENS is not rendering it.`,
+    ).toEqual([]);
     ratchet(surface.name, '6. focus', focus.examined, focus.offenders, then?.findings.focus);
     ratchet(surface.name, '7. rows', styles.rows.examined, styles.rows.offenders, then?.findings.rows);
 

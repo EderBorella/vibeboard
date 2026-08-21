@@ -47,9 +47,12 @@
 // It is a real subset of "no rule outside the primitive block declares geometry for a button-shaped
 // element", stated so nobody mistakes it for the whole.
 
-import { readdirSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { rulesOf, shapedRules } from './lib/css.mjs';
+import { openTagsOf } from './lib/jsx.mjs';
+import { walk as walkFiles } from './lib/source.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const CORPUS = 'web/src';
@@ -137,17 +140,13 @@ const GEOMETRY = [
   'font-size',
 ];
 
-const walk = (ext) =>
-  readdirSync(join(ROOT, CORPUS), { recursive: true })
-    .filter((entry) => typeof entry === 'string' && entry.endsWith(ext))
-    .map((entry) => join(CORPUS, entry))
-    .sort();
-
-const lineOf = (text, offset) => {
-  let line = 1;
-  for (let i = 0; i < offset && i < text.length; i += 1) if (text[i] === '\n') line += 1;
-  return line;
-};
+// `tools/lib/source.mjs` owns the walk, the line counter and the comment blanker; `lib/css.mjs` the
+// rule scanner; `lib/jsx.mjs` the opening-tag reader. One copy each, because this file's at-rule
+// double-count was a bug fixed in one of the three copies and left in the other two.
+// A SMOKE ALARM, NOT A TARGET: two css files and a hundred components, floored an order of magnitude
+// below each so deleting a file never fails the run. See walk() in lib/source.mjs for why it is here.
+const FLOOR = { '.css': 2, '.ts': 10, '.tsx': 20 };
+const walk = (ext) => walkFiles(ROOT, CORPUS, ext, FLOOR[ext] ?? 1);
 
 // The tokens the stylesheet actually defines, so a name can be RESOLVED and not merely recognised:
 // `var(--r-mdd)` matches any `--r-*` shape, resolves to nothing, and makes the declaration invalid at
@@ -157,37 +156,10 @@ const defined = new Set(
   [...readFileSync(join(ROOT, TOKENS_FILE), 'utf8').matchAll(/^\s*(--[\w-]+)\s*:/gm)].map((m) => m[1]),
 );
 
-// Every rule in a stylesheet, as `{ file, line, selector, body }`. Brace-matched rather than
-// regex-split, because `@media`/`@container`/`@supports` nest and a flat regex reads their prelude as
-// a selector.
+// One stylesheet's rules, read through the shared brace matcher in `tools/lib/css.mjs`. Split from it
+// so `radiusSelfTest` can scan a FIXTURE through exactly the same parser rather than through a second
+// copy of it.
 const rules = (file) => rulesOf(file, readFileSync(join(ROOT, file), 'utf8'));
-
-// Split from `rules` so `parserSelfTest` can scan a fixture through exactly this brace matcher rather
-// than through a second copy of it.
-function rulesOf(file, raw) {
-  // Comments blanked rather than removed, so every offset still maps to its real line.
-  const text = raw.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' '));
-  const out = [];
-  const stack = [];
-  let selStart = 0;
-  for (let i = 0; i < text.length; i += 1) {
-    const c = text[i];
-    if (c === '{') stack.push({ selector: text.slice(selStart, i).trim(), start: i + 1 });
-    else if (c === '}') {
-      const open = stack.pop();
-      if (open) {
-        out.push({
-          file,
-          line: lineOf(text, open.start),
-          selector: open.selector,
-          body: text.slice(open.start, i),
-        });
-      }
-      selStart = i + 1;
-    } else if (c === ';') selStart = Math.max(selStart, i + 1);
-  }
-  return out;
-}
 
 // ---------- claim 1: every authored radius is on the scale ----------
 // Its own function so `parserSelfTest` measures it on a fixture. Takes the rules rather than the file,
@@ -219,7 +191,7 @@ function radiiOf(ruleList) {
   /** @type {{ site: string, detail: string }[]} */
   const findings = [];
   let count = 0;
-  for (const rule of ruleList) {
+  for (const rule of shapedRules(ruleList)) {
     for (const match of rule.body.matchAll(/border-radius:\s*([^;}]+?)\s*(?=[;}])/g)) {
       count += 1;
       const site = `${rule.file}:${rule.line}`;
@@ -246,21 +218,25 @@ const RADIUS_FIXTURE = `
 .delta { border-radius: 50%; }
 .epsilon { border-radius: var(--r-nope); }
 @media (min-width: 1px) { .zeta { border-radius: 3px; } }
+@container vbboards (max-width: 1px) { .eta { border-radius: 2px; } }
 `;
 
-// SEVEN AND NOT SIX, AND THE SEVENTH IS A FINDING ABOUT THE PARSER RATHER THAN A TYPO HERE. A rule
-// nested in an at-rule is counted twice: `rulesOf` emits both the inner rule and the `@media` itself, and
-// the `@media`'s body text contains the inner rule's declaration. So `.zeta`'s `3px` is reported at line 8
-// twice. It over-reports, which is loud and harmless, and it is recorded rather than smoothed away —
-// an expectation written to look tidy is an expectation that stops matching the code.
-// It is LATENT and not live: measured on 2026-08-21, no `border-radius` in the tree sits inside an
-// `@media`, `@supports` or `@container`, so the 59 the check prints has no duplicate in it.
+// SEVEN DECLARATIONS AND EACH AT-RULE'S ONE REPORTED ONCE, which is the line Phase 10 changed. It read
+// `7 declarations` for six with `.zeta`'s `3px` printed TWICE: `rulesOf` did not reset its selector
+// cursor at a `{`, so the inner rule read as `@media (min-width: 1px) { .zeta` and the `@media`'s own
+// body — which contains every declaration nested in it — was scanned as a rule in its own right. The
+// over-report was latent (no `border-radius` in the tree sits inside an at-rule) and the SELECTOR half
+// was not harmless at all: a class whose rule sits in an `@media` was invisible to claim 2, because
+// every selector test there is anchored on `.name` and that string began with `@`.
+//
+// TWO AT-RULE KINDS, deliberately: `@media` and `@container` are both in this stylesheet, and a fix
+// keyed on the word `media` would pass a fixture that only held the first.
 const RADIUS_SELF_TEST_WANT = [
   '7 declarations',
   'fixture.css:4 border-radius: 7px — not a step on the scale',
   'fixture.css:7 border-radius: var(--r-nope) — not one of the four steps',
   'fixture.css:8 border-radius: 3px — not a step on the scale',
-  'fixture.css:8 border-radius: 3px — not a step on the scale',
+  'fixture.css:9 border-radius: 2px — not a step on the scale',
 ].join(' | ');
 
 function radiusSelfTest() {
@@ -280,20 +256,6 @@ const radiusDecls = claim1.count;
 // ---------- claim 2: geometry for a button-shaped class lives in the primitive stylesheet ----------
 // Every class that appears as a literal in a `<button>`'s own `className`. A `${...}` hole is skipped:
 // that is a composed class, which Phase 3 exists to remove and which this cannot resolve anyway.
-// The end of an element's opening tag: the first `>` outside any `{}`. A naive `indexOf('>')` stops
-// inside `onClick={() => ...}` and reads half a tag, which silently loses every className written
-// after a handler. Its own function because the brace scan is a separate concern from the census, and
-// because the complexity metric punishes nesting far more than length.
-function openTagEnd(text, from) {
-  let depth = 0;
-  for (let i = from; i < text.length; i += 1) {
-    const c = text[i];
-    if (c === '{') depth += 1;
-    else if (c === '}') depth -= 1;
-    else if (c === '>' && depth === 0) return i;
-  }
-  return -1;
-}
 
 // The literal class tokens in one opening tag's `className`. A `${...}` hole is blanked: that is a
 // composed class, which Phase 3 exists to remove and which this could not resolve anyway.
@@ -364,18 +326,6 @@ const TAGS = [
   { tag: '<Button', requires: null },
   { tag: '<Panel', requires: /\bas="button"/ },
 ];
-
-// Every opening tag of `tag` in `text`, as `{ attrs, line }`. Its own function because the two nested
-// loops it removes cost more in the complexity metric than the whole of the rest of this file — the
-// metric punishes nesting far harder than length, and flattening beat extracting the body.
-function openTagsOf(text, tag) {
-  // `\b` would let `<button` match `<Button` under a case-insensitive read, and would let `<Button`
-  // match `<ButtonRow`; the next character must not continue the name.
-  return [...text.matchAll(new RegExp(`${tag}(?![\\w-])`, 'g'))]
-    .map((open) => ({ open: open.index, end: openTagEnd(text, open.index + tag.length) }))
-    .filter(({ end }) => end >= 0)
-    .map(({ open, end }) => ({ attrs: text.slice(open, end), line: lineOf(text, open) }));
-}
 
 // Every opening tag of `tag` that also satisfies `requires`, which is how `<Panel as="button">` is
 // separated from an ordinary `<Panel>`. Its own function so `parserSelfTest` goes through exactly the

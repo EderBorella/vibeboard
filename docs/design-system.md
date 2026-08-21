@@ -1598,7 +1598,7 @@ No baseline file is involved.
 
 # Part Two — the phases the first six did not cover
 
-**Status: Phases 6, 7, 8 and 9 done 2026-08-21; Phase 10 planned, not started.** Part One built seven primitives and thirteen gates. It was
+**Status: Phases 6, 7, 8, 9 and 10 done 2026-08-21. Part Two is complete.** Part One built seven primitives and thirteen gates. It was
 reviewed phase by phase and every gate was green. It also missed a whole family of work, and the miss was
 reported by the owner looking at the board rather than by any check — which makes the cause worth stating
 before the phases: **only the button shape has a coverage gate.**
@@ -2449,23 +2449,221 @@ cases, one test selector, and in `tools/`: `CONTROL_CEILING`, `CONTROL_GEOMETRY_
 `CONTROL_BOX_CLASS`, `controlGeometryFault`, the `boxed`/`where` fields of `controlsIn`, the two control
 fixtures, `PANEL_CEILING` and `CLASS_CEILING`. No baseline file is involved.
 
-## Phase 10 — the leftovers, each already measured
+## Phase 10 — the leftovers — **DONE 2026-08-21**
 
-- **Card tiles are not keyboard reachable.** `web/src/board/CardTile.tsx:43` is a `<div>` with `onClick`, no
-  `tabIndex`, no `onKeyDown`. The board's primary control cannot be operated without a mouse, and it is
-  absent from the 55 focusables the focus gate protects.
-- **`npm test` leaks ~840 directories per run into `~/.vibeboard/copilot/`**, which holds 55,061 directories
-  and 545MB. Same class as the inode incident: it does not set `VIBEBOARD_COPILOT_HOME`, which the harness
-  does.
-- **The dock wastes 79px of a definite 342px body** — `.raw-pane`'s `flex: 1` has no flex parent. Recorded as
-  `DOCK_SHORTFALL = 79`.
-- **`--exec-cols`** is the last unresolved token, visible once Phase 6 renders the Execution tab.
-- **`Tabs` was refused** on two candidates disagreeing about face and selected state. Re-decide with
-  Execution and settings measurable.
-- **`check-radius-scale.mjs` double-counts inside at-rules** — latent, no `border-radius` sits in one today.
-- **`.archive-title`** needs `.archive-item` to stop padding itself.
+Six items, each already measured before the phase began, and **every one of them has a test that fails
+without the fix** — which is this phase's whole gate. The one that changes what a person can do is first.
 
-**Gate:** each one has a test that fails without the fix.
+### 1 — the board's primary control could not be operated without a mouse
+
+`web/src/board/CardTile.tsx` was a `<div className="tile">` with an `onClick`, no `tabIndex` and no
+`onKeyDown`. Fourteen tiles on the owner's board and three on the harness fixture could not be reached or
+opened from the keyboard, and **none of them was in the focus gate's population at all** — which is why no
+check had ever said so: check 6 is a ratchet on a COUNT, and an element that is not focusable takes its own
+row out of the count rather than appearing as a finding. That is the same structural blindness check 8 was
+written for in Phase 3.
+
+**IT IS NOT A `<button>`, AND THAT IS A RULING RATHER THAN A SHORTCUT.** A tile is a card-sized region that
+CONTAINS controls — a `Chip as="button"` per tag and a bare archive button — so the two obvious answers are
+both wrong: `<button>` may not contain a button (invalid HTML, and Chromium re-parents it), and
+`role="button"` makes its children **presentational**, which would hide those same controls from a screen
+reader to gain keyboard access to their parent. So the tile is `role="group"` with an `aria-label` naming
+the card, `tabIndex={0}` where there is something to open, and its own `onKeyDown` for Enter and Space —
+a labelled region whose interactive children stay interactive.
+
+**The `tabIndex` is conditional on `onOpen`**, because a tab stop that does nothing is worse than none: the
+archive drawer renders read-only tiles.
+
+**KEYBOARD ACTIVATION RESPECTS THE SAME BOUNDARY THE CHILDREN'S `stopPropagation` DRAWS, and it needs its
+own guard to do it.** Enter on the archive button fires that button's click, which stops propagating — but
+its **keydown still bubbles to the tile**, so a handler that acted on a bubbled key would archive the card
+and open it in one keystroke. `e.target !== e.currentTarget` is the whole fix and it is asserted in both
+directions: dropping it turns **2 of 21** tests in `test/card-tile.test.tsx` red.
+
+| planted | result |
+|---|---|
+| `tabIndex` and `onKeyDown` removed | **2 of 21** red — *"expected `matches(FOCUSABLE)` to be true"* and *"expected spy to be called 1 times, but got 0"* |
+| the `e.target !== e.currentTarget` guard removed | **2 of 21** red — the archive-button and the tag rows, the two that pass vacuously without a handler |
+| `tabIndex` removed, in the BROWSER | `npm run visual` exit **1** on all three themes: *"3 of 3 card tiles cannot be reached from the keyboard, and are absent from the 56 elements this check protects"*, and the boards surface's own ratchet fired beside it — *"the focus walk examined 56, against 59 when this was recorded"* |
+
+**Check 6 gained a claim of its own for that reason: every `.tile` on the board is in the focus population**,
+asserted against the walk's own selector string rather than a paraphrase of it. The count alone could not
+carry this, and the count is what moved: **focus examined 56 → 59 on the boards surface, one per tile.**
+The plan predicted +14; **the harness fixture renders three cards, not fourteen** — 14 is the owner's own
+board and Phase 3's `.tile` measurement, and the number here is 3 of 3.
+
+### 2 — `npm test` leaked 851 directories per run into the owner's home
+
+`vitest.config.ts` did not set `VIBEBOARD_COPILOT_HOME`, so `copilotHome()` fell back to
+`~/.vibeboard/copilot` and every temp project the suite opened left a `projects/<digest>` behind.
+`visual/playwright.config.ts` has set it since Phase 0 **and cites this very count in its own comment**;
+the suite was the half nobody had done.
+
+**Measured rather than estimated, and both halves are commands.** With the variable pointed at a scratch
+path, one full `npm test` creates **851 directories (422 project digests, 3.4MB)** —
+`find <path> -type d | wc -l`. The owner's tree holds **118,902 directories, 58,877 of them project
+digests, 799MB** on 2026-08-21, up from the 55,061 and 545MB this page recorded. **It is not deleted here:
+a cleanup that removes something a person wanted is worse than the leak**, so the path and the count are
+reported and the decision is the owner's.
+
+This is the inode incident's exact shape, one directory tree along — 440,653 leaked trees filled 9.43M of
+9.83M inodes while 61G of block space sat free, and past that ceiling one arbitrary test fails per run and
+is indistinguishable from flakiness in the code.
+
+**Fixed in one line, inside the per-RUN root the teardown already removes.** Proven three ways: a full
+`npm test` now creates **0** new directories under `~/.vibeboard/copilot` (`find` before and after, 118,902
+both times); deleting the env line turns `test/copilot-env.test.ts`'s new case red (exit **1**,
+*"VIBEBOARD_COPILOT_HOME is unset, so the copilot writes into ~/.vibeboard/copilot"*); and pointing it at a
+path outside the run root failed the same case while the 851 directories appeared there, which is the leak
+measured and the test proven in one run. The assertion goes through `opencodeConfigHome()` rather than
+reading the variable back, so a fallback that changed shape is caught as well as a line that was deleted.
+
+### 3 — the dock wasted 79px of a definite 342px body
+
+`.raw-pane`'s `flex: 1` had no flex parent: `.cards-body` was a scrolling BLOCK, so the pane sat at its own
+content height floored by `.raw-area`'s `min-height: 14rem` — 224px, large enough to hide the collapse.
+`.cards-body` is a flex column now, which is the one-line fix, and **the ratchet it replaces is gone**:
+`DOCK_SHORTFALL = 79` is deleted and check 10 asserts an EQUALITY.
+
+**It is measured against the box the pane was GIVEN, not against the dock body, and that distinction is the
+honest form of "the pane fills the body".** The tab strip and `.cards-body`'s own inset are inside the
+342px body too, so `paneHeight === bodyHeight` is unsatisfiable — asserting it would be asserting a number.
+`pageDock` now reads the pane's parent's content height in the page (`clientHeight` less that parent's
+padding), so a padding change cannot silently become slack. Measured at 1440×900: the pane is **287px of a
+287px box** in a 342px definite dock body, where it was 263px.
+
+**Check 10 fails without the fix**, on all three themes: with `.cards-body` put back to a block,
+`npm run visual` exits **1** — *"the raw pane is 263px inside the 287px box it was given, in a 342px
+definite dock body: it is leaving 24px of it unused"*. The dock's resting height moved 76px → **81px**,
+still strictly under its 342px cap, which is what that half of check 10 asserts.
+
+### 4 — RULED: a token supplied at run time by the surface that uses it is NOT a finding
+
+`--exec-cols` and `--max-cols` were the last two unresolved tokens, and the answer is that **there is
+nothing here to fix**. Neither can be defined in a stylesheet without becoming a lie: `--max-cols` is the
+column count of the widest board and `--exec-cols` is the length of `ExecutionView`'s own `COLUMNS`, so a
+CSS definition would be a second copy of a fact React already owns — which is the class of defect the
+`--track-fit` comment in `styles.css` records. Phase 0 called it *"a gap in the harness's coverage rather
+than a defect"* and Phase 6 closed the coverage half; counting them on the nine surfaces that do not render
+their view was **the instrument mistaking its own scope for a fault**, and a gate that reports a correct
+design is a gate that gets switched off.
+
+**So each one is NAMED in `RUN_TIME_TOKENS`, with the element that supplies it and the surface that proves
+it — and the excuse is worth exactly what those two clauses make it.** This is the form
+`OFF_SCALE_ON_PURPOSE` and `CHIP_EXEMPT` established, with the addition that this list cannot rot quietly:
+
+- **`supplier`** — the excuse applies only where that element is absent **from the walk's own population**.
+  Measured against the population and not the document, which the four overlay surfaces force: the board is
+  still behind the settings modal, so `main.boards` exists while being no part of what is measured. Asking
+  the document reported `--max-cols` as a fault on four surfaces that neither use it nor could supply it.
+- **`owner`** — the surface that supplies it asserts the token is not excused there, and that the supplier
+  selector **matches something**. Without the second clause a stale selector would make the excuse
+  unconditional everywhere, and nothing else could see it: on the owner surface the token resolves either
+  way, and on the other nine it is excused either way. That is the assertion the first draft was missing,
+  and a planted `main.boardsX` exited **0** until it existed.
+
+**A GENUINELY UNDEFINED TOKEN STILL FAILS, WHICH IS THE HALF THAT MATTERS**, and nothing like `--ink` can
+ever reach this list: every entry has to name an element that really sets the value.
+
+| planted | result |
+|---|---|
+| `color: var(--ink-nope)` on `.tile-title` — the `--ink` defect exactly | exit **1**, *"--ink-nope — referenced by a rule, defined by no stylesheet and set by no element"*, tokens 0 → 1 on boards, examined 41 → 42 |
+| `BoardsView` stops setting the inline style | exit **1** on the boards surface — the supplier is in the population and supplies nothing, so the excuse does not apply |
+| `supplier` changed to `main.boardsX` | exit **1**, *"the excuse in RUN_TIME_TOKENS is now unconditional. Fix the selector."* |
+
+**Unresolved tokens are therefore 0 of 41 on all ten surfaces on all three themes**, from 1 on the board and
+1–2 on the other nine, and the ceilings are re-recorded at zero in the same commit — which is this page's
+own rule for a count that reaches it.
+
+### 5 — two latent gate bugs
+
+**`tools/check-radius-scale.mjs` counted a shape inside an at-rule twice, and it was the SELECTOR half that
+mattered.** `rulesOf` did not reset its selector cursor at a `{`, so a nested rule read as
+`@media (min-width: 1px) { .zeta` — which made the at-rule's own body (it contains every declaration nested
+in it) a second rule with the same declarations, AND hid the real rule from claim 2, whose every selector
+test is anchored on `.name`. `check-shape-coverage.mjs` hit this in Phase 7 and removed the cause; this file
+recorded it as *"a latent over-report it can live with"*. One copy fixed and two left is the argument for
+item 6.
+
+Its fixture now holds **two** at-rule kinds — `@media` and `@container`, both of which are in this
+stylesheet, because a fix keyed on the word `media` would pass a fixture holding only the first — and the
+expectation went from `7 declarations` for six with `.zeta` printed twice to **7 for seven, each once**.
+Proven in both directions, each restored: with the cursor reset removed the self-test exits **1** at
+*"5 declarations"* (the two nested rules vanish entirely, because the at-rule filter then drops them with
+their prelude), and with the at-rule filter removed it exits **1** at *"9 declarations"* with both nested
+findings doubled. **The tree's own numbers do not move — 41 authored declarations, geometry ratchet 4/4 —
+because no `border-radius` in this stylesheet sits inside an at-rule**, which is what "latent" meant.
+
+**`docs/by-file.md` indexed two of the five gates.** `check-radius-scale.mjs`, `check-class-budget.mjs` and
+`check-shape-coverage.mjs` had no row, so a reader holding a red `npm run check` had nowhere to go for the
+radius ratchet, the class budget or the six shape censuses. All three are indexed now, with `tools/lib/`
+beside them. **A gate is the one class of file that cannot explain itself at the point of use** — it is met
+as an exit code by somebody who has not opened it — which is exactly the condition that page exists for.
+`test/docs-by-file-index.test.ts` asserts it **by class rather than by list**, so the sixth gate is covered
+by existing; removing the `check-shape-coverage.mjs` row exits **1** naming it.
+
+### 6 — the parser duplication, extracted, and the proof is a byte-identical diff
+
+`lineOf` existed in **four** copies, `walk` in three, and `rulesOf`, `openTagEnd`, `openTagsOf`, `codeOf`,
+`classesOf` and `shapedRules` in two or three each. `tools/lib/` holds one of each, split by concern:
+`source.mjs` (the corpus walk, the line counter, the comment blanker), `css.mjs` (the brace-matched rule
+scanner, the at-rule filter, the selector reader) and `jsx.mjs` (the opening-tag reader).
+
+**CHARACTERISED FIRST, AND THE CONTRACT IS THE OUTPUT.** All five gates' stdout was captured on the tree
+before the extraction and diffed after it: **byte-identical, all five, md5 for md5** — including
+`check-shape-coverage.mjs`'s 44-line census listing, which names 20 panel rules, 11 mono rules and their
+call sites. That is a stronger claim than any unit test of a helper could make, and it is the reason the
+extraction is safe to review at a glance.
+
+**EVERY GATE'S SELF-TEST GOES THROUGH THE SHARED CODE**, which is the mistake this repository has now made
+twice and did not make again: seven defects were planted in `tools/lib/` and each one was caught by the
+self-tests of the gates that depend on it, with every gate restored between plants.
+
+| planted in `tools/lib/` | which gates exited **1** |
+|---|---|
+| `rulesOf`'s brace matcher (`'{'` → `'('`) | radius, class-budget, shape-coverage |
+| `shapedRules` stops dropping at-rule preludes | radius, shape-coverage |
+| `classesOf`'s selector regex | class-budget, shape-coverage |
+| `codeOf`'s comment blanking removed | class-budget |
+| `lineOf` off by one | type-scale, radius, shape-coverage |
+| `openTagsOf`'s `(?![\w-])` name guard removed | radius, shape-coverage |
+| `walk` matches no file | class-budget |
+
+**Two of those rows are findings about the gates rather than about the extraction, and they are recorded
+rather than smoothed away.** A broken `codeOf` is caught only by `check-class-budget.mjs` — the
+comment-in-prose case is in its fixture and not in `check-shape-coverage.mjs`'s. And **a broken `walk` is
+caught only by `check-class-budget.mjs`'s `PARSE_FLOOR`**: the other four have no count floor, deliberately
+(every count they measure shrinks as the sweep succeeds, and a floor on one fails the run for succeeding),
+so a walk that matched nothing would report zero findings and exit 0 on three of them. That exposure is
+unchanged by this phase — each gate had its own identical `walk` before — but it is one copy now, and one
+place to fix if the owner wants a fixture-based guard on it.
+
+### Exit
+
+**Every ceiling is where it was and none rose.** Class budget **375/375**, geometry ratchet **4/4**, panel
+**20/20**, mono **11/11**, control **2/2**, control-geometry / chip / dot / seg / box-less **0**, authored
+`font-size` **115**, authored `border-radius` **41**. `npm run lint` clean over **548** files (544 + three
+`tools/lib/` modules and one test). Suite **243 files / 4,411 tests** (242 / 4,402 + 7 keyboard cases, the
+copilot-home case and the docs-index case). Harness **93 tests, three themes, exit 0**. `npm run build`
+exit 0. **`querySelector('.class')` calls in `test/`: 106, unchanged** — the new tests select by role,
+title and accessible name, not by class.
+
+**Three baseline numbers moved and each was read before it was re-recorded:** `focus` examined **56 → 59**
+(three tiles), `tokens` findings **1 → 0** on the board and **1–2 → 0** on the other nine, and the board's
+type TALLY **`13px×133 → ×135`, `12px×66 → ×64`** — which is **not this phase's**: it is Phase 9's two
+selects moving from `--t-small` to `--t-body`, which that phase read and deliberately did not record because
+drift compares the value SET. The set did not move in either phase. No other recorded number changed.
+
+**Two items from this phase's own list were NOT in its scope and are untouched:** re-deciding `Tabs` with
+Execution and settings measurable, and `.archive-title` needing `.archive-item` to stop padding itself.
+Both remain as Phase 5b left them, with their measurements.
+
+**Revert:** `web/src/board/CardTile.tsx` (the role, label, `tabIndex` and `onKeyDown`), the `.cards-body`
+flex column in `styles.css`, one line of `vitest.config.ts`, `RUN_TIME_TOKENS` and `paneBoxHeight` in
+`visual/support/audit.ts`, checks 5, 6 and 10 in `visual/checks/board.spec.ts`, the token block in
+`surfaces.spec.ts`, three baseline files, the at-rule reset and fixture in `tools/check-radius-scale.mjs`,
+`tools/lib/` with the five gates' imports, five rows of `docs/by-file.md`, and
+`test/{card-tile,copilot-env,docs-by-file-index}`.
 
 ---
 

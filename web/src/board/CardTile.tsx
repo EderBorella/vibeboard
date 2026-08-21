@@ -43,6 +43,19 @@ export function CardTile({
   return (
     <div
       className="tile"
+      // A REGION IN THE TAB ORDER, NOT A `<button>`, and the markup is a ruling rather than a
+      // shortcut. A tile is a card-sized region that CONTAINS controls — a `Chip as="button"` per
+      // tag and a bare archive button — and `<button>` may not contain a button, while
+      // `role="button"` makes its children presentational, which would hide those same controls
+      // from a screen reader. `role="group"` is what the tile actually is: a labelled region whose
+      // interactive children stay interactive, and `tabIndex` is what puts it where a keyboard can
+      // reach it. Before this, the board's primary control could not be operated without a mouse and
+      // fourteen tiles were absent from the focus gate's population.
+      role="group"
+      aria-label={`Card ${card.id}: ${card.title}`}
+      // Only where there is something to open. A tab stop that does nothing is worse than none, and
+      // the archive drawer's read-only tiles pass no `onOpen`.
+      tabIndex={onOpen ? 0 : undefined}
       draggable={!!onDragStart}
       onDragStart={(e) => {
         // setData is required for the browser to actually start a native drag (Firefox
@@ -52,6 +65,17 @@ export function CardTile({
         onDragStart?.(card);
       }}
       onClick={() => onOpen?.(card)}
+      onKeyDown={(e) => {
+        // THE SAME BOUNDARY THE CHILDREN'S `stopPropagation` DRAWS, on the keyboard side. Enter on
+        // the archive button fires that button's click — which stops propagating — but its keydown
+        // still bubbles here, so acting on a bubbled key would open the card as well as archive it.
+        // Only the tile's own keystrokes count.
+        if (e.target !== e.currentTarget) return;
+        if (e.key !== 'Enter' && e.key !== ' ') return;
+        // Space scrolls the column otherwise, which moves the board under the card being opened.
+        e.preventDefault();
+        onOpen?.(card);
+      }}
     >
       <div className="tile-head">
         <Readout tone="accent">{card.id}</Readout>

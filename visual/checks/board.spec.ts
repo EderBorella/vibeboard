@@ -6,6 +6,7 @@ import {
   auditStyles,
   documentOverflow,
   type Offender,
+  RUN_TIME_TOKENS,
 } from '../support/audit.js';
 import { type Baseline, expect, readBaseline, recording, test, writeBaseline } from '../support/fixtures.js';
 
@@ -68,11 +69,6 @@ const SCROLL_REGION = 'main.boards';
 // than a silent change of look — and it has already been lowered by accident once, to 144px, which put
 // the column head's `+` button outside the column's border in the gutter. See `headOverflows`.
 const TRACK_FLOOR = 180;
-
-// WHAT THE RAW PANE LEAVES UNUSED INSIDE THE DEFINITE DOCK BODY, at 1440×900: 79px of 342px. A
-// RATCHET and not zero, because it is a fault this check FOUND rather than one Phase 4 introduced —
-// see check 10 for the cause. Drive it down; never raise it.
-const DOCK_SHORTFALL = 79;
 
 // The three widths the board's shared grid is designed around, and the ones the dock's `38vh` is
 // measured against.
@@ -334,6 +330,29 @@ test('5. no unresolved token', async ({ board, theme }) => {
   const styles = await auditStyles(board);
   expect(styles.tokens.examined).toBeGreaterThan(FLOOR.tokens);
   report(theme, 'tokens', styles.tokens.examined, styles.tokens.offenders);
+  // THE BOARD PROVES ITS OWN RUN-TIME TOKEN, which is what keeps RUN_TIME_TOKENS from being an
+  // allow-list. `--max-cols` is supplied by `main.boards`, and this is the one surface where that
+  // element is rendered — so here the excuse must NOT apply: the token has to really resolve. Rename
+  // the element or drop the inline style and this line fails rather than the token quietly becoming
+  // excusable everywhere. See RUN_TIME_TOKENS in visual/support/audit.ts.
+  const owned = RUN_TIME_TOKENS.filter((token) => token.owner === 'boards');
+  expect(owned.length, 'RUN_TIME_TOKENS names no token this surface owns — has `owner` moved?').toBe(1);
+  for (const token of owned) {
+    // THE SUPPLIER IS ASSERTED PRESENT, and this is the half that stops the ruling decaying into a
+    // plain allow-list. A `supplier` selector that matches nothing makes the excuse UNCONDITIONAL on
+    // every surface — the token would be waved through wherever it appeared — and nothing else here
+    // can see that, because on this surface the token resolves either way.
+    expect(
+      await board.locator(token.supplier).count(),
+      `${token.name}'s supplier \`${token.supplier}\` matches nothing on the surface that owns it, so ` +
+        `the excuse in RUN_TIME_TOKENS is now unconditional. Fix the selector.`,
+    ).toBeGreaterThan(0);
+  }
+  expect(
+    styles.tokens.excused.filter((name) => owned.some((token) => token.name === name)),
+    `${owned.map((t) => t.name).join(', ')} is supplied by this surface, so it must resolve HERE rather ` +
+      `than be excused. The element named in RUN_TIME_TOKENS is not rendering it.`,
+  ).toEqual([]);
   const baseline = await readBaseline(theme);
   expect(
     styles.tokens.offenders.length,
@@ -349,6 +368,29 @@ test('6. focus is visible', async ({ board, theme }) => {
   const focus = await auditFocus(board);
   expect(focus.examined).toBeGreaterThan(FLOOR.focus);
   report(theme, 'focus', focus.examined, focus.offenders);
+
+  // EVERY CARD TILE IS IN THAT POPULATION, which is Phase 10's claim and needs saying separately: the
+  // count above is a RATCHET, and until this phase the board's primary control was not in it at all —
+  // `.tile` was a `<div>` with an `onClick`, no `tabIndex` and no `onKeyDown`, so no card could be
+  // reached or opened without a mouse and every tile was invisible to this check. A ratchet cannot see
+  // that: an element absent from the population takes its own row out of the count.
+  //
+  // The selector is the walk's own, read out of the same place (`pageFocus` in audit.ts). A tile made
+  // focusable by some other means would still be absent from what this gate protects.
+  const tiles = await board.evaluate(() => {
+    const SELECTOR =
+      'button, a[href], input, select, textarea, [tabindex]:not([tabindex="-1"]), [role="button"]';
+    const all = Array.from(document.querySelectorAll('.tile'));
+    return { total: all.length, focusable: all.filter((el) => el.matches(SELECTOR)).length };
+  });
+  expect(tiles.total, 'no .tile on the board — has the fixture stopped rendering cards?').toBeGreaterThan(0);
+  expect(
+    tiles.focusable,
+    `${tiles.total - tiles.focusable} of ${tiles.total} card tiles cannot be reached from the keyboard, ` +
+      `and are absent from the ${focus.examined} elements this check protects`,
+  ).toBe(tiles.total);
+  console.log(`[${theme}] tiles: ${tiles.focusable} of ${tiles.total} reachable from the keyboard`);
+
   const baseline = await readBaseline(theme);
   expect(
     focus.offenders.length,
@@ -609,33 +651,34 @@ test('10. the dock is content-sized until a pane asks to be filled', async ({ bo
     `the dock body is ${filled.bodyHeight}px with a raw pane open, and 38vh of ${filled.viewport}px is ` +
       `${cap}px. A pane that asks to be filled needs a parent with a DEFINITE height to fill.`,
   ).toBe(cap);
-  // AND WHAT THE PANE DOES WITH IT, WHICH IS A RATCHET AND NOT ZERO — because the first run of this
-  // check found that it does not take all of it, and that is a pre-existing fault rather than
-  // something Phase 4 moved.
+  // AND THE PANE TAKES ALL OF IT, EXACTLY, which is Phase 10's half of this check. It used to be a
+  // RATCHET at 79px, because the first run of this check found the pane leaving that much of a definite
+  // box unused: `.raw-pane`'s `flex: 1` had no flex parent — `.cards-body` was a scrolling BLOCK — so
+  // the pane sat at its content height, floored by `.raw-area`'s `min-height: 14rem` (224px), which was
+  // large enough to hide the collapse. `.cards-body` is a flex column now and the shortfall is gone, so
+  // the ratchet and its constant are gone with it: an exact equality is available and a ratchet at a
+  // number nobody has to live with is slack.
   //
-  // Measured at 1440×900: the dock body is 342px and the raw pane is 263px, so 79px of a definite box
-  // goes unused. The cause is the same one the `height: 38vh` comment in styles.css describes, one
-  // level further down: `.raw-pane`'s `flex: 1` needs a FLEX parent, and its parent is `.cards-body`,
-  // which is a scrolling block. So the pane sits at its own content height, floored by
-  // `.raw-pane .raw-area`'s `min-height: 14rem` — 224px, which is large enough to hide the collapse.
-  // Phase 4's gate is that the dock BODY's height is definite, and it is, exactly. Fixing the chain
-  // below it is a change to the dock's internals that this phase has no business making, so the number
-  // is recorded and any increase blocks.
-  const shortfall = filled.bodyHeight - filled.paneHeight;
+  // MEASURED AGAINST THE BOX THE PANE WAS GIVEN, not against the dock body: the tab strip and
+  // `.cards-body`'s own inset are inside the body too, so `paneHeight === bodyHeight` is unsatisfiable
+  // and asserting it would be asserting a number rather than the behaviour. `paneBoxHeight` is that
+  // parent's content height, read in the page — see `pageDock` in visual/support/audit.ts.
   expect(filled.paneHeight, 'the raw pane rendered nothing').toBeGreaterThan(0);
+  expect(filled.paneBoxHeight, 'the pane has no measurable box to fill').toBeGreaterThan(0);
   expect(
     filled.paneHeight,
-    `the raw pane is ${filled.paneHeight}px, taller than the ${filled.bodyHeight}px box it sits in`,
+    `the raw pane is ${filled.paneHeight}px, taller than the ${filled.bodyHeight}px dock body it sits in`,
   ).toBeLessThanOrEqual(filled.bodyHeight);
   expect(
-    shortfall,
-    `the raw pane leaves ${shortfall}px of a ${filled.bodyHeight}px definite dock body unused, against ` +
-      `${DOCK_SHORTFALL}px when this was measured. Its \`flex: 1\` has no flex parent — .cards-body is a ` +
-      `scrolling block — so it sits at its content height. Do not raise this number.`,
-  ).toBeLessThanOrEqual(DOCK_SHORTFALL);
+    filled.paneHeight,
+    `the raw pane is ${filled.paneHeight}px inside the ${filled.paneBoxHeight}px box it was given, in a ` +
+      `${filled.bodyHeight}px definite dock body: it is leaving ` +
+      `${filled.paneBoxHeight - filled.paneHeight}px of it unused. A pane with \`flex: 1\` needs a FLEX ` +
+      `parent — .cards-body is one, and it must stay one.`,
+  ).toBe(filled.paneBoxHeight);
   console.log(
     `[${theme}] dock: ${resting.bodyHeight}px at rest, ${filled.bodyHeight}px with ${filled.pane} ` +
-      `(38vh of ${filled.viewport} = ${cap}), pane ${filled.paneHeight}px`,
+      `(38vh of ${filled.viewport} = ${cap}), pane ${filled.paneHeight}px of a ${filled.paneBoxHeight}px box`,
   );
 });
 

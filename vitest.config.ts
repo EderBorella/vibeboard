@@ -78,6 +78,18 @@ export default defineConfig({
       // is an http URL and `fileURLToPath` throws — which failed the collection of every .tsx suite.
       VIBEBOARD_DOCKER_BIN: fileURLToPath(new URL('./test/fake-docker.mjs', import.meta.url)),
       VIBEBOARD_STATE_FILE: join(mkdtempSync(join(RUN_TMP, 'state-')), 'state.json'),
+      // THE COPILOT'S CLEAN CONFIG HOME, INSIDE THE RUN ROOT — and this is the same leak as the one
+      // above, found in the same place and left running for as long. `copilotHome()` in
+      // src/server/boxes/copilot-env.ts falls back to `~/.vibeboard/copilot`, and it is created PER
+      // PROJECT (`projects/<digest>`), so every temp project the suite opens left a directory behind
+      // in the owner's real home: measured on 2026-08-21 at 118,902 directories and 799MB, growing by
+      // roughly 840 per `npm test`. That is precisely the shape of the inode incident recorded above —
+      // block space stays free while the inode table fills, and past the ceiling one arbitrary test
+      // fails per run and looks exactly like flakiness in the code.
+      //
+      // visual/playwright.config.ts has set this since Phase 0, for this reason and citing this count.
+      // The suite is the half that was missed.
+      VIBEBOARD_COPILOT_HOME: join(RUN_TMP, 'copilot'),
       // The server's logger is on by default (src/server/logging.ts). Silence it for the suite —
       // every file that builds an app, directly or through openTestProject, would otherwise bury
       // the test output in request lines. test/logging.test.ts passes its own logger instead.

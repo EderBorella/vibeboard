@@ -23,7 +23,7 @@
         "contrast": 129,
         "tokens": 41,
         "rows": 25,
-        "focus": 56
+        "focus": 59
       },
       "findings": {
         "type": 0,
@@ -31,7 +31,7 @@
         "overflow": 0,
         "clipping": 1,
         "contrast": 0,
-        "tokens": 1,
+        "tokens": 0,
         "rows": 0,
         "focus": 0
       }
@@ -65,7 +65,7 @@
         "overflow": 0,
         "clipping": 0,
         "contrast": 0,
-        "tokens": 1,
+        "tokens": 0,
         "rows": 0,
         "focus": 0
       }
@@ -98,7 +98,7 @@
         "overflow": 0,
         "clipping": 0,
         "contrast": 0,
-        "tokens": 2,
+        "tokens": 0,
         "rows": 2,
         "focus": 0
       }
@@ -132,7 +132,7 @@
         "overflow": 0,
         "clipping": 0,
         "contrast": 0,
-        "tokens": 2,
+        "tokens": 0,
         "rows": 0,
         "focus": 0
       }
@@ -165,7 +165,7 @@
         "overflow": 0,
         "clipping": 0,
         "contrast": 0,
-        "tokens": 2,
+        "tokens": 0,
         "rows": 0,
         "focus": 0
       }
@@ -197,7 +197,7 @@
         "overflow": 0,
         "clipping": 0,
         "contrast": 0,
-        "tokens": 2,
+        "tokens": 0,
         "rows": 0,
         "focus": 0
       }
@@ -228,7 +228,7 @@
         "overflow": 0,
         "clipping": 0,
         "contrast": 0,
-        "tokens": 1,
+        "tokens": 0,
         "rows": 0,
         "focus": 0
       }
@@ -258,7 +258,7 @@
         "overflow": 0,
         "clipping": 0,
         "contrast": 0,
-        "tokens": 2,
+        "tokens": 0,
         "rows": 0,
         "focus": 0
       }
@@ -290,7 +290,7 @@
         "overflow": 0,
         "clipping": 0,
         "contrast": 0,
-        "tokens": 2,
+        "tokens": 0,
         "rows": 0,
         "focus": 0
       }
@@ -320,16 +320,16 @@
         "overflow": 0,
         "clipping": 0,
         "contrast": 0,
-        "tokens": 2,
+        "tokens": 0,
         "rows": 0,
         "focus": 0
       }
     }
   },
   "fontSizes": {
-    "13px": 133,
+    "13px": 135,
     "15px": 1,
-    "12px": 66,
+    "12px": 64,
     "11px": 36
   },
   "fontSizesOnText": {
@@ -353,14 +353,14 @@
     "contrast": 129,
     "tokens": 41,
     "rows": 25,
-    "focus": 56,
+    "focus": 59,
     "focusUnfocusable": 1
   },
   "findings": {
     "overflow": 0,
     "clipping": 1,
     "contrast": 0,
-    "tokens": 1,
+    "tokens": 0,
     "rows": 0,
     "focus": 0
   }

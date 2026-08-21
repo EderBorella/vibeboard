@@ -85,9 +85,12 @@
 // green phases. Both read ZERO today and both block an increase, so they are cheap insurance rather than
 // a backlog: every one of the seven rows in the table in docs/design-system.md now has a gate.
 
-import { readdirSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { classesOf, rulesOf, shapedRules } from './lib/css.mjs';
+import { openTagEnd, openTagsOf as tagsIn } from './lib/jsx.mjs';
+import { codeOf, lineOf, walk as walkFiles } from './lib/source.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const CORPUS = 'web/src';
@@ -207,51 +210,14 @@ const ADOPTION = [
   { shape: 'boxless-chip', tags: [CHIP_TAG] },
 ];
 
-const walk = (ext) =>
-  readdirSync(join(ROOT, CORPUS), { recursive: true })
-    .filter((entry) => typeof entry === 'string' && entry.endsWith(ext))
-    .map((entry) => join(CORPUS, entry))
-    .sort();
-
-const lineOf = (text, offset) => {
-  let line = 1;
-  for (let i = 0; i < offset && i < text.length; i += 1) if (text[i] === '\n') line += 1;
-  return line;
-};
-
-// Every rule in a stylesheet as `{ file, line, selector, body }`, brace-matched rather than regex-split
-// because `@media`/`@supports`/`@container` nest and a flat regex reads their prelude as a selector.
-// Comments are BLANKED and not removed, so every offset still maps to its real line — the repair
-// `check-type-scale.mjs` needed after it read a comment's prose as a declaration.
-function rulesOf(file, raw) {
-  const text = raw.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' '));
-  const out = [];
-  const stack = [];
-  let selStart = 0;
-  for (let i = 0; i < text.length; i += 1) {
-    const c = text[i];
-    if (c === '{') {
-      stack.push({ selector: text.slice(selStart, i).trim(), start: i + 1 });
-      // Reset here as well as at `}` and `;`, so a rule NESTED in an at-rule carries its own selector
-      // rather than the at-rule's prelude glued to the front of it. `check-radius-scale.mjs` does not,
-      // and it does not have to: it drops anything starting with `@`, which drops the nested rule too.
-      // This file counts shapes, and a shape inside a `@media` is a shape.
-      selStart = i + 1;
-    } else if (c === '}') {
-      const open = stack.pop();
-      if (open) {
-        out.push({
-          file,
-          line: lineOf(text, open.start),
-          selector: open.selector,
-          body: text.slice(open.start, i),
-        });
-      }
-      selStart = i + 1;
-    } else if (c === ';') selStart = Math.max(selStart, i + 1);
-  }
-  return out;
-}
+// `tools/lib/` owns the parsers: `source.mjs` the walk, the line counter and the comment blanker,
+// `css.mjs` the rule scanner (including the selector-cursor reset this file's Phase 7 self-test
+// forced), `jsx.mjs` the opening-tag reader. One copy each — three copies is how that reset came to
+// exist here and not in `check-radius-scale.mjs`.
+// A SMOKE ALARM, NOT A TARGET: two css files and a hundred components, floored an order of magnitude
+// below each so deleting a file never fails the run. See walk() in lib/source.mjs for why it is here.
+const FLOOR = { '.css': 2, '.ts': 10, '.tsx': 20 };
+const walk = (ext) => walkFiles(ROOT, CORPUS, ext, FLOOR[ext] ?? 1);
 
 // One declaration's value, or null. Anchored on a boundary so `border` does not match `border-radius`
 // and `background` does not match `background-clip`.
@@ -267,22 +233,6 @@ const GROUND = ['background', 'background-color'];
 // `check-radius-scale.mjs` refuses a button: the box is the primitive's, the layout is the caller's.
 const CHIP_GEOMETRY = ['border-radius', ...PADDING, 'font-size'];
 
-const classesOf = (selector) => [...selector.matchAll(/\.(-?[_a-zA-Z][\w-]*)/g)].map((m) => m[1]);
-
-// The end of an element's opening tag: the first `>` outside any `{}`. A naive `indexOf('>')` stops
-// inside `onClick={() => …}` and reads half a tag, silently losing every className written after a
-// handler. Lifted from `check-radius-scale.mjs`, where it was forced by exactly that.
-function openTagEnd(text, from) {
-  let depth = 0;
-  for (let i = from; i < text.length; i += 1) {
-    const c = text[i];
-    if (c === '{') depth += 1;
-    else if (c === '}') depth -= 1;
-    else if (c === '>' && depth === 0) return i;
-  }
-  return -1;
-}
-
 // The class tokens in one opening tag's `className`, through the SAME reader the call-site lookup uses —
 // one attribute reader and not two, so a class reaching a `<Chip>` through a ternary is not visible to the
 // locator and invisible to the census.
@@ -290,26 +240,24 @@ function classesInTag(attrs) {
   return [...attrs.matchAll(/className=/g)].flatMap((m) => classNameTokens(attrs, m.index));
 }
 
-// Every class literal on a `<tag …>`, whatever else that tag says. `(?![\w-])` so `<Chip` does not match
-// `<ChipRow`, the guard `check-radius-scale.mjs` needed for `<Button` against `<ButtonRow`.
+// Every `<tag …>` across the corpus, with its site, its attribute text and its class literals. The tag
+// scan itself — including the `(?![\w-])` that stops `<Chip` matching `<ChipRow` — is `openTagsOf` in
+// tools/lib/jsx.mjs.
 // ONE READER FOR BOTH THINGS THAT ASK ABOUT A `<Chip>`: arm 2 wants the class set, and the box-less
 // check below wants the attribute text as well. Two readers would be two things to break, and the one
 // that broke would be the one nobody planted at.
-function openTagsOf(sources, tag) {
-  const out = [];
-  for (const { file, code } of sources) {
-    for (const open of code.matchAll(new RegExp(`${tag}(?![\\w-])`, 'g'))) {
-      const end = openTagEnd(code, open.index + tag.length);
-      if (end < 0) continue;
-      const attrs = code.slice(open.index, end);
-      out.push({ site: `${file}:${lineOf(code, open.index)}`, attrs, classes: classesInTag(attrs) });
-    }
-  }
-  return out;
+function tagsAcross(sources, tag) {
+  return sources.flatMap(({ file, code }) =>
+    tagsIn(code, tag).map(({ attrs, line }) => ({
+      site: `${file}:${line}`,
+      attrs,
+      classes: classesInTag(attrs),
+    })),
+  );
 }
 
 function tagClasses(sources, tag) {
-  return new Set(openTagsOf(sources, tag).flatMap((open) => open.classes));
+  return new Set(tagsAcross(sources, tag).flatMap((open) => open.classes));
 }
 
 // ---------- the three CSS shapes, one predicate each ----------
@@ -390,16 +338,11 @@ const censuses = (onChip) => [
     fault: (rule) => chipFault(rule) ?? chipGeometryFault(rule, onChip),
     phase: 'Phase 8',
   },
-  { shape: 'panel', ceiling: PANEL_CEILING, fault: panelFault, phase: 'Phase 10' },
-  { shape: 'mono', ceiling: MONO_CEILING, fault: monoFault, phase: 'Phase 10' },
+  { shape: 'panel', ceiling: PANEL_CEILING, fault: panelFault, phase: 'unassigned' },
+  { shape: 'mono', ceiling: MONO_CEILING, fault: monoFault, phase: 'unassigned' },
   { shape: 'dot', ceiling: DOT_CEILING, fault: dotFault, phase: 'at zero — blocking' },
   { shape: 'seg', ceiling: SEG_CEILING, fault: segFault, phase: 'at zero — blocking' },
 ];
-
-// An at-rule's own body text contains every rule nested inside it, so counting it as well as its
-// children reports the same shape twice. Dropping the prelude — which is what `startsWith('@')` selects,
-// now that a nested rule keeps its own selector — counts each shape exactly once, wherever it sits.
-const shapedRules = (ruleList) => ruleList.filter((rule) => !rule.selector.startsWith('@'));
 
 function censusOf(ruleList, fault) {
   const findings = [];
@@ -661,7 +604,7 @@ const BOXLESS_SELF_TEST_WANT = [
 
 function boxlessSelfTest() {
   const sources = [{ file: 'fixture.tsx', code: codeOf(BOXLESS_FIXTURE) }];
-  const got = boxlessFaults(BOXLESS_NAMES, openTagsOf(sources, CHIP_TAG), classSites(sources)).join(' | ');
+  const got = boxlessFaults(BOXLESS_NAMES, tagsAcross(sources, CHIP_TAG), classSites(sources)).join(' | ');
   return got === BOXLESS_SELF_TEST_WANT
     ? null
     : `box-less chips: expected\n  ${BOXLESS_SELF_TEST_WANT}\ngot\n  ${got}`;
@@ -696,14 +639,10 @@ function controlSelfTest() {
 //
 // SCOPED TO `className` AND NOT A BARE TOKEN GREP, and the first version was the bare grep. It reported
 // `.markdown code` as used at `cards/CardView.tsx:1`, which is the `markdown` MODULE in an import
-// statement — a search that matched something other than what it claimed. A `${…}` hole is blanked for the
-// reason `check-radius-scale.mjs` blanks it: a composed name cannot be resolved here, and
-// `check-class-budget.mjs` is the check that resolves composition.
-function codeOf(source) {
-  return source
-    .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' '))
-    .replace(/(^|[^:\w])\/\/[^\n]*/g, (m, lead) => lead + ' '.repeat(m.length - lead.length));
-}
+// statement — a search that matched something other than what it claimed. A `${…}` hole is blanked for
+// the reason `check-radius-scale.mjs` blanks it: a composed name cannot be resolved here, and
+// `check-class-budget.mjs` is the check that resolves composition. The comment blanking itself is
+// `codeOf` in tools/lib/source.mjs.
 
 // The class tokens named anywhere in one `className=`'s value, whatever shape the expression is. A plain
 // string, a template literal, and a TERNARY — `.popover`'s own call site is
@@ -820,7 +759,7 @@ const sites = classSites(sources);
 // `.mp-modal > .vb-readout { padding }`, a rule about a READOUT in the model picker, was reported as
 // geometry on a chip. Arm 2 asks whether a SURFACE class decides a chip's box; `vb-*` names are the
 // primitives' own and their rules live in primitives.css, which this census does not read.
-const chipTagList = openTagsOf(sources, CHIP_TAG);
+const chipTagList = tagsAcross(sources, CHIP_TAG);
 const onChip = new Set([...tagClasses(sources, CHIP_TAG)].filter((cls) => !primitiveClasses.has(cls)));
 // Where a class is NAMED AT ALL — a `className` first, a stylesheet rule if nothing renders it. The
 // box-less check needs both directions: a class rendered as a `<span>` is visible in the JSX, and a class

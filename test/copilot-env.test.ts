@@ -12,6 +12,7 @@ import {
   utimesSync,
   writeFileSync,
 } from 'node:fs';
+import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
@@ -53,6 +54,32 @@ describe('isolationEnabled', () => {
     expect(isolationEnabled()).toBe(false);
     process.env.VIBEBOARD_COPILOT_ISOLATE = '1';
     expect(isolationEnabled()).toBe(true);
+  });
+});
+
+// THE SUITE'S OWN ISOLATION, AND IT IS A CLAIM ABOUT vitest.config.ts. `copilotHome()` falls back to
+// `~/.vibeboard/copilot` and every project the suite opens gets a `projects/<digest>` of its own, so
+// with nothing set the run leaves ~840 directories in the owner's real home — measured at 118,902
+// directories and 799MB on 2026-08-21. That is the shape of the inode incident vitest.config.ts records
+// at the top: block space stays free, the inode table fills, and past the ceiling one arbitrary test
+// fails per run with no attributable cause.
+//
+// Asserted here rather than trusted, because the env line is one line in a config nothing else reads
+// back. It goes through the real resolver — `opencodeConfigHome()`, which is `copilotHome()` plus a
+// leaf — so a fallback that changed shape is caught as well as an env line that was deleted.
+describe("the suite's own copilot home", () => {
+  it('resolves inside the run temp root and never into the real home', () => {
+    const root = process.env.VIBEBOARD_TEST_TMP;
+    expect(root, 'VIBEBOARD_TEST_TMP is set by vitest.config.ts').toBeTruthy();
+    expect(
+      process.env.VIBEBOARD_COPILOT_HOME,
+      'VIBEBOARD_COPILOT_HOME is unset, so the copilot writes into ~/.vibeboard/copilot — see the ' +
+        'note beside it in vitest.config.ts',
+    ).toBeTruthy();
+    // The resolver, not the variable: this is the path a test that opens a project actually writes to.
+    const resolved = opencodeConfigHome();
+    expect(resolved.startsWith(`${root}/`)).toBe(true);
+    expect(resolved.startsWith(join(homedir(), '.vibeboard'))).toBe(false);
   });
 });
 

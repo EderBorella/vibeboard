@@ -12,8 +12,11 @@
 // back to the original offsets, so a match still reports the line it started on.
 
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+// The line counter is shared: `tools/lib/source.mjs`. Its own `walk` stays here — this gate reads
+// three source trees rather than one directory, so the two walks are different questions.
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { lineOf } from './lib/source.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const CORPUS = ['src', 'web/src', 'test'];
@@ -67,12 +70,6 @@ const flatten = (text) => {
     i += 1;
   }
   return { flat, offsets };
-};
-
-const lineOf = (text, offset) => {
-  let line = 1;
-  for (let i = 0; i < offset && i < text.length; i += 1) if (text[i] === '\n') line += 1;
-  return line;
 };
 
 // One file's citations, in both notations. Split out of `scan` for the NESTING, not the length: two
@@ -176,6 +173,22 @@ const missing = [...found.keys()].filter((id) => !rows.has(id.toLowerCase())).so
 const stale = stalePaths();
 
 const total = [...found.values()].reduce((sum, sites) => sum + sites.length, 0);
+
+// A SMOKE ALARM ON THE CORPUS, because this gate keeps its own `walk` — a recursive one taking a full
+// path — rather than the shared one in lib/source.mjs, and so is the one gate the shared floor cannot
+// protect. A discovery that matched nothing reports "0 distinct, 0 references" and exits 0, which is
+// byte-for-byte what a clean tree looks like. Floored an order of magnitude under the real count so
+// that deleting a file never fails the run: this is not a target, and the two anti-vacuity floors this
+// repository has already withdrawn were both targets pretending to be alarms.
+const REFERENCE_FLOOR = 100;
+if (total < REFERENCE_FLOOR) {
+  console.error(
+    `\nonly ${total} citation reference(s) found, against a floor of ${REFERENCE_FLOOR}. ` +
+      `The corpus is missing, so "every identifier has a row" is a claim about nothing.`,
+  );
+  process.exit(1);
+}
+
 console.log(`citations: ${found.size} distinct, ${total} references across ${CORPUS.join(', ')}`);
 
 if (missing.length > 0) {

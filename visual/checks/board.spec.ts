@@ -144,8 +144,13 @@ test('record the baseline', async ({ board, theme }) => {
   await board.keyboard.press('Tab');
   const focus = await auditFocus(board);
   report(theme, 'focus', focus.examined, focus.offenders);
+  // Phase 6's per-surface entries are carried over rather than rebuilt: they are written by
+  // surfaces.spec.ts, and a record pass that dropped them would leave nine surfaces with no ceiling
+  // at all — every ratchet would go quiet on the run after the next `visual:record`.
+  const previous = await readBaseline(theme).catch(() => null);
   const baseline: Baseline = {
     recorded: new Date().toISOString().slice(0, 10),
+    ...(previous?.surfaces ? { surfaces: previous.surfaces } : {}),
     fontSizes: styles.fontSizes,
     fontSizesOnText: styles.fontSizesOnText,
     radii: styles.radii,

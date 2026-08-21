@@ -1,32 +1,32 @@
 {
   "recorded": "2026-08-21",
   "fontSizes": {
-    "13px": 127,
+    "13px": 133,
     "15px": 1,
-    "12px": 84,
-    "11px": 19
+    "12px": 66,
+    "11px": 36
   },
   "fontSizesOnText": {
     "15px": 1,
-    "13px": 29,
-    "12px": 76,
-    "11px": 18
+    "13px": 33,
+    "12px": 60,
+    "11px": 35
   },
   "radii": {
     "50%": 12,
     "6px": 240,
-    "999px": 72,
+    "999px": 84,
     "10px": 56
   },
   "examined": {
-    "elements": 231,
-    "textElements": 124,
-    "overflow": 120,
+    "elements": 236,
+    "textElements": 129,
+    "overflow": 125,
     "clipping": 35,
-    "contrast": 124,
-    "tokens": 40,
+    "contrast": 129,
+    "tokens": 41,
     "rows": 25,
-    "focus": 55,
+    "focus": 56,
     "focusUnfocusable": 1
   },
   "findings": {
@@ -36,5 +36,330 @@
     "tokens": 1,
     "rows": 0,
     "focus": 0
+  },
+  "surfaces": {
+    "boards": {
+      "fontSizes": [
+        "11px",
+        "12px",
+        "13px",
+        "15px"
+      ],
+      "radii": [
+        "10px",
+        "50%",
+        "6px",
+        "999px"
+      ],
+      "examined": {
+        "elements": 236,
+        "textElements": 129,
+        "overflow": 125,
+        "clipping": 35,
+        "contrast": 129,
+        "tokens": 41,
+        "rows": 25,
+        "focus": 56
+      },
+      "findings": {
+        "type": 0,
+        "radius": 0,
+        "overflow": 0,
+        "clipping": 1,
+        "contrast": 0,
+        "tokens": 1,
+        "rows": 0,
+        "focus": 0
+      }
+    },
+    "execution": {
+      "fontSizes": [
+        "11px",
+        "12px",
+        "13px",
+        "15px"
+      ],
+      "radii": [
+        "10px",
+        "50%",
+        "6px",
+        "999px"
+      ],
+      "examined": {
+        "elements": 146,
+        "textElements": 84,
+        "overflow": 77,
+        "clipping": 12,
+        "contrast": 84,
+        "tokens": 41,
+        "rows": 11,
+        "focus": 42
+      },
+      "findings": {
+        "type": 0,
+        "radius": 0,
+        "overflow": 0,
+        "clipping": 0,
+        "contrast": 0,
+        "tokens": 1,
+        "rows": 0,
+        "focus": 0
+      }
+    },
+    "diary": {
+      "fontSizes": [
+        "11px",
+        "12px",
+        "13px",
+        "15px"
+      ],
+      "radii": [
+        "50%",
+        "6px",
+        "999px"
+      ],
+      "examined": {
+        "elements": 148,
+        "textElements": 82,
+        "overflow": 78,
+        "clipping": 15,
+        "contrast": 82,
+        "tokens": 41,
+        "rows": 11,
+        "focus": 38
+      },
+      "findings": {
+        "type": 0,
+        "radius": 0,
+        "overflow": 0,
+        "clipping": 0,
+        "contrast": 0,
+        "tokens": 2,
+        "rows": 2,
+        "focus": 0
+      }
+    },
+    "control": {
+      "fontSizes": [
+        "11px",
+        "12px",
+        "13px",
+        "15px"
+      ],
+      "radii": [
+        "4px",
+        "50%",
+        "6px",
+        "999px"
+      ],
+      "examined": {
+        "elements": 168,
+        "textElements": 88,
+        "overflow": 63,
+        "clipping": 13,
+        "contrast": 88,
+        "tokens": 41,
+        "rows": 8,
+        "focus": 59
+      },
+      "findings": {
+        "type": 0,
+        "radius": 0,
+        "overflow": 0,
+        "clipping": 0,
+        "contrast": 0,
+        "tokens": 2,
+        "rows": 0,
+        "focus": 0
+      }
+    },
+    "explorer": {
+      "fontSizes": [
+        "11px",
+        "12px",
+        "13px",
+        "15px"
+      ],
+      "radii": [
+        "50%",
+        "6px",
+        "999px"
+      ],
+      "examined": {
+        "elements": 127,
+        "textElements": 71,
+        "overflow": 62,
+        "clipping": 13,
+        "contrast": 71,
+        "tokens": 41,
+        "rows": 14,
+        "focus": 43
+      },
+      "findings": {
+        "type": 0,
+        "radius": 0,
+        "overflow": 0,
+        "clipping": 0,
+        "contrast": 0,
+        "tokens": 2,
+        "rows": 0,
+        "focus": 0
+      }
+    },
+    "card": {
+      "fontSizes": [
+        "11px",
+        "12px",
+        "13px",
+        "18px"
+      ],
+      "radii": [
+        "6px",
+        "999px"
+      ],
+      "examined": {
+        "elements": 57,
+        "textElements": 35,
+        "overflow": 30,
+        "clipping": 3,
+        "contrast": 35,
+        "tokens": 41,
+        "rows": 4,
+        "focus": 18
+      },
+      "findings": {
+        "type": 0,
+        "radius": 0,
+        "overflow": 0,
+        "clipping": 0,
+        "contrast": 0,
+        "tokens": 2,
+        "rows": 0,
+        "focus": 0
+      }
+    },
+    "archive": {
+      "fontSizes": [
+        "11px",
+        "12px",
+        "13px"
+      ],
+      "radii": [
+        "10px",
+        "6px"
+      ],
+      "examined": {
+        "elements": 9,
+        "textElements": 4,
+        "overflow": 3,
+        "clipping": 2,
+        "contrast": 4,
+        "tokens": 41,
+        "rows": 1,
+        "focus": 3
+      },
+      "findings": {
+        "type": 0,
+        "radius": 0,
+        "overflow": 0,
+        "clipping": 0,
+        "contrast": 0,
+        "tokens": 1,
+        "rows": 0,
+        "focus": 0
+      }
+    },
+    "settings": {
+      "fontSizes": [
+        "12px",
+        "13px"
+      ],
+      "radii": [
+        "10px",
+        "6px"
+      ],
+      "examined": {
+        "elements": 125,
+        "textElements": 80,
+        "overflow": 79,
+        "clipping": 14,
+        "contrast": 80,
+        "tokens": 41,
+        "rows": 0,
+        "focus": 24
+      },
+      "findings": {
+        "type": 0,
+        "radius": 0,
+        "overflow": 0,
+        "clipping": 0,
+        "contrast": 0,
+        "tokens": 2,
+        "rows": 0,
+        "focus": 0
+      }
+    },
+    "model-picker": {
+      "fontSizes": [
+        "11px",
+        "12px",
+        "13px"
+      ],
+      "radii": [
+        "10px",
+        "6px",
+        "999px"
+      ],
+      "examined": {
+        "elements": 57,
+        "textElements": 31,
+        "overflow": 23,
+        "clipping": 4,
+        "contrast": 31,
+        "tokens": 41,
+        "rows": 5,
+        "focus": 14
+      },
+      "findings": {
+        "type": 0,
+        "radius": 0,
+        "overflow": 0,
+        "clipping": 0,
+        "contrast": 0,
+        "tokens": 2,
+        "rows": 0,
+        "focus": 0
+      }
+    },
+    "confirm": {
+      "fontSizes": [
+        "12px",
+        "13px"
+      ],
+      "radii": [
+        "10px",
+        "6px"
+      ],
+      "examined": {
+        "elements": 8,
+        "textElements": 4,
+        "overflow": 4,
+        "clipping": 1,
+        "contrast": 4,
+        "tokens": 41,
+        "rows": 0,
+        "focus": 2
+      },
+      "findings": {
+        "type": 0,
+        "radius": 0,
+        "overflow": 0,
+        "clipping": 0,
+        "contrast": 0,
+        "tokens": 2,
+        "rows": 0,
+        "focus": 0
+      }
+    }
   }
 }

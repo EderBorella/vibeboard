@@ -228,7 +228,15 @@ button.vb-panel:disabled { cursor: default; }
   border: 1px solid var(--border); border-radius: var(--r-md);
   padding: var(--s-3) var(--s-4); font: inherit; font-size: var(--t-body);
 }
-.vb-input:focus, .vb-field input:focus, .vb-field textarea:focus, .vb-field select:focus {
+/* NOT a checkbox or a radio, and that exclusion is the whole point. Trading the outline for an accent
+   border only works on a control that paints a border; a native checkbox paints none, so this rule was
+   removing the app's global :focus-visible ring and replacing it with nothing — two controls in Settings
+   and one in Diagnostics focusable with no visible focus at all. Excluded here rather than re-ringed,
+   so they fall through to that global rule instead of carrying a second copy of it. */
+.vb-input:focus,
+.vb-field input:not([type='checkbox']):not([type='radio']):focus,
+.vb-field textarea:focus,
+.vb-field select:focus {
   outline: none; border-color: var(--accent);
 }
 /* A SELECT TRIGGER IS THAT BOX WITH A CARET ON IT, and docs/design-system.md has said so twice without

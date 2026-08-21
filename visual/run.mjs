@@ -63,12 +63,156 @@ if (process.env.VB_VISUAL_SKIP_BUILD !== '1') {
 // would drift, and then the harness would be testing a project shape the product cannot produce.
 const { scaffoldProject } = await import(pathToFileURL(join(REPO, 'dist/store/project/scaffold.js')));
 
+// FIXTURE STATE, BECAUSE AN EMPTY SURFACE EXAMINES ALMOST NOTHING AND A CHECK THAT EXAMINES NOTHING
+// PASSES.
+//
+// The scaffolder writes three sample cards, which is what makes the board worth measuring — and it
+// writes no runs, no suggestions and nothing archived, so before Phase 6 the Execution view was three
+// empty panels, the Project Log's right-hand column said "Nothing has been filed in this project yet",
+// and the archive drawer could not be opened at all because its button only exists at a non-zero count.
+// Recording those as green would have been the coverage-shaped lie this phase exists to avoid.
+//
+// Written through the PRODUCT'S OWN STORES, imported from `dist/`, for the reason `scaffoldProject` is:
+// a fixture built by a second copy of the writer drifts, and then the harness measures a project shape
+// the product cannot produce. Everything lands under the per-run temp root and goes with it.
+async function furnish(projectRoot) {
+  const { readConfig } = await import(pathToFileURL(join(REPO, 'dist/store/project/config.js')));
+  const { readBoard } = await import(pathToFileURL(join(REPO, 'dist/store/cards/board.js')));
+  const { archiveCard, createCard } = await import(
+    pathToFileURL(join(REPO, 'dist/store/cards/mutations.js'))
+  );
+  const { writeRun } = await import(pathToFileURL(join(REPO, 'dist/store/run-store.js')));
+  const { appendEntry } = await import(pathToFileURL(join(REPO, 'dist/store/diary-store.js')));
+  const { writeSuggestion } = await import(pathToFileURL(join(REPO, 'dist/store/suggestion-store.js')));
+
+  const config = await readConfig(projectRoot);
+  const product = (await readBoard(projectRoot, 'product', config))[0];
+  const engineering = (await readBoard(projectRoot, 'engineering', config))[0];
+  if (!product || !engineering) die('the scaffolder wrote no sample cards, so there is nothing to furnish');
+
+  // Two runs on the product card and one on the engineering card, so the Execution view's "Done" and
+  // "Requires attention" columns both have rows and the open card has a report list of its own.
+  //
+  // NONE OF THEM IS IN FLIGHT, deliberately. The server rewrites a `running` record to `interrupted`
+  // when it opens the project — a child process cannot survive the server that spawned it — so a
+  // `queued` or `running` fixture would be measured as something other than what was written. The "In
+  // progress" column is therefore empty and says so, which is a real state of that surface rather than
+  // an empty surface: the two columns beside it carry the rows.
+  const dispatched = { backend: 'claude', model: 'sonnet', effort: 'default', mode: 'bypassPermissions' };
+  const runs = [
+    {
+      ...dispatched,
+      run: '20260101-090000-1a2b',
+      board: 'product',
+      card: product.id,
+      skill: 'implement',
+      status: 'success',
+      started: '2026-01-01T09:00:00.000Z',
+      finished: '2026-01-01T09:04:09.000Z',
+      outcome: 'success',
+      summary: 'Wrote the first pass and left two notes about the column names.',
+      usage: { costUsd: 0.4231, durationMs: 249_000, turns: 14, contextTokens: 48_200, outputTokens: 3100 },
+      suggestions: 2,
+    },
+    {
+      ...dispatched,
+      run: '20260101-101500-3c4d',
+      board: 'product',
+      card: product.id,
+      skill: 'review',
+      status: 'attention',
+      started: '2026-01-01T10:15:00.000Z',
+      finished: '2026-01-01T10:20:48.000Z',
+      outcome: 'attention',
+      summary: 'Needs a decision before it can go further.',
+      // A report with options renders the option list, which is a surface of its own on the card pane.
+      options: ['Rename the column to match', 'Leave it and note the mismatch'],
+      usage: { costUsd: 0.1177, durationMs: 348_000, turns: 9, contextTokens: 31_400 },
+    },
+    {
+      ...dispatched,
+      run: '20260101-114500-5e6f',
+      board: 'engineering',
+      card: engineering.id,
+      skill: 'implement',
+      status: 'failed',
+      started: '2026-01-01T11:45:00.000Z',
+      finished: '2026-01-01T11:45:00.449Z',
+      note: 'The agent stopped without writing a report.',
+      usage: { costUsd: 0.0119, durationMs: 449 },
+    },
+  ];
+  for (const record of runs) await writeRun(projectRoot, record);
+
+  // ONE ARCHIVED CARD, so the drawer's button exists at all: `.board-archive` is rendered only at a
+  // non-zero count, so with nothing archived the surface is not merely empty — it is unreachable.
+  const spare = await createCard(
+    projectRoot,
+    config,
+    {
+      board: 'product',
+      // The slug the scaffolded card is already in, rather than a second derivation of it: the
+      // config's labels are slugified by `boardColumnSlugs` and a hand-rolled copy of that rule is
+      // exactly the drift this file avoids by importing the product's own writers.
+      columnSlug: product.columnSlug,
+      title: 'A card that was archived',
+      description: 'Here so the archive drawer has something in it.',
+    },
+    '2026-01-01',
+  );
+  if (typeof spare === 'string') die(`the archive fixture card was refused: ${spare}`);
+  await archiveCard(projectRoot, spare, '2026-01-02T08:30:00.000Z');
+
+  // The scaffolder writes one diary line. Two more, of two different kinds, so the list renders rows
+  // with a kind, an outcome and a card reference rather than one bare lifecycle entry.
+  await appendEntry(projectRoot, {
+    at: '2026-01-01T09:04:09.000Z',
+    kind: 'run',
+    text: 'implement finished on the sample product card.',
+    iteration: 1,
+    card: product.id,
+    outcome: 'success',
+  });
+  await appendEntry(projectRoot, {
+    at: '2026-01-01T11:45:01.000Z',
+    kind: 'note',
+    text: 'Left a note by hand so the log has a line somebody wrote as well as one a machine did.',
+  });
+
+  // What agents filed: the right-hand column of the Project Log, and the dock's Suggestions badge.
+  const filed = [
+    {
+      id: '20260101-090409-aaaa',
+      state: 'active',
+      created: '2026-01-01T09:04:09.000Z',
+      title: 'The product and engineering columns disagree',
+      run: runs[0].run,
+      card: product.id,
+      board: 'product',
+      body: 'Noticed while implementing. Not acted on, because renaming a column is a decision.',
+    },
+    {
+      id: '20260101-092000-bbbb',
+      state: 'rejected',
+      created: '2026-01-01T09:20:00.000Z',
+      title: 'Add a fourth board',
+      run: runs[0].run,
+      card: product.id,
+      board: 'product',
+      reason: 'Three boards is the design; a fourth would need its own place in the hierarchy.',
+      body: 'Filed so it is not raised again.',
+    },
+  ];
+  for (const s of filed) await writeSuggestion(projectRoot, s);
+}
+
 const projects = join(root, 'projects');
 const project = join(projects, 'harness');
 mkdirSync(project, { recursive: true });
 // Greenfield, because it writes the sample cards: a board with no cards renders almost no elements,
 // and a check that examines nothing passes.
 await scaffoldProject(project, { name: 'Harness', mode: 'greenfield', today: '2026-01-01' });
+await furnish(project);
 
 const stateFile = join(root, 'state.json');
 writeFileSync(stateFile, `${JSON.stringify({ lastProject: project }, null, 2)}\n`, 'utf8');

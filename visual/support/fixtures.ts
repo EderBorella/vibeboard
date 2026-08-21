@@ -21,6 +21,22 @@ interface Fixtures {
 const HERE = dirname(fileURLToPath(import.meta.url));
 const BASELINE_DIR = resolve(HERE, '..', 'baseline');
 
+// PER-SURFACE, AND DELIBERATELY NOT THE SAME SHAPE AS THE BOARD'S.
+//
+// The board records TALLIES (`13px×127`) and its drift check compares the value set behind them. A
+// surface records only the SET, sorted, and the reason is what the two numbers are for: the board's
+// tally is a fact about a fixed arrangement of 231 elements, while a surface's element count moves
+// with the fixture's content — one more run record changes every tally on the Execution view and
+// nothing about its type. So drift on a surface is asserted over the set, symmetrically NEW and GONE,
+// which is the claim that a new off-scale value cannot appear and an existing one cannot vanish
+// unnoticed. The board's own `fontSizes`/`radii` tallies are untouched by this phase.
+export interface SurfaceBaseline {
+  fontSizes: string[];
+  radii: string[];
+  examined: Record<string, number>;
+  findings: Record<string, number>;
+}
+
 export interface Baseline {
   recorded: string;
   // Value → number of elements computing it. The count matters as much as the list: it is what says
@@ -30,6 +46,9 @@ export interface Baseline {
   radii: Record<string, number>;
   examined: Record<string, number>;
   findings: Record<string, number>;
+  // Keyed by `Surface.name`. Absent for a theme recorded before Phase 6, which is why every reader
+  // below defaults rather than indexes blind.
+  surfaces?: Record<string, SurfaceBaseline>;
 }
 
 export function baselineFile(theme: string): string {

@@ -85,17 +85,41 @@ export const RADIUS_SCALE = ['--r-sm', '--r-md', '--r-lg', '--r-pill'] as const;
 // scale is circular — and "fixing" it to a step would rescale every rem in the stylesheet, including
 // the steps themselves. It carries no text and no corner of its own.
 //
+// WHICH SURFACE IS BEING MEASURED. `null` is the whole document, which is what every check measured
+// before Phase 6 and is what the four top-level views still measure — a view IS the page.
+//
+// A selector is given for the four surfaces that are OVERLAYS: the settings modal, the model picker,
+// the confirm dialog and the archive drawer all render with the board still behind them, so a
+// whole-document walk would report the board's numbers again under a second name. That is the exact
+// failure this phase exists to avoid — a harness that measures the board five times and calls it five
+// surfaces is worse than one that measures it once, because the numbers would look like coverage.
+//
+// An unmatched selector yields an EMPTY population rather than falling back to the document, so a
+// surface whose root stopped existing fails its floor instead of silently measuring the board.
+export interface AuditOptions {
+  root?: string | null;
+}
+
 // Type and radius counts. Every visible element, because every element computes a font size: an
 // off-scale container hands its size to any descendant that does not set one, which is how 94
 // elements sat on the UA's 16px default before Phase 2.
-function pageBoxes(): { elements: number; fontSizes: Tally; radii: Tally } {
+function pageBoxes(root: string | null): { elements: number; fontSizes: Tally; radii: Tally } {
+  // Repeated in every walk below, and it has to be: this function is serialised into the page, so a
+  // shared helper would be `undefined` by the time the page ran it. Same reason `describe` appears
+  // seven times.
+  function population(scope: string | null): Element[] {
+    if (!scope) return Array.from(document.querySelectorAll('*'));
+    const host = document.querySelector(scope);
+    return host ? [host, ...Array.from(host.querySelectorAll('*'))] : [];
+  }
+
   const fontSizes: Tally = {};
   const radii: Tally = {};
   const bump = (tally: Tally, key: string): void => {
     tally[key] = (tally[key] ?? 0) + 1;
   };
   let elements = 0;
-  for (const el of Array.from(document.querySelectorAll('*'))) {
+  for (const el of population(root)) {
     if (el.tagName === 'SCRIPT' || el.tagName === 'STYLE' || el === document.documentElement) continue;
     const style = getComputedStyle(el);
     if (style.visibility === 'hidden' || style.display === 'none' || Number(style.opacity) === 0) continue;
@@ -125,7 +149,13 @@ function pageBoxes(): { elements: number; fontSizes: Tally; radii: Tally } {
 //
 // It names the offending ELEMENTS and not only the value. A blocking gate that says "13.6px is not on
 // the scale" without saying where cannot be acted on, and a gate nobody can act on gets bypassed.
-function pageType(names: string[]): { scale: string[]; type: Findings } {
+function pageType(arg: { names: string[]; root: string | null }): { scale: string[]; type: Findings } {
+  function population(scope: string | null): Element[] {
+    if (!scope) return Array.from(document.querySelectorAll('*'));
+    const host = document.querySelector(scope);
+    return host ? [host, ...Array.from(host.querySelectorAll('*'))] : [];
+  }
+
   function describe(el: Element): string {
     const parts: string[] = [];
     for (let node: Element | null = el; node && parts.length < 4; node = node.parentElement) {
@@ -142,7 +172,7 @@ function pageType(names: string[]): { scale: string[]; type: Findings } {
   probe.style.position = 'absolute';
   probe.style.visibility = 'hidden';
   document.body.append(probe);
-  const scale = names.map((name) => {
+  const scale = arg.names.map((name) => {
     probe.style.fontSize = `var(${name})`;
     return getComputedStyle(probe).fontSize;
   });
@@ -150,7 +180,7 @@ function pageType(names: string[]): { scale: string[]; type: Findings } {
 
   const offenders: Offender[] = [];
   let examined = 0;
-  for (const el of Array.from(document.querySelectorAll('*'))) {
+  for (const el of population(arg.root)) {
     if (el.tagName === 'SCRIPT' || el.tagName === 'STYLE' || el === document.documentElement) continue;
     const style = getComputedStyle(el);
     if (style.visibility === 'hidden' || style.display === 'none' || Number(style.opacity) === 0) continue;
@@ -174,7 +204,16 @@ function pageType(names: string[]): { scale: string[]; type: Findings } {
 // `50%` IS ALLOWED AND IS NOT A STEP. A circle is a circle at any size, so a dot cannot be expressed as
 // a length without knowing its width — `--r-pill`'s 999px would be a claim about a stadium. It is
 // checked as a literal because there is no token to read back.
-function pageRadius(names: string[]): { radiusScale: string[]; radius: Findings } {
+function pageRadius(arg: { names: string[]; root: string | null }): {
+  radiusScale: string[];
+  radius: Findings;
+} {
+  function population(scope: string | null): Element[] {
+    if (!scope) return Array.from(document.querySelectorAll('*'));
+    const host = document.querySelector(scope);
+    return host ? [host, ...Array.from(host.querySelectorAll('*'))] : [];
+  }
+
   function describe(el: Element): string {
     const parts: string[] = [];
     for (let node: Element | null = el; node && parts.length < 4; node = node.parentElement) {
@@ -191,7 +230,7 @@ function pageRadius(names: string[]): { radiusScale: string[]; radius: Findings 
   probe.style.position = 'absolute';
   probe.style.visibility = 'hidden';
   document.body.append(probe);
-  const scale = names.map((name) => {
+  const scale = arg.names.map((name) => {
     probe.style.borderRadius = `var(${name})`;
     return getComputedStyle(probe).borderTopLeftRadius;
   });
@@ -199,7 +238,7 @@ function pageRadius(names: string[]): { radiusScale: string[]; radius: Findings 
 
   const offenders: Offender[] = [];
   let examined = 0;
-  for (const el of Array.from(document.querySelectorAll('*'))) {
+  for (const el of population(arg.root)) {
     if (el.tagName === 'SCRIPT' || el.tagName === 'STYLE' || el === document.documentElement) continue;
     const style = getComputedStyle(el);
     if (style.visibility === 'hidden' || style.display === 'none' || Number(style.opacity) === 0) continue;
@@ -224,7 +263,17 @@ function pageRadius(names: string[]): { radiusScale: string[]; radius: Findings 
 // rather than sharing one pass: together they needed nine nested helpers and scored 17 on the
 // cognitive-complexity gate, and the honest repair for that is fewer things in one function — not a
 // higher ceiling. Two walks of 233 elements cost nothing measurable.
-function pageOverflow(): { textElements: number; fontSizesOnText: Tally; overflow: Findings } {
+function pageOverflow(root: string | null): {
+  textElements: number;
+  fontSizesOnText: Tally;
+  overflow: Findings;
+} {
+  function population(scope: string | null): Element[] {
+    if (!scope) return Array.from(document.querySelectorAll('*'));
+    const host = document.querySelector(scope);
+    return host ? [host, ...Array.from(host.querySelectorAll('*'))] : [];
+  }
+
   function describe(el: Element): string {
     const parts: string[] = [];
     for (let node: Element | null = el; node && parts.length < 4; node = node.parentElement) {
@@ -253,7 +302,7 @@ function pageOverflow(): { textElements: number; fontSizesOnText: Tally; overflo
   const offenders: Offender[] = [];
   let textElements = 0;
   let examined = 0;
-  for (const el of Array.from(document.querySelectorAll('*'))) {
+  for (const el of population(root)) {
     const style = getComputedStyle(el);
     if (!eligible(el, style)) continue;
     textElements += 1;
@@ -289,7 +338,13 @@ function pageOverflow(): { textElements: number; fontSizesOnText: Tally; overflo
 // `text-overflow: ellipsis` is skipped for the reason it is skipped above: it is a DELIBERATE
 // statement that this text may be cut, and counting it would fill the list with the correct cases —
 // `.ap-status` in the auto-pilot bar is one, at 211px of content in a 126px box on purpose.
-function pageClipping(): Findings {
+function pageClipping(root: string | null): Findings {
+  function population(scope: string | null): Element[] {
+    if (!scope) return Array.from(document.querySelectorAll('*'));
+    const host = document.querySelector(scope);
+    return host ? [host, ...Array.from(host.querySelectorAll('*'))] : [];
+  }
+
   function describe(el: Element): string {
     const parts: string[] = [];
     for (let node: Element | null = el; node && parts.length < 4; node = node.parentElement) {
@@ -302,7 +357,7 @@ function pageClipping(): Findings {
 
   const offenders: Offender[] = [];
   let examined = 0;
-  for (const el of Array.from(document.querySelectorAll('*'))) {
+  for (const el of population(root)) {
     if (el.tagName === 'SCRIPT' || el.tagName === 'STYLE') continue;
     const style = getComputedStyle(el);
     // `visible` means nothing is cut and nothing scrolls, so there is no question to ask.
@@ -446,8 +501,14 @@ function pageDock(): DockAudit {
 
 // Contrast, on the pairs the stylesheet actually forms. themes.css states measured ratios in prose;
 // this is what pins them.
-function pageContrast(): Findings {
+function pageContrast(root: string | null): Findings {
   type Colour = [number, number, number, number];
+
+  function population(scope: string | null): Element[] {
+    if (!scope) return Array.from(document.querySelectorAll('*'));
+    const host = document.querySelector(scope);
+    return host ? [host, ...Array.from(host.querySelectorAll('*'))] : [];
+  }
 
   function describe(el: Element): string {
     const parts: string[] = [];
@@ -513,7 +574,7 @@ function pageContrast(): Findings {
 
   const offenders: Offender[] = [];
   let examined = 0;
-  for (const el of Array.from(document.querySelectorAll('*'))) {
+  for (const el of population(root)) {
     const style = getComputedStyle(el);
     if (!eligible(el, style)) continue;
     const fg = parse(style.color);
@@ -538,7 +599,13 @@ function pageContrast(): Findings {
 // nothing makes the declaration invalid at computed-value time and the property falls back to what
 // it inherited, which looks like a deliberate value. So the reference is checked against the
 // definitions instead, which is the form that can actually fail.
-function pageTokens(): Findings {
+function pageTokens(root: string | null): Findings {
+  function population(scope: string | null): Element[] {
+    if (!scope) return Array.from(document.querySelectorAll('*'));
+    const host = document.querySelector(scope);
+    return host ? [host, ...Array.from(host.querySelectorAll('*'))] : [];
+  }
+
   function ruleText(): string[] {
     const texts: string[] = [];
     for (const sheet of Array.from(document.styleSheets)) {
@@ -556,11 +623,15 @@ function pageTokens(): Findings {
     for (const hit of text.matchAll(/var\((--[\w-]+)/g)) referenced.add(hit[1]);
     for (const hit of text.matchAll(/(--[\w-]+)\s*:/g)) defined.add(hit[1]);
   }
-  const elements = Array.from(document.querySelectorAll('*'));
+  // Scoped to the surface, like every other walk. `--exec-cols` is the case that makes this matter: it
+  // arrives as an inline style on `main.execution`, so it is a finding on every surface EXCEPT the
+  // Execution view, where the element that supplies it is in the population. Phase 0 recorded it as a
+  // gap in the harness's coverage; Phase 6 is where it stops being one.
+  const elements = population(root);
   const offenders: Offender[] = [];
-  const root = getComputedStyle(document.documentElement);
+  const atRoot = getComputedStyle(document.documentElement);
   for (const name of referenced) {
-    if (root.getPropertyValue(name).trim()) continue;
+    if (atRoot.getPropertyValue(name).trim()) continue;
     // Defined somewhere but not at the root is a SCOPED token, which is legitimate; defined nowhere
     // is the fault — `--warn` fell through to a hardcoded fallback that way before it existed.
     if (defined.has(name)) continue;
@@ -586,7 +657,13 @@ function pageTokens(): Findings {
 // Measured that way and NOT by comparing top edges: the first version compared rounded tops and
 // reported 22 of 25 rows as wrapped, because `align-items: center` gives children of different
 // heights different tops. It was measuring vertical centring and calling it wrapping.
-function pageRows(): Findings {
+function pageRows(root: string | null): Findings {
+  function population(scope: string | null): Element[] {
+    if (!scope) return Array.from(document.querySelectorAll('*'));
+    const host = document.querySelector(scope);
+    return host ? [host, ...Array.from(host.querySelectorAll('*'))] : [];
+  }
+
   function describe(el: Element): string {
     const id = el.getAttribute('data-testid');
     const name = typeof el.className === 'string' ? el.className.trim().split(/\s+/)[0] : '';
@@ -594,7 +671,7 @@ function pageRows(): Findings {
   }
   const offenders: Offender[] = [];
   let examined = 0;
-  for (const el of Array.from(document.querySelectorAll('*'))) {
+  for (const el of population(root)) {
     const style = getComputedStyle(el);
     if (style.display !== 'flex' && style.display !== 'inline-flex') continue;
     if (!style.flexDirection.startsWith('row')) continue;
@@ -621,7 +698,7 @@ function pageRows(): Findings {
 // The caller presses Tab first. Chromium matches `:focus-visible` on a programmatic focus only when
 // the most recent interaction was a keypress, so without that every element in the app reports no
 // focus style — and a check that fails everywhere is as uninformative as one that passes everywhere.
-function pageFocus(): FocusAudit {
+function pageFocus(root: string | null): FocusAudit {
   const SELECTOR =
     'button, a[href], input, select, textarea, [tabindex]:not([tabindex="-1"]), [role="button"]';
   const PROPS = [
@@ -652,6 +729,19 @@ function pageFocus(): FocusAudit {
     return PROPS.map((prop) => style[prop]).join('|');
   }
 
+  // An unmatched root yields NOTHING rather than falling back to the whole document, so a surface
+  // whose root stopped existing fails its floor instead of quietly reporting the board's fifty-five
+  // focusables under another name. Extracted rather than written inline because the ternary it
+  // replaces took this function to 17 on the cognitive-complexity gate, and the metric punishes
+  // nesting far harder than length.
+  function found(scope: string | null): Element[] {
+    if (!scope) return Array.from(document.querySelectorAll(SELECTOR));
+    const host = document.querySelector(scope);
+    if (!host) return [];
+    const inside = Array.from(host.querySelectorAll(SELECTOR));
+    return host.matches(SELECTOR) ? [host, ...inside] : inside;
+  }
+
   function candidate(el: Element): el is HTMLElement {
     if (!(el instanceof HTMLElement)) return false;
     const style = getComputedStyle(el);
@@ -669,7 +759,7 @@ function pageFocus(): FocusAudit {
   // with no focus style.
   if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
 
-  for (const el of Array.from(document.querySelectorAll(SELECTOR))) {
+  for (const el of found(root)) {
     if (!candidate(el)) continue;
     const before = snapshot(el);
     el.focus();
@@ -702,15 +792,16 @@ function pageDocument(): { scrollWidth: number; clientWidth: number } {
 
 // The four page walks, composed here in node rather than in the page, so each in-page function stays
 // small enough to read and to score under the complexity gate.
-export async function auditStyles(page: Page): Promise<StyleAudit> {
-  const boxes = await page.evaluate(pageBoxes);
-  const type = await page.evaluate(pageType, [...TYPE_SCALE]);
-  const radius = await page.evaluate(pageRadius, [...RADIUS_SCALE]);
-  const text = await page.evaluate(pageOverflow);
-  const clipping = await page.evaluate(pageClipping);
-  const contrast = await page.evaluate(pageContrast);
-  const tokens = await page.evaluate(pageTokens);
-  const rows = await page.evaluate(pageRows);
+export async function auditStyles(page: Page, options: AuditOptions = {}): Promise<StyleAudit> {
+  const root = options.root ?? null;
+  const boxes = await page.evaluate(pageBoxes, root);
+  const type = await page.evaluate(pageType, { names: [...TYPE_SCALE], root });
+  const radius = await page.evaluate(pageRadius, { names: [...RADIUS_SCALE], root });
+  const text = await page.evaluate(pageOverflow, root);
+  const clipping = await page.evaluate(pageClipping, root);
+  const contrast = await page.evaluate(pageContrast, root);
+  const tokens = await page.evaluate(pageTokens, root);
+  const rows = await page.evaluate(pageRows, root);
   return { ...boxes, ...type, ...radius, ...text, clipping, contrast, tokens, rows };
 }
 
@@ -724,8 +815,8 @@ export async function auditDock(page: Page): Promise<DockAudit> {
   return page.evaluate(pageDock);
 }
 
-export async function auditFocus(page: Page): Promise<FocusAudit> {
-  return page.evaluate(pageFocus);
+export async function auditFocus(page: Page, options: AuditOptions = {}): Promise<FocusAudit> {
+  return page.evaluate(pageFocus, options.root ?? null);
 }
 
 export async function documentOverflow(page: Page): Promise<{ scrollWidth: number; clientWidth: number }> {

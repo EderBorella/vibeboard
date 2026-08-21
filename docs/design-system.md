@@ -1,6 +1,6 @@
 # The design system, and how it lands in phases
 
-**Status: Phases 0–5 done (2026-08-21). The class count is 380 against a target of 183 — re-derived on
+**Status: Part One (Phases 0–5) and Part Two's Phase 6 done (2026-08-21). The class count is 380 against a target of 183 — re-derived on
 2026-08-21 from the measured surface count, with the plan's *under 150* withdrawn as unreachable at its
 own allowance. What stands between 380 and 183 is measured under Phase 5b.** Phase 0 built the instrument and
 measured, touching no stylesheet; Phase 1 added the 17 tokens and nothing that consumes them; Phase 2
@@ -1598,7 +1598,7 @@ No baseline file is involved.
 
 # Part Two — the phases the first six did not cover
 
-**Status: planned 2026-08-21, not started.** Part One built seven primitives and thirteen gates. It was
+**Status: Phase 6 done 2026-08-21; Phases 7–10 planned, not started.** Part One built seven primitives and thirteen gates. It was
 reviewed phase by phase and every gate was green. It also missed a whole family of work, and the miss was
 reported by the owner looking at the board rather than by any check — which makes the cause worth stating
 before the phases: **only the button shape has a coverage gate.**
@@ -1631,31 +1631,220 @@ only inspects button-shaped elements, so they were never in any number this page
 
 ### And the browser only ever sees one page
 
-`visual/support/fixtures.ts:82` is the whole of the harness's navigation: `page.goto('/')`. So every claim
-Part One makes about the *browser* — contrast at 4.5:1, focus visible, nothing overflows, nothing clips,
-type and radius conformance — is a claim about **the board view alone**. Execution, Project Log, Project
-Control and Explorer are four other top-level views; an open card, the archive drawer, settings, the model
-picker and the confirm dialog are never rendered at all.
+`visual/support/fixtures.ts:82` **was** the whole of the harness's navigation: `page.goto('/')`. So every
+claim Part One makes about the *browser* — contrast at 4.5:1, focus visible, nothing overflows, nothing
+clips, type and radius conformance — was a claim about **the board view alone**. Execution, Project Log,
+Project Control and Explorer are four other top-level views; an open card, the archive drawer, settings, the
+model picker and the confirm dialog were never rendered at all.
 
 That is also why Phase 0 measured 15 computed font sizes against 27 authored: the other twelve were on
-surfaces the harness cannot reach. The static checks close that gap **for values in the file**; they cannot
-close it for layout, contrast or focus, which only exist at render time.
+surfaces the harness could not reach. The static checks close that gap **for values in the file**; they
+cannot close it for layout, contrast or focus, which only exist at render time.
+
+**Phase 6 closed it — ten surfaces instead of one, and the answer was four findings.** See its section
+below: type and radius conformance are zero on all ten, the two run-time tokens are the coverage gap Phase 0
+named rather than a defect, two `flex-wrap: wrap` rows on the Project Log are doing what their rule permits,
+and **two checkboxes in Settings have no focus style at all** — the one real defect, and Phase 9's.
 
 ---
 
-## Phase 6 — see the whole app
+## Phase 6 — see the whole app — **DONE 2026-08-21**
 
-Extend the harness past `/`. Every existing check runs on every reachable surface: the five top-level views,
-an open card, the archive drawer, settings, the model picker, the confirm dialog.
+The harness measures **ten surfaces** where it measured one. `visual/support/surfaces.ts` is the whole of
+the new navigation and `visual/checks/surfaces.spec.ts` runs checks 1–8 on each, per theme: **93 harness
+tests against 33**, exit 0.
 
-This will surface a backlog, and that is the point of doing it first — **you cannot fix a contrast failure on
-a surface you cannot render.** Report the new counts, then ratchet each check at what you find rather than at
-zero, on this page's standing rule about blocking gates and backlogs.
+**The backlog it surfaced is four findings, and only one of them is a defect.** That is a smaller answer
+than this phase expected and the reason is measurable: the two static checks — `check:type-scale` over the
+authored file and `check:radius-scale` beside it — had already driven the values on surfaces the browser
+could not reach, and the browser now confirms it. **Type and radius conformance are ZERO on all ten
+surfaces on all three themes**, which is the claim Phase 0 could not make: it measured 15 computed sizes
+against 27 authored and named the twelve-value gap as surfaces the harness never opened.
 
-**Gate:** every check reports a per-surface number; each ratchets. The navigation itself is proven by
-asserting something only each surface renders, the way `fixtures.ts` already proves it is on the board and
-not the sign-in gate.
-**Exit:** a table of every check against every surface.
+### The table: every check against every surface
+
+Findings / examined, identical on all three themes unless noted. `root` is what the walk was scoped to.
+
+| surface | root | 1. type | 2. radius | 3. overflow | 3b. clip | 4. contrast | 5. tokens | 6. focus | 7. rows | 8. rings |
+|---|---|---|---|---|---|---|---|---|---|---|
+| boards | document | 0/236 | 0/236 | 0/125 | **1**/35 | 0/129 | **1**/41 | 0/56 | 0/25 | 29 of 29 |
+| execution | document | 0/146 | 0/146 | 0/77 | 0/12 | 0/84 | **1**/41 | 0/42 | 0/11 | 16 of 16 |
+| diary | document | 0/148 | 0/148 | 0/78 | 0/15 | 0/82 | **2**/41 | 0/38 | **2**/11 | 14 of 14 |
+| control | document | 0/168 | 0/168 | 0/63 | 0/13 | 0/88 | **2**/41 | 0/59 | 0/8 | 15 of 15 |
+| explorer | document | 0/127 | 0/127 | 0/62 | 0/13 | 0/71 | **2**/41 | 0/43 | 0/14 | 15 of 15 |
+| card | `[data-testid="dock-body"]` | 0/57 | 0/57 | 0/30 | 0/3 | 0/35 | **2**/41 | 0/18 | 0/4 | 8 of 8 |
+| archive | `[data-testid="archive-drawer"]` | 0/9 | 0/9 | 0/3 | 0/2 | 0/4 | **1**/41 | 0/3 | 0/1 | 1 of 1 |
+| settings | `.modal:not(.confirm)` | 0/125 | 0/125 | 0/79 | 0/14 | 0/80 | **2**/41 | **2**/24 | 0/0 | 7 of 7 |
+| model-picker | `.mp-modal` | 0/57 | 0/57 | 0/23 | 0/4 | 0/31 | **2**/41 | 0/14 | 0/5 | 5 of 5 |
+| confirm | `.modal.confirm` | 0/8 | 0/8 | 0/4 | 0/1 | 0/4 | **2**/41 | 0/2 | 0/0 | 2 of 2 |
+
+**Two cells are `0/0` and they are vacuous, which is stated rather than counted as a pass.** Neither the
+settings modal nor the confirm dialog contains a flex row of three or more visible children, so check 7 has
+nothing to ask of either. That is a fact about those two surfaces and not a hole: a row is what the check is
+about, and inventing a floor for a surface with no rows would fail the run for succeeding — the count-floor
+mistake this page has now made three times (`check-radius-scale`'s button population, `check-type-scale`'s
+150, `check-radius-scale`'s 60).
+
+**Five surfaces are measured against a ROOT and five against the document, and the split is not a
+convenience.** A top-level view IS the page. The other five render with the board still behind them, so a
+whole-document walk would report the board's 236 elements again under a second name — and *a harness that
+measures the board five times and reports it as five surfaces is worse than one that measures it once,
+because the numbers would look like coverage.* An unmatched root yields an EMPTY population rather than
+falling back to the document, so a root that stopped matching fails a floor instead of measuring the board.
+
+### The four findings, each with what it is
+
+- **`--exec-cols` and `--max-cols` — 2 unresolved tokens off their own view, 1 on it.** Both arrive as an
+  inline style from React (`main.execution` and `.board-columns`), so each resolves on the one surface that
+  supplies it and is a finding on the nine that do not. Phase 0 recorded `--exec-cols` as *"a gap in the
+  harness's coverage rather than a defect"*; the gap is closed and the reading is unchanged. **Neither is
+  touched here** — `--exec-cols` is Phase 10's.
+- **Two wrapped `.vb-readout-block` rows on the Project Log**, *"4 children span 33.0px, tallest is
+  15.0px"* — the two `.filed-entry` meta rows, in the narrow right-hand column of the split. **The rows are
+  doing what their own rule permits:** `.vb-readout-block` declares `flex-wrap: wrap` and 5a's note calls
+  these *"the five wrapping figure rows"*. So this is an instrument gap rather than a layout fault — check 7
+  does not exempt `flex-wrap: wrap` the way check 3 exempts `text-overflow: ellipsis`, which is the same
+  kind of deliberate statement. Recorded at 2 and **not** exempted, because narrowing a check is a ruling.
+
+  **RULED 2026-08-21: check 7 does NOT get a `flex-wrap: wrap` exemption, and the two findings stay findings.**
+  Two reasons, and the second is the one that decides it. The check exists for the action rows that have
+  wrapped twice; an exemption keyed on `flex-wrap: wrap` means anyone who adds that declaration to an action
+  row silences the check on it, which is suppressing a warning rather than removing a cause — and the rule it
+  would suppress is the one pointing at the real design fault. Second, these are not action rows, they are
+  **figure** rows: a wrapped `.vb-readout-block` is a column of figures that does not align, which is
+  precisely the claim the Readout signature makes and the reason the whole treatment exists. A gate cannot be
+  taught to accept the thing its own page argues against. The fault belongs to `.vb-readout-block` in a narrow
+  column, and it is fixed by the phase that next touches the Project Log — not by the check learning to look
+  away.
+- **TWO CHECKBOXES IN SETTINGS HAVE NO FOCUS STYLE AT ALL, and this one is a real defect.**
+  `primitives.css`'s `.vb-field input:focus { outline: none; border-color: var(--accent) }` applies to every
+  `input` inside a `Field` — including a checkbox, which paints no border, so the rule removes the app's
+  `:focus-visible` ring and replaces it with nothing. Measured: `focus-visible matched but no property
+  changed`, with the outline at `style: none` and the UA's `width: 3px` surviving underneath. It is
+  **exactly the defect Phase 5 found one level along** — `.skill-input` and `.dispatch-prompt` keeping the UA
+  outline where the other eight turned their border — and `Field`'s own `layout: check` variant exists for
+  these two controls. Left for **Phase 9**, whose gate is *"focus visible on every control on every surface,
+  not only the board's fifty-five"*; recorded at 2 so it cannot become 3.
+
+### The empty-surface problem was solved by furnishing the fixture, not by lowering a floor
+
+**A greenfield scaffold has no runs, no suggestions and nothing archived — so three of these surfaces were
+not merely empty, one was unreachable.** The Execution view was three empty panels, the Project Log's filed
+column was one sentence, and `.board-archive` is rendered only at a non-zero archived count, so the archive
+drawer could not be opened at all. Recording those as green is the coverage-shaped lie this phase exists to
+avoid.
+
+So `visual/run.mjs` furnishes the fixture **through the product's own stores, imported from `dist/`** — the
+reason it already imports `scaffoldProject` rather than reimplementing it: three run records (`writeRun`),
+one archived card (`createCard` + `archiveCard`), two diary entries (`appendEntry`) and two filed
+suggestions (`writeSuggestion`). **None of the runs is in flight**, deliberately: the server rewrites a
+`running` record to `interrupted` when it opens the project, so a `queued` fixture would be measured as
+something other than what was written. "In progress" is therefore an empty column on a populated surface,
+which is a real state of that view.
+
+**And BOTH guards are kept, because neither is enough on its own.** A floor read out of the baseline can
+only agree with whatever was there when `visual:record` last ran, so it would bless a vacuous surface
+forever; an absolute floor per surface cannot see a surface that shrank by one element. Every surface
+therefore carries an absolute `floor` in `surfaces.ts` **and** ratchets its recorded examined counts.
+
+**Proven by planting, and the plant fired on both halves at once.** With `writeRun` removed from the
+fixture, `npm run visual` exited **1**: the Execution and card surfaces REFUSED to measure — *"locator
+('.exec-run').first() … element(s) not found"*, *"locator('section.reports') … not found"* — and four other
+surfaces failed their examined ratchet, because the attention run's `.tab-badge` went with it: *"[boards]
+the elements walk examined 235, against 236 when this was recorded"*, and 147/148, 167/168, 126/127.
+
+### Every surface is proven before it is measured, and the proof was planted at
+
+**`fixtures.ts:82` was the entire navigation of this harness — `await page.goto('/')`.** So every browser
+claim in Part One is a claim about the board view. The trap in extending it is that nine of the ten
+surfaces would still render *something* if navigation silently failed, and it would be the board.
+
+Each surface therefore names something only it renders, and the four top-level views additionally assert
+`main.boards` is GONE. **Planted by removing `surface.open()` from both check bodies in one edit: nine of
+the ten refused, each naming its own assertion, and `boards` correctly passed because its `open` is a no-op
+by design** — the control that says the plant was a plant and not a broken run.
+
+| surface | the assertion that only it satisfies | what the planted navigation failure said |
+|---|---|---|
+| boards | `main.boards` visible, `section.board` ×3, a `.tile` | *passes — its `open` is a no-op* |
+| execution | `main.execution`, three `section[aria-label]`s, an `.exec-run`, no `main.boards` | `locator('main.execution')` — element(s) not found |
+| diary | `.log-split`, both `section[aria-label]`s, a `.diary-entry` AND a `.filed-entry` | `locator('.log-split')` — not found |
+| control | `section.control` and **not** `section.control.explorer`, a `[data-testid="control-item"]` | `locator('section.control')` — not found |
+| explorer | `section.control.explorer`, a `[data-testid="explorer-item"]` | `locator('section.control.explorer')` — not found |
+| card | `.cards-pane` in the dock body, `.cardview .cv-title`, a `.cards-tab`, `aside.card-skills`, `section.reports`, no `.cards-gone` | `locator('.cardview .cv-title')` — not found |
+| archive | `[data-testid="archive-drawer"]` — which is on the POPULATED drawer only — and an `.archive-item` | `locator('[data-testid="archive-drawer"]')` — not found |
+| settings | `.modal:not(.confirm) .modal-title` reads "Settings", a third `.settings-section` | `toHaveText("Settings")` — not found |
+| model-picker | `.mp-modal-title` reads "Choose a model", a `[data-testid="mp-pick"]`, no `.mp-empty` | `toHaveText("Choose a model")` — not found |
+| confirm | `.modal.confirm`, `#confirm-title`, `.confirm-body`, exactly two `.confirm-actions .vb-btn` | `locator('.modal.confirm')` — not found |
+
+**`control` and `explorer` would otherwise have proven each other**, which is the one pair where the
+assertion had to be written against the surfaces rather than off a class name: the Explorer reuses
+`.control` and adds `.explorer`, so Project Control asserts the second is absent.
+
+### The ratchets block an increase, planted on two surfaces the board cannot see
+
+| planted | result |
+|---|---|
+| `font-size: 0.81rem` on `.exec-head`, an Execution-only rule | exit **1** on all three themes: *"[execution] 1. type conformance went from 0 finding(s) to 3"*, naming `h3.exec-head` three times at `12.96px`. **The board's own check 1 stayed green** — which is the same pair Phase 2 used to justify the static check, now answered the other way round: that phase planted this exact defect and recorded *"`npm run visual` on the same tree exited 0"* |
+| `color: #5a5a5a` on `.settings-section`, a settings-only rule | exit **1**: *"[settings] 4. contrast went from 0 to 12"* at **2.51:1**, and `[boards] 4. contrast: 0 finding(s)` on the same run — which is what says the settings numbers are the modal's and not the board's. Green on marshmallow, whose light ground clears 4.5:1 at that ink, so the plant also demonstrates the per-theme split |
+| `surface.open()` removed from both check bodies | exit **1**, nine surfaces refusing — the table above |
+| `writeRun` removed from the fixture | exit **1**, two surfaces refusing and four failing their examined ratchet |
+
+### Drift: per-surface, on the value SET, and the board's tallies are untouched
+
+**A surface records the SET and the board keeps its TALLY, because the two numbers answer different
+questions.** The board's tally is a fact about a fixed arrangement of 236 elements; a surface's element
+count moves with the fixture's content — one more run record changes every tally on the Execution view and
+nothing about its type. So `SurfaceBaseline` holds `fontSizes` and `radii` as sorted sets and drift over
+them blocks symmetrically, NEW and GONE, for the reason board.spec.ts gives: a value disappearing is
+usually progress and is also how a whole surface stops rendering.
+
+**Recording a surface's values as a baseline is fine; widening the board's set is not, and the board's set
+did not move.** Every surface's set is a SUBSET of the scale and no surface computes anything off it — but
+they are not all the same subset, and **two surfaces compute a step the board never renders**: the open card
+adds `18px` (`--t-title`, its own title) and Project Control adds `4px` (`--r-sm`). The narrowest are the
+confirm dialog and the settings modal at `12 / 13px` and `6 / 10px`. `--t-display` 24px is still absent from
+everywhere the browser can reach, exactly as Phase 5 recorded — its one consumer is `.markdown h1`, and no
+fixture card has a heading. Recorded per surface for that reason: a shared set would have had to be the
+union, which asserts nothing about any of them.
+
+`board.spec.ts`'s record test now carries `surfaces` across rather than rebuilding the file, or the next
+`visual:record` would leave nine surfaces with no ceiling.
+
+**The board's asserted numbers are byte-identical to `42b5e7e`** — `findings` on all three themes is
+`overflow 0, clipping 1, contrast 0, tokens 1, rows 0, focus 0`, and the drift sets are unchanged.
+
+**Its EXAMINED counts moved from 231 to 236, and both halves of that are accounted for.** The recorded 231
+was **stale before this phase**: Phase 5b read its new tally and deliberately did not re-record, because
+drift compares the key set and the file's counts are documentary — this tree renders **232** on 42b5e7e,
+which is the number 5b's own notes quote. The remaining **+4 is the fixture state, and every one of the
+four is a `--t-micro` badge caused by one thing that was written**: `.tab-badge` (the attention run),
+`[data-testid="dock-badge"]` (the one active suggestion), `.tile-suggestions` (two open suggestions on the
+product card) and `.board-archive` (the archived card) — counted in the page, one each. Nothing else on the
+board changed shape.
+
+### What is left where it was, and why
+
+- **Checks 9, 10 and 11 stay in `board.spec.ts`.** There is one board whose three rows share a grid, one
+  dock whose height is definite, and check 11 is a claim about a FACE — identical on every surface that
+  renders a readout, and already asserted per theme. Check 7's two NAMED rows stay too: the auto-pilot bar
+  and the top bar are the shell, not a surface. Its generic half runs everywhere.
+- **Check 8 is BLOCKING AT ZERO per surface, and it is the only claim here that is.** It was already zero
+  on the board, and a surface where a primitive cannot be reached by Tab has a keyboard fault rather than a
+  styling backlog. **112 enabled primitives across the ten surfaces (8 disabled, skipped), every
+  one reached by Tab, every one with a ring**, in each theme's own accent.
+- **Type and radius conformance are RATCHETS per surface** and remain BLOCKING AT ZERO on the board. They
+  happen to be at zero on all ten today, so the ratchet is blocking everywhere — but it is written as a
+  ratchet because Phases 7–10 may legitimately move a surface before they fix it, and this page's rule is
+  that a gate pointed at a backlog gets bypassed.
+
+**Exit:** the table above. **Harness: 93 tests, three themes, exit 0.** No stylesheet, component or test
+under `test/` was touched: `npm run lint` clean over **541** files, `npm test` **240 files / 4,271 tests**,
+`npm run check` green with the class budget at **380/380**, the geometry ratchet at **8/8**, 136 authored
+`font-size` and 59 authored `border-radius` declarations — every Part One number unmoved.
+**Revert:** `visual/checks/surfaces.spec.ts`, `visual/support/surfaces.ts`, the `AuditOptions` root
+threaded through `audit.ts`, `SurfaceBaseline` in `fixtures.ts`, `furnish` in `run.mjs`, the `surfaces`
+key in three baseline files, and five lines of `board.spec.ts`.
 
 ## Phase 7 — gate every primitive, not only buttons
 

@@ -1,3 +1,4 @@
+import { Button } from '../ui/Button';
 import { activePane, type DockPane } from './panes';
 
 interface Props {
@@ -31,15 +32,16 @@ export function UtilityDock({ panes, activeId, onPane, collapsed, onCollapse }: 
             {p.badge !== undefined && <span className="dock-badge">{p.badge}</span>}
           </button>
         ))}
-        <button
-          type="button"
+        <Button
+          variant="bare"
+          size="sm"
           className="dock-collapse"
           title={collapsed ? 'Expand the dock' : 'Collapse the dock'}
           aria-expanded={!collapsed}
           onClick={onCollapse}
         >
           {collapsed ? '▴' : '▾'}
-        </button>
+        </Button>
       </div>
 
       {/* Hidden rather than unmounted while collapsed, so a keepMounted pane survives folding the

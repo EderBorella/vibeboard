@@ -34,7 +34,10 @@ const skill = (over: Partial<Skill> = {}): Skill => ({
   ...over,
 });
 
-const actions = (): HTMLButtonElement[] => [...document.querySelectorAll<HTMLButtonElement>('.cs-action')];
+// `[data-testid]`, not `.cs-action`: the class is `text-align: left` now; Button owns the box.
+const actions = (): HTMLButtonElement[] => [
+  ...document.querySelectorAll<HTMLButtonElement>('[data-testid="cs-action"]'),
+];
 
 describe('CardSkills', () => {
   it('offers one action per skill, labelled and hinted by the file', () => {

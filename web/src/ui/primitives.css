@@ -1,0 +1,108 @@
+/* THE PRIMITIVES — Button, Dot, Chip. Phase 3 of docs/design-system.md.
+ *
+ * EVERY GEOMETRY DECLARATION FOR A BUTTON-SHAPED ELEMENT LIVES IN THIS FILE, and `npm run
+ * check:radius-scale` fails if a rule anywhere else names a class rendered on a `<button>` OR passed to
+ * a `<Button className>` and declares `border-radius`, `padding` or `font-size`. That is what makes the
+ * split real rather than aspirational: before this file there were 56 such classes, each one a
+ * re-implementation of a shape, and adding a button to the auto-pilot bar meant borrowing a card report
+ * list's class and shipping it at 10.88px inside a 12.16px row. 56 → 46 → **22**.
+ *
+ * READING `<Button className>` WAS FORCED, not chosen. The check saw literal `<button>` only, so
+ * migrating 27 classes onto the primitive moved every one of them out of its sight — a `padding`
+ * planted on `.cs-action` right after the migration exited 0. The `className` prop is documented as
+ * layout-only, and this is what turns that documentation into a gate.
+ *
+ * A caller may still pass `className`, and it is FOR LAYOUT — `align-self`, `flex`, `min-width`, a
+ * margin — or for a non-geometry treatment a surface genuinely owns (monospace, uppercase, a
+ * letter-spacing, a state colour outside the five tones). Not for a padding.
+ *
+ * Loaded BEFORE styles.css, so a surface can still override a primitive's COLOUR at equal
+ * specificity — the emergency stop is a `default` button with a danger hover, a `✕` that deletes goes
+ * red, and the connection light tints its own dot. What stops that override becoming a geometry is the
+ * check, not the cascade.
+ *
+ * Written as compact one-line rules to match styles.css's own idiom — see biome.jsonc: the CSS
+ * linter is on and the CSS formatter is off, because the formatter cannot express this and took
+ * styles.css from 1,927 to 4,348 lines. */
+
+/* ---------- Button ---------- */
+/* `border: 1px solid transparent` on the base rather than per variant: a variant that sets only a
+   colour then cannot accidentally change the box's width, which is the same 2px argument the owner's
+   dashed-ghost ruling rests on. */
+.vb-btn {
+  display: inline-flex; align-items: center; gap: var(--s-3);
+  border: 1px solid transparent; border-radius: var(--r-md);
+  font-family: inherit; cursor: pointer;
+}
+.vb-btn:disabled { opacity: 0.5; cursor: default; }
+
+.vb-btn-sm { padding: var(--s-2) var(--s-4); font-size: var(--t-small); }
+.vb-btn-md { padding: var(--s-4) var(--s-6); font-size: var(--t-body); }
+
+/* THE FIVE VOICES. `primary` is the one action, `default` is everything ordinary, `ghost` explains,
+   `danger` is destructive, `bare` is a glyph with no box. Hover moves the border and the ink and never
+   the box. */
+.vb-btn-primary { background: var(--accent-fill); color: var(--on-fill); font-weight: 600; }
+.vb-btn-default { background: var(--panel-2); color: var(--text); border-color: var(--border); }
+.vb-btn-default:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+/* THE GHOST CARRIES A DASHED BORDER, ruled by the owner on 2026-08-20 reviewing the samples. Not
+   decoration: dashed reads as explanatory rather than actionable — and it keeps the box exactly as wide
+   as a solid button, where a borderless ghost is 2px narrower and shifts the row it sits in. The radius
+   conformance check therefore asserts on `border-radius` and NOT on `border-style`.
+   THAT SENTENCE IS THE TEST FOR WHETHER A CONTROL BELONGS HERE, and it is a narrow gate: does this
+   control EXPLAIN, or does it ACT? Two consumers — the auto-pilot bar's "How it works" and its
+   Details/Hide disclosure. Both reveal information and change nothing in the project. Everything that
+   acts is solid, including the emergency stop, which spent one commit dashed and read as a footnote.
+   `Clear failed tries` was a ghost on the argument that an escape hatch is quiet; quiet is not
+   explanatory, and it writes. */
+.vb-btn-ghost { background: none; color: var(--muted); border-color: var(--border); border-style: dashed; }
+.vb-btn-ghost:hover:not(:disabled) { border-color: var(--accent); color: var(--text); }
+.vb-btn-danger { background: none; color: var(--danger); border-color: var(--border); }
+.vb-btn-danger:hover:not(:disabled) { border-color: var(--danger); }
+/* NO BOX AT ALL — a `×`, a `+`, a `★`, a chevron, an underlined word. It keeps the base's transparent
+   1px border rather than `border: none` so it occupies the same width as every other button and cannot
+   shift the row it is dropped into, which is the same argument the dashed ghost rests on. The hover ink
+   is `--accent` here and a surface may override it with a colour of its own: a `×` that deletes goes
+   red, and `.chat-del` goes to `--accent-2`. A colour is the caller's; the box is not. */
+.vb-btn-bare { background: none; color: var(--muted); }
+.vb-btn-bare:hover:not(:disabled) { color: var(--accent); }
+
+/* ---------- Dot ---------- */
+/* `50%` and not a token, deliberately: a circle is a circle at any size, and `--r-pill`'s 999px would
+   be a claim about a stadium. The radius conformance check allows `50%` for exactly this. */
+.vb-dot { display: inline-block; flex: none; border-radius: 50%; background: currentColor; }
+/* Three sizes, and the hierarchy is the argument: 12px is the connection light (the app's state), 8px
+   is the transport (the project's state), 7px is a property of one of them. */
+.vb-dot-7 { width: 7px; height: 7px; }
+.vb-dot-8 { width: 8px; height: 8px; }
+.vb-dot-12 { width: 12px; height: 12px; }
+
+/* THE FIVE TONES, shared with Chip. NO GLOW HERE, and that is measured rather than tidy: `.conn-online
+   .conn` had one and `.ap-dot-running` did not, so a tone that carried it would light a dot that was
+   never lit. A glow is a surface's emphasis, and the connection light keeps its own. */
+.vb-dot-neutral { background: var(--muted); }
+.vb-dot-accent { background: var(--accent); }
+.vb-dot-ok { background: var(--ok); }
+.vb-dot-warn { background: var(--warn); }
+.vb-dot-bad { background: var(--danger); }
+
+.vb-dot-pulse { animation: vb-dot-pulse 1.6s ease-in-out infinite; }
+@keyframes vb-dot-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+/* Named as well as caught by the blanket `*` rule in styles.css: that one shortens the duration to
+   0.01ms, which is a pulse nobody sees but still a compositor layer per frame. */
+@media (prefers-reduced-motion: reduce) {
+  .vb-dot-pulse { animation: none; }
+}
+
+/* ---------- Chip ---------- */
+.vb-chip {
+  display: inline-flex; align-items: center; gap: var(--s-2);
+  border: 1px solid var(--border); border-radius: var(--r-sm);
+  padding: 0 var(--s-3); font-size: var(--t-micro);
+}
+.vb-chip-pill { border-radius: var(--r-pill); }
+.vb-chip-neutral { color: var(--muted); }
+.vb-chip-accent { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 50%, var(--border)); }
+.vb-chip-ok { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 50%, var(--border)); }
+.vb-chip-warn { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 50%, var(--border)); }
+.vb-chip-bad { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 55%, var(--border)); }

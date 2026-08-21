@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { FsNode } from '../api';
+import { Button } from '../ui/Button';
 import { formatBytes } from './format';
 import { canDropInto } from './paths';
 import type { TreeRow } from './useTree';
@@ -200,23 +201,43 @@ export function FileTree(props: Props) {
       >
         <span>{dragging && rootDroppable ? 'Drop here for the project root' : 'Files'}</span>
         <div className="explorer-actions">
-          <button className="control-new" title={`New file in ${where}`} onClick={() => props.onNew('file')}>
+          <Button
+            variant="bare"
+            size="sm"
+            className="control-new"
+            title={`New file in ${where}`}
+            onClick={() => props.onNew('file')}
+          >
             📄＋
-          </button>
-          <button className="control-new" title={`New folder in ${where}`} onClick={() => props.onNew('dir')}>
+          </Button>
+          <Button
+            variant="bare"
+            size="sm"
+            className="control-new"
+            title={`New folder in ${where}`}
+            onClick={() => props.onNew('dir')}
+          >
             📁＋
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="bare"
+            size="sm"
             className="control-new"
             title={selected ? `Delete ${selected.name}` : 'Select something to delete'}
             disabled={!selected}
             onClick={props.onDelete}
           >
             ✕
-          </button>
-          <button className="control-new" title="Re-read the project from disk" onClick={props.onRefresh}>
+          </Button>
+          <Button
+            variant="bare"
+            size="sm"
+            className="control-new"
+            title="Re-read the project from disk"
+            onClick={props.onRefresh}
+          >
             ⟳
-          </button>
+          </Button>
         </div>
       </div>
 

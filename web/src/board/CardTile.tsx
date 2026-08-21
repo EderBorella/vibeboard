@@ -1,4 +1,5 @@
 import type { Card } from '../shared';
+import { Button } from '../ui/Button';
 import { miniature } from '../viewmodel';
 
 interface Props {
@@ -83,7 +84,8 @@ export function CardTile({
           </span>
         )}
         {onArchive && (
-          <button
+          <Button
+            variant="bare"
             className="tile-archive"
             title="Archive"
             onClick={(e) => {
@@ -92,7 +94,7 @@ export function CardTile({
             }}
           >
             ✕
-          </button>
+          </Button>
         )}
       </div>
       <div className="tile-title">{card.title}</div>

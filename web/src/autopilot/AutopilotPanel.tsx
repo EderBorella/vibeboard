@@ -12,6 +12,7 @@ import { useConfirm } from '../confirm/useConfirm';
 import { errorText } from '../errors';
 import { useAccounting } from '../runs/useAccounting';
 import { type AutopilotConfig, BLOCKED_BOARDS, BOARD_LABELS, type ProjectConfig } from '../shared';
+import { Button } from '../ui/Button';
 import { useReadiness } from './useReadiness';
 
 // The lifecycle as it will actually be executed, plus what is stopping it.
@@ -208,9 +209,9 @@ function StartControl({
         moves the card only if the check passes. It stops on its own when there is nothing left it can do.
       </div>
       <div className="ap-controls">
-        <button
-          type="button"
-          className="btn-primary"
+        <Button
+          variant="primary"
+          size="md"
           // Running means it is already going; halted needs a person to restart it first. Not-ready is NOT a
           // reason to disable: the refusal is how you learn what is missing.
           disabled={running || halted || starting}
@@ -224,7 +225,7 @@ function StartControl({
           }}
         >
           {starting ? 'Starting…' : 'Start auto-pilot'}
-        </button>
+        </Button>
         {running && (
           <span className="settings-hint" data-testid="ap-progress">
             Running — {state?.iteration ?? 0} dispatch{(state?.iteration ?? 0) === 1 ? '' : 'es'} so far
@@ -250,9 +251,8 @@ function StartControl({
       */}
       {(readiness?.unreviewedGates?.length ?? 0) > 0 && (
         <div className="ap-controls">
-          <button
-            type="button"
-            className="btn-secondary"
+          <Button
+            size="md"
             data-testid="ap-panel-review-gates"
             onClick={() => {
               setError(null);
@@ -262,7 +262,7 @@ function StartControl({
             }}
           >
             I have read the gate commands
-          </button>
+          </Button>
         </div>
       )}
       {error && <div className="settings-error">{error}</div>}
@@ -299,18 +299,17 @@ function StopControls({ state, refresh }: { state: AutopilotState | null; refres
         stops. An emergency stop kills every agent in this project and halts it until you restart it.
       </div>
       <div className="ap-controls">
-        <button
-          type="button"
-          className="btn-secondary"
+        <Button
+          size="md"
           // Nothing to stop when it is not running, and refused outright while halted.
           disabled={!running}
           onClick={() => void act(() => softStopAutopilot('You stopped it from Settings.'))}
         >
           Soft stop
-        </button>
-        <button
-          type="button"
-          className="btn-danger"
+        </Button>
+        <Button
+          variant="danger"
+          size="md"
           disabled={halted}
           onClick={() => {
             void confirm(killProjectRequest()).then((ok) => {
@@ -319,7 +318,7 @@ function StopControls({ state, refresh }: { state: AutopilotState | null; refres
           }}
         >
           Emergency stop
-        </button>
+        </Button>
       </div>
       {error && <div className="settings-error">{error}</div>}
       {dialog}

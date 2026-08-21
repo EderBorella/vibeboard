@@ -2,6 +2,7 @@ import { memo, useMemo, useState } from 'react';
 import { addDiaryEntry, type DiaryEntry } from '../api';
 import { MAX_ENTRY_TEXT, type Suggestion } from '../shared';
 import { useSuggestions } from '../suggestions/useSuggestions';
+import { Button } from '../ui/Button';
 import { useAction } from '../useAction';
 import { useDiary } from './useDiary';
 
@@ -107,16 +108,16 @@ function FiledColumn({ bump }: { bump: number }) {
           Work an agent noticed and deliberately did not do. Nothing blocks on one and nothing is lost; triage
           them in the Suggestions pane.
         </p>
-        <button type="button" className="btn-secondary diary-refresh" onClick={refresh}>
+        <Button size="md" className="diary-refresh" onClick={refresh}>
           Refresh suggestions
-        </button>
+        </Button>
       </div>
       {failed ? (
         <div className="diary-empty">
           <p>Could not read what agents filed.</p>
-          <button type="button" className="btn-secondary" onClick={refresh}>
+          <Button size="md" onClick={refresh}>
             Try again
-          </button>
+          </Button>
         </div>
       ) : suggestions.length === 0 ? (
         // Said out loud, like the diary's own empty state: an empty column reads as a broken one.
@@ -165,9 +166,9 @@ export function DiaryView({ bump }: { bump: number }) {
           {/* Always reachable, not only after a failed read. New entries arrive over the socket, and a dropped
             socket is invisible: reconnecting does not change `bump`, and the server replays only the board
             snapshot on connect — so without this the log can sit silently stale with no way to ask again. */}
-          <button type="button" className="btn-secondary diary-refresh" onClick={refresh}>
+          <Button size="md" className="diary-refresh" onClick={refresh}>
             Refresh
-          </button>
+          </Button>
         </div>
 
         <div className="diary-compose">
@@ -183,14 +184,14 @@ export function DiaryView({ bump }: { bump: number }) {
             maxLength={MAX_ENTRY_TEXT}
             onChange={(e) => setDraft(e.target.value)}
           />
-          <button
-            type="button"
-            className="btn-primary"
+          <Button
+            variant="primary"
+            size="md"
             disabled={busy !== null || text === ''}
             onClick={() => void add()}
           >
             {busy ? 'Adding…' : 'Add entry'}
-          </button>
+          </Button>
         </div>
         {/* `assertive`, not `polite`: the entry was NOT written, and the box still holds what was typed. */}
         <div aria-live="assertive">{error && <p className="diary-error">{error}</p>}</div>
@@ -198,9 +199,9 @@ export function DiaryView({ bump }: { bump: number }) {
         {failed ? (
           <div className="diary-empty">
             <p>Could not read this project’s log.</p>
-            <button type="button" className="btn-secondary" onClick={refresh}>
+            <Button size="md" onClick={refresh}>
               Try again
-            </button>
+            </Button>
           </div>
         ) : entries.length === 0 ? (
           // Said out loud. An empty screen would read as a broken one, and this is the file a reader comes

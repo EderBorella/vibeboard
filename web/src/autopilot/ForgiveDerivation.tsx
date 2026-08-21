@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { forgiveProjectAttempts } from '../api';
 import { useConfirm } from '../confirm/useConfirm';
+import { Button } from '../ui/Button';
 import { useAction } from '../useAction';
 
 interface Props {
@@ -64,16 +65,25 @@ export function ForgiveDerivation({ reason, onForgiven }: Props) {
 
   return (
     <>
-      {/* ITS OWN CLASS, not the card list's `reports-forgive`. Borrowing that one put a 10.88px control with
-          1.6px of padding into a bar whose other buttons are 12.16px with 4px — measured in a browser, because
-          jsdom reports every box as zero and cannot see it. The result and error lines below stay on the shared
-          classes: those are prose, and prose in the muted colour is right in both places. */}
-      <button type="button" className="ap-remedy-btn" disabled={busy !== null} onClick={() => void clear()}>
+      {/* IT HAD ITS OWN CLASS, and the reason it needed one is now the primitive's job. Borrowing the card
+          list's `reports-forgive` put a 10.88px control with 1.6px of padding into a bar whose other buttons
+          were 12.16px with 4px — measured in a browser, because jsdom reports every box as zero and cannot
+          see it. Copying the neighbour's declarations verbatim was the second attempt. `Button` is the third
+          and last: there is one geometry, so there is nothing left to borrow wrongly.
+          `default` rather than `ghost`, deliberately: this is the ONE action on a stopped project, and the
+          three controls beside it (Details, How it works, Settings) are quiet on purpose.
+          The result and error lines below stay on the shared classes — those are prose. */}
+      <Button
+        variant="default"
+        className="ap-remedy-btn"
+        disabled={busy !== null}
+        onClick={() => void clear()}
+      >
         {/* Names the derivation rather than saying "clear failed tries", because the card button already
             uses those words for a different position — and a person looking at a stalled project needs to
             know which of the two this is. */}
         {busy !== null ? 'Clearing…' : 'Clear the derivation attempts'}
-      </button>
+      </Button>
       {forgiven !== null && (
         <span className="reports-forgiven">
           {forgiven === 0

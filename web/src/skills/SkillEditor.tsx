@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { Skill } from '../api';
 import { BOARD_LABELS, BOARDS, type BoardName, type ProjectConfig } from '../shared';
+import { Button } from '../ui/Button';
 import { slugify } from '../viewmodel';
 
 interface Props {
@@ -125,16 +126,16 @@ export function SkillEditor({ skill, config, busy, onSave }: Props) {
       />
 
       <div className="skill-foot">
-        <button
-          type="button"
-          className="btn-primary"
+        <Button
+          variant="primary"
+          size="md"
           disabled={busy || !dirty || name.trim() === '' || description.trim() === '' || prompt.trim() === ''}
           onClick={() => {
             void onSave({ name, description, boards, columns, prompt }).then(() => setDirty(false));
           }}
         >
           Save skill
-        </button>
+        </Button>
       </div>
     </div>
   );

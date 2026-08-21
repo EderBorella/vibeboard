@@ -27,7 +27,7 @@ body {
 /* Themed scrollbars */
 * { scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
 *::-webkit-scrollbar { width: 9px; height: 9px; }
-*::-webkit-scrollbar-thumb { background: var(--border); border-radius: 999px; }
+*::-webkit-scrollbar-thumb { background: var(--border); border-radius: var(--r-pill); }
 *::-webkit-scrollbar-thumb:hover { background: var(--accent); }
 
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -114,16 +114,20 @@ body {
   gap: var(--s-4);
   flex: 0 0 auto;
 }
-.theme-select, .switch-btn {
+/* `.switch-btn` shared this and is now `default` — the same box, the same hover. The rule stays for the
+   `<select>`, which is not a button and which no primitive owns yet. */
+.theme-select {
   background: var(--panel-2);
   color: var(--text);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--r-md);
   padding: var(--s-2) var(--s-4);
   font-size: var(--t-small);
   cursor: pointer;
 }
-.switch-btn:hover, .theme-select:hover { border-color: var(--accent); }
+.theme-select:hover { border-color: var(--accent); }
+/* PRESSED, which is not one of the five voices: the copilot toggle is lit while the panel is open, and a
+   filled `primary` would make a view toggle look like the page's one action. A colour and a glow only. */
 .switch-btn.active { border-color: var(--accent); color: var(--accent); box-shadow: var(--glow); }
 /* The live-connection indicator: dot plus the state in words.
    FIXED WIDTH, and that is the whole reason the label sits in its own element. The four states are
@@ -165,32 +169,34 @@ body {
      The fixed width exists to stop the TABS moving, not to make the label wander inside it. */
   text-align: left;
 }
-.conn-status:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 3px; }
+.conn-status:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: var(--r-sm); }
 .conn-text { width: 12ch; white-space: nowrap; }
-.conn {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: var(--muted);
-  flex: 0 0 auto;
-  align-self: center;
-}
+/* THE SHAPE IS `Dot`'s NOW — 12px and the circle live in ui/primitives.css. What is left here is what
+   the light's own row needs: it opts out of the bar's baseline alignment (see above), and the colour is
+   the state's, below. */
+.conn { align-self: center; }
 /* The state class is on the WRAPPER, so it can tint the dot and the word together.
    `online`, not `open`: the four socket states are transport words, and `open` describes a WebSocket
    rather than anything a person is trying to do. `online`/`offline` is the pair that means something at
    a glance — and `offline` is the one that is NOT about the connection at all: the server is right
    there, the project simply cannot run anything because a dependency is missing. */
-.conn-online .conn { background: var(--accent); box-shadow: var(--glow); }
-.conn-connecting .conn { background: var(--accent-2); }
-.conn-closed .conn { background: var(--danger); }
-.conn-closed .conn-text { color: var(--danger); }
-.conn-unauthorized .conn-text { color: var(--warn); }
+/* `[data-state]` AND NOT `.conn-<state>`. The six state classes existed ONLY inside the template
+   literal `conn-${light}` in ConnectionLight.tsx, so a literal grep for any of them found nothing and
+   all six read as dead — and deleting them would have removed the colour that says the connection has
+   dropped while leaving a healthy board looking perfect. See docs/design-system.md, *Risks*.
+   The glow stays HERE rather than moving into the `accent` tone: `.ap-dot-running` never had one, so a
+   tone that carried it would light a dot that was never lit. */
+.conn-status[data-state='online'] .vb-dot { background: var(--accent); box-shadow: var(--glow); }
+.conn-status[data-state='connecting'] .vb-dot { background: var(--accent-2); }
+.conn-status[data-state='closed'] .vb-dot { background: var(--danger); }
+.conn-status[data-state='closed'] .conn-text { color: var(--danger); }
+.conn-status[data-state='unauthorized'] .conn-text { color: var(--warn); }
 /* Amber rather than red, and both halves tinted. A red dot beside a working board reads as "it is
    broken"; this is "it is here, and it cannot do the thing it exists for", which is a different alarm
    and a milder one. Distinguished from `connecting` — the other amber — by the word, which is exactly
    why the word is there. */
-.conn-offline .conn { background: var(--warn); }
-.conn-offline .conn-text { color: var(--warn); }
+.conn-status[data-state='offline'] .vb-dot { background: var(--warn); }
+.conn-status[data-state='offline'] .conn-text { color: var(--warn); }
 /* `failing` is the only state here that is NOT about the present: the project can run agents, and the last
    ones it ran died before reaching a model. So it must not look like `online` — that was the bug, a green
    light over a morning of auto-pilot stopping itself — and it must not look like `offline` either, which
@@ -199,8 +205,8 @@ body {
    define the two to the same amber and one does not, so where they coincide this is distinguished from
    `offline` by the word — which is the same bargain `connecting` already strikes with `offline`, and the
    reason the word is rendered at all. A hex here would be a colour belonging to no theme. */
-.conn-failing .conn { background: var(--accent-2); }
-.conn-failing .conn-text { color: var(--accent-2); }
+.conn-status[data-state='failing'] .vb-dot { background: var(--accent-2); }
+.conn-status[data-state='failing'] .conn-text { color: var(--accent-2); }
 /* LAST OF THE `.conn-text` RULES, and the position is the point. At (0,3,0) it outranks every state
    tint above it and won wherever it was written, so this is a move and not a change — but written
    first it was a descending-specificity trap: the next person adding a `.conn-<state> .conn-text`
@@ -223,7 +229,7 @@ body {
   padding: 0.7rem 0.85rem;
   background: var(--panel-2);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--r-lg);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
   text-align: left;
   letter-spacing: normal;
@@ -307,7 +313,7 @@ body {
   letter-spacing: 0;
   background: var(--panel-2);
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   padding: 0 var(--s-4);
 }
 
@@ -318,7 +324,7 @@ body {
   flex: 0 0 auto;
   background: var(--panel-2);
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   color: var(--muted);
   cursor: pointer;
   font-size: var(--t-micro);
@@ -380,7 +386,7 @@ body {
   gap: var(--s-4);
   background: var(--panel-2);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--r-md);
   padding: var(--s-3) var(--s-4);
 }
 .archive-meta { display: flex; align-items: baseline; gap: var(--s-4); flex: 0 0 auto; }
@@ -393,14 +399,14 @@ body {
 }
 .archive-title:hover { color: var(--accent); }
 .archive-actions { display: flex; align-items: center; gap: var(--s-3); flex: 0 0 auto; }
-.archive-restore, .archive-column {
-  background: var(--panel); color: var(--text);
-  border: 1px solid var(--border); border-radius: 6px;
+/* `.archive-restore` shared this rule and is now `default` — hover included, which `.vb-btn-default`
+   already says. The rule stays for the `<select>` beside it, which no primitive owns yet. */
+.archive-column {
+  background: var(--panel); color: var(--muted);
+  border: 1px solid var(--border); border-radius: var(--r-md);
   cursor: pointer; font-size: var(--t-small); font-family: inherit;
   padding: 0.2rem var(--s-4);
 }
-.archive-restore:hover { border-color: var(--accent); color: var(--accent); }
-.archive-column { color: var(--muted); }
 
 /* ---------- Column ---------- */
 .column {
@@ -441,13 +447,10 @@ body {
 .column-title::after { content: "]"; color: var(--accent); margin-left: 0.3em; }
 .column-count {
   color: var(--muted); font-size: var(--t-small);
-  background: var(--panel-2); border-radius: 999px; padding: 0 var(--s-3);
+  background: var(--panel-2); border-radius: var(--r-pill); padding: 0 var(--s-3);
 }
-.column-add {
-  margin-left: auto; background: transparent; color: var(--muted);
-  border: none; font-size: var(--t-title); line-height: 1; cursor: pointer;
-}
-.column-add:hover { color: var(--accent); }
+/* `bare` owns the box and the hover. What is left is where it sits. */
+.column-add { margin-left: auto; }
 .column-body {
   padding: var(--tile-gap);
   display: flex;
@@ -459,7 +462,7 @@ body {
 }
 .column-empty {
   color: var(--muted); font-size: var(--t-small); text-align: center;
-  padding: 0.9rem var(--s-4); border: 1px dashed var(--border); border-radius: 8px;
+  padding: 0.9rem var(--s-4); border: 1px dashed var(--border); border-radius: var(--r-md);
 }
 
 /* ---------- Card tile (fixed size) ---------- */
@@ -470,7 +473,7 @@ body {
   background: var(--panel-2);
   border: 1px solid var(--border);
   border-left: 2px solid var(--accent);
-  border-radius: 8px;
+  border-radius: var(--r-md);
   padding: var(--s-4) var(--s-4);
   cursor: pointer;
   display: flex;
@@ -481,11 +484,10 @@ body {
 .tile-head { display: flex; align-items: center; gap: var(--s-3); }
 .tile-id { font-family: var(--font-mono); font-size: var(--t-micro); color: var(--accent); }
 .tile-link { font-size: var(--t-micro); color: var(--accent-2); }
-.tile-archive {
-  margin-left: auto; background: transparent; border: none;
-  color: var(--muted); cursor: pointer; font-size: var(--t-body);
-}
-.tile-archive:hover { color: var(--danger); }
+/* A `✕` that ARCHIVES goes red on hover rather than accent — a colour the surface owns, and the one
+   thing `bare` cannot decide for it. */
+.tile-archive { margin-left: auto; }
+.tile-archive:hover:not(:disabled) { color: var(--danger); }
 .tile-title {
   font-size: var(--t-body); font-weight: 600; line-height: 1.25;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
@@ -502,7 +504,7 @@ body {
 .tag {
   font-size: var(--t-micro); color: var(--muted);
   background: var(--panel); border: 1px solid var(--border);
-  border-radius: 999px; padding: 0.02rem var(--s-3);
+  border-radius: var(--r-pill); padding: 0.02rem var(--s-3);
 }
 /* A tag on a tile is a real button wherever it can filter the board (CardTile's onTag). */
 .tag-btn { cursor: pointer; font-family: inherit; line-height: inherit; }
@@ -514,7 +516,7 @@ body {
   display: inline-flex; align-items: center; gap: var(--s-2);
   font-size: var(--t-micro); font-family: var(--font-mono);
   color: var(--muted); background: var(--panel-2);
-  border: 1px solid var(--border); border-radius: 999px;
+  border: 1px solid var(--border); border-radius: var(--r-pill);
   padding: 0.1rem var(--s-4); cursor: pointer;
 }
 .tag-chip:hover { color: var(--accent); border-color: var(--accent); }
@@ -523,12 +525,9 @@ body {
   border-color: var(--accent); box-shadow: var(--glow);
 }
 .tag-chip-count { opacity: 0.7; font-size: var(--t-micro); }
-.tag-filter-clear {
-  font-size: var(--t-micro); color: var(--muted);
-  background: transparent; border: none; cursor: pointer;
-  text-decoration: underline; padding: 0.1rem 0.2rem;
-}
-.tag-filter-clear:hover { color: var(--accent); }
+/* The underline is what makes it read as a link rather than a control, which is deliberate here: it
+   undoes a filter rather than doing anything to the project. Not a geometry. */
+.tag-filter-clear { text-decoration: underline; }
 
 /* ---------- Responsive: 3 thresholds on the board area (reacts to copilot too) ---------- */
 @container vbboards (max-width: 720px) {
@@ -544,14 +543,14 @@ body {
 .gate-card {
   width: 100%; max-width: 520px;
   background: var(--panel); border: 1px solid var(--border);
-  border-radius: 12px; padding: 1.5rem;
+  border-radius: var(--r-lg); padding: 1.5rem;
 }
 .gate-card h2 { margin: 0 0 1rem; font-family: var(--font-display); letter-spacing: 0.04em; }
 .gate-card h3 { margin: 1.5rem 0 0.5rem; font-size: var(--t-lead); color: var(--muted); }
 .gate-list { list-style: none; margin: 0 0 1rem; padding: 0; display: flex; flex-direction: column; gap: var(--s-3); }
 .gate-list button {
   width: 100%; text-align: left; background: var(--panel-2);
-  border: 1px solid var(--border); border-radius: 8px; padding: var(--s-4) 0.7rem;
+  border: 1px solid var(--border); border-radius: var(--r-md); padding: var(--s-4) 0.7rem;
   cursor: pointer; color: var(--text); display: flex; flex-direction: column; gap: 0.15rem;
 }
 .gate-list button:hover { border-color: var(--accent); }
@@ -562,12 +561,12 @@ body {
 .gate-row { display: flex; gap: var(--s-4); }
 .gate input {
   flex: 1; background: var(--bg); border: 1px solid var(--border);
-  border-radius: 6px; padding: var(--s-4) var(--s-4); color: var(--text); font-size: var(--t-body);
+  border-radius: var(--r-md); padding: var(--s-4) var(--s-4); color: var(--text); font-size: var(--t-body);
 }
 .gate input:focus { outline: none; border-color: var(--accent); }
 .gate button:not(.gate-list button) {
   background: var(--accent-fill); color: var(--on-fill); border: none;
-  border-radius: 6px; padding: 0 0.9rem; font-weight: 600; cursor: pointer;
+  border-radius: var(--r-md); padding: 0 0.9rem; font-weight: 600; cursor: pointer;
 }
 .gate button:disabled { opacity: 0.5; cursor: default; }
 .gate-preview { margin-top: 0.6rem; font-size: var(--t-small); color: var(--muted); }
@@ -578,7 +577,7 @@ body {
   margin-top: 1rem; color: var(--danger); font-size: var(--t-body);
   background: color-mix(in srgb, var(--danger) 12%, transparent);
   border: 1px solid color-mix(in srgb, var(--danger) 35%, transparent);
-  border-radius: 6px; padding: var(--s-4) 0.7rem;
+  border-radius: var(--r-md); padding: var(--s-4) 0.7rem;
 }
 
 /* ---------- Card editor modal ---------- */
@@ -589,16 +588,16 @@ body {
 .modal {
   width: 100%; max-width: 620px; max-height: 90vh;
   background: var(--panel); border: 1px solid var(--border);
-  border-radius: 12px; display: flex; flex-direction: column;
+  border-radius: var(--r-lg); display: flex; flex-direction: column;
 }
 .modal-head { display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); }
 .modal-title { font-weight: 600; font-family: var(--font-display); letter-spacing: 0.04em; }
-.modal-close { background: transparent; border: none; color: var(--muted); cursor: pointer; font-size: var(--t-lead); }
+/* `.modal-close` is gone outright — it was the `bare` variant and nothing else. */
 .modal-body { padding: 1rem; overflow-y: auto; display: flex; flex-direction: column; gap: 0.7rem; }
 .field { display: flex; flex-direction: column; gap: var(--s-2); }
 .field > span { font-size: var(--t-small); color: var(--muted); }
 .field input, .field textarea {
-  background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+  background: var(--bg); border: 1px solid var(--border); border-radius: var(--r-md);
   padding: var(--s-4) var(--s-4); color: var(--text); font-size: var(--t-body); font-family: inherit; resize: vertical;
 }
 .field input:focus, .field textarea:focus { outline: none; border-color: var(--accent); }
@@ -616,7 +615,7 @@ body {
   font-size: var(--t-small); color: var(--text); line-height: 1.55;
   background: color-mix(in srgb, var(--warn, var(--danger)) 10%, transparent);
   border: 1px solid color-mix(in srgb, var(--warn, var(--danger)) 32%, transparent);
-  border-radius: 6px; padding: var(--s-4) 0.7rem;
+  border-radius: var(--r-md); padding: var(--s-4) 0.7rem;
 }
 .settings-warn code { font-family: var(--font-mono); font-size: var(--t-small); }
 /* Each blocker is a sentence naming what to change, so they are set as prose rather than as status
@@ -628,7 +627,7 @@ body {
 
 .settings-row { display: flex; gap: 0.75rem; }
 .settings-row .field { flex: 1; }
-.field select { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: var(--s-4) var(--s-4); color: var(--text); font-size: var(--t-body); }
+.field select { background: var(--bg); border: 1px solid var(--border); border-radius: var(--r-md); padding: var(--s-4) var(--s-4); color: var(--text); font-size: var(--t-body); }
 .field select:focus { outline: none; border-color: var(--accent); }
 
 /* Searchable model picker */
@@ -636,7 +635,7 @@ body {
 .mp-trigger {
   width: 100%; display: flex; align-items: center; gap: var(--s-3);
   background: var(--bg); color: var(--text); border: 1px solid var(--border);
-  border-radius: 6px; padding: var(--s-3) var(--s-4); font-size: var(--t-small); cursor: pointer;
+  border-radius: var(--r-md); padding: var(--s-3) var(--s-4); font-size: var(--t-small); cursor: pointer;
 }
 .mp-trigger:hover:not(:disabled) { border-color: var(--accent); }
 .mp-trigger:disabled { opacity: 0.5; cursor: default; }
@@ -648,16 +647,9 @@ body {
 .confirm { max-width: 420px; }
 .confirm-body { margin: 0; font-size: var(--t-body); color: var(--muted); }
 .confirm-actions { display: flex; justify-content: flex-end; gap: var(--s-4); }
-.confirm-cancel, .confirm-go {
-  background: var(--panel); color: var(--text);
-  border: 1px solid var(--border); border-radius: 6px;
-  cursor: pointer; font-size: var(--t-small); font-family: inherit;
-  padding: var(--s-2) 0.7rem;
-}
-.confirm-cancel:hover { border-color: var(--accent); color: var(--accent); }
-/* The destructive button is the one that looks dangerous; a reversible action keeps the plain style,
-   so the two do not read as equally final. */
-.confirm-go:hover { border-color: var(--accent); color: var(--accent); }
+/* `.confirm-cancel`'s rule and `.confirm-go`'s plain state are both gone — they were `default`, hover
+   included. The destructive button is the one that looks dangerous; a reversible action keeps the plain
+   style, so the two do not read as equally final. That colour is all `.confirm-go` still carries. */
 .confirm-go.danger { color: var(--danger); border-color: var(--danger); }
 .confirm-go.danger:hover { background: var(--danger); color: var(--bg); }
 
@@ -665,30 +657,32 @@ body {
 .mp-modal-backdrop { position: fixed; inset: 0; z-index: 60; background: rgba(0,0,0,0.55); display: flex; align-items: center; justify-content: center; padding: 1rem; }
 .mp-modal {
   width: min(560px, 100%); max-height: 80vh; display: flex; flex-direction: column;
-  background: var(--panel); border: 1px solid var(--accent); border-radius: 10px;
+  background: var(--panel); border: 1px solid var(--accent); border-radius: var(--r-lg);
   box-shadow: var(--glow), 0 12px 40px rgba(0,0,0,0.5); overflow: hidden;
 }
 .mp-modal-head { display: flex; align-items: center; padding: 0.7rem 0.9rem; border-bottom: 1px solid var(--border); }
 .mp-modal-title { font-weight: 700; font-family: var(--font-display); text-transform: uppercase; letter-spacing: 0.12em; }
-.mp-modal-close { margin-left: auto; background: transparent; border: none; color: var(--muted); cursor: pointer; font-size: var(--t-lead); }
+.mp-modal-close { margin-left: auto; }
 .mp-search {
   margin: 0.6rem 0.9rem 0.4rem; padding: var(--s-4) var(--s-4); background: var(--bg); color: var(--text);
-  border: 1px solid var(--border); border-radius: 6px; font-size: var(--t-body);
+  border: 1px solid var(--border); border-radius: var(--r-md); font-size: var(--t-body);
 }
 .mp-search:focus { outline: none; border-color: var(--accent); }
 .mp-filters { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-3); padding: 0 0.9rem var(--s-3); }
 .mp-chip {
   background: var(--panel-2); color: var(--muted); border: 1px solid var(--border);
-  border-radius: 999px; padding: 0.22rem var(--s-4); font-size: var(--t-small); cursor: pointer;
+  border-radius: var(--r-pill); padding: 0.22rem var(--s-4); font-size: var(--t-small); cursor: pointer;
 }
 .mp-chip:hover { border-color: var(--accent); }
 .mp-chip.on { background: var(--accent-fill); color: var(--on-fill); border-color: var(--accent); font-weight: 600; }
-.mp-prov { margin-left: auto; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 0.22rem var(--s-3); font-size: var(--t-small); }
+.mp-prov { margin-left: auto; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: var(--r-md); padding: 0.22rem var(--s-3); font-size: var(--t-small); }
 .mp-count { padding: 0 0.9rem var(--s-2); font-size: var(--t-micro); color: var(--muted); font-family: var(--font-mono); }
 .mp-list { flex: 1; overflow-y: auto; padding: 0 var(--s-4) var(--s-4); }
-.mp-item { display: flex; align-items: center; border-radius: 6px; }
+.mp-item { display: flex; align-items: center; border-radius: var(--r-md); }
 .mp-item:hover, .mp-sel { background: var(--panel-2); }
-.mp-star { background: transparent; border: none; color: var(--accent-2); cursor: pointer; font-size: var(--t-lead); padding: var(--s-2) var(--s-3); }
+/* A favourite is already lit; it does not need a hover to say so. `--accent-2` at rest is the colour, and
+   `bare`'s muted default is what it overrides. */
+.mp-star { color: var(--accent-2); }
 .mp-pick {
   flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.15rem;
   background: transparent; border: none; color: var(--text); cursor: pointer;
@@ -699,7 +693,7 @@ body {
 .mp-def { border-left: 2px solid var(--accent); }
 .mp-def-tag {
   flex: 0 0 auto; font-size: var(--t-micro); text-transform: uppercase; letter-spacing: 0.08em;
-  color: var(--accent); border: 1px solid var(--accent); border-radius: 999px; padding: 0 var(--s-3);
+  color: var(--accent); border: 1px solid var(--accent); border-radius: var(--r-pill); padding: 0 var(--s-3);
 }
 .mp-pick-top { display: flex; align-items: baseline; gap: var(--s-4); min-width: 0; }
 .mp-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
@@ -718,18 +712,13 @@ body {
   font-size: var(--t-micro); color: var(--muted);
   padding: var(--s-2) var(--s-4);
 }
-.copilot-reset {
-  margin-left: auto; background: var(--panel-2); color: var(--text);
-  border: 1px solid var(--border); border-radius: 6px;
-  cursor: pointer; font-size: var(--t-micro); font-family: inherit; padding: 0.1rem var(--s-3);
-}
-.copilot-reset:hover { border-color: var(--accent); color: var(--accent); }
+.copilot-reset { margin-left: auto; }
 
 .copilot-warn { padding: var(--s-3) 0.75rem; font-size: var(--t-small); color: var(--danger); background: color-mix(in srgb, var(--danger) 12%, transparent); border-bottom: 1px solid var(--border); }
 .links-hint { color: var(--muted); font-size: var(--t-body); font-style: italic; }
 .links-list {
   display: flex; flex-direction: column; gap: var(--s-2); max-height: 180px; overflow-y: auto;
-  border: 1px solid var(--border); border-radius: 6px; padding: var(--s-4); background: var(--bg);
+  border: 1px solid var(--border); border-radius: var(--r-md); padding: var(--s-4); background: var(--bg);
 }
 .links-group { font-size: var(--t-micro); text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 0.3rem 0 0.1rem; }
 .links-group:first-child { margin-top: 0; }
@@ -759,7 +748,7 @@ body {
 .cv-link { display: flex; gap: var(--s-4); align-items: baseline; font-size: var(--t-body); }
 /* A link is a button wherever it can actually open the card (CardView's onOpenCard). */
 .cv-link-btn {
-  background: transparent; border: 1px solid transparent; border-radius: 6px;
+  background: transparent; border: 1px solid transparent; border-radius: var(--r-md);
   color: inherit; cursor: pointer; font: inherit; text-align: left;
   padding: 0.1rem var(--s-3); width: fit-content;
 }
@@ -772,18 +761,18 @@ body {
   color: var(--danger); font-size: var(--t-body);
   background: color-mix(in srgb, var(--danger) 12%, transparent);
   border: 1px solid color-mix(in srgb, var(--danger) 35%, transparent);
-  border-radius: 6px; padding: var(--s-4) 0.7rem;
+  border-radius: var(--r-md); padding: var(--s-4) 0.7rem;
 }
 .modal-foot { display: flex; justify-content: flex-end; gap: var(--s-4); padding: 0.75rem 1rem; border-top: 1px solid var(--border); }
-.btn-primary { background: var(--accent-fill); color: var(--on-fill); border: none; border-radius: 6px; padding: var(--s-4) 1rem; font-weight: 600; cursor: pointer; }
-.btn-secondary { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: var(--s-4) 1rem; cursor: pointer; }
-.btn-primary:disabled, .btn-secondary:disabled { opacity: 0.5; cursor: default; }
+/* `.btn-primary`, `.btn-secondary` and `.btn-danger` WERE HERE and are gone: 37 call sites that were
+   `primary`, `default` and `danger` under their old names, with `padding: var(--s-4) 1rem` — which is
+   `md` exactly. `:disabled` went with them; `.vb-btn:disabled` says the same thing once. */
 
 /* A REFRESH IS NOT THE MAIN ACTION IN ITS PANE, and it was being drawn as one. `.diary-refresh` had no
    rule at all, so it stretched to the width of its flex column: 690px in the Project Log and 1240px in
    "What agents filed", which made a minor repeatable button the single most prominent element in each
    pane — above the log it refreshes. `align-self: flex-start` is the idiom this stylesheet already uses
-   for exactly this, on `.sandbox-action > .btn-secondary`. */
+   for exactly this, on `.sandbox-action > .vb-btn`. */
 .diary-refresh { align-self: flex-start; }
 
 /* ---------- Utility dock (bottom of the work column) ---------- */
@@ -798,7 +787,7 @@ body {
 .dock-tab {
   display: inline-flex; align-items: center; gap: var(--s-3);
   background: transparent; border: 1px solid transparent; color: var(--muted);
-  border-radius: 6px; padding: 0.2rem var(--s-4); cursor: pointer;
+  border-radius: var(--r-md); padding: 0.2rem var(--s-4); cursor: pointer;
   font-family: var(--font-display); font-size: var(--t-small);
   text-transform: uppercase; letter-spacing: 0.08em;
 }
@@ -806,14 +795,10 @@ body {
 .dock-tab.active { color: var(--text); background: var(--panel-2); border-color: var(--border); }
 .dock-badge {
   font-family: var(--font-mono); font-size: var(--t-micro); letter-spacing: 0;
-  background: var(--bg); border: 1px solid var(--border); border-radius: 999px;
+  background: var(--bg); border: 1px solid var(--border); border-radius: var(--r-pill);
   padding: 0 var(--s-3);
 }
-.dock-collapse {
-  margin-left: auto; background: transparent; border: none;
-  color: var(--muted); cursor: pointer; font-size: var(--t-body); padding: 0 var(--s-2);
-}
-.dock-collapse:hover { color: var(--accent); }
+.dock-collapse { margin-left: auto; }
 /* SIZED BY ITS CONTENT, capped at 38vh — EXCEPT where a pane exists to be filled.
    It was `height: 38vh` outright, so the dock reserved 38% of the viewport whatever was in it: 414px of
    empty panel to display the words "No card open." on a 1000px-tall screen, while the boards above had
@@ -842,7 +827,7 @@ body {
 }
 .cards-tab {
   display: inline-flex; align-items: center; flex: 0 0 auto;
-  background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+  background: var(--bg); border: 1px solid var(--border); border-radius: var(--r-md);
   max-width: 220px;
 }
 .cards-tab.active { border-color: var(--accent); box-shadow: var(--glow); }
@@ -852,11 +837,8 @@ body {
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .cards-tab.active .cards-tab-label { color: var(--text); }
-.cards-tab-x {
-  background: transparent; border: none; color: var(--muted);
-  cursor: pointer; font-size: var(--t-micro); padding: 0.18rem var(--s-3);
-}
-.cards-tab-x:hover { color: var(--danger); }
+/* Closing a tab is a small destruction, so it goes red rather than accent. */
+.cards-tab-x:hover:not(:disabled) { color: var(--danger); }
 .cards-main { flex: 1; min-height: 0; display: flex; }
 .cards-body { flex: 1; min-width: 0; overflow-y: auto; padding: 0.7rem 1rem; }
 .cards-gone { color: var(--muted); font-size: var(--t-body); font-style: italic; padding: 1rem 0; }
@@ -871,19 +853,15 @@ body {
   margin: 0 0 0.1rem; font-family: var(--font-display); font-size: var(--t-small);
   text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted);
 }
-.cs-action {
-  background: var(--panel); color: var(--text); border: 1px solid var(--border);
-  border-radius: 6px; padding: var(--s-3) var(--s-4); font-size: var(--t-body); text-align: left;
-  cursor: pointer;
-}
-.cs-action:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
-.cs-action:disabled { opacity: 0.45; cursor: default; }
+/* A skill's name is prose of arbitrary length in a narrow rail, so it reads from the left like the list
+   it is. Alignment is layout, and the only thing left of this rule. */
+.cs-action { text-align: left; }
 .cs-empty { margin: 0.2rem 0 0; font-size: var(--t-micro); color: var(--muted); line-height: 1.4; }
 .cs-invalid { margin: 0.3rem 0 0; font-size: var(--t-micro); color: var(--danger); cursor: help; }
 
 /* Inline editing: a field looks like text until hovered, and becomes an input on click. */
 .inline-view {
-  background: transparent; border: 1px solid transparent; border-radius: 6px;
+  background: transparent; border: 1px solid transparent; border-radius: var(--r-md);
   color: inherit; font: inherit; text-align: left; cursor: text;
   padding: 0.1rem var(--s-3); margin: -0.1rem -0.35rem; width: 100%;
   display: block;
@@ -896,7 +874,7 @@ body {
 .inline-empty { color: var(--muted); font-style: italic; font-size: var(--t-body); }
 .inline-edit {
   width: 100%; background: var(--bg); color: var(--text);
-  border: 1px solid var(--accent); border-radius: 6px;
+  border: 1px solid var(--accent); border-radius: var(--r-md);
   padding: 0.1rem var(--s-3); font: inherit; font-family: inherit; resize: vertical;
 }
 .inline-edit:focus { outline: none; }
@@ -905,11 +883,7 @@ body {
 .cv-group.inline-view { width: auto; display: inline-block; }
 .cv-tags-edit { min-height: 1.4rem; }
 .cv-links .cv-label { display: flex; align-items: center; gap: var(--s-4); }
-.cv-link-edit {
-  background: transparent; border: none; color: var(--muted);
-  cursor: pointer; font-size: var(--t-micro); text-decoration: underline; padding: 0;
-}
-.cv-link-edit:hover { color: var(--accent); }
+.cv-link-edit { text-decoration: underline; }
 
 /* Raw pane (the card's file, inside the dock) */
 .raw-pane { flex: 1; display: flex; flex-direction: column; gap: var(--s-3); min-height: 0; }
@@ -919,13 +893,9 @@ body {
 .raw-pane .raw-area { flex: 1; min-height: 14rem; }
 .raw-foot { display: flex; align-items: center; justify-content: flex-end; gap: var(--s-4); }
 .raw-error { color: var(--danger); font-size: var(--t-small); margin-right: auto; }
-.cards-raw {
-  margin-left: auto; flex: 0 0 auto;
-  background: var(--panel-2); color: var(--text); border: 1px solid var(--border);
-  border-radius: 6px; padding: 0.18rem 0.7rem; cursor: pointer; font-size: var(--t-small);
-}
-.cards-raw:hover { border-color: var(--accent); color: var(--accent); }
-.cards-raw.active { background: var(--accent-fill); color: var(--on-fill); border-color: var(--accent); }
+/* A TOGGLE, and its "on" state is now the `primary` variant rather than an `.active` class of its own —
+   which is what `.cards-raw.active`'s accent fill already was, written twice. Layout is what is left. */
+.cards-raw { margin-left: auto; flex: 0 0 auto; }
 
 /* ---------- Copilot dock (shrink side-by-side) ---------- */
 .copilot {
@@ -941,8 +911,8 @@ body {
 .copilot-title { font-weight: 700; font-family: var(--font-display); text-transform: uppercase; letter-spacing: 0.14em; }
 .copilot-title::before { content: "◈ "; color: var(--accent); }
 .copilot-model { font-size: var(--t-micro); color: var(--muted); font-family: var(--font-mono); }
-.copilot-x { margin-left: auto; background: transparent; border: none; color: var(--muted); cursor: pointer; }
-.backend-toggle { display: flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+.copilot-x { margin-left: auto; }
+.backend-toggle { display: flex; border: 1px solid var(--border); border-radius: var(--r-md); overflow: hidden; }
 .bt-btn { background: var(--panel-2); color: var(--muted); border: none; border-right: 1px solid var(--border); padding: 0.18rem var(--s-4); font-size: var(--t-micro); cursor: pointer; }
 .bt-btn:last-child { border-right: none; }
 .bt-btn.active { background: var(--accent-fill); color: var(--on-fill); font-weight: 600; }
@@ -955,45 +925,46 @@ body {
 /* Chat switcher */
 .copilot-chatbar { display: flex; align-items: center; gap: var(--s-3); padding: var(--s-3) 0.75rem; border-bottom: 1px solid var(--border); }
 .chat-switcher { position: relative; flex: 1; min-width: 0; }
-.chat-current { display: flex; align-items: center; gap: var(--s-3); width: 100%; background: var(--panel-2); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: var(--s-2) var(--s-4); font-size: var(--t-small); cursor: pointer; }
+.chat-current { display: flex; align-items: center; gap: var(--s-3); width: 100%; background: var(--panel-2); color: var(--text); border: 1px solid var(--border); border-radius: var(--r-md); padding: var(--s-2) var(--s-4); font-size: var(--t-small); cursor: pointer; }
 .chat-current:hover:not(:disabled) { border-color: var(--accent); }
 .chat-current:disabled { opacity: 0.5; cursor: default; }
 .chat-current-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
 .chat-caret { color: var(--accent); font-size: var(--t-micro); }
-.chat-new { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: var(--s-2) var(--s-4); font-size: var(--t-small); cursor: pointer; white-space: nowrap; }
-.chat-new:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
-.chat-new:disabled { opacity: 0.5; cursor: default; }
+/* "+ New" must not break across two lines when the switcher beside it is wide. */
+.chat-new { white-space: nowrap; }
 .chat-menu-backdrop { position: fixed; inset: 0; z-index: 20; }
-.chat-menu { position: absolute; z-index: 21; top: calc(100% + 4px); left: 0; right: 0; max-height: 320px; overflow-y: auto; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; box-shadow: var(--glow), 0 6px 24px rgba(0,0,0,0.4); padding: var(--s-2); }
+.chat-menu { position: absolute; z-index: 21; top: calc(100% + 4px); left: 0; right: 0; max-height: 320px; overflow-y: auto; background: var(--panel); border: 1px solid var(--border); border-radius: var(--r-lg); box-shadow: var(--glow), 0 6px 24px rgba(0,0,0,0.4); padding: var(--s-2); }
 .chat-menu-empty { padding: var(--s-4) var(--s-4); font-size: var(--t-small); color: var(--muted); }
-.chat-menu-item { display: flex; align-items: stretch; gap: var(--s-2); border-radius: 6px; }
+.chat-menu-item { display: flex; align-items: stretch; gap: var(--s-2); border-radius: var(--r-md); }
 .chat-menu-item.active { background: var(--panel-2); }
 .chat-menu-item:hover { background: var(--panel-2); }
 .chat-menu-open { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.1rem; background: transparent; border: none; color: var(--text); text-align: left; padding: var(--s-3) var(--s-4); cursor: pointer; }
 .chat-menu-item.active .chat-menu-open { border-left: 2px solid var(--accent); }
 .chat-menu-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--t-small); }
+/* `Chip pill` owns the box; this keeps the treatment and the two backend colours. `bk-claude-code` and
+   `bk-opencode` existed only inside `bk-${c.backend}`, so a literal grep found neither. */
 .chat-backend {
-  display: inline-block; margin-right: 0.4rem; padding: 0.02rem var(--s-3); border-radius: 999px;
-  font-size: var(--t-micro); font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; vertical-align: middle;
-  border: 1px solid var(--border);
+  margin-right: 0.4rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
+  vertical-align: middle;
 }
-.chat-backend.bk-claude-code { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 50%, transparent); }
-.chat-backend.bk-opencode { color: var(--accent-2); border-color: color-mix(in srgb, var(--accent-2) 50%, transparent); }
+.chat-backend[data-state='claude-code'] { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 50%, transparent); }
+.chat-backend[data-state='opencode'] { color: var(--accent-2); border-color: color-mix(in srgb, var(--accent-2) 50%, transparent); }
 .chat-menu-meta { font-size: var(--t-micro); color: var(--muted); font-family: var(--font-mono); }
-.chat-del { background: transparent; border: none; color: var(--muted); cursor: pointer; padding: 0 var(--s-4); font-size: var(--t-small); }
-.chat-del:hover { color: var(--accent-2); }
+/* `--accent-2` and not `--danger`: deleting a chat is confirmed, and this row already has a red `✕`
+   nowhere near it. The distinction was deliberate before the migration and survives it. */
+.chat-del:hover:not(:disabled) { color: var(--accent-2); }
 
 .copilot-controls { display: flex; align-items: center; flex-wrap: wrap; gap: var(--s-4); padding: var(--s-4) 0.75rem; border-bottom: 1px solid var(--border); }
-.mode-group { display: flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+.mode-group { display: flex; border: 1px solid var(--border); border-radius: var(--r-md); overflow: hidden; }
 .mode-btn { background: var(--panel-2); color: var(--muted); border: none; border-right: 1px solid var(--border); padding: var(--s-2) var(--s-4); font-size: var(--t-small); cursor: pointer; }
 .mode-btn:last-child { border-right: none; }
 .mode-btn.active { background: var(--accent-fill); color: var(--on-fill); font-weight: 600; }
 .mode-btn:disabled { opacity: 0.6; cursor: default; }
 .copilot-actions { margin-left: auto; display: flex; gap: var(--s-2); }
-.copilot-actions button { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: var(--s-2) var(--s-4); font-size: var(--t-small); cursor: pointer; }
+.copilot-actions button { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); border-radius: var(--r-md); padding: var(--s-2) var(--s-4); font-size: var(--t-small); cursor: pointer; }
 .copilot-actions button:disabled { opacity: 0.5; cursor: default; }
 .copilot-selects { display: flex; gap: var(--s-4); padding: 0 0.75rem var(--s-4); border-bottom: 1px solid var(--border); }
-.copilot-selects select { flex: 1; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: var(--s-2) var(--s-3); font-size: var(--t-small); }
+.copilot-selects select { flex: 1; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: var(--r-md); padding: var(--s-2) var(--s-3); font-size: var(--t-small); }
 .copilot-selects select:disabled { opacity: 0.5; }
 .copilot-status { display: flex; align-items: center; gap: var(--s-3); padding: var(--s-2) 0.75rem; font-size: var(--t-micro); color: var(--muted); border-bottom: 1px solid var(--border); }
 .copilot-status .status-dot { width: 8px; height: 8px; border-radius: 50%; }
@@ -1003,20 +974,20 @@ body {
 .copilot-body { flex: 1; overflow-y: auto; padding: 0.75rem; display: flex; flex-direction: column; gap: var(--s-4); }
 .copilot-empty { color: var(--muted); font-size: var(--t-body); line-height: 1.5; }
 .msg { font-size: var(--t-body); line-height: 1.45; white-space: pre-wrap; word-break: break-word; }
-.msg-user { align-self: flex-end; background: var(--accent-fill); color: var(--on-fill); padding: var(--s-3) var(--s-4); border-radius: 10px 10px 2px 10px; max-width: 85%; }
-.msg-assistant { background: var(--panel-2); border: 1px solid var(--border); padding: var(--s-3) var(--s-4); border-radius: 10px 10px 10px 2px; max-width: 90%; }
+.msg-user { align-self: flex-end; background: var(--accent-fill); color: var(--on-fill); padding: var(--s-3) var(--s-4); border-radius: var(--r-lg) var(--r-lg) var(--r-sm) var(--r-lg); max-width: 85%; }
+.msg-assistant { background: var(--panel-2); border: 1px solid var(--border); padding: var(--s-3) var(--s-4); border-radius: var(--r-lg) var(--r-lg) var(--r-lg) var(--r-sm); max-width: 90%; }
 .msg-thinking { color: var(--muted); font-style: italic; font-size: var(--t-small); }
 .msg-tool { color: var(--accent); font-family: var(--font-mono); font-size: var(--t-small); }
 .msg-error { color: var(--danger); font-size: var(--t-body); }
 .msg-running { color: var(--muted); font-style: italic; }
 .copilot-readout { display: flex; align-items: center; gap: 0.75rem; padding: var(--s-3) 0.75rem; border-top: 1px solid var(--border); font-size: var(--t-small); color: var(--muted); }
 .ctx { margin-left: auto; display: flex; align-items: center; gap: var(--s-3); }
-.ctx-bar { width: 60px; height: 5px; background: var(--panel-2); border-radius: 3px; overflow: hidden; }
+.ctx-bar { width: 60px; height: 5px; background: var(--panel-2); border-radius: var(--r-pill); overflow: hidden; }
 .ctx-fill { display: block; height: 100%; background: var(--accent); }
 .ctx-warn { color: var(--accent-2); }
 .ctx-warn .ctx-fill { background: var(--accent-2); }
 .copilot-input { display: flex; gap: var(--s-4); padding: var(--s-4) 0.75rem; border-top: 1px solid var(--border); }
-.copilot-input textarea { flex: 1; resize: none; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: var(--s-4); color: var(--text); font-family: inherit; font-size: var(--t-body); }
+.copilot-input textarea { flex: 1; resize: none; background: var(--bg); border: 1px solid var(--border); border-radius: var(--r-md); padding: var(--s-4); color: var(--text); font-family: inherit; font-size: var(--t-body); }
 .copilot-input textarea:focus { outline: none; border-color: var(--accent); }
 
 /* A USER-PREFERENCE OVERRIDE IS THE ONE PLACE `!important` IS THE MECHANISM AND NOT A SHORTCUT.
@@ -1038,7 +1009,7 @@ body {
 .topbar-tabs { display: flex; gap: var(--s-2); margin-left: 0.5rem; }
 .tab-btn {
   background: transparent; color: var(--muted); border: 1px solid transparent;
-  border-radius: 6px; padding: var(--s-2) 0.7rem; font-size: var(--t-small); cursor: pointer;
+  border-radius: var(--r-md); padding: var(--s-2) 0.7rem; font-size: var(--t-small); cursor: pointer;
   font-family: var(--font-display); letter-spacing: 0.04em;
 }
 .tab-btn:hover { color: var(--text); }
@@ -1056,25 +1027,24 @@ body {
   font-family: var(--font-display); text-transform: uppercase; letter-spacing: 0.12em;
   font-size: var(--t-micro); color: var(--muted); padding: 0 0.15rem 0.15rem;
 }
-.control-new {
-  background: transparent; border: none; color: var(--accent); cursor: pointer;
-  font-size: var(--t-lead); line-height: 1; padding: 0 0.2rem;
-}
+/* Accent at rest, not on hover: a `＋` that creates is the affordance of the group head it sits in, and
+   a muted one reads as disabled. */
+.control-new { color: var(--accent); }
 .control-item {
   display: flex; align-items: center; gap: var(--s-3); width: 100%; text-align: left;
   background: transparent; color: var(--text); border: 1px solid transparent;
-  border-radius: 6px; padding: var(--s-3) var(--s-4); font-size: var(--t-body); cursor: pointer;
+  border-radius: var(--r-md); padding: var(--s-3) var(--s-4); font-size: var(--t-body); cursor: pointer;
 }
 .control-item:hover { background: var(--panel-2); }
 .control-item.active { background: var(--panel-2); border-color: var(--accent); color: var(--accent); }
 .control-item-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .control-tag {
   font-size: var(--t-micro); text-transform: uppercase; letter-spacing: 0.08em; color: var(--accent-2);
-  border: 1px solid var(--border); border-radius: 4px; padding: 0.05rem var(--s-2);
+  border: 1px solid var(--border); border-radius: var(--r-sm); padding: 0.05rem var(--s-2);
 }
 /* Where the dragged card will land. Sits in the gap between tiles. */
 .drop-line {
-  height: 2px; margin: 2px 0; border-radius: 2px;
+  height: 2px; margin: 2px 0; border-radius: var(--r-pill);
   background: var(--accent); box-shadow: var(--glow);
 }
 
@@ -1104,14 +1074,14 @@ body {
 }
 .confirm-input {
   background: var(--bg); color: var(--text); border: 1px solid var(--border);
-  border-radius: 6px; padding: var(--s-3) var(--s-4); font-family: var(--font-mono); font-size: var(--t-body);
+  border-radius: var(--r-md); padding: var(--s-3) var(--s-4); font-family: var(--font-mono); font-size: var(--t-body);
 }
 .confirm-input:focus { outline: none; border-color: var(--accent); }
 .confirm-go:disabled { opacity: 0.45; cursor: not-allowed; }
 /* Inline rename: sits exactly where the list row was, so the row appears to become editable. */
 .control-rename {
   width: 100%; background: var(--bg); color: var(--text);
-  border: 1px solid var(--accent); border-radius: 6px;
+  border: 1px solid var(--accent); border-radius: var(--r-md);
   padding: var(--s-3) var(--s-4); font-size: var(--t-body); font-family: inherit;
 }
 .control-rename:focus { outline: none; box-shadow: var(--glow); }
@@ -1125,24 +1095,19 @@ body {
 .control-tabs { display: flex; gap: var(--s-2); margin-left: 0.5rem; }
 .control-tabs button {
   background: var(--panel-2); color: var(--muted); border: 1px solid var(--border);
-  border-radius: 6px; padding: 0.2rem var(--s-4); font-size: var(--t-small); cursor: pointer;
+  border-radius: var(--r-md); padding: 0.2rem var(--s-4); font-size: var(--t-small); cursor: pointer;
 }
 .control-tabs button.active { color: var(--text); border-color: var(--accent); }
 .control-editor-actions { margin-left: auto; display: flex; gap: var(--s-3); }
-.btn-danger {
-  background: transparent; color: var(--danger); border: 1px solid var(--border);
-  border-radius: 6px; padding: var(--s-3) 0.8rem; font-size: var(--t-small); cursor: pointer;
-}
-.btn-danger:hover { border-color: var(--danger); }
-.btn-danger:disabled { opacity: 0.5; cursor: default; }
+/* `.btn-danger` was here — `Button`'s `danger` variant at `md`, so it sits level with the Save beside it. */
 .control-disclaimer {
   margin: 0.6rem 0.9rem 0; padding: var(--s-4) 0.7rem; font-size: var(--t-small); line-height: 1.45;
   color: var(--text); background: color-mix(in srgb, var(--danger) 12%, transparent);
-  border: 1px solid color-mix(in srgb, var(--danger) 40%, var(--border)); border-radius: 6px;
+  border: 1px solid color-mix(in srgb, var(--danger) 40%, var(--border)); border-radius: var(--r-md);
 }
 .control-textarea {
   flex: 1; margin: 0.75rem 0.9rem; resize: none; background: var(--bg); color: var(--text);
-  border: 1px solid var(--border); border-radius: 6px; padding: 0.8rem;
+  border: 1px solid var(--border); border-radius: var(--r-md); padding: 0.8rem;
   font-family: var(--font-mono); font-size: var(--t-body); line-height: 1.5;
 }
 .control-textarea:focus { outline: none; border-color: var(--accent); }
@@ -1162,8 +1127,8 @@ body {
 .markdown p { margin: 0.5rem 0; }
 .markdown ul, .markdown ol { margin: 0.5rem 0 0.5rem 1.3rem; }
 .markdown li { margin: 0.2rem 0; }
-.markdown code { font-family: var(--font-mono); font-size: var(--t-small); background: var(--panel-2); padding: 0.05rem var(--s-2); border-radius: 4px; }
-.markdown pre { background: var(--panel-2); border: 1px solid var(--border); border-radius: 6px; padding: 0.7rem; overflow-x: auto; }
+.markdown code { font-family: var(--font-mono); font-size: var(--t-small); background: var(--panel-2); padding: 0.05rem var(--s-2); border-radius: var(--r-sm); }
+.markdown pre { background: var(--panel-2); border: 1px solid var(--border); border-radius: var(--r-md); padding: 0.7rem; overflow-x: auto; }
 .markdown pre code { background: transparent; padding: 0; }
 .markdown a { color: var(--accent); }
 .markdown blockquote { margin: 0.5rem 0; padding-left: 0.8rem; border-left: 3px solid var(--border); color: var(--muted); }
@@ -1174,21 +1139,16 @@ body {
 .resource-row { display: flex; gap: var(--s-3); align-items: center; }
 .resource-row input {
   background: var(--bg); color: var(--text); border: 1px solid var(--border);
-  border-radius: 6px; padding: var(--s-3) var(--s-4); font-size: var(--t-body);
+  border-radius: var(--r-md); padding: var(--s-3) var(--s-4); font-size: var(--t-body);
 }
 .resource-row input:focus { outline: none; border-color: var(--accent); }
 .res-title { flex: 1; } .res-url { flex: 1.4; } .res-note { flex: 1.2; }
-.res-del { background: transparent; border: none; color: var(--muted); cursor: pointer; font-size: var(--t-lead); }
-.res-del:hover { color: var(--danger); }
+.res-del:hover:not(:disabled) { color: var(--danger); }
 
 /* ---------- Dispatch (the details step, inside the cards pane) ---------- */
 .dispatch { display: flex; flex-direction: column; gap: var(--s-4); }
 .dispatch-head { display: flex; align-items: center; gap: var(--s-4); }
-.dispatch-back {
-  background: transparent; border: 1px solid var(--border); border-radius: 6px;
-  color: var(--muted); cursor: pointer; padding: 0.05rem var(--s-3); font-size: var(--t-lead);
-}
-.dispatch-back:hover { color: var(--accent); border-color: var(--accent); }
+/* `.dispatch-back` is gone outright: a bordered `←` with an accent hover is `default`, exactly. */
 .dispatch-title { margin: 0; font-family: var(--font-display); font-size: var(--t-lead); }
 .dispatch-on { color: var(--muted); font-family: var(--font-mono); font-size: var(--t-body); }
 .dispatch-desc { margin: 0; font-size: var(--t-body); color: var(--muted); }
@@ -1204,16 +1164,16 @@ body {
 .dispatch-prompt-label { font-size: var(--t-small); color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
 .dispatch-prompt {
   width: 100%; background: var(--bg); color: var(--text); border: 1px solid var(--border);
-  border-radius: 6px; padding: var(--s-3) var(--s-4); font: inherit; font-size: var(--t-body); resize: vertical;
+  border-radius: var(--r-md); padding: var(--s-3) var(--s-4); font: inherit; font-size: var(--t-body); resize: vertical;
 }
-.dispatch-attach { font-size: var(--t-body); border: 1px solid var(--border); border-radius: 6px; padding: var(--s-3) var(--s-4); }
+.dispatch-attach { font-size: var(--t-body); border: 1px solid var(--border); border-radius: var(--r-md); padding: var(--s-3) var(--s-4); }
 .dispatch-attach summary { cursor: pointer; color: var(--muted); }
 .dispatch-hint { margin: 0.3rem 0; font-size: var(--t-small); color: var(--muted); font-style: italic; }
 .dispatch-error {
   margin: 0; color: var(--danger); font-size: var(--t-body);
   background: color-mix(in srgb, var(--danger) 12%, transparent);
   border: 1px solid color-mix(in srgb, var(--danger) 35%, transparent);
-  border-radius: 6px; padding: var(--s-3) var(--s-4);
+  border-radius: var(--r-md); padding: var(--s-3) var(--s-4);
 }
 .dispatch-foot { display: flex; justify-content: flex-end; gap: var(--s-4); margin-top: 0.2rem; }
 
@@ -1224,22 +1184,28 @@ body {
 .report-row { display: flex; align-items: center; gap: var(--s-3); }
 .report-open {
   flex: 1; min-width: 0; display: flex; align-items: baseline; gap: var(--s-4);
-  background: transparent; border: 1px solid transparent; border-radius: 6px;
+  background: transparent; border: 1px solid transparent; border-radius: var(--r-md);
   color: inherit; cursor: pointer; font: inherit; text-align: left; padding: 0.15rem var(--s-3);
 }
 .report-open:hover { border-color: var(--accent); }
+/* `Chip pill` owns the box. What is left is this surface's own treatment — mono and uppercase, because
+   a status is machine vocabulary — plus `flex: 0 0 auto`, which is the row's decision.
+   THE SEVEN STATUS CLASSES BECAME `[data-state]`. They existed only inside `chip-${status}` at three
+   call sites, so a literal grep found none of them; see docs/design-system.md, *Risks*. They are not
+   `tone`s: `attention` is `--accent-2`, every theme's secondary, which equals `--warn` in two themes
+   and NOT in marshmallow — mapping it onto the `warn` tone would silently repaint the light theme.
+   And `running`/`queued` are `--text`, which is no tone at all. */
 .report-chip {
-  flex: 0 0 auto; font-family: var(--font-mono); font-size: var(--t-micro);
+  flex: 0 0 auto; font-family: var(--font-mono);
   text-transform: uppercase; letter-spacing: 0.06em;
-  border: 1px solid var(--border); border-radius: 999px; padding: 0 var(--s-3);
 }
-.chip-success { color: var(--accent); border-color: var(--accent); }
-.chip-attention { color: var(--accent-2); border-color: var(--accent-2); }
-.chip-failed, .chip-interrupted { color: var(--danger); border-color: var(--danger); }
-.chip-running, .chip-queued { color: var(--text); border-color: var(--text); }
+.report-chip[data-state='success'] { color: var(--accent); border-color: var(--accent); }
+.report-chip[data-state='attention'] { color: var(--accent-2); border-color: var(--accent-2); }
+.report-chip[data-state='failed'], .report-chip[data-state='interrupted'] { color: var(--danger); border-color: var(--danger); }
+.report-chip[data-state='running'], .report-chip[data-state='queued'] { color: var(--text); border-color: var(--text); }
 /* Stopping a run is a decision, not a fault — but it is still an ending that produced nothing, and
    grey made it disappear into the row. Same red as failed: what they have in common is "no report". */
-.chip-cancelled { color: var(--danger); border-color: var(--danger); }
+.report-chip[data-state='cancelled'] { color: var(--danger); border-color: var(--danger); }
 .report-skill { flex: 0 0 auto; font-size: var(--t-small); }
 /* Money reads as data, not prose: mono, so a card's runs line up down the column. */
 .report-cost { flex: 0 0 auto; color: var(--muted); font-family: var(--font-mono); font-size: var(--t-micro); }
@@ -1248,24 +1214,20 @@ body {
   flex: 1; min-width: 0; color: var(--muted); font-size: var(--t-small);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.report-stop {
-  flex: 0 0 auto; background: var(--panel-2); color: var(--muted);
-  border: 1px solid var(--border); border-radius: 6px; cursor: pointer;
-  font-size: var(--t-micro); padding: 0.1rem var(--s-3);
-}
-.report-stop:hover { color: var(--danger); border-color: var(--danger); }
+/* `ghost` Buttons, both of them, with the one colour each surface owns: Stop turns dangerous and
+   Dismiss turns accent. Everything else — the box, the quiet muted ink, the dashed border — is the
+   variant. They were two near-identical classes and `.reports-forgive` was a third copy of the same
+   declarations; its own comment said it "borrows the report row's Stop styling rather than inventing a
+   third small button", which is what this replaces. */
+.report-stop { flex: 0 0 auto; }
+.report-stop:hover:not(:disabled) { color: var(--danger); border-color: var(--danger); }
 /* A run that has been dealt with is history: still readable, no longer shouting. Dimmed rather than
    greyed — repainting the chip muted threw away the one thing it encodes, which is HOW the run ended,
    and left "Stopped" and "Needs you · dealt with" looking identical. The "· dealt with" text says it
    was answered; the colour is still free to say what it was. */
 .report-row.resolved .report-chip { opacity: 0.6; }
 .report-row.resolved .report-skill { color: var(--muted); }
-.report-dismiss {
-  flex: 0 0 auto; align-self: flex-start; background: var(--panel-2); color: var(--muted);
-  border: 1px solid var(--border); border-radius: 6px; cursor: pointer;
-  font-size: var(--t-micro); padding: 0.1rem var(--s-3);
-}
-.report-dismiss:hover { color: var(--accent); border-color: var(--accent); }
+.report-dismiss { flex: 0 0 auto; align-self: flex-start; }
 
 .report { display: flex; flex-direction: column; gap: var(--s-4); overflow-wrap: anywhere; }
 .report-head { display: flex; align-items: center; gap: var(--s-4); }
@@ -1288,14 +1250,12 @@ body {
 .options { display: flex; flex-direction: column; gap: var(--s-2); border-top: 1px solid var(--border); padding-top: var(--s-4); }
 .options-head { margin: 0; font-size: var(--t-small); color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
 .options-warn { margin: 0; font-size: var(--t-small); color: var(--danger); }
-.option-btn {
-  text-align: left; background: var(--panel-2); color: var(--text);
-  border: 1px solid var(--border); border-radius: 6px;
-  padding: var(--s-3) var(--s-4); font: inherit; font-size: var(--t-body); cursor: pointer;
-}
-.option-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
-.option-btn:disabled { opacity: 0.45; cursor: default; }
-.option-fixed { border-style: dashed; }
+/* Left-aligned because an option is a whole sentence. `.option-fixed { border-style: dashed }` WENT WITH
+   THE MIGRATION and its removal is a fix, not a casualty: this section's own comment says "the agent's
+   suggestions and the fixed ones look the same on purpose — they all lead to the same editable prompt",
+   and the dash was the one thing making them look different. Dashed also now means "explains", which a
+   button that starts a run does not. */
+.option-btn { text-align: left; }
 .options-close { display: flex; align-items: center; gap: var(--s-4); margin-top: 0.2rem; }
 .options-close-label { font-size: var(--t-small); color: var(--muted); margin-right: auto; }
 
@@ -1333,11 +1293,11 @@ body {
   font-family: var(--font-display); font-size: var(--t-small);
   text-transform: uppercase; letter-spacing: 0.1em;
 }
-.exec-count { color: var(--muted); font-size: var(--t-micro); letter-spacing: 0; background: var(--panel-2); border-radius: 999px; padding: 0 var(--s-3); }
+.exec-count { color: var(--muted); font-size: var(--t-micro); letter-spacing: 0; background: var(--panel-2); border-radius: var(--r-pill); padding: 0 var(--s-3); }
 .exec-empty { margin: 0; color: var(--muted); font-size: var(--t-small); font-style: italic; }
 .exec-run {
   display: flex; flex-direction: column; gap: var(--s-2); align-items: flex-start;
-  background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: var(--s-4) var(--s-4);
+  background: var(--bg); border: 1px solid var(--border); border-radius: var(--r-md); padding: var(--s-4) var(--s-4);
 }
 .exec-run-top { display: flex; align-items: baseline; gap: var(--s-3); width: 100%; }
 /* The run's actions, side by side. `.exec-run` is a flex column, so without this every button is its
@@ -1358,7 +1318,7 @@ body {
      without this they set the column's minimum content width and pushed past the track. */
   overflow-wrap: anywhere;
   width: 100%; text-align: left; background: transparent; border: 1px solid transparent;
-  border-radius: 6px; color: inherit; cursor: pointer; font: inherit; font-size: var(--t-body); padding: 0.1rem var(--s-2);
+  border-radius: var(--r-md); color: inherit; cursor: pointer; font: inherit; font-size: var(--t-body); padding: 0.1rem var(--s-2);
 }
 .exec-card:hover:not(:disabled) { border-color: var(--accent); }
 .exec-card:disabled { cursor: default; opacity: 0.7; }
@@ -1374,7 +1334,7 @@ body {
 .exec-summary { margin: 0; color: var(--muted); font-size: var(--t-small); line-height: 1.35; overflow-wrap: anywhere; }
 .tab-badge {
   margin-left: 0.35rem; font-family: var(--font-mono); font-size: var(--t-micro);
-  background: var(--accent-2); color: var(--on-accent); border-radius: 999px; padding: 0 var(--s-3);
+  background: var(--accent-2); color: var(--on-accent); border-radius: var(--r-pill); padding: 0 var(--s-3);
 }
 
 /* ---------- Skill editor (fields view in Project Control) ---------- */
@@ -1383,10 +1343,10 @@ body {
 .skill-label { width: 6rem; flex: 0 0 auto; font-size: var(--t-small); color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
 .skill-input, .skill-prompt {
   flex: 1; min-width: 0; background: var(--bg); color: var(--text);
-  border: 1px solid var(--border); border-radius: 6px; padding: var(--s-3) var(--s-4); font: inherit; font-size: var(--t-body);
+  border: 1px solid var(--border); border-radius: var(--r-md); padding: var(--s-3) var(--s-4); font: inherit; font-size: var(--t-body);
 }
 .skill-prompt { resize: vertical; font-family: var(--font-mono); font-size: var(--t-body); }
-.skill-scope { border: 1px solid var(--border); border-radius: 8px; padding: var(--s-3) 0.7rem var(--s-4); margin: 0; }
+.skill-scope { border: 1px solid var(--border); border-radius: var(--r-md); padding: var(--s-3) 0.7rem var(--s-4); margin: 0; }
 .skill-scope legend { font-size: var(--t-small); color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; padding: 0 var(--s-2); }
 .skill-hint { margin: 0 0 0.3rem; font-size: var(--t-micro); color: var(--muted); font-style: italic; }
 .skill-foot { display: flex; justify-content: flex-end; }
@@ -1395,7 +1355,7 @@ body {
 /* The agent sandbox panel in Settings. Two states, and they must not read alike: "enforced" is a
    claim the user is trusting, "not enforced" is a condition they can act on. */
 .sandbox-state {
-  font-size: var(--t-body); line-height: 1.5; border-radius: 6px; padding: var(--s-4) 0.7rem;
+  font-size: var(--t-body); line-height: 1.5; border-radius: var(--r-md); padding: var(--s-4) 0.7rem;
   border: 1px solid transparent;
 }
 .sandbox-ok {
@@ -1412,14 +1372,16 @@ body {
 /* Each action says what it does to the running session. A bare verb on a button that restarts a
    server somebody has work in flight on is not enough to decide with. */
 .sandbox-hint { font-size: var(--t-small); color: var(--muted); line-height: 1.5; }
-.sandbox-action > .btn-secondary { align-self: flex-start; }
+/* `> .vb-btn` since the class became a variant. Still a LAYOUT rule and still the caller's: a button in
+   a flex column stretches to the column's width otherwise, which is what made `.diary-refresh` 1240px. */
+.sandbox-action > .vb-btn { align-self: flex-start; }
 
 /* The project-level barrier. The accent rather than ochre: this is not a warning, it is the card the
    whole board is waiting on, and it should read as structure rather than as a problem. */
 .tile-setup {
   font-size: var(--t-micro); text-transform: uppercase; letter-spacing: 0.08em; white-space: nowrap;
   color: var(--accent); border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
-  border-radius: 3px; padding: 0 var(--s-2);
+  border-radius: var(--r-sm); padding: 0 var(--s-2);
 }
 
 /* Work an agent found and deliberately did not do. Ochre, not the accent: a card carrying this is
@@ -1466,21 +1428,10 @@ body {
 .reports-attempts {
   opacity: 0.85;
 }
-/* The way out of a card the machine spent, on the same line as the count it clears. Quiet by
-   default — it is an escape hatch, not the thing you came to the card to do — and it borrows the
-   report row's Stop styling rather than inventing a third small button. */
-.reports-forgive {
-  background: var(--panel-2);
-  color: var(--muted);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  cursor: pointer;
-  font: inherit;
-  font-size: var(--t-micro);
-  padding: 0.1rem var(--s-3);
-}
-.reports-forgive:hover:not(:disabled) { color: var(--text); border-color: var(--accent); }
-.reports-forgive:disabled { cursor: default; opacity: 0.6; }
+/* The way out of a card the machine spent, on the same line as the count it clears. Quiet by default —
+   it is an escape hatch, not the thing you came to the card to do — which is the `ghost` variant, and
+   it no longer has to borrow the report row's Stop styling because there is one Button. Nothing is left
+   for this class to say, so the class is gone; the two prose lines below keep theirs. */
 .reports-forgiven { flex-basis: 100%; opacity: 0.85; }
 /* The server's refusal, on its own line so it is not read as part of the ledger it sits under. */
 .reports-forgive-error { flex-basis: 100%; color: var(--danger); }
@@ -1529,7 +1480,8 @@ body {
 .halt-error {
   color: var(--danger);
 }
-.halt .btn-primary {
+/* The overlay's one button. `.vb-btn` rather than the old `.btn-primary`, and layout only. */
+.halt .vb-btn {
   align-self: flex-start;
   margin-top: 0.2rem;
 }
@@ -1546,12 +1498,12 @@ body {
   padding: var(--s-4) 0.65rem;
   background: var(--bg);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--r-md);
   font-family: var(--font-mono);
   font-size: var(--t-small);
   word-break: break-all;
 }
-/* Refuse first, and it keeps `.halt .btn-primary`'s accent — the reflex click and the reflex Enter
+/* Refuse first, and it keeps `.halt .vb-btn`'s accent — the reflex click and the reflex Enter
    both have to land on "no". Allow sits beside it as the quiet one. */
 .signin-actions {
   display: flex;
@@ -1576,34 +1528,27 @@ body {
   margin-left: 0.35rem;
   padding: 0.05rem var(--s-3);
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   font-size: var(--t-micro);
   color: var(--muted);
   text-transform: lowercase;
   white-space: nowrap;
 }
-/* The state chip in the top bar. `complete` is the only stop that reads as a success. */
-.ap-chip {
-  padding: 0.1rem var(--s-4);
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  font-size: var(--t-micro);
-  letter-spacing: 0.03em;
-  text-transform: lowercase;
-  color: var(--muted);
-}
-/* Amber while it works, teal for the one stop that means the work is done, red for a halt. There is
-   no success token in the palette and `complete` must not borrow the working colour: they are the two
-   states a glance most needs to tell apart. */
-.ap-running {
+/* The state chip in the top bar. `Chip pill` owns the box; this keeps the treatment and the colours.
+   Amber while it works, teal for the one stop that means the work is done, red for a halt. There is no
+   success token in the palette and `complete` must not borrow the working colour: they are the two
+   states a glance most needs to tell apart — which is why these are `[data-state]` and not `tone`s.
+   `ap-${chip.tone}` built all three names at run time and no grep could see them. */
+.ap-chip { letter-spacing: 0.03em; text-transform: lowercase; color: var(--muted); }
+.ap-chip[data-state='running'] {
   color: var(--accent-2);
   border-color: color-mix(in srgb, var(--accent-2) 50%, var(--border));
 }
-.ap-halted {
+.ap-chip[data-state='halted'] {
   color: var(--danger);
   border-color: color-mix(in srgb, var(--danger) 55%, var(--border));
 }
-.ap-complete {
+.ap-chip[data-state='complete'] {
   color: var(--accent);
   border-color: color-mix(in srgb, var(--accent) 50%, var(--border));
 }
@@ -1631,7 +1576,7 @@ body {
 .diary-compose textarea {
   flex: 1; resize: vertical; min-height: 2.6rem; padding: var(--s-4) var(--s-4);
   background: var(--panel-2); color: var(--text);
-  border: 1px solid var(--border); border-radius: 6px;
+  border: 1px solid var(--border); border-radius: var(--r-md);
   font: inherit; line-height: 1.45;
 }
 .diary-error { color: var(--danger, #d66); font-size: var(--t-body); max-width: 68ch; }
@@ -1669,7 +1614,7 @@ body {
 }
 .diary-about { display: flex; flex-wrap: wrap; gap: var(--s-3); }
 .diary-chip {
-  padding: 0.05rem var(--s-3); border: 1px solid var(--border); border-radius: 999px;
+  padding: 0.05rem var(--s-3); border: 1px solid var(--border); border-radius: var(--r-pill);
   font-variant-numeric: tabular-nums;
 }
 .diary-outcome { color: var(--text); }
@@ -1685,7 +1630,7 @@ body {
 .suggestions-reason {
   flex: 1; min-width: 12rem; padding: var(--s-2) var(--s-4);
   background: var(--panel-2); color: var(--text);
-  border: 1px solid var(--border); border-radius: 6px; font: inherit;
+  border: 1px solid var(--border); border-radius: var(--r-md); font: inherit;
 }
 .suggestions-became { color: var(--accent); font-size: var(--t-body); }
 .suggestions-list { list-style: none; display: flex; flex-direction: column; gap: 0.1rem; min-height: 0; }
@@ -1763,34 +1708,19 @@ body {
 
 /* The transport control. Wider than its label needs, because it is the one button on this strip anybody
    is looking for, and a target you have to aim at is one you misclick. */
-.ap-transport {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--s-3);
-  min-width: 6.5rem;
-  padding: var(--s-3) 0.8rem;
-  border: 1px solid transparent;
-  border-radius: 6px;
-  font-weight: 600;
-  font-size: var(--t-body);
-  cursor: pointer;
-  background: var(--accent-fill);
-  color: var(--on-fill);
-}
-.ap-transport-stop { background: var(--panel-2); color: var(--text); border-color: var(--border); }
-.ap-transport:disabled { opacity: 0.5; cursor: default; }
-.ap-transport:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* LAYOUT ONLY. The box is `Button variant=primary|default size=md`; what is left is the one thing the
+   bar decides — that the transport is wider than its label needs, because it is the control anybody on
+   this strip is looking for and a target you have to aim at is one you misclick.
+   `.ap-transport-stop`, the `:disabled` opacity and the duplicate `:focus-visible` all went with it: the
+   first is the `default` variant, the second is on `.vb-btn:disabled`, and the third restated the
+   file-wide `:focus-visible` rule at the top. */
+.ap-transport { min-width: 6.5rem; }
 
-/* A dot rather than a second text badge: the state word is already in the status line, and repeating it
-   would be two statements of one fact. */
-.ap-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: none; }
-.ap-dot-running { background: var(--accent); animation: ap-pulse 1.6s ease-in-out infinite; }
-.ap-dot-halted { background: var(--danger); }
-.ap-dot-complete { background: var(--ok, #3fb950); }
-@keyframes ap-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
-@media (prefers-reduced-motion: reduce) {
-  .ap-dot-running { animation: none; }
-}
+/* THE TRANSPORT DOT IS `Dot` NOW. It was five classes — one shape and four tones, of which only three
+   existed: `idle` and `stopped` fell through to the base grey, which is right and was true only by
+   omission. The mapping is a table in AutopilotBar.tsx and is pinned by test/state-tones.test.tsx,
+   which asserts that pair is ONE colour on purpose. The pulse and its reduced-motion override moved to
+   ui/primitives.css, where the keyframes are. */
 
 /* Truncated, with the full text in the drawer rather than in a title attribute — a `title` is
    unreachable on a touch device and invisible to anyone who does not know to hover. */
@@ -1811,28 +1741,28 @@ body {
 /* THE DOT, because a bare word was the odd one out: the transport state two elements to the left says itself
    with `.ap-dot`, and the connection light in the top bar with `.conn`. Smaller than both at 7px — those two
    are the primary states of the app and the project, and this is a property of one of them. */
-.ap-agent-state,
-.ap-agent-chip { display: inline-flex; align-items: center; gap: var(--s-2); }
-.ap-agent-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); flex: none; }
-/* `currentColor` for the two faults, so the dot cannot drift from the word it belongs to: the tone class
-   already colours the text, and a second colour declaration is a second thing to keep in step. */
-.ap-agent-dot-bad,
-.ap-agent-dot-warn { background: currentColor; }
-.ap-agent-dot-ok { background: var(--ok, #3fb950); }
-/* Only the fault gets a colour. "Ready" and "Checking…" are the states you are not meant to act on, and
+.ap-agent-state { display: inline-flex; align-items: center; gap: var(--s-2); }
+/* THE DOT IS `Dot` at size 7. `currentColor` is its DEFAULT, which is what `.ap-agent-dot-bad` and
+   `-warn` set by hand and for the reason they gave: the tone already colours the text, and a second
+   colour declaration is a second thing to keep in step. `ok` is the one that differs — a green pip
+   beside grey text — so it is the one case that names a tone.
+   Only the fault gets a colour. "Ready" and "Checking…" are the states you are not meant to act on, and
    a permanently coloured badge teaches people to stop reading the bar — the same reason the emergency
-   stop beside it stays grey until you hover it. */
-.ap-agent-ok,
-.ap-agent-unknown { color: var(--muted); }
-.ap-agent-bad { color: var(--danger); font-weight: 600; }
+   stop beside it stays grey until you hover it. `[data-state]` rather than `ap-agent-${tone}`, for the
+   reason the connection light above gives. */
+.ap-agent-state[data-state='ok'],
+.ap-agent-state[data-state='unknown'] { color: var(--muted); }
+.ap-agent-state[data-state='bad'] { color: var(--danger); font-weight: 600; }
 /* BELOW the fault colour, on purpose: "Failing" says the last runs died before reaching a model, which has
    stopped auto-pilot but refuses nothing you do by hand. Painting it `--danger` would make the two
    indistinguishable, and they need different actions. */
-.ap-agent-warn { color: var(--warn); font-weight: 600; }
+.ap-agent-state[data-state='warn'] { color: var(--warn); font-weight: 600; }
 /* A button, because it opens the balloon — but it must read as the chip it replaced, not as a control.
    `font-family` ONLY, never the `font` shorthand: `font: inherit` resets font-size too, so the chip grew from
    10.88px to 13.12px the moment it had something to say and shifted the whole row with it. Measured in a real
-   browser — jsdom has no computed cascade, so the suite cannot see this class of defect at all. */
+   browser — jsdom has no computed cascade, so the suite cannot see this class of defect at all.
+   NOT `Button`, deliberately, and this is the counter-example that keeps the primitive honest: the whole
+   point of this element is that it does NOT read as a control. */
 button.ap-agent-state {
   background: none;
   border: 0;
@@ -1850,80 +1780,41 @@ button.ap-agent-state:hover { text-decoration: underline; }
    report list it borrowed from. Measured: it came out at 10.88px with 1.6px of padding against 12.16px and
    4px for Settings and the expander, so the one action on a stopped project read as a caption. */
 .ap-bar-remedy { display: flex; align-items: center; gap: var(--s-4); flex-wrap: wrap; }
-.ap-remedy-btn {
-  flex: none;
-  background: none;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: var(--s-2) var(--s-4);
-  /* `--ink` was referenced here and defined by no theme, so the declaration was invalid at
-     computed-value time and the colour fell through to the inherited `--text`. This states what it
-     was already rendering, and `--text` is also the right answer: the three muted buttons beside it
-     (`.ap-expand`, `.ap-help-btn`, `.ap-settings-link`) are secondary, and this is the one action on
-     a stopped project — the comment above is about it not reading as a caption. */
-  color: var(--text);
-  font-family: inherit;
-  font-size: var(--t-small);
-  cursor: pointer;
-}
-.ap-remedy-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
-.ap-remedy-btn:disabled { color: var(--muted); cursor: default; }
-
-.ap-expand,
-.ap-help-btn,
-.ap-settings-link {
-  flex: none;
-  background: none;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: var(--s-2) var(--s-4);
-  color: var(--muted);
-  font-size: var(--t-small);
-  cursor: pointer;
-}
-.ap-expand:hover,
-.ap-help-btn:hover,
-.ap-settings-link:hover { border-color: var(--accent); color: var(--text); }
+/* LAYOUT ONLY, all of them. `Button` owns the box; `flex: none` is what this row decides, because
+   `.ap-status` beside them takes the slack and a long stall message must not squeeze the controls.
+   `.ap-remedy-btn` is the `default` variant — the ONE action on a stopped project — and the three
+   quiet ones are `ghost`, which the owner ruled carries a DASHED border: dashed reads as explanatory
+   rather than actionable, which is exactly what "How it works" is, and it keeps the box the same
+   width as a solid button.
+   Three separate classes became one, because there was never a difference between them. */
+.ap-remedy-btn, .ap-inline { flex: none; }
+/* The `:disabled` word goes grey as well as pale. `.vb-btn:disabled` sets the opacity; this says the
+   ink, which is the part that distinguished a spent remedy from a busy one. */
+.ap-remedy-btn:disabled { color: var(--muted); }
 
 /* The emergency stop, on the bar. Quiet until hovered, then unmistakably dangerous: a control that is
    permanently red is one people stop reading, and this bar's whole job is to be read. The guard against
    pressing it by accident is the confirm dialog, which names what dies — not the styling. */
-.ap-kill {
-  flex: none;
-  background: none;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: var(--s-2) var(--s-4);
-  color: var(--muted);
-  font-size: var(--t-small);
-  cursor: pointer;
-}
-.ap-kill:hover:not(:disabled) {
-  border-color: var(--danger);
-  color: var(--danger);
-}
-.ap-kill:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
+/* `ghost`, with the ONE thing that is not the variant: it turns dangerous on hover rather than accent.
+   That override works because primitives.css is loaded BEFORE styles.css — equal specificity, later
+   source — which is the whole reason for that order. `not-allowed` rather than `default` on the
+   disabled cursor, because a stop you cannot press is a refusal and not merely an absence. */
+.ap-kill { flex: none; }
+.ap-kill:hover:not(:disabled) { border-color: var(--danger); color: var(--danger); }
+.ap-kill:disabled { cursor: not-allowed; }
 
 /* LAST in the row, and the only control here that disappears when used — so nothing sits after it to
    jump leftwards when it goes. `margin-left: auto` would push it to the far edge and reintroduce exactly
    that shift for the buttons before it, so it does NOT get one. */
+/* The `default` variant with its own tint — a colour, which a caller may override, and not a geometry,
+   which it may not. `--accent-2` is every theme's secondary/attention colour, so this follows the theme
+   instead of pinning an amber that fights three of the five palettes. */
 .ap-review-gates {
   flex: none;
-  /* `--accent-2` is every theme's secondary/attention colour, so this follows the theme instead of
-     pinning an amber that fights three of the five palettes. */
   background: color-mix(in srgb, var(--accent-2) 14%, transparent);
-  border: 1px solid var(--accent-2);
-  border-radius: 6px;
-  padding: var(--s-2) var(--s-4);
-  color: var(--text);
-  font-size: var(--t-small);
+  border-color: var(--accent-2);
   font-weight: 500;
-  cursor: pointer;
 }
-.ap-review-gates:hover { border-color: var(--accent); }
 
 .ap-bar-error {
   padding: var(--s-3) 0.75rem var(--s-4);

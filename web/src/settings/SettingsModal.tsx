@@ -28,6 +28,7 @@ import {
   type ProjectConfig,
 } from '../shared';
 import { SignInPanel } from '../signin/SignInPanel';
+import { Button } from '../ui/Button';
 import { useAction } from '../useAction';
 import { useFetched } from '../useFetched';
 import { parseCsv } from '../viewmodel';
@@ -139,9 +140,9 @@ export function SettingsModal({ config, onClose, onSaved, autopilot, onAutopilot
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
           <span className="modal-title">Settings</span>
-          <button className="modal-close" onClick={onClose}>
+          <Button variant="bare" size="sm" onClick={onClose}>
             ✕
-          </button>
+          </Button>
         </div>
 
         <div className="modal-body">
@@ -283,12 +284,12 @@ export function SettingsModal({ config, onClose, onSaved, autopilot, onAutopilot
         </div>
 
         <div className="modal-foot">
-          <button className="btn-secondary" onClick={onClose} disabled={busy !== null}>
+          <Button size="md" onClick={onClose} disabled={busy !== null}>
             Cancel
-          </button>
-          <button className="btn-primary" onClick={save} disabled={busy !== null}>
+          </Button>
+          <Button variant="primary" size="md" onClick={save} disabled={busy !== null}>
             Save
-          </button>
+          </Button>
         </div>
       </div>
     </div>

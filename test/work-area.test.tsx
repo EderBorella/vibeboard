@@ -341,7 +341,7 @@ describe('WorkArea', () => {
     );
     const column = screen.getByLabelText('Requires attention');
     const dismiss = column.querySelector('.report-dismiss');
-    const forgive = column.querySelector('.reports-forgive');
+    const forgive = column.querySelector('[data-testid="reports-forgive"]');
     expect(dismiss?.textContent).toBe('Dismiss');
     // The RENAMED label. "Try this card again" promised a retry the button does not perform.
     expect(forgive?.textContent).toBe('Clear failed tries');
@@ -389,6 +389,6 @@ describe('WorkArea', () => {
     );
     const column = screen.getByLabelText('Requires attention');
     expect(column.querySelector('.report-dismiss')).toBeTruthy();
-    expect(column.querySelector('.reports-forgive')).toBeNull();
+    expect(column.querySelector('[data-testid="reports-forgive"]')).toBeNull();
   });
 });

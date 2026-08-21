@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { getModelStatus, listModels, type ModelOption, type ModelStatus } from '../api';
 import { useConfirm } from '../confirm/useConfirm';
 import { backendCaps, backendDefaults } from '../shared';
+import { Button } from '../ui/Button';
 import { useFetched } from '../useFetched';
 import { BackendPicker } from './BackendPicker';
 import { ChatSwitcher } from './ChatSwitcher';
@@ -125,9 +126,11 @@ export function CopilotPanel({
           onChange={onBackend}
         />
         {activeModel && <span className="copilot-model">{activeModel}</span>}
-        <button className="copilot-x" onClick={onClose} title="Hide (session keeps running)">
+        {/* Not in the ratchet — Phase 2's control reset took its font-size away, so no rule gave it
+            geometry any more — but the same `✕` as nine others, so it goes with them. */}
+        <Button variant="bare" className="copilot-x" onClick={onClose} title="Hide (session keeps running)">
           ✕
-        </button>
+        </Button>
       </div>
 
       <ChatSwitcher
@@ -163,9 +166,12 @@ export function CopilotPanel({
         those carry commands the server later runs outside the sandbox as you.
       */}
       <div className="copilot-authority">
-        <button
-          type="button"
-          className={authorised ? 'btn-primary' : 'btn-secondary'}
+        {/* The ternary was `btn-primary`/`btn-secondary` — a toggle whose "on" state is the filled one.
+            It is also the one site the ratchet could not see, because a class reaching a `<button>`
+            through an expression is not a literal in the attribute text; the check names that gap. */}
+        <Button
+          variant={authorised ? 'primary' : 'default'}
+          size="md"
           onClick={() => {
             if (authorised) {
               setCopilotAuthority(false);
@@ -186,7 +192,7 @@ export function CopilotPanel({
           }
         >
           {authorised ? 'Authorised' : 'Authorise'}
-        </button>
+        </Button>
       </div>
 
       <CopilotControls
@@ -206,9 +212,9 @@ export function CopilotPanel({
       {overridden && (
         <div className="copilot-override">
           Just for this session — the project default is unchanged.
-          <button className="copilot-reset" onClick={onReset} disabled={running}>
+          <Button size="sm" className="copilot-reset" onClick={onReset} disabled={running}>
             Use default
-          </button>
+          </Button>
         </div>
       )}
       {noTools && (
@@ -262,13 +268,13 @@ export function CopilotPanel({
           rows={3}
         />
         {running ? (
-          <button className="btn-secondary" onClick={cancel}>
+          <Button size="md" onClick={cancel}>
             Stop
-          </button>
+          </Button>
         ) : (
-          <button className="btn-primary" onClick={submit} disabled={!draft.trim()}>
+          <Button variant="primary" size="md" onClick={submit} disabled={!draft.trim()}>
             Send
-          </button>
+          </Button>
         )}
       </div>
 

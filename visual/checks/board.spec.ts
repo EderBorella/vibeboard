@@ -11,7 +11,11 @@ import { type Baseline, expect, readBaseline, recording, test, writeBaseline } f
 //   TYPE is BLOCKING as of Phase 2, the commit that took its count from 15 distinct computed sizes
 //   (94 elements alone sitting on the 16px default) to the scale. It is the assertion that would have
 //   caught the 10.88px-inside-a-12.16px-bar defect on the commit that introduced it.
-//   RADIUS still REPORTS. Its count is 6, and driving it to zero is Phase 3's job.
+//   RADIUS is BLOCKING as of Phase 3, the commit that took its count from 6 distinct computed values
+//   (6px, 999px, 10px, 8px, 50%, 3px) to the four steps plus 50%. It asserts on `border-radius` and
+//   deliberately NOT on `border-style`: the ghost Button's DASHED border is the owner's ruling of
+//   2026-08-20, because dashed reads as explanatory rather than actionable and keeps the box the same
+//   width as a solid button — a borderless ghost is 2px narrower and shifts the row it sits in.
 //
 // DRIFT — "the set of computed values is exactly the set in visual/baseline/<theme>.json" — is
 // BLOCKING, on all three themes, because its count is zero today, which is the same condition that
@@ -187,19 +191,43 @@ test('1. type — conformance BLOCKING, drift BLOCKING', async ({ board, theme }
   expectNoDrift(theme, 'font-size', moved);
 });
 
-test('2. radius — conformance REPORTING, drift BLOCKING', async ({ board, theme }) => {
+test('2. radius — conformance BLOCKING, drift BLOCKING', async ({ board, theme }) => {
   const styles = await auditStyles(board);
   expect(styles.elements).toBeGreaterThan(FLOOR.elements);
+  // The same two anti-vacuity guards the type check carries, for the same reasons. Four DISTINCT
+  // resolved steps: a token that stopped resolving would make `border-radius: var(--r-x)` invalid on
+  // the probe, the probe would report `0px`, and the "allowed" set would quietly become `{0px}` —
+  // which permits nothing and would fail loudly, but three tokens collapsing onto one value would
+  // permit less than it claims and pass.
+  expect(
+    new Set(styles.radiusScale).size,
+    `the radius scale did not resolve to four steps: ${styles.radiusScale}`,
+  ).toBe(4);
+  expect(styles.radius.examined, 'the radius walk and the tally walk examined different populations').toBe(
+    styles.elements,
+  );
   const values = Object.keys(styles.radii);
   const baseline = await readBaseline(theme);
   const moved = drift(styles.radii, baseline.radii);
   console.log(
     [
       `[${theme}] radius: ${values.length} distinct non-zero corner values across ${styles.elements} visible elements`,
+      `  scale        : ${styles.radiusScale.join('  ')}  (and 50%)`,
       `  ${tallyLine(styles.radii)}`,
       `  ${driftLine(moved)}`,
     ].join('\n'),
   );
+  // BLOCKING as of Phase 3 — the commit that took this from 6 distinct computed values to 4. Asserted
+  // before drift for the reason the type check is: an off-scale value is the more specific fault, since
+  // it says both "this moved" and "where it moved to was never allowed".
+  expect(
+    styles.radius.offenders.length,
+    `[${theme}] computed corner radii that are not one of the four steps (${styles.radiusScale.join(', ')}) or 50%:\n` +
+      `${offScale(styles.radius.offenders)}\n` +
+      `  Give the rule a var(--r-*) from the scale. Do NOT add a fifth step — see docs/design-system.md.\n` +
+      `  NOTE: this asserts on border-radius and NOT on border-style. The ghost Button's DASHED border\n` +
+      `  is deliberate (owner's ruling, 2026-08-20) and is nothing to do with this check.`,
+  ).toBe(0);
   expectNoDrift(theme, 'border-radius', moved);
 });
 
@@ -260,6 +288,92 @@ test('6. focus is visible', async ({ board, theme }) => {
     focus.offenders.length,
     `interactive elements with no discernible focus style:\n${lines(focus.offenders)}`,
   ).toBeLessThanOrEqual(baseline.findings.focus);
+});
+
+// THE PRIMITIVES, REACHED BY TAB AND MEASURED WHILE FOCUSED. Phase 3 of docs/design-system.md.
+//
+// Check 6 above already walks every focusable element, so why this one: because check 6 is a RATCHET
+// against a recorded count, and a primitive that fell out of the tab order entirely would take its
+// own row out of the population and leave the ratchet satisfied. This asserts the population — every
+// `.vb-btn` the board renders is reachable by Tab — before it asserts the ring.
+//
+// AND IT PRESSES TAB RATHER THAN CALLING `focus()`. Chromium matches `:focus-visible` on a
+// programmatic focus only when the last interaction was a keypress, which is the trap that made
+// check 6's first version fail on all 55 elements. This walks the real tab order, so a control that
+// is only reachable with a mouse is a finding here and cannot be one there.
+//
+// The ring is read as a CHANGE against the element's own resting style, not against a literal
+// `2px solid`, and `outline-offset` is deliberately not compared — see the PROPS list in audit.ts.
+// Comparing it is what made check 6 vacuous: the app sets both `outline` and `outline-offset`, so a
+// planted `outline: none` still moved the offset and every element went on reporting a focus style it
+// no longer had.
+test('8. every primitive shows a focus ring when tabbed to', async ({ board, theme }) => {
+  // ENABLED ONLY. A disabled control cannot take focus, so Tab skips it and `focus()` is a no-op —
+  // the same distinction `pageFocus` in audit.ts draws, and for the same reason: counting them as
+  // findings reports a disabled emergency stop as having no focus style. The board renders the stop
+  // and the transport disabled while nothing is running.
+  const enabled = await board.locator('.vb-btn:not(:disabled)').count();
+  const total = await board.locator('.vb-btn').count();
+  // A floor, because the failure mode of this check is a selector that matches nothing: the auto-pilot
+  // bar alone renders the transport, the emergency stop, "How it works" and Settings.
+  expect(total, 'no .vb-btn on the board — has the selector stopped matching?').toBeGreaterThan(3);
+  expect(enabled, 'every .vb-btn on the board is disabled — nothing would be measured').toBeGreaterThan(1);
+
+  // MARKED ON THE ELEMENT, not collected into a map keyed on the class list. The first version did
+  // the latter and it was a fixture too thin to distinguish two outcomes: the bar's ghost buttons
+  // carried byte-identical class lists (`vb-btn vb-btn-ghost vb-btn-sm ap-inline`), so several
+  // elements collapsed into one entry and the check reported "3 of 5 reached" against a board where
+  // every one of them had been tabbed to and had a ring. The population is now 30 rather than 5 —
+  // finishing the adoption took it there — and the 14 column-head `+` buttons alone are 14 identical
+  // class lists, so the fixture is far thinner now than when it first misled.
+  //
+  // Walk the real tab order. The bound is generous rather than tight: the board has 55 focusable
+  // elements and the order is not ours to predict, so this presses Tab enough times to visit them all
+  // twice over.
+  for (let press = 0; press < 140; press += 1) {
+    await board.keyboard.press('Tab');
+    await board.evaluate(() => {
+      const el = document.activeElement;
+      if (!(el instanceof HTMLElement) || !el.classList.contains('vb-btn')) return;
+      // Measured against ITSELF unfocused, which is the only comparison that means anything: a theme
+      // may give a resting element an outline of its own.
+      const focused = getComputedStyle(el);
+      const ring = [focused.outlineStyle, focused.outlineWidth, focused.outlineColor].join(' ');
+      const matched = el.matches(':focus-visible');
+      el.blur();
+      const resting = getComputedStyle(el);
+      const bare = [resting.outlineStyle, resting.outlineWidth, resting.outlineColor].join(' ');
+      el.focus();
+      el.dataset.vbTabbed = ring !== bare && matched ? `ring ${ring}` : `NONE (focus-visible ${matched})`;
+    });
+  }
+
+  const found = await board.evaluate(() =>
+    Array.from(document.querySelectorAll<HTMLElement>('.vb-btn')).map((el) => ({
+      id: Array.from(el.classList).join('.'),
+      disabled: el.matches(':disabled'),
+      tabbed: el.dataset.vbTabbed ?? null,
+    })),
+  );
+  const live = found.filter((p) => !p.disabled);
+  const reached = live.filter((p) => p.tabbed !== null);
+  const ringless = reached.filter((p) => !p.tabbed?.startsWith('ring '));
+
+  console.log(
+    `[${theme}] primitives: ${reached.length} of ${live.length} enabled .vb-btn reached by Tab ` +
+      `(${found.length - live.length} disabled, skipped), ${ringless.length} without a ring\n` +
+      found.map((p) => `  ${p.id} — ${p.disabled ? 'disabled' : (p.tabbed ?? 'NOT REACHED')}`).join('\n'),
+  );
+
+  expect(
+    reached.length,
+    `${live.length - reached.length} enabled .vb-btn could not be reached by Tab at all. A control only ` +
+      `a mouse can reach is invisible to check 6, which walks the DOM rather than the tab order.`,
+  ).toBe(live.length);
+  expect(
+    ringless.map((p) => `${p.id}: ${p.tabbed}`),
+    `these primitives showed no focus ring when tabbed to, on ${theme}`,
+  ).toEqual([]);
 });
 
 test('7. one line where one line is meant', async ({ board, theme }) => {

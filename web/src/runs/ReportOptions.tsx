@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Button } from '../ui/Button';
 
 interface ColumnChoice {
   slug: string;
@@ -50,35 +51,38 @@ export function ReportOptions({
       )}
 
       {options.map((option) => (
-        <button
+        <Button
+          size="sm"
           key={option}
-          type="button"
           className="option-btn"
+          data-testid="option-btn"
           disabled={!canContinue}
           onClick={() => onContinue(option)}
         >
           {option}
-        </button>
+        </Button>
       ))}
 
-      <button
-        type="button"
-        className="option-btn option-fixed"
+      <Button
+        size="sm"
+        className="option-btn"
+        data-testid="option-btn"
         disabled={!canContinue}
         title="Runs an agent to split this into cards, linked to this one"
         onClick={() => onContinue(createPrompt)}
       >
         Create new cards
-      </button>
-      <button
-        type="button"
-        className="option-btn option-fixed"
+      </Button>
+      <Button
+        size="sm"
+        className="option-btn"
+        data-testid="option-btn"
         disabled={!canContinue}
         title="Opens the details step with an empty prompt"
         onClick={() => onContinue('')}
       >
         Write my own input
-      </button>
+      </Button>
 
       <div className="options-close">
         <span className="options-close-label">Ignore and close</span>
@@ -94,14 +98,13 @@ export function ReportOptions({
             </option>
           ))}
         </select>
-        <button
-          type="button"
-          className="btn-secondary"
+        <Button
+          size="md"
           disabled={column === '' || column === currentColumn}
           onClick={() => onClose(column)}
         >
           Close card
-        </button>
+        </Button>
       </div>
     </section>
   );

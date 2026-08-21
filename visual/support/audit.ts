@@ -42,6 +42,11 @@ export interface StyleAudit {
   // printed beside it.
   scale: string[];
   type: Findings;
+  // The four radius steps as the BROWSER resolves them, and the elements that compute something else.
+  // Same construction as `scale`/`type` above and for the same reason: the pixel values are read back
+  // out of the page, so this check cannot disagree with themes.css about what `--r-md` is.
+  radiusScale: string[];
+  radius: Findings;
   overflow: Findings;
   contrast: Findings;
   tokens: Findings;
@@ -68,6 +73,10 @@ export const TYPE_SCALE = [
   '--t-title',
   '--t-display',
 ] as const;
+
+// The four radius steps of docs/design-system.md, BY NAME, for the reason the type scale is: the pixel
+// values are read back out of the page, so this check cannot disagree with themes.css about them.
+export const RADIUS_SCALE = ['--r-sm', '--r-md', '--r-lg', '--r-pill'] as const;
 
 // THE ROOT IS THE UNIT, NOT A SURFACE, and every walk below skips it. Every step of both scales is
 // expressed in `rem`, which is root-relative, so asking whether the root's own font-size is on the
@@ -149,6 +158,64 @@ function pageType(names: string[]): { scale: string[]; type: Findings } {
     if (!scale.includes(style.fontSize)) offenders.push({ where: describe(el), detail: style.fontSize });
   }
   return { scale, type: { examined, offenders } };
+}
+
+// Radius CONFORMANCE, which blocks as of Phase 3 — the phase that drove its count to zero. Its own
+// walk for the same reason `pageType` is: one function doing both scored over the cognitive-complexity
+// gate, and raising the gate to fit it would be the wrong repair.
+//
+// IT NAMES THE OFFENDING ELEMENTS AND NOT ONLY THE VALUE. Phase 2 learned that on the type check: a
+// blocking gate that says "8px is not on the scale" without saying where cannot be acted on, and a gate
+// nobody can act on gets bypassed. `8px` was on 56 corners when this was written and the first question
+// anybody asks is which fourteen elements those were.
+//
+// `50%` IS ALLOWED AND IS NOT A STEP. A circle is a circle at any size, so a dot cannot be expressed as
+// a length without knowing its width — `--r-pill`'s 999px would be a claim about a stadium. It is
+// checked as a literal because there is no token to read back.
+function pageRadius(names: string[]): { radiusScale: string[]; radius: Findings } {
+  function describe(el: Element): string {
+    const parts: string[] = [];
+    for (let node: Element | null = el; node && parts.length < 4; node = node.parentElement) {
+      const id = node.getAttribute('data-testid');
+      const name = typeof node.className === 'string' ? node.className.trim().split(/\s+/)[0] : '';
+      parts.unshift(`${node.tagName.toLowerCase()}${id ? `[${id}]` : name ? `.${name}` : ''}`);
+    }
+    return parts.join(' > ');
+  }
+
+  // The scale in the unit the elements report it in, measured off a probe rather than read out of the
+  // token's own text — the same construction, and the same reason, as the type scale above.
+  const probe = document.createElement('span');
+  probe.style.position = 'absolute';
+  probe.style.visibility = 'hidden';
+  document.body.append(probe);
+  const scale = names.map((name) => {
+    probe.style.borderRadius = `var(${name})`;
+    return getComputedStyle(probe).borderTopLeftRadius;
+  });
+  probe.remove();
+
+  const offenders: Offender[] = [];
+  let examined = 0;
+  for (const el of Array.from(document.querySelectorAll('*'))) {
+    if (el.tagName === 'SCRIPT' || el.tagName === 'STYLE' || el === document.documentElement) continue;
+    const style = getComputedStyle(el);
+    if (style.visibility === 'hidden' || style.display === 'none' || Number(style.opacity) === 0) continue;
+    const box = el.getBoundingClientRect();
+    if (box.width === 0 || box.height === 0) continue;
+    examined += 1;
+    // `0px` is not a radius: an element with square corners has made no claim about the scale. `50%`
+    // is a circle and is allowed — see the header. Written as a filter rather than a nested loop with
+    // a `continue`, because the complexity metric punishes NESTING far more than length.
+    const off = [
+      style.borderTopLeftRadius,
+      style.borderTopRightRadius,
+      style.borderBottomRightRadius,
+      style.borderBottomLeftRadius,
+    ].filter((corner) => corner !== '0px' && corner !== '50%' && !scale.includes(corner));
+    for (const corner of off) offenders.push({ where: describe(el), detail: corner });
+  }
+  return { radiusScale: scale, radius: { examined, offenders } };
 }
 
 // Overflow, and the font sizes of the elements that carry text. Split from the contrast walk below
@@ -463,11 +530,12 @@ function pageDocument(): { scrollWidth: number; clientWidth: number } {
 export async function auditStyles(page: Page): Promise<StyleAudit> {
   const boxes = await page.evaluate(pageBoxes);
   const type = await page.evaluate(pageType, [...TYPE_SCALE]);
+  const radius = await page.evaluate(pageRadius, [...RADIUS_SCALE]);
   const text = await page.evaluate(pageOverflow);
   const contrast = await page.evaluate(pageContrast);
   const tokens = await page.evaluate(pageTokens);
   const rows = await page.evaluate(pageRows);
-  return { ...boxes, ...type, ...text, contrast, tokens, rows };
+  return { ...boxes, ...type, ...radius, ...text, contrast, tokens, rows };
 }
 
 export async function auditFocus(page: Page): Promise<FocusAudit> {

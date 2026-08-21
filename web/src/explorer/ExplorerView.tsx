@@ -12,6 +12,7 @@ import {
 import { useConfirm } from '../confirm/useConfirm';
 import { errorText } from '../errors';
 import type { ProjectSnapshot } from '../shared';
+import { Button } from '../ui/Button';
 import { EditorBody, EditorShell } from '../ui/EditorShell';
 import { FileTree } from './FileTree';
 import { formatBytes } from './format';
@@ -208,13 +209,14 @@ export function ExplorerView({ snapshot }: Props) {
             onView={open.setView}
             actions={
               file.kind === 'text' && (
-                <button
-                  className="btn-primary"
+                <Button
+                  variant="primary"
+                  size="md"
                   disabled={open.busy || !open.dirty}
                   onClick={() => void save()}
                 >
                   Save
-                </button>
+                </Button>
               )
             }
           >

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { getResources, putResources, type ResourceLink } from '../api';
 import { errorText } from '../errors';
+import { Button } from '../ui/Button';
 import { useAction } from '../useAction';
 
 // The links registry (.vibeboard/resources.yaml) — a small editable table of external
@@ -60,12 +61,12 @@ export function ResourcesEditor({ onError }: { onError: (e: string | null) => vo
       <div className="control-editor-head">
         <span className="control-editor-path">Links registry{dirty ? ' •' : ''}</span>
         <div className="control-editor-actions">
-          <button className="btn-secondary" onClick={add}>
+          <Button size="md" onClick={add}>
             ＋ Add link
-          </button>
-          <button className="btn-primary" disabled={busy !== null || !dirty} onClick={save}>
+          </Button>
+          <Button variant="primary" size="md" disabled={busy !== null || !dirty} onClick={save}>
             Save
-          </button>
+          </Button>
         </div>
       </div>
       <div className="resources-table">
@@ -92,9 +93,9 @@ export function ResourcesEditor({ onError }: { onError: (e: string | null) => vo
               value={l.note ?? ''}
               onChange={(e) => update(i, { note: e.target.value })}
             />
-            <button className="res-del" title="Remove" onClick={() => removeRow(i)}>
+            <Button variant="bare" size="sm" className="res-del" title="Remove" onClick={() => removeRow(i)}>
               ✕
-            </button>
+            </Button>
           </div>
         ))}
       </div>

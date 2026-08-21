@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { listArchive, restoreCard } from '../api';
 import { errorText } from '../errors';
 import type { ArchivedCard, BoardName, ProjectConfig } from '../shared';
+import { Button } from '../ui/Button';
 import { columnSlugs } from '../viewmodel';
 
 interface Props {
@@ -76,9 +77,9 @@ export function ArchiveDrawer({ board, config, count, onOpen }: Props) {
             {c.title}
           </button>
           <div className="archive-actions">
-            <button className="archive-restore" onClick={() => restore(c)}>
+            <Button size="sm" onClick={() => restore(c)}>
               Restore → {labelOf(c.restoreTo)}
-            </button>
+            </Button>
             {/* Somewhere else, for when the original column is no longer the right home. */}
             <select
               className="archive-column"

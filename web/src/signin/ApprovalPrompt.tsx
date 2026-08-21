@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { approveSignin, refuseSignin, type SigninPending } from '../api';
+import { Button } from '../ui/Button';
 import { useAction } from '../useAction';
 
 interface Props {
@@ -63,23 +64,18 @@ export function ApprovalPrompt({ pending, onError }: Props) {
         </p>
         <div className="signin-actions">
           {/* Refuse first in the DOM as well as visually, so tab order and reading order agree. */}
-          <button
+          <Button
+            variant="primary"
+            size="md"
             ref={refuseRef}
-            type="button"
-            className="btn-primary"
             onClick={() => void decide(first.id, false)}
             disabled={busy !== null}
           >
             Refuse
-          </button>
-          <button
-            type="button"
-            className="btn-secondary"
-            onClick={() => void decide(first.id, true)}
-            disabled={busy !== null}
-          >
+          </Button>
+          <Button size="md" onClick={() => void decide(first.id, true)} disabled={busy !== null}>
             Allow
-          </button>
+          </Button>
         </div>
       </div>
     </div>

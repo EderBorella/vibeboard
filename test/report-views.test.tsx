@@ -586,7 +586,7 @@ describe('ReportPane', () => {
     expect(screen.getByText('Create new cards')).toBeTruthy();
     expect(screen.getByText('Write my own input')).toBeTruthy();
     expect(screen.getByText('Close card')).toBeTruthy();
-    expect(document.querySelectorAll('.option-btn')).toHaveLength(2);
+    expect(document.querySelectorAll('[data-testid="option-btn"]')).toHaveLength(2);
   });
 });
 

@@ -1,33 +1,29 @@
 {
   "recorded": "2026-08-21",
   "fontSizes": {
-    "13px": 132,
+    "13px": 127,
     "15px": 1,
-    "12px": 65,
-    "11px": 20,
-    "18px": 14
+    "12px": 84,
+    "11px": 19
   },
   "fontSizesOnText": {
     "15px": 1,
-    "13px": 34,
-    "12px": 57,
-    "11px": 18,
-    "18px": 14
+    "13px": 29,
+    "12px": 76,
+    "11px": 18
   },
   "radii": {
     "50%": 12,
-    "6px": 108,
-    "999px": 68,
-    "10px": 56,
-    "8px": 56,
-    "3px": 4
+    "6px": 240,
+    "999px": 72,
+    "10px": 56
   },
   "examined": {
-    "elements": 232,
+    "elements": 231,
     "textElements": 124,
     "overflow": 120,
     "contrast": 124,
-    "tokens": 34,
+    "tokens": 40,
     "rows": 25,
     "focus": 55,
     "focusUnfocusable": 1

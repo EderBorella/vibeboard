@@ -3,6 +3,7 @@ import { getSigninState, revokeDevice, type SigninDevice, signOutEverything } fr
 import { revokeDeviceRequest, signOutEverythingRequest } from '../confirm/requests';
 import type { Confirmer } from '../confirm/useConfirm';
 import { errorText } from '../errors';
+import { Button } from '../ui/Button';
 import { useAction } from '../useAction';
 
 interface Props {
@@ -78,9 +79,8 @@ export function SignInPanel({ confirm }: Props) {
               {d.address} · signed in {d.created.slice(0, 10)} · last seen {d.lastSeen}
             </div>
           </div>
-          <button
-            type="button"
-            className="btn-secondary"
+          <Button
+            size="md"
             disabled={busy !== null}
             onClick={() => {
               void confirm(revokeDeviceRequest(d.label)).then((ok) => {
@@ -89,7 +89,7 @@ export function SignInPanel({ confirm }: Props) {
             }}
           >
             Sign out
-          </button>
+          </Button>
         </div>
       ))}
 
@@ -112,9 +112,8 @@ export function SignInPanel({ confirm }: Props) {
         on this machine signs itself in again — which is how you replace a credential you think somebody else
         has seen. No restart needed.
       </div>
-      <button
-        type="button"
-        className="btn-secondary"
+      <Button
+        size="md"
         disabled={busy !== null}
         onClick={() => {
           void confirm(signOutEverythingRequest(devices.length)).then((ok) => {
@@ -123,7 +122,7 @@ export function SignInPanel({ confirm }: Props) {
         }}
       >
         Sign every browser out
-      </button>
+      </Button>
 
       {error && <div className="settings-warn">{error}</div>}
     </>

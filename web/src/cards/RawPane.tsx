@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { getRaw, putRaw } from '../api';
 import { errorText } from '../errors';
 import type { Card } from '../shared';
+import { Button } from '../ui/Button';
 import { useAction } from '../useAction';
 
 interface Props {
@@ -60,14 +61,14 @@ export function RawPane({ card }: Props) {
       />
       <div className="raw-foot">
         {error !== null && <span className="raw-error">{error}</span>}
-        <button
-          type="button"
-          className="btn-primary"
+        <Button
+          variant="primary"
+          size="md"
           disabled={busy !== null || loading || draft === onDisk}
           onClick={save}
         >
           Save file
-        </button>
+        </Button>
       </div>
     </div>
   );

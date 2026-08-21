@@ -206,9 +206,13 @@ describe('CardsPane', () => {
   it('offers the Raw toggle for the active card, and not when there is no card', () => {
     const live = [card('E-001')];
     const { rerender } = render(<CardsPane {...props} tabs={[ref('E-001')]} activeId="E-001" live={live} />);
-    const toggle = screen.getByText('Raw');
+    // `data-testid`, not `.cards-raw`: the class carries only the toggle's LAYOUT now, and the pressed
+    // state is `Button`'s `primary` variant rather than an `.active` of its own. Both claims are still
+    // made — the second on the primitive's variant, which is the API the surface actually calls.
+    const toggle = screen.getByTestId('cards-raw');
     expect(toggle.getAttribute('aria-pressed')).toBe('false');
-    expect(toggle.className).toBe('cards-raw');
+    expect(toggle.classList.contains('vb-btn-primary')).toBe(false);
+    expect(toggle.classList.contains('vb-btn-default')).toBe(true);
 
     rerender(<CardsPane {...props} tabs={[]} activeId={null} live={live} />);
     expect(screen.queryByText('Raw')).toBeNull();
@@ -223,8 +227,8 @@ describe('CardsPane', () => {
     await act(async () => {
       fireEvent.click(screen.getByText('Raw'));
     });
-    expect(screen.getByText('Raw').className).toBe('cards-raw active');
-    expect(screen.getByText('Raw').getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getByTestId('cards-raw').classList.contains('vb-btn-primary')).toBe(true);
+    expect(screen.getByTestId('cards-raw').getAttribute('aria-pressed')).toBe('true');
     expect(container.querySelector('.cardview')).toBeNull();
     expect((screen.getByLabelText('card file') as HTMLTextAreaElement).value).toBe('file of the active card');
 
@@ -277,7 +281,9 @@ describe('CardsPane', () => {
         live={[card('E-001')]}
       />,
     );
-    expect(screen.getByText('Execute').className).toBe('cs-action');
+    // The claim is that the catalogue REACHED the rail, which is the element existing under the rail's
+    // own test id — not the string of classes it happens to carry.
+    expect(screen.getByTestId('cs-action').textContent).toBe('Execute');
     expect(screen.getByText('⚠ 1 skill file invalid')).toBeTruthy();
   });
 

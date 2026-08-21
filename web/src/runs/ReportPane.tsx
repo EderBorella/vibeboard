@@ -2,6 +2,8 @@ import { useState } from 'react';
 import type { RunRecord } from '../api';
 import { renderMarkdown } from '../markdown';
 import type { Card, ProjectConfig } from '../shared';
+import { Button } from '../ui/Button';
+import { Chip } from '../ui/Chip';
 import { slugify } from '../viewmodel';
 import { usageLine } from './format';
 import { ReportOptions } from './ReportOptions';
@@ -51,13 +53,15 @@ export function ReportPane({
   return (
     <article className="report" aria-label={`Report from ${record.skill} on ${card.id}`}>
       <header className="report-head">
-        <button type="button" className="dispatch-back" onClick={onBack} title="Back to the card">
+        <Button size="sm" onClick={onBack} title="Back to the card">
           ←
-        </button>
+        </Button>
         <h3 className="report-title">
           {record.skill} <span className="dispatch-on">on {card.id}</span>
         </h3>
-        <span className={`report-chip chip-${record.status}`}>{record.status}</span>
+        <Chip pill state={record.status} className="report-chip" testId="report-chip">
+          {record.status}
+        </Chip>
       </header>
 
       <dl className="report-meta">
@@ -163,14 +167,14 @@ export function ReportPane({
               </option>
             ))}
           </select>
-          <button
-            type="button"
-            className="btn-primary"
+          <Button
+            variant="primary"
+            size="md"
             disabled={column === '' || column === card.columnSlug}
             onClick={() => onMove(column)}
           >
             Move card
-          </button>
+          </Button>
         </div>
       )}
     </article>

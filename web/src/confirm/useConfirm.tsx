@@ -1,4 +1,5 @@
 import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
+import { Button } from '../ui/Button';
 
 // Ask before doing something that cannot be taken back.
 //
@@ -123,17 +124,20 @@ export function useConfirm(): Confirmer {
             </label>
           )}
           <div className="confirm-actions">
-            <button type="button" className="confirm-cancel" ref={cancelButton} onClick={() => settle(false)}>
+            <Button ref={cancelButton} onClick={() => settle(false)}>
               Cancel
-            </button>
-            <button
-              type="button"
+            </Button>
+            {/* BOTH buttons had to move together. `.confirm-cancel` was in the ratchet and `.confirm-go`
+                was not — only because its class arrives through a ternary, which the check cannot read
+                and says so. Migrating the visible one alone would have left the pair at two different
+                sizes in the same dialog. `.confirm-go` keeps its class for the danger colour only. */}
+            <Button
               className={request.danger ? 'confirm-go danger' : 'confirm-go'}
               disabled={!unlocked}
               onClick={() => settle(true)}
             >
               {request.action}
-            </button>
+            </Button>
           </div>
         </div>
       </div>

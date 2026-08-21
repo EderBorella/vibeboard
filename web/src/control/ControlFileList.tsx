@@ -1,4 +1,5 @@
 import type { ControlCategory, ControlFile, ControlGroup } from '../api';
+import { Button } from '../ui/Button';
 
 // A selection that means "the links registry", not a path on disk. It travels through the same
 // `selected` state as a real file path so the list has one notion of what is active.
@@ -42,13 +43,15 @@ export function ControlFileList({
           <div className="control-group-head">
             <span>{g.label}</span>
             {g.creatable && (
-              <button
+              <Button
+                variant="bare"
+                size="sm"
                 className="control-new"
                 title={`New ${g.label.toLowerCase().replace(/s$/, '')}`}
                 onClick={() => onNew(g.key)}
               >
                 ＋
-              </button>
+              </Button>
             )}
           </div>
           {g.key === 'resources' && (

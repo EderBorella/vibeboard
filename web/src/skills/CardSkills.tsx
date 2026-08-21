@@ -1,5 +1,6 @@
 import type { InvalidSkill, Skill } from '../api';
 import type { Card } from '../shared';
+import { Button } from '../ui/Button';
 import { skillsForCard } from './filter';
 
 interface Props {
@@ -21,16 +22,17 @@ export function CardSkills({ card, skills, invalid, onRun }: Props) {
     <aside className="card-skills" aria-label={`Skills for ${card.id}`}>
       <h3 className="cs-head">Skills</h3>
       {mine.map((s) => (
-        <button
+        <Button
+          size="sm"
           key={s.slug}
-          type="button"
           className="cs-action"
+          data-testid="cs-action"
           disabled={onRun === undefined}
           title={onRun ? s.description : `${s.description} — archived cards cannot be run`}
           onClick={() => onRun?.(s)}
         >
           {s.name}
-        </button>
+        </Button>
       ))}
       {mine.length === 0 && (
         <p className="cs-empty">No skills for this column. Add one in Project Control → Skills.</p>

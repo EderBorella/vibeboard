@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import type { ControlFile } from '../api';
+import { Button } from '../ui/Button';
 import { EditorBody, EditorShell, type EditorView } from '../ui/EditorShell';
 
 // A control file as opened for editing: its listing metadata plus the content on disk.
@@ -55,14 +56,14 @@ export function ControlFileEditor({
       actions={
         <>
           {file.deletable && (
-            <button className="btn-danger" disabled={busy} onClick={onDelete}>
+            <Button variant="danger" size="md" disabled={busy} onClick={onDelete}>
               Delete
-            </button>
+            </Button>
           )}
           {view !== 'fields' && (
-            <button className="btn-primary" disabled={busy || !dirty} onClick={onSave}>
+            <Button variant="primary" size="md" disabled={busy || !dirty} onClick={onSave}>
               Save
-            </button>
+            </Button>
           )}
         </>
       }

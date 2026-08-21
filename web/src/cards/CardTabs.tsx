@@ -1,6 +1,7 @@
 import type { CardRef } from '../dock/tabs';
 import { resolveTab } from '../dock/tabs';
 import type { Card } from '../shared';
+import { Button } from '../ui/Button';
 
 interface Props {
   tabs: CardRef[];
@@ -40,21 +41,29 @@ export function CardTabs({
           >
             {resolveTab(t, live)?.title ?? t.id}
           </button>
-          <button type="button" className="cards-tab-x" title={`Close ${t.id}`} onClick={() => onClose(t.id)}>
+          <Button
+            variant="bare"
+            size="sm"
+            className="cards-tab-x"
+            title={`Close ${t.id}`}
+            onClick={() => onClose(t.id)}
+          >
             ✕
-          </button>
+          </Button>
         </span>
       ))}
       {rawAvailable && (
-        <button
-          type="button"
-          className={`cards-raw${rawActive ? ' active' : ''}`}
+        <Button
+          variant={rawActive ? 'primary' : 'default'}
+          size="sm"
+          className="cards-raw"
+          data-testid="cards-raw"
           title="Show the card's file, frontmatter and all"
           aria-pressed={rawActive}
           onClick={onToggleRaw}
         >
           Raw
-        </button>
+        </Button>
       )}
     </div>
   );

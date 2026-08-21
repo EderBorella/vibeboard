@@ -157,32 +157,47 @@ describe('TopBar', () => {
     expect(screen.getByRole('dialog').querySelector('.conn-pop-detail')?.textContent).toBe(note);
   });
 
-  // A state the stylesheet does not know about is an invisible one: the class is what tints the dot and
-  // the word, and `failing` must not fall through to the default grey — nor borrow either of the two
-  // colours it is there to be distinguished from. Read from the source because jsdom loads no CSS, the
-  // same reason the width assertions below do.
+  // A state the stylesheet does not know about is an invisible one: the wrapper's state is what tints the
+  // dot and the word, and `failing` must not fall through to the default grey — nor borrow either of the
+  // two colours it is there to be distinguished from. Read from the source because jsdom loads no CSS,
+  // the same reason the width assertions below do.
+  //
+  // `[data-state='…']` AND NOT `.conn-<state>`. Phase 3 of docs/design-system.md moved the six state
+  // classes onto an attribute, because they existed only inside the template literal `conn-${light}` and
+  // so a literal grep for any of them found nothing — 36 live classes read as dead, and the ones here are
+  // the worst of the set: delete them and a board that has failed nothing still looks perfect while the
+  // colour saying the connection dropped is gone. The dot is `.vb-dot` now; the word is still `.conn-text`.
   it('gives failing a colour of its own, distinct from online and offline', () => {
     const css = readFileSync(join(process.cwd(), 'web', 'src', 'styles.css'), 'utf8');
     const varsFor = (state: string): string[] =>
-      [...css.matchAll(new RegExp(`^\\.conn-${state} \\.conn(?:-text)?\\s*\\{([^}]*)\\}`, 'gm'))].flatMap(
-        (m) => [...(m[1] ?? '').matchAll(/var\((--[\w-]+)\)/g)].map((v) => v[1] ?? ''),
-      );
+      [
+        ...css.matchAll(
+          new RegExp(
+            `^\\.conn-status\\[data-state='${state}'\\] \\.(?:vb-dot|conn-text)\\s*\\{([^}]*)\\}`,
+            'gm',
+          ),
+        ),
+      ].flatMap((m) => [...(m[1] ?? '').matchAll(/var\((--[\w-]+)\)/g)].map((v) => v[1] ?? ''));
 
     const failing = varsFor('failing');
-    expect(failing.length, '.conn-failing rules not found in web/src/styles.css').toBeGreaterThan(0);
+    expect(
+      failing.length,
+      "no .conn-status[data-state='failing'] rules found in web/src/styles.css",
+    ).toBeGreaterThan(0);
     for (const shared of [...varsFor('online'), ...varsFor('offline')]) {
       expect(failing, `failing must not reuse ${shared}`).not.toContain(shared);
     }
   });
 
-  it('exposes the socket state as a class and a title', () => {
+  it('exposes the socket state as an attribute and a title', () => {
     const { container } = render(<TopBar {...props} light="closed" lightTitle="WebSocket closed" />);
-    // The state class is on the WRAPPER, not the dot: it tints the dot and the word together, and the
-    // dot itself is now a plain `.conn` with no state of its own.
-    const status = container.querySelector('.conn-status');
-    expect(status?.className).toContain('conn-closed');
-    expect(status?.getAttribute('title')).toBe('WebSocket closed');
-    expect(container.querySelector('.conn')).toBeTruthy();
+    // The state is on the WRAPPER, not the dot: it tints the dot and the word together, and the dot
+    // itself is a `Dot` primitive with no state of its own. `data-state` and not a class, because
+    // `conn-${light}` built six names no literal grep could see — see docs/design-system.md, *Risks*.
+    const status = screen.getByTestId('conn-status');
+    expect(status.getAttribute('data-state')).toBe('closed');
+    expect(status.getAttribute('title')).toBe('WebSocket closed');
+    expect(container.querySelector('.vb-dot')).toBeTruthy();
   });
 
   // A colour cannot say WHICH failure this is, and two of the four states are failures with different
@@ -309,10 +324,10 @@ describe('TopBar visibility and labels', () => {
     expect([...offered].sort()).toEqual([...defined].sort());
   });
 
-  it('reflects the connection state in a title and a class', () => {
+  it('reflects the connection state in a title and an attribute', () => {
     render(<TopBar {...withProps({ light: 'closed', lightTitle: 'WebSocket closed' })} />);
     const dot = screen.getByTitle('WebSocket closed');
-    expect(dot.className).toContain('conn-closed');
+    expect(dot.getAttribute('data-state')).toBe('closed');
   });
 });
 
@@ -342,7 +357,7 @@ describe('the auto-pilot chip', () => {
     ...over,
   });
 
-  const chip = (): HTMLElement | null => document.querySelector('.ap-chip');
+  const chip = (): HTMLElement | null => document.querySelector('[data-testid="ap-chip"]');
   const header = (): HTMLElement | null => document.querySelector('header.topbar');
 
   // The sentence belongs to `ap-bar-detail`, which wraps it under the auto-pilot bar's row for every state
@@ -381,13 +396,13 @@ describe('the auto-pilot chip', () => {
   it('says when auto-pilot is running', () => {
     render(<TopBar {...props} autopilot={state({ state: 'running' })} />);
     expect(chip()?.textContent).toBe('auto-pilot running');
-    expect(chip()?.className).toContain('ap-running');
+    expect(chip()?.getAttribute('data-state')).toBe('running');
   });
 
   it('says halted, whatever the reason was', () => {
     render(<TopBar {...props} autopilot={state({ state: 'halted', reason: 'killed' })} />);
     expect(chip()?.textContent).toBe('halted');
-    expect(chip()?.className).toContain('ap-halted');
+    expect(chip()?.getAttribute('data-state')).toBe('halted');
   });
 
   it('names the reason it stopped', () => {
@@ -403,7 +418,7 @@ describe('the auto-pilot chip', () => {
     for (const reason of STOP_REASONS) {
       cleanup();
       render(<TopBar {...props} autopilot={state({ state: 'stopped', reason })} />);
-      const success = chip()?.className.includes('ap-complete');
+      const success = chip()?.getAttribute('data-state') === 'complete';
       expect(success, reason).toBe(reason === 'complete');
     }
   });

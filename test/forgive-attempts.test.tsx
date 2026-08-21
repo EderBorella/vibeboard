@@ -89,7 +89,7 @@ describe('where the control appears', () => {
     );
     const line = document.querySelector('.reports-ledger');
     expect(line?.textContent).toContain('execute 3 of 3');
-    expect(line?.querySelector('.reports-forgive')).toBeTruthy();
+    expect(line?.querySelector('[data-testid="reports-forgive"]')).toBeTruthy();
   });
 
   it('is not offered on a card that has spent nothing', () => {
@@ -105,7 +105,7 @@ describe('where the control appears', () => {
         onForgiven={vi.fn()}
       />,
     );
-    expect(document.querySelector('.reports-forgive')).toBeNull();
+    expect(document.querySelector('[data-testid="reports-forgive"]')).toBeNull();
   });
 });
 

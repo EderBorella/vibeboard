@@ -14,6 +14,8 @@ export function Popover({
   trigger,
   triggerClassName,
   triggerTitle,
+  triggerTestId,
+  triggerState,
   className,
   children,
 }: {
@@ -23,6 +25,14 @@ export function Popover({
   trigger: ReactNode;
   triggerClassName?: string;
   triggerTitle?: string;
+  // ON THE TRIGGER, so one selector finds a control whether or not it happens to have a balloon —
+  // `.ap-agent-state` is a bare span when the agent is healthy and this button when it is not, and a
+  // test that had to know which was asserting on the implementation.
+  triggerTestId?: string;
+  // The caller's own state vocabulary, as `data-state`. It replaces a class composed at run time from
+  // a prefix and the state word: those composed names are invisible to a literal grep, which is how 36
+  // live classes came to look dead. See docs/design-system.md, *Risks*.
+  triggerState?: string;
   className?: string;
   children: ReactNode;
 }) {
@@ -58,6 +68,8 @@ export function Popover({
         type="button"
         className={triggerClassName}
         title={triggerTitle}
+        data-testid={triggerTestId}
+        data-state={triggerState}
         aria-expanded={open}
         aria-haspopup="dialog"
         onClick={() => setOpen((v) => !v)}

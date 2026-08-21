@@ -1,4 +1,6 @@
 import { type AutopilotState, isSuccessReason } from '../api';
+import { Button } from '../ui/Button';
+import { Chip } from '../ui/Chip';
 import { ConnectionLight } from './ConnectionLight';
 import type { LightState, RecentFailure, RefusalKind } from './connection-light';
 
@@ -112,9 +114,20 @@ export function TopBar({
         recentFailure={recentFailure}
       />
       {showProject && chip && (
-        <span className={`ap-chip ap-${chip.tone}`} title={autopilot?.detail ?? chip.label}>
+        // `state` and not a `tone`, because the palette does not fit the five: `running` is `--accent-2`,
+        // every theme's SECONDARY, which equals `--warn` in two of the three themes and not in
+        // marshmallow (#8a6420 against #9a5b12). Mapping it onto `warn` would silently repaint the light
+        // theme, and themes.css argues that distinction by name. What the attribute buys even so is that
+        // `ap-${chip.tone}` no longer builds three class names no literal grep can see.
+        <Chip
+          pill
+          state={chip.tone}
+          className="ap-chip"
+          testId="ap-chip"
+          title={autopilot?.detail ?? chip.label}
+        >
           {chip.label}
-        </span>
+        </Chip>
       )}
       {/* The SENTENCE is not here, and the reasoning that put it here is worth keeping because it was true when
           it was written: `whyStuck` names WHICH cards are stuck and why, and all of it once lived in a `title`
@@ -154,19 +167,19 @@ export function TopBar({
           ))}
         </select>
         {showProject && (
-          <button className="switch-btn" title="Settings" onClick={onSettings}>
+          <Button size="sm" className="switch-btn" title="Settings" onClick={onSettings}>
             ⚙
-          </button>
+          </Button>
         )}
         {showProject && (
-          <button className="switch-btn" onClick={onSwitchProject}>
+          <Button size="sm" className="switch-btn" onClick={onSwitchProject}>
             Switch project
-          </button>
+          </Button>
         )}
         {showProject && (
-          <button className={`switch-btn${copilotOpen ? ' active' : ''}`} onClick={onToggleCopilot}>
+          <Button size="sm" className={`switch-btn${copilotOpen ? ' active' : ''}`} onClick={onToggleCopilot}>
             {copilotOpen ? 'Hide copilot' : 'Copilot'}
-          </button>
+          </Button>
         )}
       </div>
     </header>

@@ -1,6 +1,8 @@
 import type { CSSProperties } from 'react';
 import type { RunRecord } from '../api';
 import type { Card } from '../shared';
+import { Button } from '../ui/Button';
+import { Chip } from '../ui/Chip';
 import { ForgiveAttempts } from './ForgiveAttempts';
 import { costLabel, usageTotal } from './format';
 import { useAccounting } from './useAccounting';
@@ -85,7 +87,9 @@ export function ExecutionView({
               return (
                 <div key={record.run} className="exec-run">
                   <div className="exec-run-top">
-                    <span className={`report-chip chip-${record.status}`}>{record.status}</span>
+                    <Chip pill state={record.status} className="report-chip" testId="report-chip">
+                      {record.status}
+                    </Chip>
                     <span className="exec-skill">{record.skill}</span>
                     {/* What it cost, beside how long it took — the two things a dashboard row is
                         actually asked. Absent while a run is still in flight. */}
@@ -113,24 +117,24 @@ export function ExecutionView({
                   {(stoppable || column.key === 'attention') && (
                     <div className="exec-actions">
                       {stoppable && (
-                        <button
-                          type="button"
+                        <Button
                           className="report-stop"
+                          data-testid="report-stop"
                           title={`Stop the ${record.skill} run on ${subject}`}
                           onClick={() => onCancel(record)}
                         >
                           Stop
-                        </button>
+                        </Button>
                       )}
                       {column.key === 'attention' && (
-                        <button
-                          type="button"
+                        <Button
                           className="report-dismiss"
+                          data-testid="report-dismiss"
                           title={`Mark the ${record.skill} run on ${subject} dealt with`}
                           onClick={() => onResolve(record)}
                         >
                           Dismiss
-                        </button>
+                        </Button>
                       )}
                       {/* BESIDE DISMISS, because the two are the pair of answers to a failed run and
                           this column is where a person actually meets one. Dismiss says "I have read

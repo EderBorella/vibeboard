@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { rebuildBoxes, restartOpencodeServer, type SandboxState, takeOverOpencodeServer } from '../api';
 import { useConfirm } from '../confirm/useConfirm';
+import { Button } from '../ui/Button';
 import { useAction } from '../useAction';
 
 interface Props {
@@ -91,9 +92,9 @@ export function SandboxPanel({ state, backend, onChanged }: Props) {
           Take-over is the action that actually resolves that state. */}
       {opencode && state.backend === 'managed' && (
         <div className="field sandbox-action">
-          <button className="btn-secondary" disabled={busy !== null} onClick={() => act('restart')}>
+          <Button size="md" disabled={busy !== null} onClick={() => act('restart')}>
             {busy === 'restart' ? 'Restarting…' : 'Restart server'}
-          </button>
+          </Button>
           <p className="sandbox-hint">
             Stops the managed OpenCode server and starts a new one. Any turn in flight is lost. Use it when
             the server is hung or stale, or when it started before the sandbox was installed.
@@ -103,9 +104,9 @@ export function SandboxPanel({ state, backend, onChanged }: Props) {
 
       {opencode && state.backend === 'attached' && (
         <div className="field sandbox-action">
-          <button className="btn-secondary" disabled={busy !== null} onClick={() => act('takeover')}>
+          <Button size="md" disabled={busy !== null} onClick={() => act('takeover')}>
             {busy === 'takeover' ? 'Taking over…' : 'Take over with a managed server'}
-          </button>
+          </Button>
           <p className="sandbox-hint">
             Stops using <code>VIBEBOARD_OPENCODE_URL</code> and spawns a sandboxed server instead, for this
             session. You set that variable deliberately, most likely for debugging, so nothing does this on
@@ -119,9 +120,9 @@ export function SandboxPanel({ state, backend, onChanged }: Props) {
           drifted — a credential file replaced on the host by rename, leaving the mount on a dead inode —
           survives every restart of VibeBoard and there was no other way to be rid of it. */}
       <div className="field sandbox-action">
-        <button className="btn-secondary" disabled={busy !== null} onClick={() => void rebuild()}>
+        <Button size="md" disabled={busy !== null} onClick={() => void rebuild()}>
           {busy === 'rebuild' ? 'Throwing away…' : 'Rebuild the agent boxes'}
-        </button>
+        </Button>
         <p className="sandbox-hint">
           Removes this project's containers. Anything in flight inside them is lost, and the next agent turn
           builds new ones. The agent <strong>image is not rebuilt</strong> — that is{' '}

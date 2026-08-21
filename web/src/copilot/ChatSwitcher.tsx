@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import type { ChatMeta } from '../shared';
+import { Button } from '../ui/Button';
+import { Chip } from '../ui/Chip';
 import { backendLabel, relTime } from './format';
 
 interface Props {
@@ -48,25 +50,33 @@ export function ChatSwitcher({ chats, currentChatId, backend, running, onOpen, o
                     title={c.title}
                   >
                     <span className="chat-menu-title">
-                      <span className={`chat-backend bk-${c.backend}`}>{backendLabel(c.backend)}</span>
+                      <Chip pill state={c.backend} className="chat-backend">
+                        {backendLabel(c.backend)}
+                      </Chip>
                       {c.title}
                     </span>
                     <span className="chat-menu-meta">
                       {relTime(c.updatedAt)} · {c.messageCount} msg
                     </span>
                   </button>
-                  <button className="chat-del" title="Delete chat" onClick={() => onDelete(c.id)}>
+                  <Button
+                    variant="bare"
+                    size="sm"
+                    className="chat-del"
+                    title="Delete chat"
+                    onClick={() => onDelete(c.id)}
+                  >
                     ✕
-                  </button>
+                  </Button>
                 </div>
               ))}
             </div>
           </>
         )}
       </div>
-      <button className="chat-new" disabled={running} onClick={onNew} title="Start a fresh chat">
+      <Button size="sm" className="chat-new" disabled={running} onClick={onNew} title="Start a fresh chat">
         + New
-      </button>
+      </Button>
     </div>
   );
 }

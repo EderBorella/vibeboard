@@ -15,11 +15,13 @@ import { useConfirm } from '../confirm/useConfirm';
 import { BackendPicker } from '../copilot/BackendPicker';
 import { resolveChoice } from '../copilot/choice';
 import type { CopilotConfig } from '../shared';
+import { Button } from '../ui/Button';
+import { Dot, type Tone as DotTone } from '../ui/Dot';
 import { Popover } from '../ui/Popover';
 import { useAction } from '../useAction';
 import { AutopilotHelp } from './AutopilotHelp';
 import { ForgiveDerivation } from './ForgiveDerivation';
-import { transportModel } from './transport';
+import { type Tone as TransportTone, transportModel } from './transport';
 import { useReadiness } from './useReadiness';
 
 interface Props {
@@ -123,14 +125,23 @@ export function agentStatus(sandbox: SandboxState | null): {
 // Its own component because the bar was already at the complexity limit and this is the second conditional
 // rendering in it — the gate refusing the third one is the gate working.
 function AgentChip({ agent }: { agent: ReturnType<typeof agentStatus> }) {
-  const className = `ap-agent-state ap-agent-${agent.tone}`;
-  // A DOT AND THE WORD, like the connection light and like the transport dot two elements to the left. A word
-  // alone is the odd one out on a bar that already says its states with a coloured dot, and the colour is the
-  // part read at a glance — the word is what you read second, once the dot has made you look.
-  const dot = <span className={`ap-agent-dot ap-agent-dot-${agent.tone}`} aria-hidden="true" />;
+  // THE TONE IS A `data-tone` ATTRIBUTE AND NO LONGER A CLASS NAME BUILT AT RUN TIME. `ap-agent-${tone}`
+  // produced four classes no literal grep could see, which is the defect the *Risks* section of
+  // docs/design-system.md describes: 36 live classes looked dead, and deleting them would have broken every
+  // state colour on this bar in exactly the states a person only reaches once something has gone wrong.
+  // A `data-` value is visible to the same grep that reads the stylesheet's own selector.
+  //
+  // ONLY THE FAULT GETS A COLOUR, so `ok` and `unknown` are the muted word with a dot that differs — see
+  // styles.css. The dot's tone is therefore NOT the word's: `ok` is a green pip beside grey text.
+  const dot = <Dot size={7} tone={agent.tone === 'ok' ? 'ok' : undefined} />;
   if (!agent.advice) {
     return (
-      <span className={className} data-testid="ap-agent-state" title={agent.title}>
+      <span
+        className="ap-agent-state"
+        data-state={agent.tone}
+        data-testid="ap-agent-state"
+        title={agent.title}
+      >
         {dot}
         {agent.word}
       </span>
@@ -139,22 +150,77 @@ function AgentChip({ agent }: { agent: ReturnType<typeof agentStatus> }) {
   return (
     <Popover
       label="What is wrong with this agent"
-      triggerClassName={className}
+      triggerClassName="ap-agent-state"
       triggerTitle={agent.title}
-      // The id is on the CONTENT rather than on the trigger, so one selector finds this chip whether it is a
-      // plain span or a button with a balloon. A `triggerTestId` prop on the shared Popover would work too,
-      // and is a wider change for one caller's convenience.
+      // ON THE TRIGGER, not on the content. It used to sit on the inner span so one selector would find
+      // this chip whether it was a plain span or a button with a balloon — and that made
+      // `test/autopilot-bar.test.tsx`'s `expect(badge.className).not.toContain('ap-agent-ok')` VACUOUS in
+      // every case that has a balloon, because the inner span never carried a tone at all. The tone and
+      // the test id now sit on the same element in both shapes, which is what that assertion needed.
+      triggerTestId="ap-agent-state"
+      triggerState={agent.tone}
       trigger={
-        <span className="ap-agent-chip" data-testid="ap-agent-state">
+        <>
           {dot}
           {agent.word}
-        </span>
+        </>
       }
     >
       <strong className="ap-agent-heading">{agent.advice.heading}</strong>
       <p className="ap-agent-detail">{agent.advice.detail}</p>
       {agent.advice.next && <p className="ap-agent-next">{agent.advice.next}</p>}
     </Popover>
+  );
+}
+
+// THE TRANSPORT DOT'S TONE, as a table rather than as a class name composed from the state word.
+// `ap-dot-${tone}` created four classes, and only THREE of them existed in the stylesheet: `idle` and
+// `stopped` both fell through to the base rule's grey, which is right — neither is a fault and neither
+// is progress — but it was true by omission, so nothing said so and nothing could check it. Stated here
+// instead, and pinned by test/state-tones.test.tsx, which asserts the pair is one colour on purpose.
+//
+// `running` is the only one that moves. The pulse belongs to the Dot because the reduced-motion
+// override that switches it off has to sit beside the keyframes.
+const DOT_TONE: Record<TransportTone, DotTone> = {
+  idle: 'neutral',
+  stopped: 'neutral',
+  running: 'accent',
+  halted: 'bad',
+  complete: 'ok',
+};
+
+function ToneDot({ tone }: { tone: TransportTone }) {
+  return <Dot size={8} tone={DOT_TONE[tone]} pulse={tone === 'running'} testId="ap-tone-dot" />;
+}
+
+// THE ONE BIG BUTTON. Its own component for the reason AgentChip is: the bar sits on the
+// cognitive-complexity limit, and the gate refusing one more conditional in it is the gate working.
+//
+// `primary` to start and `default` to stop — the two are the same box in the same place, and the one
+// that begins work is the one that should read as the action. That is exactly what `.ap-transport` and
+// `.ap-transport-stop` said before the variant existed.
+function Transport({
+  control,
+  onAct,
+}: {
+  control: ReturnType<typeof transportModel>['control'];
+  onAct: () => void;
+}) {
+  const stopping = control.kind === 'stop';
+  return (
+    <Button
+      variant={stopping ? 'default' : 'primary'}
+      size="md"
+      className="ap-transport"
+      data-testid="ap-transport"
+      disabled={control.disabled}
+      title={control.title}
+      aria-label={control.label}
+      onClick={onAct}
+    >
+      <span aria-hidden="true">{stopping ? '■' : '▶'}</span>
+      {control.label}
+    </Button>
   );
 }
 
@@ -252,22 +318,17 @@ export function AutopilotBar({
   return (
     <div className={`ap-bar ap-bar-${model.tone}`} data-testid="ap-bar">
       <div className="ap-bar-row">
-        <button
-          type="button"
-          className={`ap-transport ap-transport-${model.control.kind}`}
-          disabled={model.control.disabled}
-          title={model.control.title}
-          aria-label={model.control.label}
-          onClick={act}
-        >
-          <span aria-hidden="true">{model.control.kind === 'stop' ? '■' : '▶'}</span>
-          {model.control.label}
-        </button>
+        <Transport control={model.control} onAct={act} />
 
         {/* Beside the transport, because it IS transport — the most destructive kind. Quiet until you
             hover it: a permanently red bar teaches people to stop reading the bar. */}
-        <button
-          type="button"
+        {/* `default`, and NOT `danger` — but not `ghost` either. Two separate arguments, and the first
+            one was previously used to settle the second. (a) Not `danger`: a control that is permanently
+            red is one people stop reading, and this bar's whole job is to be read; it turns dangerous on
+            hover, which `.ap-kill` still owns — a colour, which a caller may override, and not a
+            geometry, which it may not. (b) Not `ghost`: the dashed border reads as EXPLANATORY, and an
+            emergency stop is the most actionable control on the board. It looked like a footnote. */}
+        <Button
           className="ap-kill"
           disabled={model.emergency.disabled || busy !== null}
           title={model.emergency.title}
@@ -275,9 +336,9 @@ export function AutopilotBar({
           onClick={kill}
         >
           <span aria-hidden="true">✕</span> Emergency stop
-        </button>
+        </Button>
 
-        <span className={`ap-dot ap-dot-${model.tone}`} aria-hidden="true" />
+        <ToneDot tone={model.tone} />
         <span className="ap-status" data-testid="ap-status">
           {model.status}
         </span>
@@ -301,32 +362,41 @@ export function AutopilotBar({
         </span>
 
         {model.expandable && (
-          <button
-            type="button"
-            className="ap-expand"
+          // `ghost`, and this is the call the owner left open. A disclosure toggle EXPLAINS: it reveals
+          // the bar's own detail and changes nothing in the project — same category as "How it works",
+          // which shows prose where this shows numbers. Both are dashed; everything on this row that
+          // acts on the run is solid.
+          <Button
+            variant="ghost"
+            className="ap-inline"
             aria-expanded={open}
             onClick={() => setOpen((v) => !v)}
             data-testid="ap-expand"
           >
             {open ? '▾' : '▸'} {open ? 'Hide' : 'Details'}
-          </button>
+          </Button>
         )}
-        <button
-          type="button"
-          className="ap-help-btn"
+        {/* THE ghost, and the one the owner ruled on: a help affordance explains, which is what the
+            dashed border says. */}
+        <Button
+          variant="ghost"
+          className="ap-inline"
           onClick={() => setHelpOpen(true)}
           title="How auto-pilot works"
+          data-testid="ap-help-btn"
         >
           ? How it works
-        </button>
-        <button
-          type="button"
-          className="ap-settings-link"
+        </Button>
+        {/* Acts: it takes you to a surface where caps and columns are changed. Navigation is not
+            explanation, so it is solid. */}
+        <Button
+          className="ap-inline"
           onClick={onSettings}
           title="Caps, the columns that mean finished, and where a blocked card goes"
+          data-testid="ap-settings-link"
         >
           Settings
-        </button>
+        </Button>
 
         {/*
           LAST IN THE ROW, deliberately. It is the one blocker a person CLEARS rather than fixes, so it
@@ -342,8 +412,7 @@ export function AutopilotBar({
           the top of them is the kind of prompt people learn to click through without reading.
         */}
         {model.reviewGates && (
-          <button
-            type="button"
+          <Button
             className="ap-review-gates"
             data-testid="ap-review-gates"
             title="These files hold commands this server runs outside the sandbox, as you. Read them in Project Control first."
@@ -355,7 +424,7 @@ export function AutopilotBar({
             }}
           >
             I have read the gate commands
-          </button>
+          </Button>
         )}
       </div>
 

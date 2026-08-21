@@ -22,7 +22,11 @@ const props = {
   canContinue: true,
 };
 
-const buttons = (): HTMLButtonElement[] => [...document.querySelectorAll<HTMLButtonElement>('.option-btn')];
+// `[data-testid]`, not `.option-btn`: the class now carries `text-align` and nothing else, and the box
+// belongs to Button. `.option-fixed`'s dashed border went with the migration — see styles.css.
+const buttons = (): HTMLButtonElement[] => [
+  ...document.querySelectorAll<HTMLButtonElement>('[data-testid="option-btn"]'),
+];
 
 describe('ReportOptions', () => {
   it('offers the agent’s options first, then the fixed ones', () => {

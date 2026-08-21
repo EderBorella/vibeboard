@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { Button } from '../ui/Button';
 
 // How auto-pilot works, in the app rather than in a design document nobody reading the header has open.
 //
@@ -24,9 +25,9 @@ export function AutopilotHelp({ onClose }: { onClose: () => void }) {
       <div className="modal ap-help">
         <div className="modal-head">
           <h2>How auto-pilot works</h2>
-          <button ref={closeRef} type="button" className="btn-secondary" onClick={onClose}>
+          <Button size="md" ref={closeRef} onClick={onClose}>
             Close
-          </button>
+          </Button>
         </div>
         <div className="modal-body ap-help-body">
           <h3>The loop</h3>

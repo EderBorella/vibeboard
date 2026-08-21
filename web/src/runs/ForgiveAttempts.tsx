@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { forgiveCardAttempts } from '../api';
 import { useConfirm } from '../confirm/useConfirm';
 import type { BoardName } from '../shared';
+import { Button } from '../ui/Button';
 import { useAction } from '../useAction';
 
 interface Props {
@@ -53,12 +54,16 @@ export function ForgiveAttempts({ board, card, onForgiven }: Props) {
 
   return (
     <>
-      <button type="button" className="reports-forgive" disabled={busy !== null} onClick={() => void clear()}>
+      {/* `default`, not `ghost`. It was a ghost on the argument that an escape hatch is a quiet thing,
+          and that conflated QUIET with EXPLANATORY: this button WRITES — it clears the spent attempts and
+          changes what auto-pilot will dispatch. A dashed border on a control that mutates the ledger says
+          the wrong thing about it. Quietness is what `default` beside a `primary` already gives. */}
+      <Button data-testid="reports-forgive" disabled={busy !== null} onClick={() => void clear()}>
         {/* "Clear failed tries" and not "Try this card again": the button does not RUN anything, and a
             label promising a retry set up the wrong expectation — what it does is stop the spent tries
             counting, after which auto-pilot picks the card up on its own schedule. */}
         {busy !== null ? 'Clearing…' : 'Clear failed tries'}
-      </button>
+      </Button>
       {forgiven !== null && (
         <span className="reports-forgiven">
           {forgiven === 0

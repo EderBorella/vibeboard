@@ -1,3 +1,4 @@
+import { Button } from '../ui/Button';
 import type { TagCount } from '../viewmodel';
 
 interface Props {
@@ -28,9 +29,9 @@ export function TagFilter({ tags, active, onToggle, onClear }: Props) {
         </button>
       ))}
       {active.length > 0 && (
-        <button className="tag-filter-clear" onClick={onClear}>
+        <Button variant="bare" size="sm" className="tag-filter-clear" onClick={onClear}>
           Clear filter
-        </button>
+        </Button>
       )}
     </div>
   );

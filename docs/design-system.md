@@ -1,6 +1,6 @@
 # The design system, and how it lands in phases
 
-**Status: Phases 0, 1 and 2 done (2026-08-21), Phases 3–5 planned.** Phase 0 built the instrument and
+**Status: Phases 0–3 done (2026-08-21), Phases 4 and 5 planned.** Phase 0 built the instrument and
 measured, touching no stylesheet; Phase 1 added the 17 tokens and nothing that consumes them; Phase 2
 collapsed the type and space values onto them, which is the first phase that changes rendering. This page is
 the argument and the sequence; the work is phased so each phase ships on its own and can be reverted on its
@@ -178,9 +178,9 @@ hand many times over.
 
 | Primitive | Replaces | Variants |
 |---|---|---|
-| `Button` | the button cases among the 104 radius rules — `.ap-expand`, `.ap-settings-link`, `.ap-help-btn`, `.reports-forgive`, `.ap-remedy-btn`, and the rest | `primary` \| `default` \| `ghost` \| `danger`, sizes `sm` \| `md` |
-| `Chip` | tags, state words, counts, badges | tones `neutral` \| `accent` \| `ok` \| `warn` \| `bad`, optional `pill` |
-| `Dot` | `.ap-dot`, `.conn`, `.ap-agent-dot` — three hand-rolled indicators already | tones as `Chip`, sizes `7` \| `8` \| `12`px |
+| `Button` **(built, Phase 3)** | the button cases among the 104 radius rules — `.ap-expand`, `.ap-settings-link`, `.ap-help-btn`, `.reports-forgive`, `.ap-remedy-btn`, and the rest | `primary` \| `default` \| `ghost` \| `danger` \| `bare`, sizes `sm` \| `md` |
+| `Chip` **(built, Phase 3)** | tags, state words, counts, badges | tones `neutral` \| `accent` \| `ok` \| `warn` \| `bad`, optional `pill`, plus `data-state` for a surface vocabulary outside the five |
+| `Dot` **(built, Phase 3)** | `.ap-dot`, `.conn`, `.ap-agent-dot` — three hand-rolled indicators already | tones as `Chip`, sizes `7` \| `8` \| `12`px |
 | `Panel` | board columns, drawers, settings sections, dock panes | `flat` \| `raised`, optional header slot |
 | `Readout` | the signature above: every duration, cost, token count, run id | inline \| block |
 | `Field` | `InlineField`, settings inputs, the gate form | label + control + hint + error |
@@ -190,6 +190,46 @@ samples. Not merely decorative: dashed reads as explanatory rather than actionab
 affordance ("How it works") actually is, and it keeps the box the same size as a solid button — a
 borderless ghost is 2px narrower and shifts the row it sits in. The radius conformance check in Phase 3
 therefore asserts on `border-radius` and not on `border-style`.
+
+**That sentence is the TEST for whether a control may be a ghost, and it was applied to eight sites and
+failed by six of them.** The first cut of Phase 3 read "dashed reads as quiet" and put a dash on
+everything unobtrusive — including **"✕ Emergency stop"**, the most actionable control on the board,
+which then read as a footnote. The two arguments had been collapsed into one: *not `danger`* (a
+permanently red control is one people stop reading, and the auto-pilot bar's whole job is to be read) is
+a sound argument that says nothing whatever about *not solid*. Corrected on 2026-08-21, one verdict per
+site:
+
+| site | explains or acts? | variant |
+|---|---|---|
+| `AutopilotBar` `ap-help-btn` — "? How it works" | **explains** — opens prose | `ghost` (the owner's ruling) |
+| `AutopilotBar` `ap-expand` — "▸ Details / ▾ Hide" | **explains** — reveals the bar's own numbers and changes nothing in the project | `ghost` |
+| `AutopilotBar` `ap-kill` — "✕ Emergency stop" | **acts** — kills every agent and halts the project | `default`, keeping `.ap-kill`'s danger-on-hover |
+| `AutopilotBar` `ap-settings-link` — "Settings" | **acts** — navigation is not explanation | `default` |
+| `CardReports` `report-stop` — "Stop" | **acts** — cancels a live run | `default`, keeping the danger hover |
+| `ExecutionView` `report-stop` — "Stop" | **acts** | `default` |
+| `ExecutionView` `report-dismiss` — "Dismiss" | **acts** — writes `resolved` | `default` |
+| `ForgiveAttempts` `reports-forgive` — "Clear failed tries" | **acts** — writes, and changes what auto-pilot will dispatch | `default` |
+
+**The disclosure toggle was the one genuinely open call, and it went to `ghost`.** It reveals detail
+about the thing you are already looking at and touches nothing outside the bar's own presentation —
+the same category as the help button, which shows prose where this shows figures. A dashed pair at the
+right-hand end of the bar and solid everywhere that acts on the run is a distinction a person can read
+without being told it exists.
+
+**`ghost` therefore has two consumers, and it is kept deliberately at two.** "Explanatory affordance" is
+a real category and a two-site variant that names one is worth more than a five-site variant that names
+nothing — which is what it had become. `test/button-voices.test.tsx` asserts the census by **test id**
+rather than by line number, so a new ghost is a named row in a diff.
+
+**`bare` is the fifth variant, and it was added by measurement.** Working down the 46 hand-rolled
+classes, **twelve were one shape under twelve names** — `background: transparent; border: none; color:
+var(--muted); cursor: pointer`, differing only in a `font-size` nobody chose (11px to 18px across them)
+and a hover colour that genuinely is the surface's. Asking "which of the four voices would have to lie"
+of each gets the same answer twelve times — *all four, because every one of them draws a box and these
+have none.* Twelve identical answers is not twelve survivors; it is a missing voice, and the precedent is
+`--t-display` in Phase 2, where the scale turned out not to be short. Here it was. `bare` keeps the
+base's transparent 1px border so it cannot shift the row it is dropped into — the same argument the dash
+rests on — and its hover ink is overridable, because a `✕` that deletes goes red.
 
 **`Field` is last and least urgent** — it has the fewest sites and the most bespoke behaviour (inline
 commit-on-blur editing). If the budget runs out, stopping before it leaves a coherent system.
@@ -218,7 +258,9 @@ no prerequisite left to satisfy. **Verified rather than assumed** when Phase 0 l
 
 1. **Type conformance** — every element's computed `font-size` is one of the six scale values. This is the
    assertion that would have caught the 10.88px/13.12px defect on the commit that introduced it.
-2. **Radius conformance** — every computed `border-radius` is one of the four, or `50%`.
+2. **Radius conformance** — every computed `border-radius` is one of the four, or `50%`. Blocking since
+   Phase 3, with a sibling static check (`npm run check:radius-scale`) over the file for the same reason
+   type has one.
 
 Checks 1 and 2 each make **two** claims, and they are gated differently — see the split below.
 3. **Nothing overflows** — for every text element, `scrollWidth <= clientWidth + 1`; and the document does
@@ -236,7 +278,9 @@ made the first version of this gate worthless.
 - **Conformance** — "every computed `font-size` is one of the six", "every radius is one of the four" — becomes
   blocking **in the phase that drives its count to zero**, and not before: a gate pointed at a backlog has to
   be bypassed on every commit, which teaches everyone to ignore it. **Type is BLOCKING as of Phase 2**, which
-  took it from 15 distinct computed sizes to 5. **Radius still REPORTS** at 6 values; that is Phase 3.
+  took it from 15 distinct computed sizes to 5. **Radius is BLOCKING as of Phase 3**, which took it from 6
+  computed values to 4 — and asserts on `border-radius`, never on `border-style`, because the ghost Button's
+  dash is a ruling and not a defect.
 - **Conformance is asserted twice, in two places, and neither is redundant.** The harness measures what the
   board COMPUTES — including sizes no rule authored, like a UA default on a control — and `npm run
   check:type-scale` reads what the file AUTHORS, including the surfaces the harness never opens. Phase 0
@@ -478,15 +522,237 @@ and was empty on all three themes.
 is untouched by it.
 **Revert:** `styles.css`, three baseline files, and the two gates return to reporting.
 
-### Phase 3 — Button, Dot, Chip
+### Phase 3 — Button, Dot, Chip — **DONE 2026-08-21**
 
-The three highest-frequency shapes. Replaces the button and chip cases among the 104 radius rules.
+The three highest-frequency shapes, in `web/src/ui/` with `web/src/ui/primitives.css` — **24 class
+selectors** for the three components and their variants, loaded **before** `styles.css` so a surface can
+still override a primitive's *colour* at equal specificity (the emergency stop is a ghost button with a
+danger hover) while the geometry gate stops that override becoming a padding.
 
-**Gate:** radius conformance turns **BLOCKING**. A CSS check that no rule outside the primitive block
-declares its own `border-radius`, `padding` or `font-size` for a button-shaped element. Focus visible on
-every primitive, keyboard-activated, in all three themes.
-**Exit:** the single-use class count has dropped measurably from 278 — the number goes in this page.
-**Revert:** per primitive, since each is a separate commit.
+**`Button`** — `primary` | `default` | `ghost` | `danger`, sizes `sm` (4/8px, `--t-small`) and `md`
+(8/16px, `--t-body`). **`Dot`** — the five tones at 7 / 8 / 12px, plus a `pulse`. **`Chip`** — the five
+tones, optional `pill`.
+
+**The `ghost` variant carries a DASHED border**, the owner's ruling of 2026-08-20. The radius conformance
+check therefore asserts on `border-radius` and **not** on `border-style`, and says so in its own failure
+message so nobody "fixes" the dash to satisfy it.
+
+#### The dynamic-class problem is solved rather than dodged
+
+**36 classes were never named literally in `web/src`; 7 are.** Measured by the method beside the class
+counts at the top of this page, before and after. The 29 that went are the ones `Dot` and `Chip` replaced,
+and every one of them now has its state as a **`data-state` attribute** rather than a class composed at run
+time: the six `conn-*`, the seven `chip-*` statuses, the four `ap-agent-*` and three `ap-agent-dot-*`, the
+three `ap-*` chip tones, the three `ap-dot-*`, the two `bk-*`, and `ap-transport-stop`. A `data-` value is
+visible to the same literal grep that reads the stylesheet's own selector, so Phase 5's gate has 29 fewer
+classes to get wrong.
+
+**The seven that remain are named, not overlooked:** `ap-bar-running` / `-halted` / `-complete` /
+`-stopped`, which tint the bar's own left border and are neither a Dot nor a Chip; and `msg-user` /
+`-assistant` / `-error`, which are chat bubbles and belong to `Panel`. Phase 5's gate still needs the
+allow-list the *Risks* section demands — for seven classes instead of thirty-six.
+
+**A tone is not a state, and forcing the one into the other would have repainted a theme.** Three of the
+migrated vocabularies do not fit the five tones: `attention`, `running` (the top-bar chip) and
+`connecting`/`failing` are all `--accent-2`, every theme's secondary — which equals `--warn` in cyberpunk
+and classic-dark but **not** in marshmallow (`#8a6420` against `#9a5b12`). `themes.css` argues that
+distinction by name at `.conn-failing`. So `tone` is the closed five the primitive owns, `data-state` is
+the surface's own vocabulary, and the primitive colours neither by guessing.
+
+#### What the off-scale radii turned out to be, measured
+
+The board computed **6** values; it computes **4**. The two that had to go were found by running the
+harness rather than by reading the file:
+
+| was | on | became | why |
+|---|---|---|---|
+| `8px` × 56 corners | **14 `.tile` elements** — every card on the board, and nothing else | `--r-md` 6px | A tile sits inside a `.column` at 10px, and a nested box wants the smaller corner. It also puts every card on the same radius as every button and panel, which is the point of the phase |
+| `3px` × 4 corners | **one `.ctx-bar`** — the copilot's context meter | `--r-pill` | A 5px-tall progress bar is a capsule; at that height `999px` renders as a 2.5px radius, which is what the `3px` was reaching for |
+
+**The arithmetic accounts for every corner, which is how the change is known to be only the change:**
+`6px` 108 → 164 (+56, the fourteen tiles), `999px` 68 → 72 (+4, the meter), `10px` 56 and `50%` 12
+unchanged, `8px` and `3px` gone. **The drift list read `GONE 8px, GONE 3px` on all three themes and
+nothing NEW** — read before `npm run visual:record` was run, because a re-record done first is how a real
+regression gets blessed into the baseline. **Type drift was empty**: 5 computed sizes, same tally, despite
+every button on the bar changing geometry. Element count 232 → 231, which is `.ap-agent-chip`'s inner span
+going away when the Popover trigger took the test id.
+
+The other six authored values went with them: `12px` (`.gate-card`, `.modal`) → `--r-lg`, `10px`
+(`.mp-modal`) → `--r-lg`, the `8px` floating surfaces (`.popover`, `.chat-menu`) → `--r-lg`, `4px` →
+`--r-sm`, `2px` → `--r-pill` on `.drop-line` and `--r-sm` on the chat bubbles' tail corner. **`--radius`
+survives** with its four consumers, exactly as Phase 1 ruled: it is `--r-lg`'s value, and `Panel` owns
+removing it.
+
+#### Gates
+
+**Radius conformance is BLOCKING** as of this commit, on all three themes. Proven by a planted defect:
+`7px` on `.tile` was named as `7px on 12 element(s)` with the DOM path of each, and the run exited **1**;
+restored, it exited **0**. It carries the same two anti-vacuity guards the type check does — four
+*distinct* resolved steps off a probe, and the same examined population as the tally beside it.
+
+**`tools/check-radius-scale.mjs`, wired into `npm run check`, makes two claims about the FILES.** The
+first — every authored `border-radius` is one of the four steps or `50%` — is **blocking and at zero**, 96
+declarations. Its whole justification is the pair Phase 2 established for type, reproduced here: `9px`
+planted on `.skill-scope`, a Skill-editor rule the board never renders, made `npm run check` exit **1**
+naming `web/src/styles.css:1394` while `npm run visual` exited **0** on the same tree. It also asserts a
+floor of 60 declarations, because a pattern that stops matching reports zero findings and looks exactly
+like success — planted too: a broken `border-radius` regex exits **1** with "this check is vacuous".
+
+**The second claim is a RATCHET, and that is a deliberate departure from "blocking at zero".** It is
+*"no rule outside the primitive stylesheet declares `border-radius`, `padding` or `font-size` for a class
+rendered on a `<button>` or passed to a `<Button className>`"* — and the honest count is **56 before this
+phase, 46 when the primitives landed, and 22 once the adoption was finished**. A blocking gate pointed at
+the remainder would have to be bypassed on every commit, so it prints the full list on a passing run and
+blocks any increase. Proven live: a `padding` planted on `.diary-refresh` took it to 47 and exited **1**;
+after the migration, a `padding` planted on `.cs-action` took it to 23 and exited **1**, naming the class
+and its call site. **Never raise the ceiling.**
+
+#### The adoption was finished, not sampled — 46 → 22
+
+**46 was not a stopping point, it was half a job.** `.btn-primary` (14 call sites), `.btn-secondary` (20)
+and `.btn-danger` (3) are `primary`, `default` and `danger` under their old names — `padding: var(--s-4)
+1rem` is `md` **exactly** — and there was no judgement in them at all. The stated reason for stopping was
+that `.tab-btn`, `.dock-tab`, `.mp-trigger` and `.control-item` would make the variants lie, which is true
+of those four and of nothing else on the list.
+
+**24 classes went, across 66 call sites:**
+
+| class | → | call sites |
+|---|---|---|
+| `.btn-primary` | `primary` `md` | 14 |
+| `.btn-secondary` | `default` `md` | 20 |
+| `.btn-danger` | `danger` `md` — `md` and not `sm`, because all three sit in the same rows | 3 |
+| `.option-btn` | `default` `sm` | 3 |
+| `.switch-btn` | `default` `sm` | 3 |
+| `.control-new` | `bare` `sm` | 5 |
+| `.dispatch-back` | `default` `sm` | 2 |
+| `.archive-restore` `.confirm-cancel` `.chat-new` `.copilot-reset` `.cs-action` | `default` `sm` | 1 each |
+| `.cards-raw` | `primary` when pressed, `default` when not — which is what `.cards-raw.active`'s accent fill already was, written twice | 1 |
+| `.modal-close` `.mp-modal-close` `.cards-tab-x` `.res-del` `.chat-del` `.tile-archive` `.column-add` `.mp-star` `.dock-collapse` `.tag-filter-clear` `.cv-link-edit` | `bare` `sm` | 1 each |
+
+**Two more went that the ratchet could not see, and finding them is the argument for reading the source
+as well as the census.** `.confirm-go`'s class arrives through a ternary and `.copilot-authority`'s button
+chose between `btn-primary` and `btn-secondary` the same way, so neither was ever a literal in a
+`className` attribute. Migrating `.confirm-cancel` alone would have left the confirm dialog's two buttons
+at two different sizes.
+
+**The 22 survivors, each with the reason it is not a `Button`** — and none of the reasons is "it has its
+own padding", which is the thing being removed:
+
+| survivor | which variant would have to lie, and how |
+|---|---|
+| `.tab-btn` `.dock-tab` `.cards-tab-label` | **A tab.** Its selected state is a border on three sides continuous with the panel below it; every variant closes the box. |
+| `.bt-btn` `.mode-btn` | **A cell in a segmented control.** The GROUP owns one border and one radius and each cell has none — every variant gives the cell its own, which puts a seam down the middle. |
+| `.mp-trigger` `.chat-current` | **A select trigger.** Full width, a caret pinned right, an ellipsised label; it is an `<input>` that happens to be a button, and `default` sizes it as a control. |
+| `.report-open` `.exec-card` `.control-item` `.explorer-item` `.mp-pick` `.suggestions-pick` `.chat-menu-open` `.archive-title` `.cv-link` `.cv-link-btn` | **A list row.** Full-bleed, left-aligned, `font: inherit`, a transparent border that only appears on hover. `default`'s panel-2 fill would draw a box round every row of every list. |
+| `.tag` `.tag-chip` `.mp-chip` | **A Chip that happens to be clickable.** `Chip` owns that box, not `Button`; making it a button gives it a button's radius and padding. |
+| `.board-label` | **A section header.** `border-left: 3px solid var(--accent)`, uppercase display face, full width — a heading you can collapse, not a control. |
+| `.board-archive` | **A pill.** Every variant is `--r-md`; there is no pill radius among the five. |
+
+**They are five kinds, not twenty-two problems**, which is why they are Phase 4 and Phase 5's work rather
+than this phase's: tabs and segmented cells want a `Tabs`/`SegmentedControl`, the ten list rows want
+`Panel`, and the three chips want `Chip`.
+
+**The check's `<Button className>` blind spot had to be closed in the same commit, and it was found by
+planting.** Its header listed *"a `<Button>` whose `className` smuggles a padding in — the class is not on
+a literal `<button>`, so this check never sees it"* as a known gap. Moving 27 classes onto `<Button>` drove
+a bus through it: a `padding` planted on `.cs-action` **exited 0**, and the ratchet would have gone on
+falling while the geometry it counted quietly moved somewhere it could not look. It now reads both tags,
+which took the population from 23 back to 49 and left the finding count at 22.
+
+**The anti-vacuity floor on that population had to go, and its replacement is a self-test.** The floor was
+30 against a population of 50; the migration took the population to 23, so a floor doing its job failed the
+run *for succeeding*. The flaw is structural — claim 2's population shrinks to zero as the backlog clears,
+which is the goal — so it is now a `parserSelfTest` over a fixed fixture, which works identically at a
+population of 50 and at 0. **Its own first version was vacuous and a planted defect said so:** it carried
+its own `/<button\b/` rather than calling the census's code, so `TAGS = ['<buttonXX', …]` made the check
+find 0 classes, report 0 findings and exit **0** — sailing straight past the test meant to refuse exactly
+that. Rewritten to go through `openTagsOf` and `classesIn`, it exits **1** on all three of: a broken tag
+name, `<Button>` dropped from `TAGS` (which still reported a plausible 22), and `<ButtonRow>` swept in.
+
+**The check still states what it does not catch**: a class reaching a button through a variable or a
+ternary (`.confirm-go` is one), geometry applied by an element selector (`.copilot-actions button` really
+is one), and anything about an `<a>` or a `role="button"`.
+
+**Check 8 — every primitive shows a focus ring when tabbed to**, on all three themes: **29 of 29** enabled
+`.vb-btn` reached by pressing Tab through the real order (1 disabled, skipped — 30 on the board against
+**5** before the adoption was finished), 0 without a ring, in each theme's own accent
+(`rgb(20,184,166)` / `rgb(47,122,80)` / `rgb(91,157,255)`). It exists *beside* check 6 because check 6 is a
+ratchet on a count, so a primitive that fell out of the tab order would take its own row out of the
+population and leave the ratchet satisfied. Its first version was itself a fixture too thin to distinguish
+two outcomes — it keyed a map on the class list, and the bar's three ghost buttons carry byte-identical
+class lists, so three elements collapsed into one entry and it reported "3 of 5" on a board where all five
+were fine. It marks the element instead. Check 6's own count is unchanged at 55 examined, 0 findings.
+
+#### The characterisation suite, and the three things it found
+
+`test/state-tones.test.tsx` was written and **run green against the code as it was**, before any migration,
+because these are the markers a person only sees once something has already gone wrong. It resolves each
+state to **the colour the stylesheet gives it**, read out of the source with `el.matches()` doing the
+selector work — jsdom loads no CSS — over the element, its ancestors and its descendants, since a tone is
+set on a wrapper to tint a dot and a word together. Three real findings, none of them the rewrite:
+
+- **`.ap-dot-idle` and `.ap-dot-stopped` do not exist.** Both states fell through to the base grey, which
+  is right — neither is a fault and neither is progress — but it was true by *omission*, so nothing said so
+  and nothing could check it. Now a named row in a table, and the test asserts the pair is one colour on
+  purpose.
+- **`.chip-failed`, `.chip-interrupted` and `.chip-cancelled` are three names for one colour**, deliberately:
+  "what they have in common is no report". A first version of the test compared class strings and called
+  that a difference.
+- **`test/autopilot-bar.test.tsx`'s `expect(badge.className).not.toContain('ap-agent-ok')` was VACUOUS** in
+  every case that has a balloon: `data-testid="ap-agent-state"` sat on an inner span that never carried a
+  tone class at all, so the assertion was true of an element that could not have contained it. The tone and
+  the test id now sit on the same element, and the repaired assertion is proven live — planting
+  `data-state="ok"` makes it exit 1.
+
+**Selector migrations: 11.** Seven in `test/topbar.test.tsx` — three connection-light assertions (including
+the one that reads `styles.css` for `.conn-failing`'s tokens, now `[data-state='failing']`), three
+auto-pilot-chip tone assertions, and the chip's own lookup from `.ap-chip` to `[data-testid="ap-chip"]`.
+One in `test/autopilot-bar.test.tsx` — the vacuous `ap-agent-ok` assertion, now `data-state`. Four on
+`.reports-forgive`, in `test/work-area.test.tsx` and `test/forgive-attempts.test.tsx`: the `ghost` variant
+took every one of that class's declarations, so the class was removed rather than left as a name that
+looks live and decides nothing — which is exactly what Phase 5's gate would then have to explain. The
+`default` variant took them when the ghost ruling was corrected; the class stayed deleted either way.
+**126 `querySelector('.class')` calls in `test/` remain the standing blast radius** — see the measured
+count and its command at the end of this phase.
+
+#### What the adoption cost the class count, which is less than the premise assumed
+
+**66 call sites migrated and only 8 classes died.** `styles.css` goes **423 → 416**, `primitives.css`
+**24 → 25** (`vb-btn-bare`), so the total is **447 → 441** — six. The expectation was one deletion per
+migrated class; the reality is that **19 of the 27 still carry a real declaration** once the geometry is
+taken out, and it is a declaration only the surface can make: `.column-add { margin-left: auto }`,
+`.tile-archive:hover { color: var(--danger) }`, `.cs-action { text-align: left }`. The eight that died
+outright had nothing left at all: `.btn-primary`, `.btn-secondary`, `.btn-danger`, `.archive-restore`,
+`.confirm-cancel`, `.dispatch-back`, `.modal-close` and `.option-fixed`.
+
+**So Phase 5's under-150 is not much closer, and the honest reading is that the ratchet and the class count
+measure different things.** 46 → 22 is the real result here: the geometry is in one place. The class count
+needs the *merge* the plan already says it needs — and this phase hands it a measured, concrete target,
+because **six of the survivors are now the single declaration `margin-left: auto`**: `.column-add`,
+`.mp-modal-close`, `.copilot-reset`, `.dock-collapse`, `.copilot-x` and `.tile-archive`. Six names for one
+thing is exactly the "same thing under a second name" the sweep exists to find. It is left rather than
+merged because collapsing them means one shared utility class, and "no utility framework" is an explicit
+non-goal of this document — so it is Phase 5's call to make, not this phase's to sneak in.
+
+**`.option-fixed`'s dashed border was deleted rather than carried, and that is a fix.** `ReportOptions`'s
+own comment says *"the agent's suggestions and the fixed ones look the same on purpose — they all lead to
+the same editable prompt"*, and the dash was the one thing making them look different. It is also now the
+ghost's mark, and a button that starts an agent run does not explain anything.
+
+**Exit:** 4 computed radius values, 86 authored declarations all on the scale, both radius gates blocking,
+**geometry ratchet 46 → 22**. **Classes never named literally: 36 → 7.** **Class selectors: 457 → 416 in
+`styles.css`, plus 25 in `primitives.css` — 441 against 457.** Computed font sizes on the board **5 → 4**:
+`.column-add` was the only 18px the board rendered, on 14 column heads, and `bare`/`sm` puts it at 12px.
+**Suite: 237 files, 4,110 tests** (`test/button-voices.test.tsx` adds 5).
+**`querySelector('.class')` calls in `test/`: 129 → 126** — the three that this change touched
+(`.option-btn` twice, `.cs-action` once) are now `[data-testid]`; measured with
+`grep -rhoE "querySelector(All)?(<[^>]*>)?\(\s*'\.[^']*'" test/ | wc -l`, which reads **135** on the commit
+before Phase 3 and is quoted here rather than the **132** this page carried, because 132 was recorded
+without its method and does not reproduce.
+**Revert:** `web/src/ui/{Button,Dot,Chip}.tsx` and `primitives.css`, the **37** components that call them,
+`styles.css`, three baseline files, `tools/check-radius-scale.mjs` with its two `package.json` scripts, and
+radius conformance returns to reporting.
 
 ### Phase 4 — Panel
 
@@ -519,11 +785,16 @@ numerals are the claim.
 
 ## Risks, and what would stop this
 
-- **Class renames break tests.** There are **132** `querySelector('.class')` calls in the React tests. They
+- **Class renames break tests.** There are **126** `querySelector('.class')` calls in the React tests —
+  135 before Phase 3, measured by the command recorded at the end of that phase; the **132** this line
+  carried until 2026-08-21 had no method beside it and does not reproduce. They
   are the blast radius, and they must be migrated to `data-testid` as each phase touches them, not left
   to a final sweep. A test that selects on a class turns a visual fix into a red suite, which is how a
   suite stops being trusted.
-- **Thirty-six classes are never named literally in `web/src/`, and none of them is dead.** They are
+- **Thirty-six classes were never named literally in `web/src/`, and none of them was dead. Phase 3 took
+  that to SEVEN** — the four `ap-bar-*` and the three `msg-*` — by giving every state the `Dot` and `Chip`
+  primitives replaced a `data-state` attribute instead of a composed class name. The argument below stands
+  for those seven, and the allow-list it demands is seven rows rather than thirty-six. They are
   composed at run time from a prefix and a value, so a literal grep for the class name finds nothing —
   and Phase 5's gate is *"every class in `styles.css` is referenced from `web/src/`, blocking"*. **A naive
   implementation of that gate deletes all 36.** Measured on 2026-08-21, by the method beside the class

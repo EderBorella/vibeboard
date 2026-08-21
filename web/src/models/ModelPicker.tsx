@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { ModelOption } from '../api';
+import { Button } from '../ui/Button';
 import { compareModels, type ModelFilter, matchesFilter } from './model-filter';
 import { fmtCtx, fmtPrice, loadFavs, providerOf, saveFavs } from './model-format';
 
@@ -82,9 +83,9 @@ export function ModelPicker({ models, value, defaultModel, onChange, disabled }:
           <div className="mp-modal" onClick={(e) => e.stopPropagation()}>
             <div className="mp-modal-head">
               <span className="mp-modal-title">Choose a model</span>
-              <button className="mp-modal-close" onClick={() => setOpen(false)}>
+              <Button variant="bare" size="sm" className="mp-modal-close" onClick={() => setOpen(false)}>
                 ✕
-              </button>
+              </Button>
             </div>
 
             <input
@@ -118,13 +119,15 @@ export function ModelPicker({ models, value, defaultModel, onChange, disabled }:
                   key={m.id}
                   className={`mp-item${m.id === value ? ' mp-sel' : ''}${m.id === defaultModel ? ' mp-def' : ''}`}
                 >
-                  <button
+                  <Button
+                    variant="bare"
+                    size="sm"
                     className="mp-star"
                     title={favs.has(m.id) ? 'Unfavorite' : 'Favorite'}
                     onClick={() => toggleFav(m.id)}
                   >
                     {favs.has(m.id) ? '★' : '☆'}
-                  </button>
+                  </Button>
                   <button className="mp-pick" onClick={() => pick(m.id)}>
                     <span className="mp-pick-top">
                       <span className="mp-name">{m.name ?? m.id}</span>

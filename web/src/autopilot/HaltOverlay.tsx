@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { type AutopilotState, restartAutopilot } from '../api';
+import { Button } from '../ui/Button';
 import { useAction } from '../useAction';
 
 // The project is halted: everything in it was killed, and nothing will start again until someone says
@@ -65,15 +66,15 @@ export function HaltOverlay({ state, onRestarted }: { state: AutopilotState; onR
           yourself.
         </p>
         {error && <p className="halt-error">{error}</p>}
-        <button
+        <Button
+          variant="primary"
+          size="md"
           ref={restartRef}
-          type="button"
-          className="btn-primary"
           onClick={() => void restart()}
           disabled={busy !== null}
         >
           {busy ? 'Restarting…' : 'Restart project'}
-        </button>
+        </Button>
       </div>
     </div>
   );

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { BoardName, Card } from '../shared';
+import { Button } from '../ui/Button';
 import { CardTile } from './CardTile';
 
 interface Props {
@@ -80,9 +81,15 @@ export function Column({
         <span className="column-title">{title}</span>
         <span className="column-count">{cards.length}</span>
         {onAdd && (
-          <button className="column-add" title="New card" onClick={() => onAdd(board, slug)}>
+          <Button
+            variant="bare"
+            size="sm"
+            className="column-add"
+            title="New card"
+            onClick={() => onAdd(board, slug)}
+          >
             +
-          </button>
+          </Button>
         )}
       </div>
       <div className="column-body">

@@ -4,6 +4,7 @@ import { BackendPicker } from '../copilot/BackendPicker';
 import { clampToCaps } from '../copilot/choice';
 import { ModelPicker } from '../models/ModelPicker';
 import { backendCaps, type Card } from '../shared';
+import { Button } from '../ui/Button';
 
 interface Props {
   skill: Skill;
@@ -73,9 +74,9 @@ export function DispatchPane({
   return (
     <section className="dispatch" aria-label={`Run ${skill.name} on ${card.id}`}>
       <header className="dispatch-head">
-        <button type="button" className="dispatch-back" onClick={onBack} title="Back to the card">
+        <Button size="sm" onClick={onBack} title="Back to the card">
           ←
-        </button>
+        </Button>
         <h3 className="dispatch-title">
           {skill.name} <span className="dispatch-on">on {card.id}</span>
         </h3>
@@ -165,12 +166,12 @@ export function DispatchPane({
       {error !== null && <p className="dispatch-error">{error}</p>}
 
       <div className="dispatch-foot">
-        <button type="button" className="btn-secondary" onClick={onBack}>
+        <Button size="md" onClick={onBack}>
           Cancel
-        </button>
-        <button type="button" className="btn-primary" disabled={busy} onClick={dispatch}>
+        </Button>
+        <Button variant="primary" size="md" disabled={busy} onClick={dispatch}>
           {busy ? 'A run is in flight' : `Run ${skill.name}`}
-        </button>
+        </Button>
       </div>
     </section>
   );

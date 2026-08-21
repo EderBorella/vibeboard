@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { Card } from '../shared';
+import { Button } from '../ui/Button';
 import { linkedCards } from '../viewmodel';
 import { LinkPicker } from './LinkPicker';
 
@@ -33,9 +34,9 @@ export function CardLinks({ card, allCards, onOpenCard, onLinks }: Props) {
       <div className="cv-label">
         Linked cards
         {onLinks && (
-          <button type="button" className="cv-link-edit" onClick={() => setPicking((v) => !v)}>
+          <Button variant="bare" size="sm" className="cv-link-edit" onClick={() => setPicking((v) => !v)}>
             {picking ? 'Done' : 'Change'}
-          </button>
+          </Button>
         )}
       </div>
       {picking && toggle ? (

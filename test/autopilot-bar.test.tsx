@@ -502,7 +502,11 @@ describe('whether that agent can actually run', () => {
 
     const badge = screen.getByTestId('ap-agent-state');
     expect(badge.textContent).toBe('Checking…');
-    expect(badge.className).not.toContain('ap-agent-ok');
+    // `data-state`, not the class name. THE CLASS VERSION OF THIS WAS VACUOUS in every case that has a
+    // balloon: the test id sat on an inner span that never carried a tone at all, so
+    // `not.toContain('ap-agent-ok')` was true of an element that could not have contained it. Phase 3
+    // put the tone and the id on the same element — see AutopilotBar.tsx — which is what this needed.
+    expect(badge.getAttribute('data-state')).toBe('unknown');
   });
 });
 

@@ -1,5 +1,7 @@
 import type { CardLedgerData, RunRecord, RunStatus } from '../api';
 import type { Card } from '../shared';
+import { Button } from '../ui/Button';
+import { Chip } from '../ui/Chip';
 import { ForgiveAttempts } from './ForgiveAttempts';
 import { costLabel, usageTotal } from './format';
 
@@ -51,9 +53,9 @@ export function CardReports({ card, runs, account, onOpen, onCancel, onForgiven 
           >
             {/* A resolved run keeps its chip — it did end needing you — but says it was answered,
                 so the history reads as history rather than a row still asking. */}
-            <span className={`report-chip chip-${r.status}`}>
+            <Chip pill state={r.status} className="report-chip" testId="report-chip">
               {r.resolved ? `${LABELS[r.status]} · dealt with` : LABELS[r.status]}
-            </span>
+            </Chip>
             <span className="report-skill">{r.skill}</span>
             {/* Cost only, and only when reported: the row has one line, and the full breakdown is
                 one click away in the report itself. */}
@@ -62,14 +64,15 @@ export function CardReports({ card, runs, account, onOpen, onCancel, onForgiven 
             <span className="report-summary">{r.summary ?? r.note ?? ''}</span>
           </button>
           {(r.status === 'running' || r.status === 'queued') && (
-            <button
-              type="button"
+            // Acts — it cancels a live run. `.report-stop` still owns the danger-on-hover colour.
+            <Button
               className="report-stop"
+              data-testid="report-stop"
               title={`Stop the ${r.skill} run`}
               onClick={() => onCancel(r)}
             >
               Stop
-            </button>
+            </Button>
           )}
         </div>
       ))}

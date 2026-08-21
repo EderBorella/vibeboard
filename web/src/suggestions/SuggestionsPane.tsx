@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { cardSuggestion, patchSuggestion } from '../api';
 import type { Suggestion, SuggestionLevel } from '../shared';
 import { SUGGESTION_LEVELS } from '../shared';
+import { Button } from '../ui/Button';
 import { useAction } from '../useAction';
 
 // The dock's second occupant (decision 48): what agents filed, and the two things a person may do with
@@ -79,9 +80,9 @@ export function SuggestionsPane({ suggestions, failed, onRefresh, onApply }: Pro
       <div className="suggestions-pane">
         <div className="diary-empty">
           <p>Could not read what agents filed.</p>
-          <button type="button" className="btn-secondary" onClick={onRefresh}>
+          <Button size="md" onClick={onRefresh}>
             Try again
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -99,14 +100,9 @@ export function SuggestionsPane({ suggestions, failed, onRefresh, onApply }: Pro
         <>
           {/* The actions at the top, on the picked suggestion, and Dismiss in its own colour. */}
           <div className="suggestions-actions">
-            <button
-              type="button"
-              className="btn-danger"
-              disabled={busy !== null}
-              onClick={() => dismiss(picked.id)}
-            >
+            <Button variant="danger" size="md" disabled={busy !== null} onClick={() => dismiss(picked.id)}>
               Dismiss
-            </button>
+            </Button>
             <input
               aria-label="Why not?"
               className="suggestions-reason"
@@ -127,17 +123,12 @@ export function SuggestionsPane({ suggestions, failed, onRefresh, onApply }: Pro
                 </option>
               ))}
             </select>
-            <button
-              type="button"
-              className="btn-primary"
-              disabled={busy !== null}
-              onClick={() => make(picked.id)}
-            >
+            <Button variant="primary" size="md" disabled={busy !== null} onClick={() => make(picked.id)}>
               {busy ? 'Working…' : 'Make a card'}
-            </button>
-            <button type="button" className="btn-secondary" onClick={onRefresh}>
+            </Button>
+            <Button size="md" onClick={onRefresh}>
               Refresh
-            </button>
+            </Button>
           </div>
           {/* `assertive`: the action did NOT happen, and the row is still there. */}
           <div aria-live="assertive">

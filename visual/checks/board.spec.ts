@@ -478,6 +478,26 @@ test('8. every primitive shows a focus ring when tabbed to', async ({ board, the
     `${live.length - reached.length} enabled .vb-btn could not be reached by Tab at all. A control only ` +
       `a mouse can reach is invisible to check 6, which walks the DOM rather than the tab order.`,
   ).toBe(live.length);
+
+  // THE GHOST'S DASHED BORDER, WHICH NOTHING HELD UNTIL NOW. It is an owner ruling with a reason —
+  // dashed reads as explanatory rather than actionable, which is what a help affordance is — and the
+  // radius check says in its own NOTE that it asserts border-radius and deliberately NOT border-style,
+  // precisely so a dashed ghost is not a conformance failure. The gap between those two facts is that
+  // the ruling was gated by nothing: an audit found 20 of 20 ghosts still dashed, by luck rather than
+  // by anything refusing the alternative. Solid is the regression this refuses.
+  const ghosts = await board.evaluate(() =>
+    Array.from(document.querySelectorAll<HTMLElement>('.vb-btn-ghost')).map((el) => ({
+      id: Array.from(el.classList).join('.'),
+      style: getComputedStyle(el).borderStyle,
+    })),
+  );
+  expect(ghosts.length, 'no ghost Button on the board — this check would pass on nothing').toBeGreaterThan(0);
+  const solid = ghosts.filter((g) => g.style !== 'dashed');
+  expect(
+    solid.length,
+    `ghost Buttons whose border is not dashed:\n${solid.map((g) => `  ${g.id} — ${g.style}`).join('\n')}`,
+  ).toBe(0);
+  console.log(`[${theme}] ghosts: ${ghosts.length} of ${ghosts.length} dashed`);
   expect(
     ringless.map((p) => `${p.id}: ${p.tabbed}`),
     `these primitives showed no focus ring when tabbed to, on ${theme}`,

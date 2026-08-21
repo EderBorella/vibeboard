@@ -1,0 +1,23 @@
+{
+  // The browser harness. Its own project because it is the one place in this repository where node
+  // and DOM code sit in the same folder: visual/support/audit.ts is evaluated INSIDE the page and
+  // needs the DOM lib, while the specs around it read files. Folding it into tsconfig.test.json
+  // would put the DOM lib and vitest's globals in one scope for no gain.
+  //
+  // Without a project of its own it would have no typechecker at all — `playwright test` transpiles
+  // per file and never checks types across them, so a wrong evaluate return type would surface as a
+  // green run that measured `undefined`.
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "noUnusedLocals": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "types": ["node"]
+  },
+  "include": ["visual"]
+}

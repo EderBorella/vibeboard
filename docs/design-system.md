@@ -1,7 +1,8 @@
 # The design system, and how it lands in phases
 
-**Status: planned, not started.** Nothing in `web/src/` has changed. This page is the argument and the
-sequence; the work is phased so each phase ships on its own and can be reverted on its own.
+**Status: Phase 0 done (2026-08-21), Phases 1–5 planned.** Nothing in `web/src/` has changed — Phase 0 built
+the instrument and measured; it did not touch a stylesheet. This page is the argument and the sequence; the
+work is phased so each phase ships on its own and can be reverted on its own.
 
 ---
 
@@ -186,7 +187,10 @@ reported by eye and none could have been caught. This is the instrument that mak
 verifiable rather than hopeful.
 
 The browsers are already installed on this host and the system libraries are present, so the harness has
-no prerequisite left to satisfy.
+no prerequisite left to satisfy. **Verified rather than assumed** when Phase 0 landed: the cache holds
+`chromium-1234` and `chromium_headless_shell-1234`, `chrome --version` answers *Google Chrome for Testing
+151.0.7922.34*, `ldd` reports no missing shared library, and revision 1234 is exactly what `@playwright/test`
+1.62.1 asks for — so the pin is chosen to match the browser on disk, not the other way round.
 
 **What it will assert, per theme:**
 
@@ -217,19 +221,52 @@ restore it. A gate that has never failed on purpose is not known to work.
 Each phase is independently shippable, independently revertible, and ends with the suite green plus its own
 gate. No phase changes behaviour — no endpoint, no state machine, no copy that carries a decision.
 
-### Phase 0 — build the instrument
+### Phase 0 — build the instrument — **DONE 2026-08-21**
 
-Introduce the browser harness. **No visual change at all.**
+The browser harness. **No visual change at all** — `styles.css` and `themes.css` are byte-identical, and the
+built CSS bundle hashes the same before and after.
 
-- `@playwright/test` as a dev dependency, pinned; config with a `webServer` that boots the real server
-  against a scaffolded fixture project, so the app under test is the app.
-- The seven checks above, written and running.
-- Type and radius conformance run in **reporting** mode and record today's baseline: 27 sizes, 8 radii.
+`@playwright/test` is pinned at **1.62.1** (exact, not a caret) and lives in `visual/`:
 
-**Gate:** the harness runs green on all three themes; the two conformance checks report the baseline
-without failing the build; one planted off-scale size is shown to be detected.
-**Exit:** a number for every check, written into this page.
-**Revert:** delete a directory and one devDependency.
+| file | what it is |
+|---|---|
+| `visual/run.mjs` | `npm run visual`. Owns the ONE per-run temp root and removes it; builds first, so the artefact under test matches the tree; scaffolds the fixture project by calling the product's own `scaffoldProject`. |
+| `visual/playwright.config.ts` | `webServer` boots `node dist/server/main.js` on **4699** (never 4610, which is the owner's live board) against the fixture, with `~/.vibeboard` relocated into the temp root and docker pointed at `/bin/false`. |
+| `visual/support/audit.ts` | Everything measured in the page. |
+| `visual/checks/board.spec.ts` | The seven checks, three themes: 21 tests. |
+| `visual/baseline/<theme>.json` | Today's numbers, which Phase 1's gate compares against. |
+
+**What the browser actually measured, per theme** — identical on all three, because the themes change colour
+and not metrics. The static prediction above was 27 font sizes and 8 radii **authored**; the browser sees
+**15 computed sizes and 6 radius values on the board view**, and the difference is the point: authored values
+that no board element computes (other views, other states) do not reach the eye, and computed values are what
+a Playwright assertion can state.
+
+| check | examined | result |
+|---|---|---|
+| 1. type conformance (REPORTING) | 233 visible elements, 124 text-bearing | **15** distinct computed sizes: 10.4, 10.88, 11.2, 11.52, 11.84, 12, 12.16, 12.48, 12.8, 13.12, 13.3333, 13.6, 13.76, 16, 18.4px |
+| 2. radius conformance (REPORTING) | 233 visible elements | **6** distinct values: 6px×108, 999px×68, 10px×56, 8px×56, 50%×12, 3px×4 |
+| 3. nothing overflows | 120 text elements + 3 viewport widths | **0** overflowing; no horizontal document scroll at 900/1200/1440 |
+| 4. contrast ≥ 4.5:1 | 124 text/ground pairs, composited | **0** below 4.5:1 |
+| 5. no unresolved token | 27 referenced custom properties | **2**: `--ink` (referenced at `styles.css:1807`, defined nowhere — a real defect) and `--exec-cols` (supplied by the Execution tab, which this board-only sweep does not visit) |
+| 6. focus is visible | 55 focusable elements (1 disabled, skipped) | **0** without a discernible `:focus-visible` style |
+| 7. one line where one line is meant | 25 flex rows, plus `.ap-bar-row` and `header.topbar` named and blocking | **0** wrapped |
+
+Type and radius **report and do not fail**, as argued above; they also print what is NEW since the baseline,
+which is how a reporting check still names a regression by value. The other five **ratchet** against the
+recorded baseline rather than against zero — four of them sit at zero, so for those the ratchet IS blocking.
+
+**Every check was proven by a planted defect**, each reverted: an off-scale `0.5856rem` was named as
+`9.3696px`; a `7px` radius was named as new; a 6px-wide `.tile-id` produced three overflow findings; a
+`min-width: 2000px` shell made the document scroll at 900px; `#5a5a5a` ink reported 2.28:1; `var(--tile-ink-nope)`
+raised the token count; a wrapped `.ap-bar-row` was caught; and `*:focus-visible { outline: none }` took focus
+findings from 0 to 52 — which it did **not** do until `outline-offset` was removed from the compared
+properties. That is the one repair the planting bought: the app's focus rules set both `outline` and
+`outline-offset`, so the offset alone kept changing and every element went on reporting a focus style it no
+longer had. **The focus check was vacuous and green before a defect was planted at it.**
+
+**Revert:** delete `visual/`, one devDependency, `tsconfig.visual.json`, three `package.json` scripts and
+three lines of `biome.jsonc`.
 
 ### Phase 1 — add the tokens
 

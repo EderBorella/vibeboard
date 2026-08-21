@@ -21,7 +21,12 @@
       // runs, and stryker.config.mjs, whose stale paths would score green over zero mutants.
       "test/**/*.mjs",
       "tools/**/*.mjs",
-      "stryker.config.mjs"
+      "stryker.config.mjs",
+      // The browser harness, listed for the same reason: unlisted code has no automated reader, and
+      // this is the code every later phase's gate depends on.
+      "visual/**/*.ts",
+      "visual/**/*.mjs",
+      "visual/playwright.config.ts"
     ]
   },
 

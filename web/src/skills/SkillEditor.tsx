@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { Skill } from '../api';
 import { BOARD_LABELS, BOARDS, type BoardName, type ProjectConfig } from '../shared';
 import { Button } from '../ui/Button';
+import { Field } from '../ui/Field';
 import { slugify } from '../viewmodel';
 
 interface Props {
@@ -60,38 +61,24 @@ export function SkillEditor({ skill, config, busy, onSave }: Props) {
 
   return (
     <div className="skill-editor">
-      <div className="skill-row">
-        <label className="vb-label vb-label-caps vb-label-rail" htmlFor="skill-name">
-          Name
-        </label>
+      <Field layout="rail" label="Name" className="skill-row">
+        <input value={name} onChange={(e) => touch(setName)(e.target.value)} />
+      </Field>
+      <Field layout="rail" label="Description" className="skill-row">
         <input
-          id="skill-name"
-          className="vb-input"
-          value={name}
-          onChange={(e) => touch(setName)(e.target.value)}
-        />
-      </div>
-      <div className="skill-row">
-        <label className="vb-label vb-label-caps vb-label-rail" htmlFor="skill-description">
-          Description
-        </label>
-        <input
-          id="skill-description"
-          className="vb-input"
           placeholder="What this does, shown on the rail button"
           value={description}
           onChange={(e) => touch(setDescription)(e.target.value)}
         />
-      </div>
+      </Field>
 
       <fieldset className="skill-scope">
         <legend>Boards</legend>
         <p className="vb-hint">Nothing ticked means every board.</p>
         {BOARDS.map((board) => (
-          <label key={board} className="link-option">
+          <Field key={board} layout="check" label={BOARD_LABELS[board]}>
             <input type="checkbox" checked={boards.includes(board)} onChange={() => toggleBoard(board)} />
-            <span>{BOARD_LABELS[board]}</span>
-          </label>
+          </Field>
         ))}
       </fieldset>
 
@@ -99,7 +86,7 @@ export function SkillEditor({ skill, config, busy, onSave }: Props) {
         <legend>Columns</legend>
         <p className="vb-hint">Nothing ticked means every column.</p>
         {columnChoices.map(([slug, label]) => (
-          <label key={slug} className="link-option">
+          <Field key={slug} layout="check" label={label}>
             <input
               type="checkbox"
               checked={columns.includes(slug)}
@@ -109,21 +96,16 @@ export function SkillEditor({ skill, config, busy, onSave }: Props) {
                 )
               }
             />
-            <span>{label}</span>
-          </label>
+          </Field>
         ))}
       </fieldset>
 
-      <label className="vb-label vb-label-caps vb-label-rail" htmlFor="skill-prompt">
-        Prompt
-      </label>
-      <textarea
-        id="skill-prompt"
-        className="vb-input"
-        rows={12}
-        value={prompt}
-        onChange={(e) => touch(setPrompt)(e.target.value)}
-      />
+      {/* `caps` and no rail: the same face as the two rows above, over a control too tall to sit beside
+          its label. It was `vb-label-caps vb-label-rail` on a full-width label, so the 6rem the rail
+          declares was doing nothing here — the face is what it wanted. */}
+      <Field caps label="Prompt">
+        <textarea rows={12} value={prompt} onChange={(e) => touch(setPrompt)(e.target.value)} />
+      </Field>
 
       <div className="skill-foot">
         <Button

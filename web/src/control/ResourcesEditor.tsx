@@ -74,22 +74,25 @@ export function ResourcesEditor({ onError }: { onError: (e: string | null) => vo
         {links.length === 0 && (
           <div className="control-blank">No links yet. Add references the copilot can consult.</div>
         )}
+        {/* NOT `Field`s: this is a table row, and each placeholder is the column heading. A label per
+            cell would repeat "Title / URL / Note" once per link. The boxes are the primitive's — the
+            rule they had was byte-identical to `.vb-input` already. */}
         {links.map((l, i) => (
           <div key={l.rowId} className="resource-row">
             <input
-              className="res-title"
+              className="vb-input res-title"
               placeholder="Title"
               value={l.title}
               onChange={(e) => update(i, { title: e.target.value })}
             />
             <input
-              className="res-url"
+              className="vb-input res-url"
               placeholder="https://…"
               value={l.url}
               onChange={(e) => update(i, { url: e.target.value })}
             />
             <input
-              className="res-note"
+              className="vb-input res-note"
               placeholder="Note (optional)"
               value={l.note ?? ''}
               onChange={(e) => update(i, { note: e.target.value })}

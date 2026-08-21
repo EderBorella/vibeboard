@@ -26,6 +26,12 @@ interface Props {
   // control comes FIRST and the label says what it does — a field that holds a decision rather than a
   // value, which is the distinction `.field-check` already drew by hand.
   layout?: 'stack' | 'rail' | 'check';
+  // THE FACE, WHICH IS A SEPARATE AXIS FROM THE LAYOUT, and Phase 5b is what separated them: the RAIL
+  // is a width and the CAPS is a face. `rail` implies caps because a rail label has always worn it;
+  // this flag is for the two labels that want the same face over a control too tall to sit beside them
+  // — the skill editor's prompt and the dispatch pane's, both of which wrote
+  // `class="vb-label vb-label-caps"` by hand in a form whose other labels are railed.
+  caps?: boolean;
   // A `<label>` wraps its control and focuses it on click, which is what almost every one of these
   // wants. `div` is for the two whose control is a custom picker rather than a form element, where a
   // wrapping label has nothing to focus and screen readers announce the whole group as the name.
@@ -34,13 +40,31 @@ interface Props {
   children?: ReactNode;
 }
 
-export function Field({ label, hint, error, layout = 'stack', as = 'label', className, children }: Props) {
+export function Field({
+  label,
+  hint,
+  error,
+  layout = 'stack',
+  caps = false,
+  as = 'label',
+  className,
+  children,
+}: Props) {
   const Tag = as;
-  const classes = ['vb-field', layout !== 'stack' && 'vb-field-row', className];
+  const classes = [
+    'vb-field',
+    layout !== 'stack' && 'vb-field-row',
+    // A DECISION IS NOT A VALUE, and the label of one is content rather than a field name — so the check
+    // layout sets its label at the surrounding size and ink, and makes the whole row a click target. Both
+    // were measured rather than chosen: five checkbox rows in the tree labelled themselves at body/text
+    // (`.link-option` at four sites and Diagnostics' bare span) against one at `.vb-label`'s muted 12px.
+    layout === 'check' && 'vb-field-check',
+    className,
+  ];
   // A rail label names its caps face explicitly, because `.vb-label-rail` is a width and nothing else
   // since the two were separated — see the note beside them in primitives.css.
-  const railed = 'vb-label vb-label-caps vb-label-rail';
-  const name = <span className={layout === 'rail' ? railed : 'vb-label'}>{label}</span>;
+  const face = layout === 'rail' || caps ? 'vb-label vb-label-caps' : 'vb-label';
+  const name = <span className={layout === 'rail' ? `${face} vb-label-rail` : face}>{label}</span>;
   return (
     <Tag className={classes.filter(Boolean).join(' ')}>
       {layout === 'check' ? children : name}

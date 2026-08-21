@@ -144,6 +144,36 @@ describe('DispatchPane', () => {
     expect(dispatched(onDispatch).attachments).toEqual([]);
   });
 
+  // WHAT THESE THREE CONTROLS SAY BESIDES THEIR VALUES, pinned for Phase 9 of docs/design-system.md
+  // before `Field` took them. The effort select and the prompt are reached above through
+  // `getByLabelText`, which a wrapping `<label>` satisfies as well as an `id`/`htmlFor` pair, so the
+  // association is covered in both worlds; the attributes are what a migration drops in silence.
+  it('gives the prompt four rows and the sentence that says where it goes', () => {
+    render(<DispatchPane {...props} />);
+    const prompt = screen.getByLabelText('Anything to add?') as HTMLTextAreaElement;
+    expect(prompt.tagName).toBe('TEXTAREA');
+    expect(prompt.rows).toBe(4);
+    expect(prompt.placeholder).toMatch(/^Optional\. This goes last in the prompt/);
+  });
+
+  it('offers the effort as a select of the backend’s own steps', () => {
+    render(<DispatchPane {...props} />);
+    const effort = screen.getByLabelText('Effort') as HTMLSelectElement;
+    expect(effort.tagName).toBe('SELECT');
+    expect([...effort.options].map((o) => o.value)).toContain('low');
+  });
+
+  it('is a label round each attachment box, so the path is a click target', () => {
+    render(<DispatchPane {...props} attachable={[API]} />);
+    const check = screen.getByRole('checkbox') as HTMLInputElement;
+    expect(check.type).toBe('checkbox');
+    expect(check.closest('label')).not.toBeNull();
+    // Already exercised above through the path text; asserted here as the mechanism rather than the
+    // consequence, because a `<div>` wrapper would keep those cases green only while they click the box.
+    fireEvent.click(screen.getByText(API));
+    expect(check.checked).toBe(true);
+  });
+
   it('counts the attachments in the summary, so a collapsed section still says so', () => {
     // The section collapses, and this count is the only thing that tells you something is attached
     // without opening it.

@@ -72,8 +72,9 @@ interface BodyProps {
 export function EditorBody({ view, draft, onDraft }: BodyProps) {
   if (view === 'edit') {
     return (
+      // NOT a `Field`: this IS the editor body, and the file path above it is its label.
       <textarea
-        className="control-textarea"
+        className="vb-input control-textarea"
         value={draft}
         onChange={(e) => onDraft(e.target.value)}
         spellCheck={false}

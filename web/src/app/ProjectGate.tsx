@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { listProjects, openProject, type ProjectRef, scaffoldProject } from '../api';
+import { Field } from '../ui/Field';
 import { Readout } from '../ui/Readout';
 import { useAction } from '../useAction';
 import { slugify } from '../viewmodel';
@@ -95,16 +96,14 @@ export function ProjectGate({ onOpened }: Props) {
           Creates the folder, the board, and the container its agents will run in. The container is built the
           first time and reused after that.
         </div>
-        <label className="vb-field">
-          <span>Location (parent folder)</span>
+        <Field label="Location (parent folder)">
           <input
             value={newParent}
             placeholder="/path/to/projects"
             onChange={(e) => setNewParent(e.target.value)}
           />
-        </label>
-        <label className="vb-field">
-          <span>Name (dash-separated, lowercase)</span>
+        </Field>
+        <Field label="Name (dash-separated, lowercase)">
           <div className="gate-row">
             <input
               value={newName}
@@ -118,7 +117,7 @@ export function ProjectGate({ onOpened }: Props) {
               Create
             </button>
           </div>
-        </label>
+        </Field>
         {relativeParent && (
           <div className="gate-preview">
             Give an absolute path, starting with <code>/</code>. A relative one is resolved against

@@ -52,8 +52,11 @@ export function RawPane({ card }: Props) {
 
   return (
     <div className="raw-pane">
+      {/* NOT a `Field`: this IS the pane, and the dock tab that opened it is its label. It drew NO box
+          at all before Phase 9 — a whole card's file in the browser's own textarea chrome, beside boxes
+          that were the primitive's — so `.vb-input` is a fix here and not only a merge. */}
       <textarea
-        className="raw-area"
+        className="vb-input raw-area"
         aria-label="card file"
         value={draft}
         placeholder={loading ? 'Loading…' : ''}

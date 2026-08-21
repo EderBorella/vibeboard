@@ -110,7 +110,13 @@ export function ModelPicker({ models, value, defaultModel, onChange, disabled }:
               {chip(toolOnly, setToolOnly, '🔧 Tool use')}
               {chip(freeOnly, setFreeOnly, '🆓 Free')}
               {chip(visionOnly, setVisionOnly, '👁 Vision')}
-              <select className="mp-prov" value={provider} onChange={(e) => setProvider(e.target.value)}>
+              {/* NOT a `Field`: a filter in a row of filters, named by its own first option. `push` is
+                  the one layout utility in the file and it is what `.mp-prov`'s whole remainder was. */}
+              <select
+                className="vb-input push"
+                value={provider}
+                onChange={(e) => setProvider(e.target.value)}
+              >
                 {providers.map((p) => (
                   <option key={p} value={p}>
                     {p === 'all' ? 'All providers' : p}

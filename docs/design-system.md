@@ -1598,7 +1598,7 @@ No baseline file is involved.
 
 # Part Two — the phases the first six did not cover
 
-**Status: Phases 6, 7 and 8 done 2026-08-21; Phases 9 and 10 planned, not started.** Part One built seven primitives and thirteen gates. It was
+**Status: Phases 6, 7, 8 and 9 done 2026-08-21; Phase 10 planned, not started.** Part One built seven primitives and thirteen gates. It was
 reviewed phase by phase and every gate was green. It also missed a whole family of work, and the miss was
 reported by the owner looking at the board rather than by any check — which makes the cause worth stating
 before the phases: **only the button shape has a coverage gate.**
@@ -1617,8 +1617,8 @@ started; the *measured* column is what the census derives, with the disagreement
 | primitive | call sites | hand-rolled, estimated | hand-rolled, the census's own rule | coverage gate |
 |---|---|---|---|---|
 | `Button` | 66 | **8** (tabs, labels, chips — the ratchet) | 8 | `check:radius-scale`, claim 2 |
-| `Panel` | ~20 | **32** panel-shaped rules, including `.tile` | 32 → **28** (four were chips) | `check:shape-coverage`, panel |
-| `Field` | 9 | **~33** raw `input`/`textarea`/`select` across 23 files | **35** of 42 controls | `check:shape-coverage`, control |
+| `Panel` | ~20 | **32** panel-shaped rules, including `.tile` | 32 → 28 (four were chips) → **20** (Phase 9: eight were controls) | `check:shape-coverage`, panel |
+| `Field` | 9 → **22** | **~33** raw `input`/`textarea`/`select` across 23 files | 35 → **2** of 42 (Phase 9; the two are `InlineField`'s) | `check:shape-coverage`, control — **two arms, arm 2 blocking at zero** |
 | `Chip` | 15 → **29** | **9** chip classes | 10 → **0** (Phase 8; `.markdown code` exempt by name) | `check:shape-coverage`, chip — **blocking at zero** |
 | `Readout` | 45 | **14** hand-rolled `--font-mono` rules | 14 → **11** (three were chips) | `check:shape-coverage`, mono |
 | `Dot` | 3 → **4** | 1 | 1 → **0** (Phase 8) | `check:shape-coverage`, dot — **blocking at zero** |
@@ -1738,8 +1738,10 @@ falling back to the document, so a root that stopped matching fails a floor inst
   changed`, with the outline at `style: none` and the UA's `width: 3px` surviving underneath. It is
   **exactly the defect Phase 5 found one level along** — `.skill-input` and `.dispatch-prompt` keeping the UA
   outline where the other eight turned their border — and `Field`'s own `layout: check` variant exists for
-  these two controls. Left for **Phase 9**, whose gate is *"focus visible on every control on every surface,
-  not only the board's fifty-five"*; recorded at 2 so it cannot become 3.
+  these two controls. **FIXED IN THIS PHASE, not Phase 9**, by excluding `[type='checkbox']` and
+  `[type='radio']` from the rule; Phase 9 re-planted the removal of that exclusion and the settings surface
+  went 0 → 2 findings on all three themes, exit 1. Phase 9 also found that `test/css-box.tsx` could not see
+  the fix at all, because it dropped every `:not()` before matching.
 
 ### The empty-surface problem was solved by furnishing the fixture, not by lowering a floor
 
@@ -2198,15 +2200,254 @@ ten surfaces that call it (`Board`, `CardTile`, `CardView`, `TagFilter`, `ModelP
 `4px` in three baseline files, and the chip ceiling, `CHIP_EXEMPT`, `dotFault`, `segFault` and
 `BOXLESS_CHIPS` in `tools/check-shape-coverage.mjs`.
 
-## Phase 9 — `Field`, and the thirty-three controls
+## Phase 9 — `Field`, and the thirty-three controls — **DONE 2026-08-21**
 
-`Field` was called *"last and least urgent"* and it is the least adopted: nine sites against roughly
-thirty-three raw controls. With Phase 6 done, settings and the modals are visible for the first time, so this
-is the first phase that can verify a field at all.
+**The control census is 2, from 35, and both twos are `ui/InlineField.tsx` — the one component this
+document rules out of `Field`'s scope by name.** `Field` was *"last and least urgent"* and it was the least
+adopted primitive: 9 call sites against 42 literal controls, 7 of them in a `Field`. It is 42 against 42
+now: **15 controls migrated onto `<Field>`** and **18 put on `.vb-input`**, which is the box
+`ui/primitives.css` already names for a control with no label to give.
 
-**Gate:** the control census at zero or with a reason per survivor; focus visible on every control on every
-surface, not only the board's fifty-five. `InlineField`'s commit-on-blur behaviour is characterised before it
-is touched — it has its own suite and it stays green.
+### The census's rule changed, and that is stated first because it moves the number
+
+**Arm 1 was *"a literal control whose nearest enclosing `<Field>` region does not contain it"*, and it asked
+a narrower question than the one the file exists to ask.** The question is *how much of this shape is still
+hand-rolled?*, and `primitives.css` answers it in two ways on purpose — the sentence is beside `.vb-input`
+and it names its own three cases: *"`.vb-input` is the same box for a control that is not inside a Field — an
+inline rename, a model search, a typed confirmation."* A control wearing `.vb-input` has the primitive's box;
+counting it as hand-rolled is the same category error as counting `.vb-trigger`, which
+`check-shape-coverage.mjs`'s own header already excludes by name. So arm 1 is now *"gets its box from
+NEITHER a `<Field>` NOR `.vb-input`"*.
+
+**Under the OLD rule this phase's number is 20, and that figure is recorded here rather than only the
+better one.** Eighteen of the 20 are labelled below with the reason each is not a field; two are
+`InlineField`'s.
+
+**ARM 2 IS WHAT KEEPS THE WIDENING FROM BEING A LOOPHOLE, and it is strictly stronger than what it
+replaces:** *a surface class that lands on a literal `<input>`, `<textarea>` or `<select>` may not decide the
+box* — a border, a corner, a padding or a size. Without it, `<input className="vb-input my-own-box">` would
+pass arm 1 while the geometry moved out of sight, which is precisely the hole Phase 3 drove a bus through
+when 27 classes went onto `<Button>`. It is the chip census's second arm one primitive along. **It reads 0
+and it BLOCKS at 0**, and `font-family` and `color` are deliberately not in its property list: a monospaced
+editor body and a muted secondary select are the surface's to decide.
+
+**Arm 2 cannot see `.inline-edit`, and the limit is recorded rather than padded.** The first draft set its
+ceiling to 2 for `.inline-edit`'s border/corner/padding and `.cv-title.inline-edit`'s size — and neither is
+reachable: `InlineField` builds one `common` object and spreads it, so `className: 'inline-edit'` never
+appears in a `className=` attribute. That is this file's already-stated blind spot — *"a class reaching a
+`<Chip>` through a variable or a ternary that names no literal"* — one primitive along. Those two controls
+are counted by arm 1 regardless, which is why the pair is covered rather than lost.
+
+### The fifteen that became `Field`s
+
+| control | layout | at |
+|---|---|---|
+| the project gate's parent folder | `stack` | `app/ProjectGate.tsx:98` |
+| the project gate's project name | `stack` | `app/ProjectGate.tsx:105` |
+| the four auto-pilot caps | `stack` + `hint` | `autopilot/AutopilotPanel.tsx:122` |
+| the run timeout | `stack` + `hint` | `autopilot/AutopilotPanel.tsx:132` |
+| a card to link | `check` | `cards/LinkPicker.tsx:26` |
+| the typed confirmation | `stack` | `confirm/useConfirm.tsx:114` |
+| the dispatch effort | `rail` | `runs/DispatchPane.tsx:110` |
+| the dispatch prompt | `stack` + `caps` | `runs/DispatchPane.tsx:139` |
+| an attachment to send | `check` | `runs/DispatchPane.tsx:156` |
+| the verbose-log switch | `check` | `settings/DiagnosticsPanel.tsx:51` |
+| a skill's name | `rail` | `skills/SkillEditor.tsx:64` |
+| a skill's description | `rail` | `skills/SkillEditor.tsx:67` |
+| a skill's boards | `check` | `skills/SkillEditor.tsx:79` |
+| a skill's columns | `check` | `skills/SkillEditor.tsx:89` |
+| a skill's prompt | `stack` + `caps` | `skills/SkillEditor.tsx:106` |
+
+**Three more rows moved that hold no literal control**, and leaving them would have left one form written
+two ways: `DispatchPane`'s Connector, Model and Mode rows each wrote `<span class="vb-label vb-label-caps
+vb-label-rail">` by hand beside a custom picker. They are `Field as="div" layout="rail"` — the variant that
+exists for exactly this, *"the two whose control is a custom picker rather than a form element, where a
+wrapping label has nothing to focus"*.
+
+### `Field` gained one axis and one layout class, both measured
+
+**`caps` is a FACE and it is not a layout, which is Phase 5b's own ruling applied to its second case.**
+That phase separated `.vb-label-rail` (a width) from `.vb-label-caps` (a face) after finding the caps class
+named at eight call sites and defined by no rule. Two labels want the face with no rail — `SkillEditor`'s
+prompt and `DispatchPane`'s — because their control is too tall to sit beside its label, and both wrote
+`vb-label vb-label-caps` by hand in a form whose other labels are railed. The skill editor's also named
+`vb-label-rail`, whose 6rem was doing nothing on a full-width label. **Two consumers, which is the bar
+`ghost` is held to.**
+
+**`.vb-field-check` overrides `.vb-label` because A DECISION'S LABEL IS CONTENT, NOT A FIELD NAME, and the
+count is the argument.** Five checkbox rows in the tree labelled themselves at the surrounding size and ink
+— `.link-option` at four sites and Diagnostics' bare span — against **one** at `.vb-label`'s muted 12px,
+which is Settings' `Enforce 1-to-many relations on boards`. A card title or a file path shrunk to 12px muted
+reads as furniture, and it is the thing being chosen. **One rendering change at one site, and it lets eight
+controls in.** The class also carries the pointer `.link-option` had, and makes the label a flex row with
+`.link-option`'s own `var(--s-4)` gap — because a decision's label is often two parts, an id and a title,
+which `.link-option` laid out itself while both were its own children. Written AFTER the three label rules,
+because `.vb-field-check > .vb-label` is (0,2,0) over a (0,1,0): the repair Phase 2 made by moving two rules
+later.
+
+### The eighteen survivors, each with the quality it keeps
+
+**None of the reasons is "it has its own padding", and none of the eighteen keeps one:** every one takes the
+primitive's box, and eight hand-rolled box rules died to give it to them.
+
+| survivor | why a `Field` would have to lie |
+|---|---|
+| the top bar theme select | **A toolbar control.** The bar carries no labels at all, and the value it shows is its own name. |
+| the archive restore-elsewhere select | **One of two actions in a row of actions**, named by its own first option, "Elsewhere…". |
+| a report's close-into column, and its move-to column | **An action row.** "Ignore and close" names the BUTTON and the select is one of its two operands; the other's first option is "Choose a column…". A Field's label names one control. |
+| the copilot effort select | **A dock toolbar.** The row has no labels at all, and one label on one of its two controls reads worse than none. |
+| the copilot composer, the diary composer | **A composer.** Its label is its placeholder and the Send button beside it. |
+| the raw card file, the control editor body | **It IS the pane.** The dock tab and the file path above it are the label. |
+| two inline renames (`ControlFileList`, `FileTree`) | **It replaces the row it renames**, so the row is the label — the case `primitives.css` names. |
+| the model search | **The case `primitives.css` names**, verbatim. |
+| the model picker's provider filter | **A filter in a row of filters**, named by its own first option, "All providers". |
+| three links-registry cells | **A table row.** Each placeholder is the column heading, and a label per cell would repeat "Title / URL / Note" once per link. |
+| the suggestions "why not?" box and level select | **An action row** of five controls with no labels between them. |
+| `InlineField`'s textarea and input | **Ruled out of `Field` by name** — commit-on-blur is behaviour, and Phase 5 proved it live before leaving it alone. Re-proven here: planting `onBlur: () => setDraft(null)` turns **4 of 17** red, exit **1**; restored, exit 0. |
+
+### The characterisation suite, and the five things it found
+
+`test/control-boxes.test.tsx` — written and **run green against the code as it was**, pinning fifteen
+different boxes before anything moved. Its assertions are the same claims with the values the merge moved
+them to, and `git show` on the file is the before-and-after. Five findings, none of them the rewrite:
+
+- **TWO CONTROLS DREW NO BOX AT ALL.** `.raw-area` — a whole card's file, in the dock — declared a
+  monospaced face and nothing else, and the suggestions pane's level `<select>` declared nothing whatever.
+  Both rendered the browser's own control chrome beside a `.vb-input` in the same pane. That is Phase 5's
+  `.skill-input`/`.dispatch-prompt` finding one level along: not a box that disagrees, a box never drawn.
+- **SIX DECLARED NO `:focus` RULE** — `.theme-select` (four call sites), `.archive-column`, `.mp-prov`,
+  `.copilot-selects select`, `.diary-compose textarea` and `.raw-area` — so they fell through to the app's
+  global ring where the eight boxes Phase 5 took turn their border accent. Nothing chose between the two.
+- **A HAND-ROLLED `.vb-field` LABEL HAD NO CLASS AND THEREFORE NO TREATMENT.** `<label class="vb-field">
+  <span>Location (parent folder)</span>` in the project gate, and the same shape on all five auto-pilot
+  caps: seven labels rendering at the value's own size and ink, so the name of the field and the number in
+  it looked identical. It is the **mirror** of Phase 5b's `.vb-label-caps` — that was a name with no rule,
+  this is a rule with seven call sites that never asked for it, and `check-class-budget.mjs` reads CSS →
+  code so neither direction is gated.
+- **`.link-option`'s `font-size: var(--t-body)` WAS DEAD** — `body` already gave it. The fourth such
+  declaration this sweep has found, after `.cv-link`, `.archive-title` and `.tag-chip-count`.
+- **THE SUGGESTIONS COMPOSER'S `--panel-2` GROUND NAMED A GROUND ITS PANE DOES NOT HAVE, so the exception
+  does not survive.** Its recorded reason was *"this one sits in a `--wash` pane where `--bg` would read as
+  a hole"* — and `.suggestions-pane` declares no ground, so it takes the dock's `--panel`, which is exactly
+  what `.modal` and `.gate-card` are, and both of those put their boxes on `--bg`. **The reason was true of
+  `.diary-compose`**, whose pane really does declare `background: var(--wash)` — and `--wash` is `none` in
+  classic-dark, so `--bg` on `--bg` there would render as no box at all. The argument is written on the box
+  it belongs to and the suggestions composer joins the other nine.
+
+**Behaviour was pinned too, at every one of the fifteen sites, because a control has behaviour as well as a
+box and that is what a migration drops in silence.** Seven existing suites gained a case each — the number
+box's `type`/`min`/`step`, the twelve- and four-row textareas, three placeholders, `autoFocus`, and *the row
+is a `<label>` so its words are a click target*, which is what an `as="div"` would have quietly cost. Both
+premises that failed were the test's and not the code's: **`Max dispatches` steps by 10, not 1**, and the
+control fixture's own `boxed` count is 5, not 4.
+
+**And a repair to the shared resolver, forced by a planted premise.** `test/css-box.tsx` dropped every
+`:not()` before matching — right for `:hover:not(:disabled)`, where the inner state would otherwise count as
+a second one — and therefore also dropped
+`.vb-field input:not([type='checkbox']):not([type='radio']):focus`. So it reported a checkbox in a `Field` as
+taking `outline: none`, which is **exactly the defect Phase 6 fixed by writing those two exclusions**: the
+instrument meant to assert the fix could not see it. A `:not()` whose content is a state is dropped now and
+any other is kept, and the four box suites are green either way.
+
+### `.mp-prov` against `.mp-chip`, resolved rather than recorded
+
+**A CONTROL IS 13px AND A CHIP IS 11px, and the filter row holds both and now says so.** Phase 8 moved
+`.mp-chip` to `--t-micro` deliberately — nine of the ten chip classes were already there and it is the
+scale's own name for *"chips, state words, dot labels, tags"* — and left the `<select>` beside it at
+`--t-small`, which nothing chose. The select takes the control box, so it is `--t-body`, the same box as the
+search input above it in the same modal: **two controls at 13px and three chips at 11px, where it was one
+control at 12px, one at 13px and three chips at 11px.** This is the ruling Phase 5b made putting the two
+select triggers at `--t-body` beside the inputs they share a row with, and it is the same 12px-that-nobody-
+chose being removed. `.mp-prov` died: its whole remainder was `margin-left: auto`, which is `.push`.
+
+### What went from the stylesheet
+
+Eight hand-rolled control boxes, and what each one kept:
+
+| rule | kept |
+|---|---|
+| `.theme-select` (4 call sites) | **nothing — died.** Its `cursor: pointer` and accent hover are what `primitives.css` now says about every select |
+| `.mp-prov` | **nothing — died.** `margin-left: auto` is `.push` |
+| `.link-option` (4 call sites) | **nothing — died.** `Field layout="check"` is all of it, plus a dead `font-size` |
+| `.resource-row input` | **nothing — it was `.vb-input` declaration for declaration**, focus rule included |
+| `.archive-column` | a muted ink — a secondary restore must not read as loudly as the button beside it |
+| `.copilot-selects select`, `.copilot-input textarea`, `.diary-compose textarea` | `flex`, `resize`, a `min-height`, and the diary's `--panel-2` — each now a descendant rule of the row that already had a name |
+| `.control-textarea` | the pane's inset, `flex: 1`, and the mono face |
+| `.raw-area` | the mono face; its `font-size` restated the primitive's and went |
+
+**A SELECT IS A CONTROL YOU POINT AT, and five of the tree's seven said so by hand.** `.theme-select`
+carried `cursor: pointer` and an accent hover at four call sites and `.archive-column` carried the cursor,
+against `.mp-prov` and `.copilot-selects select` with neither. The hover makes the same statement `:focus`
+makes on an input — *this is the control you are about to use* — which is the argument `.vb-trigger` already
+rests on one line up in the same file.
+
+### Gates
+
+| gate | before | after | planted defect, and what it said |
+|---|---|---|---|
+| control census, arm 1 | 35/35 | **2/2** | a raw `<input>` in `SettingsModal.tsx`, a file with nine migrated Fields → exit **1**, *"3 hand-rolled … against a ceiling of 2"*, naming `SettingsModal.tsx:203`. **This is the Phase 3 defect answered:** the population stayed 42 |
+| control census, arm 2 | — | **0/0, new, BLOCKING** | a `padding` on `.archive-column`, which lands on a `<select>` → exit **1**, *"geometry on a control — padding (used at board/ArchiveDrawer.tsx:91)"* |
+| its self-test | — | 3 ways | `CONTROL_BOX_CLASS` broken (`boxed` 5 → 2), `CONTROL_GEOMETRY` emptied (geometry list empty), `controlsIn`'s class reader stubbed — each exit **1** with *"this check is vacuous"* |
+| panel census | 28/28 | **20/20** | a `.planted-panel` with the border/corner/ground trio → exit **1**, 21 against 20 |
+| class budget | 377/377 | **375/375** | a `.planted-name` referenced from `CardTile.tsx`, so claim 1 could not mask it → exit **1** |
+| `check:type-scale` | 123 | **115** | `font-size: 0.81rem` on `.archive-column` → exit **1** |
+| `check:radius-scale` claim 1 | 49 | **41** | `border-radius: 9px` on `.archive-column` → exit **1** |
+| `npm run lint` | clean/543 | clean/**544** | a duplicate `cursor` on `.vb-field-check` → exit **1** |
+| `npm test` | 241/4,298 | **242/4,402** | `caps` dropped from `Field`'s face → 1 red; `vb-field-check` dropped → 3 red; both exit **1** |
+| `npm run build` | ok | ok | a type error in `src/core/layout.ts` → exit **2**; an unresolvable import used in `web/src/ui/Field.tsx` → exit **1** |
+| `npm run visual`, check 6 | 0 findings | 0 findings | the `[type='checkbox']` exclusion removed from `.vb-field input:focus` → **`[settings] 6. focus: 0 → 2`** on all three themes, exit **1**. That is Phase 6's defect put back and caught |
+| `InlineField` | 17 pass | 17 pass | `onBlur: () => setDraft(null)` → **4 of 17** red, exit **1** |
+
+**`npm run build` does NOT typecheck `web/src`, which is worth stating because a reviewer will assume it
+does.** `tsconfig.json` includes only `src`, and `vite build` transpiles without checking types — so
+`caps?: number` on `Field`'s props built **clean, exit 0**. `npm run check`'s `typecheck:web` catches it,
+exit **2**, naming `DispatchPane.tsx:130`, `SkillEditor.tsx:106` and `Field.tsx:48`. The build gate is live
+for `src/` and for module resolution; types in the web tree belong to `npm run check`.
+
+**Mono stays at 11 and the button ratchet at 4, both untouched.** `.control-textarea` and `.raw-area` keep
+the mono face because the CONTENT is machine text, which is not `Readout`'s claim that a figure was
+measured.
+
+### Drift, read before anything was re-recorded — and nothing was
+
+**No baseline file changed, so `visual:record` was not run.** 93 harness tests, three themes, exit 0. Every
+per-surface number is byte-identical to Phase 6's table, including the counts that would move if a container
+collapsed: settings **125** elements with focus **0 of 24**, model-picker **57** with **0 of 14**, confirm
+**8** with **0 of 2**, card **57**, control **168**, explorer **127**, diary **148** with its two known
+wrapped `.vb-readout-block` rows, execution **146**, archive **9**, boards **236**.
+
+**The board's TALLY moved by two and the SET did not, which is why drift did not fire — and the two are
+accounted for.** `13px×133 → ×135` and `12px×66 → ×64`, at 236 elements: the top bar's theme select and the
+copilot's effort select, the only two of the fifteen the board view renders, both `--t-small` before and
+`--t-body` now. Radius tally unchanged — `6px×240 999px×84 10px×56 50%×12 4px×4` — because every one of the
+eight boxes already had a `--r-md` corner. **Nine surfaces record a value SET rather than a tally**, so the
+six selects moving from 12px to 13px is invisible there; both steps were already in each set.
+
+**Exit:** **control census 35 → 2**, ceiling 2, with a per-survivor reason for the eighteen and both twos
+in one component. **A second control arm at 0, blocking.** Panel **28 → 20**, ceiling lowered. Mono
+**11/11**, chip / dot / seg / box-less **0**, button geometry **4/4** — all unmoved. Class selectors
+**377 → 375** (`styles.css` 330 → 327: `.theme-select`, `.mp-prov` and `.link-option` died;
+`primitives.css` 60 → 61: `.vb-field-check`), ceiling lowered. Authored `font-size` **123 → 115**, authored
+`border-radius` **49 → 41**, both entirely on the scale. Suite **242 files / 4,402 tests**. Harness **93
+tests, three themes, exit 0**. `npm run lint` clean over **544** files.
+
+**Phase 8's recorded "authored `font-size` 124" does not reproduce**: `node tools/check-type-scale.mjs` at
+`4726fd6` prints **123**, and 123 is the figure this phase measured from. Recorded here rather than
+silently carried, which is what this page did to the withdrawn 432 and 132.
+
+**Selector migrations: 102 → 106**, measured with the command recorded at the end of Phase 3. One went out
+— `test/suggestions-pane.test.tsx`'s `.suggestions-actions`, now a `data-testid`, because this phase touched
+the controls in that row — and **five came in, all of them this phase's own characterisation suite and all
+of them the subject**: `.vb-field` and `.vb-label` are the classes whose treatment is the claim, and a
+`data-testid` would answer neither question. That is the Phase 4 precedent (`.board-columns`,
+`.column-head, .vb-panel-head`) applied unchanged. Reporting 101 by leaving them out would be laundering it.
+
+**Revert:** `Field`'s `caps` prop and its `vb-field-check` class, the Field block of `primitives.css` (the
+check rules and the select cursor/hover), the **22** components that call `Field` or carry `.vb-input`,
+`styles.css`, `test/control-boxes.test.tsx`, the `:not()` repair in `test/css-box.tsx`, the seven behaviour
+cases, one test selector, and in `tools/`: `CONTROL_CEILING`, `CONTROL_GEOMETRY_CEILING`,
+`CONTROL_BOX_CLASS`, `controlGeometryFault`, the `boxed`/`where` fields of `controlsIn`, the two control
+fixtures, `PANEL_CEILING` and `CLASS_CEILING`. No baseline file is involved.
 
 ## Phase 10 — the leftovers, each already measured
 
@@ -2230,7 +2471,7 @@ is touched — it has its own suite and it stays green.
 
 ## Risks, and what would stop this
 
-- **Class renames break tests.** There are **102** `querySelector('.class')` calls in the React tests — Phase 8 migrated six, four to `data-testid` and two to a `testId` the primitive takes as a named prop, and moved a seventh assertion off an exact-`className` comparison that a composing primitive would have pinned; 108 before it and unchanged across Phase 5b, which took two out and put two back and says so under *Selector migrations*; 127 before Phase 5, which migrated nineteen —
+- **Class renames break tests.** There are **106** `querySelector('.class')` calls in the React tests — Phase 9 migrated one and its own characterisation suite added five, all five of which ARE the subject (`.vb-field` and `.vb-label`, whose treatment is the claim), the same shape as Phase 4's; 102 before it, and Phase 8 migrated six, four to `data-testid` and two to a `testId` the primitive takes as a named prop, and moved a seventh assertion off an exact-`className` comparison that a composing primitive would have pinned; 108 before it and unchanged across Phase 5b, which took two out and put two back and says so under *Selector migrations*; 127 before Phase 5, which migrated nineteen —
   135 before Phase 3 and 126 after it, measured by the command recorded at the end of that phase; the
   **132** this line carried until 2026-08-21 had no method beside it and does not reproduce. Phase 4
   took it UP by one, and deliberately: it migrated one and its own characterisation suite added four,

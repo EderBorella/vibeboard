@@ -56,6 +56,19 @@ describe('LinkPicker', () => {
     expect(onToggle.mock.calls).toEqual([['E-001']]);
   });
 
+  // Pinned for Phase 9 of docs/design-system.md before `Field layout="check"` took this row. A checkbox
+  // row is a `<label>` wrapping its box, and that is behaviour rather than styling: the text is a click
+  // target. A migration to a `<div>` wrapper would keep every assertion above green and lose it.
+  it('is a label round its box, so the card title is a click target', () => {
+    const onToggle = vi.fn();
+    render(<LinkPicker linkable={[card('E-001')]} links={[]} onToggle={onToggle} />);
+    const check = screen.getByRole('checkbox') as HTMLInputElement;
+    expect(check.type).toBe('checkbox');
+    expect(check.closest('label')).not.toBeNull();
+    fireEvent.click(screen.getByText('title of E-001'));
+    expect(onToggle.mock.calls).toEqual([['E-001']]);
+  });
+
   it('says so when there is nothing to link to', () => {
     render(<LinkPicker linkable={[]} links={[]} onToggle={vi.fn()} />);
     expect(screen.getByText('No other cards yet to link.')).toBeTruthy();

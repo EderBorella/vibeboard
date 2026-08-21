@@ -76,8 +76,16 @@ const BOXES: [name: string, el: () => Element][] = [
     'the dispatch prompt',
     () => at('<div class="dispatch"><textarea class="vb-input"></textarea></div>', 'textarea'),
   ],
-  ['a links registry row', () => at('<div class="resource-row"><input/></div>', 'input')],
-  ['the copilot composer', () => at('<div class="copilot-input"><textarea></textarea></div>', 'textarea')],
+  // TWO FIXTURES MOVED IN PHASE 9 AND THE ASSERTIONS DID NOT, which is what Phase 4 recorded of
+  // test/panel-boxes.test.tsx and Phase 8 of test/chip-boxes.test.tsx. Both of these drew their box from
+  // a descendant rule of their container — `.resource-row input`, which was `.vb-input` declaration for
+  // declaration, and `.copilot-input textarea` — and both rules are gone: the element carries
+  // `vb-input` now, so the class list is the claim rather than the container.
+  ['a links registry row', () => at('<div class="resource-row"><input class="vb-input"/></div>', 'input')],
+  [
+    'the copilot composer',
+    () => at('<div class="copilot-input"><textarea class="vb-input"></textarea></div>', 'textarea'),
+  ],
 ];
 
 describe('every text box in the app draws one box', () => {
@@ -102,12 +110,21 @@ describe('every text box in the app draws one box', () => {
 });
 
 describe('the boxes that differ, and why', () => {
-  it('the suggestions composer sits on the panel ground rather than the app ground', () => {
-    // A reason box inside a `--wash` pane, where `--bg` would read as a hole. Recorded so the merge is
-    // a decision and not an accident.
+  // WITHDRAWN IN PHASE 9, AND THE REASON IS WHY. This read "a reason box inside a `--wash` pane, where
+  // `--bg` would read as a hole" — and `.suggestions-pane` declares no ground at all, so it takes the
+  // dock's `--panel`, which is what `.modal` and `.gate-card` are; both of those put their boxes on
+  // `--bg`. The pane the argument describes is `.diary`, which really does declare `--wash`, and the
+  // claim is asserted on `.diary-compose`'s box below and in test/control-boxes.test.tsx.
+  it('the suggestions composer is on the app ground like every other box', () => {
     const el = at('<div class="suggestions-actions"><input class="vb-input"/></div>', 'input');
-    expect(box(el).background).toBe('var(--panel-2)');
+    expect(box(el).background).toBe('var(--bg)');
     expect(box(el).border).toBe('1px solid var(--border)');
+  });
+
+  it('the diary composer is the one that is not, because its pane is the wash', () => {
+    const el = at('<div class="diary-compose"><textarea class="vb-input"></textarea></div>', 'textarea');
+    expect(box(el).background).toBe('var(--panel-2)');
+    expect(box(at('<section class="diary"></section>', 'section')).background).toBe('var(--wash)');
   });
 
   it('an inline rename is already accent-bordered, because it is already active', () => {

@@ -58,8 +58,10 @@ export function CopilotControls({
           disabled={running}
           onChange={onModel}
         />
+        {/* NOT a `Field`: the dock's control row carries no labels at all, and one label on one of its
+            two controls would read worse than none. The box is the primitive's. */}
         <select
-          className="effort-select"
+          className="vb-input"
           value={effEffort}
           disabled={running}
           onChange={(e) => onEffort(e.target.value)}

@@ -86,8 +86,10 @@ export function ReportOptions({
 
       <div className="options-close">
         <span className="options-close-label">Ignore and close</span>
+        {/* NOT a `Field`: an action row. "Ignore and close" names the BUTTON, and the select is one of
+            its two operands — a Field's label names one control. */}
         <select
-          className="theme-select"
+          className="vb-input"
           aria-label="Column to close the card into"
           value={column}
           onChange={(e) => setColumn(e.target.value)}

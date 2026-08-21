@@ -5,6 +5,7 @@ import { clampToCaps } from '../copilot/choice';
 import { ModelPicker } from '../models/ModelPicker';
 import { backendCaps, type Card } from '../shared';
 import { Button } from '../ui/Button';
+import { Field } from '../ui/Field';
 import { Readout } from '../ui/Readout';
 import { SegmentedControl } from '../ui/SegmentedControl';
 
@@ -91,57 +92,49 @@ export function DispatchPane({
         </p>
       )}
 
-      <div className="dispatch-row">
-        <span className="vb-label vb-label-caps vb-label-rail">Connector</span>
+      {/* `as="div"` for the three rows whose control is a custom picker rather than a form element: a
+          wrapping `<label>` has nothing to focus and would announce the whole group as the name. */}
+      <Field as="div" layout="rail" label="Connector" className="dispatch-row">
         {/* THE SHARED PICKER, and the fourth call site to get it. This one built its own group from
             `BACKEND_DEFAULTS`'s KEYS, so it showed a person the raw id — "claude-code" — where the dock
             showed "Claude" and Settings showed "Claude Code": one setting with three spellings, two of
             them written by hand. */}
         <BackendPicker value={backend} onChange={onBackend} label="Connector" />
-      </div>
+      </Field>
 
-      <div className="dispatch-row">
-        <span className="vb-label vb-label-caps vb-label-rail">Model</span>
+      <Field as="div" layout="rail" label="Model" className="dispatch-row">
         <ModelPicker models={models} value={model} defaultModel={defaults.model} onChange={setModel} />
-      </div>
+      </Field>
 
-      <div className="dispatch-row">
-        <span className="vb-label vb-label-caps vb-label-rail">Effort</span>
-        <select
-          className="theme-select"
-          aria-label="Effort"
-          value={clamped.effort}
-          onChange={(e) => setEffort(e.target.value)}
-        >
+      <Field layout="rail" label="Effort" className="dispatch-row">
+        <select value={clamped.effort} onChange={(e) => setEffort(e.target.value)}>
           {caps.efforts.map((e) => (
             <option key={e.value} value={e.value}>
               {e.label}
             </option>
           ))}
         </select>
-      </div>
+      </Field>
 
-      <div className="dispatch-row">
-        <span className="vb-label vb-label-caps vb-label-rail">Mode</span>
+      <Field as="div" layout="rail" label="Mode" className="dispatch-row">
         <SegmentedControl
           items={caps.modes.map((m) => ({ value: m.value, label: m.label, title: m.hint }))}
           value={clamped.mode}
           onChange={setMode}
           label="Mode"
         />
-      </div>
+      </Field>
 
-      <label className="vb-label vb-label-caps" htmlFor="dispatch-prompt">
-        Anything to add?
-      </label>
-      <textarea
-        id="dispatch-prompt"
-        className="vb-input"
-        rows={4}
-        placeholder="Optional. This goes last in the prompt, so it qualifies the skill rather than competing with it."
-        value={prompt}
-        onChange={(e) => setPrompt(e.target.value)}
-      />
+      {/* `caps` and no rail: the same face as the four rows above, over a control too tall to sit
+          beside its label. The face and the width are separate axes — Phase 5b's ruling. */}
+      <Field caps label="Anything to add?">
+        <textarea
+          rows={4}
+          placeholder="Optional. This goes last in the prompt, so it qualifies the skill rather than competing with it."
+          value={prompt}
+          onChange={(e) => setPrompt(e.target.value)}
+        />
+      </Field>
 
       {attachable.length > 0 && (
         <details className="dispatch-attach">
@@ -151,10 +144,9 @@ export function DispatchPane({
             registry always go with a run.
           </p>
           {attachable.map((path) => (
-            <label key={path} className="link-option">
+            <Field key={path} layout="check" label={<span className="link-title">{path}</span>}>
               <input type="checkbox" checked={attachments.includes(path)} onChange={() => toggle(path)} />
-              <span className="link-title">{path}</span>
-            </label>
+            </Field>
           ))}
         </details>
       )}

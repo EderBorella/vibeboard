@@ -68,12 +68,20 @@ export function resolve(value: string): string {
 // reason. Both answers were wrong and only one of them was red.
 const STATES = /:(hover|disabled|focus-visible|focus|first-child|last-child|last-of-type)/g;
 
+// A `:not()` WHOSE CONTENT IS A STATE IS DROPPED; ANY OTHER `:not()` IS KEPT, and the distinction was
+// forced by a planted premise rather than reasoned in. The first version dropped every `:not()` before
+// matching — right for `:hover:not(:disabled)`, where the inner `:disabled` would otherwise count as a
+// second state and the rule would apply to nothing — and it therefore also dropped
+// `.vb-field input:not([type='checkbox']):not([type='radio']):focus`, so this resolver reported a
+// checkbox in a Field as taking `outline: none`. That is exactly the defect Phase 6 fixed by writing
+// those two exclusions, and the instrument that is supposed to assert the fix could not see it.
+const stateOnlyNot =
+  /:not\(\s*:(?:hover|disabled|focus-visible|focus|first-child|last-child|last-of-type)\s*\)/g;
+
 function applies(el: Element, selector: string, state: string): boolean {
-  // `:not(...)` goes first, or the `:disabled` inside `:hover:not(:disabled)` counts as a second
-  // state and the rule would apply to nothing at all.
-  const outer = selector.replace(/:not\([^)]*\)/g, '');
-  if ([...outer.matchAll(STATES)].some((m) => m[0] !== state)) return false;
-  return safeMatches(el, outer.replace(STATES, '').trim());
+  // State scan first, with every `:not()` out of the way, for the reason above.
+  if ([...selector.replace(/:not\([^)]*\)/g, '').matchAll(STATES)].some((m) => m[0] !== state)) return false;
+  return safeMatches(el, selector.replace(stateOnlyNot, '').replace(STATES, '').trim());
 }
 
 function safeMatches(el: Element, selector: string): boolean {

@@ -77,4 +77,18 @@ describe('the diagnostics panel', () => {
     fireEvent.click(box());
     expect(api.setDebugLog).not.toHaveBeenCalled();
   });
+
+  // Pinned for Phase 9 of docs/design-system.md before `Field layout="check"` took this row: the words
+  // beside the box are a click target because a `<label>` wraps it, which is behaviour and not styling.
+  // Phase 6 measured this control as focusable with NO visible focus at all — `.vb-field input:focus`
+  // traded the app's ring for an accent border and a native checkbox paints none — so it is also the one
+  // control here whose focus rule is asserted in test/control-boxes.test.tsx.
+  it('is a label round its box, so its words are a click target', async () => {
+    render(<DiagnosticsPanel />);
+    await waitFor(() => expect(box().disabled).toBe(false));
+    expect(box().type).toBe('checkbox');
+    expect(box().closest('label')).not.toBeNull();
+    fireEvent.click(screen.getByText('Verbose auto-pilot log'));
+    await waitFor(() => expect(api.setDebugLog).toHaveBeenCalledWith(true));
+  });
 });

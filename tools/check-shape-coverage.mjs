@@ -18,11 +18,12 @@
 // measurement is what this page exists to stop. Phase 8 drove the chip census from 10 to ZERO, which is
 // what this instrument was built for and the first time one of these numbers has moved.
 //
-// A CENSUS RATCHETS UNTIL IT REACHES ZERO, AND THEN IT BLOCKS. Three backlogs are left — panel 28, mono
-// 11 and control 35 — and a gate pointed at a backlog has to be bypassed on every commit, which teaches
+// A CENSUS RATCHETS UNTIL IT REACHES ZERO, AND THEN IT BLOCKS. Three backlogs are left — panel 20, mono
+// 11 and control 2 — and a gate pointed at a backlog has to be bypassed on every commit, which teaches
 // everyone to ignore it, so each of those prints its FULL list on a passing run and fails only on an
-// increase. Chip, dot, segmented control and the box-less list are AT ZERO and therefore block outright:
-// the commit that reaches zero is the commit that sets the ceiling to zero. Never raise one.
+// increase. Chip, dot, segmented control, the control-geometry arm and the box-less list are AT ZERO and
+// therefore block outright: the commit that reaches zero is the commit that sets the ceiling to zero.
+// Never raise one. Phase 9 drove control 35 -> 2, and the two that are left are one component.
 //
 // FIVE CENSUSES READ THE STYLESHEETS AND ONE READS THE JSX, and that split is what makes them
 // migration-proof — the Phase 3 defect this file was written not to repeat. That defect: the geometry
@@ -34,11 +35,13 @@
 //     site read out of the JSX — ANY tag, the primitive's own included — so the finding follows the class
 //     onto the primitive rather than losing sight of it.
 //   - control is detected in the JSX, because a raw `<input>` is not a class at all. Its population is
-//     EVERY control in the tree and its finding count is the controls outside a `<Field>`, both printed:
-//     migration moves a control from one to the other and leaves the population where it was. A census
-//     whose population shrinks as the migration succeeds is the Phase 3 defect wearing a new hat, and the
-//     "in a Field" test is per-ELEMENT and not per-file for the same reason — a file-level test would
-//     silence every remaining control in a file the moment one of them was migrated.
+//     EVERY control in the tree and its finding count is the controls that get their box from neither a
+//     `<Field>` nor `.vb-input`, both printed: migration moves a control from one to the other and leaves
+//     the population where it was. A census whose population shrinks as the migration succeeds is the
+//     Phase 3 defect wearing a new hat, and the coverage test is per-ELEMENT and not per-file for the same
+//     reason — a file-level test would silence every remaining control in a file the moment one of them
+//     was migrated. It has a SECOND ARM for the other direction, exactly as the chip census does; see
+//     THE CONTROL CENSUS below.
 //
 // NO COUNT FLOORS, ANYWHERE. A floor on a number the sweep exists to reduce fails the run for SUCCEEDING
 // and says "this check is vacuous" while doing it — that has now happened twice in this repository
@@ -106,12 +109,14 @@ const PRIMITIVES = join('web', 'src', 'ui', 'primitives.css');
 // there were eleven. `.report-chip`, `.ap-chip`, `.tag`, `.tile-setup` and the rest decide a face, an
 // ink and a ground, which is the caller's to decide; not one decides the box.
 const CHIP_CEILING = 0;
-// PANEL — 32 as Phase 7 measured it, 28 today. FOUR OF THE FOUR IT LOST WERE CHIPS — `.board-archive`,
-// `.tag`, `.tag-chip` and `.mp-chip` each drew a 1px border, a corner and a ground, which is a chip's
-// box and also, by this census's rule, a small panel's. The CEILING IS LEFT AT 32 deliberately: Phase 10
-// owns the rest of this row and lowering a ceiling for a number a different phase moved would take the
-// slack away from the phase that has to work in it. NEVER RAISE IT.
-const PANEL_CEILING = 28;
+// PANEL — 32 as Phase 7 measured it, 28 after Phase 8, 20 after Phase 9. Phase 8's four were chips;
+// PHASE 9'S EIGHT WERE CONTROLS — `.theme-select`, `.archive-column`, `.mp-prov`, `.copilot-selects
+// select`, `.copilot-input textarea`, `.control-textarea`, `.resource-row input` and `.diary-compose
+// textarea` each drew a 1px border, a corner and a ground, which is a control's box and also, by this
+// census's rule, a small panel's. Phase 8 LEFT its ceiling at 32 on the argument that lowering it for a
+// number a different phase moved takes the slack away from the phase that has to work in it; the owner
+// asked for the opposite here, so it is 20. Phase 10 still owns the row. NEVER RAISE IT.
+const PANEL_CEILING = 20;
 // MONO — 14 as Phase 7 measured it, 11 today, and the three it lost are the same chips: `.board-archive`,
 // `.tag-chip` and `.tab-badge` borrowed the readout's face by hand and now say so with `vb-readout` on the
 // `<Chip>`. Not all eleven are readout facts: a `<pre>`, a `<code>` and three textareas are monospaced
@@ -141,13 +146,39 @@ const CHIP_EXEMPT = new Map([
       "at. Making it a `Chip` would put an inline-flex box with a chip's gap into running text.",
   ],
 ]);
-// CONTROL — 35 of 42, against the owner's approximate ~33 across 23 files. The tree holds 42 literal
-// `<input>`/`<textarea>`/`<select>` tags in 23 files; seven are already inside a `<Field>`, leaving 35 in
-// 22 files. Two of the 35 are `ui/InlineField.tsx`'s, which docs/design-system.md rules OUT of `Field`'s
-// scope by name — its commit-on-blur is behaviour, not a box — so 33 is the number Phase 9 can actually
-// reach, and it is not made 33 here by exempting them: a census that quietly drops its own known
-// survivors is how a backlog stops being visible. PHASE 9'S NUMBER.
-const CONTROL_CEILING = 35;
+// THE CONTROL CENSUS, AND ITS RULE CHANGED IN PHASE 9 — read this before quoting either number.
+//
+// It was 35 of 42: a literal control whose nearest enclosing `<Field>` region does not contain it. That
+// asked a narrower question than the one this file exists to ask. The question is *how much of this shape
+// is still hand-rolled?*, and `ui/primitives.css` answers it in two ways on purpose — the sentence is
+// beside `.vb-input` and it names its own three cases: "`.vb-input` is the same box for a control that is
+// not inside a Field — an inline rename, a model search, a typed confirmation." A control wearing
+// `.vb-input` has the primitive's box; counting it as hand-rolled is the same category error as counting
+// `.vb-trigger`, which this file's header already excludes by name.
+//
+// SO ARM 1 IS NOW "gets its box from NEITHER a `<Field>` NOR `.vb-input`", and ARM 2 IS WHAT KEEPS THAT
+// FROM BEING A LOOPHOLE: a class ON a literal control may not decide the box. Without arm 2, widening
+// arm 1 would let `<input className="vb-input my-own-box">` through, which is precisely the hole Phase 3
+// drove a bus through when 27 classes moved onto `<Button>`. Arm 2 is the chip census's second arm one
+// primitive along, and it is the stricter half: it refuses a border, a corner, a padding or a size on any
+// surface class that lands on an `<input>`, `<textarea>` or `<select>`.
+//
+// BOTH ARMS READ 2 AND BOTH TWOS ARE `ui/InlineField.tsx`, which docs/design-system.md rules OUT of
+// `Field`'s scope BY NAME — its commit-on-blur is behaviour, not a box, and Phase 5 proved that behaviour
+// live before leaving it alone. They are NOT exempted here: a census that quietly drops its own known
+// survivors is how a backlog stops being visible, so they are counted, printed and ratcheted at 2.
+// Phase 9 migrated 15 controls onto `<Field>` and put the other 18 on `.vb-input`; under the OLD rule the
+// number would read 20, and both are stated in docs/design-system.md rather than only the better one.
+const CONTROL_CEILING = 2;
+// ARM 2's own ceiling is ZERO, and it blocks: no surface class in the tree decides a control's box. The
+// first draft of this constant was 2, for `.inline-edit`'s border/corner/padding and
+// `.cv-title.inline-edit`'s size — and neither is reachable, which is a LIMIT worth stating rather than a
+// ceiling worth padding. `InlineField` builds one `common` object and spreads it, so `className:
+// 'inline-edit'` never appears in a `className=` attribute and the reader arm 2 shares with the chip
+// census cannot see it. That is the blind spot this file already names — "a class reaching a `<Chip>`
+// through a variable or a ternary that names no literal" — one primitive along, and those two controls are
+// counted by arm 1 regardless, which is why the pair is covered rather than lost.
+const CONTROL_GEOMETRY_CEILING = 0;
 
 const CHIP_FONT = ['var(--t-micro)', 'var(--t-small)'];
 // A chip's corner, and the primitive's own two: `--r-sm` square-ish, `--r-pill` for a state word or a
@@ -155,6 +186,10 @@ const CHIP_FONT = ['var(--t-micro)', 'var(--t-small)'];
 // refused a primitive by Phase 5b with a measurement — out of a census they are not in the family of.
 const CHIP_RADIUS = ['var(--r-pill)', 'var(--r-sm)'];
 const CONTROL_TAGS = ['input', 'textarea', 'select'];
+// The class primitives.css gives a control that has no label to put in a `<Field>`. ONE CONSTANT AND NOT
+// A STRING AT THREE CALL SITES, for the reason CHIP_TAG is one: a self-test that carries its own copy of
+// the value it is meant to test has no opinion about the code under test.
+const CONTROL_BOX_CLASS = 'vb-input';
 // ONE CONSTANT AND NOT A STRING AT TWO CALL SITES, and a planted defect is what says so: with the tag
 // written literally at both the run's call and the self-test's, breaking the run's copy to `'<ChipX'` took
 // arm 2 blind and the run still exited 0 — the self-test was asserting its own argument. That is the same
@@ -168,6 +203,7 @@ const ADOPTION = [
   { shape: 'dot', tags: ['<Dot'] },
   { shape: 'seg', tags: ['<SegmentedControl'] },
   { shape: 'control', tags: ['<Field'] },
+  { shape: 'control-geometry', tags: ['<Field'] },
   { shape: 'boxless-chip', tags: [CHIP_TAG] },
 ];
 
@@ -437,22 +473,51 @@ function fieldRanges(text) {
   return ranges;
 }
 
-// Every literal control tag in one file, each marked with whether it is inside a Field. PER ELEMENT and
-// never per file: a file-level test would stop counting a file's remaining controls the moment one of
-// them was migrated, which is the Phase 3 blindness exactly.
+// Every literal control tag in one file, each marked with where its box comes from and with the classes
+// it carries. PER ELEMENT and never per file: a file-level test would stop counting a file's remaining
+// controls the moment one of them was migrated, which is the Phase 3 blindness exactly.
 // Sorted by LINE as a number, not by the `file:line` string: a string sort puts line 105 before line 93,
 // and a census nobody can read down a file is a census nobody reads.
 function controlsIn(file, text) {
   const ranges = fieldRanges(text);
   const found = CONTROL_TAGS.flatMap((tag) =>
-    [...text.matchAll(new RegExp(`<${tag}(?![\\w-])`, 'g'))].map((m) => ({
-      line: lineOf(text, m.index),
-      site: `${file}:${lineOf(text, m.index)}`,
-      tag,
-      inField: ranges.some(([from, to]) => m.index > from && m.index < to),
-    })),
+    [...text.matchAll(new RegExp(`<${tag}(?![\\w-])`, 'g'))].map((m) => {
+      const end = openTagEnd(text, m.index + tag.length);
+      // A tag whose `>` cannot be found is read as carrying no classes rather than skipped: an
+      // unparseable control must stay a finding, not vanish from the population.
+      const classes = end < 0 ? [] : classesInTag(text.slice(m.index, end));
+      const inField = ranges.some(([from, to]) => m.index > from && m.index < to);
+      return {
+        line: lineOf(text, m.index),
+        site: `${file}:${lineOf(text, m.index)}`,
+        tag,
+        classes,
+        inField,
+        // The two routes to the primitive's box, and `where` is printed so a reader can see which.
+        boxed: inField || classes.includes(CONTROL_BOX_CLASS),
+        where: inField
+          ? '<Field>'
+          : classes.includes(CONTROL_BOX_CLASS)
+            ? `.${CONTROL_BOX_CLASS}`
+            : 'nothing',
+      };
+    }),
   );
   return found.sort((a, b) => a.line - b.line);
+}
+
+// ARM 2. A surface class that lands on a literal control may not decide the box — the same claim
+// `chipGeometryFault` makes about a `<Chip>` and `check-radius-scale.mjs` about a `<button>`, and it is
+// what stops arm 1's `.vb-input` clause becoming a licence: `<input className="vb-input my-own-box">`
+// would otherwise pass arm 1 while the geometry moved out of sight, which is the Phase 3 defect exactly.
+// `font-family` and `color` are NOT here: a monospaced editor body and a muted secondary select are the
+// surface's to decide, and `.control-textarea` and `.archive-column` are both correct designs.
+const CONTROL_GEOMETRY = ['border', 'border-width', 'border-radius', ...PADDING, 'font-size'];
+
+function controlGeometryFault(rule, onControl) {
+  if (!classesOf(rule.selector).some((cls) => onControl.has(cls))) return null;
+  const decided = CONTROL_GEOMETRY.filter((prop) => declares(rule.body, prop));
+  return decided.length > 0 ? `geometry on a control — ${decided.join(', ')}` : null;
 }
 
 // ---------- the anti-vacuity self-tests ----------
@@ -532,13 +597,21 @@ function cssSelfTest() {
   return got === CSS_SELF_TEST_WANT ? null : `css census: expected\n  ${CSS_SELF_TEST_WANT}\ngot\n  ${got}`;
 }
 
-// The control fixture: a control inside a Field (not a finding), one outside it (a finding), one inside
-// an `<InlineField>` — which is NOT a Field, and is the case docs/design-system.md rules out of Field's
-// scope by name — a multi-line Field, and a `<Fieldset>` that must not open a region either.
+// The control fixture, and every row is a branch that can silently stop matching: a control inside a
+// `<Field>` (covered), one carrying `.vb-input` (covered by the OTHER route, and the row that fails if
+// arm 1's second clause breaks), one carrying `.vb-input` AND a class of its own (covered by arm 1 and a
+// finding under arm 2 — the post-migration hole, and the reason arm 2 exists at all), a bare one (the
+// finding), one inside an `<InlineField>` — which is NOT a Field, and is the case docs/design-system.md
+// rules out of Field's scope by name — a control whose tag holds a brace expression before its
+// `className` (so `openTagEnd` is exercised rather than a naive `indexOf('>')`), a multi-line Field, and
+// a `<Fieldset>` that must not open a region either.
 const CONTROL_FIXTURE = [
   '<Field label="a"><input value={v} /></Field>',
   '<input className="vb-input" />',
-  '<InlineField><input /></InlineField>',
+  '<input className="vb-input own-box" />',
+  '<input placeholder="bare" />',
+  '<InlineField><input className="inline-edit" /></InlineField>',
+  '<select onChange={(e) => set(e.target.value)} className="vb-input"><option /></select>',
   '<Field',
   '  label="b"',
   '>',
@@ -547,8 +620,25 @@ const CONTROL_FIXTURE = [
   '<Fieldset><textarea /></Fieldset>',
 ].join('\n');
 
-const CONTROL_SELF_TEST_WANT =
-  'in-field 2 | findings fixture.tsx:2 input, fixture.tsx:3 input, fixture.tsx:9 textarea';
+// `.own-box` and `.inline-edit` are the two arm-2 rows: one on a control that IS boxed by the primitive
+// and one on a control that is not. `.plain-ink` is on a control and decides only a colour, which is the
+// surface's — both directions, for the reason `chipGeometryFault`'s fixture carries `.kappa`.
+const CONTROL_CSS_FIXTURE = [
+  '.own-box { border-radius: var(--r-sm); padding: 0 var(--s-2); }',
+  '.inline-edit { border: 1px solid var(--accent); }',
+  '.plain-ink { color: var(--muted); }',
+  '.not-on-a-control { padding: var(--s-3); font-size: var(--t-small); }',
+].join('\n');
+
+const CONTROL_SELF_TEST_WANT = [
+  // FIVE, and the first draft of this line said four: the two `<Field>` regions cover one control each
+  // and three tags carry `.vb-input`. The fixture was right and the expectation was wrong, which is what
+  // a fixture the tree cannot move is for.
+  'boxed 5',
+  'findings fixture.tsx:4 input nothing, fixture.tsx:5 input nothing, fixture.tsx:12 textarea nothing',
+  'geometry .own-box — geometry on a control — border-radius, padding' +
+    ' | .inline-edit — geometry on a control — border',
+].join(' | ');
 
 // The box-less fixture, and it exercises every way this check can go quiet: a name rendered as
 // something other than a chip (the regression), a name on a `<Chip>` with a tone (the pass), a name on
@@ -579,10 +669,19 @@ function boxlessSelfTest() {
 
 function controlSelfTest() {
   const all = controlsIn('fixture.tsx', CONTROL_FIXTURE);
-  const findings = all.filter((c) => !c.inField);
+  const findings = all.filter((c) => !c.boxed);
+  // Arm 2 goes through the same two functions the run does — `controlsIn` for the classes and
+  // `controlGeometryFault` for the verdict — so a break in either is a red fixture rather than a quiet
+  // zero. `vb-input` is filtered out here for the reason the run filters primitive classes out of
+  // `onChip`: the primitive's own class is not a surface hand-rolling one.
+  const onControl = new Set(all.flatMap((c) => c.classes).filter((cls) => cls !== CONTROL_BOX_CLASS));
+  const geometry = censusOf(shapedRules(rulesOf('fixture.css', CONTROL_CSS_FIXTURE)), (rule) =>
+    controlGeometryFault(rule, onControl),
+  );
   const got = [
-    `in-field ${all.length - findings.length}`,
-    `findings ${findings.map((c) => `${c.site} ${c.tag}`).join(', ')}`,
+    `boxed ${all.length - findings.length}`,
+    `findings ${findings.map((c) => `${c.site} ${c.tag} ${c.where}`).join(', ')}`,
+    `geometry ${geometry.map((f) => `${f.selector} — ${f.detail}`).join(' | ')}`,
   ].join(' | ');
   return got === CONTROL_SELF_TEST_WANT
     ? null
@@ -731,7 +830,11 @@ for (const rule of cssRules)
   for (const cls of classesOf(rule.selector))
     if (!named.has(cls)) named.set(cls, `${rule.file}:${rule.line}`);
 const controls = tsxFiles.flatMap(({ file, text }) => controlsIn(file, text));
-const rawControls = controls.filter((c) => !c.inField);
+const rawControls = controls.filter((c) => !c.boxed);
+// Arm 2's population: every surface class that lands on a literal control. `vb-input` and the rest of the
+// primitives' own names are filtered out for the reason `onChip` filters them — a primitive's class is
+// not a surface hand-rolling one, and its rules live in primitives.css, which this census does not read.
+const onControl = new Set(controls.flatMap((c) => c.classes).filter((cls) => !primitiveClasses.has(cls)));
 
 const adoption = new Map(
   ADOPTION.map(({ shape, tags }) => [
@@ -795,8 +898,19 @@ for (const { shape, ceiling, fault, phase } of censuses(onChip)) {
 report(
   'control',
   CONTROL_CEILING,
-  'Phase 9',
-  rawControls.map((c) => `${c.site} <${c.tag}> — not inside a <Field>`),
+  'ui/InlineField.tsx, ruled out of Field by name',
+  rawControls.map((c) => `${c.site} <${c.tag}> — its box comes from neither a <Field> nor .vb-input`),
+);
+
+// ARM 2, reported as its own census because it answers the other direction and would be invisible folded
+// into arm 1's count: arm 1 falls as controls are migrated and this one RISES if one is migrated badly.
+report(
+  'control-geometry',
+  CONTROL_GEOMETRY_CEILING,
+  'ui/InlineField.tsx, ruled out of Field by name',
+  censusOf(cssRules, (rule) => controlGeometryFault(rule, onControl)).map(
+    (f) => `${f.site} ${f.selector} — ${f.detail}  (used at ${siteOf(f.selector, sites)})`,
+  ),
 );
 
 // A ceiling of ZERO, because this one never had a backlog: the four are migrated or gone as of Phase 8,
@@ -810,5 +924,8 @@ for (const [selector, reason] of CHIP_EXEMPT) console.log(`chip-shaped, EXEMPT: 
 if (failed) process.exit(1);
 
 console.log(
-  `all six shape censuses and the box-less list are at or under their ceilings; ${controls.length - rawControls.length} of ${controls.length} control(s) are in a Field`,
+  `all six shape censuses, both control arms and the box-less list are at or under their ceilings; ` +
+    `${controls.length - rawControls.length} of ${controls.length} control(s) take the primitive's box ` +
+    `(${controls.filter((c) => c.inField).length} in a <Field>, ` +
+    `${controls.filter((c) => !c.inField && c.boxed).length} on .${CONTROL_BOX_CLASS})`,
 );

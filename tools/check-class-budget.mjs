@@ -60,7 +60,11 @@ const SHEETS = [join('web', 'src', 'styles.css'), join('web', 'src', 'ui', 'prim
 // every commit, which teaches everyone to ignore it — the same argument that kept radius conformance
 // reporting until Phase 3 drove it to zero. Lower this as the sweep continues; the commit that reaches
 // 183 is the commit that sets it to 183 and deletes this paragraph. NEVER raise it.
-const CLASS_CEILING = 377;
+// 377 before Phase 9, 375 after it, measured: three classes died in styles.css — `.theme-select`,
+// `.mp-prov` and `.link-option` — and `.vb-field-check` was added to primitives.css. The other eight
+// control classes the phase touched survive with a declaration only the surface can make, which is the
+// same result Phase 3 measured on its 27 and Phase 8 on its nine.
+const CLASS_CEILING = 375;
 const CLASS_TARGET = 183;
 
 // Anti-vacuity floor on the SELECTOR PARSER, not on the class count: a regex that stops matching reports

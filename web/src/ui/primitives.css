@@ -236,6 +236,21 @@ button.vb-panel:disabled { cursor: default; }
 /* The label in a fixed-width rail beside its control, which the skill editor and the dispatch pane each
    wrote their own of at 6rem and 5.5rem — half a rem apart, and nobody chose either. */
 .vb-label-rail { width: 6rem; flex: 0 0 auto; }
+/* A DECISION'S LABEL IS CONTENT, NOT A FIELD NAME, which is why the check layout overrides `.vb-label`
+   rather than the base changing. Measured, not chosen: five checkbox rows labelled themselves at the
+   surrounding size and ink — `.link-option` at four sites (the link picker, the dispatch attachments,
+   and the skill editor's boards and columns) plus Diagnostics' bare span — against one at `.vb-label`'s
+   muted 12px. A card title or a file path shrunk to 12px muted reads as furniture, and it is the thing
+   being chosen. The pointer is `.link-option`'s, and it is behaviour a `<label>` already has: the words
+   are a click target, so they must look like one. */
+.vb-field-check { cursor: pointer; }
+/* A ROW, because a decision's label is often more than one part — an id and a title, a path — and
+   `.link-option` laid those out itself while they were its own children. The gap is `.link-option`'s. */
+.vb-field-check > .vb-label {
+  display: flex; align-items: center; gap: var(--s-4); min-width: 0;
+  font-size: var(--t-body); color: var(--text);
+}
+.vb-field-check input { cursor: pointer; }
 .vb-input, .vb-trigger, .vb-field input, .vb-field textarea, .vb-field select {
   background: var(--bg); color: var(--text);
   border: 1px solid var(--border); border-radius: var(--r-md);
@@ -252,6 +267,14 @@ button.vb-panel:disabled { cursor: default; }
 .vb-field select:focus {
   outline: none; border-color: var(--accent);
 }
+/* A SELECT IS A CONTROL YOU POINT AT, and five of the tree's seven said so by hand while two said
+   nothing: `.theme-select` carried `cursor: pointer` and an accent hover at four call sites and
+   `.archive-column` carried the cursor, against `.mp-prov` and `.copilot-selects select` with neither.
+   The hover makes the same statement `:focus` makes on an input — this is the control you are about to
+   use — and it is the argument `.vb-trigger` already rests on one line up: a trigger is reached by
+   pointer far more than by tab. A native select is the same affordance without the caret. */
+select.vb-input, .vb-field select { cursor: pointer; }
+select.vb-input:hover:not(:disabled), .vb-field select:hover:not(:disabled) { border-color: var(--accent); }
 /* A SELECT TRIGGER IS THAT BOX WITH A CARET ON IT, and docs/design-system.md has said so twice without
    either of them becoming one: Phase 3 and Phase 4 both listed `.chat-current` and `.mp-trigger` as "an
    `<input>` that happens to be a button" and left them out. They are the box above — same 1px border,

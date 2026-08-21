@@ -217,6 +217,19 @@ describe('useConfirm with a typed confirmation', () => {
     await screen.findByText('true');
   });
 
+  // Pinned for Phase 9 of docs/design-system.md before `Field` took this row. The box is `autoFocus`
+  // and the words above it name what has to be typed — a `<label>` wrapping both, so the name is a
+  // click target into the box. Everything else about it is asserted above; these are the parts a
+  // migration moves the wrapper past without failing anything.
+  it('is a labelled, auto-focused box that names the word it wants', () => {
+    render(<Host request={folder} />);
+    ask();
+    expect(field().tagName).toBe('INPUT');
+    expect(field().closest('label')).not.toBeNull();
+    expect(document.activeElement).toBe(field());
+    expect(field().closest('label')?.textContent).toBe('Type attic to confirm');
+  });
+
   it('forgives whitespace around the name, which a paste often brings', () => {
     render(<Host request={folder} />);
     ask();

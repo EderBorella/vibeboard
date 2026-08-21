@@ -60,3 +60,25 @@ describe('the new-project form', () => {
     expect(api.scaffoldProject).toHaveBeenCalledWith('/data/projects/calculator', 'calculator');
   });
 });
+
+// WHAT A CONTROL SAYS BESIDES ITS VALUE, pinned for Phase 9 of docs/design-system.md before `Field`
+// took these two. A migration moves the wrapper, and the thing it drops silently is an attribute: a
+// placeholder, a type, a bound, a row count. The value and the handler are asserted above; these are
+// the parts no existing case would have missed.
+describe('the two boxes, as controls', () => {
+  const box = (label: RegExp): HTMLInputElement => screen.getByLabelText(label) as HTMLInputElement;
+
+  it('are text inputs with the example each one needs', () => {
+    render(<ProjectGate onOpened={() => {}} />);
+    expect(box(/location/i).tagName).toBe('INPUT');
+    expect(box(/location/i).placeholder).toBe('/path/to/projects');
+    expect(box(/name/i).tagName).toBe('INPUT');
+    expect(box(/name/i).placeholder).toBe('my-project');
+  });
+
+  it('name their fields in full, which is what the label is for', () => {
+    render(<ProjectGate onOpened={() => {}} />);
+    expect(screen.getByText('Location (parent folder)')).toBeTruthy();
+    expect(screen.getByText('Name (dash-separated, lowercase)')).toBeTruthy();
+  });
+});

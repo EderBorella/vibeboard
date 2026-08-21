@@ -156,12 +156,9 @@ export function TopBar({
         </div>
       )}
       <div className="topbar-right">
-        <select
-          className="theme-select"
-          value={theme}
-          title="Theme"
-          onChange={(e) => onTheme(e.target.value)}
-        >
+        {/* NOT A `Field`: the top bar carries no labels, and the value this shows is its own name. It
+            takes the primitive's box through `.vb-input`, which is what primitives.css names it for. */}
+        <select className="vb-input" value={theme} title="Theme" onChange={(e) => onTheme(e.target.value)}>
           {THEMES.map((t) => (
             <option key={t.value} value={t.value}>
               {t.label}

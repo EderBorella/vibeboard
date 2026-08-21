@@ -102,7 +102,7 @@ export function SuggestionsPane({ suggestions, failed, onRefresh, onApply }: Pro
       ) : (
         <>
           {/* The actions at the top, on the picked suggestion, and Dismiss in its own colour. */}
-          <div className="suggestions-actions">
+          <div className="suggestions-actions" data-testid="suggestions-actions">
             <Button variant="danger" size="md" disabled={busy !== null} onClick={() => dismiss(picked.id)}>
               Dismiss
             </Button>
@@ -113,7 +113,10 @@ export function SuggestionsPane({ suggestions, failed, onRefresh, onApply }: Pro
               value={reason}
               onChange={(e) => setReason(e.target.value)}
             />
+            {/* NOT a `Field`: an action row of five controls with no labels between them. It drew NO
+                box at all before Phase 9 — a bare UA select beside a `.vb-input` in the same row. */}
             <select
+              className="vb-input"
               aria-label="Level"
               value={level}
               onChange={(e) => setLevel(e.target.value as SuggestionLevel)}

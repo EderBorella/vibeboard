@@ -13,6 +13,7 @@ import { errorText } from '../errors';
 import { useAccounting } from '../runs/useAccounting';
 import { type AutopilotConfig, BLOCKED_BOARDS, BOARD_LABELS, type ProjectConfig } from '../shared';
 import { Button } from '../ui/Button';
+import { Field } from '../ui/Field';
 import { useReadiness } from './useReadiness';
 
 // The lifecycle as it will actually be executed, plus what is stopping it.
@@ -119,8 +120,7 @@ export function AutopilotPanel({
         {accounting?.cap?.why ?? 'Whichever of these is reached first will stop the run.'}
       </div>
       {CAPS.map((cap) => (
-        <label className="vb-field" key={cap.key}>
-          <span>{cap.label}</span>
+        <Field label={cap.label} hint={cap.hint} key={cap.key}>
           <input
             type="number"
             min={cap.min}
@@ -128,11 +128,12 @@ export function AutopilotPanel({
             value={caps[cap.key] ?? ap[cap.key]}
             onChange={(e) => edit(cap.key, Number(e.target.value), cap.min)}
           />
-          <span className="vb-hint">{cap.hint}</span>
-        </label>
+        </Field>
       ))}
-      <label className="vb-field">
-        <span>Run timeout (minutes)</span>
+      <Field
+        label="Run timeout (minutes)"
+        hint="One run is abandoned after this long and recorded as failed, which burns an attempt — a card that hangs every time must not retry for ever."
+      >
         {/* Minutes, because 1800000 in a box is unreadable. The enforceable per-run bound is
             wall-clock: a dollar ceiling per run is not implementable, since usage is only known once
             the run has finished spending it. */}
@@ -143,11 +144,7 @@ export function AutopilotPanel({
           value={Math.round((caps.runTimeoutMs ?? ap.runTimeoutMs) / 60_000)}
           onChange={(e) => edit('runTimeoutMs', Number(e.target.value) * 60_000, 60_000)}
         />
-        <span className="vb-hint">
-          One run is abandoned after this long and recorded as failed, which burns an attempt — a card that
-          hangs every time must not retry for ever.
-        </span>
-      </label>
+      </Field>
       <div className="vb-hint">
         Finished at:{' '}
         {Object.entries(ap.terminal)

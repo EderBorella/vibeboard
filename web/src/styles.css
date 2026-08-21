@@ -122,18 +122,9 @@ body {
   gap: var(--s-4);
   flex: 0 0 auto;
 }
-/* `.switch-btn` shared this and is now `default` — the same box, the same hover. The rule stays for the
-   `<select>`, which is not a button and which no primitive owns yet. */
-.theme-select {
-  background: var(--panel-2);
-  color: var(--text);
-  border: 1px solid var(--border);
-  border-radius: var(--r-md);
-  padding: var(--s-2) var(--s-4);
-  font-size: var(--t-small);
-  cursor: pointer;
-}
-.theme-select:hover { border-color: var(--accent); }
+/* `.switch-btn` shared this and is now `default`; `.theme-select` was the `<select>` half of it, at four
+   call sites, and it is `.vb-input` as of Phase 9 — the pointer and the accent hover it declared are now
+   what primitives.css says about every select. The class died outright. */
 /* PRESSED, which is not one of the five voices: the copilot toggle is lit while the panel is open, and a
    filled `primary` would make a view toggle look like the page's one action. A colour and a glow only. */
 .switch-btn.active { border-color: var(--accent); color: var(--accent); box-shadow: var(--glow); }
@@ -425,13 +416,9 @@ body {
 .archive-title:hover { color: var(--accent); }
 .archive-actions { display: flex; align-items: center; gap: var(--s-3); flex: 0 0 auto; }
 /* `.archive-restore` shared this rule and is now `default` — hover included, which `.vb-btn-default`
-   already says. The rule stays for the `<select>` beside it, which no primitive owns yet. */
-.archive-column {
-  background: var(--panel); color: var(--muted);
-  border: 1px solid var(--border); border-radius: var(--r-md);
-  cursor: pointer; font-size: var(--t-small); font-family: inherit;
-  padding: 0.2rem var(--s-4);
-}
+   already says. The `<select>` beside it is `.vb-input` as of Phase 9; the muted ink is all it kept,
+   because a secondary restore must not read as loudly as the button it sits next to. */
+.archive-column { color: var(--muted); }
 
 /* ---------- Column ---------- */
 /* `.column` IS A `Panel` WITH THE `raised` VARIANT AND A HEADER, and it has no rule of its own left.
@@ -586,7 +573,10 @@ body {
    the column, the label's size and colour, and the box on every input and textarea inside it. A textarea
    inside a Field still resizes vertically, which is the one thing the primitive leaves to the surface. */
 .vb-field textarea { resize: vertical; }
-.raw-area { font-family: var(--font-mono); font-size: var(--t-body); }
+/* The face, because a card's file is machine text. The BOX is `.vb-input`'s as of Phase 9, and before
+   that there was none: a whole file in the browser's own textarea chrome. `font-size` went with it — the
+   primitive says `--t-body` and this restated it. */
+.raw-area { font-family: var(--font-mono); }
 .settings-section { font-family: var(--font-display); text-transform: uppercase; letter-spacing: 0.12em; font-size: var(--t-small); color: var(--accent); margin-top: 0.4rem; border-bottom: 1px solid var(--border); padding-bottom: var(--s-2); }
 .settings-section:first-child { margin-top: 0; }
 /* A hint says how something works; this says what will be refused. Ochre rather than danger: nothing
@@ -631,7 +621,10 @@ body {
    the ten chip classes were already there and this was the one that was not. */
 .mp-chip:hover { border-color: var(--accent); }
 .mp-chip.on { background: var(--accent-fill); color: var(--on-fill); border-color: var(--accent); font-weight: 600; }
-.mp-prov { margin-left: auto; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: var(--r-md); padding: 0.22rem var(--s-3); font-size: var(--t-small); }
+/* `.mp-prov` died in Phase 9: the box is `.vb-input`'s and its whole remainder was `margin-left: auto`,
+   which is `.push`. A CONTROL IS 13px AND A CHIP IS 11px, and this row holds both — which is the same
+   ruling Phase 5b made putting the two select triggers at `--t-body` beside the inputs they share a row
+   with. The 12px it had said neither. */
 .mp-modal > .vb-readout { padding: 0 0.9rem var(--s-2); }
 .mp-list { flex: 1; overflow-y: auto; padding: 0 var(--s-4) var(--s-4); }
 .mp-item { display: flex; align-items: center; border-radius: var(--r-md); }
@@ -677,8 +670,9 @@ body {
 }
 .links-group { font-size: var(--t-micro); text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 0.3rem 0 0.1rem; }
 .links-group:first-child { margin-top: 0; }
-.link-option { display: flex; align-items: center; gap: var(--s-4); font-size: var(--t-body); cursor: pointer; }
-.link-option input { cursor: pointer; }
+/* `.link-option` died in Phase 9: it was `Field layout="check"` at four call sites — a flex row with
+   `var(--s-4)` of gap, a pointer on the label and on the box — plus a `font-size: var(--t-body)` that
+   `body` already gave it, which is the fourth dead declaration this sweep has found. */
 .link-title { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* ---------- Card view (read-only tab) ---------- */
 /* `anywhere` rather than `break-word`: only `anywhere` also shrinks the min-content size, so a long
@@ -886,7 +880,8 @@ body {
 .copilot-actions button { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); border-radius: var(--r-md); padding: var(--s-2) var(--s-4); font-size: var(--t-small); cursor: pointer; }
 .copilot-actions button:disabled { opacity: 0.5; cursor: default; }
 .copilot-selects { display: flex; gap: var(--s-4); padding: 0 0.75rem var(--s-4); border-bottom: 1px solid var(--border); }
-.copilot-selects select { flex: 1; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: var(--r-md); padding: var(--s-2) var(--s-3); font-size: var(--t-small); }
+/* The row decides how its controls sit; the box is `.vb-input`'s. */
+.copilot-selects > .vb-input { flex: 1; }
 .copilot-selects select:disabled { opacity: 0.5; }
 .copilot-status { display: flex; align-items: center; gap: var(--s-3); padding: var(--s-2) 0.75rem; font-size: var(--t-micro); color: var(--muted); border-bottom: 1px solid var(--border); }
 /* THE LAST HAND-ROLLED DOT, and it is a `Dot` now: the 8px circle and its `50%` corner were the only
@@ -919,8 +914,7 @@ body {
 .ctx-warn { color: var(--accent-2); }
 .ctx-warn .ctx-fill { background: var(--accent-2); }
 .copilot-input { display: flex; gap: var(--s-4); padding: var(--s-4) 0.75rem; border-top: 1px solid var(--border); }
-.copilot-input textarea { flex: 1; resize: none; background: var(--bg); border: 1px solid var(--border); border-radius: var(--r-md); padding: var(--s-4); color: var(--text); font-family: inherit; font-size: var(--t-body); }
-.copilot-input textarea:focus { outline: none; border-color: var(--accent); }
+.copilot-input > .vb-input { flex: 1; resize: none; }
 
 /* A USER-PREFERENCE OVERRIDE IS THE ONE PLACE `!important` IS THE MECHANISM AND NOT A SHORTCUT.
    `*` has specificity (0,0,0), so every class in this file outranks it; without `!important` this rule
@@ -1029,12 +1023,13 @@ body {
 /* `.btn-danger` was here — `Button`'s `danger` variant at `md`, so it sits level with the Save beside it. */
 /* The prose ink is the surface's and the shell's inset is the shell's; the box is the primitive's. */
 .control-disclaimer { margin: 0.6rem 0.9rem 0; color: var(--text); }
+/* The box is `.vb-input`'s as of Phase 9. What is left is the pane's inset, the fact that this one
+   fills its pane, and the monospaced face — which is the CONTENT being machine text, not a measurement,
+   so it is not a `Readout`. */
 .control-textarea {
-  flex: 1; margin: 0.75rem 0.9rem; resize: none; background: var(--bg); color: var(--text);
-  border: 1px solid var(--border); border-radius: var(--r-md); padding: 0.8rem;
-  font-family: var(--font-mono); font-size: var(--t-body); line-height: 1.5;
+  flex: 1; margin: 0.75rem 0.9rem; resize: none;
+  font-family: var(--font-mono); line-height: 1.5;
 }
-.control-textarea:focus { outline: none; border-color: var(--accent); }
 .control-preview { flex: 1; overflow-y: auto; padding: 0.75rem 1.1rem; }
 .control-blank { margin: auto; color: var(--muted); padding: 2rem; }
 .control-editor > .vb-error, .explorer-list > .vb-error { padding: var(--s-4) 0.9rem; }
@@ -1061,11 +1056,8 @@ body {
 /* Resources links registry */
 .resources-table { flex: 1; overflow-y: auto; padding: 0.75rem 0.9rem; display: flex; flex-direction: column; gap: var(--s-3); }
 .resource-row { display: flex; gap: var(--s-3); align-items: center; }
-.resource-row input {
-  background: var(--bg); color: var(--text); border: 1px solid var(--border);
-  border-radius: var(--r-md); padding: var(--s-3) var(--s-4); font-size: var(--t-body);
-}
-.resource-row input:focus { outline: none; border-color: var(--accent); }
+/* `.resource-row input` was `.vb-input` DECLARATION FOR DECLARATION, focus rule included, and it died
+   in Phase 9. Only the three widths are the row's own. */
 .res-title { flex: 1; } .res-url { flex: 1.4; } .res-note { flex: 1.2; }
 .res-del:hover:not(:disabled) { color: var(--danger); }
 
@@ -1431,11 +1423,13 @@ body {
 .diary-lede { color: var(--muted); font-size: var(--t-body); line-height: 1.5; }
 
 .diary-compose { display: flex; gap: var(--s-4); align-items: flex-start; max-width: 68ch; }
-.diary-compose textarea {
-  flex: 1; resize: vertical; min-height: 2.6rem; padding: var(--s-4) var(--s-4);
-  background: var(--panel-2); color: var(--text);
-  border: 1px solid var(--border); border-radius: var(--r-md);
-  font: inherit; line-height: 1.45;
+/* ON THE PANEL GROUND RATHER THAN THE APP GROUND, and this is the box that argument belongs to: `.diary`
+   declares `background: var(--wash)`, and `--wash` is `none` in classic-dark — so `--bg` on `--bg` would
+   render as no box at all. It was written on the suggestions composer instead, whose pane has no ground of
+   its own and takes the dock's `--panel`, exactly as `.modal` and `.gate-card` do; both of those put their
+   boxes on `--bg`, and that one now does too. Measured in test/control-boxes.test.tsx. */
+.diary-compose > .vb-input {
+  flex: 1; resize: vertical; min-height: 2.6rem; background: var(--panel-2); line-height: 1.45;
 }
 .diary > .vb-error, .suggestions-pane > .vb-error { max-width: 68ch; }
 
@@ -1477,9 +1471,11 @@ body {
   padding: var(--s-4) var(--s-4); gap: var(--s-4); overflow-y: auto;
 }
 .suggestions-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-3); }
-/* On the PANEL ground rather than the app ground, which is the one difference among the ten text boxes
-   that a person can see: this one sits in a `--wash` pane where `--bg` would read as a hole. */
-.suggestions-actions > .vb-input { flex: 1; min-width: 12rem; background: var(--panel-2); }
+/* THE `--panel-2` GROUND IS GONE, and its stated reason is why: "this one sits in a `--wash` pane where
+   `--bg` would read as a hole" — but `.suggestions-pane` declares no ground and takes the dock's
+   `--panel`, which is what `.modal` and `.gate-card` are, and both of those put their boxes on `--bg`.
+   The reason was true of `.diary-compose`, which really is on `--wash`, and it is written there now. */
+.suggestions-actions > .vb-input { flex: 1; min-width: 12rem; }
 .suggestions-became { color: var(--accent); font-size: var(--t-body); }
 .suggestions-list { list-style: none; display: flex; flex-direction: column; gap: 0.1rem; min-height: 0; }
 .suggestions-row { border-left: 2px solid var(--border); }

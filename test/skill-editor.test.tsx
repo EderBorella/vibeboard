@@ -218,6 +218,29 @@ describe('SkillEditor', () => {
     expect((screen.getByText('Save skill') as HTMLButtonElement).disabled).toBe(true);
   });
 
+  // WHAT THESE FIVE CONTROLS SAY BESIDES THEIR VALUES, pinned for Phase 9 of docs/design-system.md
+  // before `Field` took them. Every case above reaches its control through `getByLabelText`, which is
+  // satisfied by `htmlFor`/`id` OR by a wrapping `<label>` — so the label association is already
+  // covered in both worlds and what is left is the attributes.
+  it('gives the prompt a twelve-row box and the description its example', () => {
+    render(<SkillEditor {...props} skill={skill()} />);
+    const prompt = screen.getByLabelText('Prompt') as HTMLTextAreaElement;
+    expect(prompt.tagName).toBe('TEXTAREA');
+    expect(prompt.rows).toBe(12);
+    const description = screen.getByLabelText('Description') as HTMLInputElement;
+    expect(description.placeholder).toBe('What this does, shown on the rail button');
+  });
+
+  it('is a label round each scope box, so its words are a click target', () => {
+    const onSave = saver();
+    render(<SkillEditor {...props} onSave={onSave} skill={skill()} />);
+    expect(box('Engineering').type).toBe('checkbox');
+    expect(box('Engineering').closest('label')).not.toBeNull();
+    fireEvent.click(screen.getByText('Engineering'));
+    fireEvent.click(screen.getByText('Save skill'));
+    expect(onSave.mock.calls[0][0]).toMatchObject({ boards: ['engineering'] });
+  });
+
   it('goes clean once the save lands, so one edit cannot be sent twice', async () => {
     const onSave = saver();
     render(<SkillEditor {...props} onSave={onSave} skill={skill()} />);

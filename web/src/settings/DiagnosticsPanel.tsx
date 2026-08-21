@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { type AppSettings, getAppSettings, setDebugLog } from '../api';
 import { errorText } from '../errors';
+import { Field } from '../ui/Field';
 import { Readout } from '../ui/Readout';
 import { useAction } from '../useAction';
 
@@ -47,15 +48,14 @@ export function DiagnosticsPanel() {
         something. It applies the next time auto-pilot starts.
       </div>
 
-      <label className="vb-field vb-field-row">
+      <Field layout="check" label="Verbose auto-pilot log">
         <input
           type="checkbox"
           checked={settings?.debugLog ?? false}
           disabled={settings === null || busy !== null}
           onChange={(e) => void toggle(e.target.checked)}
         />
-        <span>Verbose auto-pilot log</span>
-      </label>
+      </Field>
 
       {settings && (
         <div className="signin-row">

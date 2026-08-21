@@ -1,5 +1,6 @@
 import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from '../ui/Button';
+import { Field } from '../ui/Field';
 
 // Ask before doing something that cannot be taken back.
 //
@@ -110,10 +111,15 @@ export function useConfirm(): Confirmer {
         <div className="modal-body">
           {request.body && <p className="confirm-body">{request.body}</p>}
           {request.requireText && (
-            <label className="confirm-require">
-              Type <strong>{request.requireText}</strong> to confirm
+            <Field
+              className="confirm-require"
+              label={
+                <>
+                  Type <strong>{request.requireText}</strong> to confirm
+                </>
+              }
+            >
               <input
-                className="vb-input"
                 value={typed}
                 autoFocus
                 onChange={(e) => setTyped(e.target.value)}
@@ -121,7 +127,7 @@ export function useConfirm(): Confirmer {
                   if (e.key === 'Enter' && unlocked) settle(true);
                 }}
               />
-            </label>
+            </Field>
           )}
           <div className="confirm-actions">
             <Button ref={cancelButton} onClick={() => settle(false)}>

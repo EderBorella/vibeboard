@@ -186,7 +186,9 @@ export function DiaryView({ bump }: { bump: number }) {
         </div>
 
         <div className="diary-compose">
+          {/* NOT a `Field`: a composer's label is its placeholder and the button beside it. */}
           <textarea
+            className="vb-input"
             aria-label="Add to the log"
             placeholder="What happened?"
             value={draft}

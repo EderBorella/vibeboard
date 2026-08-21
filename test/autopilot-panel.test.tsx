@@ -246,6 +246,35 @@ describe('the caps', () => {
     expect(onCaps).toHaveBeenLastCalledWith(expect.objectContaining({ budgetUsd: 9, attemptCap: 4 }));
   });
 
+  // WHAT EACH CAP SAYS BESIDES ITS VALUE, pinned for Phase 9 of docs/design-system.md before `Field`
+  // took these six. The clamping above is asserted on what the panel REPORTS; these are the attributes
+  // the browser itself acts on, and an attribute is what a migration drops silently.
+  it.each([
+    ['Budget (USD)', '0', '1'],
+    // Ten, not one: the premise here was that every cap stepped by one, and the code was right — a
+    // dispatch cap is adjusted in tens. The expectation moved rather than the step.
+    ['Max dispatches', '1', '10'],
+    ['Attempts per card', '1', '1'],
+    ['Run timeout (minutes)', '1', '5'],
+  ])('%s is a number box with a floor of %s and a step of %s', async (label, min, step) => {
+    api.getReadiness.mockResolvedValue(readiness());
+    render(panel(configWith(true)));
+    await settled();
+    expect(field(label).type).toBe('number');
+    expect(field(label).min).toBe(min);
+    expect(field(label).step).toBe(step);
+  });
+
+  // Every cap carries a sentence saying what it stops, and the run timeout says it too. Six labels and
+  // six hints, so a hint lost in the migration is a case here rather than a thing nobody notices.
+  it('each carry the sentence that says what they stop', async () => {
+    api.getReadiness.mockResolvedValue(readiness());
+    render(panel(configWith(true)));
+    await settled();
+    expect(screen.getByText(/Zero means no dollar budget/)).toBeTruthy();
+    expect(screen.getByText(/recorded as failed, which burns an attempt/)).toBeTruthy();
+  });
+
   // A budget of zero is a real setting — no dollar budget — and must survive being typed.
   it('accept a budget of zero', async () => {
     api.getReadiness.mockResolvedValue(readiness());

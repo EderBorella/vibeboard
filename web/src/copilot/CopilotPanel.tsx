@@ -257,7 +257,9 @@ export function CopilotPanel({
       <CopilotReadout stats={stats} budget={contextBudget} />
 
       <div className="copilot-input">
+        {/* NOT a `Field`: a composer's label is its placeholder and the Send button beside it. */}
         <textarea
+          className="vb-input"
           value={draft}
           placeholder={running ? 'Running…' : 'Message the copilot (Enter to send)'}
           onChange={(e) => setDraft(e.target.value)}

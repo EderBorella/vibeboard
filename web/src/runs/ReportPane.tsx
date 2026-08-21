@@ -161,8 +161,9 @@ export function ReportPane({
 
       {record.status === 'success' && (
         <div className="report-foot">
+          {/* NOT a `Field`: an action row, and its own first option — "Choose a column…" — names it. */}
           <select
-            className="theme-select"
+            className="vb-input"
             aria-label="Column to move the card to"
             value={column}
             onChange={(e) => setColumn(e.target.value)}

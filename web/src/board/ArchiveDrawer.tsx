@@ -84,8 +84,11 @@ export function ArchiveDrawer({ board, config, count, onOpen }: Props) {
               Restore → {labelOf(c.restoreTo)}
             </Button>
             {/* Somewhere else, for when the original column is no longer the right home. */}
+            {/* NOT a `Field`: this is one of two actions in a row of actions, and its own first option
+                — "Elsewhere…" — is what names it. The box is the primitive's; the muted ink is the
+                surface's, because a secondary restore must not read as loudly as the button beside it. */}
             <select
-              className="archive-column"
+              className="vb-input archive-column"
               value=""
               title="Restore to another column"
               onChange={(e) => {

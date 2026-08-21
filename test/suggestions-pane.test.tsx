@@ -63,7 +63,9 @@ describe('the Suggestions pane', () => {
     // one per suggestion — so "exactly two" was held by nothing, and a third action beside them would have
     // passed. TWO ACTIONS, FIXED (decision 49): Refresh re-reads the list, it is not something done to a
     // finding.
-    const actions = container.querySelector('.suggestions-actions') as HTMLElement;
+    // Phase 9 touched the controls in this row, so its selector moved with the change: a class-based
+    // selector turns a visual fix into a red suite, which is how a suite stops being trusted.
+    const actions = container.querySelector('[data-testid="suggestions-actions"]') as HTMLElement;
     expect([...actions.querySelectorAll('button')].map((b) => b.textContent)).toEqual([
       'Dismiss',
       'Make a card',

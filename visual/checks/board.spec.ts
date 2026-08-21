@@ -3,13 +3,15 @@ import { type Baseline, expect, readBaseline, recording, test, writeBaseline } f
 
 // The seven checks of docs/design-system.md, per theme.
 //
-// CHECKS 1 AND 2 MAKE TWO DIFFERENT CLAIMS, AND ONLY ONE OF THEM FAILS.
+// CHECKS 1 AND 2 MAKE TWO DIFFERENT CLAIMS, AND THEY ARE GATED SEPARATELY.
 //
 // CONFORMANCE — "every computed font-size is one of the six scale values", "every radius is one of
-// the four" — is REPORTING, deliberately. There are 15 computed sizes and 6 radius values today: a
-// blocking gate pointed at a backlog that size has to be bypassed on every commit, which teaches
-// everyone to ignore it. Conformance becomes blocking in the phase that drives its count to zero —
-// Phase 2 for type, Phase 3 for radius — and not before.
+// the four" — becomes blocking in the phase that drives its count to zero, and not before: a gate
+// pointed at a backlog has to be bypassed on every commit, which teaches everyone to ignore it.
+//   TYPE is BLOCKING as of Phase 2, the commit that took its count from 15 distinct computed sizes
+//   (94 elements alone sitting on the 16px default) to the scale. It is the assertion that would have
+//   caught the 10.88px-inside-a-12.16px-bar defect on the commit that introduced it.
+//   RADIUS still REPORTS. Its count is 6, and driving it to zero is Phase 3's job.
 //
 // DRIFT — "the set of computed values is exactly the set in visual/baseline/<theme>.json" — is
 // BLOCKING, on all three themes, because its count is zero today, which is the same condition that
@@ -128,12 +130,38 @@ test('record the baseline', async ({ board, theme }) => {
   await writeBaseline(theme, baseline);
 });
 
-test('1. type — conformance REPORTING, drift BLOCKING', async ({ board, theme }) => {
+// The offender list, grouped: 233 elements can share one off-scale value, and a failure message that
+// repeats it 233 times buries the one fact that matters — which VALUES are off the scale, and one
+// place each to go and look. Sorted by count, so the default that leaked into everything comes first.
+function offScale(offenders: Offender[]): string {
+  const byValue = new Map<string, string[]>();
+  for (const o of offenders) {
+    if (!byValue.has(o.detail)) byValue.set(o.detail, []);
+    byValue.get(o.detail)?.push(o.where);
+  }
+  return [...byValue.entries()]
+    .sort((a, b) => b[1].length - a[1].length)
+    .map(
+      ([value, where]) => `  ${value} on ${where.length} element(s), e.g. ${where.slice(0, 3).join(' | ')}`,
+    )
+    .join('\n');
+}
+
+test('1. type — conformance BLOCKING, drift BLOCKING', async ({ board, theme }) => {
   const styles = await auditStyles(board);
-  // The floor stops the check being vacuous. The conformance COUNT below may not fail; the drift
-  // gate at the end may.
+  // The floor stops the check being vacuous. So does this: six DISTINCT resolved steps. A token that
+  // stopped resolving would make `font-size: var(--t-x)` invalid on the probe, the probe would fall
+  // back to its inherited size, and the "allowed" set would quietly become the page's own default —
+  // an allow-list that permits exactly what it is meant to refuse.
   expect(styles.elements).toBeGreaterThan(FLOOR.elements);
   expect(styles.textElements).toBeGreaterThan(FLOOR.text);
+  expect(new Set(styles.scale).size, `the type scale did not resolve to six steps: ${styles.scale}`).toBe(6);
+  // The tally and the conformance list are two separate walks of the page (see audit.ts). This is
+  // what stops them diverging: a conformance walk that examined a different population from the one
+  // the tally reports could pass while the printed numbers said otherwise.
+  expect(styles.type.examined, 'the type walk and the tally walk examined different populations').toBe(
+    styles.elements,
+  );
   const sizes = Object.keys(styles.fontSizes);
   const onText = Object.keys(styles.fontSizesOnText);
   const baseline = await readBaseline(theme);
@@ -141,11 +169,21 @@ test('1. type — conformance REPORTING, drift BLOCKING', async ({ board, theme 
   console.log(
     [
       `[${theme}] type: ${sizes.length} distinct computed font-size values across ${styles.elements} visible elements`,
+      `  scale        : ${styles.scale.join('  ')}`,
       `  all elements : ${tallyLine(styles.fontSizes)}`,
       `  text-bearing (${styles.textElements} elements, ${onText.length} values): ${tallyLine(styles.fontSizesOnText)}`,
       `  ${driftLine(moved)}`,
     ].join('\n'),
   );
+  // BLOCKING as of Phase 2. Asserted before drift, because an off-scale value is the more specific
+  // fault of the two: it says both "this moved" and "where it moved to was never allowed".
+  expect(
+    styles.type.offenders.length,
+    `[${theme}] computed font sizes that are not one of the six steps (${styles.scale.join(', ')}):\n` +
+      `${offScale(styles.type.offenders)}\n` +
+      `  Give the rule a var(--t-*) from the scale. Do NOT add a seventh step — if a surface looks\n` +
+      `  wrong on the nearest step, the surface is wrong. See docs/design-system.md.`,
+  ).toBe(0);
   expectNoDrift(theme, 'font-size', moved);
 });
 

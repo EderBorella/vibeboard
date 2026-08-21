@@ -12,6 +12,12 @@
       "src/**/*.ts",
       "web/src/**/*.ts",
       "web/src/**/*.tsx",
+      // THE STYLESHEETS HAD NO AUTOMATED READER AT ALL until Phase 2 of docs/design-system.md. 1,800
+      // lines of CSS were outside this list, so `npm run lint` was green on a file it never opened —
+      // proven by planting a duplicate property in themes.css, which exited 0. Two of the three rules
+      // it turns out to find can change rendering (`noImportantStyles`, `noDescendingSpecificity`), so
+      // this was not lint noise.
+      "web/src/**/*.css",
       "test/**/*.ts",
       "test/**/*.tsx",
       "vitest.config.ts",
@@ -39,6 +45,13 @@
     "indentWidth": 2,
     "lineWidth": 110
   },
+  // THE CSS LINTER IS WANTED AND THE CSS FORMATTER IS NOT, and adding `web/src/**/*.css` above brings
+  // both. `styles.css` is written as compact one-line rules — its own idiom, and new code has to read
+  // like the code around it — which Biome's CSS formatter cannot express: it took the file from 1,927
+  // to 4,348 lines, so a phase that rewrote 230 font sizes showed a 4,405-line diff and could be
+  // neither reviewed nor reverted. The linter is the half that finds things that change rendering
+  // (`noImportantStyles`, `noDescendingSpecificity`, a duplicate property), and it stays on.
+  "css": { "formatter": { "enabled": false } },
   "javascript": {
     "formatter": {
       "quoteStyle": "single",

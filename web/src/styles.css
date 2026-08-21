@@ -2,9 +2,24 @@
 
 * { box-sizing: border-box; }
 
+/* A UA stylesheet gives every form control its own font-size — 13.3333px in Chromium — which is not a
+   step on the scale and is not the size of the text beside it. Three controls on the board were
+   sitting on it (`.copilot-x`, `.btn-primary`, `.btn-secondary`), and the class of defect is
+   open-ended: any new button that forgets a font-size gets it. Removing the cause rather than
+   patching the three. `font-size` only, not the `font` shorthand: a textarea's UA monospace is a
+   separate decision, and several rules below make it deliberately. A rule that names its own step
+   still wins — a class beats a type selector. */
+button, input, select, textarea { font-size: inherit; }
+
+/* THE DEFAULT IS ON THE SCALE, and it has to be stated here or the scale has a hole in it. Nothing
+   set a body font-size, so every element that did not name one inherited the UA's 16px — 94 of the
+   233 elements the browser measures on the board, and 16px is not a step. Naming it makes `--t-body`
+   what "UI text" means and leaves the rem-based steps untouched, since rem is root-relative and this
+   is not the root. */
 body {
   margin: 0;
   font-family: var(--font-body);
+  font-size: var(--t-body);
   background: var(--bg);
   color: var(--text);
 }
@@ -19,8 +34,16 @@ body {
 
 /* Exactly one viewport tall, clipped — the boards and copilot scroll internally so the
    page itself never scrolls (keeps the copilot input box on screen). dvh handles mobile
-   browser chrome. */
-.app-shell { height: 100vh; height: 100dvh; overflow: hidden; display: flex; flex-direction: column; }
+   browser chrome.
+   `@supports` RATHER THAN TWO `height` DECLARATIONS IN ONE RULE. The pair was the older idiom for
+   the same thing — a browser that does not know `dvh` drops the second at parse time and keeps
+   `100vh` — but written that way it is indistinguishable from an accidental duplicate property, which
+   is what a linter reads it as. Same computed height in both kinds of browser; the intent is now
+   stated instead of inferred. */
+.app-shell { height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+@supports (height: 100dvh) {
+  .app-shell { height: 100dvh; }
+}
 
 /* ---------- Top bar ---------- */
 /* WRAPS RATHER THAN PUSHING ITS CONTROLS OFF THE EDGE.
@@ -30,8 +53,9 @@ body {
    scrolled out of reach. Screenshotted at 820px, which is where it was found.
    Wrapping makes this two rows when it has to be. A taller header at a narrow width is a cost; an
    unreachable control is a dead end. */
-/* BASELINE, not centre. The bar is a row of text at four different sizes — brand 16px, project name
-   13.6px, connection state 11.52px, tab labels 12.48px — and `align-items: center` centres each item's
+/* BASELINE, not centre. The bar is a row of text at four different sizes — brand `--t-lead`, project
+   name `--t-body`, connection state `--t-small`, tab labels `--t-small` (measured before Phase 2
+   collapsed them onto the scale: 16, 13.6, 11.52 and 12.48px) — and `align-items: center` centres each item's
    LINE BOX. A line box scales with its font, so centring boxes of different sizes puts their baselines at
    different heights, which is what the eye actually reads. Measured with a zero-size inline probe (whose
    bottom margin edge sits exactly on the baseline it joins): brand 28.09, name 26.59, state 26.59, tabs
@@ -44,13 +68,17 @@ body {
   flex-wrap: wrap;
   align-items: baseline;
   gap: 0.75rem;
-  padding: 0.55rem 1rem;
+  padding: var(--s-4) 1rem;
   background: linear-gradient(var(--panel), var(--panel));
   border-bottom: 1px solid var(--border);
   position: sticky; top: 0; z-index: 5;
 }
+/* The one thing in the bar that was never sized: it rode the UA's 16px, which is off the scale.
+   `--t-lead` is the nearest step, and it keeps the brand the largest text in the row — which is the
+   hierarchy the baseline alignment below was written to serve. */
 .brand {
   font-family: var(--font-display);
+  font-size: var(--t-lead);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.22em;
@@ -65,7 +93,7 @@ body {
    changes in that commit worked against each other. */
 .project-name {
   color: var(--muted);
-  font-size: 0.85rem;
+  font-size: var(--t-body);
   letter-spacing: 0.02em;
   min-width: 0;
   max-width: 22ch;
@@ -83,7 +111,7 @@ body {
   display: flex;
   align-items: center;
   align-self: center;
-  gap: 0.6rem;
+  gap: var(--s-4);
   flex: 0 0 auto;
 }
 .theme-select, .switch-btn {
@@ -91,8 +119,8 @@ body {
   color: var(--text);
   border: 1px solid var(--border);
   border-radius: 6px;
-  padding: 0.3rem 0.55rem;
-  font-size: 0.76rem;
+  padding: var(--s-2) var(--s-4);
+  font-size: var(--t-small);
   cursor: pointer;
 }
 .switch-btn:hover, .theme-select:hover { border-color: var(--accent); }
@@ -121,9 +149,9 @@ body {
 .conn-status {
   display: inline-flex;
   align-items: baseline;
-  gap: 0.4rem;
+  gap: var(--s-3);
   flex: 0 0 auto;
-  font-size: 0.72rem;
+  font-size: var(--t-small);
   font-family: inherit;
   letter-spacing: 0.04em;
   color: var(--muted);
@@ -137,7 +165,6 @@ body {
      The fixed width exists to stop the TABS moving, not to make the label wander inside it. */
   text-align: left;
 }
-.conn-status:hover .conn-text { color: var(--text); }
 .conn-status:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 3px; }
 .conn-text { width: 12ch; white-space: nowrap; }
 .conn {
@@ -174,6 +201,12 @@ body {
    reason the word is rendered at all. A hex here would be a colour belonging to no theme. */
 .conn-failing .conn { background: var(--accent-2); }
 .conn-failing .conn-text { color: var(--accent-2); }
+/* LAST OF THE `.conn-text` RULES, and the position is the point. At (0,3,0) it outranks every state
+   tint above it and won wherever it was written, so this is a move and not a change — but written
+   first it was a descending-specificity trap: the next person adding a `.conn-<state> .conn-text`
+   above would reasonably expect the later rule to win, and it would not. Hover deliberately drops the
+   state colour: while you are pointing at the indicator it is a control, not a status. */
+.conn-status:hover .conn-text { color: var(--text); }
 
 /* The panel. Anchored under its trigger, left-aligned to it, and deliberately NOT a modal: these
    explain or adjust the thing they hang off, so the context has to stay visible behind them.
@@ -211,14 +244,14 @@ body {
 }
 .conn-pop-head {
   margin: 0 0 0.35rem;
-  font-size: 0.82rem;
+  font-size: var(--t-body);
   font-weight: 600;
   color: var(--text);
   letter-spacing: 0.01em;
 }
 .conn-pop-detail, .conn-pop-next {
   margin: 0;
-  font-size: 0.76rem;
+  font-size: var(--t-small);
   line-height: 1.45;
   color: var(--muted);
 }
@@ -248,37 +281,37 @@ body {
 }
 
 /* ---------- Board ---------- */
-.board { display: flex; flex-direction: column; gap: 0.5rem; }
+.board { display: flex; flex-direction: column; gap: var(--s-4); }
 .board-label {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--s-4);
   width: 100%;
   text-align: left;
   background: transparent;
   border: none;
   border-left: 3px solid var(--accent);
-  padding: 0.15rem 0.6rem;
+  padding: 0.15rem var(--s-4);
   cursor: pointer;
   font-family: var(--font-display);
-  font-size: 0.82rem;
+  font-size: var(--t-body);
   text-transform: uppercase;
   letter-spacing: 0.16em;
   color: var(--text);
 }
 .board-label:hover { color: var(--accent); }
-.board-chevron { color: var(--accent); font-size: 0.7rem; width: 0.8em; }
+.board-chevron { color: var(--accent); font-size: var(--t-micro); width: 0.8em; }
 .board-count {
   color: var(--muted);
-  font-size: 0.7rem;
+  font-size: var(--t-micro);
   letter-spacing: 0;
   background: var(--panel-2);
   border: 1px solid var(--border);
   border-radius: 999px;
-  padding: 0 0.45rem;
+  padding: 0 var(--s-4);
 }
 
-.board-head { display: flex; align-items: center; gap: 0.5rem; }
+.board-head { display: flex; align-items: center; gap: var(--s-4); }
 /* The archive toggle appears only once a board has archived cards, so it never advertises a
    drawer with nothing in it. */
 .board-archive {
@@ -288,9 +321,9 @@ body {
   border-radius: 999px;
   color: var(--muted);
   cursor: pointer;
-  font-size: 0.7rem;
+  font-size: var(--t-micro);
   font-family: var(--font-mono);
-  padding: 0.1rem 0.5rem;
+  padding: 0.1rem var(--s-4);
 }
 .board-archive:hover { color: var(--accent); border-color: var(--accent); }
 .board-archive.active { color: var(--accent); border-color: var(--accent); box-shadow: var(--glow); }
@@ -322,7 +355,7 @@ body {
   gap: 0.7rem;
   align-items: flex-start;
   overflow-x: auto;
-  padding-bottom: 0.35rem;
+  padding-bottom: var(--s-3);
 }
 
 /* ---------- Archive drawer ---------- */
@@ -331,40 +364,40 @@ body {
 .archive-drawer {
   display: flex;
   flex-direction: column;
-  gap: 0.3rem;
+  gap: var(--s-2);
   max-height: 14rem;
   overflow-y: auto;
   background: var(--panel);
   border: 1px dashed var(--border);
   border-radius: var(--radius);
-  padding: 0.5rem;
+  padding: var(--s-4);
 }
-.archive-empty, .archive-error { color: var(--muted); font-size: 0.78rem; }
+.archive-empty, .archive-error { color: var(--muted); font-size: var(--t-small); }
 .archive-error { color: var(--danger); }
 .archive-item {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
+  gap: var(--s-4);
   background: var(--panel-2);
   border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 0.35rem 0.6rem;
+  padding: var(--s-3) var(--s-4);
 }
-.archive-meta { display: flex; align-items: baseline; gap: 0.5rem; flex: 0 0 auto; }
-.archive-when { color: var(--muted); font-size: 0.7rem; font-family: var(--font-mono); }
+.archive-meta { display: flex; align-items: baseline; gap: var(--s-4); flex: 0 0 auto; }
+.archive-when { color: var(--muted); font-size: var(--t-micro); font-family: var(--font-mono); }
 .archive-title {
   flex: 1; min-width: 0; text-align: left;
   background: transparent; border: none; color: var(--text);
-  cursor: pointer; font-size: 0.82rem; font-family: inherit;
+  cursor: pointer; font-size: var(--t-body); font-family: inherit;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .archive-title:hover { color: var(--accent); }
-.archive-actions { display: flex; align-items: center; gap: 0.35rem; flex: 0 0 auto; }
+.archive-actions { display: flex; align-items: center; gap: var(--s-3); flex: 0 0 auto; }
 .archive-restore, .archive-column {
   background: var(--panel); color: var(--text);
   border: 1px solid var(--border); border-radius: 6px;
-  cursor: pointer; font-size: 0.72rem; font-family: inherit;
-  padding: 0.2rem 0.45rem;
+  cursor: pointer; font-size: var(--t-small); font-family: inherit;
+  padding: 0.2rem var(--s-4);
 }
 .archive-restore:hover { border-color: var(--accent); color: var(--accent); }
 .archive-column { color: var(--muted); }
@@ -394,25 +427,25 @@ body {
 .column-head {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 0.65rem;
+  gap: var(--s-4);
+  padding: var(--s-4) 0.65rem;
   border-bottom: 1px solid var(--border);
 }
 .column-title {
   font-family: var(--font-display);
-  font-size: 0.8rem;
+  font-size: var(--t-body);
   text-transform: uppercase;
   letter-spacing: 0.1em;
 }
 .column-title::before { content: "["; color: var(--accent); margin-right: 0.3em; }
 .column-title::after { content: "]"; color: var(--accent); margin-left: 0.3em; }
 .column-count {
-  color: var(--muted); font-size: 0.72rem;
-  background: var(--panel-2); border-radius: 999px; padding: 0 0.4rem;
+  color: var(--muted); font-size: var(--t-small);
+  background: var(--panel-2); border-radius: 999px; padding: 0 var(--s-3);
 }
 .column-add {
   margin-left: auto; background: transparent; color: var(--muted);
-  border: none; font-size: 1.15rem; line-height: 1; cursor: pointer;
+  border: none; font-size: var(--t-title); line-height: 1; cursor: pointer;
 }
 .column-add:hover { color: var(--accent); }
 .column-body {
@@ -425,8 +458,8 @@ body {
   max-height: calc(var(--tile-h) * 3 + var(--tile-gap) * 4);
 }
 .column-empty {
-  color: var(--muted); font-size: 0.78rem; text-align: center;
-  padding: 0.9rem 0.5rem; border: 1px dashed var(--border); border-radius: 8px;
+  color: var(--muted); font-size: var(--t-small); text-align: center;
+  padding: 0.9rem var(--s-4); border: 1px dashed var(--border); border-radius: 8px;
 }
 
 /* ---------- Card tile (fixed size) ---------- */
@@ -438,60 +471,60 @@ body {
   border: 1px solid var(--border);
   border-left: 2px solid var(--accent);
   border-radius: 8px;
-  padding: 0.5rem 0.6rem;
+  padding: var(--s-4) var(--s-4);
   cursor: pointer;
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
 }
 .tile:hover { border-color: var(--accent); box-shadow: var(--glow); }
-.tile-head { display: flex; align-items: center; gap: 0.4rem; }
-.tile-id { font-family: var(--font-mono); font-size: 0.7rem; color: var(--accent); }
-.tile-link { font-size: 0.7rem; color: var(--accent-2); }
+.tile-head { display: flex; align-items: center; gap: var(--s-3); }
+.tile-id { font-family: var(--font-mono); font-size: var(--t-micro); color: var(--accent); }
+.tile-link { font-size: var(--t-micro); color: var(--accent-2); }
 .tile-archive {
   margin-left: auto; background: transparent; border: none;
-  color: var(--muted); cursor: pointer; font-size: 0.8rem;
+  color: var(--muted); cursor: pointer; font-size: var(--t-body);
 }
 .tile-archive:hover { color: var(--danger); }
 .tile-title {
-  font-size: 0.86rem; font-weight: 600; line-height: 1.25;
+  font-size: var(--t-body); font-weight: 600; line-height: 1.25;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
 .tile-summary {
-  color: var(--muted); font-size: 0.76rem; line-height: 1.3;
+  color: var(--muted); font-size: var(--t-small); line-height: 1.3;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
 .tile-group {
-  font-size: 0.64rem; color: var(--accent-2);
+  font-size: var(--t-micro); color: var(--accent-2);
   text-transform: uppercase; letter-spacing: 0.06em;
 }
-.tile-tags { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: auto; overflow: hidden; max-height: 1.3rem; }
+.tile-tags { display: flex; flex-wrap: wrap; gap: var(--s-2); margin-top: auto; overflow: hidden; max-height: 1.3rem; }
 .tag {
-  font-size: 0.64rem; color: var(--muted);
+  font-size: var(--t-micro); color: var(--muted);
   background: var(--panel); border: 1px solid var(--border);
-  border-radius: 999px; padding: 0.02rem 0.4rem;
+  border-radius: 999px; padding: 0.02rem var(--s-3);
 }
 /* A tag on a tile is a real button wherever it can filter the board (CardTile's onTag). */
 .tag-btn { cursor: pointer; font-family: inherit; line-height: inherit; }
 .tag-btn:hover { color: var(--accent); border-color: var(--accent); }
 
 /* ---------- Tag filter bar ---------- */
-.tag-filter { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; }
+.tag-filter { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-3); }
 .tag-chip {
-  display: inline-flex; align-items: center; gap: 0.3rem;
-  font-size: 0.68rem; font-family: var(--font-mono);
+  display: inline-flex; align-items: center; gap: var(--s-2);
+  font-size: var(--t-micro); font-family: var(--font-mono);
   color: var(--muted); background: var(--panel-2);
   border: 1px solid var(--border); border-radius: 999px;
-  padding: 0.1rem 0.5rem; cursor: pointer;
+  padding: 0.1rem var(--s-4); cursor: pointer;
 }
 .tag-chip:hover { color: var(--accent); border-color: var(--accent); }
 .tag-chip.active {
   color: var(--on-fill); background: var(--accent-fill);
   border-color: var(--accent); box-shadow: var(--glow);
 }
-.tag-chip-count { opacity: 0.7; font-size: 0.62rem; }
+.tag-chip-count { opacity: 0.7; font-size: var(--t-micro); }
 .tag-filter-clear {
-  font-size: 0.68rem; color: var(--muted);
+  font-size: var(--t-micro); color: var(--muted);
   background: transparent; border: none; cursor: pointer;
   text-decoration: underline; padding: 0.1rem 0.2rem;
 }
@@ -500,7 +533,7 @@ body {
 /* ---------- Responsive: 3 thresholds on the board area (reacts to copilot too) ---------- */
 @container vbboards (max-width: 720px) {
   .boards { --col-w: 208px; --tile-h: 96px; }
-  .tile-title { font-size: 0.82rem; }
+  .tile-title { font-size: var(--t-body); }
 }
 @container vbboards (min-width: 1160px) {
   .boards { --col-w: 288px; --tile-h: 124px; }
@@ -514,22 +547,22 @@ body {
   border-radius: 12px; padding: 1.5rem;
 }
 .gate-card h2 { margin: 0 0 1rem; font-family: var(--font-display); letter-spacing: 0.04em; }
-.gate-card h3 { margin: 1.5rem 0 0.5rem; font-size: 0.95rem; color: var(--muted); }
-.gate-list { list-style: none; margin: 0 0 1rem; padding: 0; display: flex; flex-direction: column; gap: 0.4rem; }
+.gate-card h3 { margin: 1.5rem 0 0.5rem; font-size: var(--t-lead); color: var(--muted); }
+.gate-list { list-style: none; margin: 0 0 1rem; padding: 0; display: flex; flex-direction: column; gap: var(--s-3); }
 .gate-list button {
   width: 100%; text-align: left; background: var(--panel-2);
-  border: 1px solid var(--border); border-radius: 8px; padding: 0.55rem 0.7rem;
+  border: 1px solid var(--border); border-radius: 8px; padding: var(--s-4) 0.7rem;
   cursor: pointer; color: var(--text); display: flex; flex-direction: column; gap: 0.15rem;
 }
 .gate-list button:hover { border-color: var(--accent); }
 .gate-list-name { font-weight: 600; }
-.gate-list-path { font-size: 0.72rem; color: var(--muted); font-family: var(--font-mono); }
+.gate-list-path { font-size: var(--t-small); color: var(--muted); font-family: var(--font-mono); }
 .gate-field { display: block; margin-top: 0.75rem; }
-.gate-field > span { display: block; font-size: 0.78rem; color: var(--muted); margin-bottom: 0.3rem; }
-.gate-row { display: flex; gap: 0.5rem; }
+.gate-field > span { display: block; font-size: var(--t-small); color: var(--muted); margin-bottom: 0.3rem; }
+.gate-row { display: flex; gap: var(--s-4); }
 .gate input {
   flex: 1; background: var(--bg); border: 1px solid var(--border);
-  border-radius: 6px; padding: 0.5rem 0.6rem; color: var(--text); font-size: 0.85rem;
+  border-radius: 6px; padding: var(--s-4) var(--s-4); color: var(--text); font-size: var(--t-body);
 }
 .gate input:focus { outline: none; border-color: var(--accent); }
 .gate button:not(.gate-list button) {
@@ -537,15 +570,15 @@ body {
   border-radius: 6px; padding: 0 0.9rem; font-weight: 600; cursor: pointer;
 }
 .gate button:disabled { opacity: 0.5; cursor: default; }
-.gate-preview { margin-top: 0.6rem; font-size: 0.78rem; color: var(--muted); }
+.gate-preview { margin-top: 0.6rem; font-size: var(--t-small); color: var(--muted); }
 .gate-preview code { font-family: var(--font-mono); color: var(--accent); }
-.gate-hint { margin-top: 0.3rem; font-size: 0.74rem; line-height: 1.45; color: var(--muted); }
+.gate-hint { margin-top: 0.3rem; font-size: var(--t-small); line-height: 1.45; color: var(--muted); }
 .gate-hint code { font-family: var(--font-mono); }
 .gate-error {
-  margin-top: 1rem; color: var(--danger); font-size: 0.82rem;
+  margin-top: 1rem; color: var(--danger); font-size: var(--t-body);
   background: color-mix(in srgb, var(--danger) 12%, transparent);
   border: 1px solid color-mix(in srgb, var(--danger) 35%, transparent);
-  border-radius: 6px; padding: 0.5rem 0.7rem;
+  border-radius: 6px; padding: var(--s-4) 0.7rem;
 }
 
 /* ---------- Card editor modal ---------- */
@@ -560,50 +593,50 @@ body {
 }
 .modal-head { display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); }
 .modal-title { font-weight: 600; font-family: var(--font-display); letter-spacing: 0.04em; }
-.modal-close { background: transparent; border: none; color: var(--muted); cursor: pointer; font-size: 0.95rem; }
+.modal-close { background: transparent; border: none; color: var(--muted); cursor: pointer; font-size: var(--t-lead); }
 .modal-body { padding: 1rem; overflow-y: auto; display: flex; flex-direction: column; gap: 0.7rem; }
-.field { display: flex; flex-direction: column; gap: 0.3rem; }
-.field > span { font-size: 0.76rem; color: var(--muted); }
+.field { display: flex; flex-direction: column; gap: var(--s-2); }
+.field > span { font-size: var(--t-small); color: var(--muted); }
 .field input, .field textarea {
   background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
-  padding: 0.5rem 0.6rem; color: var(--text); font-size: 0.85rem; font-family: inherit; resize: vertical;
+  padding: var(--s-4) var(--s-4); color: var(--text); font-size: var(--t-body); font-family: inherit; resize: vertical;
 }
 .field input:focus, .field textarea:focus { outline: none; border-color: var(--accent); }
-.raw-area { font-family: var(--font-mono); font-size: 0.8rem; }
-.settings-section { font-family: var(--font-display); text-transform: uppercase; letter-spacing: 0.12em; font-size: 0.78rem; color: var(--accent); margin-top: 0.4rem; border-bottom: 1px solid var(--border); padding-bottom: 0.25rem; }
+.raw-area { font-family: var(--font-mono); font-size: var(--t-body); }
+.settings-section { font-family: var(--font-display); text-transform: uppercase; letter-spacing: 0.12em; font-size: var(--t-small); color: var(--accent); margin-top: 0.4rem; border-bottom: 1px solid var(--border); padding-bottom: var(--s-2); }
 .settings-section:first-child { margin-top: 0; }
-.settings-hint { font-size: 0.74rem; color: var(--muted); font-style: italic; }
+.settings-hint { font-size: var(--t-small); color: var(--muted); font-style: italic; }
 /* A checkbox reads left-to-right: the control, then what it does. The other fields are label-above
    because they hold a value; this one holds a decision. */
-.field-check { flex-direction: row; align-items: center; gap: 0.5rem; }
+.field-check { flex-direction: row; align-items: center; gap: var(--s-4); }
 .field-check input { width: auto; }
 /* A hint says how something works; this says what will be refused. Ochre rather than danger: nothing
    is broken yet, and a save that is about to be rejected must not look like one that already failed. */
 .settings-warn {
-  font-size: 0.76rem; color: var(--text); line-height: 1.55;
+  font-size: var(--t-small); color: var(--text); line-height: 1.55;
   background: color-mix(in srgb, var(--warn, var(--danger)) 10%, transparent);
   border: 1px solid color-mix(in srgb, var(--warn, var(--danger)) 32%, transparent);
-  border-radius: 6px; padding: 0.5rem 0.7rem;
+  border-radius: 6px; padding: var(--s-4) 0.7rem;
 }
-.settings-warn code { font-family: var(--font-mono); font-size: 0.72rem; }
+.settings-warn code { font-family: var(--font-mono); font-size: var(--t-small); }
 /* Each blocker is a sentence naming what to change, so they are set as prose rather than as status
    chips — there is nothing to scan, only something to read and do. */
-.blockers { list-style: none; display: flex; flex-direction: column; gap: 0.3rem; font-size: 0.76rem; }
+.blockers { list-style: none; display: flex; flex-direction: column; gap: var(--s-2); font-size: var(--t-small); }
 .blockers li { padding-left: 0.9rem; position: relative; color: var(--text); line-height: 1.5; }
 .blockers li::before { content: "→"; position: absolute; left: 0; color: var(--warn, var(--danger)); }
-.ready-ok { font-size: 0.76rem; color: var(--accent); }
+.ready-ok { font-size: var(--t-small); color: var(--accent); }
 
 .settings-row { display: flex; gap: 0.75rem; }
 .settings-row .field { flex: 1; }
-.field select { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 0.45rem 0.5rem; color: var(--text); font-size: 0.85rem; }
+.field select { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: var(--s-4) var(--s-4); color: var(--text); font-size: var(--t-body); }
 .field select:focus { outline: none; border-color: var(--accent); }
 
 /* Searchable model picker */
 .mp { position: relative; flex: 1; min-width: 0; }
 .mp-trigger {
-  width: 100%; display: flex; align-items: center; gap: 0.4rem;
+  width: 100%; display: flex; align-items: center; gap: var(--s-3);
   background: var(--bg); color: var(--text); border: 1px solid var(--border);
-  border-radius: 6px; padding: 0.35rem 0.5rem; font-size: 0.78rem; cursor: pointer;
+  border-radius: 6px; padding: var(--s-3) var(--s-4); font-size: var(--t-small); cursor: pointer;
 }
 .mp-trigger:hover:not(:disabled) { border-color: var(--accent); }
 .mp-trigger:disabled { opacity: 0.5; cursor: default; }
@@ -613,13 +646,13 @@ body {
 /* Above every other modal: it can be asked from inside one (deleting a file in Project Control). */
 .confirm-backdrop { z-index: 80; }
 .confirm { max-width: 420px; }
-.confirm-body { margin: 0; font-size: 0.82rem; color: var(--muted); }
-.confirm-actions { display: flex; justify-content: flex-end; gap: 0.5rem; }
+.confirm-body { margin: 0; font-size: var(--t-body); color: var(--muted); }
+.confirm-actions { display: flex; justify-content: flex-end; gap: var(--s-4); }
 .confirm-cancel, .confirm-go {
   background: var(--panel); color: var(--text);
   border: 1px solid var(--border); border-radius: 6px;
-  cursor: pointer; font-size: 0.78rem; font-family: inherit;
-  padding: 0.3rem 0.7rem;
+  cursor: pointer; font-size: var(--t-small); font-family: inherit;
+  padding: var(--s-2) 0.7rem;
 }
 .confirm-cancel:hover { border-color: var(--accent); color: var(--accent); }
 /* The destructive button is the one that looks dangerous; a reversible action keeps the plain style,
@@ -637,113 +670,113 @@ body {
 }
 .mp-modal-head { display: flex; align-items: center; padding: 0.7rem 0.9rem; border-bottom: 1px solid var(--border); }
 .mp-modal-title { font-weight: 700; font-family: var(--font-display); text-transform: uppercase; letter-spacing: 0.12em; }
-.mp-modal-close { margin-left: auto; background: transparent; border: none; color: var(--muted); cursor: pointer; font-size: 0.9rem; }
+.mp-modal-close { margin-left: auto; background: transparent; border: none; color: var(--muted); cursor: pointer; font-size: var(--t-lead); }
 .mp-search {
-  margin: 0.6rem 0.9rem 0.4rem; padding: 0.45rem 0.55rem; background: var(--bg); color: var(--text);
-  border: 1px solid var(--border); border-radius: 6px; font-size: 0.82rem;
+  margin: 0.6rem 0.9rem 0.4rem; padding: var(--s-4) var(--s-4); background: var(--bg); color: var(--text);
+  border: 1px solid var(--border); border-radius: 6px; font-size: var(--t-body);
 }
 .mp-search:focus { outline: none; border-color: var(--accent); }
-.mp-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; padding: 0 0.9rem 0.4rem; }
+.mp-filters { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-3); padding: 0 0.9rem var(--s-3); }
 .mp-chip {
   background: var(--panel-2); color: var(--muted); border: 1px solid var(--border);
-  border-radius: 999px; padding: 0.22rem 0.6rem; font-size: 0.72rem; cursor: pointer;
+  border-radius: 999px; padding: 0.22rem var(--s-4); font-size: var(--t-small); cursor: pointer;
 }
 .mp-chip:hover { border-color: var(--accent); }
 .mp-chip.on { background: var(--accent-fill); color: var(--on-fill); border-color: var(--accent); font-weight: 600; }
-.mp-prov { margin-left: auto; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 0.22rem 0.4rem; font-size: 0.72rem; }
-.mp-count { padding: 0 0.9rem 0.3rem; font-size: 0.66rem; color: var(--muted); font-family: var(--font-mono); }
-.mp-list { flex: 1; overflow-y: auto; padding: 0 0.5rem 0.6rem; }
+.mp-prov { margin-left: auto; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 0.22rem var(--s-3); font-size: var(--t-small); }
+.mp-count { padding: 0 0.9rem var(--s-2); font-size: var(--t-micro); color: var(--muted); font-family: var(--font-mono); }
+.mp-list { flex: 1; overflow-y: auto; padding: 0 var(--s-4) var(--s-4); }
 .mp-item { display: flex; align-items: center; border-radius: 6px; }
 .mp-item:hover, .mp-sel { background: var(--panel-2); }
-.mp-star { background: transparent; border: none; color: var(--accent-2); cursor: pointer; font-size: 0.95rem; padding: 0.3rem 0.35rem; }
+.mp-star { background: transparent; border: none; color: var(--accent-2); cursor: pointer; font-size: var(--t-lead); padding: var(--s-2) var(--s-3); }
 .mp-pick {
   flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.15rem;
   background: transparent; border: none; color: var(--text); cursor: pointer;
-  text-align: left; padding: 0.4rem 0.45rem; font-size: 0.8rem;
+  text-align: left; padding: var(--s-3) var(--s-4); font-size: var(--t-body);
 }
 /* The backend's default is pinned first in the list — mark it so it reads as the safe pick
    rather than just whatever happened to sort to the top. */
 .mp-def { border-left: 2px solid var(--accent); }
 .mp-def-tag {
-  flex: 0 0 auto; font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.08em;
-  color: var(--accent); border: 1px solid var(--accent); border-radius: 999px; padding: 0 0.35rem;
+  flex: 0 0 auto; font-size: var(--t-micro); text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--accent); border: 1px solid var(--accent); border-radius: 999px; padding: 0 var(--s-3);
 }
-.mp-pick-top { display: flex; align-items: baseline; gap: 0.5rem; min-width: 0; }
+.mp-pick-top { display: flex; align-items: baseline; gap: var(--s-4); min-width: 0; }
 .mp-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
-.mp-price { flex: 0 0 auto; font-size: 0.7rem; color: var(--accent-2); font-family: var(--font-mono); }
-.mp-pick-bot { display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
-.mp-id { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-mono); font-size: 0.68rem; color: var(--muted); }
-.mp-badges { flex: 0 0 auto; display: flex; align-items: center; gap: 0.3rem; font-size: 0.72rem; }
-.mp-ctx { font-family: var(--font-mono); font-size: 0.66rem; color: var(--muted); }
+.mp-price { flex: 0 0 auto; font-size: var(--t-micro); color: var(--accent-2); font-family: var(--font-mono); }
+.mp-pick-bot { display: flex; align-items: center; gap: var(--s-4); min-width: 0; }
+.mp-id { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-mono); font-size: var(--t-micro); color: var(--muted); }
+.mp-badges { flex: 0 0 auto; display: flex; align-items: center; gap: var(--s-2); font-size: var(--t-small); }
+.mp-ctx { font-family: var(--font-mono); font-size: var(--t-micro); color: var(--muted); }
 .mp-sel .mp-name { color: var(--accent); }
-.mp-empty { color: var(--muted); font-size: 0.8rem; padding: 0.8rem 0.5rem; font-style: italic; }
+.mp-empty { color: var(--muted); font-size: var(--t-body); padding: 0.8rem var(--s-4); font-style: italic; }
 
 /* Session-override notice: the dock's controls don't write the project default, so say so
    rather than leaving the user to wonder why Settings still shows something else. */
 .copilot-override {
-  display: flex; align-items: center; gap: 0.5rem;
-  font-size: 0.7rem; color: var(--muted);
-  padding: 0.25rem 0.6rem;
+  display: flex; align-items: center; gap: var(--s-4);
+  font-size: var(--t-micro); color: var(--muted);
+  padding: var(--s-2) var(--s-4);
 }
 .copilot-reset {
   margin-left: auto; background: var(--panel-2); color: var(--text);
   border: 1px solid var(--border); border-radius: 6px;
-  cursor: pointer; font-size: 0.68rem; font-family: inherit; padding: 0.1rem 0.4rem;
+  cursor: pointer; font-size: var(--t-micro); font-family: inherit; padding: 0.1rem var(--s-3);
 }
 .copilot-reset:hover { border-color: var(--accent); color: var(--accent); }
 
-.copilot-warn { padding: 0.4rem 0.75rem; font-size: 0.72rem; color: var(--danger); background: color-mix(in srgb, var(--danger) 12%, transparent); border-bottom: 1px solid var(--border); }
-.links-hint { color: var(--muted); font-size: 0.8rem; font-style: italic; }
+.copilot-warn { padding: var(--s-3) 0.75rem; font-size: var(--t-small); color: var(--danger); background: color-mix(in srgb, var(--danger) 12%, transparent); border-bottom: 1px solid var(--border); }
+.links-hint { color: var(--muted); font-size: var(--t-body); font-style: italic; }
 .links-list {
-  display: flex; flex-direction: column; gap: 0.3rem; max-height: 180px; overflow-y: auto;
-  border: 1px solid var(--border); border-radius: 6px; padding: 0.5rem; background: var(--bg);
+  display: flex; flex-direction: column; gap: var(--s-2); max-height: 180px; overflow-y: auto;
+  border: 1px solid var(--border); border-radius: 6px; padding: var(--s-4); background: var(--bg);
 }
-.links-group { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 0.3rem 0 0.1rem; }
+.links-group { font-size: var(--t-micro); text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 0.3rem 0 0.1rem; }
 .links-group:first-child { margin-top: 0; }
-.link-option { display: flex; align-items: center; gap: 0.5rem; font-size: 0.82rem; cursor: pointer; }
+.link-option { display: flex; align-items: center; gap: var(--s-4); font-size: var(--t-body); cursor: pointer; }
 .link-option input { cursor: pointer; }
-.link-id { font-family: var(--font-mono); font-size: 0.72rem; color: var(--accent); }
+.link-id { font-family: var(--font-mono); font-size: var(--t-small); color: var(--accent); }
 .link-title { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* ---------- Card view (read-only tab) ---------- */
 /* `anywhere` rather than `break-word`: only `anywhere` also shrinks the min-content size, so a long
    unbroken token (a path, a URL) cannot stretch the flex items below past the pane. */
-.cardview { display: flex; flex-direction: column; gap: 0.6rem; overflow-wrap: anywhere; }
-.cv-title { font-family: var(--font-display); font-size: 1.25rem; line-height: 1.3; margin: 0; }
+.cardview { display: flex; flex-direction: column; gap: var(--s-4); overflow-wrap: anywhere; }
+.cv-title { font-family: var(--font-display); font-size: var(--t-title); line-height: 1.3; margin: 0; }
 .cv-meta {
-  display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem;
-  font-size: 0.72rem; color: var(--muted); font-family: var(--font-mono);
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-4);
+  font-size: var(--t-small); color: var(--muted); font-family: var(--font-mono);
 }
 .cv-group {
-  color: var(--accent-2); text-transform: uppercase; letter-spacing: 0.06em; font-size: 0.66rem;
+  color: var(--accent-2); text-transform: uppercase; letter-spacing: 0.06em; font-size: var(--t-micro);
 }
-.cv-tags { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.cv-tags { display: flex; flex-wrap: wrap; gap: var(--s-2); }
 .cv-desc {
   margin: 0; padding-left: 0.7rem; border-left: 3px solid var(--accent);
-  color: var(--text); font-size: 0.9rem; line-height: 1.5;
+  color: var(--text); font-size: var(--t-lead); line-height: 1.5;
 }
-.cv-links { display: flex; flex-direction: column; gap: 0.25rem; }
-.cv-label { font-size: 0.72rem; color: var(--muted); }
-.cv-link { display: flex; gap: 0.5rem; align-items: baseline; font-size: 0.82rem; }
+.cv-links { display: flex; flex-direction: column; gap: var(--s-2); }
+.cv-label { font-size: var(--t-small); color: var(--muted); }
+.cv-link { display: flex; gap: var(--s-4); align-items: baseline; font-size: var(--t-body); }
 /* A link is a button wherever it can actually open the card (CardView's onOpenCard). */
 .cv-link-btn {
   background: transparent; border: 1px solid transparent; border-radius: 6px;
   color: inherit; cursor: pointer; font: inherit; text-align: left;
-  padding: 0.1rem 0.35rem; width: fit-content;
+  padding: 0.1rem var(--s-3); width: fit-content;
 }
 .cv-link-btn:hover { border-color: var(--accent); }
 .cv-link-btn:hover .link-title { color: var(--accent); }
-.cv-body { border-top: 1px solid var(--border); padding-top: 0.4rem; }
-.cv-nobody { color: var(--muted); font-size: 0.82rem; font-style: italic; }
+.cv-body { border-top: 1px solid var(--border); padding-top: var(--s-3); }
+.cv-nobody { color: var(--muted); font-size: var(--t-body); font-style: italic; }
 
 .modal-error {
-  color: var(--danger); font-size: 0.82rem;
+  color: var(--danger); font-size: var(--t-body);
   background: color-mix(in srgb, var(--danger) 12%, transparent);
   border: 1px solid color-mix(in srgb, var(--danger) 35%, transparent);
-  border-radius: 6px; padding: 0.5rem 0.7rem;
+  border-radius: 6px; padding: var(--s-4) 0.7rem;
 }
-.modal-foot { display: flex; justify-content: flex-end; gap: 0.5rem; padding: 0.75rem 1rem; border-top: 1px solid var(--border); }
-.btn-primary { background: var(--accent-fill); color: var(--on-fill); border: none; border-radius: 6px; padding: 0.45rem 1rem; font-weight: 600; cursor: pointer; }
-.btn-secondary { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 0.45rem 1rem; cursor: pointer; }
+.modal-foot { display: flex; justify-content: flex-end; gap: var(--s-4); padding: 0.75rem 1rem; border-top: 1px solid var(--border); }
+.btn-primary { background: var(--accent-fill); color: var(--on-fill); border: none; border-radius: 6px; padding: var(--s-4) 1rem; font-weight: 600; cursor: pointer; }
+.btn-secondary { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: var(--s-4) 1rem; cursor: pointer; }
 .btn-primary:disabled, .btn-secondary:disabled { opacity: 0.5; cursor: default; }
 
 /* A REFRESH IS NOT THE MAIN ACTION IN ITS PANE, and it was being drawn as one. `.diary-refresh` had no
@@ -761,24 +794,24 @@ body {
   border-top: 1px solid var(--border);
   background: var(--panel);
 }
-.dock-strip { display: flex; align-items: center; gap: 0.25rem; padding: 0.3rem 0.6rem; }
+.dock-strip { display: flex; align-items: center; gap: var(--s-2); padding: var(--s-2) var(--s-4); }
 .dock-tab {
-  display: inline-flex; align-items: center; gap: 0.35rem;
+  display: inline-flex; align-items: center; gap: var(--s-3);
   background: transparent; border: 1px solid transparent; color: var(--muted);
-  border-radius: 6px; padding: 0.2rem 0.6rem; cursor: pointer;
-  font-family: var(--font-display); font-size: 0.78rem;
+  border-radius: 6px; padding: 0.2rem var(--s-4); cursor: pointer;
+  font-family: var(--font-display); font-size: var(--t-small);
   text-transform: uppercase; letter-spacing: 0.08em;
 }
 .dock-tab:hover { color: var(--text); }
 .dock-tab.active { color: var(--text); background: var(--panel-2); border-color: var(--border); }
 .dock-badge {
-  font-family: var(--font-mono); font-size: 0.64rem; letter-spacing: 0;
+  font-family: var(--font-mono); font-size: var(--t-micro); letter-spacing: 0;
   background: var(--bg); border: 1px solid var(--border); border-radius: 999px;
-  padding: 0 0.32rem;
+  padding: 0 var(--s-3);
 }
 .dock-collapse {
   margin-left: auto; background: transparent; border: none;
-  color: var(--muted); cursor: pointer; font-size: 0.85rem; padding: 0 0.3rem;
+  color: var(--muted); cursor: pointer; font-size: var(--t-body); padding: 0 var(--s-2);
 }
 .dock-collapse:hover { color: var(--accent); }
 /* SIZED BY ITS CONTENT, capped at 38vh — EXCEPT where a pane exists to be filled.
@@ -803,8 +836,8 @@ body {
 /* Cards pane */
 .cards-pane { flex: 1; min-width: 0; display: flex; flex-direction: column; min-height: 0; }
 .cards-tabs {
-  display: flex; align-items: center; gap: 0.3rem;
-  padding: 0 0.6rem 0.35rem; overflow-x: auto;
+  display: flex; align-items: center; gap: var(--s-2);
+  padding: 0 var(--s-4) var(--s-3); overflow-x: auto;
   border-bottom: 1px solid var(--border);
 }
 .cards-tab {
@@ -815,44 +848,44 @@ body {
 .cards-tab.active { border-color: var(--accent); box-shadow: var(--glow); }
 .cards-tab-label {
   background: transparent; border: none; color: var(--muted); cursor: pointer;
-  font-size: 0.76rem; padding: 0.18rem 0.1rem 0.18rem 0.5rem;
+  font-size: var(--t-small); padding: 0.18rem 0.1rem 0.18rem var(--s-4);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .cards-tab.active .cards-tab-label { color: var(--text); }
 .cards-tab-x {
   background: transparent; border: none; color: var(--muted);
-  cursor: pointer; font-size: 0.7rem; padding: 0.18rem 0.4rem;
+  cursor: pointer; font-size: var(--t-micro); padding: 0.18rem var(--s-3);
 }
 .cards-tab-x:hover { color: var(--danger); }
 .cards-main { flex: 1; min-height: 0; display: flex; }
 .cards-body { flex: 1; min-width: 0; overflow-y: auto; padding: 0.7rem 1rem; }
-.cards-gone { color: var(--muted); font-size: 0.82rem; font-style: italic; padding: 1rem 0; }
+.cards-gone { color: var(--muted); font-size: var(--t-body); font-style: italic; padding: 1rem 0; }
 
 /* Card action rail. Fixed width so the card body keeps a predictable measure whichever card is up. */
 .card-skills {
   flex: 0 0 11rem; min-width: 0; overflow-y: auto;
-  display: flex; flex-direction: column; gap: 0.35rem;
-  padding: 0.7rem 0.6rem; border-left: 1px solid var(--border); background: var(--panel-2);
+  display: flex; flex-direction: column; gap: var(--s-3);
+  padding: 0.7rem var(--s-4); border-left: 1px solid var(--border); background: var(--panel-2);
 }
 .cs-head {
-  margin: 0 0 0.1rem; font-family: var(--font-display); font-size: 0.72rem;
+  margin: 0 0 0.1rem; font-family: var(--font-display); font-size: var(--t-small);
   text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted);
 }
 .cs-action {
   background: var(--panel); color: var(--text); border: 1px solid var(--border);
-  border-radius: 6px; padding: 0.32rem 0.6rem; font-size: 0.8rem; text-align: left;
+  border-radius: 6px; padding: var(--s-3) var(--s-4); font-size: var(--t-body); text-align: left;
   cursor: pointer;
 }
 .cs-action:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
 .cs-action:disabled { opacity: 0.45; cursor: default; }
-.cs-empty { margin: 0.2rem 0 0; font-size: 0.7rem; color: var(--muted); line-height: 1.4; }
-.cs-invalid { margin: 0.3rem 0 0; font-size: 0.7rem; color: var(--danger); cursor: help; }
+.cs-empty { margin: 0.2rem 0 0; font-size: var(--t-micro); color: var(--muted); line-height: 1.4; }
+.cs-invalid { margin: 0.3rem 0 0; font-size: var(--t-micro); color: var(--danger); cursor: help; }
 
 /* Inline editing: a field looks like text until hovered, and becomes an input on click. */
 .inline-view {
   background: transparent; border: 1px solid transparent; border-radius: 6px;
   color: inherit; font: inherit; text-align: left; cursor: text;
-  padding: 0.1rem 0.35rem; margin: -0.1rem -0.35rem; width: 100%;
+  padding: 0.1rem var(--s-3); margin: -0.1rem -0.35rem; width: 100%;
   display: block;
   /* A <button> is a flex item whose automatic minimum size is its content on ONE line, and that
      beats width:100% — which is why an editable description ran off the pane while the body (a div)
@@ -860,36 +893,36 @@ body {
   min-width: 0;
 }
 .inline-view:hover { border-color: var(--border); background: var(--bg); }
-.inline-empty { color: var(--muted); font-style: italic; font-size: 0.8rem; }
+.inline-empty { color: var(--muted); font-style: italic; font-size: var(--t-body); }
 .inline-edit {
   width: 100%; background: var(--bg); color: var(--text);
   border: 1px solid var(--accent); border-radius: 6px;
-  padding: 0.1rem 0.35rem; font: inherit; font-family: inherit; resize: vertical;
+  padding: 0.1rem var(--s-3); font: inherit; font-family: inherit; resize: vertical;
 }
 .inline-edit:focus { outline: none; }
 /* The title keeps its display face while editable. */
-.cv-title.inline-view, .cv-title.inline-edit { font-family: var(--font-display); font-size: 1.25rem; }
+.cv-title.inline-view, .cv-title.inline-edit { font-family: var(--font-display); font-size: var(--t-title); }
 .cv-group.inline-view { width: auto; display: inline-block; }
 .cv-tags-edit { min-height: 1.4rem; }
-.cv-links .cv-label { display: flex; align-items: center; gap: 0.5rem; }
+.cv-links .cv-label { display: flex; align-items: center; gap: var(--s-4); }
 .cv-link-edit {
   background: transparent; border: none; color: var(--muted);
-  cursor: pointer; font-size: 0.7rem; text-decoration: underline; padding: 0;
+  cursor: pointer; font-size: var(--t-micro); text-decoration: underline; padding: 0;
 }
 .cv-link-edit:hover { color: var(--accent); }
 
 /* Raw pane (the card's file, inside the dock) */
-.raw-pane { flex: 1; display: flex; flex-direction: column; gap: 0.4rem; min-height: 0; }
+.raw-pane { flex: 1; display: flex; flex-direction: column; gap: var(--s-3); min-height: 0; }
 /* 8rem was the floor a collapsed flex parent left it sitting on. It is the FLOOR, not the size — the
    `flex: 1` above is what makes it fill — but a floor you can actually edit in is worth having for any
    context where the parent has no height to give. */
 .raw-pane .raw-area { flex: 1; min-height: 14rem; }
-.raw-foot { display: flex; align-items: center; justify-content: flex-end; gap: 0.6rem; }
-.raw-error { color: var(--danger); font-size: 0.78rem; margin-right: auto; }
+.raw-foot { display: flex; align-items: center; justify-content: flex-end; gap: var(--s-4); }
+.raw-error { color: var(--danger); font-size: var(--t-small); margin-right: auto; }
 .cards-raw {
   margin-left: auto; flex: 0 0 auto;
   background: var(--panel-2); color: var(--text); border: 1px solid var(--border);
-  border-radius: 6px; padding: 0.18rem 0.7rem; cursor: pointer; font-size: 0.76rem;
+  border-radius: 6px; padding: 0.18rem 0.7rem; cursor: pointer; font-size: var(--t-small);
 }
 .cards-raw:hover { border-color: var(--accent); color: var(--accent); }
 .cards-raw.active { background: var(--accent-fill); color: var(--on-fill); border-color: var(--accent); }
@@ -904,97 +937,108 @@ body {
   background: var(--panel);
   min-height: 0;
 }
-.copilot-head { display: flex; align-items: center; gap: 0.5rem; padding: 0.55rem 0.75rem; border-bottom: 1px solid var(--border); }
+.copilot-head { display: flex; align-items: center; gap: var(--s-4); padding: var(--s-4) 0.75rem; border-bottom: 1px solid var(--border); }
 .copilot-title { font-weight: 700; font-family: var(--font-display); text-transform: uppercase; letter-spacing: 0.14em; }
 .copilot-title::before { content: "◈ "; color: var(--accent); }
-.copilot-model { font-size: 0.68rem; color: var(--muted); font-family: var(--font-mono); }
+.copilot-model { font-size: var(--t-micro); color: var(--muted); font-family: var(--font-mono); }
 .copilot-x { margin-left: auto; background: transparent; border: none; color: var(--muted); cursor: pointer; }
 .backend-toggle { display: flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
-.bt-btn { background: var(--panel-2); color: var(--muted); border: none; border-right: 1px solid var(--border); padding: 0.18rem 0.5rem; font-size: 0.68rem; cursor: pointer; }
+.bt-btn { background: var(--panel-2); color: var(--muted); border: none; border-right: 1px solid var(--border); padding: 0.18rem var(--s-4); font-size: var(--t-micro); cursor: pointer; }
 .bt-btn:last-child { border-right: none; }
 .bt-btn.active { background: var(--accent-fill); color: var(--on-fill); font-weight: 600; }
 .bt-btn:disabled { opacity: 0.6; cursor: default; }
 /* The same control in a form rather than a dense row. Settings used to render its own button group at
    this size, from its own list; the scale was the ONLY thing the two copies disagreed about that was
    deliberate — the label was drift. */
-.backend-toggle-md .bt-btn { padding: 0.25rem 0.45rem; font-size: 0.72rem; }
+.backend-toggle-md .bt-btn { padding: var(--s-2) var(--s-4); font-size: var(--t-small); }
 
 /* Chat switcher */
-.copilot-chatbar { display: flex; align-items: center; gap: 0.4rem; padding: 0.4rem 0.75rem; border-bottom: 1px solid var(--border); }
+.copilot-chatbar { display: flex; align-items: center; gap: var(--s-3); padding: var(--s-3) 0.75rem; border-bottom: 1px solid var(--border); }
 .chat-switcher { position: relative; flex: 1; min-width: 0; }
-.chat-current { display: flex; align-items: center; gap: 0.4rem; width: 100%; background: var(--panel-2); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 0.28rem 0.5rem; font-size: 0.74rem; cursor: pointer; }
+.chat-current { display: flex; align-items: center; gap: var(--s-3); width: 100%; background: var(--panel-2); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: var(--s-2) var(--s-4); font-size: var(--t-small); cursor: pointer; }
 .chat-current:hover:not(:disabled) { border-color: var(--accent); }
 .chat-current:disabled { opacity: 0.5; cursor: default; }
 .chat-current-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
-.chat-caret { color: var(--accent); font-size: 0.65rem; }
-.chat-new { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 0.28rem 0.55rem; font-size: 0.74rem; cursor: pointer; white-space: nowrap; }
+.chat-caret { color: var(--accent); font-size: var(--t-micro); }
+.chat-new { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: var(--s-2) var(--s-4); font-size: var(--t-small); cursor: pointer; white-space: nowrap; }
 .chat-new:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
 .chat-new:disabled { opacity: 0.5; cursor: default; }
 .chat-menu-backdrop { position: fixed; inset: 0; z-index: 20; }
-.chat-menu { position: absolute; z-index: 21; top: calc(100% + 4px); left: 0; right: 0; max-height: 320px; overflow-y: auto; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; box-shadow: var(--glow), 0 6px 24px rgba(0,0,0,0.4); padding: 0.25rem; }
-.chat-menu-empty { padding: 0.5rem 0.6rem; font-size: 0.74rem; color: var(--muted); }
-.chat-menu-item { display: flex; align-items: stretch; gap: 0.25rem; border-radius: 6px; }
+.chat-menu { position: absolute; z-index: 21; top: calc(100% + 4px); left: 0; right: 0; max-height: 320px; overflow-y: auto; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; box-shadow: var(--glow), 0 6px 24px rgba(0,0,0,0.4); padding: var(--s-2); }
+.chat-menu-empty { padding: var(--s-4) var(--s-4); font-size: var(--t-small); color: var(--muted); }
+.chat-menu-item { display: flex; align-items: stretch; gap: var(--s-2); border-radius: 6px; }
 .chat-menu-item.active { background: var(--panel-2); }
 .chat-menu-item:hover { background: var(--panel-2); }
-.chat-menu-open { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.1rem; background: transparent; border: none; color: var(--text); text-align: left; padding: 0.4rem 0.5rem; cursor: pointer; }
+.chat-menu-open { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.1rem; background: transparent; border: none; color: var(--text); text-align: left; padding: var(--s-3) var(--s-4); cursor: pointer; }
 .chat-menu-item.active .chat-menu-open { border-left: 2px solid var(--accent); }
-.chat-menu-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.76rem; }
+.chat-menu-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--t-small); }
 .chat-backend {
-  display: inline-block; margin-right: 0.4rem; padding: 0.02rem 0.35rem; border-radius: 999px;
-  font-size: 0.58rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; vertical-align: middle;
+  display: inline-block; margin-right: 0.4rem; padding: 0.02rem var(--s-3); border-radius: 999px;
+  font-size: var(--t-micro); font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; vertical-align: middle;
   border: 1px solid var(--border);
 }
 .chat-backend.bk-claude-code { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 50%, transparent); }
 .chat-backend.bk-opencode { color: var(--accent-2); border-color: color-mix(in srgb, var(--accent-2) 50%, transparent); }
-.chat-menu-meta { font-size: 0.64rem; color: var(--muted); font-family: var(--font-mono); }
-.chat-del { background: transparent; border: none; color: var(--muted); cursor: pointer; padding: 0 0.5rem; font-size: 0.72rem; }
+.chat-menu-meta { font-size: var(--t-micro); color: var(--muted); font-family: var(--font-mono); }
+.chat-del { background: transparent; border: none; color: var(--muted); cursor: pointer; padding: 0 var(--s-4); font-size: var(--t-small); }
 .chat-del:hover { color: var(--accent-2); }
 
-.copilot-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); }
+.copilot-controls { display: flex; align-items: center; flex-wrap: wrap; gap: var(--s-4); padding: var(--s-4) 0.75rem; border-bottom: 1px solid var(--border); }
 .mode-group { display: flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
-.mode-btn { background: var(--panel-2); color: var(--muted); border: none; border-right: 1px solid var(--border); padding: 0.25rem 0.45rem; font-size: 0.72rem; cursor: pointer; }
+.mode-btn { background: var(--panel-2); color: var(--muted); border: none; border-right: 1px solid var(--border); padding: var(--s-2) var(--s-4); font-size: var(--t-small); cursor: pointer; }
 .mode-btn:last-child { border-right: none; }
 .mode-btn.active { background: var(--accent-fill); color: var(--on-fill); font-weight: 600; }
 .mode-btn:disabled { opacity: 0.6; cursor: default; }
-.copilot-actions { margin-left: auto; display: flex; gap: 0.3rem; }
-.copilot-actions button { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 0.25rem 0.55rem; font-size: 0.75rem; cursor: pointer; }
+.copilot-actions { margin-left: auto; display: flex; gap: var(--s-2); }
+.copilot-actions button { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: var(--s-2) var(--s-4); font-size: var(--t-small); cursor: pointer; }
 .copilot-actions button:disabled { opacity: 0.5; cursor: default; }
-.copilot-selects { display: flex; gap: 0.5rem; padding: 0 0.75rem 0.5rem; border-bottom: 1px solid var(--border); }
-.copilot-selects select { flex: 1; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 0.3rem 0.4rem; font-size: 0.76rem; }
+.copilot-selects { display: flex; gap: var(--s-4); padding: 0 0.75rem var(--s-4); border-bottom: 1px solid var(--border); }
+.copilot-selects select { flex: 1; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: var(--s-2) var(--s-3); font-size: var(--t-small); }
 .copilot-selects select:disabled { opacity: 0.5; }
-.copilot-status { display: flex; align-items: center; gap: 0.4rem; padding: 0.3rem 0.75rem; font-size: 0.7rem; color: var(--muted); border-bottom: 1px solid var(--border); }
+.copilot-status { display: flex; align-items: center; gap: var(--s-3); padding: var(--s-2) 0.75rem; font-size: var(--t-micro); color: var(--muted); border-bottom: 1px solid var(--border); }
 .copilot-status .status-dot { width: 8px; height: 8px; border-radius: 50%; }
 .copilot-status.ok .status-dot { background: var(--accent); box-shadow: var(--glow); }
 .copilot-status.down .status-dot { background: var(--danger); }
 .copilot-status.down { color: var(--danger); }
-.copilot-body { flex: 1; overflow-y: auto; padding: 0.75rem; display: flex; flex-direction: column; gap: 0.5rem; }
-.copilot-empty { color: var(--muted); font-size: 0.82rem; line-height: 1.5; }
-.msg { font-size: 0.85rem; line-height: 1.45; white-space: pre-wrap; word-break: break-word; }
-.msg-user { align-self: flex-end; background: var(--accent-fill); color: var(--on-fill); padding: 0.4rem 0.6rem; border-radius: 10px 10px 2px 10px; max-width: 85%; }
-.msg-assistant { background: var(--panel-2); border: 1px solid var(--border); padding: 0.4rem 0.6rem; border-radius: 10px 10px 10px 2px; max-width: 90%; }
-.msg-thinking { color: var(--muted); font-style: italic; font-size: 0.78rem; }
-.msg-tool { color: var(--accent); font-family: var(--font-mono); font-size: 0.76rem; }
-.msg-error { color: var(--danger); font-size: 0.8rem; }
+.copilot-body { flex: 1; overflow-y: auto; padding: 0.75rem; display: flex; flex-direction: column; gap: var(--s-4); }
+.copilot-empty { color: var(--muted); font-size: var(--t-body); line-height: 1.5; }
+.msg { font-size: var(--t-body); line-height: 1.45; white-space: pre-wrap; word-break: break-word; }
+.msg-user { align-self: flex-end; background: var(--accent-fill); color: var(--on-fill); padding: var(--s-3) var(--s-4); border-radius: 10px 10px 2px 10px; max-width: 85%; }
+.msg-assistant { background: var(--panel-2); border: 1px solid var(--border); padding: var(--s-3) var(--s-4); border-radius: 10px 10px 10px 2px; max-width: 90%; }
+.msg-thinking { color: var(--muted); font-style: italic; font-size: var(--t-small); }
+.msg-tool { color: var(--accent); font-family: var(--font-mono); font-size: var(--t-small); }
+.msg-error { color: var(--danger); font-size: var(--t-body); }
 .msg-running { color: var(--muted); font-style: italic; }
-.copilot-readout { display: flex; align-items: center; gap: 0.75rem; padding: 0.4rem 0.75rem; border-top: 1px solid var(--border); font-size: 0.72rem; color: var(--muted); }
-.ctx { margin-left: auto; display: flex; align-items: center; gap: 0.4rem; }
+.copilot-readout { display: flex; align-items: center; gap: 0.75rem; padding: var(--s-3) 0.75rem; border-top: 1px solid var(--border); font-size: var(--t-small); color: var(--muted); }
+.ctx { margin-left: auto; display: flex; align-items: center; gap: var(--s-3); }
 .ctx-bar { width: 60px; height: 5px; background: var(--panel-2); border-radius: 3px; overflow: hidden; }
 .ctx-fill { display: block; height: 100%; background: var(--accent); }
 .ctx-warn { color: var(--accent-2); }
 .ctx-warn .ctx-fill { background: var(--accent-2); }
-.copilot-input { display: flex; gap: 0.5rem; padding: 0.6rem 0.75rem; border-top: 1px solid var(--border); }
-.copilot-input textarea { flex: 1; resize: none; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 0.5rem; color: var(--text); font-family: inherit; font-size: 0.85rem; }
+.copilot-input { display: flex; gap: var(--s-4); padding: var(--s-4) 0.75rem; border-top: 1px solid var(--border); }
+.copilot-input textarea { flex: 1; resize: none; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: var(--s-4); color: var(--text); font-family: inherit; font-size: var(--t-body); }
 .copilot-input textarea:focus { outline: none; border-color: var(--accent); }
 
+/* A USER-PREFERENCE OVERRIDE IS THE ONE PLACE `!important` IS THE MECHANISM AND NOT A SHORTCUT.
+   `*` has specificity (0,0,0), so every class in this file outranks it; without `!important` this rule
+   would lose to the first animated class and the whole guarantee would be decorative. It is a blanket
+   catch for animations added later — `.ap-dot-running`, the only one in the file today, is also
+   stopped specifically further down — so narrowing the selector to raise its specificity would defeat
+   the point of having it. */
 @media (prefers-reduced-motion: reduce) {
-  * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  * {
+    /* biome-ignore lint/complexity/noImportantStyles: `*` is specificity (0,0,0) and every animated class outranks it — see above */
+    animation-duration: 0.01ms !important;
+    /* biome-ignore lint/complexity/noImportantStyles: `*` is specificity (0,0,0) and every transitioned class outranks it — see above */
+    transition-duration: 0.01ms !important;
+  }
 }
 
 /* ---------- Top tabs (Boards | Project Control) ---------- */
-.topbar-tabs { display: flex; gap: 0.25rem; margin-left: 0.5rem; }
+.topbar-tabs { display: flex; gap: var(--s-2); margin-left: 0.5rem; }
 .tab-btn {
   background: transparent; color: var(--muted); border: 1px solid transparent;
-  border-radius: 6px; padding: 0.3rem 0.7rem; font-size: 0.78rem; cursor: pointer;
+  border-radius: 6px; padding: var(--s-2) 0.7rem; font-size: var(--t-small); cursor: pointer;
   font-family: var(--font-display); letter-spacing: 0.04em;
 }
 .tab-btn:hover { color: var(--text); }
@@ -1010,23 +1054,23 @@ body {
 .control-group-head {
   display: flex; align-items: center; justify-content: space-between;
   font-family: var(--font-display); text-transform: uppercase; letter-spacing: 0.12em;
-  font-size: 0.68rem; color: var(--muted); padding: 0 0.15rem 0.15rem;
+  font-size: var(--t-micro); color: var(--muted); padding: 0 0.15rem 0.15rem;
 }
 .control-new {
   background: transparent; border: none; color: var(--accent); cursor: pointer;
-  font-size: 0.95rem; line-height: 1; padding: 0 0.2rem;
+  font-size: var(--t-lead); line-height: 1; padding: 0 0.2rem;
 }
 .control-item {
-  display: flex; align-items: center; gap: 0.4rem; width: 100%; text-align: left;
+  display: flex; align-items: center; gap: var(--s-3); width: 100%; text-align: left;
   background: transparent; color: var(--text); border: 1px solid transparent;
-  border-radius: 6px; padding: 0.35rem 0.5rem; font-size: 0.8rem; cursor: pointer;
+  border-radius: 6px; padding: var(--s-3) var(--s-4); font-size: var(--t-body); cursor: pointer;
 }
 .control-item:hover { background: var(--panel-2); }
 .control-item.active { background: var(--panel-2); border-color: var(--accent); color: var(--accent); }
 .control-item-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .control-tag {
-  font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--accent-2);
-  border: 1px solid var(--border); border-radius: 4px; padding: 0.05rem 0.3rem;
+  font-size: var(--t-micro); text-transform: uppercase; letter-spacing: 0.08em; color: var(--accent-2);
+  border: 1px solid var(--border); border-radius: 4px; padding: 0.05rem var(--s-2);
 }
 /* Where the dragged card will land. Sits in the gap between tiles. */
 .drop-line {
@@ -1034,20 +1078,20 @@ body {
   background: var(--accent); box-shadow: var(--glow);
 }
 
-.control-empty { color: var(--muted); font-size: 0.72rem; padding: 0 0.5rem; }
+.control-empty { color: var(--muted); font-size: var(--t-small); padding: 0 var(--s-4); }
 
 /* The Explorer's tree. One flat list of rows indented by depth, not nested elements, so tab order
    and reading order are the same thing. Wider than the control list: paths run deep. */
 .explorer-list { width: 320px; gap: 0.1rem; }
 .explorer-head { position: sticky; top: -0.75rem; background: var(--wash); z-index: 1; padding-top: 0.15rem; }
-.explorer-item { padding-right: 0.4rem; gap: 0.25rem; }
+.explorer-item { padding-right: var(--s-3); gap: var(--s-2); }
 /* Fixed width so names line up whether or not a row has a twisty. */
-.explorer-twist { width: 0.7rem; flex-shrink: 0; color: var(--muted); font-size: 0.65rem; }
-.explorer-icon { flex-shrink: 0; font-size: 0.72rem; }
-.explorer-size { flex-shrink: 0; color: var(--muted); font-size: 0.65rem; font-family: var(--font-mono); }
+.explorer-twist { width: 0.7rem; flex-shrink: 0; color: var(--muted); font-size: var(--t-micro); }
+.explorer-icon { flex-shrink: 0; font-size: var(--t-small); }
+.explorer-size { flex-shrink: 0; color: var(--muted); font-size: var(--t-micro); font-family: var(--font-mono); }
 /* The tail of a capped listing. Deliberately not styled as an error — the folder is fine, the
    listing is simply not all of it. */
-.explorer-more { color: var(--muted); font-size: 0.68rem; font-style: italic; padding: 0.2rem 0.5rem; }
+.explorer-more { color: var(--muted); font-size: var(--t-micro); font-style: italic; padding: 0.2rem var(--s-4); }
 .explorer-actions { display: flex; gap: 0.1rem; }
 .explorer-actions button:disabled { opacity: 0.3; cursor: not-allowed; }
 /* Where a dragged entry would land. */
@@ -1055,12 +1099,12 @@ body {
 
 /* Typed confirmation: for the actions that destroy more than the one thing they name. */
 .confirm-require {
-  display: flex; flex-direction: column; gap: 0.3rem;
-  font-size: 0.78rem; color: var(--muted); margin-bottom: 0.9rem;
+  display: flex; flex-direction: column; gap: var(--s-2);
+  font-size: var(--t-small); color: var(--muted); margin-bottom: 0.9rem;
 }
 .confirm-input {
   background: var(--bg); color: var(--text); border: 1px solid var(--border);
-  border-radius: 6px; padding: 0.4rem 0.6rem; font-family: var(--font-mono); font-size: 0.8rem;
+  border-radius: 6px; padding: var(--s-3) var(--s-4); font-family: var(--font-mono); font-size: var(--t-body);
 }
 .confirm-input:focus { outline: none; border-color: var(--accent); }
 .confirm-go:disabled { opacity: 0.45; cursor: not-allowed; }
@@ -1068,52 +1112,57 @@ body {
 .control-rename {
   width: 100%; background: var(--bg); color: var(--text);
   border: 1px solid var(--accent); border-radius: 6px;
-  padding: 0.35rem 0.5rem; font-size: 0.8rem; font-family: inherit;
+  padding: var(--s-3) var(--s-4); font-size: var(--t-body); font-family: inherit;
 }
 .control-rename:focus { outline: none; box-shadow: var(--glow); }
 
 .control-editor { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
 .control-editor-head {
-  display: flex; align-items: center; gap: 0.5rem; padding: 0.55rem 0.9rem;
+  display: flex; align-items: center; gap: var(--s-4); padding: var(--s-4) 0.9rem;
   border-bottom: 1px solid var(--border); background: var(--panel);
 }
-.control-editor-path { font-family: var(--font-mono); font-size: 0.76rem; color: var(--muted); }
-.control-tabs { display: flex; gap: 0.25rem; margin-left: 0.5rem; }
+.control-editor-path { font-family: var(--font-mono); font-size: var(--t-small); color: var(--muted); }
+.control-tabs { display: flex; gap: var(--s-2); margin-left: 0.5rem; }
 .control-tabs button {
   background: var(--panel-2); color: var(--muted); border: 1px solid var(--border);
-  border-radius: 6px; padding: 0.2rem 0.6rem; font-size: 0.74rem; cursor: pointer;
+  border-radius: 6px; padding: 0.2rem var(--s-4); font-size: var(--t-small); cursor: pointer;
 }
 .control-tabs button.active { color: var(--text); border-color: var(--accent); }
-.control-editor-actions { margin-left: auto; display: flex; gap: 0.4rem; }
+.control-editor-actions { margin-left: auto; display: flex; gap: var(--s-3); }
 .btn-danger {
   background: transparent; color: var(--danger); border: 1px solid var(--border);
-  border-radius: 6px; padding: 0.35rem 0.8rem; font-size: 0.78rem; cursor: pointer;
+  border-radius: 6px; padding: var(--s-3) 0.8rem; font-size: var(--t-small); cursor: pointer;
 }
 .btn-danger:hover { border-color: var(--danger); }
 .btn-danger:disabled { opacity: 0.5; cursor: default; }
 .control-disclaimer {
-  margin: 0.6rem 0.9rem 0; padding: 0.5rem 0.7rem; font-size: 0.76rem; line-height: 1.45;
+  margin: 0.6rem 0.9rem 0; padding: var(--s-4) 0.7rem; font-size: var(--t-small); line-height: 1.45;
   color: var(--text); background: color-mix(in srgb, var(--danger) 12%, transparent);
   border: 1px solid color-mix(in srgb, var(--danger) 40%, var(--border)); border-radius: 6px;
 }
 .control-textarea {
   flex: 1; margin: 0.75rem 0.9rem; resize: none; background: var(--bg); color: var(--text);
   border: 1px solid var(--border); border-radius: 6px; padding: 0.8rem;
-  font-family: var(--font-mono); font-size: 0.82rem; line-height: 1.5;
+  font-family: var(--font-mono); font-size: var(--t-body); line-height: 1.5;
 }
 .control-textarea:focus { outline: none; border-color: var(--accent); }
 .control-preview { flex: 1; overflow-y: auto; padding: 0.75rem 1.1rem; }
 .control-blank { margin: auto; color: var(--muted); padding: 2rem; }
-.control-error { padding: 0.5rem 0.9rem; color: var(--danger); font-size: 0.78rem; }
+.control-error { padding: var(--s-4) 0.9rem; color: var(--danger); font-size: var(--t-small); }
 
 /* Rendered markdown (preview pane) */
 .markdown { line-height: 1.6; color: var(--text); }
 .markdown h1, .markdown h2, .markdown h3 { font-family: var(--font-display); margin: 1rem 0 0.5rem; }
-.markdown h1 { font-size: 1.3rem; } .markdown h2 { font-size: 1.1rem; } .markdown h3 { font-size: 0.98rem; }
+/* `--t-display` ON h1, and the reason is that nearest-step collapsed a heading level. `1.3rem` and
+   `1.1rem` both rounded to `--t-title`, so h1 and h2 rendered identically at 18px — a preview with
+   two heading levels that look the same has one. `--t-display` is the scale's "one big number per
+   surface" step, and the largest heading of a rendered document is exactly that; it also had no
+   consumer at all until here, which is what a defined-and-unused step eventually costs. */
+.markdown h1 { font-size: var(--t-display); } .markdown h2 { font-size: var(--t-title); } .markdown h3 { font-size: var(--t-lead); }
 .markdown p { margin: 0.5rem 0; }
 .markdown ul, .markdown ol { margin: 0.5rem 0 0.5rem 1.3rem; }
 .markdown li { margin: 0.2rem 0; }
-.markdown code { font-family: var(--font-mono); font-size: 0.85em; background: var(--panel-2); padding: 0.05rem 0.3rem; border-radius: 4px; }
+.markdown code { font-family: var(--font-mono); font-size: var(--t-small); background: var(--panel-2); padding: 0.05rem var(--s-2); border-radius: 4px; }
 .markdown pre { background: var(--panel-2); border: 1px solid var(--border); border-radius: 6px; padding: 0.7rem; overflow-x: auto; }
 .markdown pre code { background: transparent; padding: 0; }
 .markdown a { color: var(--accent); }
@@ -1121,68 +1170,68 @@ body {
 .markdown hr { border: none; border-top: 1px solid var(--border); margin: 1rem 0; }
 
 /* Resources links registry */
-.resources-table { flex: 1; overflow-y: auto; padding: 0.75rem 0.9rem; display: flex; flex-direction: column; gap: 0.4rem; }
-.resource-row { display: flex; gap: 0.4rem; align-items: center; }
+.resources-table { flex: 1; overflow-y: auto; padding: 0.75rem 0.9rem; display: flex; flex-direction: column; gap: var(--s-3); }
+.resource-row { display: flex; gap: var(--s-3); align-items: center; }
 .resource-row input {
   background: var(--bg); color: var(--text); border: 1px solid var(--border);
-  border-radius: 6px; padding: 0.35rem 0.5rem; font-size: 0.8rem;
+  border-radius: 6px; padding: var(--s-3) var(--s-4); font-size: var(--t-body);
 }
 .resource-row input:focus { outline: none; border-color: var(--accent); }
 .res-title { flex: 1; } .res-url { flex: 1.4; } .res-note { flex: 1.2; }
-.res-del { background: transparent; border: none; color: var(--muted); cursor: pointer; font-size: 0.9rem; }
+.res-del { background: transparent; border: none; color: var(--muted); cursor: pointer; font-size: var(--t-lead); }
 .res-del:hover { color: var(--danger); }
 
 /* ---------- Dispatch (the details step, inside the cards pane) ---------- */
-.dispatch { display: flex; flex-direction: column; gap: 0.5rem; }
-.dispatch-head { display: flex; align-items: center; gap: 0.5rem; }
+.dispatch { display: flex; flex-direction: column; gap: var(--s-4); }
+.dispatch-head { display: flex; align-items: center; gap: var(--s-4); }
 .dispatch-back {
   background: transparent; border: 1px solid var(--border); border-radius: 6px;
-  color: var(--muted); cursor: pointer; padding: 0.05rem 0.4rem; font-size: 0.9rem;
+  color: var(--muted); cursor: pointer; padding: 0.05rem var(--s-3); font-size: var(--t-lead);
 }
 .dispatch-back:hover { color: var(--accent); border-color: var(--accent); }
-.dispatch-title { margin: 0; font-family: var(--font-display); font-size: 1rem; }
-.dispatch-on { color: var(--muted); font-family: var(--font-mono); font-size: 0.8rem; }
-.dispatch-desc { margin: 0; font-size: 0.82rem; color: var(--muted); }
+.dispatch-title { margin: 0; font-family: var(--font-display); font-size: var(--t-lead); }
+.dispatch-on { color: var(--muted); font-family: var(--font-mono); font-size: var(--t-body); }
+.dispatch-desc { margin: 0; font-size: var(--t-body); color: var(--muted); }
 .dispatch-continues {
-  margin: 0; font-size: 0.76rem; color: var(--accent-2); font-family: var(--font-mono);
+  margin: 0; font-size: var(--t-small); color: var(--accent-2); font-family: var(--font-mono);
 }
-.dispatch-row { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+.dispatch-row { display: flex; align-items: center; gap: var(--s-4); flex-wrap: wrap; }
 .dispatch-label {
-  width: 5.5rem; flex: 0 0 auto; font-size: 0.72rem; color: var(--muted);
+  width: 5.5rem; flex: 0 0 auto; font-size: var(--t-small); color: var(--muted);
   text-transform: uppercase; letter-spacing: 0.06em;
 }
 .dispatch-row .mp-trigger { flex: 1; min-width: 0; }
-.dispatch-prompt-label { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+.dispatch-prompt-label { font-size: var(--t-small); color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
 .dispatch-prompt {
   width: 100%; background: var(--bg); color: var(--text); border: 1px solid var(--border);
-  border-radius: 6px; padding: 0.4rem 0.5rem; font: inherit; font-size: 0.85rem; resize: vertical;
+  border-radius: 6px; padding: var(--s-3) var(--s-4); font: inherit; font-size: var(--t-body); resize: vertical;
 }
-.dispatch-attach { font-size: 0.8rem; border: 1px solid var(--border); border-radius: 6px; padding: 0.4rem 0.6rem; }
+.dispatch-attach { font-size: var(--t-body); border: 1px solid var(--border); border-radius: 6px; padding: var(--s-3) var(--s-4); }
 .dispatch-attach summary { cursor: pointer; color: var(--muted); }
-.dispatch-hint { margin: 0.3rem 0; font-size: 0.72rem; color: var(--muted); font-style: italic; }
+.dispatch-hint { margin: 0.3rem 0; font-size: var(--t-small); color: var(--muted); font-style: italic; }
 .dispatch-error {
-  margin: 0; color: var(--danger); font-size: 0.8rem;
+  margin: 0; color: var(--danger); font-size: var(--t-body);
   background: color-mix(in srgb, var(--danger) 12%, transparent);
   border: 1px solid color-mix(in srgb, var(--danger) 35%, transparent);
-  border-radius: 6px; padding: 0.4rem 0.6rem;
+  border-radius: 6px; padding: var(--s-3) var(--s-4);
 }
-.dispatch-foot { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 0.2rem; }
+.dispatch-foot { display: flex; justify-content: flex-end; gap: var(--s-4); margin-top: 0.2rem; }
 
 /* ---------- Reports (a card's run history, and one report) ---------- */
 /* Deliberately not link-shaped: chips and times, so it cannot be mistaken for the card links. */
-.reports { display: flex; flex-direction: column; gap: 0.25rem; border-top: 1px solid var(--border); padding-top: 0.5rem; }
-.reports-head { margin: 0; font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
-.report-row { display: flex; align-items: center; gap: 0.35rem; }
+.reports { display: flex; flex-direction: column; gap: var(--s-2); border-top: 1px solid var(--border); padding-top: var(--s-4); }
+.reports-head { margin: 0; font-size: var(--t-small); color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+.report-row { display: flex; align-items: center; gap: var(--s-3); }
 .report-open {
-  flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 0.5rem;
+  flex: 1; min-width: 0; display: flex; align-items: baseline; gap: var(--s-4);
   background: transparent; border: 1px solid transparent; border-radius: 6px;
-  color: inherit; cursor: pointer; font: inherit; text-align: left; padding: 0.15rem 0.35rem;
+  color: inherit; cursor: pointer; font: inherit; text-align: left; padding: 0.15rem var(--s-3);
 }
 .report-open:hover { border-color: var(--accent); }
 .report-chip {
-  flex: 0 0 auto; font-family: var(--font-mono); font-size: 0.62rem;
+  flex: 0 0 auto; font-family: var(--font-mono); font-size: var(--t-micro);
   text-transform: uppercase; letter-spacing: 0.06em;
-  border: 1px solid var(--border); border-radius: 999px; padding: 0 0.4rem;
+  border: 1px solid var(--border); border-radius: 999px; padding: 0 var(--s-3);
 }
 .chip-success { color: var(--accent); border-color: var(--accent); }
 .chip-attention { color: var(--accent-2); border-color: var(--accent-2); }
@@ -1191,18 +1240,18 @@ body {
 /* Stopping a run is a decision, not a fault — but it is still an ending that produced nothing, and
    grey made it disappear into the row. Same red as failed: what they have in common is "no report". */
 .chip-cancelled { color: var(--danger); border-color: var(--danger); }
-.report-skill { flex: 0 0 auto; font-size: 0.78rem; }
+.report-skill { flex: 0 0 auto; font-size: var(--t-small); }
 /* Money reads as data, not prose: mono, so a card's runs line up down the column. */
-.report-cost { flex: 0 0 auto; color: var(--muted); font-family: var(--font-mono); font-size: 0.66rem; }
-.report-when { flex: 0 0 auto; color: var(--muted); font-family: var(--font-mono); font-size: 0.66rem; }
+.report-cost { flex: 0 0 auto; color: var(--muted); font-family: var(--font-mono); font-size: var(--t-micro); }
+.report-when { flex: 0 0 auto; color: var(--muted); font-family: var(--font-mono); font-size: var(--t-micro); }
 .report-summary {
-  flex: 1; min-width: 0; color: var(--muted); font-size: 0.74rem;
+  flex: 1; min-width: 0; color: var(--muted); font-size: var(--t-small);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .report-stop {
   flex: 0 0 auto; background: var(--panel-2); color: var(--muted);
   border: 1px solid var(--border); border-radius: 6px; cursor: pointer;
-  font-size: 0.68rem; padding: 0.1rem 0.4rem;
+  font-size: var(--t-micro); padding: 0.1rem var(--s-3);
 }
 .report-stop:hover { color: var(--danger); border-color: var(--danger); }
 /* A run that has been dealt with is history: still readable, no longer shouting. Dimmed rather than
@@ -1214,41 +1263,41 @@ body {
 .report-dismiss {
   flex: 0 0 auto; align-self: flex-start; background: var(--panel-2); color: var(--muted);
   border: 1px solid var(--border); border-radius: 6px; cursor: pointer;
-  font-size: 0.68rem; padding: 0.1rem 0.4rem;
+  font-size: var(--t-micro); padding: 0.1rem var(--s-3);
 }
 .report-dismiss:hover { color: var(--accent); border-color: var(--accent); }
 
-.report { display: flex; flex-direction: column; gap: 0.5rem; overflow-wrap: anywhere; }
-.report-head { display: flex; align-items: center; gap: 0.5rem; }
-.report-title { margin: 0; font-family: var(--font-display); font-size: 1rem; }
-.report-meta { display: flex; flex-wrap: wrap; gap: 0.2rem 1rem; margin: 0; font-size: 0.72rem; }
-.report-meta div { display: flex; gap: 0.35rem; }
+.report { display: flex; flex-direction: column; gap: var(--s-4); overflow-wrap: anywhere; }
+.report-head { display: flex; align-items: center; gap: var(--s-4); }
+.report-title { margin: 0; font-family: var(--font-display); font-size: var(--t-lead); }
+.report-meta { display: flex; flex-wrap: wrap; gap: 0.2rem 1rem; margin: 0; font-size: var(--t-small); }
+.report-meta div { display: flex; gap: var(--s-3); }
 .report-meta dt { color: var(--muted); }
 .report-meta dd { margin: 0; font-family: var(--font-mono); }
-.report-lead { margin: 0; font-size: 0.9rem; padding-left: 0.7rem; border-left: 3px solid var(--accent); }
-.report-note { margin: 0; font-size: 0.82rem; color: var(--accent-2); }
-.report-prompt { margin: 0; font-size: 0.8rem; color: var(--muted); }
-.report-prompt-label { text-transform: uppercase; letter-spacing: 0.06em; font-size: 0.68rem; }
-.report-body { border-top: 1px solid var(--border); padding-top: 0.4rem; }
-.report-empty { color: var(--muted); font-style: italic; font-size: 0.82rem; }
+.report-lead { margin: 0; font-size: var(--t-lead); padding-left: 0.7rem; border-left: 3px solid var(--accent); }
+.report-note { margin: 0; font-size: var(--t-body); color: var(--accent-2); }
+.report-prompt { margin: 0; font-size: var(--t-body); color: var(--muted); }
+.report-prompt-label { text-transform: uppercase; letter-spacing: 0.06em; font-size: var(--t-micro); }
+.report-body { border-top: 1px solid var(--border); padding-top: var(--s-3); }
+.report-empty { color: var(--muted); font-style: italic; font-size: var(--t-body); }
 .report-created { display: flex; flex-direction: column; gap: 0.2rem; }
-.report-foot { display: flex; align-items: center; justify-content: flex-end; gap: 0.5rem; }
+.report-foot { display: flex; align-items: center; justify-content: flex-end; gap: var(--s-4); }
 
 /* Options on a report that needs attention. The agent's suggestions and the fixed ones look the
    same on purpose — they all lead to the same editable prompt. */
-.options { display: flex; flex-direction: column; gap: 0.3rem; border-top: 1px solid var(--border); padding-top: 0.5rem; }
-.options-head { margin: 0; font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
-.options-warn { margin: 0; font-size: 0.76rem; color: var(--danger); }
+.options { display: flex; flex-direction: column; gap: var(--s-2); border-top: 1px solid var(--border); padding-top: var(--s-4); }
+.options-head { margin: 0; font-size: var(--t-small); color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+.options-warn { margin: 0; font-size: var(--t-small); color: var(--danger); }
 .option-btn {
   text-align: left; background: var(--panel-2); color: var(--text);
   border: 1px solid var(--border); border-radius: 6px;
-  padding: 0.35rem 0.6rem; font: inherit; font-size: 0.82rem; cursor: pointer;
+  padding: var(--s-3) var(--s-4); font: inherit; font-size: var(--t-body); cursor: pointer;
 }
 .option-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
 .option-btn:disabled { opacity: 0.45; cursor: default; }
 .option-fixed { border-style: dashed; }
-.options-close { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.2rem; }
-.options-close-label { font-size: 0.78rem; color: var(--muted); margin-right: auto; }
+.options-close { display: flex; align-items: center; gap: var(--s-4); margin-top: 0.2rem; }
+.options-close-label { font-size: var(--t-small); color: var(--muted); margin-right: auto; }
 
 /* ---------- Execution (the run dashboard) ---------- */
 /* A GRID, which is what it was already written for. `.exec-ledger` below carries
@@ -1276,37 +1325,40 @@ body {
   /* No `flex` basis: the parent is a grid and the track sizes this box. `min-width: 0` so a long
      unbroken run title cannot push its track past the share the grid gave it — which is what let the
      titles reach the viewport edge and get cut. */
-  min-width: 0; display: flex; flex-direction: column; gap: 0.45rem;
-  background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.6rem;
+  min-width: 0; display: flex; flex-direction: column; gap: var(--s-4);
+  background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: var(--s-4);
 }
 .exec-head {
-  display: flex; align-items: center; gap: 0.5rem; margin: 0;
-  font-family: var(--font-display); font-size: 0.78rem;
+  display: flex; align-items: center; gap: var(--s-4); margin: 0;
+  font-family: var(--font-display); font-size: var(--t-small);
   text-transform: uppercase; letter-spacing: 0.1em;
 }
-.exec-count { color: var(--muted); font-size: 0.7rem; letter-spacing: 0; background: var(--panel-2); border-radius: 999px; padding: 0 0.4rem; }
-.exec-empty { margin: 0; color: var(--muted); font-size: 0.78rem; font-style: italic; }
+.exec-count { color: var(--muted); font-size: var(--t-micro); letter-spacing: 0; background: var(--panel-2); border-radius: 999px; padding: 0 var(--s-3); }
+.exec-empty { margin: 0; color: var(--muted); font-size: var(--t-small); font-style: italic; }
 .exec-run {
-  display: flex; flex-direction: column; gap: 0.25rem; align-items: flex-start;
-  background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 0.45rem 0.55rem;
+  display: flex; flex-direction: column; gap: var(--s-2); align-items: flex-start;
+  background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: var(--s-4) var(--s-4);
 }
-.exec-run-top { display: flex; align-items: baseline; gap: 0.4rem; width: 100%; }
+.exec-run-top { display: flex; align-items: baseline; gap: var(--s-3); width: 100%; }
 /* The run's actions, side by side. `.exec-run` is a flex column, so without this every button is its
    own row — Dismiss and Clear failed tries stacked, which reads as two unrelated controls rather than
    the pair of answers to one failed run. Wraps, so ForgiveAttempts' result and error lines (both
    `flex-basis: 100%`) still take a line of their own underneath. */
-.exec-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem; width: 100%; }
-.exec-skill { font-size: 0.78rem; }
+.exec-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2); width: 100%; }
+.exec-skill { font-size: var(--t-small); }
 /* Cost takes the push-right when present, so cost and elapsed sit together at the end of the row. */
-.exec-cost { margin-left: auto; color: var(--muted); font-family: var(--font-mono); font-size: 0.66rem; }
+.exec-cost { margin-left: auto; color: var(--muted); font-family: var(--font-mono); font-size: var(--t-micro); }
+.exec-when { margin-left: auto; color: var(--muted); font-family: var(--font-mono); font-size: var(--t-micro); }
+/* AFTER the plain `.exec-when` above, not before it. At (0,2,0) the adjacent form won either way, so
+   this is a move and not a change — but the descending order read as though the plain rule was meant
+   to override it, which is the opposite of what happens. */
 .exec-cost + .exec-when { margin-left: 0; }
-.exec-when { margin-left: auto; color: var(--muted); font-family: var(--font-mono); font-size: 0.66rem; }
 .exec-card {
   /* WRAPS. A card title is arbitrary user text and several are long file paths with no spaces, so
      without this they set the column's minimum content width and pushed past the track. */
   overflow-wrap: anywhere;
   width: 100%; text-align: left; background: transparent; border: 1px solid transparent;
-  border-radius: 6px; color: inherit; cursor: pointer; font: inherit; font-size: 0.8rem; padding: 0.1rem 0.25rem;
+  border-radius: 6px; color: inherit; cursor: pointer; font: inherit; font-size: var(--t-body); padding: 0.1rem var(--s-2);
 }
 .exec-card:hover:not(:disabled) { border-color: var(--accent); }
 .exec-card:disabled { cursor: default; opacity: 0.7; }
@@ -1319,31 +1371,31 @@ body {
    Scoped to `.exec-card` rather than fixed on `.link-title`, because the other users of that class
    sit in a constrained block where truncating really is what is wanted. */
 .exec-card .link-title { white-space: normal; overflow: visible; }
-.exec-summary { margin: 0; color: var(--muted); font-size: 0.74rem; line-height: 1.35; overflow-wrap: anywhere; }
+.exec-summary { margin: 0; color: var(--muted); font-size: var(--t-small); line-height: 1.35; overflow-wrap: anywhere; }
 .tab-badge {
-  margin-left: 0.35rem; font-family: var(--font-mono); font-size: 0.62rem;
-  background: var(--accent-2); color: var(--on-accent); border-radius: 999px; padding: 0 0.32rem;
+  margin-left: 0.35rem; font-family: var(--font-mono); font-size: var(--t-micro);
+  background: var(--accent-2); color: var(--on-accent); border-radius: 999px; padding: 0 var(--s-3);
 }
 
 /* ---------- Skill editor (fields view in Project Control) ---------- */
-.skill-editor { display: flex; flex-direction: column; gap: 0.6rem; padding: 0.8rem 1.1rem; overflow-y: auto; }
-.skill-row { display: flex; align-items: center; gap: 0.6rem; }
-.skill-label { width: 6rem; flex: 0 0 auto; font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+.skill-editor { display: flex; flex-direction: column; gap: var(--s-4); padding: 0.8rem 1.1rem; overflow-y: auto; }
+.skill-row { display: flex; align-items: center; gap: var(--s-4); }
+.skill-label { width: 6rem; flex: 0 0 auto; font-size: var(--t-small); color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
 .skill-input, .skill-prompt {
   flex: 1; min-width: 0; background: var(--bg); color: var(--text);
-  border: 1px solid var(--border); border-radius: 6px; padding: 0.35rem 0.5rem; font: inherit; font-size: 0.85rem;
+  border: 1px solid var(--border); border-radius: 6px; padding: var(--s-3) var(--s-4); font: inherit; font-size: var(--t-body);
 }
-.skill-prompt { resize: vertical; font-family: var(--font-mono); font-size: 0.8rem; }
-.skill-scope { border: 1px solid var(--border); border-radius: 8px; padding: 0.4rem 0.7rem 0.6rem; margin: 0; }
-.skill-scope legend { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; padding: 0 0.3rem; }
-.skill-hint { margin: 0 0 0.3rem; font-size: 0.7rem; color: var(--muted); font-style: italic; }
+.skill-prompt { resize: vertical; font-family: var(--font-mono); font-size: var(--t-body); }
+.skill-scope { border: 1px solid var(--border); border-radius: 8px; padding: var(--s-3) 0.7rem var(--s-4); margin: 0; }
+.skill-scope legend { font-size: var(--t-small); color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; padding: 0 var(--s-2); }
+.skill-hint { margin: 0 0 0.3rem; font-size: var(--t-micro); color: var(--muted); font-style: italic; }
 .skill-foot { display: flex; justify-content: flex-end; }
-.skill-invalid { padding: 1rem 1.1rem; color: var(--danger); font-size: 0.85rem; line-height: 1.5; }
+.skill-invalid { padding: 1rem 1.1rem; color: var(--danger); font-size: var(--t-body); line-height: 1.5; }
 
 /* The agent sandbox panel in Settings. Two states, and they must not read alike: "enforced" is a
    claim the user is trusting, "not enforced" is a condition they can act on. */
 .sandbox-state {
-  font-size: 0.82rem; line-height: 1.5; border-radius: 6px; padding: 0.55rem 0.7rem;
+  font-size: var(--t-body); line-height: 1.5; border-radius: 6px; padding: var(--s-4) 0.7rem;
   border: 1px solid transparent;
 }
 .sandbox-ok {
@@ -1359,28 +1411,28 @@ body {
 .sandbox-state + .sandbox-state { margin-top: 0.4rem; }
 /* Each action says what it does to the running session. A bare verb on a button that restarts a
    server somebody has work in flight on is not enough to decide with. */
-.sandbox-hint { font-size: 0.76rem; color: var(--muted); line-height: 1.5; }
+.sandbox-hint { font-size: var(--t-small); color: var(--muted); line-height: 1.5; }
 .sandbox-action > .btn-secondary { align-self: flex-start; }
 
 /* The project-level barrier. The accent rather than ochre: this is not a warning, it is the card the
    whole board is waiting on, and it should read as structure rather than as a problem. */
 .tile-setup {
-  font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.08em; white-space: nowrap;
+  font-size: var(--t-micro); text-transform: uppercase; letter-spacing: 0.08em; white-space: nowrap;
   color: var(--accent); border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
-  border-radius: 3px; padding: 0 0.25rem;
+  border-radius: 3px; padding: 0 var(--s-2);
 }
 
 /* Work an agent found and deliberately did not do. Ochre, not the accent: a card carrying this is
    not failing, but it is not plainly done either, and those two must not look the same. */
 .tile-suggestions {
-  font-size: 0.7rem; color: var(--warn, #b8860b); white-space: nowrap;
+  font-size: var(--t-micro); color: var(--warn, #b8860b); white-space: nowrap;
 }
 
 /* A blocked task somewhere under this card. Danger rather than ochre, and the strongest of the three:
    a story in Done carrying one has finished with a real failure inside it, which is a different fact
    from work deliberately left behind. */
 .tile-problem {
-  font-size: 0.7rem; color: var(--danger); white-space: nowrap;
+  font-size: var(--t-micro); color: var(--danger); white-space: nowrap;
 }
 
 
@@ -1392,7 +1444,7 @@ body {
   flex-wrap: wrap;
   gap: 0.2rem 0.9rem;
   margin: 0 0 0.6rem;
-  font-size: 0.78rem;
+  font-size: var(--t-small);
   color: var(--muted);
   font-variant-numeric: tabular-nums;
 }
@@ -1407,7 +1459,7 @@ body {
   flex-wrap: wrap;
   gap: 0.2rem 0.8rem;
   margin: 0.45rem 0 0;
-  font-size: 0.74rem;
+  font-size: var(--t-small);
   color: var(--muted);
   font-variant-numeric: tabular-nums;
 }
@@ -1424,8 +1476,8 @@ body {
   border-radius: 6px;
   cursor: pointer;
   font: inherit;
-  font-size: 0.68rem;
-  padding: 0.1rem 0.4rem;
+  font-size: var(--t-micro);
+  padding: 0.1rem var(--s-3);
 }
 .reports-forgive:hover:not(:disabled) { color: var(--text); border-color: var(--accent); }
 .reports-forgive:disabled { cursor: default; opacity: 0.6; }
@@ -1460,18 +1512,18 @@ body {
 .halt-title {
   margin: 0;
   font-family: var(--font-display);
-  font-size: 1.25rem;
+  font-size: var(--t-title);
   color: var(--text);
 }
 .halt-why {
   margin: 0;
   color: var(--text);
-  font-size: 0.9rem;
+  font-size: var(--t-lead);
 }
 .halt-hint,
 .halt-error {
   margin: 0;
-  font-size: 0.8rem;
+  font-size: var(--t-body);
   color: var(--muted);
 }
 .halt-error {
@@ -1491,19 +1543,19 @@ body {
    dialog past the viewport. */
 .signin-label {
   margin: 0;
-  padding: 0.5rem 0.65rem;
+  padding: var(--s-4) 0.65rem;
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 6px;
   font-family: var(--font-mono);
-  font-size: 0.78rem;
+  font-size: var(--t-small);
   word-break: break-all;
 }
 /* Refuse first, and it keeps `.halt .btn-primary`'s accent — the reflex click and the reflex Enter
    both have to land on "no". Allow sits beside it as the quiet one. */
 .signin-actions {
   display: flex;
-  gap: 0.5rem;
+  gap: var(--s-4);
   align-items: center;
   margin-top: 0.2rem;
 }
@@ -1514,28 +1566,28 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
-  padding: 0.5rem 0;
+  padding: var(--s-4) 0;
   border-bottom: 1px solid var(--border);
 }
 .signin-row:last-of-type { border-bottom: none; }
-.signin-row-label { font-size: 0.85rem; word-break: break-all; }
-.signin-row-meta { font-size: 0.72rem; color: var(--muted); font-family: var(--font-mono); }
+.signin-row-label { font-size: var(--t-body); word-break: break-all; }
+.signin-row-meta { font-size: var(--t-small); color: var(--muted); font-family: var(--font-mono); }
 .signin-this {
   margin-left: 0.35rem;
-  padding: 0.05rem 0.4rem;
+  padding: 0.05rem var(--s-3);
   border: 1px solid var(--border);
   border-radius: 999px;
-  font-size: 0.66rem;
+  font-size: var(--t-micro);
   color: var(--muted);
   text-transform: lowercase;
   white-space: nowrap;
 }
 /* The state chip in the top bar. `complete` is the only stop that reads as a success. */
 .ap-chip {
-  padding: 0.1rem 0.45rem;
+  padding: 0.1rem var(--s-4);
   border: 1px solid var(--border);
   border-radius: 999px;
-  font-size: 0.68rem;
+  font-size: var(--t-micro);
   letter-spacing: 0.03em;
   text-transform: lowercase;
   color: var(--muted);
@@ -1558,7 +1610,7 @@ body {
 
 .ap-controls {
   display: flex;
-  gap: 0.5rem;
+  gap: var(--s-4);
   margin: 0.4rem 0 0.2rem;
 }
 
@@ -1568,25 +1620,25 @@ body {
   flex: 1; min-width: 0; overflow-y: auto; background: var(--wash);
   padding: 1.25rem 1.5rem; display: flex; flex-direction: column; gap: 1rem;
 }
-.diary-head { display: flex; flex-direction: column; gap: 0.3rem; max-width: 68ch; }
+.diary-head { display: flex; flex-direction: column; gap: var(--s-2); max-width: 68ch; }
 .diary-head h2 {
   font-family: var(--font-display); text-transform: uppercase; letter-spacing: 0.1em;
-  font-size: 0.95rem; color: var(--text);
+  font-size: var(--t-lead); color: var(--text);
 }
-.diary-lede { color: var(--muted); font-size: 0.85rem; line-height: 1.5; }
+.diary-lede { color: var(--muted); font-size: var(--t-body); line-height: 1.5; }
 
-.diary-compose { display: flex; gap: 0.6rem; align-items: flex-start; max-width: 68ch; }
+.diary-compose { display: flex; gap: var(--s-4); align-items: flex-start; max-width: 68ch; }
 .diary-compose textarea {
-  flex: 1; resize: vertical; min-height: 2.6rem; padding: 0.5rem 0.6rem;
+  flex: 1; resize: vertical; min-height: 2.6rem; padding: var(--s-4) var(--s-4);
   background: var(--panel-2); color: var(--text);
   border: 1px solid var(--border); border-radius: 6px;
   font: inherit; line-height: 1.45;
 }
-.diary-error { color: var(--danger, #d66); font-size: 0.85rem; max-width: 68ch; }
+.diary-error { color: var(--danger, #d66); font-size: var(--t-body); max-width: 68ch; }
 
 .diary-empty {
-  display: flex; flex-direction: column; align-items: flex-start; gap: 0.6rem;
-  color: var(--muted); font-size: 0.9rem; padding: 1.5rem 0;
+  display: flex; flex-direction: column; align-items: flex-start; gap: var(--s-4);
+  color: var(--muted); font-size: var(--t-lead); padding: 1.5rem 0;
 }
 
 .diary-list {
@@ -1594,7 +1646,7 @@ body {
 }
 .diary-entry {
   display: flex; flex-direction: column; gap: 0.2rem;
-  padding: 0.6rem 0 0.6rem 0.75rem;
+  padding: var(--s-4) 0 var(--s-4) 0.75rem;
   border-left: 2px solid var(--border);
 }
 /* The kind, encoded in the rail as well as the word: a run, a checkup, a lifecycle event and a human's own
@@ -1608,41 +1660,41 @@ body {
 .diary-entry[data-kind='note'] { border-left-color: var(--accent-2); }
 
 .diary-meta {
-  display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.5rem;
-  font-size: 0.72rem; color: var(--muted);
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--s-4);
+  font-size: var(--t-small); color: var(--muted);
 }
 .diary-kind {
   font-family: var(--font-display); text-transform: uppercase; letter-spacing: 0.1em;
-  font-size: 0.66rem; color: var(--text);
+  font-size: var(--t-micro); color: var(--text);
 }
-.diary-about { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.diary-about { display: flex; flex-wrap: wrap; gap: var(--s-3); }
 .diary-chip {
-  padding: 0.05rem 0.35rem; border: 1px solid var(--border); border-radius: 999px;
+  padding: 0.05rem var(--s-3); border: 1px solid var(--border); border-radius: 999px;
   font-variant-numeric: tabular-nums;
 }
 .diary-outcome { color: var(--text); }
-.diary-text { line-height: 1.55; font-size: 0.92rem; }
+.diary-text { line-height: 1.55; font-size: var(--t-lead); }
 
 /* The dock's Suggestions pane. The actions sit at the TOP, on the picked row: they are what the pane is
    for, and a person should not have to scroll a list to reach them. */
 .suggestions-pane {
   flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column;
-  padding: 0.5rem 0.6rem; gap: 0.5rem; overflow-y: auto;
+  padding: var(--s-4) var(--s-4); gap: var(--s-4); overflow-y: auto;
 }
-.suggestions-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; }
+.suggestions-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-3); }
 .suggestions-reason {
-  flex: 1; min-width: 12rem; padding: 0.3rem 0.45rem;
+  flex: 1; min-width: 12rem; padding: var(--s-2) var(--s-4);
   background: var(--panel-2); color: var(--text);
   border: 1px solid var(--border); border-radius: 6px; font: inherit;
 }
-.suggestions-became { color: var(--accent); font-size: 0.85rem; }
+.suggestions-became { color: var(--accent); font-size: var(--t-body); }
 .suggestions-list { list-style: none; display: flex; flex-direction: column; gap: 0.1rem; min-height: 0; }
 .suggestions-row { border-left: 2px solid var(--border); }
 /* The one the buttons act on. Marked, because two rows and one action bar is otherwise a guess. */
 .suggestions-row.picked { border-left-color: var(--accent); background: var(--wash); }
 .suggestions-pick {
   width: 100%; display: flex; flex-direction: column; gap: 0.2rem; align-items: flex-start;
-  padding: 0.45rem 0.6rem; background: none; border: none; color: inherit; font: inherit;
+  padding: var(--s-4) var(--s-4); background: none; border: none; color: inherit; font: inherit;
   text-align: left; cursor: pointer;
 }
 
@@ -1664,7 +1716,7 @@ body {
 .filed-list { list-style: none; display: flex; flex-direction: column; gap: 0.1rem; }
 .filed-entry {
   display: flex; flex-direction: column; gap: 0.2rem;
-  padding: 0.6rem 0 0.6rem 0.75rem;
+  padding: var(--s-4) 0 var(--s-4) 0.75rem;
   border-left: 2px solid var(--border);
 }
 /* The state in the rail as well as the word. An active finding is the one asking for something; a
@@ -1673,17 +1725,17 @@ body {
 .filed-entry[data-state='actioned'] { border-left-color: var(--accent); }
 .filed-entry[data-state='dismissed'] { border-left-color: var(--border); }
 .filed-meta {
-  display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.5rem;
-  font-size: 0.72rem; color: var(--muted);
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--s-4);
+  font-size: var(--t-small); color: var(--muted);
 }
 .filed-state {
   font-family: var(--font-display); text-transform: uppercase; letter-spacing: 0.1em;
-  font-size: 0.66rem; color: var(--text);
+  font-size: var(--t-micro); color: var(--text);
 }
-.filed-title { font-size: 0.92rem; line-height: 1.5; color: var(--text); }
-.filed-text { font-size: 0.86rem; line-height: 1.5; color: var(--muted); }
+.filed-title { font-size: var(--t-lead); line-height: 1.5; color: var(--text); }
+.filed-text { font-size: var(--t-body); line-height: 1.5; color: var(--muted); }
 /* Why it was said no to. Quiet, and italic so it does not read as part of the finding itself. */
-.filed-reason { font-size: 0.82rem; line-height: 1.5; color: var(--muted); font-style: italic; }
+.filed-reason { font-size: var(--t-body); line-height: 1.5; color: var(--muted); font-style: italic; }
 
 /* ---------- Auto-pilot transport strip ----------
    Stacked directly under the header, so the thing the app is FOR has a control on the page rather than
@@ -1693,7 +1745,7 @@ body {
   border-bottom: 1px solid var(--border);
   background: var(--panel);
   border-left: 3px solid var(--border);
-  font-size: 0.82rem;
+  font-size: var(--t-body);
 }
 .ap-bar-running { border-left-color: var(--accent); }
 .ap-bar-halted { border-left-color: var(--danger); }
@@ -1703,8 +1755,8 @@ body {
 .ap-bar-row {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
-  padding: 0.4rem 0.75rem;
+  gap: var(--s-4);
+  padding: var(--s-3) 0.75rem;
   /* The status can be long — a stall names the cards that are stuck — so it is the part that shrinks. */
   min-width: 0;
 }
@@ -1714,13 +1766,13 @@ body {
 .ap-transport {
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: var(--s-3);
   min-width: 6.5rem;
-  padding: 0.35rem 0.8rem;
+  padding: var(--s-3) 0.8rem;
   border: 1px solid transparent;
   border-radius: 6px;
   font-weight: 600;
-  font-size: 0.82rem;
+  font-size: var(--t-body);
   cursor: pointer;
   background: var(--accent-fill);
   color: var(--on-fill);
@@ -1754,13 +1806,13 @@ body {
 /* Which agent, and whether it can run. `flex: none` because `.ap-status` above already takes the slack:
    without it the pair would be squeezed by a long stall message, and the state word is exactly what you
    need when the message is long. */
-.ap-agent { display: inline-flex; align-items: center; gap: 0.4rem; flex: none; }
-.ap-agent-state { font-size: 0.68rem; white-space: nowrap; }
+.ap-agent { display: inline-flex; align-items: center; gap: var(--s-3); flex: none; }
+.ap-agent-state { font-size: var(--t-micro); white-space: nowrap; }
 /* THE DOT, because a bare word was the odd one out: the transport state two elements to the left says itself
    with `.ap-dot`, and the connection light in the top bar with `.conn`. Smaller than both at 7px — those two
    are the primary states of the app and the project, and this is a property of one of them. */
 .ap-agent-state,
-.ap-agent-chip { display: inline-flex; align-items: center; gap: 0.3rem; }
+.ap-agent-chip { display: inline-flex; align-items: center; gap: var(--s-2); }
 .ap-agent-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); flex: none; }
 /* `currentColor` for the two faults, so the dot cannot drift from the word it belongs to: the tone class
    already colours the text, and a second colour declaration is a second thing to keep in step. */
@@ -1797,16 +1849,21 @@ button.ap-agent-state:hover { text-decoration: underline; }
 /* THE WAY OUT OF A STALLED PROJECT, sized like the other controls in this bar rather than like the card
    report list it borrowed from. Measured: it came out at 10.88px with 1.6px of padding against 12.16px and
    4px for Settings and the expander, so the one action on a stopped project read as a caption. */
-.ap-bar-remedy { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.ap-bar-remedy { display: flex; align-items: center; gap: var(--s-4); flex-wrap: wrap; }
 .ap-remedy-btn {
   flex: none;
   background: none;
   border: 1px solid var(--border);
   border-radius: 6px;
-  padding: 0.25rem 0.55rem;
-  color: var(--ink);
+  padding: var(--s-2) var(--s-4);
+  /* `--ink` was referenced here and defined by no theme, so the declaration was invalid at
+     computed-value time and the colour fell through to the inherited `--text`. This states what it
+     was already rendering, and `--text` is also the right answer: the three muted buttons beside it
+     (`.ap-expand`, `.ap-help-btn`, `.ap-settings-link`) are secondary, and this is the one action on
+     a stopped project — the comment above is about it not reading as a caption. */
+  color: var(--text);
   font-family: inherit;
-  font-size: 0.76rem;
+  font-size: var(--t-small);
   cursor: pointer;
 }
 .ap-remedy-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
@@ -1819,9 +1876,9 @@ button.ap-agent-state:hover { text-decoration: underline; }
   background: none;
   border: 1px solid var(--border);
   border-radius: 6px;
-  padding: 0.25rem 0.55rem;
+  padding: var(--s-2) var(--s-4);
   color: var(--muted);
-  font-size: 0.76rem;
+  font-size: var(--t-small);
   cursor: pointer;
 }
 .ap-expand:hover,
@@ -1836,9 +1893,9 @@ button.ap-agent-state:hover { text-decoration: underline; }
   background: none;
   border: 1px solid var(--border);
   border-radius: 6px;
-  padding: 0.25rem 0.55rem;
+  padding: var(--s-2) var(--s-4);
   color: var(--muted);
-  font-size: 0.76rem;
+  font-size: var(--t-small);
   cursor: pointer;
 }
 .ap-kill:hover:not(:disabled) {
@@ -1860,18 +1917,18 @@ button.ap-agent-state:hover { text-decoration: underline; }
   background: color-mix(in srgb, var(--accent-2) 14%, transparent);
   border: 1px solid var(--accent-2);
   border-radius: 6px;
-  padding: 0.25rem 0.6rem;
+  padding: var(--s-2) var(--s-4);
   color: var(--text);
-  font-size: 0.76rem;
+  font-size: var(--t-small);
   font-weight: 500;
   cursor: pointer;
 }
 .ap-review-gates:hover { border-color: var(--accent); }
 
 .ap-bar-error {
-  padding: 0.4rem 0.75rem 0.55rem;
+  padding: var(--s-3) 0.75rem var(--s-4);
   color: var(--danger);
-  font-size: 0.78rem;
+  font-size: var(--t-small);
   /* Wraps. Both of these carry sentences that quote git or name several cards, and a refusal nobody can
      read to the end is the dead end this whole strip exists to remove. */
   white-space: pre-wrap;
@@ -1880,9 +1937,9 @@ button.ap-agent-state:hover { text-decoration: underline; }
 
 /* Why the loop stopped. NOT ellipsised, unlike `.ap-status` — that one is a row and this one is prose. */
 .ap-bar-detail {
-  padding: 0 0.75rem 0.55rem;
+  padding: 0 0.75rem var(--s-4);
   color: var(--muted);
-  font-size: 0.78rem;
+  font-size: var(--t-small);
   line-height: 1.45;
   max-width: 90ch;
   white-space: pre-wrap;
@@ -1899,16 +1956,16 @@ button.ap-agent-state:hover { text-decoration: underline; }
   border-top: 1px solid var(--border);
 }
 .ap-drawer-head {
-  font-size: 0.7rem;
+  font-size: var(--t-micro);
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--muted);
   margin-bottom: 0.35rem;
 }
-.ap-drawer-empty { color: var(--muted); font-size: 0.8rem; }
-.ap-work { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.25rem; }
-.ap-work li { font-size: 0.8rem; }
-.ap-waiting { color: var(--muted); font-size: 0.74rem; }
+.ap-drawer-empty { color: var(--muted); font-size: var(--t-body); }
+.ap-work { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--s-2); }
+.ap-work li { font-size: var(--t-body); }
+.ap-waiting { color: var(--muted); font-size: var(--t-small); }
 
 /* The instructions. Taller than the card modal and scrolling inside itself: it is prose, and prose that
    pushes its own close button off the screen is prose nobody finishes. */
@@ -1916,12 +1973,12 @@ button.ap-agent-state:hover { text-decoration: underline; }
 .ap-help-body { overflow-y: auto; max-height: 70vh; padding: 1rem; line-height: 1.55; }
 .ap-help-body h3 {
   margin: 1.2rem 0 0.4rem;
-  font-size: 0.9rem;
+  font-size: var(--t-lead);
   letter-spacing: 0.03em;
   color: var(--accent);
 }
 .ap-help-body h3:first-child { margin-top: 0; }
-.ap-help-body p { margin: 0 0 0.6rem; font-size: 0.85rem; }
-.ap-help-body ul { margin: 0 0 0.6rem; padding-left: 1.1rem; font-size: 0.85rem; }
+.ap-help-body p { margin: 0 0 0.6rem; font-size: var(--t-body); }
+.ap-help-body ul { margin: 0 0 0.6rem; padding-left: 1.1rem; font-size: var(--t-body); }
 .ap-help-body li { margin-bottom: 0.25rem; }
-.ap-help-body code { font-family: var(--font-mono); font-size: 0.78rem; color: var(--accent); }
+.ap-help-body code { font-family: var(--font-mono); font-size: var(--t-small); color: var(--accent); }

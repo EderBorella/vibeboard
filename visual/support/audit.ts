@@ -37,6 +37,11 @@ export interface StyleAudit {
   fontSizes: Tally;
   fontSizesOnText: Tally;
   radii: Tally;
+  // The six scale steps as the BROWSER resolves them, and the elements that compute something else.
+  // Both come out of the same page walk as `fontSizes`, so the gate cannot disagree with the tally
+  // printed beside it.
+  scale: string[];
+  type: Findings;
   overflow: Findings;
   contrast: Findings;
   tokens: Findings;
@@ -51,9 +56,27 @@ export interface FocusAudit {
   offenders: Offender[];
 }
 
-// Type and radius: the two conformance checks, which report and do not fail until the phase that
-// drives them to zero. Every visible element, because every element computes a font size — and the
-// point of the exercise is how many distinct values that comes to.
+// The six steps of docs/design-system.md, BY NAME. The pixel values are deliberately not written
+// here: they are read back out of the page, so this check cannot disagree with themes.css about what
+// `--t-body` is. A token whose value is wrong is drift's business; an element whose size is not on
+// the scale at all is this one's.
+export const TYPE_SCALE = [
+  '--t-micro',
+  '--t-small',
+  '--t-body',
+  '--t-lead',
+  '--t-title',
+  '--t-display',
+] as const;
+
+// THE ROOT IS THE UNIT, NOT A SURFACE, and every walk below skips it. Every step of both scales is
+// expressed in `rem`, which is root-relative, so asking whether the root's own font-size is on the
+// scale is circular — and "fixing" it to a step would rescale every rem in the stylesheet, including
+// the steps themselves. It carries no text and no corner of its own.
+//
+// Type and radius counts. Every visible element, because every element computes a font size: an
+// off-scale container hands its size to any descendant that does not set one, which is how 94
+// elements sat on the UA's 16px default before Phase 2.
 function pageBoxes(): { elements: number; fontSizes: Tally; radii: Tally } {
   const fontSizes: Tally = {};
   const radii: Tally = {};
@@ -62,7 +85,7 @@ function pageBoxes(): { elements: number; fontSizes: Tally; radii: Tally } {
   };
   let elements = 0;
   for (const el of Array.from(document.querySelectorAll('*'))) {
-    if (el.tagName === 'SCRIPT' || el.tagName === 'STYLE') continue;
+    if (el.tagName === 'SCRIPT' || el.tagName === 'STYLE' || el === document.documentElement) continue;
     const style = getComputedStyle(el);
     if (style.visibility === 'hidden' || style.display === 'none' || Number(style.opacity) === 0) continue;
     const box = el.getBoundingClientRect();
@@ -81,6 +104,51 @@ function pageBoxes(): { elements: number; fontSizes: Tally; radii: Tally } {
     }
   }
   return { elements, fontSizes, radii };
+}
+
+// Type CONFORMANCE, which blocks as of Phase 2 — the phase that drove its count to zero. A separate
+// walk from the tally above rather than a branch inside it, for the reason `pageContrast` is also its
+// own walk: one function doing both scored 19 on the cognitive-complexity gate, and raising the gate
+// to fit it would be the wrong repair. Two walks of 232 elements cost nothing measurable, and the
+// caller asserts the two examined the same population so they cannot silently diverge.
+//
+// It names the offending ELEMENTS and not only the value. A blocking gate that says "13.6px is not on
+// the scale" without saying where cannot be acted on, and a gate nobody can act on gets bypassed.
+function pageType(names: string[]): { scale: string[]; type: Findings } {
+  function describe(el: Element): string {
+    const parts: string[] = [];
+    for (let node: Element | null = el; node && parts.length < 4; node = node.parentElement) {
+      const id = node.getAttribute('data-testid');
+      const name = typeof node.className === 'string' ? node.className.trim().split(/\s+/)[0] : '';
+      parts.unshift(`${node.tagName.toLowerCase()}${id ? `[${id}]` : name ? `.${name}` : ''}`);
+    }
+    return parts.join(' > ');
+  }
+
+  // The scale in the unit the elements report it in: a probe carrying `font-size: var(--t-x)` and
+  // then measured — not the token's own `0.8125rem` text, which no computed style is ever equal to.
+  const probe = document.createElement('span');
+  probe.style.position = 'absolute';
+  probe.style.visibility = 'hidden';
+  document.body.append(probe);
+  const scale = names.map((name) => {
+    probe.style.fontSize = `var(${name})`;
+    return getComputedStyle(probe).fontSize;
+  });
+  probe.remove();
+
+  const offenders: Offender[] = [];
+  let examined = 0;
+  for (const el of Array.from(document.querySelectorAll('*'))) {
+    if (el.tagName === 'SCRIPT' || el.tagName === 'STYLE' || el === document.documentElement) continue;
+    const style = getComputedStyle(el);
+    if (style.visibility === 'hidden' || style.display === 'none' || Number(style.opacity) === 0) continue;
+    const box = el.getBoundingClientRect();
+    if (box.width === 0 || box.height === 0) continue;
+    examined += 1;
+    if (!scale.includes(style.fontSize)) offenders.push({ where: describe(el), detail: style.fontSize });
+  }
+  return { scale, type: { examined, offenders } };
 }
 
 // Overflow, and the font sizes of the elements that carry text. Split from the contrast walk below
@@ -394,11 +462,12 @@ function pageDocument(): { scrollWidth: number; clientWidth: number } {
 // small enough to read and to score under the complexity gate.
 export async function auditStyles(page: Page): Promise<StyleAudit> {
   const boxes = await page.evaluate(pageBoxes);
+  const type = await page.evaluate(pageType, [...TYPE_SCALE]);
   const text = await page.evaluate(pageOverflow);
   const contrast = await page.evaluate(pageContrast);
   const tokens = await page.evaluate(pageTokens);
   const rows = await page.evaluate(pageRows);
-  return { ...boxes, ...text, contrast, tokens, rows };
+  return { ...boxes, ...type, ...text, contrast, tokens, rows };
 }
 
 export async function auditFocus(page: Page): Promise<FocusAudit> {

@@ -200,4 +200,5 @@ given. **`copilot/` is the chat**, and the model catalogue its picker offers. **
 | `src/server/auth/auth.ts` | the scope table is a security property in its own right — see `decisions.md`, `decision 21` |
 | `stryker.config.mjs` | its exclusions carry their own reasoning inline; it is invisible to both biome and tsc, so a stale path there scores green over zero mutants |
 | `tools/check-citations.mjs` | the gate behind `decisions.md` — `npm run check:citations` |
+| `tools/check-type-scale.mjs` | the gate behind the type and space scales — `npm run check:type-scale`. It reads the FILE, where the browser harness reads the board, and the two do not overlap: twelve of the 27 authored font sizes were on surfaces `npm run visual` never opens. See `design-system.md` |
 | `tools/docker/` | the image, the relay, the entrypoint and the install helper — see `security/containment.md` |

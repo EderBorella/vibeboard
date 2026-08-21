@@ -69,7 +69,7 @@ export function CardsBody({
     // Either nothing is open, or the card left the board while its tab was — deleted outside the
     // app, or its file moved. Saying so beats an empty pane that looks broken.
     body = (
-      <div className="cards-gone">
+      <div className="cards-gone vb-empty">
         {activeRef ? `${activeRef.id} is no longer on the board.` : 'No card open.'}
       </div>
     );

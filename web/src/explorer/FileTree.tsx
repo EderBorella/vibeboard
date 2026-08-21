@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { FsNode } from '../api';
 import { Button } from '../ui/Button';
 import { Panel } from '../ui/Panel';
+import { Readout } from '../ui/Readout';
 import { formatBytes } from './format';
 import { canDropInto } from './paths';
 import type { TreeRow } from './useTree';
@@ -120,7 +121,7 @@ function NodeRow(props: NodeRowProps) {
       <span className="control-item-name">{node.name}</span>
       {node.symlink && <span className="control-tag">link</span>}
       {node.escapes && <span className="control-tag">outside</span>}
-      <span className="explorer-size">{formatBytes(node.size)}</span>
+      <Readout>{formatBytes(node.size)}</Readout>
     </Panel>
   );
 }
@@ -138,7 +139,7 @@ interface RenameRowProps {
 function RenameRow({ depth, value, onChange, onCommit, onCancel }: RenameRowProps) {
   return (
     <input
-      className="control-rename"
+      className="vb-input"
       style={indent(depth)}
       value={value}
       autoFocus
@@ -163,7 +164,7 @@ function RenameRow({ depth, value, onChange, onCommit, onCancel }: RenameRowProp
 // looked complete would be a lie about what is in it.
 function MoreRow({ depth, count }: { depth: number; count: number }) {
   return (
-    <div className="explorer-more" style={indent(depth)}>
+    <div className="explorer-more vb-empty" style={indent(depth)}>
       … {count} more, not shown
     </div>
   );
@@ -245,8 +246,10 @@ export function FileTree(props: Props) {
         </div>
       </div>
 
-      {error && <div className="control-error">{error}</div>}
-      {rows.length === 0 && <div className="control-empty">{busy ? 'Reading…' : '— empty —'}</div>}
+      {error && <div className="vb-error">{error}</div>}
+      {rows.length === 0 && (
+        <div className="control-empty vb-empty vb-empty-small">{busy ? 'Reading…' : '— empty —'}</div>
+      )}
 
       {rows.map((row) => {
         if (row.kind === 'more') {

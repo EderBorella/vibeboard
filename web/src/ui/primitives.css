@@ -101,11 +101,35 @@
   padding: 0 var(--s-3); font-size: var(--t-micro);
 }
 .vb-chip-pill { border-radius: var(--r-pill); }
+/* A count, not a state: a ground rather than an outline. See ui/Chip.tsx for the four it replaces. */
+.vb-chip-fill { background: var(--panel-2); }
 .vb-chip-neutral { color: var(--muted); }
 .vb-chip-accent { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 50%, var(--border)); }
 .vb-chip-ok { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 50%, var(--border)); }
 .vb-chip-warn { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 50%, var(--border)); }
 .vb-chip-bad { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 55%, var(--border)); }
+
+/* ---------- SegmentedControl ---------- */
+/* THE GROUP OWNS ONE BORDER AND ONE CORNER AND CLIPS ITS CELLS, which is exactly why Phases 3 and 4 both
+   refused to make these `Button`s: every variant gives the cell its own border and radius, and that puts
+   a seam down the middle of the group.
+   `.mode-group` and `.backend-toggle` were byte-identical, and `.mode-btn` and `.bt-btn` were identical
+   apart from one size step — with `.backend-toggle-md .bt-btn` restating `.mode-btn`'s padding and
+   font-size verbatim, which is the file asserting the equality itself. Four classes, one shape. */
+.vb-seg {
+  display: flex; border: 1px solid var(--border); border-radius: var(--r-md); overflow: hidden;
+}
+.vb-seg-cell {
+  background: var(--panel-2); color: var(--muted);
+  border: none; border-right: 1px solid var(--border);
+  padding: var(--s-2) var(--s-4); font-size: var(--t-small); cursor: pointer;
+}
+/* `0.18rem` stays as authored rather than going to `--s-1`: it is below the 0.25rem floor the space scale
+   deliberately does not claim, where the nearest step is a 2-6x change on what is a hairline. */
+.vb-seg-cell-sm { padding: 0.18rem var(--s-4); font-size: var(--t-micro); }
+.vb-seg-cell:last-child { border-right: none; }
+.vb-seg-cell.active { background: var(--accent-fill); color: var(--on-fill); font-weight: 600; }
+.vb-seg-cell:disabled { opacity: 0.6; cursor: default; }
 
 /* ---------- Panel ---------- */
 /* THE VARIANT SAYS WHETHER THE BOX IS DRAWN. `raised` draws a ground, a border and a 10px corner;
@@ -136,3 +160,165 @@
    which is what `.exec-card` said by hand. */
 button.vb-panel { cursor: pointer; }
 button.vb-panel:disabled { cursor: default; }
+
+/* ---------- Readout ---------- */
+/* THE SIGNATURE: every machine-measured fact is tabular monospace, everything a person wrote is not.
+   `tabular-nums` is what makes a column of figures line up on the digit — it is the CLAIM, not the
+   face, and `visual/checks/board.spec.ts` measures it by stacking two readouts of different digits and
+   comparing their glyph advance rather than by reading the font name back.
+   The DEFAULT carries `--t-micro` and `--muted` because eleven classes said exactly that by hand — see
+   ui/Readout.tsx for the census. A variant here is a distinction a person can actually see. */
+.vb-readout {
+  font-family: var(--font-mono); font-variant-numeric: tabular-nums; letter-spacing: -0.01em;
+  font-size: var(--t-micro); color: var(--muted);
+}
+.vb-readout-small { font-size: var(--t-small); }
+.vb-readout-body { font-size: var(--t-body); }
+/* A figure inside a line that has already decided its size and colour — a model name in a select
+   trigger, a definition in a report's meta list. */
+.vb-readout-plain { font-size: inherit; color: inherit; }
+.vb-readout-accent { color: var(--accent); }
+.vb-readout-accent2 { color: var(--accent-2); }
+.vb-readout-text { color: var(--text); }
+.vb-readout-quiet { opacity: 0.85; }
+/* A LINE of figures, which five surfaces each wrote their own version of: the two ledgers, a card's meta
+   row, a diary entry's and a filed finding's. They agreed on everything except a gap nobody chose —
+   8/8px, 3.2/14.4px and 8/8px — so the row is the primitive's and the surfaces keep only where it sits.
+   `baseline` and not `center`: the parts are text at two sizes, and centring line boxes of different
+   sizes puts their baselines at different heights, which is the argument `.topbar` already makes. */
+.vb-readout-block {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--s-2) var(--s-5);
+  margin: 0; font-size: var(--t-small); color: var(--muted);
+}
+
+/* ---------- Field ---------- */
+/* THE FORM CONTROL, and the census is the argument: TEN text boxes were written ten times and agreed on
+   the ground, the border, the corner and the size — see test/field-boxes.test.tsx, which pinned all four
+   before this existed. They disagreed on the padding (five values: `var(--s-4) var(--s-4)`,
+   `var(--s-3) var(--s-4)`, `var(--s-2) var(--s-4)`, `var(--s-4)`, `0.8rem`) and, in two cases, on
+   whether focus was answered at all: `.skill-input` and `.dispatch-prompt` declared no `:focus` rule, so
+   a skill's name and a dispatch prompt kept the UA outline where every other box in the app turns its
+   border accent. That inconsistency is fixed here rather than at the two sites, because the class of
+   defect is open-ended — the next box added would have had the same coin-flip.
+   `var(--s-3) var(--s-4)` is the padding, which is the one of the five a person had chosen (five of the
+   ten already carried it) and the same value `Panel`'s `flat` variant landed on for the same reason.
+   THE DESCENDANT SELECTOR IS DELIBERATE: a caller wraps a real `<input>`, `<textarea>` or `<select>` and
+   does not have to remember a class for it. `.vb-input` is the same box for a control that is not inside
+   a Field — an inline rename, a model search, a typed confirmation. */
+.vb-field { display: flex; flex-direction: column; gap: var(--s-2); }
+/* A checkbox reads left-to-right — the control, then what it does — and a rail label reads label-then-box.
+   Everything else holds a value and is label-above. */
+.vb-field-row { flex-direction: row; align-items: center; gap: var(--s-4); }
+.vb-label { font-size: var(--t-small); color: var(--muted); }
+/* THE CAPS FACE, AND IT WAS NAMED AT EIGHT CALL SITES BEFORE IT EXISTED. `vb-label-caps` is written in
+   SkillEditor's three rail labels and DispatchPane's five, and no stylesheet contained the string until
+   this commit: the tracking and the `text-transform` sat on `.vb-label-rail`, which is why seven of the
+   eight looked right anyway and `DispatchPane.tsx`'s prompt label — a caps label with no rail — rendered
+   in lower case. Neither gate could see it, because `check-class-budget.mjs` reads CSS → code and this
+   name goes the other way.
+   So the two are separated by what they decide: the RAIL is a width, the CAPS is a face. `margin: 0`
+   belongs here because a caps label is a label whatever element carries it, and half of these are
+   headings that would otherwise take the UA's paragraph margins. */
+.vb-label-caps { text-transform: uppercase; letter-spacing: 0.06em; margin: 0; }
+/* The label in a fixed-width rail beside its control, which the skill editor and the dispatch pane each
+   wrote their own of at 6rem and 5.5rem — half a rem apart, and nobody chose either. */
+.vb-label-rail { width: 6rem; flex: 0 0 auto; }
+.vb-input, .vb-trigger, .vb-field input, .vb-field textarea, .vb-field select {
+  background: var(--bg); color: var(--text);
+  border: 1px solid var(--border); border-radius: var(--r-md);
+  padding: var(--s-3) var(--s-4); font: inherit; font-size: var(--t-body);
+}
+.vb-input:focus, .vb-field input:focus, .vb-field textarea:focus, .vb-field select:focus {
+  outline: none; border-color: var(--accent);
+}
+/* A SELECT TRIGGER IS THAT BOX WITH A CARET ON IT, and docs/design-system.md has said so twice without
+   either of them becoming one: Phase 3 and Phase 4 both listed `.chat-current` and `.mp-trigger` as "an
+   `<input>` that happens to be a button" and left them out. They are the box above — same 1px border,
+   same `--r-md` corner, same ground — plus a caret pinned right and an ellipsised label.
+   THE TWO DIFFERENCES BETWEEN THEM WERE NOT CHOSEN. The chat switcher sat on `--panel-2` and the model
+   picker on `--bg`, while nine of the ten text boxes `Field` took chose `--bg`; and their vertical
+   paddings were two pixels apart. Both now take the box's, which also puts them at `--t-body` beside the
+   real inputs they share a row with — a control at 12px next to an input at 13px is the shape of the
+   10.88px incident.
+   The hover makes the same statement `:focus` makes on an input: this is the control you are about to
+   use. It is a hover rather than a focus because a trigger is reached by pointer far more than by tab,
+   and `:focus-visible` still draws the app's ring on top. */
+.vb-trigger {
+  width: 100%; display: flex; align-items: center; gap: var(--s-3);
+  text-align: left; cursor: pointer;
+}
+.vb-trigger:hover:not(:disabled) { border-color: var(--accent); }
+.vb-trigger:disabled { opacity: 0.5; cursor: default; }
+/* The label takes the slack and ellipsises; the caret does not shrink. Named rather than reached by
+   `:first-child`, because the trigger's label is sometimes a `Readout` and sometimes plain prose, and a
+   positional selector makes the order of two spans load-bearing.
+   ONE CARET, AND IT WAS TWO. `.mp-caret` was `--muted` at the trigger's own size and `.chat-caret` was
+   `--accent` at `--t-micro` — the same glyph in the same role, and nothing chose the difference. Muted,
+   because a caret is furniture on a control whose border already answers the hover; an accent caret
+   shouts where the border has already spoken. */
+.vb-trigger-label {
+  flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left;
+}
+.vb-caret { color: var(--muted); flex: none; }
+/* A hint says how something works. Six of them were written; four were italic and two were not, at three
+   different sizes. */
+.vb-hint { font-size: var(--t-small); color: var(--muted); font-style: italic; line-height: 1.45; }
+/* MUTED PROSE WHERE CONTENT WOULD BE, and seventeen classes said it. Every one of the seventeen declared
+   `color: var(--muted)` — that is the family — and they agreed on nothing else: four sizes, five
+   paddings, three line-heights, and SEVEN ITALIC AGAINST TEN NOT with nothing whatever distinguishing
+   them. `.cv-nobody`, `.report-empty` and `.inline-empty` were byte-for-byte one declaration set under
+   three names.
+   Italic is the default because `.vb-hint` above already established it for muted secondary prose, and
+   because an empty state is the interface talking about ITSELF rather than showing content — the same
+   distinction the readout draws between a measured fact and a written sentence. `margin: 0` is here for
+   the reason it is on `.vb-label-caps`: half of these are `<p>`s that never wanted a paragraph's margins.
+   ONE SIZE VARIANT AND NO MORE. `--t-small` earns its place on four consumers inside dense lists; the
+   diary's `--t-lead` blank and the two `--t-micro` tree rows keep their own size, because a variant with
+   one consumer is a name that decides nothing.
+   NOT IN THIS FAMILY, each for a reason a person can see: `.column-empty` is a dashed drop target,
+   `.diary-empty` is a flex column with a button in it, and `.empty` / `.control-blank` are `margin: auto`
+   blanks filling a pane — a layout rather than a line. */
+.vb-empty {
+  color: var(--muted); font-size: var(--t-body); font-style: italic; line-height: 1.5; margin: 0;
+}
+.vb-empty-small { font-size: var(--t-small); }
+
+/* A LINE OF DANGER INK beside the thing that refused, which nine classes said. The other shape an error
+   took — a tinted box that is the whole answer to a submit — is `.vb-notice-bad` below: three error boxes
+   and two sandbox states and a disclaimer turned out to be one box in three hues. */
+.vb-error { font-size: var(--t-small); color: var(--danger); }
+
+/* THE TINTED NOTICE, and five classes drew it. `.vb-error-box`, `.settings-warn`, `.control-disclaimer`
+   and `.sandbox-state` each declared the same box — a `--r-md` corner, `var(--s-4) 0.7rem` of padding and
+   a 1px border — and differed only in hue and in a line-height nobody chose (1.45 / 1.5 / 1.55, three
+   values for one property). `.sandbox-ok` and `.sandbox-off` were already a tone SET written by hand on
+   top of `.sandbox-state`, which is what says this shape wanted a tone axis rather than four more names.
+   THREE TONES AND THE INK IS PART OF THE TONE. `bad` is danger ink because a refusal IS the answer to
+   what you just did; `warn` and `ok` are prose ink because they are conditions you can read and act on,
+   which is `.control-disclaimer`'s own argument — "set as prose rather than as status".
+   `--warn` and `--danger` are NOT interchangeable: themes.css gives them different values in marshmallow
+   and equal ones in the other two, and argues that by name. So a caution keeps `--warn` with its
+   `var(--warn, var(--danger))` fallback, exactly as `.settings-warn` wrote it. */
+.vb-notice {
+  font-size: var(--t-body); line-height: 1.5;
+  border: 1px solid transparent; border-radius: var(--r-md); padding: var(--s-4) 0.7rem;
+}
+.vb-notice-bad {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  border-color: color-mix(in srgb, var(--danger) 35%, transparent);
+}
+.vb-notice-warn {
+  color: var(--text);
+  background: color-mix(in srgb, var(--warn, var(--danger)) 10%, transparent);
+  border-color: color-mix(in srgb, var(--warn, var(--danger)) 32%, transparent);
+}
+.vb-notice-ok {
+  color: var(--text);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 30%, transparent);
+}
+/* Inline code inside a notice is machine vocabulary in a sentence, which `.settings-warn code` already
+   said. Two stacked notices need separating, which `.sandbox-state + .sandbox-state` already said. */
+.vb-notice code { font-family: var(--font-mono); font-size: var(--t-small); }
+.vb-notice + .vb-notice { margin-top: var(--s-3); }

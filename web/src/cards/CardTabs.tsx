@@ -56,7 +56,7 @@ export function CardTabs({
         <Button
           variant={rawActive ? 'primary' : 'default'}
           size="sm"
-          className="cards-raw"
+          className="push"
           data-testid="cards-raw"
           title="Show the card's file, frontmatter and all"
           aria-pressed={rawActive}

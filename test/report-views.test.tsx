@@ -125,7 +125,7 @@ describe('CardReports', () => {
         onCancel={vi.fn()}
       />,
     );
-    expect(document.querySelector('.report-when')?.textContent).toBe('2026-07-26 14:41');
+    expect(document.querySelector('[data-testid="report-when"]')?.textContent).toBe('2026-07-26 14:41');
   });
 
   it('falls back to when it started for a run that has not finished', () => {
@@ -139,7 +139,7 @@ describe('CardReports', () => {
         onCancel={vi.fn()}
       />,
     );
-    expect(document.querySelector('.report-when')?.textContent).toBe('2026-07-26 14:30');
+    expect(document.querySelector('[data-testid="report-when"]')?.textContent).toBe('2026-07-26 14:30');
   });
 
   it('shows each run’s cost, and nothing where it is unknown', () => {
@@ -155,7 +155,7 @@ describe('CardReports', () => {
     );
     // One row has a cost, the other has no element at all — not an empty one, which would leave a
     // gap implying the run was free.
-    const costs = [...document.querySelectorAll('.report-cost')].map((n) => n.textContent);
+    const costs = [...document.querySelectorAll('[data-testid="report-cost"]')].map((n) => n.textContent);
     expect(costs).toEqual(['$0.042']);
   });
 
@@ -170,7 +170,7 @@ describe('CardReports', () => {
         onCancel={vi.fn()}
       />,
     );
-    expect(document.querySelector('.report-cost')?.textContent).toBe('$0');
+    expect(document.querySelector('[data-testid="report-cost"]')?.textContent).toBe('$0');
   });
 
   it('leaves the summary blank rather than printing undefined', () => {
@@ -620,9 +620,9 @@ describe('ActiveReport', () => {
     render(<ActiveReport {...props} record={run({ created: ['E-041', 'E-999'] })} />);
     // The EXACT set: E-999 was never on the board, but E-010 is — so asserting only that E-999 is
     // absent would pass just as well if the filter were dropped entirely.
-    expect([...document.querySelectorAll('.report-created .link-id')].map((e) => e.textContent)).toEqual([
-      'E-041',
-    ]);
+    expect(
+      [...document.querySelectorAll('.report-created [data-testid="created-id"]')].map((e) => e.textContent),
+    ).toEqual(['E-041']);
   });
 
   it('links nothing when the run created nothing', () => {
@@ -672,7 +672,7 @@ describe('a card’s ledger line', () => {
         onCancel={vi.fn()}
       />,
     );
-    const line = document.querySelector('.reports-ledger')?.textContent ?? '';
+    const line = document.querySelector('[data-testid="reports-ledger"]')?.textContent ?? '';
     expect(line).toContain('$0.420 usage');
     expect(line).toContain('implement 2 of 3');
   });
@@ -690,7 +690,7 @@ describe('a card’s ledger line', () => {
         onCancel={vi.fn()}
       />,
     );
-    const line = document.querySelector('.reports-ledger')?.textContent ?? '';
+    const line = document.querySelector('[data-testid="reports-ledger"]')?.textContent ?? '';
     expect(line).toContain('implement 2 of 3');
     expect(line).not.toContain('review');
   });
@@ -706,7 +706,7 @@ describe('a card’s ledger line', () => {
         onCancel={vi.fn()}
       />,
     );
-    expect(document.querySelector('.reports-ledger')?.textContent).toContain('not reported');
+    expect(document.querySelector('[data-testid="reports-ledger"]')?.textContent).toContain('not reported');
   });
 
   it('renders no line at all before the ledger has arrived', () => {
@@ -720,6 +720,6 @@ describe('a card’s ledger line', () => {
         onCancel={vi.fn()}
       />,
     );
-    expect(document.querySelector('.reports-ledger')).toBeNull();
+    expect(document.querySelector('[data-testid="reports-ledger"]')).toBeNull();
   });
 });

@@ -42,7 +42,7 @@ export function ReportOptions({
 
   return (
     <section className="options" aria-label="What next">
-      <h4 className="options-head">What next?</h4>
+      <h4 className="vb-label vb-label-caps">What next?</h4>
       {!canContinue && (
         <p className="options-warn">
           The skill this run used is no longer in the project, so there is nothing to continue with. Closing

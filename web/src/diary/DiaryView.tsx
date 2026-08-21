@@ -3,6 +3,8 @@ import { addDiaryEntry, type DiaryEntry } from '../api';
 import { MAX_ENTRY_TEXT, type Suggestion } from '../shared';
 import { useSuggestions } from '../suggestions/useSuggestions';
 import { Button } from '../ui/Button';
+import { Chip } from '../ui/Chip';
+import { ReadoutLine } from '../ui/Readout';
 import { useAction } from '../useAction';
 import { useDiary } from './useDiary';
 
@@ -38,9 +40,9 @@ function About({ entry }: { entry: DiaryEntry }) {
   return (
     <span className="diary-about">
       {bits.map((bit) => (
-        <span className="diary-chip" key={bit}>
+        <Chip pill className="vb-readout" testId="diary-chip" key={bit}>
           {bit}
-        </span>
+        </Chip>
       ))}
     </span>
   );
@@ -55,12 +57,12 @@ const DiaryList = memo(function DiaryList({ entries }: { entries: DiaryEntry[] }
     <ol className="diary-list">
       {ordered.map(({ entry, at }) => (
         <li className="diary-entry" data-kind={entry.kind} key={`${at}-${entry.at}`}>
-          <div className="diary-meta">
+          <ReadoutLine>
             <span className="diary-kind">{entry.kind}</span>
             <time dateTime={entry.at}>{when(entry.at)}</time>
             <About entry={entry} />
             {entry.outcome && <span className="diary-outcome">{entry.outcome}</span>}
-          </div>
+          </ReadoutLine>
           <p className="diary-text">{entry.text}</p>
         </li>
       ))}
@@ -80,15 +82,27 @@ function FiledList({ suggestions }: { suggestions: Suggestion[] }) {
     <ol className="filed-list">
       {ordered.map((s) => (
         <li className="filed-entry" data-state={s.state} key={s.id}>
-          <div className="filed-meta">
+          <ReadoutLine>
             <span className="filed-state">{s.state}</span>
             <time dateTime={s.created}>{when(s.created)}</time>
             {/* Only what is there: a project-level finding carries no card, and an invented dash for
                 every absent field would make every row look the same shape. */}
-            {s.run && <span className="diary-chip">{s.run}</span>}
-            {s.card && <span className="diary-chip">{s.card}</span>}
-            {s.became && <span className="diary-chip">became {s.became}</span>}
-          </div>
+            {s.run && (
+              <Chip pill className="vb-readout">
+                {s.run}
+              </Chip>
+            )}
+            {s.card && (
+              <Chip pill className="vb-readout">
+                {s.card}
+              </Chip>
+            )}
+            {s.became && (
+              <Chip pill className="vb-readout">
+                became {s.became}
+              </Chip>
+            )}
+          </ReadoutLine>
           <p className="filed-title">{s.title}</p>
           {s.body && <p className="filed-text">{s.body}</p>}
           {s.reason && <p className="filed-reason">{s.reason}</p>}
@@ -194,7 +208,7 @@ export function DiaryView({ bump }: { bump: number }) {
           </Button>
         </div>
         {/* `assertive`, not `polite`: the entry was NOT written, and the box still holds what was typed. */}
-        <div aria-live="assertive">{error && <p className="diary-error">{error}</p>}</div>
+        <div aria-live="assertive">{error && <p className="vb-error">{error}</p>}</div>
 
         {failed ? (
           <div className="diary-empty">

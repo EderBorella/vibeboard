@@ -87,7 +87,7 @@ describe('where the control appears', () => {
         onForgiven={vi.fn()}
       />,
     );
-    const line = document.querySelector('.reports-ledger');
+    const line = document.querySelector('[data-testid="reports-ledger"]');
     expect(line?.textContent).toContain('execute 3 of 3');
     expect(line?.querySelector('[data-testid="reports-forgive"]')).toBeTruthy();
   });

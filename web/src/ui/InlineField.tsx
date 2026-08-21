@@ -63,8 +63,7 @@ export function InlineField({
     );
   }
 
-  const shown =
-    value === '' ? <span className="inline-empty">{placeholder}</span> : (display?.(value) ?? value);
+  const shown = value === '' ? <span className="vb-empty">{placeholder}</span> : (display?.(value) ?? value);
   const cls = `inline-view${className ? ` ${className}` : ''}`;
   const open = (): void => setDraft(value);
 

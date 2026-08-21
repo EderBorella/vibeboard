@@ -113,7 +113,7 @@ export function useConfirm(): Confirmer {
             <label className="confirm-require">
               Type <strong>{request.requireText}</strong> to confirm
               <input
-                className="confirm-input"
+                className="vb-input"
                 value={typed}
                 autoFocus
                 onChange={(e) => setTyped(e.target.value)}

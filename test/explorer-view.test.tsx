@@ -93,7 +93,7 @@ describe('ExplorerView', () => {
     fireEvent.click(row('README.md'));
     await waitFor(() => expect(screen.getByRole('textbox')).toBeTruthy());
     expect((screen.getByRole('textbox') as HTMLTextAreaElement).value).toBe('# hello\n');
-    expect(screen.getByText('README.md', { selector: '.control-editor-path' })).toBeTruthy();
+    expect(screen.getByText('README.md', { selector: '[data-testid="editor-path"]' })).toBeTruthy();
   });
 
   it('saves the buffer and refreshes the folder, because the size just changed', async () => {
@@ -315,7 +315,7 @@ describe('ExplorerView — creating and renaming', () => {
     await waitFor(() => expect(api.renameFsNode.mock.calls).toEqual([['old.md', 'new name.md']]));
     // The editor was showing the old path; it must follow the file rather than keep a dead one.
     await waitFor(() =>
-      expect(screen.getByText('new name.md', { selector: '.control-editor-path' })).toBeTruthy(),
+      expect(screen.getByText('new name.md', { selector: '[data-testid="editor-path"]' })).toBeTruthy(),
     );
   });
 
@@ -637,7 +637,7 @@ describe('ExplorerView — dragging to move', () => {
       expect(api.listDir.mock.calls.map(([p]) => p).sort()).toEqual(expect.arrayContaining(['', 'docs'])),
     );
     await waitFor(() =>
-      expect(screen.getByText('docs/a.md', { selector: '.control-editor-path' })).toBeTruthy(),
+      expect(screen.getByText('docs/a.md', { selector: '[data-testid="editor-path"]' })).toBeTruthy(),
     );
   });
 

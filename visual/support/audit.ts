@@ -731,3 +731,54 @@ export async function auditFocus(page: Page): Promise<FocusAudit> {
 export async function documentOverflow(page: Page): Promise<{ scrollWidth: number; clientWidth: number }> {
   return page.evaluate(pageDocument);
 }
+
+export interface ReadoutAudit {
+  readouts: number;
+  // Two stacked readouts of the same digit COUNT and different digits. Tabular numerals mean one advance
+  // per digit, so these are equal — which is the claim, and it is a claim about widths and not about a
+  // font name.
+  digitWidths: [number, number];
+  // The same two, in the widest and narrowest letters the face has. In a MONOSPACED face these are also
+  // equal; in the proportional body face they are not, by a mile.
+  glyphWidths: [number, number];
+  // The control: the identical pair measured in the surface's own type instead of a readout's. It exists
+  // because the assertion above is only worth anything if the measurement can tell the two apart at all
+  // — a check that compares two numbers a proportional face also renders identically is vacuous, and
+  // this is the number that proves it is not.
+  controlWidths: [number, number];
+}
+
+// THE SIGNATURE'S OWN CLAIM, MEASURED. `font-variant-numeric: tabular-nums` and a monospaced face are
+// what make a column of figures line up on the digit; asserting the `font-family` string back would
+// assert that a declaration exists, which is not the same thing and would pass with the numerals still
+// proportional. So two clones are stacked and their advance compared.
+function pageReadouts(): ReadoutAudit {
+  const source = document.querySelector('.vb-readout');
+  if (!source) return { readouts: 0, digitWidths: [0, 0], glyphWidths: [0, 0], controlWidths: [0, 0] };
+  const host = document.createElement('div');
+  host.style.cssText = 'position:fixed;left:-9999px;top:0;white-space:pre;';
+  document.body.appendChild(host);
+  const measure = (template: Element, text: string): number => {
+    const probe = template.cloneNode(false) as HTMLElement;
+    probe.style.whiteSpace = 'pre';
+    probe.textContent = text;
+    host.appendChild(probe);
+    const width = probe.getBoundingClientRect().width;
+    probe.remove();
+    return width;
+  };
+  // The surface the readout sits in, for the control pair: its own type, whatever that is.
+  const surface = source.parentElement ?? document.body;
+  const audit: ReadoutAudit = {
+    readouts: document.querySelectorAll('.vb-readout').length,
+    digitWidths: [measure(source, '1111111111'), measure(source, '8888888888')],
+    glyphWidths: [measure(source, 'iiiiiiiiii'), measure(source, 'MMMMMMMMMM')],
+    controlWidths: [measure(surface, 'iiiiiiiiii'), measure(surface, 'MMMMMMMMMM')],
+  };
+  host.remove();
+  return audit;
+}
+
+export async function auditReadouts(page: Page): Promise<ReadoutAudit> {
+  return page.evaluate(pageReadouts);
+}

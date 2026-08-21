@@ -3,6 +3,7 @@ import type { ChatMeta } from '../shared';
 import { Button } from '../ui/Button';
 import { Chip } from '../ui/Chip';
 import { Panel } from '../ui/Panel';
+import { Readout } from '../ui/Readout';
 import { backendLabel, relTime } from './format';
 
 interface Props {
@@ -27,19 +28,19 @@ export function ChatSwitcher({ chats, currentChatId, backend, running, onOpen, o
     <div className="copilot-chatbar">
       <div className="chat-switcher">
         <button
-          className="chat-current"
+          className="vb-trigger"
           disabled={running}
           onClick={() => setChatMenu((v) => !v)}
           title="Chat history"
         >
-          <span className="chat-current-title">{currentTitle}</span>
-          <span className="chat-caret">▾</span>
+          <span className="vb-trigger-label">{currentTitle}</span>
+          <span className="vb-caret">▾</span>
         </button>
         {chatMenu && (
           <>
             <div className="chat-menu-backdrop" onClick={() => setChatMenu(false)} />
             <div className="chat-menu" role="menu">
-              {chats.length === 0 && <div className="chat-menu-empty">No saved chats yet</div>}
+              {chats.length === 0 && <div className="vb-empty vb-empty-small">No saved chats yet</div>}
               {chats.map((c) => (
                 <div key={c.id} className={`chat-menu-item${c.id === currentChatId ? ' active' : ''}`}>
                   <Panel
@@ -59,9 +60,9 @@ export function ChatSwitcher({ chats, currentChatId, backend, running, onOpen, o
                       </Chip>
                       {c.title}
                     </span>
-                    <span className="chat-menu-meta">
+                    <Readout>
                       {relTime(c.updatedAt)} · {c.messageCount} msg
-                    </span>
+                    </Readout>
                   </Panel>
                   <Button
                     variant="bare"

@@ -1,6 +1,8 @@
 # The design system, and how it lands in phases
 
-**Status: Phases 0–4 done (2026-08-21), Phase 5 planned.** Phase 0 built the instrument and
+**Status: Phases 0–5 done (2026-08-21). The class count is 380 against a target of 183 — re-derived on
+2026-08-21 from the measured surface count, with the plan's *under 150* withdrawn as unreachable at its
+own allowance. What stands between 380 and 183 is measured under Phase 5b.** Phase 0 built the instrument and
 measured, touching no stylesheet; Phase 1 added the 17 tokens and nothing that consumes them; Phase 2
 collapsed the type and space values onto them, which is the first phase that changes rendering. This page is
 the argument and the sequence; the work is phased so each phase ships on its own and can be reverted on its
@@ -42,13 +44,64 @@ next surface invents a new one, just from a nicer list.
 
 ### Deleting the one-offs is not enough on its own
 
-**Deleting every one of the 278 one-offs leaves 179, and the target is under 150 — so the sweep cannot only
-delete; it has to merge.** 457 − 278 = **179**, and the gap is not a rounding error: it is roughly **30
-surviving classes that have to be merged into something else**, on top of every deletion. A systematised
-stylesheet's whole budget is about that 150: six primitives with four or five variants each is roughly 30
-classes, and ten genuinely bespoke surfaces — the board grid, the dock, the two bars, the skill rail, the
-explorer, settings, chat, card tabs, the diary — want perhaps 80 layout classes between them. There is no
-slack in it anywhere.
+**Deleting every one of the 278 one-offs leaves 179 — so the sweep cannot only delete; it has to merge.**
+457 − 278 = **179**, and the gap to any credible budget is not a rounding error: dozens of surviving
+classes have to be merged into something else, on top of every deletion.
+
+#### ~~Under 150~~ is WITHDRAWN, and the target is **183**
+
+**The under-150 figure was wrong, and it was wrong in exactly the way this page's own rule forbids.** It
+was derived as *"six primitives with four or five variants each is roughly 30 classes, and ten genuinely
+bespoke surfaces — the board grid, the dock, the two bars, the skill rail, the explorer, settings, chat,
+card tabs, the diary — want perhaps 80 layout classes between them"*, giving 110 and a target of under 150.
+**Both terms were estimated and neither was counted.** The surface count was written down from memory of
+the interface; nobody enumerated `web/src`. *A target expressed against a number nobody can reproduce is
+not a target* is this page's rule about the withdrawn **432**, and 150 breaks it the same way — 432 was a
+total nobody could reproduce, and 150 was a total derived from a surface count nobody had taken.
+
+**It was also unreachable at its own allowance, which is what makes it a wrong number rather than an
+ambitious one.** The measured surface count is **17** and the plan's allowance is **8 layout classes per
+surface**, so the surfaces alone want 136; the primitives, measured rather than estimated, are **47**.
+136 + 47 = **183**, and 183 is already above 150. The plan therefore set a target its own arithmetic
+excludes, and no amount of sweeping could have reached it without breaking the allowance it was derived
+from.
+
+**The re-derived target is 183, at the plan's own allowance and the measured counts:**
+
+| term | plan's estimate | measured | how |
+|---|---|---|---|
+| bespoke surfaces | 10 | **17** | 16 feature directories under `web/src` besides `ui/` and `api/`, plus `markdown.tsx`, which is a bespoke surface with its own class family and no directory of its own |
+| layout classes per surface | 8 | **8, kept** | The plan's allowance, unchanged — it is the one term with no better measurement, and re-deriving the budget is not licence to widen it |
+| primitive classes | ~30 | **47** | `web/src/ui/primitives.css`, six primitives with their variants, counted |
+| **budget** | **110 → under 150** | **183** | 17 × 8 + 47 |
+
+Measured on 2026-08-21, and every figure here is a command:
+
+```
+# 17 surfaces — 16 feature directories, plus markdown.tsx
+ls -d web/src/*/ | sed 's|web/src/||;s|/$||' | grep -vx 'ui\|api' | wc -l     # 16
+find web/src -maxdepth 1 -name '*.tsx'                                        # markdown.tsx, main.tsx
+# 47 primitive classes and 355 in styles.css, by the method beside the class counts above
+node tools/check-class-budget.mjs
+```
+
+**`main.tsx` is not one of the 17 and `markdown.tsx` is**, which is the one judgement in the count rather
+than a measurement: `main.tsx` mounts the app and renders no surface of its own, while `markdown.tsx` owns
+the rendered-document surface — the one `--t-display`'s single consumer lives on. So it is 16 directories
+plus one file, not 17 directories, and anyone re-running the first command above gets 16 and should.
+
+**The 8-per-surface allowance is the term to distrust next, and it is recorded as a tension rather than
+quietly widened.** No surface in the tree is near it: `styles.css`'s 355 classes sit under **75 distinct
+prefixes**, and the largest families are `ap-*` **29**, `mp-*` **22**, `report-*` **19**, `control-*`
+**17**, `copilot-*` **14**, `chat-*` **13**, `diary-*` **12**, `cv-*` **11**. The auto-pilot bar alone
+holds three and a half times its allowance. Whether 8 is a floor a real surface can live at is the open
+question behind the remaining gap, and it is the one thing in this budget still expressed against a number
+nobody has measured — a surface built to the allowance. Until one exists, 8 is inherited from the plan and
+marked as inherited.
+
+**183 is a total, not a reduction**, exactly as 150 was meant to be: `styles.css` plus `primitives.css`,
+distinct union, measured by `node tools/check-class-budget.mjs`, with the closing number written into this
+page. A target expressed as "fewer than we have" is not a target.
 
 **The corrected numbers make this argument stronger, not weaker.** On the withdrawn 432 / 154 figures the
 remaining work after the deletions looked like a handful of stragglers, and a plan can talk itself into
@@ -60,9 +113,6 @@ That reframes what the phases are for. Every one-off removed is a class that was
 shape; every *surviving* class then has to justify itself against the question "is this genuinely a different
 thing, or the same thing under a second name?" — and on the evidence of 104 hand-made rounded boxes, most
 answers will be the second.
-
-**The target is a total, not a reduction:** `styles.css` under **150 class selectors**, measured, with the
-closing number written into this page. A target expressed as "fewer than we have" is not a target.
 
 The clearest evidence is `0.72` / `0.74` / `0.76` / `0.78` / `0.80` / `0.82rem` all being in use — a
 2-hundredths-of-a-rem ladder nobody chose and nobody can see, which accumulates into an interface that
@@ -182,8 +232,17 @@ hand many times over.
 | `Chip` **(built, Phase 3)** | tags, state words, counts, badges | tones `neutral` \| `accent` \| `ok` \| `warn` \| `bad`, optional `pill`, plus `data-state` for a surface vocabulary outside the five |
 | `Dot` **(built, Phase 3)** | `.ap-dot`, `.conn`, `.ap-agent-dot` — three hand-rolled indicators already | tones as `Chip`, sizes `7` \| `8` \| `12`px |
 | `Panel` **(built, Phase 4)** | board columns, drawers, the halt card, the nine full-bleed list rows | `flat` \| `raised`, optional header slot, `as` of `div`\|`section`\|`button` |
-| `Readout` | the signature above: every duration, cost, token count, run id | inline \| block |
-| `Field` | `InlineField`, settings inputs, the gate form | label + control + hint + error |
+| `Readout` **(built, Phase 5)** | the signature above: every duration, cost, token count, run id | inline (`Readout`, sizes `micro`\|`small`\|`body`\|`plain`, tones `muted`\|`accent`\|`accent2`\|`text`, `quiet`) \| block (`ReadoutLine`) |
+| `Field` **(built, Phase 5)** | settings inputs, the gate form, the skill editor, the dispatch pane — **not** `InlineField`, whose commit-on-blur is behaviour and stays where it is | label + control + hint + error, `layout` of `stack`\|`rail`\|`check`, plus `.vb-trigger` for the two select triggers |
+| `SegmentedControl` **(built, Phase 5b)** | `.mode-group` + `.backend-toggle` (byte-identical) and `.mode-btn` + `.bt-btn` (identical apart from one size step) | sizes `sm` \| `md`; the GROUP owns the one border and corner and clips its cells |
+
+**Six was the plan's count and seven is the tree's, and the seventh was added by measurement rather
+than by design.** `SegmentedControl` exists because four classes were already one shape and the
+stylesheet said so itself: `.backend-toggle-md .bt-btn` restated `.mode-btn`'s padding and font-size
+verbatim. Taken as multisets the four classes declared **36 things with 19 distinct values**; the three
+primitive classes declare **19**, and the distinct sets are identical — 0 added, 0 removed, 0 changed.
+That is a stronger argument than a consumer count: `Button` gained `bare` on twelve classes and `Chip`
+gained `fill` on four, but neither had a rule in the file asserting the equality.
 
 **`Button`'s `ghost` variant carries a DASHED border**, ruled by the owner on 2026-08-20 reviewing the
 samples. Not merely decorative: dashed reads as explanatory rather than actionable, which is what a help
@@ -518,8 +577,9 @@ and was empty on all three themes.
   exits **1** with "this check is vacuous", not 0.
 
 **Exit:** the type gate is blocking and green; 233 authored `font-size` declarations, all on the scale.
-**Class selectors: 457, unchanged** — Phase 2 changes values, not classes, and Phase 5's target of under 150
-is untouched by it.
+**Class selectors: 457, unchanged** — Phase 2 changes values, not classes, and Phase 5's class target
+is untouched by it. (That target read *under 150* when this phase shipped; it is **183** since the
+re-derivation of 2026-08-21.)
 **Revert:** `styles.css`, three baseline files, and the two gates return to reporting.
 
 ### Phase 3 — Button, Dot, Chip — **DONE 2026-08-21**
@@ -726,7 +786,7 @@ taken out, and it is a declaration only the surface can make: `.column-add { mar
 outright had nothing left at all: `.btn-primary`, `.btn-secondary`, `.btn-danger`, `.archive-restore`,
 `.confirm-cancel`, `.dispatch-back`, `.modal-close` and `.option-fixed`.
 
-**So Phase 5's under-150 is not much closer, and the honest reading is that the ratchet and the class count
+**So Phase 5's class target is not much closer, and the honest reading is that the ratchet and the class count
 measure different things.** 46 → 22 is the real result here: the geometry is in one place. The class count
 needs the *merge* the plan already says it needs — and this phase hands it a measured, concrete target,
 because **six of the survivors are now the single declaration `margin-left: auto`**: `.column-add`,
@@ -1045,7 +1105,8 @@ the geometry comes out is a real declaration only the surface can make — `.rep
 `.cv-link-btn { width: fit-content }`, `.exec-card { overflow-wrap: anywhere }`.
 **The distinct UNION across both files is 441**, because `vb-btn` and `vb-dot` are named in
 `styles.css` too (`.halt .vb-btn`, the connection light's dot), so the two methods differ by exactly
-those two names. Phase 5's under-150 target is measured against the union.
+those two names. Phase 5's class target — under 150 when this phase shipped, **183** since the
+re-derivation — is measured against the union.
 
 **Suite: 238 files, 4,135 tests** (`test/panel-boxes.test.tsx` adds 25). **Harness: 30 tests, three
 themes, exit 0.**
@@ -1053,28 +1114,491 @@ themes, exit 0.**
 call it, `styles.css`, `themes.css` (`--radius` returns), three baseline files, `check-radius-scale.mjs`
 (TAGS and the ceiling), and checks 9 and 10 with `pageClipping`, `pageGrid` and `pageDock`.
 
-### Phase 5 — Readout, Field, and the sweep
+### Phase 5 — Readout, Field, and the sweep — **DONE 2026-08-21**
 
-The signature lands, the last primitive arrives, and the dead classes go.
+The signature landed, the last two primitives arrived, and the sweep ran in two passes: **443 → 392** (5a)
+and **392 → 380** (5b). The target is **183** and it is not reached. That gap is the headline of this
+section and it is stated first, because a phase that reports its intention rather than its measurement is
+the thing this document exists to stop. What the number costs and what would close it is *What stands
+between 380 and 183* below.
 
-- `Readout` applied to every duration, cost, token count, run id and attempt tally.
-- `Field` for the remaining inputs.
-- Delete what is now unreferenced, **and merge what survives**. Deleting all 278 one-offs lands at 179,
-  which is already over the whole budget — so every surviving class is asked whether it is a different thing
-  or the same thing under a second name, and roughly 30 of them have to answer "the same thing".
+#### `Readout` — the signature, and where it landed
 
-**Gate:** a check that every class in `styles.css` is referenced from `web/src/`, blocking — **and read
-*Thirty-six classes are never named literally* in *Risks* before writing it, because the naive version of
-this gate deletes live code.** A count of class selectors, blocking at **under 150**. Numbers align
-in a column — asserted by measuring two stacked readouts and comparing their glyph advance, since tabular
-numerals are the claim.
-**Exit:** one number for classes, one for font sizes, one for radii.
+**`.vb-readout` is the treatment: `var(--font-mono)`, `font-variant-numeric: tabular-nums`,
+`letter-spacing: -0.01em` — plus `--t-micro` and `--muted`, which is the part that was measured rather than
+designed.** Eleven classes said exactly `font-family: var(--font-mono); font-size: var(--t-micro); color:
+var(--muted)` under eleven names: `.archive-when`, `.mp-count`, `.mp-id`, `.mp-ctx`, `.copilot-model`,
+`.chat-menu-meta`, `.explorer-size`, `.report-cost`, `.report-when`, `.exec-cost` and `.exec-when`. Eleven
+identical answers is one thing under eleven names, so that combination is the DEFAULT and every variant
+below it is a distinction a person can see: `small` and `body` for the two other steps in use, `plain` for a
+figure inside a line that has already decided its size and colour, `accent` for an id, `accent2` for a
+price, `text` for a total among muted neighbours, and `quiet` (`opacity: 0.85`) which three classes had
+written by hand.
+
+**`ReadoutLine` is the `block` half, and it is a merge of five surfaces.** The two ledgers, a card's meta
+row, a diary entry's and a filed finding's each wrote their own wrapping row and agreed on everything except
+a gap nobody chose — 8/8px, 3.2/14.4px and 8/8px. The primitive is `var(--s-2) var(--s-5)` on a baseline,
+and what the five surfaces keep is only where the row sits: `.execution > .vb-readout-block` spans the grid,
+`.reports > .vb-readout-block` sits under the report list.
+
+**Where the figures are now**: card and run ids, archived-at times, model ids and prices and context sizes,
+file sizes, chat meta, a run's cost and elapsed time, the project and card ledgers, the attempt tally, the
+copilot footer's cost/turns/duration/context, sign-in addresses and dates, project and file paths, and a
+card's created date. **25 readouts render on the board view alone**, counted by check 11.
+
+**A sentence a person wrote is NOT a readout, even when it contains a figure**, and applying that rule
+changed two sites for the better. `.dispatch-continues` — *"Continues run 20260726-141000-9f3e. Its report
+goes to the agent with this one."* — was entirely monospaced, which said the prose was machine-written; now
+the run id is a `Readout` inside proportional prose. `.reports-forgiven` was left alone for the same reason.
+
+**`--t-display` was NOT used, and that is the judgement rather than an omission.** The step is *"the one big
+number per surface"*, and the search for one came up empty: the Execution dashboard's ledger is the only
+candidate and it is a SENTENCE — `usageTotal` renders *"3 runs · $1.20 usage · 5m"* — which at 24px reads as
+shouting rather than as a figure. The copilot's context meter renders a bar and a `48.2k`, not a headline;
+the auto-pilot bar's dominant element is a status line. So `--t-display` keeps its one consumer, the
+markdown h1, and the honest reading is that this product does not have a surface with a single dominating
+number. Inventing one to give the step a second consumer is the tail wagging the dog.
+
+#### `Field` — and the two boxes that answered nothing
+
+**`.vb-field`, `.vb-field-row`, `.vb-label`, `.vb-label-caps`, `.vb-label-rail`, `.vb-input`, `.vb-hint`,
+`.vb-error`, `.vb-error-box`** — nine classes against the twenty-nine they replace, and the control gets its
+box from a DESCENDANT selector (`.vb-field input, .vb-field textarea, .vb-field select`) so a caller cannot
+forget it. `Field` takes `label`, `hint`, `error` and a `layout` of `stack | rail | check`; `check` puts the
+control first because a checkbox holds a decision rather than a value, which is the distinction
+`.field-check` already drew by hand.
+
+**The characterisation suite is `test/field-boxes.test.tsx`, 47 tests, written and run green against the code
+as it was — and it found a real defect.** Ten text boxes were written ten times. They agreed on the ground
+(`--bg`, nine of ten), the border, the `--r-md` corner and `--t-body`; they disagreed on the padding — five
+values, `var(--s-4) var(--s-4)`, `var(--s-3) var(--s-4)`, `var(--s-2) var(--s-4)`, `var(--s-4)` and `0.8rem`,
+the same pathology as Phase 4's eight list rows one level up — and **two of them declared no `:focus` rule at
+all**. `.skill-input` and `.dispatch-prompt` kept the UA outline where the other eight turn their border
+accent, which nothing said and nothing could check. The primitive answers for all ten, and the suite asserts
+it over the whole list rather than a subset, because a list with an exception in it is what let two slip.
+
+**The suite's own first premise was wrong twice, and the code was right both times** — it guessed
+`.resource-row input` was a third silent box (it answers) and asserted one border for `.control-rename`
+(accent at rest, because it only exists while it is being typed into). Each became a named row instead of a
+widened expectation. That is the third phase running in which the resolution was "the test moved".
+
+**Commit-on-blur was proven live before anything touched it.** `test/inline-field.test.tsx`'s 17 tests are
+the behaviour `Field` deliberately does NOT own; planting `onBlur: () => setDraft(null)` in
+`ui/InlineField.tsx` turned **four** of them red (exit 1) and restoring it returned exit 0. `.inline-view`
+and `.inline-edit` are untouched by this phase for that reason: the primitive owns the box, and inline
+editing is behaviour.
+
+**The cascade resolver is now shared** — `test/css-box.tsx`, used by `panel-boxes` and `field-boxes` — and
+moving it bought a repair. It flattened by source order only, and once the input box moved into
+`primitives.css` (loaded BEFORE `styles.css`) the type selector `button, input, select, textarea { font-size:
+inherit }` won every comparison, so **every text box in the app read as `font-size: inherit`** while the
+browser gives the class (0,1,0) the win. It now resolves a coarse specificity first and source order second.
+
+#### The sweep, and where it stopped
+
+**443 → 392 by the method at the top of this page** (`styles.css` 414 → 355, `primitives.css` 29 → 47; the
+distinct union is 392). Measured by `node tools/check-class-budget.mjs`, which is wired into `npm run check`.
+What went, and what it went into:
+
+| merge | classes | after |
+|---|---|---|
+| the eleven micro/muted/mono facts, plus 11 more at other sizes and tones | −22, +9 (`Readout`) | 421 |
+| the five wrapping figure rows (two ledgers, three meta rows) | −5, +1 (`ReadoutLine`) | 419 |
+| four count badges — `.board-count`, `.column-count`, `.exec-count`, `.dock-badge` — each with its own ground | −4, +1 (`Chip fill`) | 419 → 419 |
+| the ten text boxes, six hints, ten error lines and boxes, four rail labels | −29, +9 (`Field`) | 395 |
+| the seven classes whose whole content was `margin-left: auto` | −7, +1 (`.push`) | 392 |
+
+**`Chip` gained `fill` on a measurement, the same way `Button` gained `bare`.** Four count badges chose their
+own ground — `--panel-2` twice, `--bg` once, none once — for one thing: how many items are in the group
+beside it. A fill is what distinguishes a count from a state chip, which is an outline. One flag, four
+classes.
+
+**`.push` is the one layout utility in the file and it is a deliberate exception rather than the start of a
+set.** Phase 3 measured seven classes whose entire content was `margin-left: auto` and left the call to this
+phase, because collapsing them means a shared utility class and "no utility framework" is an explicit
+non-goal. The call: name the thing they all say — *this one goes to the far end of its row* — and add nothing
+beside it. `.tile-archive`'s red hover survives as `.tile-head > .push:hover:not(:disabled)`.
+
+**The mechanism that made most of this possible is worth naming: a leaf class whose only content was
+positional became a DESCENDANT rule of the container that already had a name.** `.exec-cost`/`.exec-when`
+became `.exec-run-top > .vb-readout` and `.exec-run-top > .vb-readout + .vb-readout` — the same pair of
+claims the two classes made by hand, minus two names. It is also a better statement of the truth: the row
+decides how its figures sit, not the figures.
+
+**WHAT PHASE 5a LEFT, AND WHAT 5b DID WITH IT.** The list below was 5a's own measurement of the gap. 5b
+took the first three items and the two select triggers, built the seventh primitive, and stopped where
+the measurement said stop:
+
+| 5a's remaining work | what 5b did | classes |
+|---|---|---|
+| ~14 uppercase display-face labels → `.vb-label-caps` | **two migrated; the family refused** — and `.vb-label-caps` turned out not to exist | 392 → **391** |
+| ~20 empty-state and loading lines → one thing | **thirteen migrated to `.vb-empty`, eight died** | 391 → **385** |
+| four tinted notice boxes beside `.vb-error-box` | **five classes became `.vb-notice` in three tones** | 385 → **384** |
+| the two select triggers → `Field` | **`.vb-trigger`, and it is `.vb-input`'s box with a caret** | 384 → **382** |
+| the three tabs → a `Tabs` | **refused, measured** — see below | 382 → 382 |
+| the two segmented cells → a `SegmentedControl` | **built, and it took four classes not two** | 382 → **380** |
+| `.archive-title` → `Panel flat` | **refused, measured** — and a dead `font-size` removed instead | 380 → 380 |
+
+#### `.vb-label-caps` was named at eight call sites and defined by no rule
+
+**That is a live defect and the characterisation suite found it before the merge touched anything.**
+`SkillEditor`'s three rail labels and `DispatchPane`'s five all write `className="vb-label vb-label-caps
+…"`, and no stylesheet in the tree contained the string `label-caps`. Seven of the eight were uppercase
+anyway, because `.vb-label-rail` carried the `text-transform` — but `DispatchPane`'s prompt label has no
+rail, so it named a class for its caps and **rendered in lower case**.
+
+**Neither gate could see it, and the reason is structural.** `check-class-budget.mjs` reads CSS → code, so
+it finds a rule with no reference; this is a reference with no rule, which is the other direction and
+nothing measures it. Every React test runs in jsdom, which computes no cascade. And
+`test/field-boxes.test.tsx`'s rail-label test was **vacuous about exactly this**: its fixture is
+`<span class="vb-label vb-label-caps vb-label-rail">` asserting `text-transform: uppercase`, which
+`.vb-label-rail` supplied on its own — an assertion true of a fixture that could not have contained the
+class it names. A fixture too thin to distinguish two outcomes tests neither.
+
+**Fixed by separating what the two decide: the RAIL is a width, the CAPS is a face.** Pinned as `it.fails`
+first, so it flipped when the rule existed rather than being quietly reworded, and `.vb-label-rail`'s
+negative is now asserted too — a rail that took the `text-transform` back would make the caps class
+vacuous again without failing anything.
+
+**THE FOURTEEN-NAME MERGE IS REFUSED, and the number is why.** Only two of the fourteen died:
+`.reports-head` and `.options-head`, which were `--t-small` muted uppercase with `margin: 0` — exactly
+`.vb-label` plus `.vb-label-caps`, with no judgement in either. The other twelve keep a real declaration
+only the surface can make, which is the same result Phase 3 measured on its 27:
+
+| what the survivor still says | which |
+|---|---|
+| an ink somebody chose | `.settings-section` `--accent`, `.diary-kind` and `.filed-state` `--text`, `.tile-group` and `.cv-group` `--accent-2` |
+| a layout | `.exec-head` and `.control-group-head` are flex rows |
+| an inset | `.cs-head`, `.ap-drawer-head`, `.links-group` |
+| a size | `.report-prompt-label` at `--t-micro` |
+| not a label at all | `.mp-def-tag` is a bordered pill — a Chip that happens to be uppercase |
+
+**Both ways of forcing the merge were costed and both were refused.** Giving `.vb-label-caps` the size and
+the ink and adding tone variants to match `Readout`'s (`accent`, `accent2`, `text`) plus a `micro` step
+kills six and adds five: **net −1**. Giving it only the face and tracking kills none and adds one:
+**net +1**. And either version has to put `--font-display` on the eight of the fourteen that do not have
+it, which re-faces eight surfaces in a condensed face to move the count by one. *Do not merge two classes
+that differ in a way a person can see just to move the number* — so the two that die outright died, and
+the twelve are recorded above with what each of them still says.
+
+**The tracking is normalised and nothing else is.** Five values across the fourteen — `0.06` / `0.08` /
+`0.1` / `0.12em` — is the same ladder nobody chose that the 27 font sizes were, and `.vb-label-caps` takes
+`0.06em`, which is the mode and is what the eight existing call sites already rendered. Zero rendering
+change at those eight.
+
+#### The empty states were one thing, and the italic was the finding
+
+**Seventeen classes, and every single one of them declared `color: var(--muted)`.** That is the family:
+muted prose where content would be. They agreed on nothing else — four sizes, five paddings, three
+line-heights, and **seven italic against ten not, with nothing whatever distinguishing them**.
+`.cv-nobody`, `.report-empty` and `.inline-empty` were byte-for-byte one declaration set under three
+names.
+
+`.vb-empty` is `--muted` `--t-body` italic at `line-height: 1.5` with `margin: 0`, plus one size variant.
+Italic because `.vb-hint` already established it for muted secondary prose and because an empty state is
+the interface talking about itself rather than showing content — the same distinction the readout draws
+between a measured fact and a written sentence. **`margin: 0` for the reason `.vb-label-caps` has it:**
+half of these are `<p>`s that never wanted a paragraph's margins.
+
+**ONE SIZE VARIANT AND NO MORE.** `--t-small` earns its place on four consumers inside dense lists. The
+diary's `--t-lead` blank and the two `--t-micro` tree rows keep their own size, because a variant with one
+consumer is a name that decides nothing — the argument that kept `ghost` at two and refused `--t-display`
+a second consumer in 5a.
+
+**Eight died and five survive with only what the surface can decide.** Dead: `.archive-empty`,
+`.cv-nobody`, `.report-empty`, `.inline-empty`, `.copilot-empty`, `.ap-drawer-empty`, `.exec-empty`, and
+`.chat-menu-empty` — whose only remainder was its container's inset, so it became `.chat-menu > .vb-empty`,
+the descendant-rule mechanism 5a named as what made most of its sweep possible. Surviving with one
+declaration each: `.mp-empty`, `.cards-gone`, `.control-empty` (a padding), `.explorer-more`, `.cs-empty`
+(a size).
+
+**Two of the eight gained an italic they did not have** — `.copilot-empty` and `.ap-drawer-empty` — and
+that is a visible change made on the 7-against-10 measurement rather than on taste. **Four classes are NOT
+in the family**, each for a reason a person can see: `.column-empty` is a dashed drop target,
+`.diary-empty` is a flex column with a button in it, and `.empty` / `.control-blank` are `margin: auto`
+blanks filling a pane — a layout rather than a line.
+
+#### One notice box in three tones
+
+**Five classes drew the same box** — `.vb-error-box`, `.settings-warn`, `.control-disclaimer` and
+`.sandbox-state`, all with a `--r-md` corner, `var(--s-4) 0.7rem` of padding and a 1px border, differing
+only in hue and in a line-height nobody chose (1.45 / 1.5 / 1.55). `.sandbox-ok` and `.sandbox-off` were
+**already a tone set written by hand** on top of `.sandbox-state`, which is what says the shape wanted a
+tone axis rather than four more names.
+
+**The ink is part of the tone and not a separate axis.** `bad` is danger ink because a refusal IS the
+answer to what you just did; `warn` and `ok` are prose ink because they are conditions you can read and act
+on — which is `.control-disclaimer`'s own comment, *"set as prose rather than as status"*.
+
+**`.control-disclaimer` is the one survivor and it keeps exactly two things**: the shell's inset, and a
+prose ink over the danger hue. That combination is deliberate and could not be a tone without inventing a
+fourth, so it overrides the tone's colour at equal specificity — the pattern the emergency stop's danger
+hover established in Phase 3. Its hue was NOT moved to `--warn`: `themes.css` gives `--warn` and
+`--danger` different values in marshmallow, so that would have been a repaint of one theme dressed up as
+a merge. **Net −1**: five dead against four added.
+
+**`.vb-error-box` was renamed, so its two test selectors moved in the same commit** —
+`test/dispatch-pane.test.tsx`, which the 5a notes name as keeping them on purpose because they assert the
+refusal box IS that box. `test/settings-columns-warning.test.tsx`'s `.closest('.settings-warn')` became a
+`data-testid`.
+
+#### The two select triggers, which this document had called an input twice without making one
+
+**`.chat-current` and `.mp-trigger` are `.vb-input`'s box with a caret**, and Phase 3 and Phase 4 both said
+so — *"an `<input>` that happens to be a button"* — and left them. `.vb-trigger` joins the box's own
+selector list, so a trigger cannot forget the box.
+
+**The two differences between them were not chosen by anybody.** The chat switcher sat on `--panel-2` and
+the model picker on `--bg`, while nine of the ten text boxes `Field` took chose `--bg`; and their vertical
+paddings were two pixels apart. Both now take the box's, which also puts them at `--t-body` beside the real
+inputs they share a row with — **a control at 12px next to an input at 13px is the shape of the 10.88px
+incident**, and the dispatch pane had exactly that.
+
+**The carets were two names for one glyph**: `.mp-caret` muted at the trigger's own size, `.chat-caret`
+accent at `--t-micro`. `.vb-caret` is muted, because a caret is furniture on a control whose border already
+answers the hover.
+
+**The layout did not move, and that is measured rather than asserted.** The four checks that would have
+seen it: **3. overflow 0 findings across 121 examined** (120 at the Phase 4 baseline); **7. one line where
+one line is meant, 0 findings across 25 rows**, unchanged; **9. the shared grid — 9 rows, 42 columns, 42
+heads, narrowest track 180px at 900/1200 and 192px at 1440, only `main.boards` scrolling**, unchanged; and
+**10. the dock, 342px with a raw pane open and a 263px pane inside it**, the recorded 79px shortfall
+unmoved. All three themes.
+
+#### `Tabs` was refused, and `.archive-title` was not made a `Panel`
+
+**Three tab candidates and only two are tabs.** `.cards-tab-label` has `border: none` and no corner: it is
+the ellipsised label *inside* a tab, not a tab. And the two real ones disagree on both of the things a tab
+primitive would have to own:
+
+| | `.tab-btn` | `.dock-tab` |
+|---|---|---|
+| face | not uppercase, `0.04em` | uppercase, `0.08em`, `--font-display` |
+| selected | `--accent` ink, `--panel-2`, plus a `--glow` | `--text` ink, `--panel-2`, no glow |
+
+**Two consumers disagreeing on both of a primitive's decisions is a primitive that carries one variant
+each, which is a name that decides nothing** — the same test that keeps `ghost` at two and that the
+segmented cells pass on the opposite evidence. So: **not built, at two real consumers with two visible
+disagreements**, and `.cards-tab-label` is not a fourth.
+
+**`.archive-title` is not a `Panel flat` either, and the measurement is that the migration saves zero
+classes.** Its remainder after `flat`'s declarations come out is `flex: 1; min-width: 0; white-space;
+overflow; text-overflow` plus a hover ink — so the class survives, exactly as Phase 4 measured for its
+nine migrated rows. And taking it costs a real layout change: `.archive-item` would have to give up its
+padding and its `gap` so the title's `flat` padding could supply the row's inset instead, which moves the
+row's height by 2px and makes the arrangement of three cells depend on one of them.
+
+**What was wrong with it was something else, and it is fixed.** Its only geometry declaration was
+`font-size: var(--t-body)` — which is what `body` already gives it. A dead declaration restating an
+inherited value: **the same defect Phase 4 found on `.cv-link`**. Removing it took the class off the
+geometry ratchet with no rendering change at all.
+
+#### The segmented control: four classes, one shape, and the file said so itself
+
+`.mode-group` and `.backend-toggle` were **byte-identical**. `.mode-btn` and `.bt-btn` were identical
+declaration for declaration apart from one size step — and `.backend-toggle-md .bt-btn` **restated
+`.mode-btn`'s padding and font-size verbatim**, which is the stylesheet asserting the equality on its own
+behalf.
+
+**The proof is a multiset diff and not an argument.** The four classes declared **36 things with 19
+distinct values**, every one of them written twice except the two `sm` values; `.vb-seg`, `.vb-seg-cell`
+and `.vb-seg-cell-sm` declare **19**. The distinct sets are identical: **0 added, 0 removed, 0 changed.**
+`md` is the default because three of the four call sites already rendered it. **Net −2**: five dead
+(`.mode-group`, `.backend-toggle`, `.backend-toggle-md`, `.mode-btn`, `.bt-btn`) against three added.
+
+**The group owns the one border and the one corner and clips its cells**, which is exactly the reason
+Phases 3 and 4 both refused to make these `Button`s: every Button variant gives the cell its own border
+and radius, and that puts a seam down the middle of the group.
+
+#### WHAT STANDS BETWEEN 380 AND 183, measured rather than estimated
+
+- **The three tabs and the four chips — 7 of the 8 geometry-ratchet survivors.** The tabs are refused
+  above with their measurement. The four chips (`.tag`, `.tag-chip`, `.mp-chip`, `.board-archive`) still
+  belong to `Chip` and are still held back only by `.board-archive`'s pill and `.tag`'s tile-local sizing,
+  exactly as 5a recorded. `.board-label` is the eighth and is a collapsible section heading, not a control.
+- **The twelve surviving uppercase labels**, each with what it still says, in the table above. Closing
+  them means either a tone axis on `.vb-label` (costed at net −1) or moving three insets onto their
+  containers' `gap`, which is three separate layout judgements.
+- **The five surviving empty states**, which are four paddings and two sizes. Each would become a
+  descendant rule of its container, and only `.chat-menu` had a container named cleanly enough to take one.
+- **The rest — roughly 300 — are the seventeen surfaces' layout classes**, and the honest reading is that
+  this is where the whole remaining gap lives. The budget allows 8 per surface and the largest families are
+  `ap-*` **29**, `mp-*` **22**, `report-*` **19**, `control-*` **17**. Halving them means merging surfaces
+  that are genuinely different shapes, and **it is still the part of this work with no measured argument** —
+  see the note under the re-derived budget: whether 8 is a floor a real surface can live at is the one term
+  in the target still expressed against a number nobody has measured.
+
+**A real 392 with that list is worth more than a 149 reached by deleting something live**, which is the
+choice this phase actually faced: the reference gate below finds six unreferenced classes on a first run and
+every one of them was a leftover of this phase's own edits, not a dead surface.
+
+#### Gates
+
+**`tools/check-class-budget.mjs`, wired into `npm run check`, makes two claims.**
+
+**Claim 1 — every class selector in both stylesheets is referenced from `web/src`. BLOCKING at zero.** It
+**resolves** template-literal composition rather than allow-listing it, which is the more expensive of the
+two options *Risks* offers and the one that cannot rot: a prefix is read from the source
+(`` `ap-bar-${ ``), the suffix must appear as a quoted string or a numeric literal in the corpus, and both
+halves are re-derived on every run — so a prefix whose call site is deleted stops resolving anything and its
+classes go straight back to being findings. Comments are stripped from the corpus first, because several
+comments in this repository name classes they have just removed and a comment must not keep a class alive.
+**Eight prefixes resolve today** against 1,423 quoted values: `ap-bar-*`, `msg-*`, `status-*`, and the five
+primitives' own (`vb-btn-*`, `vb-chip-*`, `vb-dot-*`, `vb-panel-*`, `vb-readout-*`).
+
+**Proven by planting, four ways, each restored:**
+
+| planted | result |
+|---|---|
+| `.ap-bar-running` renamed to `.ap-bar-runningx` — a DYNAMICALLY composed class | exit **1**, naming `.ap-bar-runningx`. This is the one that matters: the literal-grep version of this gate deletes that rule and the board looks perfect until a run halts |
+| `.dead-and-never-named` appended to `styles.css` | exit **1** |
+| the selector regex broken (`/\.(name)ZZZ/`) | exit **1**: *"only 0 class selector(s) found, against a floor of 40 — this check is vacuous"* |
+| comment stripping removed from `codeOf` | exit **1** from the parser self-test: *"comment stripping: a commented class survived"* |
+
+The self-test goes through the same four functions the census does — the lesson from
+`check-radius-scale.mjs`, whose first self-test carried its own regex and therefore had no opinion about the
+code under test at all. Its fixture holds a literal class, a class composed from a prefix and a quoted
+value, a class composed from a prefix whose value is written NOWHERE (the shape of a renamed dynamic class,
+and the one finding it must produce), and a class named only in a comment.
+
+**Claim 2 — the class count, and it is a RATCHET at 380 rather than blocking at 183.** That is a departure
+from the plan and it is deliberate: *"never point a blocking gate at a pre-existing backlog"* is this
+document's own rule, and a gate that must be bypassed on every commit teaches everyone to ignore it. The
+target is written into the failure message and into the constant beside the ceiling, so the number to beat
+is visible on every run. **Proven by planting, at both ceilings:** a new class added to `styles.css` and
+referenced from `CardTile.tsx` — so claim 1 could not mask it — took the count to 393 against the 5a
+ceiling of 392 and exited **1**, and the same plant at the 5b ceiling of 380 took it to 381 and exited **1**.
+Lower it as the sweep continues; the commit that reaches 183 is the commit that sets it to 183.
+**Never raise it.**
+
+**Claim 1 was re-planted after 5b, on a class the primitives compose rather than write.**
+`.vb-seg-cell-sm` reaches its element through a ternary in `SegmentedControl.tsx`, so it is exactly the
+shape the reference gate exists for. Renamed to `.vb-seg-cell-smx`, the run exited **1** naming it; the
+literal-grep version of this gate would have deleted the rule and the backend picker in Settings would
+have silently rendered at the dock's size.
+
+**Check 11 — numbers align in a column, MEASURED.** A `font-family` assertion says a declaration exists; it
+does not say the digits line up, and it would pass with `font-variant-numeric` deleted. So a real readout is
+cloned twice off-screen and the advance compared: ten `1`s against ten `8`s, and ten `i`s against ten `M`s.
+Measured identically on all three themes: **79.140625px / 79.140625px** for the digits and the same for the
+letters, across **25 readouts** on the board. **The anti-vacuity half is asserted FIRST**: the same letter
+pair measured in the surrounding proportional type is **78.140625px against 151.96875px**, which is what
+says the instrument can tell two widths apart at all — without it, the check compares two numbers that a
+proportional face might also render identically.
+
+**Planted at check 11, and the second plant is a finding about the check itself:**
+
+| planted | result |
+|---|---|
+| `.vb-readout` set in `var(--font-body)` instead of `var(--font-mono)` | exit **1** on all three themes: *"ten 'i's measured 43.46875px against ten 'M's at 107.8125px in a readout — the face is not monospaced"* |
+| `font-variant-numeric: tabular-nums` deleted, the mono face kept | **exit 0 — an equivalent mutant, verified rather than assumed.** In a monospaced face every digit already has one advance, so the declaration is belt-and-braces while the family holds. It is kept because it is what makes the claim true of any readout a surface re-faces, and this check cannot see it. Recorded here rather than left for someone to rediscover as a hole |
+
+**Check 7 caught a real regression this phase introduced, which is the harness earning its keep.**
+`ReadoutLine` aligns on the baseline — right for a row of text at two sizes — and the copilot footer's last
+item is the context METER, a 5px bar with no baseline of its own, which then hung 1.5px below the figures
+beside it: *"div.vb-readout-block — 4 children span 15.5px, tallest is 14.0px"*, exit 1 on all three themes.
+`.copilot-readout` takes `align-items: center` back, with the reason written beside it: a graphic in a row of
+text is the one case where centring the boxes is right.
+
+**The drift was read, and it did not fire — which needed explaining rather than accepting.** The drift check
+compares the SET of computed values, not the tally, and the set is unchanged in both passes: type
+`13 / 12 / 11 / 15px`, radius `6 / 999 / 10px / 50%`. **No baseline file changed in either pass**, so
+`visual:record` was not run at all.
+
+**The TALLY moved twice and was read both times.** 5a: `12px×84 → ×71` and `11px×19 → ×33` on 232 elements
+(231 before) — thirteen elements from 12px to 11px, accounted for by `Readout`'s `--t-micro` default
+replacing a `--t-small` surface class and by the four count badges becoming `Chip`s at `--t-micro`.
+
+5b: **`13px×127 → ×133`, `12px×71 → ×66`, `11px×33 → ×32`**, `15px×1` unchanged, still 232 elements. **Six
+elements moved to 13px and every one is accounted for**: the two select triggers, their two labels and their
+two carets. Five came from 12px — both triggers were `--t-small` and both labels inherited it — and one from
+11px, the chat caret, which was the only one of the six that named `--t-micro`. Radius tally unchanged.
+
+**Everything else held, measured not assumed** (5b figures, all three themes): overflow **0 of 121**,
+clipping **1 of 35** (the exempt board area), contrast **0 of 125**, wrapped rows **0 of 25**, focus
+**0 of 55**, unresolved tokens **1 of 41** (`--exec-cols`, still a gap in the harness's coverage rather than
+a defect), primitive focus rings all present, the shared grid **9 rows / 42 columns / 42 heads** with only
+`main.boards` scrolling, and the dock **342px with a raw pane and a 263px pane inside it** — the recorded
+79px shortfall unmoved. **33 harness tests, three themes, exit 0.**
+
+**Authored declarations after both passes:** `font-size` **202 → 155 → 136**, `border-radius`
+**80 → 65 → 59**, both still entirely on the scale, both checks blocking. **The geometry ratchet went
+13 → 13 → 8**: 5a merged treatment and not button geometry, and 5b took the two select triggers, the two
+segmented cells and `.archive-title`'s dead `font-size`. The ceiling is lowered to 8 in the same commit.
+
+**Selector migrations: 127 → 108 in 5a, and 108 → 108 in 5b.** Measured with the command recorded at the
+end of Phase 3. 5a migrated nineteen: `.exec-cost`, `.report-cost`, `.report-when`, `.reports-ledger` (×5),
+`.report-created .link-id`, `.diary-chip` (×2), `.control-editor-path` (×3), `.board-count` (×3),
+`.dock-badge` (×4), `.exec-count` — each replaced by a `data-testid` at the call site, which the primitives
+take as a named prop rather than as an arbitrary spread.
+
+**5b's net zero is two out and two in, and reporting it as "unchanged" without the movement would be
+laundering it.** Out: `.vb-error-box` and `.mode-btn.active`, both classes that this pass renamed. In:
+`.vb-notice`, because `test/dispatch-pane.test.tsx` asserts that the refusal box IS that box — which is the
+claim, and the reason 5a's notes say it keeps class selectors on purpose — and `.active`, scoped by the mode
+group's accessible role rather than by a class, because the highlight is what that test is about and
+`.active` did not move. A third went through a `data-testid`: `test/settings-columns-warning.test.tsx`'s
+`.closest('.settings-warn')`.
+
+#### The count floors were the wrong instrument, and two of them fired
+
+**A count floor on a number the sweep exists to reduce fails the run for SUCCEEDING, and says
+*"this check is vacuous"* while doing it.** Phase 3 hit this on `check-radius-scale.mjs`'s button-class
+population and replaced it with a parser self-test. Phase 5b hit it twice more, and the precedent was
+applied both times.
+
+- **`check-type-scale.mjs` was five away.** Its floor was **150** font-size declarations and 5a's sweep had
+  taken the tree to **155**. It was repaired FIRST, before the merge, so the sweep was not fought against
+  a false failure — and the merge then took the count to **136**, which the old floor would have refused.
+- **`check-radius-scale.mjs`'s radius floor was ZERO away, and it fired.** 65 declarations against a floor
+  of 60; the segmented-control merge took the tree to **59** and `npm run check` exited 1 with *"only 59
+  border-radius found, against a floor of 60. This check is vacuous."* Same repair, same commit.
+
+**Both replacements are self-tests over a fixture the tree cannot move**, going through the census's own
+functions rather than a second copy of the pattern — the lesson from `check-radius-scale.mjs`, whose first
+self-test carried its own regex and therefore had no opinion about the code under test at all. Each fixture
+exercises the case that can silently break: a comment naming a declaration in prose (which must not be read
+as one, and must not shift the line numbers of what follows), the compact no-whitespace form a reformatting
+run produces, the shorthand, and a token name that is not a step.
+
+**Each self-test found something about the parser on its first run, and both are recorded rather than
+smoothed away** — an expectation written to look tidy is an expectation that stops matching the code:
+
+| found | what it is |
+|---|---|
+| `FONT_SHORTHAND` carries the space before a closing `}` into its message, so the finding reads `font: 14px/1.2 sans-serif  — …` with two spaces | cosmetic, pre-existing, and now in the fixture's expectation |
+| a rule nested in an `@media` has its `border-radius` counted **twice** — `rulesOf` emits both the inner rule and the at-rule, whose body text contains the declaration | over-reports, which is loud and harmless. **Latent, not live**: measured on 2026-08-21, no `border-radius` in the tree sits inside an `@media`, `@supports` or `@container`, so the 59 the check prints holds no duplicate |
+
+**Both proven by planting, each restored.** Type scale, exit **1** on all of: a broken `FONT_SIZE` regex
+(counts 155 → 0), a broken `SPACE` regex (258 → 132 in the tree and 3 → 2 in the fixture), comment blanking
+removed — which reported **157** authored font-sizes against the real 155, *the two extra being prose*, and
+so is also the proof that the old floor of 150 was partly satisfied by comment text — and a deliberately
+wrong number in the fixture's own expectation. Radius scale, exit **1** on all of: a broken `border-radius`
+regex, a broken brace matcher in `rulesOf`, and a wrong number in the fixture. Restored, both files are
+byte-identical and `npm run check` exits 0.
+
+**The two extractions the self-tests needed were then flagged for cognitive complexity, and the cause was
+removed rather than suppressed.** `scan` and `radiiOf` each put three branches inside two or three loops;
+`fontSizeFault`, `bandedLengths`, `cornerFault` and `shorthandFaults` flatten them. The metric punishes
+nesting far harder than length, so flattening beat every other shape — and the self-tests were re-planted
+after the flattening, all five exiting **1** again.
+
+**Exit:** **380 class selectors** (target 183, not reached — see *What stands between 380 and 183*),
+**136 authored `font-size` declarations**, **59 authored `border-radius` declarations**, **geometry ratchet
+8/8**. Suite **240 files, 4,271 tests**. Harness **33 tests, three themes, exit 0**. `npm run lint` clean
+over 539 files.
+**Revert:** `web/src/ui/{Readout,Field,SegmentedControl}.tsx`, the Readout / Field / notice / empty /
+trigger / SegmentedControl blocks of `primitives.css`, the ~40 components that call them, `styles.css`,
+`tools/check-class-budget.mjs` with its two `package.json` entries, the floor removals in
+`check-type-scale.mjs` and `check-radius-scale.mjs`, check 11 with `auditReadouts`, and
+`test/{field-boxes,label-notice-boxes,css-box}` with `panel-boxes`'s import of the last.
+No baseline file is involved.
 
 ---
 
 ## Risks, and what would stop this
 
-- **Class renames break tests.** There are **127** `querySelector('.class')` calls in the React tests —
+- **Class renames break tests.** There are **108** `querySelector('.class')` calls in the React tests — unchanged across Phase 5b, which took two out and put two back and says so under *Selector migrations*; 127 before Phase 5, which migrated nineteen —
   135 before Phase 3 and 126 after it, measured by the command recorded at the end of that phase; the
   **132** this line carried until 2026-08-21 had no method beside it and does not reproduce. Phase 4
   took it UP by one, and deliberately: it migrated one and its own characterisation suite added four,

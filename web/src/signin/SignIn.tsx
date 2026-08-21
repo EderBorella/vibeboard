@@ -16,14 +16,14 @@ export function SignIn({ phase, onRetry }: Props) {
     <div className="gate">
       <div className="gate-card">
         <h2>{phase.phase === 'waiting' ? 'Waiting to be let in' : 'Signing in'}</h2>
-        {phase.phase === 'claiming' && <p className="gate-hint">Signing this browser in…</p>}
+        {phase.phase === 'claiming' && <p className="vb-hint">Signing this browser in…</p>}
 
         {phase.phase === 'waiting' && (
           <>
             {/* What to DO, in the first sentence. This screen used to open by telling the user there
                 was nothing to copy — an absence, about a mechanism they had never heard of, which only
                 raises the question of what they were supposed to have copied. */}
-            <p className="gate-hint">
+            <p className="vb-hint">
               This board is already open on another device. Go to that device: it is showing a message asking
               whether to let this one in. Choose <strong>Allow</strong> there.
             </p>
@@ -33,7 +33,7 @@ export function SignIn({ phase, onRetry }: Props) {
             <p className="gate-preview">
               That message will show this address: <code>{phase.address}</code>
             </p>
-            <p className="gate-hint">Leave this page open — it continues on its own once you allow it.</p>
+            <p className="vb-hint">Leave this page open — it continues on its own once you allow it.</p>
           </>
         )}
 
@@ -41,9 +41,9 @@ export function SignIn({ phase, onRetry }: Props) {
           <>
             {/* The whole reason this screen exists: it says WHY. A single red "unauthorized" is what
                 sent the user looking for a token they had no way to know about. */}
-            <p className="gate-error">{phase.reason}</p>
+            <p className="vb-notice vb-notice-bad">{phase.reason}</p>
             {phase.retry && (
-              <p className="gate-field">
+              <p className="vb-field">
                 <button type="button" onClick={onRetry}>
                   Try again
                 </button>

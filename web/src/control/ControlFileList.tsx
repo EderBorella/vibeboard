@@ -66,12 +66,14 @@ export function ControlFileList({
               <span className="control-item-name">🔗 Links registry</span>
             </Panel>
           )}
-          {g.files.length === 0 && g.key !== 'resources' && <div className="control-empty">— none —</div>}
+          {g.files.length === 0 && g.key !== 'resources' && (
+            <div className="control-empty vb-empty vb-empty-small">— none —</div>
+          )}
           {g.files.map((f) =>
             renaming === f.path ? (
               <input
                 key={f.path}
-                className="control-rename"
+                className="vb-input"
                 value={renameDraft}
                 autoFocus
                 onFocus={(e) => e.currentTarget.select()}

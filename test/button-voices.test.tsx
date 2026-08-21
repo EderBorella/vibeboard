@@ -117,7 +117,10 @@ describe('the bare variant carries the glyph buttons', () => {
     expect(add.tagName).toBe('BUTTON');
     expect(add.classList.contains('vb-btn-bare')).toBe(true);
     // The box is the primitive's and the position is the surface's — the split the whole phase is for.
-    expect(add.classList.contains('column-add')).toBe(true);
+    // `.push` and not `.column-add`: Phase 5 merged the seven classes whose whole content was
+    // `margin-left: auto` into the one utility that names what they all said. The claim is unchanged —
+    // the box is the primitive's, the position is the surface's — so this stays a class assertion.
+    expect(add.classList.contains('push')).toBe(true);
     add.click();
     expect(onAdd.mock.calls).toEqual([['engineering', 'todo']]);
   });

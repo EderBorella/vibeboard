@@ -138,14 +138,16 @@ describe('the project log', () => {
     const item = (await screen.findByText('Archived two stale cards.')).closest('li') as HTMLElement;
     // The chips themselves, empty. The first version asserted `queryByText('/')` was null, which can never
     // match `engineering/E-001` — so a chip invented from any field would have sailed through it.
-    expect(item.querySelectorAll('.diary-chip')).toHaveLength(0);
+    expect(item.querySelectorAll('[data-testid="diary-chip"]')).toHaveLength(0);
   });
 
   it('shows a chip for each field that is there, and no others', async () => {
     api.listDiary.mockResolvedValue([entry({ kind: 'run', card: 'E-001', text: 'did a thing' })]);
     render(<DiaryView bump={0} />);
     const item = (await screen.findByText('did a thing')).closest('li') as HTMLElement;
-    expect([...item.querySelectorAll('.diary-chip')].map((c) => c.textContent)).toEqual(['E-001']);
+    expect([...item.querySelectorAll('[data-testid="diary-chip"]')].map((c) => c.textContent)).toEqual([
+      'E-001',
+    ]);
   });
 
   it('says so when nothing has happened, rather than rendering an empty screen', async () => {

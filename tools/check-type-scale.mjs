@@ -61,11 +61,19 @@ const OFF_SCALE_ON_PURPOSE = new Map([
 const FONT_SHORTHAND = /(?:^|[;{\s])font:([^;}]*)/g;
 const LENGTH = /\d*\.?\d+(?:px|rem|em|pt|%)/;
 
-// The floors. A REGEX THAT STOPS MATCHING IS THE FAILURE MODE OF A CHECK LIKE THIS: it reports zero
-// findings, exits 0, and looks exactly like success. Reformatting the stylesheet (which Phase 2 also
-// did, taking it from 1,980 lines to 4,347) is precisely the kind of change that could do it. Set well
-// under what the file holds, so they catch "matched nothing" and not ordinary editing.
-const FLOOR = { fontSize: 150, space: 150 };
+// THERE ARE NO COUNT FLOORS ANY MORE, and removing them was forced rather than chosen — the same
+// structural flaw check-radius-scale.mjs hit at its button-class floor, one file over.
+//
+// A REGEX THAT STOPS MATCHING IS STILL THE FAILURE MODE OF A CHECK LIKE THIS: it reports zero findings,
+// exits 0, and looks exactly like success. The floors were 150 font-size and 150 gap/padding
+// declarations, and they were the wrong instrument for it. Phase 5's sweep took font-size from 202 to
+// **155** by merging surfaces onto primitives, which is the goal, so the next merge would have failed
+// the run FOR SUCCEEDING — and the message it failed with would have said "this check is vacuous" about
+// a check that was working perfectly. Both counts shrink as the sweep continues, so any floor on either
+// must eventually be bypassed or deleted.
+//
+// Its replacement is `parserSelfTest` below, which asserts every pattern here against a fixture the tree
+// cannot move: it works identically at 155 declarations and at 5. Do NOT put a count floor back.
 
 const cssFiles = () =>
   readdirSync(join(ROOT, CORPUS), { recursive: true })
@@ -92,12 +100,36 @@ const SPACE = /(?:^|[;{\s])(gap|row-gap|column-gap|padding(?:-top|-right|-bottom
 const REM = /(\d*\.?\d+)rem/g;
 
 const known = defined();
-/** @type {{ site: string, detail: string }[]} */
-const findings = [];
-let fontSizes = 0;
-let spaces = 0;
 
-for (const file of cssFiles()) {
+// ONE FILE'S SCAN, AS A FUNCTION, so `parserSelfTest` goes through exactly the code the census does.
+// The lesson is check-radius-scale.mjs's, whose first self-test carried its own `/<button\b/` and
+// therefore had no opinion about the code under test at all: it reported success on a census that had
+// stopped matching anything. This one has no patterns of its own.
+// What is wrong with ONE `font-size` value, or null if nothing is. Its own function because the three
+// branches nested inside two loops cost more in the complexity metric than the whole of the rest of this
+// file — the metric punishes nesting far harder than length, so flattening beat every other shape.
+function fontSizeFault(value) {
+  if (OFF_SCALE_ON_PURPOSE.has(value)) return null;
+  const token = /^var\((--t-[\w-]+)\)$/.exec(value)?.[1];
+  if (!token) return `font-size: ${value} — not a step on the scale`;
+  if (!TYPE_SCALE.includes(token)) return `font-size: var(${token}) — not one of the six steps`;
+  if (!known.has(token)) return `font-size: var(${token}) — defined in no stylesheet`;
+  return null;
+}
+
+// The rem lengths in one `gap`/`padding` value that sit inside the band the space scale replaced.
+function bandedLengths(value) {
+  return [...value.matchAll(REM)].filter(([, n]) => {
+    const rem = Number(n);
+    return rem >= SPACE_BAND.lo && rem <= SPACE_BAND.hi;
+  });
+}
+
+export function scan(file, raw) {
+  /** @type {{ site: string, detail: string }[]} */
+  const findings = [];
+  let fontSizes = 0;
+  let spaces = 0;
   // COMMENTS ARE BLANKED, NOT READ. This check scanned the raw file, so any comment that mentioned
   // `font-size:` or `padding:` in prose was parsed as a declaration and the words after it as its
   // value — Phase 4 tripped it with a comment explaining why a `font-size` had been REMOVED, and it
@@ -107,28 +139,13 @@ for (const file of cssFiles()) {
   // Blanked to spaces rather than removed, so every offset still maps to its real line and the
   // `file:line` in a finding stays correct. This is the same treatment `rules()` in
   // tools/check-radius-scale.mjs has always applied, which is why that check never had the fault.
-  const raw = readFileSync(join(ROOT, file), 'utf8');
   const text = raw.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' '));
   const site = (offset) => `${file}:${lineOf(text, offset)}`;
 
   for (const match of text.matchAll(FONT_SIZE)) {
     fontSizes += 1;
-    const value = match[1];
-    if (OFF_SCALE_ON_PURPOSE.has(value)) continue;
-    const token = /^var\((--t-[\w-]+)\)$/.exec(value)?.[1];
-    if (!token) {
-      findings.push({ site: site(match.index), detail: `font-size: ${value} — not a step on the scale` });
-    } else if (!TYPE_SCALE.includes(token)) {
-      findings.push({
-        site: site(match.index),
-        detail: `font-size: var(${token}) — not one of the six steps`,
-      });
-    } else if (!known.has(token)) {
-      findings.push({
-        site: site(match.index),
-        detail: `font-size: var(${token}) — defined in no stylesheet`,
-      });
-    }
+    const fault = fontSizeFault(match[1]);
+    if (fault) findings.push({ site: site(match.index), detail: fault });
   }
 
   for (const match of text.matchAll(FONT_SHORTHAND)) {
@@ -141,30 +158,87 @@ for (const file of cssFiles()) {
 
   for (const match of text.matchAll(SPACE)) {
     spaces += 1;
-    for (const length of match[2].matchAll(REM)) {
-      const rem = Number(length[1]);
-      if (rem < SPACE_BAND.lo || rem > SPACE_BAND.hi) continue;
+    for (const length of bandedLengths(match[2])) {
       findings.push({
         site: site(match.index),
         detail: `${match[1]}: ${length[0]} — inside the ${SPACE_BAND.lo}–${SPACE_BAND.hi}rem band the space scale replaced`,
       });
     }
   }
+
+  return { fontSizes, spaces, findings };
+}
+
+// THE ANTI-VACUITY TEST, and it is a self-test rather than a count — see the note where the floors
+// used to be. What can silently break here is the PARSER: `FONT_SIZE`, `FONT_SHORTHAND`, `LENGTH`,
+// `SPACE`, `REM`, the comment blanking, and the `var(--t-*)` resolution against `known`. Each of them
+// is exercised once, and a broken one changes either a count or a finding.
+//
+// The fixture is a stylesheet the tree cannot move. Its comment names `font-size` and `padding` in
+// prose, which is the Phase 4 fault; the two lines AFTER it are what says the blanking did not shift
+// the offsets, because their findings must report lines 7 and 8 rather than 5 and 6. `.delta` is
+// written in the compact no-whitespace form, which is what a reformatting run produces and what a
+// pattern anchored on `font-size: ` would miss.
+const FIXTURE = `
+/* font-size: 0.99rem and padding: 0.42rem in prose are NOT declarations, and this check read them as
+   declarations until Phase 4. */
+.alpha { font-size: var(--t-body); padding: 1rem }
+.beta { font: 14px/1.2 sans-serif }
+.gamma { gap: 0.4rem; padding-left: var(--s-3) }
+.delta{font-size:0.81rem}
+.epsilon { font-size: var(--t-nope); font: inherit }
+.zeta { font-size: inherit }
+`;
+
+// 4 font-size (alpha, delta, epsilon, zeta — NOT the comment's) and 3 gap/padding (alpha, gamma's two
+// — NOT the comment's). `.zeta` is counted and is not a finding, which is `OFF_SCALE_ON_PURPOSE`
+// working; `.alpha`'s `1rem` and `.epsilon`'s `font: inherit` carry no finding either, which is the
+// space band's ceiling and the shorthand's length test.
+const SELF_TEST_WANT = [
+  '4 font-size',
+  '3 gap/padding',
+  'fixture.css:7 font-size: 0.81rem — not a step on the scale',
+  'fixture.css:8 font-size: var(--t-nope) — not one of the six steps',
+  // Two spaces after `sans-serif`, and that is the parser's real output rather than a typo here:
+  // `FONT_SHORTHAND` captures `[^;}]*`, so a declaration with no trailing semicolon carries the space
+  // before its `}` into the message. Cosmetic, pre-existing, and recorded rather than smoothed over —
+  // an expectation written to look tidy is an expectation that stops matching the code.
+  'fixture.css:5 font: 14px/1.2 sans-serif  — the shorthand sets a font size; name the step with font-size instead',
+  'fixture.css:6 gap: 0.4rem — inside the 0.25–0.6rem band the space scale replaced',
+].join(' | ');
+
+function parserSelfTest() {
+  const { fontSizes, spaces, findings } = scan('fixture.css', FIXTURE);
+  const got = [
+    `${fontSizes} font-size`,
+    `${spaces} gap/padding`,
+    ...findings.map(({ site, detail }) => `${site} ${detail}`),
+  ].join(' | ');
+  return got === SELF_TEST_WANT ? null : `expected\n  ${SELF_TEST_WANT}\ngot\n  ${got}`;
+}
+
+/** @type {{ site: string, detail: string }[]} */
+const findings = [];
+let fontSizes = 0;
+let spaces = 0;
+
+for (const file of cssFiles()) {
+  const seen = scan(file, readFileSync(join(ROOT, file), 'utf8'));
+  fontSizes += seen.fontSizes;
+  spaces += seen.spaces;
+  findings.push(...seen.findings);
 }
 
 console.log(
   `type scale: ${fontSizes} font-size and ${spaces} gap/padding declaration(s) across ${cssFiles().length} file(s) in ${CORPUS}`,
 );
 
-// Before the findings, because a green run on a regex that matched nothing is the worse failure.
-for (const [what, seen, floor] of [
-  ['font-size', fontSizes, FLOOR.fontSize],
-  ['gap/padding', spaces, FLOOR.space],
-]) {
-  if (seen >= floor) continue;
-  console.error(`\nonly ${seen} ${what} declaration(s) found, against a floor of ${floor}.`);
-  console.error(`This check is vacuous: the pattern has stopped matching the stylesheet. Fix the`);
-  console.error(`pattern in tools/check-type-scale.mjs — do NOT lower the floor.`);
+// Before the findings, because a green run on a pattern that matched nothing is the worse failure.
+const parserFault = parserSelfTest();
+if (parserFault) {
+  console.error(`\nthe type-scale parser is broken: ${parserFault}`);
+  console.error(`\nThis check is vacuous — it would report nothing whatever the stylesheets hold. Fix the`);
+  console.error(`pattern in tools/check-type-scale.mjs; do NOT relax the fixture.`);
   process.exit(1);
 }
 

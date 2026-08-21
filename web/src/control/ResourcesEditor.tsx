@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { getResources, putResources, type ResourceLink } from '../api';
 import { errorText } from '../errors';
 import { Button } from '../ui/Button';
+import { Readout } from '../ui/Readout';
 import { useAction } from '../useAction';
 
 // The links registry (.vibeboard/resources.yaml) — a small editable table of external
@@ -59,7 +60,7 @@ export function ResourcesEditor({ onError }: { onError: (e: string | null) => vo
   return (
     <>
       <div className="control-editor-head">
-        <span className="control-editor-path">Links registry{dirty ? ' •' : ''}</span>
+        <Readout size="small">Links registry{dirty ? ' •' : ''}</Readout>
         <div className="control-editor-actions">
           <Button size="md" onClick={add}>
             ＋ Add link

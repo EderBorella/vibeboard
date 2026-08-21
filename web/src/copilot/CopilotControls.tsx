@@ -1,6 +1,7 @@
 import type { ModelOption } from '../api';
 import { ModelPicker } from '../models/ModelPicker';
 import type { BackendCaps } from '../shared';
+import { SegmentedControl } from '../ui/SegmentedControl';
 
 interface Props {
   // Modes and efforts are backend-specific; the caller passes the caps of the backend in force.
@@ -35,19 +36,13 @@ export function CopilotControls({
   return (
     <>
       <div className="copilot-controls">
-        <div className="mode-group" role="group" aria-label="Mode">
-          {caps.modes.map((m) => (
-            <button
-              key={m.value}
-              className={`mode-btn${effMode === m.value ? ' active' : ''}`}
-              title={m.hint}
-              disabled={running}
-              onClick={() => onMode(m.value)}
-            >
-              {m.label}
-            </button>
-          ))}
-        </div>
+        <SegmentedControl
+          items={caps.modes.map((m) => ({ value: m.value, label: m.label, title: m.hint }))}
+          value={effMode}
+          onChange={onMode}
+          label="Mode"
+          disabled={running}
+        />
         <div className="copilot-actions">
           <button onClick={onCompact} disabled={running} title="Compact the conversation">
             Compact

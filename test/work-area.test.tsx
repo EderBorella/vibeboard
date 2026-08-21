@@ -219,7 +219,7 @@ describe('WorkArea', () => {
   it('badges the dock with the number of open cards, and nothing at zero', () => {
     // "Cards 0" is noise: the pane says so itself when empty.
     render(<WorkArea {...props} />);
-    expect(document.querySelector('.dock-tab .dock-badge')).toBeNull();
+    expect(document.querySelector('.dock-tab [data-testid="dock-badge"]')).toBeNull();
     cleanup();
 
     render(
@@ -237,7 +237,7 @@ describe('WorkArea', () => {
         }
       />,
     );
-    expect(document.querySelector('.dock-badge')?.textContent).toBe('2');
+    expect(document.querySelector('[data-testid="dock-badge"]')?.textContent).toBe('2');
   });
 
   // The dock's second occupant (decision 48). `UtilityDock` carries no knowledge of any particular pane,
@@ -257,7 +257,7 @@ describe('WorkArea', () => {
     // "Suggestions 0" is noise, exactly as "Cards 0" is.
     render(<WorkArea {...props} />);
     await waitFor(() => expect(api.listSuggestions).toHaveBeenCalled());
-    expect(document.querySelectorAll('.dock-badge')).toHaveLength(0);
+    expect(document.querySelectorAll('[data-testid="dock-badge"]')).toHaveLength(0);
     cleanup();
 
     api.listSuggestions.mockResolvedValue([
@@ -266,7 +266,7 @@ describe('WorkArea', () => {
     ]);
     render(<WorkArea {...props} />);
     // The badge is on the SUGGESTIONS tab: with no card open, it is the only badge on the strip.
-    await waitFor(() => expect(document.querySelector('.dock-badge')?.textContent).toBe('2'));
+    await waitFor(() => expect(document.querySelector('[data-testid="dock-badge"]')?.textContent).toBe('2'));
     api.listSuggestions.mockResolvedValue([]);
   });
 

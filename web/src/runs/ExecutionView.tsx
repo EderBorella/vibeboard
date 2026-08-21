@@ -4,6 +4,7 @@ import type { Card } from '../shared';
 import { Button } from '../ui/Button';
 import { Chip } from '../ui/Chip';
 import { Panel } from '../ui/Panel';
+import { Readout, ReadoutLine } from '../ui/Readout';
 import { ForgiveAttempts } from './ForgiveAttempts';
 import { costLabel, usageTotal } from './format';
 import { useAccounting } from './useAccounting';
@@ -65,12 +66,18 @@ export function ExecutionView({
   return (
     <main className="execution" style={{ '--exec-cols': COLUMNS.length } as CSSProperties}>
       {accounting && (
-        <p className="exec-ledger">
-          <span className="exec-ledger-total">{usageTotal(accounting.project)}</span>
+        <ReadoutLine as="p">
+          <Readout size="plain" tone="text">
+            {usageTotal(accounting.project)}
+          </Readout>
           {/* S10: which cap will actually stop this project. A dollar figure beside a budget that can
               never trip would tell the reader the opposite of the truth. */}
-          {accounting.cap && <span className="exec-ledger-cap">{accounting.cap.why}</span>}
-        </p>
+          {accounting.cap && (
+            <Readout size="plain" quiet>
+              {accounting.cap.why}
+            </Readout>
+          )}
+        </ReadoutLine>
       )}
       {COLUMNS.map((column) => {
         const group = grouped[column.key];
@@ -84,9 +91,11 @@ export function ExecutionView({
           >
             <h3 className="exec-head">
               {column.label}
-              <span className="exec-count">{group.length}</span>
+              <Chip pill fill className="vb-readout" testId="exec-count">
+                {group.length}
+              </Chip>
             </h3>
-            {group.length === 0 && <p className="exec-empty">Nothing here.</p>}
+            {group.length === 0 && <p className="vb-empty vb-empty-small">Nothing here.</p>}
             {group.map((record) => {
               const card = cards.find((c) => c.id === record.card);
               const subject = runSubject(record);
@@ -100,8 +109,10 @@ export function ExecutionView({
                     <span className="exec-skill">{record.skill}</span>
                     {/* What it cost, beside how long it took — the two things a dashboard row is
                         actually asked. Absent while a run is still in flight. */}
-                    {costLabel(record.usage) && <span className="exec-cost">{costLabel(record.usage)}</span>}
-                    <span className="exec-when">{elapsed(record, now)}</span>
+                    {costLabel(record.usage) && (
+                      <Readout testId="exec-cost">{costLabel(record.usage)}</Readout>
+                    )}
+                    <Readout testId="exec-when">{elapsed(record, now)}</Readout>
                   </div>
                   <Panel
                     as="button"
@@ -113,7 +124,9 @@ export function ExecutionView({
                     title={openTitle(record, card)}
                     onClick={() => card && onOpenCard(card, record)}
                   >
-                    <span className="link-id">{subject}</span>{' '}
+                    <Readout size="small" tone="accent">
+                      {subject}
+                    </Readout>{' '}
                     <span className="link-title">{card?.title ?? (record.card ? '(gone)' : '')}</span>
                   </Panel>
                   {(record.summary || record.note) && (

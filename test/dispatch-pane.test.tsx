@@ -162,12 +162,16 @@ describe('DispatchPane', () => {
     render(<DispatchPane {...props} />);
     expect(screen.getByText('Claude').className).toContain('active');
     expect(screen.getByText('OpenCode').className).not.toContain('active');
-    expect(document.querySelectorAll('.mode-btn.active')).toHaveLength(1);
+    // Scoped by the group's accessible name rather than by `.mode-btn`, which is `.vb-seg-cell` since
+    // the SegmentedControl merge — and both groups on this form render it, so an unscoped count is 2.
+    // `.active` stays: it is the highlight, which is what this test is about.
+    const modes = screen.getByRole('group', { name: 'Mode' });
+    expect(modes.querySelectorAll('.active')).toHaveLength(1);
   });
 
   it('leaves the error line out entirely when there is no error', () => {
     render(<DispatchPane {...props} error={null} />);
-    expect(document.querySelector('.dispatch-error')).toBeNull();
+    expect(document.querySelector('.vb-notice')).toBeNull();
   });
 
   it('carries the run it continues, and says so', () => {
@@ -178,7 +182,11 @@ describe('DispatchPane', () => {
     );
     // The chosen option arrives as an editable starting point, not a fixed instruction.
     expect((screen.getByLabelText('Anything to add?') as HTMLTextAreaElement).value).toBe('Split it in two');
-    expect(screen.getByText(/Continues run 20260726-141000-9f3e/)).toBeTruthy();
+    // The run id is a Readout inside the sentence, so the sentence is two text nodes and one element —
+    // asserted whole, because "which run does this continue" is exactly the byte in the middle.
+    expect(screen.getByText(/Continues run/).textContent).toBe(
+      'Continues run 20260726-141000-9f3e. Its report goes to the agent with this one.',
+    );
     fireEvent.click(screen.getByText('Run Execute'));
     expect(dispatched(onDispatch).previous).toBe('20260726-141000-9f3e');
   });
@@ -191,7 +199,7 @@ describe('DispatchPane', () => {
 
   it('shows the reason a dispatch was refused', () => {
     render(<DispatchPane {...props} error="A run is already in flight" />);
-    expect(screen.getByText('A run is already in flight').className).toBe('dispatch-error');
+    expect(screen.getByText('A run is already in flight').className).toBe('vb-notice vb-notice-bad');
   });
 
   it('goes back without dispatching, from the arrow and from Cancel', () => {

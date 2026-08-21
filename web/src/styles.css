@@ -106,6 +106,14 @@ body {
    `align-self: center` opts this cluster out of the bar's baseline alignment: these are controls, not
    prose, and a flex container donates its FIRST item's baseline — here a <select>, whose baseline is a
    UA-defined thing unrelated to the words beside it. */
+/* THE ONE LAYOUT UTILITY IN THIS FILE, and it is a deliberate exception rather than the start of a set.
+   SEVEN classes existed whose entire content was `margin-left: auto` — `.column-add`, `.mp-modal-close`,
+   `.copilot-reset`, `.dock-collapse`, `.copilot-x`, `.tile-archive` and `.cards-raw` — which is seven
+   names for one declaration, and Phase 3 measured them as exactly that. Naming the thing they all say
+   ("this one goes to the far end of its row") is the merge; adding a second utility beside it is the
+   utility framework docs/design-system.md refuses, so there is not one. */
+.push { margin-left: auto; }
+
 .topbar-right {
   margin-left: auto;
   display: flex;
@@ -320,15 +328,6 @@ body {
 }
 .board-label:hover { color: var(--accent); }
 .board-chevron { color: var(--accent); font-size: var(--t-micro); width: 0.8em; }
-.board-count {
-  color: var(--muted);
-  font-size: var(--t-micro);
-  letter-spacing: 0;
-  background: var(--panel-2);
-  border: 1px solid var(--border);
-  border-radius: var(--r-pill);
-  padding: 0 var(--s-4);
-}
 
 .board-head { display: flex; align-items: center; gap: var(--s-4); }
 /* The archive toggle appears only once a board has archived cards, so it never advertises a
@@ -412,8 +411,6 @@ body {
   border-style: dashed;
   padding: var(--s-4);
 }
-.archive-empty, .archive-error { color: var(--muted); font-size: var(--t-small); }
-.archive-error { color: var(--danger); }
 .archive-item {
   display: flex;
   align-items: center;
@@ -424,11 +421,13 @@ body {
   padding: var(--s-3) var(--s-4);
 }
 .archive-meta { display: flex; align-items: baseline; gap: var(--s-4); flex: 0 0 auto; }
-.archive-when { color: var(--muted); font-size: var(--t-micro); font-family: var(--font-mono); }
 .archive-title {
   flex: 1; min-width: 0; text-align: left;
   background: transparent; border: none; color: var(--text);
-  cursor: pointer; font-size: var(--t-body); font-family: inherit;
+  /* NO `font-size`: it declared `var(--t-body)`, which is what `body` already gives it — the same dead
+     declaration Phase 4 found on `.cv-link`. The type reset above turns the UA's 13.3333px into
+     `inherit`, so the class had nothing to add. */
+  cursor: pointer; font-family: inherit;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .archive-title:hover { color: var(--accent); }
@@ -463,12 +462,7 @@ body {
 }
 .column-title::before { content: "["; color: var(--accent); margin-right: 0.3em; }
 .column-title::after { content: "]"; color: var(--accent); margin-left: 0.3em; }
-.column-count {
-  color: var(--muted); font-size: var(--t-small);
-  background: var(--panel-2); border-radius: var(--r-pill); padding: 0 var(--s-3);
-}
-/* `bare` owns the box and the hover. What is left is where it sits. */
-.column-add { margin-left: auto; }
+/* `bare` owns the box and the hover; `push` is where it sits. */
 .column-body {
   padding: var(--tile-gap);
   display: flex;
@@ -500,12 +494,11 @@ body {
 }
 .tile:hover { border-color: var(--accent); box-shadow: var(--glow); }
 .tile-head { display: flex; align-items: center; gap: var(--s-3); }
-.tile-id { font-family: var(--font-mono); font-size: var(--t-micro); color: var(--accent); }
 .tile-link { font-size: var(--t-micro); color: var(--accent-2); }
 /* A `✕` that ARCHIVES goes red on hover rather than accent — a colour the surface owns, and the one
-   thing `bare` cannot decide for it. */
-.tile-archive { margin-left: auto; }
-.tile-archive:hover:not(:disabled) { color: var(--danger); }
+   thing `bare` cannot decide for it. Reached through the row, because the `margin-left: auto` that used
+   to be `.tile-archive`'s whole other declaration is now `push`. */
+.tile-head > .push:hover:not(:disabled) { color: var(--danger); }
 .tile-title {
   font-size: var(--t-body); font-weight: 600; line-height: 1.25;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
@@ -573,15 +566,9 @@ body {
 }
 .gate-list button:hover { border-color: var(--accent); }
 .gate-list-name { font-weight: 600; }
-.gate-list-path { font-size: var(--t-small); color: var(--muted); font-family: var(--font-mono); }
-.gate-field { display: block; margin-top: 0.75rem; }
-.gate-field > span { display: block; font-size: var(--t-small); color: var(--muted); margin-bottom: 0.3rem; }
+.gate .vb-field { margin-top: 0.75rem; }
 .gate-row { display: flex; gap: var(--s-4); }
-.gate input {
-  flex: 1; background: var(--bg); border: 1px solid var(--border);
-  border-radius: var(--r-md); padding: var(--s-4) var(--s-4); color: var(--text); font-size: var(--t-body);
-}
-.gate input:focus { outline: none; border-color: var(--accent); }
+.gate .vb-input { flex: 1; }
 .gate button:not(.gate-list button) {
   background: var(--accent-fill); color: var(--on-fill); border: none;
   border-radius: var(--r-md); padding: 0 0.9rem; font-weight: 600; cursor: pointer;
@@ -589,14 +576,8 @@ body {
 .gate button:disabled { opacity: 0.5; cursor: default; }
 .gate-preview { margin-top: 0.6rem; font-size: var(--t-small); color: var(--muted); }
 .gate-preview code { font-family: var(--font-mono); color: var(--accent); }
-.gate-hint { margin-top: 0.3rem; font-size: var(--t-small); line-height: 1.45; color: var(--muted); }
-.gate-hint code { font-family: var(--font-mono); }
-.gate-error {
-  margin-top: 1rem; color: var(--danger); font-size: var(--t-body);
-  background: color-mix(in srgb, var(--danger) 12%, transparent);
-  border: 1px solid color-mix(in srgb, var(--danger) 35%, transparent);
-  border-radius: var(--r-md); padding: var(--s-4) 0.7rem;
-}
+.gate .vb-hint { margin-top: 0.3rem; }
+.gate .vb-notice { margin-top: 1rem; }
 
 /* ---------- Card editor modal ---------- */
 .modal-backdrop {
@@ -612,30 +593,15 @@ body {
 .modal-title { font-weight: 600; font-family: var(--font-display); letter-spacing: 0.04em; }
 /* `.modal-close` is gone outright — it was the `bare` variant and nothing else. */
 .modal-body { padding: 1rem; overflow-y: auto; display: flex; flex-direction: column; gap: 0.7rem; }
-.field { display: flex; flex-direction: column; gap: var(--s-2); }
-.field > span { font-size: var(--t-small); color: var(--muted); }
-.field input, .field textarea {
-  background: var(--bg); border: 1px solid var(--border); border-radius: var(--r-md);
-  padding: var(--s-4) var(--s-4); color: var(--text); font-size: var(--t-body); font-family: inherit; resize: vertical;
-}
-.field input:focus, .field textarea:focus { outline: none; border-color: var(--accent); }
+/* THE FIELD IS A PRIMITIVE — see ui/Field.tsx and the Field block of ui/primitives.css. What was here:
+   the column, the label's size and colour, and the box on every input and textarea inside it. A textarea
+   inside a Field still resizes vertically, which is the one thing the primitive leaves to the surface. */
+.vb-field textarea { resize: vertical; }
 .raw-area { font-family: var(--font-mono); font-size: var(--t-body); }
 .settings-section { font-family: var(--font-display); text-transform: uppercase; letter-spacing: 0.12em; font-size: var(--t-small); color: var(--accent); margin-top: 0.4rem; border-bottom: 1px solid var(--border); padding-bottom: var(--s-2); }
 .settings-section:first-child { margin-top: 0; }
-.settings-hint { font-size: var(--t-small); color: var(--muted); font-style: italic; }
-/* A checkbox reads left-to-right: the control, then what it does. The other fields are label-above
-   because they hold a value; this one holds a decision. */
-.field-check { flex-direction: row; align-items: center; gap: var(--s-4); }
-.field-check input { width: auto; }
 /* A hint says how something works; this says what will be refused. Ochre rather than danger: nothing
    is broken yet, and a save that is about to be rejected must not look like one that already failed. */
-.settings-warn {
-  font-size: var(--t-small); color: var(--text); line-height: 1.55;
-  background: color-mix(in srgb, var(--warn, var(--danger)) 10%, transparent);
-  border: 1px solid color-mix(in srgb, var(--warn, var(--danger)) 32%, transparent);
-  border-radius: var(--r-md); padding: var(--s-4) 0.7rem;
-}
-.settings-warn code { font-family: var(--font-mono); font-size: var(--t-small); }
 /* Each blocker is a sentence naming what to change, so they are set as prose rather than as status
    chips — there is nothing to scan, only something to read and do. */
 .blockers { list-style: none; display: flex; flex-direction: column; gap: var(--s-2); font-size: var(--t-small); }
@@ -644,21 +610,10 @@ body {
 .ready-ok { font-size: var(--t-small); color: var(--accent); }
 
 .settings-row { display: flex; gap: 0.75rem; }
-.settings-row .field { flex: 1; }
-.field select { background: var(--bg); border: 1px solid var(--border); border-radius: var(--r-md); padding: var(--s-4) var(--s-4); color: var(--text); font-size: var(--t-body); }
-.field select:focus { outline: none; border-color: var(--accent); }
+.settings-row .vb-field { flex: 1; }
 
 /* Searchable model picker */
 .mp { position: relative; flex: 1; min-width: 0; }
-.mp-trigger {
-  width: 100%; display: flex; align-items: center; gap: var(--s-3);
-  background: var(--bg); color: var(--text); border: 1px solid var(--border);
-  border-radius: var(--r-md); padding: var(--s-3) var(--s-4); font-size: var(--t-small); cursor: pointer;
-}
-.mp-trigger:hover:not(:disabled) { border-color: var(--accent); }
-.mp-trigger:disabled { opacity: 0.5; cursor: default; }
-.mp-trigger-label { flex: 1; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-mono); }
-.mp-caret { color: var(--muted); }
 /* ---------- Confirm dialog ---------- */
 /* Above every other modal: it can be asked from inside one (deleting a file in Project Control). */
 .confirm-backdrop { z-index: 80; }
@@ -680,12 +635,7 @@ body {
 }
 .mp-modal-head { display: flex; align-items: center; padding: 0.7rem 0.9rem; border-bottom: 1px solid var(--border); }
 .mp-modal-title { font-weight: 700; font-family: var(--font-display); text-transform: uppercase; letter-spacing: 0.12em; }
-.mp-modal-close { margin-left: auto; }
-.mp-search {
-  margin: 0.6rem 0.9rem 0.4rem; padding: var(--s-4) var(--s-4); background: var(--bg); color: var(--text);
-  border: 1px solid var(--border); border-radius: var(--r-md); font-size: var(--t-body);
-}
-.mp-search:focus { outline: none; border-color: var(--accent); }
+.mp-modal > .vb-input { margin: 0.6rem 0.9rem 0.4rem; }
 .mp-filters { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-3); padding: 0 0.9rem var(--s-3); }
 .mp-chip {
   background: var(--panel-2); color: var(--muted); border: 1px solid var(--border);
@@ -694,7 +644,7 @@ body {
 .mp-chip:hover { border-color: var(--accent); }
 .mp-chip.on { background: var(--accent-fill); color: var(--on-fill); border-color: var(--accent); font-weight: 600; }
 .mp-prov { margin-left: auto; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: var(--r-md); padding: 0.22rem var(--s-3); font-size: var(--t-small); }
-.mp-count { padding: 0 0.9rem var(--s-2); font-size: var(--t-micro); color: var(--muted); font-family: var(--font-mono); }
+.mp-modal > .vb-readout { padding: 0 0.9rem var(--s-2); }
 .mp-list { flex: 1; overflow-y: auto; padding: 0 var(--s-4) var(--s-4); }
 .mp-item { display: flex; align-items: center; border-radius: var(--r-md); }
 .mp-item:hover, .mp-sel { background: var(--panel-2); }
@@ -713,14 +663,14 @@ body {
   color: var(--accent); border: 1px solid var(--accent); border-radius: var(--r-pill); padding: 0 var(--s-3);
 }
 .mp-pick-top { display: flex; align-items: baseline; gap: var(--s-4); min-width: 0; }
+/* The price is a `Readout`; the row decides it does not shrink, and that the model id takes the slack. */
+.mp-pick-top > .vb-readout { flex: 0 0 auto; }
 .mp-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
-.mp-price { flex: 0 0 auto; font-size: var(--t-micro); color: var(--accent-2); font-family: var(--font-mono); }
 .mp-pick-bot { display: flex; align-items: center; gap: var(--s-4); min-width: 0; }
-.mp-id { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-mono); font-size: var(--t-micro); color: var(--muted); }
+.mp-pick-bot > .vb-readout { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mp-badges { flex: 0 0 auto; display: flex; align-items: center; gap: var(--s-2); font-size: var(--t-small); }
-.mp-ctx { font-family: var(--font-mono); font-size: var(--t-micro); color: var(--muted); }
 .mp-sel .mp-name { color: var(--accent); }
-.mp-empty { color: var(--muted); font-size: var(--t-body); padding: 0.8rem var(--s-4); font-style: italic; }
+.mp-empty { padding: 0.8rem var(--s-4); }
 
 /* Session-override notice: the dock's controls don't write the project default, so say so
    rather than leaving the user to wonder why Settings still shows something else. */
@@ -729,10 +679,8 @@ body {
   font-size: var(--t-micro); color: var(--muted);
   padding: var(--s-2) var(--s-4);
 }
-.copilot-reset { margin-left: auto; }
 
 .copilot-warn { padding: var(--s-3) 0.75rem; font-size: var(--t-small); color: var(--danger); background: color-mix(in srgb, var(--danger) 12%, transparent); border-bottom: 1px solid var(--border); }
-.links-hint { color: var(--muted); font-size: var(--t-body); font-style: italic; }
 .links-list {
   display: flex; flex-direction: column; gap: var(--s-2); max-height: 180px; overflow-y: auto;
   border: 1px solid var(--border); border-radius: var(--r-md); padding: var(--s-4); background: var(--bg);
@@ -741,17 +689,12 @@ body {
 .links-group:first-child { margin-top: 0; }
 .link-option { display: flex; align-items: center; gap: var(--s-4); font-size: var(--t-body); cursor: pointer; }
 .link-option input { cursor: pointer; }
-.link-id { font-family: var(--font-mono); font-size: var(--t-small); color: var(--accent); }
 .link-title { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* ---------- Card view (read-only tab) ---------- */
 /* `anywhere` rather than `break-word`: only `anywhere` also shrinks the min-content size, so a long
    unbroken token (a path, a URL) cannot stretch the flex items below past the pane. */
 .cardview { display: flex; flex-direction: column; gap: var(--s-4); overflow-wrap: anywhere; }
 .cv-title { font-family: var(--font-display); font-size: var(--t-title); line-height: 1.3; margin: 0; }
-.cv-meta {
-  display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-4);
-  font-size: var(--t-small); color: var(--muted); font-family: var(--font-mono);
-}
 .cv-group {
   color: var(--accent-2); text-transform: uppercase; letter-spacing: 0.06em; font-size: var(--t-micro);
 }
@@ -765,7 +708,6 @@ body {
    specificity, so it reset the size, and the button and the plain `<div>` beside it matched only by
    accident of what they inherited. That is the shape of the 10.88px incident. Stated once, here. */
 .cv-links { display: flex; flex-direction: column; gap: var(--s-2); font-size: var(--t-body); }
-.cv-label { font-size: var(--t-small); color: var(--muted); }
 .cv-link { display: flex; gap: var(--s-4); align-items: baseline; }
 /* A link is a button wherever it can actually open the card (CardView's onOpenCard). */
 /* A `Panel` with the `flat` variant. `width: fit-content` is the one thing left: a link is as wide as
@@ -774,14 +716,7 @@ body {
 .cv-link-btn:hover { border-color: var(--accent); }
 .cv-link-btn:hover .link-title { color: var(--accent); }
 .cv-body { border-top: 1px solid var(--border); padding-top: var(--s-3); }
-.cv-nobody { color: var(--muted); font-size: var(--t-body); font-style: italic; }
 
-.modal-error {
-  color: var(--danger); font-size: var(--t-body);
-  background: color-mix(in srgb, var(--danger) 12%, transparent);
-  border: 1px solid color-mix(in srgb, var(--danger) 35%, transparent);
-  border-radius: var(--r-md); padding: var(--s-4) 0.7rem;
-}
 .modal-foot { display: flex; justify-content: flex-end; gap: var(--s-4); padding: 0.75rem 1rem; border-top: 1px solid var(--border); }
 /* `.btn-primary`, `.btn-secondary` and `.btn-danger` WERE HERE and are gone: 37 call sites that were
    `primary`, `default` and `danger` under their old names, with `padding: var(--s-4) 1rem` — which is
@@ -812,12 +747,6 @@ body {
 }
 .dock-tab:hover { color: var(--text); }
 .dock-tab.active { color: var(--text); background: var(--panel-2); border-color: var(--border); }
-.dock-badge {
-  font-family: var(--font-mono); font-size: var(--t-micro); letter-spacing: 0;
-  background: var(--bg); border: 1px solid var(--border); border-radius: var(--r-pill);
-  padding: 0 var(--s-3);
-}
-.dock-collapse { margin-left: auto; }
 /* SIZED BY ITS CONTENT, capped at 38vh — EXCEPT where a pane exists to be filled.
    It was `height: 38vh` outright, so the dock reserved 38% of the viewport whatever was in it: 414px of
    empty panel to display the words "No card open." on a 1000px-tall screen, while the boards above had
@@ -860,7 +789,7 @@ body {
 .cards-tab-x:hover:not(:disabled) { color: var(--danger); }
 .cards-main { flex: 1; min-height: 0; display: flex; }
 .cards-body { flex: 1; min-width: 0; overflow-y: auto; padding: 0.7rem 1rem; }
-.cards-gone { color: var(--muted); font-size: var(--t-body); font-style: italic; padding: 1rem 0; }
+.cards-gone { padding: 1rem 0; }
 
 /* Card action rail. Fixed width so the card body keeps a predictable measure whichever card is up. */
 .card-skills {
@@ -875,8 +804,8 @@ body {
 /* A skill's name is prose of arbitrary length in a narrow rail, so it reads from the left like the list
    it is. Alignment is layout, and the only thing left of this rule. */
 .cs-action { text-align: left; }
-.cs-empty { margin: 0.2rem 0 0; font-size: var(--t-micro); color: var(--muted); line-height: 1.4; }
-.cs-invalid { margin: 0.3rem 0 0; font-size: var(--t-micro); color: var(--danger); cursor: help; }
+.cs-empty { margin-top: 0.2rem; font-size: var(--t-micro); }
+.card-skills > .vb-error { margin: 0.3rem 0 0; cursor: help; }
 
 /* Inline editing: a field looks like text until hovered, and becomes an input on click. */
 .inline-view {
@@ -890,7 +819,6 @@ body {
   min-width: 0;
 }
 .inline-view:hover { border-color: var(--border); background: var(--bg); }
-.inline-empty { color: var(--muted); font-style: italic; font-size: var(--t-body); }
 .inline-edit {
   width: 100%; background: var(--bg); color: var(--text);
   border: 1px solid var(--accent); border-radius: var(--r-md);
@@ -901,7 +829,7 @@ body {
 .cv-title.inline-view, .cv-title.inline-edit { font-family: var(--font-display); font-size: var(--t-title); }
 .cv-group.inline-view { width: auto; display: inline-block; }
 .cv-tags-edit { min-height: 1.4rem; }
-.cv-links .cv-label { display: flex; align-items: center; gap: var(--s-4); }
+.cv-links .vb-label { display: flex; align-items: center; gap: var(--s-4); }
 .cv-link-edit { text-decoration: underline; }
 
 /* Raw pane (the card's file, inside the dock) */
@@ -911,10 +839,10 @@ body {
    context where the parent has no height to give. */
 .raw-pane .raw-area { flex: 1; min-height: 14rem; }
 .raw-foot { display: flex; align-items: center; justify-content: flex-end; gap: var(--s-4); }
-.raw-error { color: var(--danger); font-size: var(--t-small); margin-right: auto; }
+.raw-foot > .vb-error { margin-right: auto; }
 /* A TOGGLE, and its "on" state is now the `primary` variant rather than an `.active` class of its own —
    which is what `.cards-raw.active`'s accent fill already was, written twice. Layout is what is left. */
-.cards-raw { margin-left: auto; flex: 0 0 auto; }
+.cards-tabs > .push { flex: 0 0 auto; }
 
 /* ---------- Copilot dock (shrink side-by-side) ---------- */
 .copilot {
@@ -929,31 +857,20 @@ body {
 .copilot-head { display: flex; align-items: center; gap: var(--s-4); padding: var(--s-4) 0.75rem; border-bottom: 1px solid var(--border); }
 .copilot-title { font-weight: 700; font-family: var(--font-display); text-transform: uppercase; letter-spacing: 0.14em; }
 .copilot-title::before { content: "◈ "; color: var(--accent); }
-.copilot-model { font-size: var(--t-micro); color: var(--muted); font-family: var(--font-mono); }
-.copilot-x { margin-left: auto; }
-.backend-toggle { display: flex; border: 1px solid var(--border); border-radius: var(--r-md); overflow: hidden; }
-.bt-btn { background: var(--panel-2); color: var(--muted); border: none; border-right: 1px solid var(--border); padding: 0.18rem var(--s-4); font-size: var(--t-micro); cursor: pointer; }
-.bt-btn:last-child { border-right: none; }
-.bt-btn.active { background: var(--accent-fill); color: var(--on-fill); font-weight: 600; }
-.bt-btn:disabled { opacity: 0.6; cursor: default; }
+
 /* The same control in a form rather than a dense row. Settings used to render its own button group at
    this size, from its own list; the scale was the ONLY thing the two copies disagreed about that was
    deliberate — the label was drift. */
-.backend-toggle-md .bt-btn { padding: var(--s-2) var(--s-4); font-size: var(--t-small); }
 
 /* Chat switcher */
 .copilot-chatbar { display: flex; align-items: center; gap: var(--s-3); padding: var(--s-3) 0.75rem; border-bottom: 1px solid var(--border); }
 .chat-switcher { position: relative; flex: 1; min-width: 0; }
-.chat-current { display: flex; align-items: center; gap: var(--s-3); width: 100%; background: var(--panel-2); color: var(--text); border: 1px solid var(--border); border-radius: var(--r-md); padding: var(--s-2) var(--s-4); font-size: var(--t-small); cursor: pointer; }
-.chat-current:hover:not(:disabled) { border-color: var(--accent); }
-.chat-current:disabled { opacity: 0.5; cursor: default; }
-.chat-current-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
-.chat-caret { color: var(--accent); font-size: var(--t-micro); }
 /* "+ New" must not break across two lines when the switcher beside it is wide. */
 .chat-new { white-space: nowrap; }
 .chat-menu-backdrop { position: fixed; inset: 0; z-index: 20; }
 .chat-menu { position: absolute; z-index: 21; top: calc(100% + 4px); left: 0; right: 0; max-height: 320px; overflow-y: auto; background: var(--panel); border: 1px solid var(--border); border-radius: var(--r-lg); box-shadow: var(--glow), 0 6px 24px rgba(0,0,0,0.4); padding: var(--s-2); }
-.chat-menu-empty { padding: var(--s-4) var(--s-4); font-size: var(--t-small); color: var(--muted); }
+/* The menu decides its own inset; the line inside it decides nothing. */
+.chat-menu > .vb-empty { padding: var(--s-4); }
 .chat-menu-item { display: flex; align-items: stretch; gap: var(--s-2); border-radius: var(--r-md); }
 .chat-menu-item.active { background: var(--panel-2); }
 .chat-menu-item:hover { background: var(--panel-2); }
@@ -970,17 +887,11 @@ body {
 }
 .chat-backend[data-state='claude-code'] { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 50%, transparent); }
 .chat-backend[data-state='opencode'] { color: var(--accent-2); border-color: color-mix(in srgb, var(--accent-2) 50%, transparent); }
-.chat-menu-meta { font-size: var(--t-micro); color: var(--muted); font-family: var(--font-mono); }
 /* `--accent-2` and not `--danger`: deleting a chat is confirmed, and this row already has a red `✕`
    nowhere near it. The distinction was deliberate before the migration and survives it. */
 .chat-del:hover:not(:disabled) { color: var(--accent-2); }
 
 .copilot-controls { display: flex; align-items: center; flex-wrap: wrap; gap: var(--s-4); padding: var(--s-4) 0.75rem; border-bottom: 1px solid var(--border); }
-.mode-group { display: flex; border: 1px solid var(--border); border-radius: var(--r-md); overflow: hidden; }
-.mode-btn { background: var(--panel-2); color: var(--muted); border: none; border-right: 1px solid var(--border); padding: var(--s-2) var(--s-4); font-size: var(--t-small); cursor: pointer; }
-.mode-btn:last-child { border-right: none; }
-.mode-btn.active { background: var(--accent-fill); color: var(--on-fill); font-weight: 600; }
-.mode-btn:disabled { opacity: 0.6; cursor: default; }
 .copilot-actions { margin-left: auto; display: flex; gap: var(--s-2); }
 .copilot-actions button { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); border-radius: var(--r-md); padding: var(--s-2) var(--s-4); font-size: var(--t-small); cursor: pointer; }
 .copilot-actions button:disabled { opacity: 0.5; cursor: default; }
@@ -993,7 +904,6 @@ body {
 .copilot-status.down .status-dot { background: var(--danger); }
 .copilot-status.down { color: var(--danger); }
 .copilot-body { flex: 1; overflow-y: auto; padding: 0.75rem; display: flex; flex-direction: column; gap: var(--s-4); }
-.copilot-empty { color: var(--muted); font-size: var(--t-body); line-height: 1.5; }
 .msg { font-size: var(--t-body); line-height: 1.45; white-space: pre-wrap; word-break: break-word; }
 .msg-user { align-self: flex-end; background: var(--accent-fill); color: var(--on-fill); padding: var(--s-3) var(--s-4); border-radius: var(--r-lg) var(--r-lg) var(--r-sm) var(--r-lg); max-width: 85%; }
 .msg-assistant { background: var(--panel-2); border: 1px solid var(--border); padding: var(--s-3) var(--s-4); border-radius: var(--r-lg) var(--r-lg) var(--r-lg) var(--r-sm); max-width: 90%; }
@@ -1001,7 +911,14 @@ body {
 .msg-tool { color: var(--accent); font-family: var(--font-mono); font-size: var(--t-small); }
 .msg-error { color: var(--danger); font-size: var(--t-body); }
 .msg-running { color: var(--muted); font-style: italic; }
-.copilot-readout { display: flex; align-items: center; gap: 0.75rem; padding: var(--s-3) 0.75rem; border-top: 1px solid var(--border); font-size: var(--t-small); color: var(--muted); }
+/* CENTRED, not baseline-aligned, and the harness is why: `ReadoutLine` aligns on the baseline because
+   its parts are text at two sizes — but this row's last item is the context METER, a 5px bar with no
+   baseline of its own, and on a baseline it hung 1.5px below the figures beside it. Check 7 named the row
+   as wrapping. A graphic in a row of text is the one case where centring the boxes is right. */
+.copilot-readout {
+  align-items: center; gap: var(--s-2) 0.75rem; padding: var(--s-3) 0.75rem;
+  border-top: 1px solid var(--border);
+}
 .ctx { margin-left: auto; display: flex; align-items: center; gap: var(--s-3); }
 .ctx-bar { width: 60px; height: 5px; background: var(--panel-2); border-radius: var(--r-pill); overflow: hidden; }
 .ctx-fill { display: block; height: 100%; background: var(--accent); }
@@ -1067,7 +984,7 @@ body {
   background: var(--accent); box-shadow: var(--glow);
 }
 
-.control-empty { color: var(--muted); font-size: var(--t-small); padding: 0 var(--s-4); }
+.control-empty { padding: 0 var(--s-4); }
 
 /* The Explorer's tree. One flat list of rows indented by depth, not nested elements, so tab order
    and reading order are the same thing. Wider than the control list: paths run deep. */
@@ -1079,10 +996,10 @@ body {
 /* Fixed width so names line up whether or not a row has a twisty. */
 .explorer-twist { width: 0.7rem; flex-shrink: 0; color: var(--muted); font-size: var(--t-micro); }
 .explorer-icon { flex-shrink: 0; font-size: var(--t-small); }
-.explorer-size { flex-shrink: 0; color: var(--muted); font-size: var(--t-micro); font-family: var(--font-mono); }
+.explorer-item > .vb-readout { flex-shrink: 0; }
 /* The tail of a capped listing. Deliberately not styled as an error — the folder is fine, the
    listing is simply not all of it. */
-.explorer-more { color: var(--muted); font-size: var(--t-micro); font-style: italic; padding: 0.2rem var(--s-4); }
+.explorer-more { font-size: var(--t-micro); padding: 0.2rem var(--s-4); }
 .explorer-actions { display: flex; gap: 0.1rem; }
 .explorer-actions button:disabled { opacity: 0.3; cursor: not-allowed; }
 /* Where a dragged entry would land. */
@@ -1093,26 +1010,19 @@ body {
   display: flex; flex-direction: column; gap: var(--s-2);
   font-size: var(--t-small); color: var(--muted); margin-bottom: 0.9rem;
 }
-.confirm-input {
-  background: var(--bg); color: var(--text); border: 1px solid var(--border);
-  border-radius: var(--r-md); padding: var(--s-3) var(--s-4); font-family: var(--font-mono); font-size: var(--t-body);
-}
-.confirm-input:focus { outline: none; border-color: var(--accent); }
+.confirm-require .vb-input { font-family: var(--font-mono); }
 .confirm-go:disabled { opacity: 0.45; cursor: not-allowed; }
-/* Inline rename: sits exactly where the list row was, so the row appears to become editable. */
-.control-rename {
-  width: 100%; background: var(--bg); color: var(--text);
-  border: 1px solid var(--accent); border-radius: var(--r-md);
-  padding: var(--s-3) var(--s-4); font-size: var(--t-body); font-family: inherit;
-}
-.control-rename:focus { outline: none; box-shadow: var(--glow); }
+/* Inline rename: sits exactly where the list row was, so the row appears to become editable. Accent at
+   REST, because it only exists while it is being typed into — which is why the primitive's focus rule is
+   not what does the work here. */
+.control-list .vb-input, .explorer-list .vb-input { width: 100%; border-color: var(--accent); }
+.control-list .vb-input:focus, .explorer-list .vb-input:focus { box-shadow: var(--glow); }
 
 .control-editor { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
 .control-editor-head {
   display: flex; align-items: center; gap: var(--s-4); padding: var(--s-4) 0.9rem;
   border-bottom: 1px solid var(--border); background: var(--panel);
 }
-.control-editor-path { font-family: var(--font-mono); font-size: var(--t-small); color: var(--muted); }
 .control-tabs { display: flex; gap: var(--s-2); margin-left: 0.5rem; }
 .control-tabs button {
   background: var(--panel-2); color: var(--muted); border: 1px solid var(--border);
@@ -1121,11 +1031,8 @@ body {
 .control-tabs button.active { color: var(--text); border-color: var(--accent); }
 .control-editor-actions { margin-left: auto; display: flex; gap: var(--s-3); }
 /* `.btn-danger` was here — `Button`'s `danger` variant at `md`, so it sits level with the Save beside it. */
-.control-disclaimer {
-  margin: 0.6rem 0.9rem 0; padding: var(--s-4) 0.7rem; font-size: var(--t-small); line-height: 1.45;
-  color: var(--text); background: color-mix(in srgb, var(--danger) 12%, transparent);
-  border: 1px solid color-mix(in srgb, var(--danger) 40%, var(--border)); border-radius: var(--r-md);
-}
+/* The prose ink is the surface's and the shell's inset is the shell's; the box is the primitive's. */
+.control-disclaimer { margin: 0.6rem 0.9rem 0; color: var(--text); }
 .control-textarea {
   flex: 1; margin: 0.75rem 0.9rem; resize: none; background: var(--bg); color: var(--text);
   border: 1px solid var(--border); border-radius: var(--r-md); padding: 0.8rem;
@@ -1134,7 +1041,7 @@ body {
 .control-textarea:focus { outline: none; border-color: var(--accent); }
 .control-preview { flex: 1; overflow-y: auto; padding: 0.75rem 1.1rem; }
 .control-blank { margin: auto; color: var(--muted); padding: 2rem; }
-.control-error { padding: var(--s-4) 0.9rem; color: var(--danger); font-size: var(--t-small); }
+.control-editor > .vb-error, .explorer-list > .vb-error { padding: var(--s-4) 0.9rem; }
 
 /* Rendered markdown (preview pane) */
 .markdown { line-height: 1.6; color: var(--text); }
@@ -1171,37 +1078,22 @@ body {
 .dispatch-head { display: flex; align-items: center; gap: var(--s-4); }
 /* `.dispatch-back` is gone outright: a bordered `←` with an accent hover is `default`, exactly. */
 .dispatch-title { margin: 0; font-family: var(--font-display); font-size: var(--t-lead); }
-.dispatch-on { color: var(--muted); font-family: var(--font-mono); font-size: var(--t-body); }
 .dispatch-desc { margin: 0; font-size: var(--t-body); color: var(--muted); }
-.dispatch-continues {
-  margin: 0; font-size: var(--t-small); color: var(--accent-2); font-family: var(--font-mono);
-}
+/* A SENTENCE, so it is not a readout — only the run id inside it is, which is the signature's whole
+   claim: mono means the machine measured it. It was entirely mono before, which said the prose was
+   machine-written too. */
+.dispatch-continues { margin: 0; font-size: var(--t-small); color: var(--accent-2); }
 .dispatch-row { display: flex; align-items: center; gap: var(--s-4); flex-wrap: wrap; }
-.dispatch-label {
-  width: 5.5rem; flex: 0 0 auto; font-size: var(--t-small); color: var(--muted);
-  text-transform: uppercase; letter-spacing: 0.06em;
-}
-.dispatch-row .mp-trigger { flex: 1; min-width: 0; }
-.dispatch-prompt-label { font-size: var(--t-small); color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
-.dispatch-prompt {
-  width: 100%; background: var(--bg); color: var(--text); border: 1px solid var(--border);
-  border-radius: var(--r-md); padding: var(--s-3) var(--s-4); font: inherit; font-size: var(--t-body); resize: vertical;
-}
+.dispatch-row .vb-trigger { flex: 1; min-width: 0; }
+.dispatch > .vb-input { width: 100%; resize: vertical; }
 .dispatch-attach { font-size: var(--t-body); border: 1px solid var(--border); border-radius: var(--r-md); padding: var(--s-3) var(--s-4); }
 .dispatch-attach summary { cursor: pointer; color: var(--muted); }
-.dispatch-hint { margin: 0.3rem 0; font-size: var(--t-small); color: var(--muted); font-style: italic; }
-.dispatch-error {
-  margin: 0; color: var(--danger); font-size: var(--t-body);
-  background: color-mix(in srgb, var(--danger) 12%, transparent);
-  border: 1px solid color-mix(in srgb, var(--danger) 35%, transparent);
-  border-radius: var(--r-md); padding: var(--s-3) var(--s-4);
-}
+.dispatch .vb-hint { margin: 0.3rem 0; }
 .dispatch-foot { display: flex; justify-content: flex-end; gap: var(--s-4); margin-top: 0.2rem; }
 
 /* ---------- Reports (a card's run history, and one report) ---------- */
 /* Deliberately not link-shaped: chips and times, so it cannot be mistaken for the card links. */
 .reports { display: flex; flex-direction: column; gap: var(--s-2); border-top: 1px solid var(--border); padding-top: var(--s-4); }
-.reports-head { margin: 0; font-size: var(--t-small); color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
 .report-row { display: flex; align-items: center; gap: var(--s-3); }
 /* A `Panel` with the `flat` variant. What is left is where the box sits and how it lays its parts out;
    the undrawn box, the corner, the padding and the inherited type are the primitive's. */
@@ -1227,8 +1119,9 @@ body {
 .report-chip[data-state='cancelled'] { color: var(--danger); border-color: var(--danger); }
 .report-skill { flex: 0 0 auto; font-size: var(--t-small); }
 /* Money reads as data, not prose: mono, so a card's runs line up down the column. */
-.report-cost { flex: 0 0 auto; color: var(--muted); font-family: var(--font-mono); font-size: var(--t-micro); }
-.report-when { flex: 0 0 auto; color: var(--muted); font-family: var(--font-mono); font-size: var(--t-micro); }
+/* The cost and the elapsed time are `Readout`s. What the row still decides is that neither shrinks —
+   the summary beside them takes the slack. */
+.report-open > .vb-readout { flex: 0 0 auto; }
 .report-summary {
   flex: 1; min-width: 0; color: var(--muted); font-size: var(--t-small);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -1260,14 +1153,12 @@ body {
 .report-prompt { margin: 0; font-size: var(--t-body); color: var(--muted); }
 .report-prompt-label { text-transform: uppercase; letter-spacing: 0.06em; font-size: var(--t-micro); }
 .report-body { border-top: 1px solid var(--border); padding-top: var(--s-3); }
-.report-empty { color: var(--muted); font-style: italic; font-size: var(--t-body); }
 .report-created { display: flex; flex-direction: column; gap: 0.2rem; }
 .report-foot { display: flex; align-items: center; justify-content: flex-end; gap: var(--s-4); }
 
 /* Options on a report that needs attention. The agent's suggestions and the fixed ones look the
    same on purpose — they all lead to the same editable prompt. */
 .options { display: flex; flex-direction: column; gap: var(--s-2); border-top: 1px solid var(--border); padding-top: var(--s-4); }
-.options-head { margin: 0; font-size: var(--t-small); color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
 .options-warn { margin: 0; font-size: var(--t-small); color: var(--danger); }
 /* Left-aligned because an option is a whole sentence. `.option-fixed { border-style: dashed }` WENT WITH
    THE MIGRATION and its removal is a fix, not a casualty: this section's own comment says "the agent's
@@ -1310,8 +1201,6 @@ body {
   font-family: var(--font-display); font-size: var(--t-small);
   text-transform: uppercase; letter-spacing: 0.1em;
 }
-.exec-count { color: var(--muted); font-size: var(--t-micro); letter-spacing: 0; background: var(--panel-2); border-radius: var(--r-pill); padding: 0 var(--s-3); }
-.exec-empty { margin: 0; color: var(--muted); font-size: var(--t-small); font-style: italic; }
 .exec-run {
   display: flex; flex-direction: column; gap: var(--s-2); align-items: flex-start;
   background: var(--bg); border: 1px solid var(--border); border-radius: var(--r-md); padding: var(--s-4) var(--s-4);
@@ -1324,12 +1213,13 @@ body {
 .exec-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2); width: 100%; }
 .exec-skill { font-size: var(--t-small); }
 /* Cost takes the push-right when present, so cost and elapsed sit together at the end of the row. */
-.exec-cost { margin-left: auto; color: var(--muted); font-family: var(--font-mono); font-size: var(--t-micro); }
-.exec-when { margin-left: auto; color: var(--muted); font-family: var(--font-mono); font-size: var(--t-micro); }
+/* Cost takes the push-right when present, so cost and elapsed sit together at the end of the row. Both
+   are `Readout`s now, and the pair rule below is the same claim the two classes made by hand. */
+.exec-run-top > .vb-readout { margin-left: auto; }
 /* AFTER the plain `.exec-when` above, not before it. At (0,2,0) the adjacent form won either way, so
    this is a move and not a change — but the descending order read as though the plain rule was meant
    to override it, which is the opposite of what happens. */
-.exec-cost + .exec-when { margin-left: 0; }
+.exec-run-top > .vb-readout + .vb-readout { margin-left: 0; }
 /* A `Panel` with the `flat` variant. WRAPS: a card title is arbitrary user text and several are long
    file paths with no spaces, so without this they set the column's minimum content width and pushed
    past the track. `cursor: default` on a disabled one is the primitive's now; the dimming is this
@@ -1355,38 +1245,20 @@ body {
 /* ---------- Skill editor (fields view in Project Control) ---------- */
 .skill-editor { display: flex; flex-direction: column; gap: var(--s-4); padding: 0.8rem 1.1rem; overflow-y: auto; }
 .skill-row { display: flex; align-items: center; gap: var(--s-4); }
-.skill-label { width: 6rem; flex: 0 0 auto; font-size: var(--t-small); color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
-.skill-input, .skill-prompt {
-  flex: 1; min-width: 0; background: var(--bg); color: var(--text);
-  border: 1px solid var(--border); border-radius: var(--r-md); padding: var(--s-3) var(--s-4); font: inherit; font-size: var(--t-body);
-}
-.skill-prompt { resize: vertical; font-family: var(--font-mono); font-size: var(--t-body); }
+/* The rail label and the box are the primitive's. What the editor still says is that a field takes the
+   slack beside its label, and that the prompt is a monospace box you can drag taller. */
+.skill-row > .vb-input { flex: 1; min-width: 0; }
+.skill-editor textarea.vb-input { resize: vertical; font-family: var(--font-mono); }
 .skill-scope { border: 1px solid var(--border); border-radius: var(--r-md); padding: var(--s-3) 0.7rem var(--s-4); margin: 0; }
 .skill-scope legend { font-size: var(--t-small); color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; padding: 0 var(--s-2); }
-.skill-hint { margin: 0 0 0.3rem; font-size: var(--t-micro); color: var(--muted); font-style: italic; }
+.skill-scope .vb-hint { margin: 0 0 0.3rem; }
 .skill-foot { display: flex; justify-content: flex-end; }
-.skill-invalid { padding: 1rem 1.1rem; color: var(--danger); font-size: var(--t-body); line-height: 1.5; }
 
 /* The agent sandbox panel in Settings. Two states, and they must not read alike: "enforced" is a
    claim the user is trusting, "not enforced" is a condition they can act on. */
-.sandbox-state {
-  font-size: var(--t-body); line-height: 1.5; border-radius: var(--r-md); padding: var(--s-4) 0.7rem;
-  border: 1px solid transparent;
-}
-.sandbox-ok {
-  color: var(--text);
-  background: color-mix(in srgb, var(--accent) 10%, transparent);
-  border-color: color-mix(in srgb, var(--accent) 30%, transparent);
-}
-.sandbox-off {
-  color: var(--text);
-  background: color-mix(in srgb, var(--warn, var(--danger)) 10%, transparent);
-  border-color: color-mix(in srgb, var(--warn, var(--danger)) 32%, transparent);
-}
-.sandbox-state + .sandbox-state { margin-top: 0.4rem; }
 /* Each action says what it does to the running session. A bare verb on a button that restarts a
-   server somebody has work in flight on is not enough to decide with. */
-.sandbox-hint { font-size: var(--t-small); color: var(--muted); line-height: 1.5; }
+   server somebody has work in flight on is not enough to decide with — the hint IS the decision, so it
+   is a `vb-hint` like every other. */
 /* `> .vb-btn` since the class became a variant. Still a LAYOUT rule and still the caller's: a button in
    a flex column stretches to the column's width otherwise, which is what made `.diary-refresh` 1240px. */
 .sandbox-action > .vb-btn { align-self: flex-start; }
@@ -1415,34 +1287,11 @@ body {
 
 /* The ledger lines: what a project or a card has spent, and which cap will stop it. Quiet by
    default — a number you only look at when you are asking — and tabular so digits line up. */
-.exec-ledger {
-  grid-column: 1 / -1;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.2rem 0.9rem;
-  margin: 0 0 0.6rem;
-  font-size: var(--t-small);
-  color: var(--muted);
-  font-variant-numeric: tabular-nums;
-}
-.exec-ledger-total {
-  color: var(--text);
-}
-.exec-ledger-cap {
-  opacity: 0.85;
-}
-.reports-ledger {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.2rem 0.8rem;
-  margin: 0.45rem 0 0;
-  font-size: var(--t-small);
-  color: var(--muted);
-  font-variant-numeric: tabular-nums;
-}
-.reports-attempts {
-  opacity: 0.85;
-}
+/* BOTH LEDGERS ARE `ReadoutLine` — see ui/Readout.tsx. Five classes wrote this row by hand and agreed on
+   everything except a gap nobody chose. What is left is where each one sits: the project ledger spans the
+   whole execution grid, and a card's sits under its report list. */
+.execution > .vb-readout-block { grid-column: 1 / -1; margin-bottom: 0.6rem; }
+.reports > .vb-readout-block { margin-top: 0.45rem; }
 /* The way out of a card the machine spent, on the same line as the count it clears. Quiet by default —
    it is an escape hatch, not the thing you came to the card to do — which is the `ghost` variant, and
    it no longer has to borrow the report row's Stop styling because there is one Button. Nothing is left
@@ -1536,7 +1385,6 @@ body {
 }
 .signin-row:last-of-type { border-bottom: none; }
 .signin-row-label { font-size: var(--t-body); word-break: break-all; }
-.signin-row-meta { font-size: var(--t-small); color: var(--muted); font-family: var(--font-mono); }
 .signin-this {
   margin-left: 0.35rem;
   padding: 0.05rem var(--s-3);
@@ -1592,7 +1440,7 @@ body {
   border: 1px solid var(--border); border-radius: var(--r-md);
   font: inherit; line-height: 1.45;
 }
-.diary-error { color: var(--danger, #d66); font-size: var(--t-body); max-width: 68ch; }
+.diary > .vb-error, .suggestions-pane > .vb-error { max-width: 68ch; }
 
 .diary-empty {
   display: flex; flex-direction: column; align-items: flex-start; gap: var(--s-4);
@@ -1617,19 +1465,11 @@ body {
 .diary-entry[data-kind='lifecycle'] { border-left-color: var(--muted); }
 .diary-entry[data-kind='note'] { border-left-color: var(--accent-2); }
 
-.diary-meta {
-  display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--s-4);
-  font-size: var(--t-small); color: var(--muted);
-}
 .diary-kind {
   font-family: var(--font-display); text-transform: uppercase; letter-spacing: 0.1em;
   font-size: var(--t-micro); color: var(--text);
 }
 .diary-about { display: flex; flex-wrap: wrap; gap: var(--s-3); }
-.diary-chip {
-  padding: 0.05rem var(--s-3); border: 1px solid var(--border); border-radius: var(--r-pill);
-  font-variant-numeric: tabular-nums;
-}
 .diary-outcome { color: var(--text); }
 .diary-text { line-height: 1.55; font-size: var(--t-lead); }
 
@@ -1640,11 +1480,9 @@ body {
   padding: var(--s-4) var(--s-4); gap: var(--s-4); overflow-y: auto;
 }
 .suggestions-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-3); }
-.suggestions-reason {
-  flex: 1; min-width: 12rem; padding: var(--s-2) var(--s-4);
-  background: var(--panel-2); color: var(--text);
-  border: 1px solid var(--border); border-radius: var(--r-md); font: inherit;
-}
+/* On the PANEL ground rather than the app ground, which is the one difference among the ten text boxes
+   that a person can see: this one sits in a `--wash` pane where `--bg` would read as a hole. */
+.suggestions-actions > .vb-input { flex: 1; min-width: 12rem; background: var(--panel-2); }
 .suggestions-became { color: var(--accent); font-size: var(--t-body); }
 .suggestions-list { list-style: none; display: flex; flex-direction: column; gap: 0.1rem; min-height: 0; }
 .suggestions-row { border-left: 2px solid var(--border); }
@@ -1680,10 +1518,6 @@ body {
 .filed-entry[data-state='active'] { border-left-color: var(--warn, #b8860b); }
 .filed-entry[data-state='actioned'] { border-left-color: var(--accent); }
 .filed-entry[data-state='dismissed'] { border-left-color: var(--border); }
-.filed-meta {
-  display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--s-4);
-  font-size: var(--t-small); color: var(--muted);
-}
 .filed-state {
   font-family: var(--font-display); text-transform: uppercase; letter-spacing: 0.1em;
   font-size: var(--t-micro); color: var(--text);
@@ -1864,7 +1698,6 @@ button.ap-agent-state:hover { text-decoration: underline; }
   color: var(--muted);
   margin-bottom: 0.35rem;
 }
-.ap-drawer-empty { color: var(--muted); font-size: var(--t-body); }
 .ap-work { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--s-2); }
 .ap-work li { font-size: var(--t-body); }
 .ap-waiting { color: var(--muted); font-size: var(--t-small); }

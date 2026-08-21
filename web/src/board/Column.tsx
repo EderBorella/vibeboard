@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { BoardName, Card } from '../shared';
 import { Button } from '../ui/Button';
+import { Chip } from '../ui/Chip';
 import { Panel } from '../ui/Panel';
 import { CardTile } from './CardTile';
 
@@ -63,12 +64,14 @@ export function Column({
       header={
         <>
           <span className="column-title">{title}</span>
-          <span className="column-count">{cards.length}</span>
+          <Chip pill fill className="vb-readout" testId="column-count">
+            {cards.length}
+          </Chip>
           {onAdd && (
             <Button
               variant="bare"
               size="sm"
-              className="column-add"
+              className="push"
               title="New card"
               onClick={() => onAdd(board, slug)}
             >

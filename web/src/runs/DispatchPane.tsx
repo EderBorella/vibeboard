@@ -5,6 +5,8 @@ import { clampToCaps } from '../copilot/choice';
 import { ModelPicker } from '../models/ModelPicker';
 import { backendCaps, type Card } from '../shared';
 import { Button } from '../ui/Button';
+import { Readout } from '../ui/Readout';
+import { SegmentedControl } from '../ui/SegmentedControl';
 
 interface Props {
   skill: Skill;
@@ -78,18 +80,19 @@ export function DispatchPane({
           ←
         </Button>
         <h3 className="dispatch-title">
-          {skill.name} <span className="dispatch-on">on {card.id}</span>
+          {skill.name} <Readout size="body">on {card.id}</Readout>
         </h3>
       </header>
       <p className="dispatch-desc">{skill.description}</p>
       {previous && (
         <p className="dispatch-continues">
-          Continues run {previous.run}. Its report goes to the agent with this one.
+          Continues run <Readout size="plain">{previous.run}</Readout>. Its report goes to the agent with this
+          one.
         </p>
       )}
 
       <div className="dispatch-row">
-        <span className="dispatch-label">Connector</span>
+        <span className="vb-label vb-label-caps vb-label-rail">Connector</span>
         {/* THE SHARED PICKER, and the fourth call site to get it. This one built its own group from
             `BACKEND_DEFAULTS`'s KEYS, so it showed a person the raw id — "claude-code" — where the dock
             showed "Claude" and Settings showed "Claude Code": one setting with three spellings, two of
@@ -98,12 +101,12 @@ export function DispatchPane({
       </div>
 
       <div className="dispatch-row">
-        <span className="dispatch-label">Model</span>
+        <span className="vb-label vb-label-caps vb-label-rail">Model</span>
         <ModelPicker models={models} value={model} defaultModel={defaults.model} onChange={setModel} />
       </div>
 
       <div className="dispatch-row">
-        <span className="dispatch-label">Effort</span>
+        <span className="vb-label vb-label-caps vb-label-rail">Effort</span>
         <select
           className="theme-select"
           aria-label="Effort"
@@ -119,28 +122,21 @@ export function DispatchPane({
       </div>
 
       <div className="dispatch-row">
-        <span className="dispatch-label">Mode</span>
-        <div className="mode-group" role="group" aria-label="Mode">
-          {caps.modes.map((m) => (
-            <button
-              key={m.value}
-              type="button"
-              className={`mode-btn${clamped.mode === m.value ? ' active' : ''}`}
-              title={m.hint}
-              onClick={() => setMode(m.value)}
-            >
-              {m.label}
-            </button>
-          ))}
-        </div>
+        <span className="vb-label vb-label-caps vb-label-rail">Mode</span>
+        <SegmentedControl
+          items={caps.modes.map((m) => ({ value: m.value, label: m.label, title: m.hint }))}
+          value={clamped.mode}
+          onChange={setMode}
+          label="Mode"
+        />
       </div>
 
-      <label className="dispatch-prompt-label" htmlFor="dispatch-prompt">
+      <label className="vb-label vb-label-caps" htmlFor="dispatch-prompt">
         Anything to add?
       </label>
       <textarea
         id="dispatch-prompt"
-        className="dispatch-prompt"
+        className="vb-input"
         rows={4}
         placeholder="Optional. This goes last in the prompt, so it qualifies the skill rather than competing with it."
         value={prompt}
@@ -150,7 +146,7 @@ export function DispatchPane({
       {attachable.length > 0 && (
         <details className="dispatch-attach">
           <summary>Attach material{attachments.length > 0 ? ` (${attachments.length})` : ''}</summary>
-          <p className="dispatch-hint">
+          <p className="vb-hint">
             Paths are passed to the agent, which reads what it needs. Reference links from the resources
             registry always go with a run.
           </p>
@@ -163,7 +159,7 @@ export function DispatchPane({
         </details>
       )}
 
-      {error !== null && <p className="dispatch-error">{error}</p>}
+      {error !== null && <p className="vb-notice vb-notice-bad">{error}</p>}
 
       <div className="dispatch-foot">
         <Button size="md" onClick={onBack}>

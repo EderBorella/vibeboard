@@ -2,6 +2,7 @@ import {
   auditDock,
   auditFocus,
   auditGrid,
+  auditReadouts,
   auditStyles,
   documentOverflow,
   type Offender,
@@ -630,5 +631,52 @@ test('10. the dock is content-sized until a pane asks to be filled', async ({ bo
   console.log(
     `[${theme}] dock: ${resting.bodyHeight}px at rest, ${filled.bodyHeight}px with ${filled.pane} ` +
       `(38vh of ${filled.viewport} = ${cap}), pane ${filled.paneHeight}px`,
+  );
+});
+
+// CHECK 11 — NUMBERS ALIGN IN A COLUMN, and it is measured rather than asserted by font name. A
+// `font-family` assertion says a declaration exists; it does not say the digits line up, and it would
+// pass with `font-variant-numeric` deleted. So two clones of a real readout are stacked off-screen and
+// their advance is compared: ten `1`s against ten `8`s (tabular numerals), and ten `i`s against ten `M`s
+// (a monospaced face). The CONTROL is the same letter pair measured in the surface's own type — it has to
+// differ, or the instrument cannot tell two widths apart and both claims above are vacuous.
+//
+// WHAT THIS CHECK CANNOT SEE, verified rather than assumed: deleting `font-variant-numeric: tabular-nums`
+// from `.vb-readout` leaves it GREEN. In a monospaced face every digit already has one advance, so the
+// declaration is belt-and-braces while the family holds — an equivalent mutant, probed once and recorded
+// here rather than left as a hole for someone to rediscover. It is kept because it is what makes the
+// claim true of a readout whose surface re-faces it. Changing the family to `var(--font-body)` exits 1.
+test('11. numbers align in a column', async ({ board, theme }) => {
+  const audit = await auditReadouts(board);
+  expect(
+    audit.readouts,
+    'the board rendered no readouts at all — this check has nothing to measure',
+  ).toBeGreaterThan(0);
+  const [ones, eights] = audit.digitWidths;
+  const [narrow, wide] = audit.glyphWidths;
+  const [cNarrow, cWide] = audit.controlWidths;
+
+  // ANTI-VACUITY FIRST, because a green run on an instrument that cannot see is the worse failure.
+  expect(
+    Math.abs(cWide - cNarrow),
+    `the control pair measured ${cNarrow}px against ${cWide}px in the surrounding type — if a
+     proportional face renders 'iiii' and 'MMMM' at the same width, this whole check compares numbers
+     that are equal whatever the readout does`,
+  ).toBeGreaterThan(1);
+
+  expect(
+    Math.abs(eights - ones),
+    `two stacked readouts of ten digits each measured ${ones}px and ${eights}px — the digits do not
+     share an advance, so a column of figures will not line up. That is what tabular-nums buys.`,
+  ).toBeLessThan(0.01);
+  expect(
+    Math.abs(wide - narrow),
+    `ten 'i's measured ${narrow}px against ten 'M's at ${wide}px in a readout — the face is not
+     monospaced, so "if it is monospaced the machine measured it" is not true of this element`,
+  ).toBeLessThan(0.01);
+
+  console.log(
+    `[${theme}] readouts: ${audit.readouts} on the board; digits ${ones}/${eights}px, ` +
+      `glyphs ${narrow}/${wide}px, proportional control ${cNarrow}/${cWide}px`,
   );
 });

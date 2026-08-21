@@ -69,7 +69,7 @@ export function ControlFileEditor({
       }
       notice={
         file.managed && (
-          <div className="control-disclaimer" role="alert">
+          <div className="vb-notice vb-notice-bad control-disclaimer" role="alert">
             ⚠ <strong>{file.name}</strong> is managed by VibeBoard — the copilot won’t edit it, and it steers
             how the boards work. Edit only if you know what you’re doing. For your own standing instructions,
             use <strong>INSTRUCTIONS.md</strong> instead.

@@ -35,10 +35,10 @@ export function CardSkills({ card, skills, invalid, onRun }: Props) {
         </Button>
       ))}
       {mine.length === 0 && (
-        <p className="cs-empty">No skills for this column. Add one in Project Control → Skills.</p>
+        <p className="cs-empty vb-empty">No skills for this column. Add one in Project Control → Skills.</p>
       )}
       {invalid.length > 0 && (
-        <p className="cs-invalid" title={invalid.map((i) => `${i.path}: ${i.reason}`).join('\n')}>
+        <p className="vb-error" title={invalid.map((i) => `${i.path}: ${i.reason}`).join('\n')}>
           ⚠ {invalid.length} skill file{invalid.length === 1 ? '' : 's'} invalid
         </p>
       )}

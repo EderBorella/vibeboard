@@ -467,7 +467,7 @@ export function AutopilotBar({
           <div className="ap-drawer-col">
             <div className="ap-drawer-head">Working on</div>
             {model.doing.length === 0 ? (
-              <div className="ap-drawer-empty">Nothing is running.</div>
+              <div className="vb-empty">Nothing is running.</div>
             ) : (
               <ul className="ap-work">
                 {model.doing.map((w) => (
@@ -482,7 +482,7 @@ export function AutopilotBar({
           <div className="ap-drawer-col">
             <div className="ap-drawer-head">Stopping it from starting</div>
             {model.missing.length === 0 ? (
-              <div className="ap-drawer-empty">Nothing — it is ready to run.</div>
+              <div className="vb-empty">Nothing — it is ready to run.</div>
             ) : (
               <ul className="blockers">
                 {model.missing.map((b) => (

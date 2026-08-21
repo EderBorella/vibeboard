@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { listProjects, openProject, type ProjectRef, scaffoldProject } from '../api';
+import { Readout } from '../ui/Readout';
 import { useAction } from '../useAction';
 import { slugify } from '../viewmodel';
 
@@ -80,21 +81,21 @@ export function ProjectGate({ onOpened }: Props) {
               <li key={p.path}>
                 <button disabled={busy !== null} onClick={() => run(() => openProject(p.path))}>
                   <span className="gate-list-name">{p.name}</span>
-                  <span className="gate-list-path">{p.path}</span>
+                  <Readout size="small">{p.path}</Readout>
                 </button>
               </li>
             ))}
           </ul>
         ) : (
-          <div className="gate-hint">No projects yet. Create one below.</div>
+          <div className="vb-hint">No projects yet. Create one below.</div>
         )}
 
         <h3>New project</h3>
-        <div className="gate-hint">
+        <div className="vb-hint">
           Creates the folder, the board, and the container its agents will run in. The container is built the
           first time and reused after that.
         </div>
-        <label className="gate-field">
+        <label className="vb-field">
           <span>Location (parent folder)</span>
           <input
             value={newParent}
@@ -102,7 +103,7 @@ export function ProjectGate({ onOpened }: Props) {
             onChange={(e) => setNewParent(e.target.value)}
           />
         </label>
-        <label className="gate-field">
+        <label className="vb-field">
           <span>Name (dash-separated, lowercase)</span>
           <div className="gate-row">
             <input
@@ -130,7 +131,7 @@ export function ProjectGate({ onOpened }: Props) {
           </div>
         )}
 
-        {error && <div className="gate-error">{error}</div>}
+        {error && <div className="vb-notice vb-notice-bad">{error}</div>}
       </div>
     </div>
   );

@@ -29,106 +29,16 @@
 // description of the old code rather than a guard on what must survive it. What IS pinned for those
 // rows is the part that must survive: no ground at rest, a marker that appears on hover or selection,
 // and left-aligned inherited type.
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { cleanup, render } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { BoardsView } from '../web/src/board/BoardsView.js';
 import type { BoardName, Card, ProjectConfig, ProjectSnapshot } from '../web/src/shared.js';
 import { Panel } from '../web/src/ui/Panel.js';
+// THE CASCADE RESOLVER IS SHARED with test/field-boxes.test.tsx — see test/css-box.tsx. Its own two
+// directions are asserted below, under *the cascade helper separates a state from the resting style*.
+import { box } from './css-box.js';
 
 afterEach(cleanup);
-
-const WEB = join(process.cwd(), 'web', 'src');
-// PRIMITIVES FIRST, exactly as main.tsx imports them: a surface may override a primitive's colour at
-// equal specificity, so source order is what decides. Reading them the other way round would report
-// the primitive's value where the surface's is what renders.
-const SHEETS = ['ui/primitives.css', 'styles.css'].map((f) => readFileSync(join(WEB, f), 'utf8'));
-
-// The scale tokens, resolved to the pixel values themes.css gives them, so a rule that moves from
-// `var(--radius)` to `var(--r-lg)` reads as the same 10px it renders as. Colour tokens are left as
-// names: `--panel` is a different colour in each theme and the token IS the claim.
-const TOKENS = new Map(
-  [...readFileSync(join(WEB, 'themes.css'), 'utf8').matchAll(/^\s*(--[\w-]+)\s*:\s*([^;]+);/gm)]
-    .filter(([, name]) => /^--(t|s|r)-|^--radius$/.test(name))
-    .map(([, name, value]) => [name, value.trim()]),
-);
-
-interface Rule {
-  selector: string;
-  body: string;
-}
-
-// Brace-matched rather than regex-split, because @media/@container/@supports nest and a flat regex
-// reads their prelude as a selector — the same reason tools/check-radius-scale.mjs matches braces.
-function rules(text: string): Rule[] {
-  const clean = text.replace(/\/\*[\s\S]*?\*\//g, '');
-  const out: Rule[] = [];
-  const stack: { selector: string; start: number }[] = [];
-  let from = 0;
-  for (let i = 0; i < clean.length; i += 1) {
-    const c = clean[i];
-    if (c === '{') stack.push({ selector: clean.slice(from, i).trim(), start: i + 1 });
-    else if (c === '}') {
-      const open = stack.pop();
-      if (open) out.push({ selector: open.selector, body: clean.slice(open.start, i) });
-      from = i + 1;
-    } else if (c === ';') from = Math.max(from, i + 1);
-  }
-  // At-rule preludes are not selectors; their inner rules are already in `out` from the brace scan.
-  return out.filter((r) => r.selector !== '' && !r.selector.startsWith('@'));
-}
-
-const ALL = SHEETS.flatMap(rules);
-
-function resolve(value: string): string {
-  return value.replace(/var\((--[\w-]+)\)/g, (whole, name: string) => TOKENS.get(name) ?? whole);
-}
-
-// Every declaration that reaches `el` through a selector that matches it, in source order, flattened
-// so the LAST value for a property wins. An approximation of the cascade — it ignores specificity —
-// and it is honest about that: everything asserted below is either a single-class rule or a state
-// rule written after the base, which is the order this stylesheet is maintained in anyway.
-function box(el: Element, state = ''): Record<string, string> {
-  const out: Record<string, string> = {};
-  for (const rule of ALL) {
-    const matches = rule.selector.split(',').some((sel) => applies(el, sel.trim(), state));
-    if (!matches) continue;
-    for (const decl of rule.body.split(';')) {
-      const at = decl.indexOf(':');
-      if (at < 0) continue;
-      out[decl.slice(0, at).trim()] = resolve(decl.slice(at + 1).trim());
-    }
-  }
-  return out;
-}
-
-// `:hover` and `:disabled` cannot be asked of an element that is not under a pointer, so the state
-// is named instead: `box(el, ':hover')` takes the base rules PLUS the `:hover` ones and nothing else.
-//
-// A RULE'S STATES MUST BE A SUBSET OF THE ONE ASKED FOR, and that is the part that has to be exact.
-// The first version stripped the pseudo-class out and matched what was left, so every `:hover` rule
-// applied at rest: `.control-item`'s hover ground read as its RESTING ground and "a list row has no
-// ground" went red, while the same bug made the identical claim pass on `.report-open` for the wrong
-// reason. Both answers were wrong and only one of them was red — see the helper's own case below.
-const STATES = /:(hover|disabled|focus-visible|focus|first-child|last-child)/g;
-
-function applies(el: Element, selector: string, state: string): boolean {
-  // `:not(...)` goes first, or the `:disabled` inside `:hover:not(:disabled)` counts as a second
-  // state and the rule would apply to nothing at all.
-  const outer = selector.replace(/:not\([^)]*\)/g, '');
-  if ([...outer.matchAll(STATES)].some((m) => m[0] !== state)) return false;
-  return safeMatches(el, outer.replace(STATES, '').trim());
-}
-
-function safeMatches(el: Element, selector: string): boolean {
-  if (selector === '') return false;
-  try {
-    return el.matches(selector);
-  } catch {
-    return false;
-  }
-}
 
 // THE ELEMENT AS THE COMPONENT RENDERS IT, and the class list is not hand-written anywhere. Before
 // Phase 4 these were plain `<button class="report-open">`; after it they are `Panel`s, so the fixture

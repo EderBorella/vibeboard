@@ -1,3 +1,4 @@
+import { SegmentedControl } from '../ui/SegmentedControl';
 import { BACKENDS } from './format';
 
 interface Props {
@@ -27,24 +28,17 @@ interface Props {
 // dock, a write to the project config in the bar — because those are genuinely different acts, and a
 // component that decided between them would be the place the difference gets lost.
 export function BackendPicker({ value, onChange, label, disabled = false, titleFor, size = 'sm' }: Props) {
+  // The per-site hover text is computed here and carried on the item, because `titleFor` is this
+  // component's contract and the primitive's is a plain list.
+  const items = BACKENDS.map((b) => ({ value: b.value, label: b.label, title: titleFor?.(b) }));
   return (
-    <div
-      className={`backend-toggle${size === 'md' ? ' backend-toggle-md' : ''}`}
-      role="group"
-      aria-label={label}
-    >
-      {BACKENDS.map((b) => (
-        <button
-          key={b.value}
-          type="button"
-          className={`bt-btn${value === b.value ? ' active' : ''}`}
-          disabled={disabled}
-          title={titleFor?.(b)}
-          onClick={() => onChange(b.value)}
-        >
-          {b.label}
-        </button>
-      ))}
-    </div>
+    <SegmentedControl
+      items={items}
+      value={value}
+      onChange={onChange}
+      label={label}
+      size={size}
+      disabled={disabled}
+    />
   );
 }

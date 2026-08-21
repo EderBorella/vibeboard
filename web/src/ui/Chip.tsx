@@ -20,6 +20,10 @@ interface Props {
   // `--r-pill` rather than `--r-sm`. A state word is a pill; a tag on a tile is a pill; a count is a
   // pill. A square-ish chip is the exception, which is why the flag turns it on rather than off.
   pill?: boolean;
+  // A GROUND. Four count badges each chose their own — `--panel-2` twice, `--bg` once, none once —
+  // for one thing: how many items are in the group this sits beside. The fill is the distinction from a
+  // state chip, which is an outline, so it is a flag rather than four classes.
+  fill?: boolean;
   // The surface's own state vocabulary. See above.
   state?: string;
   title?: string;
@@ -31,8 +35,14 @@ interface Props {
   children?: ReactNode;
 }
 
-export function Chip({ tone, pill, state, title, className, testId, children }: Props) {
-  const classes = ['vb-chip', pill && 'vb-chip-pill', tone && `vb-chip-${tone}`, className];
+export function Chip({ tone, pill, fill, state, title, className, testId, children }: Props) {
+  const classes = [
+    'vb-chip',
+    pill && 'vb-chip-pill',
+    fill && 'vb-chip-fill',
+    tone && `vb-chip-${tone}`,
+    className,
+  ];
   return (
     <span className={classes.filter(Boolean).join(' ')} data-state={state} data-testid={testId} title={title}>
       {children}

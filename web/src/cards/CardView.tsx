@@ -1,6 +1,7 @@
 import { renderMarkdown } from '../markdown';
 import { BOARD_LABELS, type Card, type CardFrontmatterPatch, type ProjectConfig } from '../shared';
 import { InlineField } from '../ui/InlineField';
+import { Readout, ReadoutLine } from '../ui/Readout';
 import { cardPlace, csv, parseCsv } from '../viewmodel';
 import { CardLinks } from './CardLinks';
 
@@ -41,15 +42,15 @@ export function CardView({ card, config, allCards, onOpenCard, onPatch, onLinks 
     <article className="cardview">
       {onPatch ? field('title', 'title', 'Untitled', 'cv-title') : <h2 className="cv-title">{card.title}</h2>}
 
-      <div className="cv-meta">
-        <span className="cv-crumb">
+      <ReadoutLine>
+        <span>
           {BOARD_LABELS[card.board]} › {cardPlace(config, card)}
         </span>
-        <span className="cv-created">Created {card.created}</span>
+        <Readout size="plain">Created {card.created}</Readout>
         {onPatch
           ? field('group', 'group', '+ group', 'cv-group')
           : card.group && <span className="cv-group">{card.group}</span>}
-      </div>
+      </ReadoutLine>
 
       {onPatch ? (
         <InlineField
@@ -100,7 +101,7 @@ export function CardView({ card, config, allCards, onOpenCard, onPatch, onLinks 
       ) : card.body.trim() ? (
         <div className="markdown cv-body">{renderMarkdown(card.body)}</div>
       ) : (
-        <div className="cv-nobody">No body yet.</div>
+        <div className="vb-empty">No body yet.</div>
       )}
     </article>
   );

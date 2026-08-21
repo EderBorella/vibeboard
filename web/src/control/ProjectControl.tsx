@@ -196,7 +196,7 @@ export function ProjectControl({ snapshot }: Props) {
     }
     const invalid = catalogue.invalid.find((i) => i.path === open.path);
     return (
-      <p className="skill-invalid">
+      <p className="vb-error">
         {invalid
           ? `This skill is not valid, so it does not appear on any card: ${invalid.reason}. Fix it in Raw.`
           : 'Loading…'}
@@ -242,7 +242,7 @@ export function ProjectControl({ snapshot }: Props) {
         ) : (
           <div className="control-blank">Select a file to view or edit, or create a new one.</div>
         )}
-        {error && <div className="control-error">{error}</div>}
+        {error && <div className="vb-error">{error}</div>}
       </div>
 
       {dialog}

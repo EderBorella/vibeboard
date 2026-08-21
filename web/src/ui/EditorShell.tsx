@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { renderMarkdown } from '../markdown';
+import { Readout } from './Readout';
 
 // The chrome around an editable file: which path is open, which view of it you are looking at, and
 // what you can do to it. Shared by Project Control (a control document, sometimes as fields) and the
@@ -38,10 +39,10 @@ export function EditorShell({ path, dirty, views, view, onView, actions, notice,
   return (
     <>
       <div className="control-editor-head">
-        <span className="control-editor-path">
+        <Readout size="small" testId="editor-path">
           {path}
           {dirty ? ' •' : ''}
-        </span>
+        </Readout>
         {views.length > 0 && (
           <div className="control-tabs" role="group" aria-label="View">
             {views.map((v) => (

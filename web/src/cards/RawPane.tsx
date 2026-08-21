@@ -60,7 +60,7 @@ export function RawPane({ card }: Props) {
         onChange={(e) => setDraft(e.target.value)}
       />
       <div className="raw-foot">
-        {error !== null && <span className="raw-error">{error}</span>}
+        {error !== null && <span className="vb-error">{error}</span>}
         <Button
           variant="primary"
           size="md"

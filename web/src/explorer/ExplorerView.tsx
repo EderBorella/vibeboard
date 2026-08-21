@@ -229,7 +229,7 @@ export function ExplorerView({ snapshot }: Props) {
         ) : (
           <div className="control-blank">Select a file to view or edit it.</div>
         )}
-        {(error ?? open.error) && <div className="control-error">{error ?? open.error}</div>}
+        {(error ?? open.error) && <div className="vb-error">{error ?? open.error}</div>}
       </div>
 
       {dialog}

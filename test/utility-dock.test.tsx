@@ -66,7 +66,7 @@ describe('UtilityDock', () => {
     );
     expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual(['CARDS3', 'TERMINAL0', 'LOGS']);
     // Counting the elements, not the text: an empty badge span reads the same as none at all.
-    expect(container.querySelectorAll('.dock-badge')).toHaveLength(2);
+    expect(container.querySelectorAll('[data-testid="dock-badge"]')).toHaveLength(2);
   });
 
   it('hides the body when collapsed instead of unmounting it', () => {

@@ -5,6 +5,7 @@ import type { Card, ProjectConfig } from '../shared';
 import { Button } from '../ui/Button';
 import { Chip } from '../ui/Chip';
 import { Panel } from '../ui/Panel';
+import { Readout } from '../ui/Readout';
 import { slugify } from '../viewmodel';
 import { usageLine } from './format';
 import { ReportOptions } from './ReportOptions';
@@ -58,7 +59,7 @@ export function ReportPane({
           ←
         </Button>
         <h3 className="report-title">
-          {record.skill} <span className="dispatch-on">on {card.id}</span>
+          {record.skill} <Readout size="body">on {card.id}</Readout>
         </h3>
         <Chip pill state={record.status} className="report-chip" testId="report-chip">
           {record.status}
@@ -117,12 +118,12 @@ export function ReportPane({
       {record.report.trim() ? (
         <div className="markdown report-body">{renderMarkdown(record.report)}</div>
       ) : (
-        <p className="report-empty">This run left no report.</p>
+        <p className="vb-empty">This run left no report.</p>
       )}
 
       {createdCards.length > 0 && (
         <div className="report-created">
-          <span className="cv-label">Cards this run created</span>
+          <span className="vb-label">Cards this run created</span>
           {createdCards.map((c) => (
             <Panel
               as="button"
@@ -133,7 +134,10 @@ export function ReportPane({
               title={`Open ${c.id}`}
               onClick={() => onOpenCard(c)}
             >
-              <span className="link-id">{c.id}</span> <span className="link-title">{c.title}</span>
+              <Readout size="small" tone="accent" testId="created-id">
+                {c.id}
+              </Readout>{' '}
+              <span className="link-title">{c.title}</span>
             </Panel>
           ))}
         </div>

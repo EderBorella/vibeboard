@@ -61,23 +61,23 @@ export function SkillEditor({ skill, config, busy, onSave }: Props) {
   return (
     <div className="skill-editor">
       <div className="skill-row">
-        <label className="skill-label" htmlFor="skill-name">
+        <label className="vb-label vb-label-caps vb-label-rail" htmlFor="skill-name">
           Name
         </label>
         <input
           id="skill-name"
-          className="skill-input"
+          className="vb-input"
           value={name}
           onChange={(e) => touch(setName)(e.target.value)}
         />
       </div>
       <div className="skill-row">
-        <label className="skill-label" htmlFor="skill-description">
+        <label className="vb-label vb-label-caps vb-label-rail" htmlFor="skill-description">
           Description
         </label>
         <input
           id="skill-description"
-          className="skill-input"
+          className="vb-input"
           placeholder="What this does, shown on the rail button"
           value={description}
           onChange={(e) => touch(setDescription)(e.target.value)}
@@ -86,7 +86,7 @@ export function SkillEditor({ skill, config, busy, onSave }: Props) {
 
       <fieldset className="skill-scope">
         <legend>Boards</legend>
-        <p className="skill-hint">Nothing ticked means every board.</p>
+        <p className="vb-hint">Nothing ticked means every board.</p>
         {BOARDS.map((board) => (
           <label key={board} className="link-option">
             <input type="checkbox" checked={boards.includes(board)} onChange={() => toggleBoard(board)} />
@@ -97,7 +97,7 @@ export function SkillEditor({ skill, config, busy, onSave }: Props) {
 
       <fieldset className="skill-scope">
         <legend>Columns</legend>
-        <p className="skill-hint">Nothing ticked means every column.</p>
+        <p className="vb-hint">Nothing ticked means every column.</p>
         {columnChoices.map(([slug, label]) => (
           <label key={slug} className="link-option">
             <input
@@ -114,12 +114,12 @@ export function SkillEditor({ skill, config, busy, onSave }: Props) {
         ))}
       </fieldset>
 
-      <label className="skill-label" htmlFor="skill-prompt">
+      <label className="vb-label vb-label-caps vb-label-rail" htmlFor="skill-prompt">
         Prompt
       </label>
       <textarea
         id="skill-prompt"
-        className="skill-prompt"
+        className="vb-input"
         rows={12}
         value={prompt}
         onChange={(e) => touch(setPrompt)(e.target.value)}

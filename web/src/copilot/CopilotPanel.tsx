@@ -3,6 +3,7 @@ import { getModelStatus, listModels, type ModelOption, type ModelStatus } from '
 import { useConfirm } from '../confirm/useConfirm';
 import { backendCaps, backendDefaults } from '../shared';
 import { Button } from '../ui/Button';
+import { Readout } from '../ui/Readout';
 import { useFetched } from '../useFetched';
 import { BackendPicker } from './BackendPicker';
 import { ChatSwitcher } from './ChatSwitcher';
@@ -125,10 +126,10 @@ export function CopilotPanel({
           }
           onChange={onBackend}
         />
-        {activeModel && <span className="copilot-model">{activeModel}</span>}
+        {activeModel && <Readout>{activeModel}</Readout>}
         {/* Not in the ratchet — Phase 2's control reset took its font-size away, so no rule gave it
             geometry any more — but the same `✕` as nine others, so it goes with them. */}
-        <Button variant="bare" className="copilot-x" onClick={onClose} title="Hide (session keeps running)">
+        <Button variant="bare" className="push" onClick={onClose} title="Hide (session keeps running)">
           ✕
         </Button>
       </div>
@@ -212,7 +213,7 @@ export function CopilotPanel({
       {overridden && (
         <div className="copilot-override">
           Just for this session — the project default is unchanged.
-          <Button size="sm" className="copilot-reset" onClick={onReset} disabled={running}>
+          <Button size="sm" className="push" onClick={onReset} disabled={running}>
             Use default
           </Button>
         </div>
@@ -233,7 +234,7 @@ export function CopilotPanel({
 
       <div className="copilot-body" ref={bodyRef}>
         {items.length === 0 && (
-          <div className="copilot-empty">
+          <div className="vb-empty">
             Ask the copilot to work on this project. It runs your configured backend ({backend}) in the
             project folder, so card changes appear on the board as it works.
           </div>

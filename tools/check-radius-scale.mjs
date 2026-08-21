@@ -70,37 +70,50 @@ const OFF_SCALE_ON_PURPOSE = new Map([
   ],
 ]);
 
-// The floor. A REGEX THAT STOPS MATCHING IS THE FAILURE MODE OF A CHECK LIKE THIS: it reports zero
-// findings, exits 0, and looks exactly like success. Set well under what the tree holds, so it catches
-// "matched nothing" and not ordinary editing.
+// THERE ARE NO COUNT FLOORS HERE AT ALL ANY MORE, and both removals were forced rather than chosen.
 //
-// THERE IS NO FLOOR ON THE BUTTON-CLASS POPULATION ANY MORE, and removing it was forced rather than
-// chosen. It was 30 against a population of 50, and this commit's migration took the population to 23 —
-// so a floor that was doing its job failed the run for SUCCEEDING. The flaw is structural: claim 2's
-// population shrinks to zero as the backlog clears, which is the goal, so any floor on it must
-// eventually be bypassed or deleted. Its replacement is `parserSelfTest` below, which asserts the
-// pattern still matches a fixture the tree cannot move — it works identically at a population of 50 and
-// at 0. Do NOT put a count floor back here.
-const FLOOR = { radius: 60 };
+// A REGEX THAT STOPS MATCHING IS STILL THE FAILURE MODE OF A CHECK LIKE THIS: it reports zero findings,
+// exits 0, and looks exactly like success. A count floor is the wrong instrument for it, twice over.
+//
+// The BUTTON-CLASS floor went first. It was 30 against a population of 50, and Phase 3's migration took
+// the population to 23 — so a floor that was doing its job failed the run for SUCCEEDING.
+//
+// The RADIUS floor went the same way, and it had already fired. It was 60 against 65 declarations when
+// Phase 5's sweep began; the segmented-control merge took the tree to **59**, and the run failed saying
+// *"only 59 border-radius found, against a floor of 60. This check is vacuous"* about a check that was
+// working perfectly and had just been given less work to do. `tools/check-type-scale.mjs` had its own
+// version of this five away from firing and lost its floors in the same commit.
+//
+// The flaw is structural in both cases: every count this file measures SHRINKS as the sweep succeeds,
+// which is the goal, so any floor on any of them must eventually be bypassed or deleted. Their
+// replacement is `parserSelfTest` below, which asserts every pattern against a fixture the tree cannot
+// move — it works identically at 65 declarations and at 5. Do NOT put a count floor back.
 
 // WHAT CLAIM 2 STANDS AT. 56 before Phase 3; 46 when the primitives landed; 22 after that adoption was
-// finished; **13** after Phase 4 gave the list rows a `Panel`, which is the number here. The nine that
-// went are `.report-open`, `.exec-card`, `.control-item`, `.explorer-item`, `.cv-link`, `.cv-link-btn`,
-// `.mp-pick`, `.chat-menu-open` and `.suggestions-pick` — all one shape, a full-bleed row with no box
-// until the surface lights it, which is `Panel`'s `flat` variant.
+// finished; 13 after Phase 4 gave the list rows a `Panel`; **8** after Phase 5b, which is the number
+// here. The five that went in 5b:
+//   `.chat-current` `.mp-trigger` — the two select triggers, now `.vb-trigger`: they were `.vb-input`'s
+//                      box with a caret, which is what this file called them for two phases running.
+//   `.bt-btn` `.mode-btn` — the segmented cells, now `.vb-seg-cell`. They were identical declaration for
+//                      declaration apart from one size step, and `.backend-toggle-md .bt-btn` restated
+//                      `.mode-btn`'s padding and font-size verbatim.
+//   `.archive-title` — NOT migrated to `Panel`, and it left the census for a different reason: its only
+//                      geometry declaration was `font-size: var(--t-body)`, which is what `body` already
+//                      gives it. A dead declaration, the same one Phase 4 found on `.cv-link`.
 //
-// The 13 that remain are FOUR kinds and none of the reasons is "it has its own padding":
-//   `.archive-title` — a list row whose CONTAINER is already padded, and which is `flex: 1` inside it.
-//                      `flat`'s padding would pad it twice and push the restore controls off the row.
-//                      The only one of the ten Phase 3 named that Panel could not take.
+// The 8 that remain are THREE kinds and none of the reasons is "it has its own padding":
 //   `.board-archive` `.mp-chip` `.tag` `.tag-chip` — chips. `Chip` owns that box; every Panel variant
 //                      is a rectangle with a corner, and a pill is not.
 //   `.board-label` — a section header. Panel's header slot is a bordered row INSIDE a panel; this is a
 //                      collapsible heading ABOVE one, with a 3px accent left edge.
-//   `.bt-btn` `.mode-btn` — cells in a segmented control: the GROUP owns one border and one radius.
-//   `.cards-tab-label` `.dock-tab` `.tab-btn` — tabs, whose selected state is a border on three sides
-//                      continuous with the panel below them. Every variant closes the box.
-//   `.chat-current` `.mp-trigger` — select triggers. A control, not a region that takes a click.
+//   `.cards-tab-label` `.dock-tab` `.tab-btn` — tabs, and Phase 5b measured them and did NOT build a
+//                      `Tabs`. `.cards-tab-label` is not a tab at all — it is the ellipsised label inside
+//                      one, with `border: none` and no corner — and the two real tabs disagree on the two
+//                      things a tab primitive would have to own: the face (`.tab-btn` is not uppercase at
+//                      0.04em tracking, `.dock-tab` is uppercase at 0.08em) and the selected state
+//                      (`.tab-btn` goes accent with a `--glow`, `.dock-tab` goes `--text` with none).
+//                      Two consumers disagreeing on both of a primitive's decisions is a primitive that
+//                      would carry one variant each, which is a name that decides nothing.
 //
 // The 24 that went in Phase 3's second pass were `.btn-primary`, The 24 that went in that second pass are `.btn-primary`,
 // `.btn-secondary` and `.btn-danger` (37 call sites between them, and exactly `primary`, `default` and
@@ -111,7 +124,7 @@ const FLOOR = { radius: 60 };
 // `.dock-collapse`, `.tag-filter-clear`, `.cv-link-edit`.
 //
 // NEVER raise this: a ratchet that moves the wrong way is a gate switched off in place.
-const BUTTON_GEOMETRY_CEILING = 13;
+const BUTTON_GEOMETRY_CEILING = 8;
 
 const GEOMETRY = [
   'border-radius',
@@ -146,8 +159,11 @@ const defined = new Set(
 // Every rule in a stylesheet, as `{ file, line, selector, body }`. Brace-matched rather than
 // regex-split, because `@media`/`@container`/`@supports` nest and a flat regex reads their prelude as
 // a selector.
-function rules(file) {
-  const raw = readFileSync(join(ROOT, file), 'utf8');
+const rules = (file) => rulesOf(file, readFileSync(join(ROOT, file), 'utf8'));
+
+// Split from `rules` so `parserSelfTest` can scan a fixture through exactly this brace matcher rather
+// than through a second copy of it.
+function rulesOf(file, raw) {
   // Comments blanked rather than removed, so every offset still maps to its real line.
   const text = raw.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' '));
   const out = [];
@@ -172,34 +188,93 @@ function rules(file) {
   return out;
 }
 
-/** @type {{ site: string, detail: string }[]} */
-const findings = [];
-let radiusDecls = 0;
-
 // ---------- claim 1: every authored radius is on the scale ----------
-for (const file of walk('.css')) {
-  for (const rule of rules(file)) {
+// Its own function so `parserSelfTest` measures it on a fixture. Takes the rules rather than the file,
+// because the brace matcher is the other half of what can silently stop matching.
+// What is wrong with ONE corner value, or null if nothing is. Its own function because three branches
+// inside three loops is what the complexity metric punishes, and the metric punishes nesting far harder
+// than length — the same repair `fontSizeFault` is in tools/check-type-scale.mjs.
+function cornerFault(value) {
+  if (OFF_SCALE_ON_PURPOSE.has(value)) return null;
+  const token = /^var\((--[\w-]+)\)$/.exec(value)?.[1];
+  if (!token) return `border-radius: ${value} — not a step on the scale`;
+  if (!RADIUS_SCALE.includes(token)) return `border-radius: var(${token}) — not one of the four steps`;
+  if (!defined.has(token)) return `border-radius: var(${token}) — defined in no stylesheet`;
+  return null;
+}
+
+// The faults in one whole `border-radius` value. The shorthand takes up to four values — the chat
+// bubbles' tail corner is one of them — so each is checked on its own: a single off-scale corner is
+// exactly as visible as four.
+function shorthandFaults(whole) {
+  if (OFF_SCALE_ON_PURPOSE.has(whole)) return [];
+  return whole
+    .split(/\s+/)
+    .map(cornerFault)
+    .filter((fault) => fault !== null);
+}
+
+function radiiOf(ruleList) {
+  /** @type {{ site: string, detail: string }[]} */
+  const findings = [];
+  let count = 0;
+  for (const rule of ruleList) {
     for (const match of rule.body.matchAll(/border-radius:\s*([^;}]+?)\s*(?=[;}])/g)) {
-      radiusDecls += 1;
-      const whole = match[1].trim();
-      if (OFF_SCALE_ON_PURPOSE.has(whole)) continue;
-      const site = `${file}:${rule.line}`;
-      // The shorthand takes up to four values — the chat bubbles' tail corner is one of them — so each
-      // is checked on its own. A single off-scale corner is exactly as visible as four.
-      for (const value of whole.split(/\s+/)) {
-        if (OFF_SCALE_ON_PURPOSE.has(value)) continue;
-        const token = /^var\((--[\w-]+)\)$/.exec(value)?.[1];
-        if (!token) {
-          findings.push({ site, detail: `border-radius: ${value} — not a step on the scale` });
-        } else if (!RADIUS_SCALE.includes(token)) {
-          findings.push({ site, detail: `border-radius: var(${token}) — not one of the four steps` });
-        } else if (!defined.has(token)) {
-          findings.push({ site, detail: `border-radius: var(${token}) — defined in no stylesheet` });
-        }
-      }
+      count += 1;
+      const site = `${rule.file}:${rule.line}`;
+      for (const detail of shorthandFaults(match[1].trim())) findings.push({ site, detail });
     }
   }
+  return { count, findings };
 }
+
+// THE ANTI-VACUITY TEST FOR CLAIM 1, and it replaced a count floor that had just failed the run for
+// succeeding — see the note where the floors used to be. It goes through `rulesOf` and `radiiOf`, which
+// is the census's own code and not a second copy of the pattern.
+//
+// The fixture exercises every branch that can silently stop matching: a comment naming a radius in prose
+// (which must NOT be a declaration, and which must not shift the line numbers of what follows), the
+// compact no-whitespace form a reformatting run produces, the four-value shorthand, `50%` reaching
+// OFF_SCALE_ON_PURPOSE, a `--r-*` name that is not a step, and a rule nested inside an at-rule — the case
+// a flat regex reads as a selector.
+const RADIUS_FIXTURE = `
+/* border-radius: 7px named in prose is not a declaration, and neither is padding: 0.4rem. */
+.alpha { border-radius: var(--r-md); }
+.beta{border-radius:7px;}
+.gamma { border-radius: var(--r-lg) var(--r-lg) var(--r-sm) var(--r-lg); }
+.delta { border-radius: 50%; }
+.epsilon { border-radius: var(--r-nope); }
+@media (min-width: 1px) { .zeta { border-radius: 3px; } }
+`;
+
+// SEVEN AND NOT SIX, AND THE SEVENTH IS A FINDING ABOUT THE PARSER RATHER THAN A TYPO HERE. A rule
+// nested in an at-rule is counted twice: `rulesOf` emits both the inner rule and the `@media` itself, and
+// the `@media`'s body text contains the inner rule's declaration. So `.zeta`'s `3px` is reported at line 8
+// twice. It over-reports, which is loud and harmless, and it is recorded rather than smoothed away —
+// an expectation written to look tidy is an expectation that stops matching the code.
+// It is LATENT and not live: measured on 2026-08-21, no `border-radius` in the tree sits inside an
+// `@media`, `@supports` or `@container`, so the 59 the check prints has no duplicate in it.
+const RADIUS_SELF_TEST_WANT = [
+  '7 declarations',
+  'fixture.css:4 border-radius: 7px — not a step on the scale',
+  'fixture.css:7 border-radius: var(--r-nope) — not one of the four steps',
+  'fixture.css:8 border-radius: 3px — not a step on the scale',
+  'fixture.css:8 border-radius: 3px — not a step on the scale',
+].join(' | ');
+
+function radiusSelfTest() {
+  const { count, findings } = radiiOf(rulesOf('fixture.css', RADIUS_FIXTURE));
+  const got = [`${count} declarations`, ...findings.map(({ site, detail }) => `${site} ${detail}`)].join(
+    ' | ',
+  );
+  return got === RADIUS_SELF_TEST_WANT
+    ? null
+    : `radius scan: expected\n  ${RADIUS_SELF_TEST_WANT}\ngot\n  ${got}`;
+}
+
+const claim1 = radiiOf(walk('.css').flatMap((file) => rules(file)));
+const findings = claim1.findings;
+const radiusDecls = claim1.count;
 
 // ---------- claim 2: geometry for a button-shaped class lives in the primitive stylesheet ----------
 // Every class that appears as a literal in a `<button>`'s own `className`. A `${...}` hole is skipped:
@@ -354,17 +429,10 @@ console.log(
 );
 
 // Before the findings, because a green run on a pattern that matched nothing is the worse failure.
-if (radiusDecls < FLOOR.radius) {
-  console.error(`\nonly ${radiusDecls} border-radius found, against a floor of ${FLOOR.radius}.`);
-  console.error(`This check is vacuous: the pattern has stopped matching the tree. Fix the pattern in`);
-  console.error(`tools/check-radius-scale.mjs — do NOT lower the floor.`);
-  process.exit(1);
-}
-
-const parserFault = parserSelfTest();
+const parserFault = radiusSelfTest() ?? parserSelfTest();
 if (parserFault) {
-  console.error(`\nthe <button> parser is broken: ${parserFault}.`);
-  console.error(`Claim 2 is vacuous — it would report zero findings whatever the tree holds. Fix the`);
+  console.error(`\nthe parser is broken: ${parserFault}.`);
+  console.error(`A claim here is vacuous — it would report zero findings whatever the tree holds. Fix the`);
   console.error(`pattern in tools/check-radius-scale.mjs; do NOT relax the fixture.`);
   process.exit(1);
 }

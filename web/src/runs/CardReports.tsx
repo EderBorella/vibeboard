@@ -3,6 +3,7 @@ import type { Card } from '../shared';
 import { Button } from '../ui/Button';
 import { Chip } from '../ui/Chip';
 import { Panel } from '../ui/Panel';
+import { Readout, ReadoutLine } from '../ui/Readout';
 import { ForgiveAttempts } from './ForgiveAttempts';
 import { costLabel, usageTotal } from './format';
 
@@ -43,7 +44,7 @@ export function CardReports({ card, runs, account, onOpen, onCancel, onForgiven 
   if (runs.length === 0) return null;
   return (
     <section className="reports" aria-label="Reports">
-      <h4 className="reports-head">Reports</h4>
+      <h4 className="vb-label vb-label-caps">Reports</h4>
       {[...runs].reverse().map((r) => (
         <div key={r.run} className={`report-row status-${r.status}${r.resolved ? ' resolved' : ''}`}>
           <Panel
@@ -62,8 +63,8 @@ export function CardReports({ card, runs, account, onOpen, onCancel, onForgiven 
             <span className="report-skill">{r.skill}</span>
             {/* Cost only, and only when reported: the row has one line, and the full breakdown is
                 one click away in the report itself. */}
-            {costLabel(r.usage) && <span className="report-cost">{costLabel(r.usage)}</span>}
-            <span className="report-when">{when(r)}</span>
+            {costLabel(r.usage) && <Readout testId="report-cost">{costLabel(r.usage)}</Readout>}
+            <Readout testId="report-when">{when(r)}</Readout>
             <span className="report-summary">{r.summary ?? r.note ?? ''}</span>
           </Panel>
           {(r.status === 'running' || r.status === 'queued') && (
@@ -106,8 +107,8 @@ function CardLedger({
   // dialog's backdrop with it and a `div` inside a `p` is closed by the parser before it is reached —
   // the dialog would be rendered outside the tree React thinks it put it in.
   return (
-    <div className="reports-ledger">
-      <span>{usageTotal(spend)}</span>
+    <ReadoutLine testId="reports-ledger">
+      <Readout size="plain">{usageTotal(spend)}</Readout>
       {/* The count and the way to clear it, in the same line. Offered from the first spent attempt
           rather than only at the cap: a card blocked by the machine is worth clearing before it runs
           out of tries, and a control that appears only once everything has already stopped is one
@@ -115,12 +116,12 @@ function CardLedger({
           clear, and a button that can only report "nothing happened" is noise. */}
       {used.length > 0 && (
         <>
-          <span className="reports-attempts">
+          <Readout size="plain" quiet>
             {used.map(([skill, n]) => `${skill} ${n} of ${attemptCap}`).join(' · ')}
-          </span>
+          </Readout>
           <ForgiveAttempts board={card.board} card={card.id} onForgiven={onForgiven} />
         </>
       )}
-    </div>
+    </ReadoutLine>
   );
 }

@@ -4,6 +4,7 @@ import { errorText } from '../errors';
 import type { ArchivedCard, BoardName, ProjectConfig } from '../shared';
 import { Button } from '../ui/Button';
 import { Panel } from '../ui/Panel';
+import { Readout } from '../ui/Readout';
 import { columnSlugs } from '../viewmodel';
 
 interface Props {
@@ -60,10 +61,11 @@ export function ArchiveDrawer({ board, config, count, onOpen }: Props) {
       .catch((e: unknown) => setError(errorText(e)));
   };
 
-  if (error) return <Panel className="archive-drawer archive-error">{error}</Panel>;
-  if (cards === null) return <Panel className="archive-drawer archive-empty">Loading the archive…</Panel>;
+  if (error) return <Panel className="archive-drawer vb-error">{error}</Panel>;
+  if (cards === null)
+    return <Panel className="archive-drawer vb-empty vb-empty-small">Loading the archive…</Panel>;
   if (cards.length === 0) {
-    return <Panel className="archive-drawer archive-empty">Nothing archived on this board.</Panel>;
+    return <Panel className="archive-drawer vb-empty vb-empty-small">Nothing archived on this board.</Panel>;
   }
 
   return (
@@ -71,8 +73,8 @@ export function ArchiveDrawer({ board, config, count, onOpen }: Props) {
       {cards.map((c) => (
         <div className="archive-item" key={c.id}>
           <div className="archive-meta">
-            <span className="tile-id">{c.id}</span>
-            <span className="archive-when">{when(c.archived)}</span>
+            <Readout tone="accent">{c.id}</Readout>
+            <Readout>{when(c.archived)}</Readout>
           </div>
           <button className="archive-title" onClick={() => onOpen?.(c)} title="Open this card">
             {c.title}

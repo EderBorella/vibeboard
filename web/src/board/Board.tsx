@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { BoardName, Card, ProjectConfig } from '../shared';
+import { Chip } from '../ui/Chip';
 import { cardsByColumn, columnSlugs } from '../viewmodel';
 import { ArchiveDrawer } from './ArchiveDrawer';
 import { Column } from './Column';
@@ -50,7 +51,9 @@ export function Board({
         <button className="board-label" onClick={onToggle} aria-expanded={!collapsed}>
           <span className="board-chevron">{collapsed ? '▸' : '▾'}</span>
           {label}
-          <span className="board-count">{cards.length}</span>
+          <Chip pill fill className="vb-readout" testId="board-count">
+            {cards.length}
+          </Chip>
         </button>
         {!collapsed && archivedCount > 0 && (
           <button

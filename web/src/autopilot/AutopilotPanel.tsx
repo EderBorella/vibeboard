@@ -95,7 +95,7 @@ export function AutopilotPanel({
     return (
       <>
         <div className="settings-section">Auto-pilot</div>
-        <div className="settings-hint">
+        <div className="vb-hint">
           This project has no autopilot block in its config, so there is no lifecycle to run. Projects created
           before auto-pilot are upgraded in one pass once the work lands — until then this is an honest
           refusal rather than a half-upgrade.
@@ -107,19 +107,19 @@ export function AutopilotPanel({
   return (
     <>
       <div className="settings-section">Auto-pilot</div>
-      <div className="settings-hint">
+      <div className="vb-hint">
         The lifecycle is fixed (ruling 52): auto-pilot derives where a project is from the board and looks up
         what to do next. It is not a setting, so there is no table here to edit — only the caps below, the
         columns that mean finished, and where a blocked card goes.
       </div>
       <div className="settings-section">Caps</div>
-      <div className="settings-hint">
+      <div className="vb-hint">
         {/* S10: the number that will actually stop this project, in words. A dollar dial beside a
             budget that can never trip tells the reader the opposite of the truth. */}
         {accounting?.cap?.why ?? 'Whichever of these is reached first will stop the run.'}
       </div>
       {CAPS.map((cap) => (
-        <label className="field" key={cap.key}>
+        <label className="vb-field" key={cap.key}>
           <span>{cap.label}</span>
           <input
             type="number"
@@ -128,10 +128,10 @@ export function AutopilotPanel({
             value={caps[cap.key] ?? ap[cap.key]}
             onChange={(e) => edit(cap.key, Number(e.target.value), cap.min)}
           />
-          <span className="field-hint">{cap.hint}</span>
+          <span className="vb-hint">{cap.hint}</span>
         </label>
       ))}
-      <label className="field">
+      <label className="vb-field">
         <span>Run timeout (minutes)</span>
         {/* Minutes, because 1800000 in a box is unreadable. The enforceable per-run bound is
             wall-clock: a dollar ceiling per run is not implementable, since usage is only known once
@@ -143,12 +143,12 @@ export function AutopilotPanel({
           value={Math.round((caps.runTimeoutMs ?? ap.runTimeoutMs) / 60_000)}
           onChange={(e) => edit('runTimeoutMs', Number(e.target.value) * 60_000, 60_000)}
         />
-        <span className="field-hint">
+        <span className="vb-hint">
           One run is abandoned after this long and recorded as failed, which burns an attempt — a card that
           hangs every time must not retry for ever.
         </span>
       </label>
-      <div className="settings-hint">
+      <div className="vb-hint">
         Finished at:{' '}
         {Object.entries(ap.terminal)
           .map(([b, c]) => `${b} ${c.join('/')}`)
@@ -160,11 +160,11 @@ export function AutopilotPanel({
       <StartControl state={autopilot} readiness={readiness} refresh={onAutopilotChanged} />
       <StopControls state={autopilot} refresh={onAutopilotChanged} />
 
-      <div className="settings-hint" style={{ marginTop: '0.6rem' }}>
+      <div className="vb-hint" style={{ marginTop: '0.6rem' }}>
         Before auto-pilot can start:
       </div>
-      {readiness === null && !failed && <div className="settings-hint">Checking…</div>}
-      {failed && <div className="settings-hint">Could not read this project’s readiness.</div>}
+      {readiness === null && !failed && <div className="vb-hint">Checking…</div>}
+      {failed && <div className="vb-hint">Could not read this project’s readiness.</div>}
       {readiness?.ok && <div className="ready-ok">Everything auto-pilot needs is in place.</div>}
       {readiness && !readiness.ok && (
         <ul className="blockers">
@@ -204,7 +204,7 @@ function StartControl({
   return (
     <>
       <div className="settings-section">Running</div>
-      <div className="settings-hint">
+      <div className="vb-hint">
         Auto-pilot walks the board on its own: it picks a card, runs its phase's skill, checks the work, and
         moves the card only if the check passes. It stops on its own when there is nothing left it can do.
       </div>
@@ -227,16 +227,16 @@ function StartControl({
           {starting ? 'Starting…' : 'Start auto-pilot'}
         </Button>
         {running && (
-          <span className="settings-hint" data-testid="ap-progress">
+          <span className="vb-hint" data-testid="ap-progress">
             Running — {state?.iteration ?? 0} dispatch{(state?.iteration ?? 0) === 1 ? '' : 'es'} so far
           </span>
         )}
-        {halted && <span className="settings-hint">Halted. Restart it from the overlay first.</span>}
+        {halted && <span className="vb-hint">Halted. Restart it from the overlay first.</span>}
       </div>
       {/* The blockers again, next to the button, because the list further up the panel is easy to scroll
           past — and this is the moment somebody wants to know. */}
       {!running && readiness && !readiness.ok && (
-        <div className="settings-hint">
+        <div className="vb-hint">
           Auto-pilot cannot start yet: {readiness.blockers.length} thing
           {readiness.blockers.length === 1 ? '' : 's'} to fix, listed above.
         </div>
@@ -294,7 +294,7 @@ function StopControls({ state, refresh }: { state: AutopilotState | null; refres
   return (
     <>
       <div className="settings-section">Stopping</div>
-      <div className="settings-hint">
+      <div className="vb-hint">
         A soft stop leaves the app alone: chat, manual runs and the board carry on, and only dispatching
         stops. An emergency stop kills every agent in this project and halts it until you restart it.
       </div>

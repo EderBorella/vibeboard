@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { Card } from '../shared';
 import { Button } from '../ui/Button';
 import { Panel } from '../ui/Panel';
+import { Readout } from '../ui/Readout';
 import { linkedCards } from '../viewmodel';
 import { LinkPicker } from './LinkPicker';
 
@@ -32,7 +33,7 @@ export function CardLinks({ card, allCards, onOpenCard, onLinks }: Props) {
 
   return (
     <div className="cv-links">
-      <div className="cv-label">
+      <div className="vb-label">
         Linked cards
         {onLinks && (
           <Button variant="bare" size="sm" className="cv-link-edit" onClick={() => setPicking((v) => !v)}>
@@ -58,12 +59,16 @@ export function CardLinks({ card, allCards, onOpenCard, onLinks }: Props) {
               title={`Open ${c.id}`}
               onClick={() => onOpenCard(c)}
             >
-              <span className="link-id">{c.id}</span>
+              <Readout size="small" tone="accent">
+                {c.id}
+              </Readout>
               <span className="link-title">{c.title}</span>
             </Panel>
           ) : (
             <div key={c.id} className="cv-link">
-              <span className="link-id">{c.id}</span>
+              <Readout size="small" tone="accent">
+                {c.id}
+              </Readout>
               <span className="link-title">{c.title}</span>
             </div>
           ),

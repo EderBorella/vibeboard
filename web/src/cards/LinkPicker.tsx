@@ -1,4 +1,5 @@
 import { BOARD_LABELS, BOARDS, type Card } from '../shared';
+import { Readout } from '../ui/Readout';
 
 // The link picker: cards grouped by board, boards with nothing to offer omitted.
 export function LinkPicker({
@@ -10,7 +11,7 @@ export function LinkPicker({
   links: string[];
   onToggle: (id: string) => void;
 }) {
-  if (linkable.length === 0) return <div className="links-hint">No other cards yet to link.</div>;
+  if (linkable.length === 0) return <div className="vb-hint">No other cards yet to link.</div>;
   return (
     <div className="links-list">
       {BOARDS.map((b) => {
@@ -22,7 +23,9 @@ export function LinkPicker({
             {group.map((c) => (
               <label key={c.id} className="link-option">
                 <input type="checkbox" checked={links.includes(c.id)} onChange={() => onToggle(c.id)} />
-                <span className="link-id">{c.id}</span>
+                <Readout size="small" tone="accent">
+                  {c.id}
+                </Readout>
                 <span className="link-title">{c.title}</span>
               </label>
             ))}

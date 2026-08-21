@@ -88,7 +88,7 @@ describe('ExecutionView', () => {
     expect(column('In progress').querySelectorAll('.exec-run')).toHaveLength(2);
     expect(column('Requires attention').querySelectorAll('.exec-run')).toHaveLength(2);
     expect(column('Done').querySelectorAll('.exec-run')).toHaveLength(1);
-    expect(column('Requires attention').querySelector('.exec-count')?.textContent).toBe('2');
+    expect(column('Requires attention').querySelector('[data-testid="exec-count"]')?.textContent).toBe('2');
   });
 
   it('names the card each run is about, and opens it', () => {
@@ -124,7 +124,7 @@ describe('ExecutionView', () => {
         ]}
       />,
     );
-    const costs = [...document.querySelectorAll('.exec-cost')].map((n) => n.textContent);
+    const costs = [...document.querySelectorAll('[data-testid="exec-cost"]')].map((n) => n.textContent);
     expect(costs).toEqual(['$0.042']);
   });
 

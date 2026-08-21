@@ -1,5 +1,6 @@
 import type { Card } from '../shared';
 import { Button } from '../ui/Button';
+import { Readout } from '../ui/Readout';
 import { miniature } from '../viewmodel';
 
 interface Props {
@@ -52,7 +53,7 @@ export function CardTile({
       onClick={() => onOpen?.(card)}
     >
       <div className="tile-head">
-        <span className="tile-id">{card.id}</span>
+        <Readout tone="accent">{card.id}</Readout>
         {card.setup && (
           // The project-level barrier. Worth a badge because its effect is invisible from the card
           // it is on: nothing outside this feature's subtree runs until it is finished, so a board
@@ -86,7 +87,7 @@ export function CardTile({
         {onArchive && (
           <Button
             variant="bare"
-            className="tile-archive"
+            className="push"
             title="Archive"
             onClick={(e) => {
               e.stopPropagation();

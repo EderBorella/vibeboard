@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { ModelOption } from '../api';
 import { Button } from '../ui/Button';
 import { Panel } from '../ui/Panel';
+import { Readout } from '../ui/Readout';
 import { compareModels, type ModelFilter, matchesFilter } from './model-filter';
 import { fmtCtx, fmtPrice, loadFavs, providerOf, saveFavs } from './model-format';
 
@@ -71,12 +72,12 @@ export function ModelPicker({ models, value, defaultModel, onChange, disabled }:
 
   return (
     <div className="mp">
-      <button className="mp-trigger" disabled={disabled} onClick={() => setOpen(true)} title={value}>
-        <span className="mp-trigger-label">
+      <button className="vb-trigger" disabled={disabled} onClick={() => setOpen(true)} title={value}>
+        <Readout size="plain" className="vb-trigger-label">
           {selected?.free ? '🆓 ' : ''}
           {label}
-        </span>
-        <span className="mp-caret">▾</span>
+        </Readout>
+        <span className="vb-caret">▾</span>
       </button>
 
       {open && (
@@ -84,13 +85,13 @@ export function ModelPicker({ models, value, defaultModel, onChange, disabled }:
           <div className="mp-modal" onClick={(e) => e.stopPropagation()}>
             <div className="mp-modal-head">
               <span className="mp-modal-title">Choose a model</span>
-              <Button variant="bare" size="sm" className="mp-modal-close" onClick={() => setOpen(false)}>
+              <Button variant="bare" size="sm" className="push" onClick={() => setOpen(false)}>
                 ✕
               </Button>
             </div>
 
             <input
-              className="mp-search"
+              className="vb-input"
               autoFocus
               value={query}
               placeholder="Search by name or id…"
@@ -110,9 +111,9 @@ export function ModelPicker({ models, value, defaultModel, onChange, disabled }:
               </select>
             </div>
 
-            <div className="mp-count">
+            <Readout>
               {filtered.length} of {models.length} models
-            </div>
+            </Readout>
 
             <div className="mp-list">
               {filtered.map((m) => (
@@ -139,12 +140,12 @@ export function ModelPicker({ models, value, defaultModel, onChange, disabled }:
                     <span className="mp-pick-top">
                       <span className="mp-name">{m.name ?? m.id}</span>
                       {m.id === defaultModel && <span className="mp-def-tag">default</span>}
-                      <span className="mp-price">{fmtPrice(m)}</span>
+                      <Readout tone="accent2">{fmtPrice(m)}</Readout>
                     </span>
                     <span className="mp-pick-bot">
-                      <span className="mp-id">{m.id}</span>
+                      <Readout>{m.id}</Readout>
                       <span className="mp-badges">
-                        {m.contextLength ? <span className="mp-ctx">{fmtCtx(m.contextLength)}</span> : null}
+                        {m.contextLength ? <Readout>{fmtCtx(m.contextLength)}</Readout> : null}
                         {m.caps?.toolCall && (
                           <span className="mp-badge" title="Tool use">
                             🔧
@@ -165,7 +166,9 @@ export function ModelPicker({ models, value, defaultModel, onChange, disabled }:
                   </Panel>
                 </div>
               ))}
-              {filtered.length === 0 && <div className="mp-empty">No models match the current filters.</div>}
+              {filtered.length === 0 && (
+                <div className="mp-empty vb-empty">No models match the current filters.</div>
+              )}
             </div>
           </div>
         </div>

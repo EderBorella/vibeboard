@@ -1,4 +1,5 @@
 import { formatCost } from '../format';
+import { Readout, ReadoutLine } from '../ui/Readout';
 import { fmtK } from './format';
 import type { CopilotStats } from './useCopilot';
 
@@ -10,10 +11,12 @@ export function CopilotReadout({ stats, budget }: { stats: CopilotStats; budget:
   const nearFull = stats.contextTokens > budget * 0.8;
 
   return (
-    <div className="copilot-readout">
-      <span title="cumulative session cost">{formatCost(stats.costUsd)}</span>
-      <span>{stats.turns} turns</span>
-      <span>{(stats.lastDurationMs / 1000).toFixed(1)}s</span>
+    <ReadoutLine className="copilot-readout">
+      <Readout size="plain" title="cumulative session cost">
+        {formatCost(stats.costUsd)}
+      </Readout>
+      <Readout size="plain">{stats.turns} turns</Readout>
+      <Readout size="plain">{(stats.lastDurationMs / 1000).toFixed(1)}s</Readout>
       <span
         className={`ctx${nearFull ? ' ctx-warn' : ''}`}
         title={`context window: ${stats.contextTokens.toLocaleString()} / ${budget.toLocaleString()} tokens`}
@@ -21,9 +24,9 @@ export function CopilotReadout({ stats, budget }: { stats: CopilotStats; budget:
         <span className="ctx-bar">
           <span className="ctx-fill" style={{ width: `${pct}%` }} />
         </span>
-        ctx {fmtK(stats.contextTokens)}
+        ctx <Readout size="plain">{fmtK(stats.contextTokens)}</Readout>
         {nearFull ? ' · consider /compact' : ''}
       </span>
-    </div>
+    </ReadoutLine>
   );
 }

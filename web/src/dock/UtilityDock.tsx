@@ -1,4 +1,5 @@
 import { Button } from '../ui/Button';
+import { Chip } from '../ui/Chip';
 import { activePane, type DockPane } from './panes';
 
 interface Props {
@@ -29,13 +30,17 @@ export function UtilityDock({ panes, activeId, onPane, collapsed, onCollapse }: 
             onClick={() => onPane(p.id)}
           >
             {p.label}
-            {p.badge !== undefined && <span className="dock-badge">{p.badge}</span>}
+            {p.badge !== undefined && (
+              <Chip pill fill className="vb-readout" testId="dock-badge">
+                {p.badge}
+              </Chip>
+            )}
           </button>
         ))}
         <Button
           variant="bare"
           size="sm"
-          className="dock-collapse"
+          className="push"
           title={collapsed ? 'Expand the dock' : 'Collapse the dock'}
           aria-expanded={!collapsed}
           onClick={onCollapse}

@@ -67,7 +67,7 @@ describe('the columns warning', () => {
     show(true);
     // Scoped to the warning itself: the auto-pilot panel below it also names config.yaml, and an
     // assertion satisfied by either one would survive the warning being deleted.
-    const warning = screen.getByText(/will be refused/i).closest('.settings-warn');
+    const warning = screen.getByText(/will be refused/i).closest('[data-testid="columns-warning"]');
     expect(warning).not.toBeNull();
     const inWarning = within(warning as HTMLElement);
     expect(inWarning.getByText('.vibeboard/config.yaml')).toBeTruthy();

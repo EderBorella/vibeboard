@@ -4,6 +4,7 @@ import { revokeDeviceRequest, signOutEverythingRequest } from '../confirm/reques
 import type { Confirmer } from '../confirm/useConfirm';
 import { errorText } from '../errors';
 import { Button } from '../ui/Button';
+import { Readout } from '../ui/Readout';
 import { useAction } from '../useAction';
 
 interface Props {
@@ -53,7 +54,7 @@ export function SignInPanel({ confirm }: Props) {
   return (
     <>
       <div className="settings-section">Signed-in browsers</div>
-      <div className="settings-hint">
+      <div className="vb-hint">
         The first browser to open this board is let in automatically. Every one after that has to be allowed
         from a browser that is already in.
       </div>
@@ -64,9 +65,9 @@ export function SignInPanel({ confirm }: Props) {
             <div className="signin-row-label">
               {mine.label} <span className="signin-this">this browser</span>
             </div>
-            <div className="signin-row-meta">
+            <Readout size="small">
               {mine.address} · signed in {mine.created.slice(0, 10)} · last seen {mine.lastSeen}
-            </div>
+            </Readout>
           </div>
         </div>
       )}
@@ -75,9 +76,9 @@ export function SignInPanel({ confirm }: Props) {
         <div className="signin-row" key={d.id}>
           <div>
             <div className="signin-row-label">{d.label}</div>
-            <div className="signin-row-meta">
+            <Readout size="small">
               {d.address} · signed in {d.created.slice(0, 10)} · last seen {d.lastSeen}
-            </div>
+            </Readout>
           </div>
           <Button
             size="md"
@@ -94,20 +95,20 @@ export function SignInPanel({ confirm }: Props) {
       ))}
 
       {devices.length === 0 && !error && (
-        <div className="settings-hint">
+        <div className="vb-hint">
           No browser is signed in — this one is using the server's own token from{' '}
           <code>~/.vibeboard/token</code>.
         </div>
       )}
 
       <div className="settings-section">This browser's credential</div>
-      <div className="settings-hint">
+      <div className="vb-hint">
         Held by the browser itself and not readable by this page, so there is nothing here to show, copy or
         leak. You never need to handle it. To replace it, sign every browser out below.
       </div>
 
       <div className="settings-section">Start over</div>
-      <div className="settings-hint">
+      <div className="vb-hint">
         Signs out every browser above, including this one, and forgets their credentials. The next page load
         on this machine signs itself in again — which is how you replace a credential you think somebody else
         has seen. No restart needed.
@@ -124,7 +125,7 @@ export function SignInPanel({ confirm }: Props) {
         Sign every browser out
       </Button>
 
-      {error && <div className="settings-warn">{error}</div>}
+      {error && <div className="vb-notice vb-notice-warn">{error}</div>}
     </>
   );
 }

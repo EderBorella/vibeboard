@@ -3,7 +3,9 @@ import { cardSuggestion, patchSuggestion } from '../api';
 import type { Suggestion, SuggestionLevel } from '../shared';
 import { SUGGESTION_LEVELS } from '../shared';
 import { Button } from '../ui/Button';
+import { Chip } from '../ui/Chip';
 import { Panel } from '../ui/Panel';
+import { ReadoutLine } from '../ui/Readout';
 import { useAction } from '../useAction';
 
 // The dock's second occupant (decision 48): what agents filed, and the two things a person may do with
@@ -106,7 +108,7 @@ export function SuggestionsPane({ suggestions, failed, onRefresh, onApply }: Pro
             </Button>
             <input
               aria-label="Why not?"
-              className="suggestions-reason"
+              className="vb-input"
               placeholder="Why not? (kept, so a checkup does not raise it again)"
               value={reason}
               onChange={(e) => setReason(e.target.value)}
@@ -133,7 +135,7 @@ export function SuggestionsPane({ suggestions, failed, onRefresh, onApply }: Pro
           </div>
           {/* `assertive`: the action did NOT happen, and the row is still there. */}
           <div aria-live="assertive">
-            {error && <p className="diary-error">{error}</p>}
+            {error && <p className="vb-error">{error}</p>}
             {became && <p className="suggestions-became">Carded as {became}.</p>}
           </div>
 
@@ -152,13 +154,21 @@ export function SuggestionsPane({ suggestions, failed, onRefresh, onApply }: Pro
                   onClick={() => pick(s.id)}
                 >
                   <span className="filed-title">{s.title}</span>
-                  <span className="filed-meta">
+                  <ReadoutLine as="div">
                     <time dateTime={s.created}>{when(s.created)}</time>
                     {/* Which run filed it, and the card it was filed FROM. Only what is there: a
                         project-level finding has no card. */}
-                    {s.run && <span className="diary-chip">{s.run}</span>}
-                    {s.card && <span className="diary-chip">{s.card}</span>}
-                  </span>
+                    {s.run && (
+                      <Chip pill className="vb-readout">
+                        {s.run}
+                      </Chip>
+                    )}
+                    {s.card && (
+                      <Chip pill className="vb-readout">
+                        {s.card}
+                      </Chip>
+                    )}
+                  </ReadoutLine>
                   {s.body && <span className="filed-text">{s.body}</span>}
                 </Panel>
               </li>

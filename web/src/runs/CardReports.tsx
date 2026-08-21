@@ -46,7 +46,7 @@ export function CardReports({ card, runs, account, onOpen, onCancel, onForgiven 
     <section className="reports" aria-label="Reports">
       <h4 className="vb-label vb-label-caps">Reports</h4>
       {[...runs].reverse().map((r) => (
-        <div key={r.run} className={`report-row status-${r.status}${r.resolved ? ' resolved' : ''}`}>
+        <div key={r.run} className={`report-row${r.resolved ? ' resolved' : ''}`}>
           <Panel
             as="button"
             variant="flat"
@@ -57,7 +57,7 @@ export function CardReports({ card, runs, account, onOpen, onCancel, onForgiven 
           >
             {/* A resolved run keeps its chip — it did end needing you — but says it was answered,
                 so the history reads as history rather than a row still asking. */}
-            <Chip pill state={r.status} className="report-chip" testId="report-chip">
+            <Chip pill state={r.status} className="report-chip vb-readout" testId="report-chip">
               {r.resolved ? `${LABELS[r.status]} · dealt with` : LABELS[r.status]}
             </Chip>
             <span className="report-skill">{r.skill}</span>

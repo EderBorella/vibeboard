@@ -82,27 +82,37 @@ function FiledList({ suggestions }: { suggestions: Suggestion[] }) {
     <ol className="filed-list">
       {ordered.map((s) => (
         <li className="filed-entry" data-state={s.state} key={s.id}>
+          {/* TWO LINES, NOT ONE WRAPPED ONE. This column is 42% of the split and its readout block held
+              four figures — a state, a full locale timestamp and up to three id chips, 366px of content
+              in a 266px line — so it wrapped, and check 7 read it as what it was: a row of figures that
+              does not align. A `ReadoutLine` of the two facts the entry is ABOUT ITSELF fits (188px),
+              and the ids it POINTS AT are a `.diary-about` group, which the diary beside it already
+              uses for exactly that. Stacked rather than wrapped in this column — see styles.css. */}
           <ReadoutLine>
             <span className="filed-state">{s.state}</span>
             <time dateTime={s.created}>{when(s.created)}</time>
-            {/* Only what is there: a project-level finding carries no card, and an invented dash for
-                every absent field would make every row look the same shape. */}
-            {s.run && (
-              <Chip pill className="vb-readout">
-                {s.run}
-              </Chip>
-            )}
-            {s.card && (
-              <Chip pill className="vb-readout">
-                {s.card}
-              </Chip>
-            )}
-            {s.became && (
-              <Chip pill className="vb-readout">
-                became {s.became}
-              </Chip>
-            )}
           </ReadoutLine>
+          {/* Only what is there: a project-level finding carries no card, and an invented dash for
+              every absent field would make every row look the same shape. */}
+          {(s.run || s.card || s.became) && (
+            <span className="diary-about">
+              {s.run && (
+                <Chip pill className="vb-readout">
+                  {s.run}
+                </Chip>
+              )}
+              {s.card && (
+                <Chip pill className="vb-readout">
+                  {s.card}
+                </Chip>
+              )}
+              {s.became && (
+                <Chip pill className="vb-readout">
+                  became {s.became}
+                </Chip>
+              )}
+            </span>
+          )}
           <p className="filed-title">{s.title}</p>
           {s.body && <p className="filed-text">{s.body}</p>}
           {s.reason && <p className="filed-reason">{s.reason}</p>}

@@ -1,6 +1,6 @@
 # The design system, and how it lands in phases
 
-**Status: Part One (Phases 0–5) and Part Two's Phase 6 done (2026-08-21). The class count is 380 against a target of 183 — re-derived on
+**Status: Part One (Phases 0–5) and Part Two's Phase 6 done (2026-08-21). The class count is 374 against a target of 183 — re-derived on
 2026-08-21 from the measured surface count, with the plan's *under 150* withdrawn as unreachable at its
 own allowance. What stands between 380 and 183 is measured under Phase 5b.** Phase 0 built the instrument and
 measured, touching no stylesheet; Phase 1 added the 17 tokens and nothing that consumes them; Phase 2
@@ -2669,9 +2669,10 @@ flex column in `styles.css`, one line of `vitest.config.ts`, `RUN_TIME_TOKENS` a
 
 # Part Three — the two censuses Part Two left unassigned
 
-**Status: Phase 11 done 2026-08-21. Phase 12 not started.** Part Two closed six shapes and left two
-reading *unassigned* rather than pretending a phase owned them: **panel 20** and **mono 11**. Phase 11
-took the panel row and drove it to **10**; mono is still 11 and still Phase 12's. Both are listed in
+**Status: Phases 11 and 12 done 2026-08-21. Part Three is finished, and one decision is left open for
+the owner rather than taken here.** Part Two closed six shapes and left two reading *unassigned* rather
+than pretending a phase owned them: **panel 20** and **mono 11**. Phase 11 took the panel row and drove
+it to **10**; Phase 12 took mono to **7**, all seven the same reasoned exception. Both are listed in
 full by `npm run check:shape-coverage`.
 
 ## Phase 11 — Panel's twenty, and the Tabs decision re-taken on four — **DONE 2026-08-21**
@@ -2892,23 +2893,239 @@ flex column stops their children's vertical margins collapsing. The choice is a 
 counted as findings. It is not taken here because **neither surface is rendered by the harness**, so a
 spacing change on either is invisible to every gate this repository has.
 
-## Phase 12 — the mono eleven, and the four things still open
+## Phase 12 — the mono eleven, the wrapped figure rows, and the direction nothing read — **DONE 2026-08-21**
 
-- **`raised` is a flex column, and `.popover` and `.gate-card` are refused for that and nothing else.**
-  Phase 11's one open decision, stated at the end of its section: both match `raised` in ground, edge and
-  corner, and neither is rendered by the harness, so a spacing change on either is invisible to every
-  gate here. A `block` layout axis on `raised` has two consumers, which is the bar `ghost` is held to.
-- **Mono 11 → 0 or a reason each.** Eleven rules still declare `font-family: var(--font-mono)` outside the
-  primitive. The signature's own claim is that mono means the machine measured it, so every one of these is
-  either a `Readout` or a deliberate exception with its reason written down.
-- **The Project Log's two wrapped `.vb-readout-block` rows.** Ruled on 2026-08-21: check 7 gets no
-  `flex-wrap` exemption, so the fault belongs to the rule. A wrapped figure row is a column of figures that
-  does not align, which is the claim the signature makes.
-- **`npm run build` does not typecheck `web/src`.** A bad prop type on `Field` built clean; `npm run check`
-  and the pre-commit hook both catch it, so this is a gap in one gate rather than in the set.
+Four things, and the fourth is a gate that did not exist. **Mono 11 → 7**, ceiling lowered in the same
+commit; **the Project Log's two wrapped figure rows → 0**; a new gate reading **code → CSS**; and a
+`npm run build` that can no longer emit a web type error.
 
-**Gate:** the mono census at zero or fully reasoned; check 7 at zero on every surface; and a build that
-cannot emit a web type error.
+### The mono eleven: three moved to the primitive, two merged, and seven are one exception
+
+**The test is the signature's own sentence and not the census number** — *if it is monospaced, the
+machine measured it; if it is not, a person wrote it.* A ratchet at 7 reads exactly the same whether
+the seven are the seven that were reasoned about or seven somebody added last week, so
+`test/mono-census.test.tsx` asserts the SET against a table of survivors with the category that excuses
+each, and fails in both directions: a rule in the census and not in the table, or a rule in the table
+that has left the stylesheet.
+
+**THREE WERE READOUT FACTS SAYING SO BY HAND**, and each was the primitive value for value:
+
+| was | is | measured how |
+|---|---|---|
+| `.msg-tool` | `Readout` `small` `accent`, and **the class is gone** | `color: var(--accent); font-family: var(--font-mono); font-size: var(--t-small)` IS that variant. A tool name is machine vocabulary. `msg-tool` still reaches the wrapper `<div>` through `` `msg-${it.kind}` `` and has nothing left to say, because the line's only child is the readout |
+| `.report-chip` | `vb-readout` on the `<Chip>` | The form Phase 8 established for `.board-archive`, `.tag-chip` and `.tab-badge`. Three call sites. The rule keeps its uppercase tracking and `flex: 0 0 auto`, which are the surface's; the face is the primitive's |
+| `.report-meta dd` | six `Readout` `plain`s | `ui/primitives.css` names this case at `--t-plain` itself — *"a definition in a report's meta list"*. A model id, two timestamps, an attachment list and a cost line are all machine facts |
+
+**AND TWO WERE ONE RULE UNDER TWO NAMES.** `.gate-preview code` and `.ap-help-body code` each declared
+mono, `--t-small` and `--accent`; they are now one rule, sitting with `.markdown code` so all three
+inline code treatments are read together. `--t-small` is explicit because `.ap-help-body p` is
+`--t-body`, and it is what `.gate-preview` already inherited — so the merge emits the same bytes.
+
+**THE SEVEN SURVIVORS ARE ALL THE SAME EXCEPTION, and it is a weaker claim than the signature's: the
+CONTENT is machine text rather than a measurement.** Four could not be a `Readout` at all, which is
+structural rather than a judgement — a `Readout` is a `<span>` and these are controls:
+
+| survivor | why it is not a fact the machine measured |
+|---|---|
+| `.raw-area` | A whole card FILE in a textarea. |
+| `.control-textarea` | A config file in the editor body. |
+| `.skill-editor textarea.vb-input` | A prompt, which is edited like code. |
+| `.confirm-require .vb-input` | The exact string the machine demands back, typed character by character — the face is what lets you compare the two. |
+| `.gate-preview code, .ap-help-body code` | Inline code in prose. A `<code>` means *this is code*; it is not a measurement. |
+| `.markdown code` | The same, in rendered prose, and the one chip exemption in `check-shape-coverage.mjs`. |
+| `.signin-label` | A browser's own User-Agent string, quoted back at you. |
+
+**A FOURTH INLINE `<code>` HAS NO RULE AT ALL and is left alone:** `.halt-why code`, in the approval
+prompt, renders in the UA's own monospace. It is not in the census — no rule declares anything — and
+whether the three treatments should be one generic `code` rule is a question about rendering on two
+surfaces the harness never opens, which is not this phase's to answer.
+
+### The Project Log's figure rows: two lines, not one wrapped one
+
+Check 7 reported *"4 children span 33.0px, tallest is 15.0px"* twice on the `diary` surface — the two
+`.filed-entry` meta rows. **Ruled 2026-08-21 and not re-opened: check 7 gets no `flex-wrap` exemption**,
+because an exemption keyed on that declaration lets anyone silence the check by adding it to an action
+row. The fault was the rule's.
+
+**MEASURED BEFORE IT WAS CHANGED, in the browser.** The filed column is `flex: 0 1 42%` — 369px, a
+266px line inside the entry — and the row carried **366px of figures plus 36px of gaps**: a state word
+at 46px, a full locale timestamp at 130px, a run id chip at 144px and a card id at 46px. It cannot fit,
+so the row was split by what the figures MEAN:
+
+- The `ReadoutLine` keeps the two facts the entry states **about itself** — its state and when it was
+  filed. 188px of 266px, on one line, and two children rather than three.
+- The ids it **points at** — run, card, and what it became — are a `.diary-about` group, which is the
+  class the diary beside it already uses for exactly that. **No new class**, so the budget did not move.
+
+**THE GROUP STACKS IN THIS COLUMN, and that is the part the fixture could not have proven.**
+`.filed-entry .diary-about` is `flex-direction: column`; the diary's own copy has 408px and stays a row.
+Kept as a row, the group fits with a run and a card and wraps the moment a `became` chip appears — and
+the harness fixture carries no `became`, so a row would have passed every gate in this repository and
+still been wrong. Stacked, the references line up on their left edge whether there are one, two or
+three of them, which is the claim the readout makes; wrapped, they were the one it refuses.
+
+**Looked at as well as measured.** Before: `ACTIVE 1/1/2026, 9:20:00 AM` on line one and the two pills
+ragged under it, which read as the second line of a paragraph. After: the state line, then the pills
+stacked directly beneath it — a small block of references under a header, left-aligned on the same edge
+as the title below. The entry is 20px taller and the column scrolls, which it already did.
+
+**Drift, read surface by surface before anything was re-recorded**, with `assertExamined` bypassed in a
+copy of `surfaces.spec.ts` and the file restored from that copy rather than by `git checkout` — the same
+procedure Phase 11 used, and `git status` reported `visual/` clean before the re-record. **Three numbers
+moved, all on `diary`, all with the same cause:**
+
+| what | was | now | why |
+|---|---|---|---|
+| diary elements | 147 | **149** | the two `.diary-about` spans |
+| diary rows EXAMINED | 11 | **9** | a two-child row is below check 7's own three-child threshold, so the two rows leave its population |
+| diary rows FINDINGS | 2 | **0** | the phase's subject |
+
+**Nothing else moved, on any of the ten surfaces or any of the three themes**: type and radius
+conformance 0 everywhere, the value SETS unchanged (the drift check printed nothing on all thirty
+surface-theme pairs), overflow 0, clipping 1 of 35 (the exempt board area), contrast 0, tokens 0, focus
+0, and every other surface's `examined` block byte-identical. The board's own tallies in
+`board.spec.ts` are untouched.
+
+**STATED PLAINLY, BECAUSE IT IS A REAL COST: check 7 no longer looks at those two rows.** Both
+exclusions are the check's own pre-existing rules rather than new exemptions — a row of fewer than three
+children is not in its population anywhere in the app, and it only claims about `flex-direction: row` —
+but the honest reading is that the rows were removed from the check as well as from the finding list.
+What holds them now is `test/diary-view.test.tsx`, which pins the structure and the stacking.
+
+### The gate for the direction nothing read
+
+`tools/check-name-resolution.mjs`, `npm run check:name-resolution`. **Three times** this repository has
+found a name written at a call site and defined by nothing, and every one was found by a person:
+`.vb-label-caps` (eight call sites, no rule, a caps label rendering lower-case), `--ink` (referenced,
+undefined, a wrong ink for weeks) and `.conn-pop` (handed to `<Popover>`, no rule, removed in Phase 11).
+`check-class-budget.mjs` reads **CSS → code**; nothing read **code → CSS**. Two claims:
+
+1. **Every class named in a `…ClassName` attribute across `web/src` is defined by a rule.** A RATCHET at
+   **5**, with the full list printed on a passing run.
+2. **Every `var(--token)` a stylesheet references is defined by a stylesheet, or supplied at run time by
+   code that names it.** BLOCKING AT ZERO, and it is at zero: 41 referenced against 42 defined, with `--max-cols` and
+   `--exec-cols` supplied from React and read out of the source rather than allow-listed.
+
+**The naive version is wrong in both directions, and both are handled rather than allowed for.**
+
+- **Composition.** `` `ap-bar-${model.tone}` `` reads as the token `ap-bar-`, which is no class.
+  `check-class-budget.mjs`'s method is reused rather than re-derived: a token ending in `-` is a PREFIX,
+  satisfied when the prefix plus some value written in the corpus is a class that exists. **Never by
+  prefix MATCH** — `.conn-pop` prefix-matches its own children `.conn-pop-head` and `.conn-pop-detail`,
+  which is how the defect it is named after would have gone on hiding, and the self-test fixture pins
+  exactly that case.
+- **Legitimate hooks.** A `className` can exist so something can FIND the element. `.column` is read by
+  the harness (`.column > .vb-panel-head`) and `.explorer` by both the harness and the suite
+  (`section.control.explorer`, `.control:not(.explorer)`). So a class is excused when it is **READ** —
+  named as a selector or passed to `classList`, in `web/src`, `test/` or `visual/`. That is a measurement
+  and not an allow-list: delete the `querySelector` and the class is a finding again. The selector test
+  is anchored, because a bare substring search for `.explorer` matches `'./api/explorer'` in an import
+  and would excuse the class on the strength of a module path.
+
+**IT READS `…ClassName`, NOT `className`, and that widening is the `.conn-pop` shape exactly**: a class
+handed to a component through a prop of its own is still a class on an element. `Popover` takes
+`triggerClassName`, and `.conn-status` and `.ap-agent-state` reach the DOM through it — invisible to a
+reader anchored on the literal string `className=`.
+
+**THE READER MOVED INTO `tools/lib/jsx.mjs` AND IT FOUND A DEFECT IN ITSELF.** Two gates now ask the
+same question of it from opposite ends, so there is one copy, and the first run of the new one reported
+`.rail` — which is the operand of `layout === 'rail'` in the ternary that CHOOSES the class list at
+`ui/Field.tsx:67`. A string being compared is a value and not a class, so comparison operands are
+blanked, and the change was verified by measurement rather than by reading: it removes **exactly one**
+token, `rail`, and `check-shape-coverage.mjs`'s output is **byte-identical** before and after the whole
+extraction.
+
+**AND THE FIRST PLANT AT IT FOUND A SECOND DEFECT IN THE GATE ITSELF, which is the whole argument for
+planting.** `.conn-pop` was put back at its old call site and the gate exited **0**, because the hook
+test was a bare `\.name` search and `test/panel-twenty.test.tsx` contains the string in a TEST TITLE —
+*"`.conn-pop` decides nothing about the popover it is passed to"*. Prose in a test name is not a reader.
+Selection happens through a NAMED API, so the match is scoped to the argument of one — `querySelector`,
+`querySelectorAll`, `closest`, `matches`, `locator` — or to a `classList` call. That repair also took the
+left anchor off the dot, and it had to: the anchor broke the COMPOUND selector, so
+`page.locator('section.control.explorer')` did not excuse `.explorer` on the surface list that reads it
+every run. Both cases are fixture rows now. **The limit that is left**: a selector reached through a
+helper — `gone(page, 'section.control.explorer')` — is invisible, and `.explorer` is excused only because
+a `locator` call reads it as well.
+
+**No count floor on the findings.** Both existing count floors in this repository failed a run FOR
+SUCCEEDING and were withdrawn, so the anti-vacuity instrument is a fixture the tree cannot move, run
+through the gate's own functions — and it earned its place immediately: the first draft of the prefix
+resolver stripped the trailing dash, so `beta-` + `ok` became `betaok` and a perfectly live composed
+class was reported as dead. The fixture caught it. There is a floor on the POPULATION (40 names, 10
+token references, against 323 and 41), which is a smoke alarm an order of magnitude below the real
+count.
+
+**The five findings, each the `.conn-pop` defect again — a name that styles nothing.** Left where they
+are, printed, because removing five is a different change from building the instrument that finds them:
+
+| finding | sites | what is there instead |
+|---|---|---|
+| `.ap-drawer-col` | `AutopilotBar.tsx:467`, `:482` | `.ap-drawer` and `.ap-drawer-head` have rules; the column does not |
+| `.copilot-authority` | `CopilotPanel.tsx:170` | nothing — a bare wrapper `<div>` |
+| `.mp-badge` | `ModelPicker.tsx:168`, `:173`, `:178` | `.mp-badges`, the PARENT, has the rule; the three badges have none |
+| `.settings-error` | `AutopilotPanel.tsx:265`, `:320` | nothing, and `.vb-error` is the class that draws an error |
+| `.status-` | `runs/CardReports.tsx:49` | nothing whatever: no `status-*` rule exists in the tree, so the composed name resolves to zero |
+
+**What it does not catch**, stated so nobody mistakes a ratchet for a proof: a class that is defined but
+defined WRONG (this is resolution, not conformance — `.vb-label-caps` with an empty body would pass); a
+class reached through a variable rather than an attribute, which is `InlineField`'s `common` object and
+the blind spot `check-shape-coverage.mjs` already names for its own arm 2; a hook that is read by a test
+that no longer asserts anything; a custom property referenced only from code; and a token defined and
+never referenced — which is the other direction again, and is `--s-1`, `--s-7` and `--scan` today.
+
+### `npm run build` can no longer emit a web type error
+
+`tsconfig.json` includes only `src` and `vite build` transpiles without checking, so a bad prop type on
+`Field` built clean at exit 0. `npm run typecheck:web` is now the second step of `build`, before the
+copy and the bundle. **It costs 1.6s**, taking the build from 2.7s to 4.3s; `npm run visual` builds once
+per run, so the harness goes from ~31s to ~33s. That is 5% of a run to close a gap where a reviewer
+would reasonably read "build" as "it compiles", and it is worth it.
+
+### Gates
+
+| gate | before | after | planted defect, and what it said |
+|---|---|---|---|
+| mono census | 11/11 | **7/7** | `font-family: var(--font-mono)` put back on `.report-chip` → exit **1**, *"mono-shaped: 8 … against a ceiling of 7"*, naming `styles.css:1130` and `runs/CardReports.tsx:60` |
+| `check:name-resolution` claim 1 | — | **5/5, new** | `.vb-label-caps`-style: `className="vb-label-caps-planted"` → exit **1**, 6 against 5. `.conn-pop`-style: `<Popover className="conn-pop">` put back → exit **1**, naming `ConnectionLight.tsx:46`. **And both negatives, which is the half a ratchet cannot show:** `` className={`conn-pop-${'head'}`} `` — a live composed name — exited **0**, and the same line with a prefix nothing defines (`conn-nope-`) exited **1**; a planted `.planted-hook` with a `querySelector` on it exited **0** and was PRINTED as a hook, and exited **1** the moment the `querySelector` was taken away |
+| `check:name-resolution` claim 2 | — | **0, blocking** | `--ink`-style: `color: var(--ink)` on `.ap-remedy-btn` → exit **1**, *"--ink — referenced at web/src/styles.css:1668"* |
+| `npm run visual`, check 7 | diary 2/11 | **diary 0/9** | the ids put back inside the `ReadoutLine` → exit **1** on all three themes, *"3 children span 33.0px, tallest is 15.0px"*, with the rows population back at 11 |
+| `npm run build` | ok, and **blind** | ok | a bad prop type on `Field` → exit **2**, naming the call site. Before this phase the same plant exited **0** |
+| `test/mono-census.test.tsx` | — | **10 pass, new** | the survivor table given a row the stylesheet does not have → red; `.msg-tool` restored → red on both claims |
+| `test/diary-view.test.tsx` | 20 pass | **24 pass** | the ids moved back into the `ReadoutLine` → **2** red; the stacking rule removed → **1** red |
+| class budget | 375/375 | **374/374** | a `.vb-planted` added → exit **1**, *"375 class selectors, against a ceiling of 374"* |
+| `npm run lint` | clean/549 | clean/**551** | a duplicate `flex-direction` on `.filed-entry .diary-about` → exit **1**, `lint/suspicious/noDuplicateProperties` |
+| `check:type-scale` | 114 | **113** | `.msg-tool`'s `font-size` went with the rule |
+
+### Exit
+
+**Mono 11 → 7**, ceiling lowered in the same commit, every survivor reasoned in one place.
+**Class selectors 375 → 374** (`.msg-tool` died), ceiling lowered. Authored `font-size` **114 → 113**,
+authored `border-radius` **31**, unchanged. **Panel 10/10, control 2/2, control-geometry / chip / dot /
+seg / box-less 0, button geometry 4/4 — every other ceiling unmoved.** One new gate, at a ratchet of 5
+and a blocking zero. Suite **245 files / 4,454 tests** (`test/mono-census.test.tsx` adds 10, and three
+existing files add 6 between them). Harness **93 tests, three themes, exit 0**, with the diary surface
+re-recorded and the other nine untouched. `npm run lint` clean over **551** files. `npm run build` exit
+0 and no longer blind.
+
+**`querySelector`/`querySelectorAll` calls with a class in `test/`: 105 → 112, and the seven are named
+rather than waved at.** Measured with `grep -rEoh "querySelector(All)?\((['\"])\." test | wc -l`, on the
+working tree and on the same command against `git archive HEAD test` — the *106* Phase 11 recorded was
+taken by a method not written down beside it and does not reproduce, so this line carries the command.
+The seven: **five in `test/diary-view.test.tsx`** — `.filed-state`, `.filed-entry`, and `.diary-about`
+three times — every one of which IS the claim, because the structure of that entry is the phase's
+subject and a `data-testid` on the group would assert that a test id exists rather than that the readout
+line has two children and the group is its sibling; and **two in `test/report-views.test.tsx`** on
+`.report-meta dd` and `.vb-readout`, which are the migration itself. `test/mono-census.test.tsx` adds
+none: it reaches its element by text and the rest by reading the stylesheet. None of the seven is a
+convenience selector on a class this phase could have renamed.
+
+**STILL OPEN FOR THE OWNER, and deliberately not taken here: `raised` IS A FLEX COLUMN, and that is the
+only thing keeping two boxes out of `Panel`.** Phase 11's one open decision, unchanged by this phase.
+`.popover` and `.gate-card` match `raised` in ground, edge and corner and are refused solely because a
+flex column stops their children's vertical margins collapsing. The choice is a `layout` axis on
+`raised` (a `block` form, two consumers, which is the bar `ghost` is held to) against leaving two
+correct designs counted as findings. **Neither surface is rendered by the harness**, so a spacing change
+on either is invisible to every gate this repository has.
 
 ---
 

@@ -464,7 +464,7 @@ export function AutopilotBar({
 
       {open && (
         <div className="ap-drawer" data-testid="ap-drawer">
-          <div className="ap-drawer-col">
+          <div>
             <div className="ap-drawer-head">Working on</div>
             {model.doing.length === 0 ? (
               <div className="vb-empty">Nothing is running.</div>
@@ -479,7 +479,7 @@ export function AutopilotBar({
               </ul>
             )}
           </div>
-          <div className="ap-drawer-col">
+          <div>
             <div className="ap-drawer-head">Stopping it from starting</div>
             {model.missing.length === 0 ? (
               <div className="vb-empty">Nothing — it is ready to run.</div>

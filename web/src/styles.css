@@ -552,7 +552,7 @@ body {
 }
 .gate button:disabled { opacity: 0.5; cursor: default; }
 .gate-preview { margin-top: 0.6rem; font-size: var(--t-small); color: var(--muted); }
-.gate-preview code { font-family: var(--font-mono); color: var(--accent); }
+/* `.gate-preview code` is with the other two inline code spans, beside `.markdown code`. */
 .gate .vb-hint { margin-top: 0.3rem; }
 .gate .vb-notice { margin-top: 1rem; }
 
@@ -917,7 +917,9 @@ body {
 .msg-user { align-self: flex-end; background: var(--accent-fill); color: var(--on-fill); padding: var(--s-3) var(--s-4); border-radius: var(--r-lg) var(--r-lg) var(--r-sm) var(--r-lg); max-width: 85%; }
 .msg-assistant { background: var(--panel-2); border: 1px solid var(--border); padding: var(--s-3) var(--s-4); border-radius: var(--r-lg) var(--r-lg) var(--r-lg) var(--r-sm); max-width: 90%; }
 .msg-thinking { color: var(--muted); font-style: italic; font-size: var(--t-small); }
-.msg-tool { color: var(--accent); font-family: var(--font-mono); font-size: var(--t-small); }
+/* `.msg-tool` IS GONE: a tool name is machine vocabulary and the rule was `Readout` `small` `accent`
+   written out by hand. `msg-tool` still reaches the wrapper through `msg-${it.kind}`, and there is
+   nothing left for it to say — the line's only child is the readout. See copilot/CopilotPanel.tsx. */
 .msg-error { color: var(--danger); font-size: var(--t-body); }
 .msg-running { color: var(--muted); font-style: italic; }
 /* CENTRED, not baseline-aligned, and the harness is why: `ReadoutLine` aligns on the baseline because
@@ -1066,6 +1068,15 @@ body {
 .markdown p { margin: 0.5rem 0; }
 .markdown ul, .markdown ol { margin: 0.5rem 0 0.5rem 1.3rem; }
 .markdown li { margin: 0.2rem 0; }
+/* THE THREE INLINE CODE SPANS, TOGETHER, AND ALL THREE ARE MONO-CENSUS EXCEPTIONS RATHER THAN
+   READOUTS. A `<code>` in running prose means "this is code" — it is not a measurement, so the
+   signature's claim (*if it is monospaced, the machine measured it*) is not the claim being made; the
+   weaker one, that the CONTENT is machine text, is. `.gate-preview code` (a path in the project gate's
+   preview) and `.ap-help-body code` (a token in the auto-pilot help) were TWO rules declaring the same
+   three things under two names, so they are one rule: `--t-small` is explicit because `.ap-help-body p`
+   is `--t-body`, and it is what `.gate-preview` already inherited. `.markdown code` keeps its own rule
+   because it also draws a box, which is why it is `check-shape-coverage.mjs`'s one chip exemption. */
+.gate-preview code, .ap-help-body code { font-family: var(--font-mono); font-size: var(--t-small); color: var(--accent); }
 .markdown code { font-family: var(--font-mono); font-size: var(--t-small); background: var(--panel-2); padding: 0.05rem var(--s-2); border-radius: var(--r-sm); }
 .markdown pre { background: var(--panel-2); border: 1px solid var(--border); border-radius: var(--r-md); padding: 0.7rem; overflow-x: auto; }
 .markdown pre code { background: transparent; padding: 0; }
@@ -1107,15 +1118,17 @@ body {
    the undrawn box, the corner, the padding and the inherited type are the primitive's. */
 .report-open { flex: 1; display: flex; align-items: baseline; gap: var(--s-4); }
 .report-open:hover { border-color: var(--accent); }
-/* `Chip pill` owns the box. What is left is this surface's own treatment — mono and uppercase, because
-   a status is machine vocabulary — plus `flex: 0 0 auto`, which is the row's decision.
+/* `Chip pill` owns the box and `vb-readout` on the `<Chip>` owns the monospaced face — a status is
+   machine vocabulary, so it says so by naming the primitive rather than by restating `font-family`,
+   which is the form `.board-archive`, `.tag-chip` and `.tab-badge` took in Phase 8. What is left is
+   the uppercase tracking and `flex: 0 0 auto`, which is the row's decision.
    THE SEVEN STATUS CLASSES BECAME `[data-state]`. They existed only inside `chip-${status}` at three
    call sites, so a literal grep found none of them; see docs/design-system.md, *Risks*. They are not
    `tone`s: `attention` is `--accent-2`, every theme's secondary, which equals `--warn` in two themes
    and NOT in marshmallow — mapping it onto the `warn` tone would silently repaint the light theme.
    And `running`/`queued` are `--text`, which is no tone at all. */
 .report-chip {
-  flex: 0 0 auto; font-family: var(--font-mono);
+  flex: 0 0 auto;
   text-transform: uppercase; letter-spacing: 0.06em;
 }
 .report-chip[data-state='success'] { color: var(--accent); border-color: var(--accent); }
@@ -1155,7 +1168,9 @@ body {
 .report-meta { display: flex; flex-wrap: wrap; gap: 0.2rem 1rem; margin: 0; font-size: var(--t-small); }
 .report-meta div { display: flex; gap: var(--s-3); }
 .report-meta dt { color: var(--muted); }
-.report-meta dd { margin: 0; font-family: var(--font-mono); }
+/* Every value in this list is a `Readout` `plain` — see runs/ReportPane.tsx. What is left is the
+   margin a `<dd>` arrives with. */
+.report-meta dd { margin: 0; }
 .report-lead { margin: 0; font-size: var(--t-lead); padding-left: 0.7rem; border-left: 3px solid var(--accent); }
 .report-note { margin: 0; font-size: var(--t-body); color: var(--accent-2); }
 .report-prompt { margin: 0; font-size: var(--t-body); color: var(--muted); }
@@ -1533,6 +1548,13 @@ body {
   font-family: var(--font-display); text-transform: uppercase; letter-spacing: 0.1em;
   font-size: var(--t-micro); color: var(--text);
 }
+/* ONE CHIP PER LINE IN THIS COLUMN, because a row of them cannot be made to fit. A run id alone is
+   144px of a 266px line, so any second reference wraps — and the fix must not depend on how many
+   references the fixture happens to carry: with `run` and `card` the row fits and with `became` as well
+   it does not, which is a wrap no gate here would ever see. Stacked, they are a column of figures that
+   lines up on its left edge, which is the claim the readout makes; wrapped, they were the one it
+   refuses. The diary's own `.diary-about` stays a row: it has 408px. */
+.filed-entry .diary-about { flex-direction: column; align-items: flex-start; }
 .filed-title { font-size: var(--t-lead); line-height: 1.5; color: var(--text); }
 .filed-text { font-size: var(--t-body); line-height: 1.5; color: var(--muted); }
 /* Why it was said no to. Quiet, and italic so it does not read as part of the finding itself. */
@@ -1727,4 +1749,4 @@ button.ap-agent-state:hover { text-decoration: underline; }
 .ap-help-body p { margin: 0 0 0.6rem; font-size: var(--t-body); }
 .ap-help-body ul { margin: 0 0 0.6rem; padding-left: 1.1rem; font-size: var(--t-body); }
 .ap-help-body li { margin-bottom: 0.25rem; }
-.ap-help-body code { font-family: var(--font-mono); font-size: var(--t-small); color: var(--accent); }
+/* `.ap-help-body code` is with the other two inline code spans, beside `.markdown code`. */

@@ -83,13 +83,13 @@
         "999px"
       ],
       "examined": {
-        "elements": 147,
+        "elements": 149,
         "textElements": 82,
         "overflow": 78,
         "clipping": 15,
         "contrast": 82,
         "tokens": 41,
-        "rows": 11,
+        "rows": 9,
         "focus": 38
       },
       "findings": {
@@ -99,7 +99,7 @@
         "clipping": 0,
         "contrast": 0,
         "tokens": 0,
-        "rows": 2,
+        "rows": 0,
         "focus": 0
       }
     },

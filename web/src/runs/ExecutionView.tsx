@@ -103,7 +103,7 @@ export function ExecutionView({
               return (
                 <Panel key={record.run} variant="inset" className="exec-run">
                   <div className="exec-run-top">
-                    <Chip pill state={record.status} className="report-chip" testId="report-chip">
+                    <Chip pill state={record.status} className="report-chip vb-readout" testId="report-chip">
                       {record.status}
                     </Chip>
                     <span className="exec-skill">{record.skill}</span>

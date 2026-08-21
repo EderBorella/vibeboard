@@ -19,7 +19,7 @@
 // what this instrument was built for and the first time one of these numbers has moved.
 //
 // A CENSUS RATCHETS UNTIL IT REACHES ZERO, AND THEN IT BLOCKS. Three backlogs are left — panel 10, mono
-// 11 and control 2 — and a gate pointed at a backlog has to be bypassed on every commit, which teaches
+// 7 and control 2 — and a gate pointed at a backlog has to be bypassed on every commit, which teaches
 // everyone to ignore it, so each of those prints its FULL list on a passing run and fails only on an
 // increase. Chip, dot, segmented control, the control-geometry arm and the box-less list are AT ZERO and
 // therefore block outright: the commit that reaches zero is the commit that sets the ceiling to zero.
@@ -89,7 +89,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { classesOf, rulesOf, shapedRules } from './lib/css.mjs';
-import { openTagEnd, openTagsOf as tagsIn } from './lib/jsx.mjs';
+import { classesInTag, classSites as classSitesOf, openTagEnd, openTagsOf as tagsIn } from './lib/jsx.mjs';
 import { codeOf, lineOf, walk as walkFiles } from './lib/source.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -124,12 +124,18 @@ const CHIP_CEILING = 0;
 // put a primitive on; `.msg-assistant` has four corners and a tail; and `InlineField`'s two are one
 // control in two states that must share one padding. NEVER RAISE IT.
 const PANEL_CEILING = 10;
-// MONO — 14 as Phase 7 measured it, 11 today, and the three it lost are the same chips: `.board-archive`,
-// `.tag-chip` and `.tab-badge` borrowed the readout's face by hand and now say so with `vb-readout` on the
-// `<Chip>`. Not all eleven are readout facts: a `<pre>`, a `<code>` and three textareas are monospaced
-// because the CONTENT is machine text rather than because a figure is a measurement, and those are
-// legitimate survivors. Ceiling left at 14 for the reason PANEL's is left at 32.
-const MONO_CEILING = 11;
+// MONO — 14 as Phase 7 measured it, 11 after Phase 8's three chips, and **7 after Phase 12**, which is
+// the phase that owned the row. Three went to the primitive: `.report-chip` names `vb-readout` on its
+// `<Chip>` (the form Phase 8 established), `.msg-tool` IS `Readout` `small` `accent` and its rule is
+// gone, and every `<dd>` in a report's meta list is a `Readout` `plain`. Two more merged: `.gate-preview
+// code` and `.ap-help-body code` declared the same three things under two names and are one rule.
+// THE SEVEN THAT REMAIN are all the SAME exception and it is not the signature's claim: the CONTENT is
+// machine text rather than a measurement. Four are controls a person types machine text into and cannot
+// be a `<span>` at all (`.raw-area` a card's file, `.control-textarea` a config file, `.skill-editor
+// textarea` a prompt, `.confirm-require .vb-input` the exact string the machine demands back); three are
+// quoted machine text (`.markdown code` and the merged pair, inline code in prose; `.signin-label`, a
+// browser's User-Agent). Each reason is written at its own rule. NEVER RAISE IT.
+const MONO_CEILING = 7;
 // DOT — ZERO, and it is zero because Phase 8 took the one. `.copilot-status .status-dot` was the last
 // `border-radius: 50%` outside the primitive stylesheet — named in `check-radius-scale.mjs`'s
 // OFF_SCALE_ON_PURPOSE as the Dot's one remaining hand-rolled instance since Phase 3 — and it is a `Dot`
@@ -236,13 +242,6 @@ const GROUND = ['background', 'background-color'];
 // What a class rendered on the primitive's own tag may NOT decide, and it is the same list
 // `check-radius-scale.mjs` refuses a button: the box is the primitive's, the layout is the caller's.
 const CHIP_GEOMETRY = ['border-radius', ...PADDING, 'font-size'];
-
-// The class tokens in one opening tag's `className`, through the SAME reader the call-site lookup uses —
-// one attribute reader and not two, so a class reaching a `<Chip>` through a ternary is not visible to the
-// locator and invisible to the census.
-function classesInTag(attrs) {
-  return [...attrs.matchAll(/className=/g)].flatMap((m) => classNameTokens(attrs, m.index));
-}
 
 // Every `<tag …>` across the corpus, with its site, its attribute text and its class literals. The tag
 // scan itself — including the `(?![\w-])` that stops `<Chip` matching `<ChipRow` — is `openTagsOf` in
@@ -641,59 +640,14 @@ function controlSelfTest() {
 // class moved onto `<Chip className="tag">` is still counted and still located: the census does not lose
 // sight of the shape when the shape lands on the primitive.
 //
-// SCOPED TO `className` AND NOT A BARE TOKEN GREP, and the first version was the bare grep. It reported
-// `.markdown code` as used at `cards/CardView.tsx:1`, which is the `markdown` MODULE in an import
-// statement — a search that matched something other than what it claimed. A `${…}` hole is blanked for
-// the reason `check-radius-scale.mjs` blanks it: a composed name cannot be resolved here, and
-// `check-class-budget.mjs` is the check that resolves composition. The comment blanking itself is
-// `codeOf` in tools/lib/source.mjs.
+// SCOPED TO `className` AND NOT A BARE TOKEN GREP — see `classSites` in tools/lib/jsx.mjs, which owns
+// the reader and the reason. A `${…}` hole is blanked there: a composed name cannot be resolved here, and
+// `check-class-budget.mjs` is the check that resolves composition. The comment blanking itself is `codeOf`
+// in tools/lib/source.mjs.
 
-// The class tokens named anywhere in one `className=`'s value, whatever shape the expression is. A plain
-// string, a template literal, and a TERNARY — `.popover`'s own call site is
-// `className={className ? `popover ${className}` : 'popover'}`, and a reader that only understood the
-// first two forms reported that rule as having no call site at all.
-// The braced expression after `className=`, brace-matched. Scoped to the ATTRIBUTE'S OWN VALUE and not to
-// the rest of the tag, because a `title="two words"` in the same tag would otherwise contribute two class
-// names that do not exist.
-function bracedAt(code, from) {
-  let depth = 0;
-  for (let i = from; i < code.length; i += 1) {
-    if (code[i] === '{') depth += 1;
-    else if (code[i] === '}') {
-      depth -= 1;
-      if (depth === 0) return code.slice(from + 1, i);
-    }
-  }
-  return '';
-}
-
-const tokensOf = (text) =>
-  text
-    .replace(/\$\{[^}]*\}/g, ' ')
-    .split(/\s+/)
-    .filter(Boolean);
-
-function classNameTokens(code, at) {
-  const from = at + 'className='.length;
-  if (code[from] === '"') return tokensOf(code.slice(from + 1, code.indexOf('"', from + 1)));
-  if (code[from] !== '{') return [];
-  // Every string in the expression, whichever branch of a ternary it is in.
-  return [...bracedAt(code, from).matchAll(/'([^'\n]*)'|"([^"\n]*)"|`([^`]*)`/g)].flatMap((m) =>
-    tokensOf(m[1] ?? m[2] ?? m[3] ?? ''),
-  );
-}
-
-// class name -> the first `file:line` whose `className` names it.
-function classSites(sources) {
-  const sites = new Map();
-  for (const { file, code } of sources) {
-    for (const m of code.matchAll(/className=/g)) {
-      const at = `${file}:${lineOf(code, m.index)}`;
-      for (const cls of classNameTokens(code, m.index)) if (!sites.has(cls)) sites.set(cls, at);
-    }
-  }
-  return sites;
-}
+// class name -> the FIRST `file:line` whose `className` names it. The shared reader keeps every site,
+// because `check-name-resolution.mjs` prints all of them; a census only needs somewhere to look.
+const classSites = (sources) => new Map([...classSitesOf(sources)].map(([cls, at]) => [cls, at[0]]));
 
 function siteOf(selector, sites) {
   for (const cls of classesOf(selector)) {

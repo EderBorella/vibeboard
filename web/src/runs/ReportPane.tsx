@@ -61,32 +61,43 @@ export function ReportPane({
         <h3 className="report-title">
           {record.skill} <Readout size="body">on {card.id}</Readout>
         </h3>
-        <Chip pill state={record.status} className="report-chip" testId="report-chip">
+        <Chip pill state={record.status} className="report-chip vb-readout" testId="report-chip">
           {record.status}
         </Chip>
       </header>
 
+      {/* Every definition here is a machine fact — a model id, two timestamps, a token and cost line —
+          so each is a `Readout`. `plain` because the list has already decided its size and colour;
+          `.report-meta dd` restated the mono face by hand until Phase 12. */}
       <dl className="report-meta">
         <div>
           <dt>Model</dt>
           <dd>
-            {record.model} · {record.effort} · {record.mode}
+            <Readout size="plain">
+              {record.model} · {record.effort} · {record.mode}
+            </Readout>
           </dd>
         </div>
         <div>
           <dt>Started</dt>
-          <dd>{record.started.replace('T', ' ').slice(0, 19)}</dd>
+          <dd>
+            <Readout size="plain">{record.started.replace('T', ' ').slice(0, 19)}</Readout>
+          </dd>
         </div>
         {record.finished && (
           <div>
             <dt>Finished</dt>
-            <dd>{record.finished.replace('T', ' ').slice(0, 19)}</dd>
+            <dd>
+              <Readout size="plain">{record.finished.replace('T', ' ').slice(0, 19)}</Readout>
+            </dd>
           </div>
         )}
         {record.attached && (
           <div>
             <dt>Attached</dt>
-            <dd>{record.attached.join(', ')}</dd>
+            <dd>
+              <Readout size="plain">{record.attached.join(', ')}</Readout>
+            </dd>
           </div>
         )}
         {/* "Usage", not "Cost": for Claude Code this is the API-equivalent figure, which is not what
@@ -94,14 +105,18 @@ export function ReportPane({
         {record.usage && (
           <div>
             <dt>Usage</dt>
-            <dd>{usageLine(record.usage)}</dd>
+            <dd>
+              <Readout size="plain">{usageLine(record.usage)}</Readout>
+            </dd>
           </div>
         )}
         {/* Shown for what it is: the run still reads as `attention`, and this is the answer to it. */}
         {record.resolved && (
           <div>
             <dt>Dealt with</dt>
-            <dd>{record.resolved.replace('T', ' ').slice(0, 19)}</dd>
+            <dd>
+              <Readout size="plain">{record.resolved.replace('T', ' ').slice(0, 19)}</Readout>
+            </dd>
           </div>
         )}
       </dl>

@@ -164,21 +164,9 @@ export function ModelPicker({ models, value, defaultModel, onChange, disabled }:
                       <Readout>{m.id}</Readout>
                       <span className="mp-badges">
                         {m.contextLength ? <Readout>{fmtCtx(m.contextLength)}</Readout> : null}
-                        {m.caps?.toolCall && (
-                          <span className="mp-badge" title="Tool use">
-                            🔧
-                          </span>
-                        )}
-                        {m.caps?.reasoning && (
-                          <span className="mp-badge" title="Reasoning">
-                            🧠
-                          </span>
-                        )}
-                        {m.caps?.vision && (
-                          <span className="mp-badge" title="Vision">
-                            👁
-                          </span>
-                        )}
+                        {m.caps?.toolCall && <span title="Tool use">🔧</span>}
+                        {m.caps?.reasoning && <span title="Reasoning">🧠</span>}
+                        {m.caps?.vision && <span title="Vision">👁</span>}
                       </span>
                     </span>
                   </Panel>

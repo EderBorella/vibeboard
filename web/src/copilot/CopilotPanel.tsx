@@ -167,7 +167,7 @@ export function CopilotPanel({
         The confirm is not ceremony: the grant includes writing the foundation documents, and two of
         those carry commands the server later runs outside the sandbox as you.
       */}
-      <div className="copilot-authority">
+      <div>
         {/* The ternary was `btn-primary`/`btn-secondary` — a toggle whose "on" state is the filled one.
             It is also the one site the ratchet could not see, because a class reaching a `<button>`
             through an expression is not a literal in the attribute text; the check names that gap. */}
@@ -243,7 +243,11 @@ export function CopilotPanel({
         {items.map((it) => (
           <div key={it.id} className={`msg msg-${it.kind}`}>
             {it.kind === 'tool' ? (
-              <span className="msg-tool">⚙ {it.toolName}</span>
+              // The name of a tool the agent called is machine vocabulary, and `.msg-tool` said so by
+              // hand in `--t-small` accent mono — which is `Readout` `small` `accent` value for value.
+              <Readout size="small" tone="accent">
+                ⚙ {it.toolName}
+              </Readout>
             ) : it.kind === 'thinking' ? (
               <span className="msg-thinking">{it.text}</span>
             ) : (

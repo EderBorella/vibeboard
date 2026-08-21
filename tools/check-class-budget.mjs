@@ -66,7 +66,9 @@ const SHEETS = [join('web', 'src', 'styles.css'), join('web', 'src', 'ui', 'prim
 // `.mp-prov` and `.link-option` — and `.vb-field-check` was added to primitives.css. The other eight
 // control classes the phase touched survive with a declaration only the surface can make, which is the
 // same result Phase 3 measured on its 27 and Phase 8 on its nine.
-const CLASS_CEILING = 375;
+// 375 before Phase 12, 374 after it: `.msg-tool` died — a tool name is a `Readout` `small` `accent`, and
+// the rule was that primitive written out by hand.
+const CLASS_CEILING = 374;
 const CLASS_TARGET = 183;
 
 // Anti-vacuity floor on the SELECTOR PARSER, not on the class count: a regex that stops matching reports

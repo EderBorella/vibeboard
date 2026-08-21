@@ -227,6 +227,10 @@ describe('the chip family draws one box', () => {
     ['.board-archive', { as: 'button', pill: true, fill: true, className: 'board-archive vb-readout' }],
     ['.tag-chip', { as: 'button', pill: true, fill: true, className: 'tag-chip vb-readout' }],
     ['.tab-badge', { pill: true, className: 'tab-badge vb-readout' }],
+    // A FOURTH, added by Phase 12: a run's status is machine vocabulary, and `.report-chip` restated
+    // `font-family` in its own rule until it named the primitive instead. Its uppercase tracking is
+    // still the surface's, which is why the class survives the migration.
+    ['.report-chip', { pill: true, state: 'failed', className: 'report-chip vb-readout' }],
   ] as [string, ComponentProps<typeof Chip>][])('%s is set in the monospaced face', (_name, props) => {
     expect(box(chip(props))['font-family']).toBe('var(--font-mono)');
   });

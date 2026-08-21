@@ -588,6 +588,33 @@ describe('ReportPane', () => {
     expect(screen.getByText('Close card')).toBeTruthy();
     expect(document.querySelectorAll('[data-testid="option-btn"]')).toHaveLength(2);
   });
+
+  // PHASE 12: every definition in this list is a machine fact — a model id, two timestamps, an
+  // attachment list, a cost line — and `.report-meta dd` restated the monospaced face by hand rather
+  // than saying which claim it was making. See test/mono-census.test.tsx for the sentence.
+  it('sets every value in the meta list as a Readout, not as a mono <dd>', () => {
+    render(
+      <ReportPane
+        {...props}
+        // ALL SIX ROWS PRESENT, because five of them are conditional: a fixture carrying four would
+        // assert four `<dd>`s were readouts and say nothing whatever about the other two.
+        record={run({
+          attached: ['notes.md'],
+          resolved: '2026-01-02T08:00:00.000Z',
+          usage: { costUsd: 0.0421, durationMs: 62_431, turns: 7, contextTokens: 48_210 },
+        })}
+      />,
+    );
+    const values = [...document.querySelectorAll('.report-meta dd')];
+    expect(values).toHaveLength(6);
+    for (const dd of values) {
+      const readout = dd.querySelector('.vb-readout');
+      expect(readout, `${dd.textContent} is not a Readout`).not.toBeNull();
+      // `plain`: the list has already decided its size and its colour, and a figure inside a line that
+      // has done that inherits both.
+      expect(readout?.classList.contains('vb-readout-plain')).toBe(true);
+    }
+  });
 });
 
 describe('ActiveReport', () => {

@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MAX_ENTRY_TEXT } from '../src/core/diary.js';
 import type { DiaryEntry } from '../web/src/api.js';
 import type { Suggestion } from '../web/src/shared.js';
+import { box } from './css-box.js';
 
 const api = vi.hoisted(() => ({
   listDiary: vi.fn(),
@@ -324,6 +325,71 @@ describe('the split — what agents filed', () => {
     api.listSuggestions.mockResolvedValue([suggestion({ title: 'it came back' })]);
     fireEvent.click(within(filed()).getByText('Try again'));
     expect(await within(filed()).findByText('it came back')).toBeTruthy();
+  });
+
+  // PHASE 12. Check 7 of the browser harness reported these two rows as wrapped on the diary surface —
+  // *"4 children span 33.0px, tallest is 15.0px"* — and the ruling of 2026-08-21 is that check 7 gets no
+  // `flex-wrap` exemption, because a wrapped readout block is a column of figures that does not align,
+  // which is the claim the signature makes. The fault was the rule's: 366px of figures in a 266px line.
+  describe("a filed entry's figures are two lines and not one wrapped one", () => {
+    const full = () => suggestion({ card: 'P-001', became: 'C-042' });
+    // `waitFor` retries on a THROW and not on a null: returning the query directly resolves with
+    // `null` on the first tick and every assertion after it reads a property of nothing.
+    const found = (selector: string) =>
+      waitFor(() => {
+        const el = filed().querySelector(selector);
+        if (!el) throw new Error(`no ${selector} in the filed column yet`);
+        return el as HTMLElement;
+      });
+
+    it('leaves the readout line the two facts the entry states about itself', async () => {
+      api.listDiary.mockResolvedValue([]);
+      api.listSuggestions.mockResolvedValue([full()]);
+      render(<DiaryView bump={0} />);
+      const line = await found('.filed-entry .vb-readout-block');
+      // TWO, not four: the state and when it was filed. `.filed-state` first, then the `<time>`.
+      expect([...line.children].map((c) => c.tagName)).toEqual(['SPAN', 'TIME']);
+      expect(line.querySelector('.filed-state')?.textContent).toBe('active');
+    });
+
+    it('puts the ids it POINTS AT in a group of their own, outside that line', async () => {
+      api.listDiary.mockResolvedValue([]);
+      api.listSuggestions.mockResolvedValue([full()]);
+      render(<DiaryView bump={0} />);
+      const row = await found('.filed-entry');
+      const refs = row.querySelector('.diary-about') as HTMLElement;
+      // A sibling of the readout line, not a child of it — `.diary-about` is what the diary beside this
+      // column already uses for exactly this, so the group costs no class.
+      expect(refs.parentElement).toBe(row);
+      expect([...refs.children].map((c) => c.textContent)).toEqual(['run-7', 'P-001', 'became C-042']);
+    });
+
+    it('renders no group at all for a finding that points at nothing', async () => {
+      api.listDiary.mockResolvedValue([]);
+      api.listSuggestions.mockResolvedValue([suggestion({ run: undefined })]);
+      render(<DiaryView bump={0} />);
+      await waitFor(() => expect(filed().querySelector('.filed-entry')).toBeTruthy());
+      expect(filed().querySelector('.diary-about')).toBeNull();
+    });
+
+    // THE HALF jsdom CANNOT SEE is the layout, so the rule is read out of the stylesheets instead. A
+    // stacked group is a column of figures that lines up on its left edge whether it holds one
+    // reference or three; a row of them fits with two and wraps with three, and the harness fixture
+    // carries two — so a row would have passed every gate here and still been wrong.
+    it('stacks that group in this column, because a row of ids cannot be made to fit', async () => {
+      // BOTH COLUMNS RENDER A GROUP, so the claim is a comparison rather than an assertion about one
+      // element: a fixture with only the filed side could not tell "stacked in the narrow column" from
+      // "stacked everywhere", which would have taken the diary's own row with it.
+      api.listDiary.mockResolvedValue([entry({ card: 'P-001', iteration: 1 })]);
+      api.listSuggestions.mockResolvedValue([full()]);
+      render(<DiaryView bump={0} />);
+      const refs = await found('.diary-about');
+      const drawn = box(refs);
+      expect(drawn['flex-direction']).toBe('column');
+      expect(drawn['align-items']).toBe('flex-start');
+      const inTheDiary = screen.getByLabelText('Project log').querySelector('.diary-about') as Element;
+      expect(box(inTheDiary)['flex-direction']).toBeUndefined();
+    });
   });
 
   it('keeps the composer working — the diary half is unchanged', async () => {

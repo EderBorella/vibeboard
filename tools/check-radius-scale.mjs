@@ -65,8 +65,9 @@ const OFF_SCALE_ON_PURPOSE = new Map([
   [
     '50%',
     "A CIRCLE, and it cannot be expressed as a length without knowing the box width — `--r-pill`'s " +
-      '999px would be a claim about a stadium. Owned by the Dot primitive; the one other consumer is ' +
-      '`.copilot-status .status-dot`, which Phase 5 folds into Dot.',
+      '999px would be a claim about a stadium. Owned by the Dot primitive, and as of Phase 8 the ONLY ' +
+      'consumer: `.copilot-status .status-dot` was the last hand-rolled one and it is a `Dot`. ' +
+      "`check-shape-coverage.mjs`'s dot census now blocks a new one at zero.",
   ],
 ]);
 
@@ -124,7 +125,7 @@ const OFF_SCALE_ON_PURPOSE = new Map([
 // `.dock-collapse`, `.tag-filter-clear`, `.cv-link-edit`.
 //
 // NEVER raise this: a ratchet that moves the wrong way is a gate switched off in place.
-const BUTTON_GEOMETRY_CEILING = 8;
+const BUTTON_GEOMETRY_CEILING = 4;
 
 const GEOMETRY = [
   'border-radius',

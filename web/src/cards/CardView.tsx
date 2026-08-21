@@ -1,5 +1,6 @@
 import { renderMarkdown } from '../markdown';
 import { BOARD_LABELS, type Card, type CardFrontmatterPatch, type ProjectConfig } from '../shared';
+import { Chip } from '../ui/Chip';
 import { InlineField } from '../ui/InlineField';
 import { Readout, ReadoutLine } from '../ui/Readout';
 import { cardPlace, csv, parseCsv } from '../viewmodel';
@@ -61,9 +62,9 @@ export function CardView({ card, config, allCards, onOpenCard, onPatch, onLinks 
           display={(value) => (
             <span className="cv-tags">
               {parseCsv(value).map((t) => (
-                <span key={t} className="tag">
+                <Chip pill tone="neutral" key={t} className="tag" testId="cv-tag">
                   {t}
-                </span>
+                </Chip>
               ))}
             </span>
           )}
@@ -73,9 +74,9 @@ export function CardView({ card, config, allCards, onOpenCard, onPatch, onLinks 
         card.tags.length > 0 && (
           <div className="cv-tags">
             {card.tags.map((t) => (
-              <span key={t} className="tag">
+              <Chip pill tone="neutral" key={t} className="tag" testId="cv-tag">
                 {t}
-              </span>
+              </Chip>
             ))}
           </div>
         )

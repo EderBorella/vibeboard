@@ -67,7 +67,10 @@ describe('CardView', () => {
       />,
     );
     expect(container.querySelector('.cv-group')?.textContent).toBe('Platform');
-    expect([...container.querySelectorAll('.cv-tags .tag')].map((t) => t.textContent)).toEqual(['bug', 'ui']);
+    expect([...container.querySelectorAll('[data-testid="cv-tag"]')].map((t) => t.textContent)).toEqual([
+      'bug',
+      'ui',
+    ]);
     expect(container.querySelector('.cv-desc')?.textContent).toBe('a summary');
   });
 
@@ -176,7 +179,10 @@ describe('CardView editing', () => {
 
   it('shows tags as chips and the body as markdown while not editing', () => {
     const { container } = editable({ tags: ['ui', 'bug'], body: '## Plan' });
-    expect([...container.querySelectorAll('.cv-tags .tag')].map((t) => t.textContent)).toEqual(['ui', 'bug']);
+    expect([...container.querySelectorAll('[data-testid="cv-tag"]')].map((t) => t.textContent)).toEqual([
+      'ui',
+      'bug',
+    ]);
     expect(container.querySelector('.cv-body h2')?.textContent).toBe('Plan');
   });
 

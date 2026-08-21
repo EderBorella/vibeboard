@@ -1,4 +1,5 @@
 import { Button } from '../ui/Button';
+import { Chip } from '../ui/Chip';
 import type { TagCount } from '../viewmodel';
 
 interface Props {
@@ -17,16 +18,19 @@ export function TagFilter({ tags, active, onToggle, onClear }: Props) {
   return (
     <div className="tag-filter" role="group" aria-label="Filter by tag">
       {tags.map(({ tag, count }) => (
-        <button
+        <Chip
+          as="button"
+          pill
+          fill
           key={tag}
-          className={`tag-chip${active.includes(tag) ? ' active' : ''}`}
-          aria-pressed={active.includes(tag)}
+          className={`tag-chip vb-readout${active.includes(tag) ? ' active' : ''}`}
+          ariaPressed={active.includes(tag)}
           title={`Cards tagged ${tag}: ${count}`}
           onClick={() => onToggle(tag)}
         >
           {tag}
-          <span className="tag-chip-count">{count}</span>
-        </button>
+          <span>{count}</span>
+        </Chip>
       ))}
       {active.length > 0 && (
         <Button variant="bare" size="sm" className="tag-filter-clear" onClick={onClear}>

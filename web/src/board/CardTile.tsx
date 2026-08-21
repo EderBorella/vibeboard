@@ -1,5 +1,6 @@
 import type { Card } from '../shared';
 import { Button } from '../ui/Button';
+import { Chip } from '../ui/Chip';
 import { Readout } from '../ui/Readout';
 import { miniature } from '../viewmodel';
 
@@ -54,35 +55,55 @@ export function CardTile({
     >
       <div className="tile-head">
         <Readout tone="accent">{card.id}</Readout>
+        {/* THREE STATE WORDS IN THREE TONES, and the tones are the meaning rather than the styling —
+            see the three rules in styles.css and test/chip-boxes.test.tsx, which measures that a
+            person can tell them apart in each theme's own palette. */}
         {card.setup && (
           // The project-level barrier. Worth a badge because its effect is invisible from the card
           // it is on: nothing outside this feature's subtree runs until it is finished, so a board
-          // that looks stuck is explained by a tile somewhere else.
-          <span className="tile-setup" title="The setup feature — nothing outside it runs until it is done">
+          // that looks stuck is explained by a tile somewhere else. `accent` and not `warn`: this is
+          // structure, not a problem.
+          <Chip
+            tone="accent"
+            className="tile-setup"
+            testId="tile-setup"
+            title="The setup feature — nothing outside it runs until it is done"
+          >
             setup
-          </span>
+          </Chip>
         )}
         {openSuggestions > 0 && (
-          <span
+          // `warn` — not failing, but not plainly done either.
+          <Chip
+            tone="warn"
             className="tile-suggestions"
+            testId="tile-suggestions"
             title={`${openSuggestions} open ${openSuggestions === 1 ? 'suggestion' : 'suggestions'}`}
           >
             ⚑ {openSuggestions}
-          </span>
+          </Chip>
         )}
         {blocked.length > 0 && (
-          <span
+          // `bad`, the strongest of the three: a real failure inside something that says it finished.
+          <Chip
+            tone="bad"
             className="tile-problem"
+            testId="tile-problem"
             // Every one of them, not just the first: the ids are what a person goes and looks at.
             title={`Carrying ${blocked.length === 1 ? 'a blocked card' : `${blocked.length} blocked cards`}: ${blocked.join(', ')}`}
           >
             ⚠ {blocked.length}
-          </span>
+          </Chip>
         )}
         {card.links.length > 0 && (
-          <span className="tile-link" title={card.links.join(', ')}>
+          // A READOUT AND NOT A CHIP, beside three chips, on purpose. The other four badges in this head
+          // wear a tone because each signals a state to act on — waiting, unfinished, failed. A link count
+          // signals nothing: it is a structural fact about the card, and the tone vocabulary is worth more
+          // if a count cannot borrow from it. Mono also puts it under the signature's own rule — the machine
+          // counted these.
+          <Readout tone="accent2" testId="tile-link" title={card.links.join(', ')}>
             🔗 {card.links.length}
-          </span>
+          </Readout>
         )}
         {onArchive && (
           <Button
@@ -105,9 +126,13 @@ export function CardTile({
         <div className="tile-tags">
           {card.tags.map((t) =>
             onTag ? (
-              <button
+              <Chip
+                as="button"
+                pill
+                tone="neutral"
                 key={t}
                 className="tag tag-btn"
+                testId="tile-tag"
                 title={`Filter by ${t}`}
                 // Without this the tile's own onClick opens the editor as well.
                 onClick={(e) => {
@@ -116,11 +141,11 @@ export function CardTile({
                 }}
               >
                 {t}
-              </button>
+              </Chip>
             ) : (
-              <span key={t} className="tag">
+              <Chip pill tone="neutral" key={t} className="tag" testId="tile-tag">
                 {t}
-              </span>
+              </Chip>
             ),
           )}
         </div>

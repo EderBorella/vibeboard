@@ -147,7 +147,9 @@ export function TopBar({
             >
               {label}
               {value === 'execution' && attentionCount > 0 && (
-                <span className="tab-badge">{attentionCount}</span>
+                <Chip pill className="tab-badge vb-readout" testId="tab-badge">
+                  {attentionCount}
+                </Chip>
               )}
             </button>
           ))}

@@ -4,6 +4,7 @@ import { revokeDeviceRequest, signOutEverythingRequest } from '../confirm/reques
 import type { Confirmer } from '../confirm/useConfirm';
 import { errorText } from '../errors';
 import { Button } from '../ui/Button';
+import { Chip } from '../ui/Chip';
 import { Readout } from '../ui/Readout';
 import { useAction } from '../useAction';
 
@@ -63,7 +64,10 @@ export function SignInPanel({ confirm }: Props) {
         <div className="signin-row">
           <div>
             <div className="signin-row-label">
-              {mine.label} <span className="signin-this">this browser</span>
+              {mine.label}{' '}
+              <Chip pill tone="neutral" className="signin-this">
+                this browser
+              </Chip>
             </div>
             <Readout size="small">
               {mine.address} · signed in {mine.created.slice(0, 10)} · last seen {mine.lastSeen}

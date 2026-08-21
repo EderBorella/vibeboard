@@ -56,14 +56,18 @@ export function Board({
           </Chip>
         </button>
         {!collapsed && archivedCount > 0 && (
-          <button
-            className={`board-archive${showArchive ? ' active' : ''}`}
+          <Chip
+            as="button"
+            pill
+            fill
+            className={`board-archive vb-readout${showArchive ? ' active' : ''}`}
+            testId="board-archive"
             title={showArchive ? 'Hide the archive' : 'Show archived cards'}
-            aria-expanded={showArchive}
+            ariaExpanded={showArchive}
             onClick={() => setShowArchive((v) => !v)}
           >
             🗄 {archivedCount}
-          </button>
+          </Chip>
         )}
       </div>
       {!collapsed && (

@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 //
-// FOUR COVERAGE CENSUSES, ONE PER PRIMITIVE SHAPE: chip, panel, mono-fact, control. Each one asks the
-// single question `tools/check-radius-scale.mjs` asks of buttons — *how much of this shape is still
-// hand-rolled?* — and each one RATCHETS at what the tree holds today rather than blocking at zero.
+// SIX COVERAGE CENSUSES, ONE PER PRIMITIVE SHAPE — chip, panel, mono-fact, dot, segmented control and
+// control — PLUS ONE NAMED LIST. Each census asks the single question `tools/check-radius-scale.mjs`
+// asks of buttons: *how much of this shape is still hand-rolled?* The named list asks the question no
+// census can — see THE BOX-LESS CHIPS below, which is the half of Phase 8 that a shape rule could never
+// have found.
 //
 // WHY IT EXISTS. Part Two of docs/design-system.md opens with the reason, and it is a real miss rather
 // than a hypothetical one: `check-radius-scale.mjs`'s claim 2 was the ONLY gate asking that question,
@@ -13,20 +15,22 @@
 //
 // A NUMBER NOBODY PRINTS IS A NUMBER NOBODY REDUCES. That is the whole of this file's job: Phases 8, 9
 // and 10 each drive one of these counts, and a phase that reports its intention rather than its
-// measurement is what this page exists to stop.
+// measurement is what this page exists to stop. Phase 8 drove the chip census from 10 to ZERO, which is
+// what this instrument was built for and the first time one of these numbers has moved.
 //
-// EVERY CENSUS RATCHETS, AND NOT ONE OF THEM BLOCKS AT ZERO. Four backlogs exist today; a gate pointed
-// at a backlog has to be bypassed on every commit, which teaches everyone to ignore it. Each census
-// therefore prints its FULL list on a passing run and fails only on an increase. Lower the ceilings as
-// the phases land; never raise one.
+// A CENSUS RATCHETS UNTIL IT REACHES ZERO, AND THEN IT BLOCKS. Three backlogs are left — panel 28, mono
+// 11 and control 35 — and a gate pointed at a backlog has to be bypassed on every commit, which teaches
+// everyone to ignore it, so each of those prints its FULL list on a passing run and fails only on an
+// increase. Chip, dot, segmented control and the box-less list are AT ZERO and therefore block outright:
+// the commit that reaches zero is the commit that sets the ceiling to zero. Never raise one.
 //
-// THREE CENSUSES READ THE STYLESHEETS AND ONE READS THE JSX, and that split is what makes them
+// FIVE CENSUSES READ THE STYLESHEETS AND ONE READS THE JSX, and that split is what makes them
 // migration-proof — the Phase 3 defect this file was written not to repeat. That defect: the geometry
 // ratchet read literal `<button>` only, so moving 27 classes onto `<Button>` took its population from 50
 // to 23 and a planted `padding` exited 0. The count kept falling while the geometry moved out of sight.
-//   - chip, panel and mono are detected in the CSS, by the declarations that DRAW the shape. A shape can
-//     only be hand-rolled in one place, so moving the element onto `<Chip>`, `<Panel>` or `<Readout>`
-//     cannot hide it: the rule is still there and still counted. Each finding additionally names a call
+//   - chip, panel, mono, dot and seg are detected in the CSS, by the declarations that DRAW the shape. A
+//     shape can only be hand-rolled in one place, so moving the element onto `<Chip>`, `<Panel>` or
+//     `<Readout>` cannot hide it: the rule is still there and still counted. Each finding names a call
 //     site read out of the JSX — ANY tag, the primitive's own included — so the finding follows the class
 //     onto the primitive rather than losing sight of it.
 //   - control is detected in the JSX, because a raw `<input>` is not a class at all. Its population is
@@ -39,23 +43,25 @@
 // NO COUNT FLOORS, ANYWHERE. A floor on a number the sweep exists to reduce fails the run for SUCCEEDING
 // and says "this check is vacuous" while doing it — that has now happened twice in this repository
 // (`check-radius-scale.mjs`'s button population at 30 against 23, and its radius floor at 60 against 59).
-// The anti-vacuity instrument here is `cssSelfTest`, `controlSelfTest` and `siteSelfTest` below, over
-// fixtures the tree cannot move, and all three go through the census's OWN functions: a self-test that
-// carries its own copy of the regex it is meant to test has no opinion about the code under test at all,
-// which is what happened to the first one written in this repository.
+// The anti-vacuity instrument here is `cssSelfTest`, `controlSelfTest`, `siteSelfTest` and
+// `boxlessSelfTest` below, over fixtures the tree cannot move, and all four go through the census's OWN
+// functions: a self-test that carries its own copy of the regex it is meant to test has no opinion about
+// the code under test at all, which is what happened to the first one written in this repository.
 //
 // WHAT THESE CENSUSES DO NOT CATCH, stated so nobody mistakes a ratchet for a proof:
-//   - A CHIP WITH NO BOX. The census reads the box — a small font-size, a pill-or-`--r-sm` corner and a
-//     padding. `.tile-suggestions` and `.tile-problem` declare a size, an ink and `white-space: nowrap`
-//     and nothing else, so they are chips by MEANING and invisible here; `.tag-btn` (a cursor on `.tag`)
-//     and `.tag-chip-count` (an opacity inside `.tag-chip`) are modifiers of a box declared elsewhere.
-//     Those four are the reason this census reads 10 where the owner's family list reads 9, and no shape
-//     rule can separate a state word from any other coloured word without becoming a list of names.
-//     Phase 8's own gate is where the three tones of those two are asserted.
+//   - A CHIP WITH NO BOX. A census reads the box — a small font-size, a pill-or-`--r-sm` corner and a
+//     padding — so a chip that draws none is invisible to it, and four were: `.tile-suggestions` and
+//     `.tile-problem` were a size, an ink and `white-space: nowrap`; `.tag-btn` was a cursor on `.tag`
+//     and `.tag-chip-count` an opacity inside `.tag-chip`. Those four are why this census read 10 where
+//     the owner's family list read 9. No shape rule can separate a state word from any other coloured
+//     word "without becoming a list of names" — so BOXLESS_CHIPS below is that list of names, and it
+//     covers those four and nothing else. A FIFTH one, under a name nobody adds there, is still
+//     invisible: that limit is structural and is the reason the tones are also asserted in
+//     test/chip-boxes.test.tsx, which resolves them per theme.
 //   - A SHAPE BUILT BY MORE THAN ONE RULE. `.a { border-radius } .a { padding }` is two rules and each is
 //     short of the pattern. Every shape in the tree today is declared in one rule.
 //   - GEOMETRY FROM AN INLINE STYLE, or from a `style={{…}}` prop. Nothing in `web/src` draws one of
-//     these four shapes that way, and a census over the stylesheets cannot see it if it did.
+//     these six shapes that way, and a census over the stylesheets cannot see it if it did.
 //   - A CONTROL THAT IS NOT A `<input>`/`<textarea>`/`<select>` literal — a control rendered by a
 //     component of its own, or reached through a variable. `.vb-trigger` is the deliberate case: two
 //     select triggers that are `<button>`s.
@@ -63,9 +69,18 @@
 //     type and radius checks' business.
 //
 // THE CENSUSES OVERLAP AND THAT IS NOT DOUBLE-COUNTING, because they answer per-shape questions and one
-// rule can be two shapes: `.tag`, `.tag-chip`, `.mp-chip` and `.board-archive` are in both the chip and
+// rule can be two shapes: `.tag`, `.tag-chip`, `.mp-chip` and `.board-archive` were in both the chip and
 // the panel census (a chip IS a small panel with a corner and a ground), and `.board-archive`, `.tag-chip`
-// and `.tab-badge` are in the mono census too. Phase 8 taking the chips therefore moves three numbers.
+// and `.tab-badge` were in the mono census too. Phase 8 taking the chips moved three numbers, which is
+// why panel and mono fell to 28 and 11 without a panel or a readout being touched.
+//
+// A CENSUS AT ZERO IS STILL WORTH ITS LINES, which is the judgement Phase 7 made the other way and
+// Phase 8 reverses on the evidence. Phase 7 left `Dot` and `SegmentedControl` ungated because "a census
+// for zero is a gate blocking at zero with nothing to ratchet" — but the argument against that is the
+// whole reason this file exists: the shape nobody counts is the shape that gets hand-rolled back in, and
+// a coverage table with a hole in it is exactly what let nine chip classes accumulate unseen through six
+// green phases. Both read ZERO today and both block an increase, so they are cheap insurance rather than
+// a backlog: every one of the seven rows in the table in docs/design-system.md now has a gate.
 
 import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -73,7 +88,7 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const CORPUS = 'web/src';
-// The primitive stylesheet: the ONE place any of these four shapes may be declared.
+// The primitive stylesheet: the ONE place any of these six shapes may be declared.
 const PRIMITIVES = join('web', 'src', 'ui', 'primitives.css');
 
 // ---------------------------------------------------------------------------------------------------
@@ -81,26 +96,51 @@ const PRIMITIVES = join('web', 'src', 'ui', 'primitives.css');
 // number the phase named beside it has to drive down. NEVER raise one: a ratchet that moves the wrong way
 // is a gate switched off in place.
 
-// CHIP — 10, against the owner's family list of 9. Five are the same rule (`.tag`, `.tag-chip`,
-// `.mp-chip`, `.board-archive`, `.tile-setup`); four of his nine declare no box and cannot be seen here
-// (see WHAT THESE DO NOT CATCH); and five more draw a chip's box that his list does not name —
-// `.mp-def-tag`, `.control-tag`, `.tab-badge`, `.signin-this` and `.markdown code`. The last is inline
-// code in rendered prose and is the one member of this census that may legitimately never be a `Chip`;
-// it is counted rather than exempted, because over-reporting is loud and harmless while an exemption list
-// is a licence.
-// ALL TEN ARE ARM 1 AND ARM 2 IS AT ZERO TODAY: no surface class currently on a `<Chip>` declares a
-// corner, a padding or a size — `.report-chip` and `.ap-chip` decide a face and an ink, which is the
-// caller's to decide. That zero is the interesting half, because it is the half that goes up the moment a
-// chip is migrated carelessly. PHASE 8'S NUMBER.
-const CHIP_CEILING = 10;
-// PANEL — 32, and it agrees with the owner's independently measured 32 exactly. Four of them are the
-// chips above. PHASE 8 AND PHASE 10 MOVE PARTS OF THIS; no phase owns the whole of it yet.
-const PANEL_CEILING = 32;
-// MONO — 14, and it agrees with the owner's 14 exactly. Not all fourteen are readout facts: a `<pre>`, a
-// `<code>` and three textareas are monospaced because the CONTENT is machine text rather than because a
-// figure is a measurement, and those are legitimate survivors. Counted anyway, for the reason
-// `.markdown code` is counted above.
-const MONO_CEILING = 14;
+// CHIP — ZERO, and it was 10 when Phase 7 wrote this census. Phase 8 migrated all ten: nine onto `Chip`
+// and one — `.markdown code` — exempted BY NAME with its reason in CHIP_EXEMPT below. So this census is
+// the one that stopped being a ratchet and became a gate blocking at zero, which is what this page asks
+// of a count that has reached it.
+// ARM 2 IS THE HALF THAT MATTERS NOW. Arm 1 is empty because there is nothing left to migrate; arm 2 —
+// a surface class ON a `<Chip>` that decides a corner, a padding or a size — is the half that goes up
+// the moment a chip is migrated carelessly, and Phase 8 put fourteen classes within its reach where
+// there were eleven. `.report-chip`, `.ap-chip`, `.tag`, `.tile-setup` and the rest decide a face, an
+// ink and a ground, which is the caller's to decide; not one decides the box.
+const CHIP_CEILING = 0;
+// PANEL — 32 as Phase 7 measured it, 28 today. FOUR OF THE FOUR IT LOST WERE CHIPS — `.board-archive`,
+// `.tag`, `.tag-chip` and `.mp-chip` each drew a 1px border, a corner and a ground, which is a chip's
+// box and also, by this census's rule, a small panel's. The CEILING IS LEFT AT 32 deliberately: Phase 10
+// owns the rest of this row and lowering a ceiling for a number a different phase moved would take the
+// slack away from the phase that has to work in it. NEVER RAISE IT.
+const PANEL_CEILING = 28;
+// MONO — 14 as Phase 7 measured it, 11 today, and the three it lost are the same chips: `.board-archive`,
+// `.tag-chip` and `.tab-badge` borrowed the readout's face by hand and now say so with `vb-readout` on the
+// `<Chip>`. Not all eleven are readout facts: a `<pre>`, a `<code>` and three textareas are monospaced
+// because the CONTENT is machine text rather than because a figure is a measurement, and those are
+// legitimate survivors. Ceiling left at 14 for the reason PANEL's is left at 32.
+const MONO_CEILING = 11;
+// DOT — ZERO, and it is zero because Phase 8 took the one. `.copilot-status .status-dot` was the last
+// `border-radius: 50%` outside the primitive stylesheet — named in `check-radius-scale.mjs`'s
+// OFF_SCALE_ON_PURPOSE as the Dot's one remaining hand-rolled instance since Phase 3 — and it is a `Dot`
+// now. Blocking at zero, which is what a census at zero is for.
+const DOT_CEILING = 0;
+// SEGMENTED CONTROL — ZERO, and it has been zero since Phase 5b built the primitive out of the four
+// classes that were one shape. Gated anyway: a group that clips its own cells is a shape somebody will
+// write again, and this is the row of the coverage table that had no gate at all.
+const SEG_CEILING = 0;
+
+// THE ONE EXEMPTION, BY NAME AND WITH ITS REASON ON IT — the form `check-radius-scale.mjs`'s
+// OFF_SCALE_ON_PURPOSE established, for the same argument: a shape that is deliberately not the
+// primitive's has to be stated where the census is, or the next person reads a ratchet of 1 as a
+// backlog of 1 and migrates it. Keyed on the whole selector, so `.markdown pre code` is not excused by
+// it and neither is anything else that happens to contain the word.
+const CHIP_EXEMPT = new Map([
+  [
+    '.markdown code',
+    'AN INLINE CODE SPAN IN RENDERED PROSE, NOT A CHIP. It means "this is code", it sits mid-sentence ' +
+      'inside a paragraph, and it is not a discrete labelled thing — a chip is a noun you could point ' +
+      "at. Making it a `Chip` would put an inline-flex box with a chip's gap into running text.",
+  ],
+]);
 // CONTROL — 35 of 42, against the owner's approximate ~33 across 23 files. The tree holds 42 literal
 // `<input>`/`<textarea>`/`<select>` tags in 23 files; seven are already inside a `<Field>`, leaving 35 in
 // 22 files. Two of the 35 are `ui/InlineField.tsx`'s, which docs/design-system.md rules OUT of `Field`'s
@@ -125,7 +165,10 @@ const ADOPTION = [
   { shape: 'chip', tags: [CHIP_TAG] },
   { shape: 'panel', tags: ['<Panel'] },
   { shape: 'mono', tags: ['<Readout', '<ReadoutLine'] },
+  { shape: 'dot', tags: ['<Dot'] },
+  { shape: 'seg', tags: ['<SegmentedControl'] },
   { shape: 'control', tags: ['<Field'] },
+  { shape: 'boxless-chip', tags: [CHIP_TAG] },
 ];
 
 const walk = (ext) =>
@@ -213,21 +256,31 @@ function classesInTag(attrs) {
 
 // Every class literal on a `<tag …>`, whatever else that tag says. `(?![\w-])` so `<Chip` does not match
 // `<ChipRow`, the guard `check-radius-scale.mjs` needed for `<Button` against `<ButtonRow`.
-function tagClasses(sources, tag) {
-  const found = new Set();
-  for (const { code } of sources) {
+// ONE READER FOR BOTH THINGS THAT ASK ABOUT A `<Chip>`: arm 2 wants the class set, and the box-less
+// check below wants the attribute text as well. Two readers would be two things to break, and the one
+// that broke would be the one nobody planted at.
+function openTagsOf(sources, tag) {
+  const out = [];
+  for (const { file, code } of sources) {
     for (const open of code.matchAll(new RegExp(`${tag}(?![\\w-])`, 'g'))) {
       const end = openTagEnd(code, open.index + tag.length);
-      if (end >= 0) for (const cls of classesInTag(code.slice(open.index, end))) found.add(cls);
+      if (end < 0) continue;
+      const attrs = code.slice(open.index, end);
+      out.push({ site: `${file}:${lineOf(code, open.index)}`, attrs, classes: classesInTag(attrs) });
     }
   }
-  return found;
+  return out;
+}
+
+function tagClasses(sources, tag) {
+  return new Set(openTagsOf(sources, tag).flatMap((open) => open.classes));
 }
 
 // ---------- the three CSS shapes, one predicate each ----------
 // A CHIP is the primitive's own declaration set written by hand: a small font-size, a chip's corner and
 // a padding. See `.vb-chip` in ui/primitives.css, which says exactly those three things.
 function chipFault(rule) {
+  if (CHIP_EXEMPT.has(rule.selector)) return null;
   if (!CHIP_FONT.includes(declValue(rule.body, 'font-size'))) return null;
   if (!CHIP_RADIUS.includes(declValue(rule.body, 'border-radius'))) return null;
   if (!declaresAny(rule.body, PADDING)) return null;
@@ -253,6 +306,31 @@ function monoFault(rule) {
   return /font-family\s*:\s*var\(--font-mono\)/.test(rule.body) ? 'font-family: var(--font-mono)' : null;
 }
 
+// A DOT is a `50%` corner, and nothing else needs saying: `--r-pill`'s 999px is a claim about a stadium,
+// so a circle is the ONE shape in this stylesheet that legitimately declares a raw value — which is why
+// `check-radius-scale.mjs` carries `50%` in OFF_SCALE_ON_PURPOSE and named the Dot as its owner. The
+// sizes are separate classes on the primitive, so requiring a width here would miss a dot that inherited
+// one; the corner is what makes it a circle at all.
+function dotFault(rule) {
+  return declValue(rule.body, 'border-radius') === '50%' ? 'a circle — border-radius: 50%' : null;
+}
+
+// A SEGMENTED GROUP is a flex box that draws ONE 1px border and ONE corner and CLIPS what is inside it,
+// and the ground is its cells' rather than its own. That last clause is the discriminator and it is
+// measured rather than tidy: without it `.mp-modal` — a flex column with a border, a `--r-lg` corner and
+// `overflow: hidden` — is reported as a segmented control, which is a false finding on a modal. A group
+// with no ground of its own is the primitive's own statement (`.vb-seg` declares no background) and it is
+// what makes the cells' fill reach the group's edge.
+function segFault(rule) {
+  const border = declValue(rule.body, 'border') ?? declValue(rule.body, 'border-width');
+  if (border === null || !/(?:^|\s)1px(?:\s|$)/.test(border)) return null;
+  if (!declares(rule.body, 'border-radius')) return null;
+  if (!/^(inline-)?flex$/.test(declValue(rule.body, 'display') ?? '')) return null;
+  if (declValue(rule.body, 'overflow') !== 'hidden') return null;
+  if (declaresAny(rule.body, GROUND)) return null;
+  return 'a clipped group — flex, border 1px, a border-radius, overflow: hidden and no ground of its own';
+}
+
 // THE CHIP CENSUS'S SECOND ARM, AND IT IS THE PHASE 3 HOLE CLOSED BEFORE IT COSTS ANYTHING. Arm 1 finds
 // a chip nobody has migrated. This finds the other half: a class that IS on a `<Chip>` and still decides
 // the box — a padding, a corner or a size of its own. Without it the census would fall as chips migrated
@@ -276,8 +354,10 @@ const censuses = (onChip) => [
     fault: (rule) => chipFault(rule) ?? chipGeometryFault(rule, onChip),
     phase: 'Phase 8',
   },
-  { shape: 'panel', ceiling: PANEL_CEILING, fault: panelFault, phase: 'Phases 8 and 10' },
-  { shape: 'mono', ceiling: MONO_CEILING, fault: monoFault, phase: 'Phase 8' },
+  { shape: 'panel', ceiling: PANEL_CEILING, fault: panelFault, phase: 'Phase 10' },
+  { shape: 'mono', ceiling: MONO_CEILING, fault: monoFault, phase: 'Phase 10' },
+  { shape: 'dot', ceiling: DOT_CEILING, fault: dotFault, phase: 'at zero — blocking' },
+  { shape: 'seg', ceiling: SEG_CEILING, fault: segFault, phase: 'at zero — blocking' },
 ];
 
 // An at-rule's own body text contains every rule nested inside it, so counting it as well as its
@@ -291,6 +371,47 @@ function censusOf(ruleList, fault) {
     const detail = fault(rule);
     if (detail !== null)
       findings.push({ site: `${rule.file}:${rule.line}`, selector: rule.selector, detail });
+  }
+  return findings;
+}
+
+// ---------- the box-less chips, which no shape rule can ever find ----------
+// FOUR CLASSES THAT ARE CHIPS BY MEANING AND DECLARE NO BOX, and this check exists because the original
+// miss was invisible for exactly that reason. Every census above reads a DRAWN box — a corner, a padding,
+// a border, a ground — and these four drew none: `.tile-suggestions` and `.tile-problem` were a size, an
+// ink and a `white-space: nowrap`; `.tag-btn` was a cursor and two `inherit`s on a box declared by
+// `.tag`; `.tag-chip-count` was an opacity inside `.tag-chip`. Phase 7 stated that as a known gap and
+// said no shape rule could close it "without becoming a list of names". THIS IS THE LIST OF NAMES, and
+// naming them is the only instrument available: the alternative is that the next person renders a
+// coloured `<span>` where a chip belongs and nothing whatever notices, which is what happened.
+//
+// TWO CLAIMS PER NAME, and the second is the one that protects the tones.
+//   1. The class is GONE, or every `<Chip>` in the tree carries it. A plain `<span className="tile-problem">`
+//      fails, which is the regression this exists for.
+//   2. The `<Chip>` carrying it names a `tone`. A tone is the whole meaning of three of these four — a
+//      setup barrier, work left behind, and a real failure are three different facts and must not read
+//      alike — and a `tone` prop dropped in a refactor is a silent collapse to the default ink. The
+//      COLOURS are measured per theme in test/chip-boxes.test.tsx; this half only asserts that the
+//      distinction is still being asked for at the call site, which is where it would be lost.
+//
+// WHAT IT DOES NOT CATCH, and the limit is real rather than a caveat: a FIFTH box-less chip, under a name
+// nobody has added here. No rule over declarations can see one, because a state word with an ink and no
+// box is indistinguishable from any other coloured word — that is Phase 7's finding and it still stands.
+// It also cannot see a class that reaches a `<Chip>` through a variable or a ternary that names no
+// literal, and it has no opinion about whether the tone chosen is the RIGHT one.
+const BOXLESS_CHIPS = ['tile-suggestions', 'tile-problem', 'tag-btn', 'tag-chip-count'];
+
+function boxlessFaults(names, chipTagList, named) {
+  const findings = [];
+  for (const cls of names) {
+    const carried = chipTagList.filter((open) => open.classes.includes(cls));
+    if (carried.length === 0) {
+      // Gone is a pass. Named anywhere else is not: that is a box-less chip rendered as something else.
+      if (named.has(cls)) findings.push(`.${cls} — named at ${named.get(cls)} and not on a <Chip>`);
+      continue;
+    }
+    for (const open of carried)
+      if (!/\stone=/.test(open.attrs)) findings.push(`.${cls} — on a <Chip> with no tone at ${open.site}`);
   }
   return findings;
 }
@@ -359,6 +480,10 @@ const CSS_FIXTURE = `
 @media (min-width: 1px) { .theta { font-family: var(--font-mono); } }
 .iota { padding: 0 var(--s-3); }
 .kappa { color: var(--muted); }
+.markdown code { font-size: var(--t-small); border-radius: var(--r-sm); padding: 0 var(--s-2); }
+.lambda { width: 8px; height: 8px; border-radius: 50%; }
+.mu { display: flex; border: 1px solid var(--border); border-radius: var(--r-md); overflow: hidden; }
+.nu { display: flex; border: 1px solid var(--border); border-radius: var(--r-lg); overflow: hidden; background: var(--panel); }
 `;
 
 // The JSX half of the chip fixture: `.iota` is on the primitive's own tag and still decides a padding —
@@ -381,10 +506,18 @@ const CHIP_TAG_FIXTURE = [
 // `.iota@12` is the second arm: a padding on a class the fixture puts on a `<Chip>`. `.kappa` is on one
 // too and is NOT a finding, because a colour is the caller's — both directions, for the reason
 // `check-radius-scale.mjs` puts both directions of `<Panel as="button">` in its own fixture.
+//
+// `.markdown code@14` IS THE EXEMPTION, and it is in the fixture rather than trusted because an
+// exemption is the one construct here that can silently swallow a real finding. It declares a chip's box
+// exactly and must NOT appear below; widen CHIP_EXEMPT to anything else and `.alpha` or `.beta` drops out
+// of this line, which fails. `.nu@17` is the same guard for `segFault`: a modal is a clipped bordered
+// flex box WITH a ground, and it is the false finding that discriminator exists to refuse.
 const CSS_SELF_TEST_WANT = [
   'chip .alpha@4 .beta@5 .iota@12',
-  'panel .delta@7 .epsilon@8',
+  'panel .delta@7 .epsilon@8 .nu@17',
   'mono .eta@10 .theta@11',
+  'dot .lambda@15',
+  'seg .mu@16',
 ].join(' | ');
 
 function cssSelfTest() {
@@ -416,6 +549,33 @@ const CONTROL_FIXTURE = [
 
 const CONTROL_SELF_TEST_WANT =
   'in-field 2 | findings fixture.tsx:2 input, fixture.tsx:3 input, fixture.tsx:9 textarea';
+
+// The box-less fixture, and it exercises every way this check can go quiet: a name rendered as
+// something other than a chip (the regression), a name on a `<Chip>` with a tone (the pass), a name on
+// one WITHOUT a tone (the silent collapse), a `<ChipRow>` that must not count as a `<Chip>` — the
+// `(?![\w-])` guard — and a name nobody uses at all, which is what "gone" looks like and must pass.
+const BOXLESS_FIXTURE = [
+  '<span className="gone-word">x</span>',
+  '<Chip tone="warn" className="toned">y</Chip>',
+  '<Chip className="untoned">z</Chip>',
+  '<ChipRow tone="bad" className="rowed">w</ChipRow>',
+].join('\n');
+
+const BOXLESS_NAMES = ['gone-word', 'toned', 'untoned', 'rowed', 'never-written'];
+
+const BOXLESS_SELF_TEST_WANT = [
+  '.gone-word — named at fixture.tsx:1 and not on a <Chip>',
+  '.untoned — on a <Chip> with no tone at fixture.tsx:3',
+  '.rowed — named at fixture.tsx:4 and not on a <Chip>',
+].join(' | ');
+
+function boxlessSelfTest() {
+  const sources = [{ file: 'fixture.tsx', code: codeOf(BOXLESS_FIXTURE) }];
+  const got = boxlessFaults(BOXLESS_NAMES, openTagsOf(sources, CHIP_TAG), classSites(sources)).join(' | ');
+  return got === BOXLESS_SELF_TEST_WANT
+    ? null
+    : `box-less chips: expected\n  ${BOXLESS_SELF_TEST_WANT}\ngot\n  ${got}`;
+}
 
 function controlSelfTest() {
   const all = controlsIn('fixture.tsx', CONTROL_FIXTURE);
@@ -561,7 +721,15 @@ const sites = classSites(sources);
 // `.mp-modal > .vb-readout { padding }`, a rule about a READOUT in the model picker, was reported as
 // geometry on a chip. Arm 2 asks whether a SURFACE class decides a chip's box; `vb-*` names are the
 // primitives' own and their rules live in primitives.css, which this census does not read.
+const chipTagList = openTagsOf(sources, CHIP_TAG);
 const onChip = new Set([...tagClasses(sources, CHIP_TAG)].filter((cls) => !primitiveClasses.has(cls)));
+// Where a class is NAMED AT ALL — a `className` first, a stylesheet rule if nothing renders it. The
+// box-less check needs both directions: a class rendered as a `<span>` is visible in the JSX, and a class
+// whose rule survives with no call site is visible only in the CSS.
+const named = new Map(sites);
+for (const rule of cssRules)
+  for (const cls of classesOf(rule.selector))
+    if (!named.has(cls)) named.set(cls, `${rule.file}:${rule.line}`);
 const controls = tsxFiles.flatMap(({ file, text }) => controlsIn(file, text));
 const rawControls = controls.filter((c) => !c.inField);
 
@@ -578,7 +746,7 @@ console.log(
 
 // Before any finding is printed, because a green run on a pattern that matched nothing is the worse
 // failure — the same order `check-radius-scale.mjs` prints in, and for the same reason.
-const parserFault = cssSelfTest() ?? controlSelfTest() ?? siteSelfTest();
+const parserFault = cssSelfTest() ?? controlSelfTest() ?? siteSelfTest() ?? boxlessSelfTest();
 if (parserFault) {
   console.error(`\nthe parser is broken: ${parserFault}.`);
   console.error(`A census here is vacuous — it would report zero findings whatever the tree holds. Fix the`);
@@ -588,13 +756,23 @@ if (parserFault) {
 
 let failed = false;
 
+// A CEILING OF ZERO GETS ITS OWN MESSAGE, because the ratchet wording is unactionable on one: "it blocks
+// an increase, not the backlog — Phase 8 drives it down" is nonsense addressed to somebody who has just
+// added the only finding there is, and a gate message a reader cannot act on is a gate that gets
+// bypassed. Found by planting at all three of the zero censuses and reading what they said.
 function report(shape, ceiling, phase, lines) {
   const adopted = adoption.get(shape) ?? 0;
   const head = `${shape}-shaped: ${lines.length} hand-rolled against ${adopted} primitive call site(s)`;
   if (lines.length > ceiling) {
-    console.error(`\n${head}, against a ceiling of ${ceiling}. This census is a RATCHET: it blocks an`);
-    console.error(`increase, not the backlog — ${phase} drives it down. Render the new one with the`);
-    console.error(`primitive in web/src/ui/ instead of declaring the shape again.\n`);
+    if (ceiling === 0) {
+      console.error(`\n${head}. This shape is FULLY MIGRATED and this census BLOCKS AT ZERO: every`);
+      console.error(`finding below is a new hand-rolled instance. Render it with the primitive in`);
+      console.error(`web/src/ui/ instead of declaring the shape again.\n`);
+    } else {
+      console.error(`\n${head}, against a ceiling of ${ceiling}. This census is a RATCHET: it blocks an`);
+      console.error(`increase, not the backlog — ${phase} drives it down. Render the new one with the`);
+      console.error(`primitive in web/src/ui/ instead of declaring the shape again.\n`);
+    }
     for (const line of lines) console.error(`  ${line}`);
     failed = true;
     return;
@@ -621,8 +799,16 @@ report(
   rawControls.map((c) => `${c.site} <${c.tag}> — not inside a <Field>`),
 );
 
+// A ceiling of ZERO, because this one never had a backlog: the four are migrated or gone as of Phase 8,
+// so there is nothing here to ratchet down and every finding is a regression.
+report('boxless-chip', 0, 'gone or a <Chip> — blocking', boxlessFaults(BOXLESS_CHIPS, chipTagList, named));
+
+// PRINTED, because an exemption nobody sees is an exemption nobody re-examines — the same argument as
+// printing a passing census's full list.
+for (const [selector, reason] of CHIP_EXEMPT) console.log(`chip-shaped, EXEMPT: ${selector} — ${reason}`);
+
 if (failed) process.exit(1);
 
 console.log(
-  `all four shape censuses are at or under their ceilings; ${controls.length - rawControls.length} of ${controls.length} control(s) are in a Field`,
+  `all six shape censuses and the box-less list are at or under their ceilings; ${controls.length - rawControls.length} of ${controls.length} control(s) are in a Field`,
 );

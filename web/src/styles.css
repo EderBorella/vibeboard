@@ -331,18 +331,10 @@ body {
 
 .board-head { display: flex; align-items: center; gap: var(--s-4); }
 /* The archive toggle appears only once a board has archived cards, so it never advertises a
-   drawer with nothing in it. */
-.board-archive {
-  flex: 0 0 auto;
-  background: var(--panel-2);
-  border: 1px solid var(--border);
-  border-radius: var(--r-pill);
-  color: var(--muted);
-  cursor: pointer;
-  font-size: var(--t-micro);
-  font-family: var(--font-mono);
-  padding: 0.1rem var(--s-4);
-}
+   drawer with nothing in it. `Chip pill fill` owns the box and `vb-readout` the mono face — the count
+   in it is a measured fact, which is the same reason the board's own count badge borrows the treatment.
+   What is left is where it sits in the head. */
+.board-archive { flex: 0 0 auto; }
 .board-archive:hover { color: var(--accent); border-color: var(--accent); }
 .board-archive.active { color: var(--accent); border-color: var(--accent); box-shadow: var(--glow); }
 
@@ -494,7 +486,6 @@ body {
 }
 .tile:hover { border-color: var(--accent); box-shadow: var(--glow); }
 .tile-head { display: flex; align-items: center; gap: var(--s-3); }
-.tile-link { font-size: var(--t-micro); color: var(--accent-2); }
 /* A `✕` that ARCHIVES goes red on hover rather than accent — a colour the surface owns, and the one
    thing `bare` cannot decide for it. Reached through the row, because the `margin-left: auto` that used
    to be `.tile-archive`'s whole other declaration is now `push`. */
@@ -512,30 +503,28 @@ body {
   text-transform: uppercase; letter-spacing: 0.06em;
 }
 .tile-tags { display: flex; flex-wrap: wrap; gap: var(--s-2); margin-top: auto; overflow: hidden; max-height: 1.3rem; }
-.tag {
-  font-size: var(--t-micro); color: var(--muted);
-  background: var(--panel); border: 1px solid var(--border);
-  border-radius: var(--r-pill); padding: 0.02rem var(--s-3);
-}
-/* A tag on a tile is a real button wherever it can filter the board (CardTile's onTag). */
-.tag-btn { cursor: pointer; font-family: inherit; line-height: inherit; }
+/* `Chip pill neutral` owns the box and the ink. The ground is the one thing a tag still decides:
+   `--panel` is a shade off the `--panel-2` a tile is drawn on, where `fill`'s `--panel-2` would make
+   the tag disappear into the card. */
+.tag { background: var(--panel); }
+/* A tag on a tile is a real button wherever it can filter the board (CardTile's onTag), and a `Chip`
+   may be one. The cursor and the inherited face are `button.vb-chip`'s now; the hover is the tile's. */
 .tag-btn:hover { color: var(--accent); border-color: var(--accent); }
 
 /* ---------- Tag filter bar ---------- */
 .tag-filter { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-3); }
-.tag-chip {
-  display: inline-flex; align-items: center; gap: var(--s-2);
-  font-size: var(--t-micro); font-family: var(--font-mono);
-  color: var(--muted); background: var(--panel-2);
-  border: 1px solid var(--border); border-radius: var(--r-pill);
-  padding: 0.1rem var(--s-4); cursor: pointer;
-}
+/* `Chip as="button" pill fill` plus `vb-readout`: the box, the ground and the mono face all come from
+   the primitives, and what the filter bar still decides is the two states below. */
 .tag-chip:hover { color: var(--accent); border-color: var(--accent); }
 .tag-chip.active {
   color: var(--on-fill); background: var(--accent-fill);
   border-color: var(--accent); box-shadow: var(--glow);
 }
-.tag-chip-count { opacity: 0.7; font-size: var(--t-micro); }
+/* The count is quieter than the tag it counts. A DESCENDANT RULE and not a class of its own: the only
+   other thing `.tag-chip-count` said was `font-size: var(--t-micro)`, which is what it already
+   inherited from the chip around it — a dead declaration of the kind Phase 4 found on `.cv-link` and
+   Phase 5b on `.archive-title`. */
+.tag-chip > span { opacity: 0.7; }
 /* The underline is what makes it read as a link rather than a control, which is deliberate here: it
    undoes a filter rather than doing anything to the project. Not a geometry. */
 .tag-filter-clear { text-decoration: underline; }
@@ -637,10 +626,9 @@ body {
 .mp-modal-title { font-weight: 700; font-family: var(--font-display); text-transform: uppercase; letter-spacing: 0.12em; }
 .mp-modal > .vb-input { margin: 0.6rem 0.9rem 0.4rem; }
 .mp-filters { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-3); padding: 0 0.9rem var(--s-3); }
-.mp-chip {
-  background: var(--panel-2); color: var(--muted); border: 1px solid var(--border);
-  border-radius: var(--r-pill); padding: 0.22rem var(--s-4); font-size: var(--t-small); cursor: pointer;
-}
+/* `Chip as="button" pill fill neutral` owns all of it. THE SIZE MOVED, from `--t-small` to the chip's
+   own `--t-micro`, which is the scale's own name for "chips, state words, dot labels, tags": nine of
+   the ten chip classes were already there and this was the one that was not. */
 .mp-chip:hover { border-color: var(--accent); }
 .mp-chip.on { background: var(--accent-fill); color: var(--on-fill); border-color: var(--accent); font-weight: 600; }
 .mp-prov { margin-left: auto; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: var(--r-md); padding: 0.22rem var(--s-3); font-size: var(--t-small); }
@@ -658,9 +646,11 @@ body {
 /* The backend's default is pinned first in the list — mark it so it reads as the safe pick
    rather than just whatever happened to sort to the top. */
 .mp-def { border-left: 2px solid var(--accent); }
+/* `Chip pill accent`, and the border is the one thing it keeps: the tone's edge is a 50% mix with the
+   border colour, and this marker is the only place in the picker that states a default, so it takes the
+   accent solid. A colour is the caller's; the box is not. */
 .mp-def-tag {
-  flex: 0 0 auto; font-size: var(--t-micro); text-transform: uppercase; letter-spacing: 0.08em;
-  color: var(--accent); border: 1px solid var(--accent); border-radius: var(--r-pill); padding: 0 var(--s-3);
+  flex: 0 0 auto; text-transform: uppercase; letter-spacing: 0.08em; border-color: var(--accent);
 }
 .mp-pick-top { display: flex; align-items: baseline; gap: var(--s-4); min-width: 0; }
 /* The price is a `Readout`; the row decides it does not shrink, and that the model id takes the slack. */
@@ -899,9 +889,13 @@ body {
 .copilot-selects select { flex: 1; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: var(--r-md); padding: var(--s-2) var(--s-3); font-size: var(--t-small); }
 .copilot-selects select:disabled { opacity: 0.5; }
 .copilot-status { display: flex; align-items: center; gap: var(--s-3); padding: var(--s-2) 0.75rem; font-size: var(--t-micro); color: var(--muted); border-bottom: 1px solid var(--border); }
-.copilot-status .status-dot { width: 8px; height: 8px; border-radius: 50%; }
-.copilot-status.ok .status-dot { background: var(--accent); box-shadow: var(--glow); }
-.copilot-status.down .status-dot { background: var(--danger); }
+/* THE LAST HAND-ROLLED DOT, and it is a `Dot` now: the 8px circle and its `50%` corner were the only
+   `border-radius: 50%` left outside the primitive. The wrapper tints it, which is the construction
+   `.conn-status[data-state]` already uses and for its reason — only the wrapper knows the state, and it
+   colours the pip and the word beside it together. The glow is the surface's emphasis, not the tone's:
+   `Dot`'s five tones deliberately carry none. */
+.copilot-status.ok .vb-dot { background: var(--accent); box-shadow: var(--glow); }
+.copilot-status.down .vb-dot { background: var(--danger); }
 .copilot-status.down { color: var(--danger); }
 .copilot-body { flex: 1; overflow-y: auto; padding: 0.75rem; display: flex; flex-direction: column; gap: var(--s-4); }
 .msg { font-size: var(--t-body); line-height: 1.45; white-space: pre-wrap; word-break: break-word; }
@@ -974,9 +968,11 @@ body {
 .control-item:hover { background: var(--panel-2); }
 .control-item.active { background: var(--panel-2); border-color: var(--accent); color: var(--accent); }
 .control-item-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* A `Chip` with no `pill`, which is the square-ish corner the primitive defaults to. `--accent-2` is not
+   one of the five tones and must not be forced into one — themes.css gives it a different value from
+   `--warn` in marshmallow — so the ink stays here, as `.ap-chip`'s does. */
 .control-tag {
-  font-size: var(--t-micro); text-transform: uppercase; letter-spacing: 0.08em; color: var(--accent-2);
-  border: 1px solid var(--border); border-radius: var(--r-sm); padding: 0.05rem var(--s-2);
+  text-transform: uppercase; letter-spacing: 0.08em; color: var(--accent-2);
 }
 /* Where the dragged card will land. Sits in the gap between tiles. */
 .drop-line {
@@ -1237,9 +1233,11 @@ body {
    sit in a constrained block where truncating really is what is wanted. */
 .exec-card .link-title { white-space: normal; overflow: visible; }
 .exec-summary { margin: 0; color: var(--muted); font-size: var(--t-small); line-height: 1.35; overflow-wrap: anywhere; }
+/* `Chip pill` plus `vb-readout` for the mono face. The ground is `--accent-2` rather than `fill`'s
+   `--panel-2` because this badge is the one ambient signal that a run wants a decision — a count on a
+   panel ground would read as furniture. Not a `tone`: `--accent-2` is outside the closed five. */
 .tab-badge {
-  margin-left: 0.35rem; font-family: var(--font-mono); font-size: var(--t-micro);
-  background: var(--accent-2); color: var(--on-accent); border-radius: var(--r-pill); padding: 0 var(--s-3);
+  margin-left: 0.35rem; background: var(--accent-2); color: var(--on-accent);
 }
 
 /* ---------- Skill editor (fields view in Project Control) ---------- */
@@ -1263,26 +1261,28 @@ body {
    a flex column stretches to the column's width otherwise, which is what made `.diary-refresh` 1240px. */
 .sandbox-action > .vb-btn { align-self: flex-start; }
 
-/* The project-level barrier. The accent rather than ochre: this is not a warning, it is the card the
+/* THREE STATE WORDS IN THREE TONES, ONE SHAPE. All three are `Chip`s now — `accent`, `warn` and `bad` —
+   and the tone carries the ink and the edge. Only two of the three ever declared a box, which is why no
+   shape census could see this family at all and why the distinction below is asserted by
+   test/chip-boxes.test.tsx instead: three tones a refactor could collapse into one is the defect this
+   phase exists not to ship, and the tones are MEASURED per theme there rather than trusted to differ
+   because they name different tokens.
+   The project-level barrier. The accent rather than ochre: this is not a warning, it is the card the
    whole board is waiting on, and it should read as structure rather than as a problem. */
 .tile-setup {
-  font-size: var(--t-micro); text-transform: uppercase; letter-spacing: 0.08em; white-space: nowrap;
-  color: var(--accent); border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
-  border-radius: var(--r-sm); padding: 0 var(--s-2);
+  text-transform: uppercase; letter-spacing: 0.08em; white-space: nowrap;
 }
 
 /* Work an agent found and deliberately did not do. Ochre, not the accent: a card carrying this is
-   not failing, but it is not plainly done either, and those two must not look the same. */
-.tile-suggestions {
-  font-size: var(--t-micro); color: var(--warn, #b8860b); white-space: nowrap;
-}
+   not failing, but it is not plainly done either, and those two must not look the same. `tone="warn"`
+   is `--warn` with no fallback, where this rule carried `var(--warn, #b8860b)` — a fallback that has
+   been dead since every theme defined the token. */
+.tile-suggestions { white-space: nowrap; }
 
 /* A blocked task somewhere under this card. Danger rather than ochre, and the strongest of the three:
    a story in Done carrying one has finished with a real failure inside it, which is a different fact
    from work deliberately left behind. */
-.tile-problem {
-  font-size: var(--t-micro); color: var(--danger); white-space: nowrap;
-}
+.tile-problem { white-space: nowrap; }
 
 
 /* The ledger lines: what a project or a card has spent, and which cap will stop it. Quiet by
@@ -1385,13 +1385,10 @@ body {
 }
 .signin-row:last-of-type { border-bottom: none; }
 .signin-row-label { font-size: var(--t-body); word-break: break-all; }
+/* `Chip pill neutral`. The lowercase stays: the label beside it is whatever the browser called itself,
+   and this word is deliberately not shouting next to it. */
 .signin-this {
   margin-left: 0.35rem;
-  padding: 0.05rem var(--s-3);
-  border: 1px solid var(--border);
-  border-radius: var(--r-pill);
-  font-size: var(--t-micro);
-  color: var(--muted);
   text-transform: lowercase;
   white-space: nowrap;
 }

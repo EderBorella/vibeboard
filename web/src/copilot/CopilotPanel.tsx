@@ -3,6 +3,7 @@ import { getModelStatus, listModels, type ModelOption, type ModelStatus } from '
 import { useConfirm } from '../confirm/useConfirm';
 import { backendCaps, backendDefaults } from '../shared';
 import { Button } from '../ui/Button';
+import { Dot } from '../ui/Dot';
 import { Readout } from '../ui/Readout';
 import { useFetched } from '../useFetched';
 import { BackendPicker } from './BackendPicker';
@@ -225,7 +226,7 @@ export function CopilotPanel({
       )}
       {status && (
         <div className={`copilot-status ${status.up ? 'ok' : 'down'}`}>
-          <span className="status-dot" />
+          <Dot testId="copilot-status-dot" />
           {status.up ? 'available' : 'unavailable'}
           {status.uptime != null && ` · ${status.uptime.toFixed(1)}% uptime`}
           {` · ${status.endpoints} provider${status.endpoints === 1 ? '' : 's'}`}

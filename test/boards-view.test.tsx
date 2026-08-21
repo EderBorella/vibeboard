@@ -141,17 +141,16 @@ describe('BoardsView', () => {
       />,
     );
     // Only boards with archived cards offer the drawer, so the zero must stay a zero.
-    expect([...document.querySelectorAll('.board-archive')].map((e) => e.textContent?.trim())).toEqual([
-      '🗄 4',
-      '🗄 1',
-    ]);
+    expect(
+      [...document.querySelectorAll('[data-testid="board-archive"]')].map((e) => e.textContent?.trim()),
+    ).toEqual(['🗄 4', '🗄 1']);
   });
 
   it('treats a snapshot with no archive counts at all as none archived', () => {
     const partial = snapshot();
     delete (partial as { archivedCounts?: unknown }).archivedCounts;
     render(<BoardsView {...props} snapshot={partial} />);
-    expect(document.querySelectorAll('.board-archive')).toHaveLength(0);
+    expect(document.querySelectorAll('[data-testid="board-archive"]')).toHaveLength(0);
   });
 
   it('reports which board was collapsed, not just that one was', () => {

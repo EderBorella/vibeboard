@@ -95,11 +95,24 @@
 }
 
 /* ---------- Chip ---------- */
+/* THE WHOLE UA CONTROL RESET IS ON THE BASE AND NOT ON A `button.vb-chip` QUALIFIER, and the placement
+   is load-bearing rather than tidy — a planted-first characterisation suite caught it going the other
+   way. `button.vb-chip { … }` is (0,1,1) and outranks every single-class rule at (0,1,0), so it would
+   have beaten `.vb-chip-fill` (three of the four clickable chips silently lose their ground) and
+   `.vb-readout` (`.board-archive` and `.tag-chip` silently lose the monospaced face — which is what
+   test/chip-boxes.test.tsx reported, on the mono claim it had pinned before the migration). Declared
+   here they are all (0,1,0) and the later rule wins, which is the cascade doing what it is for.
+   On a `<span>` every one of these renders exactly what a span already rendered: a span inherits its
+   face and its line-height, and has no ground. `font-size` needs no line: `.vb-chip` at (0,1,0) already
+   outranks styles.css's `button, input, select, textarea` reset at (0,0,1). */
 .vb-chip {
   display: inline-flex; align-items: center; gap: var(--s-2);
   border: 1px solid var(--border); border-radius: var(--r-sm);
   padding: 0 var(--s-3); font-size: var(--t-micro);
+  background: none; color: inherit; font-family: inherit; line-height: inherit;
 }
+/* The one thing that really is the tag's and not the box's: a span must not offer a pointer. */
+button.vb-chip { cursor: pointer; }
 .vb-chip-pill { border-radius: var(--r-pill); }
 /* A count, not a state: a ground rather than an outline. See ui/Chip.tsx for the four it replaces. */
 .vb-chip-fill { background: var(--panel-2); }

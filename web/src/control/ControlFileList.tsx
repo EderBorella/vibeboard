@@ -1,5 +1,6 @@
 import type { ControlCategory, ControlFile, ControlGroup } from '../api';
 import { Button } from '../ui/Button';
+import { Chip } from '../ui/Chip';
 import { Panel } from '../ui/Panel';
 
 // A selection that means "the links registry", not a path on disk. It travels through the same
@@ -102,7 +103,7 @@ export function ControlFileList({
                 onDoubleClick={() => onStartRename(f)}
               >
                 <span className="control-item-name">{f.name}</span>
-                {f.managed && <span className="control-tag">managed</span>}
+                {f.managed && <Chip className="control-tag">managed</Chip>}
               </Panel>
             ),
           )}

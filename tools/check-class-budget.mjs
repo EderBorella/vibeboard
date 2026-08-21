@@ -60,7 +60,7 @@ const SHEETS = [join('web', 'src', 'styles.css'), join('web', 'src', 'ui', 'prim
 // every commit, which teaches everyone to ignore it — the same argument that kept radius conformance
 // reporting until Phase 3 drove it to zero. Lower this as the sweep continues; the commit that reaches
 // 183 is the commit that sets it to 183 and deletes this paragraph. NEVER raise it.
-const CLASS_CEILING = 380;
+const CLASS_CEILING = 377;
 const CLASS_TARGET = 183;
 
 // Anti-vacuity floor on the SELECTOR PARSER, not on the class count: a regex that stops matching reports

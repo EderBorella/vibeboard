@@ -28,10 +28,13 @@ describe('TagFilter', () => {
     render(<TagFilter tags={tags} active={['ui']} onToggle={vi.fn()} onClear={vi.fn()} />);
     expect(screen.getByTitle('Cards tagged ui: 2').getAttribute('aria-pressed')).toBe('true');
     expect(screen.getByTitle('Cards tagged bug: 3').getAttribute('aria-pressed')).toBe('false');
-    // Exact class, not a substring: an inactive chip's class is the bytes the CSS keys off, and
-    // `not.toContain('active')` is satisfied by any wrong className at all.
-    expect(screen.getByTitle('Cards tagged ui: 2').className).toBe('tag-chip active');
-    expect(screen.getByTitle('Cards tagged bug: 3').className).toBe('tag-chip');
+    // `classList.contains`, not a substring of `className` and not the whole byte string either. The
+    // whole string was the right assertion while the chip was a hand-rolled `<button class="tag-chip">`
+    // — `not.toContain('active')` is satisfied by any wrong className at all — but a `Chip` composes
+    // five classes of its own, so pinning the bytes would pin the primitive's class list here and break
+    // this test the next time a variant is added. `contains` is exactly as strong for a boolean marker.
+    expect(screen.getByTitle('Cards tagged ui: 2').classList.contains('active')).toBe(true);
+    expect(screen.getByTitle('Cards tagged bug: 3').classList.contains('active')).toBe(false);
   });
 
   it('reports the clicked tag, active or not, so the click toggles', () => {

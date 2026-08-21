@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { FsNode } from '../api';
 import { Button } from '../ui/Button';
+import { Chip } from '../ui/Chip';
 import { Panel } from '../ui/Panel';
 import { Readout } from '../ui/Readout';
 import { formatBytes } from './format';
@@ -119,8 +120,8 @@ function NodeRow(props: NodeRowProps) {
       <span className="explorer-twist">{twist}</span>
       <span className="explorer-icon">{icon(node)}</span>
       <span className="control-item-name">{node.name}</span>
-      {node.symlink && <span className="control-tag">link</span>}
-      {node.escapes && <span className="control-tag">outside</span>}
+      {node.symlink && <Chip className="control-tag">link</Chip>}
+      {node.escapes && <Chip className="control-tag">outside</Chip>}
       <Readout>{formatBytes(node.size)}</Readout>
     </Panel>
   );

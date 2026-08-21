@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { ModelOption } from '../api';
 import { Button } from '../ui/Button';
+import { Chip } from '../ui/Chip';
 import { Panel } from '../ui/Panel';
 import { Readout } from '../ui/Readout';
 import { compareModels, type ModelFilter, matchesFilter } from './model-filter';
@@ -65,9 +66,16 @@ export function ModelPicker({ models, value, defaultModel, onChange, disabled }:
   const label = selected?.name ?? value ?? '';
 
   const chip = (on: boolean, set: (v: boolean) => void, text: string): React.ReactNode => (
-    <button className={`mp-chip${on ? ' on' : ''}`} onClick={() => set(!on)}>
+    <Chip
+      as="button"
+      pill
+      fill
+      tone="neutral"
+      className={`mp-chip${on ? ' on' : ''}`}
+      onClick={() => set(!on)}
+    >
       {text}
-    </button>
+    </Chip>
   );
 
   return (
@@ -139,7 +147,11 @@ export function ModelPicker({ models, value, defaultModel, onChange, disabled }:
                   >
                     <span className="mp-pick-top">
                       <span className="mp-name">{m.name ?? m.id}</span>
-                      {m.id === defaultModel && <span className="mp-def-tag">default</span>}
+                      {m.id === defaultModel && (
+                        <Chip pill tone="accent" className="mp-def-tag">
+                          default
+                        </Chip>
+                      )}
                       <Readout tone="accent2">{fmtPrice(m)}</Readout>
                     </span>
                     <span className="mp-pick-bot">

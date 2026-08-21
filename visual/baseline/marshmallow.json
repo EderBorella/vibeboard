@@ -1,42 +1,5 @@
 {
   "recorded": "2026-08-21",
-  "fontSizes": {
-    "13px": 133,
-    "15px": 1,
-    "12px": 66,
-    "11px": 36
-  },
-  "fontSizesOnText": {
-    "15px": 1,
-    "13px": 33,
-    "12px": 60,
-    "11px": 35
-  },
-  "radii": {
-    "50%": 12,
-    "6px": 240,
-    "999px": 84,
-    "10px": 56
-  },
-  "examined": {
-    "elements": 236,
-    "textElements": 129,
-    "overflow": 125,
-    "clipping": 35,
-    "contrast": 129,
-    "tokens": 41,
-    "rows": 25,
-    "focus": 56,
-    "focusUnfocusable": 1
-  },
-  "findings": {
-    "overflow": 0,
-    "clipping": 1,
-    "contrast": 0,
-    "tokens": 1,
-    "rows": 0,
-    "focus": 0
-  },
   "surfaces": {
     "boards": {
       "fontSizes": [
@@ -47,6 +10,7 @@
       ],
       "radii": [
         "10px",
+        "4px",
         "50%",
         "6px",
         "999px"
@@ -361,5 +325,43 @@
         "focus": 0
       }
     }
+  },
+  "fontSizes": {
+    "13px": 133,
+    "15px": 1,
+    "12px": 66,
+    "11px": 36
+  },
+  "fontSizesOnText": {
+    "15px": 1,
+    "13px": 33,
+    "12px": 60,
+    "11px": 35
+  },
+  "radii": {
+    "50%": 12,
+    "6px": 240,
+    "999px": 84,
+    "10px": 56,
+    "4px": 4
+  },
+  "examined": {
+    "elements": 236,
+    "textElements": 129,
+    "overflow": 125,
+    "clipping": 35,
+    "contrast": 129,
+    "tokens": 41,
+    "rows": 25,
+    "focus": 56,
+    "focusUnfocusable": 1
+  },
+  "findings": {
+    "overflow": 0,
+    "clipping": 1,
+    "contrast": 0,
+    "tokens": 1,
+    "rows": 0,
+    "focus": 0
   }
 }

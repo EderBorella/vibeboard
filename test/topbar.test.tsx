@@ -98,10 +98,10 @@ describe('TopBar', () => {
     // The badge is the only ambient signal that a run needs a decision. At zero it must be absent
     // rather than a "0" — an empty badge reads as something to do.
     render(<TopBar {...props} attentionCount={0} />);
-    expect(document.querySelector('.tab-badge')).toBeNull();
+    expect(document.querySelector('[data-testid="tab-badge"]')).toBeNull();
     cleanup();
     render(<TopBar {...props} attentionCount={3} />);
-    expect(document.querySelector('.tab-badge')?.textContent).toBe('3');
+    expect(document.querySelector('[data-testid="tab-badge"]')?.textContent).toBe('3');
   });
 
   it('reports a theme change', () => {

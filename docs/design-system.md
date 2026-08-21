@@ -229,7 +229,7 @@ hand many times over.
 | Primitive | Replaces | Variants |
 |---|---|---|
 | `Button` **(built, Phase 3)** | the button cases among the 104 radius rules — `.ap-expand`, `.ap-settings-link`, `.ap-help-btn`, `.reports-forgive`, `.ap-remedy-btn`, and the rest | `primary` \| `default` \| `ghost` \| `danger` \| `bare`, sizes `sm` \| `md` |
-| `Chip` **(built, Phase 3)** | tags, state words, counts, badges | tones `neutral` \| `accent` \| `ok` \| `warn` \| `bad`, optional `pill`, plus `data-state` for a surface vocabulary outside the five |
+| `Chip` **(built, Phase 3; `fill` Phase 5a, `as` Phase 8)** | tags, state words, counts, badges — **the whole family, Phase 8** | tones `neutral` \| `accent` \| `ok` \| `warn` \| `bad`, optional `pill`, optional `fill`, `as` of `span`\|`button`, plus `data-state` for a surface vocabulary outside the five |
 | `Dot` **(built, Phase 3)** | `.ap-dot`, `.conn`, `.ap-agent-dot` — three hand-rolled indicators already | tones as `Chip`, sizes `7` \| `8` \| `12`px |
 | `Panel` **(built, Phase 4)** | board columns, drawers, the halt card, the nine full-bleed list rows | `flat` \| `raised`, optional header slot, `as` of `div`\|`section`\|`button` |
 | `Readout` **(built, Phase 5)** | the signature above: every duration, cost, token count, run id | inline (`Readout`, sizes `micro`\|`small`\|`body`\|`plain`, tones `muted`\|`accent`\|`accent2`\|`text`, `quiet`) \| block (`ReadoutLine`) |
@@ -1598,7 +1598,7 @@ No baseline file is involved.
 
 # Part Two — the phases the first six did not cover
 
-**Status: Phases 6 and 7 done 2026-08-21; Phases 8–10 planned, not started.** Part One built seven primitives and thirteen gates. It was
+**Status: Phases 6, 7 and 8 done 2026-08-21; Phases 9 and 10 planned, not started.** Part One built seven primitives and thirteen gates. It was
 reviewed phase by phase and every gate was green. It also missed a whole family of work, and the miss was
 reported by the owner looking at the board rather than by any check — which makes the cause worth stating
 before the phases: **only the button shape has a coverage gate.**
@@ -1617,26 +1617,32 @@ started; the *measured* column is what the census derives, with the disagreement
 | primitive | call sites | hand-rolled, estimated | hand-rolled, the census's own rule | coverage gate |
 |---|---|---|---|---|
 | `Button` | 66 | **8** (tabs, labels, chips — the ratchet) | 8 | `check:radius-scale`, claim 2 |
-| `Panel` | ~20 | **32** panel-shaped rules, including `.tile` | **32** — agrees exactly | `check:shape-coverage`, panel |
+| `Panel` | ~20 | **32** panel-shaped rules, including `.tile` | 32 → **28** (four were chips) | `check:shape-coverage`, panel |
 | `Field` | 9 | **~33** raw `input`/`textarea`/`select` across 23 files | **35** of 42 controls | `check:shape-coverage`, control |
-| `Chip` | 15 | **9** chip classes | **10** — five of his nine, plus five he did not name | `check:shape-coverage`, chip |
-| `Readout` | 45 | **14** hand-rolled `--font-mono` rules | **14** — agrees exactly | `check:shape-coverage`, mono |
-| `Dot` | 3 | 1 | 1, **not gated** — `.copilot-status .status-dot` | none |
-| `SegmentedControl` | 2 | 0 | 0, **not gated** | none |
+| `Chip` | 15 → **29** | **9** chip classes | 10 → **0** (Phase 8; `.markdown code` exempt by name) | `check:shape-coverage`, chip — **blocking at zero** |
+| `Readout` | 45 | **14** hand-rolled `--font-mono` rules | 14 → **11** (three were chips) | `check:shape-coverage`, mono |
+| `Dot` | 3 → **4** | 1 | 1 → **0** (Phase 8) | `check:shape-coverage`, dot — **blocking at zero** |
+| `SegmentedControl` | 2 | 0 | **0** | `check:shape-coverage`, seg — **blocking at zero** |
 
 Commands: `grep -rn '<Chip' web/src --include=*.tsx | wc -l` and siblings for the call sites;
 `npm run check:shape-coverage` for every hand-rolled count, which prints its full list on a passing run.
 
-**Two rows still have no gate and that is a decision rather than an omission.** A census for one hand-rolled
-instance is a gate at a backlog of one, and a census for zero is a gate blocking at zero — which this page
-argues for, but there is nothing to ratchet: the segmented control has no equivalent left, and the Dot's one
-is `.copilot-status .status-dot`, a `50%` circle already named in `check-radius-scale.mjs`'s
-`OFF_SCALE_ON_PURPOSE` with its reason. Both belong to whichever phase touches them.
+**~~Two rows still have no gate~~ — EVERY ROW HAS ONE, as of Phase 8.** Phase 7's reading was that *"a census
+for one hand-rolled instance is a gate at a backlog of one, and a census for zero is a gate blocking at zero
+… but there is nothing to ratchet"*, and it left `Dot` and `SegmentedControl` ungated. Phase 8 reversed it on
+this page's own evidence: the shape nobody counts is the shape that gets hand-rolled back in, and a coverage
+table with a hole in it is precisely what let nine chip classes accumulate through six green phases. Both
+censuses read **zero** and both block outright. The Dot's one instance —
+`.copilot-status .status-dot`, a `50%` circle named in `check-radius-scale.mjs`'s `OFF_SCALE_ON_PURPOSE` — is
+a `Dot`, so `OFF_SCALE_ON_PURPOSE`'s note about it is now history rather than a pointer.
 
 **The chip family is the one the owner saw**, and it is exactly what an uncovered shape looks like: `.tag`,
 `.tag-btn`, `.tag-chip`, `.tag-chip-count`, `.mp-chip`, `.board-archive`, `.tile-setup`,
 `.tile-suggestions`, `.tile-problem`. Most are `<span>`s, and the one gate that could have counted them
-only inspects button-shaped elements, so they were never in any number this page reports.
+only inspects button-shaped elements, so they were never in any number this page reports. **All nine are
+`Chip`s or gone as of Phase 8**, and the four of them that declared no box at all are held by a named list
+rather than by a shape rule — see Phase 8's *8b*, which is the half of that phase no census could have
+found.
 
 ### And the browser only ever sees one page
 
@@ -1952,14 +1958,245 @@ files / 4,271 tests**, `npm run lint` clean over **542** files.
 **Revert:** `tools/check-shape-coverage.mjs`, two `package.json` entries and this section. No stylesheet, no
 component and no test under `test/` is touched by it.
 
-## Phase 8 — the chip family
+## Phase 8 — the chip family — **DONE 2026-08-21**
 
-The nine classes onto `Chip`. `.tile-suggestions` and `.tile-problem` are state words in three tones and
-their comments carefully distinguish accent from ochre from danger — *"a card carrying this is not failing,
-but it is not plainly done either, and those two must not look the same."* **Preserve that distinction; it is
-the meaning, not the styling.**
+**The chip census is ZERO, from ten, and its ceiling is zero in the same commit** — the first of Phase 7's
+four numbers to move, which is what that instrument was built for. Nine classes are `Chip`s; the tenth,
+`.markdown code`, is exempt **by name with its reason on the exemption**, the form
+`check-radius-scale.mjs`'s `OFF_SCALE_ON_PURPOSE` established. The phase also took `Dot`'s last hand-rolled
+instance and gave the two ungated rows of the coverage table a gate each, so **every one of the seven rows
+now has one.**
 
-**Gate:** the chip census at zero, and the tone distinction asserted rather than assumed.
+### 8a — the ten, and what each one still says
+
+`Chip` gained **`as`**, a closed `span | button`, and that is the whole of why this took three phases to
+become possible. Phases 3, 4 and 5 each listed `.tag`, `.tag-chip`, `.mp-chip` and `.board-archive` as
+survivors with the *same* reason — *"a Chip that happens to be clickable: `Chip` owns that box, not
+`Button`; making it a button gives it a button's radius and padding"* — and then left them, because the
+primitive rendered a `<span>` and nothing else. **The box is the same box whether or not it takes a click**,
+which is the argument `Panel`'s `as="button"` already rests on.
+
+| class | → | call sites |
+|---|---|---|
+| `.board-archive` | `Chip as="button" pill fill` + `vb-readout` | 1 |
+| `.tag` | `Chip pill neutral` — and `as="button"` where the tile can filter | 4 — two in `CardView`, and `CardTile`'s clickable and plain forms |
+| `.tag-chip` | `Chip as="button" pill fill` + `vb-readout` | 1 |
+| `.mp-chip` | `Chip as="button" pill fill neutral` | 1 (three renders) |
+| `.mp-def-tag` | `Chip pill accent` | 1 |
+| `.control-tag` | `Chip` — no `pill`, which is the primitive's own `--r-sm` corner | **3** — see below |
+| `.tab-badge` | `Chip pill` + `vb-readout` | 1 |
+| `.tile-setup` | `Chip accent` | 1 |
+| `.signin-this` | `Chip pill neutral` | 1 |
+| `.markdown code` | **EXEMPT BY NAME** — inline code in rendered prose | — |
+
+**Nine of the ten classes survive and one died, which is the same result Phase 3 measured on its 27 and
+Phase 4 on its nine rows:** what is left after the geometry comes out is a declaration only the surface can
+make. `.board-archive { flex: 0 0 auto }`, `.tag { background: var(--panel) }` — a shade off the
+`--panel-2` a tile is drawn on, where `fill`'s `--panel-2` would make the tag vanish into the card —
+`.mp-def-tag`'s solid accent edge, `.control-tag`'s `--accent-2` ink, `.tab-badge`'s `--accent-2` ground,
+`.signin-this`'s lowercase. **None of the reasons is "it has its own padding"**, and not one of the fourteen
+classes now reachable by the census's second arm decides a corner, a padding or a size.
+
+**THE CENSUS NAMES ONE CALL SITE PER CLASS AND `.control-tag` HAS THREE, and reading the census instead of
+the source cost two of them.** `siteOf` returns *the first `file:line` whose `className` names it* — it is
+there so a reader can go and look, and it says so — but taken as the list of what to migrate it left
+`explorer/FileTree.tsx:122` and `:123` rendering `<span className="control-tag">` after the rule had given
+its box to the primitive: two badges on the Explorer with no border at all. **Neither gate could see it.**
+The chip census was already at zero, because the fault is a call site and not a rule; and the harness cannot
+reach it, because the fixture has no symlinked and no escaping file, so those two spans never render. It is
+Phase 3's own lesson one class along — *"two more went that the ratchet could not see, and finding them is
+the argument for reading the source as well as the census"* — and it was found by counting `className`
+occurrences per migrated class rather than by trusting the census's one site each.
+
+**`.tag-chip-count` is the one that died, and it was a dead declaration as well.** Its whole content was
+`opacity: 0.7` plus `font-size: var(--t-micro)` — which is what it already inherited from the chip around
+it, the same defect Phase 4 found on `.cv-link` and Phase 5b on `.archive-title`. The opacity became
+`.tag-chip > span`, the descendant-rule mechanism 5a named as what made most of its sweep possible.
+
+**One rendering change was made on purpose and it is the only one of its kind: `.mp-chip` moved from
+`--t-small` to `--t-micro`.** Nine of the ten chip classes were already at micro, which is the scale's own
+name for *"chips, state words, dot labels, tags"*, and `Chip` has no size axis — adding one for a single
+consumer is a name that decides nothing, the argument that kept `ghost` at two and refused `--t-display` a
+second consumer. The model picker's own `--t-small` set was already recorded on that surface, so the
+harness's drift did not move; the tally did, and it is read below.
+
+**Two dead declarations went with them, neither of them the point of the phase:** `.tile-suggestions`'s
+`var(--warn, #b8860b)` fallback, unreachable since every theme defined `--warn`, and the `font-size` above.
+
+### 8b — the four chips no census can see, which is the half that mattered
+
+`.tile-suggestions`, `.tile-problem`, `.tag-btn` and `.tag-chip-count` are chips by **meaning** and declared
+no box: a size, an ink and a `white-space`; a cursor and two `inherit`s; an opacity. **Every census in this
+repository reads a drawn box, so no shape rule will ever find one of these** — which is exactly how the
+family stayed invisible through six phases in which every gate was green.
+
+`.tag-btn`'s two `inherit`s were the load-bearing half and they were right for one of the four clickable
+chips: **a `<button>` takes the UA's own control face**, so a tag rendered as a button renders in a
+different typeface from an identical one rendered as a span unless something says `inherit`.
+`button.vb-chip` says it for all four.
+
+**THE THREE TONES ARE PRESERVED AND ASSERTED, and the assertion is this phase's own gate.**
+`.tile-setup` → `accent`, `.tile-suggestions` → `warn`, `.tile-problem` → `bad`, and the three comments that
+carry the *meaning* rather than the styling stay in `styles.css` where they were:
+
+- `.tile-setup` — *"the accent rather than ochre: this is not a warning, it is the card the whole board is
+  waiting on, and it should read as structure rather than as a problem."*
+- `.tile-suggestions` — *"Ochre, not the accent: a card carrying this is not failing, but it is not plainly
+  done either."*
+- `.tile-problem` — *"Danger rather than ochre, and the strongest of the three: a story in Done carrying one
+  has finished with a real failure inside it, which is a different fact from work deliberately left
+  behind."*
+
+**Measured per theme, not inferred from the token names**, and that distinction is the whole reason the
+assertion is worth writing: `--warn` and `--danger` are the *same value* in cyberpunk and classic-dark and
+different in marshmallow, which `themes.css` argues by name. "They name different tokens" is therefore not
+the claim. `test/chip-boxes.test.tsx` resolves each theme's palette out of `themes.css` and asserts the
+three inks are three, and the three **border colours** are three — a second axis a collapse could flatten on
+its own:
+
+| theme | `.tile-setup` | `.tile-suggestions` | `.tile-problem` |
+|---|---|---|---|
+| cyberpunk | `#14b8a6` | `#f59e0b` | `#ff5c6c` |
+| marshmallow | `#2f7a50` | `#9a5b12` | `#c0392f` |
+| classic-dark | `#5b9dff` | `#e6b450` | `#e06c75` |
+
+**It is rendered through `CardTile` and not through a class list, deliberately.** The tone is a PROP now, so
+a refactor that dropped `tone="warn"` would leave `.tile-suggestions` in place and every class-list fixture
+green while the board rendered two identical grey words. The board's own component is the only fixture that
+can fail on that — and it does: dropping the tone at the call site turns **7 of the 27 tests red**, and the
+anti-vacuity half is asserted first, because an unresolved `var(--x)` compares unequal to another
+unresolved one and a broken resolver would report three "distinct" colours and pass.
+
+**And because a shape census cannot see these, Phase 8 leaves behind a check that can:
+`BOXLESS_CHIPS` in `tools/check-shape-coverage.mjs`, a NAMED LIST with a ceiling of zero.** Phase 7 wrote
+that no shape rule could separate a state word from any other coloured word *"without becoming a list of
+names"*. This is that list of names, and naming them is the only instrument available — the alternative is
+that the next person renders a coloured `<span>` where a chip belongs and nothing whatever notices, which is
+what happened.
+
+Two claims per name: the class is **gone, or every `<Chip>` in the tree carries it**; and the `<Chip>`
+carrying it **names a `tone`**. What it catches: those four regressing, in either of those two ways. **What
+it does not catch, stated rather than implied:** a FIFTH box-less chip under a name nobody adds to the list
+— that limit is structural, and it is why the tones are also asserted in the suite; a class reaching a
+`<Chip>` through a variable or a ternary that names no literal; and whether the tone chosen is the RIGHT
+one, which is a judgement and not a measurement.
+
+### 8c — `Dot`'s last survivor, and two censuses to finish the row
+
+**`.copilot-status .status-dot` is a `Dot`**, and it was the last `border-radius: 50%` outside the primitive
+stylesheet — named in `check-radius-scale.mjs`'s `OFF_SCALE_ON_PURPOSE` as the Dot's one remaining
+hand-rolled instance since Phase 3. The wrapper tints it (`.copilot-status.ok .vb-dot`), which is the
+construction `.conn-status[data-state]` already uses and for its reason: only the wrapper knows the state,
+and it colours the pip and the word beside it together. The glow stays the surface's, because `Dot`'s five
+tones deliberately carry none. **The class died outright.**
+
+**A `Dot` census and a `SegmentedControl` census were added, both at ZERO, and that reverses Phase 7's
+judgement on the evidence.** Phase 7 left both ungated because *"a census for zero is a gate blocking at
+zero with nothing to ratchet"*. The argument against that is the whole reason the file exists: the shape
+nobody counts is the shape that gets hand-rolled back in, and a coverage table with a hole in it is what let
+nine chip classes accumulate unseen.
+
+- **dot** — a rule outside `primitives.css` declaring `border-radius: 50%`. Nothing else needs saying: a
+  circle is the one shape in this stylesheet that legitimately declares a raw value, which is why `50%` is
+  in `OFF_SCALE_ON_PURPOSE` at all. Requiring a `width` too would miss a dot that inherited one.
+- **seg** — a flex box that draws ONE 1px border and ONE corner and CLIPS its contents **and has no ground
+  of its own**. That last clause is the discriminator and it is measured rather than tidy: without it
+  `.mp-modal` — a flex column with a border, a `--r-lg` corner and `overflow: hidden` — is reported as a
+  segmented control, which is a false finding on a modal. `.vb-seg` declares no background, and that is
+  what lets its cells' fill reach the group's edge. `.nu` in the fixture is the modal case, both directions.
+
+### The characterisation suite, written first, and the real defect it found
+
+`test/chip-boxes.test.tsx` — **27 tests, run green against the code as it was, before any migration.** It
+asserts the box a class list draws, resolved out of the stylesheets by `test/css-box.tsx`.
+
+**It found a cascade trap, in the code this phase had just written, on the one claim a reviewer would never
+have checked by eye.** `button.vb-chip { font-family: inherit }` — the obvious place for a button reset — is
+**(0,1,1)**, and it outranks every single-class rule at (0,1,0). So it beat `.vb-readout`'s
+`font-family: var(--font-mono)`, and `.board-archive` and `.tag-chip` **silently lost the monospaced face**:
+a tag filter and a board's archive toggle rendered in proportional type while every gate stayed green. The
+suite had pinned the mono claim before the migration and reported *"expected 'inherit' to be
+'var(--font-mono)'"*. The same trap would have taken `.vb-chip-fill`'s ground off three of the four
+clickable chips. **The cause is removed rather than worked around:** the whole UA reset —
+`background: none`, `color: inherit`, `font-family: inherit`, `line-height: inherit` — is on the `.vb-chip`
+BASE at (0,1,0), where the later rule wins, and only `cursor: pointer` stays on the tag qualifier, because
+a span must not offer a pointer. On a `<span>` every one of those declarations renders what a span already
+rendered.
+
+**THE ASSERTIONS SURVIVED THE MIGRATION AND THE FIXTURES DID NOT**, which is what Phase 4 recorded of
+`test/panel-boxes.test.tsx` and is honest to repeat rather than dress up: run against the old code every
+fixture was a hand-written class list on the element the surface rendered, and 21 of the 25 went red once
+the box moved to the primitive, for the right reason — the element genuinely carries five more classes.
+They are `Chip` renders now, so the class list is never hand-written again and the PROPS are the props the
+call site passes. **The one fixture that stays hand-written is `.markdown code`**, because it is the one
+thing here that must not go through the primitive.
+
+### Gates
+
+| gate | before | after | planted defect, and what it said |
+|---|---|---|---|
+| chip census | 10/10 | **0/0, BLOCKING AT ZERO** | a new `.planted-chip` box → exit **1**, *"chip-shaped: 1 … This shape is FULLY MIGRATED and this census BLOCKS AT ZERO"* |
+| chip census, arm 2 | 0 | 0 | a `padding` on `.tag`, which is on a `<Chip>` → exit **1**, *".tag — geometry on a `<Chip>` — padding (used at board/CardTile.tsx:129)"* |
+| box-less list | — | **0/0, new** | `.tile-problem` returned to a `<span>` → exit **1**, *"named at board/CardTile.tsx:89 and not on a `<Chip>`"*; and kept as a `<Chip>` with `tone` dropped → exit **1**, *"on a `<Chip>` with no tone at board/CardTile.tsx:88"* |
+| dot census | — | **0/0, new** | a `.planted-pip` with `border-radius: 50%` → exit **1** |
+| seg census | — | **0/0, new** | a `.planted-group`, flex + 1px + corner + clipped → exit **1** |
+| the three tones | — | 7 tests | `tone="bad"` dropped at the call site → **7 of 27 red**, on all three themes plus the ink and the edge |
+| `check:radius-scale` claim 2 | 8/8 | **4/8** | ceiling LEFT at 8 — see below |
+| panel census | 32/32 | **28/32** | ceiling LEFT at 32 |
+| mono census | 14/14 | **11/14** | ceiling LEFT at 14 |
+| `npm run visual` | 93, exit 0 | 93, exit 0 | `5px` on `.vb-chip` → radius conformance **0 → 4 findings on boards** naming `span[tile-suggestions]` four times, **0 → 32 on Project Control** (the `.control-tag` chips), and drift *"NEW 5px, GONE 4px"* |
+
+**The four censuses whose numbers this phase moved WITHOUT owning them keep their ceilings, and that is a
+rule rather than an oversight.** Panel fell 32 → 28 and mono 14 → 11 because four of the chips drew a 1px
+border, a corner and a ground (which is a chip's box and, by that census's rule, a small panel's) and three
+borrowed the mono face by hand. The button-geometry ratchet fell 8 → 4 because four chip classes stopped
+being literal on a `<button>`. **None of those four is Phase 8's number**, and lowering a ceiling for a
+count a different phase has to work in takes the slack away from that phase. **Every one of them is a
+number the owner may want lowered now, and it is recorded here rather than done quietly.** The coverage the
+button ratchet gave up is not lost: it moved to the chip census's second arm, which is stricter — it refuses
+a corner, a padding *or* a size on any class on a `<Chip>`, at a ceiling of zero.
+
+**Six of the ten surfaces did NOT move, and one did.** Only the boards baseline changed, by exactly one
+value: **`radius NEW 4px`**, on all three themes, read before `npm run visual:record` was run. It is
+`.tile-suggestions` gaining a `--r-sm` corner — one element, four corners, `4px×4` — which is what a chip
+having a box means. The board's type tally is byte-identical (`13px×133 12px×66 11px×36 15px×1` at 236
+elements), the radius tally is `6px×240 999px×84 10px×56 50%×12` plus the new `4px×4`, and every other
+recorded number is unmoved: overflow **0 of 125**, clipping **1 of 35** (the exempt board area), contrast
+**0 of 129**, tokens **1 of 41** (`--exec-cols`, Phase 10's), rows **0 of 25**, focus **0 of 56**, readouts
+**28** with digits at 79.140625/79.140625px, primitive rings **29 of 29**.
+
+**The other nine surfaces were NOT re-recorded and did not need to be**, which was read rather than assumed:
+execution, diary, control, explorer, card, archive, settings, model-picker and confirm all report
+**0 findings on type and radius conformance** at their recorded examined counts (146 / 148 / 168 / 127 / 57
+/ 9 / 125 / 57 / 8 elements), unchanged. Three of them render migrated chips — Project Control the
+`.control-tag`s, the model picker the `.mp-chip`s and `.mp-def-tag`, the card pane the `.tag`s — and the
+reason their baselines did not move is structural and worth stating: **a surface records the value SET, not
+the tally**, so `.mp-chip`'s 12px → 11px is invisible there because both steps were already in the model
+picker's set. That is a documented property of the per-surface baseline (Phase 6, *Drift: per-surface, on
+the value SET*) and not a hole this phase opened; the tally that moved is stated above.
+
+**Selector migrations: 108 → 102**, measured with the command recorded at the end of Phase 3. Six went:
+`.board-archive` ×2 (`test/boards-view.test.tsx`) and `.tab-badge` ×2 (`test/topbar.test.tsx`) to
+`data-testid`, and `.cv-tags .tag` ×2 (`test/card-view.test.tsx`) to a `testId` the primitive takes as a
+named prop. A seventh assertion moved without being a `querySelector`: `test/tag-filter.test.tsx` asserted
+the **exact** `className` bytes — the right assertion while the chip was a hand-rolled
+`<button class="tag-chip">`, since `not.toContain('active')` is satisfied by any wrong className at all —
+and a `Chip` composes five classes of its own, so pinning the bytes would pin the primitive's class list in
+a test about a highlight. It is `classList.contains('active')`, which is exactly as strong for a boolean
+marker.
+
+**Exit:** **chip census 0**, ceiling 0, one exemption by name. **Dot 0 and SegmentedControl 0, both newly
+gated; the box-less list 0.** Panel **28/32**, mono **11/14**, control **35/35**, button geometry **4/8**.
+Class selectors **380 → 378** (`styles.css` 333 → 331, `primitives.css` 60 unchanged — `.tag-chip-count`
+and `.status-dot` died and `button.vb-chip` is a tag qualifier, not a new name); the ratchet stays at 380.
+Authored `font-size` **136 → 124**, authored `border-radius` **59 → 49**, both still entirely on the scale.
+Suite **241 files, 4,298 tests**. Harness **93 tests, three themes, exit 0**. `npm run lint` clean over
+**543** files.
+**Revert:** `Chip`'s `as`/`onClick`/`ariaPressed`/`ariaExpanded`, the Chip block of `primitives.css`, the
+ten surfaces that call it (`Board`, `CardTile`, `CardView`, `TagFilter`, `ModelPicker`, `ControlFileList`,
+`FileTree`, `TopBar`, `SignInPanel`, `CopilotPanel`), `styles.css`, `test/chip-boxes.test.tsx`, six test selectors, the
+`4px` in three baseline files, and the chip ceiling, `CHIP_EXEMPT`, `dotFault`, `segFault` and
+`BOXLESS_CHIPS` in `tools/check-shape-coverage.mjs`.
 
 ## Phase 9 — `Field`, and the thirty-three controls
 
@@ -1973,7 +2210,7 @@ is touched — it has its own suite and it stays green.
 
 ## Phase 10 — the leftovers, each already measured
 
-- **Card tiles are not keyboard reachable.** `web/src/board/CardTile.tsx:41` is a `<div>` with `onClick`, no
+- **Card tiles are not keyboard reachable.** `web/src/board/CardTile.tsx:43` is a `<div>` with `onClick`, no
   `tabIndex`, no `onKeyDown`. The board's primary control cannot be operated without a mouse, and it is
   absent from the 55 focusables the focus gate protects.
 - **`npm test` leaks ~840 directories per run into `~/.vibeboard/copilot/`**, which holds 55,061 directories
@@ -1993,7 +2230,7 @@ is touched — it has its own suite and it stays green.
 
 ## Risks, and what would stop this
 
-- **Class renames break tests.** There are **108** `querySelector('.class')` calls in the React tests — unchanged across Phase 5b, which took two out and put two back and says so under *Selector migrations*; 127 before Phase 5, which migrated nineteen —
+- **Class renames break tests.** There are **102** `querySelector('.class')` calls in the React tests — Phase 8 migrated six, four to `data-testid` and two to a `testId` the primitive takes as a named prop, and moved a seventh assertion off an exact-`className` comparison that a composing primitive would have pinned; 108 before it and unchanged across Phase 5b, which took two out and put two back and says so under *Selector migrations*; 127 before Phase 5, which migrated nineteen —
   135 before Phase 3 and 126 after it, measured by the command recorded at the end of that phase; the
   **132** this line carried until 2026-08-21 had no method beside it and does not reproduce. Phase 4
   took it UP by one, and deliberately: it migrated one and its own characterisation suite added four,

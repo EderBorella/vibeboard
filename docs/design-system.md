@@ -3129,6 +3129,60 @@ on either is invisible to every gate this repository has.
 
 ---
 
+# Part Four — one state vocabulary
+
+**Status: planned 2026-08-21, not started.** The owner looked at the board and said the state indicators
+were not substituted. They are right, and the reason is worth stating exactly: **`Chip` was adopted as a
+box and every surface kept its own words and its own colours.**
+
+## Measured
+
+**Six independent state vocabularies, 31 `[data-state]` rules**, each mapping its own names to a colour by
+hand:
+
+| owner | values | colours it picks |
+|---|---|---|
+| `.conn-status` | 9 rules — online, connecting, closed, unauthorized, offline, failing | `--accent`, `--accent-2`, `--danger`, `--warn` |
+| `.report-chip` | 5 — success, attention, failed/interrupted, running/queued, cancelled | `--accent`, `--accent-2`, `--danger`, `--text` |
+| `.ap-agent-state` | 4 — unknown, bad, warn, (ok) | `--muted`, `--danger`, `--warn` |
+| `.filed-entry` | 3 — active, actioned, dismissed | `--warn`, `--accent`, `--border` |
+| `.ap-chip` | 3 | — |
+| `.chat-backend` | 2 — claude-code, opencode | `--accent`, `--accent-2` |
+
+And four mechanisms show a state, not one: a `Chip` with `state=`; a `data-state` attribute on something
+that is **not** a Chip (`.conn-status`, `.ap-agent-state`, `.filed-entry`); a `Dot` with `tone=`; and a
+runtime-composed class (`ap-bar-${tone}`, `msg-${kind}`).
+
+**Three specific consequences, each measured:**
+
+- **Two tokens mean "needs attention"** — `--accent-2` at 22 uses and `--warn` at 4. Nothing says which.
+- **`.conn-status` uses three tokens for three shades of "not right"** — `--danger` for closed, `--warn`
+  for offline, `--accent-2` for failing — on one control.
+- **`--ok` is one of `Chip`'s five tone names and is referenced ZERO times in `styles.css`.** The
+  primitive offers a vocabulary the stylesheet does not use; every surface says "good" with `--accent`.
+- **`.filed-entry[data-state='active']` carries `var(--warn, #b8860b)`**, the dead fallback the comment
+  200 lines above it says was removed — surviving on the next surface along.
+
+## Phase 13 — the state vocabulary becomes one thing
+
+- **One set of tone names**, `Chip`'s five, and every state name in the app maps onto them in **one
+  table** rather than in 31 rules. A surface may not choose the colour of a state.
+- **Equivalent states get the same colour.** failed, closed, interrupted, cancelled and bad are one tone;
+  attention, offline, active and warn are one tone. If two of those are genuinely different facts, the
+  difference is a different tone name, not the same name with two colours.
+- **`--ok` is either used or deleted.** A token in a primitive's vocabulary that no surface references is
+  a promise nobody kept.
+- **The four mechanisms become as few as the evidence allows.** The bar's left border and the chat bubble
+  are not chips and may keep their own shape — but not their own vocabulary.
+
+**Gate:** a static check that every `data-state` value in `web/src` resolves to a tone in the table, and
+that no rule outside the table decides a state's colour — blocking at whatever it reaches, printed in
+full. Plus a browser assertion that the same tone renders the same ink on every surface that shows it,
+on all three themes. `test/chip-boxes.test.tsx` already does this for three tones on one surface; the
+claim is the same one widened.
+
+---
+
 ## Risks, and what would stop this
 
 - **Class renames break tests.** There are **106** `querySelector('.class')` calls in the React tests — Phase 9 migrated one and its own characterisation suite added five, all five of which ARE the subject (`.vb-field` and `.vb-label`, whose treatment is the claim), the same shape as Phase 4's; 102 before it, and Phase 8 migrated six, four to `data-testid` and two to a `testId` the primitive takes as a named prop, and moved a seventh assertion off an exact-`className` comparison that a composing primitive would have pinned; 108 before it and unchanged across Phase 5b, which took two out and put two back and says so under *Selector migrations*; 127 before Phase 5, which migrated nineteen —

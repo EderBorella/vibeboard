@@ -1596,6 +1596,118 @@ No baseline file is involved.
 
 ---
 
+# Part Two — the phases the first six did not cover
+
+**Status: planned 2026-08-21, not started.** Part One built seven primitives and thirteen gates. It was
+reviewed phase by phase and every gate was green. It also missed a whole family of work, and the miss was
+reported by the owner looking at the board rather than by any check — which makes the cause worth stating
+before the phases: **only the button shape has a coverage gate.**
+
+## What is uncovered, measured
+
+`tools/check-radius-scale.mjs` counts button-shaped elements that declare their own geometry, and it is the
+only gate that asks *"how much of this shape is still hand-rolled?"*. Nothing asks it of the other six
+primitives, so their remaining backlog is invisible to every check and to every review that trusts the
+checks.
+
+| primitive | call sites | hand-rolled equivalents left | coverage gate |
+|---|---|---|---|
+| `Button` | 66 | **8** (tabs, labels, chips — the ratchet) | yes |
+| `Panel` | ~20 | **32** panel-shaped rules, including `.tile` | **none** |
+| `Field` | 9 | **~33** raw `input`/`textarea`/`select` across 23 files | **none** |
+| `Chip` | 15 | **9** chip classes | **none** |
+| `Readout` | 45 | **14** hand-rolled `--font-mono` rules | **none** |
+| `Dot` | 3 | 1 | none |
+| `SegmentedControl` | 2 | 0 | none |
+
+Commands: `grep -rn '<Chip' web/src --include=*.tsx | wc -l` and siblings; the panel-shaped count is rules
+declaring a `border: 1px`, a `border-radius` and a `background` together; the control count is
+`grep -rn '<input\|<textarea\|<select' web/src --include=*.tsx`.
+
+**The chip family is the one the owner saw**, and it is exactly what an uncovered shape looks like: `.tag`,
+`.tag-btn`, `.tag-chip`, `.tag-chip-count`, `.mp-chip`, `.board-archive`, `.tile-setup`,
+`.tile-suggestions`, `.tile-problem`. Most are `<span>`s, and the one gate that could have counted them
+only inspects button-shaped elements, so they were never in any number this page reports.
+
+### And the browser only ever sees one page
+
+`visual/support/fixtures.ts:82` is the whole of the harness's navigation: `page.goto('/')`. So every claim
+Part One makes about the *browser* — contrast at 4.5:1, focus visible, nothing overflows, nothing clips,
+type and radius conformance — is a claim about **the board view alone**. Execution, Project Log, Project
+Control and Explorer are four other top-level views; an open card, the archive drawer, settings, the model
+picker and the confirm dialog are never rendered at all.
+
+That is also why Phase 0 measured 15 computed font sizes against 27 authored: the other twelve were on
+surfaces the harness cannot reach. The static checks close that gap **for values in the file**; they cannot
+close it for layout, contrast or focus, which only exist at render time.
+
+---
+
+## Phase 6 — see the whole app
+
+Extend the harness past `/`. Every existing check runs on every reachable surface: the five top-level views,
+an open card, the archive drawer, settings, the model picker, the confirm dialog.
+
+This will surface a backlog, and that is the point of doing it first — **you cannot fix a contrast failure on
+a surface you cannot render.** Report the new counts, then ratchet each check at what you find rather than at
+zero, on this page's standing rule about blocking gates and backlogs.
+
+**Gate:** every check reports a per-surface number; each ratchets. The navigation itself is proven by
+asserting something only each surface renders, the way `fixtures.ts` already proves it is on the board and
+not the sign-in gate.
+**Exit:** a table of every check against every surface.
+
+## Phase 7 — gate every primitive, not only buttons
+
+One coverage census per shape, in the style of `check-radius-scale.mjs`: chip-shaped, panel-shaped,
+mono-fact, control-shaped. Each reports its hand-rolled remainder and ratchets it.
+
+**This is the phase that makes the other three honest**, because a number nobody prints is a number nobody
+reduces.
+
+**Gate:** each census blocks an increase, prints its full list on a passing run, and self-tests its parser
+against a fixture rather than against a count floor — the defect that fired twice in Part One.
+**Exit:** the table above, with a gate in every row.
+
+## Phase 8 — the chip family
+
+The nine classes onto `Chip`. `.tile-suggestions` and `.tile-problem` are state words in three tones and
+their comments carefully distinguish accent from ochre from danger — *"a card carrying this is not failing,
+but it is not plainly done either, and those two must not look the same."* **Preserve that distinction; it is
+the meaning, not the styling.**
+
+**Gate:** the chip census at zero, and the tone distinction asserted rather than assumed.
+
+## Phase 9 — `Field`, and the thirty-three controls
+
+`Field` was called *"last and least urgent"* and it is the least adopted: nine sites against roughly
+thirty-three raw controls. With Phase 6 done, settings and the modals are visible for the first time, so this
+is the first phase that can verify a field at all.
+
+**Gate:** the control census at zero or with a reason per survivor; focus visible on every control on every
+surface, not only the board's fifty-five. `InlineField`'s commit-on-blur behaviour is characterised before it
+is touched — it has its own suite and it stays green.
+
+## Phase 10 — the leftovers, each already measured
+
+- **Card tiles are not keyboard reachable.** `web/src/board/CardTile.tsx:41` is a `<div>` with `onClick`, no
+  `tabIndex`, no `onKeyDown`. The board's primary control cannot be operated without a mouse, and it is
+  absent from the 55 focusables the focus gate protects.
+- **`npm test` leaks ~840 directories per run into `~/.vibeboard/copilot/`**, which holds 55,061 directories
+  and 545MB. Same class as the inode incident: it does not set `VIBEBOARD_COPILOT_HOME`, which the harness
+  does.
+- **The dock wastes 79px of a definite 342px body** — `.raw-pane`'s `flex: 1` has no flex parent. Recorded as
+  `DOCK_SHORTFALL = 79`.
+- **`--exec-cols`** is the last unresolved token, visible once Phase 6 renders the Execution tab.
+- **`Tabs` was refused** on two candidates disagreeing about face and selected state. Re-decide with
+  Execution and settings measurable.
+- **`check-radius-scale.mjs` double-counts inside at-rules** — latent, no `border-radius` sits in one today.
+- **`.archive-title`** needs `.archive-item` to stop padding itself.
+
+**Gate:** each one has a test that fails without the fix.
+
+---
+
 ## Risks, and what would stop this
 
 - **Class renames break tests.** There are **108** `querySelector('.class')` calls in the React tests — unchanged across Phase 5b, which took two out and put two back and says so under *Selector migrations*; 127 before Phase 5, which migrated nineteen —

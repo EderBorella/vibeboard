@@ -28,7 +28,9 @@ Measured against `web/src/styles.css` and `web/src/*.tsx` on 2026-08-20, not est
 
 **The class counts carry their method, because three different answers have now been quoted for the same
 property.** The first three rows are measured like this, and any re-measurement that wants to be comparable
-has to be measured the same way: strip `/* … */` comments from `web/src/styles.css`, take the selector text
+has to be measured the same way: strip `/* … */` comments from the surface stylesheets — `web/src/styles.css`
+when this was written, and the 47 layer sheets `web/src/styles.ts` lists now, which
+`npm run check:class-budget` prints as *the surfaces* — take the selector text
 before each `{` (skipping at-rule preludes), extract every `.name` token, and count the distinct names —
 **457**. Of those 457, the ones whose name occurs exactly once across all that selector text — **313**.
 Also of those 457 — not of the 313, they are two independent counts over the same set — the ones whose name

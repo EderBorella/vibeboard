@@ -16,10 +16,10 @@
  * margin — or for a non-geometry treatment a surface genuinely owns (monospace, uppercase, a
  * letter-spacing, a state colour outside the five tones). Not for a padding.
  *
- * Loaded BEFORE every surface sheet — see web/src/styles.ts — so a surface can still override a primitive's COLOUR at equal
- * specificity — the emergency stop is a `default` button with a danger hover, a `✕` that deletes goes
- * red, and the connection light tints its own dot. What stops that override becoming a geometry is the
- * check, not the cascade.
+ * Loaded BEFORE every surface sheet — see web/src/styles.ts — so a surface can still override a
+ * primitive's COLOUR at equal specificity — the emergency stop is a `default` button with a danger
+ * hover, a `✕` that deletes goes red, and the connection light tints its own dot. What stops that
+ * override becoming a geometry is the check, not the cascade.
  *
  * Written as compact one-line rules to match styles.css's own idiom — see biome.jsonc: the CSS
  * linter is on and the CSS formatter is off, because the formatter cannot express this and took
@@ -150,8 +150,9 @@ button.vb-chip { cursor: pointer; }
    precisely the silent colour loss the *Risks* section describes: a board that has failed nothing looks
    perfectly correct. The five rules it replaces were at (0,2,0) on `.report-chip[data-state='…']` and
    won for that reason without anyone having to know it. (0,2,0) here restores the win, and still loses
-   to `.tag-chip.active`, `.mp-chip.on` and `.board-archive.active`, which are (0,2,0) in styles.css and
-   therefore later. */
+   to `.tag-chip.active`, `.mp-chip.on` and `.board-archive.active`, which are (0,2,0) in
+   organisms/board/board.css and organisms/shared/model-picker.css, and therefore later — every surface
+   sheet loads after this file. See web/src/styles.ts. */
 .vb-chip.vb-chip-tone { color: var(--tone); border-color: color-mix(in srgb, var(--tone) 50%, var(--border)); }
 /* `neutral` KEEPS THE PLAIN EDGE, which is what `.vb-chip-neutral` did — it declared an ink and no
    border-color at all. Mixing `--muted` into `--border` only greys the grey, and `.tag`, `.signin-this`

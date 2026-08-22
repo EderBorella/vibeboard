@@ -67,20 +67,22 @@ const SURVIVORS = new Map([
 // rules outside the primitive stylesheet declare the monospaced face. Comments are stripped, because a
 // rule quoted in prose is not a rule — the defect `check-type-scale.mjs` had before it blanked them.
 // THE SURFACES, WHICH ARE 47 FILES RATHER THAN ONE — read out of `web/src/styles.ts`, the app's own
-// cascade list, so a sheet added by a later phase is censused by existing. `ui/primitives.css` is the one
-// dropped: it is the primitive stylesheet this census is asking about the outside of.
+// cascade list, so a sheet added by a later phase is censused by existing. The three dropped are the
+// three that are not surfaces: `ui/primitives.css` is the primitive stylesheet this census is asking
+// about the outside of, and the two token files declare properties rather than a face. Filtered rather
+// than left in for tidiness — `--font-mono` is DEFINED in `design/tokens.css`, so a census that reads it
+// as a surface is one `font-family` away from reporting the definition as a hand-rolled exception.
+const NOT_A_SURFACE = ['ui/primitives.css', 'design/tokens.css', 'design/themes.css'];
 const SURFACE_SHEETS = [
   ...readFileSync(join(process.cwd(), 'web', 'src', 'styles.ts'), 'utf8').matchAll(
     /^\s*import\s+'\.\/([^']+\.css)';/gm,
   ),
 ]
   .map(([, file]) => file)
-  .filter((file) => file !== 'ui/primitives.css');
+  .filter((file) => !NOT_A_SURFACE.includes(file));
 
 function monoRules(): string[] {
-  const css = SURFACE_SHEETS.map((file) =>
-    readFileSync(join(process.cwd(), 'web', 'src', file), 'utf8'),
-  )
+  const css = SURFACE_SHEETS.map((file) => readFileSync(join(process.cwd(), 'web', 'src', file), 'utf8'))
     .join('\n')
     .replace(/\/\*[\s\S]*?\*\//g, '');
   const out: string[] = [];

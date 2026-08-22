@@ -23,7 +23,7 @@
   --font-display: "Roboto Condensed", "Arial Narrow", ui-sans-serif, system-ui, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
 
-  /* Card sizing (responsive overrides live in styles.css container queries). */
+  /* Card sizing (responsive overrides live in the container queries in organisms/board/board.css). */
   --tile-h: 112px;
   --tile-gap: 0.55rem;
   --col-w: 248px;
@@ -99,8 +99,8 @@
 
   /* THE FOUR LAYERS, and four rather than fewer because a real path needs each boundary: a confirm
    * raised from inside SettingsModal must clear the modal, so alert ≠ modal, and a popover must clear
-   * sticky chrome, so pop ≠ chrome. The 20/21 adjacency in styles.css disappears by construction —
-   * two siblings on one layer let DOM order decide, which is what should have decided.
+   * sticky chrome, so pop ≠ chrome. The 20/21 adjacency in organisms/copilot/copilot.css disappears by
+   * construction — two siblings on one layer let DOM order decide, which is what should have decided.
    */
   --z-chrome: 5;
   --z-pop: 20;

@@ -39,11 +39,16 @@ import './design/themes.css';
 // dot. What stops that override becoming a padding is `npm run check:radius-scale`, not the cascade.
 import './ui/primitives.css';
 
-// AFTER the primitives although it is a design file, because that is where its bytes were: the UA
-// control reset opened `styles.css`, and `ui/primitives.css` has rules that meet it — `.vb-input`'s
-// step beats the `button, input, select, textarea` reset on specificity, but `*`, `body` and
-// `:focus-visible` are decided by order. Moving it above the primitives is a cascade change, which is
-// the one thing this phase must not make.
+// AFTER the primitives although it is a design file, and the reason is BYTES rather than cascade: the
+// UA control reset opened `styles.css`, and the phase that made this list a list may not move a rule.
+// The cascade argument that stood here was wrong, and was withdrawn after it was tested: it claimed
+// `*`, `body` and `:focus-visible` were decided by order against `ui/primitives.css`, and that file
+// declares none of the three — its only non-class selectors are `button.vb-chip`, `button.vb-panel`
+// and `select.vb-input`, all (0,1,1) and so above every reset rule here whatever the order. Lifting
+// this above the primitives was planted and changed NOTHING the browser harness could see, on any of
+// the three themes. It stays where its bytes were, and `npm run check:split` pins the position — not
+// because this pair contends, but because the pair below it does: `ui/primitives.css` moved to the end
+// put a 15.5px span in a 14.0px flex row on all three themes.
 import './design/reset.css';
 import './templates/app-shell.css';
 import './organisms/topbar/topbar.css';

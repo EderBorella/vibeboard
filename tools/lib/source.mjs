@@ -41,10 +41,21 @@ import { join } from 'node:path';
 // had fixed. A rule about what the corpus IS belongs with the walk.
 const STORY = '.stories.';
 
+// A STYLESHEET MANIFEST IS NOT APPLICATION CODE EITHER, and it is excluded here for the same reason and
+// in the same place. `web/src/styles.ts` is 50 bare `import './x/y.css';` lines, and every gate that
+// counts a class name as REFERENCED when it appears as a token reads those paths as references: the
+// specifier `'./organisms/dock/dock.css'` names `dock`, and 16 of the classes in this tree now have a
+// stylesheet called after them. In `check-class-budget.mjs` that excuses a dead class — the ratchet
+// would go green on a class whose last real consumer had gone — and in `check-layers.mjs` it produced 7
+// findings of the form ".ap-chip read from web/src/styles.ts", which name a filename and cannot be
+// acted on. Nothing in it declares or wears a class, so no gate loses a reader by its absence.
+const MANIFEST = join('web', 'src', 'styles.ts');
+
 export const walk = (root, corpus, ext, atLeast) => {
   const files = readdirSync(join(root, corpus), { recursive: true })
     .filter((entry) => typeof entry === 'string' && entry.endsWith(ext) && !entry.includes(STORY))
     .map((entry) => join(corpus, entry))
+    .filter((file) => file !== MANIFEST)
     .sort();
   if (files.length < atLeast) {
     throw new Error(

@@ -102,7 +102,7 @@ const PARSE_FLOOR = 40;
 
 // The walk, the line counter and the comment blanker are `tools/lib/source.mjs`; the rule scanner and
 // the selector reader are `tools/lib/css.mjs`. One copy each — see that file's header.
-// A SMOKE ALARM, NOT A TARGET: 48 css files and a hundred components, floored an order of magnitude
+// A SMOKE ALARM, NOT A TARGET: 50 css files and a hundred components, floored an order of magnitude
 // below each so deleting a file never fails the run. See walk() in lib/source.mjs for why it is here.
 const FLOOR = { '.css': 2, '.ts': 10, '.tsx': 20 };
 const walk = (ext) => walkFiles(ROOT, CORPUS, ext, FLOOR[ext] ?? 1);

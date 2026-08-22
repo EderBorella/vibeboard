@@ -5,13 +5,20 @@
 //
 // Run it with: npm run check:split
 //
-// Two claims, both blocking at zero:
+// Three claims, all blocking at zero:
 //   1. The concatenation equals `tools/fixtures/styles-pre-split.css`, the file as it stood at the
 //      commit before the split. Not a checksum: a mismatch has to be readable, so it reports the first
 //      differing byte with the part it falls in and the line it is on.
 //   2. Every `.css` file under `web/src` is imported by the manifest exactly once. An orphan sheet is
 //      invisible twice over — the app never loads it and the concatenation never sees it — so a part
 //      dropped from the list would otherwise read as a clean run with a surface missing.
+//   3. The three sheets that are not parts are the first three imports. Claim 1 CANNOT MAKE THIS ONE,
+//      and that is not a nuance: the non-parts are filtered out before the join, so the concatenation
+//      only ever sees the parts' order relative to EACH OTHER. Both reorders across that boundary were
+//      planted and both exited 0 here — `design/reset.css` lifted above `ui/primitives.css`, and
+//      `ui/primitives.css` moved to the end, which put a 15.5px span in a 14.0px flex row on all three
+//      themes. `styles.ts` is the cascade, so the boundary between the parts and the sheets every part
+//      overrides has to be pinned where the parts' own order is.
 //
 // WHY BYTES AND NOT "THE SAME RULES": the failure this exists to catch is a cascade change, not a typo.
 // Equal-specificity rules are decided by source order, and `styles.css` leaned on that in both
@@ -27,7 +34,7 @@
 // DELETES THIS GATE, its witness and its `package.json` line — a gate that has to be bypassed is worse
 // than no gate. Until then it is the only instrument that can tell a move from an edit.
 
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { lineOf } from './lib/source.mjs';
@@ -40,7 +47,9 @@ const WITNESS = 'tools/fixtures/styles-pre-split.css';
 // The three sheets that were already their own files when `styles.css` was split, so they are not
 // slices of it: the token block and the palettes (split out in the phase before this one) and the
 // primitives. Everything else the manifest imports is a part.
-const NOT_A_PART = new Set(['design/tokens.css', 'design/themes.css', 'ui/primitives.css']);
+// Geometry, then colour, then the primitives every surface overrides — in that order, ahead of all 47.
+const HEAD = ['design/tokens.css', 'design/themes.css', 'ui/primitives.css'];
+const NOT_A_PART = new Set(HEAD);
 
 // A SMOKE ALARM, NOT A TARGET — the same argument as walk() in lib/source.mjs. A manifest parser that
 // stopped matching would find no parts, concatenate nothing, and an empty string compared against an
@@ -149,11 +158,20 @@ if (parts.length < PART_FLOOR) {
 
 const witness = read(WITNESS);
 const bytes = parts.reduce((sum, part) => sum + part.text.length, 0);
-console.log(
-  `split: ${parts.length} part(s), ${bytes} byte(s), against ${witness.length} in ${WITNESS}`,
-);
+console.log(`split: ${parts.length} part(s), ${bytes} byte(s), against ${witness.length} in ${WITNESS}`);
 
 let failed = false;
+
+const head = imported.slice(0, HEAD.length);
+if (head.join(', ') !== HEAD.join(', ')) {
+  console.error(`\nthe manifest does not open with the three sheets that are not parts.`);
+  console.error(`  expected: ${HEAD.join(', ')}`);
+  console.error(`  found:    ${head.join(', ')}`);
+  console.error(`\nA part loaded before the tokens reads them as unset; a part loaded before the`);
+  console.error(`primitives loses every colour override the primitive header describes. Neither is`);
+  console.error(`visible in the concatenation, because the non-parts are not in it.`);
+  failed = true;
+}
 
 const difference = firstDifference(parts, witness);
 if (difference) {
@@ -186,4 +204,5 @@ if (twice.length > 0) {
 
 if (failed) process.exit(1);
 
-console.log(`the parts concatenate to the pre-split file exactly; every sheet in ${CORPUS} is imported once`);
+console.log(`the parts concatenate to the pre-split file exactly, behind ${HEAD.length} non-parts;`);
+console.log(`every sheet in ${CORPUS} is imported exactly once`);

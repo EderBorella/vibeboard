@@ -82,8 +82,8 @@ export function CardTile({
       <div className="tile-head">
         <Readout tone="accent">{card.id}</Readout>
         {/* THREE STATE WORDS IN THREE TONES, and the tones are the meaning rather than the styling —
-            see the three rules in styles.css and test/chip-boxes.test.tsx, which measures that a
-            person can tell them apart in each theme's own palette. */}
+            see the three rules in organisms/board/tile-states.css and test/chip-boxes.test.tsx, which
+            measures that a person can tell them apart in each theme's own palette. */}
         {card.setup && (
           // The project-level barrier. Worth a badge because its effect is invisible from the card
           // it is on: nothing outside this feature's subtree runs until it is finished, so a board

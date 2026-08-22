@@ -96,11 +96,22 @@ function selfTest() {
   if (scopeOf(`${CORPUS}/molecules/popover.css`) !== null) return 'scopeOf: a molecule is not open';
   if (surfaceOf(`${CORPUS}/board/CardTile.tsx`) !== 'board') return 'surfaceOf: a component';
   if (surfaceOf(`${CORPUS}/markdown.tsx`) !== null) return 'surfaceOf: a loose file';
-  const defs = definitionsOf('fixture.css', '.alpha { color: red }\n@media (min-width: 1px) { .beta {} }');
+  // THE PRELUDE CARRIES A CLASS TOKEN ON PURPOSE. With `@media (min-width: 1px)` this fixture could not
+  // distinguish `shapedRules()` from no filter at all — a prelude with no dot in it reads as zero
+  // definitions either way — and dropping the call was planted and passed here.
+  const defs = definitionsOf('fixture.css', '.alpha { color: red }\n@supports selector(.gamma) { .beta {} }');
   if (defs.map((d) => d.cls).join(',') !== 'alpha,beta') return `definitionsOf: [${defs.map((d) => d.cls)}]`;
   if (!names(codeOf('const a = <div className="alpha" />;'), 'alpha')) return 'names: a literal';
   if (names(codeOf('// .alpha is named only here\n'), 'alpha')) return 'names: a comment counted';
-  if (!names(codeOf('const c = `msg-${kind}`;'), 'msg-error')) return 'names: a composed prefix';
+  // BOTH BOUNDARIES, because an accusation is the only thing this gate produces. `names()` reduced to
+  // `code.includes(cls)` was planted and passed everything above it while moving the report from 82
+  // findings to 84 — a scoped class read nowhere gets blamed on whatever longer name contains it, and
+  // this gate goes blocking in the phase that has to drive the count to zero.
+  if (names(codeOf('const x = "alpha-beta";'), 'alpha')) return 'names: a longer name on the right';
+  if (names(codeOf('const x = "an-alpha";'), 'alpha')) return 'names: a longer name on the left';
+  // A template literal with the placeholder escaped, so the fixture holds the two characters the
+  // composed-prefix arm looks for without a lint suppression standing where the reason should be.
+  if (!names(codeOf(`const c = \`msg-\${kind}\`;`), 'msg-error')) return 'names: a composed prefix';
   return null;
 }
 
@@ -172,7 +183,9 @@ for (const { cls, scope, site, readers } of findings) {
   console.log(`  .${cls} (${scope}, ${site}) read from ${[...new Set(readers)].join(', ')}`);
 }
 for (const [cls, owner] of split) {
-  console.log(`  .${cls} is defined in ${[...owner.scopes].join(' and ')}: ${owner.sites.join(', ')}`);
+  // `null` is the open layer, and it printed as an empty string — `defined in autopilot and settings and`.
+  const where = [...owner.scopes].map((scope) => scope ?? 'the shared layer').join(' and ');
+  console.log(`  .${cls} is defined in ${where}: ${owner.sites.join(', ')}`);
 }
 
 // REPORTING, so the exit code is 0 whatever the count — see the header for when that changes and why it

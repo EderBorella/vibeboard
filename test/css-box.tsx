@@ -18,13 +18,31 @@ const WEB = join(process.cwd(), 'web', 'src');
 // the primitive's value where the surface's is what renders.
 const SHEETS = ['ui/primitives.css', 'styles.css'].map((f) => readFileSync(join(WEB, f), 'utf8'));
 
-// The scale tokens, resolved to the pixel values themes.css gives them, so a rule that moves from
-// `var(--radius)` to `var(--r-lg)` reads as the same 10px it renders as. Colour tokens are left as
+// The geometry tokens, resolved to the pixel values design/tokens.css gives them, so a rule that moves
+// from `var(--radius)` to `var(--r-lg)` reads as the same 10px it renders as. Colour tokens are left as
 // names: `--panel` is a different colour in each theme and the token IS the claim.
+//
+// BOTH FILES ARE READ, and reading only one is the trap this phase walked into deliberately. Phase 1 of
+// notes/atomic-revamp-plan.md split `themes.css` into design/tokens.css and design/themes.css, so a
+// resolver pointed at the old name would still have found a file — one that now holds nothing but
+// colour — and every geometry `var()` would have stopped resolving. 88 assertions compare a resolved box
+// to an exact string, so they all go red in one run.
+//
+// THAT FAILURE HAS A DANGEROUS REPAIR AND IT IS NOT THIS ONE: eighty-eight red assertions are exactly
+// the number somebody makes green by pasting the token name into the expectation. At that point the
+// resolver is inert, every box assertion compares one literal to the same literal, and the suite passes
+// while asserting nothing. Not one expectation was rewritten to a `var()` string; the resolver was
+// widened instead.
+const TOKEN_FILES = ['design/tokens.css', 'design/themes.css'];
+// The names worth resolving to a value rather than left as a claim: the three scales, the two heights,
+// the rule width, the tracking, the elevation and the four layers.
+const GEOMETRY = /^--(t|s|r)-|^--(ctl-h|mark-h|rule|track|lift)$|^--z-/;
 const TOKENS = new Map(
-  [...readFileSync(join(WEB, 'themes.css'), 'utf8').matchAll(/^\s*(--[\w-]+)\s*:\s*([^;]+);/gm)]
-    .filter(([, name]) => /^--(t|s|r)-|^--radius$/.test(name))
-    .map(([, name, value]) => [name, value.trim()]),
+  TOKEN_FILES.flatMap((file) => [
+    ...readFileSync(join(WEB, file), 'utf8').matchAll(/^\s*(--[\w-]+)\s*:\s*([^;]+);/gm),
+  ])
+    .filter(([, name]) => GEOMETRY.test(name))
+    .map(([, name, value]) => [name, value.trim()] as [string, string]),
 );
 
 interface Rule {

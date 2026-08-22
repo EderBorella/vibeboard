@@ -56,7 +56,9 @@ import { walk as walkFiles } from './lib/source.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const CORPUS = 'web/src';
-const TOKENS_FILE = 'web/src/themes.css';
+// The radius scale is geometry, so it lives in design/tokens.css rather than in design/themes.css —
+// the split Phase 1 of notes/atomic-revamp-plan.md made structural and `check:tokens` keeps.
+const TOKENS_FILE = 'web/src/design/tokens.css';
 // The primitive stylesheet. Rules here are the ONE place a button's geometry may be decided.
 const PRIMITIVES = join('web', 'src', 'ui', 'primitives.css');
 const RADIUS_SCALE = ['--r-sm', '--r-md', '--r-lg', '--r-pill'];

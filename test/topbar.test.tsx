@@ -332,7 +332,7 @@ describe('TopBar visibility and labels', () => {
   it('offers exactly the themes themes.css defines', () => {
     // `process.cwd()`, not `import.meta.url`: this file runs under jsdom, where import.meta.url is an
     // http URL and any file API on it throws — the same trap vitest.config.ts records for the docker shim.
-    const css = readFileSync(join(process.cwd(), 'web', 'src', 'themes.css'), 'utf8');
+    const css = readFileSync(join(process.cwd(), 'web', 'src', 'design', 'themes.css'), 'utf8');
     const defined = new Set([...css.matchAll(/\[data-theme="([a-z-]+)"\]/g)].map((m) => m[1]));
     render(<TopBar {...withProps({})} />);
     const offered = new Set(

@@ -1,0 +1,109 @@
+/* VibeBoard primitives — GEOMETRY, ELEVATION AND LAYERS. One shared block, no colour.
+ * -----------------------------------------------------------------------------------
+ * Split out of web/src/themes.css, which held both halves in one file and therefore could only ask a
+ * reader to keep them apart. `npm run check:tokens` now makes it structural: nothing here may define a
+ * colour, nothing in design/themes.css may define a length, and a name defined for one theme must be
+ * defined for all three. A theme decides colour; a theme that disagreed about what 12px means is a
+ * theme with its own layout.
+ *
+ * A NAME MAY LAND HERE BEFORE ANYTHING READS IT, on purpose — tokens arrive first so the phase that
+ * consumes them is one revertible commit. An unconsumed name is not free: it is listed in `UNCONSUMED`
+ * in tools/check-tokens.mjs with the phase that spends it, and the gate fails on any name that is
+ * neither referenced nor listed. That is what stopped being possible to forget — `--scan` survived
+ * three palettes with zero consumers.
+ */
+
+:root {
+  /* `--radius: 10px` WAS HERE AND IS GONE. Phase 1 of docs/design-system.md ruled it would be deleted
+   * in the phase where a surface primitive owned its four consumers — `.archive-drawer`, `.column`,
+   * `.exec-column` and `.halt` — because renaming a token while no caller exists buys nothing and
+   * splits the revert. That primitive is `Panel`, and all four are now its `raised` variant, which
+   * spells the same 10px as `--r-lg`. */
+  --font-body: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-display: "Roboto Condensed", "Arial Narrow", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* Card sizing (responsive overrides live in styles.css container queries). */
+  --tile-h: 112px;
+  --tile-gap: 0.55rem;
+  --col-w: 248px;
+
+  /* Type, space and radius: ONE definition for all three themes, on purpose. See
+   * docs/design-system.md — these three scales replace 27 authored font sizes, a 0.25–0.6rem gap band
+   * and 8 radius values.
+   */
+
+  /* Whole pixels at the 16px default base, and the rem values are chosen to land there: 0.6875rem is
+   * exactly 11px. Fractional steps are what produced a button at 10.88px inside a 12.16px bar — two
+   * sizes nobody could name, so nobody could see they disagreed. Do not "tidy" these to round rems.
+   * The ratio is deliberately not constant: the working range is compressed because a cockpit's text
+   * is small and dense, and --t-display separates because a heading has to win.
+   */
+  --t-micro: 0.6875rem;   /* 11px — chips, state words, dot labels, tags */
+  --t-small: 0.75rem;     /* 12px — controls, secondary text, table cells */
+  --t-body: 0.8125rem;    /* 13px — default UI text, card titles on the board */
+  --t-lead: 0.9375rem;    /* 15px — panel headings, an open card's title */
+  --t-title: 1.125rem;    /* 18px — surface titles */
+  /* Retires in Phase 3 WITH its one consumer, and the argument is a measurement rather than taste: the
+   * step exists to carry "the one big number per surface" and no number in the app is set in it. Its
+   * actual consumer is a markdown `h1`, which takes `--t-title`, with `h2`/`h3` on `--t-lead`/`--t-body`
+   * — three heading levels off three steps the scale already has. */
+  --t-display: 1.5rem;    /* 24px — the one big number per surface */
+
+  /* A 2px grid, in px rather than rem: these are gaps and paddings between boxes whose own sizes are
+   * already px (--tile-h, --col-w), and a space that rescaled with the root font while its container
+   * did not is how the 0.3rem/0.35rem band happened. 1px is absent deliberately — it is a border
+   * width, not a space.
+   */
+  --s-1: 2px;   /* hairline separation, icon-to-label */
+  --s-2: 4px;   /* inside a chip */
+  --s-3: 6px;   /* inside a control */
+  --s-4: 8px;   /* between controls */
+  --s-5: 12px;  /* between groups */
+  --s-6: 16px;  /* panel padding */
+  --s-7: 24px;  /* between sections */
+
+  --r-sm: 4px;      /* inputs, small chips */
+  --r-md: 6px;      /* buttons, cards, panels — already the de facto default */
+  --r-lg: 10px;     /* surfaces and modals */
+  --r-pill: 999px;  /* state chips and tags */
+
+  /* THE TWO HEIGHTS. Eleven control heights accumulated because a height nobody declares is a height
+   * nobody chose: it is padding plus a line box plus a border, so a badge inside a tab changes the
+   * tab. One token for a box you operate and one for a box you read, and NOT one token for both — three
+   * markers stack inside a 112px tile and one sits INSIDE a 28px tab, so a 28px chip in a 28px tab has
+   * nowhere to be. `* { box-sizing: border-box }` means these include the border.
+   */
+  --ctl-h: 28px;   /* 14px line box + 2 × --s-3 ("inside a control") + 2 × 1px hairline */
+  --mark-h: 16px;  /* 14px + 2 × 1px — what .vb-status already measures */
+
+  /* AN EDGE THAT CARRIES MEANING, as against one that merely separates. Eleven `border-left` rails do
+   * one job and split 6:5 between 3px and 2px by nothing at all — `--tone`, `--accent` and `--border`
+   * each appear on both sides of that split. 3px because every owner report so far has been "I cannot
+   * see it". `1px` stays a bare literal: it separates, it does not mean.
+   */
+  --rule: 3px;
+
+  /* THE UPPERCASE CHROME TREATMENT. 34 letter-spacing declarations, 12 values, three real decisions;
+   * 25 of them collapse here. `.brand`'s 0.22em and `.vb-readout`'s -0.01em stay as named exceptions
+   * with their reasons in the gate, on the precedent of `50%` and `inherit`.
+   */
+  --track: 0.08em;
+
+  /* THIS SURFACE IS OFF THE PAGE, and it is one statement rather than four shadows over seven blur
+   * radii. The value is the modal's, the largest of the four, because the four disagree only by
+   * accident. `--glow` is NOT folded in: it is emphasis, it is per-theme, and marshmallow sets it to
+   * `none` for an argued reason — a halo on a light ground reads as a smudge.
+   */
+  --lift: 0 12px 40px rgb(0 0 0 / 45%);
+
+  /* THE FOUR LAYERS, and four rather than fewer because a real path needs each boundary: a confirm
+   * raised from inside SettingsModal must clear the modal, so alert ≠ modal, and a popover must clear
+   * sticky chrome, so pop ≠ chrome. The 20/21 adjacency in styles.css disappears by construction —
+   * two siblings on one layer let DOM order decide, which is what should have decided.
+   */
+  --z-chrome: 5;
+  --z-pop: 20;
+  --z-modal: 60;
+  --z-alert: 80;
+}

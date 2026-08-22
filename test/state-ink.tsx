@@ -17,7 +17,9 @@ import { box } from './css-box.js';
 
 export const THEMES = ['cyberpunk', 'marshmallow', 'classic-dark'];
 
-const THEMES_CSS = readFileSync(join(process.cwd(), 'web', 'src', 'themes.css'), 'utf8');
+// The palettes only. Geometry left this file for design/tokens.css in Phase 1 of
+// notes/atomic-revamp-plan.md, and a colour resolver has no business reading it.
+const THEMES_CSS = readFileSync(join(process.cwd(), 'web', 'src', 'design', 'themes.css'), 'utf8');
 
 // The palette a theme really has: `:root` carries the shared block and each `[data-theme=…]` overrides
 // it, exactly as the cascade does.

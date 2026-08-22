@@ -1,11 +1,12 @@
 import type { Decorator, Preview } from '@storybook/react-vite';
 import { useEffect } from 'react';
-// THE SAME THREE FILES THE APP LOADS, IN THE SAME ORDER, and the order is load-bearing rather than tidy:
+// THE SAME FOUR FILES THE APP LOADS, IN THE SAME ORDER, and the order is load-bearing rather than tidy:
 // `primitives.css` comes BEFORE `styles.css` so a surface can still override a primitive's COLOUR at
 // equal specificity — the emergency stop is a ghost button with a danger hover, the connection light
 // tints its own dot. Loading them the other way round here would make this workbench show a cascade the
 // app does not have, which is worse than showing nothing.
-import '../web/src/themes.css';
+import '../web/src/design/tokens.css';
+import '../web/src/design/themes.css';
 import '../web/src/ui/primitives.css';
 import '../web/src/styles.css';
 

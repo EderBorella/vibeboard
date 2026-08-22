@@ -33,7 +33,9 @@ const CORPUS = 'web/src';
 // looking right: `var(--t-bdoy)` matches any `--t-*` pattern, resolves to nothing, and makes the
 // declaration invalid at computed-value time — so the element silently inherits and the file passes a
 // check that only ever read the shape of the name.
-const TOKENS_FILE = 'web/src/themes.css';
+// The scale is geometry, so it lives in design/tokens.css and not in design/themes.css — the split
+// Phase 1 of notes/atomic-revamp-plan.md made structural, and `npm run check:tokens` is what keeps it.
+const TOKENS_FILE = 'web/src/design/tokens.css';
 const TYPE_SCALE = ['--t-micro', '--t-small', '--t-body', '--t-lead', '--t-title', '--t-display'];
 
 // The band Phase 2 closed, in rem. Below 0.25rem the nearest step is a 2–6x change on what is a

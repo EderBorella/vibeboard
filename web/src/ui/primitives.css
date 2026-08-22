@@ -154,6 +154,32 @@ button.vb-chip { cursor: pointer; }
    and `.mp-chip` are the boxes that would have moved. */
 .vb-chip.vb-chip-tone.vb-tone-neutral { border-color: var(--border); }
 
+/* ---------- StatusChip ---------- */
+/* THE FOUR STATE INDICATORS, AS ONE. The census and the argument are in ui/StatusChip.tsx; what is here
+   is the part the box could not inherit from `.vb-chip`.
+   ONE STEP UP FROM A CHIP, and it is the only geometry this adds. `--t-micro` is the chip step — right
+   for a tag or a count, both of which sit beside the thing they describe. A state word is read on its
+   own, across a bar, and the connection light was already `--t-small` for exactly that reason; the other
+   three were `--t-micro` and one of them measured 10.88px in a 12.16px row. Levelling them at the
+   SMALLEST of the four would have made the app's own health indicator harder to see, which is the
+   opposite of the request.
+   THE FOCUS RING IS HERE and it was on `.conn-status` alone. All four are buttons now — that is the
+   ruling — so all four need one, and `.vb-chip` deliberately has none: a chip is usually a `<span>`. */
+.vb-status { font-size: var(--t-small); letter-spacing: 0.04em; white-space: nowrap; }
+.vb-status:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* THE BALLOON'S THREE LINES, ONCE. They were six classes — `.conn-pop-{head,detail,next}` and
+   `.ap-agent-{heading,detail,next}` — declaring the same three things at the same values, because the
+   two surfaces that had a balloon each wrote one. */
+.vb-status-head {
+  display: block; margin: 0 0 0.35rem;
+  font-size: var(--t-body); font-weight: 600; color: var(--text); letter-spacing: 0.01em;
+}
+.vb-status-detail,
+.vb-status-next { margin: 0; font-size: var(--t-small); line-height: 1.45; color: var(--muted); }
+/* Separated from the detail above it, because they have different authors: the detail is the server's
+   sentence and this is our advice about it. */
+.vb-status-next { margin-top: 0.5rem; color: var(--text); opacity: 0.75; }
+
 /* ---------- SegmentedControl ---------- */
 /* THE GROUP OWNS ONE BORDER AND ONE CORNER AND CLIPS ITS CELLS, which is exactly why Phases 3 and 4 both
    refused to make these `Button`s: every variant gives the cell its own border and radius, and that puts
@@ -342,6 +368,19 @@ select.vb-input:hover:not(:disabled), .vb-field select:hover:not(:disabled) { bo
   flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left;
 }
 .vb-caret { color: var(--muted); flex: none; }
+/* A DISCLOSURE GLYPH, AND ITS ONLY JOB IS THE SIZE. Six of them — the board's chevron, the Explorer's
+   twisty, the two select carets, the dock's fold and the auto-pilot bar's Details — were drawn at
+   `--t-micro`, the step meant for chip text, and the owner could not see them: an 11px triangle is
+   roughly five pixels of ink, and the arrow that says whether a board is folded is the one thing on that
+   row you aim at.
+   SIZE AND NOT COLOUR, because the colour is genuinely each surface's: the board's chevron is `--accent`
+   where the Explorer's is `--muted`, and the two inside a `<Button>` must inherit the button's ink or
+   they stop tracking its hover. So this carries a step and a line-height and nothing else, and sits
+   beside whatever class already owned the glyph.
+   IN THIS FILE because two of the six are inside a `<Button>`, and `npm run check:radius-scale` refuses a
+   `font-size` on a button class anywhere else — which is the gate working: the fix for a glyph that is
+   too small is not a padding on the control around it. */
+.vb-twist { font-size: var(--t-lead); line-height: 1; flex: none; }
 /* A hint says how something works. Six of them were written; four were italic and two were not, at three
    different sizes. */
 .vb-hint { font-size: var(--t-small); color: var(--muted); font-style: italic; line-height: 1.45; }

@@ -3239,6 +3239,77 @@ Fixing it means renaming one of the two.
 
 ---
 
+## Phase 14 — the owner's pass over the board
+
+Seven things the owner found in a minute of using the board that fourteen phases and 99 browser checks had
+not. Six are one-line fixes and the seventh is the merge Phase 13 stopped one step short of. Recorded
+together because the pattern behind them is the interesting part: **every one of them was invisible to a
+gate that was measuring the right thing in the wrong place.**
+
+| what he saw | what it was | what could have seen it |
+|---|---|---|
+| the Start button is too big | `Button size="md"` on a row of `sm` — a step taller than everything beside it | nothing. Check 7 asserts the row does not WRAP, and a taller row does not wrap |
+| the collapse arrows are too small to see | six disclosure glyphs at `--t-micro`, the step meant for chip text — about five pixels of ink | nothing. 11px is ON the scale, so type conformance passed |
+| Authorise is touching the board | its row was a classless `<div>`; the other six rows in the dock each pad by `0.75rem` | nothing. jsdom loads no CSS and the harness never opens the dock |
+| the second line of a card title is cut in half | `-webkit-line-clamp: 2` inside a fixed `height: 112px` that only fits one | nothing — and the FIRST instrument written for it could not either. See below |
+| I can't find the column scrollbar | `thin`, with a `--border` thumb on a transparent track, one token from the panel behind it | nothing, and still nothing: headless Chromium draws overlay scrollbars |
+| the bar's tail is one undifferentiated queue | selector, state and three buttons at equal spacing — two statements and three actions | nothing |
+| the state indicators are four different things | four shapes, three sizes, three answers to "where is the explanation" | nothing. Phase 13 unified the COLOUR and left the shape |
+
+**Phase 13 did half the job and said so.** It gave the app one state vocabulary — five tones, one table, no
+surface choosing a colour — and it left four separate mechanisms for DRAWING a state: a 12px dot with a
+word and a balloon, a bordered pill with no dot and a tooltip, a 7px dot that became a button only once
+something broke, and a full-width row with two numbers glued on by ` · `. They agreed on the colour and on
+nothing else. `ui/StatusChip.tsx` is the fifth mechanism that replaces all four, and the two rulings in it
+are the owner's: every indicator is **clickable in every state**, and the explanation lives in the balloon
+rather than in a `title`.
+
+**A control that only exists once something is broken is one nobody has ever pressed.** The agent chip was
+a `<span>` while the agent was healthy and a `<button>` once it was not, and the old CSS defended that at
+length — *"the whole point of this element is that it does NOT read as a control"*, and *"it IS a button
+precisely when there is something wrong"*. Both sentences are coherent and both are withdrawn: the
+affordance appeared for the first time at the exact moment a person needed it, on the surface they were
+already frustrated with. A healthy state's balloon is not an invented reassurance either — `agentStatus`
+has always written one sentence per state and hidden it in an attribute.
+
+**364 → 362 classes.** Seven died, five arrived, and the interesting pair is `.conn-pop-{head,detail,next}`
+against `.ap-agent-{heading,detail,next}`: two copies of one balloon's prose, 150 rules apart, which had
+already drifted — one gave the heading a bottom margin and the detail none, the other gave both `0.35rem`,
+which is `0.35rem` of gap in block flow and `0.7rem` inside a flex column. `test/panel-twenty.test.tsx`
+pinned the second pair as the reason `.popover` cannot be a `raised` Panel; that reason is now gone, which
+is recorded there rather than quietly deleted.
+
+**The check written for the card titles was green and worthless, for one commit.** It counted
+`getClientRects().length`, which is one rect per line box of an *inline* formatting context and exactly one
+rect for a block element whatever it contains. Planting the old two-line clamp back left it passing. Height
+over computed `line-height` is the instrument that sees it — and with the clamp restored it reports **every
+title on the board at two lines**, not just the long one, because a 180px column wraps `Sample product
+card`. That is the seventh gate in this document to have been proved worthless by a planted defect, and the
+count is the argument for the practice.
+
+**The scrollbar is the one claim here that is NOT held by a gate, and it is worth being exact about why.**
+The only instrument that would prove pixels is the gutter the browser reserves, `offsetWidth -
+clientWidth`. It reads 0 in this harness under every flag spelling tried — `OverlayScrollbar`,
+`OverlayScrollbars`, the Fluent variants — because headless Chromium draws overlay scrollbars, which
+occupy no layout. What check 12 holds instead is the CASCADE: `.column-body` computes the `auto` width and
+the opaque two-token colour pair it declares, rather than the `thin`/`--border`-on-transparent the
+app-wide `*` rule would give it by inheritance. That is how this regresses in practice. It is not proof
+that the bar is wide enough to see; that part was checked by eye.
+
+**And the assertion that nearly shipped vacuous, for the record.** The track-visibility check was first
+written as `not.toContain('transparent')` — against a computed value, where `transparent` resolves to
+`rgba(0, 0, 0, 0)`. It could never have fired against the rule it exists to reject. Found by feeding both
+forms through the pattern rather than by reasoning about the spec. The pattern itself was wrong too:
+splitting `rgb(127, 154, 163) rgb(17, 28, 34)` on whitespace gives six tokens, not two, because the commas
+inside a colour function carry spaces.
+
+**The fixture grew three cards, and that is a finding about the harness rather than housekeeping.** A
+column shows three fixed-height tiles and then scrolls, and every board in the scaffolded fixture had ONE
+card — so no check in this file could have said anything about a scrolling column, and none of them
+noticed they could not. One of the three carries a title far too long for a tile, for the same reason: a
+title that fits cannot distinguish "clamped to one line and ellipsised" from "clamped to two and cut
+through the middle".
+
 ## Risks, and what would stop this
 
 - **Class renames break tests.** There are **106** `querySelector('.class')` calls in the React tests — Phase 9 migrated one and its own characterisation suite added five, all five of which ARE the subject (`.vb-field` and `.vb-label`, whose treatment is the claim), the same shape as Phase 4's; 102 before it, and Phase 8 migrated six, four to `data-testid` and two to a `testId` the primitive takes as a named prop, and moved a seventh assertion off an exact-`className` comparison that a composing primitive would have pinned; 108 before it and unchanged across Phase 5b, which took two out and put two back and says so under *Selector migrations*; 127 before Phase 5, which migrated nineteen —

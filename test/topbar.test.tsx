@@ -131,7 +131,7 @@ describe('TopBar', () => {
     const headingFor = (kind: RefusalKind): string => {
       render(<TopBar {...props} light="offline" agentRefusal={refusal} refusalKind={kind} />);
       fireEvent.click(screen.getByTitle(props.lightTitle));
-      const head = screen.getByRole('dialog').querySelector('.conn-pop-head')?.textContent ?? '';
+      const head = screen.getByRole('dialog').querySelector('.vb-status-head')?.textContent ?? '';
       const body = screen.getByRole('dialog').textContent ?? '';
       cleanup();
       return `${head}||${body}`;
@@ -155,7 +155,7 @@ describe('TopBar', () => {
       />,
     );
     fireEvent.click(screen.getByTitle(props.lightTitle));
-    expect(screen.getByRole('dialog').querySelector('.conn-pop-detail')?.textContent).toBe(note);
+    expect(screen.getByRole('dialog').querySelector('.vb-status-detail')?.textContent).toBe(note);
   });
 
   // A state the stylesheet does not know about is an invisible one: the wrapper's state is what tints the
@@ -380,6 +380,39 @@ describe('the auto-pilot chip', () => {
   it('falls back to the chip word when the stop said nothing', () => {
     render(<TopBar {...props} autopilot={state({ state: 'stopped', reason: 'exhausted' })} />);
     expect(chip()?.getAttribute('title')).toBe('exhausted');
+  });
+
+  // THE CHIP OPENS NOW, and it was the only one of the four indicators that could not. Its whole
+  // explanation was the `title` the test above asserts — which truncates, needs a hover, and is
+  // unreachable on a touch device, on the one indicator that is on screen from every tab.
+  //
+  // THE STOP SENTENCE IS THE SERVER'S AND MUST REACH THE BALLOON VERBATIM. It names the branch the loop
+  // could not create and quotes git underneath, so this is exactly the string a tooltip was cutting off.
+  // The test above proves the header does not RENDER it beside the chip; this proves it is one click away.
+  it('opens to the loop’s own stop sentence, which the tooltip was truncating', () => {
+    const said = 'Nothing can move E-004, E-007 — check that every column that holds a card is routed.';
+    render(<TopBar {...props} autopilot={state({ state: 'stopped', reason: 'stalled', detail: said })} />);
+
+    const it_ = chip();
+    expect(it_?.tagName).toBe('BUTTON');
+    expect(screen.queryByRole('dialog')).toBeNull();
+    fireEvent.click(it_ as HTMLElement);
+    const balloon = screen.getByRole('dialog');
+    expect(balloon.querySelector('.vb-status-detail')?.textContent).toBe(said);
+    // Our heading names the stop; the server's sentence is the detail. Same split as `lightAdvice`.
+    expect(balloon.querySelector('.vb-status-head')?.textContent).toBe('Auto-pilot stopped: stalled');
+  });
+
+  // `next` IS ABSENT ON A SUCCESS, which is `LightAdvice`'s contract and the reason it is asserted rather
+  // than assumed: an instruction implies something is wrong, and a finished run is not a fault. A `?.` on
+  // the query would make this pass against a balloon that failed to open at all, so the dialog is fetched
+  // first and asserted to exist.
+  it('gives a finished run no instruction, because there is nothing to do', () => {
+    render(<TopBar {...props} autopilot={state({ state: 'stopped', reason: 'complete' })} />);
+    fireEvent.click(chip() as HTMLElement);
+    const balloon = screen.getByRole('dialog');
+    expect(balloon.querySelector('.vb-status-head')?.textContent).toBe('Auto-pilot finished');
+    expect(balloon.querySelector('.vb-status-next')).toBeNull();
   });
 
   it('says nothing at all while the project is idle', () => {

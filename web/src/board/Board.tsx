@@ -49,7 +49,7 @@ export function Board({
     <section className="board">
       <div className="board-head">
         <button className="board-label" onClick={onToggle} aria-expanded={!collapsed}>
-          <span className="board-chevron">{collapsed ? '▸' : '▾'}</span>
+          <span className="board-chevron vb-twist">{collapsed ? '▸' : '▾'}</span>
           {label}
           <Chip pill fill className="vb-readout" testId="board-count">
             {cards.length}

@@ -117,7 +117,7 @@ function NodeRow(props: NodeRowProps) {
           : undefined
       }
     >
-      <span className="explorer-twist">{twist}</span>
+      <span className="explorer-twist vb-twist">{twist}</span>
       <span className="explorer-icon">{icon(node)}</span>
       <span className="control-item-name">{node.name}</span>
       {node.symlink && <Chip className="control-tag">link</Chip>}

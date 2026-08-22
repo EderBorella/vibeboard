@@ -77,7 +77,14 @@ const SHEETS = [join('web', 'src', 'styles.css'), join('web', 'src', 'ui', 'prim
 // each named a token, replaced by five that name it once), and `.msg-error` (a state's colour picked on
 // a surface). Five arrived: `.vb-tone-*`, which IS the table. Plus `.vb-chip-tone` and `.vb-dot-glow`,
 // and `.ok`/`.down` off `.copilot-status` — the fifth mechanism, which no census had counted.
-const CLASS_CEILING = 364;
+// 364 before the status-indicator merge, 362 after it. Seven died — `.conn-status`'s box kept the class
+// but `.conn` went with it, and `.conn-pop-{head,detail,next}` plus `.ap-agent-{heading,detail,next}` were
+// two copies of one balloon; `.ap-agent-state` went too, with the `button.` qualifier that undid the UA
+// styles by hand. Five arrived: `.vb-status`, `.vb-status-{head,detail,next}` — the one copy — and
+// `.vb-twist`, which is a font-size for six disclosure glyphs drawn at the chip step. Plus
+// `.copilot-authority`, a row that had never had a class and therefore never had the gutter its six
+// siblings all have.
+const CLASS_CEILING = 362;
 const CLASS_TARGET = 183;
 
 // Anti-vacuity floor on the SELECTOR PARSER, not on the class count: a regex that stops matching reports

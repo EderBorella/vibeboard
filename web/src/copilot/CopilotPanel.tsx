@@ -3,8 +3,8 @@ import { getModelStatus, listModels, type ModelOption, type ModelStatus } from '
 import { useConfirm } from '../confirm/useConfirm';
 import { backendCaps, backendDefaults } from '../shared';
 import { Button } from '../ui/Button';
-import { Dot } from '../ui/Dot';
 import { Readout } from '../ui/Readout';
+import { StatusChip } from '../ui/StatusChip';
 import { stateClass } from '../ui/state-tones';
 import { useFetched } from '../useFetched';
 import { BackendPicker } from './BackendPicker';
@@ -27,12 +27,30 @@ const NO_MODELS: ModelOption[] = [];
 // `AgentChip` on the auto-pilot bar.
 function BackendStatus({ status }: { status: ModelStatus }) {
   const state = status.up ? 'available' : 'unavailable';
+  const facts = [
+    status.uptime != null && `${status.uptime.toFixed(1)}% uptime`,
+    `${status.endpoints} provider${status.endpoints === 1 ? '' : 's'}`,
+  ].filter(Boolean);
   return (
-    <div className={`copilot-status ${stateClass(state)}`} data-state={state}>
-      <Dot testId="copilot-status-dot" glow={status.up} />
-      {state}
-      {status.uptime != null && ` · ${status.uptime.toFixed(1)}% uptime`}
-      {` · ${status.endpoints} provider${status.endpoints === 1 ? '' : 's'}`}
+    // THE FOURTH INDICATOR, AND IT IS A `StatusChip` NOW. It was a full-width row with the word and two
+    // numbers glued to it by ` · `, so the state you were looking for was the shortest thing on a line of
+    // three facts — and the row itself was the fifth mechanism no census counted, because `.ok` and
+    // `.down` did not look like states.
+    //
+    // THE TWO NUMBERS MOVE INTO THE BALLOON rather than being dropped. That is where the other three
+    // indicators put their detail, and neither number is something you read at a glance: an uptime
+    // percentage is what you go and check once the word has told you to.
+    <div className="copilot-status">
+      <StatusChip
+        state={state}
+        word={state}
+        advice={{
+          heading: status.up ? 'This backend is answering' : 'This backend is not answering',
+          detail: facts.join(' · '),
+        }}
+        glow={status.up}
+        testId="copilot-status"
+      />
     </div>
   );
 }
@@ -218,7 +236,12 @@ export function CopilotPanel({
         The confirm is not ceremony: the grant includes writing the foundation documents, and two of
         those carry commands the server later runs outside the sandbox as you.
       */}
-      <div>
+      {/* A CLASS, because the bare `<div>` this was had no padding and every other row in this panel does
+          — `.copilot-head`, `.copilot-chatbar`, `.copilot-controls`, `.copilot-selects`, `.copilot-status`
+          and `.copilot-input` all pad themselves by `0.75rem`. So the one button in the dock that grants
+          write access to the project sat flush against the panel's left edge, touching the board behind
+          it. Nothing chose that; the row simply never got a class. */}
+      <div className="copilot-authority">
         {/* The ternary was `btn-primary`/`btn-secondary` — a toggle whose "on" state is the filled one.
             It is also the one site the ratchet could not see, because a class reaching a `<button>`
             through an expression is not a literal in the attribute text; the check names that gap. */}

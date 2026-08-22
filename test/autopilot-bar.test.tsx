@@ -484,6 +484,36 @@ describe('whether that agent can actually run', () => {
     ).toBeTruthy();
   });
 
+  // A CONTROL THAT ONLY EXISTS ONCE SOMETHING IS BROKEN IS ONE NOBODY HAS EVER PRESSED, which is the
+  // owner's ruling and the reason this test exists. The chip used to be a `<span>` while the agent was
+  // healthy and a `<button>` once it was not: the affordance appeared for the first time at the exact
+  // moment a person needed it, on the surface they were already frustrated with.
+  //
+  // ASSERTED AS THE TAG AND THEN AS A CLICK, in both directions, because the tag alone was the vacuous
+  // half of this claim's ancestor — `.ap-agent-state` sat on an inner span for one phase, so a selector
+  // found something whether or not it was the control. The click is what proves the balloon opens.
+  it.each(['ready', 'failing'] as const)('is a button you can open in the %s state too', (which) => {
+    show({
+      sandbox:
+        which === 'ready'
+          ? SANDBOX_OK
+          : {
+              ...SANDBOX_OK,
+              recentFailure: { runs: 3, note: 'died before a model', at: '2026-08-22T00:00:00Z' },
+            },
+    });
+
+    const chip = screen.getByTestId('ap-agent-state');
+    expect(chip.tagName).toBe('BUTTON');
+    expect(screen.queryByRole('dialog')).toBeNull();
+    fireEvent.click(chip);
+    // AND IT SAYS SOMETHING TRUE RATHER THAN SOMETHING REASSURING. A healthy agent's balloon carries the
+    // sentence `agentStatus` has always written and hidden in a `title` — so this is not an invented
+    // reassurance, it is the same sentence somewhere a touch device can read it.
+    const said = screen.getByRole('dialog').textContent ?? '';
+    expect(said).toContain(which === 'ready' ? 'has what it needs to run' : 'died before a model');
+  });
+
   it.each([
     ['docker', 'No Docker'],
     ['attached', 'Not sandboxed'],

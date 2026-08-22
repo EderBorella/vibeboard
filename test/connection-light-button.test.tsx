@@ -78,15 +78,15 @@ describe('the light is a button', () => {
     render(light({ light: state, agentRefusal: state === 'offline' ? REFUSAL : null }));
     fireEvent.click(screen.getByRole('button'));
     const dialog = screen.getByRole('dialog');
-    expect(dialog.querySelector('.conn-pop-head')?.textContent?.length).toBeGreaterThan(0);
-    expect(dialog.querySelector('.conn-pop-detail')?.textContent?.length).toBeGreaterThan(0);
+    expect(dialog.querySelector('.vb-status-head')?.textContent?.length).toBeGreaterThan(0);
+    expect(dialog.querySelector('.vb-status-detail')?.textContent?.length).toBeGreaterThan(0);
     cleanup();
   });
 
   it('offers no instruction when everything is fine', () => {
     render(light({ light: 'online', agentRefusal: null }));
     fireEvent.click(screen.getByRole('button'));
-    expect(screen.getByRole('dialog').querySelector('.conn-pop-next')).toBeNull();
+    expect(screen.getByRole('dialog').querySelector('.vb-status-next')).toBeNull();
   });
 
   // THE CAUSE HAS TO REACH THE BALLOON. The component renders whatever `lightAdvice` returns, so a
@@ -98,7 +98,7 @@ describe('the light is a button', () => {
   it('titles the credential fault as a credential fault, not as Docker', () => {
     render(light({ refusalKind: 'credential' }));
     fireEvent.click(screen.getByRole('button'));
-    const head = screen.getByRole('dialog').querySelector('.conn-pop-head')?.textContent ?? '';
+    const head = screen.getByRole('dialog').querySelector('.vb-status-head')?.textContent ?? '';
     expect(head.toLowerCase()).not.toContain('docker');
     expect(screen.getByRole('dialog').textContent).toContain('Rebuild the agent boxes');
   });
@@ -106,7 +106,7 @@ describe('the light is a button', () => {
   it('still titles a Docker fault as Docker, on that same sentence', () => {
     render(light({ refusalKind: 'docker' }));
     fireEvent.click(screen.getByRole('button'));
-    expect(screen.getByRole('dialog').querySelector('.conn-pop-head')?.textContent).toBe(
+    expect(screen.getByRole('dialog').querySelector('.vb-status-head')?.textContent).toBe(
       'Docker is not ready',
     );
   });
@@ -125,7 +125,7 @@ describe('the light is a button', () => {
       }),
     );
     fireEvent.click(screen.getByRole('button'));
-    expect(screen.getByRole('dialog').querySelector('.conn-pop-detail')?.textContent).toBe(note);
+    expect(screen.getByRole('dialog').querySelector('.vb-status-detail')?.textContent).toBe(note);
   });
 
   // A FIXTURE THAT CANNOT TELL THE TWO APART TESTS NEITHER. `failing` and `offline` are the two states

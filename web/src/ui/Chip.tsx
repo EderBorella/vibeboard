@@ -62,6 +62,32 @@ interface Props {
   children?: ReactNode;
 }
 
+// THE CLASS LIST, EXPORTED, and the export is what makes `StatusChip` possible without a second copy of
+// these names. `Popover` renders its own `<button>` — it owns the open state and the dismiss handlers —
+// so a status chip cannot BE a `<Chip>`; it can only wear one. Writing `vb-chip vb-chip-pill` out by hand
+// in that file would be a chip's box decided outside the chip, which is precisely what this directory was
+// built to stop.
+//
+// `toned` RATHER THAN A TONE OR A STATE, because the two callers arrive at the tone class by different
+// routes: `Chip` resolves it here, and `Popover` sets it from `triggerState` alongside the `data-state`
+// attribute it must not disagree with. Passing a state through both would put the same class in the
+// attribute twice.
+export function chipClasses({
+  pill,
+  fill,
+  toned,
+  className,
+}: {
+  pill?: boolean;
+  fill?: boolean;
+  toned?: boolean;
+  className?: string;
+}): string {
+  return ['vb-chip', pill && 'vb-chip-pill', fill && 'vb-chip-fill', toned && 'vb-chip-tone', className]
+    .filter(Boolean)
+    .join(' ');
+}
+
 export function Chip({
   tone,
   pill,
@@ -80,15 +106,12 @@ export function Chip({
   // `vb-chip-tone` carries the ink and the edge and the `vb-tone-*` class carries the colour, so a chip
   // with neither prop keeps `color: inherit` — the run-id chips inside a toned `.filed-entry` would
   // otherwise take that entry's tone by inheritance. See ui/primitives.css.
-  const classes = [
-    'vb-chip',
-    pill && 'vb-chip-pill',
-    fill && 'vb-chip-fill',
-    (tone || state) && 'vb-chip-tone',
-    tone && toneClass(tone),
-    state && stateClass(state),
-    className,
-  ];
+  const classes = chipClasses({
+    pill,
+    fill,
+    toned: Boolean(tone || state),
+    className: [tone && toneClass(tone), state && stateClass(state), className].filter(Boolean).join(' '),
+  });
   // `type="button"` BY DEFAULT for Button's and Panel's reason: a `<button>` inside a `<form>` defaults
   // to `submit`, and a tag filter that submitted the form around it is a behaviour change.
   const control =
@@ -97,7 +120,7 @@ export function Chip({
       : {};
   return (
     <Tag
-      className={classes.filter(Boolean).join(' ')}
+      className={classes}
       data-state={state}
       data-testid={testId}
       title={title}

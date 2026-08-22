@@ -34,7 +34,7 @@ export function ChatSwitcher({ chats, currentChatId, backend, running, onOpen, o
           title="Chat history"
         >
           <span className="vb-trigger-label">{currentTitle}</span>
-          <span className="vb-caret">▾</span>
+          <span className="vb-caret vb-twist">▾</span>
         </button>
         {chatMenu && (
           <>

@@ -1,4 +1,5 @@
 import { type AutopilotState, isSuccessReason, type Readiness, type RunList, type RunRecord } from '../api';
+import type { StatusAdvice } from '../ui/StatusChip';
 
 // What the transport strip shows, as data rather than as JSX.
 //
@@ -88,6 +89,54 @@ function detailFor(state: AutopilotState | null): string | null {
   if (!state) return null;
   if (state.state === 'stopped' || state.state === 'halted') return state.detail ?? null;
   return null;
+}
+
+// WHAT THE TOP BAR'S CHIP SAYS WHEN YOU CLICK IT, and until now the answer was "nothing you can read
+// on a phone": the chip put its whole explanation in a `title`, so the one indicator that follows you
+// across all five tabs was the only one of the four with no way to open it.
+//
+// HERE RATHER THAN IN `TopBar`, for the reason the rest of this module is here: it is a decision about
+// what to SAY, it is worth asserting directly, and reaching it through a rendered component means
+// mocking four hooks to check a sentence. It is `lightAdvice`'s counterpart — same shape, same split
+// between our heading and the server's detail.
+//
+// THE DETAIL IS THE SERVER'S OWN SENTENCE WHEREVER THERE IS ONE. `state.detail` holds
+// `stopSentence(reason, detail)` — the canned explanation and the specifics, composed on the server by
+// the code that stopped the loop. Rewording it here would be a second description of a rule this chip
+// does not enforce, and two descriptions of one rule in this codebase have already drifted apart.
+//
+// `next` IS ABSENT ON A SUCCESS, deliberately, and it is the same contract `LightAdvice` states: an
+// instruction implies something is wrong, so a finished run gets no instruction.
+export function autopilotAdvice(state: AutopilotState): StatusAdvice {
+  if (state.state === 'running') {
+    const n = state.iteration;
+    return {
+      heading: 'Auto-pilot is running',
+      detail: `${n} dispatch${n === 1 ? '' : 'es'} so far.`,
+      next: 'The auto-pilot bar on the Boards tab names the card it is working on, and stops it.',
+    };
+  }
+  if (state.state === 'halted') {
+    return {
+      heading: 'Auto-pilot is halted',
+      detail: state.detail ?? 'Everything in this project was stopped.',
+      // The overlay and not the play button: a halt takes the chat and manual runs down with it, and
+      // `emergency.title` below says the same thing to anyone who tries to halt it twice.
+      next: 'Restart the project from the overlay before anything here can run again.',
+    };
+  }
+  const reason = state.reason ?? 'stopped';
+  if (isSuccessReason(reason)) {
+    return {
+      heading: 'Auto-pilot finished',
+      detail: state.detail ?? 'The board has no unfinished work left.',
+    };
+  }
+  return {
+    heading: `Auto-pilot stopped: ${reason}`,
+    detail: state.detail ?? 'The loop stopped and the server recorded no further detail.',
+    next: 'Press play on the auto-pilot bar to start it again.',
+  };
 }
 
 // The ROW. Short by construction: anything that needs room goes to `detailFor` instead.

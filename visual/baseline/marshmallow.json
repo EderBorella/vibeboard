@@ -1,5 +1,5 @@
 {
-  "recorded": "2026-08-21",
+  "recorded": "2026-08-22",
   "surfaces": {
     "boards": {
       "fontSizes": [
@@ -16,14 +16,14 @@
         "999px"
       ],
       "examined": {
-        "elements": 235,
-        "textElements": 129,
-        "overflow": 125,
-        "clipping": 35,
-        "contrast": 129,
-        "tokens": 41,
+        "elements": 258,
+        "textElements": 142,
+        "overflow": 132,
+        "clipping": 38,
+        "contrast": 142,
+        "tokens": 42,
         "rows": 25,
-        "focus": 59
+        "focus": 65
       },
       "findings": {
         "type": 0,
@@ -50,12 +50,12 @@
         "999px"
       ],
       "examined": {
-        "elements": 145,
-        "textElements": 84,
-        "overflow": 77,
+        "elements": 147,
+        "textElements": 85,
+        "overflow": 78,
         "clipping": 12,
-        "contrast": 84,
-        "tokens": 41,
+        "contrast": 85,
+        "tokens": 42,
         "rows": 11,
         "focus": 42
       },
@@ -83,12 +83,12 @@
         "999px"
       ],
       "examined": {
-        "elements": 149,
-        "textElements": 82,
-        "overflow": 78,
+        "elements": 151,
+        "textElements": 83,
+        "overflow": 79,
         "clipping": 15,
-        "contrast": 82,
-        "tokens": 41,
+        "contrast": 83,
+        "tokens": 42,
         "rows": 9,
         "focus": 38
       },
@@ -117,12 +117,12 @@
         "999px"
       ],
       "examined": {
-        "elements": 167,
-        "textElements": 88,
-        "overflow": 63,
+        "elements": 169,
+        "textElements": 89,
+        "overflow": 64,
         "clipping": 13,
-        "contrast": 88,
-        "tokens": 41,
+        "contrast": 89,
+        "tokens": 42,
         "rows": 8,
         "focus": 59
       },
@@ -150,12 +150,12 @@
         "999px"
       ],
       "examined": {
-        "elements": 126,
-        "textElements": 71,
-        "overflow": 62,
+        "elements": 128,
+        "textElements": 72,
+        "overflow": 63,
         "clipping": 13,
-        "contrast": 71,
-        "tokens": 41,
+        "contrast": 72,
+        "tokens": 42,
         "rows": 14,
         "focus": 43
       },
@@ -187,7 +187,7 @@
         "overflow": 30,
         "clipping": 3,
         "contrast": 35,
-        "tokens": 41,
+        "tokens": 42,
         "rows": 4,
         "focus": 18
       },
@@ -218,7 +218,7 @@
         "overflow": 3,
         "clipping": 2,
         "contrast": 4,
-        "tokens": 41,
+        "tokens": 42,
         "rows": 1,
         "focus": 3
       },
@@ -236,7 +236,8 @@
     "settings": {
       "fontSizes": [
         "12px",
-        "13px"
+        "13px",
+        "15px"
       ],
       "radii": [
         "10px",
@@ -248,7 +249,7 @@
         "overflow": 79,
         "clipping": 14,
         "contrast": 80,
-        "tokens": 41,
+        "tokens": 42,
         "rows": 0,
         "focus": 24
       },
@@ -280,7 +281,7 @@
         "overflow": 23,
         "clipping": 4,
         "contrast": 31,
-        "tokens": 41,
+        "tokens": 42,
         "rows": 5,
         "focus": 14
       },
@@ -310,7 +311,7 @@
         "overflow": 4,
         "clipping": 1,
         "contrast": 4,
-        "tokens": 41,
+        "tokens": 42,
         "rows": 0,
         "focus": 2
       },
@@ -327,33 +328,33 @@
     }
   },
   "fontSizes": {
-    "13px": 134,
-    "15px": 1,
-    "12px": 64,
-    "11px": 36
+    "13px": 142,
+    "15px": 8,
+    "12px": 74,
+    "11px": 34
   },
   "fontSizesOnText": {
-    "15px": 1,
-    "13px": 33,
-    "12px": 60,
-    "11px": 35
+    "15px": 8,
+    "13px": 32,
+    "12px": 68,
+    "11px": 34
   },
   "radii": {
+    "999px": 92,
     "50%": 12,
-    "6px": 240,
-    "999px": 84,
+    "6px": 268,
     "10px": 56,
     "4px": 4
   },
   "examined": {
-    "elements": 235,
-    "textElements": 129,
-    "overflow": 125,
-    "clipping": 35,
-    "contrast": 129,
-    "tokens": 41,
+    "elements": 258,
+    "textElements": 142,
+    "overflow": 132,
+    "clipping": 38,
+    "contrast": 142,
+    "tokens": 42,
     "rows": 25,
-    "focus": 59,
+    "focus": 65,
     "focusUnfocusable": 1
   },
   "findings": {

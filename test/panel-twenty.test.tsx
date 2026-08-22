@@ -132,13 +132,25 @@ describe('the raised surfaces — a --panel ground, a --border edge and a 10px c
     expect(box(el('popover conn-pop'))).toEqual(box(el('popover')));
   });
 
-  // THE REASON `.popover` AND `.gate-card` CANNOT TAKE `raised` AS IT IS, measured rather than argued:
-  // both are documents whose adjacent vertical margins COLLAPSE in block flow, and `raised` is a flex
-  // column, where they do not. `.ap-agent-heading`'s 0.35rem bottom against `.ap-agent-detail`'s
-  // 0.35rem top is 0.35rem of gap today and 0.7rem inside a flex column.
-  it('a popover stacks prose whose margins meet', () => {
-    expect(box(el('ap-agent-heading', 'strong'))['margin-bottom']).toBe('0.35rem');
-    expect(box(el('ap-agent-detail', 'p')).margin).toBe('0.35rem 0 0');
+  // THE POPOVER'S HALF OF THAT REASON IS GONE, and the status-indicator merge is what removed it. There
+  // were two copies of this balloon's prose — `.conn-pop-{head,detail,next}` and
+  // `.ap-agent-{heading,detail,next}` — and they disagreed: the connection light gave the head a bottom
+  // margin and the detail none, while the auto-pilot bar gave both 0.35rem, which is 0.35rem of gap in
+  // block flow and 0.7rem inside a flex column. `.vb-status-*` keeps the light's values, so no two
+  // adjacent children of a popover now carry a margin at the same boundary and there is nothing left to
+  // collapse. Pinned as bytes rather than as a substring for exactly that reason: which of the two sets
+  // survived IS the behaviour, and `toContain` cannot tell 0 from 0.35rem.
+  //
+  // `.gate-card` below is the surviving reason `raised` is not simply applied to both — 1rem against
+  // 1.5rem collapses to 1.5rem in block flow and stacks to 2.5rem in a flex column.
+  it('a popover stacks prose whose margins no longer meet', () => {
+    // The SHORTHAND, because that is what the rule writes: `box()` resolves the cascade but does not
+    // expand `margin` into its four sides, so asking for `margin-bottom` here answers `undefined` — which
+    // is the same value a deleted declaration would answer, and would have passed as `not.toBe`.
+    expect(box(el('vb-status-head', 'strong')).margin).toBe('0 0 0.35rem');
+    expect(box(el('vb-status-detail', 'p')).margin).toBe('0');
+    // The one boundary that still has a margin on it, and it is on the LOWER of the two elements.
+    expect(box(el('vb-status-next', 'p'))['margin-top']).toBe('0.5rem');
   });
 
   it('the gate card stacks headings whose margins meet', () => {

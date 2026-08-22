@@ -748,3 +748,206 @@ test('11. numbers align in a column', async ({ board, theme }) => {
       `glyphs ${narrow}/${wide}px, proportional control ${cNarrow}/${cWide}px`,
   );
 });
+
+// CHECK 12 — THE THINGS A PERSON HAS TO SEE ARE BIG ENOUGH TO SEE. The owner's report, in three parts,
+// and not one of the three was visible to any check in this file.
+//
+// Every one of them is a claim about RENDERED GEOMETRY, which is why it is here and not in the suite:
+// jsdom loads no CSS and computes no layout, so `-webkit-line-clamp: 2` inside a `height: 112px` box
+// reads as two perfectly good declarations there. What it drew was one line of text and one line of
+// half-glyphs — the box clipped the second line through the middle — and 4,465 green tests said nothing.
+//
+//   1. A CARD TITLE OCCUPIES EXACTLY ONE LINE. Asserted as the element's own height over its computed
+//      `line-height`, and NOT as a computed `white-space` — `nowrap` is the mechanism and one line is the
+//      behaviour, so a clamp that reached two lines by another route would keep the declaration and break
+//      the claim. Which is precisely what happened: the first version of this counted
+//      `getClientRects().length`, which is one rect per line box of an INLINE formatting context and
+//      exactly one rect for a block element whatever it contains. Planting the old `-webkit-line-clamp: 2`
+//      back left it green. A check that cannot see the defect it was written for is the thing this
+//      harness exists to stop shipping, and it shipped for the length of one commit.
+//   2. NOTHING IN A TILE IS CUT. Every child's bottom edge sits inside the tile's content box. This is
+//      the half that names the actual defect, and the long-titled fixture card in visual/run.mjs is what
+//      makes it able to fail — on a title that fits, both the old clamp and the new one pass.
+//   3. A COLUMN THAT SCROLLS ASKS FOR A SCROLLBAR OF ITS OWN, and this one is asserted more weakly than
+//      the other two — deliberately, and it is worth saying exactly how. The first instrument here was
+//      the gutter the browser reserves, `offsetWidth - clientWidth`, which is the only thing that would
+//      prove pixels. It reads 0 in this harness: headless Chromium draws OVERLAY scrollbars, and it does
+//      so under `--disable-features=OverlayScrollbar` too — measured, both spellings, plus the Fluent
+//      variants. There is no arrangement of flags that makes a headless scrollbar occupy layout.
+//      So what is held here is the CASCADE and not the paint: `.column-body` computes the `auto` width
+//      and the two-token colour pair it declares, rather than the `thin`/`--border` the app-wide `*` rule
+//      would give it. That is the way this regresses in practice — a rule deleted, or one that loses to
+//      the star selector — and it is not proof that the bar is wide enough to see. That part was checked
+//      by eye.
+const TWIST_FLOOR = 14; // --t-lead is 15px; a step below it would be --t-body at 13px.
+
+test('12. the affordances are big enough to see', async ({ board, theme }) => {
+  const seen = await board.evaluate(
+    ({ twistFloor }) => {
+      const rect = (el: Element) => el.getBoundingClientRect();
+      const titles = Array.from(document.querySelectorAll<HTMLElement>('.tile-title'));
+      const twists = Array.from(document.querySelectorAll<HTMLElement>('.vb-twist'));
+      const bodies = Array.from(document.querySelectorAll<HTMLElement>('.column-body'));
+
+      // A tile is `overflow: hidden`, so a clipped child still reports its own full rect — which is
+      // exactly what makes this measurable: the child's bottom against the PADDING box of the tile.
+      const cut: string[] = [];
+      for (const tile of Array.from(document.querySelectorAll<HTMLElement>('.tile'))) {
+        const box = rect(tile);
+        const inner = box.bottom - Number.parseFloat(getComputedStyle(tile).paddingBottom || '0');
+        for (const child of Array.from(tile.children)) {
+          const c = rect(child);
+          if (c.height > 0 && c.bottom > inner + 1) {
+            cut.push(`${child.className} bottom ${c.bottom.toFixed(1)} past ${inner.toFixed(1)}`);
+          }
+        }
+      }
+
+      const scrolling = bodies.filter((b) => b.scrollHeight > b.clientHeight + 1);
+      // Every control on the auto-pilot bar's row, as computed sizes. The transport was a step taller
+      // than everything beside it.
+      //
+      // `:not(.vb-seg-cell)` AND THE EXCLUSION IS MEASURED RATHER THAN ASSUMED: with it left in, this
+      // reported `vb-seg-cell-sm 11px` against everything else's 12px. A segmented control's cells are
+      // one primitive with one border and one corner, sized a step down on purpose — they are the parts
+      // of a single control, not controls sitting on this row, and folding them in would make the claim
+      // "everything is one size" false by construction and therefore unassertable.
+      const controls = Array.from(
+        document.querySelectorAll<HTMLElement>('[data-testid="ap-bar"] .ap-bar-row button:not(.vb-seg-cell)'),
+      ).map((b) => ({ id: b.dataset.testid ?? b.className, px: getComputedStyle(b).fontSize }));
+      return {
+        controls,
+        titles: titles.length,
+        // HEIGHT OVER LINE-HEIGHT, rounded. A `-webkit-box` clamped to two lines is twice as tall as a
+        // `nowrap` one and reports the same single client rect, so height is the only thing that tells
+        // them apart from outside.
+        multiline: titles
+          .map((t) => {
+            const lead = Number.parseFloat(getComputedStyle(t).lineHeight);
+            const lines = Math.round(rect(t).height / lead);
+            return { lines, text: (t.textContent ?? '').slice(0, 40) };
+          })
+          .filter((t) => t.lines !== 1),
+        twists: twists.length,
+        small: twists
+          .map((t) => ({ cls: t.className, px: Number.parseFloat(getComputedStyle(t).fontSize) }))
+          .filter((t) => t.px < twistFloor),
+        columns: bodies.length,
+        scrolling: scrolling.length,
+        bars: scrolling.map((b) => {
+          const style = getComputedStyle(b);
+          return { width: style.scrollbarWidth, color: style.scrollbarColor };
+        }),
+      };
+    },
+    { twistFloor: TWIST_FLOOR },
+  );
+
+  // THE THREE ANTI-VACUITY FLOORS, and the third one is the whole reason visual/run.mjs grew three
+  // cards: a board whose columns all fit reports `scrolling: 0` and passes the gutter claim by having
+  // nothing to measure.
+  expect(seen.titles, 'no card titles on the board').toBeGreaterThan(3);
+  expect(seen.twists, 'no disclosure glyphs on the board').toBeGreaterThan(3);
+  expect(
+    seen.scrolling,
+    'no column on the board overflows, so the scrollbar claim would measure nothing — see the crowd cards in visual/run.mjs',
+  ).toBeGreaterThan(0);
+
+  expect(
+    seen.multiline,
+    `card titles rendering on more than one line inside a fixed-height tile, where the box cuts the
+     second line through the middle:\n  ${seen.multiline.map((t) => `${t.lines} lines — ${t.text}`).join('\n  ')}`,
+  ).toEqual([]);
+  expect(seen.small, 'disclosure glyphs below the legible floor').toEqual([]);
+  // 4. ONE SIZE ACROSS THE TRANSPORT ROW. `Button size="md"` on the play control made it a step taller
+  //    than the emergency stop, Settings and How it works beside it — `primary` is what says which control
+  //    is the action, and it says it in a colour rather than in a box. The set is asserted rather than a
+  //    value, for check 13's reason: a deliberate step change belongs in the drift baseline, not here.
+  expect(seen.controls.length, 'the auto-pilot bar rendered no controls').toBeGreaterThan(3);
+  expect(
+    new Set(seen.controls.map((c) => c.px)).size,
+    `the auto-pilot bar's controls are not one size: ${seen.controls.map((c) => `${c.id} ${c.px}`).join(', ')}`,
+  ).toBe(1);
+  for (const bar of seen.bars) {
+    // `auto` and not `thin`: the app-wide rule is `thin`, so this is the assertion that the column's own
+    // rule is reaching the element at all.
+    expect(bar.width, 'a scrolling column fell back to the app-wide thin scrollbar').toBe('auto');
+    // TWO COLOURS, and neither is `transparent`. The `*` rule pairs a `--border` thumb with a transparent
+    // track — a bar you cannot see against the panel it sits on, which is what the owner reported. The
+    // pair is asserted rather than the exact tokens: those are per-theme and this check runs on all three.
+    // MATCHED, NOT SPLIT ON WHITESPACE, and the first version of this line was wrong in the way that
+    // proves the point about verifying what a pattern matched: `rgb(127, 154, 163) rgb(17, 28, 34)` splits
+    // into SIX tokens on `\s+`, because the commas inside a colour function carry spaces of their own.
+    const parts = bar.color.match(/(?:rgba?|color|oklch|hsla?)\([^)]*\)|[a-z]+/g) ?? [];
+    expect(parts.length, `scrollbar-color did not resolve to a pair: ${bar.color}`).toBe(2);
+    // ZERO ALPHA, NOT THE KEYWORD, and this is the second half of the same lesson: `getComputedStyle`
+    // resolves `transparent` to `rgba(0, 0, 0, 0)`, so `not.toContain('transparent')` — which is what
+    // was written first — could never have fired against the app-wide rule it exists to reject. Verified
+    // by feeding both forms through this pattern rather than by reading the spec.
+    const invisible = parts.filter((p) => /,\s*0\)$/.test(p) || p === 'transparent');
+    expect(invisible, `scrollbar-color leaves part of the bar invisible: ${bar.color}`).toEqual([]);
+  }
+
+  console.log(
+    `[${theme}] affordances: ${seen.titles} titles all on one line, ${seen.twists} glyphs at or above ` +
+      `${TWIST_FLOOR}px, ${seen.controls.length} controls at ${seen.controls[0]?.px}, ` +
+      `${seen.scrolling}/${seen.columns} columns scrolling, asking for ` +
+      `${seen.bars.map((b) => `${b.width} ${b.color}`).join(' | ')}`,
+  );
+});
+
+// CHECK 13 — THE STATE INDICATORS ARE ONE SHAPE. The owner counted four implementations in one glance
+// across two rows of chrome, and the merge in ui/StatusChip.tsx is what this holds in place.
+//
+// THE CLAIM IS NOT "they share a colour" — Phase 13 already did that, and it is asserted by
+// test/state-tones.test.tsx without a browser. It is that they share a BOX and an AFFORDANCE: same
+// element type, same computed size, same drawn edge, and every one of them opens. Three of those four
+// are computed values, so this is the only place they can be held.
+//
+// WHY `<button>` IS ASSERTED RATHER THAN INFERRED FROM A CLICK: the agent chip was a `<span>` in its
+// healthy state and a `<button>` once something broke, so a check that clicked whatever it found would
+// have passed on the shape the owner objected to.
+//
+// AND WHAT THIS CHECK CANNOT SEE, measured by planting it: the harness runs with `VIBEBOARD_DOCKER_BIN`
+// pointed at `/bin/false`, so the agent chip on this board is always `blocked` — it has advice, and it
+// was a `<button>` even before the merge. Reverting the healthy branch to a `<span>` leaves this test
+// green. The state that matters there is covered in jsdom, by test/autopilot-bar.test.tsx's *is a button
+// you can open in the ready state too*, which fails on that plant. What is genuinely held HERE is the
+// part jsdom cannot compute: that the indicators agree on a size, an edge and a corner.
+test('13. the state indicators are one shape', async ({ board, theme }) => {
+  const chips = await board.evaluate(() =>
+    Array.from(document.querySelectorAll<HTMLElement>('.vb-status')).map((el) => {
+      const style = getComputedStyle(el);
+      return {
+        id: el.dataset.testid ?? el.className,
+        tag: el.tagName,
+        fontSize: style.fontSize,
+        borderWidth: style.borderTopWidth,
+        // A pill. `--r-pill` is 999px and the browser clamps it to half the box height.
+        radius: Number.parseFloat(style.borderTopLeftRadius),
+        opens: el.getAttribute('aria-haspopup'),
+      };
+    }),
+  );
+
+  expect(chips.length, 'no status chip on the board — the merge left nothing to measure').toBeGreaterThan(1);
+  expect(chips.map((c) => c.tag)).toEqual(chips.map(() => 'BUTTON'));
+  expect(chips.map((c) => c.opens)).toEqual(chips.map(() => 'dialog'));
+  // ONE SIZE, and it is the set that is asserted rather than a value: the point is that they agree, and
+  // pinning 12px here would make a deliberate step change look like a regression in this check as well
+  // as in the drift baseline, which is where a font-size change belongs.
+  expect(
+    new Set(chips.map((c) => c.fontSize)).size,
+    `sizes: ${chips.map((c) => c.fontSize).join(', ')}`,
+  ).toBe(1);
+  expect(new Set(chips.map((c) => c.borderWidth)).size).toBe(1);
+  for (const chip of chips) {
+    expect(Number.parseFloat(chip.borderWidth), `${chip.id} draws no edge`).toBeGreaterThan(0);
+    expect(chip.radius, `${chip.id} is not a pill`).toBeGreaterThan(4);
+  }
+
+  console.log(
+    `[${theme}] indicators: ${chips.length} status chips — ${chips.map((c) => c.id).join(', ')} — all ` +
+      `BUTTON at ${chips[0]?.fontSize} with a ${chips[0]?.borderWidth} edge`,
+  );
+});

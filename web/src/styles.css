@@ -135,49 +135,28 @@ body {
    while you were aiming at it. `12ch` is the longest state name, stated in the unit that makes the number
    mean something: widen this only if a fifth, longer state is added to ConnState in web/src/ws.ts.
    `ch` is the advance of "0", and lowercase letters are narrower, so it has margin without measuring. */
-/* `align-items: baseline` here, with the DOT opted out — and the order matters for a reason that is not
-   visual. A flex container donates the baseline of its first BASELINE-ALIGNED item, and the dot comes
-   first in the DOM. The dot is an empty span, so its "baseline" is its bottom edge; leaving it
-   baseline-aligned would hand that to the top bar and hang the whole indicator off a circle. Centring the
-   dot removes it from the calculation, so `.conn-text` becomes the first baseline-aligned item and the
-   word lines up with the project name and the tabs, which is the point. */
+/* THE BASELINE GYMNASTICS ARE GONE WITH `.conn`, and the reason they existed is worth keeping because it
+   explains why nothing replaced them. The indicator was `align-items: baseline` with the dot opted out via
+   `.conn { align-self: center }`: a flex container donates the baseline of its first baseline-aligned
+   item, the dot comes first in the DOM, and an empty span's baseline is its bottom edge — so the whole
+   indicator hung off a circle unless the circle was excluded. As a `StatusChip` it is a drawn box that
+   centres its own contents, and `.pop-wrap` below is what sits on the row's baseline. */
 /* The anchor for any popover. `position: relative` on a wrapper rather than on the button, so the panel
    is positioned against the whole control and is not clipped by the button's own box.
    `align-self: baseline` because the one in the top bar sits in a baseline-aligned row; it is harmless
    anywhere else, since align-self only means anything to a flex or grid child. */
 .pop-wrap { position: relative; display: inline-flex; align-self: baseline; flex: 0 0 auto; }
-/* A BUTTON now, so the browser's own resets have to be undone: a UA stylesheet gives it a background, a
-   border, a centred `align-items` and — the one that matters here — its own font, which would have
-   thrown it straight back off the baseline the bar was just aligned to. */
-.conn-status {
-  display: inline-flex;
-  align-items: baseline;
-  gap: var(--s-3);
-  flex: 0 0 auto;
-  font-size: var(--t-small);
-  font-family: inherit;
-  letter-spacing: 0.04em;
-  /* THE ROLE THIS SURFACE GIVES ITS TONE: ink, on the wrapper, so it tints the pip and the word
-     together — which is the one thing nine `[data-state]` rules here agreed about and the only thing
-     left of them. `--muted` is the fallback and is reached by nothing today: `LightState` is never
-     absent, so `Popover` always sets a tone class. It is here so a state added without a row in
-     ui/state-tones.ts renders grey rather than inheriting the bar's ink and looking deliberate. */
-  color: var(--tone, var(--muted));
-  background: none;
-  border: 0;
-  padding: 0;
-  margin: 0;
-  cursor: pointer;
-  /* A button centres its text by UA default, and `.conn-text` is a fixed 12ch box — so the word sat
-     24px in from where the dot leaves off, and shuffled sideways as the state name changed length.
-     The fixed width exists to stop the TABS moving, not to make the label wander inside it. */
-  text-align: left;
-}
-.conn-status:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: var(--r-sm); }
+/* THE BOX IS `StatusChip`'s NOW, and eleven declarations went with it. This rule used to undo the UA
+   button styles by hand — `background: none; border: 0; padding: 0; margin: 0` — set its own font-size
+   and letter-spacing, and declare `color: var(--tone, var(--muted))`, which is the one role the surface
+   was choosing and the one the primitive now chooses for all four indicators. `.vb-chip.vb-chip-tone`
+   makes the ink and the edge, `.vb-status` the step and the focus ring. See ui/StatusChip.tsx.
+   WHAT IS LEFT IS THIS ROW'S, and only this row's: the word is `text-align: left` inside its fixed box,
+   because a `<button>` centres its text by UA default — so the label sat 24px in from where the dot
+   leaves off and shuffled sideways as the state name changed length. The fixed width exists to stop the
+   TABS moving, not to make the label wander inside it. */
+.conn-status { text-align: left; }
 .conn-text { width: 12ch; white-space: nowrap; }
-/* THE SHAPE IS `Dot`'s NOW — 12px, the circle and the fill all live in ui/primitives.css. What is left
-   here is what the light's own row needs: it opts out of the bar's baseline alignment (see above). */
-.conn { align-self: center; }
 /* NINE `[data-state]` RULES ARE GONE FROM HERE, and they were the largest of the six vocabularies. Six
    words, four tokens, three of them for three shades of "not right" on one control: `--danger` for
    `closed`, `--warn` for `offline`, `--accent-2` for `failing`. What each of them decided is now one row
@@ -233,22 +212,11 @@ body {
   border-top: 1px solid var(--border);
   transform: rotate(45deg);
 }
-.conn-pop-head {
-  margin: 0 0 0.35rem;
-  font-size: var(--t-body);
-  font-weight: 600;
-  color: var(--text);
-  letter-spacing: 0.01em;
-}
-.conn-pop-detail, .conn-pop-next {
-  margin: 0;
-  font-size: var(--t-small);
-  line-height: 1.45;
-  color: var(--muted);
-}
-/* Separated from the detail above it, because they have different authors: the detail is the server's
-   sentence and this is our advice about it. */
-.conn-pop-next { margin-top: 0.5rem; color: var(--text); opacity: 0.75; }
+/* `.conn-pop-{head,detail,next}` ARE GONE, and so is the duplicate set the auto-pilot bar kept:
+   `.ap-agent-{heading,detail,next}` said the same three things a hundred and fifty rules further down.
+   Both are `.vb-status-*` in ui/primitives.css now — the balloon's three lines belong to whatever draws
+   the balloon, and two surfaces each writing their own was how they came to disagree about the size of
+   the heading in the first place. */
 
 .empty { margin: auto; color: var(--muted); padding: 3rem; }
 
@@ -304,7 +272,9 @@ body {
   color: var(--text);
 }
 .board-label:hover { color: var(--accent); }
-.board-chevron { color: var(--accent); font-size: var(--t-micro); width: 0.8em; }
+/* The size is `.vb-twist`'s — see ui/primitives.css. What is left here is the colour, which is this
+   surface's, and the fixed width that stops the label sliding as the glyph swaps. */
+.board-chevron { color: var(--accent); width: 0.8em; }
 
 .board-head { display: flex; align-items: center; gap: var(--s-4); }
 /* The archive toggle appears only once a board has archived cards, so it never advertises a
@@ -435,7 +405,36 @@ body {
   overflow-y: auto;
   /* Show ~3 fixed-height cards, then scroll inside the column. */
   max-height: calc(var(--tile-h) * 3 + var(--tile-gap) * 4);
+  /* AND THE SCROLLBAR IS THIS COLUMN'S OWN, louder than the app's, because the app's could not do the
+     one job it has here. The global rule is `thin` with a `--border` thumb — furniture, correctly quiet
+     on a log or a chat, where you already know there is more text below. A column is the opposite case:
+     the max-height above is what hides the fourth card, so this scrollbar is the ONLY thing on screen
+     that says a fourth card exists. The owner reported reading three cards and forgetting the rest, on
+     every column, which is that. Wider, and a thumb at `--muted` against a `--panel` track: two tokens
+     apart rather than the one the `--border`-on-`--panel` pair was, so the trough is visible even when
+     the thumb is at the top. */
+  scrollbar-width: auto;
+  scrollbar-color: var(--muted) var(--panel);
 }
+/* AND THE SAME TWO CLAIMS IN THE OTHER VOCABULARY, because two engines read two different ones and this
+   is the one element where the difference is the whole point.
+   `background-color` and NOT the `background` shorthand, in both thumb rules. The shorthand resets
+   `background-clip` to `border-box`, so writing the hover colour with it would silently undo the
+   transparent-border inset the rule above it draws — the thumb would jump 6px wider under the pointer.
+   WHAT THE HARNESS CAN AND CANNOT SEE, recorded here so nobody reads check 12 as more than it is:
+   headless Chromium draws OVERLAY scrollbars whatever it is launched with — `offsetWidth - clientWidth`
+   is 0 on a scrolling element under `--disable-features=OverlayScrollbar` as well as without it, which
+   was measured rather than assumed. So the RENDERED width of this scrollbar is not asserted anywhere.
+   What check 12 does assert is that these declarations land on `.column-body` and are not the app-wide
+   `*` rule's `thin`/`--border` reaching it by inheritance, which is the way this would actually break. */
+.column-body::-webkit-scrollbar { width: 14px; }
+.column-body::-webkit-scrollbar-track { background-color: var(--panel); }
+.column-body::-webkit-scrollbar-thumb {
+  background-color: var(--muted);
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+.column-body::-webkit-scrollbar-thumb:hover { background-color: var(--accent); }
 .column-empty {
   color: var(--muted); font-size: var(--t-small); text-align: center;
   padding: 0.9rem var(--s-4); border: 1px dashed var(--border); border-radius: var(--r-md);
@@ -462,9 +461,15 @@ body {
    thing `bare` cannot decide for it. Reached through the row, because the `margin-left: auto` that used
    to be `.tile-archive`'s whole other declaration is now `push`. */
 .tile-head > .push:hover:not(:disabled) { color: var(--danger); }
+/* ONE LINE, ellipsised — and it was a two-line clamp until the owner measured what that actually drew.
+   A `.tile` is a FIXED `--tile-h`, and the title's second line was the first thing past the budget once
+   the head, the summary's two lines and the tag row had taken theirs: the clamp allowed a line the box
+   then cut through the middle of, so a long title rendered as one line of text and one line of half
+   glyphs. A row that cannot be read is worse than a row that is not there, so the clamp now matches
+   what the box can actually show and the rest goes to `…`. */
 .tile-title {
   font-size: var(--t-body); font-weight: 600; line-height: 1.25;
-  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .tile-summary {
   color: var(--muted); font-size: var(--t-small); line-height: 1.3;
@@ -901,7 +906,14 @@ body {
    healthy case coloured the pip and not the word, which is the same asymmetry the agent chip had. The
    halo is a `Dot` prop now: `--glow` is `none` in two of the three themes, so it cannot belong to a
    tone. */
-.copilot-status { display: flex; align-items: center; gap: var(--s-3); padding: var(--s-2) 0.75rem; font-size: var(--t-micro); color: var(--tone, var(--muted)); border-bottom: 1px solid var(--border); }
+/* THE ROW, AND NO LONGER THE INDICATOR. The `font-size` and the `color: var(--tone, …)` are gone: what
+   sits in here is a `StatusChip`, which brings both. This row's remaining job is the panel's own rhythm —
+   the same `0.75rem` gutter and the same rule underneath as every other row in the dock. */
+.copilot-status { display: flex; align-items: center; gap: var(--s-3); padding: var(--s-2) 0.75rem; border-bottom: 1px solid var(--border); }
+/* THE ROW THAT HAD NO CLASS. The Authorise button sat in a bare `<div>` while its six siblings each padded
+   themselves by `0.75rem`, so the one control that grants write access to the project was flush against
+   the dock's left edge and touching the board behind it. Nobody chose that. */
+.copilot-authority { padding: var(--s-4) 0.75rem; border-bottom: 1px solid var(--border); }
 .copilot-body { flex: 1; overflow-y: auto; padding: 0.75rem; display: flex; flex-direction: column; gap: var(--s-4); }
 /* THE ROLE THIS SURFACE GIVES ITS TONE: ink, and only the `error` kind carries one — see CopilotPanel.
    `inherit` is the fallback, which is what a bubble with no state has always rendered. Nothing above a
@@ -1003,7 +1015,9 @@ body {
    decision anybody made. `gap` is layout and stays. */
 .explorer-item { gap: var(--s-2); }
 /* Fixed width so names line up whether or not a row has a twisty. */
-.explorer-twist { width: 0.7rem; flex-shrink: 0; color: var(--muted); font-size: var(--t-micro); }
+/* The size is `.vb-twist`'s. The box widens with it: at 0.7rem an 11px glyph fitted and a 15px one did
+   not, and the overflow pushed every name in the tree half a character to the right. */
+.explorer-twist { width: 0.9rem; flex-shrink: 0; color: var(--muted); }
 .explorer-icon { flex-shrink: 0; font-size: var(--t-small); }
 .explorer-item > .vb-readout { flex-shrink: 0; }
 /* The tail of a capped listing. Deliberately not styled as an error — the folder is fine, the
@@ -1610,51 +1624,39 @@ body {
   color: var(--text);
 }
 
-/* Which agent, and whether it can run. `flex: none` because `.ap-status` above already takes the slack:
-   without it the pair would be squeezed by a long stall message, and the state word is exactly what you
-   need when the message is long. */
-.ap-agent { display: inline-flex; align-items: center; gap: var(--s-3); flex: none; }
-.ap-agent-state { font-size: var(--t-micro); white-space: nowrap; }
-/* THE DOT, because a bare word was the odd one out: the transport state two elements to the left says itself
-   with `.ap-dot`, and the connection light in the top bar with `.conn`. Smaller than both at 7px — those two
-   are the primary states of the app and the project, and this is a property of one of them. */
-/* THE ROLE THIS SURFACE GIVES ITS TONE: ink, on the wrapper, so the 7px `Dot` inside it takes the same
-   colour through `currentColor` — which is what `.ap-agent-dot-bad` and `-warn` set by hand and for the
-   reason they gave: a second colour declaration is a second thing to keep in step.
-   FOUR STATE RULES ARE GONE, and with them the vocabulary that was the worst of the six: its values were
-   `ok`, `bad`, `warn` and `unknown` — TONE NAMES used as state names, so `ok` mapped to `--muted` and a
-   reader could not tell whether the word meant a state or a colour. They are `ready`, `blocked`,
-   `failing` and `checking` now, and `failing` is the SAME ROW the connection light uses for the same
-   fact: the last runs died before reaching a model.
-   "ONLY THE FAULT GETS A COLOUR" IS WITHDRAWN, and it is the one change on this bar a person will
-   notice. It was argued as "a permanently coloured badge teaches people to stop reading the bar" — but
-   the `Dot` beside the word was already `--ok` green whenever the agent was ready, so the bar already
-   carried the colour the word was refusing, and the rule was a per-surface vocabulary rather than a
-   quietness policy. `checking` is still quiet: it is the `neutral` tone, the same `--muted` it had. */
-.ap-agent-state { display: inline-flex; align-items: center; gap: var(--s-2); color: var(--tone, var(--muted)); }
-/* A button, because it opens the balloon — but it must read as the chip it replaced, not as a control.
-   `font-family` ONLY, never the `font` shorthand: `font: inherit` resets font-size too, so the chip grew from
-   10.88px to 13.12px the moment it had something to say and shifted the whole row with it. Measured in a real
-   browser — jsdom has no computed cascade, so the suite cannot see this class of defect at all.
-   NOT `Button`, deliberately, and this is the counter-example that keeps the primitive honest: the whole
-   point of this element is that it does NOT read as a control.
-   AND IT CARRIES THE WEIGHT THE TWO FAULT STATES USED TO NAME. `agentStatus` gives an `advice` balloon to
-   exactly `blocked` and `failing` and to neither of the other two, so this element IS a button precisely
-   when there is something wrong — which says the same thing `[data-state='bad']` and `[data-state='warn']`
-   said, without naming a state and without deciding a colour. */
-button.ap-agent-state {
-  background: none;
-  border: 0;
-  padding: 0;
-  cursor: pointer;
-  font-family: inherit;
-  font-weight: 600;
+/* WHICH AGENT, AND WHETHER IT CAN RUN — AND NOW IT IS DRAWN AS THE PAIR IT ALWAYS WAS.
+   The row's tail read as one undifferentiated queue of controls: the backend selector, the agent's state,
+   Details, How it works and Settings, five things at the same distance from each other, of which two are
+   a statement about the project and three are buttons. So the pair takes a box of its own and a wider gap
+   before the buttons that follow it — the same argument `.ap-agent`'s own `gap` already made one level
+   down, that these two are useless apart. A selector with no state does not say the run will start, and a
+   state with no selector does not say what it is a state OF.
+   `--s-6` AND NOT A MARGIN ON THE BUTTONS: the separation is a property of this group's right-hand edge,
+   and putting it on the three controls would need it removed again from whichever of them happens to be
+   first once the gate acknowledgement appears and disappears.
+   `flex: none` because `.ap-status` above already takes the slack: without it the pair would be squeezed
+   by a long stall message, and the state word is exactly what you need when the message is long. */
+.ap-agent {
+  display: inline-flex; align-items: center; gap: var(--s-3); flex: none;
+  border: 1px solid var(--border); border-radius: var(--r-md);
+  padding: var(--s-2) var(--s-3); margin-right: var(--s-6);
 }
-button.ap-agent-state:hover { text-decoration: underline; }
-.ap-agent-heading { display: block; margin-bottom: 0.35rem; }
-.ap-agent-detail,
-.ap-agent-next { margin: 0.35rem 0 0; }
-.ap-agent-next { color: var(--muted); }
+/* `.ap-agent-state` IS GONE — SIX DECLARATIONS AND A `button.` QUALIFIER — and it is the one indicator
+   whose deletion is worth recording, because two of its rules were arguments against the shape it has now.
+   It said `NOT Button, deliberately, and this is the counter-example that keeps the primitive honest: the
+   whole point of this element is that it does NOT read as a control` — and it said the element `IS a button
+   precisely when there is something wrong`. Both were coherent and both are withdrawn: an indicator that
+   becomes a control only once the project is broken is one nobody has ever pressed, so the affordance is
+   missing at exactly the moment it is needed. All four indicators are `StatusChip` now and all four are
+   buttons in every state. ui/StatusChip.tsx carries the census.
+   `button.ap-agent-state` undid the UA button styles by hand and warned, correctly, that `font: inherit`
+   would reset the font-size and grow the chip from 10.88px to 13.12px the moment it had something to say.
+   `.vb-status` sets one step for all four, so there is nothing left to grow between states.
+   THE FOUR `[data-state]` RULES WENT IN PHASE 13 and their vocabulary was the worst of the six: `ok`,
+   `bad`, `warn` and `unknown` — TONE NAMES used as state names, so `ok` mapped to `--muted` and a reader
+   could not tell whether the word meant a state or a colour. They are `ready`, `blocked`, `failing` and
+   `checking`, and `failing` is the SAME ROW the connection light uses for the same fact: the last runs
+   died before reaching a model. */
 
 /* THE WAY OUT OF A STALLED PROJECT, sized like the other controls in this bar rather than like the card
    report list it borrowed from. Measured: it came out at 10.88px with 1.6px of padding against 12.16px and

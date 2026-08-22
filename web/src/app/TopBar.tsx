@@ -1,7 +1,8 @@
 import { type AutopilotState, isSuccessReason } from '../api';
-import type { TransportState } from '../autopilot/transport';
+import { autopilotAdvice, type TransportState } from '../autopilot/transport';
 import { Button } from '../ui/Button';
 import { Chip } from '../ui/Chip';
+import { StatusChip } from '../ui/StatusChip';
 import { ConnectionLight } from './ConnectionLight';
 import type { LightState, RecentFailure, RefusalKind } from './connection-light';
 
@@ -117,22 +118,27 @@ export function TopBar({
         refusalKind={refusalKind}
         recentFailure={recentFailure}
       />
-      {showProject && chip && (
+      {showProject && chip && autopilot && (
         // `state`, AND IT IS A ROW IN THE TABLE NOW. The note here used to argue that "the palette does
         // not fit the five" because `running` was `--accent-2`, the palette's secondary, which is not
         // `--warn` in marshmallow. That defended a token this surface had picked: the same `running`
         // rendered `--text` on a report chip and `--accent` on the auto-pilot bar's rail, three colours
         // for one fact. `--warn` is the attention token, `--accent-2` is a hue, and `running` is
         // `accent` wherever it is said. See ui/state-tones.ts.
-        <Chip
-          pill
+        // A `StatusChip`, AND THE CHANGE A PERSON WILL NOTICE IS THAT IT NOW OPENS. It was the only one
+        // of the four indicators with no dot and no way to read its explanation: `title={detail}` put
+        // the loop's own stop sentence — which names the branch it could not create and quotes git
+        // underneath — into a tooltip that truncates it, on the one indicator that is on screen from
+        // every tab. `autopilotAdvice` is where that sentence goes now.
+        <StatusChip
           state={chip.state}
+          dot={8}
+          word={chip.label}
+          advice={autopilotAdvice(autopilot)}
+          title={autopilot.detail ?? chip.label}
           className="ap-chip"
           testId="ap-chip"
-          title={autopilot?.detail ?? chip.label}
-        >
-          {chip.label}
-        </Chip>
+        />
       )}
       {/* The SENTENCE is not here, and the reasoning that put it here is worth keeping because it was true when
           it was written: `whyStuck` names WHICH cards are stuck and why, and all of it once lived in a `title`

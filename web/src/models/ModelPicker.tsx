@@ -85,7 +85,7 @@ export function ModelPicker({ models, value, defaultModel, onChange, disabled }:
           {selected?.free ? '🆓 ' : ''}
           {label}
         </Readout>
-        <span className="vb-caret">▾</span>
+        <span className="vb-caret vb-twist">▾</span>
       </button>
 
       {open && (

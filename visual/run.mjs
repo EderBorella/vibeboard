@@ -163,6 +163,33 @@ async function furnish(projectRoot) {
   if (typeof spare === 'string') die(`the archive fixture card was refused: ${spare}`);
   await archiveCard(projectRoot, spare, '2026-01-02T08:30:00.000Z');
 
+  // A COLUMN THAT OVERFLOWS, AND A TITLE THAT DOES NOT FIT — two conditions this harness could not
+  // reach and the owner hit within a minute of using his own board.
+  //
+  // A `.column-body` shows three fixed-height tiles and then scrolls, so a fixture with ONE card can
+  // never say anything about the scrollbar: the check would examine a column with nothing to scroll,
+  // report clean, and be exactly the vacuous pass this harness exists to prevent. Four cards is the
+  // smallest number that produces the state.
+  //
+  // AND ONE OF THE FOUR HAS A TITLE FAR TOO LONG FOR THE TILE, for the same reason one card was too
+  // thin: a title that fits cannot distinguish "clamped to one line and ellipsised" from "clamped to
+  // two lines and cut through the middle of the second", which is what the box actually drew. Both
+  // outcomes look identical on `Sample product card`.
+  const crowd = [
+    'A card whose title is far longer than one line of a fixed-height tile can hold, and which therefore has to end in an ellipsis rather than be sliced through the middle of its second line',
+    'The third card in this column',
+    'The fourth card in this column',
+  ];
+  for (const [i, title] of crowd.entries()) {
+    const extra = await createCard(
+      projectRoot,
+      config,
+      { board: 'product', columnSlug: product.columnSlug, title, description: 'Here so the column scrolls.' },
+      '2026-01-01',
+    );
+    if (typeof extra === 'string') die(`crowd card ${i + 1} was refused: ${extra}`);
+  }
+
   // The scaffolder writes one diary line. Two more, of two different kinds, so the list renders rows
   // with a kind, an outcome and a card reference rather than one bare lifecycle entry.
   await appendEntry(projectRoot, {

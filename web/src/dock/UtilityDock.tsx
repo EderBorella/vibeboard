@@ -45,7 +45,7 @@ export function UtilityDock({ panes, activeId, onPane, collapsed, onCollapse }: 
           aria-expanded={!collapsed}
           onClick={onCollapse}
         >
-          {collapsed ? '▴' : '▾'}
+          <span className="vb-twist">{collapsed ? '▴' : '▾'}</span>
         </Button>
       </div>
 

@@ -17,7 +17,7 @@ import { resolveChoice } from '../copilot/choice';
 import type { CopilotConfig } from '../shared';
 import { Button } from '../ui/Button';
 import { Dot } from '../ui/Dot';
-import { Popover } from '../ui/Popover';
+import { StatusChip } from '../ui/StatusChip';
 import { stateClass } from '../ui/state-tones';
 import { useAction } from '../useAction';
 import { AutopilotHelp } from './AutopilotHelp';
@@ -133,51 +133,33 @@ export function agentStatus(sandbox: SandboxState | null): {
 // Its own component because the bar was already at the complexity limit and this is the second conditional
 // rendering in it — the gate refusing the third one is the gate working.
 function AgentChip({ agent }: { agent: ReturnType<typeof agentStatus> }) {
-  // THE STATE IS AN ATTRIBUTE AND NO LONGER A CLASS NAME BUILT AT RUN TIME. `ap-agent-${tone}`
-  // produced four classes no literal grep could see, which is the defect the *Risks* section of
-  // docs/design-system.md describes: 36 live classes looked dead, and deleting them would have broken every
-  // state colour on this bar in exactly the states a person only reaches once something has gone wrong.
-  //
-  // THE DOT HAS NO STATE OF ITS OWN. It used to carry `tone="ok"` while the word beside it was painted
-  // `--muted` — a green pip beside grey text, which was this surface deciding that a healthy agent should
-  // say so in one place and not the other. The wrapper's tone now reaches both through `currentColor`.
-  const dot = <Dot size={7} />;
-  if (!agent.advice) {
-    return (
-      <span
-        className={`ap-agent-state ${stateClass(agent.state)}`}
-        data-state={agent.state}
-        data-testid="ap-agent-state"
-        title={agent.title}
-      >
-        {dot}
-        {agent.word}
-      </span>
-    );
-  }
   return (
-    <Popover
+    // A `StatusChip`, AND IT IS ALWAYS A BUTTON NOW. It used to be a `<span>` when the agent was fine and
+    // a `<button>` when it was not — the element changing shape under the state it reports, which the
+    // comment on the old CSS defended as carrying "the weight the two fault states used to name". The
+    // owner ruled the other way and it is the right call: a control that only exists once something is
+    // broken is one nobody has ever clicked, so it is undiscovered at exactly the moment it matters.
+    //
+    // AND A HEALTHY AGENT HAS SOMETHING TO SAY. `agentStatus` has always written one sentence per state —
+    // "This agent has what it needs to run in this project" — and put it in a `title` where two of the
+    // four states also had a full balloon. So the fallback below is not an invented reassurance: it is
+    // the sentence this surface already had, moved somewhere it can be read on a touch device.
+    //
+    // THE STATE IS AN ATTRIBUTE AND NOT A CLASS BUILT AT RUN TIME. `ap-agent-${tone}` produced four
+    // classes no literal grep could see, which is the defect the *Risks* section of
+    // docs/design-system.md describes: deleting them would have broken every state colour on this bar in
+    // exactly the states a person only reaches once something has gone wrong.
+    <StatusChip
+      state={agent.state}
+      // 7px: the transport dot two elements to the left is the PROJECT's state and the light in the top
+      // bar is the APP's, and this is a property of one of them.
+      dot={7}
+      word={agent.word}
+      advice={agent.advice ?? { heading: agent.word, detail: agent.title }}
+      title={agent.title}
       label="What is wrong with this agent"
-      triggerClassName="ap-agent-state"
-      triggerTitle={agent.title}
-      // ON THE TRIGGER, not on the content. It used to sit on the inner span so one selector would find
-      // this chip whether it was a plain span or a button with a balloon — and that made
-      // `test/autopilot-bar.test.tsx`'s `expect(badge.className).not.toContain('ap-agent-ok')` VACUOUS in
-      // every case that has a balloon, because the inner span never carried a tone at all. The tone and
-      // the test id now sit on the same element in both shapes, which is what that assertion needed.
-      triggerTestId="ap-agent-state"
-      triggerState={agent.state}
-      trigger={
-        <>
-          {dot}
-          {agent.word}
-        </>
-      }
-    >
-      <strong className="ap-agent-heading">{agent.advice.heading}</strong>
-      <p className="ap-agent-detail">{agent.advice.detail}</p>
-      {agent.advice.next && <p className="ap-agent-next">{agent.advice.next}</p>}
-    </Popover>
+      testId="ap-agent-state"
+    />
   );
 }
 
@@ -210,7 +192,11 @@ function Transport({
   return (
     <Button
       variant={stopping ? 'default' : 'primary'}
-      size="md"
+      // `sm`, THE SAME SIZE AS EVERY OTHER CONTROL ON THIS ROW. It was `md` on the argument that the one
+      // action should read as the one action — but `primary` is what says that, and it says it in a
+      // colour rather than in a box: the emergency stop, Settings and How it works are all `sm`, so `md`
+      // made the play button a step taller than the row it sits in and pushed the whole strip's height
+      // off the tabs above it. The owner asked for the normal size.
       className="ap-transport"
       data-testid="ap-transport"
       disabled={control.disabled}
@@ -378,7 +364,7 @@ export function AutopilotBar({
             onClick={() => setOpen((v) => !v)}
             data-testid="ap-expand"
           >
-            {open ? '▾' : '▸'} {open ? 'Hide' : 'Details'}
+            <span className="vb-twist">{open ? '▾' : '▸'}</span> {open ? 'Hide' : 'Details'}
           </Button>
         )}
         {/* THE ghost, and the one the owner ruled on: a help affordance explains, which is what the

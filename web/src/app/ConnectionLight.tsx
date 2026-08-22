@@ -1,5 +1,4 @@
-import { Dot } from '../ui/Dot';
-import { Popover } from '../ui/Popover';
+import { StatusChip } from '../ui/StatusChip';
 import { type LightState, lightAdvice, type RecentFailure, type RefusalKind } from './connection-light';
 
 // The light, as a button that explains itself.
@@ -31,36 +30,33 @@ export function ConnectionLight({
   // `refusalKind` and refusing nothing — see `lightFor`.
   recentFailure?: RecentFailure | null;
 }) {
-  const advice = lightAdvice(light, agentRefusal, refusalKind, recentFailure);
   return (
-    <Popover
-      label={advice.heading}
-      // THE STATE IS AN ATTRIBUTE, not a class built at run time from `conn-${light}`. Six classes lived
-      // only inside that template string, so a literal grep for any of them found nothing and all six
-      // looked dead — the exact defect the *Risks* section of docs/design-system.md describes, and the
-      // worst possible shape for one: deleting them breaks the colour that tells you the connection has
-      // dropped, and nothing else. `data-state` is visible to the same grep that reads the stylesheet.
-      //
-      // Still on the WRAPPER rather than on the dot, which has not changed: it tints the dot and the word
-      // together, and only the wrapper knows the state.
-      triggerClassName="conn-status"
-      triggerTitle={title}
-      triggerTestId="conn-status"
-      triggerState={light}
-      trigger={
-        <>
-          {/* NO STATE OF ITS OWN: the trigger carries the tone and the dot's fill inherits it, which
-              is what nine `.conn-status[data-state='…'] .vb-dot` rules used to say one state at a
-              time. The halo stays a property of THIS surface — the app's own health is one of the two
-              things worth one — and it is a prop rather than a tenth state rule. */}
-          <Dot size={12} glow={light === 'online'} className="conn" />
-          <span className="conn-text">{light}</span>
-        </>
-      }
-    >
-      <h3 className="conn-pop-head">{advice.heading}</h3>
-      <p className="conn-pop-detail">{advice.detail}</p>
-      {advice.next && <p className="conn-pop-next">{advice.next}</p>}
-    </Popover>
+    // A `StatusChip`, AND IT IS THE FIRST OF THE FOUR — this is the one the other three were made to look
+    // like, because it was the only one that already explained itself on a click. What it gives up is its
+    // own box: `.conn-status` declared a border, a padding, a background and a font-size of its own, which
+    // was four decisions about a shape three other indicators were also making separately. See
+    // ui/StatusChip.tsx for the census.
+    //
+    // THE STATE IS STILL AN ATTRIBUTE and not a class built at run time from `conn-${light}`. Six classes
+    // lived only inside that template string, so a literal grep for any of them found nothing and all six
+    // looked dead — the exact defect the *Risks* section of docs/design-system.md describes, and the worst
+    // possible shape for one: deleting them breaks the colour that tells you the connection has dropped,
+    // and nothing else. `StatusChip` passes it through `triggerState`, which sets the attribute and the
+    // tone class from the one table.
+    <StatusChip
+      state={light}
+      // THE HALO IS THIS SURFACE'S, and it is the reason `glow` is a prop rather than a tone: the app's
+      // own health is one of the two things in the app worth one, and `--glow` is `none` in two themes.
+      dot={12}
+      glow={light === 'online'}
+      // A FIXED 12ch BOX, sized to the longest name the light can report, and it is a claim about THIS
+      // row rather than about a status chip: the indicator sits left of the tabs, so a label that resized
+      // with its text would shove the whole tab row sideways on every reconnect.
+      word={<span className="conn-text">{light}</span>}
+      advice={lightAdvice(light, agentRefusal, refusalKind, recentFailure)}
+      title={title}
+      className="conn-status"
+      testId="conn-status"
+    />
   );
 }

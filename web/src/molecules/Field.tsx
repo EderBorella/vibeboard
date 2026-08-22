@@ -70,7 +70,16 @@ export function Field(props: FormProps | InlineProps) {
   return props.inline ? <InlineBody {...props} /> : <FormBody {...props} />;
 }
 
-function FormBody({ label, hint, error, layout = 'stack', caps = false, as = 'label', className, children }: FormProps) {
+function FormBody({
+  label,
+  hint,
+  error,
+  layout = 'stack',
+  caps = false,
+  as = 'label',
+  className,
+  children,
+}: FormProps) {
   const Tag = as;
   const classes = [
     'vb-field',

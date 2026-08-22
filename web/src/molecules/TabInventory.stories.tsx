@@ -47,7 +47,8 @@ function Measured({ label, probe, children }: { label: string; probe: string; ch
       setPx('not found');
       return;
     }
-    const read = (): void => setPx(`${(Math.round(el.getBoundingClientRect().height * 100) / 100).toFixed(2)}`);
+    const read = (): void =>
+      setPx(`${(Math.round(el.getBoundingClientRect().height * 100) / 100).toFixed(2)}`);
     read();
     const observer = new ResizeObserver(read);
     observer.observe(el);

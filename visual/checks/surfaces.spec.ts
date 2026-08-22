@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test';
-import { auditFocus, auditStyles, type Offender, RUN_TIME_TOKENS } from '../support/audit.js';
+import { auditFocus, auditStyles, type Offender, RUN_TIME_TOKENS, TYPE_SCALE } from '../support/audit.js';
 import {
   type Baseline,
   expect,
@@ -195,9 +195,12 @@ for (const surface of SURFACES) {
     // The two probes, asserted here as well as on the board: a token that stopped resolving turns the
     // allow-list into "whatever this page happens to compute", which permits exactly what it exists to
     // refuse. They are read off a probe in the page, so they hold per surface too.
-    expect(new Set(styles.scale).size, `the type scale did not resolve to six steps: ${styles.scale}`).toBe(
-      6,
-    );
+    // Counted off `TYPE_SCALE`, not written down — the same repair, and the same reason, as
+    // board.spec.ts. The literal here and the list in audit.ts drifted apart the moment a step retired.
+    expect(
+      new Set(styles.scale).size,
+      `the type scale did not resolve to ${TYPE_SCALE.length} steps: ${styles.scale}`,
+    ).toBe(TYPE_SCALE.length);
     expect(
       new Set(styles.radiusScale).size,
       `the radius scale did not resolve to four steps: ${styles.radiusScale}`,

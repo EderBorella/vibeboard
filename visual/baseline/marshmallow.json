@@ -16,14 +16,14 @@
         "999px"
       ],
       "examined": {
-        "elements": 258,
-        "textElements": 142,
-        "overflow": 132,
+        "elements": 261,
+        "textElements": 143,
+        "overflow": 133,
         "clipping": 38,
-        "contrast": 142,
-        "tokens": 42,
-        "rows": 25,
-        "focus": 65
+        "contrast": 143,
+        "tokens": 41,
+        "rows": 26,
+        "focus": 66
       },
       "findings": {
         "type": 0,
@@ -50,14 +50,14 @@
         "999px"
       ],
       "examined": {
-        "elements": 147,
-        "textElements": 85,
-        "overflow": 78,
+        "elements": 150,
+        "textElements": 86,
+        "overflow": 79,
         "clipping": 12,
-        "contrast": 85,
-        "tokens": 42,
-        "rows": 11,
-        "focus": 42
+        "contrast": 86,
+        "tokens": 41,
+        "rows": 12,
+        "focus": 43
       },
       "findings": {
         "type": 0,
@@ -83,14 +83,14 @@
         "999px"
       ],
       "examined": {
-        "elements": 151,
-        "textElements": 83,
-        "overflow": 79,
+        "elements": 154,
+        "textElements": 84,
+        "overflow": 80,
         "clipping": 15,
-        "contrast": 83,
-        "tokens": 42,
-        "rows": 9,
-        "focus": 38
+        "contrast": 84,
+        "tokens": 41,
+        "rows": 10,
+        "focus": 39
       },
       "findings": {
         "type": 0,
@@ -117,14 +117,14 @@
         "999px"
       ],
       "examined": {
-        "elements": 169,
-        "textElements": 89,
-        "overflow": 64,
+        "elements": 172,
+        "textElements": 90,
+        "overflow": 65,
         "clipping": 13,
-        "contrast": 89,
-        "tokens": 42,
-        "rows": 8,
-        "focus": 59
+        "contrast": 90,
+        "tokens": 41,
+        "rows": 9,
+        "focus": 60
       },
       "findings": {
         "type": 0,
@@ -150,14 +150,14 @@
         "999px"
       ],
       "examined": {
-        "elements": 128,
-        "textElements": 72,
-        "overflow": 63,
+        "elements": 131,
+        "textElements": 73,
+        "overflow": 64,
         "clipping": 13,
-        "contrast": 72,
-        "tokens": 42,
-        "rows": 14,
-        "focus": 43
+        "contrast": 73,
+        "tokens": 41,
+        "rows": 15,
+        "focus": 44
       },
       "findings": {
         "type": 0,
@@ -187,7 +187,7 @@
         "overflow": 30,
         "clipping": 3,
         "contrast": 35,
-        "tokens": 42,
+        "tokens": 41,
         "rows": 4,
         "focus": 18
       },
@@ -218,7 +218,7 @@
         "overflow": 3,
         "clipping": 2,
         "contrast": 4,
-        "tokens": 42,
+        "tokens": 41,
         "rows": 1,
         "focus": 3
       },
@@ -249,7 +249,7 @@
         "overflow": 79,
         "clipping": 14,
         "contrast": 80,
-        "tokens": 42,
+        "tokens": 41,
         "rows": 0,
         "focus": 24
       },
@@ -281,7 +281,7 @@
         "overflow": 23,
         "clipping": 4,
         "contrast": 31,
-        "tokens": 42,
+        "tokens": 41,
         "rows": 5,
         "focus": 14
       },
@@ -311,7 +311,7 @@
         "overflow": 4,
         "clipping": 1,
         "contrast": 4,
-        "tokens": 42,
+        "tokens": 41,
         "rows": 0,
         "focus": 2
       },
@@ -328,33 +328,33 @@
     }
   },
   "fontSizes": {
-    "13px": 142,
+    "13px": 143,
     "15px": 8,
-    "12px": 74,
+    "12px": 76,
     "11px": 34
   },
   "fontSizesOnText": {
     "15px": 8,
     "13px": 32,
-    "12px": 68,
+    "12px": 69,
     "11px": 34
   },
   "radii": {
-    "999px": 92,
+    "999px": 96,
     "50%": 12,
     "6px": 268,
     "10px": 56,
     "4px": 4
   },
   "examined": {
-    "elements": 258,
-    "textElements": 142,
-    "overflow": 132,
+    "elements": 261,
+    "textElements": 143,
+    "overflow": 133,
     "clipping": 38,
-    "contrast": 142,
-    "tokens": 42,
-    "rows": 25,
-    "focus": 65,
+    "contrast": 143,
+    "tokens": 41,
+    "rows": 26,
+    "focus": 66,
     "focusUnfocusable": 1
   },
   "findings": {

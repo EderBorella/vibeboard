@@ -30,9 +30,17 @@ interface Step {
 const STEPS: Step[] = [
   { token: '--t-micro', means: 'chips, state words, tags', specimen: 'needs you · 3' },
   { token: '--t-small', means: 'controls, secondary text, table cells', specimen: 'Refresh suggestions' },
-  { token: '--t-body', means: 'default UI text, card titles on the board', specimen: 'Split the dispatch pane' },
+  {
+    token: '--t-body',
+    means: 'default UI text, card titles on the board',
+    specimen: 'Split the dispatch pane',
+  },
   { token: '--t-lead', means: 'panel headings, an open card’s title', specimen: 'Project log' },
-  { token: '--t-title', means: 'surface titles, and a rendered document’s h1', specimen: 'Auto-pilot halted' },
+  {
+    token: '--t-title',
+    means: 'surface titles, and a rendered document’s h1',
+    specimen: 'Auto-pilot halted',
+  },
 ];
 
 const STACKS = [
@@ -94,12 +102,7 @@ function Specimens() {
             }}
           >
             {STEPS.map((step) => (
-              <Specimen
-                key={step.token}
-                step={step}
-                size={sizes.get(step.token) ?? ''}
-                stack={stack.token}
-              />
+              <Specimen key={step.token} step={step} size={sizes.get(step.token) ?? ''} stack={stack.token} />
             ))}
           </div>
         </section>

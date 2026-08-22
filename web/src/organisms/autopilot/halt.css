@@ -15,7 +15,7 @@
 .halt {
   max-width: 34rem;
   gap: var(--s-5);
-  padding: var(--s-7) var(--s-7);
+  padding: var(--s-7);
   border-color: var(--danger);
   box-shadow: 0 18px 50px rgb(0 0 0 / 45%);
 }

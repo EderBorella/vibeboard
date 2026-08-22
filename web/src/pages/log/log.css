@@ -4,7 +4,7 @@
 .filed {
   flex: 0 1 42%; min-width: 0; overflow-y: auto; background: var(--wash);
   border-left: 1px solid var(--border);
-  padding: var(--s-7) var(--s-7); display: flex; flex-direction: column; gap: var(--s-6);
+  padding: var(--s-7); display: flex; flex-direction: column; gap: var(--s-6);
 }
 /* Narrow enough that the two columns stop being two columns: the diary keeps the width, and this stacks
    under it rather than becoming a gutter neither half can be read in. */

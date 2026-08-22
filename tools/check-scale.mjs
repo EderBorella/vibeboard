@@ -94,7 +94,7 @@ const TRACKING_ON_PURPOSE = new Map([
   ],
   [
     '-0.01em',
-    '`.vb-readout` in web/src/ui/primitives.css — one third of the signature\'s own definition in ' +
+    "`.vb-readout` in web/src/ui/primitives.css — one third of the signature's own definition in " +
       'docs/design-system.md (*The signature: the readout*), beside `font-family: var(--font-mono)` and ' +
       '`font-variant-numeric: tabular-nums`. NEGATIVE, and the tracking token is positive: this is the ' +
       'opposite decision from the chrome treatment rather than a different amount of it.',
@@ -158,7 +158,8 @@ function fontSizeFault(value) {
   if (OFF_SCALE_ON_PURPOSE.has(value)) return null;
   const token = /^var\((--t-[\w-]+)\)$/.exec(value)?.[1];
   if (!token) return `font-size: ${value} — not a step on the scale`;
-  if (!TYPE_SCALE.includes(token)) return `font-size: var(${token}) — not one of the ${TYPE_SCALE.length} steps`;
+  if (!TYPE_SCALE.includes(token))
+    return `font-size: var(${token}) — not one of the ${TYPE_SCALE.length} steps`;
   if (!known.has(token)) return `font-size: var(${token}) — defined in no stylesheet`;
   return null;
 }
@@ -200,24 +201,84 @@ function spaceFaults(property, rawValue) {
   return faults.map((fault) => `${property}: ${fault}`);
 }
 
+// `inherit` IS NOT ALLOWED HERE, AND IT WAS. The claim this arm makes is `var(--track)`, `normal`, or a
+// named exception with its reason — and a bare `inherit` branch was neither: no rule in the tree used it,
+// so nothing exercised it, and it sat OUTSIDE `TRACKING_ON_PURPOSE` where the stale-row check cannot see
+// it. This file's own doctrine two screens up is that an exception nothing exercises is an exception that
+// would pass an empty tree; an allowance hardcoded into a condition is that with the audit removed. It
+// belongs in the map with a reason on the day a rule needs it.
 function trackingFault(value) {
-  if (value === 'normal' || value === 'inherit' || TRACKING_ON_PURPOSE.has(value)) return null;
+  if (value === 'normal' || TRACKING_ON_PURPOSE.has(value)) return null;
   if (value !== `var(${TRACK})`) {
     return `letter-spacing: ${value} — not var(${TRACK}), \`normal\`, or a named exception`;
   }
   return known.has(TRACK) ? null : `letter-spacing: var(${TRACK}) — defined in no stylesheet`;
 }
 
-export function scan(file, raw) {
-  /** @type {{ site: string, detail: string }[]} */
+// ONE ARM EACH, and the split is forced rather than tidy: `scan` scored 16 on the cognitive-complexity
+// metric against a ceiling of 15 — four loops, a branch in each, and a loop inside one of them. The
+// metric punishes NESTING far harder than length, so lifting the arms out flattens it while moving no
+// pattern at all: every regex still lives at the top of this file and every arm is still reached only
+// through `scan`, which is what keeps `parserSelfTest` honest about the code the census runs.
+//
+// THE ORDER OF THE THREE CALLS IN `scan` IS LOAD-BEARING: `SELF_TEST_WANT` is a single joined string, so
+// the arms' findings are compared in sequence. Reordering them fails the self-test, which is correct.
+
+/** @returns {{ count: number, findings: {site: string, detail: string}[], used: {key: string, site: string}[] }} */
+function typeArm(text, site) {
   const findings = [];
-  // Keyed `property:value`, not by value alone: `inherit` is a legal font-size exception AND a legal
-  // letter-spacing, and one shared set would let either one prune the other's row.
-  /** @type {Set<string>} */
-  const exceptionsUsed = new Set();
-  let fontSizes = 0;
-  let spaces = 0;
-  let trackings = 0;
+  const used = [];
+  let count = 0;
+  for (const match of text.matchAll(FONT_SIZE)) {
+    count += 1;
+    if (OFF_SCALE_ON_PURPOSE.has(match[1])) {
+      used.push({ key: `font-size:${match[1]}`, site: site(match.index) });
+    }
+    const fault = fontSizeFault(match[1]);
+    if (fault) findings.push({ site: site(match.index), detail: fault });
+  }
+  for (const match of text.matchAll(FONT_SHORTHAND)) {
+    if (!LENGTH.test(match[1])) continue;
+    findings.push({
+      site: site(match.index),
+      detail: `font:${match[1]} — the shorthand sets a font size; name the step with font-size instead`,
+    });
+  }
+  return { count, findings, used };
+}
+
+/** @returns {{ count: number, findings: {site: string, detail: string}[], used: {key: string, site: string}[] }} */
+function spaceArm(text, site) {
+  const findings = [];
+  let count = 0;
+  for (const match of text.matchAll(SPACE)) {
+    count += 1;
+    for (const detail of spaceFaults(match[1], match[2])) {
+      findings.push({ site: site(match.index), detail });
+    }
+  }
+  // No exception map on this arm ON PURPOSE: a space value is a fixed length, so "the nearest step" is
+  // always defined for it and the judgement a person would have to record does not exist.
+  return { count, findings, used: [] };
+}
+
+/** @returns {{ count: number, findings: {site: string, detail: string}[], used: {key: string, site: string}[] }} */
+function trackingArm(text, site) {
+  const findings = [];
+  const used = [];
+  let count = 0;
+  for (const match of text.matchAll(LETTER_SPACING)) {
+    count += 1;
+    if (TRACKING_ON_PURPOSE.has(match[1])) {
+      used.push({ key: `letter-spacing:${match[1]}`, site: site(match.index) });
+    }
+    const fault = trackingFault(match[1]);
+    if (fault) findings.push({ site: site(match.index), detail: fault });
+  }
+  return { count, findings, used };
+}
+
+export function scan(file, raw) {
   // COMMENTS ARE BLANKED, NOT READ. This check scanned the raw file, so any comment that mentioned
   // `font-size:` or `padding:` in prose was parsed as a declaration and the words after it as its
   // value — Phase 4 tripped it with a comment explaining why a `font-size` had been REMOVED, and it
@@ -230,36 +291,23 @@ export function scan(file, raw) {
   const text = raw.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' '));
   const site = (offset) => `${file}:${lineOf(text, offset)}`;
 
-  for (const match of text.matchAll(FONT_SIZE)) {
-    fontSizes += 1;
-    if (OFF_SCALE_ON_PURPOSE.has(match[1])) exceptionsUsed.add(`font-size:${match[1]}`);
-    const fault = fontSizeFault(match[1]);
-    if (fault) findings.push({ site: site(match.index), detail: fault });
-  }
+  const type = typeArm(text, site);
+  const space = spaceArm(text, site);
+  const tracking = trackingArm(text, site);
 
-  for (const match of text.matchAll(FONT_SHORTHAND)) {
-    if (!LENGTH.test(match[1])) continue;
-    findings.push({
-      site: site(match.index),
-      detail: `font:${match[1]} — the shorthand sets a font size; name the step with font-size instead`,
-    });
-  }
-
-  for (const match of text.matchAll(SPACE)) {
-    spaces += 1;
-    for (const detail of spaceFaults(match[1], match[2])) {
-      findings.push({ site: site(match.index), detail });
-    }
-  }
-
-  for (const match of text.matchAll(LETTER_SPACING)) {
-    trackings += 1;
-    if (TRACKING_ON_PURPOSE.has(match[1])) exceptionsUsed.add(`letter-spacing:${match[1]}`);
-    const fault = trackingFault(match[1]);
-    if (fault) findings.push({ site: site(match.index), detail: fault });
-  }
-
-  return { fontSizes, spaces, trackings, findings, exceptionsUsed };
+  return {
+    fontSizes: type.count,
+    spaces: space.count,
+    trackings: tracking.count,
+    findings: [...type.findings, ...space.findings, ...tracking.findings],
+    // Keyed `property:value`, not by value alone: `inherit` is a legal font-size exception, and one
+    // shared key on the value alone would let either arm prune the other's row.
+    //
+    // A LIST OF SITES RATHER THAN A SET OF KEYS, and that is what makes the uniqueness claim below
+    // checkable: an exception keyed by VALUE spreads silently, so the number of rules using it has to
+    // be visible to the run.
+    exceptionsUsed: [...type.used, ...space.used, ...tracking.used],
+  };
 }
 
 // THE ANTI-VACUITY TEST, and it is a self-test rather than a count — see the note where the floors
@@ -289,19 +337,23 @@ const FIXTURE = `
 .iota { letter-spacing: 0.05em }
 .kappa { letter-spacing: normal; margin: calc(-1 * 4px) }
 .lambda { padding: calc(var(--s-3) + 3px) }
+.mu { padding: calc(var(--ctl-h) - var(--s-2)) }
 `;
 
-// 4 font-size (alpha, delta, epsilon, zeta — NOT the comment's), 7 gap/padding/margin (alpha, gamma's
-// two, eta, theta, kappa, lambda — NOT the comment's) and 3 letter-spacing (theta, iota, kappa).
+// 4 font-size (alpha, delta, epsilon, zeta — NOT the comment's), 8 gap/padding/margin (alpha, gamma's
+// two, eta, theta, kappa, lambda, mu — NOT the comment's) and 3 letter-spacing (theta, iota, kappa).
 // `.zeta` is counted and is not a finding, which is `OFF_SCALE_ON_PURPOSE` working; `.epsilon`'s
 // `font: inherit` carries no finding either, which is the shorthand's length test. `.eta` shows the three
 // atoms a space value may hold beside a step — `auto`, `0` and a percentage — with one off-scale length
 // among them, so the per-atom walk is exercised in both directions on one declaration. `.theta`'s
-// negative margin is the legal `calc()`; `.kappa`'s names no step at all and `.lambda`'s names one and
-// then adds a literal to it, which are the two separate ways a `calc()` can be a loophole.
+// negative margin is the legal `calc()`; `.kappa`'s names no step at all, `.lambda`'s names one and then
+// adds a literal to it, and `.mu` names a token that IS defined and is NOT on the space scale — three
+// separate ways a `calc()` can be a loophole, and `calcFault` has exactly three branches. `.mu` is the
+// third, which nothing exercised: a `--ctl-h`-tall gap would have passed a check whose whole claim is
+// that a space value is one of seven steps.
 const SELF_TEST_WANT = [
   '4 font-size',
-  '7 gap/padding/margin',
+  '8 gap/padding/margin',
   '3 letter-spacing',
   'fixture.css:7 font-size: 0.81rem — not a step on the scale',
   'fixture.css:8 font-size: var(--t-nope) — not one of the 5 steps',
@@ -315,6 +367,7 @@ const SELF_TEST_WANT = [
   'fixture.css:10 margin: 0.35rem — not on the space scale',
   'fixture.css:13 margin: calc(-1 * 4px) — names no step of the space scale',
   'fixture.css:14 padding: calc(var(--s-3) + 3px) — the hand-written length 3px',
+  'fixture.css:15 padding: calc(var(--ctl-h) - var(--s-2)) — var(--ctl-h) is not one of the 7 steps',
   'fixture.css:12 letter-spacing: 0.05em — not var(--track), `normal`, or a named exception',
 ].join(' | ');
 
@@ -331,7 +384,8 @@ function parserSelfTest() {
 
 /** @type {{ site: string, detail: string }[]} */
 const findings = [];
-const exceptionsUsed = new Set();
+/** @type {Map<string, string[]>} keyed `property:value`, valued by the sites that use it */
+const exceptionsUsed = new Map();
 let fontSizes = 0;
 let spaces = 0;
 let trackings = 0;
@@ -342,7 +396,10 @@ for (const file of cssFiles()) {
   spaces += seen.spaces;
   trackings += seen.trackings;
   findings.push(...seen.findings);
-  for (const value of seen.exceptionsUsed) exceptionsUsed.add(value);
+  for (const { key, site } of seen.exceptionsUsed) {
+    if (!exceptionsUsed.has(key)) exceptionsUsed.set(key, []);
+    exceptionsUsed.get(key)?.push(site);
+  }
 }
 
 console.log(
@@ -361,15 +418,37 @@ if (parserFault) {
 
 // An exception nothing exercises is an exception that would pass an empty tree, so a stale row is a
 // finding in its own right — the mechanism check-tokens.mjs applies to `UNCONSUMED`.
+//
+// AND A SECOND CONSUMER IS A FINDING TOO, which it was not: both maps are keyed by VALUE, and the
+// reason written down for that — *"both values are unique in the tree, and a selector-keyed map would
+// need this check to become rule-aware for two rows"* — was an ASSUMPTION the run never tested.
+// Pasting `.brand`'s wordmark tracking onto `.dock-tab` exited 0: one rule's argued exception had
+// silently become the app's second-choice tracking value, and nothing here could see it. Counting the
+// sites turns the stated reason into a checked one without making this file rule-aware, which is the
+// cheapest repair that closes it. `inherit` is the row that must be allowed many consumers — it is
+// allowed BY CONSTRUCTION rather than by exception (see its reason), so it is excluded by name.
+const EXCEPTION_MAY_REPEAT = new Set(['font-size:inherit']);
 const EXCEPTIONS = [
   ...[...OFF_SCALE_ON_PURPOSE].map(([value, reason]) => ['font-size', value, reason]),
   ...[...TRACKING_ON_PURPOSE].map(([value, reason]) => ['letter-spacing', value, reason]),
 ];
 for (const [property, value, reason] of EXCEPTIONS) {
-  if (!exceptionsUsed.has(`${property}:${value}`)) {
+  const key = `${property}:${value}`;
+  const sites = exceptionsUsed.get(key);
+  if (!sites) {
     findings.push({
       site: 'tools/check-scale.mjs',
       detail: `\`${property}: ${value}\` is written down as off the scale on purpose (${reason.slice(0, 60)}…) and no rule uses it — delete the row`,
+    });
+    continue;
+  }
+  if (sites.length > 1 && !EXCEPTION_MAY_REPEAT.has(key)) {
+    findings.push({
+      site: 'tools/check-scale.mjs',
+      detail:
+        `\`${property}: ${value}\` is one rule's argued exception (${reason.slice(0, 60)}…) and ` +
+        `${sites.length} rules use it: ${sites.join(', ')} — an exception with a second consumer is a ` +
+        `value, so either put the second one on the scale or the reason no longer holds`,
     });
   }
 }

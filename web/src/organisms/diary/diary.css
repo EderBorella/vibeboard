@@ -2,7 +2,7 @@
    structure kept quiet so the prose is what the eye lands on. */
 .diary {
   flex: 1; min-width: 0; overflow-y: auto; background: var(--wash);
-  padding: var(--s-7) var(--s-7); display: flex; flex-direction: column; gap: var(--s-6);
+  padding: var(--s-7); display: flex; flex-direction: column; gap: var(--s-6);
 }
 .diary-head { display: flex; flex-direction: column; gap: var(--s-2); max-width: 68ch; }
 .diary-head h2 {

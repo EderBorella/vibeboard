@@ -7,6 +7,7 @@ import {
   documentOverflow,
   type Offender,
   RUN_TIME_TOKENS,
+  TYPE_SCALE,
 } from '../support/audit.js';
 import { type Baseline, expect, readBaseline, recording, test, writeBaseline } from '../support/fixtures.js';
 
@@ -14,7 +15,7 @@ import { type Baseline, expect, readBaseline, recording, test, writeBaseline } f
 //
 // CHECKS 1 AND 2 MAKE TWO DIFFERENT CLAIMS, AND THEY ARE GATED SEPARATELY.
 //
-// CONFORMANCE — "every computed font-size is one of the six scale values", "every radius is one of
+// CONFORMANCE — "every computed font-size is one of the scale's values", "every radius is one of
 // the four" — becomes blocking in the phase that drives its count to zero, and not before: a gate
 // pointed at a backlog has to be bypassed on every commit, which teaches everyone to ignore it.
 //   TYPE is BLOCKING as of Phase 2, the commit that took its count from 15 distinct computed sizes
@@ -192,13 +193,22 @@ function offScale(offenders: Offender[]): string {
 
 test('1. type — conformance BLOCKING, drift BLOCKING', async ({ board, theme }) => {
   const styles = await auditStyles(board);
-  // The floor stops the check being vacuous. So does this: six DISTINCT resolved steps. A token that
-  // stopped resolving would make `font-size: var(--t-x)` invalid on the probe, the probe would fall
+  // The floor stops the check being vacuous. So does this: one DISTINCT resolved step per name. A token
+  // that stopped resolving would make `font-size: var(--t-x)` invalid on the probe, the probe would fall
   // back to its inherited size, and the "allowed" set would quietly become the page's own default —
   // an allow-list that permits exactly what it is meant to refuse.
+  //
+  // COUNTED OFF `TYPE_SCALE` RATHER THAN WRITTEN DOWN, and the literal `6` that used to be here is why:
+  // the phase that retired `--t-display` narrowed the scale in audit.ts and left this number behind, so
+  // the check failed on all three themes for disagreeing with its own source of truth — and it failed
+  // BEFORE the drift comparison below, which hid the whole NEW/GONE list the phase existed to read. A
+  // hand-written count of a list one import away is only ever a second place for that list to be wrong.
   expect(styles.elements).toBeGreaterThan(FLOOR.elements);
   expect(styles.textElements).toBeGreaterThan(FLOOR.text);
-  expect(new Set(styles.scale).size, `the type scale did not resolve to six steps: ${styles.scale}`).toBe(6);
+  expect(
+    new Set(styles.scale).size,
+    `the type scale did not resolve to ${TYPE_SCALE.length} steps: ${styles.scale}`,
+  ).toBe(TYPE_SCALE.length);
   // The tally and the conformance list are two separate walks of the page (see audit.ts). This is
   // what stops them diverging: a conformance walk that examined a different population from the one
   // the tally reports could pass while the printed numbers said otherwise.
@@ -222,7 +232,8 @@ test('1. type — conformance BLOCKING, drift BLOCKING', async ({ board, theme }
   // fault of the two: it says both "this moved" and "where it moved to was never allowed".
   expect(
     styles.type.offenders.length,
-    `[${theme}] computed font sizes that are not one of the six steps (${styles.scale.join(', ')}):\n` +
+    `[${theme}] computed font sizes that are not one of the ${TYPE_SCALE.length} steps ` +
+      `(${styles.scale.join(', ')}):\n` +
       `${offScale(styles.type.offenders)}\n` +
       `  Give the rule a var(--t-*) from the scale. Do NOT add a seventh step — if a surface looks\n` +
       `  wrong on the nearest step, the surface is wrong. See docs/design-system.md.`,

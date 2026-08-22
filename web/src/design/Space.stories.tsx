@@ -7,11 +7,13 @@ import { useEffect, useState } from 'react';
 // make. Stacked from a shared left edge, it is one picture: the four small steps are visibly a ladder,
 // and the hole a "10px" would fill is visibly not a hole.
 //
-// THIS IS THE PHASE'S OWN EVIDENCE. 176 hand-written lengths landed on these seven, carrying 36 distinct
-// values — `0.7rem` thirteen times, `0.9rem` eleven, `0.75rem` twenty-six — and the argument for refusing
-// an eighth step was made on the numbers in `notes/atomic-revamp-plan.md` §3.2. This is the same argument
-// as a thing rather than as a table: every value that moved is written beside the step it moved onto, so
-// the owner can see WHICH crowd each step absorbed and judge whether it should have been two.
+// THIS IS THE PHASE'S OWN EVIDENCE. 176 hand-written lengths landed on these seven, carrying 32 distinct
+// values — `0.75rem` twenty-eight times, `1rem` eighteen, `0.2rem` seventeen, `0.9rem` fifteen — and the
+// argument for refusing an eighth step was made on the numbers in `notes/atomic-revamp-plan.md` §3.2.
+// This is the same argument as a thing rather than as a table: every value that moved is written beside
+// the step it moved onto, so the owner can see WHICH crowd each step absorbed and judge whether it should
+// have been two. The four counts above were re-counted off the diff; three of them were wrong first time,
+// which is what a figure typed beside a picture costs when nothing re-derives it.
 //
 // MEASURED, NOT TRANSCRIBED. The width of every bar comes from `getComputedStyle` on `<html>`, so a step
 // renamed or retuned in design/tokens.css shows up here as a bar that is the wrong length or absent —
@@ -27,7 +29,7 @@ interface Step {
 }
 
 const STEPS: Step[] = [
-  { token: '--s-1', means: 'hairline separation, icon-to-label', absorbed: '2.88 · 2.4 · 1.6 · 0.8px' },
+  { token: '--s-1', means: 'hairline separation, icon-to-label', absorbed: '2.88 · 2.4 · 2 · 1.6 · 0.8px' },
   { token: '--s-2', means: 'inside a chip', absorbed: '4.8 · 4 · 3.9 · 3.2px' },
   { token: '--s-3', means: 'inside a control', absorbed: '6.4 · 5.6px' },
   { token: '--s-4', means: 'between controls', absorbed: '8.8 · 8 · 7.2px' },
@@ -81,9 +83,7 @@ function Scale() {
       >
         {STEPS.map(({ token, means, absorbed }) => {
           const value = values.get(token) ?? '';
-          return (
-            <Row key={token} token={token} value={value} means={means} absorbed={absorbed} />
-          );
+          return <Row key={token} token={token} value={value} means={means} absorbed={absorbed} />;
         })}
       </div>
     </div>
@@ -104,13 +104,13 @@ function Row({
   return (
     <>
       <code style={{ fontSize: 'var(--t-small)' }}>{token}</code>
-      <span
-        style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--t-micro)', opacity: 0.75 }}
-      >
+      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--t-micro)', opacity: 0.75 }}>
         {value || 'undefined'}
       </span>
-      {/* A minimum width so a 2px bar is still a bar: at 2px against a 24px one the smallest step reads
-          as a dot, and "is this distinguishable from the next" is the question being asked. */}
+      {/* `1` is the floor for a step that resolved to NOTHING — a bar of zero width is invisible and
+          reads as "this step does not exist", which is the one thing this story must not say by accident.
+          A 2px step is drawn at its true 2px: making the smallest bar bigger than it is would delete the
+          question the picture exists to ask. */}
       <div
         style={{
           width: value || 1,

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { chipClasses } from './Chip';
+import { chipClasses } from '../atoms/Chip';
 import { Dot, type DotSize } from './Dot';
 import { Popover } from './Popover';
 import type { StateName } from './state-tones';

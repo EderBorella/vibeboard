@@ -37,6 +37,10 @@ export interface StyleAudit {
   fontSizes: Tally;
   fontSizesOnText: Tally;
   radii: Tally;
+  // The height of every box you OPERATE and every box you READ. Same shape as the two above, so the
+  // drift baseline compares them with the same code — see `pageHeights`.
+  controlHeights: Tally;
+  markerHeights: Tally;
   // The six scale steps as the BROWSER resolves them, and the elements that compute something else.
   // Both come out of the same page walk as `fontSizes`, so the gate cannot disagree with the tally
   // printed beside it.
@@ -188,6 +192,49 @@ function pageBoxes(root: string | null): { elements: number; fontSizes: Tally; r
     }
   }
   return { elements, fontSizes, radii };
+}
+
+// THE TWO BOX HEIGHTS, AS THE BROWSER MEASURES THEM. Two tallies, on the same shape as `fontSizes` and
+// `radii` so they inherit the drift mechanism that already exists rather than growing a second one:
+// value → how many elements measure it, recorded per surface and compared as a SET, failing NEW and GONE
+// symmetrically.
+//
+// WHY THEY ARE WORTH RECORDING AT ALL, and it is the gap the phase log names: `visual/baseline/<theme>.json`
+// records font sizes and radii and NOTHING about padding, margin, gap or height, so every box this phase
+// moved was invisible to Tier 4 — "zero drift" meant "nothing this file measures moved", which is not the
+// same sentence. A control height is the one number the whole revamp is about.
+//
+// A CONTROL IS WHAT YOU OPERATE and a MARKER IS WHAT YOU READ, and the populations are selected the way a
+// person would point at them rather than by class: a control is a `<button>`, an `<input>`, a `<select>`,
+// a `<textarea>` or anything with an explicit widget role; a marker is a `.vb-chip`. `.vb-seg-cell` is
+// EXCLUDED from the control tally and the reason is geometric rather than aesthetic — a cell inside a
+// group that owns the border is 2px shorter than the group by construction, because the group's own 1px
+// edge is inside its 28px. The group is the control you operate and the group is what carries `--ctl-h`.
+function pageHeights(root: string | null): { controlHeights: Tally; markerHeights: Tally } {
+  function population(scope: string | null): Element[] {
+    if (!scope) return Array.from(document.querySelectorAll('*'));
+    const host = document.querySelector(scope);
+    return host ? [host, ...Array.from(host.querySelectorAll('*'))] : [];
+  }
+
+  const controlHeights: Tally = {};
+  const markerHeights: Tally = {};
+  const bump = (tally: Tally, key: string): void => {
+    tally[key] = (tally[key] ?? 0) + 1;
+  };
+  const CONTROL = 'button, input, select, textarea, [role="button"], [role="tab"], .vb-trigger, .vb-seg';
+  for (const el of population(root)) {
+    const style = getComputedStyle(el);
+    if (style.visibility === 'hidden' || style.display === 'none' || Number(style.opacity) === 0) continue;
+    const box = el.getBoundingClientRect();
+    if (box.width === 0 || box.height === 0) continue;
+    // Rounded to a tenth: sub-pixel layout puts 27.99 and 28.01 on one 28px rule, and a tally keyed on
+    // the raw float would report a NEW value every run.
+    const px = `${Math.round(box.height * 10) / 10}px`;
+    if (el.matches(CONTROL) && !el.classList.contains('vb-seg-cell')) bump(controlHeights, px);
+    if (el.classList.contains('vb-chip')) bump(markerHeights, px);
+  }
+  return { controlHeights, markerHeights };
 }
 
 // Type CONFORMANCE, which blocks as of Phase 2 — the phase that drove its count to zero. A separate
@@ -507,7 +554,7 @@ function pageHeads(): { headsExamined: number; headOverflows: Offender[] } {
   }
 
   const headOverflows: Offender[] = [];
-  const heads = Array.from(document.querySelectorAll('.column > .vb-panel-head'));
+  const heads = Array.from(document.querySelectorAll('.column > .vb-surface-head'));
   for (const head of heads) {
     const inner = content(head);
     const column = head.parentElement?.querySelector('.column-title')?.textContent ?? '?';
@@ -868,6 +915,7 @@ function pageDocument(): { scrollWidth: number; clientWidth: number } {
 export async function auditStyles(page: Page, options: AuditOptions = {}): Promise<StyleAudit> {
   const root = options.root ?? null;
   const boxes = await page.evaluate(pageBoxes, root);
+  const heights = await page.evaluate(pageHeights, root);
   const type = await page.evaluate(pageType, { names: [...TYPE_SCALE], root });
   const radius = await page.evaluate(pageRadius, { names: [...RADIUS_SCALE], root });
   const text = await page.evaluate(pageOverflow, root);
@@ -875,7 +923,7 @@ export async function auditStyles(page: Page, options: AuditOptions = {}): Promi
   const contrast = await page.evaluate(pageContrast, root);
   const tokens = await page.evaluate(pageTokens, { root, runtime: RUN_TIME_TOKENS });
   const rows = await page.evaluate(pageRows, root);
-  return { ...boxes, ...type, ...radius, ...text, clipping, contrast, tokens, rows };
+  return { ...boxes, ...heights, ...type, ...radius, ...text, clipping, contrast, tokens, rows };
 }
 
 export async function auditGrid(page: Page): Promise<GridAudit> {

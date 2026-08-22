@@ -1,7 +1,9 @@
 import type { ControlCategory, ControlFile, ControlGroup } from '../api';
-import { Button } from '../ui/Button';
-import { Chip } from '../ui/Chip';
-import { Panel } from '../ui/Panel';
+import { Button } from '../atoms/Button';
+import { Chip } from '../atoms/Chip';
+import { Control } from '../atoms/Control';
+import { Surface } from '../atoms/Surface';
+import { Text } from '../atoms/Text';
 
 // A selection that means "the links registry", not a path on disk. It travels through the same
 // `selected` state as a real file path so the list has one notion of what is active.
@@ -57,7 +59,7 @@ export function ControlFileList({
             )}
           </div>
           {g.key === 'resources' && (
-            <Panel
+            <Surface
               as="button"
               variant="flat"
               className={`control-item${selected === RESOURCES_SENTINEL ? ' active' : ''}`}
@@ -65,16 +67,16 @@ export function ControlFileList({
               onClick={() => onSelect(RESOURCES_SENTINEL)}
             >
               <span className="control-item-name">🔗 Links registry</span>
-            </Panel>
+            </Surface>
           )}
           {g.files.length === 0 && g.key !== 'resources' && (
-            <div className="control-empty vb-empty vb-empty-small">— none —</div>
+            <Text role="hint" className="control-empty">— none —</Text>
           )}
           {g.files.map((f) =>
             renaming === f.path ? (
-              <input
+              <Control
                 key={f.path}
-                className="vb-input"
+                
                 value={renameDraft}
                 autoFocus
                 onFocus={(e) => e.currentTarget.select()}
@@ -92,7 +94,7 @@ export function ControlFileList({
                 }}
               />
             ) : (
-              <Panel
+              <Surface
                 as="button"
                 variant="flat"
                 key={f.path}
@@ -104,7 +106,7 @@ export function ControlFileList({
               >
                 <span className="control-item-name">{f.name}</span>
                 {f.managed && <Chip className="control-tag">managed</Chip>}
-              </Panel>
+              </Surface>
             ),
           )}
         </div>

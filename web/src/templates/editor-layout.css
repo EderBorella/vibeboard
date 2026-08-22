@@ -13,14 +13,13 @@
 /* `.btn-danger` was here — `Button`'s `danger` variant at `md`, so it sits level with the Save beside it. */
 /* The prose ink is the surface's and the shell's inset is the shell's; the box is the primitive's. */
 .control-disclaimer { margin: var(--s-5) var(--s-6) 0; color: var(--text); }
-/* The box is `.vb-input`'s as of Phase 9. What is left is the pane's inset, the fact that this one
-   fills its pane, and the monospaced face — which is the CONTENT being machine text, not a measurement,
-   so it is not a `Readout`. */
+/* The box is the Control atom's. What is left is the pane's inset, the fact that this one fills its pane,
+   and its line. The monospaced face went with the box: it is `Control mono` at the call site, because the
+   content being machine text is a property of the CONTROL and four surfaces each wrote that rule. */
 .control-textarea {
-  flex: 1; margin: var(--s-5) var(--s-6); resize: none;
-  font-family: var(--font-mono); line-height: 1.5;
+  flex: 1; margin: var(--s-5) var(--s-6); resize: none; line-height: 1.5;
 }
 .control-preview { flex: 1; overflow-y: auto; padding: var(--s-5) var(--s-6); }
 .control-blank { margin: auto; color: var(--muted); padding: var(--s-7); }
-.control-editor > .vb-error, .explorer-list > .vb-error { padding: var(--s-4) var(--s-6); }
+.control-editor > .vb-text-error, .explorer-list > .vb-text-error { padding: var(--s-4) var(--s-6); }
 

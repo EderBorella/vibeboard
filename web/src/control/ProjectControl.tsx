@@ -20,6 +20,7 @@ import { useAction } from '../useAction';
 import { ControlFileEditor, type ControlView, type OpenFile } from './ControlFileEditor';
 import { ControlFileList, RESOURCES_SENTINEL } from './ControlFileList';
 import { ResourcesEditor } from './ResourcesEditor';
+import { Text } from '../atoms/Text';
 
 interface Props {
   // Bumps whenever the project changes on disk (shared snapshot stream) so the file list and
@@ -196,11 +197,11 @@ export function ProjectControl({ snapshot }: Props) {
     }
     const invalid = catalogue.invalid.find((i) => i.path === open.path);
     return (
-      <p className="vb-error">
+      <Text role="error">
         {invalid
           ? `This skill is not valid, so it does not appear on any card: ${invalid.reason}. Fix it in Raw.`
           : 'Loading…'}
-      </p>
+      </Text>
     );
   }
 
@@ -242,7 +243,7 @@ export function ProjectControl({ snapshot }: Props) {
         ) : (
           <div className="control-blank">Select a file to view or edit, or create a new one.</div>
         )}
-        {error && <div className="vb-error">{error}</div>}
+        {error && <Text role="error">{error}</Text>}
       </div>
 
       {dialog}

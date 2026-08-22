@@ -1,7 +1,8 @@
 import { BOARD_LABELS, BOARDS, type Card } from '../shared';
 import { Field } from '../ui/Field';
-import { Panel } from '../ui/Panel';
-import { Readout } from '../ui/Readout';
+import { Readout } from '../atoms/Readout';
+import { Surface } from '../atoms/Surface';
+import { Text } from '../atoms/Text';
 
 // The link picker: cards grouped by board, boards with nothing to offer omitted.
 export function LinkPicker({
@@ -13,9 +14,9 @@ export function LinkPicker({
   links: string[];
   onToggle: (id: string) => void;
 }) {
-  if (linkable.length === 0) return <div className="vb-hint">No other cards yet to link.</div>;
+  if (linkable.length === 0) return <Text role="hint">No other cards yet to link.</Text>;
   return (
-    <Panel variant="inset" className="links-list">
+    <Surface variant="inset" className="links-list">
       {BOARDS.map((b) => {
         const group = linkable.filter((c) => c.board === b);
         if (group.length === 0) return null;
@@ -28,7 +29,7 @@ export function LinkPicker({
                 layout="check"
                 label={
                   <>
-                    <Readout size="small" tone="accent">
+                    <Readout>
                       {c.id}
                     </Readout>
                     <span className="link-title">{c.title}</span>
@@ -41,6 +42,6 @@ export function LinkPicker({
           </div>
         );
       })}
-    </Panel>
+    </Surface>
   );
 }

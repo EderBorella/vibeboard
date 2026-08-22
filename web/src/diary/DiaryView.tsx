@@ -2,9 +2,11 @@ import { memo, useMemo, useState } from 'react';
 import { addDiaryEntry, type DiaryEntry } from '../api';
 import { MAX_ENTRY_TEXT, type Suggestion } from '../shared';
 import { useSuggestions } from '../suggestions/useSuggestions';
-import { Button } from '../ui/Button';
-import { Chip } from '../ui/Chip';
-import { ReadoutLine } from '../ui/Readout';
+import { Button } from '../atoms/Button';
+import { Chip } from '../atoms/Chip';
+import { Control } from '../atoms/Control';
+import { ReadoutLine } from '../atoms/Readout';
+import { Text } from '../atoms/Text';
 import { stateClass } from '../ui/state-tones';
 import { useAction } from '../useAction';
 import { useDiary } from './useDiary';
@@ -202,8 +204,10 @@ export function DiaryView({ bump }: { bump: number }) {
 
         <div className="diary-compose">
           {/* NOT a `Field`: a composer's label is its placeholder and the button beside it. */}
-          <textarea
-            className="vb-input"
+          <Control
+            
+            as="textarea"
+            
             aria-label="Add to the log"
             placeholder="What happened?"
             value={draft}
@@ -225,7 +229,7 @@ export function DiaryView({ bump }: { bump: number }) {
           </Button>
         </div>
         {/* `assertive`, not `polite`: the entry was NOT written, and the box still holds what was typed. */}
-        <div aria-live="assertive">{error && <p className="vb-error">{error}</p>}</div>
+        <div aria-live="assertive">{error && <Text role="error">{error}</Text>}</div>
 
         {failed ? (
           <div className="diary-empty">

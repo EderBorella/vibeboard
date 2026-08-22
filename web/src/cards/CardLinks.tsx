@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import type { Card } from '../shared';
-import { Button } from '../ui/Button';
-import { Panel } from '../ui/Panel';
-import { Readout } from '../ui/Readout';
+import { Button } from '../atoms/Button';
+import { Readout } from '../atoms/Readout';
+import { Surface } from '../atoms/Surface';
+import { Text } from '../atoms/Text';
 import { linkedCards } from '../viewmodel';
 import { LinkPicker } from './LinkPicker';
 
@@ -33,14 +34,14 @@ export function CardLinks({ card, allCards, onOpenCard, onLinks }: Props) {
 
   return (
     <div className="cv-links">
-      <div className="vb-label">
+      <Text>
         Linked cards
         {onLinks && (
           <Button variant="bare" size="sm" className="cv-link-edit" onClick={() => setPicking((v) => !v)}>
             {picking ? 'Done' : 'Change'}
           </Button>
         )}
-      </div>
+      </Text>
       {picking && toggle ? (
         <LinkPicker
           linkable={allCards.filter((c) => c.id !== card.id)}
@@ -50,7 +51,7 @@ export function CardLinks({ card, allCards, onOpenCard, onLinks }: Props) {
       ) : (
         linked.map((c) =>
           onOpenCard ? (
-            <Panel
+            <Surface
               as="button"
               variant="flat"
               key={c.id}
@@ -59,14 +60,14 @@ export function CardLinks({ card, allCards, onOpenCard, onLinks }: Props) {
               title={`Open ${c.id}`}
               onClick={() => onOpenCard(c)}
             >
-              <Readout size="small" tone="accent">
+              <Readout>
                 {c.id}
               </Readout>
               <span className="link-title">{c.title}</span>
-            </Panel>
+            </Surface>
           ) : (
             <div key={c.id} className="cv-link">
-              <Readout size="small" tone="accent">
+              <Readout>
                 {c.id}
               </Readout>
               <span className="link-title">{c.title}</span>

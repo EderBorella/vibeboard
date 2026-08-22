@@ -5,7 +5,7 @@
    context where the parent has no height to give. */
 .raw-pane .raw-area { flex: 1; min-height: 14rem; }
 .raw-foot { display: flex; align-items: center; justify-content: flex-end; gap: var(--s-4); }
-.raw-foot > .vb-error { margin-right: auto; }
+.raw-foot > .vb-text-error { margin-right: auto; }
 /* A TOGGLE, and its "on" state is now the `primary` variant rather than an `.active` class of its own —
    which is what `.cards-raw.active`'s accent fill already was, written twice. Layout is what is left. */
 .cards-tabs > .push { flex: 0 0 auto; }

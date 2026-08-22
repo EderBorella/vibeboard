@@ -1,0 +1,29 @@
+/* READOUT — not a box at all. A TREATMENT: mono, tabular numerals, and the one tracking exception the
+ * scale allows. Nothing else in the app says "a machine measured this".
+ *
+ * NINE CLASSES BECAME ONE, and the census is the argument rather than the tidiness. The four sizes and
+ * the four tones and `quiet` were nine names for a decision the surrounding atom has already made:
+ * `size="plain"` — inherit both — was already 17 of 53 call sites, `tone="text"` had ONE consumer, and
+ * `size="body"` and `tone="accent2"` had two each. A figure sits inside a chip, a row, a label or a
+ * heading that has declared its step and its ink; taking both is what makes a readout a treatment
+ * instead of a second opinion about type.
+ *
+ * WHICH ALSO DELETES A DOCUMENTED SPECIFICITY LOSS. The default used to declare `font-size: var(--t-micro)`
+ * and `color: var(--muted)`, and that `color` at (0,1,0) beat `.vb-chip-tone` at (0,1,0) from later in
+ * the cascade — every report chip rendered grey in all seven of its statuses. The repair at the time was
+ * to lift the chip's rule to (0,2,0); the cause is gone here. */
+.vb-readout {
+  font-family: var(--font-mono); font-variant-numeric: tabular-nums; letter-spacing: -0.01em;
+}
+/* A LINE of figures, which five surfaces each wrote their own version of: the two ledgers, a card's meta
+   row, a diary entry's and a filed finding's. They agreed on everything except a gap nobody chose —
+   8/8px, 3.2/14.4px and 8/8px — so the row is shared and the surfaces keep only where it sits.
+   `baseline` and not `center`: the parts are text at two sizes, and centring line boxes of different
+   sizes puts their baselines at different heights, which is the argument `.topbar` already makes.
+   IT IS `ReadoutLine`'S AND NOT `Readout`'S, so it is a molecule's class living in an atom's sheet
+   until Phase 5 gives `FigureRow` a file. Kept here rather than moved twice: the phase that moves the
+   molecules is the phase that moves it, because moving a rule changes its position in the cascade. */
+.vb-readout-block {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--s-2) var(--s-5);
+  margin: 0; font-size: var(--t-small); color: var(--muted);
+}

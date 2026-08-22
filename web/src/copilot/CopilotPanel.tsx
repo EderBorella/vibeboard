@@ -2,8 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import { getModelStatus, listModels, type ModelOption, type ModelStatus } from '../api';
 import { useConfirm } from '../confirm/useConfirm';
 import { backendCaps, backendDefaults } from '../shared';
-import { Button } from '../ui/Button';
-import { Readout } from '../ui/Readout';
+import { Button } from '../atoms/Button';
+import { Control } from '../atoms/Control';
+import { Readout } from '../atoms/Readout';
+import { Text } from '../atoms/Text';
 import { StatusChip } from '../ui/StatusChip';
 import { stateClass } from '../ui/state-tones';
 import { useFetched } from '../useFetched';
@@ -72,7 +74,7 @@ function MessageLine({ item }: { item: TranscriptItem }) {
       {item.kind === 'tool' ? (
         // The name of a tool the agent called is machine vocabulary, and `.msg-tool` said so by hand in
         // `--t-small` accent mono — which is `Readout` `small` `accent` value for value.
-        <Readout size="small" tone="accent">
+        <Readout>
           ⚙ {item.toolName}
         </Readout>
       ) : item.kind === 'thinking' ? (
@@ -302,10 +304,10 @@ export function CopilotPanel({
 
       <div className="copilot-body" ref={bodyRef}>
         {items.length === 0 && (
-          <div className="vb-empty">
+          <Text role="hint" lead>
             Ask the copilot to work on this project. It runs your configured backend ({backend}) in the
             project folder, so card changes appear on the board as it works.
-          </div>
+          </Text>
         )}
         {items.map((it) => (
           <MessageLine key={it.id} item={it} />
@@ -317,8 +319,10 @@ export function CopilotPanel({
 
       <div className="copilot-input">
         {/* NOT a `Field`: a composer's label is its placeholder and the Send button beside it. */}
-        <textarea
-          className="vb-input"
+        <Control
+          
+          as="textarea"
+          
           value={draft}
           placeholder={running ? 'Running…' : 'Message the copilot (Enter to send)'}
           onChange={(e) => setDraft(e.target.value)}

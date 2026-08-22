@@ -1,26 +1,34 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { Dot } from '../ui/Dot';
+import { Field } from '../ui/Field';
+import { SegmentedControl } from '../ui/SegmentedControl';
+import { StatusChip } from '../ui/StatusChip';
 import { Button } from './Button';
 import { Chip } from './Chip';
-import { Dot } from './Dot';
-import { Field } from './Field';
+import { Control } from './Control';
 import { Readout } from './Readout';
-import { SegmentedControl } from './SegmentedControl';
-import { StatusChip } from './StatusChip';
 
 // THE INVENTORY, AND IT IS THE POINT OF THE WORKBENCH RATHER THAN AN EXTRA.
 //
-// `notes/token-audit.md` reports ten distinct interactive control heights on one board. A number in a
-// document is an argument; this is the thing itself — every control the app can draw, on one line, each
-// labelled with the height it actually renders at, measured from the DOM rather than read off a stylesheet.
+// TEN DISTINCT INTERACTIVE CONTROL HEIGHTS ON ONE BOARD is the measurement the whole revamp answers, and
+// this story is the ACCEPTANCE TEST for the answer: after the atom layer there must be ONE number in the
+// operable column and ONE in the marker column. Ten rows of the same number is what the owner asked to
+// see, and it is the one artefact here that replies to his original complaint directly.
 //
-// MEASURED, NOT DECLARED. A height computed from padding plus font-size plus a border is not written down
-// anywhere; it only exists once a browser has laid it out. That is exactly why ten of them accumulated
-// without anyone choosing them, and why this story reports `getBoundingClientRect()` instead of a token.
+// MEASURED, NOT DECLARED. A height computed from padding plus a line box plus a border is not written down
+// anywhere; it exists only once a browser has laid it out. That is exactly why ten of them accumulated
+// without anyone choosing them, and why this story reports `getBoundingClientRect()` rather than a token —
+// a story that read `--ctl-h` back out of the stylesheet would agree with itself whatever rendered.
 //
-// IT IS NOT A TEST. It has no assertion and cannot fail — the browser harness holds the claims. What this
-// does is make the disagreement legible in one glance, which is what nothing in the repository has ever
-// done and what the owner asked for.
+// IT IS NOT A TEST. It has no assertion and cannot fail; `npm run visual`'s checks 12 and 13 hold the
+// claims, and the drift baseline records the two tallies. What this does is make agreement — or its
+// absence — legible in one glance.
+//
+// THE TWO ROWS THAT ARE EXPECTED TO DISAGREE ARE NAMED AS SUCH, and there are two kinds. A segmented CELL
+// is 2px shorter than its group because the group owns the border, which is geometry rather than an
+// oversight; and `.tab-btn`/`.dock-tab` are the tab faces no atom owns yet, deleted in Phases 5 and 6
+// rather than patched here — patching a class you are about to delete is migration scaffolding.
 const meta = {
   title: 'Audit/Control inventory',
   parameters: { layout: 'padded' },
@@ -108,26 +116,39 @@ export const ControlHeights: StoryObj = {
           onChange={() => {}}
         />
       </Measured>
-      <Measured label="Field / input">
+      <Measured label="Field / Control">
         <Field label="Cap">
-          <input className="vb-input" defaultValue="12" />
+          <Control defaultValue="12" />
         </Field>
       </Measured>
-      <Measured label=".vb-input alone">
-        <input className="vb-input" defaultValue="a rename" />
+      <Measured label="Control alone">
+        <Control defaultValue="a rename" />
       </Measured>
-      <Measured label="select .vb-input">
-        <select className="vb-input" defaultValue="cyberpunk">
+      <Measured label="Control as=select">
+        <Control as="select" defaultValue="cyberpunk">
           <option value="cyberpunk">Cyberpunk</option>
-        </select>
+        </Control>
+      </Measured>
+      {/* THE TWO ROWS ALLOWED TO DISAGREE, drawn last so the column above is read as one number. */}
+      <Measured label="vb-seg-cell (part of a group)">
+        <span className="vb-seg">
+          <button type="button" className="vb-seg-cell active">
+            a cell
+          </button>
+        </span>
+      </Measured>
+      <Measured label=".tab-btn (Phase 5 deletes it)">
+        <button type="button" className="tab-btn">
+          Boards
+        </button>
       </Measured>
     </Grid>
   ),
 };
 
-// EVERY BOX YOU CAN ONLY READ. A chip ends `line-height: inherit` with no vertical padding, so its height
-// is its CONTEXT's — which is why the same chip is one height on the board and another in prose. Both are
-// shown, because the difference is the finding.
+// EVERY BOX YOU CAN ONLY READ. The chip used to end `line-height: inherit` with no vertical padding, so its
+// height was its CONTEXT's — which is why the same chip measured one height on the board and another in
+// prose. Both are still shown, because the pair that used to be the finding is now the proof.
 export const MarkerHeights: StoryObj = {
   render: () => (
     <Grid>

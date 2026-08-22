@@ -51,8 +51,18 @@ const CORPUS = 'web/src';
 // EVERY SHEET IN THE CORPUS, DISCOVERED RATHER THAN LISTED. It was the two names `styles.css` and
 // `ui/primitives.css`; the split made those 48 files, and a hand-written list of 48 is a list that goes
 // stale the first time a phase adds a layer sheet — which would drop its classes out of the count
-// silently, and the count is a ratchet.
-const PRIMITIVES = join('web', 'src', 'ui', 'primitives.css');
+// silently, and the count is a ratchet. The list below is the opposite direction and is safe for it: it
+// only SPLITS a total that is already discovered, so a sheet missing from it lands in the other column.
+// THE PRIMITIVE LAYER, and it is seven sheets since the atom phase: what is left of `ui/primitives.css`
+// plus one file per atom. Documentary here — the ratchet is on the UNION — but the split of the count
+// into "what the primitives name" and "what the surfaces name between them" is the pair the record
+// quotes, and reading only the old file would have moved 40 classes into the surfaces' column overnight.
+const PRIMITIVE_LAYER = [
+  join('web', 'src', 'ui', 'primitives.css'),
+  ...['button', 'chip', 'control', 'readout', 'surface', 'text'].map((name) =>
+    join('web', 'src', 'atoms', `${name}.css`),
+  ),
+];
 
 // THE RATCHET, and the number is what the tree holds today rather than what the plan wants. Phase 5 took
 // the union from 443 to this; docs/design-system.md's target is **183** and it is not reached — the
@@ -91,7 +101,18 @@ const PRIMITIVES = join('web', 'src', 'ui', 'primitives.css');
 // 362 before the owner's second pass, 361 after it: `.ap-transport` lost its whole rule — a `min-width`
 // that measured 104px around 49px of ink — and `.ap-chip` moved from the top bar to the auto-pilot bar's
 // own chip rather than being added again.
-const CLASS_CEILING = 361;
+// 361 before the ATOM LAYER, 354 after it, and the arithmetic is 20 out against 13 in:
+//   OUT (20)  `.vb-readout-{small,body,plain,accent,accent2,text,quiet}` — a Readout is a TREATMENT and
+//             takes the step and the ink of the atom it sits in, so nine classes are one;
+//             `.vb-label`, `.vb-label-caps`, `.vb-hint`, `.vb-error`, `.vb-empty`, `.vb-empty-small` —
+//             six names for one face times three options, and the last of the six was the fifth
+//             declaration for declaration; `.vb-label-rail`, `.vb-input` and the five `.vb-panel*`,
+//             which are renames rather than deletions.
+//   IN (13)   `.vb-text` + four modifiers; `.vb-ctl` and `.vb-ctl-mono`; `.vb-field-rail`; the five
+//             `.vb-surface*`. Nine of the thirteen are the renames' other half.
+// The renames net to zero on purpose and are worth their churn for one reason: one vocabulary, one word
+// per thing. `Panel` meant six things in this tree and `.vb-input` named a class that is now a component.
+const CLASS_CEILING = 354;
 const CLASS_TARGET = 183;
 
 // Anti-vacuity floor on the SELECTOR PARSER, not on the class count: a regex that stops matching reports
@@ -206,9 +227,11 @@ const perSheet = walk('.css').map((file) => ({
 const union = new Set(perSheet.flatMap(({ names }) => [...names]));
 // The two numbers the record quotes, and they are still the two that mean something: what the primitives
 // name, and what the surfaces name between them. Printing 48 per-file counts would bury both.
-const primitives = perSheet.find(({ file }) => file === PRIMITIVES)?.names ?? new Set();
+const primitives = new Set(
+  perSheet.filter(({ file }) => PRIMITIVE_LAYER.includes(file)).flatMap(({ names }) => [...names]),
+);
 const surfaces = new Set(
-  perSheet.filter(({ file }) => file !== PRIMITIVES).flatMap(({ names }) => [...names]),
+  perSheet.filter(({ file }) => !PRIMITIVE_LAYER.includes(file)).flatMap(({ names }) => [...names]),
 );
 
 // Where each dynamic prefix is composed, so a failing run can be read against the source rather than
@@ -224,7 +247,7 @@ const unreferenced = [...union].filter((cls) => !referenced(cls, sources, prefix
 
 console.log(
   `class budget: ${union.size} distinct class selector(s) across ${perSheet.length} sheet(s) — ` +
-    `${PRIMITIVES} ${primitives.size}, the surfaces ${surfaces.size}`,
+    `the ${PRIMITIVE_LAYER.length}-sheet primitive layer ${primitives.size}, the surfaces ${surfaces.size}`,
 );
 console.log(
   `dynamic composition: ${prefixes.length} prefix(es) resolved against ${vocabulary.size} quoted value(s) — ${[

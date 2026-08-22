@@ -1,24 +1,24 @@
 /* Model picker modal */
-.mp-modal-backdrop { position: fixed; inset: 0; z-index: 60; background: rgba(0,0,0,0.55); display: flex; align-items: center; justify-content: center; padding: var(--s-6); }
-/* A `Panel` with the `raised` variant. THE ACCENT EDGE IS NOW A `border-color` AND IT WAS THE WHOLE
+.mp-modal-backdrop { position: fixed; inset: 0; z-index: var(--z-modal); background: rgba(0,0,0,0.55); display: flex; align-items: center; justify-content: center; padding: var(--s-6); }
+/* A `Surface` with the `raised` variant. THE ACCENT EDGE IS NOW A `border-color` AND IT WAS THE WHOLE
    `border` SHORTHAND, which the characterisation suite caught: a shorthand at equal specificity replaces
    the primitive's width and style as well as its colour, so a Panel that ever moved off 1px would have
    been silently overruled here. A colour is the surface's to override — the emergency stop's danger
    hover, `.control-disclaimer`'s prose ink — and the accent says this modal is the one thing on screen. */
 .mp-modal {
   width: min(560px, 100%); max-height: 80vh; border-color: var(--accent);
-  box-shadow: var(--glow), 0 12px 40px rgba(0,0,0,0.5); overflow: hidden;
+  box-shadow: var(--glow), var(--lift); overflow: hidden;
 }
 .mp-modal-head { display: flex; align-items: center; padding: var(--s-5) var(--s-6); border-bottom: 1px solid var(--border); }
 .mp-modal-title { font-weight: 700; font-family: var(--font-display); text-transform: uppercase; letter-spacing: var(--track); }
-.mp-modal > .vb-input { margin: var(--s-5) var(--s-6) var(--s-3); }
+.mp-modal > .vb-ctl { margin: var(--s-5) var(--s-6) var(--s-3); }
 .mp-filters { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-3); padding: 0 var(--s-6) var(--s-3); }
 /* `Chip as="button" pill fill neutral` owns all of it. THE SIZE MOVED, from `--t-small` to the chip's
    own `--t-micro`, which is the scale's own name for "chips, state words, dot labels, tags": nine of
    the ten chip classes were already there and this was the one that was not. */
 .mp-chip:hover { border-color: var(--accent); }
 .mp-chip.on { background: var(--accent-fill); color: var(--on-fill); border-color: var(--accent); font-weight: 600; }
-/* `.mp-prov` died in Phase 9: the box is `.vb-input`'s and its whole remainder was `margin-left: auto`,
+/* `.mp-prov` died in Phase 9: the box is `.vb-ctl`'s and its whole remainder was `margin-left: auto`,
    which is `.push`. A CONTROL IS 13px AND A CHIP IS 11px, and this row holds both — which is the same
    ruling Phase 5b made putting the two select triggers at `--t-body` beside the inputs they share a row
    with. The 12px it had said neither. */
@@ -29,13 +29,13 @@
 /* A favourite is already lit; it does not need a hover to say so. `--accent-2` at rest is the colour, and
    `bare`'s muted default is what it overrides. */
 .mp-star { color: var(--accent-2); }
-/* A `Panel` with the `flat` variant. It gains a 1px transparent border it did not have, which is the
+/* A `Surface` with the `flat` variant. It gains a 1px transparent border it did not have, which is the
    primitive's whole point — `.mp-item` around it lights on hover, and a row that grew a border only
    then would move 2px under the pointer. */
 .mp-pick { flex: 1; display: flex; flex-direction: column; gap: var(--s-1); color: var(--text); }
 /* The backend's default is pinned first in the list — mark it so it reads as the safe pick
    rather than just whatever happened to sort to the top. */
-.mp-def { border-left: 2px solid var(--accent); }
+.mp-def { border-left: var(--rule) solid var(--accent); }
 /* `Chip pill accent`, and the border is the one thing it keeps: the tone's edge is a 50% mix with the
    border colour, and this marker is the only place in the picker that states a default, so it takes the
    accent solid. A colour is the caller's; the box is not. */

@@ -1,8 +1,9 @@
 import { renderMarkdown } from '../markdown';
 import { BOARD_LABELS, type Card, type CardFrontmatterPatch, type ProjectConfig } from '../shared';
-import { Chip } from '../ui/Chip';
 import { InlineField } from '../ui/InlineField';
-import { Readout, ReadoutLine } from '../ui/Readout';
+import { Chip } from '../atoms/Chip';
+import { Readout, ReadoutLine } from '../atoms/Readout';
+import { Text } from '../atoms/Text';
 import { cardPlace, csv, parseCsv } from '../viewmodel';
 import { CardLinks } from './CardLinks';
 
@@ -47,7 +48,7 @@ export function CardView({ card, config, allCards, onOpenCard, onPatch, onLinks 
         <span>
           {BOARD_LABELS[card.board]} › {cardPlace(config, card)}
         </span>
-        <Readout size="plain">Created {card.created}</Readout>
+        <Readout>Created {card.created}</Readout>
         {onPatch
           ? field('group', 'group', '+ group', 'cv-group')
           : card.group && <span className="cv-group">{card.group}</span>}
@@ -102,7 +103,7 @@ export function CardView({ card, config, allCards, onOpenCard, onPatch, onLinks 
       ) : card.body.trim() ? (
         <div className="markdown cv-body">{renderMarkdown(card.body)}</div>
       ) : (
-        <div className="vb-empty">No body yet.</div>
+        <Text role="hint" lead>No body yet.</Text>
       )}
     </article>
   );

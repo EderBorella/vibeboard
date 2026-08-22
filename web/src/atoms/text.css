@@ -1,0 +1,40 @@
+/* TEXT — a line of secondary text. One element, no box, and the smallest atom in the set.
+ *
+ * SIX CLASSES AND 87 HAND-APPLIED `className`s BECAME FIVE CLASSES AND A PROP, and the six were not six
+ * decisions. `.vb-label`, `.vb-label-caps`, `.vb-hint`, `.vb-error`, `.vb-empty` and `.vb-empty-small`
+ * agreed on the step (`--t-small`) and on the ink (`--muted`) and differed in three ways a person can
+ * actually see: is it italic, is it danger, is it a step up. That is `role` × `caps` × `lead`.
+ *
+ * `.vb-empty-small` IS DELETED AS THE DUPLICATE IT WAS. `--t-small`, `--muted`, italic — which is
+ * `.vb-hint` declaration for declaration, under a second name, on six call sites. It is the near-duplicate
+ * §1.8 of the plan names, and the two names could not be told apart at any call site.
+ *
+ * `margin: 0` IS ON THE BASE and it was on two of the six: half of these render as `<p>` or a heading in
+ * the source they replace, and a paragraph's UA margins are not a decision anybody made. The atom renders
+ * a `<span>`, so the reset is belt and braces on a caller that puts one inside prose.
+ *
+ * `.vb-label-rail` IS NOT HERE. It is a WIDTH — the fixed column a label sits in beside its control — and
+ * a width is the field's business rather than the face's, so it moved to Field as `.vb-field-rail`. That
+ * separation was made once already and got the two confused again immediately; naming it after the thing
+ * that owns it is what stops that. */
+.vb-text {
+  font-size: var(--t-small); color: var(--muted); line-height: 1.45; margin: 0;
+}
+/* THE ITALIC IS THE INTERFACE TALKING ABOUT ITSELF. A hint says how something works and an empty state
+   says there is nothing here; both are the app's own voice rather than content, which is the same
+   distinction the readout draws between a measured fact and a written sentence. Four of the six hints in
+   the tree were italic and two were not, at three sizes, and nothing distinguished them; seventeen empty
+   states all declared `--muted` and agreed on nothing else, SEVEN ITALIC AGAINST TEN NOT. */
+.vb-text-quiet { font-style: italic; }
+/* A LINE OF DANGER INK beside the thing that refused, which nine classes said. The other shape an error
+   took — a tinted box that is the whole answer to a submit — is `.vb-notice-bad`, which is a molecule. */
+.vb-text-error { color: var(--danger); }
+/* THE CAPS FACE, AND IT WAS NAMED AT EIGHT CALL SITES BEFORE IT EXISTED: `vb-label-caps` was written in
+   SkillEditor's three rail labels and DispatchPane's five and no stylesheet contained the string, because
+   the tracking and the `text-transform` sat on the RAIL — which is why seven of the eight looked right
+   anyway and a caps label with no rail rendered in lower case. */
+.vb-text-caps { text-transform: uppercase; letter-spacing: var(--track); }
+/* ONE STEP UP, and it earns its name on the empty states: an empty pane is the only thing on the surface,
+   and reading it at the step meant for a field's label made it furniture. `--t-body` and the looser line
+   are `.vb-empty`'s own two values. */
+.vb-text-lead { font-size: var(--t-body); line-height: 1.5; }

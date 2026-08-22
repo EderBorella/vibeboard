@@ -1,7 +1,8 @@
 import type { ModelOption } from '../api';
 import { ModelPicker } from '../models/ModelPicker';
 import type { BackendCaps } from '../shared';
-import { Button } from '../ui/Button';
+import { Button } from '../atoms/Button';
+import { Control } from '../atoms/Control';
 import { SegmentedControl } from '../ui/SegmentedControl';
 
 interface Props {
@@ -62,8 +63,10 @@ export function CopilotControls({
         />
         {/* NOT a `Field`: the dock's control row carries no labels at all, and one label on one of its
             two controls would read worse than none. The box is the primitive's. */}
-        <select
-          className="vb-input"
+        <Control
+          
+          as="select"
+          
           value={effEffort}
           disabled={running}
           onChange={(e) => onEffort(e.target.value)}
@@ -73,7 +76,7 @@ export function CopilotControls({
               {e.label}
             </option>
           ))}
-        </select>
+        </Control>
       </div>
     </>
   );

@@ -32,7 +32,7 @@
   text-align: left;
   background: transparent;
   border: none;
-  border-left: 3px solid var(--accent);
+  border-left: var(--rule) solid var(--accent);
   padding: var(--s-1) var(--s-4);
   cursor: pointer;
   font-family: var(--font-display);
@@ -113,7 +113,7 @@
 /* ---------- Archive drawer ---------- */
 /* Deliberately not column-shaped: archived cards have no position, and a row of full tiles
    would read as a fifth column you could drag into. */
-/* A `Panel` with the `raised` variant. The DASH is the one thing it keeps of its own box, and it is
+/* A `Surface` with the `raised` variant. The DASH is the one thing it keeps of its own box, and it is
    the treatment rather than the geometry: a drawer of archived cards is a temporary thing hanging off
    the board, and the dashed edge says so. A border STYLE cannot shift the row — the width is still the
    primitive's 1px — which is the same argument the ghost Button's dash rests on. */
@@ -124,7 +124,7 @@
   border-style: dashed;
   padding: var(--s-4);
 }
-/* A `Panel` with the `inset` variant — and the one of the ten whose padding the primitive did not move:
+/* A `Surface` with the `inset` variant — and the one of the ten whose padding the primitive did not move:
    `var(--s-3) var(--s-4)` is what this row already said, which is why it is the value `inset` took. All
    that is left is how the row arranges its three cells. */
 .archive-item {
@@ -145,21 +145,21 @@
 .archive-title:hover { color: var(--accent); }
 .archive-actions { display: flex; align-items: center; gap: var(--s-3); flex: 0 0 auto; }
 /* `.archive-restore` shared this rule and is now `default` — hover included, which `.vb-btn-default`
-   already says. The `<select>` beside it is `.vb-input` as of Phase 9; the muted ink is all it kept,
+   already says. The `<select>` beside it is `.vb-ctl` as of Phase 9; the muted ink is all it kept,
    because a secondary restore must not read as loudly as the button it sits next to. */
 .archive-column { color: var(--muted); }
 
 /* ---------- Column ---------- */
-/* `.column` IS A `Panel` WITH THE `raised` VARIANT AND A HEADER, and it has no rule of its own left.
+/* `.column` IS A `Surface` WITH THE `raised` VARIANT AND A HEADER, and it has no rule of its own left.
    What used to be here: a `--panel` ground, `1px solid var(--border)`, `border-radius: var(--radius)`,
-   `display: flex; flex-direction: column` and `min-width: 0`. `Panel`'s `raised` variant is every one
-   of them at the same values, and `.column-head` is `.vb-panel-head`.
+   `display: flex; flex-direction: column` and `min-width: 0`. `Surface`'s `raised` variant is every one
+   of them at the same values, and `.column-head` is `.vb-surface-head`.
    The two arguments the old comment carried are both still stated, because deleting a rule must not
    delete its reason: a column GROWS to share the width and never shrinks below a floor — that is
    `minmax(clamp(...), 1fr)` on the track above, and it replaced a fixed `flex: 0 0 var(--col-w)` basis
    that left ~400px of void on a 1600px viewport. And `min-width: 0` is there because a grid item's
    automatic minimum is its content, which would otherwise let a long unbroken card title push its
-   track past the share the grid gave it; that guard now lives on `.vb-panel`, once, for every
+   track past the share the grid gave it; that guard now lives on `.vb-surface`, once, for every
    Panel. */
 .column-over { border-color: var(--accent); box-shadow: var(--glow); }
 .column-title {
@@ -206,7 +206,7 @@
 .column-body::-webkit-scrollbar-track { background-color: var(--panel); }
 .column-body::-webkit-scrollbar-thumb {
   background-color: var(--muted);
-  border: 3px solid transparent;
+  border: var(--rule) solid transparent;
   background-clip: content-box;
 }
 .column-body::-webkit-scrollbar-thumb:hover { background-color: var(--accent); }
@@ -216,15 +216,15 @@
 }
 
 /* ---------- Card tile (fixed size) ---------- */
-/* A `Panel` with the `inset` variant. The 2px ACCENT LEFT EDGE stays here and is the one thing about
+/* A `Surface` with the `inset` variant. The 2px ACCENT LEFT EDGE stays here and is the one thing about
    this box the surface decides: it is 2px where the primitive's is 1px, and it is what says which board
    a card belongs to. `cursor: pointer` is the surface's too — a tile is a `role="group"` rather than a
-   `<button>`, so `button.vb-panel`'s pointer does not reach it. */
+   `<button>`, so `button.vb-surface`'s pointer does not reach it. */
 .tile {
   height: var(--tile-h);
   flex: 0 0 var(--tile-h); /* don't let flex shrink the card — overflow into the column scroll instead */
   overflow: hidden;
-  border-left: 2px solid var(--accent);
+  border-left: var(--rule) solid var(--accent);
   cursor: pointer;
   display: flex;
   flex-direction: column;

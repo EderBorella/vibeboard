@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { renderMarkdown } from '../markdown';
-import { Readout } from './Readout';
+import { Control } from '../atoms/Control';
+import { Readout } from '../atoms/Readout';
 
 // The chrome around an editable file: which path is open, which view of it you are looking at, and
 // what you can do to it. Shared by Project Control (a control document, sometimes as fields) and the
@@ -39,7 +40,7 @@ export function EditorShell({ path, dirty, views, view, onView, actions, notice,
   return (
     <>
       <div className="control-editor-head">
-        <Readout size="small" testId="editor-path">
+        <Readout testId="editor-path">
           {path}
           {dirty ? ' •' : ''}
         </Readout>
@@ -73,8 +74,10 @@ export function EditorBody({ view, draft, onDraft }: BodyProps) {
   if (view === 'edit') {
     return (
       // NOT a `Field`: this IS the editor body, and the file path above it is its label.
-      <textarea
-        className="vb-input control-textarea"
+      <Control
+        as="textarea"
+        mono
+        className="control-textarea"
         value={draft}
         onChange={(e) => onDraft(e.target.value)}
         spellCheck={false}

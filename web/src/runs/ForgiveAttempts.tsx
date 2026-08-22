@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { forgiveCardAttempts } from '../api';
 import { useConfirm } from '../confirm/useConfirm';
 import type { BoardName } from '../shared';
-import { Button } from '../ui/Button';
+import { Button } from '../atoms/Button';
 import { useAction } from '../useAction';
 
 interface Props {

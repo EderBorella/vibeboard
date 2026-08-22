@@ -1,0 +1,44 @@
+/* SURFACE — a container box. It was called Panel, and the rename is the whole of what changed: the word
+ * collided with five components that are not it (`CopilotPanel`, `AutopilotPanel`, `SandboxPanel`,
+ * `DiagnosticsPanel`, `SignInPanel`) and with `.dock-pane`. One vocabulary means one word per thing, so
+ * the classes moved with the component rather than being left to say `panel` at a component called
+ * Surface.
+ *
+ * THE VARIANT SAYS WHETHER THE BOX IS DRAWN. `raised` draws a ground, a border and a 10px corner;
+ * `flat` draws nothing and keeps a 1px TRANSPARENT border so its edge can appear on hover without
+ * moving the row — the same argument the dashed ghost and the bare glyph rest on.
+ * `min-width: 0` on the base rather than at five call sites: a grid or flex item's automatic minimum
+ * is its content, which is what let a long unbroken card title push its track past its share.
+ *
+ * NO HEIGHT, AND THAT IS THE ATOM'S ANSWER RATHER THAN AN OMISSION. `--ctl-h` and `--mark-h` are the
+ * heights of a box you OPERATE and a box you READ; a container's height is its content's, which is why
+ * `npm run check:box-scale` allows `auto` and why nothing here declares one. */
+.vb-surface { min-width: 0; }
+/* Every raised consumer stacks a head over a scrolling body, so the column direction is the
+   atom's. A row's direction is genuinely the row's own and `flat` leaves it alone. */
+.vb-surface-raised {
+  display: flex; flex-direction: column;
+  background: var(--panel); border: 1px solid var(--border); border-radius: var(--r-lg);
+}
+/* `--r-md` and not `--r-lg`, which is Phase 3's ruling about nested boxes reapplied: a row sits inside
+   a raised surface, and a nested box wants the smaller corner.
+   `font: inherit` is the row's whole type claim — a list row is the prose of the list it is in, and
+   four of these carried a `font-size: var(--t-body)` that only ever restated what they inherited.
+   `inset` IS `flat` WITH THE BOX DRAWN, and that is the whole of the difference: the same corner, the
+   same padding, the same reset — a `--panel-2` ground and a visible edge where `flat` has neither. Which
+   keeps the variant axis exactly one question wide, "is the box drawn?", with `raised` answering it
+   for a surface above the wash and `inset` for a box inside one. See atoms/Surface.tsx for the census. */
+.vb-surface-flat, .vb-surface-inset {
+  border: 1px solid transparent; border-radius: var(--r-md);
+  padding: var(--s-3) var(--s-4); color: inherit; font: inherit; text-align: left;
+}
+.vb-surface-flat { background: transparent; }
+.vb-surface-inset { background: var(--panel-2); border-color: var(--border); }
+.vb-surface-head {
+  display: flex; align-items: center; gap: var(--s-4);
+  padding: var(--s-4) var(--s-5); border-bottom: 1px solid var(--border);
+}
+/* A Surface that takes a click is still a control. `:disabled` keeps the box and drops the affordance,
+   which is what `.exec-card` said by hand. */
+button.vb-surface { cursor: pointer; }
+button.vb-surface:disabled { cursor: default; }

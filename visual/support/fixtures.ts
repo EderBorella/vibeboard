@@ -23,6 +23,11 @@ const BASELINE_DIR = resolve(HERE, '..', 'baseline');
 
 // PER-SURFACE, AND DELIBERATELY NOT THE SAME SHAPE AS THE BOARD'S.
 //
+// FOUR MEASUREMENTS NOW AND IT WAS TWO: the atom phase added `controlHeights` and `markerHeights`,
+// because this file recorded font sizes and radii and NOTHING about height — so the phase whose whole
+// subject is that ten controls were ten heights was invisible to the instrument that fails on drift.
+// "Zero drift" meant "nothing this file measures moved".
+//
 // The board records TALLIES (`13px×127`) and its drift check compares the value set behind them. A
 // surface records only the SET, sorted, and the reason is what the two numbers are for: the board's
 // tally is a fact about a fixed arrangement of 231 elements, while a surface's element count moves
@@ -33,6 +38,13 @@ const BASELINE_DIR = resolve(HERE, '..', 'baseline');
 export interface SurfaceBaseline {
   fontSizes: string[];
   radii: string[];
+  // THE TWO BOX HEIGHTS, added by the atom phase and OPTIONAL for one run only: every baseline on disk
+  // was recorded before they existed, and a reader that indexed blind would compare a set against
+  // `undefined`. A surface whose baseline predates them is reported as drift rather than passed over —
+  // see the drift block in surfaces.spec.ts — because the alternative is a field that silently checks
+  // nothing until somebody remembers to re-record.
+  controlHeights?: string[];
+  markerHeights?: string[];
   examined: Record<string, number>;
   findings: Record<string, number>;
 }

@@ -13,7 +13,7 @@
 /* Accent at rest, not on hover: a `＋` that creates is the affordance of the group head it sits in, and
    a muted one reads as disabled. */
 .control-new { color: var(--accent); }
-/* A `Panel` with the `flat` variant, and its padding was ALREADY `var(--s-3) var(--s-4)` — which is
+/* A `Surface` with the `flat` variant, and its padding was ALREADY `var(--s-3) var(--s-4)` — which is
    where the primitive's value comes from: it is the one of the eight that a person had chosen. */
 .control-item { display: flex; align-items: center; gap: var(--s-3); width: 100%; color: var(--text); }
 .control-item:hover { background: var(--panel-2); }

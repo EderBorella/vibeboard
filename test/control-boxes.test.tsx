@@ -9,7 +9,7 @@
 //
 //   1. TWO CONTROLS DREW NO BOX AT ALL. `.raw-area` — a whole card's file, in the dock — declared a
 //      monospaced face and nothing else, and the suggestions pane's level `<select>` declared nothing
-//      whatever. Both rendered the browser's own control chrome beside a `.vb-input` in the same pane.
+//      whatever. Both rendered the browser's own control chrome beside a `.vb-ctl` in the same pane.
 //      That is Phase 5's `.skill-input`/`.dispatch-prompt` finding one level along: not a box that
 //      disagrees, a box that was never drawn. Both are the primitive's box now.
 //   2. SIX DECLARED NO `:focus` RULE, so they fell through to the app's global ring where the eight boxes
@@ -35,7 +35,7 @@
 import { cleanup, render } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { Field } from '../web/src/ui/Field.js';
-import { Panel } from '../web/src/ui/Panel.js';
+import { Surface } from '../web/src/atoms/Surface.js';
 import { box } from './css-box.js';
 
 afterEach(cleanup);
@@ -51,11 +51,11 @@ function at(html: string, selector: string): Element {
   return el;
 }
 
-// A `Panel` AS THE PRIMITIVE RENDERS IT, for the reason test/panel-boxes.test.tsx gives: the class list
-// is never hand-written, so renaming `vb-panel-raised` moves the fixture instead of quietly testing a
+// A `Surface` AS THE PRIMITIVE RENDERS IT, for the reason test/panel-boxes.test.tsx gives: the class list
+// is never hand-written, so renaming `vb-surface-raised` moves the fixture instead of quietly testing a
 // dead class.
 function panel(className: string): Element {
-  const { container } = render(<Panel className={className} />);
+  const { container } = render(<Surface className={className} />);
   const el = container.firstElementChild;
   if (!el) throw new Error(`Panel rendered nothing for ${className}`);
   return el;
@@ -78,57 +78,57 @@ function checkRow(): { row: Element; label: Element; check: Element } {
     </Field>,
   );
   const row = container.querySelector('.vb-field');
-  const label = container.querySelector('.vb-label');
+  const label = container.querySelector('.vb-text');
   const check = container.querySelector('input');
   if (!row || !label || !check) throw new Error('the check layout rendered no row, label or box');
   return { row, label, check };
 }
 
 // The fifteen controls the census counted outside a `<Field>` after Phase 5, named by where they live.
-// Nine are `Field`s now and six carry `.vb-input` — the box primitives.css names for a control with no
+// Nine are `Field`s now and six carry `.vb-ctl` — the box primitives.css names for a control with no
 // label to give — and this list does not distinguish them, deliberately: the claim is the BOX.
 const CONTROLS: [name: string, el: () => Element][] = [
   [
     'the top bar theme select',
-    () => at('<div class="topbar-right"><select class="vb-input"/></div>', 'select'),
+    () => at('<div class="topbar-right"><select class="vb-ctl"/></div>', 'select'),
   ],
   ['the dispatch effort select', () => inField('select')],
-  ['a report column select', () => at('<div class="report-foot"><select class="vb-input"/></div>', 'select')],
+  ['a report column select', () => at('<div class="report-foot"><select class="vb-ctl"/></div>', 'select')],
   [
     'the archive restore-elsewhere select',
-    () => at('<div class="archive-actions"><select class="vb-input archive-column"/></div>', 'select'),
+    () => at('<div class="archive-actions"><select class="vb-ctl archive-column"/></div>', 'select'),
   ],
   [
     'the model picker provider filter',
-    () => at('<div class="mp-filters"><select class="vb-input push"/></div>', 'select'),
+    () => at('<div class="mp-filters"><select class="vb-ctl push"/></div>', 'select'),
   ],
   [
     'the copilot effort select',
-    () => at('<div class="copilot-selects"><select class="vb-input"/></div>', 'select'),
+    () => at('<div class="copilot-selects"><select class="vb-ctl"/></div>', 'select'),
   ],
   [
     'the copilot composer',
-    () => at('<div class="copilot-input"><textarea class="vb-input"></textarea></div>', 'textarea'),
+    () => at('<div class="copilot-input"><textarea class="vb-ctl"></textarea></div>', 'textarea'),
   ],
   [
     'the diary composer',
-    () => at('<div class="diary-compose"><textarea class="vb-input"></textarea></div>', 'textarea'),
+    () => at('<div class="diary-compose"><textarea class="vb-ctl"></textarea></div>', 'textarea'),
   ],
   [
     'the control editor body',
-    () => at('<textarea class="vb-input control-textarea"></textarea>', 'textarea'),
+    () => at('<textarea class="vb-ctl control-textarea"></textarea>', 'textarea'),
   ],
   [
     'a links registry cell',
-    () => at('<div class="resource-row"><input class="vb-input res-title"/></div>', 'input'),
+    () => at('<div class="resource-row"><input class="vb-ctl res-title"/></div>', 'input'),
   ],
   [
     'the raw card file',
-    () => at('<div class="raw-pane"><textarea class="vb-input raw-area"></textarea></div>', 'textarea'),
+    () => at('<div class="raw-pane"><textarea class="vb-ctl raw-area"></textarea></div>', 'textarea'),
   ],
   [
     'the suggestions level select',
-    () => at('<div class="suggestions-actions"><select class="vb-input"/></div>', 'select'),
+    () => at('<div class="suggestions-actions"><select class="vb-ctl"/></div>', 'select'),
   ],
   ['an auto-pilot cap', () => inField('input')],
   ['a skill name', () => inField('input')],
@@ -140,7 +140,14 @@ const PRIMITIVE = {
   radius: '6px',
   ground: 'var(--bg)',
   size: '0.8125rem',
-  padding: '6px 8px',
+  // THE VERTICAL HALF IS GONE AND THE HEIGHT IS WHY. `var(--s-3) var(--s-4)` made this box 14px of line
+  // box plus 12px of padding plus 2px of border, which is a height nobody chose and which moved with
+  // whatever step the caller set — the defect the whole atom layer exists to remove. It is `--ctl-h`
+  // now, 28px, and the horizontal half is untouched because a value needs room from the edge it sits
+  // against. Written as the resolved px string, never as `var(--ctl-h)`: an expectation rewritten into a
+  // token name compares one literal to the same literal and asserts nothing.
+  padding: '0 8px',
+  height: '28px',
 };
 
 describe('the fifteen controls Field had not taken draw one box', () => {
@@ -152,8 +159,15 @@ describe('the fifteen controls Field had not taken draw one box', () => {
   // SIX PADDINGS BECAME ONE, and the arithmetic is the argument: 4/8, 3.2/8, 3.52/6, 4/6, 8, 12.8 and
   // 6/8 px for one kind of box, plus two boxes with no padding at all. `var(--s-3) var(--s-4)` — 6/8 —
   // is the primitive's, which is the one of the seven a person had chosen.
-  it.each(CONTROLS)('%s is padded the primitive’s 6/8', (_name, el) => {
+  it.each(CONTROLS)('%s is padded the atom’s 0/8', (_name, el) => {
     expect(box(el()).padding).toBe(PRIMITIVE.padding);
+  });
+
+  // THE CLAIM THE PHASE IS ABOUT: every one of these declares the SAME height, so a control's box no
+  // longer depends on what is inside it. Ten unchosen heights is the measured diagnosis; this is the
+  // jsdom half of the answer, and `npm run visual`'s check 12 is the half that measures a real browser.
+  it.each(CONTROLS)('%s declares the control height rather than emerging at one', (_name, el) => {
+    expect(box(el()).height).toBe(PRIMITIVE.height);
   });
 
   // A CONTROL AT 12px BESIDE AN INPUT AT 13px IS THE SHAPE OF THE 10.88px INCIDENT, which is the reason
@@ -176,7 +190,7 @@ describe('the survivors that differ, and what each one still says', () => {
   it('the diary composer keeps the panel ground, because its pane is the wash', () => {
     // `--wash` is `none` in classic-dark, so `--bg` on `--bg` would render as no box at all.
     expect(box(at('<section class="diary"></section>', 'section')).background).toBe('var(--wash)');
-    const el = at('<div class="diary-compose"><textarea class="vb-input"></textarea></div>', 'textarea');
+    const el = at('<div class="diary-compose"><textarea class="vb-ctl"></textarea></div>', 'textarea');
     expect(box(el).background).toBe('var(--panel-2)');
   });
 
@@ -185,27 +199,27 @@ describe('the survivors that differ, and what each one still says', () => {
     // are, and both of those put their boxes on `--bg`.
     expect(box(at('<div class="suggestions-pane"></div>', 'div')).background).toBeUndefined();
     expect(box(at('<div class="dock"></div>', 'div')).background).toBe('var(--panel)');
-    // A `Panel` render rather than a hand-written class list: Phase 11 moved this ground into
-    // `.vb-panel-raised`, and the fixture has to ask the primitive for its own markup or it quietly
+    // A `Surface` render rather than a hand-written class list: Phase 11 moved this ground into
+    // `.vb-surface-raised`, and the fixture has to ask the primitive for its own markup or it quietly
     // tests a class that no longer draws anything. The CLAIM is unchanged.
     expect(box(panel('modal')).background).toBe('var(--panel)');
     expect(box(at('<div class="gate-card"></div>', 'div')).background).toBe('var(--panel)');
-    const el = at('<div class="suggestions-actions"><input class="vb-input"/></div>', 'input');
+    const el = at('<div class="suggestions-actions"><input class="vb-ctl"/></div>', 'input');
     expect(box(el).background).toBe(PRIMITIVE.ground);
   });
 
   it('the archive restore-elsewhere select keeps a muted ink', () => {
     // A secondary restore must not read as loudly as the Restore button beside it. An ink somebody
     // chose is the accepted survivor reason; a padding of its own is not.
-    const el = at('<div class="archive-actions"><select class="vb-input archive-column"/></div>', 'select');
+    const el = at('<div class="archive-actions"><select class="vb-ctl archive-column"/></div>', 'select');
     expect(box(el).color).toBe('var(--muted)');
   });
 
   it.each([
-    ['the control editor body', '<textarea class="vb-input control-textarea"></textarea>', 'textarea'],
+    ['the control editor body', '<textarea class="vb-ctl control-textarea"></textarea>', 'textarea'],
     [
       'the raw card file',
-      '<div class="raw-pane"><textarea class="vb-input raw-area"></textarea></div>',
+      '<div class="raw-pane"><textarea class="vb-ctl raw-area"></textarea></div>',
       'textarea',
     ],
   ])('%s keeps the monospaced face a file is read in', (_name, html, sel) => {
@@ -234,7 +248,7 @@ describe('every control answers a focus the same way, and the checkbox is the st
   it('and a select answers the pointer as well, which five of seven said by hand', () => {
     // `.theme-select` carried `cursor: pointer` and an accent hover at four call sites and
     // `.archive-column` carried the cursor; `.mp-prov` and `.copilot-selects select` had neither.
-    const el = at('<select class="vb-input"/>', 'select');
+    const el = at('<select class="vb-ctl"/>', 'select');
     expect(box(el).cursor).toBe('pointer');
     expect(box(el, ':hover')['border-color']).toBe('var(--accent)');
   });
@@ -247,7 +261,7 @@ describe('a field label has a treatment now, because Field asks for one', () => 
         <input />
       </Field>,
     );
-    const label = container.querySelector('.vb-label');
+    const label = container.querySelector('.vb-text');
     if (!label) throw new Error('Field rendered no label');
     expect(box(label)['font-size']).toBe('0.75rem');
     expect(box(label).color).toBe('var(--muted)');
@@ -263,7 +277,7 @@ describe('a field label has a treatment now, because Field asks for one', () => 
         <textarea />
       </Field>,
     );
-    const label = container.querySelector('.vb-label');
+    const label = container.querySelector('.vb-text');
     if (!label) throw new Error('Field rendered no label');
     expect(box(label)['text-transform']).toBe('uppercase');
     expect(box(label)['letter-spacing']).toBe('0.08em');
@@ -276,7 +290,7 @@ describe('a field label has a treatment now, because Field asks for one', () => 
         <input />
       </Field>,
     );
-    const label = container.querySelector('.vb-label');
+    const label = container.querySelector('.vb-text');
     if (!label) throw new Error('Field rendered no label');
     expect(box(label)['text-transform']).toBe('uppercase');
     expect(box(label).width).toBe('6rem');
@@ -318,12 +332,12 @@ describe('the model picker filter row, resolved', () => {
   // Phase 5b made putting the two select triggers at `--t-body` beside the inputs they share a row with.
   it('sets the chips at the chip step and the select at the control step', () => {
     const chip = at('<div class="mp-filters"><button class="vb-chip vb-chip-pill mp-chip"/></div>', 'button');
-    const select = at('<div class="mp-filters"><select class="vb-input push"/></div>', 'select');
+    const select = at('<div class="mp-filters"><select class="vb-ctl push"/></div>', 'select');
     expect(box(chip)['font-size']).toBe('0.6875rem');
     expect(box(select)['font-size']).toBe(PRIMITIVE.size);
     // And the select's box is the same box as the search input above it in the same modal, which is
     // what the two steps are distinguishing: two controls at 13px, three chips at 11px.
-    const search = at('<div class="mp-modal"><input class="vb-input"/></div>', 'input');
+    const search = at('<div class="mp-modal"><input class="vb-ctl"/></div>', 'input');
     expect(box(select).padding).toBe(box(search).padding);
     expect(box(select)['border-radius']).toBe(box(search)['border-radius']);
   });

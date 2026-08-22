@@ -1,0 +1,51 @@
+/* CONTROL — a control box that holds a value. The box an `<input>`, a `<select>` and a `<textarea>` all
+ * draw, which was `.vb-input` applied by hand at 22 sites plus a descendant selector.
+ *
+ * THE DESCENDANT SELECTOR IS GONE, and its deletion is the point of the atom rather than a side effect.
+ * `.vb-field input, .vb-field textarea, .vb-field select` gave a Field's child the box without the caller
+ * having to remember a class — and it was (0,1,1), so it outranked every single-class rule a surface
+ * wrote, which the file it lived in commented on as a specificity hazard. It also reached a
+ * `<input type="checkbox">`, which paints no border and could not use any of it, and had to be excluded
+ * from the focus rule by name in two `:not()`s. A caller passes `<Control>` now, so the box arrives with
+ * the element instead of with its parent.
+ *
+ * `.vb-trigger` SHARES THIS RULE AND IS NOT A SECOND CONTROL. A select trigger is this box with a caret
+ * on it — the same 1px border, the same corner, the same ground — and it is a `<button>` because it opens
+ * a Popover rather than because it is a different shape. It wears the atom's box the way `StatusChip`
+ * wears `Chip`'s; its layout, its hover and its caret stay with the molecule, in ui/primitives.css.
+ *
+ * HEIGHT, AND NO VERTICAL PADDING. Both halves are the same decision as `Button`'s: the padding was
+ * `var(--s-3) var(--s-4)`, so the box's height was 14px of line box plus 12px of padding plus 2px of
+ * border, which is a height nobody chose and which changed with the step the caller happened to set. It
+ * is `--ctl-h` now, the same 28px the button beside it in the same row measures. */
+.vb-ctl, .vb-trigger {
+  background: var(--bg); color: var(--text);
+  border: 1px solid var(--border); border-radius: var(--r-md);
+  padding: 0 var(--s-4); font: inherit; font-size: var(--t-body);
+  height: var(--ctl-h);
+}
+/* A TEXTAREA IS THE ONE CONTROL WHOSE HEIGHT IS ITS CONTENT'S. `--ctl-h` is one line, and a card's whole
+   file is not one line, so the fixed height is withdrawn here and the surface says how much room the box
+   starts with — `.raw-pane .raw-area`'s 14rem, the diary's 2.6rem. (0,1,1) against (0,1,0) above, so the
+   order of the two rules is not load-bearing. Those two floors are the `rem` exceptions
+   `npm run check:box-scale` lists by name with this reason. */
+textarea.vb-ctl { height: auto; }
+/* THE MONOSPACED CONTROL, AND IT IS NOT A `Readout`. The signature says a monospaced face means the
+   machine measured it — but a card's file, a config file, a prompt and a typed confirmation are machine
+   TEXT rather than a measurement, and `test/mono-census.test.tsx` has ruled that pair apart already:
+   *"four of the seven are `<input>`/`<textarea>` and could not be a `Readout` at all — a `Readout` is a
+   `<span>`"*. That structural reason is why this is a class on the control rather than the treatment
+   reused, and it is why the four surface rules that each declared this by hand are gone. */
+.vb-ctl-mono { font-family: var(--font-mono); }
+/* THE OUTLINE TRADED FOR AN ACCENT BORDER, on a control that paints a border. Two of the ten boxes this
+   replaced declared no `:focus` rule at all, so a skill's name and a dispatch prompt kept the UA outline
+   where every other box in the app turns its border accent — fixed here rather than at the two sites,
+   because the class of defect is open-ended. A checkbox is no longer reachable by this rule at all: it
+   is not a `<Control>`, so it falls through to the app's global `:focus-visible` ring instead of needing
+   two `:not()`s to keep it. */
+.vb-ctl:focus { outline: none; border-color: var(--accent); }
+/* A SELECT IS A CONTROL YOU POINT AT, and five of the tree's seven said so by hand while two said
+   nothing. The hover makes the same statement `:focus` makes on an input — this is the control you are
+   about to use — and a native select is that affordance without the caret. */
+select.vb-ctl { cursor: pointer; }
+select.vb-ctl:hover:not(:disabled) { border-color: var(--accent); }

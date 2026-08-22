@@ -3,10 +3,10 @@
 .skill-row { display: flex; align-items: center; gap: var(--s-4); }
 /* The rail label and the box are the primitive's. What the editor still says is that a field takes the
    slack beside its label, and that the prompt is a monospace box you can drag taller. */
-.skill-row > .vb-input { flex: 1; min-width: 0; }
-.skill-editor textarea.vb-input { resize: vertical; font-family: var(--font-mono); }
+.skill-row > .vb-ctl { flex: 1; min-width: 0; }
+.skill-editor textarea.vb-ctl { resize: vertical; }
 .skill-scope { border: 1px solid var(--border); border-radius: var(--r-md); padding: var(--s-3) var(--s-5) var(--s-4); margin: 0; }
 .skill-scope legend { font-size: var(--t-small); color: var(--muted); text-transform: uppercase; letter-spacing: var(--track); padding: 0 var(--s-2); }
-.skill-scope .vb-hint { margin: 0 0 var(--s-2); }
+.skill-scope .vb-text-quiet { margin: 0 0 var(--s-2); }
 .skill-foot { display: flex; justify-content: flex-end; }
 

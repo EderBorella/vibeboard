@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react';
 import { getRaw, putRaw } from '../api';
 import { errorText } from '../errors';
 import type { Card } from '../shared';
-import { Button } from '../ui/Button';
+import { Button } from '../atoms/Button';
+import { Control } from '../atoms/Control';
+import { Text } from '../atoms/Text';
 import { useAction } from '../useAction';
 
 interface Props {
@@ -54,16 +56,18 @@ export function RawPane({ card }: Props) {
     <div className="raw-pane">
       {/* NOT a `Field`: this IS the pane, and the dock tab that opened it is its label. It drew NO box
           at all before Phase 9 — a whole card's file in the browser's own textarea chrome, beside boxes
-          that were the primitive's — so `.vb-input` is a fix here and not only a merge. */}
-      <textarea
-        className="vb-input raw-area"
+          that were the primitive's — so `.vb-ctl` is a fix here and not only a merge. */}
+      <Control
+        as="textarea"
+        mono
+        className="raw-area"
         aria-label="card file"
         value={draft}
         placeholder={loading ? 'Loading…' : ''}
         onChange={(e) => setDraft(e.target.value)}
       />
       <div className="raw-foot">
-        {error !== null && <span className="vb-error">{error}</span>}
+        {error !== null && <Text role="error">{error}</Text>}
         <Button
           variant="primary"
           size="md"

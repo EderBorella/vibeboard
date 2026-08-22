@@ -32,7 +32,7 @@ import type { ComponentProps } from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { CardTile } from '../web/src/board/CardTile.js';
 import type { Card } from '../web/src/shared.js';
-import { Chip } from '../web/src/ui/Chip.js';
+import { Chip } from '../web/src/atoms/Chip.js';
 import { box } from './css-box.js';
 import { inkIn, inkToken, isColour, THEMES } from './state-ink.js';
 
@@ -222,7 +222,13 @@ describe('a chip that takes a click is still a chip', () => {
   it('a clickable chip inherits the surrounding face rather than the UA control face', () => {
     const drawn = box(chip({ as: 'button', pill: true, tone: 'neutral', className: 'tag tag-btn' }));
     expect(drawn['font-family']).toBe('inherit');
-    expect(drawn['line-height']).toBe('inherit');
+    // `line-height: inherit` IS WITHDRAWN AND THIS IS THE ASSERTION THAT MOVED WITH IT. It existed so a
+    // `<span>` rendered what a span renders, which held while the box had no height of its own; a chip in
+    // the Project Log's prose then measured 25.25px against 15px on the board, because the surrounding
+    // line-height was deciding a marker's size. `--mark-h` with `line-height: 1` is one 16px marker
+    // everywhere. The face is still inherited — that half was never the problem.
+    expect(drawn['line-height']).toBe('1');
+    expect(drawn.height).toBe('16px');
     expect(drawn.cursor).toBe('pointer');
   });
 

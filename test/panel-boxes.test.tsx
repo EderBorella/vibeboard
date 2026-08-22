@@ -9,13 +9,13 @@
 //
 // It asserts the BOX A CLASS LIST DRAWS, resolved out of the stylesheets, rather than the class name
 // that draws it: after Phase 4 `.column`'s ground, border and corner are declared by
-// `.vb-panel-raised` in primitives.css instead of by `.column` in styles.css, and every assertion
+// `.vb-surface-raised` in primitives.css instead of by `.column` in styles.css, and every assertion
 // below reads the same value either way.
 //
 // THE ASSERTIONS SURVIVED THE MIGRATION; THE FIXTURES DID NOT, and pretending otherwise would be the
-// dishonest version of this note. A row is now built by rendering `Panel` rather than by writing
+// dishonest version of this note. A row is now built by rendering `Surface` rather than by writing
 // `<button class="report-open">`, because the element genuinely carries two more classes than it did.
-// What that buys is that the class list is never hand-written: rename `vb-panel-flat` and the fixture
+// What that buys is that the class list is never hand-written: rename `vb-surface-flat` and the fixture
 // moves with it instead of quietly testing a dead class.
 //
 // jsdom LOADS NO CSS and computes no cascade — `getComputedStyle` answers '' whatever the rule says —
@@ -33,7 +33,7 @@ import { cleanup, render } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { BoardsView } from '../web/src/board/BoardsView.js';
 import type { BoardName, Card, ProjectConfig, ProjectSnapshot } from '../web/src/shared.js';
-import { Panel } from '../web/src/ui/Panel.js';
+import { Surface } from '../web/src/atoms/Surface.js';
 // THE CASCADE RESOLVER IS SHARED with test/field-boxes.test.tsx — see test/css-box.tsx. Its own two
 // directions are asserted below, under *the cascade helper separates a state from the resting style*.
 import { box } from './css-box.js';
@@ -41,21 +41,21 @@ import { box } from './css-box.js';
 afterEach(cleanup);
 
 // THE ELEMENT AS THE COMPONENT RENDERS IT, and the class list is not hand-written anywhere. Before
-// Phase 4 these were plain `<button class="report-open">`; after it they are `Panel`s, so the fixture
-// asks `Panel` for its own markup. That is what stops the fixture drifting from the primitive: rename
-// `vb-panel-flat` and every assertion below moves with it rather than quietly testing a dead class.
+// Phase 4 these were plain `<button class="report-open">`; after it they are `Surface`s, so the fixture
+// asks `Surface` for its own markup. That is what stops the fixture drifting from the primitive: rename
+// `vb-surface-flat` and every assertion below moves with it rather than quietly testing a dead class.
 //
 // The surfaces themselves are not mounted here — several need a page of mocked api — and each is
 // covered by its own suite. What is under test is the BOX, which is a property of the class list.
 function row(className: string): Element {
-  const { container } = render(<Panel as="button" variant="flat" className={className} />);
+  const { container } = render(<Surface as="button" variant="flat" className={className} />);
   const el = container.firstElementChild;
   if (!el) throw new Error(`Panel rendered nothing for ${className}`);
   return el;
 }
 
 function raised(className: string): Element {
-  const { container } = render(<Panel variant="raised" className={className} />);
+  const { container } = render(<Surface variant="raised" className={className} />);
   const el = container.firstElementChild;
   if (!el) throw new Error(`Panel rendered nothing for ${className}`);
   return el;
@@ -144,7 +144,7 @@ describe('the shared column grid', () => {
   });
 
   // THE TWO CLASS SELECTORS LEFT IN THIS FILE ARE THE SUBJECT, not an oversight. `.board-columns` is
-  // the grid row whose tracks are the claim, and `.column-head, .vb-panel-head` asserts that the
+  // the grid row whose tracks are the claim, and `.column-head, .vb-surface-head` asserts that the
   // header slot's class MOVED to the primitive — a `data-testid` would answer neither question. The
   // rest of the file goes through test ids, which is why the standing count moved 126 → 127 rather
   // than 126 → 129.
@@ -190,7 +190,7 @@ describe('a raised surface draws a panel ground, a border and a 10px corner', ()
   it("the column head is a bordered row above the column's body", () => {
     // Off the real component, not off a class list: the header SLOT is the part of Panel a caller
     // cannot see, so this is where it has to be read from the render.
-    const head = boards().querySelector('.column-head, .vb-panel-head');
+    const head = boards().querySelector('.column-head, .vb-surface-head');
     expect(head).not.toBeNull();
     const drawn = box(head as Element);
     expect(drawn['border-bottom']).toBe('1px solid var(--border)');
@@ -263,7 +263,7 @@ describe('a list row draws no box until the surface lights it', () => {
   it('a selected chat pick keeps its accent left edge', () => {
     const { container } = render(
       <div className="chat-menu-item active">
-        <Panel as="button" variant="flat" className="chat-menu-open" data-testid="chat-pick" />
+        <Surface as="button" variant="flat" className="chat-menu-open" data-testid="chat-pick" />
       </div>,
     );
     const pick = container.querySelector('[data-testid="chat-pick"]');

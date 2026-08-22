@@ -1,4 +1,4 @@
-/* A `Panel` with the `inset` variant. It sat on `--bg` where the same box on a `--panel` parent sits on
+/* A `Surface` with the `inset` variant. It sat on `--bg` where the same box on a `--panel` parent sits on
    `--panel-2` four times over, and nothing chose the difference. */
 .links-list {
   display: flex; flex-direction: column; gap: var(--s-2); max-height: 180px; overflow-y: auto;
@@ -19,7 +19,7 @@
 }
 .cv-tags { display: flex; flex-wrap: wrap; gap: var(--s-2); }
 .cv-desc {
-  margin: 0; padding-left: var(--s-5); border-left: 3px solid var(--accent);
+  margin: 0; padding-left: var(--s-5); border-left: var(--rule) solid var(--accent);
   color: var(--text); font-size: var(--t-lead); line-height: 1.5;
 }
 /* THE SIZE LIVES ON THE LIST, not on the row. `.cv-link` declared `font-size: var(--t-body)` and it
@@ -29,7 +29,7 @@
 .cv-links { display: flex; flex-direction: column; gap: var(--s-2); font-size: var(--t-body); }
 .cv-link { display: flex; gap: var(--s-4); align-items: baseline; }
 /* A link is a button wherever it can actually open the card (CardView's onOpenCard). */
-/* A `Panel` with the `flat` variant. `width: fit-content` is the one thing left: a link is as wide as
+/* A `Surface` with the `flat` variant. `width: fit-content` is the one thing left: a link is as wide as
    its text, unlike every other row here, so the hover border traces the words rather than the column. */
 .cv-link-btn { width: fit-content; }
 .cv-link-btn:hover { border-color: var(--accent); }

@@ -1,8 +1,8 @@
 import type { Card } from '../shared';
-import { Button } from '../ui/Button';
-import { Chip } from '../ui/Chip';
-import { Panel } from '../ui/Panel';
-import { Readout } from '../ui/Readout';
+import { Button } from '../atoms/Button';
+import { Chip } from '../atoms/Chip';
+import { Readout } from '../atoms/Readout';
+import { Surface } from '../atoms/Surface';
 import { miniature } from '../viewmodel';
 
 interface Props {
@@ -42,7 +42,7 @@ export function CardTile({
   // a badge on every tile is a badge that says nothing.
   const blocked = carryingAProblem ?? [];
   return (
-    <Panel
+    <Surface
       variant="inset"
       className="tile"
       // A REGION IN THE TAB ORDER, NOT A `<button>`, and the markup is a ruling rather than a
@@ -80,7 +80,7 @@ export function CardTile({
       }}
     >
       <div className="tile-head">
-        <Readout tone="accent">{card.id}</Readout>
+        <Readout>{card.id}</Readout>
         {/* THREE STATE WORDS IN THREE TONES, and the tones are the meaning rather than the styling —
             see the three rules in organisms/board/tile-states.css and test/chip-boxes.test.tsx, which
             measures that a person can tell them apart in each theme's own palette. */}
@@ -127,7 +127,7 @@ export function CardTile({
           // signals nothing: it is a structural fact about the card, and the tone vocabulary is worth more
           // if a count cannot borrow from it. Mono also puts it under the signature's own rule — the machine
           // counted these.
-          <Readout tone="accent2" testId="tile-link" title={card.links.join(', ')}>
+          <Readout testId="tile-link" title={card.links.join(', ')}>
             🔗 {card.links.length}
           </Readout>
         )}
@@ -176,6 +176,6 @@ export function CardTile({
           )}
         </div>
       )}
-    </Panel>
+    </Surface>
   );
 }

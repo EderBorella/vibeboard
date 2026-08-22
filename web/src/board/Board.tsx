@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { BoardName, Card, ProjectConfig } from '../shared';
-import { Chip } from '../ui/Chip';
+import { Chip } from '../atoms/Chip';
 import { cardsByColumn, columnSlugs } from '../viewmodel';
 import { ArchiveDrawer } from './ArchiveDrawer';
 import { Column } from './Column';

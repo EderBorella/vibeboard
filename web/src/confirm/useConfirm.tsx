@@ -1,7 +1,8 @@
 import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
-import { Button } from '../ui/Button';
 import { Field } from '../ui/Field';
-import { Panel } from '../ui/Panel';
+import { Button } from '../atoms/Button';
+import { Control } from '../atoms/Control';
+import { Surface } from '../atoms/Surface';
 
 // Ask before doing something that cannot be taken back.
 //
@@ -103,7 +104,7 @@ export function useConfirm(): Confirmer {
         if (e.target === e.currentTarget) settle(false);
       }}
     >
-      <Panel className="modal confirm" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
+      <Surface className="modal confirm" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
         <div className="modal-head">
           <span className="modal-title" id="confirm-title">
             {request.title}
@@ -120,7 +121,8 @@ export function useConfirm(): Confirmer {
                 </>
               }
             >
-              <input
+              <Control
+                mono
                 value={typed}
                 autoFocus
                 onChange={(e) => setTyped(e.target.value)}
@@ -147,7 +149,7 @@ export function useConfirm(): Confirmer {
             </Button>
           </div>
         </div>
-      </Panel>
+      </Surface>
     </div>
   ) : null;
 

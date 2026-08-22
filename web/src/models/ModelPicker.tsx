@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { ModelOption } from '../api';
-import { Button } from '../ui/Button';
-import { Chip } from '../ui/Chip';
-import { Panel } from '../ui/Panel';
-import { Readout } from '../ui/Readout';
+import { Button } from '../atoms/Button';
+import { Chip } from '../atoms/Chip';
+import { Control } from '../atoms/Control';
+import { Readout } from '../atoms/Readout';
+import { Surface } from '../atoms/Surface';
+import { Text } from '../atoms/Text';
 import { compareModels, type ModelFilter, matchesFilter } from './model-filter';
 import { fmtCtx, fmtPrice, loadFavs, providerOf, saveFavs } from './model-format';
 
@@ -81,7 +83,7 @@ export function ModelPicker({ models, value, defaultModel, onChange, disabled }:
   return (
     <div className="mp">
       <button className="vb-trigger" disabled={disabled} onClick={() => setOpen(true)} title={value}>
-        <Readout size="plain" className="vb-trigger-label">
+        <Readout className="vb-trigger-label">
           {selected?.free ? '🆓 ' : ''}
           {label}
         </Readout>
@@ -90,7 +92,7 @@ export function ModelPicker({ models, value, defaultModel, onChange, disabled }:
 
       {open && (
         <div className="mp-modal-backdrop" onClick={() => setOpen(false)}>
-          <Panel className="mp-modal" onClick={(e) => e.stopPropagation()}>
+          <Surface className="mp-modal" onClick={(e) => e.stopPropagation()}>
             <div className="mp-modal-head">
               <span className="mp-modal-title">Choose a model</span>
               <Button variant="bare" size="sm" className="push" onClick={() => setOpen(false)}>
@@ -98,8 +100,8 @@ export function ModelPicker({ models, value, defaultModel, onChange, disabled }:
               </Button>
             </div>
 
-            <input
-              className="vb-input"
+            <Control
+              
               autoFocus
               value={query}
               placeholder="Search by name or id…"
@@ -112,8 +114,9 @@ export function ModelPicker({ models, value, defaultModel, onChange, disabled }:
               {chip(visionOnly, setVisionOnly, '👁 Vision')}
               {/* NOT a `Field`: a filter in a row of filters, named by its own first option. `push` is
                   the one layout utility in the file and it is what `.mp-prov`'s whole remainder was. */}
-              <select
-                className="vb-input push"
+              <Control
+                as="select"
+                className="push"
                 value={provider}
                 onChange={(e) => setProvider(e.target.value)}
               >
@@ -122,7 +125,7 @@ export function ModelPicker({ models, value, defaultModel, onChange, disabled }:
                     {p === 'all' ? 'All providers' : p}
                   </option>
                 ))}
-              </select>
+              </Control>
             </div>
 
             <Readout>
@@ -144,7 +147,7 @@ export function ModelPicker({ models, value, defaultModel, onChange, disabled }:
                   >
                     {favs.has(m.id) ? '★' : '☆'}
                   </Button>
-                  <Panel
+                  <Surface
                     as="button"
                     variant="flat"
                     className="mp-pick"
@@ -158,7 +161,7 @@ export function ModelPicker({ models, value, defaultModel, onChange, disabled }:
                           default
                         </Chip>
                       )}
-                      <Readout tone="accent2">{fmtPrice(m)}</Readout>
+                      <Readout>{fmtPrice(m)}</Readout>
                     </span>
                     <span className="mp-pick-bot">
                       <Readout>{m.id}</Readout>
@@ -169,14 +172,14 @@ export function ModelPicker({ models, value, defaultModel, onChange, disabled }:
                         {m.caps?.vision && <span title="Vision">👁</span>}
                       </span>
                     </span>
-                  </Panel>
+                  </Surface>
                 </div>
               ))}
               {filtered.length === 0 && (
-                <div className="mp-empty vb-empty">No models match the current filters.</div>
+                <Text role="hint" lead className="mp-empty">No models match the current filters.</Text>
               )}
             </div>
-          </Panel>
+          </Surface>
         </div>
       )}
     </div>

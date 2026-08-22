@@ -11,6 +11,8 @@ import { AutopilotPanel } from '../autopilot/AutopilotPanel';
 import type { Confirmer } from '../confirm/useConfirm';
 import { BackendPicker } from '../copilot/BackendPicker';
 import { clampToCaps, resolveChoice } from '../copilot/choice';
+import { Control } from '../atoms/Control';
+import { Text } from '../atoms/Text';
 // The same list the picker renders from, and the reason this file no longer declares its own: the two
 // had drifted to different labels for one backend, so the setting read as "Claude Code" here and
 // "Claude" in the dock that obeys it.
@@ -28,9 +30,9 @@ import {
   type ProjectConfig,
 } from '../shared';
 import { SignInPanel } from '../signin/SignInPanel';
-import { Button } from '../ui/Button';
+import { Button } from '../atoms/Button';
 import { Field } from '../ui/Field';
-import { Panel } from '../ui/Panel';
+import { Surface } from '../atoms/Surface';
 import { useAction } from '../useAction';
 import { useFetched } from '../useFetched';
 import { parseCsv } from '../viewmodel';
@@ -139,7 +141,7 @@ export function SettingsModal({ config, onClose, onSaved, autopilot, onAutopilot
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
-      <Panel className="modal" onClick={(e) => e.stopPropagation()}>
+      <Surface className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
           <span className="modal-title">Settings</span>
           <Button variant="bare" size="sm" onClick={onClose}>
@@ -165,7 +167,8 @@ export function SettingsModal({ config, onClose, onSaved, autopilot, onAutopilot
             />
           </Field>
           <Field label={`Default ${backend === 'opencode' ? 'variant' : 'effort'}`}>
-            <select
+            <Control
+              as="select"
               value={clampToCaps({ backend, model, effort }, 'plan').effort}
               onChange={(e) => setEffort(e.target.value)}
             >
@@ -174,10 +177,10 @@ export function SettingsModal({ config, onClose, onSaved, autopilot, onAutopilot
                   {e.label}
                 </option>
               ))}
-            </select>
+            </Control>
           </Field>
           <Field label="Keep last N chats">
-            <input
+            <Control
               type="number"
               min={1}
               value={keepChats}
@@ -185,7 +188,7 @@ export function SettingsModal({ config, onClose, onSaved, autopilot, onAutopilot
             />
           </Field>
           <Field label="Context window (tokens)">
-            <input
+            <Control
               type="number"
               min={1000}
               step={1000}
@@ -193,20 +196,20 @@ export function SettingsModal({ config, onClose, onSaved, autopilot, onAutopilot
               onChange={(e) => setContextBudget(Number(e.target.value))}
             />
           </Field>
-          <div className="vb-hint">
+          <Text role="hint">
             What the context bar treats as full. Set it to the window of the model you actually use —{' '}
             {DEFAULT_CONTEXT_BUDGET.toLocaleString()} over-reports occupancy several times over on a
             million-token model.
-          </div>
+          </Text>
 
           {sandbox && <SandboxPanel state={sandbox} backend={backend} onChanged={loadSandbox} />}
 
           <div className="settings-section">Boards</div>
-          <div className="vb-hint">
+          <Text role="hint">
             Columns are comma-separated (left→right). Renaming one moves its folder, so its cards come with
             it. A column that still holds cards can't be removed, and renaming and reordering in the same save
             is refused — do those one at a time.
-          </div>
+          </Text>
           {config.autopilot && (
             // Only when there is a block to break. Adding a column is free now that nothing routes — the
             // lifecycle is code (ruling 52) — but REMOVING the terminal or blocked column is still refused,
@@ -223,7 +226,7 @@ export function SettingsModal({ config, onClose, onSaved, autopilot, onAutopilot
           )}
           {BOARDS.map((b) => (
             <Field key={b} label={`${BOARD_LABELS[b]} columns`}>
-              <input
+              <Control
                 value={columns[b]}
                 onChange={(e) => setColumns((c) => ({ ...c, [b]: e.target.value }))}
               />
@@ -237,11 +240,11 @@ export function SettingsModal({ config, onClose, onSaved, autopilot, onAutopilot
               onChange={(e) => setEnforceOneParent(e.target.checked)}
             />
           </Field>
-          <div className="vb-hint">
+          <Text role="hint">
             A card gets one parent on the board above it — features → product → engineering. Off by default,
             because linking a card to two places is legitimate when you mean it. Agent runs are held to this
             rule either way: it is the hierarchy auto-pilot rolls up, and an agent cannot mean “see also”.
-          </div>
+          </Text>
 
           <AutopilotPanel
             config={config}
@@ -253,14 +256,14 @@ export function SettingsModal({ config, onClose, onSaved, autopilot, onAutopilot
           <div className="settings-section">Cards</div>
           <div className="settings-row">
             <Field label="Miniature length">
-              <input
+              <Control
                 type="number"
                 value={miniatureChars}
                 onChange={(e) => setMiniatureChars(Number(e.target.value))}
               />
             </Field>
             <Field label="ID padding">
-              <input type="number" value={idPadding} onChange={(e) => setIdPadding(Number(e.target.value))} />
+              <Control type="number" value={idPadding} onChange={(e) => setIdPadding(Number(e.target.value))} />
             </Field>
           </div>
 
@@ -284,7 +287,7 @@ export function SettingsModal({ config, onClose, onSaved, autopilot, onAutopilot
             Save
           </Button>
         </div>
-      </Panel>
+      </Surface>
     </div>
   );
 }

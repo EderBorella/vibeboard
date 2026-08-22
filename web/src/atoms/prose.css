@@ -30,6 +30,6 @@
 .markdown pre { background: var(--panel-2); border: 1px solid var(--border); border-radius: var(--r-md); padding: var(--s-5); overflow-x: auto; }
 .markdown pre code { background: transparent; padding: 0; }
 .markdown a { color: var(--accent); }
-.markdown blockquote { margin: var(--s-4) 0; padding-left: var(--s-5); border-left: 3px solid var(--border); color: var(--muted); }
+.markdown blockquote { margin: var(--s-4) 0; padding-left: var(--s-5); border-left: var(--rule) solid var(--border); color: var(--muted); }
 .markdown hr { border: none; border-top: 1px solid var(--border); margin: var(--s-6) 0; }
 

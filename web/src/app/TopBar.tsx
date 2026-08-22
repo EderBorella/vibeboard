@@ -1,5 +1,6 @@
-import { Button } from '../ui/Button';
-import { Chip } from '../ui/Chip';
+import { Button } from '../atoms/Button';
+import { Chip } from '../atoms/Chip';
+import { Control } from '../atoms/Control';
 import { ConnectionLight } from './ConnectionLight';
 import type { LightState, RecentFailure, RefusalKind } from './connection-light';
 
@@ -134,14 +135,14 @@ export function TopBar({
       )}
       <div className="topbar-right">
         {/* NOT A `Field`: the top bar carries no labels, and the value this shows is its own name. It
-            takes the primitive's box through `.vb-input`, which is what primitives.css names it for. */}
-        <select className="vb-input" value={theme} title="Theme" onChange={(e) => onTheme(e.target.value)}>
+            takes the primitive's box through `.vb-ctl`, which is what primitives.css names it for. */}
+        <Control as="select" value={theme} title="Theme" onChange={(e) => onTheme(e.target.value)}>
           {THEMES.map((t) => (
             <option key={t.value} value={t.value}>
               {t.label}
             </option>
           ))}
-        </select>
+        </Control>
         {showProject && (
           <Button size="sm" className="switch-btn" title="Settings" onClick={onSettings}>
             ⚙

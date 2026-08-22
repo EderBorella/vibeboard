@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import { listProjects, openProject, type ProjectRef, scaffoldProject } from '../api';
 import { Field } from '../ui/Field';
-import { Panel } from '../ui/Panel';
-import { Readout } from '../ui/Readout';
+import { Control } from '../atoms/Control';
+import { Readout } from '../atoms/Readout';
+import { Surface } from '../atoms/Surface';
+import { Text } from '../atoms/Text';
 import { useAction } from '../useAction';
 import { slugify } from '../viewmodel';
 
@@ -81,32 +83,32 @@ export function ProjectGate({ onOpened }: Props) {
           <ul className="gate-list">
             {projects.map((p) => (
               <li key={p.path}>
-                {/* A region of a list that takes a click, with no voice of its own — a `Panel`, not
+                {/* A region of a list that takes a click, with no voice of its own — a `Surface`, not
                     a `Button`, which is the line Phase 4 drew. `inset` because it draws its box at
                     rest, where `flat`'s list rows light theirs on hover. */}
-                <Panel
+                <Surface
                   as="button"
                   variant="inset"
                   disabled={busy !== null}
                   onClick={() => run(() => openProject(p.path))}
                 >
                   <span className="gate-list-name">{p.name}</span>
-                  <Readout size="small">{p.path}</Readout>
-                </Panel>
+                  <Readout>{p.path}</Readout>
+                </Surface>
               </li>
             ))}
           </ul>
         ) : (
-          <div className="vb-hint">No projects yet. Create one below.</div>
+          <Text role="hint">No projects yet. Create one below.</Text>
         )}
 
         <h3>New project</h3>
-        <div className="vb-hint">
+        <Text role="hint">
           Creates the folder, the board, and the container its agents will run in. The container is built the
           first time and reused after that.
-        </div>
+        </Text>
         <Field label="Location (parent folder)">
-          <input
+          <Control
             value={newParent}
             placeholder="/path/to/projects"
             onChange={(e) => setNewParent(e.target.value)}
@@ -114,7 +116,7 @@ export function ProjectGate({ onOpened }: Props) {
         </Field>
         <Field label="Name (dash-separated, lowercase)">
           <div className="gate-row">
-            <input
+            <Control
               value={newName}
               placeholder="my-project"
               onChange={(e) => setNewName(toNamePattern(e.target.value))}

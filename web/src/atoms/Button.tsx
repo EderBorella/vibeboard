@@ -5,6 +5,13 @@ import type { ButtonHTMLAttributes, ReactNode, Ref } from 'react';
 // are in docs/design-system.md; the incident that pays for it is one button borrowed from a card report
 // list rendering at 10.88px inside a 12.16px bar, invisible to 2,000 green jsdom tests.
 //
+// `size` IS A HORIZONTAL AXIS ONLY as of the atom layer, which is why all 67 call sites are untouched by
+// the change that matters most here: the box declares `height: var(--ctl-h)` and its vertical padding is
+// gone. A height nobody declares is a height nobody chose — it is padding plus a line box plus a border,
+// so a badge inside a tab changed the tab — and ten unchosen control heights is the measured diagnosis
+// this whole revamp answers. `md` is still a bigger label with more room beside it; it is no longer a
+// bigger box.
+//
 // `className` IS FOR LAYOUT AND NOTHING ELSE — `align-self`, `flex`, `min-width`, a margin, or a
 // non-geometry colour a surface genuinely owns. It is not a hole to put a padding back through, and
 // `npm run check:radius-scale` fails on any rule that names a `<button>` class and declares

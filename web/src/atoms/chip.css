@@ -1,0 +1,57 @@
+/* CHIP — a marker box you read. Split out of ui/primitives.css, and it loads BEFORE atoms/readout.css
+ * and before what is left of ui/primitives.css, because both of those relationships are decided by
+ * source order and not by specificity: `.vb-readout` puts the mono face on a chip and `.vb-status` puts
+ * a step up on one, and each is (0,1,0) against this file's (0,1,0). See web/src/styles.ts.
+ *
+ * THE WHOLE UA CONTROL RESET IS ON THE BASE AND NOT ON A `button.vb-chip` QUALIFIER, and the placement
+ * is load-bearing rather than tidy — a planted-first characterisation suite caught it going the other
+ * way. `button.vb-chip { … }` is (0,1,1) and outranks every single-class rule at (0,1,0), so it would
+ * have beaten `.vb-chip-fill` (three of the four clickable chips silently lose their ground) and
+ * `.vb-readout` (`.board-archive` and `.tag-chip` silently lose the monospaced face — which is what
+ * test/chip-boxes.test.tsx reported, on the mono claim it had pinned before the migration). Declared
+ * here they are all (0,1,0) and the later rule wins, which is the cascade doing what it is for.
+ * `font-size` needs no line: `.vb-chip` at (0,1,0) already outranks design/reset.css's
+ * `button, input, select, textarea` reset at (0,0,1).
+ *
+ * `line-height: inherit` WAS HERE AND IS WITHDRAWN, WITH ITS REASON. It existed so that a `<span>`
+ * rendered what a span renders — it inherits its face and its line-height and has no ground — and that
+ * was true for exactly as long as the box had no height of its own. It has one now. A chip in the
+ * Project Log's prose measured 25.25px against 15px on the board, because the surrounding line-height
+ * was setting the marker's height; `--mark-h` and `line-height: 1` is one 16px marker everywhere, which
+ * is what the browser harness's check 13 asserts across every surface. */
+.vb-chip {
+  display: inline-flex; align-items: center; gap: var(--s-2);
+  border: 1px solid var(--border); border-radius: var(--r-sm);
+  padding: 0 var(--s-3); font-size: var(--t-micro);
+  background: none; color: inherit; font-family: inherit;
+  height: var(--mark-h); line-height: 1;
+}
+/* The one thing that really is the tag's and not the box's: a span must not offer a pointer. */
+button.vb-chip { cursor: pointer; }
+.vb-chip-pill { border-radius: var(--r-pill); }
+/* A count, not a state: a ground rather than an outline. See atoms/Chip.tsx for the four it replaces. */
+.vb-chip-fill { background: var(--panel-2); }
+/* INK AND EDGE, ONCE, for a chip that has a tone by either route — a literal `tone` prop or a `state`
+   resolved through the table. Five rules became one: the five differed only in which token they named,
+   which is exactly the decision that does not belong on a surface.
+   `--danger`'s edge was mixed at 55% and the other four at 50%. One formula now; the 5% was nobody's
+   decision and no test or theme note refers to it.
+   A CHIP WITH NO TONE MUST NOT INHERIT ONE, and that is why this is its own class rather than a
+   declaration on `.vb-chip`: the run-id chips inside a `.filed-entry` sit under that entry's `--tone`,
+   and a base-rule `color: var(--tone)` would turn every one of them amber. */
+/* `.vb-chip.vb-chip-tone` AND NOT `.vb-chip-tone`, AND THE CHARACTERISATION CENSUS IS WHAT FOUND IT.
+   At (0,1,0) this lost to `.vb-readout` — later in the cascade and also (0,1,0), declaring
+   `color: var(--muted)` — so every report chip rendered grey in all seven of its statuses, which is
+   precisely the silent colour loss the *Risks* section describes: a board that has failed nothing looks
+   perfectly correct. (That `color` declaration is itself gone now — a Readout takes the ink of the atom
+   it sits in — but the specificity stays, because it is what also beats `.vb-readout` on a chip that
+   really does want the mono face.) The five rules it replaces were at (0,2,0) on
+   `.report-chip[data-state='…']` and won for that reason without anyone having to know it. (0,2,0) here
+   restores the win, and still loses to `.tag-chip.active`, `.mp-chip.on` and `.board-archive.active`,
+   which are (0,2,0) in organisms/board/board.css and organisms/shared/model-picker.css and therefore
+   later — every surface sheet loads after this one. See web/src/styles.ts. */
+.vb-chip.vb-chip-tone { color: var(--tone); border-color: color-mix(in srgb, var(--tone) 50%, var(--border)); }
+/* `neutral` KEEPS THE PLAIN EDGE, which is what `.vb-chip-neutral` did — it declared an ink and no
+   border-color at all. Mixing `--muted` into `--border` only greys the grey, and `.tag`, `.signin-this`
+   and `.mp-chip` are the boxes that would have moved. */
+.vb-chip.vb-chip-tone.vb-tone-neutral { border-color: var(--border); }

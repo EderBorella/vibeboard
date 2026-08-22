@@ -17,10 +17,10 @@
    render as no box at all. It was written on the suggestions composer instead, whose pane has no ground of
    its own and takes the dock's `--panel`, exactly as `.modal` and `.gate-card` do; both of those put their
    boxes on `--bg`, and that one now does too. Measured in test/control-boxes.test.tsx. */
-.diary-compose > .vb-input {
+.diary-compose > .vb-ctl {
   flex: 1; resize: vertical; min-height: 2.6rem; background: var(--panel-2); line-height: 1.45;
 }
-.diary > .vb-error, .suggestions-pane > .vb-error { max-width: 68ch; }
+.diary > .vb-text-error, .suggestions-pane > .vb-text-error { max-width: 68ch; }
 
 .diary-empty {
   display: flex; flex-direction: column; align-items: flex-start; gap: var(--s-4);
@@ -33,7 +33,7 @@
 .diary-entry {
   display: flex; flex-direction: column; gap: var(--s-2);
   padding: var(--s-4) 0 var(--s-4) var(--s-5);
-  border-left: 2px solid var(--border);
+  border-left: var(--rule) solid var(--border);
 }
 /* The kind, encoded in the rail as well as the word: a run, a checkup, a lifecycle event and a human's own
    note are read at different times for different reasons, and colour is how a long file stays scannable.

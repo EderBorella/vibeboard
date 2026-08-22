@@ -1,8 +1,8 @@
 /* The Explorer's tree. One flat list of rows indented by depth, not nested elements, so tab order
    and reading order are the same thing. Wider than the control list: paths run deep. */
 .explorer-list { width: 320px; gap: var(--s-1); }
-.explorer-head { position: sticky; top: -0.75rem; background: var(--wash); z-index: 1; padding-top: var(--s-1); }
-/* `Panel`'s `flat` padding is symmetric, and the 2px this rule shaved off the right was not a
+.explorer-head { position: sticky; top: -0.75rem; background: var(--wash); z-index: var(--z-chrome); padding-top: var(--s-1); }
+/* `Surface`'s `flat` padding is symmetric, and the 2px this rule shaved off the right was not a
    decision anybody made. `gap` is layout and stays. */
 .explorer-item { gap: var(--s-2); }
 /* Fixed width so names line up whether or not a row has a twisty. */

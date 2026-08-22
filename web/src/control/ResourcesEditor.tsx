@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { getResources, putResources, type ResourceLink } from '../api';
 import { errorText } from '../errors';
-import { Button } from '../ui/Button';
-import { Readout } from '../ui/Readout';
+import { Button } from '../atoms/Button';
+import { Control } from '../atoms/Control';
+import { Readout } from '../atoms/Readout';
 import { useAction } from '../useAction';
 
 // The links registry (.vibeboard/resources.yaml) — a small editable table of external
@@ -60,7 +61,7 @@ export function ResourcesEditor({ onError }: { onError: (e: string | null) => vo
   return (
     <>
       <div className="control-editor-head">
-        <Readout size="small">Links registry{dirty ? ' •' : ''}</Readout>
+        <Readout>Links registry{dirty ? ' •' : ''}</Readout>
         <div className="control-editor-actions">
           <Button size="md" onClick={add}>
             ＋ Add link
@@ -76,23 +77,23 @@ export function ResourcesEditor({ onError }: { onError: (e: string | null) => vo
         )}
         {/* NOT `Field`s: this is a table row, and each placeholder is the column heading. A label per
             cell would repeat "Title / URL / Note" once per link. The boxes are the primitive's — the
-            rule they had was byte-identical to `.vb-input` already. */}
+            rule they had was byte-identical to `.vb-ctl` already. */}
         {links.map((l, i) => (
           <div key={l.rowId} className="resource-row">
-            <input
-              className="vb-input res-title"
+            <Control
+              className="res-title"
               placeholder="Title"
               value={l.title}
               onChange={(e) => update(i, { title: e.target.value })}
             />
-            <input
-              className="vb-input res-url"
+            <Control
+              className="res-url"
               placeholder="https://…"
               value={l.url}
               onChange={(e) => update(i, { url: e.target.value })}
             />
-            <input
-              className="vb-input res-note"
+            <Control
+              className="res-note"
               placeholder="Note (optional)"
               value={l.note ?? ''}
               onChange={(e) => update(i, { note: e.target.value })}

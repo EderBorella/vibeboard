@@ -7,14 +7,14 @@
   position: absolute;
   top: calc(100% + 0.5rem);
   left: 0;
-  z-index: 20;
+  z-index: var(--z-pop);
   width: max-content;
   max-width: 46ch;
   padding: var(--s-5);
   background: var(--panel-2);
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  box-shadow: var(--lift);
   text-align: left;
   letter-spacing: normal;
 }

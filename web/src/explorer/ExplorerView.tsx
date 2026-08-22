@@ -12,7 +12,8 @@ import {
 import { useConfirm } from '../confirm/useConfirm';
 import { errorText } from '../errors';
 import type { ProjectSnapshot } from '../shared';
-import { Button } from '../ui/Button';
+import { Button } from '../atoms/Button';
+import { Text } from '../atoms/Text';
 import { EditorBody, EditorShell } from '../ui/EditorShell';
 import { FileTree } from './FileTree';
 import { formatBytes } from './format';
@@ -229,7 +230,7 @@ export function ExplorerView({ snapshot }: Props) {
         ) : (
           <div className="control-blank">Select a file to view or edit it.</div>
         )}
-        {(error ?? open.error) && <div className="vb-error">{error ?? open.error}</div>}
+        {(error ?? open.error) && <Text role="error">{error ?? open.error}</Text>}
       </div>
 
       {dialog}

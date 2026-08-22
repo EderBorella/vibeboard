@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { Text } from '../atoms/Text';
 
 // THE FIELD: a label, a control, an optional hint and an optional error, in that order.
 //
@@ -13,8 +14,10 @@ import type { ReactNode } from 'react';
 // apart, which nobody chose. Passing the label as a prop is what makes the order of label, control, hint
 // and error one decision instead of one per form.
 //
-// The CONTROL is a child and keeps no class of its own: `.vb-field input, .vb-field textarea,
-// .vb-field select` gives it the box, so a caller cannot forget it. See ui/primitives.css.
+// THE CONTROL IS A `Control` AS OF THE ATOM LAYER, and the descendant selector that used to hand it the
+// box — `.vb-field input, .vb-field textarea, .vb-field select`, at (0,1,1) — is gone with it. That
+// selector meant a caller could not forget the box; it also meant no surface could override it, and it
+// reached a checkbox, which paints no border and had to be excluded from the focus rule by name.
 interface Props {
   // What the field is. Rendered first, or beside the control when `layout` is `row`.
   label: ReactNode;
@@ -57,20 +60,24 @@ export function Field({
     // A DECISION IS NOT A VALUE, and the label of one is content rather than a field name — so the check
     // layout sets its label at the surrounding size and ink, and makes the whole row a click target. Both
     // were measured rather than chosen: five checkbox rows in the tree labelled themselves at body/text
-    // (`.link-option` at four sites and Diagnostics' bare span) against one at `.vb-label`'s muted 12px.
+    // (`.link-option` at four sites and Diagnostics' bare span) against one at the label step's muted 12px.
     layout === 'check' && 'vb-field-check',
     className,
   ];
-  // A rail label names its caps face explicitly, because `.vb-label-rail` is a width and nothing else
-  // since the two were separated — see the note beside them in primitives.css.
-  const face = layout === 'rail' || caps ? 'vb-label vb-label-caps' : 'vb-label';
-  const name = <span className={layout === 'rail' ? `${face} vb-label-rail` : face}>{label}</span>;
+  // THE LABEL IS A `Text`, AND THE ONLY THING THE FIELD ADDS IS THE RAIL — which is a WIDTH, so it is
+  // the field's and not the face's, and it is `.vb-field-rail` for that reason. A rail label names its
+  // caps face explicitly because the two were separated once already and got confused again immediately.
+  const name = (
+    <Text caps={layout === 'rail' || caps} className={layout === 'rail' ? 'vb-field-rail' : undefined}>
+      {label}
+    </Text>
+  );
   return (
     <Tag className={classes.filter(Boolean).join(' ')}>
       {layout === 'check' ? children : name}
       {layout === 'check' ? name : children}
-      {hint && <span className="vb-hint">{hint}</span>}
-      {error && <span className="vb-error">{error}</span>}
+      {hint && <Text role="hint">{hint}</Text>}
+      {error && <Text role="error">{error}</Text>}
     </Tag>
   );
 }

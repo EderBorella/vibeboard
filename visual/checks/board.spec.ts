@@ -617,7 +617,7 @@ test('9. the three board rows are one shared grid', async ({ board, theme }) => 
     // between columns — and the text walk reported 0 findings at every floor from 144px to 200px.
     expect(
       grid.headsExamined,
-      `no column heads found at ${width}px — has .vb-panel-head stopped matching?`,
+      `no column heads found at ${width}px — has .vb-surface-head stopped matching?`,
     ).toBe(14);
     headsExamined += grid.headsExamined;
     expect(
@@ -822,7 +822,9 @@ test('12. the affordances are big enough to see', async ({ board, theme }) => {
       // reported `vb-seg-cell-sm 11px` against everything else's 12px. A segmented control's cells are
       // one primitive with one border and one corner, sized a step down on purpose — they are the parts
       // of a single control, not controls sitting on this row, and folding them in would make the claim
-      // "everything is one size" false by construction and therefore unassertable.
+      // "everything is one size" false by construction and therefore unassertable. The atom phase made
+      // that argument GEOMETRIC as well as typographic: the group declares `--ctl-h` and its cells fill
+      // it, so a cell is 2px shorter than the group because the group's own 1px edge is inside its 28px.
       const controls = Array.from(
         document.querySelectorAll<HTMLElement>('[data-testid="ap-bar"] .ap-bar-row button:not(.vb-seg-cell)'),
       ).map((b) => ({
@@ -830,6 +832,34 @@ test('12. the affordances are big enough to see', async ({ board, theme }) => {
         px: getComputedStyle(b).fontSize,
         h: rect(b).height,
       }));
+      // EVERY CONTROL ON THE WHOLE SURFACE, which is the widening the atom phase pays for. The row above
+      // is one strip; this is every box on the board you can operate — the chrome's buttons, the theme
+      // select, a tile's archive glyph, a column's `+`, the segmented group. One height, and it is
+      // asserted as a SET of size 1 rather than as 28px, for check 13's reason: a deliberate step change
+      // belongs in the drift baseline, and `controlHeights` now records it there.
+      // FOUR CLASSES ARE NAMED OUT, AND THE NAMING IS THE RATCHET. `.tab-btn`, `.dock-tab`,
+      // `.cards-tab-label` and `.board-label` are the control boxes no primitive owns — the plan
+      // deliberately does NOT give them `--ctl-h` in the atom phase, because `Tabs`, `Menu` and `Row`
+      // delete all four in Phases 5 and 6 and patching a class you are about to delete is migration
+      // scaffolding. Excluded BY NAME rather than by "everything that is not an atom", so the list
+      // shrinks to nothing in the commit that deletes them and this claim becomes the whole surface.
+      const NOT_AN_ATOM_YET = ['tab-btn', 'dock-tab', 'cards-tab-label', 'board-label'];
+      const surfaceControls = Array.from(
+        document.querySelectorAll<HTMLElement>(
+          'button, input, select, textarea, [role="button"], [role="tab"], .vb-trigger, .vb-seg',
+        ),
+      )
+        .filter((el) => !el.classList.contains('vb-seg-cell'))
+        .filter((el) => !NOT_AN_ATOM_YET.some((cls) => el.classList.contains(cls)))
+        .filter((el) => {
+          const style = getComputedStyle(el);
+          if (style.visibility === 'hidden' || style.display === 'none') return false;
+          return rect(el).height > 0 && rect(el).width > 0;
+        })
+        .map((el) => ({
+          id: el.dataset.testid ?? el.className || el.tagName,
+          h: Math.round(rect(el).height * 10) / 10,
+        }));
       // The bordered group around the backend selector and the agent's state. Its own height, because a
       // group drawn to make two things read as a pair must not become the tallest thing on the row —
       // which it was, at 29.8px against 20px buttons, until the padding came off it. Found by taking a
@@ -837,6 +867,7 @@ test('12. the affordances are big enough to see', async ({ board, theme }) => {
       const group = document.querySelector<HTMLElement>('[data-testid="ap-bar"] .ap-agent');
       return {
         controls,
+        surfaceControls,
         group: group ? rect(group).height : null,
         titles: titles.length,
         // HEIGHT OVER LINE-HEIGHT, rounded. A `-webkit-box` clamped to two lines is twice as tall as a
@@ -900,14 +931,32 @@ test('12. the affordances are big enough to see', async ({ board, theme }) => {
   const transport = seen.controls.find((c) => c.id === 'ap-transport')?.h ?? 0;
   expect(transport, 'no transport button on the row to measure against').toBeGreaterThan(0);
   expect(seen.group, 'the auto-pilot bar has no .ap-agent group').not.toBeNull();
+  // THE `+ 2` TOLERANCE IS GONE, and its deletion is the point of the atom phase rather than a tidy-up:
+  // a tolerance is what you need when the answer is EMERGENT. It was padding plus a line box plus a
+  // border, so `ap-expand` measured a pixel more than its neighbours because the bigger disclosure glyph
+  // inside it set its line box — and a ceiling of `max + 1` was then wide enough for the bordered group
+  // to slide under at 29.8px. Every one of these declares `--ctl-h` now, so the comparison is exact.
   const tall = [
     ...seen.controls.map((c) => ({ id: c.id, h: c.h })),
     { id: '.ap-agent', h: seen.group ?? 0 },
-  ].filter((c) => c.h > transport + 2);
+  ].filter((c) => c.h > transport);
   expect(
     tall,
-    `taller than the ${transport}px transport by more than 2px: ${tall.map((c) => `${c.id} ${c.h}px`).join(', ')}`,
+    `taller than the ${transport}px transport: ${tall.map((c) => `${c.id} ${c.h}px`).join(', ')}`,
   ).toEqual([]);
+  // 6. AND EVERY CONTROL ON THE SURFACE IS ONE HEIGHT. Ten unchosen control heights is the measured
+  //    diagnosis behind the whole revamp, and this is the assertion that says there is one — the artefact
+  //    that answers the owner's original complaint. It is deliberately the WHOLE surface and not the one
+  //    strip: the strip was already levelled by hand twice, and both times something off the strip was
+  //    not.
+  expect(seen.surfaceControls.length, 'no controls on the board to measure').toBeGreaterThan(8);
+  const heights = [...new Set(seen.surfaceControls.map((c) => c.h))];
+  expect(
+    heights.length,
+    `the board's controls are ${heights.length} heights, not one: ${[...new Set(seen.surfaceControls.map((c) => `${c.h}px`))].join(', ')} — ${seen.surfaceControls
+      .map((c) => `${c.id} ${c.h}`)
+      .join(', ')}`,
+  ).toBe(1);
   for (const bar of seen.bars) {
     // `auto` and not `thin`: the app-wide rule is `thin`, so this is the assertion that the column's own
     // rule is reaching the element at all.
@@ -955,6 +1004,27 @@ test('12. the affordances are big enough to see', async ({ board, theme }) => {
 // you can open in the ready state too*, which fails on that plant. What is genuinely held HERE is the
 // part jsdom cannot compute: that the indicators agree on a size, an edge and a corner.
 test('13. the state indicators are one shape', async ({ board, theme }) => {
+  // EVERY CHIP ON EVERY SURFACE, AS ONE HEIGHT, which is the widening the atom phase pays for: the four
+  // indicators below were levelled by hand and the chips they are made of were not, so a chip in the
+  // Project Log's prose measured 25.25px against 15px on the board — the surrounding line-height was
+  // deciding a marker's size, because `.vb-chip` declared `line-height: inherit` and no height at all.
+  // `--mark-h` and `line-height: 1` is what makes this assertable, and this defect was live with no gate
+  // able to see it.
+  const markers = await board.evaluate(() =>
+    Array.from(document.querySelectorAll<HTMLElement>('.vb-chip'))
+      .filter((el) => {
+        const style = getComputedStyle(el);
+        if (style.visibility === 'hidden' || style.display === 'none') return false;
+        const box = el.getBoundingClientRect();
+        return box.height > 0 && box.width > 0;
+      })
+      .map((el) => ({
+        id: el.dataset.testid ?? el.className,
+        // A tenth, for the reason the drift tally rounds: sub-pixel layout puts 15.99 and 16.01 on one
+        // 16px rule, and a raw float would make this flaky rather than strict.
+        h: Math.round(el.getBoundingClientRect().height * 10) / 10,
+      })),
+  );
   const chips = await board.evaluate(() =>
     Array.from(document.querySelectorAll<HTMLElement>('.vb-status')).map((el) => {
       const style = getComputedStyle(el);
@@ -970,6 +1040,12 @@ test('13. the state indicators are one shape', async ({ board, theme }) => {
     }),
   );
 
+  expect(markers.length, 'no chips on the board — the marker claim would measure nothing').toBeGreaterThan(3);
+  const markerHeights = [...new Set(markers.map((m) => m.h))];
+  expect(
+    markerHeights.length,
+    `the board's chips are ${markerHeights.length} heights, not one: ${markerHeights.map((h) => `${h}px`).join(', ')} — ${markers.map((m) => `${m.id} ${m.h}`).join(', ')}`,
+  ).toBe(1);
   expect(chips.length, 'no status chip on the board — the merge left nothing to measure').toBeGreaterThan(1);
   expect(chips.map((c) => c.tag)).toEqual(chips.map(() => 'BUTTON'));
   expect(chips.map((c) => c.opens)).toEqual(chips.map(() => 'dialog'));

@@ -612,7 +612,9 @@ describe('ReportPane', () => {
       expect(readout, `${dd.textContent} is not a Readout`).not.toBeNull();
       // `plain`: the list has already decided its size and its colour, and a figure inside a line that
       // has done that inherits both.
-      expect(readout?.classList.contains('vb-readout-plain')).toBe(true);
+      // `plain` WAS THE DEFAULT ALL ALONG — 17 of 53 call sites asked for it — so the atom phase made it the
+      // only behaviour and deleted the class. Inheriting the step and the ink is what a treatment does.
+      expect([...(readout?.classList ?? [])]).toEqual(['vb-readout']);
     }
   });
 });

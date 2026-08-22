@@ -12,7 +12,9 @@ import { useConfirm } from '../confirm/useConfirm';
 import { errorText } from '../errors';
 import { useAccounting } from '../runs/useAccounting';
 import { type AutopilotConfig, BLOCKED_BOARDS, BOARD_LABELS, type ProjectConfig } from '../shared';
-import { Button } from '../ui/Button';
+import { Button } from '../atoms/Button';
+import { Control } from '../atoms/Control';
+import { Text } from '../atoms/Text';
 import { Field } from '../ui/Field';
 import { useReadiness } from './useReadiness';
 
@@ -96,11 +98,11 @@ export function AutopilotPanel({
     return (
       <>
         <div className="settings-section">Auto-pilot</div>
-        <div className="vb-hint">
+        <Text role="hint">
           This project has no autopilot block in its config, so there is no lifecycle to run. Projects created
           before auto-pilot are upgraded in one pass once the work lands — until then this is an honest
           refusal rather than a half-upgrade.
-        </div>
+        </Text>
       </>
     );
   }
@@ -108,20 +110,20 @@ export function AutopilotPanel({
   return (
     <>
       <div className="settings-section">Auto-pilot</div>
-      <div className="vb-hint">
+      <Text role="hint">
         The lifecycle is fixed (ruling 52): auto-pilot derives where a project is from the board and looks up
         what to do next. It is not a setting, so there is no table here to edit — only the caps below, the
         columns that mean finished, and where a blocked card goes.
-      </div>
+      </Text>
       <div className="settings-section">Caps</div>
-      <div className="vb-hint">
+      <Text role="hint">
         {/* S10: the number that will actually stop this project, in words. A dollar dial beside a
             budget that can never trip tells the reader the opposite of the truth. */}
         {accounting?.cap?.why ?? 'Whichever of these is reached first will stop the run.'}
-      </div>
+      </Text>
       {CAPS.map((cap) => (
         <Field label={cap.label} hint={cap.hint} key={cap.key}>
-          <input
+          <Control
             type="number"
             min={cap.min}
             step={cap.step}
@@ -137,7 +139,7 @@ export function AutopilotPanel({
         {/* Minutes, because 1800000 in a box is unreadable. The enforceable per-run bound is
             wall-clock: a dollar ceiling per run is not implementable, since usage is only known once
             the run has finished spending it. */}
-        <input
+        <Control
           type="number"
           min={1}
           step={5}
@@ -145,23 +147,24 @@ export function AutopilotPanel({
           onChange={(e) => edit('runTimeoutMs', Number(e.target.value) * 60_000, 60_000)}
         />
       </Field>
-      <div className="vb-hint">
+      <Text role="hint">
         Finished at:{' '}
         {Object.entries(ap.terminal)
           .map(([b, c]) => `${b} ${c.join('/')}`)
           .join(', ')}{' '}
         · blocked cards go to {ap.blockedColumn} on{' '}
         {`${BLOCKED_BOARDS.map((b) => BOARD_LABELS[b]).join(' and ')}.`}
-      </div>
+      </Text>
 
       <StartControl state={autopilot} readiness={readiness} refresh={onAutopilotChanged} />
       <StopControls state={autopilot} refresh={onAutopilotChanged} />
 
-      <div className="vb-hint" style={{ marginTop: '0.6rem' }}>
-        Before auto-pilot can start:
-      </div>
-      {readiness === null && !failed && <div className="vb-hint">Checking…</div>}
-      {failed && <div className="vb-hint">Could not read this project’s readiness.</div>}
+      {/* The `marginTop: '0.6rem'` inline style that stood here is GONE rather than moved: 9.6px is off
+          the space scale, no rule in the tree wrote it, and the panel is a flex column with a gap of its
+          own. A new class to carry it would be a class for one margin. */}
+      <Text role="hint">Before auto-pilot can start:</Text>
+      {readiness === null && !failed && <Text role="hint">Checking…</Text>}
+      {failed && <Text role="hint">Could not read this project’s readiness.</Text>}
       {readiness?.ok && <div className="ready-ok">Everything auto-pilot needs is in place.</div>}
       {readiness && !readiness.ok && (
         <ul className="blockers">
@@ -201,10 +204,10 @@ function StartControl({
   return (
     <>
       <div className="settings-section">Running</div>
-      <div className="vb-hint">
+      <Text role="hint">
         Auto-pilot walks the board on its own: it picks a card, runs its phase's skill, checks the work, and
         moves the card only if the check passes. It stops on its own when there is nothing left it can do.
-      </div>
+      </Text>
       <div className="ap-controls">
         <Button
           variant="primary"
@@ -224,19 +227,19 @@ function StartControl({
           {starting ? 'Starting…' : 'Start auto-pilot'}
         </Button>
         {running && (
-          <span className="vb-hint" data-testid="ap-progress">
+          <Text role="hint" testId="ap-progress">
             Running — {state?.iteration ?? 0} dispatch{(state?.iteration ?? 0) === 1 ? '' : 'es'} so far
-          </span>
+          </Text>
         )}
-        {halted && <span className="vb-hint">Halted. Restart it from the overlay first.</span>}
+        {halted && <Text role="hint">Halted. Restart it from the overlay first.</Text>}
       </div>
       {/* The blockers again, next to the button, because the list further up the panel is easy to scroll
           past — and this is the moment somebody wants to know. */}
       {!running && readiness && !readiness.ok && (
-        <div className="vb-hint">
+        <Text role="hint">
           Auto-pilot cannot start yet: {readiness.blockers.length} thing
           {readiness.blockers.length === 1 ? '' : 's'} to fix, listed above.
-        </div>
+        </Text>
       )}
       {/*
         The one blocker this panel can CLEAR rather than describe. Offered here as well as on the bar,
@@ -291,10 +294,10 @@ function StopControls({ state, refresh }: { state: AutopilotState | null; refres
   return (
     <>
       <div className="settings-section">Stopping</div>
-      <div className="vb-hint">
+      <Text role="hint">
         A soft stop leaves the app alone: chat, manual runs and the board carry on, and only dispatching
         stops. An emergency stop kills every agent in this project and halts it until you restart it.
-      </div>
+      </Text>
       <div className="ap-controls">
         <Button
           size="md"

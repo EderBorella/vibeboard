@@ -24,7 +24,7 @@
   padding: var(--s-4) var(--s-6);
   background: linear-gradient(var(--panel), var(--panel));
   border-bottom: 1px solid var(--border);
-  position: sticky; top: 0; z-index: 5;
+  position: sticky; top: 0; z-index: var(--z-chrome);
 }
 /* The one thing in the bar that was never sized: it rode the UA's 16px, which is off the scale.
    `--t-lead` is the nearest step, and it keeps the brand the largest text in the row — which is the
@@ -75,7 +75,7 @@
   flex: 0 0 auto;
 }
 /* `.switch-btn` shared this and is now `default`; `.theme-select` was the `<select>` half of it, at four
-   call sites, and it is `.vb-input` as of Phase 9 — the pointer and the accent hover it declared are now
+   call sites, and it is `.vb-ctl` as of Phase 9 — the pointer and the accent hover it declared are now
    what primitives.css says about every select. The class died outright. */
 /* PRESSED, which is not one of the five voices: the copilot toggle is lit while the panel is open, and a
    filled `primary` would make a view toggle look like the page's one action. A colour and a glow only. */

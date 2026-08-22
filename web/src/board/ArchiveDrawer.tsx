@@ -2,9 +2,11 @@ import { useEffect, useState } from 'react';
 import { listArchive, restoreCard } from '../api';
 import { errorText } from '../errors';
 import type { ArchivedCard, BoardName, ProjectConfig } from '../shared';
-import { Button } from '../ui/Button';
-import { Panel } from '../ui/Panel';
-import { Readout } from '../ui/Readout';
+import { Button } from '../atoms/Button';
+import { Control } from '../atoms/Control';
+import { Readout } from '../atoms/Readout';
+import { Surface } from '../atoms/Surface';
+import { Text } from '../atoms/Text';
 import { columnSlugs } from '../viewmodel';
 
 interface Props {
@@ -61,19 +63,35 @@ export function ArchiveDrawer({ board, config, count, onOpen }: Props) {
       .catch((e: unknown) => setError(errorText(e)));
   };
 
-  if (error) return <Panel className="archive-drawer vb-error">{error}</Panel>;
+  // A FACE ON A `Surface` WAS THE SMEAR THE ATOM LAYER REMOVES: these three wrote a text class into the
+  // container's `className`, which is documented as layout-only, so the drawer itself was italic. The
+  // container is the container and the line inside it is a `Text`.
+  if (error)
+    return (
+      <Surface className="archive-drawer">
+        <Text role="error">{error}</Text>
+      </Surface>
+    );
   if (cards === null)
-    return <Panel className="archive-drawer vb-empty vb-empty-small">Loading the archive…</Panel>;
+    return (
+      <Surface className="archive-drawer">
+        <Text role="hint">Loading the archive…</Text>
+      </Surface>
+    );
   if (cards.length === 0) {
-    return <Panel className="archive-drawer vb-empty vb-empty-small">Nothing archived on this board.</Panel>;
+    return (
+      <Surface className="archive-drawer">
+        <Text role="hint">Nothing archived on this board.</Text>
+      </Surface>
+    );
   }
 
   return (
-    <Panel className="archive-drawer" data-testid="archive-drawer">
+    <Surface className="archive-drawer" data-testid="archive-drawer">
       {cards.map((c) => (
-        <Panel variant="inset" className="archive-item" key={c.id}>
+        <Surface variant="inset" className="archive-item" key={c.id}>
           <div className="archive-meta">
-            <Readout tone="accent">{c.id}</Readout>
+            <Readout>{c.id}</Readout>
             <Readout>{when(c.archived)}</Readout>
           </div>
           <button className="archive-title" onClick={() => onOpen?.(c)} title="Open this card">
@@ -87,8 +105,9 @@ export function ArchiveDrawer({ board, config, count, onOpen }: Props) {
             {/* NOT a `Field`: this is one of two actions in a row of actions, and its own first option
                 — "Elsewhere…" — is what names it. The box is the primitive's; the muted ink is the
                 surface's, because a secondary restore must not read as loudly as the button beside it. */}
-            <select
-              className="vb-input archive-column"
+            <Control
+              as="select"
+              className="archive-column"
               value=""
               title="Restore to another column"
               onChange={(e) => {
@@ -101,10 +120,10 @@ export function ArchiveDrawer({ board, config, count, onOpen }: Props) {
                   {labels[i]}
                 </option>
               ))}
-            </select>
+            </Control>
           </div>
-        </Panel>
+        </Surface>
       ))}
-    </Panel>
+    </Surface>
   );
 }

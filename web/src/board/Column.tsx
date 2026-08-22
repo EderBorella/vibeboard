@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import type { BoardName, Card } from '../shared';
-import { Button } from '../ui/Button';
-import { Chip } from '../ui/Chip';
-import { Panel } from '../ui/Panel';
+import { Button } from '../atoms/Button';
+import { Chip } from '../atoms/Chip';
+import { Surface } from '../atoms/Surface';
 import { CardTile } from './CardTile';
 
 interface Props {
@@ -57,7 +57,7 @@ export function Column({
   };
 
   return (
-    <Panel
+    <Surface
       variant="raised"
       className={`column${over ? ' column-over' : ''}`}
       data-testid="column"
@@ -134,6 +134,6 @@ export function Column({
         ))}
         {gap !== null && gap >= cards.length && cards.length > 0 && <div className="drop-line" />}
       </div>
-    </Panel>
+    </Surface>
   );
 }

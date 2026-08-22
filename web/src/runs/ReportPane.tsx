@@ -2,10 +2,12 @@ import { useState } from 'react';
 import type { RunRecord } from '../api';
 import { renderMarkdown } from '../markdown';
 import type { Card, ProjectConfig } from '../shared';
-import { Button } from '../ui/Button';
-import { Chip } from '../ui/Chip';
-import { Panel } from '../ui/Panel';
-import { Readout } from '../ui/Readout';
+import { Button } from '../atoms/Button';
+import { Chip } from '../atoms/Chip';
+import { Control } from '../atoms/Control';
+import { Readout } from '../atoms/Readout';
+import { Surface } from '../atoms/Surface';
+import { Text } from '../atoms/Text';
 import { slugify } from '../viewmodel';
 import { usageLine } from './format';
 import { ReportOptions } from './ReportOptions';
@@ -59,7 +61,7 @@ export function ReportPane({
           ←
         </Button>
         <h3 className="report-title">
-          {record.skill} <Readout size="body">on {card.id}</Readout>
+          {record.skill} <Readout>on {card.id}</Readout>
         </h3>
         <Chip pill state={record.status} className="report-chip vb-readout" testId="report-chip">
           {record.status}
@@ -73,7 +75,7 @@ export function ReportPane({
         <div>
           <dt>Model</dt>
           <dd>
-            <Readout size="plain">
+            <Readout>
               {record.model} · {record.effort} · {record.mode}
             </Readout>
           </dd>
@@ -81,14 +83,14 @@ export function ReportPane({
         <div>
           <dt>Started</dt>
           <dd>
-            <Readout size="plain">{record.started.replace('T', ' ').slice(0, 19)}</Readout>
+            <Readout>{record.started.replace('T', ' ').slice(0, 19)}</Readout>
           </dd>
         </div>
         {record.finished && (
           <div>
             <dt>Finished</dt>
             <dd>
-              <Readout size="plain">{record.finished.replace('T', ' ').slice(0, 19)}</Readout>
+              <Readout>{record.finished.replace('T', ' ').slice(0, 19)}</Readout>
             </dd>
           </div>
         )}
@@ -96,7 +98,7 @@ export function ReportPane({
           <div>
             <dt>Attached</dt>
             <dd>
-              <Readout size="plain">{record.attached.join(', ')}</Readout>
+              <Readout>{record.attached.join(', ')}</Readout>
             </dd>
           </div>
         )}
@@ -106,7 +108,7 @@ export function ReportPane({
           <div>
             <dt>Usage</dt>
             <dd>
-              <Readout size="plain">{usageLine(record.usage)}</Readout>
+              <Readout>{usageLine(record.usage)}</Readout>
             </dd>
           </div>
         )}
@@ -115,7 +117,7 @@ export function ReportPane({
           <div>
             <dt>Dealt with</dt>
             <dd>
-              <Readout size="plain">{record.resolved.replace('T', ' ').slice(0, 19)}</Readout>
+              <Readout>{record.resolved.replace('T', ' ').slice(0, 19)}</Readout>
             </dd>
           </div>
         )}
@@ -133,14 +135,14 @@ export function ReportPane({
       {record.report.trim() ? (
         <div className="markdown report-body">{renderMarkdown(record.report)}</div>
       ) : (
-        <p className="vb-empty">This run left no report.</p>
+        <Text role="hint" lead>This run left no report.</Text>
       )}
 
       {createdCards.length > 0 && (
         <div className="report-created">
-          <span className="vb-label">Cards this run created</span>
+          <Text>Cards this run created</Text>
           {createdCards.map((c) => (
-            <Panel
+            <Surface
               as="button"
               variant="flat"
               key={c.id}
@@ -149,11 +151,11 @@ export function ReportPane({
               title={`Open ${c.id}`}
               onClick={() => onOpenCard(c)}
             >
-              <Readout size="small" tone="accent" testId="created-id">
+              <Readout testId="created-id">
                 {c.id}
               </Readout>{' '}
               <span className="link-title">{c.title}</span>
-            </Panel>
+            </Surface>
           ))}
         </div>
       )}
@@ -177,8 +179,10 @@ export function ReportPane({
       {record.status === 'success' && (
         <div className="report-foot">
           {/* NOT a `Field`: an action row, and its own first option — "Choose a column…" — names it. */}
-          <select
-            className="vb-input"
+          <Control
+            
+            as="select"
+            
             aria-label="Column to move the card to"
             value={column}
             onChange={(e) => setColumn(e.target.value)}
@@ -189,7 +193,7 @@ export function ReportPane({
                 {name}
               </option>
             ))}
-          </select>
+          </Control>
           <Button
             variant="primary"
             size="md"

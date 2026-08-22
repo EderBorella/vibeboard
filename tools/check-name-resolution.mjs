@@ -35,7 +35,7 @@
 //   exactly how the defect this gate is named after would have gone on hiding.
 //
 //   LEGITIMATE HOOKS. A `className` can exist so that something can FIND the element rather than so
-//   that something can style it. `.column` is read by the visual harness (`.column > .vb-panel-head`)
+//   that something can style it. `.column` is read by the visual harness (`.column > .vb-surface-head`)
 //   and `.explorer` by both the harness and the React suite (`section.control.explorer`,
 //   `.control:not(.explorer)`) — neither has a rule and neither is a defect. So a class is excused when
 //   it is READ: named as a selector, or passed to `classList`, anywhere in web/src, test/ or visual/.

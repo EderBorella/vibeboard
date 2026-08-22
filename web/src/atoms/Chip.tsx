@@ -1,5 +1,5 @@
 import type { MouseEvent, ReactNode } from 'react';
-import { type StateName, stateClass, type Tone, toneClass } from './state-tones';
+import { type StateName, stateClass, type Tone, toneClass } from '../ui/state-tones';
 
 // THE CHIP. Tags, state words, counts and badges — the same bordered pill rebuilt by hand at a dozen
 // sites, each with its own radius, padding and font-size.
@@ -28,8 +28,14 @@ import { type StateName, stateClass, type Tone, toneClass } from './state-tones'
 // Chip that happens to be clickable: `Chip` owns that box, not `Button`; making it a button gives it a
 // button's radius and padding"* — and then left them hand-rolled, because the primitive rendered a
 // `<span>` and nothing else. The box is the same box whether or not it takes a click, which is the
-// argument `Panel`'s `as="button"` already rests on: the tag says what this thing IS in the document,
+// argument `Surface`'s `as="button"` already rests on: the tag says what this thing IS in the document,
 // and it does not change what it looks like.
+//
+// THE BOX HAS A HEIGHT NOW — `--mark-h`, 16px — and `line-height: inherit` is withdrawn with it. That
+// declaration existed so a `<span>` rendered what a span renders, which was true while the box had no
+// height and stopped being true the moment it had one: a chip in the Project Log's prose measured 25.25px
+// against 15px on the board, because the surrounding line-height was deciding the marker's size. One
+// marker height everywhere is what the browser harness's check 13 asserts, on every surface.
 export type ChipTag = 'span' | 'button';
 
 interface Props {
@@ -41,7 +47,7 @@ interface Props {
   // for one thing: how many items are in the group this sits beside. The fill is the distinction from a
   // state chip, which is an outline, so it is a flag rather than four classes.
   fill?: boolean;
-  // A CLOSED SET, for `Panel`'s reason: `as` says what the box is in the document — a label or a
+  // A CLOSED SET, for `Surface`'s reason: `as` says what the box is in the document — a label or a
   // control — and an open tag would make this a general element factory whose geometry claim is empty.
   as?: ChipTag;
   // A row in ui/state-tones.ts. See above.

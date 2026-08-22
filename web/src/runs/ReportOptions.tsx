@@ -1,5 +1,7 @@
 import { useState } from 'react';
-import { Button } from '../ui/Button';
+import { Button } from '../atoms/Button';
+import { Control } from '../atoms/Control';
+import { Text } from '../atoms/Text';
 
 interface ColumnChoice {
   slug: string;
@@ -42,7 +44,7 @@ export function ReportOptions({
 
   return (
     <section className="options" aria-label="What next">
-      <h4 className="vb-label vb-label-caps">What next?</h4>
+      <Text caps>What next?</Text>
       {!canContinue && (
         <p className="options-warn">
           The skill this run used is no longer in the project, so there is nothing to continue with. Closing
@@ -88,8 +90,10 @@ export function ReportOptions({
         <span className="options-close-label">Ignore and close</span>
         {/* NOT a `Field`: an action row. "Ignore and close" names the BUTTON, and the select is one of
             its two operands — a Field's label names one control. */}
-        <select
-          className="vb-input"
+        <Control
+          
+          as="select"
+          
           aria-label="Column to close the card into"
           value={column}
           onChange={(e) => setColumn(e.target.value)}
@@ -99,7 +103,7 @@ export function ReportOptions({
               {c.name}
             </option>
           ))}
-        </select>
+        </Control>
         <Button
           size="md"
           disabled={column === '' || column === currentColumn}

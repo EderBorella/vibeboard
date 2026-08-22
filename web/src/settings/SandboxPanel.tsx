@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { rebuildBoxes, restartOpencodeServer, type SandboxState, takeOverOpencodeServer } from '../api';
 import { useConfirm } from '../confirm/useConfirm';
-import { Button } from '../ui/Button';
+import { Button } from '../atoms/Button';
+import { Text } from '../atoms/Text';
 import { useAction } from '../useAction';
 
 interface Props {
@@ -95,10 +96,10 @@ export function SandboxPanel({ state, backend, onChanged }: Props) {
           <Button size="md" disabled={busy !== null} onClick={() => act('restart')}>
             {busy === 'restart' ? 'Restarting…' : 'Restart server'}
           </Button>
-          <p className="vb-hint">
+          <Text role="hint">
             Stops the managed OpenCode server and starts a new one. Any turn in flight is lost. Use it when
             the server is hung or stale, or when it started before the sandbox was installed.
-          </p>
+          </Text>
         </div>
       )}
 
@@ -107,11 +108,11 @@ export function SandboxPanel({ state, backend, onChanged }: Props) {
           <Button size="md" disabled={busy !== null} onClick={() => act('takeover')}>
             {busy === 'takeover' ? 'Taking over…' : 'Take over with a managed server'}
           </Button>
-          <p className="vb-hint">
+          <Text role="hint">
             Stops using <code>VIBEBOARD_OPENCODE_URL</code> and spawns a sandboxed server instead, for this
             session. You set that variable deliberately, most likely for debugging, so nothing does this on
             your behalf — it stays in your <code>.env</code> for next time.
-          </p>
+          </Text>
         </div>
       )}
 
@@ -123,18 +124,18 @@ export function SandboxPanel({ state, backend, onChanged }: Props) {
         <Button size="md" disabled={busy !== null} onClick={() => void rebuild()}>
           {busy === 'rebuild' ? 'Throwing away…' : 'Rebuild the agent boxes'}
         </Button>
-        <p className="vb-hint">
+        <Text role="hint">
           Removes this project's containers. Anything in flight inside them is lost, and the next agent turn
           builds new ones. The agent <strong>image is not rebuilt</strong> — that is{' '}
           <code>npm run box:build</code> and it takes minutes. Use this when a box is stale rather than
           missing: an expired credential it will not pick up, a mount that no longer points anywhere.
-        </p>
+        </Text>
         {removed !== null && (
-          <p className="vb-hint">
+          <Text role="hint">
             {removed === 0
               ? 'There were no boxes for this project, so nothing was removed.'
               : `Removed ${removed} box${removed === 1 ? '' : 'es'}.`}
-          </p>
+          </Text>
         )}
       </div>
 

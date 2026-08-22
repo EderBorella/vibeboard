@@ -1,6 +1,15 @@
 import type { ButtonHTMLAttributes, HTMLAttributes, ReactNode } from 'react';
 
-// THE PANEL. A box that groups content, and the variant says whether the box is DRAWN.
+// THE SURFACE. A container box, and the variant says whether the box is DRAWN.
+//
+// IT WAS `Surface`, AND THE RENAME IS THE ONLY THING THIS PHASE DID TO IT. The word collided with five
+// components that are not it — `CopilotPanel`, `AutopilotPanel`, `SandboxPanel`, `DiagnosticsPanel`,
+// `SignInPanel` — and with `.dock-pane`, so a reader met that word six times meaning six things. One
+// vocabulary means one word per thing. The classes moved with the component rather than being left
+// saying `panel` at a component called Surface; nothing about the boxes changed.
+//
+// NO HEIGHT, AND THAT IS THE ANSWER RATHER THAN AN OMISSION: `--ctl-h` is the height of a box you
+// operate and `--mark-h` of a box you read, and a container's height is its content's.
 //
 //   `raised` — drawn: a panel ground, a border, a 10px corner. A surface that sits above the wash and
 //              says where it ends: a board column, the archive drawer, an Execution column, the halt
@@ -37,19 +46,19 @@ import type { ButtonHTMLAttributes, HTMLAttributes, ReactNode } from 'react';
 // WHY IT MAY BE A `<button>`. A list row is a region of a list that happens to be clickable: it has no
 // VOICE. That is the line between the two primitives, and it is the test to apply to anything new —
 // if it is one of `primary`/`default`/`ghost`/`danger`/`bare`, it is a `Button`; if it is a region of
-// the page that happens to take a click, it is a `Panel`. `tools/check-radius-scale.mjs` reads
-// `<Panel` alongside `<button` and `<Button` for exactly this reason: a class on a Panel is a class on
-// a box, and the primitive owns the box.
-export type PanelVariant = 'flat' | 'inset' | 'raised';
+// the page that happens to take a click, it is a `Surface`. `tools/check-radius-scale.mjs` reads
+// `<Surface` alongside `<button` and `<Button` for exactly this reason: a class on a Surface is a class
+// on a box, and the atom owns the box.
+export type SurfaceVariant = 'flat' | 'inset' | 'raised';
 
 // A CLOSED SET, and closed on purpose. `as` exists to say what this box IS in the document — a
-// region, a landmark, or a control — and an open `keyof JSX.IntrinsicElements` would make Panel a
+// region, a landmark, or a control — and an open `keyof JSX.IntrinsicElements` would make this a
 // general element factory whose geometry claim means nothing.
-type PanelTag = 'div' | 'section' | 'button';
+type SurfaceTag = 'div' | 'section' | 'button';
 
 interface Props extends Omit<HTMLAttributes<HTMLElement>, 'children' | 'className'> {
-  variant?: PanelVariant;
-  as?: PanelTag;
+  variant?: SurfaceVariant;
+  as?: SurfaceTag;
   // The bordered row above the body. A SLOT rather than a `title` string, because every consumer puts
   // controls in it — a count, a `+`, an archive toggle — and a string prop would have grown a second
   // `actions` prop within one surface.
@@ -63,7 +72,7 @@ interface Props extends Omit<HTMLAttributes<HTMLElement>, 'children' | 'classNam
   disabled?: ButtonHTMLAttributes<HTMLButtonElement>['disabled'];
 }
 
-export function Panel({
+export function Surface({
   variant = 'raised',
   as = 'div',
   header,
@@ -73,14 +82,14 @@ export function Panel({
   ...rest
 }: Props) {
   const Tag = as;
-  const classes = ['vb-panel', `vb-panel-${variant}`, className].filter(Boolean).join(' ');
+  const classes = ['vb-surface', `vb-surface-${variant}`, className].filter(Boolean).join(' ');
   // `type="button"` BY DEFAULT for the same reason Button does it: a `<button>` inside a `<form>`
   // defaults to `submit`, and a list row that submitted the form it sits in would be a behaviour
   // change no phase here asked for.
   const control = as === 'button' ? { type: 'button' as const, disabled } : {};
   return (
     <Tag className={classes} {...control} {...rest}>
-      {header !== undefined && <div className="vb-panel-head">{header}</div>}
+      {header !== undefined && <div className="vb-surface-head">{header}</div>}
       {children}
     </Tag>
   );

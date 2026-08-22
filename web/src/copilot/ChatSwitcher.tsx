@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import type { ChatMeta } from '../shared';
-import { Button } from '../ui/Button';
-import { Chip } from '../ui/Chip';
-import { Panel } from '../ui/Panel';
-import { Readout } from '../ui/Readout';
+import { Button } from '../atoms/Button';
+import { Chip } from '../atoms/Chip';
+import { Readout } from '../atoms/Readout';
+import { Surface } from '../atoms/Surface';
+import { Text } from '../atoms/Text';
 import { backendLabel, relTime } from './format';
 
 interface Props {
@@ -39,11 +40,11 @@ export function ChatSwitcher({ chats, currentChatId, backend, running, onOpen, o
         {chatMenu && (
           <>
             <div className="chat-menu-backdrop" onClick={() => setChatMenu(false)} />
-            <Panel className="chat-menu" role="menu">
-              {chats.length === 0 && <div className="vb-empty vb-empty-small">No saved chats yet</div>}
+            <Surface className="chat-menu" role="menu">
+              {chats.length === 0 && <Text role="hint">No saved chats yet</Text>}
               {chats.map((c) => (
                 <div key={c.id} className={`chat-menu-item${c.id === currentChatId ? ' active' : ''}`}>
-                  <Panel
+                  <Surface
                     as="button"
                     variant="flat"
                     className="chat-menu-open"
@@ -68,7 +69,7 @@ export function ChatSwitcher({ chats, currentChatId, backend, running, onOpen, o
                     <Readout>
                       {relTime(c.updatedAt)} · {c.messageCount} msg
                     </Readout>
-                  </Panel>
+                  </Surface>
                   <Button
                     variant="bare"
                     size="sm"
@@ -80,7 +81,7 @@ export function ChatSwitcher({ chats, currentChatId, backend, running, onOpen, o
                   </Button>
                 </div>
               ))}
-            </Panel>
+            </Surface>
           </>
         )}
       </div>

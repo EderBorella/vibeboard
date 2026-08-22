@@ -1,4 +1,5 @@
 import { type KeyboardEvent, type MouseEvent, type ReactNode, useState } from 'react';
+import { Text } from '../atoms/Text';
 
 interface Props {
   value: string;
@@ -63,7 +64,7 @@ export function InlineField({
     );
   }
 
-  const shown = value === '' ? <span className="vb-empty">{placeholder}</span> : (display?.(value) ?? value);
+  const shown = value === '' ? <Text role="hint" lead>{placeholder}</Text> : (display?.(value) ?? value);
   const cls = `inline-view${className ? ` ${className}` : ''}`;
   const open = (): void => setDraft(value);
 

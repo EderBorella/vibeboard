@@ -7,7 +7,7 @@
 // the practice every phase here has followed, and the one that has found a real defect in each of the
 // five phases that used it. It asserts the BOX A CLASS LIST DRAWS, resolved out of the stylesheets by
 // test/css-box.tsx, rather than the class name that draws it: a ground moving from `.tile` in
-// styles.css into `.vb-panel-inset` in primitives.css reads as the same value and the assertion
+// styles.css into `.vb-surface-inset` in primitives.css reads as the same value and the assertion
 // survives the migration.
 //
 // WHAT IS DELIBERATELY NOT PINNED: the ten nested boxes' PADDINGS. They are nine distinct values
@@ -24,9 +24,9 @@
 // state — and the refusal is re-taken against the table below rather than cited from the old one.
 import { cleanup, render } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
-import { Button } from '../web/src/ui/Button.js';
-import type { PanelVariant } from '../web/src/ui/Panel.js';
-import { Panel } from '../web/src/ui/Panel.js';
+import { Button } from '../web/src/atoms/Button.js';
+import { Surface } from '../web/src/atoms/Surface.js';
+import type { SurfaceVariant } from '../web/src/atoms/Surface.js';
 import { box } from './css-box.js';
 
 afterEach(cleanup);
@@ -45,14 +45,14 @@ function at(html: string, selector: string): Element {
 const el = (classes: string, tag = 'div') => at(`<${tag} class="${classes}">x</${tag}>`, tag);
 const inside = (parent: string, tag: string) => at(`<div class="${parent}"><${tag}>x</${tag}></div>`, tag);
 
-// A `Panel` AS THE PRIMITIVE RENDERS IT. THE ASSERTIONS BELOW SURVIVED THE MIGRATION AND THE FIXTURES
+// A `Surface` AS THE PRIMITIVE RENDERS IT. THE ASSERTIONS BELOW SURVIVED THE MIGRATION AND THE FIXTURES
 // DID NOT — which is what Phase 4 recorded of test/panel-boxes.test.tsx and Phase 8 of
 // test/chip-boxes.test.tsx, and is honest to repeat rather than dress up: ten of these boxes are drawn
-// by `.vb-panel-raised` or `.vb-panel-inset` now, so a hand-written class list would test a class that
+// by `.vb-surface-raised` or `.vb-surface-inset` now, so a hand-written class list would test a class that
 // no longer draws anything. Asking the component for its own markup is what stops the fixture drifting:
-// rename `vb-panel-inset` and every assertion moves with it.
-function panel(variant: PanelVariant, className?: string, as?: 'button'): Element {
-  const { container } = render(<Panel variant={variant} className={className} as={as} />);
+// rename `vb-surface-inset` and every assertion moves with it.
+function panel(variant: SurfaceVariant, className?: string, as?: 'button'): Element {
+  const { container } = render(<Surface variant={variant} className={className} as={as} />);
   const it = container.firstElementChild;
   if (!it) throw new Error(`Panel rendered nothing for ${variant} ${className ?? ''}`);
   return it;
@@ -77,12 +77,12 @@ const drawn = (target: Element) => {
   };
 };
 
-// What `.vb-panel-inset` paints, and every migrated box has to read back as exactly this.
+// What `.vb-surface-inset` paints, and every migrated box has to read back as exactly this.
 const INSET_EDGE = '1px solid transparent + var(--border)';
 
 describe('the raised surfaces — a --panel ground, a --border edge and a 10px corner', () => {
   // Five of the twenty declare `raised`'s own trio. Two of them ALSO stack a head over a scrolling
-  // body, which is the argument `.vb-panel-raised` is a flex column at all; the other three do not,
+  // body, which is the argument `.vb-surface-raised` is a flex column at all; the other three do not,
   // and that difference is what Phase 11's refusals rest on, so both halves are pinned.
   const RAISED: [string, string][] = [
     ['modal', 'var(--panel)'],
@@ -94,7 +94,7 @@ describe('the raised surfaces — a --panel ground, a --border edge and a 10px c
     ['popover', 'var(--panel-2)'],
   ];
 
-  // The two that are NOT `Panel`s are still written as class lists, because that is what they are.
+  // The two that are NOT `Surface`s are still written as class lists, because that is what they are.
   const MIGRATED = new Set(['modal', 'mp-modal', 'chat-menu']);
 
   for (const [name, ground] of RAISED) {
@@ -196,14 +196,14 @@ describe('the nested boxes — a drawn edge and the smaller 6px corner', () => {
   });
 
   // `.tile`'s ACCENT LEFT EDGE is not part of the box: it is 2px where the primitive's is 1px, and it is
-  // the one thing that says which board a card is on. It has to beat `.vb-panel-inset`'s `border-color`,
+  // the one thing that says which board a card is on. It has to beat `.vb-surface-inset`'s `border-color`,
   // which it does on source order — styles.css is loaded after primitives.css — and the hover that lights
   // the whole box accent has to survive with it.
   it('.tile keeps a 2px accent left edge over the 1px box, and its hover', () => {
     const tile = panel('inset', 'tile');
     expect(box(tile)['border-left']).toBe('2px solid var(--accent)');
     expect(box(tile, ':hover')['border-color']).toBe('var(--accent)');
-    // A `role="group"` is not a `<button>`, so `button.vb-panel`'s pointer does not reach it.
+    // A `role="group"` is not a `<button>`, so `button.vb-surface`'s pointer does not reach it.
     expect(box(tile).cursor).toBe('pointer');
   });
 
@@ -241,8 +241,12 @@ describe('the nested boxes — a drawn edge and the smaller 6px corner', () => {
     expect(b.color).toBe('var(--text)');
     expect(b['border-color']).toBe('var(--border)');
     expect(b['border-radius']).toBe('6px');
-    // `2px 8px`. The horizontal half is untouched — a label needs room from the edge it sits against.
-    expect(b.padding).toBe('2px 8px');
+    // `0 8px` AND A DECLARED 28px. The owner's second pass took the vertical padding from `--s-2` to
+    // `--s-1`; the atom layer took it to nothing at all and gave the box a height instead, which is the
+    // same argument carried to its end — a control whose height is padding plus a line box is a control
+    // whose height changes when its label does. The horizontal half is untouched.
+    expect(b.padding).toBe('0 8px');
+    expect(b.height).toBe('28px');
     expect(b['font-size']).toBe('0.75rem');
   });
 });

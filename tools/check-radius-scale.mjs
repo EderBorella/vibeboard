@@ -4,8 +4,8 @@
 //
 //   1. Every `border-radius` authored in web/src/*.css is one of the four steps of the radius scale,
 //      or `50%`. BLOCKING at zero.
-//   2. No rule outside the primitive stylesheet declares `border-radius`, `padding` or `font-size`
-//      for a class that is rendered on a `<button>`. A RATCHET, not zero — see below.
+//   2. No rule outside the primitive LAYER declares `border-radius`, `padding`, `font-size`, `height` or
+//      `min-height` for a class that is rendered on a `<button>`. A RATCHET, not zero — see below.
 //
 // WHY THIS EXISTS BESIDE `npm run visual`, WHICH ALREADY ASSERTS THE FIRST ONE.
 //
@@ -30,7 +30,7 @@
 // primitives landed. Drive it down; never raise it.
 //
 // WHAT CLAIM 2 CATCHES: a `<button className="x">`, a `<Button className="x">` or a
-// `<Panel as="button" className="x">` in a .tsx file whose class `x` is given a `border-radius`, a
+// `<Surface as="button" className="x">` in a .tsx file whose class `x` is given a `border-radius`, a
 // `padding` (or `padding-top`, `-right`, `-bottom`, `-left`) or a `font-size` by any rule in a
 // stylesheet other than the primitive one.
 // WHAT IT DOES NOT CATCH, and none of these is hypothetical:
@@ -43,7 +43,7 @@
 //   - anything about an `<a>`, a `<div role="button">` or an `<input type="submit">`.
 // The `<Button className>` hole USED to be on this list, and reading `<Button>` closed it — see the
 // comment on TAGS. It was not hypothetical either: it opened up the moment 27 classes migrated, and
-// `<Panel as="button">` is the same hole reopened by Phase 4 and closed in the same commit.
+// `<Surface as="button">` is the same hole reopened by Phase 4 and closed in the same commit.
 // It is a real subset of "no rule outside the primitive block declares geometry for a button-shaped
 // element", stated so nobody mistakes it for the whole.
 
@@ -59,8 +59,16 @@ const CORPUS = 'web/src';
 // The radius scale is geometry, so it lives in design/tokens.css rather than in design/themes.css —
 // the split Phase 1 of notes/atomic-revamp-plan.md made structural and `check:tokens` keeps.
 const TOKENS_FILE = 'web/src/design/tokens.css';
-// The primitive stylesheet. Rules here are the ONE place a button's geometry may be decided.
+// THE PRIMITIVE LAYER, AND IT IS SEVEN SHEETS RATHER THAN ONE. `ui/primitives.css` was the only place a
+// button's geometry could be decided; the atom phase gave each of the six atoms its own file, so the set
+// is that file plus those six. LISTED AND NOT A DIRECTORY GLOB: `web/src/atoms/prose.css` sits in the
+// same directory and is NOT an atom sheet — it is the markdown surface — and a glob would have excused
+// every geometry declaration in it.
 const PRIMITIVES = join('web', 'src', 'ui', 'primitives.css');
+const ATOM_SHEETS = ['button', 'chip', 'control', 'readout', 'surface', 'text'].map((name) =>
+  join('web', 'src', 'atoms', `${name}.css`),
+);
+const PRIMITIVE_LAYER = new Set([PRIMITIVES, ...ATOM_SHEETS]);
 const RADIUS_SCALE = ['--r-sm', '--r-md', '--r-lg', '--r-pill'];
 
 // A VALUE MAY BE OFF THE SCALE ON PURPOSE, and then it is written here with its reason rather than
@@ -96,14 +104,14 @@ const OFF_SCALE_ON_PURPOSE = new Map([
 // move — it works identically at 65 declarations and at 5. Do NOT put a count floor back.
 
 // WHAT CLAIM 2 STANDS AT. 56 before Phase 3; 46 when the primitives landed; 22 after that adoption was
-// finished; 13 after Phase 4 gave the list rows a `Panel`; **8** after Phase 5b, which is the number
+// finished; 13 after Phase 4 gave the list rows a `Surface`; **8** after Phase 5b, which is the number
 // here. The five that went in 5b:
-//   `.chat-current` `.mp-trigger` — the two select triggers, now `.vb-trigger`: they were `.vb-input`'s
+//   `.chat-current` `.mp-trigger` — the two select triggers, now `.vb-trigger`: they were `.vb-ctl`'s
 //                      box with a caret, which is what this file called them for two phases running.
 //   `.bt-btn` `.mode-btn` — the segmented cells, now `.vb-seg-cell`. They were identical declaration for
 //                      declaration apart from one size step, and `.backend-toggle-md .bt-btn` restated
 //                      `.mode-btn`'s padding and font-size verbatim.
-//   `.archive-title` — NOT migrated to `Panel`, and it left the census for a different reason: its only
+//   `.archive-title` — NOT migrated to `Surface`, and it left the census for a different reason: its only
 //                      geometry declaration was `font-size: var(--t-body)`, which is what `body` already
 //                      gives it. A dead declaration, the same one Phase 4 found on `.cv-link`.
 //
@@ -133,6 +141,11 @@ const OFF_SCALE_ON_PURPOSE = new Map([
 // NEVER raise this: a ratchet that moves the wrong way is a gate switched off in place.
 const BUTTON_GEOMETRY_CEILING = 4;
 
+// `height` AND `min-height` JOINED THIS LIST IN THE ATOM PHASE, and the same four classes are in the
+// census before and after — the tab and label faces the plan deliberately does NOT patch, because it
+// deletes them in Phases 5 and 6 — so the ratchet did not move. Which is exactly why
+// `check-box-scale.mjs` is a separate file: this instrument is a count of CLASSES, and adding a property
+// to a class it already counts changes no count.
 const GEOMETRY = [
   'border-radius',
   'padding',
@@ -141,6 +154,8 @@ const GEOMETRY = [
   'padding-bottom',
   'padding-left',
   'font-size',
+  'height',
+  'min-height',
 ];
 
 // `tools/lib/source.mjs` owns the walk, the line counter and the comment blanker; `lib/css.mjs` the
@@ -285,8 +300,8 @@ const FIXTURE = [
   // fixture because the requirement is the part that can silently invert: a predicate that matched
   // nothing would drop `.exec-card` out of the census, and one that matched everything would report
   // `.archive-drawer`'s legitimate padding as a fault.
-  '<Panel as="button" variant="flat" className="eta">x</Panel>',
-  '<Panel variant="raised" className="theta">x</Panel>',
+  '<Surface as="button" variant="flat" className="eta">x</Surface>',
+  '<Surface variant="raised" className="theta">x</Surface>',
   // None of these is a button, and a pattern that swept them up would inflate the census.
   '<ButtonRow className="epsilon">x</ButtonRow>',
   '<PanelHead className="iota">x</PanelHead>',
@@ -314,11 +329,11 @@ function parserSelfTest() {
 // of the population — a `padding` planted on `.cs-action` right after that migration exited **0**. The
 // ratchet would have gone on falling while the geometry it counted quietly moved out of sight.
 //
-// `<Panel as="button">` is Phase 4's version of exactly that hole, and it is qualified rather than
-// swept in. A `Panel` is usually a `<div>` or a `<section>`, and one of those may legitimately declare
-// its own padding — `.archive-drawer`, `.exec-column` and `.halt` all do, because `Panel`'s `raised`
+// `<Surface as="button">` is Phase 4's version of exactly that hole, and it is qualified rather than
+// swept in. A `Surface` is usually a `<div>` or a `<section>`, and one of those may legitimately declare
+// its own padding — `.archive-drawer`, `.exec-column` and `.halt` all do, because `Surface`'s `raised`
 // variant deliberately has none: a column pads its body and a drawer pads itself. Counting every
-// `<Panel>` would therefore report three correct designs as findings, which is how a check earns the
+// `<Surface>` would therefore report three correct designs as findings, which is how a check earns the
 // reputation that gets it switched off. Counting none of them would leave `.exec-card`'s padding free
 // to come back through a prop the check cannot see. So the tag carries a REQUIREMENT, read out of the
 // same attribute text: a Panel is in the population when it says `as="button"`.
@@ -327,11 +342,11 @@ function parserSelfTest() {
 const TAGS = [
   { tag: '<button', requires: null },
   { tag: '<Button', requires: null },
-  { tag: '<Panel', requires: /\bas="button"/ },
+  { tag: '<Surface', requires: /\bas="button"/ },
 ];
 
-// Every opening tag of `tag` that also satisfies `requires`, which is how `<Panel as="button">` is
-// separated from an ordinary `<Panel>`. Its own function so `parserSelfTest` goes through exactly the
+// Every opening tag of `tag` that also satisfies `requires`, which is how `<Surface as="button">` is
+// separated from an ordinary `<Surface>`. Its own function so `parserSelfTest` goes through exactly the
 // code the census does — the first version of that test carried its own regex, had no opinion about
 // `TAGS` at all, and sailed straight past a broken tag name.
 function shapedTags(text, tag, requires) {
@@ -356,7 +371,7 @@ function buttonClasses() {
 
 const onButton = buttonClasses();
 const cssRules = walk('.css')
-  .filter((file) => file !== PRIMITIVES)
+  .filter((file) => !PRIMITIVE_LAYER.has(file))
   .flatMap((file) => rules(file));
 
 /** @type {{ cls: string, where: string, sites: string[] }[]} */
@@ -379,7 +394,7 @@ console.log(
   `radius scale: ${radiusDecls} border-radius declaration(s) across ${walk('.css').length} file(s) in ${CORPUS}`,
 );
 console.log(
-  `button geometry: ${onButton.size} class(es) literal on a ${TAGS.map((t) => t.tag).join(', ')} (Panel only when it says as="button"), ${geometry.length} of them given geometry outside ${PRIMITIVES}`,
+  `button geometry: ${onButton.size} class(es) literal on a ${TAGS.map((t) => t.tag).join(', ')} (Surface only when it says as="button"), ${geometry.length} of them given geometry outside the ${PRIMITIVE_LAYER.size}-sheet primitive layer`,
 );
 
 // Before the findings, because a green run on a pattern that matched nothing is the worse failure.
@@ -407,7 +422,7 @@ if (geometry.length > BUTTON_GEOMETRY_CEILING) {
     `\n${geometry.length} button class(es) declare their own geometry outside the primitive stylesheet,`,
   );
   console.error(`against a ceiling of ${BUTTON_GEOMETRY_CEILING}. This gate is a RATCHET: it blocks an`);
-  console.error(`increase, not the backlog. Render the new control with <Button> from web/src/ui/Button.tsx`);
+  console.error(`increase, not the backlog. Render the new control with <Button> from web/src/atoms/Button.tsx`);
   console.error(`instead of giving a class a padding of its own.\n`);
   for (const { cls, where, sites } of geometry) {
     console.error(`  .${cls} — ${where}  (${sites.length} button site(s), e.g. ${sites[0]})`);

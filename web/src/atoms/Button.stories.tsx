@@ -4,8 +4,12 @@ import { Button, type ButtonSize, type ButtonVariant } from './Button';
 // ONE BUTTON WITH OPTIONS, which is the owner's rule for the whole system: "we don't have 3 or 4 types of
 // button, we have a button with options". This file is where that claim is either true or visibly false —
 // every variant and every size, drawn together, at the size they actually render.
+//
+// `size` IS A HORIZONTAL AXIS AS OF THE ATOM LAYER, and `EveryVariant` below is where that is visible: the
+// `sm` row and the `md` row are the same HEIGHT and differ in the label and the room beside it. If they
+// ever differ in height again, this story shows it before any gate does.
 const meta = {
-  title: 'Primitives/Button',
+  title: 'Atoms/Button',
   component: Button,
   args: { children: 'Start' },
   argTypes: {

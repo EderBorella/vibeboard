@@ -54,17 +54,18 @@ const FLOOR = { defs: 20, themes: 3 };
 // A NAME MAY BE DEFINED BEFORE ANYTHING READS IT, and this is where that is signed for: the phase that
 // spends it, so the row can be deleted by the commit that does. Every phase number is
 // notes/atomic-revamp-plan.md's.
+// EMPTY, AND THAT IS THE ATOM PHASE PAYING ITS BILL. All eight rows that stood here — `--ctl-h`,
+// `--mark-h`, `--rule`, `--lift` and the four `--z-*` names — were signed for by Phase 4, and Phase 4
+// spent them: the two heights on Button, Chip, Control and the segmented group, the rule on twelve
+// border-left rails, the lift on the four shadows that each said "off the page" in their own numbers, and
+// the four layers on all nine `z-index` declarations. `npm run check:box-scale` is what holds those four
+// at zero from here.
+//
+// The claim that made the emptiness reachable is the SECOND half of claim 1: a name that has acquired a
+// consumer and kept its row is a finding too, so this map cannot rot into an allow-list. Leaving one row
+// here would have failed the run.
 /** @type {Map<string, string>} */
-const UNCONSUMED = new Map([
-  ['--ctl-h', 'Phase 4 — Button, Control and the tab faces declare their own height'],
-  ['--mark-h', 'Phase 4 — Chip and the markers declare theirs'],
-  ['--rule', 'Phase 4 — the eleven border-left rails, 6:5 between 3px and 2px by nothing'],
-  ['--lift', 'Phase 4 — Surface `raised`, replacing four disagreeing shadows'],
-  ['--z-chrome', 'Phase 4 — check:box-scale arm 4, every z-index onto one of the four layers'],
-  ['--z-pop', 'Phase 4 — same arm; .chat-menu and its backdrop stop being 20 and 21'],
-  ['--z-modal', 'Phase 4 — same arm'],
-  ['--z-alert', 'Phase 4 — same arm; .halt-backdrop rises above the confirm its comment already claims'],
-]);
+const UNCONSUMED = new Map();
 
 // A COLOUR IN THE GEOMETRY BLOCK, ON PURPOSE, with its reason — the precedent is
 // check-radius-scale.mjs's `50%` and check-scale.mjs's `inherit`.

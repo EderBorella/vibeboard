@@ -12,7 +12,7 @@
 .ap-bar {
   border-bottom: 1px solid var(--border);
   background: var(--panel);
-  border-left: 3px solid var(--tone, var(--border));
+  border-left: var(--rule) solid var(--tone, var(--border));
   font-size: var(--t-body);
 }
 

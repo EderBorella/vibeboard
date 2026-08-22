@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
-import { Button } from '../ui/Button';
-import { Panel } from '../ui/Panel';
+import { Button } from '../atoms/Button';
+import { Surface } from '../atoms/Surface';
 
 // How auto-pilot works, in the app rather than in a design document nobody reading the header has open.
 //
@@ -23,7 +23,7 @@ export function AutopilotHelp({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="modal-backdrop" role="dialog" aria-label="How auto-pilot works" aria-modal="true">
-      <Panel className="modal ap-help">
+      <Surface className="modal ap-help">
         <div className="modal-head">
           <h2>How auto-pilot works</h2>
           <Button size="md" ref={closeRef} onClick={onClose}>
@@ -115,7 +115,7 @@ export function AutopilotHelp({ onClose }: { onClose: () => void }) {
             a feature has nothing unfinished left under it, and it is what closes the card.
           </p>
         </div>
-      </Panel>
+      </Surface>
     </div>
   );
 }

@@ -12,5 +12,5 @@
    it is. Alignment is layout, and the only thing left of this rule. */
 .cs-action { text-align: left; }
 .cs-empty { margin-top: var(--s-2); font-size: var(--t-micro); }
-.card-skills > .vb-error { margin: var(--s-2) 0 0; cursor: help; }
+.card-skills > .vb-text-error { margin: var(--s-2) 0 0; cursor: help; }
 

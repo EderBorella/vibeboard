@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import type { FsNode } from '../api';
-import { Button } from '../ui/Button';
-import { Chip } from '../ui/Chip';
-import { Panel } from '../ui/Panel';
-import { Readout } from '../ui/Readout';
+import { Button } from '../atoms/Button';
+import { Chip } from '../atoms/Chip';
+import { Control } from '../atoms/Control';
+import { Readout } from '../atoms/Readout';
+import { Surface } from '../atoms/Surface';
+import { Text } from '../atoms/Text';
 import { formatBytes } from './format';
 import { canDropInto } from './paths';
 import type { TreeRow } from './useTree';
@@ -80,7 +82,7 @@ function NodeRow(props: NodeRowProps) {
   const { node, depth, expanded, active, droppable, over } = props;
   const twist = expandable(node) ? (expanded ? '▾' : '▸') : '';
   return (
-    <Panel
+    <Surface
       as="button"
       variant="flat"
       className={`control-item explorer-item${active ? ' active' : ''}${over ? ' explorer-over' : ''}`}
@@ -123,7 +125,7 @@ function NodeRow(props: NodeRowProps) {
       {node.symlink && <Chip className="control-tag">link</Chip>}
       {node.escapes && <Chip className="control-tag">outside</Chip>}
       <Readout>{formatBytes(node.size)}</Readout>
-    </Panel>
+    </Surface>
   );
 }
 
@@ -139,8 +141,8 @@ interface RenameRowProps {
 // what is typed is what lands on disk — so the whole value is selected rather than a stem of it.
 function RenameRow({ depth, value, onChange, onCommit, onCancel }: RenameRowProps) {
   return (
-    <input
-      className="vb-input"
+    <Control
+      
       style={indent(depth)}
       value={value}
       autoFocus
@@ -165,8 +167,10 @@ function RenameRow({ depth, value, onChange, onCommit, onCancel }: RenameRowProp
 // looked complete would be a lie about what is in it.
 function MoreRow({ depth, count }: { depth: number; count: number }) {
   return (
-    <div className="explorer-more vb-empty" style={indent(depth)}>
-      … {count} more, not shown
+    // The indent is a layout and stays on the row that carries it; the face is the atom's. A `style`
+    // prop on `Text` would be the hole every other atom refuses — it is where a padding comes back.
+    <div className="explorer-more" style={indent(depth)}>
+      <Text role="hint">… {count} more, not shown</Text>
     </div>
   );
 }
@@ -247,9 +251,9 @@ export function FileTree(props: Props) {
         </div>
       </div>
 
-      {error && <div className="vb-error">{error}</div>}
+      {error && <Text role="error">{error}</Text>}
       {rows.length === 0 && (
-        <div className="control-empty vb-empty vb-empty-small">{busy ? 'Reading…' : '— empty —'}</div>
+        <Text role="hint" className="control-empty">{busy ? 'Reading…' : '— empty —'}</Text>
       )}
 
       {rows.map((row) => {

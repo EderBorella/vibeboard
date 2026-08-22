@@ -19,7 +19,7 @@
 .gate-list-name { font-weight: 600; }
 .gate .vb-field { margin-top: var(--s-5); }
 .gate-row { display: flex; gap: var(--s-4); }
-.gate .vb-input { flex: 1; }
+.gate .vb-ctl { flex: 1; }
 .gate button:not(.gate-list button) {
   background: var(--accent-fill); color: var(--on-fill); border: none;
   border-radius: var(--r-md); padding: 0 var(--s-6); font-weight: 600; cursor: pointer;
@@ -27,6 +27,6 @@
 .gate button:disabled { opacity: 0.5; cursor: default; }
 .gate-preview { margin-top: var(--s-5); font-size: var(--t-small); color: var(--muted); }
 /* `.gate-preview code` is with the other two inline code spans, beside `.markdown code`. */
-.gate .vb-hint { margin-top: var(--s-2); }
+.gate .vb-text-quiet { margin-top: var(--s-2); }
 .gate .vb-notice { margin-top: var(--s-6); }
 

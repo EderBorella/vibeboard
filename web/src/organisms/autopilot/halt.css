@@ -1,23 +1,25 @@
 /* The halt overlay. Blocking is the easy half — it has to say WHY and offer the way back, or it is a
-   wall with no door. Above everything, including the confirm dialog's backdrop. */
+   wall with no door. Above everything, including the confirm dialog's backdrop — which the sentence
+   claimed and the code contradicted: this was 60 against the confirm's 80, so it sat 20 BELOW the thing
+   it says it is above. `--z-alert` is what the comment always meant. */
 .halt-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 60;
+  z-index: var(--z-alert);
   display: grid;
   place-items: center;
   padding: var(--s-7);
   background: color-mix(in srgb, var(--bg) 82%, transparent);
   backdrop-filter: blur(3px);
 }
-/* A `Panel` with the `raised` variant. The DANGER border and the drop shadow are what it keeps: a
+/* A `Surface` with the `raised` variant. The DANGER border and the drop shadow are what it keeps: a
    colour and an elevation are the surface's, and this one is the only thing on screen. */
 .halt {
   max-width: 34rem;
   gap: var(--s-5);
   padding: var(--s-7);
   border-color: var(--danger);
-  box-shadow: 0 18px 50px rgb(0 0 0 / 45%);
+  box-shadow: var(--lift);
 }
 .halt-title {
   margin: 0;

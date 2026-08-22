@@ -47,14 +47,15 @@ Element.prototype.scrollTo = Element.prototype.scrollTo ?? ((): void => {});
 // 1. THE SURVIVORS, EACH WITH THE CATEGORY THAT EXCUSES IT.
 const CONTENT_IS_MACHINE_TEXT = 'the content is machine text, not a measurement';
 
+// SEVEN BECAME THREE, and the four that went were one row rather than four: a control a person types
+// machine text into. `.raw-area`, `.control-textarea`, `.skill-editor textarea` and `.confirm-require`
+// each declared `font-family: var(--font-mono)` on a class of their own because this test's own ruling —
+// a Readout is a `<span>`, so a control cannot be one — left them nowhere else to say it. The atom layer
+// gave them somewhere: `Control` has a `mono` option, said once, inside the primitive layer.
+//
+// THE THREE THAT REMAIN ARE NOT CONTROLS. They are quoted machine text in prose, and no option on a
+// control can reach them.
 const SURVIVORS = new Map([
-  ['.raw-area', `a whole card FILE in a textarea — ${CONTENT_IS_MACHINE_TEXT}`],
-  ['.control-textarea', `a config file in the editor body — ${CONTENT_IS_MACHINE_TEXT}`],
-  ['.skill-editor textarea.vb-input', `a prompt, edited like code — ${CONTENT_IS_MACHINE_TEXT}`],
-  [
-    '.confirm-require .vb-input',
-    'the exact string the machine demands back, typed character by character — a box you cannot render a <span> in',
-  ],
   ['.gate-preview code, .ap-help-body code', `inline code in prose — ${CONTENT_IS_MACHINE_TEXT}`],
   [
     '.markdown code',
@@ -72,7 +73,21 @@ const SURVIVORS = new Map([
 // about the outside of, and the two token files declare properties rather than a face. Filtered rather
 // than left in for tidiness — `--font-mono` is DEFINED in `design/tokens.css`, so a census that reads it
 // as a surface is one `font-family` away from reporting the definition as a hand-rolled exception.
-const NOT_A_SURFACE = ['ui/primitives.css', 'design/tokens.css', 'design/themes.css'];
+// THE PRIMITIVE LAYER IS SEVEN SHEETS since the atom phase, and every one of them has to be dropped here
+// for the reason `ui/primitives.css` always was: this census asks what is OUTSIDE the primitive, and
+// `atoms/readout.css` is where the signature is declared. `atoms/prose.css` is deliberately NOT on the
+// list — it is the markdown surface, and two of the three survivors below are its rules.
+const NOT_A_SURFACE = [
+  'ui/primitives.css',
+  'design/tokens.css',
+  'design/themes.css',
+  'atoms/button.css',
+  'atoms/chip.css',
+  'atoms/control.css',
+  'atoms/readout.css',
+  'atoms/surface.css',
+  'atoms/text.css',
+];
 const SURFACE_SHEETS = [
   ...readFileSync(join(process.cwd(), 'web', 'src', 'styles.ts'), 'utf8').matchAll(
     /^\s*import\s+'\.\/([^']+\.css)';/gm,
@@ -159,7 +174,10 @@ describe("a tool call's name is a Readout", () => {
   // `.msg-tool` WAS `Readout` `small` `accent` VALUE FOR VALUE — `color: var(--accent);
   // font-family: var(--font-mono); font-size: var(--t-small)` — and the rule is gone.
   it('renders the primitive rather than a class of its own', () => {
-    expect([...line().classList].sort()).toEqual(['vb-readout', 'vb-readout-accent', 'vb-readout-small']);
+    // ONE CLASS, and it was three: `Readout` lost every option in the atom phase, because a figure takes
+    // the step and the ink of the atom it sits in. The tool name reads as the machine's either way — the
+    // face is what says so, and the face is the only thing left.
+    expect([...line().classList].sort()).toEqual(['vb-readout']);
   });
 
   it('still resolves to the monospaced face, at the small step, in the accent ink', () => {

@@ -1,0 +1,50 @@
+/* BUTTON — a control box you press. Split out of ui/primitives.css at the byte position it held, so the
+ * cascade is unchanged: see web/src/styles.ts, which imports the six atom sheets where that one file was.
+ *
+ * `border: 1px solid transparent` on the base rather than per variant: a variant that sets only a colour
+ * then cannot accidentally change the box's width, which is the same 2px argument the owner's
+ * dashed-ghost ruling rests on. */
+.vb-btn {
+  display: inline-flex; align-items: center; gap: var(--s-3);
+  border: 1px solid transparent; border-radius: var(--r-md);
+  font-family: inherit; cursor: pointer;
+  height: var(--ctl-h);
+}
+.vb-btn:disabled { opacity: 0.5; cursor: default; }
+
+/* `size` IS A HORIZONTAL AXIS AND NOTHING ELSE NOW, and the vertical padding it used to carry is what
+   made this box's height emergent: padding plus a line box plus a border, so a bigger word inside a
+   button made a taller button and eleven control heights accumulated across the app. `--ctl-h` is
+   declared above, `* { box-sizing: border-box }` in design/reset.css means it includes the border, and
+   what is left here is how much room the label has from the edge it sits against. `md` is a step up in
+   both the label and that room; it is no longer a step up in the box. */
+.vb-btn-sm { padding: 0 var(--s-4); font-size: var(--t-small); }
+.vb-btn-md { padding: 0 var(--s-6); font-size: var(--t-body); }
+
+/* THE FIVE VOICES. `primary` is the one action, `default` is everything ordinary, `ghost` explains,
+   `danger` is destructive, `bare` is a glyph with no box. Hover moves the border and the ink and never
+   the box. */
+.vb-btn-primary { background: var(--accent-fill); color: var(--on-fill); font-weight: 600; }
+.vb-btn-default { background: var(--panel-2); color: var(--text); border-color: var(--border); }
+.vb-btn-default:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+/* THE GHOST CARRIES A DASHED BORDER, ruled by the owner on 2026-08-20 reviewing the samples. Not
+   decoration: dashed reads as explanatory rather than actionable — and it keeps the box exactly as wide
+   as a solid button, where a borderless ghost is 2px narrower and shifts the row it sits in. The radius
+   conformance check therefore asserts on `border-radius` and NOT on `border-style`.
+   THAT SENTENCE IS THE TEST FOR WHETHER A CONTROL BELONGS HERE, and it is a narrow gate: does this
+   control EXPLAIN, or does it ACT? Two consumers — the auto-pilot bar's "How it works" and its
+   Details/Hide disclosure. Both reveal information and change nothing in the project. Everything that
+   acts is solid, including the emergency stop, which spent one commit dashed and read as a footnote.
+   `Clear failed tries` was a ghost on the argument that an escape hatch is quiet; quiet is not
+   explanatory, and it writes. test/button-voices.test.tsx holds the pair at two. */
+.vb-btn-ghost { background: none; color: var(--muted); border-color: var(--border); border-style: dashed; }
+.vb-btn-ghost:hover:not(:disabled) { border-color: var(--accent); color: var(--text); }
+.vb-btn-danger { background: none; color: var(--danger); border-color: var(--border); }
+.vb-btn-danger:hover:not(:disabled) { border-color: var(--danger); }
+/* NO BOX AT ALL — a `×`, a `+`, a `★`, a chevron, an underlined word. It keeps the base's transparent
+   1px border rather than `border: none` so it occupies the same width as every other button and cannot
+   shift the row it is dropped into, which is the same argument the dashed ghost rests on. The hover ink
+   is `--accent` here and a surface may override it with a colour of its own: a `×` that deletes goes
+   red, and `.chat-del` goes to `--accent-2`. A colour is the caller's; the box is not. */
+.vb-btn-bare { background: none; color: var(--muted); }
+.vb-btn-bare:hover:not(:disabled) { color: var(--accent); }

@@ -1,4 +1,5 @@
 import type { SigninPhase } from './driver';
+import { Text } from '../atoms/Text';
 
 interface Props {
   phase: SigninPhase;
@@ -16,24 +17,24 @@ export function SignIn({ phase, onRetry }: Props) {
     <div className="gate">
       <div className="gate-card">
         <h2>{phase.phase === 'waiting' ? 'Waiting to be let in' : 'Signing in'}</h2>
-        {phase.phase === 'claiming' && <p className="vb-hint">Signing this browser in…</p>}
+        {phase.phase === 'claiming' && <Text role="hint">Signing this browser in…</Text>}
 
         {phase.phase === 'waiting' && (
           <>
             {/* What to DO, in the first sentence. This screen used to open by telling the user there
                 was nothing to copy — an absence, about a mechanism they had never heard of, which only
                 raises the question of what they were supposed to have copied. */}
-            <p className="vb-hint">
+            <Text role="hint">
               This board is already open on another device. Go to that device: it is showing a message asking
               whether to let this one in. Choose <strong>Allow</strong> there.
-            </p>
+            </Text>
             {/* The address, so the user can tell their own request apart from somebody else's. The
                 User-Agent is deliberately NOT repeated here — it means nothing to the person reading
                 this screen, and it is the approving end that needs to recognise the device. */}
             <p className="gate-preview">
               That message will show this address: <code>{phase.address}</code>
             </p>
-            <p className="vb-hint">Leave this page open — it continues on its own once you allow it.</p>
+            <Text role="hint">Leave this page open — it continues on its own once you allow it.</Text>
           </>
         )}
 

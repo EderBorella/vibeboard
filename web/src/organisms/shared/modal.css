@@ -1,9 +1,11 @@
 /* ---------- Card editor modal ---------- */
+/* `--z-modal` AND IT WAS 20, WHICH IS THE POPOVER LAYER. Two siblings on one number let DOM order decide
+   whether a modal covered an open popover, and DOM order is not what should have decided that. */
 .modal-backdrop {
   position: fixed; inset: 0; background: rgba(0, 0, 0, 0.6);
-  display: flex; align-items: center; justify-content: center; padding: var(--s-7); z-index: 20;
+  display: flex; align-items: center; justify-content: center; padding: var(--s-7); z-index: var(--z-modal);
 }
-/* A `Panel` with the `raised` variant, and it was that variant DECLARATION FOR DECLARATION — the ground,
+/* A `Surface` with the `raised` variant, and it was that variant DECLARATION FOR DECLARATION — the ground,
    the edge, the 10px corner and the flex column, which is exactly the head-over-scrolling-body stack
    Phase 4 said every raised consumer wanted. Only the measure is left. */
 .modal { width: 100%; max-width: 620px; max-height: 90vh; }

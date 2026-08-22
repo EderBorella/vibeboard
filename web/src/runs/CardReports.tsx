@@ -1,9 +1,10 @@
 import type { CardLedgerData, RunRecord, RunStatus } from '../api';
 import type { Card } from '../shared';
-import { Button } from '../ui/Button';
-import { Chip } from '../ui/Chip';
-import { Panel } from '../ui/Panel';
-import { Readout, ReadoutLine } from '../ui/Readout';
+import { Button } from '../atoms/Button';
+import { Chip } from '../atoms/Chip';
+import { Readout, ReadoutLine } from '../atoms/Readout';
+import { Surface } from '../atoms/Surface';
+import { Text } from '../atoms/Text';
 import { ForgiveAttempts } from './ForgiveAttempts';
 import { costLabel, usageTotal } from './format';
 
@@ -44,10 +45,10 @@ export function CardReports({ card, runs, account, onOpen, onCancel, onForgiven 
   if (runs.length === 0) return null;
   return (
     <section className="reports" aria-label="Reports">
-      <h4 className="vb-label vb-label-caps">Reports</h4>
+      <Text caps>Reports</Text>
       {[...runs].reverse().map((r) => (
         <div key={r.run} className={`report-row${r.resolved ? ' resolved' : ''}`}>
-          <Panel
+          <Surface
             as="button"
             variant="flat"
             className="report-open"
@@ -66,7 +67,7 @@ export function CardReports({ card, runs, account, onOpen, onCancel, onForgiven 
             {costLabel(r.usage) && <Readout testId="report-cost">{costLabel(r.usage)}</Readout>}
             <Readout testId="report-when">{when(r)}</Readout>
             <span className="report-summary">{r.summary ?? r.note ?? ''}</span>
-          </Panel>
+          </Surface>
           {(r.status === 'running' || r.status === 'queued') && (
             // Acts — it cancels a live run. `.report-stop` still owns the danger-on-hover colour.
             <Button
@@ -108,7 +109,7 @@ function CardLedger({
   // the dialog would be rendered outside the tree React thinks it put it in.
   return (
     <ReadoutLine testId="reports-ledger">
-      <Readout size="plain">{usageTotal(spend)}</Readout>
+      <Readout>{usageTotal(spend)}</Readout>
       {/* The count and the way to clear it, in the same line. Offered from the first spent attempt
           rather than only at the cap: a card blocked by the machine is worth clearing before it runs
           out of tries, and a control that appears only once everything has already stopped is one
@@ -116,7 +117,7 @@ function CardLedger({
           clear, and a button that can only report "nothing happened" is noise. */}
       {used.length > 0 && (
         <>
-          <Readout size="plain" quiet>
+          <Readout>
             {used.map(([skill, n]) => `${skill} ${n} of ${attemptCap}`).join(' · ')}
           </Readout>
           <ForgiveAttempts board={card.board} card={card.id} onForgiven={onForgiven} />

@@ -3,9 +3,10 @@ import { getSigninState, revokeDevice, type SigninDevice, signOutEverything } fr
 import { revokeDeviceRequest, signOutEverythingRequest } from '../confirm/requests';
 import type { Confirmer } from '../confirm/useConfirm';
 import { errorText } from '../errors';
-import { Button } from '../ui/Button';
-import { Chip } from '../ui/Chip';
-import { Readout } from '../ui/Readout';
+import { Button } from '../atoms/Button';
+import { Chip } from '../atoms/Chip';
+import { Readout } from '../atoms/Readout';
+import { Text } from '../atoms/Text';
 import { useAction } from '../useAction';
 
 interface Props {
@@ -55,10 +56,10 @@ export function SignInPanel({ confirm }: Props) {
   return (
     <>
       <div className="settings-section">Signed-in browsers</div>
-      <div className="vb-hint">
+      <Text role="hint">
         The first browser to open this board is let in automatically. Every one after that has to be allowed
         from a browser that is already in.
-      </div>
+      </Text>
 
       {mine && (
         <div className="signin-row">
@@ -69,7 +70,7 @@ export function SignInPanel({ confirm }: Props) {
                 this browser
               </Chip>
             </div>
-            <Readout size="small">
+            <Readout>
               {mine.address} · signed in {mine.created.slice(0, 10)} · last seen {mine.lastSeen}
             </Readout>
           </div>
@@ -80,7 +81,7 @@ export function SignInPanel({ confirm }: Props) {
         <div className="signin-row" key={d.id}>
           <div>
             <div className="signin-row-label">{d.label}</div>
-            <Readout size="small">
+            <Readout>
               {d.address} · signed in {d.created.slice(0, 10)} · last seen {d.lastSeen}
             </Readout>
           </div>
@@ -99,24 +100,24 @@ export function SignInPanel({ confirm }: Props) {
       ))}
 
       {devices.length === 0 && !error && (
-        <div className="vb-hint">
+        <Text role="hint">
           No browser is signed in — this one is using the server's own token from{' '}
           <code>~/.vibeboard/token</code>.
-        </div>
+        </Text>
       )}
 
       <div className="settings-section">This browser's credential</div>
-      <div className="vb-hint">
+      <Text role="hint">
         Held by the browser itself and not readable by this page, so there is nothing here to show, copy or
         leak. You never need to handle it. To replace it, sign every browser out below.
-      </div>
+      </Text>
 
       <div className="settings-section">Start over</div>
-      <div className="vb-hint">
+      <Text role="hint">
         Signs out every browser above, including this one, and forgets their credentials. The next page load
         on this machine signs itself in again — which is how you replace a credential you think somebody else
         has seen. No restart needed.
-      </div>
+      </Text>
       <Button
         size="md"
         disabled={busy !== null}

@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { type AppSettings, getAppSettings, setDebugLog } from '../api';
 import { errorText } from '../errors';
 import { Field } from '../ui/Field';
-import { Readout } from '../ui/Readout';
+import { Readout } from '../atoms/Readout';
+import { Text } from '../atoms/Text';
 import { useAction } from '../useAction';
 
 // WHERE TO LOOK WHEN SOMETHING GOES WRONG, and the one switch that changes what is there.
@@ -42,11 +43,11 @@ export function DiagnosticsPanel() {
   return (
     <>
       <div className="settings-section">Diagnostics</div>
-      <div className="vb-hint">
+      <Text role="hint">
         Auto-pilot's errors are always written to its log, whether this is on or not. Turning it on keeps the
         ordinary tick-by-tick output too, which is what you want when you are working out why the loop did
         something. It applies the next time auto-pilot starts.
-      </div>
+      </Text>
 
       <Field layout="check" label="Verbose auto-pilot log">
         <input
@@ -61,7 +62,7 @@ export function DiagnosticsPanel() {
         <div className="signin-row">
           <div>
             <div className="signin-row-label">Log files</div>
-            <Readout size="small">
+            <Readout>
               {settings.autopilotLog ?? 'auto-pilot: not written on this install'}
               <br />
               {settings.serverLog ?? 'server: not written on this install'}

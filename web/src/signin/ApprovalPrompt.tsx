@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { approveSignin, refuseSignin, type SigninPending } from '../api';
-import { Button } from '../ui/Button';
-import { Panel } from '../ui/Panel';
+import { Button } from '../atoms/Button';
+import { Surface } from '../atoms/Surface';
 import { useAction } from '../useAction';
 
 interface Props {
@@ -51,14 +51,14 @@ export function ApprovalPrompt({ pending, onError }: Props) {
 
   return (
     <div className="halt-backdrop" role="alertdialog" aria-label="A browser is asking to sign in">
-      <Panel className="halt">
+      <Surface className="halt">
         <h2 className="halt-title">Allow this browser in?</h2>
         <p className="halt-why">
           Something at <code>{first.address}</code> is asking to use this board. It says it is:
         </p>
-        <Panel variant="inset" className="signin-label">
+        <Surface variant="inset" className="signin-label">
           {first.label}
-        </Panel>
+        </Surface>
         <p className="halt-hint">
           Allow it only if that is you, on a device you are holding. Anything allowed here can read this
           board, start agents and edit files in your projects. What it calls itself can be faked — the address
@@ -80,7 +80,7 @@ export function ApprovalPrompt({ pending, onError }: Props) {
             Allow
           </Button>
         </div>
-      </Panel>
+      </Surface>
     </div>
   );
 }

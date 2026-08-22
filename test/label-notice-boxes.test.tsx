@@ -34,7 +34,7 @@
 // What IS pinned in each family is the thing a person can see and somebody chose: an ink, a hue, a size.
 import { cleanup, render } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
-import { Panel } from '../web/src/ui/Panel.js';
+import { Surface } from '../web/src/atoms/Surface.js';
 import { box } from './css-box.js';
 
 afterEach(cleanup);
@@ -87,16 +87,16 @@ describe('the uppercase section labels', () => {
   // moment the rule existed rather than being quietly reworded — which is the whole point of pinning a
   // known bug. `.vb-label-rail` is a width and nothing else now, so this is the only thing that says the
   // caps face is applied at all, at nine call sites.
-  it('.vb-label-caps draws the caps face on its own', () => {
-    expect(box(label('vb-label vb-label-caps'))['text-transform']).toBe('uppercase');
+  it('.vb-text-caps draws the caps face on its own', () => {
+    expect(box(label('vb-text vb-text-caps'))['text-transform']).toBe('uppercase');
   });
 
   // THE RAIL IS A WIDTH AND NOTHING ELSE, which is the other half of the same repair and the reason
   // nobody noticed the first half: the rail used to supply the caps, so seven of the eight call sites
   // looked right while naming a class that decided nothing. Asserted as a negative, because a rail that
   // quietly took the `text-transform` back would make the class above vacuous again without failing.
-  it('.vb-label-rail supplies a width and NOT the caps face', () => {
-    const b = box(label('vb-label vb-label-rail'));
+  it('.vb-field-rail supplies a width and NOT the caps face', () => {
+    const b = box(label('vb-text vb-field-rail'));
     expect(b['text-transform']).toBeUndefined();
     expect(b.width).toBe('6rem');
   });
@@ -108,7 +108,7 @@ describe('the uppercase section labels', () => {
   });
 
   it('a section head is the pair, and reads as the two classes it replaced did', () => {
-    const b = box(label('vb-label vb-label-caps', 'h4'));
+    const b = box(label('vb-text vb-text-caps', 'h4'));
     expect([b['text-transform'], b['font-size'], b.color, b.margin]).toEqual([
       'uppercase',
       '0.75rem',
@@ -122,14 +122,17 @@ describe('the empty-state lines', () => {
   // SEVENTEEN NAMES BEFORE THIS COMMIT, and every single one of them said `color: var(--muted)`. That is
   // the whole family: muted prose where content would be. Thirteen now render `.vb-empty` and the
   // treatment is declared once.
+  // THE ATOM LAYER MADE THE SIX NAMES FIVE AND `.vb-empty-small` THE ONE THAT DIED: `--t-small`, muted,
+  // italic is `.vb-hint` declaration for declaration, so the pair that used to read
+  // `vb-empty vb-empty-small` is now just the hint face. An empty state is `role="hint"` with `lead`.
   const MERGED = [
-    'vb-empty',
-    'vb-empty vb-empty-small',
-    'mp-empty vb-empty',
-    'cards-gone vb-empty',
-    'cs-empty vb-empty',
-    'control-empty vb-empty vb-empty-small',
-    'explorer-more vb-empty',
+    'vb-text vb-text-quiet vb-text-lead',
+    'vb-text vb-text-quiet',
+    'mp-empty vb-text vb-text-quiet vb-text-lead',
+    'cards-gone vb-text vb-text-quiet vb-text-lead',
+    'cs-empty vb-text vb-text-quiet vb-text-lead',
+    'control-empty vb-text vb-text-quiet',
+    'explorer-more vb-text vb-text-quiet',
   ];
 
   it.each(MERGED)('.%s is muted italic prose', (cls) => {
@@ -165,7 +168,7 @@ describe('the empty-state lines', () => {
     ['cs-empty', 'font-size'],
   ])('.%s keeps only its %s', (cls, prop) => {
     const own = box(label(cls, 'p'));
-    const shared = box(label('vb-empty', 'p'));
+    const shared = box(label('vb-text vb-text-quiet vb-text-lead', 'p'));
     // Everything it still declares beyond the primitive is positional or a size — never an ink or a face.
     const extra = Object.keys(own).filter((k) => own[k] !== shared[k]);
     expect(extra).toContain(prop);
@@ -174,7 +177,7 @@ describe('the empty-state lines', () => {
   });
 
   it('the chat menu decides its own inset, and the line inside it decides nothing', () => {
-    const el = at('<div class="chat-menu"><p class="vb-empty">x</p></div>', 'p');
+    const el = at('<div class="chat-menu"><p class="vb-text vb-text-quiet">x</p></div>', 'p');
     expect(box(el).padding).toBe('8px');
   });
 
@@ -251,12 +254,12 @@ describe('the tinted notice boxes', () => {
 });
 
 describe('the two select triggers', () => {
-  // THEY ARE `.vb-input`'s BOX WITH A CARET, which is what docs/design-system.md called them in Phase 3
+  // THEY ARE `.vb-ctl`'s BOX WITH A CARET, which is what docs/design-system.md called them in Phase 3
   // and again in Phase 4 — "an `<input>` that happens to be a button" — without either of them becoming
   // one. `.vb-trigger` is that box plus a click.
   it('a trigger is the input box, declaration for declaration', () => {
     const trigger = box(label('vb-trigger', 'button'));
-    const input = box(label('vb-input', 'input'));
+    const input = box(label('vb-ctl', 'input'));
     for (const prop of ['background', 'border', 'border-radius', 'padding', 'font-size', 'color']) {
       expect([prop, trigger[prop]]).toEqual([prop, input[prop]]);
     }
@@ -264,7 +267,7 @@ describe('the two select triggers', () => {
 
   it('a trigger turns its border accent on hover, as an input does on focus', () => {
     expect(box(label('vb-trigger', 'button'), ':hover')['border-color']).toBe('var(--accent)');
-    expect(box(label('vb-input', 'input'), ':focus')['border-color']).toBe('var(--accent)');
+    expect(box(label('vb-ctl', 'input'), ':focus')['border-color']).toBe('var(--accent)');
   });
 
   it('a trigger dims when disabled', () => {
@@ -360,12 +363,12 @@ describe('the archived row', () => {
   // `.archive-title` is the one list row Phase 4's `Panel flat` could not take, and the recorded reason
   // is that its container pads itself. Both halves pinned, because the migration has to move the padding
   // from one to the other without the row's height changing.
-  // THE ASSERTION SURVIVED PHASE 11 AND THE FIXTURE DID NOT. The padding is `.vb-panel-inset`'s now —
+  // THE ASSERTION SURVIVED PHASE 11 AND THE FIXTURE DID NOT. The padding is `.vb-surface-inset`'s now —
   // and `var(--s-3) var(--s-4)` is `.archive-item`'s OWN value, which is why `inset` took it out of the
   // eight the ten nested boxes were written with. So the row's height did not move, and the claim this
   // pins — the container pads itself, so `.archive-title` inside it must not — is unchanged.
   it('.archive-item pads itself', () => {
-    const { container } = render(<Panel variant="inset" className="archive-item" />);
+    const { container } = render(<Surface variant="inset" className="archive-item" />);
     const el = container.firstElementChild;
     if (!el) throw new Error('Panel rendered nothing');
     expect(box(el).padding).toBe('6px 8px');

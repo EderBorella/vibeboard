@@ -1,6 +1,6 @@
 /* The ledger lines: what a project or a card has spent, and which cap will stop it. Quiet by
    default — a number you only look at when you are asking — and tabular so digits line up. */
-/* BOTH LEDGERS ARE `ReadoutLine` — see ui/Readout.tsx. Five classes wrote this row by hand and agreed on
+/* BOTH LEDGERS ARE `ReadoutLine` — see atoms/Readout.tsx. Five classes wrote this row by hand and agreed on
    everything except a gap nobody chose. What is left is where each one sits: the project ledger spans the
    whole execution grid, and a card's sits under its report list. */
 .execution > .vb-readout-block { grid-column: 1 / -1; margin-bottom: var(--s-5); }

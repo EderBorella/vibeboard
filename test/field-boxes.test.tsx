@@ -17,7 +17,7 @@
 // third time in three phases that has been the resolution.
 //
 // It asserts the BOX A CLASS LIST DRAWS, resolved out of the stylesheets by test/css-box.tsx, rather than
-// the class name that draws it — so `.field input`'s ground and `.vb-input`'s ground read the same, which
+// the class name that draws it — so `.field input`'s ground and `.vb-ctl`'s ground read the same, which
 // is what let every assertion here survive the migration unchanged.
 //
 // THE ASSERTIONS SURVIVED; THE FIXTURES DID NOT, and saying otherwise would be the dishonest version of
@@ -36,7 +36,7 @@ import { box } from './css-box.js';
 
 afterEach(cleanup);
 
-// Several boxes are styled by a DESCENDANT selector (`.vb-field input`, `.gate .vb-input`,
+// Several boxes are styled by a DESCENDANT selector (`.vb-field input`, `.gate .vb-ctl`,
 // `.copilot-input textarea`), so a bare element with a class on it would match nothing and every
 // assertion would pass on an empty object. `at` throws rather than returning null for exactly that
 // reason. Built with the DOM directly: `el.matches()` works on a detached tree, so there is nothing to
@@ -65,26 +65,26 @@ function field(): Element {
 // times before this phase, and all ten now the one primitive.
 const BOXES: [name: string, el: () => Element][] = [
   ['a settings field', field],
-  ['the project gate', () => at('<div class="gate"><input class="vb-input"/></div>', 'input')],
-  ['a skill field', () => at('<input class="vb-input"/>', 'input')],
+  ['the project gate', () => at('<div class="gate"><input class="vb-ctl"/></div>', 'input')],
+  ['a skill field', () => at('<input class="vb-ctl"/>', 'input')],
   [
     'the typed confirmation',
-    () => at('<div class="confirm-require"><input class="vb-input"/></div>', 'input'),
+    () => at('<div class="confirm-require"><input class="vb-ctl"/></div>', 'input'),
   ],
-  ['the model search', () => at('<div class="mp-modal"><input class="vb-input"/></div>', 'input')],
+  ['the model search', () => at('<div class="mp-modal"><input class="vb-ctl"/></div>', 'input')],
   [
     'the dispatch prompt',
-    () => at('<div class="dispatch"><textarea class="vb-input"></textarea></div>', 'textarea'),
+    () => at('<div class="dispatch"><textarea class="vb-ctl"></textarea></div>', 'textarea'),
   ],
   // TWO FIXTURES MOVED IN PHASE 9 AND THE ASSERTIONS DID NOT, which is what Phase 4 recorded of
   // test/panel-boxes.test.tsx and Phase 8 of test/chip-boxes.test.tsx. Both of these drew their box from
-  // a descendant rule of their container — `.resource-row input`, which was `.vb-input` declaration for
+  // a descendant rule of their container — `.resource-row input`, which was `.vb-ctl` declaration for
   // declaration, and `.copilot-input textarea` — and both rules are gone: the element carries
-  // `vb-input` now, so the class list is the claim rather than the container.
-  ['a links registry row', () => at('<div class="resource-row"><input class="vb-input"/></div>', 'input')],
+  // `vb-ctl` now, so the class list is the claim rather than the container.
+  ['a links registry row', () => at('<div class="resource-row"><input class="vb-ctl"/></div>', 'input')],
   [
     'the copilot composer',
-    () => at('<div class="copilot-input"><textarea class="vb-input"></textarea></div>', 'textarea'),
+    () => at('<div class="copilot-input"><textarea class="vb-ctl"></textarea></div>', 'textarea'),
   ],
 ];
 
@@ -116,19 +116,19 @@ describe('the boxes that differ, and why', () => {
   // `--bg`. The pane the argument describes is `.diary`, which really does declare `--wash`, and the
   // claim is asserted on `.diary-compose`'s box below and in test/control-boxes.test.tsx.
   it('the suggestions composer is on the app ground like every other box', () => {
-    const el = at('<div class="suggestions-actions"><input class="vb-input"/></div>', 'input');
+    const el = at('<div class="suggestions-actions"><input class="vb-ctl"/></div>', 'input');
     expect(box(el).background).toBe('var(--bg)');
     expect(box(el).border).toBe('1px solid var(--border)');
   });
 
   it('the diary composer is the one that is not, because its pane is the wash', () => {
-    const el = at('<div class="diary-compose"><textarea class="vb-input"></textarea></div>', 'textarea');
+    const el = at('<div class="diary-compose"><textarea class="vb-ctl"></textarea></div>', 'textarea');
     expect(box(el).background).toBe('var(--panel-2)');
     expect(box(at('<section class="diary"></section>', 'section')).background).toBe('var(--wash)');
   });
 
   it('an inline rename is already accent-bordered, because it is already active', () => {
-    const el = at('<div class="control-list"><input class="vb-input"/></div>', 'input');
+    const el = at('<div class="control-list"><input class="vb-ctl"/></div>', 'input');
     expect(box(el)['border-color']).toBe('var(--accent)');
   });
 
@@ -156,7 +156,7 @@ describe('a label, a hint and an error', () => {
         <input />
       </Field>,
     );
-    const label = container.querySelector('.vb-label');
+    const label = container.querySelector('.vb-text');
     if (!label) throw new Error('Field rendered no label');
     expect(box(label)['font-size']).toBe('0.75rem');
     expect(box(label).color).toBe('var(--muted)');
@@ -165,7 +165,7 @@ describe('a label, a hint and an error', () => {
   it('a rail label is the same, plus uppercase and a fixed width', () => {
     // `.skill-label` and `.dispatch-label` were this, twice, differing only in that width — 6rem
     // against 5.5rem, half a rem apart and nobody chose either.
-    const el = at('<span class="vb-label vb-label-caps vb-label-rail">L</span>', 'span');
+    const el = at('<span class="vb-text vb-text-caps vb-field-rail">L</span>', 'span');
     expect(box(el)['font-size']).toBe('0.75rem');
     expect(box(el).color).toBe('var(--muted)');
     expect(box(el)['text-transform']).toBe('uppercase');
@@ -173,7 +173,7 @@ describe('a label, a hint and an error', () => {
   });
 
   it('a hint is muted and italic, where six classes managed four italics and three sizes', () => {
-    const el = at('<p class="vb-hint">h</p>', 'p');
+    const el = at('<p class="vb-text vb-text-quiet">h</p>', 'p');
     expect(box(el).color).toBe('var(--muted)');
     expect(box(el)['font-style']).toBe('italic');
     expect(box(el)['font-size']).toBe('0.75rem');
@@ -182,7 +182,7 @@ describe('a label, a hint and an error', () => {
   it('an error is either danger ink or a danger-tinted box, and both are real', () => {
     // Nine classes said the first and three said the second. Both shapes survive because both are
     // used: a line beside the thing that refused, and a box that IS the answer to a submit.
-    const line = box(at('<p class="vb-error">e</p>', 'p'));
+    const line = box(at('<p class="vb-text vb-text-error">e</p>', 'p'));
     expect(line.color).toBe('var(--danger)');
     expect(line.border).toBeUndefined();
 

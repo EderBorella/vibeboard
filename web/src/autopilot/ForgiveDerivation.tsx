@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { forgiveProjectAttempts } from '../api';
 import { useConfirm } from '../confirm/useConfirm';
-import { Button } from '../ui/Button';
+import { Button } from '../atoms/Button';
 import { useAction } from '../useAction';
 
 interface Props {

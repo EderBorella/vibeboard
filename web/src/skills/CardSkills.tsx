@@ -1,6 +1,7 @@
 import type { InvalidSkill, Skill } from '../api';
 import type { Card } from '../shared';
-import { Button } from '../ui/Button';
+import { Button } from '../atoms/Button';
+import { Text } from '../atoms/Text';
 import { skillsForCard } from './filter';
 
 interface Props {
@@ -35,12 +36,14 @@ export function CardSkills({ card, skills, invalid, onRun }: Props) {
         </Button>
       ))}
       {mine.length === 0 && (
-        <p className="cs-empty vb-empty">No skills for this column. Add one in Project Control → Skills.</p>
+        <Text role="hint" lead className="cs-empty">
+          No skills for this column. Add one in Project Control → Skills.
+        </Text>
       )}
       {invalid.length > 0 && (
-        <p className="vb-error" title={invalid.map((i) => `${i.path}: ${i.reason}`).join('\n')}>
+        <Text role="error" title={invalid.map((i) => `${i.path}: ${i.reason}`).join('\n')}>
           ⚠ {invalid.length} skill file{invalid.length === 1 ? '' : 's'} invalid
-        </p>
+        </Text>
       )}
     </aside>
   );

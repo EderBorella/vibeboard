@@ -116,6 +116,8 @@ async function measure(page: Page, surface: Surface): Promise<SurfaceBaseline> {
   return {
     fontSizes: Object.keys(styles.fontSizes).sort(),
     radii: Object.keys(styles.radii).sort(),
+    controlHeights: Object.keys(styles.controlHeights).sort(),
+    markerHeights: Object.keys(styles.markerHeights).sort(),
     examined: {
       elements: styles.elements,
       textElements: styles.textElements,
@@ -283,9 +285,20 @@ for (const surface of SURFACES) {
     // set behind them; a surface records only the set, because its element counts move with the
     // fixture's content while its type does not. See SurfaceBaseline in fixtures.ts.
     if (then) {
+      // A BASELINE RECORDED BEFORE THESE TWO FIELDS EXISTED IS REPORTED, NOT SKIPPED. `then.controlHeights`
+      // is `undefined` on every file written before the atom phase, and `?? []` would have made both new
+      // fields read as "everything is NEW" — which is true and is also the right answer: the phase that
+      // adds a recorded measurement is the phase that re-records. What must NOT happen is the third
+      // option, a silent pass, which is a field that checks nothing until somebody remembers it.
       const moved = [
         ...drift(Object.keys(styles.fontSizes).sort(), then.fontSizes).map((d) => `font-size ${d}`),
         ...drift(Object.keys(styles.radii).sort(), then.radii).map((d) => `border-radius ${d}`),
+        ...drift(Object.keys(styles.controlHeights).sort(), then.controlHeights ?? []).map(
+          (d) => `control height ${d}`,
+        ),
+        ...drift(Object.keys(styles.markerHeights).sort(), then.markerHeights ?? []).map(
+          (d) => `marker height ${d}`,
+        ),
       ];
       expect(
         moved,

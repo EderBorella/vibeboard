@@ -10,6 +10,7 @@ import type { Card, CardFrontmatterPatch, ProjectConfig } from '../shared';
 import type { DispatchContext, View } from './CardsPane';
 import { CardView } from './CardView';
 import { RawPane } from './RawPane';
+import { Text } from '../atoms/Text';
 
 interface Props {
   card: Card | null;
@@ -69,9 +70,9 @@ export function CardsBody({
     // Either nothing is open, or the card left the board while its tab was — deleted outside the
     // app, or its file moved. Saying so beats an empty pane that looks broken.
     body = (
-      <div className="cards-gone vb-empty">
+      <Text role="hint" lead className="cards-gone">
         {activeRef ? `${activeRef.id} is no longer on the board.` : 'No card open.'}
-      </div>
+      </Text>
     );
   } else if (view.kind === 'raw') {
     body = <RawPane key={card.id} card={card} />;

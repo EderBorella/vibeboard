@@ -2,10 +2,12 @@ import { useState } from 'react';
 import { cardSuggestion, patchSuggestion } from '../api';
 import type { Suggestion, SuggestionLevel } from '../shared';
 import { SUGGESTION_LEVELS } from '../shared';
-import { Button } from '../ui/Button';
-import { Chip } from '../ui/Chip';
-import { Panel } from '../ui/Panel';
-import { ReadoutLine } from '../ui/Readout';
+import { Button } from '../atoms/Button';
+import { Chip } from '../atoms/Chip';
+import { Control } from '../atoms/Control';
+import { ReadoutLine } from '../atoms/Readout';
+import { Surface } from '../atoms/Surface';
+import { Text } from '../atoms/Text';
 import { asState } from '../ui/state-tones';
 import { useAction } from '../useAction';
 
@@ -107,17 +109,19 @@ export function SuggestionsPane({ suggestions, failed, onRefresh, onApply }: Pro
             <Button variant="danger" size="md" disabled={busy !== null} onClick={() => dismiss(picked.id)}>
               Dismiss
             </Button>
-            <input
+            <Control
               aria-label="Why not?"
-              className="vb-input"
+              
               placeholder="Why not? (kept, so a checkup does not raise it again)"
               value={reason}
               onChange={(e) => setReason(e.target.value)}
             />
             {/* NOT a `Field`: an action row of five controls with no labels between them. It drew NO
-                box at all before Phase 9 — a bare UA select beside a `.vb-input` in the same row. */}
-            <select
-              className="vb-input"
+                box at all before Phase 9 — a bare UA select beside a `.vb-ctl` in the same row. */}
+            <Control
+              
+              as="select"
+              
               aria-label="Level"
               value={level}
               onChange={(e) => setLevel(e.target.value as SuggestionLevel)}
@@ -129,7 +133,7 @@ export function SuggestionsPane({ suggestions, failed, onRefresh, onApply }: Pro
                   {l}
                 </option>
               ))}
-            </select>
+            </Control>
             <Button variant="primary" size="md" disabled={busy !== null} onClick={() => make(picked.id)}>
               {busy ? 'Working…' : 'Make a card'}
             </Button>
@@ -139,7 +143,7 @@ export function SuggestionsPane({ suggestions, failed, onRefresh, onApply }: Pro
           </div>
           {/* `assertive`: the action did NOT happen, and the row is still there. */}
           <div aria-live="assertive">
-            {error && <p className="vb-error">{error}</p>}
+            {error && <Text role="error">{error}</Text>}
             {became && <p className="suggestions-became">Carded as {became}.</p>}
           </div>
 
@@ -155,7 +159,7 @@ export function SuggestionsPane({ suggestions, failed, onRefresh, onApply }: Pro
                 // of which has a row, so giving it the rail later is one declaration.
                 data-state={asState(s.state)}
               >
-                <Panel
+                <Surface
                   as="button"
                   variant="flat"
                   className="suggestions-pick"
@@ -179,7 +183,7 @@ export function SuggestionsPane({ suggestions, failed, onRefresh, onApply }: Pro
                     )}
                   </ReadoutLine>
                   {s.body && <span className="filed-text">{s.body}</span>}
-                </Panel>
+                </Surface>
               </li>
             ))}
           </ol>

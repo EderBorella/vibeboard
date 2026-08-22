@@ -2,7 +2,7 @@
    The approval prompt borrows `.halt`'s backdrop and card: it is the same kind of object — the one
    thing on screen, blocking, explaining itself — and a second look-alike would drift from it. */
 
-/* What the asking browser calls itself. A `Panel` with the `inset` variant — a quoted block of machine
+/* What the asking browser calls itself. A `Surface` with the `inset` variant — a quoted block of machine
    text, which is the same object `.markdown pre` is and now the same box. Monospace and wrapping,
    because it is a User-Agent: long, punctuation-dense, and not prose. `break-all` so a 60-character
    token-like string cannot widen the dialog past the viewport. The `margin: 0` went with the `<p>`: a

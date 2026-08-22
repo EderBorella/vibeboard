@@ -1,5 +1,5 @@
-import { Button } from '../ui/Button';
-import { Chip } from '../ui/Chip';
+import { Button } from '../atoms/Button';
+import { Chip } from '../atoms/Chip';
 import type { TagCount } from '../viewmodel';
 
 interface Props {

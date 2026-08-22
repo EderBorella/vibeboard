@@ -23,21 +23,21 @@
 .chat-switcher { position: relative; flex: 1; min-width: 0; }
 /* "+ New" must not break across two lines when the switcher beside it is wide. */
 .chat-new { white-space: nowrap; }
-.chat-menu-backdrop { position: fixed; inset: 0; z-index: 20; }
-/* A `Panel` with the `raised` variant: the ground, the edge and the 10px corner were that variant's own
+.chat-menu-backdrop { position: fixed; inset: 0; z-index: var(--z-pop); }
+/* A `Surface` with the `raised` variant: the ground, the edge and the 10px corner were that variant's own
    three values. Its flex column is a no-op here and that is checked rather than assumed — every child of
    this menu is a full-width block with `margin: 0`, so nothing in it has margins to stop collapsing. The
    float, the shadow and the inset are what a menu adds to a raised surface. */
-.chat-menu { position: absolute; z-index: 21; top: calc(100% + 4px); left: 0; right: 0; max-height: 320px; overflow-y: auto; box-shadow: var(--glow), 0 6px 24px rgba(0,0,0,0.4); padding: var(--s-2); }
+.chat-menu { position: absolute; z-index: var(--z-pop); top: calc(100% + 4px); left: 0; right: 0; max-height: 320px; overflow-y: auto; box-shadow: var(--glow), var(--lift); padding: var(--s-2); }
 /* The menu decides its own inset; the line inside it decides nothing. */
-.chat-menu > .vb-empty { padding: var(--s-4); }
+.chat-menu > .vb-text-quiet { padding: var(--s-4); }
 .chat-menu-item { display: flex; align-items: stretch; gap: var(--s-2); border-radius: var(--r-md); }
 .chat-menu-item.active { background: var(--panel-2); }
 .chat-menu-item:hover { background: var(--panel-2); }
-/* A `Panel` with the `flat` variant; the active row's accent left edge is below and still overrides
+/* A `Surface` with the `flat` variant; the active row's accent left edge is below and still overrides
    the primitive's transparent border, which is a colour and a width rather than a box. */
 .chat-menu-open { flex: 1; display: flex; flex-direction: column; gap: var(--s-1); color: var(--text); }
-.chat-menu-item.active .chat-menu-open { border-left: 2px solid var(--accent); }
+.chat-menu-item.active .chat-menu-open { border-left: var(--rule) solid var(--accent); }
 .chat-menu-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--t-small); }
 /* `Chip pill neutral` owns the box AND the colour now; this keeps the treatment.
    A BACKEND NAME IS NOT A STATE, which is the ruling that removed the two rules that were here. They
@@ -62,8 +62,8 @@
    `display: flex` and a `gap` that had one child to separate from nothing. The button sits directly in
    `.copilot-controls`, which is already the flex row with the gap. */
 .copilot-selects { display: flex; gap: var(--s-4); padding: 0 var(--s-5) var(--s-4); border-bottom: 1px solid var(--border); }
-/* The row decides how its controls sit; the box is `.vb-input`'s. */
-.copilot-selects > .vb-input { flex: 1; }
+/* The row decides how its controls sit; the box is `.vb-ctl`'s. */
+.copilot-selects > .vb-ctl { flex: 1; }
 .copilot-selects select:disabled { opacity: 0.5; }
 /* THE ROLE THIS SURFACE GIVES ITS TONE: ink, on the wrapper, so the `Dot` inside takes it through
    `currentColor` — the construction `.conn-status` uses and for its reason: only the wrapper knows the
@@ -114,5 +114,5 @@
 .ctx-warn { color: var(--accent-2); }
 .ctx-warn .ctx-fill { background: var(--accent-2); }
 .copilot-input { display: flex; gap: var(--s-4); padding: var(--s-4) var(--s-5); border-top: 1px solid var(--border); }
-.copilot-input > .vb-input { flex: 1; resize: none; }
+.copilot-input > .vb-ctl { flex: 1; resize: none; }
 

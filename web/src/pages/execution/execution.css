@@ -20,9 +20,9 @@
   align-content: start;
   background: var(--wash);
 }
-/* A `Panel` with the `raised` variant. No `flex` basis: the parent is a grid and the track sizes this
+/* A `Surface` with the `raised` variant. No `flex` basis: the parent is a grid and the track sizes this
    box, and the `min-width: 0` that stops a long unbroken run title pushing its track past its share —
-   the fault that let those titles reach the viewport edge and get cut — is now `.vb-panel`'s, for every
+   the fault that let those titles reach the viewport edge and get cut — is now `.vb-surface`'s, for every
    Panel rather than for this one. */
 .exec-column { gap: var(--s-4); padding: var(--s-4); }
 .exec-head {
@@ -30,7 +30,7 @@
   font-family: var(--font-display); font-size: var(--t-small);
   text-transform: uppercase; letter-spacing: var(--track);
 }
-/* A `Panel` with the `inset` variant. It is the same object as a `.tile` — a record in a column on a
+/* A `Surface` with the `inset` variant. It is the same object as a `.tile` — a record in a column on a
    `--panel` parent — and it sat on `--bg` while the tile sat on `--panel-2`, which nobody chose. */
 .exec-run {
   display: flex; flex-direction: column; gap: var(--s-2); align-items: flex-start;
@@ -50,7 +50,7 @@
    this is a move and not a change — but the descending order read as though the plain rule was meant
    to override it, which is the opposite of what happens. */
 .exec-run-top > .vb-readout + .vb-readout { margin-left: 0; }
-/* A `Panel` with the `flat` variant. WRAPS: a card title is arbitrary user text and several are long
+/* A `Surface` with the `flat` variant. WRAPS: a card title is arbitrary user text and several are long
    file paths with no spaces, so without this they set the column's minimum content width and pushed
    past the track. `cursor: default` on a disabled one is the primitive's now; the dimming is this
    surface's, because it says "already dealt with" rather than "not a control". */

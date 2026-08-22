@@ -1,10 +1,11 @@
 import type { CSSProperties } from 'react';
 import type { RunRecord } from '../api';
 import type { Card } from '../shared';
-import { Button } from '../ui/Button';
-import { Chip } from '../ui/Chip';
-import { Panel } from '../ui/Panel';
-import { Readout, ReadoutLine } from '../ui/Readout';
+import { Button } from '../atoms/Button';
+import { Chip } from '../atoms/Chip';
+import { Readout, ReadoutLine } from '../atoms/Readout';
+import { Surface } from '../atoms/Surface';
+import { Text } from '../atoms/Text';
 import { ForgiveAttempts } from './ForgiveAttempts';
 import { costLabel, usageTotal } from './format';
 import { useAccounting } from './useAccounting';
@@ -67,13 +68,13 @@ export function ExecutionView({
     <main className="execution" style={{ '--exec-cols': COLUMNS.length } as CSSProperties}>
       {accounting && (
         <ReadoutLine as="p">
-          <Readout size="plain" tone="text">
+          <Readout>
             {usageTotal(accounting.project)}
           </Readout>
           {/* S10: which cap will actually stop this project. A dollar figure beside a budget that can
               never trip would tell the reader the opposite of the truth. */}
           {accounting.cap && (
-            <Readout size="plain" quiet>
+            <Readout>
               {accounting.cap.why}
             </Readout>
           )}
@@ -82,7 +83,7 @@ export function ExecutionView({
       {COLUMNS.map((column) => {
         const group = grouped[column.key];
         return (
-          <Panel
+          <Surface
             key={column.key}
             as="section"
             variant="raised"
@@ -95,13 +96,13 @@ export function ExecutionView({
                 {group.length}
               </Chip>
             </h3>
-            {group.length === 0 && <p className="vb-empty vb-empty-small">Nothing here.</p>}
+            {group.length === 0 && <Text role="hint">Nothing here.</Text>}
             {group.map((record) => {
               const card = cards.find((c) => c.id === record.card);
               const subject = runSubject(record);
               const stoppable = active.includes(record.run) || queued.includes(record.run);
               return (
-                <Panel key={record.run} variant="inset" className="exec-run">
+                <Surface key={record.run} variant="inset" className="exec-run">
                   <div className="exec-run-top">
                     <Chip pill state={record.status} className="report-chip vb-readout" testId="report-chip">
                       {record.status}
@@ -114,7 +115,7 @@ export function ExecutionView({
                     )}
                     <Readout testId="exec-when">{elapsed(record, now)}</Readout>
                   </div>
-                  <Panel
+                  <Surface
                     as="button"
                     variant="flat"
                     className="exec-card"
@@ -124,11 +125,11 @@ export function ExecutionView({
                     title={openTitle(record, card)}
                     onClick={() => card && onOpenCard(card, record)}
                   >
-                    <Readout size="small" tone="accent">
+                    <Readout>
                       {subject}
                     </Readout>{' '}
                     <span className="link-title">{card?.title ?? (record.card ? '(gone)' : '')}</span>
-                  </Panel>
+                  </Surface>
                   {(record.summary || record.note) && (
                     <p className="exec-summary">{record.summary ?? record.note}</p>
                   )}
@@ -167,10 +168,10 @@ export function ExecutionView({
                       )}
                     </div>
                   )}
-                </Panel>
+                </Surface>
               );
             })}
-          </Panel>
+          </Surface>
         );
       })}
     </main>

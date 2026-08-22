@@ -4,9 +4,11 @@ import { BackendPicker } from '../copilot/BackendPicker';
 import { clampToCaps } from '../copilot/choice';
 import { ModelPicker } from '../models/ModelPicker';
 import { backendCaps, type Card } from '../shared';
-import { Button } from '../ui/Button';
 import { Field } from '../ui/Field';
-import { Readout } from '../ui/Readout';
+import { Button } from '../atoms/Button';
+import { Control } from '../atoms/Control';
+import { Readout } from '../atoms/Readout';
+import { Text } from '../atoms/Text';
 import { SegmentedControl } from '../ui/SegmentedControl';
 
 interface Props {
@@ -81,13 +83,13 @@ export function DispatchPane({
           ←
         </Button>
         <h3 className="dispatch-title">
-          {skill.name} <Readout size="body">on {card.id}</Readout>
+          {skill.name} <Readout>on {card.id}</Readout>
         </h3>
       </header>
       <p className="dispatch-desc">{skill.description}</p>
       {previous && (
         <p className="dispatch-continues">
-          Continues run <Readout size="plain">{previous.run}</Readout>. Its report goes to the agent with this
+          Continues run <Readout>{previous.run}</Readout>. Its report goes to the agent with this
           one.
         </p>
       )}
@@ -107,13 +109,13 @@ export function DispatchPane({
       </Field>
 
       <Field layout="rail" label="Effort" className="dispatch-row">
-        <select value={clamped.effort} onChange={(e) => setEffort(e.target.value)}>
+        <Control as="select" value={clamped.effort} onChange={(e) => setEffort(e.target.value)}>
           {caps.efforts.map((e) => (
             <option key={e.value} value={e.value}>
               {e.label}
             </option>
           ))}
-        </select>
+        </Control>
       </Field>
 
       <Field as="div" layout="rail" label="Mode" className="dispatch-row">
@@ -128,7 +130,8 @@ export function DispatchPane({
       {/* `caps` and no rail: the same face as the four rows above, over a control too tall to sit
           beside its label. The face and the width are separate axes — Phase 5b's ruling. */}
       <Field caps label="Anything to add?">
-        <textarea
+        <Control
+          as="textarea"
           rows={4}
           placeholder="Optional. This goes last in the prompt, so it qualifies the skill rather than competing with it."
           value={prompt}
@@ -139,10 +142,10 @@ export function DispatchPane({
       {attachable.length > 0 && (
         <details className="dispatch-attach">
           <summary>Attach material{attachments.length > 0 ? ` (${attachments.length})` : ''}</summary>
-          <p className="vb-hint">
+          <Text role="hint">
             Paths are passed to the agent, which reads what it needs. Reference links from the resources
             registry always go with a run.
-          </p>
+          </Text>
           {attachable.map((path) => (
             <Field key={path} layout="check" label={<span className="link-title">{path}</span>}>
               <input type="checkbox" checked={attachments.includes(path)} onChange={() => toggle(path)} />

@@ -143,9 +143,17 @@ body {
    centres its own contents, and `.pop-wrap` below is what sits on the row's baseline. */
 /* The anchor for any popover. `position: relative` on a wrapper rather than on the button, so the panel
    is positioned against the whole control and is not clipped by the button's own box.
-   `align-self: baseline` because the one in the top bar sits in a baseline-aligned row; it is harmless
-   anywhere else, since align-self only means anything to a flex or grid child. */
-.pop-wrap { position: relative; display: inline-flex; align-self: baseline; flex: 0 0 auto; }
+   NO `align-self`, AND THE DELETED DECLARATION IS WORTH RECORDING WITH ITS OWN DEFENCE. It was
+   `align-self: baseline`, on the reason that "the one in the top bar sits in a baseline-aligned row" plus
+   the claim that it "is harmless anywhere else, since align-self only means anything to a flex or grid
+   child". The first half is true and the second half stopped being true the moment a second surface had a
+   popover: `.ap-bar-row` is `align-items: center`, and every chip in it was a flex child overriding that
+   row's own alignment. Measured on the live board — the state chip sat 2.88px above the centre line and the
+   agent chip 1.88px, against 0.00 for every button beside them, which is exactly what the owner could see.
+   WITHOUT THE DECLARATION EACH WRAPPER TAKES ITS OWN ROW'S RULE: baseline in the top bar, which is what the
+   original reason wanted and gets by inheritance, and centre on the auto-pilot bar. A default beats an
+   override that has to be right for every surface at once. */
+.pop-wrap { position: relative; display: inline-flex; flex: 0 0 auto; }
 /* THE BOX IS `StatusChip`'s NOW, and eleven declarations went with it. This rule used to undo the UA
    button styles by hand — `background: none; border: 0; padding: 0; margin: 0` — set its own font-size
    and letter-spacing, and declare `color: var(--tone, var(--muted))`, which is the one role the surface

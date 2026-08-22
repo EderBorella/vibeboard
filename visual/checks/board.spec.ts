@@ -1063,8 +1063,44 @@ test('14. the auto-pilot bar reads as three groups', async ({ board, theme }) =>
     24,
   );
 
+  // AND EVERY CONTROL SHARES THE ROW'S CENTRE LINE. Its own claim rather than part of check 7: that one
+  // asks whether the row WRAPPED — the band its children occupy against the tallest of them — and a chip
+  // sitting three pixels high passes it comfortably, which is how this shipped. The owner saw it.
+  //
+  // NESTED ONE LEVEL, because the offender was nested: `.pop-wrap` inside `.ap-agent` was off by 1.88px
+  // while `.ap-agent` itself was exactly centred, so a direct-children-only version would have reported
+  // half of this defect. 1px of tolerance for the sub-pixel heights the segmented control lands on.
+  const off = await board.evaluate(() => {
+    const row = document.querySelector<HTMLElement>('[data-testid="ap-bar"] .ap-bar-row');
+    if (!row) return [];
+    const box = row.getBoundingClientRect();
+    const mid = box.top + box.height / 2;
+    const centres: { id: string; delta: number }[] = [];
+    const walk = (el: Element, depth: number): void => {
+      for (const child of Array.from(el.children)) {
+        const b = child.getBoundingClientRect();
+        if (b.height > 0) {
+          centres.push({
+            id: (child as HTMLElement).dataset.testid ?? child.className,
+            delta: b.top + b.height / 2 - mid,
+          });
+          if (depth < 1) walk(child, depth + 1);
+        }
+      }
+    };
+    walk(row, 0);
+    return centres;
+  });
+  expect(off.length, 'nothing on the row to align').toBeGreaterThan(3);
+  const adrift = off.filter((c) => Math.abs(c.delta) > 1);
+  expect(
+    adrift,
+    `off the row's centre line: ${adrift.map((c) => `${c.id} ${c.delta.toFixed(2)}px`).join(', ')}`,
+  ).toEqual([]);
+
   console.log(
-    `[${theme}] bar layout: transport at ${transport.left.toFixed(0)} (edge ${content.left.toFixed(0)}), ` +
+    `[${theme}] bar layout: ${off.length} controls on one centre line; ` +
+      `transport at ${transport.left.toFixed(0)} (edge ${content.left.toFixed(0)}), ` +
       `left group ends ${(seen?.leftGroup.right ?? 0).toFixed(0)}, gap ${before.toFixed(0)}px, ` +
       `agent ${agent.left.toFixed(0)}–${agent.right.toFixed(0)}, ` +
       `gap ${after.toFixed(0)}px, end ends ${end.right.toFixed(0)} (edge ${content.right.toFixed(0)})`,

@@ -4,11 +4,27 @@
  * `border: 1px solid transparent` on the base rather than per variant: a variant that sets only a colour
  * then cannot accidentally change the box's width, which is the same 2px argument the owner's
  * dashed-ghost ruling rests on. */
+/* A DECLARED HEIGHT IS NOT NEGOTIABLE, AND `min-height` IS WHAT SAYS SO. Measured on the settings modal,
+ * not reasoned about: a `Button size="md"` inside `.modal-body` — a COLUMN flex container — rendered at
+ * **17px** against the 28px it declares, because in a column the main axis is the HEIGHT and a flex item's
+ * default `flex-shrink: 1` shrinks it, clamped only by the automatic minimum, which for a one-line label
+ * with no vertical padding left is the line box. Before this phase the box had no declared height at all,
+ * so `flex-basis: auto` resolved to content and there was nothing to shrink FROM; declaring the height is
+ * what made it shrinkable.
+ *
+ * `min-height` AND NOT `flex-shrink: 0`, and the axis is the whole reason: `flex-shrink` is per-item and
+ * not per-axis, so refusing to shrink would also stop a control narrowing inside a ROW — which is how a
+ * row overflows, and overflow is the one thing Tier 3 does not allow. `min-height` clamps the shrink in a
+ * column and says nothing about width.
+ *
+ * SAID ON EVERY BOX THAT DECLARES ONE, at the cause rather than at the one site that proved it: the class
+ * of defect is open-ended, which is the same argument atoms/control.css makes about the two controls that
+ * declared no `:focus` rule. `check:box-scale` reads `min-height` on the same allow-list as `height`. */
 .vb-btn {
   display: inline-flex; align-items: center; gap: var(--s-3);
   border: 1px solid transparent; border-radius: var(--r-md);
   font-family: inherit; cursor: pointer;
-  height: var(--ctl-h);
+  height: var(--ctl-h); min-height: var(--ctl-h);
 }
 .vb-btn:disabled { opacity: 0.5; cursor: default; }
 

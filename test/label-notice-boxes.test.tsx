@@ -338,11 +338,18 @@ describe('the segmented control', () => {
 
   // The `sm` step is the ONLY thing the four classes disagreed about, and `.backend-toggle-md .bt-btn`
   // is the file's own proof of that: it wrote `.mode-btn`'s two values out again.
+  //
+  // AND AFTER THE ATOM PHASE IT IS ONE PROPERTY RATHER THAN TWO. `sm` was a shorter box AND a smaller
+  // label; the group declares `--ctl-h` now and the cells stretch to fill it, so the vertical padding
+  // went — which left `.vb-seg-cell-sm`'s horizontal half restating the base cell's `0 var(--s-4)` value
+  // for value. A declaration that looks like a choice and changes nothing is the `.link-option`
+  // `font-size` defect, so it is deleted rather than pinned here. `size` on a segmented group is now
+  // exactly what `size` on a `Button` is: not a height.
   it('sm is the only difference between the two cells there ever was', () => {
     const md = box(label('vb-seg-cell', 'button'));
     const sm = box(label('vb-seg-cell vb-seg-cell-sm', 'button'));
     const moved = Object.keys(md).filter((k) => md[k] !== sm[k]);
-    expect(moved.sort()).toEqual(['font-size', 'padding']);
+    expect(moved.sort()).toEqual(['font-size']);
   });
 
   // Asserted on the declarations that identified them rather than on an empty box: a `<button>` always

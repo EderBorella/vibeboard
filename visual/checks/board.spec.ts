@@ -844,22 +844,58 @@ test('12. the affordances are big enough to see', async ({ board, theme }) => {
       // scaffolding. Excluded BY NAME rather than by "everything that is not an atom", so the list
       // shrinks to nothing in the commit that deletes them and this claim becomes the whole surface.
       const NOT_AN_ATOM_YET = ['tab-btn', 'dock-tab', 'cards-tab-label', 'board-label'];
-      const surfaceControls = Array.from(
-        document.querySelectorAll<HTMLElement>(
-          'button, input, select, textarea, [role="button"], [role="tab"], .vb-trigger, .vb-seg',
-        ),
-      )
+      const shown = (el: HTMLElement): boolean => {
+        const style = getComputedStyle(el);
+        if (style.visibility === 'hidden' || style.display === 'none') return false;
+        return rect(el).height > 0 && rect(el).width > 0;
+      };
+      const measured = (el: HTMLElement): { id: string; h: number } => ({
+        id: el.dataset.testid ?? (el.className || el.tagName),
+        h: Math.round(rect(el).height * 10) / 10,
+      });
+      const OPERABLE = 'button, input, select, textarea, [role="button"], [role="tab"], .vb-trigger, .vb-seg';
+      const operable = Array.from(document.querySelectorAll<HTMLElement>(OPERABLE)).filter(shown);
+      // THREE THINGS COME OUT OF THE ONE-HEIGHT POPULATION AND EACH IS CLAIMED SOMEWHERE ELSE, because a
+      // population with a silent exclusion in it is how this repository has lost a claim twice. The first
+      // run of this assertion reported THREE heights — 16px, 28px and 47px — and neither of the two that
+      // are not 28 was a geometry fault:
+      //
+      //   A MARKER IS NOT A CONTROL. `--ctl-h` is the box you OPERATE and `--mark-h` the box you READ, and
+      //   the two tokens are the whole design. `.vb-status` wears `.vb-chip` and a `Chip` may be a
+      //   `<button>`, so the connection light, the auto-pilot chip, the agent's state and the board's
+      //   archive toggle are chips that take a click — 16px, correctly. Check 13 asserts every `.vb-chip`
+      //   on the surface is ONE height, so they are claimed and not dropped.
+      //
+      //   A TEXTAREA'S HEIGHT IS ITS CONTENT'S, by the plan's own instruction and by
+      //   `atoms/control.css`'s withdrawal of the fixed height for `textarea`: `--ctl-h` is one line and a
+      //   card's whole file is not. The copilot composer measured 47px. Asserted below as a floor rather
+      //   than excluded, which is the part a silent filter would have thrown away.
+      //
+      //   A SEGMENTED CELL IS A PART OF A GROUP. See the note above `controls`, and the derived claim
+      //   below: the group owns the border, so a cell is exactly 2px shorter.
+      const isMarker = (el: HTMLElement): boolean => el.classList.contains('vb-chip');
+      const surfaceControls = operable
         .filter((el) => !el.classList.contains('vb-seg-cell'))
         .filter((el) => !NOT_AN_ATOM_YET.some((cls) => el.classList.contains(cls)))
-        .filter((el) => {
-          const style = getComputedStyle(el);
-          if (style.visibility === 'hidden' || style.display === 'none') return false;
-          return rect(el).height > 0 && rect(el).width > 0;
-        })
-        .map((el) => ({
-          id: el.dataset.testid ?? el.className || el.tagName,
-          h: Math.round(rect(el).height * 10) / 10,
-        }));
+        .filter((el) => !isMarker(el))
+        .filter((el) => el.tagName !== 'TEXTAREA')
+        .map(measured);
+      const areas = operable.filter((el) => el.tagName === 'TEXTAREA').map(measured);
+      // A CELL AND ITS OWN GROUP, PAIRED, so the 2px is derived from the group on the page rather than
+      // asserted as a number. `.vb-seg-cell` was excluded from every height claim in this file with the
+      // comment that including it "would make the claim everything is one size false by construction" —
+      // which is true and is only half an answer, because an excluded cell that collapsed to 12px would
+      // pass. It is 2px shorter than the group that clips it, and that is checkable.
+      const cells = Array.from(document.querySelectorAll<HTMLElement>('.vb-seg'))
+        .filter(shown)
+        .flatMap((group) =>
+          Array.from(group.querySelectorAll<HTMLElement>('.vb-seg-cell'))
+            .filter(shown)
+            .map((cell) => ({
+              id: cell.dataset.testid ?? (cell.className || cell.tagName),
+              short: Math.round((rect(group).height - rect(cell).height) * 10) / 10,
+            })),
+        );
       // The bordered group around the backend selector and the agent's state. Its own height, because a
       // group drawn to make two things read as a pair must not become the tallest thing on the row —
       // which it was, at 29.8px against 20px buttons, until the padding came off it. Found by taking a
@@ -868,6 +904,8 @@ test('12. the affordances are big enough to see', async ({ board, theme }) => {
       return {
         controls,
         surfaceControls,
+        areas,
+        cells,
         group: group ? rect(group).height : null,
         titles: titles.length,
         // HEIGHT OVER LINE-HEIGHT, rounded. A `-webkit-box` clamped to two lines is twice as tall as a
@@ -936,14 +974,24 @@ test('12. the affordances are big enough to see', async ({ board, theme }) => {
   // border, so `ap-expand` measured a pixel more than its neighbours because the bigger disclosure glyph
   // inside it set its line box — and a ceiling of `max + 1` was then wide enough for the bordered group
   // to slide under at 29.8px. Every one of these declares `--ctl-h` now, so the comparison is exact.
-  const tall = [
-    ...seen.controls.map((c) => ({ id: c.id, h: c.h })),
-    { id: '.ap-agent', h: seen.group ?? 0 },
-  ].filter((c) => c.h > transport);
+  const tall = [...seen.controls.map((c) => ({ id: c.id, h: c.h }))].filter((c) => c.h > transport);
   expect(
     tall,
     `taller than the ${transport}px transport: ${tall.map((c) => `${c.id} ${c.h}px`).join(', ')}`,
   ).toEqual([]);
+  // AND THE GROUP IS EXACTLY ITS OWN EDGE TALLER, WHICH IS AN EQUATION AND NOT A TOLERANCE. `.ap-agent`
+  // is not a control: it is a bordered box drawn AROUND one — the backend picker's segmented group at
+  // `--ctl-h` — plus the agent's state chip. `* { box-sizing: border-box }` puts a box's own border
+  // INSIDE its declared height, so a container that draws a hairline around a full-height control is 2px
+  // taller by construction, which is the `.vb-seg-cell` argument in the other direction: a cell inside a
+  // bordered group is 2px SHORTER for the same reason. The 2 is named as the group's own edge and
+  // asserted exactly, so a vertical padding coming back or a child growing still fails — which a `+ 2`
+  // ceiling would not have caught. It measured 30px against a 28px transport when this claim first ran.
+  expect(
+    seen.group,
+    `the .ap-agent group is ${seen.group}px around a ${transport}px control, which is neither that height
+     nor that height plus its own 1px edge top and bottom`,
+  ).toBe(transport + 2);
   // 6. AND EVERY CONTROL ON THE SURFACE IS ONE HEIGHT. Ten unchosen control heights is the measured
   //    diagnosis behind the whole revamp, and this is the assertion that says there is one — the artefact
   //    that answers the owner's original complaint. It is deliberately the WHOLE surface and not the one
@@ -957,6 +1005,29 @@ test('12. the affordances are big enough to see', async ({ board, theme }) => {
       .map((c) => `${c.id} ${c.h}`)
       .join(', ')}`,
   ).toBe(1);
+  // 7. AND THE THREE POPULATIONS THAT ARE NOT ONE-LINE CONTROLS ARE CLAIMED RATHER THAN DROPPED.
+  //    A textarea starts at or above the control height — it is the same box with more than one line in
+  //    it, so shorter would mean the withdrawal of `--ctl-h` cost it its box rather than freeing it.
+  expect(seen.areas.length, 'no textarea on the board, so the floor claim measures nothing').toBeGreaterThan(
+    0,
+  );
+  const shortAreas = seen.areas.filter((a) => a.h < heights[0]);
+  expect(
+    shortAreas,
+    `a textarea shorter than the ${heights[0]}px control it is a longer version of: ${shortAreas
+      .map((a) => `${a.id} ${a.h}px`)
+      .join(', ')}`,
+  ).toEqual([]);
+  //    And a segmented cell is exactly its group's own edge shorter than the group — one value, and it is
+  //    2, derived from the pair on the page rather than written down.
+  expect(seen.cells.length, 'no segmented cell on the board to measure against its group').toBeGreaterThan(1);
+  const shorter = [...new Set(seen.cells.map((c) => c.short))];
+  expect(
+    shorter,
+    `a segmented cell is not its group's 1px edge shorter than the group top and bottom: ${seen.cells
+      .map((c) => `${c.id} ${c.short}px shorter`)
+      .join(', ')}`,
+  ).toEqual([2]);
   for (const bar of seen.bars) {
     // `auto` and not `thin`: the app-wide rule is `thin`, so this is the assertion that the column's own
     // rule is reaching the element at all.

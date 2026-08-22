@@ -91,9 +91,7 @@ export function ReportOptions({
         {/* NOT a `Field`: an action row. "Ignore and close" names the BUTTON, and the select is one of
             its two operands — a Field's label names one control. */}
         <Control
-          
           as="select"
-          
           aria-label="Column to close the card into"
           value={column}
           onChange={(e) => setColumn(e.target.value)}

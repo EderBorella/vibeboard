@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { forgiveCardAttempts } from '../api';
+import { Button } from '../atoms/Button';
 import { useConfirm } from '../confirm/useConfirm';
 import type { BoardName } from '../shared';
-import { Button } from '../atoms/Button';
 import { useAction } from '../useAction';
 
 interface Props {

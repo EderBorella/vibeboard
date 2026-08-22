@@ -11,6 +11,7 @@ import {
   putSkill,
   renameControlFile,
 } from '../api';
+import { Text } from '../atoms/Text';
 import { useConfirm } from '../confirm/useConfirm';
 import { errorText } from '../errors';
 import type { ProjectSnapshot } from '../shared';
@@ -20,7 +21,6 @@ import { useAction } from '../useAction';
 import { ControlFileEditor, type ControlView, type OpenFile } from './ControlFileEditor';
 import { ControlFileList, RESOURCES_SENTINEL } from './ControlFileList';
 import { ResourcesEditor } from './ResourcesEditor';
-import { Text } from '../atoms/Text';
 
 interface Props {
   // Bumps whenever the project changes on disk (shared snapshot stream) so the file list and

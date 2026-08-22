@@ -1,12 +1,12 @@
 import { memo, useMemo, useState } from 'react';
 import { addDiaryEntry, type DiaryEntry } from '../api';
-import { MAX_ENTRY_TEXT, type Suggestion } from '../shared';
-import { useSuggestions } from '../suggestions/useSuggestions';
 import { Button } from '../atoms/Button';
 import { Chip } from '../atoms/Chip';
 import { Control } from '../atoms/Control';
 import { ReadoutLine } from '../atoms/Readout';
 import { Text } from '../atoms/Text';
+import { MAX_ENTRY_TEXT, type Suggestion } from '../shared';
+import { useSuggestions } from '../suggestions/useSuggestions';
 import { stateClass } from '../ui/state-tones';
 import { useAction } from '../useAction';
 import { useDiary } from './useDiary';
@@ -205,9 +205,7 @@ export function DiaryView({ bump }: { bump: number }) {
         <div className="diary-compose">
           {/* NOT a `Field`: a composer's label is its placeholder and the button beside it. */}
           <Control
-            
             as="textarea"
-            
             aria-label="Add to the log"
             placeholder="What happened?"
             value={draft}

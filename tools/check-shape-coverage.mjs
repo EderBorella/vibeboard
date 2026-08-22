@@ -770,7 +770,15 @@ const named = new Map(sites);
 for (const rule of cssRules)
   for (const cls of classesOf(rule.selector))
     if (!named.has(cls)) named.set(cls, `${rule.file}:${rule.line}`);
-const controls = tsxFiles.flatMap(({ file, text }) => controlsIn(file, text));
+// CODE, NOT COMMENTS, and a real finding is what says so. Arm 1 read the RAW file while every other
+// reader here reads `codeOf`, which was a latent hole for as long as no `.tsx` comment quoted a control
+// tag — and the atom phase quoted three in one sentence: `atoms/Control.tsx`'s own header says "an
+// `<input>`, a `<select>` or a `<textarea>`" and names `<input type="checkbox">` eight lines later. That
+// is FOUR phantom controls in the file whose whole purpose is that a control no longer hand-rolls its
+// box, and they took the census from 2 to 6 against a ceiling of 2 — a gate reporting the component that
+// fixed the defect as the defect. `codeOf` blanks a comment to spaces and keeps its newlines, so
+// `lineOf` still answers, which is why the census can read it without losing its own sites.
+const controls = tsxFiles.flatMap(({ file, text }) => controlsIn(file, codeOf(text)));
 const rawControls = controls.filter((c) => !c.boxed);
 // Arm 2's population: every surface class that lands on a literal control. `vb-ctl` and the rest of the
 // primitives' own names are filtered out for the reason `onChip` filters them — a primitive's class is

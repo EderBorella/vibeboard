@@ -101,7 +101,6 @@ export function ModelPicker({ models, value, defaultModel, onChange, disabled }:
             </div>
 
             <Control
-              
               autoFocus
               value={query}
               placeholder="Search by name or id…"
@@ -176,7 +175,9 @@ export function ModelPicker({ models, value, defaultModel, onChange, disabled }:
                 </div>
               ))}
               {filtered.length === 0 && (
-                <Text role="hint" lead className="mp-empty">No models match the current filters.</Text>
+                <Text role="hint" lead className="mp-empty">
+                  No models match the current filters.
+                </Text>
               )}
             </div>
           </Surface>

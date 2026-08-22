@@ -1,5 +1,5 @@
-import { formatCost } from '../format';
 import { Readout, ReadoutLine } from '../atoms/Readout';
+import { formatCost } from '../format';
 import { fmtK } from './format';
 import type { CopilotStats } from './useCopilot';
 
@@ -12,9 +12,7 @@ export function CopilotReadout({ stats, budget }: { stats: CopilotStats; budget:
 
   return (
     <ReadoutLine className="copilot-readout">
-      <Readout title="cumulative session cost">
-        {formatCost(stats.costUsd)}
-      </Readout>
+      <Readout title="cumulative session cost">{formatCost(stats.costUsd)}</Readout>
       <Readout>{stats.turns} turns</Readout>
       <Readout>{(stats.lastDurationMs / 1000).toFixed(1)}s</Readout>
       <span

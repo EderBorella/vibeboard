@@ -180,10 +180,28 @@ describe("a tool call's name is a Readout", () => {
     expect([...line().classList].sort()).toEqual(['vb-readout']);
   });
 
-  it('still resolves to the monospaced face, at the small step, in the accent ink', () => {
+  // THE FACE IS ALL THAT IS LEFT, AND THE STEP AND THE INK WENT WITH THE OPTIONS. `.msg-tool` was
+  // `Readout` `small` `accent` value for value, and the atom phase deleted every Readout option — so the
+  // line takes `.msg`'s own `--t-body` and `var(--tone, inherit)`, which is the surface it sits in
+  // deciding, exactly as the atom's comment says it should.
+  //
+  // WHAT THAT COSTS IS RECORDED HERE RATHER THAN SMOOTHED AWAY, because it is bigger than the plan's own
+  // argument for it: the plan justified "loses every option" on `tone="text"` having ONE consumer and
+  // `size="body"` and `tone="accent2"` having two each, and `tone="accent"` had NINE and `size="small"`
+  // twelve. A card id, a created id and a tool name were the accent by a stated decision — *"an id is the
+  // accent"* — and they are their surface's ink now. The mono face still says the machine measured it,
+  // which is this suite's claim and is unchanged; the emphasis is a separate decision and it is gone.
+  it('still resolves to the monospaced face, and takes the step and the ink of the line it sits in', () => {
     const drawn = box(line());
     expect(drawn['font-family']).toBe('var(--font-mono)');
-    expect(drawn['font-size']).toBe('0.75rem');
-    expect(drawn.color).toBe('var(--accent)');
+    expect(drawn['font-size']).toBeUndefined();
+    expect(drawn.color).toBeUndefined();
+    // AND THE LINE IS WHAT DECIDES BOTH, asserted rather than assumed: a claim that the atom declares
+    // nothing is only half the sentence, and the half that matters is that something else does.
+    const host = document.createElement('div');
+    host.className = 'msg';
+    const wrapper = box(host);
+    expect(wrapper['font-size']).toBe('0.8125rem');
+    expect(wrapper.color).toBe('var(--tone, inherit)');
   });
 });

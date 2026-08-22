@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import type { BoardName, Card, ProjectConfig } from '../shared';
 import { Chip } from '../atoms/Chip';
+import type { BoardName, Card, ProjectConfig } from '../shared';
 import { cardsByColumn, columnSlugs } from '../viewmodel';
 import { ArchiveDrawer } from './ArchiveDrawer';
 import { Column } from './Column';
@@ -60,6 +60,7 @@ export function Board({
             as="button"
             pill
             fill
+            tone="neutral"
             className={`board-archive vb-readout${showArchive ? ' active' : ''}`}
             testId="board-archive"
             title={showArchive ? 'Hide the archive' : 'Show archived cards'}

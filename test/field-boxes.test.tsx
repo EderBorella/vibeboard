@@ -31,6 +31,7 @@
 // value this phase exists to normalise would make the suite a description of the old code.
 import { cleanup, render } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
+import { Control } from '../web/src/atoms/Control.js';
 import { Field } from '../web/src/ui/Field.js';
 import { box } from './css-box.js';
 
@@ -50,10 +51,16 @@ function at(html: string, selector: string): Element {
 }
 
 // THE FIELD AS THE COMPONENT RENDERS IT. No class list is written by hand here.
+//
+// A `<Control>` AND NOT A BARE `<input>` AS OF THE ATOM PHASE. This fixture drew its box from
+// `.vb-field input` — the (0,1,1) descendant selector the `Control` atom exists to delete — so a raw
+// element inside a `Field` draws nothing now and the four assertions below would each have passed on an
+// empty object, which is exactly the failure `at` throws to prevent one line down. The claim is
+// unchanged: a control in a field draws the primitive's box. What moved is which element hands it over.
 function field(): Element {
   const { container } = render(
     <Field label="L">
-      <input />
+      <Control />
     </Field>,
   );
   const el = container.querySelector('input');
@@ -67,10 +74,7 @@ const BOXES: [name: string, el: () => Element][] = [
   ['a settings field', field],
   ['the project gate', () => at('<div class="gate"><input class="vb-ctl"/></div>', 'input')],
   ['a skill field', () => at('<input class="vb-ctl"/>', 'input')],
-  [
-    'the typed confirmation',
-    () => at('<div class="confirm-require"><input class="vb-ctl"/></div>', 'input'),
-  ],
+  ['the typed confirmation', () => at('<div class="confirm-require"><input class="vb-ctl"/></div>', 'input')],
   ['the model search', () => at('<div class="mp-modal"><input class="vb-ctl"/></div>', 'input')],
   [
     'the dispatch prompt',
@@ -133,7 +137,11 @@ describe('the boxes that differ, and why', () => {
   });
 
   it('the control editor keeps the monospace face a file is read in', () => {
-    const el = at('<textarea class="control-textarea"></textarea>', 'textarea');
+    // THE FACE IS `Control`'s `mono` OPTION NOW, not `.control-textarea`'s own rule — one of the four
+    // `font-family: var(--font-mono)` declarations the atom phase replaced with one, which took
+    // `check-shape-coverage.mjs`'s mono ceiling from 7 to 3. The claim is the same; the class carrying
+    // it is the atom's, so the fixture names it or it asserts a deleted rule.
+    const el = at('<textarea class="vb-ctl vb-ctl-mono control-textarea"></textarea>', 'textarea');
     expect(box(el)['font-family']).toBe('var(--font-mono)');
   });
 });

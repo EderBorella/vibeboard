@@ -22,7 +22,10 @@
   background: var(--bg); color: var(--text);
   border: 1px solid var(--border); border-radius: var(--r-md);
   padding: 0 var(--s-4); font: inherit; font-size: var(--t-body);
-  height: var(--ctl-h);
+  /* `min-height` for the reason atoms/button.css states at length: a declared height is shrinkable in a
+     COLUMN flex container and this is what refuses it. Overridden by the two `rem` textarea floors, which
+     are (0,2,0) on their surfaces and therefore win. */
+  height: var(--ctl-h); min-height: var(--ctl-h);
 }
 /* A TEXTAREA IS THE ONE CONTROL WHOSE HEIGHT IS ITS CONTENT'S. `--ctl-h` is one line, and a card's whole
    file is not one line, so the fixed height is withdrawn here and the surface says how much room the box

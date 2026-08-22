@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import { cardSuggestion, patchSuggestion } from '../api';
-import type { Suggestion, SuggestionLevel } from '../shared';
-import { SUGGESTION_LEVELS } from '../shared';
 import { Button } from '../atoms/Button';
 import { Chip } from '../atoms/Chip';
 import { Control } from '../atoms/Control';
 import { ReadoutLine } from '../atoms/Readout';
 import { Surface } from '../atoms/Surface';
 import { Text } from '../atoms/Text';
+import type { Suggestion, SuggestionLevel } from '../shared';
+import { SUGGESTION_LEVELS } from '../shared';
 import { asState } from '../ui/state-tones';
 import { useAction } from '../useAction';
 
@@ -111,7 +111,6 @@ export function SuggestionsPane({ suggestions, failed, onRefresh, onApply }: Pro
             </Button>
             <Control
               aria-label="Why not?"
-              
               placeholder="Why not? (kept, so a checkup does not raise it again)"
               value={reason}
               onChange={(e) => setReason(e.target.value)}
@@ -119,9 +118,7 @@ export function SuggestionsPane({ suggestions, failed, onRefresh, onApply }: Pro
             {/* NOT a `Field`: an action row of five controls with no labels between them. It drew NO
                 box at all before Phase 9 — a bare UA select beside a `.vb-ctl` in the same row. */}
             <Control
-              
               as="select"
-              
               aria-label="Level"
               value={level}
               onChange={(e) => setLevel(e.target.value as SuggestionLevel)}

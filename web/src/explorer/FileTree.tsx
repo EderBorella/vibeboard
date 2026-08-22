@@ -142,7 +142,6 @@ interface RenameRowProps {
 function RenameRow({ depth, value, onChange, onCommit, onCancel }: RenameRowProps) {
   return (
     <Control
-      
       style={indent(depth)}
       value={value}
       autoFocus
@@ -253,7 +252,9 @@ export function FileTree(props: Props) {
 
       {error && <Text role="error">{error}</Text>}
       {rows.length === 0 && (
-        <Text role="hint" className="control-empty">{busy ? 'Reading…' : '— empty —'}</Text>
+        <Text role="hint" className="control-empty">
+          {busy ? 'Reading…' : '— empty —'}
+        </Text>
       )}
 
       {rows.map((row) => {

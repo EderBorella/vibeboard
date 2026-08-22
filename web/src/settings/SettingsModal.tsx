@@ -7,12 +7,14 @@ import {
   patchConfig,
   type SandboxState,
 } from '../api';
+import { Button } from '../atoms/Button';
+import { Control } from '../atoms/Control';
+import { Surface } from '../atoms/Surface';
+import { Text } from '../atoms/Text';
 import { AutopilotPanel } from '../autopilot/AutopilotPanel';
 import type { Confirmer } from '../confirm/useConfirm';
 import { BackendPicker } from '../copilot/BackendPicker';
 import { clampToCaps, resolveChoice } from '../copilot/choice';
-import { Control } from '../atoms/Control';
-import { Text } from '../atoms/Text';
 // The same list the picker renders from, and the reason this file no longer declares its own: the two
 // had drifted to different labels for one backend, so the setting read as "Claude Code" here and
 // "Claude" in the dock that obeys it.
@@ -30,9 +32,7 @@ import {
   type ProjectConfig,
 } from '../shared';
 import { SignInPanel } from '../signin/SignInPanel';
-import { Button } from '../atoms/Button';
 import { Field } from '../ui/Field';
-import { Surface } from '../atoms/Surface';
 import { useAction } from '../useAction';
 import { useFetched } from '../useFetched';
 import { parseCsv } from '../viewmodel';
@@ -263,7 +263,11 @@ export function SettingsModal({ config, onClose, onSaved, autopilot, onAutopilot
               />
             </Field>
             <Field label="ID padding">
-              <Control type="number" value={idPadding} onChange={(e) => setIdPadding(Number(e.target.value))} />
+              <Control
+                type="number"
+                value={idPadding}
+                onChange={(e) => setIdPadding(Number(e.target.value))}
+              />
             </Field>
           </div>
 

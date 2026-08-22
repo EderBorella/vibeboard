@@ -1,8 +1,8 @@
-import type { Card } from '../shared';
 import { Button } from '../atoms/Button';
 import { Chip } from '../atoms/Chip';
 import { Readout } from '../atoms/Readout';
 import { Surface } from '../atoms/Surface';
+import type { Card } from '../shared';
 import { miniature } from '../viewmodel';
 
 interface Props {

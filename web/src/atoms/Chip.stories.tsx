@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { Chip } from './Chip';
 import type { Tone } from '../ui/state-tones';
+import { Chip } from './Chip';
 
 // ONE MARKER WITH OPTIONS. A chip is a box you READ — a tag, a count, a state word — and the whole of what
 // it can be is `tone`/`state`, `pill`, `fill` and `as`.

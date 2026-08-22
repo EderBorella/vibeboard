@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import { getSigninState, revokeDevice, type SigninDevice, signOutEverything } from '../api';
-import { revokeDeviceRequest, signOutEverythingRequest } from '../confirm/requests';
-import type { Confirmer } from '../confirm/useConfirm';
-import { errorText } from '../errors';
 import { Button } from '../atoms/Button';
 import { Chip } from '../atoms/Chip';
 import { Readout } from '../atoms/Readout';
 import { Text } from '../atoms/Text';
+import { revokeDeviceRequest, signOutEverythingRequest } from '../confirm/requests';
+import type { Confirmer } from '../confirm/useConfirm';
+import { errorText } from '../errors';
 import { useAction } from '../useAction';
 
 interface Props {

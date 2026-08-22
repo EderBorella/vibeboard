@@ -204,9 +204,15 @@
    `*` rule's `thin`/`--border` reaching it by inheritance, which is the way this would actually break. */
 .column-body::-webkit-scrollbar { width: 14px; }
 .column-body::-webkit-scrollbar-track { background-color: var(--panel); }
+/* THE 3px HERE IS NOT `--rule` AND THE ATOM PHASE PUT IT THERE BY VALUE. `--rule` is the edge that
+   CARRIES MEANING as against the 1px one that merely separates — eleven `border-left` rails — and this is
+   neither: with `background-clip: content-box` a transparent border is the only way to INSET a scrollbar
+   thumb, so it is a padding wearing a border's name. Taking the token would mean a rail widened for
+   visibility silently made this thumb thinner. Named in `BORDER_ON_PURPOSE` with that reason, on the
+   precedent of the `9px` scrollbar row in the same gate's height map. */
 .column-body::-webkit-scrollbar-thumb {
   background-color: var(--muted);
-  border: var(--rule) solid transparent;
+  border: 3px solid transparent;
   background-clip: content-box;
 }
 .column-body::-webkit-scrollbar-thumb:hover { background-color: var(--accent); }

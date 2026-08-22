@@ -70,13 +70,14 @@ export function ControlFileList({
             </Surface>
           )}
           {g.files.length === 0 && g.key !== 'resources' && (
-            <Text role="hint" className="control-empty">— none —</Text>
+            <Text role="hint" className="control-empty">
+              — none —
+            </Text>
           )}
           {g.files.map((f) =>
             renaming === f.path ? (
               <Control
                 key={f.path}
-                
                 value={renameDraft}
                 autoFocus
                 onFocus={(e) => e.currentTarget.select()}

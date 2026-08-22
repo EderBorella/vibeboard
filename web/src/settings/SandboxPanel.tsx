@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { rebuildBoxes, restartOpencodeServer, type SandboxState, takeOverOpencodeServer } from '../api';
-import { useConfirm } from '../confirm/useConfirm';
 import { Button } from '../atoms/Button';
 import { Text } from '../atoms/Text';
+import { useConfirm } from '../confirm/useConfirm';
 import { useAction } from '../useAction';
 
 interface Props {

@@ -1,14 +1,14 @@
 import { useState } from 'react';
 import type { DispatchRequest, ModelOption, RunRecord, Skill } from '../api';
+import { Button } from '../atoms/Button';
+import { Control } from '../atoms/Control';
+import { Readout } from '../atoms/Readout';
+import { Text } from '../atoms/Text';
 import { BackendPicker } from '../copilot/BackendPicker';
 import { clampToCaps } from '../copilot/choice';
 import { ModelPicker } from '../models/ModelPicker';
 import { backendCaps, type Card } from '../shared';
 import { Field } from '../ui/Field';
-import { Button } from '../atoms/Button';
-import { Control } from '../atoms/Control';
-import { Readout } from '../atoms/Readout';
-import { Text } from '../atoms/Text';
 import { SegmentedControl } from '../ui/SegmentedControl';
 
 interface Props {
@@ -89,8 +89,7 @@ export function DispatchPane({
       <p className="dispatch-desc">{skill.description}</p>
       {previous && (
         <p className="dispatch-continues">
-          Continues run <Readout>{previous.run}</Readout>. Its report goes to the agent with this
-          one.
+          Continues run <Readout>{previous.run}</Readout>. Its report goes to the agent with this one.
         </p>
       )}
 

@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import type { ChatMeta } from '../shared';
 import { Button } from '../atoms/Button';
 import { Chip } from '../atoms/Chip';
 import { Readout } from '../atoms/Readout';
 import { Surface } from '../atoms/Surface';
 import { Text } from '../atoms/Text';
+import type { ChatMeta } from '../shared';
 import { backendLabel, relTime } from './format';
 
 interface Props {

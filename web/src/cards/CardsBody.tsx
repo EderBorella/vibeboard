@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { type CardLedgerData, cancelRun, type RunRecord, resolveRun, type Skill } from '../api';
+import { Text } from '../atoms/Text';
 import { stopRunRequest } from '../confirm/requests';
 import { useConfirm } from '../confirm/useConfirm';
 import type { CardRef } from '../dock/tabs';
@@ -10,7 +11,6 @@ import type { Card, CardFrontmatterPatch, ProjectConfig } from '../shared';
 import type { DispatchContext, View } from './CardsPane';
 import { CardView } from './CardView';
 import { RawPane } from './RawPane';
-import { Text } from '../atoms/Text';
 
 interface Props {
   card: Card | null;

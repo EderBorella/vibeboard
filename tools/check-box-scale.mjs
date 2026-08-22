@@ -114,10 +114,20 @@ const OFF_SCALE_ON_PURPOSE = new Map([
   ],
 ]);
 
-// A BORDER WIDTH THAT IS NEITHER 1px NOR `--rule`. Empty on purpose, and an empty exception map is the
-// honest state here: the twelve rails all took the token in the commit that added this file.
+// A BORDER WIDTH THAT IS NEITHER 1px NOR `--rule`, keyed on `selector | value` for the reason the height
+// map is: a row is exercised by one rule and one rule only.
 /** @type {Map<string, string>} */
-const BORDER_ON_PURPOSE = new Map();
+const BORDER_ON_PURPOSE = new Map([
+  [
+    '.column-body::-webkit-scrollbar-thumb | 3px solid transparent',
+    'A PADDING WEARING A BORDER’S NAME. `background-clip: content-box` makes a transparent border the ' +
+      'only way to inset a scrollbar thumb inside its track, so this 3px is a SPACE and not an edge — ' +
+      'which is why it is not `--rule`, even though it spells the same number. `--rule` is the edge that ' +
+      'CARRIES MEANING, and giving it to this thumb would mean a rail widened because an owner could not ' +
+      'see it silently made the thumb thinner. The eleven rails the token was created for are all ' +
+      '`border-left`. Same family as the 9px scrollbar row in the height map above.',
+  ],
+]);
 
 const read = (file) => readFileSync(join(ROOT, file), 'utf8');
 const walk = (ext) => walkFiles(ROOT, CORPUS, ext, FLOOR[ext] ?? 1);
@@ -134,8 +144,8 @@ const key = (selector, value) => `${selector.trim()} | ${value.trim()}`;
 
 // ---------- arm 1: heights ----------
 // `0`, `auto`, `100%`, a viewport unit, one of the two box heights, or the board's tile.
-function heightFault(prop, value, selector) {
-  if (OFF_SCALE_ON_PURPOSE.has(key(selector, value))) return null;
+function heightFault(prop, value, selector, exceptions) {
+  if (exceptions.has(key(selector, value))) return null;
   if (/^(0|auto|100%|fit-content|min-content|max-content|inherit)$/.test(value)) return null;
   if (/^\d*\.?\d+(?:vh|dvh|svh|lvh)$/.test(value)) return null;
   const token = /^var\((--[\w-]+)\)$/.exec(value)?.[1];
@@ -146,16 +156,22 @@ function heightFault(prop, value, selector) {
 }
 
 // ---------- arm 2: border widths ----------
-// The shorthand's width is whichever part is a length or `var()`; `border: none` and `border: 0` have no
-// width to check, and a bare colour (`border-color`) is not this arm's business.
+// The shorthand's width is whichever part is a length or a width word; `border: none` has none to check,
+// a bare colour (`border-color`) is not this arm's business, and `var(--rule)` is the token form — which
+// needs no clause of its own, because it is not a length and not a width word.
+//
+// EVERY LENGTH IN THE VALUE, AND NOT THE FIRST ACCEPTABLE ONE. The first draft returned `null` the moment
+// it saw a `1px`, which read `border-width: 1px 4px` — four longhands in one declaration — as compliant on
+// the strength of its first part. A declaration carrying two widths is precisely where the second hides.
 const WIDTH_WORD = /^(thin|medium|thick)$/;
-function borderFault(prop, value, selector) {
-  if (BORDER_ON_PURPOSE.has(key(selector, value))) return null;
+const LENGTH = /^\d*\.?\d+(?:px|rem|em)?$/;
+function borderFault(prop, value, selector, exceptions) {
+  if (exceptions.has(key(selector, value))) return null;
   const parts = value.split(/\s+/).filter(Boolean);
   for (const part of parts) {
-    if (part === '1px' || part === '0' || part === 'var(--rule)') return null;
     if (WIDTH_WORD.test(part)) return `${prop}: ${value} — \`${part}\` is a width nobody chose`;
-    if (/^\d*\.?\d+(?:px|rem|em)$/.test(part)) return `${prop}: ${value} — ${part} is neither 1px nor var(--rule)`;
+    if (!LENGTH.test(part)) continue;
+    if (part !== '1px' && part !== '0') return `${prop}: ${value} — ${part} is neither 1px nor var(--rule)`;
   }
   return null;
 }
@@ -190,7 +206,15 @@ const Z_PROP = /(?:^|[;{\s])z-index\s*:\s*([^;}]+?)\s*(?=[;}])/g;
 // A CUSTOM PROPERTY IS NOT A DECLARATION OF THE THING IT IS NAMED AFTER: `--border: #1f333b` in a theme
 // block is a colour, and a border arm that read it would report every palette as a fault. The leading
 // boundary in each pattern above is what excludes `--border`, and this is the test that says so.
-export function censusOf(ruleList) {
+//
+// THE TWO EXCEPTION MAPS ARE ARGUMENTS AND NOT CLOSED-OVER CONSTANTS, and it is the self-test that forced
+// it. `key()` and the two `has()` calls were the one path in this file no fixture could reach: with the
+// real maps closed over, a `key()` that returned a CONSTANT would have excused every declaration in the
+// tree and marked every row exercised, so all four arms would go silently blind and the run would exit 0.
+// Passing the maps in lets the fixture carry two rows the tree cannot move — one that must suppress, and
+// one with the SAME VALUE on a different selector that must NOT — which is Phase 3's finding stated as a
+// test rather than as a comment.
+export function censusOf(ruleList, heights = OFF_SCALE_ON_PURPOSE, borders = BORDER_ON_PURPOSE) {
   const counts = { height: 0, border: 0, shadow: 0, layer: 0 };
   /** @type {{ site: string, detail: string }[]} */
   const findings = [];
@@ -198,11 +222,11 @@ export function censusOf(ruleList) {
     const add = (detail) => detail && findings.push({ site: site(rule), detail });
     for (const m of rule.body.matchAll(HEIGHT_PROP)) {
       counts.height += 1;
-      add(heightFault(m[1], m[2].trim(), rule.selector));
+      add(heightFault(m[1], m[2].trim(), rule.selector, heights));
     }
     for (const m of rule.body.matchAll(BORDER_PROP)) {
       counts.border += 1;
-      add(borderFault(m[1], m[2].trim(), rule.selector));
+      add(borderFault(m[1], m[2].trim(), rule.selector, borders));
     }
     for (const m of rule.body.matchAll(SHADOW_PROP)) {
       counts.shadow += 1;
@@ -228,6 +252,12 @@ export function censusOf(ruleList) {
 // is in the middle of the value; a shadow comma-pair, which is legal, against a hand-written shadow,
 // which is not; `line-height`, which the height pattern must not match; and a rule nested in an at-rule,
 // the case a flat regex reads as a selector.
+//
+// AND THE EXCEPTION MAPS THEMSELVES, WHICH NO FIXTURE REACHED BEFORE. `.lambda` and `.mu` declare the
+// SAME height and the SAME border, and only `.lambda` is excused — so the pair fails if `key()` stops
+// composing the selector with the value, which is the exact way `check-scale.mjs`'s tracking exceptions
+// silently excused a pasted duplicate in Phase 3. A fixture with one row could not tell the two apart.
+// `.nu` is the two-width declaration: `1px 4px` must report the 4px, not pass on the 1px.
 const FIXTURE = `
 /* height: 30px, border-left: 4px solid red, box-shadow: 0 1px 2px red and z-index: 21 in prose are
    not declarations. */
@@ -242,10 +272,19 @@ const FIXTURE = `
 .theta { z-index: 21; }
 .iota { height: var(--mark-h); min-height: 0; }
 @media (min-width: 1px) { .kappa { height: 44px; } }
+.lambda { height: 5px; border: 2px dashed var(--border); }
+.mu { height: 5px; border: 2px dashed var(--border); }
+.nu { border-width: 1px 4px; }
 `;
 
+// The fixture's OWN exception maps, and they are the fixture's rather than the tree's for the reason
+// every self-test in this directory is: a row keyed on a real selector would make the test move whenever
+// the tree did, and this fixture exists precisely because the tree cannot move it.
+const FIXTURE_HEIGHTS = new Map([['.lambda | 5px', 'the suppressed row']]);
+const FIXTURE_BORDERS = new Map([['.lambda | 2px dashed var(--border)', 'the suppressed row']]);
+
 const SELF_TEST_WANT = [
-  'counts height 6 border 4 shadow 2 layer 2',
+  'counts height 8 border 7 shadow 2 layer 2',
   'fixture.css:6 height: 30px — not a declared box height',
   'fixture.css:6 min-height: 3rem — not a declared box height',
   'fixture.css:8 border-left: 4px solid var(--accent) — 4px is neither 1px nor var(--rule)',
@@ -253,10 +292,13 @@ const SELF_TEST_WANT = [
   'fixture.css:10 box-shadow: 0 8px 24px rgba(0,0,0,.35) — not var(--glow), var(--lift), a comma-pair of the two, or none',
   'fixture.css:12 z-index: 21 — not one of the four layers',
   'fixture.css:14 height: 44px — not a declared box height',
+  'fixture.css:16 height: 5px — not a declared box height',
+  'fixture.css:16 border: 2px dashed var(--border) — 2px is neither 1px nor var(--rule)',
+  'fixture.css:17 border-width: 1px 4px — 4px is neither 1px nor var(--rule)',
 ].join(' | ');
 
 function selfTest() {
-  const { counts, findings } = censusOf(rulesOf('fixture.css', FIXTURE));
+  const { counts, findings } = censusOf(rulesOf('fixture.css', FIXTURE), FIXTURE_HEIGHTS, FIXTURE_BORDERS);
   const got = [
     `counts height ${counts.height} border ${counts.border} shadow ${counts.shadow} layer ${counts.layer}`,
     ...findings.map(({ site: where, detail }) => `${where} ${detail}`),

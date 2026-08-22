@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { getResources, putResources, type ResourceLink } from '../api';
-import { errorText } from '../errors';
 import { Button } from '../atoms/Button';
 import { Control } from '../atoms/Control';
 import { Readout } from '../atoms/Readout';
+import { errorText } from '../errors';
 import { useAction } from '../useAction';
 
 // The links registry (.vibeboard/resources.yaml) — a small editable table of external

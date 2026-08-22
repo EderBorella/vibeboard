@@ -61,11 +61,7 @@ export function ReadoutLine({
 
 export function Readout({ title, className, testId, children }: Props) {
   return (
-    <span
-      className={['vb-readout', className].filter(Boolean).join(' ')}
-      title={title}
-      data-testid={testId}
-    >
+    <span className={['vb-readout', className].filter(Boolean).join(' ')} title={title} data-testid={testId}>
       {children}
     </span>
   );

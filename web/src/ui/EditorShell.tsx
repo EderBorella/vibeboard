@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
-import { renderMarkdown } from '../markdown';
 import { Control } from '../atoms/Control';
 import { Readout } from '../atoms/Readout';
+import { renderMarkdown } from '../markdown';
 
 // The chrome around an editable file: which path is open, which view of it you are looking at, and
 // what you can do to it. Shared by Project Control (a control document, sometimes as fields) and the

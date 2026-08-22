@@ -9,11 +9,11 @@ import {
   moveFsNode,
   renameFsNode,
 } from '../api';
+import { Button } from '../atoms/Button';
+import { Text } from '../atoms/Text';
 import { useConfirm } from '../confirm/useConfirm';
 import { errorText } from '../errors';
 import type { ProjectSnapshot } from '../shared';
-import { Button } from '../atoms/Button';
-import { Text } from '../atoms/Text';
 import { EditorBody, EditorShell } from '../ui/EditorShell';
 import { FileTree } from './FileTree';
 import { formatBytes } from './format';

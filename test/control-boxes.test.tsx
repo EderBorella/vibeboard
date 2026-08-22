@@ -34,8 +34,9 @@
 // subject was a set of boxes nobody chose, and six of the fifteen differences were the padding.
 import { cleanup, render } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
-import { Field } from '../web/src/ui/Field.js';
+import { Control } from '../web/src/atoms/Control.js';
 import { Surface } from '../web/src/atoms/Surface.js';
+import { Field } from '../web/src/ui/Field.js';
 import { box } from './css-box.js';
 
 afterEach(cleanup);
@@ -63,9 +64,19 @@ function panel(className: string): Element {
 
 // THE FIELD AND THE CHECK ROW AS THE COMPONENT RENDERS THEM. No class list is hand-written for either,
 // so renaming `vb-field-check` moves the fixture instead of quietly testing a dead class.
+//
+// A `<Control>` AND NOT A BARE `<input>`, AND THE ATOM PHASE IS WHY. These three fixtures passed a raw
+// element to `Field` and got the box from `.vb-field input, .vb-field textarea, .vb-field select` — the
+// (0,1,1) descendant selector whose deletion IS the Control atom, so a bare element inside a Field draws
+// no box at all now and every assertion below would have read an empty object. The CLAIM is unchanged:
+// a control in a field draws the primitive's box. What moved is who hands it over — the parent, or the
+// element. That is the whole subject of the phase, so it has to be the fixture that moves.
 function inField(kind: 'input' | 'select' | 'textarea'): Element {
-  const control = kind === 'select' ? <select /> : kind === 'textarea' ? <textarea /> : <input type="text" />;
-  const { container } = render(<Field label="L">{control}</Field>);
+  const { container } = render(
+    <Field label="L">
+      <Control as={kind} />
+    </Field>,
+  );
   const el = container.querySelector(kind);
   if (!el) throw new Error(`Field rendered no ${kind}`);
   return el;
@@ -114,10 +125,7 @@ const CONTROLS: [name: string, el: () => Element][] = [
     'the diary composer',
     () => at('<div class="diary-compose"><textarea class="vb-ctl"></textarea></div>', 'textarea'),
   ],
-  [
-    'the control editor body',
-    () => at('<textarea class="vb-ctl control-textarea"></textarea>', 'textarea'),
-  ],
+  ['the control editor body', () => at('<textarea class="vb-ctl control-textarea"></textarea>', 'textarea')],
   [
     'a links registry cell',
     () => at('<div class="resource-row"><input class="vb-ctl res-title"/></div>', 'input'),
@@ -166,8 +174,40 @@ describe('the fifteen controls Field had not taken draw one box', () => {
   // THE CLAIM THE PHASE IS ABOUT: every one of these declares the SAME height, so a control's box no
   // longer depends on what is inside it. Ten unchosen heights is the measured diagnosis; this is the
   // jsdom half of the answer, and `npm run visual`'s check 12 is the half that measures a real browser.
-  it.each(CONTROLS)('%s declares the control height rather than emerging at one', (_name, el) => {
-    expect(box(el()).height).toBe(PRIMITIVE.height);
+  //
+  // A TEXTAREA IS THE ONE EXCEPTION AND IT IS ASSERTED RATHER THAN FILTERED OUT, which is this suite's
+  // own rule two describes: a list with a silent exception in it is what let two focus rules through.
+  // `--ctl-h` is ONE LINE and five of these fifteen hold many — a whole card file, a config file, a
+  // prompt, two composers — so `atoms/control.css` withdraws the fixed height for `textarea` and the
+  // surface says how much room the box starts with. `auto` is still a DECLARED height: the box is the
+  // content's on purpose, which is not the same thing as nobody having chosen.
+  it.each(CONTROLS.filter(([, el]) => el().tagName !== 'TEXTAREA'))(
+    '%s declares the control height rather than emerging at one',
+    (_name, el) => {
+      expect(box(el()).height).toBe(PRIMITIVE.height);
+    },
+  );
+
+  it.each(CONTROLS.filter(([, el]) => el().tagName === 'TEXTAREA'))(
+    '%s withdraws the one-line height, because its content is not one line',
+    (_name, el) => {
+      expect(box(el()).height).toBe('auto');
+    },
+  );
+
+  // AND THE TWO THAT NEED A FLOOR DECLARE ONE, which is the other half of withdrawing the height: a
+  // textarea with neither a height nor a floor is two rows tall whatever it holds. These are the two
+  // `rem` rows `tools/check-box-scale.mjs` names as exceptions with this reason, asserted here so the
+  // gate's exception list and the stylesheet cannot drift apart.
+  it.each([
+    [
+      'the raw card file',
+      '<div class="raw-pane"><textarea class="vb-ctl raw-area"></textarea></div>',
+      '14rem',
+    ],
+    ['the diary composer', '<div class="diary-compose"><textarea class="vb-ctl"></textarea></div>', '2.6rem'],
+  ])('%s starts at a floor its surface chose', (_name, html, floor) => {
+    expect(box(at(html, 'textarea'))['min-height']).toBe(floor);
   });
 
   // A CONTROL AT 12px BESIDE AN INPUT AT 13px IS THE SHAPE OF THE 10.88px INCIDENT, which is the reason
@@ -184,6 +224,30 @@ describe('the fifteen controls Field had not taken draw one box', () => {
       expect(box(el()).background).toBe(PRIMITIVE.ground);
     },
   );
+});
+
+// A DECLARED HEIGHT THAT A FLEX PARENT CAN SHRINK IS NOT DECLARED, and this is the jsdom half of a
+// defect the browser harness measured: a `Button size="md"` inside `.modal-body` — a COLUMN flex
+// container, so the main axis is the height — rendered at **17px** against the 28px it declares, because
+// a flex item's default `flex-shrink: 1` shrinks the main axis and the automatic minimum for a one-line
+// label with no vertical padding left is the line box. Declaring the height is what made it shrinkable:
+// before this phase there was no height to shrink from.
+//
+// `min-height` AND NOT `flex-shrink: 0`, because `flex-shrink` is per-item and not per-axis — refusing to
+// shrink would also stop a control narrowing inside a ROW, which is how a row overflows, and overflow is
+// the one thing Tier 3 does not allow.
+describe('every box that declares a height also declares the floor it may not be squeezed below', () => {
+  it.each([
+    ['a button', '<button class="vb-btn vb-btn-default vb-btn-md"></button>', 'button', '28px'],
+    ['a control', '<input class="vb-ctl"/>', 'input', '28px'],
+    ['a select trigger', '<button class="vb-trigger"></button>', 'button', '28px'],
+    ['a segmented group', '<div class="vb-seg"></div>', 'div', '28px'],
+    ['a chip', '<span class="vb-chip"></span>', 'span', '16px'],
+  ])('%s', (_name, html, sel, px) => {
+    const drawn = box(at(html, sel));
+    expect(drawn.height).toBe(px);
+    expect(drawn['min-height']).toBe(px);
+  });
 });
 
 describe('the survivors that differ, and what each one still says', () => {
@@ -216,15 +280,25 @@ describe('the survivors that differ, and what each one still says', () => {
   });
 
   it.each([
-    ['the control editor body', '<textarea class="vb-ctl control-textarea"></textarea>', 'textarea'],
+    [
+      'the control editor body',
+      '<textarea class="vb-ctl vb-ctl-mono control-textarea"></textarea>',
+      'textarea',
+    ],
     [
       'the raw card file',
-      '<div class="raw-pane"><textarea class="vb-ctl raw-area"></textarea></div>',
+      '<div class="raw-pane"><textarea class="vb-ctl vb-ctl-mono raw-area"></textarea></div>',
       'textarea',
     ],
   ])('%s keeps the monospaced face a file is read in', (_name, html, sel) => {
     // The CONTENT is machine text, which is not the same claim as `Readout`'s — that a figure was
     // measured — so these are not readouts and the mono census keeps them.
+    //
+    // THE FACE MOVED FROM THE SURFACE TO THE ATOM AND THE CLAIM DID NOT. `.control-textarea` and
+    // `.raw-area` each declared `font-family: var(--font-mono)` in a rule of their own, which is two of
+    // the four rows `Control`'s `mono` option replaced — so the class list is `vb-ctl-mono` here where it
+    // used to be the surface's name. `check-shape-coverage.mjs`'s mono ceiling went 7 → 3 on the same
+    // move; a fixture still naming only the surface class would have asserted a deleted rule.
     expect(box(at(html, sel))['font-family']).toBe('var(--font-mono)');
   });
 });

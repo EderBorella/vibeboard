@@ -1,7 +1,7 @@
 import type { InvalidSkill, Skill } from '../api';
-import type { Card } from '../shared';
 import { Button } from '../atoms/Button';
 import { Text } from '../atoms/Text';
+import type { Card } from '../shared';
 import { skillsForCard } from './filter';
 
 interface Props {

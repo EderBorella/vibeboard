@@ -7,14 +7,14 @@ import {
   softStopAutopilot,
   startAutopilot,
 } from '../api';
+import { Button } from '../atoms/Button';
+import { Control } from '../atoms/Control';
+import { Text } from '../atoms/Text';
 import { killProjectRequest } from '../confirm/requests';
 import { useConfirm } from '../confirm/useConfirm';
 import { errorText } from '../errors';
 import { useAccounting } from '../runs/useAccounting';
 import { type AutopilotConfig, BLOCKED_BOARDS, BOARD_LABELS, type ProjectConfig } from '../shared';
-import { Button } from '../atoms/Button';
-import { Control } from '../atoms/Control';
-import { Text } from '../atoms/Text';
 import { Field } from '../ui/Field';
 import { useReadiness } from './useReadiness';
 

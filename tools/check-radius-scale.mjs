@@ -422,7 +422,9 @@ if (geometry.length > BUTTON_GEOMETRY_CEILING) {
     `\n${geometry.length} button class(es) declare their own geometry outside the primitive stylesheet,`,
   );
   console.error(`against a ceiling of ${BUTTON_GEOMETRY_CEILING}. This gate is a RATCHET: it blocks an`);
-  console.error(`increase, not the backlog. Render the new control with <Button> from web/src/atoms/Button.tsx`);
+  console.error(
+    `increase, not the backlog. Render the new control with <Button> from web/src/atoms/Button.tsx`,
+  );
   console.error(`instead of giving a class a padding of its own.\n`);
   for (const { cls, where, sites } of geometry) {
     console.error(`  .${cls} — ${where}  (${sites.length} button site(s), e.g. ${sites[0]})`);

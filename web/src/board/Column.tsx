@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import type { BoardName, Card } from '../shared';
 import { Button } from '../atoms/Button';
 import { Chip } from '../atoms/Chip';
 import { Surface } from '../atoms/Surface';
+import type { BoardName, Card } from '../shared';
 import { CardTile } from './CardTile';
 
 interface Props {

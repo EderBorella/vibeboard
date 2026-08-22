@@ -25,8 +25,8 @@
 import { cleanup, render } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { Button } from '../web/src/atoms/Button.js';
-import { Surface } from '../web/src/atoms/Surface.js';
 import type { SurfaceVariant } from '../web/src/atoms/Surface.js';
+import { Surface } from '../web/src/atoms/Surface.js';
 import { box } from './css-box.js';
 
 afterEach(cleanup);
@@ -195,13 +195,18 @@ describe('the nested boxes — a drawn edge and the smaller 6px corner', () => {
     expect(new Set(boxes).size).toBe(1);
   });
 
-  // `.tile`'s ACCENT LEFT EDGE is not part of the box: it is 2px where the primitive's is 1px, and it is
-  // the one thing that says which board a card is on. It has to beat `.vb-surface-inset`'s `border-color`,
-  // which it does on source order — styles.css is loaded after primitives.css — and the hover that lights
-  // the whole box accent has to survive with it.
-  it('.tile keeps a 2px accent left edge over the 1px box, and its hover', () => {
+  // `.tile`'s ACCENT LEFT EDGE is not part of the box: it is `--rule` where the primitive's is 1px, and it
+  // is the one thing that says which board a card is on. It has to beat `.vb-surface-inset`'s
+  // `border-color`, which it does on source order — the surface sheets load after the atoms — and the
+  // hover that lights the whole box accent has to survive with it.
+  //
+  // 2px → 3px IS THE TOKEN BEING SPENT. `--rule` is the edge that MEANS something as against the 1px one
+  // that merely separates, and the eleven rails that did that job split 6:5 between 3px and 2px by
+  // nothing at all. Resolved to `3px` here rather than written as `var(--rule)`, for Phase 1's reason:
+  // an expectation rewritten into the token name asserts nothing.
+  it('.tile keeps a 3px accent left edge over the 1px box, and its hover', () => {
     const tile = panel('inset', 'tile');
-    expect(box(tile)['border-left']).toBe('2px solid var(--accent)');
+    expect(box(tile)['border-left']).toBe('3px solid var(--accent)');
     expect(box(tile, ':hover')['border-color']).toBe('var(--accent)');
     // A `role="group"` is not a `<button>`, so `button.vb-surface`'s pointer does not reach it.
     expect(box(tile).cursor).toBe('pointer');

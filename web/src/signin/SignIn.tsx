@@ -1,5 +1,5 @@
-import type { SigninPhase } from './driver';
 import { Text } from '../atoms/Text';
+import type { SigninPhase } from './driver';
 
 interface Props {
   phase: SigninPhase;

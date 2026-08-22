@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import type { Card } from '../shared';
 import { Button } from '../atoms/Button';
 import { Readout } from '../atoms/Readout';
 import { Surface } from '../atoms/Surface';
 import { Text } from '../atoms/Text';
+import type { Card } from '../shared';
 import { linkedCards } from '../viewmodel';
 import { LinkPicker } from './LinkPicker';
 
@@ -60,16 +60,12 @@ export function CardLinks({ card, allCards, onOpenCard, onLinks }: Props) {
               title={`Open ${c.id}`}
               onClick={() => onOpenCard(c)}
             >
-              <Readout>
-                {c.id}
-              </Readout>
+              <Readout>{c.id}</Readout>
               <span className="link-title">{c.title}</span>
             </Surface>
           ) : (
             <div key={c.id} className="cv-link">
-              <Readout>
-                {c.id}
-              </Readout>
+              <Readout>{c.id}</Readout>
               <span className="link-title">{c.title}</span>
             </div>
           ),

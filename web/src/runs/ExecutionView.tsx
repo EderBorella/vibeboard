@@ -1,11 +1,11 @@
 import type { CSSProperties } from 'react';
 import type { RunRecord } from '../api';
-import type { Card } from '../shared';
 import { Button } from '../atoms/Button';
 import { Chip } from '../atoms/Chip';
 import { Readout, ReadoutLine } from '../atoms/Readout';
 import { Surface } from '../atoms/Surface';
 import { Text } from '../atoms/Text';
+import type { Card } from '../shared';
 import { ForgiveAttempts } from './ForgiveAttempts';
 import { costLabel, usageTotal } from './format';
 import { useAccounting } from './useAccounting';
@@ -68,16 +68,10 @@ export function ExecutionView({
     <main className="execution" style={{ '--exec-cols': COLUMNS.length } as CSSProperties}>
       {accounting && (
         <ReadoutLine as="p">
-          <Readout>
-            {usageTotal(accounting.project)}
-          </Readout>
+          <Readout>{usageTotal(accounting.project)}</Readout>
           {/* S10: which cap will actually stop this project. A dollar figure beside a budget that can
               never trip would tell the reader the opposite of the truth. */}
-          {accounting.cap && (
-            <Readout>
-              {accounting.cap.why}
-            </Readout>
-          )}
+          {accounting.cap && <Readout>{accounting.cap.why}</Readout>}
         </ReadoutLine>
       )}
       {COLUMNS.map((column) => {
@@ -125,9 +119,7 @@ export function ExecutionView({
                     title={openTitle(record, card)}
                     onClick={() => card && onOpenCard(card, record)}
                   >
-                    <Readout>
-                      {subject}
-                    </Readout>{' '}
+                    <Readout>{subject}</Readout>{' '}
                     <span className="link-title">{card?.title ?? (record.card ? '(gone)' : '')}</span>
                   </Surface>
                   {(record.summary || record.note) && (

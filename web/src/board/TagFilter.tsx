@@ -18,10 +18,17 @@ export function TagFilter({ tags, active, onToggle, onClear }: Props) {
   return (
     <div className="tag-filter" role="group" aria-label="Filter by tag">
       {tags.map(({ tag, count }) => (
+        // `tone="neutral"` IS THE INK THE READOUT USED TO SUPPLY. `.vb-readout` declared
+        // `color: var(--muted)` until the atom phase deleted it — a Readout is a treatment and takes the
+        // ink of the atom it sits in — and this chip and `.board-archive` were the two in the chip census
+        // with no ink of their own beneath it, so both would have rendered at `--text` beside the
+        // `.mp-chip` and `.tag` filters that say `neutral` and are muted. Said with the atom's own option
+        // rather than with a rule on the surface: an unselected filter reads quieter than the board.
         <Chip
           as="button"
           pill
           fill
+          tone="neutral"
           key={tag}
           className={`tag-chip vb-readout${active.includes(tag) ? ' active' : ''}`}
           ariaPressed={active.includes(tag)}

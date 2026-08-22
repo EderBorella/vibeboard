@@ -1,8 +1,8 @@
 import type { ModelOption } from '../api';
-import { ModelPicker } from '../models/ModelPicker';
-import type { BackendCaps } from '../shared';
 import { Button } from '../atoms/Button';
 import { Control } from '../atoms/Control';
+import { ModelPicker } from '../models/ModelPicker';
+import type { BackendCaps } from '../shared';
 import { SegmentedControl } from '../ui/SegmentedControl';
 
 interface Props {
@@ -63,14 +63,7 @@ export function CopilotControls({
         />
         {/* NOT a `Field`: the dock's control row carries no labels at all, and one label on one of its
             two controls would read worse than none. The box is the primitive's. */}
-        <Control
-          
-          as="select"
-          
-          value={effEffort}
-          disabled={running}
-          onChange={(e) => onEffort(e.target.value)}
-        >
+        <Control as="select" value={effEffort} disabled={running} onChange={(e) => onEffort(e.target.value)}>
           {caps.efforts.map((e) => (
             <option key={e.value} value={e.value}>
               {e.label}

@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import type { Skill } from '../api';
-import { BOARD_LABELS, BOARDS, type BoardName, type ProjectConfig } from '../shared';
 import { Button } from '../atoms/Button';
 import { Control } from '../atoms/Control';
 import { Text } from '../atoms/Text';
+import { BOARD_LABELS, BOARDS, type BoardName, type ProjectConfig } from '../shared';
 import { Field } from '../ui/Field';
 import { slugify } from '../viewmodel';
 
@@ -106,7 +106,13 @@ export function SkillEditor({ skill, config, busy, onSave }: Props) {
           its label. It was `vb-label-caps vb-label-rail` on a full-width label, so the 6rem the rail
           declares was doing nothing here — the face is what it wanted. */}
       <Field caps label="Prompt">
-        <Control as="textarea" mono rows={12} value={prompt} onChange={(e) => touch(setPrompt)(e.target.value)} />
+        <Control
+          as="textarea"
+          mono
+          rows={12}
+          value={prompt}
+          onChange={(e) => touch(setPrompt)(e.target.value)}
+        />
       </Field>
 
       <div className="skill-foot">

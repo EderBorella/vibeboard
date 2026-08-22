@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { getModelStatus, listModels, type ModelOption, type ModelStatus } from '../api';
-import { useConfirm } from '../confirm/useConfirm';
-import { backendCaps, backendDefaults } from '../shared';
 import { Button } from '../atoms/Button';
 import { Control } from '../atoms/Control';
 import { Readout } from '../atoms/Readout';
 import { Text } from '../atoms/Text';
+import { useConfirm } from '../confirm/useConfirm';
+import { backendCaps, backendDefaults } from '../shared';
 import { StatusChip } from '../ui/StatusChip';
 import { stateClass } from '../ui/state-tones';
 import { useFetched } from '../useFetched';
@@ -74,9 +74,7 @@ function MessageLine({ item }: { item: TranscriptItem }) {
       {item.kind === 'tool' ? (
         // The name of a tool the agent called is machine vocabulary, and `.msg-tool` said so by hand in
         // `--t-small` accent mono — which is `Readout` `small` `accent` value for value.
-        <Readout>
-          ⚙ {item.toolName}
-        </Readout>
+        <Readout>⚙ {item.toolName}</Readout>
       ) : item.kind === 'thinking' ? (
         <span className="msg-thinking">{item.text}</span>
       ) : (
@@ -320,9 +318,7 @@ export function CopilotPanel({
       <div className="copilot-input">
         {/* NOT a `Field`: a composer's label is its placeholder and the Send button beside it. */}
         <Control
-          
           as="textarea"
-          
           value={draft}
           placeholder={running ? 'Running…' : 'Message the copilot (Enter to send)'}
           onChange={(e) => setDraft(e.target.value)}

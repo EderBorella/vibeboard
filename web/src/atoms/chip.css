@@ -24,7 +24,8 @@
   border: 1px solid var(--border); border-radius: var(--r-sm);
   padding: 0 var(--s-3); font-size: var(--t-micro);
   background: none; color: inherit; font-family: inherit;
-  height: var(--mark-h); line-height: 1;
+  /* `min-height` for atoms/button.css's reason, at the marker height. */
+  height: var(--mark-h); min-height: var(--mark-h); line-height: 1;
 }
 /* The one thing that really is the tag's and not the box's: a span must not offer a pointer. */
 button.vb-chip { cursor: pointer; }

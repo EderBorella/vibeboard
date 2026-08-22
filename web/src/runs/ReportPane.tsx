@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import type { RunRecord } from '../api';
-import { renderMarkdown } from '../markdown';
-import type { Card, ProjectConfig } from '../shared';
 import { Button } from '../atoms/Button';
 import { Chip } from '../atoms/Chip';
 import { Control } from '../atoms/Control';
 import { Readout } from '../atoms/Readout';
 import { Surface } from '../atoms/Surface';
 import { Text } from '../atoms/Text';
+import { renderMarkdown } from '../markdown';
+import type { Card, ProjectConfig } from '../shared';
 import { slugify } from '../viewmodel';
 import { usageLine } from './format';
 import { ReportOptions } from './ReportOptions';
@@ -135,7 +135,9 @@ export function ReportPane({
       {record.report.trim() ? (
         <div className="markdown report-body">{renderMarkdown(record.report)}</div>
       ) : (
-        <Text role="hint" lead>This run left no report.</Text>
+        <Text role="hint" lead>
+          This run left no report.
+        </Text>
       )}
 
       {createdCards.length > 0 && (
@@ -151,10 +153,7 @@ export function ReportPane({
               title={`Open ${c.id}`}
               onClick={() => onOpenCard(c)}
             >
-              <Readout testId="created-id">
-                {c.id}
-              </Readout>{' '}
-              <span className="link-title">{c.title}</span>
+              <Readout testId="created-id">{c.id}</Readout> <span className="link-title">{c.title}</span>
             </Surface>
           ))}
         </div>
@@ -180,9 +179,7 @@ export function ReportPane({
         <div className="report-foot">
           {/* NOT a `Field`: an action row, and its own first option — "Choose a column…" — names it. */}
           <Control
-            
             as="select"
-            
             aria-label="Column to move the card to"
             value={column}
             onChange={(e) => setColumn(e.target.value)}

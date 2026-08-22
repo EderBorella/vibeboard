@@ -45,8 +45,7 @@ export const EveryOption: Story = {
 export const NotAControl: Story = {
   render: () => (
     <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8125rem' }}>
-      <input type="checkbox" defaultChecked />
-      a decision, not a value
+      <input type="checkbox" defaultChecked />a decision, not a value
     </label>
   ),
 };

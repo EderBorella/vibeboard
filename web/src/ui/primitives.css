@@ -105,18 +105,24 @@
    is what measures `--ctl-h`. A cell is 2px shorter than the group by construction, because the group's
    own 1px border is inside its 28px — and that is why the browser harness's check 12 measures the group
    and names the cells as parts of it rather than as controls on the row. */
+/* `min-height` for atoms/button.css's reason: a group whose height is declared must not be shrunk to its
+   cells' line box by a column flex parent. */
 .vb-seg {
   display: flex; border: 1px solid var(--border); border-radius: var(--r-md); overflow: hidden;
-  height: var(--ctl-h);
+  height: var(--ctl-h); min-height: var(--ctl-h);
 }
 .vb-seg-cell {
   background: var(--panel-2); color: var(--muted);
   border: none; border-right: 1px solid var(--border);
   padding: 0 var(--s-4); font-size: var(--t-small); cursor: pointer;
 }
-/* The `sm` group is a step down in its LABEL and nothing else now: the padding that made it a shorter box
-   is gone with the group's height, so `size` here is the horizontal-and-face axis `Button`'s is. */
-.vb-seg-cell-sm { padding: 0 var(--s-4); font-size: var(--t-micro); }
+/* The `sm` group is a step down in its LABEL and nothing else now: the vertical padding that made it a
+   shorter box is gone with the group's height, so `size` here is the face axis `Button`'s `size` is the
+   horizontal one. THE HORIZONTAL PADDING WENT WITH IT, and as a DEAD DECLARATION rather than a decision —
+   with the vertical half removed it restated `.vb-seg-cell`'s `0 var(--s-4)` value for value, which is the
+   same defect `.link-option`'s `font-size` and `.cv-link`'s and `.tag-chip-count`'s each were: a rule that
+   looks like a choice and changes nothing. `test/label-notice-boxes.test.tsx` measures the pair. */
+.vb-seg-cell-sm { font-size: var(--t-micro); }
 .vb-seg-cell:last-child { border-right: none; }
 .vb-seg-cell.active { background: var(--accent-fill); color: var(--on-fill); font-weight: 600; }
 .vb-seg-cell:disabled { opacity: 0.6; cursor: default; }

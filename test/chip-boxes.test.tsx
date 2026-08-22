@@ -30,9 +30,9 @@
 import { cleanup, render } from '@testing-library/react';
 import type { ComponentProps } from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
+import { Chip } from '../web/src/atoms/Chip.js';
 import { CardTile } from '../web/src/board/CardTile.js';
 import type { Card } from '../web/src/shared.js';
-import { Chip } from '../web/src/atoms/Chip.js';
 import { box } from './css-box.js';
 import { inkIn, inkToken, isColour, THEMES } from './state-ink.js';
 
@@ -92,8 +92,13 @@ const chips: {
   ground?: string;
 }[] = [
   {
+    // `tone="neutral"` IS NEW AND THE INK IS NOT. `.vb-readout` declared `color: var(--muted)` until the
+    // atom phase deleted it — a Readout is a treatment and takes the ink of the atom it sits in — and
+    // this chip and `.tag-chip` were the only two in the census with no ink of their own beneath it.
+    // Both say `neutral` at the call site now, which is what `.tag` and `.mp-chip` beside them already
+    // said, so the assertion is unchanged and it is the atom's own option carrying it.
     name: '.board-archive — the archive toggle on a board head',
-    props: { as: 'button', pill: true, fill: true, className: 'board-archive vb-readout' },
+    props: { as: 'button', pill: true, fill: true, tone: 'neutral', className: 'board-archive vb-readout' },
     radius: PILL,
     font: MICRO,
     ink: /--muted/,
@@ -108,8 +113,9 @@ const chips: {
     ground: 'var(--panel)',
   },
   {
+    // `tone="neutral"` — see `.board-archive` above.
     name: '.tag-chip — a tag in the filter bar',
-    props: { as: 'button', pill: true, fill: true, className: 'tag-chip vb-readout' },
+    props: { as: 'button', pill: true, fill: true, tone: 'neutral', className: 'tag-chip vb-readout' },
     radius: PILL,
     font: MICRO,
     ink: /--muted/,
@@ -201,8 +207,14 @@ describe('the chip family draws one box', () => {
   // `vb-readout` on the `<Chip>` rather than by restating `font-family` in its own rule, which is what
   // took three rules off the mono census. The assertion is unchanged either way.
   it.each([
-    ['.board-archive', { as: 'button', pill: true, fill: true, className: 'board-archive vb-readout' }],
-    ['.tag-chip', { as: 'button', pill: true, fill: true, className: 'tag-chip vb-readout' }],
+    [
+      '.board-archive',
+      { as: 'button', pill: true, fill: true, tone: 'neutral', className: 'board-archive vb-readout' },
+    ],
+    [
+      '.tag-chip',
+      { as: 'button', pill: true, fill: true, tone: 'neutral', className: 'tag-chip vb-readout' },
+    ],
     ['.tab-badge', { pill: true, className: 'tab-badge vb-readout' }],
     // A FOURTH, added by Phase 12: a run's status is machine vocabulary, and `.report-chip` restated
     // `font-family` in its own rule until it named the primitive instead. Its uppercase tracking is

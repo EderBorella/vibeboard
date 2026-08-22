@@ -1,10 +1,10 @@
 import type { CardLedgerData, RunRecord, RunStatus } from '../api';
-import type { Card } from '../shared';
 import { Button } from '../atoms/Button';
 import { Chip } from '../atoms/Chip';
 import { Readout, ReadoutLine } from '../atoms/Readout';
 import { Surface } from '../atoms/Surface';
 import { Text } from '../atoms/Text';
+import type { Card } from '../shared';
 import { ForgiveAttempts } from './ForgiveAttempts';
 import { costLabel, usageTotal } from './format';
 
@@ -117,9 +117,7 @@ function CardLedger({
           clear, and a button that can only report "nothing happened" is noise. */}
       {used.length > 0 && (
         <>
-          <Readout>
-            {used.map(([skill, n]) => `${skill} ${n} of ${attemptCap}`).join(' · ')}
-          </Readout>
+          <Readout>{used.map(([skill, n]) => `${skill} ${n} of ${attemptCap}`).join(' · ')}</Readout>
           <ForgiveAttempts board={card.board} card={card.id} onForgiven={onForgiven} />
         </>
       )}

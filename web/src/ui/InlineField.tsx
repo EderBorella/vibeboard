@@ -64,7 +64,14 @@ export function InlineField({
     );
   }
 
-  const shown = value === '' ? <Text role="hint" lead>{placeholder}</Text> : (display?.(value) ?? value);
+  const shown =
+    value === '' ? (
+      <Text role="hint" lead>
+        {placeholder}
+      </Text>
+    ) : (
+      (display?.(value) ?? value)
+    );
   const cls = `inline-view${className ? ` ${className}` : ''}`;
   const open = (): void => setDraft(value);
 

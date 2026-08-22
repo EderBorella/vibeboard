@@ -10,13 +10,13 @@ import {
   startAutopilot,
 } from '../api';
 import { type LightAdvice, lightAdvice } from '../app/connection-light';
+import { Button } from '../atoms/Button';
+import { Text } from '../atoms/Text';
 import { killProjectRequest } from '../confirm/requests';
 import { useConfirm } from '../confirm/useConfirm';
 import { BackendPicker } from '../copilot/BackendPicker';
 import { resolveChoice } from '../copilot/choice';
 import type { CopilotConfig } from '../shared';
-import { Button } from '../atoms/Button';
-import { Text } from '../atoms/Text';
 import { StatusChip } from '../ui/StatusChip';
 import { stateClass } from '../ui/state-tones';
 import { useAction } from '../useAction';
@@ -497,7 +497,9 @@ export function AutopilotBar({
           <div>
             <div className="ap-drawer-head">Working on</div>
             {model.doing.length === 0 ? (
-              <Text role="hint" lead>Nothing is running.</Text>
+              <Text role="hint" lead>
+                Nothing is running.
+              </Text>
             ) : (
               <ul className="ap-work">
                 {model.doing.map((w) => (
@@ -512,7 +514,9 @@ export function AutopilotBar({
           <div>
             <div className="ap-drawer-head">Stopping it from starting</div>
             {model.missing.length === 0 ? (
-              <Text role="hint" lead>Nothing — it is ready to run.</Text>
+              <Text role="hint" lead>
+                Nothing — it is ready to run.
+              </Text>
             ) : (
               <ul className="blockers">
                 {model.missing.map((b) => (

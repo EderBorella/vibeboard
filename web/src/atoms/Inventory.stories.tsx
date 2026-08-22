@@ -25,10 +25,13 @@ import { Readout } from './Readout';
 // claims, and the drift baseline records the two tallies. What this does is make agreement — or its
 // absence — legible in one glance.
 //
-// THE TWO ROWS THAT ARE EXPECTED TO DISAGREE ARE NAMED AS SUCH, and there are two kinds. A segmented CELL
-// is 2px shorter than its group because the group owns the border, which is geometry rather than an
-// oversight; and `.tab-btn`/`.dock-tab` are the tab faces no atom owns yet, deleted in Phases 5 and 6
-// rather than patched here — patching a class you are about to delete is migration scaffolding.
+// THE ROWS THAT ARE EXPECTED TO DISAGREE ARE NAMED AS SUCH, DRAWN LAST, AND THERE ARE FOUR. Operable: a
+// segmented CELL is 2px shorter than its group because the group owns the border, which is geometry
+// rather than an oversight; and `.tab-btn` is one of the four tab faces no atom owns yet, deleted in
+// Phases 5 and 6 rather than patched here — patching a class you are about to delete is migration
+// scaffolding. Marker: a `Readout` is a treatment on a `<span>` and not a box at all, and a `Dot` is a
+// circle whose height IS its width. Everything above those lines is one number, and the point of drawing
+// the exceptions at the bottom is that the column above them can be read in one glance.
 const meta = {
   title: 'Audit/Control inventory',
   parameters: { layout: 'padded' },
@@ -37,11 +40,21 @@ export default meta;
 
 // One row: the thing, its name, and what it measures. The measurement runs after layout and again on
 // every theme change, because the three themes do not share a font stack.
-function Measured({ label, children }: { label: string; children: ReactNode }) {
+//
+// `probe` NAMES THE ELEMENT THE ROW IS ABOUT, and it exists because the first version measured
+// `firstElementChild` and four of its eleven rows therefore reported a WRAPPER. The worst was the row
+// that exists to prove the phase's own headline: `Chip in 1.5 prose` measured the `<p>` and printed
+// **19.50**, which is the paragraph's line box — so the artefact that answers the owner's complaint said
+// a chip in prose was still taking its height from its context, when check 13 measures 16px for the same
+// chip on the real Project Log. `Field / Control` reported the whole field at 49.39 and
+// `vb-seg-cell (part of a group)` reported the GROUP at 28, hiding the very 2px the row is named for.
+// A story that measures the wrong box is worse than one that measures nothing: it is read as evidence.
+function Measured({ label, probe, children }: { label: string; probe?: string; children: ReactNode }) {
   const box = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState<string>('…');
   useEffect(() => {
-    const el = box.current?.firstElementChild;
+    const host = box.current;
+    const el = (probe ? host?.querySelector(probe) : host?.firstElementChild) ?? null;
     if (!el) return;
     const read = (): void => {
       const r = el.getBoundingClientRect();
@@ -52,7 +65,7 @@ function Measured({ label, children }: { label: string; children: ReactNode }) {
     const obs = new ResizeObserver(read);
     obs.observe(el);
     return () => obs.disconnect();
-  }, []);
+  }, [probe]);
   return (
     <>
       <code style={{ opacity: 0.6, fontSize: '0.6875rem', whiteSpace: 'nowrap' }}>{label}</code>
@@ -116,7 +129,7 @@ export const ControlHeights: StoryObj = {
           onChange={() => {}}
         />
       </Measured>
-      <Measured label="Field / Control">
+      <Measured label="Control in a Field" probe=".vb-ctl">
         <Field label="Cap">
           <Control defaultValue="12" />
         </Field>
@@ -130,7 +143,7 @@ export const ControlHeights: StoryObj = {
         </Control>
       </Measured>
       {/* THE TWO ROWS ALLOWED TO DISAGREE, drawn last so the column above is read as one number. */}
-      <Measured label="vb-seg-cell (part of a group)">
+      <Measured label="vb-seg-cell (a part, 2px shorter)" probe=".vb-seg-cell">
         <span className="vb-seg">
           <button type="button" className="vb-seg-cell active">
             a cell
@@ -169,23 +182,32 @@ export const MarkerHeights: StoryObj = {
           advice={{ heading: 'Ready', detail: 'This agent has what it needs to run.' }}
         />
       </Measured>
-      <Measured label="Readout">
-        <Readout>1 234 ms</Readout>
-      </Measured>
-      <Measured label="Dot 7 / 8 / 12">
-        <span style={{ display: 'inline-flex', gap: '0.5rem', alignItems: 'center' }}>
-          <Dot size={7} state="ready" />
-          <Dot size={8} state="running" />
-          <Dot size={12} state="failing" />
-        </span>
-      </Measured>
-      {/* THE SAME CHIP IN PROSE, at the line-height of the paragraph around it rather than its own. */}
-      <Measured label="Chip in 1.5 prose">
+      {/* THE SAME CHIP IN PROSE, and the row is the phase's own proof rather than a curiosity: this
+          measured 25.25px against 15px on the board while `.vb-chip` said `line-height: inherit` and
+          declared no height, so the paragraph around it was deciding a marker's size. `--mark-h` and
+          `line-height: 1` is what makes it the same 16px as the row above. Drawn among the markers and
+          NOT among the rows allowed to disagree, because agreeing is the whole point of it. */}
+      <Measured label="Chip in 1.5 prose" probe=".vb-chip">
         <p style={{ lineHeight: 1.5, margin: 0 }}>
           <Chip pill tone="neutral">
             in prose
           </Chip>
         </p>
+      </Measured>
+      {/* THE TWO ROWS ALLOWED TO DISAGREE HERE, and neither is a marker BOX. A `Readout` is a TREATMENT —
+          mono, tabular numerals, one tracking exception — on a `<span>` that declares no height at all,
+          so what it reports is the line box of whatever it sits in; that is what taking the step of the
+          atom around it MEANS. A `Dot` is a circle, so its height IS its width and it cannot be
+          `--mark-h` without ceasing to be one — the reason `check:box-scale` names all three pip sizes. */}
+      <Measured label="Readout (a treatment, not a box)">
+        <Readout>1 234 ms</Readout>
+      </Measured>
+      <Measured label="Dot 12 (a circle is a width)">
+        <span style={{ display: 'inline-flex', gap: '0.5rem', alignItems: 'center' }}>
+          <Dot size={7} state="ready" />
+          <Dot size={8} state="running" />
+          <Dot size={12} state="failing" />
+        </span>
       </Measured>
     </Grid>
   ),

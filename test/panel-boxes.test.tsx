@@ -31,9 +31,9 @@
 // and left-aligned inherited type.
 import { cleanup, render } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
+import { Surface } from '../web/src/atoms/Surface.js';
 import { BoardsView } from '../web/src/board/BoardsView.js';
 import type { BoardName, Card, ProjectConfig, ProjectSnapshot } from '../web/src/shared.js';
-import { Surface } from '../web/src/atoms/Surface.js';
 // THE CASCADE RESOLVER IS SHARED with test/field-boxes.test.tsx — see test/css-box.tsx. Its own two
 // directions are asserted below, under *the cascade helper separates a state from the resting style*.
 import { box } from './css-box.js';
@@ -260,6 +260,12 @@ describe('a list row draws no box until the surface lights it', () => {
     expect(drawn.color).toBe('var(--accent)');
   });
 
+  // 2px → 3px, AND IT IS `--rule` BEING SPENT RATHER THAN A NUMBER CHANGING. Eleven `border-left` rails
+  // did one job — "this edge MEANS something" — and split 6:5 between 3px and 2px with `--tone`,
+  // `--accent` and `--border` each appearing on both sides of the split, so neither value was chosen.
+  // 3px is the token's, and its recorded reason is that every owner report so far has been "I cannot see
+  // it". Written as the resolved `3px` and never as `var(--rule)`: an expectation rewritten into the token
+  // name compares one literal to the same literal and asserts nothing, which is the Phase 1 finding.
   it('a selected chat pick keeps its accent left edge', () => {
     const { container } = render(
       <div className="chat-menu-item active">
@@ -267,7 +273,7 @@ describe('a list row draws no box until the surface lights it', () => {
       </div>,
     );
     const pick = container.querySelector('[data-testid="chat-pick"]');
-    expect(box(pick as Element)['border-left']).toBe('2px solid var(--accent)');
+    expect(box(pick as Element)['border-left']).toBe('3px solid var(--accent)');
   });
 
   it('a disabled execution card stops being a control without losing its box', () => {

@@ -85,9 +85,9 @@ describe('ExecutionView', () => {
         ]}
       />,
     );
-    expect(column('In progress').querySelectorAll('.exec-run')).toHaveLength(2);
-    expect(column('Requires attention').querySelectorAll('.exec-run')).toHaveLength(2);
-    expect(column('Done').querySelectorAll('.exec-run')).toHaveLength(1);
+    expect(column('In progress').querySelectorAll('.vb-surface-inset')).toHaveLength(2);
+    expect(column('Requires attention').querySelectorAll('.vb-surface-inset')).toHaveLength(2);
+    expect(column('Done').querySelectorAll('.vb-surface-inset')).toHaveLength(1);
     expect(column('Requires attention').querySelector('[data-testid="exec-count"]')?.textContent).toBe('2');
   });
 
@@ -165,8 +165,8 @@ describe('ExecutionView', () => {
         ]}
       />,
     );
-    expect(column('Requires attention').querySelectorAll('.exec-run')).toHaveLength(1);
-    expect(column('Done').querySelectorAll('.exec-run')).toHaveLength(1);
+    expect(column('Requires attention').querySelectorAll('.vb-surface-inset')).toHaveLength(1);
+    expect(column('Done').querySelectorAll('.vb-surface-inset')).toHaveLength(1);
   });
 
   it('offers Dismiss for whatever is still waiting, and nothing else', () => {

@@ -54,6 +54,14 @@ export interface StyleAudit {
   overflow: Findings;
   // THE HOLE IN `overflow`, CLOSED. See `pageClipping`.
   clipping: Findings;
+  // THE ELEMENTS THE OTHER TWO WALKS SKIP, and this is check 3's replacement for a claim it lost. Both
+  // walks above `continue` on `text-overflow: ellipsis`, correctly — an ellipsis is a DELIBERATE statement
+  // that this text may be cut. As of the molecule layer every tab and menu LABEL is a `.vb-clip`, which
+  // declares one, so "check 3 can report an overflowing tab" stopped being true: fifteen labels moved out
+  // of the examined population in one commit. What is still a fault about an ellipsised box is that it may
+  // be clamped so tight there is nothing left to read, so the claim becomes a MINIMUM WIDTH rather than an
+  // overflow — see `pageClamped`.
+  clamped: Findings;
   contrast: Findings;
   tokens: TokenFindings;
   rows: Findings;
@@ -596,7 +604,7 @@ export interface DockAudit {
 
 function pageDock(): DockAudit {
   const body = document.querySelector('[data-testid="dock-body"]');
-  const pane = body?.querySelector('.raw-pane, .control-editor') ?? null;
+  const pane = body?.querySelector('[data-fill]') ?? null;
   const host = pane?.parentElement ?? null;
   const inset = host ? getComputedStyle(host) : null;
   return {
@@ -908,11 +916,60 @@ function pageFocus(root: string | null): FocusAudit {
   return { examined, unfocusable, offenders };
 }
 
+// AN ELLIPSISED BOX MUST STILL BE READABLE. The floor is 40px, which is about six characters at
+// `--t-micro` and four at `--t-body` — enough to tell two tabs apart, and far below anything in this tree
+// today, because a floor near the true number fails the run the first time somebody legitimately narrows a
+// pane. What it catches is the fault the overflow walk used to: a cell clamped to nothing.
+//
+// AND A ZERO-WIDTH ELLIPSISED BOX IS THE COLLAPSE CASE, which is why the guard is `> 0` and not
+// `!== 0`: `pageOverflow` skips a zero box as invisible and `pageClipping` skips it too, so a label whose
+// flex basis went to nothing was invisible to all three walks at once.
+const CLAMP_FLOOR = 40;
+function pageClamped(root: string | null): Findings {
+  const scope = root ? document.querySelector(root) : document.body;
+  if (!scope) return { examined: 0, offenders: [] };
+  const offenders: Offender[] = [];
+  let examined = 0;
+  for (const el of [scope, ...Array.from(scope.querySelectorAll('*'))]) {
+    const style = getComputedStyle(el);
+    if (style.textOverflow !== 'ellipsis') continue;
+    if (style.visibility === 'hidden' || style.display === 'none') continue;
+    const box = el.getBoundingClientRect();
+    if (box.height === 0) continue;
+    examined += 1;
+    if (box.width >= CLAMP_FLOOR) continue;
+    const id = el.getAttribute('data-testid');
+    const name = typeof el.className === 'string' ? el.className.trim().split(/\s+/)[0] : '';
+    offenders.push({
+      where: `${el.tagName.toLowerCase()}${id ? `[${id}]` : name ? `.${name}` : ''}`,
+      detail: `${box.width.toFixed(2)}px of ellipsised text, against a floor of ${CLAMP_FLOOR}px`,
+    });
+  }
+  return { examined, offenders };
+}
+
 // The document must not scroll sideways. Asserted at three widths because the board's columns are a
 // shared grid and the dock is a definite height: those widths are where the two decisions meet.
-function pageDocument(): { scrollWidth: number; clientWidth: number } {
+//
+// AND IT MUST NOT SCROLL DOWNWARD EITHER, WHICH NOTHING IN THIS HARNESS ASKED UNTIL NOW. `.app-shell` is
+// `height: 100vh; overflow: hidden` on purpose — the page itself never scrolls so the copilot's input box
+// cannot leave the screen — and the consequence nobody was measuring is that anything taller than the
+// viewport is simply CUT, with no scrollbar to say so. Every internal region has its own scroll; the shell
+// has none, so `scrollHeight > clientHeight` on it is content a person cannot reach by any gesture.
+function pageDocument(): {
+  scrollWidth: number;
+  clientWidth: number;
+  scrollHeight: number;
+  clientHeight: number;
+} {
   const el = document.documentElement;
-  return { scrollWidth: el.scrollWidth, clientWidth: el.clientWidth };
+  const shell = document.querySelector('.app-shell');
+  return {
+    scrollWidth: el.scrollWidth,
+    clientWidth: el.clientWidth,
+    scrollHeight: shell?.scrollHeight ?? el.scrollHeight,
+    clientHeight: shell?.clientHeight ?? el.clientHeight,
+  };
 }
 
 // The four page walks, composed here in node rather than in the page, so each in-page function stays
@@ -925,10 +982,11 @@ export async function auditStyles(page: Page, options: AuditOptions = {}): Promi
   const radius = await page.evaluate(pageRadius, { names: [...RADIUS_SCALE], root });
   const text = await page.evaluate(pageOverflow, root);
   const clipping = await page.evaluate(pageClipping, root);
+  const clamped = await page.evaluate(pageClamped, root);
   const contrast = await page.evaluate(pageContrast, root);
   const tokens = await page.evaluate(pageTokens, { root, runtime: RUN_TIME_TOKENS });
   const rows = await page.evaluate(pageRows, root);
-  return { ...boxes, ...heights, ...type, ...radius, ...text, clipping, contrast, tokens, rows };
+  return { ...boxes, ...heights, ...type, ...radius, ...text, clipping, clamped, contrast, tokens, rows };
 }
 
 export async function auditGrid(page: Page): Promise<GridAudit> {
@@ -945,7 +1003,12 @@ export async function auditFocus(page: Page, options: AuditOptions = {}): Promis
   return page.evaluate(pageFocus, options.root ?? null);
 }
 
-export async function documentOverflow(page: Page): Promise<{ scrollWidth: number; clientWidth: number }> {
+export async function documentOverflow(page: Page): Promise<{
+  scrollWidth: number;
+  clientWidth: number;
+  scrollHeight: number;
+  clientHeight: number;
+}> {
   return page.evaluate(pageDocument);
 }
 

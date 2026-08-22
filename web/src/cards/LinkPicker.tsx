@@ -16,7 +16,7 @@ export function LinkPicker({
 }) {
   if (linkable.length === 0) return <Text role="hint">No other cards yet to link.</Text>;
   return (
-    <Surface variant="inset" className="links-list">
+    <Surface variant="inset" className="vb-list links-list">
       {BOARDS.map((b) => {
         const group = linkable.filter((c) => c.board === b);
         if (group.length === 0) return null;
@@ -30,7 +30,7 @@ export function LinkPicker({
                 label={
                   <>
                     <Readout>{c.id}</Readout>
-                    <span className="link-title">{c.title}</span>
+                    <span className="vb-clip">{c.title}</span>
                   </>
                 }
               >

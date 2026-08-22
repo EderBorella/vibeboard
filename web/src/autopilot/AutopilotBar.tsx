@@ -12,6 +12,7 @@ import {
 import { type LightAdvice, lightAdvice } from '../app/connection-light';
 import { Button } from '../atoms/Button';
 import { Text } from '../atoms/Text';
+import { List } from '../organisms/shared/List';
 import { killProjectRequest } from '../confirm/requests';
 import { useConfirm } from '../confirm/useConfirm';
 import { BackendPicker } from '../copilot/BackendPicker';
@@ -515,11 +516,11 @@ export function AutopilotBar({
                 Nothing — it is ready to run.
               </Text>
             ) : (
-              <ul className="blockers">
+              <List as="ul" className="blockers">
                 {model.missing.map((b) => (
                   <li key={b}>{b}</li>
                 ))}
-              </ul>
+              </List>
             )}
           </div>
         </div>

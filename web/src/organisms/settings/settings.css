@@ -9,6 +9,17 @@
 .blockers li::before { content: "→"; position: absolute; left: 0; color: var(--warn, var(--danger)); }
 .ready-ok { font-size: var(--t-small); color: var(--accent); }
 
-.settings-row { display: flex; gap: var(--s-5); }
-.settings-row .vb-field { flex: 1; }
+/* `.settings-row` AND ITS DESCENDANT RULE ARE GONE — a `Row` with `.vb-row-main` on each of the two
+   fields, which is the shared name for "this cell takes the slack" that five families spelled five ways.
+   The gap moved from `--s-5` to the row's `--s-4`. */
+
+
+/* The agent sandbox panel in Settings. Two states, and they must not read alike: "enforced" is a
+   claim the user is trusting, "not enforced" is a condition they can act on. */
+/* Each action says what it does to the running session. A bare verb on a button that restarts a
+   server somebody has work in flight on is not enough to decide with — the hint IS the decision, so it
+   is a `vb-hint` like every other. */
+/* `> .vb-btn` since the class became a variant. Still a LAYOUT rule and still the caller's: a button in
+   a flex column stretches to the column's width otherwise, which is what made `.diary-refresh` 1240px. */
+.sandbox-action > .vb-btn { align-self: flex-start; }
 

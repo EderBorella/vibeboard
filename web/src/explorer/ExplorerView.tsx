@@ -14,7 +14,7 @@ import { Text } from '../atoms/Text';
 import { useConfirm } from '../confirm/useConfirm';
 import { errorText } from '../errors';
 import type { ProjectSnapshot } from '../shared';
-import { EditorBody, EditorShell } from '../ui/EditorShell';
+import { EditorBody, EditorLayout } from '../templates/EditorLayout';
 import { FileTree } from './FileTree';
 import { formatBytes } from './format';
 import { nameOf, parentOf } from './paths';
@@ -200,9 +200,9 @@ export function ExplorerView({ snapshot }: Props) {
         onCancelRename={() => setRenaming(null)}
       />
 
-      <div className="control-editor">
+      <div className="vb-editor" data-fill>
         {file ? (
-          <EditorShell
+          <EditorLayout
             path={file.path}
             dirty={open.dirty}
             views={file.kind === 'text' ? ['edit', 'preview'] : []}
@@ -224,11 +224,11 @@ export function ExplorerView({ snapshot }: Props) {
             {file.kind === 'text' ? (
               <EditorBody view={open.view} draft={open.draft} onDraft={open.edit} />
             ) : (
-              <div className="control-blank">{unopenable(file)}</div>
+              <div className="empty">{unopenable(file)}</div>
             )}
-          </EditorShell>
+          </EditorLayout>
         ) : (
-          <div className="control-blank">Select a file to view or edit it.</div>
+          <div className="empty">Select a file to view or edit it.</div>
         )}
         {(error ?? open.error) && <Text role="error">{error ?? open.error}</Text>}
       </div>

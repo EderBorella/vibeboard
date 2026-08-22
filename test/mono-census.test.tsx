@@ -56,7 +56,9 @@ const CONTENT_IS_MACHINE_TEXT = 'the content is machine text, not a measurement'
 // THE THREE THAT REMAIN ARE NOT CONTROLS. They are quoted machine text in prose, and no option on a
 // control can reach them.
 const SURVIVORS = new Map([
-  ['.gate-preview code, .ap-help-body code', `inline code in prose — ${CONTENT_IS_MACHINE_TEXT}`],
+  // A TYPE SELECTOR AS OF THE ORGANISM LAYER. It was `.gate-preview code, .ap-help-body code` — one rule
+  // naming two SURFACES from inside an atom's sheet, which the layer gate reads as exactly that.
+  ['code', `inline code in prose — ${CONTENT_IS_MACHINE_TEXT}`],
   [
     '.markdown code',
     `inline code in rendered prose, and the one chip exemption — ${CONTENT_IS_MACHINE_TEXT}`,

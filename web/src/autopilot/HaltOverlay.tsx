@@ -1,7 +1,8 @@
 import { useEffect, useRef } from 'react';
 import { type AutopilotState, restartAutopilot } from '../api';
 import { Button } from '../atoms/Button';
-import { Surface } from '../atoms/Surface';
+import { Text } from '../atoms/Text';
+import { Modal } from '../organisms/shared/Modal';
 import { useAction } from '../useAction';
 
 // The project is halted: everything in it was killed, and nothing will start again until someone says
@@ -55,28 +56,38 @@ export function HaltOverlay({ state, onRestarted }: { state: AutopilotState; onR
   }
 
   return (
-    <div className="halt-backdrop" role="alertdialog" aria-label="This project is halted">
-      <Surface className="halt">
-        <h2 className="halt-title">This project is halted</h2>
-        <p className="halt-why">
-          {state.detail ?? 'Everything in this project was stopped.'} Halted {readable(state)}.
-        </p>
-        <p className="halt-hint">
-          Nothing will be dispatched, and no agent or backend will be started for this project — not even by
-          the chat. Restarting brings the project back to idle; auto-pilot stays off until you start it
-          yourself.
-        </p>
-        {error && <p className="halt-error">{error}</p>}
-        <Button
-          variant="primary"
-          size="md"
-          ref={restartRef}
-          onClick={() => void restart()}
-          disabled={busy !== null}
-        >
-          {busy ? 'Restarting…' : 'Restart project'}
-        </Button>
-      </Surface>
-    </div>
+    // `blocking`: no backdrop dismiss, and the page behind is washed rather than dimmed. There is no
+    // Escape either — a halted project explaining itself must not be closed by a reflex.
+    <Modal
+      blocking
+      size="md"
+      tone="danger"
+      role="alertdialog"
+      label="This project is halted"
+      title="This project is halted"
+    >
+      <p>
+        {state.detail ?? 'Everything in this project was stopped.'} Halted {readable(state)}.
+      </p>
+      <Text lead>
+        Nothing will be dispatched, and no agent or backend will be started for this project — not even by
+        the chat. Restarting brings the project back to idle; auto-pilot stays off until you start it
+        yourself.
+      </Text>
+      {error && (
+        <Text role="error" lead>
+          {error}
+        </Text>
+      )}
+      <Button
+        variant="primary"
+        size="md"
+        ref={restartRef}
+        onClick={() => void restart()}
+        disabled={busy !== null}
+      >
+        {busy ? 'Restarting…' : 'Restart project'}
+      </Button>
+    </Modal>
   );
 }

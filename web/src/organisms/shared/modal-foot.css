@@ -1,5 +1,0 @@
-.modal-foot { display: flex; justify-content: flex-end; gap: var(--s-4); padding: var(--s-5) var(--s-6); border-top: 1px solid var(--border); }
-/* `.btn-primary`, `.btn-secondary` and `.btn-danger` WERE HERE and are gone: 37 call sites that were
-   `primary`, `default` and `danger` under their old names, with `padding: var(--s-4) 1rem` — which is
-   `md` exactly. `:disabled` went with them; `.vb-btn:disabled` says the same thing once. */
-

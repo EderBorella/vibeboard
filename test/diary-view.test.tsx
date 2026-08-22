@@ -346,7 +346,7 @@ describe('the split — what agents filed', () => {
       api.listDiary.mockResolvedValue([]);
       api.listSuggestions.mockResolvedValue([full()]);
       render(<DiaryView bump={0} />);
-      const line = await found('.filed-entry .vb-readout-block');
+      const line = await found('.filed-list .vb-readout-block');
       // TWO, not four: the state and when it was filed. `.filed-state` first, then the `<time>`.
       expect([...line.children].map((c) => c.tagName)).toEqual(['SPAN', 'TIME']);
       expect(line.querySelector('.filed-state')?.textContent).toBe('active');
@@ -356,7 +356,7 @@ describe('the split — what agents filed', () => {
       api.listDiary.mockResolvedValue([]);
       api.listSuggestions.mockResolvedValue([full()]);
       render(<DiaryView bump={0} />);
-      const row = await found('.filed-entry');
+      const row = await found('.filed-list > *');
       const refs = row.querySelector('.diary-about') as HTMLElement;
       // A sibling of the readout line, not a child of it — `.diary-about` is what the diary beside this
       // column already uses for exactly this, so the group costs no class.
@@ -368,7 +368,7 @@ describe('the split — what agents filed', () => {
       api.listDiary.mockResolvedValue([]);
       api.listSuggestions.mockResolvedValue([suggestion({ run: undefined })]);
       render(<DiaryView bump={0} />);
-      await waitFor(() => expect(filed().querySelector('.filed-entry')).toBeTruthy());
+      await waitFor(() => expect(filed().querySelector('.filed-list > *')).toBeTruthy());
       expect(filed().querySelector('.diary-about')).toBeNull();
     });
 

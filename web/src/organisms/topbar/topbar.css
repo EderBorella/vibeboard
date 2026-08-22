@@ -58,13 +58,9 @@
    `align-self: center` opts this cluster out of the bar's baseline alignment: these are controls, not
    prose, and a flex container donates its FIRST item's baseline — here a <select>, whose baseline is a
    UA-defined thing unrelated to the words beside it. */
-/* THE ONE LAYOUT UTILITY IN THIS FILE, and it is a deliberate exception rather than the start of a set.
-   SEVEN classes existed whose entire content was `margin-left: auto` — `.column-add`, `.mp-modal-close`,
-   `.copilot-reset`, `.dock-collapse`, `.copilot-x`, `.tile-archive` and `.cards-raw` — which is seven
-   names for one declaration, and Phase 3 measured them as exactly that. Naming the thing they all say
-   ("this one goes to the far end of its row") is the merge; adding a second utility beside it is the
-   utility framework docs/design-system.md refuses, so there is not one. */
-.push { margin-left: auto; }
+/* `.push` IS IN `templates/app-shell.css`, and so is `.switch-btn.active` below it. Both were the FIRST of
+   the seven misfiled strays `styles.ts` named — app-wide rules living in the top bar's sheet because that
+   is where their bytes fell — and the top bar is not where an app-wide utility belongs. */
 
 .topbar-right {
   margin-left: auto;
@@ -77,9 +73,6 @@
 /* `.switch-btn` shared this and is now `default`; `.theme-select` was the `<select>` half of it, at four
    call sites, and it is `.vb-ctl` as of Phase 9 — the pointer and the accent hover it declared are now
    what atoms/control.css says about every select. The class died outright. */
-/* PRESSED, which is not one of the five voices: the copilot toggle is lit while the panel is open, and a
-   filled `primary` would make a view toggle look like the page's one action. A colour and a glow only. */
-.switch-btn.active { border-color: var(--accent); color: var(--accent); box-shadow: var(--glow); }
 /* The live-connection indicator: dot plus the state in words.
    FIXED WIDTH, and that is the whole reason the label sits in its own element. The four states are
    `open`, `closed`, `connecting` and `unauthorized`, so the text swings between 4 and 12 characters —

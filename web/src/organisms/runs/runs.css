@@ -1,7 +1,8 @@
 /* ---------- Reports (a card's run history, and one report) ---------- */
 /* Deliberately not link-shaped: chips and times, so it cannot be mistaken for the card links. */
 .reports { display: flex; flex-direction: column; gap: var(--s-2); border-top: 1px solid var(--border); padding-top: var(--s-4); }
-.report-row { display: flex; align-items: center; gap: var(--s-3); }
+/* `.report-row` IS GONE — a `Row`. `.resolved` stays as the state the row wears; the two rules under it
+   are keyed on `.vb-row` so they cannot reach a `.resolved` that is not one. */
 /* A `Surface` with the `flat` variant. What is left is where the box sits and how it lays its parts out;
    the undrawn box, the corner, the padding and the inherited type are the primitive's. */
 .report-open { flex: 1; display: flex; align-items: baseline; gap: var(--s-4); }
@@ -45,8 +46,8 @@
    greyed — repainting the chip muted threw away the one thing it encodes, which is HOW the run ended,
    and left "Stopped" and "Needs you · dealt with" looking identical. The "· dealt with" text says it
    was answered; the colour is still free to say what it was. */
-.report-row.resolved .report-chip { opacity: 0.6; }
-.report-row.resolved .report-skill { color: var(--muted); }
+.vb-row.resolved .report-chip { opacity: 0.6; }
+.vb-row.resolved .report-skill { color: var(--muted); }
 .report-dismiss { flex: 0 0 auto; align-self: flex-start; }
 
 .report { display: flex; flex-direction: column; gap: var(--s-4); overflow-wrap: anywhere; }
@@ -78,4 +79,22 @@
 .option-btn { text-align: left; }
 .options-close { display: flex; align-items: center; gap: var(--s-4); margin-top: var(--s-2); }
 .options-close-label { font-size: var(--t-small); color: var(--muted); margin-right: auto; }
+
+
+/* The ledger lines: what a project or a card has spent, and which cap will stop it. Quiet by
+   default — a number you only look at when you are asking — and tabular so digits line up. */
+/* BOTH LEDGERS ARE `ReadoutLine` — see atoms/Readout.tsx. Five classes wrote this row by hand and agreed on
+   everything except a gap nobody chose. What is left is where each one sits: the project ledger spans the
+   whole execution grid, and a card's sits under its report list. */
+/* The project ledger's placement is `pages/execution/execution.css`'s: it named that page's class from
+   here, and a class defined in two scoped directories has no owner. */
+.reports > .vb-readout-block { margin-top: var(--s-4); }
+/* The way out of a card the machine spent, on the same line as the count it clears. Quiet by default —
+   it is an escape hatch, not the thing you came to the card to do — which is the `ghost` variant, and
+   it no longer has to borrow the report row's Stop styling because there is one Button. Nothing is left
+   for this class to say, so the class is gone; the two prose lines below keep theirs. */
+.reports-forgiven { flex-basis: 100%; opacity: 0.85; }
+/* The server's refusal, on its own line so it is not read as part of the ledger it sits under. */
+.reports-forgive-error { flex-basis: 100%; color: var(--danger); }
+
 

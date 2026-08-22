@@ -1,0 +1,65 @@
+/* LIST AND ROW — nineteen list-and-row families in five classes. §2.4 of the plan names them:
+ * `.control-item`, `.explorer-item`, `.mp-item`, `.filed-entry`, `.diary-entry`, `.suggestions-row`,
+ * `.gate-row`, `.report-row`, `.signin-row`, `.settings-row`, `.dispatch-row`, `.skill-row`,
+ * `.resource-row`, `.exec-run`, `.archive-item`, `.links-list`, `.cv-links`, `.res-*`, `.board-label`.
+ *
+ * WHAT THEY DISAGREED ABOUT, MEASURED: nineteen `display: flex`, eleven `border-left` rails, seven
+ * gaps (`--s-1` to `--s-5`), five ways of saying "this cell takes the slack" and four selected states.
+ * None of the four disagreements was a decision — the rails were split 6:5 between 3px and 2px by
+ * nothing at all, which is the measurement `--rule` was created for one phase earlier.
+ *
+ * `.vb-list` IS BOTH THE LIST AND A STACKED ROW, and that is one class doing one job rather than two
+ * doing the same one: a column of lines with a gap is what a list of rows IS and what a row of two
+ * lines IS. Five families stacked (`.diary-entry`, `.filed-entry`, `.exec-run`, `.mp-pick`,
+ * `.suggestions-pick`) and every one of them wrote the same three declarations.
+ *
+ * `.vb-row-rail` IS WHERE `--rule` AND `--tone` MEET, which is what eleven surfaces were each writing by
+ * hand — and it is why the tone table is a custom property rather than a colour: the rail reads `--tone`
+ * from whatever `.vb-tone-*` the caller put beside it, so one declaration serves five colours and the
+ * default serves a row with no state at all. */
+
+/* `min-width: 0` for `.vb-surface`'s reason: a flex item's automatic minimum is its content. */
+.vb-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+  min-width: 0;
+}
+/* THE UA LIST RESET IS ON THE ELEMENT AND NOT ON THE CLASS, and that is load-bearing rather than tidy:
+   this sheet is imported AFTER `atoms/surface.css`, so a bare `padding: 0` here would beat `flat`'s and
+   `inset`'s `var(--s-3) var(--s-4)` at equal specificity and collapse every stacked row that draws a box.
+   Six of the nineteen families were a `<ul>`/`<ol>` and each cancelled the UA's margin and bullet itself;
+   only those elements have anything to cancel. */
+ul.vb-list, ol.vb-list { list-style: none; margin: 0; padding: 0; }
+
+/* THE ROW. `align-items: center` because fifteen of the nineteen said so and the four that said
+   `baseline` are a figure beside a word, which is `FigureRow`'s claim and not a row's.
+   `width: 100%` and `text-align: left` are what a row rendered as a `<button>` needs and a UA does not
+   give it — six of the nineteen are `<button>`s and five of the six wrote both by hand. */
+.vb-row {
+  display: flex;
+  align-items: center;
+  gap: var(--s-4);
+  min-width: 0;
+  width: 100%;
+  text-align: left;
+}
+
+/* THE RAIL. `--tone` with a `--border` fallback, so a row with no state draws the quiet edge eleven of
+   these already drew and a toned row draws its colour — one declaration for five colours plus none.
+   Not `border-left-color` on a separate rule: the width IS the meaning here, which is what `--rule` is. */
+.vb-row-rail { border-left: var(--rule) solid var(--tone, var(--border)); }
+
+/* INTERACTIVE. A row you can click is a region of a list rather than a control with a voice — the line
+   `Surface` draws between itself and `Button` — so the affordance is a ground on hover and an accent edge
+   when it is the one selected. `.control-item`, `.mp-item`, `.gate-list button` and `.exec-card` each
+   wrote some of this; between them they wrote four different selected states for one fact.
+   `.active` is the app's one selection word and is not counted as this file's — see check-class-budget. */
+.vb-row-hit { cursor: pointer; }
+.vb-row-hit:hover { background: var(--panel-2); border-color: var(--accent); }
+.vb-row-hit.active { background: var(--panel-2); border-color: var(--accent); color: var(--accent); }
+
+/* THE CELL THAT TAKES THE SLACK, which five families spelled five ways (`flex: 1`, `flex: 1 1 auto`,
+   `flex: 1; min-width: 0`, and twice with the three overflow declarations `.vb-clip` now owns). The
+   overflow is NOT here: a stacked cell must be allowed to wrap, and `.vb-clip` is the one-line case. */
+.vb-row-main { flex: 1; min-width: 0; }

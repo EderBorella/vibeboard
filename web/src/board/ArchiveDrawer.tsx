@@ -4,6 +4,7 @@ import { Button } from '../atoms/Button';
 import { Control } from '../atoms/Control';
 import { Readout } from '../atoms/Readout';
 import { Surface } from '../atoms/Surface';
+import { Row } from '../organisms/shared/Row';
 import { Text } from '../atoms/Text';
 import { errorText } from '../errors';
 import type { ArchivedCard, BoardName, ProjectConfig } from '../shared';
@@ -89,7 +90,7 @@ export function ArchiveDrawer({ board, config, count, onOpen }: Props) {
   return (
     <Surface className="archive-drawer" data-testid="archive-drawer">
       {cards.map((c) => (
-        <Surface variant="inset" className="archive-item" key={c.id}>
+        <Row variant="inset" key={c.id}>
           <div className="archive-meta">
             <Readout>{c.id}</Readout>
             <Readout>{when(c.archived)}</Readout>
@@ -122,7 +123,7 @@ export function ArchiveDrawer({ board, config, count, onOpen }: Props) {
               ))}
             </Control>
           </div>
-        </Surface>
+        </Row>
       ))}
     </Surface>
   );

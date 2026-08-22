@@ -1,6 +1,13 @@
 /* The Explorer's tree. One flat list of rows indented by depth, not nested elements, so tab order
    and reading order are the same thing. Wider than the control list: paths run deep. */
-.explorer-list { width: 320px; gap: var(--s-1); }
+/* A `List` plus a width, and the two rules that used to name this class from ANOTHER surface's sheet are
+   here now: the inline rename (Project Control's) and the error line (the editor template's). Both were
+   the same fault — a class defined in two scoped directories has no owner, and `npm run check:layers`
+   blocks on it as of this phase. */
+.explorer-list { width: 320px; }
+.explorer-list .vb-ctl { width: 100%; border-color: var(--accent); }
+.explorer-list .vb-ctl:focus { box-shadow: var(--glow); }
+.explorer-list > .vb-text-error { padding: var(--s-4) var(--s-6); }
 .explorer-head { position: sticky; top: -0.75rem; background: var(--wash); z-index: var(--z-chrome); padding-top: var(--s-1); }
 /* `Surface`'s `flat` padding is symmetric, and the 2px this rule shaved off the right was not a
    decision anybody made. `gap` is layout and stays. */

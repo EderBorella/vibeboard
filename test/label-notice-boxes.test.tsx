@@ -62,7 +62,6 @@ describe('the uppercase section labels', () => {
   const LABELS: [string, string][] = [
     ['cs-head', 'var(--muted)'],
     ['ap-drawer-head', 'var(--muted)'],
-    ['control-group-head', 'var(--muted)'],
     ['links-group', 'var(--muted)'],
     ['settings-section', 'var(--accent)'],
     ['diary-kind', 'var(--text)'],
@@ -189,7 +188,7 @@ describe('the empty-state lines', () => {
     expect(box(label('column-empty', 'p')).border).toBe('1px dashed var(--border)');
   });
 
-  it.each([['empty'], ['control-blank']])('.%s is a margin:auto blank filling a pane', (cls) => {
+  it.each([['empty']])('.%s is a margin:auto blank filling a pane', (cls) => {
     expect(box(label(cls, 'div')).margin).toBe('auto');
   });
 
@@ -403,8 +402,8 @@ describe('the archived row', () => {
   // and `var(--s-3) var(--s-4)` is `.archive-item`'s OWN value, which is why `inset` took it out of the
   // eight the ten nested boxes were written with. So the row's height did not move, and the claim this
   // pins — the container pads itself, so `.archive-title` inside it must not — is unchanged.
-  it('.archive-item pads itself', () => {
-    const { container } = render(<Surface variant="inset" className="archive-item" />);
+  it('an archived row pads itself', () => {
+    const { container } = render(<Surface variant="inset" className="vb-row" />);
     const el = container.firstElementChild;
     if (!el) throw new Error('Panel rendered nothing');
     expect(box(el).padding).toBe('6px 8px');

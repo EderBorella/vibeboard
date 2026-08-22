@@ -74,8 +74,8 @@ const BOXES: [name: string, el: () => Element][] = [
   ['a settings field', field],
   ['the project gate', () => at('<div class="gate"><input class="vb-ctl"/></div>', 'input')],
   ['a skill field', () => at('<input class="vb-ctl"/>', 'input')],
-  ['the typed confirmation', () => at('<div class="confirm-require"><input class="vb-ctl"/></div>', 'input')],
-  ['the model search', () => at('<div class="mp-modal"><input class="vb-ctl"/></div>', 'input')],
+  ['the typed confirmation', () => at('<div class="vb-field"><input class="vb-ctl"/></div>', 'input')],
+  ['the model search', () => at('<div class="vb-modal"><input class="vb-ctl"/></div>', 'input')],
   [
     'the dispatch prompt',
     () => at('<div class="dispatch"><textarea class="vb-ctl"></textarea></div>', 'textarea'),
@@ -85,7 +85,7 @@ const BOXES: [name: string, el: () => Element][] = [
   // a descendant rule of their container — `.resource-row input`, which was `.vb-ctl` declaration for
   // declaration, and `.copilot-input textarea` — and both rules are gone: the element carries
   // `vb-ctl` now, so the class list is the claim rather than the container.
-  ['a links registry row', () => at('<div class="resource-row"><input class="vb-ctl"/></div>', 'input')],
+  ['a links registry row', () => at('<div class="vb-row"><input class="vb-ctl"/></div>', 'input')],
   [
     'the copilot composer',
     () => at('<div class="copilot-input"><textarea class="vb-ctl"></textarea></div>', 'textarea'),
@@ -141,7 +141,7 @@ describe('the boxes that differ, and why', () => {
     // `font-family: var(--font-mono)` declarations the atom phase replaced with one, which took
     // `check-shape-coverage.mjs`'s mono ceiling from 7 to 3. The claim is the same; the class carrying
     // it is the atom's, so the fixture names it or it asserts a deleted rule.
-    const el = at('<textarea class="vb-ctl vb-ctl-mono control-textarea"></textarea>', 'textarea');
+    const el = at('<textarea class="vb-ctl vb-ctl-mono vb-editor-body"></textarea>', 'textarea');
     expect(box(el)['font-family']).toBe('var(--font-mono)');
   });
 });

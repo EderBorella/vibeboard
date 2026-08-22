@@ -2,8 +2,8 @@ import type { ControlCategory, ControlFile, ControlGroup } from '../api';
 import { Button } from '../atoms/Button';
 import { Chip } from '../atoms/Chip';
 import { Control } from '../atoms/Control';
-import { Surface } from '../atoms/Surface';
 import { Text } from '../atoms/Text';
+import { Row } from '../organisms/shared/Row';
 
 // A selection that means "the links registry", not a path on disk. It travels through the same
 // `selected` state as a real file path so the list has one notion of what is active.
@@ -41,33 +41,36 @@ export function ControlFileList({
   onCancelRename,
 }: Props) {
   return (
-    <nav className="control-list">
+    <nav className="vb-list control-list">
       {groups.map((g) => (
         <div key={g.key} className="control-group">
-          <div className="control-group-head">
-            <span>{g.label}</span>
+          {/* A `Row` and a `Text caps`, where `.control-group-head` was a flex row plus the caps face —
+              and it was ALSO the Explorer's, which is the layer fault the gate now refuses. */}
+          <Row>
+            <Text caps>{g.label}</Text>
             {g.creatable && (
               <Button
                 variant="bare"
                 size="sm"
-                className="control-new"
+                className="control-new push"
                 title={`New ${g.label.toLowerCase().replace(/s$/, '')}`}
                 onClick={() => onNew(g.key)}
               >
                 ＋
               </Button>
             )}
-          </div>
+          </Row>
           {g.key === 'resources' && (
-            <Surface
+            <Row
               as="button"
               variant="flat"
-              className={`control-item${selected === RESOURCES_SENTINEL ? ' active' : ''}`}
+              interactive
+              active={selected === RESOURCES_SENTINEL}
               data-testid="control-item"
               onClick={() => onSelect(RESOURCES_SENTINEL)}
             >
-              <span className="control-item-name">🔗 Links registry</span>
-            </Surface>
+              <span className="vb-clip">🔗 Links registry</span>
+            </Row>
           )}
           {g.files.length === 0 && g.key !== 'resources' && (
             <Text role="hint" className="control-empty">
@@ -95,19 +98,20 @@ export function ControlFileList({
                 }}
               />
             ) : (
-              <Surface
+              <Row
                 as="button"
                 variant="flat"
+                interactive
+                active={selected === f.path}
                 key={f.path}
-                className={`control-item${selected === f.path ? ' active' : ''}`}
                 data-testid="control-item"
                 title={`${f.path}${f.deletable ? ' · double-click to rename' : ''}`}
                 onClick={() => onSelect(f.path)}
                 onDoubleClick={() => onStartRename(f)}
               >
-                <span className="control-item-name">{f.name}</span>
+                <span className="vb-clip">{f.name}</span>
                 {f.managed && <Chip className="control-tag">managed</Chip>}
-              </Surface>
+              </Row>
             ),
           )}
         </div>

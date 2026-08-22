@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Button } from '../atoms/Button';
-import { Surface } from '../atoms/Surface';
+import { Modal } from '../organisms/shared/Modal';
 
 // How auto-pilot works, in the app rather than in a design document nobody reading the header has open.
 //
@@ -22,15 +22,18 @@ export function AutopilotHelp({ onClose }: { onClose: () => void }) {
   }, [onClose]);
 
   return (
-    <div className="modal-backdrop" role="dialog" aria-label="How auto-pilot works" aria-modal="true">
-      <Surface className="modal ap-help">
-        <div className="modal-head">
-          <h2>How auto-pilot works</h2>
-          <Button size="md" ref={closeRef} onClick={onClose}>
-            Close
-          </Button>
-        </div>
-        <div className="modal-body ap-help-body">
+    <Modal
+      label="How auto-pilot works"
+      title="How auto-pilot works"
+      className="ap-help"
+      bodyClassName="ap-help-body"
+      onClose={onClose}
+      head={
+        <Button size="md" ref={closeRef} onClick={onClose}>
+          Close
+        </Button>
+      }
+    >
           <h3>The loop</h3>
           <p>
             Auto-pilot walks your three boards on its own. Each pass it works out{' '}
@@ -114,8 +117,6 @@ export function AutopilotHelp({ onClose }: { onClose: () => void }) {
             narrative, one line per dispatch and per checkup. A <strong>checkup</strong> runs when a story or
             a feature has nothing unfinished left under it, and it is what closes the card.
           </p>
-        </div>
-      </Surface>
-    </div>
+    </Modal>
   );
 }

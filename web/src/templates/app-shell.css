@@ -11,3 +11,32 @@
   .app-shell { height: 100dvh; }
 }
 
+
+/* 48px → 24px, and it is invisible: `margin: auto` centres the content, so this padding is clearance
+   from the pane's edges rather than rhythm — and the pane is always far wider than 48px. The same
+   applies to `.gate` (40px) and `.control-blank` (32px), the other two `margin: auto` blanks. */
+.empty { margin: auto; color: var(--muted); padding: var(--s-7); }
+
+
+/* THE ONE LAYOUT UTILITY IN THE TREE, and it is here rather than in the top bar's sheet because it is
+   app-wide and always was: `styles.ts` named it as the first of the seven misfiled strays. SEVEN classes
+   existed whose entire content was `margin-left: auto` — `.column-add`, `.mp-modal-close`,
+   `.copilot-reset`, `.dock-collapse`, `.copilot-x`, `.tile-archive` and `.cards-raw` — which is seven
+   names for one declaration. Naming the thing they all say ("this one goes to the far end of its row") is
+   the merge; adding a second utility beside it is the utility framework docs/design-system.md refuses. */
+.push { margin-left: auto; }
+/* PRESSED, which is not one of the five voices: the copilot toggle is lit while the panel is open, and a
+   filled `primary` would make a view toggle look like the page's one action. A colour and a glow only.
+   The second of the strays: it lived in the top bar's sheet, and the toggle it lights is app chrome. */
+.switch-btn.active { border-color: var(--accent); color: var(--accent); box-shadow: var(--glow); }
+
+/* THE SPLIT (decision 48). §2.5 of the plan lists this among `AppShell`'s holes, and that is where it is
+   now: it was `pages/log/log.css`'s, and the component that renders it is `diary/DiaryView.tsx`, so the
+   page's sheet owned a class its own surface never named. The diary is a 68ch reading column, so the
+   right-hand half costs nothing that was being used. */
+.log-split { flex: 1; min-width: 0; display: flex; overflow: hidden; }
+/* Narrow enough that the two columns stop being two columns: the diary keeps the width, and what agents
+   filed stacks under it rather than becoming a gutter neither half can be read in. */
+@media (max-width: 1100px) {
+  .log-split { flex-direction: column; overflow-y: auto; }
+}

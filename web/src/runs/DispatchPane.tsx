@@ -96,7 +96,7 @@ export function DispatchPane({
 
       {/* `as="div"` for the three rows whose control is a custom picker rather than a form element: a
           wrapping `<label>` has nothing to focus and would announce the whole group as the name. */}
-      <Field as="div" layout="rail" label="Connector" className="dispatch-row">
+      <Field as="div" layout="rail" label="Connector" className="vb-row dispatch-row">
         {/* THE SHARED PICKER, and the fourth call site to get it. This one built its own group from
             `BACKEND_DEFAULTS`'s KEYS, so it showed a person the raw id — "claude-code" — where the dock
             showed "Claude" and Settings showed "Claude Code": one setting with three spellings, two of
@@ -104,11 +104,11 @@ export function DispatchPane({
         <BackendPicker value={backend} onChange={onBackend} label="Connector" />
       </Field>
 
-      <Field as="div" layout="rail" label="Model" className="dispatch-row">
+      <Field as="div" layout="rail" label="Model" className="vb-row dispatch-row">
         <ModelPicker models={models} value={model} defaultModel={defaults.model} onChange={setModel} />
       </Field>
 
-      <Field layout="rail" label="Effort" className="dispatch-row">
+      <Field layout="rail" label="Effort" className="vb-row dispatch-row">
         <Control as="select" value={clamped.effort} onChange={(e) => setEffort(e.target.value)}>
           {caps.efforts.map((e) => (
             <option key={e.value} value={e.value}>
@@ -118,7 +118,7 @@ export function DispatchPane({
         </Control>
       </Field>
 
-      <Field as="div" layout="rail" label="Mode" className="dispatch-row">
+      <Field as="div" layout="rail" label="Mode" className="vb-row dispatch-row">
         <Tabs
           grouped
           items={caps.modes.map((m) => ({ value: m.value, label: m.label, title: m.hint }))}
@@ -148,7 +148,7 @@ export function DispatchPane({
             registry always go with a run.
           </Text>
           {attachable.map((path) => (
-            <Field key={path} layout="check" label={<span className="link-title">{path}</span>}>
+            <Field key={path} layout="check" label={<span className="vb-clip">{path}</span>}>
               <input type="checkbox" checked={attachments.includes(path)} onChange={() => toggle(path)} />
             </Field>
           ))}

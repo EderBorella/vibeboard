@@ -2,6 +2,8 @@ import { useEffect, useRef } from 'react';
 import { approveSignin, refuseSignin, type SigninPending } from '../api';
 import { Button } from '../atoms/Button';
 import { Surface } from '../atoms/Surface';
+import { Text } from '../atoms/Text';
+import { Modal } from '../organisms/shared/Modal';
 import { useAction } from '../useAction';
 
 interface Props {
@@ -50,21 +52,28 @@ export function ApprovalPrompt({ pending, onError }: Props) {
   }
 
   return (
-    <div className="halt-backdrop" role="alertdialog" aria-label="A browser is asking to sign in">
-      <Surface className="halt">
-        <h2 className="halt-title">Allow this browser in?</h2>
-        <p className="halt-why">
-          Something at <code>{first.address}</code> is asking to use this board. It says it is:
-        </p>
-        <Surface variant="inset" className="signin-label">
-          {first.label}
-        </Surface>
-        <p className="halt-hint">
+    // The same object the halt overlay is — the one thing on screen, blocking, explaining itself — and it
+    // borrows nothing by hand now: `blocking` and `danger` ARE what `.halt-backdrop` and `.halt` were.
+    <Modal
+      blocking
+      size="md"
+      tone="danger"
+      role="alertdialog"
+      label="A browser is asking to sign in"
+      title="Allow this browser in?"
+    >
+      <p>
+        Something at <code>{first.address}</code> is asking to use this board. It says it is:
+      </p>
+      <Surface variant="inset" className="signin-label">
+        {first.label}
+      </Surface>
+      <Text lead>
           Allow it only if that is you, on a device you are holding. Anything allowed here can read this
           board, start agents and edit files in your projects. What it calls itself can be faked — the address
           is the part that cannot.
-          {pending.length > 1 && ` ${pending.length - 1} more waiting after this one.`}
-        </p>
+        {pending.length > 1 && ` ${pending.length - 1} more waiting after this one.`}
+      </Text>
         <div className="signin-actions">
           {/* Refuse first in the DOM as well as visually, so tab order and reading order agree. */}
           <Button
@@ -79,8 +88,7 @@ export function ApprovalPrompt({ pending, onError }: Props) {
           <Button size="md" onClick={() => void decide(first.id, true)} disabled={busy !== null}>
             Allow
           </Button>
-        </div>
-      </Surface>
-    </div>
+      </div>
+    </Modal>
   );
 }

@@ -5,6 +5,8 @@
 //   1. Every one of them is referenced from web/src — literally, or through a class name composed at
 //      run time from a prefix and a value. BLOCKING at zero.
 //   2. How many there are, against a ratchet. BLOCKING on any increase. The target is 183.
+//   3. How many LAYOUT classes each surface names, against a per-surface ceiling of 4. REPORTING, and it
+//      is pointed at a backlog of fifteen surfaces — see PER_SURFACE below.
 //
 // A NAIVE IMPLEMENTATION OF CLAIM 1 DELETES LIVE CODE, and this is the check docs/design-system.md's
 // *Risks* section was written to stop being written badly. Classes are named nowhere as literals when
@@ -72,10 +74,24 @@ const PRIMITIVE_LAYER = [
 // THE RATCHET, and the number is what the tree holds today rather than what the plan wants. The sweep
 // took the union from 443 to this; the target is **183** and it is not reached.
 //
-// WHERE THE REST IS, MEASURED AND STATED HERE RATHER THAN CITED. 341 today — the 13-sheet primitive layer
-// 58, the surfaces 294, 11 in both. The deletions still named ahead are `Modal` 23 → 5 and `List`/`Row`
-// ~35 → 5, about −48, which lands near **293 against 183**: roughly 110 classes are not accounted for by
-// any named deletion, and that is the owner's to see rather than a gate's to hide.
+// WHERE THE REST IS, MEASURED AND STATED HERE RATHER THAN CITED. 307 today — the 13-sheet primitive layer
+// 60, the surfaces 261, 14 in both. THE ORGANISM PHASE WAS THE LAST ONE WITH A NAMED DELETION IN IT, so
+// this is the number the plan's own programme ends on, and the shortfall is the owner's to rule on rather
+// than a gate's to hide:
+//
+//   The plan's §5.3 target is **146**; `CLASS_TARGET` below still says **183** and nobody has reconciled
+//   the two (carried forward from the molecule layer as item 0i). Against 146 the gap is **161**; against
+//   183 it is **124**. Nothing named in notes/atomic-revamp-plan.md accounts for either.
+//
+//   WHERE THE 261 SURFACE CLASSES ACTUALLY LIVE, counted per directory rather than estimated: cards 38,
+//   board 33, runs 29, copilot 27, diary 20, autopilot 19, control 13, templates 12, execution 11,
+//   explorer 11, skills 10, gate 9, suggestions 8, topbar 7, settings 5, signin 5, dock 3, and 26 in
+//   `organisms/shared/` (Modal 5, List/Row 5, the picker 12, the confirm 1, plus `.danger`, `.on`,
+//   `.picked`-shaped state words). §5.3's allowance is FOUR per surface, and the four largest hold 127
+//   between them. Every one of the four is a surface whose remaining classes are TYPE FACES and one-off
+//   POSITIONS rather than boxes — `.tile-title`, `.msg-user`, `.report-meta dd`, `.diary-kind` — which is
+//   a different category from the fourteen families §1.7 measured, and no phase of this plan has a
+//   programme for it. That is the finding, stated where the number is.
 // The pointer this paragraph used to carry was FALSE, which is why the number is inline now:
 // `docs/design-system.md`'s own "Phase 5" is an earlier and different phase, it still lists
 // `SegmentedControl` as live and it still reports 457 class selectors. That document is rewritten as the
@@ -138,7 +154,28 @@ const PRIMITIVE_LAYER = [
 //             three molecules rather than one.
 // SIX FACES, SIX SELECTED STATES AND SIX HEIGHTS BECAME TWO COMPONENTS AND SEVEN CLASSES. `.active` is
 // not counted here in either direction: it is one name for the whole app and it survives on the toggles.
-const CLASS_CEILING = 341;
+// 341 before the ORGANISM LAYER, 307 after it, and the arithmetic is 44 out against 10 in:
+//   OUT (44)  MODAL, 21 — `.modal-{backdrop,head,title,body,foot}` and `.modal` (6), `.mp-modal-*` (4),
+//             `.confirm-{backdrop,body,actions,require}` and `.confirm` (5), `.halt-{backdrop,title,why,
+//             hint,error}` and `.halt` (6). Four dialogs, one shape, and the three axes they disagreed on
+//             (measure, colour, dismissable) are ATTRIBUTES rather than classes — see modal.css.
+//             LIST/ROW, 17 — `.control-item` `.control-item-name` `.control-group-head`, `.mp-item`
+//             `.mp-sel` `.mp-def` `.mp-pick` `.mp-name`, `.filed-entry` `.filed-list`, `.diary-entry`,
+//             `.suggestions-row`, `.gate-row`, `.report-row`, `.settings-row`, `.resource-row`,
+//             `.skill-row`, `.exec-run`, `.archive-item` — minus `.diary-list`, `.gate-list`,
+//             `.suggestions-list`, `.blockers`, `.control-list`, `.explorer-list`, `.mp-list`,
+//             `.signin-row`, `.dispatch-row`, `.explorer-item`, `.cv-links`, `.links-list`, which SURVIVE
+//             carrying a measure or a one-off the shared row cannot know (a 260px width, a `flex-wrap`, a
+//             `border-bottom`, a 68ch column).
+//             AND FIVE THE PLAN DID NOT NAME: `.link-title` (three overflow declarations that ARE
+//             `.vb-clip`, plus a muted ink given up), `.control-blank` (`.empty` a second time, four
+//             import lines away), `.control-editor-actions` (`push` on a `.vb-row`), `.control-preview`
+//             (the same editor slot as `.control-textarea`, one written as a margin and one as a padding),
+//             and `.gate-row`.
+//   IN (10)   `.vb-modal` + four; `.vb-list` `.vb-row` `.vb-row-rail` `.vb-row-hit` `.vb-row-main`.
+// The renames in it net to zero: `.control-editor{,-head}` → `.vb-editor{,-head}` and `.control-textarea`
+// → `.vb-editor-body`, which is the template taking its own names off one feature's stylesheet.
+const CLASS_CEILING = 307;
 const CLASS_TARGET = 183;
 
 // Anti-vacuity floor on the SELECTOR PARSER, not on the class count: a regex that stops matching reports
@@ -302,6 +339,39 @@ if (parserFault) {
   console.error(`pattern in tools/check-class-budget.mjs; do NOT relax the fixture.`);
   process.exit(1);
 }
+
+// CLAIM 3 — A PER-SURFACE CEILING, and it is what turns §5.3's 4-per-surface allowance from an estimate
+// into a claim. The 8-per-surface figure the old 183 rested on was never that: the plan records it as
+// "inherited from the plan and marked as inherited", never measured against a surface built to it.
+//
+// REPORTING, AND POINTED AT A BACKLOG OF FIFTEEN SURFACES — which is exactly the condition this repository
+// refuses to make blocking. It goes blocking in the commit that reaches zero over-budget surfaces, which
+// on today's counts is not a commit anybody can write: `organisms/cards` is at 38 against 4 and its
+// remainder is type faces, not boxes. The number is the point of printing it.
+const PER_SURFACE = 4;
+const surfaceDirs = new Map();
+for (const { file, names } of perSheet) {
+  if (PRIMITIVE_LAYER.includes(file)) continue;
+  const path = file.slice('web/src/'.length);
+  const scoped = ['organisms/', 'pages/'].find((layer) => path.startsWith(layer));
+  if (!scoped) continue;
+  const dir = path.slice(scoped.length).split('/')[0];
+  // `organisms/shared/` is the shared layer and not a surface: its classes are `Modal`'s and `List`'s,
+  // which every surface spends. Counting them against a 4-per-SURFACE allowance would be counting the
+  // primitives twice.
+  if (dir === 'shared') continue;
+  if (!surfaceDirs.has(dir)) surfaceDirs.set(dir, new Set());
+  for (const cls of names) surfaceDirs.get(dir).add(cls);
+}
+const overBudget = [...surfaceDirs]
+  .filter(([, names]) => names.size > PER_SURFACE)
+  .sort((a, b) => b[1].size - a[1].size);
+console.log(
+  `per surface: ${overBudget.length} of ${surfaceDirs.size} surface(s) over a ceiling of ${PER_SURFACE}` +
+    (overBudget.length > 0
+      ? ` — ${overBudget.map(([dir, names]) => `${dir} ${names.size}`).join(', ')}`
+      : ''),
+);
 
 let failed = false;
 

@@ -6,6 +6,9 @@ import { Control } from '../atoms/Control';
 import { Readout } from '../atoms/Readout';
 import { Surface } from '../atoms/Surface';
 import { Text } from '../atoms/Text';
+import { List } from '../organisms/shared/List';
+import { Modal } from '../organisms/shared/Modal';
+import { Row } from '../organisms/shared/Row';
 import { compareModels, type ModelFilter, matchesFilter } from './model-filter';
 import { fmtCtx, fmtPrice, loadFavs, providerOf, saveFavs } from './model-format';
 
@@ -91,23 +94,26 @@ export function ModelPicker({ models, value, defaultModel, onChange, disabled }:
       </button>
 
       {open && (
-        <div className="mp-modal-backdrop" onClick={() => setOpen(false)}>
-          <Surface className="mp-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="mp-modal-head">
-              <span className="mp-modal-title">Choose a model</span>
-              <Button variant="bare" size="sm" className="push" onClick={() => setOpen(false)}>
-                ✕
-              </Button>
-            </div>
-
-            <Control
+        <Modal
+          size="md"
+          tone="accent"
+          title="Choose a model"
+          label="Choose a model"
+          onClose={() => setOpen(false)}
+          head={
+            <Button variant="bare" size="sm" onClick={() => setOpen(false)}>
+              ✕
+            </Button>
+          }
+        >
+          <Control
               autoFocus
               value={query}
               placeholder="Search by name or id…"
               onChange={(e) => setQuery(e.target.value)}
             />
 
-            <div className="mp-filters">
+          <div className="mp-filters">
               {chip(toolOnly, setToolOnly, '🔧 Tool use')}
               {chip(freeOnly, setFreeOnly, '🆓 Free')}
               {chip(visionOnly, setVisionOnly, '👁 Vision')}
@@ -131,12 +137,17 @@ export function ModelPicker({ models, value, defaultModel, onChange, disabled }:
               {filtered.length} of {models.length} models
             </Readout>
 
-            <div className="mp-list">
-              {filtered.map((m) => (
-                <div
-                  key={m.id}
-                  className={`mp-item${m.id === value ? ' mp-sel' : ''}${m.id === defaultModel ? ' mp-def' : ''}`}
-                >
+          <List className="mp-list">
+            {filtered.map((m) => (
+              // A `Row` with a star before the pick. `rail="accent"` is what `.mp-def`'s hand-written
+              // `border-left` was; `interactive`/`active` are `.mp-item:hover` and `.mp-sel`.
+              <Row
+                key={m.id}
+                interactive
+                active={m.id === value}
+                rail={m.id === defaultModel ? 'accent' : undefined}
+                data-testid="mp-item"
+                lead={
                   <Button
                     variant="bare"
                     size="sm"
@@ -146,42 +157,37 @@ export function ModelPicker({ models, value, defaultModel, onChange, disabled }:
                   >
                     {favs.has(m.id) ? '★' : '☆'}
                   </Button>
-                  <Surface
-                    as="button"
-                    variant="flat"
-                    className="mp-pick"
-                    data-testid="mp-pick"
-                    onClick={() => pick(m.id)}
-                  >
-                    <span className="mp-pick-top">
-                      <span className="mp-name">{m.name ?? m.id}</span>
-                      {m.id === defaultModel && (
-                        <Chip pill tone="accent" className="mp-def-tag">
-                          default
-                        </Chip>
-                      )}
-                      <Readout>{fmtPrice(m)}</Readout>
+                }
+              >
+                <Surface as="button" variant="flat" className="vb-list" data-testid="mp-pick" onClick={() => pick(m.id)}>
+                  <span className="mp-pick-top">
+                    <span className="vb-clip">{m.name ?? m.id}</span>
+                    {m.id === defaultModel && (
+                      <Chip pill tone="accent" className="mp-def-tag">
+                        default
+                      </Chip>
+                    )}
+                    <Readout>{fmtPrice(m)}</Readout>
+                  </span>
+                  <span className="mp-pick-bot">
+                    <Readout>{m.id}</Readout>
+                    <span className="mp-badges">
+                      {m.contextLength ? <Readout>{fmtCtx(m.contextLength)}</Readout> : null}
+                      {m.caps?.toolCall && <span title="Tool use">🔧</span>}
+                      {m.caps?.reasoning && <span title="Reasoning">🧠</span>}
+                      {m.caps?.vision && <span title="Vision">👁</span>}
                     </span>
-                    <span className="mp-pick-bot">
-                      <Readout>{m.id}</Readout>
-                      <span className="mp-badges">
-                        {m.contextLength ? <Readout>{fmtCtx(m.contextLength)}</Readout> : null}
-                        {m.caps?.toolCall && <span title="Tool use">🔧</span>}
-                        {m.caps?.reasoning && <span title="Reasoning">🧠</span>}
-                        {m.caps?.vision && <span title="Vision">👁</span>}
-                      </span>
-                    </span>
-                  </Surface>
-                </div>
-              ))}
-              {filtered.length === 0 && (
-                <Text role="hint" lead className="mp-empty">
-                  No models match the current filters.
-                </Text>
-              )}
-            </div>
-          </Surface>
-        </div>
+                  </span>
+                </Surface>
+              </Row>
+            ))}
+            {filtered.length === 0 && (
+              <Text role="hint" lead className="mp-empty">
+                No models match the current filters.
+              </Text>
+            )}
+          </List>
+        </Modal>
       )}
     </div>
   );

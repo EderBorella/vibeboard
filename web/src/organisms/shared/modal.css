@@ -1,15 +1,92 @@
-/* ---------- Card editor modal ---------- */
-/* `--z-modal` AND IT WAS 20, WHICH IS THE POPOVER LAYER. Two siblings on one number let DOM order decide
-   whether a modal covered an open popover, and DOM order is not what should have decided that. */
-.modal-backdrop {
-  position: fixed; inset: 0; background: rgba(0, 0, 0, 0.6);
-  display: flex; align-items: center; justify-content: center; padding: var(--s-7); z-index: var(--z-modal);
+/* MODAL — the one thing on screen, and the way back out of it. FOUR HAND-BUILT FAMILIES AND 21 CLASSES
+ * BECAME FIVE: `.modal-*` (the settings dialog, the auto-pilot help), `.mp-modal-*` (the model picker),
+ * `.confirm-*` (the confirm dialog) and `.halt-*` (the halt overlay, which the sign-in prompt borrowed).
+ *
+ * THE THREE OPTIONS ARE ATTRIBUTES AND NOT CLASSES, which is a measurement rather than a trick. `size`,
+ * `tone` and `blocking` are three questions with eight answers between them, and eight classes for eight
+ * answers is exactly how four dialogs became 21 classes in the first place. An attribute selector holds no
+ * class token, so `npm run check:class-budget` counts the SHAPES and not the options — the precedent in
+ * this tree is `.diary-entry[data-kind]` and `.dock-body[hidden]`.
+ *
+ * THE MEASURE IS THE ONLY THING THE FOUR DISAGREED ABOUT that a person can see: 420px for a question,
+ * 560px for a list you scan, 620px for a form you fill in. `.halt`'s 34rem was 544px and takes `md`; a
+ * 16px difference on a card that is centred in the viewport by `blocking` below. */
+
+.vb-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--s-7);
 }
-/* A `Surface` with the `raised` variant, and it was that variant DECLARATION FOR DECLARATION — the ground,
-   the edge, the 10px corner and the flex column, which is exactly the head-over-scrolling-body stack
-   Phase 4 said every raised consumer wanted. Only the measure is left. */
-.modal { width: 100%; max-width: 620px; max-height: 90vh; }
-.modal-head { display: flex; align-items: center; gap: var(--s-5); padding: var(--s-5) var(--s-6); border-bottom: 1px solid var(--border); }
-.modal-title { font-weight: 600; font-family: var(--font-display); letter-spacing: var(--track); }
-/* `.modal-close` is gone outright — it was the `bare` variant and nothing else. */
-.modal-body { padding: var(--s-6); overflow-y: auto; display: flex; flex-direction: column; gap: var(--s-5); }
+/* ABOVE ANOTHER MODAL, because a confirm can be asked from inside one: `SettingsModal` renders
+   `SandboxPanel`, which raises a confirm. The halt overlay and the sign-in prompt take it too — they are
+   above everything, which is what `.halt-backdrop`'s comment claimed while its code said 60 against 80. */
+.vb-modal-backdrop[data-level='alert'] { z-index: var(--z-alert); }
+/* BLOCKING: no dismiss, so the wash says the page behind is not available rather than merely dimmed.
+   `grid`/`place-items` where the flex row above centres — same result, and it is `.halt-backdrop`'s own
+   pair of declarations kept verbatim so the blur has the box it was measured against. */
+.vb-modal-backdrop[data-blocking] {
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--bg) 82%, transparent);
+  backdrop-filter: blur(3px);
+}
+
+/* `Surface raised` draws the ground, the edge and the 10px corner, and it is a flex column already —
+   which is the head-over-scrolling-body stack all four of these were. Only the measure is here. */
+.vb-modal { width: 100%; max-height: 90vh; }
+.vb-modal[data-size='sm'] { max-width: 420px; }
+.vb-modal[data-size='md'] { max-width: 560px; max-height: 80vh; }
+.vb-modal[data-size='lg'] { max-width: 620px; }
+/* A COLOUR AND AN ELEVATION ARE THE CALLER'S, WHICH IS WHY THESE ARE NOT SIZES. `accent` says this modal
+   is the one thing on screen (the model picker); `danger` says the project is broken (the halt). Both were
+   a `border-color` and a shadow at the surface and both stay that, one layer up. `overflow: hidden` goes
+   with `accent`: it is what stops a scrolling list drawing over the corner it sits inside. */
+.vb-modal[data-tone='accent'] {
+  border-color: var(--accent);
+  box-shadow: var(--glow), var(--lift);
+  overflow: hidden;
+}
+.vb-modal[data-tone='danger'] { border-color: var(--danger); box-shadow: var(--lift); }
+
+.vb-modal-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-5);
+  padding: var(--s-5) var(--s-6);
+  border-bottom: 1px solid var(--border);
+}
+/* The title is the head's first cell and takes the slack; the controls beside it do not. A display face
+   because a dialog's title is the app naming what it is asking, which is `.modal-title`'s and
+   `.mp-modal-title`'s shared claim — the uppercase the picker wore is the one thing given up, on the
+   ruling that one badge and one title treatment beat two. */
+.vb-modal-head > .vb-clip { font-weight: 600; font-family: var(--font-display); letter-spacing: var(--track); }
+
+.vb-modal-body {
+  padding: var(--s-6);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-5);
+}
+/* A BLOCKING MODAL IS PROSE AND HAS NO HEAD, so its paragraphs are the body's direct children and a UA
+   paragraph margin would double the gap above. `.halt-why` and `.halt-hint` both cancelled it by hand. */
+.vb-modal-body > p { margin: 0; }
+/* A button in a flex column stretches to the column's width otherwise, which is what made
+   `.diary-refresh` 1240px. `.halt .vb-btn` said this; so does `.sandbox-action > .vb-btn`. */
+.vb-modal-body > .vb-btn { align-self: flex-start; }
+
+.vb-modal-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--s-4);
+  padding: var(--s-5) var(--s-6);
+  border-top: 1px solid var(--border);
+}
+/* A FOOT INSIDE THE BODY has no rule of its own to separate it, which is what `.confirm-actions` was: the
+   confirm dialog's two buttons sit under the question rather than under a border. Same row, no edge. */
+.vb-modal-body > .vb-modal-foot { padding: 0; border-top: none; }

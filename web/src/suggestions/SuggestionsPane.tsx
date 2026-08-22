@@ -6,6 +6,8 @@ import { Control } from '../atoms/Control';
 import { Surface } from '../atoms/Surface';
 import { Text } from '../atoms/Text';
 import { FigureRow } from '../molecules/FigureRow';
+import { List } from '../organisms/shared/List';
+import { Row } from '../organisms/shared/Row';
 import { asState } from '../molecules/state-tones';
 import type { Suggestion, SuggestionLevel } from '../shared';
 import { SUGGESTION_LEVELS } from '../shared';
@@ -144,10 +146,13 @@ export function SuggestionsPane({ suggestions, failed, onRefresh, onApply }: Pro
             {became && <p className="suggestions-became">Carded as {became}.</p>}
           </div>
 
-          <ol className="suggestions-list">
+          <List as="ol" className="suggestions-list">
             {suggestions.map((s) => (
-              <li
-                className={`suggestions-row${s.id === picked.id ? ' picked' : ''}`}
+              <Row
+                as="li"
+                stack
+                rail
+                className={s.id === picked.id ? 'picked' : undefined}
                 key={s.id}
                 // NO TONE CLASS BESIDE IT, and that is deliberate: this rail says which row the action
                 // bar acts on (`.picked`), not what state the finding is in — the state is a word in the
@@ -159,7 +164,7 @@ export function SuggestionsPane({ suggestions, failed, onRefresh, onApply }: Pro
                 <Surface
                   as="button"
                   variant="flat"
-                  className="suggestions-pick"
+                  className="vb-list suggestions-pick"
                   data-testid="suggestions-pick"
                   onClick={() => pick(s.id)}
                 >
@@ -181,9 +186,9 @@ export function SuggestionsPane({ suggestions, failed, onRefresh, onApply }: Pro
                   </FigureRow>
                   {s.body && <span className="filed-text">{s.body}</span>}
                 </Surface>
-              </li>
+              </Row>
             ))}
-          </ol>
+          </List>
         </>
       )}
     </div>

@@ -4,6 +4,12 @@ import { Readout } from '../atoms/Readout';
 import { renderMarkdown } from '../markdown';
 import { Tabs } from '../molecules/Tabs';
 
+// IT WAS `ui/EditorShell` AND IT WAS THE WRONG LAYER, which is §2.7 of the plan: a shared primitive
+// living in `ui/` that wrote FIVE of Project Control's own class names — `control-editor-head`,
+// `control-tabs`, `control-editor-actions`, `control-textarea`, `control-preview`. A shared thing
+// reaching into one feature's stylesheet is the exact inversion `npm run check:layers` exists to refuse,
+// and the gate is blocking as of this phase. The classes are this template's now and say so.
+//
 // The chrome around an editable file: which path is open, which view of it you are looking at, and
 // what you can do to it. Shared by Project Control (a control document, sometimes as fields) and the
 // Explorer (any file in the project, sometimes not editable at all), because they are the same three
@@ -37,10 +43,10 @@ interface ShellProps {
   children?: ReactNode;
 }
 
-export function EditorShell({ path, dirty, views, view, onView, actions, notice, children }: ShellProps) {
+export function EditorLayout({ path, dirty, views, view, onView, actions, notice, children }: ShellProps) {
   return (
     <>
-      <div className="control-editor-head">
+      <div className="vb-editor-head">
         <Readout testId="editor-path">
           {path}
           {dirty ? ' •' : ''}
@@ -55,7 +61,7 @@ export function EditorShell({ path, dirty, views, view, onView, actions, notice,
             onChange={(v) => onView(v as EditorView)}
           />
         )}
-        <div className="control-editor-actions">{actions}</div>
+        <div className="vb-row push">{actions}</div>
       </div>
       {notice}
       {children}
@@ -79,13 +85,13 @@ export function EditorBody({ view, draft, onDraft }: BodyProps) {
       <Control
         as="textarea"
         mono
-        className="control-textarea"
+        className="vb-editor-body"
         value={draft}
         onChange={(e) => onDraft(e.target.value)}
         spellCheck={false}
       />
     );
   }
-  if (view === 'preview') return <div className="control-preview markdown">{renderMarkdown(draft)}</div>;
+  if (view === 'preview') return <div className="vb-editor-body markdown">{renderMarkdown(draft)}</div>;
   return null;
 }

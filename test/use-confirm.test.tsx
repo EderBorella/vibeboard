@@ -86,7 +86,7 @@ describe('useConfirm', () => {
     expect(answer()).toBe('unanswered');
     expect(screen.queryByRole('dialog')).toBeTruthy();
 
-    fireEvent.click(document.querySelector('.confirm-backdrop') as HTMLElement);
+    fireEvent.click(document.querySelector('.vb-modal-backdrop') as HTMLElement);
     await screen.findByText('false');
   });
 
@@ -111,7 +111,7 @@ describe('useConfirm', () => {
   it('renders no body paragraph when there is nothing to warn about', () => {
     render(<Host request={{ title: 'Archive E-1?', action: 'Archive' }} />);
     ask();
-    expect(document.querySelector('.confirm-body')).toBeNull();
+    expect(document.querySelector('.vb-text-lead')).toBeNull();
   });
 
   it('answers an abandoned question rather than leaving its caller waiting', async () => {

@@ -2,9 +2,10 @@ import { useEffect, useState } from 'react';
 import { listProjects, openProject, type ProjectRef, scaffoldProject } from '../api';
 import { Control } from '../atoms/Control';
 import { Readout } from '../atoms/Readout';
-import { Surface } from '../atoms/Surface';
 import { Text } from '../atoms/Text';
 import { Field } from '../molecules/Field';
+import { List } from '../organisms/shared/List';
+import { Row } from '../organisms/shared/Row';
 import { Notice } from '../molecules/Notice';
 import { useAction } from '../useAction';
 import { slugify } from '../viewmodel';
@@ -81,24 +82,25 @@ export function ProjectGate({ onOpened }: Props) {
         <h2>Open a project</h2>
 
         {projects.length > 0 ? (
-          <ul className="gate-list">
+          <List as="ul" className="gate-list">
             {projects.map((p) => (
-              <li key={p.path}>
-                {/* A region of a list that takes a click, with no voice of its own — a `Surface`, not
-                    a `Button`, which is the line Phase 4 drew. `inset` because it draws its box at
-                    rest, where `flat`'s list rows light theirs on hover. */}
-                <Surface
-                  as="button"
-                  variant="inset"
-                  disabled={busy !== null}
-                  onClick={() => run(() => openProject(p.path))}
-                >
-                  <span className="gate-list-name">{p.name}</span>
-                  <Readout>{p.path}</Readout>
-                </Surface>
-              </li>
+              // A region of a list that takes a click, with no voice of its own — a `Row`, not a
+              // `Button`, which is the line Phase 4 drew. `inset` because it draws its box at rest,
+              // where `flat`'s rows light theirs on hover; `stack` is the name over the path.
+              <Row
+                as="li"
+                stack
+                variant="inset"
+                interactive
+                key={p.path}
+                disabled={busy !== null}
+                onClick={() => run(() => openProject(p.path))}
+              >
+                <span className="gate-list-name">{p.name}</span>
+                <Readout>{p.path}</Readout>
+              </Row>
             ))}
-          </ul>
+          </List>
         ) : (
           <Text role="hint">No projects yet. Create one below.</Text>
         )}
@@ -116,7 +118,7 @@ export function ProjectGate({ onOpened }: Props) {
           />
         </Field>
         <Field label="Name (dash-separated, lowercase)">
-          <div className="gate-row">
+          <Row>
             <Control
               value={newName}
               placeholder="my-project"
@@ -128,7 +130,7 @@ export function ProjectGate({ onOpened }: Props) {
             >
               Create
             </button>
-          </div>
+          </Row>
         </Field>
         {relativeParent && (
           <div className="gate-preview">

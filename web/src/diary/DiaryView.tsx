@@ -6,6 +6,8 @@ import { Control } from '../atoms/Control';
 import { Text } from '../atoms/Text';
 import { FigureRow } from '../molecules/FigureRow';
 import { stateClass } from '../molecules/state-tones';
+import { List } from '../organisms/shared/List';
+import { Row } from '../organisms/shared/Row';
 import { MAX_ENTRY_TEXT, type Suggestion } from '../shared';
 import { useSuggestions } from '../suggestions/useSuggestions';
 import { useAction } from '../useAction';
@@ -57,9 +59,12 @@ function About({ entry }: { entry: DiaryEntry }) {
 const DiaryList = memo(function DiaryList({ entries }: { entries: DiaryEntry[] }) {
   const ordered = useMemo(() => newestFirst(entries), [entries]);
   return (
-    <ol className="diary-list">
+    <List as="ol" className="diary-list">
       {ordered.map(({ entry, at }) => (
-        <li className="diary-entry" data-kind={entry.kind} key={`${at}-${entry.at}`}>
+        // `Row stack rail` — the kind still colours the rail, and the four `[data-kind]` rules are the
+        // only thing left of `.diary-entry`: three of the four kinds are not tones (`--accent-2` is the
+        // palette's secondary hue and Phase 13 ruled it is not a state).
+        <Row as="li" stack variant="flat" rail data-kind={entry.kind} key={`${at}-${entry.at}`}>
           <FigureRow>
             <span className="diary-kind">{entry.kind}</span>
             <time dateTime={entry.at}>{when(entry.at)}</time>
@@ -67,9 +72,9 @@ const DiaryList = memo(function DiaryList({ entries }: { entries: DiaryEntry[] }
             {entry.outcome && <span className="diary-outcome">{entry.outcome}</span>}
           </FigureRow>
           <p className="diary-text">{entry.text}</p>
-        </li>
+        </Row>
       ))}
-    </ol>
+    </List>
   );
 });
 
@@ -82,13 +87,13 @@ const DiaryList = memo(function DiaryList({ entries }: { entries: DiaryEntry[] }
 function FiledList({ suggestions }: { suggestions: Suggestion[] }) {
   const ordered = useMemo(() => [...suggestions].reverse(), [suggestions]);
   return (
-    <ol className="filed-list">
+    <List as="ol">
       {/* `stateClass` beside the attribute, and it is not decoration: React types every `data-*` as
           `any`, so `data-state={s.state}` alone would compile for a state with no row in the table and
           the rail would silently take whatever colour it inherited. The call is what the compiler
           checks — see molecules/state-tones.ts. */}
       {ordered.map((s) => (
-        <li className={`filed-entry ${stateClass(s.state)}`} data-state={s.state} key={s.id}>
+        <Row as="li" stack variant="flat" rail className={stateClass(s.state)} data-state={s.state} key={s.id}>
           {/* TWO LINES, NOT ONE WRAPPED ONE. This column is 42% of the split and its readout block held
               four figures — a state, a full locale timestamp and up to three id chips, 366px of content
               in a 266px line — so it wrapped, and check 7 read it as what it was: a row of figures that
@@ -102,7 +107,7 @@ function FiledList({ suggestions }: { suggestions: Suggestion[] }) {
           {/* Only what is there: a project-level finding carries no card, and an invented dash for
               every absent field would make every row look the same shape. */}
           {(s.run || s.card || s.became) && (
-            <span className="diary-about">
+            <span className="diary-about vb-list">
               {s.run && (
                 <Chip pill className="vb-readout">
                   {s.run}
@@ -123,9 +128,9 @@ function FiledList({ suggestions }: { suggestions: Suggestion[] }) {
           <p className="filed-title">{s.title}</p>
           {s.body && <p className="filed-text">{s.body}</p>}
           {s.reason && <p className="filed-reason">{s.reason}</p>}
-        </li>
+        </Row>
       ))}
-    </ol>
+    </List>
   );
 }
 

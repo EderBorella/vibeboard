@@ -62,3 +62,35 @@
    because a caret is furniture on a control whose border already answers the hover; an accent caret
    shouts where the border has already spoken. */
 .vb-caret { color: var(--muted); flex: none; }
+
+/* Inline editing: a field looks like text until hovered, and becomes a `Control` on click. It is
+ * `Field inline` as of the molecule layer — see molecules/Field.tsx, which absorbed `InlineField` once
+ * `--ctl-h` and the `Control` atom answered the geometric objection that had kept it separate. */
+.inline-view {
+  background: transparent; border: 1px solid transparent; border-radius: var(--r-md);
+  color: inherit; font: inherit; text-align: left; cursor: text;
+  padding: var(--s-1) var(--s-3); margin: calc(-1 * var(--s-1)) calc(-1 * var(--s-3)); width: 100%;
+  display: block;
+  /* A <button> is a flex item whose automatic minimum size is its content on ONE line, and that
+     beats width:100% — which is why an editable description ran off the pane while the body (a div)
+     wrapped. Without this, the fix is invisible in the read-only view and absent in the edit one. */
+  min-width: 0;
+}
+.inline-view:hover { border-color: var(--border); background: var(--bg); }
+/* THE BOX IS `Control`'s NOW and what is left is the accent EDGE, which says "you are editing this", the
+   type, which is the prose the value sits in rather than a form control's step, and the three things a
+   control that must not MOVE when it opens cannot take from the atom. `border-color` and not `border`, so
+   the atom's hairline width is untouched.
+   `height: auto` because a card title is edited at `--t-title` and `--ctl-h` is one line at `--t-body`;
+   the read-only face above has no height either, and the two have to be the same box.
+   THE PADDING AND THE `min-height` FLOOR ARE THE REST OF THAT SAME SENTENCE, and both were lost when the
+   box moved to the atom. `.vb-ctl` is `0 var(--s-4)` with a 28px floor; `.inline-view` above is
+   `var(--s-1) var(--s-3)` with none — so the value slid 4px sideways and the row grew 3px the moment it
+   was clicked. That is the GEOMETRIC objection molecules/Field.tsx says `Control` answered, so it has to
+   be answered here rather than restated. Same values `.inline-edit` carried before the merge. */
+.inline-edit {
+  width: 100%; height: auto; min-height: 0; border-color: var(--accent);
+  padding: var(--s-1) var(--s-3);
+  font: inherit; font-family: inherit; resize: vertical;
+}
+.inline-edit:focus { outline: none; }

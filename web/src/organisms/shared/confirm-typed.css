@@ -1,6 +1,0 @@
-/* Typed confirmation: for the actions that destroy more than the one thing they name. */
-.confirm-require {
-  display: flex; flex-direction: column; gap: var(--s-2);
-  font-size: var(--t-small); color: var(--muted); margin-bottom: var(--s-6);
-}
-.confirm-go:disabled { opacity: 0.45; cursor: not-allowed; }

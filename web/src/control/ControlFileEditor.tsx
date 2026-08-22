@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import type { ControlFile } from '../api';
 import { Button } from '../atoms/Button';
 import { Notice } from '../molecules/Notice';
-import { EditorBody, EditorShell, type EditorView } from '../ui/EditorShell';
+import { EditorBody, EditorLayout, type EditorView } from '../templates/EditorLayout';
 
 // A control file as opened for editing: its listing metadata plus the content on disk.
 export type OpenFile = ControlFile & { content: string };
@@ -31,7 +31,7 @@ interface Props {
   onDelete: () => void;
 }
 
-// The open control file's pane. The chrome is EditorShell, shared with the Explorer; what is left
+// The open control file's pane. The chrome is EditorLayout, shared with the Explorer; what is left
 // here is what only Project Control has — the managed-file disclaimer, and a skill's fields.
 export function ControlFileEditor({
   file,
@@ -48,7 +48,7 @@ export function ControlFileEditor({
 }: Props) {
   const views: EditorView[] = fieldsAvailable ? ['fields', 'edit', 'preview'] : ['edit', 'preview'];
   return (
-    <EditorShell
+    <EditorLayout
       path={file.path}
       dirty={dirty}
       views={views}
@@ -79,6 +79,6 @@ export function ControlFileEditor({
       }
     >
       {view === 'fields' ? fields : <EditorBody view={view} draft={draft} onDraft={onDraft} />}
-    </EditorShell>
+    </EditorLayout>
   );
 }

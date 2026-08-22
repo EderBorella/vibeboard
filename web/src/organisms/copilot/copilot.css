@@ -1,3 +1,13 @@
+/* Session-override notice: the dock's controls don't write the project default, so say so
+   rather than leaving the user to wonder why Settings still shows something else. */
+.copilot-override {
+  display: flex; align-items: center; gap: var(--s-4);
+  font-size: var(--t-micro); color: var(--muted);
+  padding: var(--s-2) var(--s-4);
+}
+
+.copilot-warn { padding: var(--s-3) var(--s-5); font-size: var(--t-small); color: var(--danger); background: color-mix(in srgb, var(--danger) 12%, transparent); border-bottom: 1px solid var(--border); }
+
 /* ---------- Copilot dock (shrink side-by-side) ---------- */
 .copilot {
   flex: 0 1 400px;

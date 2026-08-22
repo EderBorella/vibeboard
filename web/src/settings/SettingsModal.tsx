@@ -9,7 +9,6 @@ import {
 } from '../api';
 import { Button } from '../atoms/Button';
 import { Control } from '../atoms/Control';
-import { Surface } from '../atoms/Surface';
 import { Text } from '../atoms/Text';
 import { AutopilotPanel } from '../autopilot/AutopilotPanel';
 import type { Confirmer } from '../confirm/useConfirm';
@@ -22,6 +21,8 @@ import { BACKENDS } from '../copilot/format';
 import { ModelPicker } from '../models/ModelPicker';
 import { Field } from '../molecules/Field';
 import { Notice } from '../molecules/Notice';
+import { Modal } from '../organisms/shared/Modal';
+import { Row } from '../organisms/shared/Row';
 import {
   type AutopilotConfig,
   BOARD_LABELS,
@@ -141,16 +142,26 @@ export function SettingsModal({ config, onClose, onSaved, autopilot, onAutopilot
   }
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <Surface className="modal" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-head">
-          <span className="modal-title">Settings</span>
-          <Button variant="bare" size="sm" onClick={onClose}>
-            ✕
+    <Modal
+      title="Settings"
+      label="Settings"
+      onClose={onClose}
+      head={
+        <Button variant="bare" size="sm" onClick={onClose}>
+          ✕
+        </Button>
+      }
+      actions={
+        <>
+          <Button size="md" onClick={onClose} disabled={busy !== null}>
+            Cancel
           </Button>
-        </div>
-
-        <div className="modal-body">
+          <Button variant="primary" size="md" onClick={save} disabled={busy !== null}>
+            Save
+          </Button>
+        </>
+      }
+    >
           <div className="settings-section">Copilot</div>
           <Field as="div" label="Backend">
             {/* Only the selected backend changes: each backend's model/effort live in their own slot,
@@ -255,22 +266,22 @@ export function SettingsModal({ config, onClose, onSaved, autopilot, onAutopilot
           />
 
           <div className="settings-section">Cards</div>
-          <div className="settings-row">
-            <Field label="Miniature length">
+          <Row>
+            <Field label="Miniature length" className="vb-row-main">
               <Control
                 type="number"
                 value={miniatureChars}
                 onChange={(e) => setMiniatureChars(Number(e.target.value))}
               />
             </Field>
-            <Field label="ID padding">
+            <Field label="ID padding" className="vb-row-main">
               <Control
                 type="number"
                 value={idPadding}
                 onChange={(e) => setIdPadding(Number(e.target.value))}
               />
             </Field>
-          </div>
+          </Row>
 
           {/* Both of these save themselves and are NOT part of what the Save button writes: they are
               app-level, stored outside every project, so a project-config patch is the wrong carrier. */}
@@ -282,17 +293,6 @@ export function SettingsModal({ config, onClose, onSaved, autopilot, onAutopilot
           <SignInPanel confirm={confirm} />
 
           {error && <Notice tone="bad">{error}</Notice>}
-        </div>
-
-        <div className="modal-foot">
-          <Button size="md" onClick={onClose} disabled={busy !== null}>
-            Cancel
-          </Button>
-          <Button variant="primary" size="md" onClick={save} disabled={busy !== null}>
-            Save
-          </Button>
-        </div>
-      </Surface>
-    </div>
+    </Modal>
   );
 }

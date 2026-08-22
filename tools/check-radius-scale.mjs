@@ -59,7 +59,15 @@ const CORPUS = 'web/src';
 // The radius scale is geometry, so it lives in design/tokens.css rather than in design/themes.css —
 // the split Phase 1 of notes/atomic-revamp-plan.md made structural and `check:tokens` keeps.
 const TOKENS_FILE = 'web/src/design/tokens.css';
-// THE PRIMITIVE LAYER, AND IT IS THIRTEEN SHEETS. `ui/primitives.css` was the only place a button's
+// FIFTEEN SHEETS AS OF THE ORGANISM LAYER, and the two that joined are `Modal`'s and `List`/`Row`'s.
+// `organisms/shared/` is the SHARED layer by construction — §2.4 of the plan puts three components there
+// "because ≥4 surfaces each built one by hand", and `check-layers.mjs` has read it as an OPEN layer since
+// the split. A `Row` rendered as a `<button>` declares a padding for the same reason a `Tabs` cell does:
+// nineteen surfaces stop doing it. `organisms/shared/shared.css` is NOT among them — it is the two
+// CALLERS that live in that directory (the picker's filters, the confirm's danger button), which are
+// surfaces like any other. Same distinction the note below draws about `atoms/prose.css`.
+//
+// THE PRIMITIVE LAYER WAS THIRTEEN SHEETS. `ui/primitives.css` was the only place a button's
 // geometry could be decided; the atom phase gave each of the six atoms its own file, and the molecule
 // phase dissolved what was left of that file into seven — the tone table, the pip and its chip, `Tabs`,
 // `Menu`, the field and its trigger, and the notice. A `Tabs` cell IS a button and declares a padding, a
@@ -74,7 +82,10 @@ const ATOM_SHEETS = ['button', 'chip', 'control', 'readout', 'surface', 'text'].
 const MOLECULE_SHEETS = ['tones', 'status-chip', 'tabs', 'menu', 'field', 'notice', 'figure-row'].map(
   (name) => join('web', 'src', 'molecules', `${name}.css`),
 );
-const PRIMITIVE_LAYER = new Set([...ATOM_SHEETS, ...MOLECULE_SHEETS]);
+const SHARED_ORGANISM_SHEETS = ['modal', 'list'].map((name) =>
+  join('web', 'src', 'organisms', 'shared', `${name}.css`),
+);
+const PRIMITIVE_LAYER = new Set([...ATOM_SHEETS, ...MOLECULE_SHEETS, ...SHARED_ORGANISM_SHEETS]);
 const RADIUS_SCALE = ['--r-sm', '--r-md', '--r-lg', '--r-pill'];
 
 // A VALUE MAY BE OFF THE SCALE ON PURPOSE, and then it is written here with its reason rather than
@@ -157,10 +168,17 @@ const OFF_SCALE_ON_PURPOSE = new Map([
 // The refusal Phase 5b recorded here — "two consumers disagreeing on both of a primitive's decisions is a
 // primitive that would carry one variant each" — is REVERSED, and on evidence rather than taste: there
 // were never two consumers, there were SIX, and §8.1 of notes/atomic-revamp-plan.md is the argument.
-// THE ONE THAT REMAINS is `.board-label`, a collapsible section heading with a 3px accent left edge. It
-// resolves in the organism phase as a `Row`, which empties this ratchet.
+// **0 AFTER THE ORGANISM LAYER**, and `.board-label` is what went. It was "a collapsible section heading
+// with a 3px accent left edge", and it is a `Row rail="accent" interactive` on a `Surface flat` now: the
+// rail is `--rule` × `--tone`, the padding is the variant's and the pointer is `.vb-row-hit`'s. What is
+// left of the class is a FACE with no geometry in it at all — `--font-display`, `text-transform` and
+// `--track` — because its `font-size: var(--t-body)` was the value `body` already gives it, which is the
+// fifth dead declaration this sweep has found (after `.cv-link`, `.archive-title`, `.mp-prov` and
+// `.link-option`).
+// AT ZERO IT IS NO LONGER A RATCHET BUT A CLAIM, which is the point: the next surface that gives a
+// button-shaped class a padding fails the run rather than raising a number.
 // NEVER raise this: a ratchet that moves the wrong way is a gate switched off in place.
-const BUTTON_GEOMETRY_CEILING = 1;
+const BUTTON_GEOMETRY_CEILING = 0;
 
 // `height` AND `min-height` JOINED THIS LIST IN THE ATOM PHASE, and the same four classes are in the
 // census before and after — the tab and label faces the plan deliberately does NOT patch, because it

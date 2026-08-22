@@ -63,10 +63,10 @@ export function SkillEditor({ skill, config, busy, onSave }: Props) {
 
   return (
     <div className="skill-editor">
-      <Field layout="rail" label="Name" className="skill-row">
+      <Field layout="rail" label="Name" className="vb-row">
         <Control value={name} onChange={(e) => touch(setName)(e.target.value)} />
       </Field>
-      <Field layout="rail" label="Description" className="skill-row">
+      <Field layout="rail" label="Description" className="vb-row">
         <Control
           placeholder="What this does, shown on the rail button"
           value={description}

@@ -153,7 +153,7 @@ export function ReportPane({
               title={`Open ${c.id}`}
               onClick={() => onOpenCard(c)}
             >
-              <Readout testId="created-id">{c.id}</Readout> <span className="link-title">{c.title}</span>
+              <Readout testId="created-id">{c.id}</Readout> <span className="vb-clip">{c.title}</span>
             </Surface>
           ))}
         </div>

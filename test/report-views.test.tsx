@@ -109,7 +109,7 @@ describe('CardReports', () => {
       'Needs you · dealt with',
       'Needs you',
     ]);
-    expect(document.querySelectorAll('.report-row.resolved')).toHaveLength(1);
+    expect(document.querySelectorAll('.vb-row.resolved')).toHaveLength(1);
   });
 
   it('dates each run to the minute, from when it finished', () => {

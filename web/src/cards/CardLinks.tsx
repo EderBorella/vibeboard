@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Button } from '../atoms/Button';
 import { Readout } from '../atoms/Readout';
+import { List } from '../organisms/shared/List';
 import { Surface } from '../atoms/Surface';
 import { Text } from '../atoms/Text';
 import type { Card } from '../shared';
@@ -33,7 +34,7 @@ export function CardLinks({ card, allCards, onOpenCard, onLinks }: Props) {
     : undefined;
 
   return (
-    <div className="cv-links">
+    <List className="cv-links">
       <Text>
         Linked cards
         {onLinks && (
@@ -61,16 +62,16 @@ export function CardLinks({ card, allCards, onOpenCard, onLinks }: Props) {
               onClick={() => onOpenCard(c)}
             >
               <Readout>{c.id}</Readout>
-              <span className="link-title">{c.title}</span>
+              <span className="vb-clip">{c.title}</span>
             </Surface>
           ) : (
             <div key={c.id} className="cv-link">
               <Readout>{c.id}</Readout>
-              <span className="link-title">{c.title}</span>
+              <span className="vb-clip">{c.title}</span>
             </div>
           ),
         )
       )}
-    </div>
+    </List>
   );
 }

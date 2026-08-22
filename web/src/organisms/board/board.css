@@ -24,19 +24,14 @@
 
 /* ---------- Board ---------- */
 .board { display: flex; flex-direction: column; gap: var(--s-4); }
+/* A `Row rail="accent" interactive`, and this rule is a FACE with no geometry in it at all — which is
+   what empties `check:radius-scale`'s button ratchet to 0/0. The arrangement, the width, the UA reset,
+   the accent rail, the padding and the pointer are the `Row`'s and the `Surface`'s; the `font-size` it
+   declared was `var(--t-body)`, the value `body` already gives it — the dead declaration this sweep has
+   now found five times. `border: none` went too: `flat`'s 1px transparent edge is what stops the row
+   moving 2px when `interactive` lights it. */
 .board-label {
-  display: flex;
-  align-items: center;
-  gap: var(--s-4);
-  width: 100%;
-  text-align: left;
-  background: transparent;
-  border: none;
-  border-left: var(--rule) solid var(--accent);
-  padding: var(--s-1) var(--s-4);
-  cursor: pointer;
   font-family: var(--font-display);
-  font-size: var(--t-body);
   text-transform: uppercase;
   /* 0.16em → 0.08em, THE LARGEST TRACKING CHANGE IN THE APP, and it shortens every board heading by
      roughly a character's width. 0.16em was double what any other caps label in the tree used and
@@ -45,7 +40,8 @@
   letter-spacing: var(--track);
   color: var(--text);
 }
-.board-label:hover { color: var(--accent); }
+/* `.board-label:hover { color: var(--accent) }` IS GONE: `.vb-row-hit:hover` draws a ground and an accent
+   edge, which is one hover for every row in the app rather than eleven. */
 /* The size is `.vb-twist`'s — see atoms/text.css. What is left here is the colour, which is this
    surface's, and the fixed width that stops the label sliding as the glyph swaps. */
 .board-chevron { color: var(--accent); width: 0.8em; }
@@ -127,11 +123,7 @@
 /* A `Surface` with the `inset` variant — and the one of the ten whose padding the primitive did not move:
    `var(--s-3) var(--s-4)` is what this row already said, which is why it is the value `inset` took. All
    that is left is how the row arranges its three cells. */
-.archive-item {
-  display: flex;
-  align-items: center;
-  gap: var(--s-4);
-}
+/* `.archive-item` IS GONE — it was `.vb-row` declaration for declaration, on a `Surface inset`. */
 .archive-meta { display: flex; align-items: baseline; gap: var(--s-4); flex: 0 0 auto; }
 .archive-title {
   flex: 1; min-width: 0; text-align: left;
@@ -296,3 +288,36 @@
   .boards { --col-w: 288px; --tile-h: 124px; }
 }
 
+
+/* THREE STATE WORDS IN THREE TONES, ONE SHAPE. All three are `Chip`s now — `accent`, `warn` and `bad` —
+   and the tone carries the ink and the edge. Only two of the three ever declared a box, which is why no
+   shape census could see this family at all and why the distinction below is asserted by
+   test/chip-boxes.test.tsx instead: three tones a refactor could collapse into one is the defect this
+   phase exists not to ship, and the tones are MEASURED per theme there rather than trusted to differ
+   because they name different tokens.
+   The project-level barrier. The accent rather than ochre: this is not a warning, it is the card the
+   whole board is waiting on, and it should read as structure rather than as a problem. */
+.tile-setup {
+  text-transform: uppercase; letter-spacing: var(--track); white-space: nowrap;
+}
+
+/* Work an agent found and deliberately did not do. Ochre, not the accent: a card carrying this is
+   not failing, but it is not plainly done either, and those two must not look the same. `tone="warn"`
+   is `--warn` with no fallback, where this rule carried `var(--warn, #b8860b)` — a fallback that has
+   been dead since every theme defined the token. */
+.tile-suggestions { white-space: nowrap; }
+
+/* A blocked task somewhere under this card. Danger rather than ochre, and the strongest of the three:
+   a story in Done carrying one has finished with a real failure inside it, which is a different fact
+   from work deliberately left behind. */
+.tile-problem { white-space: nowrap; }
+
+
+
+/* WHERE THE DRAGGED CARD WILL LAND, and the fourth of the seven misfiled strays: it sat in Project
+   Control's sheet because that is where its bytes fell, and `board/Column.tsx` is the only thing that
+   renders it. Sits in the gap between tiles. */
+.drop-line {
+  height: 2px; margin: var(--s-1) 0; border-radius: var(--r-pill);
+  background: var(--accent); box-shadow: var(--glow);
+}

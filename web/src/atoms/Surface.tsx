@@ -54,7 +54,10 @@ export type SurfaceVariant = 'flat' | 'inset' | 'raised';
 // A CLOSED SET, and closed on purpose. `as` exists to say what this box IS in the document — a
 // region, a landmark, or a control — and an open `keyof JSX.IntrinsicElements` would make this a
 // general element factory whose geometry claim means nothing.
-type SurfaceTag = 'div' | 'section' | 'button';
+// `li` JOINED THE SET WITH `Row`: five of the nineteen row families are a list item that draws a box, and
+// a `<div>` inside a `<ul>` is invalid HTML — so the alternative was a `Row` that gave up its list
+// semantics or a sixth class for the same box. One more member of a CLOSED set is not an open factory.
+type SurfaceTag = 'div' | 'section' | 'button' | 'li';
 
 interface Props extends Omit<HTMLAttributes<HTMLElement>, 'children' | 'className'> {
   variant?: SurfaceVariant;

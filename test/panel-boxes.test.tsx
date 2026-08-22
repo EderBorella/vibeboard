@@ -110,7 +110,7 @@ function boards(): HTMLElement {
 // directions are asserted directly, on a rule that declares the same property at rest and on hover.
 describe('the cascade helper separates a state from the resting style', () => {
   it('keeps a :hover rule out of the resting box, and in the hover one', () => {
-    const el = row('control-item');
+    const el = row('vb-row');
     expect(box(el).background).toBe('transparent');
     expect(box(el, ':hover').background).toBe('var(--panel-2)');
   });
@@ -209,10 +209,10 @@ describe('a list row draws no box until the surface lights it', () => {
   const rows: [string, string][] = [
     ['a report row', 'report-open'],
     ['an execution card', 'exec-card'],
-    ['a control file row', 'control-item'],
-    ['an explorer row', 'control-item explorer-item'],
+    ['a control file row', 'vb-row'],
+    ['an explorer row', 'vb-row explorer-item'],
     ['a card link', 'cv-link cv-link-btn'],
-    ['a model pick', 'mp-pick'],
+    ['a model pick', 'vb-list'],
     ['a chat pick', 'chat-menu-open'],
     ['a suggestion pick', 'suggestions-pick'],
   ];
@@ -242,7 +242,7 @@ describe('a list row draws no box until the surface lights it', () => {
   const marked: [string, string, string][] = [
     ['a report row', 'report-open', 'border-color'],
     ['an execution card', 'exec-card', 'border-color'],
-    ['a control file row', 'control-item', 'background'],
+    ['a control file row', 'vb-row-hit', 'background'],
     ['a card link', 'cv-link cv-link-btn', 'border-color'],
   ];
   for (const [what, cls, prop] of marked) {
@@ -255,7 +255,7 @@ describe('a list row draws no box until the surface lights it', () => {
   }
 
   it('a selected control row takes the accent on all three of border, ground and ink', () => {
-    const drawn = box(row('control-item active'));
+    const drawn = box(row('vb-row-hit active'));
     expect(drawn['border-color']).toBe('var(--accent)');
     expect(drawn.background).toBe('var(--panel-2)');
     expect(drawn.color).toBe('var(--accent)');

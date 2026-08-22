@@ -14,6 +14,7 @@ import { killProjectRequest } from '../confirm/requests';
 import { useConfirm } from '../confirm/useConfirm';
 import { errorText } from '../errors';
 import { Field } from '../molecules/Field';
+import { List } from '../organisms/shared/List';
 import { useAccounting } from '../runs/useAccounting';
 import { type AutopilotConfig, BLOCKED_BOARDS, BOARD_LABELS, type ProjectConfig } from '../shared';
 import { useReadiness } from './useReadiness';
@@ -167,11 +168,11 @@ export function AutopilotPanel({
       {failed && <Text role="hint">Could not read this project’s readiness.</Text>}
       {readiness?.ok && <div className="ready-ok">Everything auto-pilot needs is in place.</div>}
       {readiness && !readiness.ok && (
-        <ul className="blockers">
+        <List as="ul" className="blockers">
           {readiness.blockers.map((b) => (
             <li key={b}>{b}</li>
           ))}
-        </ul>
+        </List>
       )}
     </>
   );

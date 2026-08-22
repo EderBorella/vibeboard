@@ -1,8 +1,9 @@
 import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from '../atoms/Button';
 import { Control } from '../atoms/Control';
-import { Surface } from '../atoms/Surface';
+import { Text } from '../atoms/Text';
 import { Field } from '../molecules/Field';
+import { Modal } from '../organisms/shared/Modal';
 
 // Ask before doing something that cannot be taken back.
 //
@@ -96,61 +97,54 @@ export function useConfirm(): Confirmer {
   const unlocked = !request?.requireText || typed.trim() === request.requireText;
 
   const dialog = request ? (
-    <div
-      className="modal-backdrop confirm-backdrop"
-      // A click outside is a cancel, like Escape. Guarded on the target so a click that started
-      // inside the dialog and ended on the backdrop does not count.
-      onClick={(e) => {
-        if (e.target === e.currentTarget) settle(false);
-      }}
+    // `alert` because a confirm can be asked from INSIDE a modal: SettingsModal renders SandboxPanel,
+    // which raises one. A click outside is a cancel, like Escape, and the target guard that made that
+    // safe is `Modal`'s now.
+    <Modal
+      size="sm"
+      alert
+      title={request.title}
+      labelledBy="confirm-title"
+      onClose={() => settle(false)}
+      actions={
+        <>
+          <Button ref={cancelButton} onClick={() => settle(false)}>
+            Cancel
+          </Button>
+          {/* BOTH buttons had to move together. `.confirm-cancel` was in the ratchet and `.confirm-go`
+              was not — only because its class arrives through a ternary, which the check cannot read
+              and says so. `.confirm-go` keeps its class for the danger colour only. */}
+          <Button
+            className={request.danger ? 'confirm-go danger' : 'confirm-go'}
+            disabled={!unlocked}
+            onClick={() => settle(true)}
+          >
+            {request.action}
+          </Button>
+        </>
+      }
     >
-      <Surface className="modal confirm" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
-        <div className="modal-head">
-          <span className="modal-title" id="confirm-title">
-            {request.title}
-          </span>
-        </div>
-        <div className="modal-body">
-          {request.body && <p className="confirm-body">{request.body}</p>}
-          {request.requireText && (
-            <Field
-              className="confirm-require"
-              label={
-                <>
-                  Type <strong>{request.requireText}</strong> to confirm
-                </>
-              }
-            >
-              <Control
-                mono
-                value={typed}
-                autoFocus
-                onChange={(e) => setTyped(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && unlocked) settle(true);
-                }}
-              />
-            </Field>
-          )}
-          <div className="confirm-actions">
-            <Button ref={cancelButton} onClick={() => settle(false)}>
-              Cancel
-            </Button>
-            {/* BOTH buttons had to move together. `.confirm-cancel` was in the ratchet and `.confirm-go`
-                was not — only because its class arrives through a ternary, which the check cannot read
-                and says so. Migrating the visible one alone would have left the pair at two different
-                sizes in the same dialog. `.confirm-go` keeps its class for the danger colour only. */}
-            <Button
-              className={request.danger ? 'confirm-go danger' : 'confirm-go'}
-              disabled={!unlocked}
-              onClick={() => settle(true)}
-            >
-              {request.action}
-            </Button>
-          </div>
-        </div>
-      </Surface>
-    </div>
+      {request.body && <Text lead>{request.body}</Text>}
+      {request.requireText && (
+        <Field
+          label={
+            <>
+              Type <strong>{request.requireText}</strong> to confirm
+            </>
+          }
+        >
+          <Control
+            mono
+            value={typed}
+            autoFocus
+            onChange={(e) => setTyped(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && unlocked) settle(true);
+            }}
+          />
+        </Field>
+      )}
+    </Modal>
   ) : null;
 
   return { confirm, dialog };

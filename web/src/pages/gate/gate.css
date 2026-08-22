@@ -7,18 +7,16 @@
 }
 .gate-card h2 { margin: 0 0 var(--s-6); font-family: var(--font-display); letter-spacing: var(--track); }
 .gate-card h3 { margin: var(--s-7) 0 var(--s-4); font-size: var(--t-lead); color: var(--muted); }
-.gate-list { list-style: none; margin: 0 0 var(--s-6); padding: 0; display: flex; flex-direction: column; gap: var(--s-3); }
-/* A `Panel as="button"` with the `inset` variant. A project in the recents list has no VOICE — it is a
-   region of a list that takes a click, which is the line Phase 4 drew between the two primitives — and
-   it draws its box at rest, which is what `inset` is and `flat` is not. `text-align`, the ink, the
-   pointer and the box are all the primitive's now; the stack of name over path is this list's. */
-.gate-list button {
-  width: 100%; display: flex; flex-direction: column; gap: var(--s-1);
-}
-.gate-list button:hover { border-color: var(--accent); }
+/* A `List`, and the measure and the looser column are what is left: this is a page's one list, not a row
+   of adjacent rows. */
+.gate-list { margin-bottom: var(--s-6); gap: var(--s-3); }
+/* A `Row as="li" stack variant="inset" interactive`. A project in the recents list has no VOICE — it is a
+   region of a list that takes a click, which is the line Phase 4 drew between the two primitives — and it
+   draws its box at rest, which is what `inset` is and `flat` is not. The stack of name over path is
+   `.vb-list`'s and the hover edge is `.vb-row-hit`'s, so both rules that were here are gone. */
 .gate-list-name { font-weight: 600; }
 .gate .vb-field { margin-top: var(--s-5); }
-.gate-row { display: flex; gap: var(--s-4); }
+/* `.gate-row` IS GONE — a `Row`, at the one call site it had. */
 .gate .vb-ctl { flex: 1; }
 .gate button:not(.gate-list button) {
   background: var(--accent-fill); color: var(--on-fill); border: none;
@@ -26,7 +24,9 @@
 }
 .gate button:disabled { opacity: 0.5; cursor: default; }
 .gate-preview { margin-top: var(--s-5); font-size: var(--t-small); color: var(--muted); }
-/* `.gate-preview code` is with the other two inline code spans, beside `.markdown code`. */
+/* AN INLINE `<code>` IN PROSE IS A TYPE SELECTOR NOW, in atoms/prose.css — see there. It was
+   `.gate-preview code, .ap-help-body code`: one rule naming TWO surfaces from inside an atom's sheet,
+   which is the fifth of the seven misfiled strays and the shape the layer gate exists to refuse. */
 .gate .vb-text-quiet { margin-top: var(--s-2); }
 .gate .vb-notice { margin-top: var(--s-6); }
 

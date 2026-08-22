@@ -1,3 +1,25 @@
+/* The state chip in the top bar. `Chip pill` owns the box and molecules/state-tones.ts owns the colour; this
+   keeps the treatment.
+   THREE STATE RULES ARE GONE AND THE CLAIM UNDER THEM SURVIVES INTACT. It said "there is no success
+   token in the palette and `complete` must not borrow the working colour: they are the two states a
+   glance most needs to tell apart". There IS a success token — `--ok`, defined by all three themes and
+   referenced by one rule in this file — so `complete` is `ok` and `running` is `accent`, and the two are
+   further apart than the amber-and-teal pair they were. What that argument was really protecting is the
+   distinction, and the table keeps it while this file no longer has an opinion about the tokens.
+   `color: var(--muted)` WENT WITH THEM, and it had to: every surface sheet is imported after
+   the atom sheets — see web/src/styles.ts — so at
+   equal specificity this rule beat `.vb-chip-tone` and the chip would have rendered grey in all four
+   states. It was the fallback for `stopped`, which had no rule of its own — and `stopped` is the
+   `neutral` tone, which is that same `--muted`. Nothing is lost. */
+.ap-chip { text-transform: lowercase; }
+
+.ap-controls {
+  display: flex;
+  gap: var(--s-4);
+  margin: var(--s-3) 0 var(--s-2);
+}
+
+
 /* ---------- Auto-pilot transport strip ----------
    Stacked directly under the header, so the thing the app is FOR has a control on the page rather than
    four clicks inside a settings modal. Tone-coloured on the left edge only: the strip is present at all

@@ -53,7 +53,7 @@ export function RawPane({ card }: Props) {
   }
 
   return (
-    <div className="raw-pane">
+    <div className="raw-pane" data-fill>
       {/* NOT a `Field`: this IS the pane, and the dock tab that opened it is its label. It drew NO box
           at all before Phase 9 — a whole card's file in the browser's own textarea chrome, beside boxes
           that were the primitive's — so `.vb-ctl` is a fix here and not only a merge. */}

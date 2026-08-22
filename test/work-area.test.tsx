@@ -305,7 +305,7 @@ describe('WorkArea', () => {
         }}
       />,
     );
-    expect(screen.getByLabelText('Requires attention').querySelectorAll('.exec-run')).toHaveLength(1);
+    expect(screen.getByLabelText('Requires attention').querySelectorAll('.vb-surface-inset')).toHaveLength(1);
   });
 
   // BESIDE DISMISS, which is the whole of the request: the Execution tab is where a person meets a

@@ -125,10 +125,10 @@ const CONTROLS: [name: string, el: () => Element][] = [
     'the diary composer',
     () => at('<div class="diary-compose"><textarea class="vb-ctl"></textarea></div>', 'textarea'),
   ],
-  ['the control editor body', () => at('<textarea class="vb-ctl control-textarea"></textarea>', 'textarea')],
+  ['the control editor body', () => at('<textarea class="vb-ctl vb-editor-body"></textarea>', 'textarea')],
   [
     'a links registry cell',
-    () => at('<div class="resource-row"><input class="vb-ctl res-title"/></div>', 'input'),
+    () => at('<div class="vb-row"><input class="vb-ctl res-title"/></div>', 'input'),
   ],
   [
     'the raw card file',
@@ -282,7 +282,7 @@ describe('the survivors that differ, and what each one still says', () => {
   it.each([
     [
       'the control editor body',
-      '<textarea class="vb-ctl vb-ctl-mono control-textarea"></textarea>',
+      '<textarea class="vb-ctl vb-ctl-mono vb-editor-body"></textarea>',
       'textarea',
     ],
     [
@@ -411,7 +411,7 @@ describe('the model picker filter row, resolved', () => {
     expect(box(select)['font-size']).toBe(PRIMITIVE.size);
     // And the select's box is the same box as the search input above it in the same modal, which is
     // what the two steps are distinguishing: two controls at 13px, three chips at 11px.
-    const search = at('<div class="mp-modal"><input class="vb-ctl"/></div>', 'input');
+    const search = at('<div class="vb-modal"><input class="vb-ctl"/></div>', 'input');
     expect(box(select).padding).toBe(box(search).padding);
     expect(box(select)['border-radius']).toBe(box(search)['border-radius']);
   });

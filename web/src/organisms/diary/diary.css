@@ -1,3 +1,11 @@
+/* A REFRESH IS NOT THE MAIN ACTION IN ITS PANE, and it was being drawn as one. `.diary-refresh` had no
+   rule at all, so it stretched to the width of its flex column: 690px in the Project Log and 1240px in
+   "What agents filed", which made a minor repeatable button the single most prominent element in each
+   pane — above the log it refreshes. `align-self: flex-start` is the idiom this stylesheet already uses
+   for exactly this, on `.sandbox-action > .vb-btn`. */
+.diary-refresh { align-self: flex-start; }
+
+
 /* The project log. A reading surface rather than a dashboard: one column, generous line height, and the
    structure kept quiet so the prose is what the eye lands on. */
 .diary {
@@ -20,30 +28,32 @@
 .diary-compose > .vb-ctl {
   flex: 1; resize: vertical; min-height: 2.6rem; background: var(--panel-2); line-height: 1.45;
 }
-.diary > .vb-text-error, .suggestions-pane > .vb-text-error { max-width: 68ch; }
+/* `.suggestions-pane`'s half of this pair moved to its own sheet: a class defined in two SCOPED
+   directories has no owner, which is the second claim `npm run check:layers` makes and now blocks on. */
+.diary > .vb-text-error { max-width: 68ch; }
 
 .diary-empty {
   display: flex; flex-direction: column; align-items: flex-start; gap: var(--s-4);
   color: var(--muted); font-size: var(--t-lead); padding: var(--s-7) 0;
 }
 
-.diary-list {
-  list-style: none; display: flex; flex-direction: column; gap: var(--s-1); max-width: 68ch;
-}
-.diary-entry {
-  display: flex; flex-direction: column; gap: var(--s-2);
-  padding: var(--s-4) 0 var(--s-4) var(--s-5);
-  border-left: var(--rule) solid var(--border);
-}
+/* A `List`, and the measure is what is left. */
+.diary-list { max-width: 68ch; }
+/* `.diary-entry` IS GONE — a `Row stack rail` on a `Surface flat`. THE FOUR KIND RULES ARE WHAT REMAIN,
+   on the shared rail rather than on a class of its own, because three of the four kinds are not TONES:
+   `--accent-2` is the palette's secondary hue and Phase 13 ruled it is not a state colour, `--border` is
+   the absence of one, and `--muted` is `neutral`. The kind, encoded in the rail as well as the word: a
+   run, a checkup, a lifecycle event and a human's own note are read at different times for different
+   reasons, and colour is how a long file stays scannable. */
 /* The kind, encoded in the rail as well as the word: a run, a checkup, a lifecycle event and a human's own
    note are read at different times for different reasons, and colour is how a long file stays scannable.
    All FOUR are named — `note` was added with the kind itself and inherited `run`'s token, so the one class
    that exists to separate human prose from the machine's looked exactly like the machine's commonest
    entry. The default above covers a kind from a future version rather than rendering it railless. */
-.diary-entry[data-kind='run'] { border-left-color: var(--border); }
-.diary-entry[data-kind='checkup'] { border-left-color: var(--accent); }
-.diary-entry[data-kind='lifecycle'] { border-left-color: var(--muted); }
-.diary-entry[data-kind='note'] { border-left-color: var(--accent-2); }
+.vb-row-rail[data-kind='run'] { border-left-color: var(--border); }
+.vb-row-rail[data-kind='checkup'] { border-left-color: var(--accent); }
+.vb-row-rail[data-kind='lifecycle'] { border-left-color: var(--muted); }
+.vb-row-rail[data-kind='note'] { border-left-color: var(--accent-2); }
 
 .diary-kind {
   font-family: var(--font-display); text-transform: uppercase; letter-spacing: var(--track);
@@ -53,3 +63,45 @@
 .diary-outcome { color: var(--text); }
 .diary-text { line-height: 1.55; font-size: var(--t-lead); }
 
+
+/* ---------- WHAT AGENTS FILED — the right-hand half of the Project Log (decision 48) ----------
+   RENDERED BY `diary/DiaryView.tsx`, WHICH IS WHY IT IS HERE. It was `pages/log/log.css`, and the layer
+   gate's finding was exact: the page's sheet owned six classes its own surface never named, while the
+   organism that renders them is this one. `.log-split` went to `templates/app-shell.css`, which is where
+   §2.5 of the plan lists it, and `pages/log/log.css` has nothing left to hold. */
+.filed {
+  flex: 0 1 42%; min-width: 0; overflow-y: auto; background: var(--wash);
+  border-left: 1px solid var(--border);
+  padding: var(--s-7); display: flex; flex-direction: column; gap: var(--s-6);
+}
+@media (max-width: 1100px) {
+  .filed { flex: none; border-left: none; border-top: 1px solid var(--border); }
+}
+/* `.filed-list` and `.filed-entry` ARE GONE — a `List` and a `Row stack rail` on a `Surface flat`. THE
+   ROLE THIS SURFACE GIVES ITS TONE is the left rail and nothing else, and that is `.vb-row-rail` reading
+   `--tone` now: the entry's own text stays `--text` and `--muted`. The claim the three `[data-state]`
+   rules carried is unchanged — an active finding is the one asking for something, and a dismissed one is
+   kept for what its reason says and must not read as still open. */
+/* `var(--warn, #b8860b)` DIED WITH `.filed-entry`. It was the last of that fallback in the tree — dead
+   since every theme defined `--warn`. `dismissed` moved from `--border` to `--muted`, which is the
+   `neutral` tone: a rail the same colour as every other border was not a state, it was the absence of
+   one, and "dismissed" is a decision somebody took. Both claims survive the class; `--tone` and
+   `--rule` are what carry them, and `.vb-row-rail` is where they meet. */
+.filed-state {
+  font-family: var(--font-display); text-transform: uppercase; letter-spacing: var(--track);
+  font-size: var(--t-micro); color: var(--text);
+}
+.filed-title { font-size: var(--t-lead); line-height: 1.5; color: var(--text); }
+.filed-text { font-size: var(--t-body); line-height: 1.5; color: var(--muted); }
+/* Why it was said no to. Quiet, and italic so it does not read as part of the finding itself. */
+.filed-reason { font-size: var(--t-body); line-height: 1.5; color: var(--muted); font-style: italic; }
+
+
+/* ONE CHIP PER LINE IN THIS COLUMN, because a row of them cannot be made to fit. A run id alone is 144px
+   of a 266px line, so any second reference wraps — and the fix must not depend on how many references the
+   fixture happens to carry. Stacked, they are a column of figures that lines up on its left edge, which
+   is the claim the readout makes; wrapped, they were the one it refuses. The diary's own `.diary-about`
+   stays a row: it has 408px. IT IS `.vb-list` AT THE CALL SITE NOW rather than a descendant rule keyed on
+   `.filed-entry`, which is the class that stopped existing; `align-items` is all that is left, because a
+   list stretches its rows and a row of chips must not stretch. */
+.diary-about.vb-list { align-items: flex-start; }

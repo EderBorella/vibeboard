@@ -3,6 +3,7 @@ import { Button } from '../atoms/Button';
 import { Chip } from '../atoms/Chip';
 import { Readout } from '../atoms/Readout';
 import { Surface } from '../atoms/Surface';
+import { Row } from '../organisms/shared/Row';
 import { Text } from '../atoms/Text';
 import { FigureRow } from '../molecules/FigureRow';
 import type { Card } from '../shared';
@@ -48,7 +49,7 @@ export function CardReports({ card, runs, account, onOpen, onCancel, onForgiven 
     <section className="reports" aria-label="Reports">
       <Text caps>Reports</Text>
       {[...runs].reverse().map((r) => (
-        <div key={r.run} className={`report-row${r.resolved ? ' resolved' : ''}`}>
+        <Row key={r.run} className={r.resolved ? 'resolved' : undefined}>
           <Surface
             as="button"
             variant="flat"
@@ -80,7 +81,7 @@ export function CardReports({ card, runs, account, onOpen, onCancel, onForgiven 
               Stop
             </Button>
           )}
-        </div>
+        </Row>
       ))}
       {account && <CardLedger card={card} account={account} onForgiven={onForgiven} />}
     </section>

@@ -1,35 +1,55 @@
 /* ---------- Project Control tab ---------- */
 .control { flex: 1; min-width: 0; display: flex; background: var(--wash); }
+/* A `List` plus a width. */
 .control-list {
   width: 260px; flex-shrink: 0; overflow-y: auto; padding: var(--s-5);
   border-right: 1px solid var(--border); display: flex; flex-direction: column; gap: var(--s-6);
 }
 .control-group { display: flex; flex-direction: column; gap: var(--s-1); }
-.control-group-head {
-  display: flex; align-items: center; justify-content: space-between;
-  font-family: var(--font-display); text-transform: uppercase; letter-spacing: var(--track);
-  font-size: var(--t-micro); color: var(--muted); padding: 0 var(--s-1) var(--s-1);
-}
+/* `.control-group-head` IS GONE — a `.vb-row` and a `Text caps`, with `push` on the `＋`. It was one of
+   the layer gate's four findings and the plainest of them: Project Control owned it and the EXPLORER's
+   tree rendered it, so one surface's heading was another's by accident of which sheet the bytes fell in.
+   The `--t-micro` step went with it; `Text`'s `--t-small` is one step up and is what a group heading
+   beside a list of files reads at everywhere else in the app. */
 /* Accent at rest, not on hover: a `＋` that creates is the affordance of the group head it sits in, and
    a muted one reads as disabled. */
 .control-new { color: var(--accent); }
-/* A `Surface` with the `flat` variant, and its padding was ALREADY `var(--s-3) var(--s-4)` — which is
-   where the primitive's value comes from: it is the one of the eight that a person had chosen. */
-.control-item { display: flex; align-items: center; gap: var(--s-3); width: 100%; color: var(--text); }
-.control-item:hover { background: var(--panel-2); }
-.control-item.active { background: var(--panel-2); border-color: var(--accent); color: var(--accent); }
-.control-item-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* `.control-item`, its hover, its selected state and `.control-item-name` ARE GONE — a
+   `Row variant="flat" interactive`, and the second and third of the layer gate's four findings: the
+   Explorer's tree wore Project Control's row class and its label class. The three declarations
+   `.control-item-name` made are `.vb-clip`'s, said once for the whole tree.
+   The gap moved from `--s-3` to the `Row`'s `--s-4`: seven gaps existed across nineteen row families and
+   nothing chose the spread. */
 /* A `Chip` with no `pill`, which is the square-ish corner the primitive defaults to. `--accent-2` is not
    one of the five tones and must not be forced into one — themes.css gives it a different value from
    `--warn` in marshmallow — so the ink stays here, as `.ap-chip`'s does. */
 .control-tag {
   text-transform: uppercase; letter-spacing: var(--track); color: var(--accent-2);
 }
-/* Where the dragged card will land. Sits in the gap between tiles. */
-.drop-line {
-  height: 2px; margin: var(--s-1) 0; border-radius: var(--r-pill);
-  background: var(--accent); box-shadow: var(--glow);
-}
+/* `.drop-line` was the BOARD's drag indicator, not this page's, and it is `organisms/board/board.css`'s
+   now — the fourth of the seven misfiled strays `styles.ts` named. */
 
 .control-empty { padding: 0 var(--s-4); }
 
+
+/* Inline rename: sits exactly where the list row was, so the row appears to become editable. Accent at
+   REST, because it only exists while it is being typed into — which is why the primitive's focus rule is
+   not what does the work here. */
+/* THE EXPLORER'S HALF OF THIS PAIR IS IN ITS OWN SHEET NOW. A class defined in two SCOPED directories has
+   no owner, which is the second claim `npm run check:layers` makes and now blocks on. */
+.control-list .vb-ctl { width: 100%; border-color: var(--accent); }
+.control-list .vb-ctl:focus { box-shadow: var(--glow); }
+
+
+/* Resources links registry */
+.resources-table { flex: 1; overflow-y: auto; padding: var(--s-5) var(--s-6); display: flex; flex-direction: column; gap: var(--s-3); }
+/* `.resource-row` IS GONE — a `Row`, and its gap moved from `--s-3` to `--s-4` with the other six. */
+/* `.resource-row input` was `.vb-ctl` DECLARATION FOR DECLARATION, focus rule included, and it died
+   in Phase 9. Only the three widths are the row's own. */
+.res-title { flex: 1; } .res-url { flex: 1.4; } .res-note { flex: 1.2; }
+.res-del:hover:not(:disabled) { color: var(--danger); }
+
+
+/* The managed-file disclaimer. It was in the editor TEMPLATE's sheet, saying `control-` at a component
+   called EditorLayout; the prose ink is this page's and the box is `Notice`'s. */
+.control-disclaimer { margin: var(--s-5) var(--s-6) 0; color: var(--text); }

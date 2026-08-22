@@ -4,8 +4,8 @@ import { Button } from '../atoms/Button';
 import { Chip } from '../atoms/Chip';
 import { Control } from '../atoms/Control';
 import { Readout } from '../atoms/Readout';
-import { Surface } from '../atoms/Surface';
 import { Text } from '../atoms/Text';
+import { Row } from '../organisms/shared/Row';
 import { formatBytes } from './format';
 import { canDropInto } from './paths';
 import type { TreeRow } from './useTree';
@@ -82,10 +82,12 @@ function NodeRow(props: NodeRowProps) {
   const { node, depth, expanded, active, droppable, over } = props;
   const twist = expandable(node) ? (expanded ? '▾' : '▸') : '';
   return (
-    <Surface
+    <Row
       as="button"
       variant="flat"
-      className={`control-item explorer-item${active ? ' active' : ''}${over ? ' explorer-over' : ''}`}
+      interactive
+      active={active}
+      className={`explorer-item${over ? ' explorer-over' : ''}`}
       data-testid="explorer-item"
       style={indent(depth)}
       title={title(node)}
@@ -121,11 +123,11 @@ function NodeRow(props: NodeRowProps) {
     >
       <span className="explorer-twist vb-twist">{twist}</span>
       <span className="explorer-icon">{icon(node)}</span>
-      <span className="control-item-name">{node.name}</span>
+      <span className="vb-clip">{node.name}</span>
       {node.symlink && <Chip className="control-tag">link</Chip>}
       {node.escapes && <Chip className="control-tag">outside</Chip>}
       <Readout>{formatBytes(node.size)}</Readout>
-    </Surface>
+    </Row>
   );
 }
 
@@ -185,9 +187,9 @@ export function FileTree(props: Props) {
   // a file dragged into a folder could never come back out.
   const rootDroppable = canDropInto(dragging, '');
   return (
-    <nav className="control-list explorer-list">
+    <nav className="vb-list explorer-list">
       <div
-        className={`control-group-head explorer-head${over === '' ? ' explorer-over' : ''}`}
+        className={`vb-row explorer-head${over === '' ? ' explorer-over' : ''}`}
         onDragOver={
           rootDroppable
             ? (e) => {

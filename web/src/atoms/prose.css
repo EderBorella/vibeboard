@@ -22,7 +22,14 @@
    three things under two names, so they are one rule: `--t-small` is explicit because `.ap-help-body p`
    is `--t-body`, and it is what `.gate-preview` already inherited. `.markdown code` keeps its own rule
    because it also draws a box, which is why it is `check-shape-coverage.mjs`'s one chip exemption. */
-.gate-preview code, .ap-help-body code { font-family: var(--font-mono); font-size: var(--t-small); color: var(--accent); }
+/* A TYPE SELECTOR AND NOT TWO SURFACE NAMES, and that is the fifth misfiled stray discharged rather than
+   moved. It was `.gate-preview code, .ap-help-body code` — one rule naming two SURFACES from inside an
+   atom's sheet, which the layer gate reads exactly as what it is. `<code>` is an element that means one
+   thing wherever it appears, so the selector is the element; `.markdown code` below is (0,1,1) and still
+   wins where it also draws a box. Two more `<code>` spans in the tree — the config path in Settings and
+   the asking browser's address in the sign-in prompt — rendered unstyled and now read the same as the
+   other two, which is the point of an element rule rather than a per-surface one. */
+code { font-family: var(--font-mono); font-size: var(--t-small); color: var(--accent); }
 /* 0.8px → 2px of vertical padding, so an inline code span in prose gains 2.4px of height. It was below
    the floor of the gap band that used to stand in for this scale, which is how a value that small
    survived at all. */

@@ -4,6 +4,7 @@ import { Readout } from '../atoms/Readout';
 import { Text } from '../atoms/Text';
 import { errorText } from '../errors';
 import { Field } from '../molecules/Field';
+import { Row } from '../organisms/shared/Row';
 import { Notice } from '../molecules/Notice';
 import { useAction } from '../useAction';
 
@@ -60,7 +61,7 @@ export function DiagnosticsPanel() {
       </Field>
 
       {settings && (
-        <div className="signin-row">
+        <Row className="signin-row">
           <div>
             <div className="signin-row-label">Log files</div>
             <Readout>
@@ -69,7 +70,7 @@ export function DiagnosticsPanel() {
               {settings.serverLog ?? 'server: not written on this install'}
             </Readout>
           </div>
-        </div>
+        </Row>
       )}
 
       {error && <Notice tone="warn">{error}</Notice>}

@@ -220,7 +220,7 @@ export function ProjectControl({ snapshot }: Props) {
         onCancelRename={() => setRenaming(null)}
       />
 
-      <div className="control-editor">
+      <div className="vb-editor" data-fill>
         {selected === RESOURCES_SENTINEL ? (
           <ResourcesEditor onError={setError} />
         ) : file ? (
@@ -241,7 +241,7 @@ export function ProjectControl({ snapshot }: Props) {
             onDelete={remove}
           />
         ) : (
-          <div className="control-blank">Select a file to view or edit, or create a new one.</div>
+          <div className="empty">Select a file to view or edit, or create a new one.</div>
         )}
         {error && <Text role="error">{error}</Text>}
       </div>

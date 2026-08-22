@@ -3,6 +3,7 @@ import { getSigninState, revokeDevice, type SigninDevice, signOutEverything } fr
 import { Button } from '../atoms/Button';
 import { Chip } from '../atoms/Chip';
 import { Readout } from '../atoms/Readout';
+import { Row } from '../organisms/shared/Row';
 import { Text } from '../atoms/Text';
 import { revokeDeviceRequest, signOutEverythingRequest } from '../confirm/requests';
 import type { Confirmer } from '../confirm/useConfirm';
@@ -63,7 +64,7 @@ export function SignInPanel({ confirm }: Props) {
       </Text>
 
       {mine && (
-        <div className="signin-row">
+        <Row className="signin-row">
           <div>
             <div className="signin-row-label">
               {mine.label}{' '}
@@ -75,11 +76,11 @@ export function SignInPanel({ confirm }: Props) {
               {mine.address} · signed in {mine.created.slice(0, 10)} · last seen {mine.lastSeen}
             </Readout>
           </div>
-        </div>
+        </Row>
       )}
 
       {others.map((d) => (
-        <div className="signin-row" key={d.id}>
+        <Row className="signin-row" key={d.id}>
           <div>
             <div className="signin-row-label">{d.label}</div>
             <Readout>

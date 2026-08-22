@@ -271,13 +271,13 @@ const PROBES: Probe[] = [
   // What an agent filed, on the Project Log's right-hand column.
   ...(['active', 'actioned', 'dismissed'] as const).map(
     (state): Probe => ({
-      surface: 'filed-entry (the rail)',
+      surface: 'the filed entry (the rail)',
       role: 'border-left-color',
       state,
       find: async () => {
         api.addDiaryEntry.mockResolvedValue({});
         render(<DiaryView bump={0} />);
-        return found(`.filed-entry[data-state="${state}"]`);
+        return found(`.filed-list [data-state="${state}"]`);
       },
     }),
   ),

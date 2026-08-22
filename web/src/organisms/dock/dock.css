@@ -22,7 +22,10 @@
    So a pane whose whole job is to be filled says so, and gets the definite height back. Everything else
    — the one-line empty states, the short lists — still gives its space away. */
 .dock-body { max-height: 38vh; min-height: 0; display: flex; }
-.dock-body:has(.raw-pane), .dock-body:has(.control-editor) { height: 38vh; }
+/* A PANE WHOSE WHOLE JOB IS TO BE FILLED SAYS SO ON ITSELF. It was `:has(.raw-pane), :has(.control-editor)`
+   — the dock naming two OTHER surfaces' classes, which is what made both of them classes defined in two
+   scoped directories. An attribute is the pane's own claim about itself and belongs to no surface. */
+.dock-body:has([data-fill]) { height: 38vh; }
 /* Spelled out: the UA rule for [hidden] loses to the display declarations above, so a hidden pane
    would still be laid out. Both levels matter — the body when folded, a pane when another is up. */
 .dock-body[hidden], .dock-pane[hidden] { display: none; }

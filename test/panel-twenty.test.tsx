@@ -89,7 +89,7 @@ describe('the raised surfaces — a --panel ground, a --border edge and a 10px c
   // and that difference is what Phase 11's refusals rest on, so both halves are pinned.
   const RAISED: [string, string][] = [
     ['modal', 'var(--panel)'],
-    ['mp-modal', 'var(--panel)'],
+    ['vb-modal', 'var(--panel)'],
     ['chat-menu', 'var(--panel)'],
     ['gate-card', 'var(--panel)'],
     // The one floating surface that chose the second panel step, and nothing chose it: `.chat-menu` is
@@ -98,15 +98,15 @@ describe('the raised surfaces — a --panel ground, a --border edge and a 10px c
   ];
 
   // The two that are NOT `Surface`s are still written as class lists, because that is what they are.
-  const MIGRATED = new Set(['modal', 'mp-modal', 'chat-menu']);
+  const MIGRATED = new Set(['modal', 'vb-modal', 'chat-menu']);
 
   for (const [name, ground] of RAISED) {
     it(`.${name} draws a 10px corner on ${ground}`, () => {
       const b = drawn(MIGRATED.has(name) ? panel('raised', name) : el(name));
       expect(b.ground).toBe(ground);
-      // `.mp-modal` is the one with a colour of its own — see below.
+      // The model picker's modal is the one with a colour of its own — see below.
       expect(b.edge).toBe(
-        name === 'mp-modal'
+        name === 'vb-modal'
           ? '1px solid var(--border) + var(--accent)'
           : '1px solid var(--border) + no colour of its own',
       );
@@ -120,8 +120,8 @@ describe('the raised surfaces — a --panel ground, a --border edge and a 10px c
   // replaces the primitive's WIDTH and STYLE as well as its colour, so a primitive that later moved to a
   // 2px edge would be silently overruled here. It becomes a `border-color` in this phase, which is the
   // form the emergency stop's danger hover and `.control-disclaimer`'s prose ink already use.
-  it('.mp-modal decides a colour and nothing else about its edge', () => {
-    const b = box(panel('raised', 'mp-modal'));
+  it('a tone="accent" modal decides a colour and nothing else about its edge', () => {
+    const b = box(panel('raised', 'vb-modal'));
     expect(b['border-color']).toBe('var(--accent)');
     expect(b.border).toBe('1px solid var(--border)');
   });
@@ -177,8 +177,8 @@ describe('the nested boxes — a drawn edge and the smaller 6px corner', () => {
   // that kept it out, and that the one that left took the cell's box rather than keeping its own.
   const MIGRATED: [string, Element][] = [
     ['tile', panel('inset', 'tile')],
-    ['archive-item', panel('inset', 'archive-item')],
-    ['exec-run', panel('inset', 'exec-run')],
+    ['an archived row', panel('inset', 'vb-row')],
+    ['a run record', panel('inset', 'vb-list')],
     ['links-list', panel('inset', 'links-list')],
     ['signin-label', panel('inset', 'signin-label')],
     ['gate-list button', panel('inset', undefined, 'button')],

@@ -87,7 +87,7 @@ export const SURFACES: Surface[] = [
       }
       // RUNS, not merely columns. A greenfield fixture has none, and three empty panels examine
       // almost nothing — see the fixture state written by visual/run.mjs.
-      await expect(page.locator('.exec-run').first()).toBeVisible();
+      await expect(page.locator('[data-testid="exec-card"]').first()).toBeVisible();
       await gone(page, 'main.boards');
     },
     floor: { elements: 60, text: 25, contrast: 25, focus: 3 },
@@ -104,8 +104,8 @@ export const SURFACES: Surface[] = [
       await expect(page.locator('section[aria-label="Project log"]')).toHaveCount(1);
       await expect(page.locator('section[aria-label="What agents filed"]')).toHaveCount(1);
       // Entries on both halves, for the reason the Execution view wants runs.
-      await expect(page.locator('.diary-entry').first()).toBeVisible();
-      await expect(page.locator('.filed-entry').first()).toBeVisible();
+      await expect(page.locator('.diary-list > *').first()).toBeVisible();
+      await expect(page.locator('.filed-list > *').first()).toBeVisible();
       await gone(page, 'main.boards');
     },
     floor: { elements: 60, text: 25, contrast: 25, focus: 3 },
@@ -123,7 +123,7 @@ export const SURFACES: Surface[] = [
       // surfaces would prove each other.
       await gone(page, 'section.control.explorer');
       await expect(page.locator('[data-testid="control-item"]').first()).toBeVisible();
-      await expect(page.locator('.control-editor')).toBeVisible();
+      await expect(page.locator('.vb-editor')).toBeVisible();
       await gone(page, 'main.boards');
     },
     floor: { elements: 40, text: 15, contrast: 15, focus: 3 },
@@ -179,7 +179,7 @@ export const SURFACES: Surface[] = [
       // The testid is only on the POPULATED drawer: the loading, error and empty states are their own
       // Panels without it, so an empty archive cannot be mistaken for a measured one.
       await expect(page.locator('[data-testid="archive-drawer"]')).toBeVisible();
-      await expect(page.locator('.archive-item').first()).toBeVisible();
+      await expect(page.locator('[data-testid="archive-drawer"] > .vb-row').first()).toBeVisible();
       await expect(page.locator('.archive-title').first()).toBeVisible();
     },
     floor: { elements: 8, text: 4, contrast: 4, focus: 2 },
@@ -187,34 +187,34 @@ export const SURFACES: Surface[] = [
   {
     name: 'settings',
     what: 'the settings modal — three sections of fields, hints and notices',
-    root: '.modal:not(.confirm)',
+    root: '.vb-modal[data-size="lg"]',
     open: async (page) => {
       // The top bar's cog, not the auto-pilot bar's "Settings" link: both open this modal, and
       // scoping says which control this surface is reached through.
       await page.locator('header.topbar [title="Settings"]').click();
-      await page.locator('.modal:not(.confirm)').waitFor({ state: 'visible' });
+      await page.locator('.vb-modal[data-size="lg"]').waitFor({ state: 'visible' });
     },
     prove: async (page) => {
-      await expect(page.locator('.modal:not(.confirm) .modal-title')).toHaveText('Settings');
+      await expect(page.locator('.vb-modal[data-size="lg"] .vb-modal-head > .vb-clip')).toHaveText('Settings');
       // AT LEAST three, asserted as "the third one is there" so the assertion retries while the modal
       // mounts. Not an exact count: the modal renders twelve section headings today and pinning that
       // would make adding a setting a failing gate.
       await expect(page.locator('.settings-section').nth(2)).toBeVisible();
       // A field with a control in it, which is what Phase 9 will be measuring here.
-      await expect(page.locator('.modal:not(.confirm) select').first()).toBeVisible();
+      await expect(page.locator('.vb-modal[data-size="lg"] select').first()).toBeVisible();
     },
     floor: { elements: 25, text: 10, contrast: 10, focus: 4 },
   },
   {
     name: 'model-picker',
     what: 'the model picker — a filtered list of models with their prices and capability badges',
-    root: '.mp-modal',
+    root: '.vb-modal[data-tone="accent"]',
     open: async (page) => {
       await page.locator('.copilot .mp .vb-trigger').click();
-      await page.locator('.mp-modal').waitFor({ state: 'visible' });
+      await page.locator('.vb-modal[data-tone="accent"]').waitFor({ state: 'visible' });
     },
     prove: async (page) => {
-      await expect(page.locator('.mp-modal-title')).toHaveText('Choose a model');
+      await expect(page.locator('.vb-modal[data-tone="accent"] .vb-modal-head > .vb-clip')).toHaveText('Choose a model');
       // Models, not an empty state. The default backend's catalogue is the four Claude aliases and
       // needs no network, so this is a real list rather than `.mp-empty`.
       await expect(page.locator('[data-testid="mp-pick"]').first()).toBeVisible();
@@ -225,19 +225,19 @@ export const SURFACES: Surface[] = [
   {
     name: 'confirm',
     what: 'the confirm dialog — the question asked before anything irreversible',
-    root: '.modal.confirm',
+    root: '.vb-modal[data-size="sm"]',
     open: async (page) => {
       // A tile's archive ✕, which is the cheapest reversible thing in the app that asks first.
       await page.locator('.tile [title="Archive"]').first().click();
-      await page.locator('.modal.confirm').waitFor({ state: 'visible' });
+      await page.locator('.vb-modal[data-size="sm"]').waitFor({ state: 'visible' });
     },
     prove: async (page) => {
-      await expect(page.locator('.modal.confirm')).toBeVisible();
+      await expect(page.locator('.vb-modal[data-size="sm"]')).toBeVisible();
       await expect(page.locator('#confirm-title')).toBeVisible();
-      await expect(page.locator('.confirm-body')).toBeVisible();
+      await expect(page.locator('.vb-modal[data-size="sm"] .vb-text-lead')).toBeVisible();
       // Both buttons, because the pair being at two different sizes is a real defect this codebase has
       // already had — see the note at `.confirm-go` in useConfirm.tsx.
-      await expect(page.locator('.confirm-actions .vb-btn')).toHaveCount(2);
+      await expect(page.locator('.vb-modal-foot .vb-btn')).toHaveCount(2);
     },
     floor: { elements: 8, text: 3, contrast: 3, focus: 2 },
   },

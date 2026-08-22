@@ -4,6 +4,7 @@ import { Button } from '../atoms/Button';
 import { Chip } from '../atoms/Chip';
 import { Readout } from '../atoms/Readout';
 import { Surface } from '../atoms/Surface';
+import { Row } from '../organisms/shared/Row';
 import { Text } from '../atoms/Text';
 import { FigureRow } from '../molecules/FigureRow';
 import type { Card } from '../shared';
@@ -97,7 +98,7 @@ export function ExecutionView({
               const subject = runSubject(record);
               const stoppable = active.includes(record.run) || queued.includes(record.run);
               return (
-                <Surface key={record.run} variant="inset" className="exec-run">
+                <Row key={record.run} stack variant="inset">
                   <div className="exec-run-top">
                     <Chip pill state={record.status} className="report-chip vb-readout" testId="report-chip">
                       {record.status}
@@ -121,7 +122,7 @@ export function ExecutionView({
                     onClick={() => card && onOpenCard(card, record)}
                   >
                     <Readout>{subject}</Readout>{' '}
-                    <span className="link-title">{card?.title ?? (record.card ? '(gone)' : '')}</span>
+                    <span className="vb-clip">{card?.title ?? (record.card ? '(gone)' : '')}</span>
                   </Surface>
                   {(record.summary || record.note) && (
                     <p className="exec-summary">{record.summary ?? record.note}</p>
@@ -161,7 +162,7 @@ export function ExecutionView({
                       )}
                     </div>
                   )}
-                </Surface>
+                </Row>
               );
             })}
           </Surface>

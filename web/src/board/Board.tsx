@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Chip } from '../atoms/Chip';
+import { Row } from '../organisms/shared/Row';
 import type { BoardName, Card, ProjectConfig } from '../shared';
 import { cardsByColumn, columnSlugs } from '../viewmodel';
 import { ArchiveDrawer } from './ArchiveDrawer';
@@ -48,13 +49,24 @@ export function Board({
   return (
     <section className="board">
       <div className="board-head">
-        <button className="board-label" onClick={onToggle} aria-expanded={!collapsed}>
+        {/* A `Row` with an accent rail. `.board-label` keeps its display FACE and no geometry at all —
+            which is what empties `check:radius-scale`'s button ratchet to 0/0: its `font-size` was
+            `var(--t-body)`, the value `body` already gives it, and its padding is `flat`'s. */}
+        <Row
+          as="button"
+          variant="flat"
+          rail="accent"
+          interactive
+          className="board-label"
+          onClick={onToggle}
+          aria-expanded={!collapsed}
+        >
           <span className="board-chevron vb-twist">{collapsed ? '▸' : '▾'}</span>
           {label}
           <Chip pill fill className="vb-readout" testId="board-count">
             {cards.length}
           </Chip>
-        </button>
+        </Row>
         {!collapsed && archivedCount > 0 && (
           <Chip
             as="button"

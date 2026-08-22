@@ -70,7 +70,15 @@ export function Menu({
         // THE DESTINATION ATTRIBUTE, and it is the discriminator the shape census reads: `aria-current`
         // says "this is where you are", `aria-selected` says "this is the pane you are reading".
         aria-current={item.value === value ? 'page' : undefined}
-        className={item.value === value ? 'vb-menu-item active' : 'vb-menu-item'}
+        // THE SELECTED SESSION'S RAIL IS `Row`'s, and it is only meaningful in `list` orientation: the
+        // row above sets `color: var(--text)` later and at equal specificity, so accent ink cannot mark
+        // a selected session and the rail is what does. `--rule` × `--tone`, one declaration, eleven
+        // surfaces — see organisms/shared/list.css.
+        className={
+          item.value === value
+            ? `vb-menu-item active${list ? ' vb-row-rail vb-tone-accent' : ''}`
+            : 'vb-menu-item'
+        }
         title={item.title}
         onClick={() => onChange(item.value)}
       >

@@ -3,6 +3,7 @@ import { getResources, putResources, type ResourceLink } from '../api';
 import { Button } from '../atoms/Button';
 import { Control } from '../atoms/Control';
 import { Readout } from '../atoms/Readout';
+import { Row } from '../organisms/shared/Row';
 import { errorText } from '../errors';
 import { useAction } from '../useAction';
 
@@ -60,9 +61,9 @@ export function ResourcesEditor({ onError }: { onError: (e: string | null) => vo
 
   return (
     <>
-      <div className="control-editor-head">
+      <div className="vb-editor-head">
         <Readout>Links registry{dirty ? ' •' : ''}</Readout>
-        <div className="control-editor-actions">
+        <div className="vb-row push">
           <Button size="md" onClick={add}>
             ＋ Add link
           </Button>
@@ -73,13 +74,13 @@ export function ResourcesEditor({ onError }: { onError: (e: string | null) => vo
       </div>
       <div className="resources-table">
         {links.length === 0 && (
-          <div className="control-blank">No links yet. Add references the copilot can consult.</div>
+          <div className="empty">No links yet. Add references the copilot can consult.</div>
         )}
         {/* NOT `Field`s: this is a table row, and each placeholder is the column heading. A label per
             cell would repeat "Title / URL / Note" once per link. The boxes are the primitive's — the
             rule they had was byte-identical to `.vb-ctl` already. */}
         {links.map((l, i) => (
-          <div key={l.rowId} className="resource-row">
+          <Row key={l.rowId}>
             <Control
               className="res-title"
               placeholder="Title"
@@ -101,7 +102,7 @@ export function ResourcesEditor({ onError }: { onError: (e: string | null) => vo
             <Button variant="bare" size="sm" className="res-del" title="Remove" onClick={() => removeRow(i)}>
               ✕
             </Button>
-          </div>
+          </Row>
         ))}
       </div>
     </>

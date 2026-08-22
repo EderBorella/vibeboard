@@ -1,22 +1,19 @@
-.control-editor { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
-.control-editor-head {
+/* EDITOR LAYOUT — the chrome around an editable file: which path is open, which view of it, what you can
+ * do to it. It was `ui/EditorShell`, and its five class names were PROJECT CONTROL'S — a shared thing
+ * reaching into one feature's stylesheet, which is the inversion `npm run check:layers` exists to refuse
+ * and refuses as of this phase. Renamed with the component, and three classes where there were seven:
+ *   `.control-editor-actions` — `margin-left: auto` plus a flex row, which is `.push` on a `.vb-row`.
+ *   `.control-textarea` / `.control-preview` — the same slot twice. One wrote its inset as a margin and
+ *     the other as a padding; nothing chose the difference, and `overflow-y: auto` is right for both.
+ *   `.control-blank` — `margin: auto; color: var(--muted); padding: var(--s-7)`, which is `.empty`
+ *     declaration for declaration, in the same layer, four import lines apart. */
+.vb-editor { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
+.vb-editor-head {
   display: flex; align-items: center; gap: var(--s-4); padding: var(--s-4) var(--s-6);
   border-bottom: 1px solid var(--border); background: var(--panel);
 }
-/* `.control-tabs` IS GONE — the three views are a `Tabs` (molecules/tabs.css). It was the fourth
-   hand-rolled tab family, and the only one whose cell had no class of its own: three declarations on a
-   descendant `button`, which is why `check:radius-scale` could see it and no class census could. */
-.control-editor-actions { margin-left: auto; display: flex; gap: var(--s-3); }
-/* `.btn-danger` was here — `Button`'s `danger` variant at `md`, so it sits level with the Save beside it. */
-/* The prose ink is the surface's and the shell's inset is the shell's; the box is the primitive's. */
-.control-disclaimer { margin: var(--s-5) var(--s-6) 0; color: var(--text); }
-/* The box is the Control atom's. What is left is the pane's inset, the fact that this one fills its pane,
-   and its line. The monospaced face went with the box: it is `Control mono` at the call site, because the
-   content being machine text is a property of the CONTROL and four surfaces each wrote that rule. */
-.control-textarea {
-  flex: 1; margin: var(--s-5) var(--s-6); resize: none; line-height: 1.5;
-}
-.control-preview { flex: 1; overflow-y: auto; padding: var(--s-5) var(--s-6); }
-.control-blank { margin: auto; color: var(--muted); padding: var(--s-7); }
-.control-editor > .vb-text-error, .explorer-list > .vb-text-error { padding: var(--s-4) var(--s-6); }
-
+/* THE BODY SLOT, whichever view fills it: a `Control mono` you type into or rendered markdown you read.
+   `resize: none` is the textarea's alone — a box that fills its pane has nothing to be dragged into. */
+.vb-editor-body { flex: 1; overflow-y: auto; padding: var(--s-5) var(--s-6); line-height: 1.5; }
+textarea.vb-editor-body { resize: none; }
+.vb-editor > .vb-text-error { padding: var(--s-4) var(--s-6); }

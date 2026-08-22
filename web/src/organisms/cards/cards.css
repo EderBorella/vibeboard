@@ -1,0 +1,110 @@
+/* A `Surface` with the `inset` variant. It sat on `--bg` where the same box on a `--panel` parent sits on
+   `--panel-2` four times over, and nothing chose the difference. */
+.links-list {
+  display: flex; flex-direction: column; gap: var(--s-2); max-height: 180px; overflow-y: auto;
+}
+.links-group { font-size: var(--t-micro); text-transform: uppercase; letter-spacing: var(--track); color: var(--muted); margin: var(--s-2) 0 var(--s-1); }
+.links-group:first-child { margin-top: 0; }
+/* `.link-option` died in Phase 9: it was `Field layout="check"` at four call sites — a flex row with
+   `var(--s-4)` of gap, a pointer on the label and on the box — plus a `font-size: var(--t-body)` that
+   `body` already gave it, which is the fourth dead declaration this sweep has found. */
+/* `.link-title` IS GONE, and it was the third of the seven misfiled strays: `cards/` owned it and
+   `runs/ReportPane.tsx` and `runs/ExecutionView.tsx` read it, which is precisely the cross-surface read
+   the layer gate now refuses. Its three overflow declarations ARE `.vb-clip`, said once for the whole
+   tree; the `color: var(--muted)` is what is given up — a reference in a row takes the row's ink, which
+   is the same ruling `Readout` took when it lost its four tones. */
+/* ---------- Card view (read-only tab) ---------- */
+/* `anywhere` rather than `break-word`: only `anywhere` also shrinks the min-content size, so a long
+   unbroken token (a path, a URL) cannot stretch the flex items below past the pane. */
+.cardview { display: flex; flex-direction: column; gap: var(--s-4); overflow-wrap: anywhere; }
+.cv-title { font-family: var(--font-display); font-size: var(--t-title); line-height: 1.3; margin: 0; }
+.cv-group {
+  color: var(--accent-2); text-transform: uppercase; letter-spacing: var(--track); font-size: var(--t-micro);
+}
+.cv-tags { display: flex; flex-wrap: wrap; gap: var(--s-2); }
+.cv-desc {
+  margin: 0; padding-left: var(--s-5); border-left: var(--rule) solid var(--accent);
+  color: var(--text); font-size: var(--t-lead); line-height: 1.5;
+}
+/* THE SIZE LIVES ON THE LIST, not on the row. `.cv-link` declared `font-size: var(--t-body)` and it
+   was DEAD on every clickable link: `.cv-link-btn`'s `font: inherit` is written later at the same
+   specificity, so it reset the size, and the button and the plain `<div>` beside it matched only by
+   accident of what they inherited. That is the shape of the 10.88px incident. Stated once, here. */
+/* A `List`, and the step is the one thing left. */
+.cv-links { gap: var(--s-2); font-size: var(--t-body); }
+.cv-link { display: flex; gap: var(--s-4); align-items: baseline; }
+/* A link is a button wherever it can actually open the card (CardView's onOpenCard). */
+/* A `Surface` with the `flat` variant. `width: fit-content` is the one thing left: a link is as wide as
+   its text, unlike every other row here, so the hover border traces the words rather than the column. */
+.cv-link-btn { width: fit-content; }
+.cv-link-btn:hover { border-color: var(--accent); }
+.cv-link-btn:hover .vb-clip { color: var(--accent); }
+.cv-body { border-top: 1px solid var(--border); padding-top: var(--s-3); }
+
+
+/* Cards pane */
+.cards-pane { flex: 1; min-width: 0; display: flex; flex-direction: column; min-height: 0; }
+/* WHAT IS LEFT OF THE STRIP AFTER `Tabs closable` TOOK IT, and it is two declarations rather than four
+   classes. `.cards-tab`, `.cards-tab-label` and `.cards-tab-x` are gone: the box, the ellipsis and the
+   selected ink are the molecule's, and the `✕` is a bare `Button` whose hover is the primitive's.
+   These two are genuinely this surface's and no other tab row has either — it is the only strip that
+   SCROLLS sideways, because the number of open cards is unbounded, and the only one with a rule under it,
+   because the pane below it has no other edge. The strip's own inset is `.vb-tabs`'s. */
+.cards-tabs { overflow-x: auto; border-bottom: 1px solid var(--border); }
+.cards-main { flex: 1; min-height: 0; display: flex; }
+/* A FLEX COLUMN, AND THAT IS WHAT MAKES A PANE'S `flex: 1` MEAN ANYTHING. It was a scrolling block, so
+   `.raw-pane { flex: 1 }` had no flex parent to grow in and the pane sat at its content height floored
+   by `.raw-area`'s `min-height` — 79px of a definite 342px dock body went unused, and the floor was
+   large enough to hide the collapse. Harness check 10 measures the pane against this box's own content
+   height for that reason: the dock body is definite, and every pixel of it now reaches the pane. */
+.cards-body {
+  flex: 1; min-width: 0; overflow-y: auto; padding: var(--s-5) var(--s-6);
+  display: flex; flex-direction: column;
+}
+.cards-gone { padding: var(--s-6) 0; }
+
+
+/* Raw pane (the card's file, inside the dock) */
+.raw-pane { flex: 1; display: flex; flex-direction: column; gap: var(--s-3); min-height: 0; }
+/* 8rem was the floor a collapsed flex parent left it sitting on. It is the FLOOR, not the size — the
+   `flex: 1` above is what makes it fill — but a floor you can actually edit in is worth having for any
+   context where the parent has no height to give. */
+.raw-pane .raw-area { flex: 1; min-height: 14rem; }
+.raw-foot { display: flex; align-items: center; justify-content: flex-end; gap: var(--s-4); }
+.raw-foot > .vb-text-error { margin-right: auto; }
+/* A TOGGLE, and its "on" state is now the `primary` variant rather than an `.active` class of its own —
+   which is what `.cards-raw.active`'s accent fill already was, written twice. Layout is what is left. */
+.cards-tabs > .push { flex: 0 0 auto; }
+
+
+/* ---------- Dispatch (the details step, inside the cards pane) ---------- */
+.dispatch { display: flex; flex-direction: column; gap: var(--s-4); }
+.dispatch-head { display: flex; align-items: center; gap: var(--s-4); }
+/* `.dispatch-back` is gone outright: a bordered `←` with an accent hover is `default`, exactly. */
+.dispatch-title { margin: 0; font-family: var(--font-display); font-size: var(--t-lead); }
+.dispatch-desc { margin: 0; font-size: var(--t-body); color: var(--muted); }
+/* A SENTENCE, so it is not a readout — only the run id inside it is, which is the signature's whole
+   claim: mono means the machine measured it. It was entirely mono before, which said the prose was
+   machine-written too. */
+.dispatch-continues { margin: 0; font-size: var(--t-small); color: var(--accent-2); }
+/* A `.vb-row`, and the WRAP is the one thing that is genuinely this surface's: the dispatch step sits in
+   a dock pane that can be 280px wide, and a rail label beside a control that cannot wrap overflows it. */
+.dispatch-row { flex-wrap: wrap; }
+.dispatch-row .vb-trigger { flex: 1; min-width: 0; }
+.dispatch > .vb-ctl { width: 100%; resize: vertical; }
+.dispatch-attach { font-size: var(--t-body); border: 1px solid var(--border); border-radius: var(--r-md); padding: var(--s-3) var(--s-4); }
+.dispatch-attach summary { cursor: pointer; color: var(--muted); }
+.dispatch .vb-text-quiet { margin: var(--s-2) 0; }
+.dispatch-foot { display: flex; justify-content: flex-end; gap: var(--s-4); margin-top: var(--s-2); }
+
+
+/* ---------- The card view's editable face ----------
+   THE SIXTH OF THE SEVEN MISFILED STRAYS. These five lived in `molecules/inline-field.css` — a
+   molecule's sheet holding one surface's overrides — and `styles.ts` said the phase that moved the
+   components would re-home them. `.inline-view` and `.inline-edit` themselves stayed with `Field`,
+   which is what absorbed `InlineField`. */
+.cv-title.inline-view, .cv-title.inline-edit { font-family: var(--font-display); font-size: var(--t-title); }
+.cv-group.inline-view { width: auto; display: inline-block; }
+.cv-tags-edit { min-height: 1.4rem; }
+.cv-links .vb-text { display: flex; align-items: center; gap: var(--s-4); }
+.cv-link-edit { text-decoration: underline; }

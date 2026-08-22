@@ -56,12 +56,13 @@
   font-family: inherit; font-size: var(--t-small); color: var(--text);
 }
 .vb-menu-list .vb-menu-item:hover { background: var(--panel-2); }
-/* THE RAIL IS THE ONLY THING THAT MARKS THE SELECTED SESSION. In `list` orientation the rule above sets
-   `color: var(--text)` at equal specificity and later than `.vb-menu-item.active`, so the accent ink never
-   lands; and `.active`'s background is the same one `:hover` draws. Without this the chosen session is
-   indistinguishable from the one under the pointer. `.chat-menu-item.active .chat-menu-open` drew it and
-   its deletion was a functional regression, not a treatment given up. Goes to `Row`'s `rail` in Phase 6. */
-.vb-menu-list .vb-menu-item.active { border-left: var(--rule) solid var(--accent); }
+/* THE RAIL IS THE ONLY THING THAT MARKS THE SELECTED SESSION, and it is `Row`'s `rail` now rather than the
+   one-declaration stopgap that stood here. In `list` orientation the rule above sets `color: var(--text)`
+   at equal specificity and later than `.vb-menu-item.active`, so the accent ink never lands; and
+   `.active`'s background is the same one `:hover` draws. Without the rail the chosen session is
+   indistinguishable from the one under the pointer. `Menu` puts `vb-row-rail vb-tone-accent` on the
+   selected list item, which is the same `--rule` × `--tone` pair eleven surfaces were each writing by
+   hand — see organisms/shared/list.css. Nothing is left for this sheet to declare. */
 
 /* The click-catcher behind an open list. `--z-pop` under the list itself, which is later in the DOM. */
 .vb-menu-backdrop { position: fixed; inset: 0; z-index: var(--z-pop); }

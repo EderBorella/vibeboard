@@ -224,26 +224,69 @@ describe('a suggestion that cannot be retired', () => {
   });
 });
 
-// THREE AT ONCE. The one-open-follow-up invariant itself holds without a lock, because it fails closed on
-// the id allocator's `wx` flag — what the losers used to get was a stack trace.
+// THREE AT ONCE. This used to assert [200, 500, 500] and call the two refusals the one-open-follow-up
+// invariant holding — it was neither. Nothing guarded that invariant: all three requests read the features
+// board, all three saw no follow-up, and the only thing that stopped the second one creating a second was
+// that all three ALSO allocated the same card id, so the `wx` flag on the file write refused it. That holds
+// only while the three chains stay in lockstep. Staggered by four event-loop turns — which is what a loaded
+// machine does — the second chain allocated a different id, and the board ended with TWO flagged follow-ups
+// and a spurious 500 on a carding that had in fact happened. Measured at 8 of 18 stagger widths before the
+// queue on the route went in; the intermittent CI failure was this, seen from the other end.
+//
+// So the contract asserted here is the one the endpoint owes, not the one its accidents produced: three
+// findings carded at once become three stories under ONE follow-up, and none of them is refused.
 describe('three simultaneous cardings', () => {
-  it('answers the losers a sentence, and leaves exactly one follow-up', async () => {
+  it('cards all three under one follow-up, and refuses none of them', async () => {
     const project = await open();
     const ids = [await file(project, 'one'), await file(project, 'two'), await file(project, 'three')];
     const answers = await Promise.all(ids.map((id) => card(project, id, 'story')));
 
-    const won = answers.filter((a) => a.statusCode === 200);
-    expect(won).toHaveLength(1);
-    for (const lost of answers.filter((a) => a.statusCode !== 200)) {
-      expect(lost.statusCode).toBe(500);
-      expect(lost.json().error).toBe(PARTIAL);
+    // A carding a person asked for and the server performed must not answer the sentence that says it did
+    // not: PARTIAL promises the finding is still open, and for two of these three it was a lie.
+    for (const answer of answers) {
+      expect(answer.statusCode).toBe(200);
+      expect(answer.json().error).toBeUndefined();
     }
-    // One follow-up, and the one story that got made is under it.
+    const stories = answers.map((a) => (a.json() as Carded).card.id);
+    // Distinct cards, not one card answered three times — a fixture where they collided would satisfy
+    // every count below while the endpoint carded once.
+    expect(new Set(stories).size).toBe(3);
+
     const features = await board(project, 'features');
     expect(features).toHaveLength(1);
     expect(features[0].followUp).toBe(true);
-    expect(features[0].links).toEqual([(won[0].json() as Carded).card.id]);
-    // And two of the three findings are still open, rather than actioned with nothing to show for it.
-    expect(await listSuggestions(project.root, 'active')).toHaveLength(2);
+    // Sorted, because the queue's order is the order the three requests reached it and that is not the
+    // order they were built in. ALL THREE: `setCardLinks` appends to the parent's list after reading it, so
+    // the concurrent case used to keep whichever back-reference was written last.
+    expect([...features[0].links].sort()).toEqual([...stories].sort());
+    expect(await board(project, 'product')).toHaveLength(3);
+    // And every finding is retired, rather than two of them left open with a story already on the board.
+    expect(await listSuggestions(project.root, 'active')).toHaveLength(0);
+  });
+
+  // THE SAME FINDING, TWICE, AT ONCE — and this is the case that makes the critical section's SCOPE
+  // load-bearing rather than its existence. The queue's own comment says it closes this: `mayBeCarded`
+  // reads the suggestion and checks it is still active, and two requests for one id both passed that read
+  // and both carded it. Nothing tested it. Moving `mayBeCarded` back OUTSIDE the queue — leaving the queue
+  // in place, so it still looks guarded — passes every other test in this file, because they all card
+  // three DISTINCT findings and never ask what happens when two requests name one.
+  //
+  // Sequentially this is a 409 and `app.suggestions-card.test.ts` has always covered it. Concurrently it
+  // was two cards from one finding, which is the outcome that 409 exists to refuse.
+  it('cards one finding once when two requests name it together', async () => {
+    const project = await open();
+    const id = await file(project, 'one');
+    const answers = await Promise.all([card(project, id, 'story'), card(project, id, 'story')]);
+
+    const won = answers.filter((a) => a.statusCode === 200);
+    const refused = answers.filter((a) => a.statusCode === 409);
+    expect(won).toHaveLength(1);
+    // 409 and not 500: the loser is refused because the finding's state changed under it, which is a fact
+    // about the board rather than a failed write. A 500 here would say the server broke.
+    expect(refused).toHaveLength(1);
+
+    // The claim the count cannot make: ONE card, not two with different ids.
+    expect(await board(project, 'product')).toHaveLength(1);
+    expect(await listSuggestions(project.root, 'active')).toHaveLength(0);
   });
 });

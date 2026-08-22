@@ -15,6 +15,7 @@ import {
   setSuggestionState,
   writeSuggestion,
 } from '../../store/suggestion-store.js';
+import { serialise } from '../../store/write-queue.js';
 import { type AppCtx, ensureOpen, nowIso, today } from '../route-context.js';
 
 // Agent Suggestions over HTTP.
@@ -214,10 +215,10 @@ async function cardAndRetire(
     // The error itself is deliberately not read. It is an ENOENT or an EACCES naming a path on the server,
     // and the sentence a person needs does not vary by which write it was.
     //
-    // This is also the answer for the losers of a concurrent carding: three at once currently answer
-    // [200, 500, 500], because the one-open-follow-up invariant fails closed on the id allocator's `wx`
-    // flag — the two that lose that race created nothing, so their ledgers are empty and the sentence is
-    // the whole of what they owe.
+    // Concurrency no longer arrives here at all — see the queue on the route below. It used to: three at
+    // once answered [200, 500, 500] and that was read as the invariant holding, when what actually
+    // happened was two cardings colliding on the same allocated id. It only looked like a guard because
+    // the three request chains ran in lockstep.
     await undoAll(undo);
     return { code: 500, error: PARTIAL_WRITE };
   }
@@ -291,9 +292,31 @@ export async function registerSuggestionRoutes(api: FastifyInstance, ctx: AppCtx
     const { root, config } = ctx.session;
     const { id } = req.params as { id: string };
     const { level } = (req.body ?? {}) as { level?: unknown };
-    const ready = await mayBeCarded(root, id, level);
-    if ('error' in ready) return reply.code(ready.code).send({ error: ready.error });
-    const done = await cardAndRetire(root, config, level as Level, id, ready.suggestion);
+    // ONE CARDING AT A TIME PER PROJECT, and the queue is the whole of the exclusion — there is no other.
+    // Everything below is read-then-write across several awaits, and all three reads went stale under
+    // concurrency:
+    //
+    //   - `mayBeCarded` reads the suggestion and checks it is still active. Two requests for the SAME id
+    //     both passed it and both carded it: two cards from one finding, which is the outcome the 409 in
+    //     that function exists to refuse.
+    //   - `openFollowUp` reads the features board. Two requests both saw no follow-up and both made one,
+    //     breaking decision 50's at-most-one — measured at 2 flagged follow-ups whenever one chain's id
+    //     allocation happened to land after the other's file. The `wx` flag on the card write is NOT a
+    //     guard on this: it guards the ID, and it only refused the second carding while both chains read
+    //     the spent-id set before either wrote. Off lockstep by four event-loop turns, the second chain
+    //     allocated a different id and both writes succeeded.
+    //   - `setCardLinks` reads the parent's `links` and appends to them, so two stories carded onto one
+    //     follow-up lost one of the two back-references.
+    //
+    // In process rather than on disk, for the reason write-queue.ts sets out: this endpoint is the only
+    // writer of a follow-up in the codebase (`followUp: true` appears once), so ordering the callers
+    // inside this process orders all of them. Carding is a person clicking a button — serialising it
+    // costs nothing worth measuring.
+    const done = await serialise(`card-suggestion:${root}`, async () => {
+      const ready = await mayBeCarded(root, id, level);
+      if ('error' in ready) return { code: ready.code, error: ready.error };
+      return cardAndRetire(root, config, level as Level, id, ready.suggestion);
+    });
     if ('error' in done) return reply.code(done.code).send({ error: done.error });
     return { card: done.card, suggestion: done.suggestion };
   });

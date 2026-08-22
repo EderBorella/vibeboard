@@ -193,7 +193,10 @@ async function furnish(projectRoot) {
     },
     {
       id: '20260101-092000-bbbb',
-      state: 'rejected',
+      // `dismissed`, not `rejected`: SUGGESTION_STATES is active|actioned|dismissed, and the store
+      // normalised the wrong value silently — so the fixture claimed to render a second state and
+      // rendered the first one twice.
+      state: 'dismissed',
       created: '2026-01-01T09:20:00.000Z',
       title: 'Add a fourth board',
       run: runs[0].run,

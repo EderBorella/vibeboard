@@ -25,9 +25,25 @@ import { join } from 'node:path';
 // floor near the true number fails the run the first time somebody legitimately deletes a file — which
 // is the mistake two anti-vacuity floors in this repository already made, each failing a run FOR
 // SUCCEEDING as its backlog cleared.
+// A STORY IS NOT APPLICATION CODE, AND EVERY GATE HERE WOULD BELIEVE IT WAS.
+//
+// `check-class-budget.mjs` calls a class REFERENCED when its name appears as a token in
+// `web/src/**/*.tsx`. Storybook's stories live beside the components they show, so without this a class
+// used by nothing but a story reads as live — which is precisely the dead class that gate exists to find,
+// and the workbench would have quietly switched off the check it was built to serve. The same argument
+// holds for `check-name-resolution.mjs` (a story's className is not a surface's), for
+// `check-shape-coverage.mjs` (a story is not an adoption site, and counting it inflates the ratio the
+// censuses print) and for `check-radius-scale.mjs` (a `className` on a `<Button>` in a story is a
+// demonstration, not a geometry decision a surface made).
+//
+// EXCLUDED IN THE ONE PLACE THE CORPUS IS DISCOVERED, rather than in five callers: `tools/lib/` exists
+// because `lineOf` had four copies and `rulesOf` three, and one of those copies carried a bug the others
+// had fixed. A rule about what the corpus IS belongs with the walk.
+const STORY = '.stories.';
+
 export const walk = (root, corpus, ext, atLeast) => {
   const files = readdirSync(join(root, corpus), { recursive: true })
-    .filter((entry) => typeof entry === 'string' && entry.endsWith(ext))
+    .filter((entry) => typeof entry === 'string' && entry.endsWith(ext) && !entry.includes(STORY))
     .map((entry) => join(corpus, entry))
     .sort();
   if (files.length < atLeast) {

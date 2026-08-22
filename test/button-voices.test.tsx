@@ -23,9 +23,15 @@ afterEach(cleanup);
 
 const WEB = join(dirname(fileURLToPath(import.meta.url)), '..', 'web', 'src');
 
+// STORIES ARE NOT CALL SITES, and this walk has to say so itself. The gates in `tools/` exclude
+// `*.stories.tsx` in `tools/lib/source.mjs`, where their shared corpus is discovered; this test keeps its
+// own walk over `web/src` and so is outside that. Storybook's arrival made it red: a story that
+// demonstrates `variant="ghost"` beside a solid button — which is the only way to SEE the dashed border
+// the owner ruled on — read as two more controls wearing the ghost, and the census below is a closed list
+// of exactly the controls that explain. A demonstration of a variant is not a use of it.
 const sources = (): { file: string; text: string }[] =>
   readdirSync(WEB, { recursive: true })
-    .filter((e): e is string => typeof e === 'string' && e.endsWith('.tsx'))
+    .filter((e): e is string => typeof e === 'string' && e.endsWith('.tsx') && !e.includes('.stories.'))
     .sort()
     .map((e) => ({ file: e, text: readFileSync(join(WEB, e), 'utf8') }));
 

@@ -23,10 +23,13 @@
 // four is a different measurement. So the four are tabulated as data — resting box, face, selected
 // state — and the refusal is re-taken against the table below rather than cited from the old one.
 import { cleanup, render } from '@testing-library/react';
+import type { ComponentProps } from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { Button } from '../web/src/atoms/Button.js';
 import type { SurfaceVariant } from '../web/src/atoms/Surface.js';
 import { Surface } from '../web/src/atoms/Surface.js';
+import { Menu } from '../web/src/molecules/Menu.js';
+import { Tabs } from '../web/src/molecules/Tabs.js';
 import { box } from './css-box.js';
 
 afterEach(cleanup);
@@ -169,8 +172,9 @@ describe('the nested boxes — a drawn edge and the smaller 6px corner', () => {
   // document has met it. They disagreed on the ground too — six `--panel-2` against four `--bg`, with
   // `.tile` and `.exec-run` both a record in a column on a `--panel` parent and answering differently.
   //
-  // SIX OF THE TEN ARE `inset` NOW; three are survivors with a reason and one is gone. What is asserted
-  // is that the six read back as ONE box, and that each survivor still says the thing that kept it out.
+  // SIX OF THE TEN ARE `inset` NOW; TWO are survivors with a reason, one is gone and one became a `Tabs`
+  // cell. What is asserted is that the six read back as ONE box, that each survivor still says the thing
+  // that kept it out, and that the one that left took the cell's box rather than keeping its own.
   const MIGRATED: [string, Element][] = [
     ['tile', panel('inset', 'tile')],
     ['archive-item', panel('inset', 'archive-item')],
@@ -225,8 +229,18 @@ describe('the nested boxes — a drawn edge and the smaller 6px corner', () => {
     expect(drawn(el('msg-assistant')).radius).toBe('10px 10px 10px 4px');
   });
 
-  it(".control-tabs button keeps a tab's padding, and it is a tab", () => {
-    expect(box(inside('control-tabs', 'button')).padding).toBe('4px 8px');
+  // IT WAS A SURVIVOR BECAUSE IT WAS A TAB, AND BEING A TAB IS WHY IT IS NO LONGER ONE. The reason
+  // recorded for keeping `.control-tabs button` out of `inset` was that it kept a tab's padding — and the
+  // molecule phase gave the editor's three views to `Tabs`, so the class is gone and the padding is the
+  // strip's. The vertical half went the way `Button`'s and `Control`'s did: `0.2rem 8px` became `0 8px`
+  // with a declared 28px, because a box whose height is padding plus a line box is a box whose height
+  // changes when its label does. Pinned as the pair, so the class coming back would be as visible as the
+  // cell's box moving.
+  it(".control-tabs button became a Tabs cell, so the box is the strip's and not its own", () => {
+    expect(box(inside('control-tabs', 'button')).padding).toBeUndefined();
+    const cell = at('<div class="vb-tabs"><button class="vb-tab">x</button></div>', 'button');
+    expect(box(cell).padding).toBe('0 8px');
+    expect(box(cell).height).toBe('28px');
   });
 
   // `.copilot-actions button` WAS `Button` `default` `sm` DECLARATION FOR DECLARATION, which is the whole
@@ -257,105 +271,286 @@ describe('the nested boxes — a drawn edge and the smaller 6px corner', () => {
 });
 
 describe('InlineField is one control in two states, and the two share one box', () => {
-  // THE PAIR'S PADDING IS THE POINT. A field that looks like text until it is clicked must not move
-  // when it becomes an input, so the view and the edit declare the SAME padding on purpose — and the
-  // control box `Field` owns is `var(--s-3) var(--s-4)`, which would make the text jump 4px on click.
+  // THE EDITOR CARRIES `.vb-ctl` NOW, and the fixture has to say so: `Field inline` renders a `<Control>`,
+  // so `.inline-edit` alone reaches none of the box. A one-class fixture here would ask about a class that
+  // draws almost nothing and pass on whatever it answered — the same fixture-too-thin failure the atom
+  // phase found on `inField()`/`field()` in this suite's neighbours.
+  const view = () => el('inline-view', 'button');
+  const edit = () => el('vb-ctl inline-edit', 'textarea');
+
+  // THE PAIR'S PADDING IS THE POINT AND THE MOLECULE PHASE BROKE IT. A field that looks like text until it
+  // is clicked must not move when it becomes an input, so the view and the edit declare the SAME padding on
+  // purpose. `.inline-edit` lost its own padding when the box moved to the atom and took `.vb-ctl`'s
+  // `0 var(--s-4)` and its 28px floor instead — so the value slid 4px sideways and the row grew 3px on
+  // click, which is the exact geometric objection `Field inline` claims to have answered. Restored on
+  // `.inline-edit` as the two declarations it carried before the merge; asserted as an EQUALITY of both
+  // halves, because either one alone still moves the text.
   it('the view and the edit declare one padding', () => {
-    expect(box(el('inline-view', 'button')).padding).toBe(box(el('inline-edit', 'textarea')).padding);
+    expect(box(view()).padding).toBe(box(edit()).padding);
+    expect(box(view()).padding).toBe('2px 6px');
+    // The height floor is the other half of "one box": `.vb-ctl`'s 28px against a read-only view with none.
+    expect(box(edit())['min-height']).toBe('0');
+    expect(box(view())['min-height']).toBeUndefined();
   });
 
+  // THE EDGE IS READ AS A PAIR for `drawn()`'s reason: the atom writes the width and the style and
+  // `.inline-edit` writes only the colour, so collapsing the two would let a lost `border-color` pass.
   it('only the edit draws its edge, and it draws it accent', () => {
-    expect(box(el('inline-view', 'button')).border).toBe('1px solid transparent');
-    expect(box(el('inline-edit', 'textarea')).border).toBe('1px solid var(--accent)');
-    expect(box(el('inline-view', 'button')).background).toBe('transparent');
+    expect(drawn(view()).edge).toBe('1px solid transparent + no colour of its own');
+    expect(drawn(edit()).edge).toBe('1px solid var(--border) + var(--accent)');
+    expect(box(view()).background).toBe('transparent');
   });
 });
 
 // ---------------------------------------------------------------------------------------------------
-// THE TABS, AND THE MEASUREMENT THE REFUSAL IS RE-TAKEN ON.
+// THE TABS. THIS SUITE PINNED A DISAGREEMENT, AND THE DISAGREEMENT IS WHAT THE MOLECULE PHASE DELETED.
 //
-// Phase 5b declined a `Tabs` primitive on three candidates of which two were real, because the two
-// disagreed about both things such a primitive would own. The census lists FOUR tab boxes, so the
-// measurement is different and the decision has to be taken again rather than restated. This is the
-// table, asserted so that it cannot rot: if a tab's face or selected state changes, the refusal has to
-// be re-read rather than inherited.
-describe('the four tabs disagree about every decision a Tabs primitive would own', () => {
-  const TABS = {
-    'dock-tab': el('dock-tab', 'button'),
-    'tab-btn': el('tab-btn', 'button'),
-    'control-tabs button': inside('control-tabs', 'button'),
-    'cards-tab': el('cards-tab'),
-  };
-  const selected = {
-    'dock-tab': box(el('dock-tab active', 'button')),
-    'tab-btn': box(el('tab-btn active', 'button')),
-    'control-tabs button': box(
-      at('<div class="control-tabs"><button class="active">x</button></div>', 'button'),
-    ),
-    'cards-tab': box(el('cards-tab active')),
+// The four tests here asserted that four tab classes answered every decision a `Tabs` primitive would own
+// differently — three resting boxes, four faces, four selected states — and the refusal to build one was
+// re-taken on that table. The table was right and the POPULATION was wrong: there were never four, there
+// were six, and six classes disagreeing six ways is not "a primitive that would carry one variant each",
+// it is nineteen classes for one shape. `Tabs` and `Menu` are what replaced them.
+//
+// SO THE TESTS ARE NOT MIGRATED, THEY ARE INVERTED. Rewriting them as "the same values, on `.vb-tab`"
+// would make them a description of the new code, which is the one thing this suite's own header forbids —
+// so what stands here is the MIRROR CLAIM, which is the acceptance test for the reversal: each thing the
+// four disagreed about now has ONE answer, and the line between `Tabs` and `Menu` is where the second
+// answer is allowed to live. A test that reads `undefined / undefined` because a rule is gone asserts
+// nothing; a test that says "one answer, and here is the only exception" asserts the merge.
+//
+// THE FIXTURES ARE THE COMPONENTS. `.vb-tab`'s rules are DESCENDANT rules — `.vb-tabs:not(.vb-tabs-grouped)
+// .vb-tab`, `.vb-tabs-grouped .vb-tab` — so a hand-written class list would reach the base cell and
+// nothing else, and every claim about what the group takes away would read as absent and pass. Rendering
+// `Tabs` also means the class list is never hand-written: rename `vb-tab` and every assertion moves.
+describe('the four tabs became one, and each decision they disagreed about has one answer', () => {
+  // `value={null}` IS A REAL STATE and it is the one wanted here: the cards pane opens with no card
+  // selected, and a resting box measured on a selected cell would be measuring `.active`.
+  function cellIn(props: Partial<ComponentProps<typeof Tabs>> = {}): Element {
+    const { container } = render(
+      <Tabs
+        label="View"
+        items={[
+          { value: 'a', label: 'one' },
+          { value: 'b', label: 'two' },
+        ]}
+        value={null}
+        onChange={() => {}}
+        {...props}
+      />,
+    );
+    const cell = container.querySelector('.vb-tab');
+    if (!cell) throw new Error('Tabs rendered no cell');
+    return cell;
+  }
+
+  function destination(selected: boolean): Element {
+    const { container } = render(
+      <Menu
+        label="View"
+        items={[
+          { value: 'a', label: 'Boards' },
+          { value: 'b', label: 'Execution' },
+        ]}
+        value={selected ? 'a' : null}
+        onChange={() => {}}
+      />,
+    );
+    const item = container.querySelector('.vb-menu-item');
+    if (!item) throw new Error('Menu rendered no item');
+    return item;
+  }
+
+  // The four shapes a cell can be in. A badge and a `✕` are DOM changes rather than class changes, which
+  // is exactly the claim: no rule keys off either, so all three ungrouped cells are one box.
+  const SHAPES: [string, Partial<ComponentProps<typeof Tabs>>][] = [
+    ['plain', {}],
+    ['badged', { items: [{ value: 'a', label: 'one', badge: 3 }] }],
+    ['closable', { closable: true, onClose: () => {} }],
+    ['grouped', { grouped: true }],
+  ];
+
+  // THE FULL BOX AND NOT JUST THE GROUND AND THE EDGE, because the four disagreed about the height too —
+  // 22.4px, 24px, 25.8px badged and 17.75px — and a signature that omitted it would call two of them equal.
+  const signature = (target: Element): string => {
+    const b = box(target);
+    return [b.background, b.border, b['border-radius'] ?? 'no corner', b.height, b.padding].join(' / ');
   };
 
-  it('the RESTING box is three answers across four tabs', () => {
-    const resting = Object.entries(TABS).map(([, target]) => {
-      const b = box(target);
-      return `${b.background} / ${b.border}`;
-    });
-    expect(resting).toEqual([
-      'transparent / 1px solid transparent',
-      'transparent / 1px solid transparent',
-      'var(--panel-2) / 1px solid var(--border)',
-      'var(--bg) / 1px solid var(--border)',
-    ]);
-    expect(new Set(resting).size).toBe(3);
+  it('the RESTING box is ONE answer', () => {
+    const resting = SHAPES.map(([, props]) => signature(cellIn(props)));
+    // TWO AND NOT ONE, and the second is by design: inside a group the cell gives its box up, which is the
+    // one shape variant the segmented control earned. Every other difference is gone.
+    expect(new Set(resting).size).toBe(2);
+    const [plain, badged, closable, grouped] = resting;
+    expect([badged, closable]).toEqual([plain, plain]);
+    expect(plain).toBe('transparent / 1px solid transparent / 6px / 28px / 0 8px');
+    expect(grouped).toBe('var(--panel-2) / none / no corner / auto / 0 8px');
   });
 
-  // THE TRACKING STOPPED BEING PART OF THE DISAGREEMENT, and that narrows this claim by exactly one
-  // property: `.dock-tab` was 0.08em against `.tab-btn`'s 0.04em, and both are `var(--track)` now. What
-  // the four still disagree about is the FAMILY and the CASE — one uppercase display, one sentence-case
-  // display, two declining a face in two different places — which is the part the Tabs refusal rests on.
-  it('the FACE is four answers across four tabs', () => {
-    const face = Object.entries(TABS).map(([, target]) => {
+  // THE FACE WAS THE WIDEST OF THE FOUR DISAGREEMENTS — one uppercase display, one sentence-case display,
+  // two declining a face in two different places — and it is the one thing the merge deleted outright
+  // rather than picked a winner for. A cell inherits the app's face and says nothing else: `--font-display`
+  // on a 12px cell was a treatment two of the four had and two did not, and the tracking made the dock's
+  // row wider than the words in it.
+  //
+  // AND THE EXCEPTION IS THE LINE BETWEEN THE TWO COMPONENTS, asserted rather than described. A DESTINATION
+  // is a NAME — the app's own vocabulary for its five places — so `--font-display` and `--track` survive on
+  // `.vb-menu-item` and nowhere else. Both halves in one test, because "it went from every tab" is only a
+  // claim about the merge if the place it survives is named.
+  it('the FACE is ONE answer, and the display face lives only on a destination', () => {
+    const face = (target: Element): string => {
       const b = box(target);
       return `${b['font-family'] ?? '—'} / ${b['text-transform'] ?? '—'} / ${b['letter-spacing'] ?? '—'}`;
-    });
-    expect(face).toEqual([
-      'var(--font-display) / uppercase / 0.08em',
-      'var(--font-display) / — / 0.08em',
-      '— / — / —',
-      '— / — / —',
+    };
+    // `inherit` AND NOT `undefined`: the cell declares it, which is the stronger claim. A `<button>` takes
+    // the UA control face, so a cell that said nothing would render in it — the defect `button.vb-chip`
+    // exists to have fixed once.
+    expect(SHAPES.map(([, props]) => face(cellIn(props)))).toEqual([
+      'inherit / — / —',
+      'inherit / — / —',
+      'inherit / — / —',
+      'inherit / — / —',
     ]);
-    // Two of the four declare no face at all, and they do not decline it in the same place:
-    // `.control-tabs button` inherits the app's, while `.cards-tab`'s face is on the LABEL inside it.
-    expect(box(el('cards-tab-label', 'button'))['font-size']).toBe('0.75rem');
+    expect(face(destination(false))).toBe('var(--font-display) / — / 0.08em');
   });
 
-  // THE SECOND PREMISE THIS SUITE GOT WRONG, and it makes the disagreement WIDER rather than narrower:
-  // `.cards-tab.active` changes no ink at all. The selected ink is `.cards-tab.active .cards-tab-label`,
-  // one level down on the control inside the box — so a `Tabs` primitive owning "selected" would have to
-  // decide which ELEMENT the state colours, and the four candidates answer that in two ways as well.
-  it('the SELECTED state is four answers across four tabs', () => {
-    const state = Object.entries(selected).map(
-      ([, b]) => `${b.color ?? 'no ink of its own'} / ${b['border-color']} / ${b['box-shadow'] ?? 'no glow'}`,
+  // ONE SELECTED STATE, AND IT IS THE DOCK'S — `--text` ink on `--panel-2` with a visible edge, which was
+  // the only one of the four that read as "selected" without also reading as "primary". The top row's
+  // `--glow` is gone with it: a halo on a destination made the header's current tab the brightest thing on
+  // a board with work running on it.
+  //
+  // AND THE INK IS THE CELL'S OWN, which is the second thing the four could not agree on: `.cards-tab`
+  // changed no ink at all and put the selected colour on its CHILD, so a primitive owning "selected" had to
+  // decide which ELEMENT the state colours. It colours the cell. Asserted as an EQUALITY between the label
+  // inside a selected cell and the label inside a resting one — a negative on one fixture could not tell a
+  // missing rule from a rule that never matched.
+  it('the SELECTED state is ONE answer, and the ink is the cell’s own', () => {
+    // THE GROUND IS IN THE SIGNATURE AND IT WAS NOT AT FIRST, which is worth recording because the omission
+    // made this test pass a planted defect: deleting `.vb-tab.active`'s `background` exited green. The four
+    // disagreed about the ground as much as the ink — `.cards-tab` sat on `--bg`, the segmented cell
+    // inverted to `--accent-fill` — so a "selected state" that does not name it is not the claim.
+    const state = (target: Element): string => {
+      const b = box(target);
+      return [
+        b.color ?? 'no ink of its own',
+        b.background,
+        b['border-color'],
+        b['box-shadow'] ?? 'no glow',
+      ].join(' / ');
+    };
+    expect(state(cellIn({ value: 'a' }))).toBe('var(--text) / var(--panel-2) / var(--border) / no glow');
+    // A destination differs in the INK and in nothing else — accent says "you are here" where `--text` on
+    // `--panel-2` says "this is the view you are reading".
+    expect(state(destination(true))).toBe('var(--accent) / var(--panel-2) / var(--border) / no glow');
+
+    const labelIn = (selected: boolean): Record<string, string> => {
+      const { container } = render(
+        <Tabs
+          label="View"
+          items={[{ value: 'a', label: 'one' }]}
+          value={selected ? 'a' : null}
+          onChange={() => {}}
+        />,
+      );
+      const clip = container.querySelector('.vb-clip');
+      if (!clip) throw new Error('Tabs rendered no label');
+      return box(clip);
+    };
+    expect(labelIn(true)).toEqual(labelIn(false));
+  });
+
+  // THE GROUP OWNS THE BOX AND THE CELL GIVES ITS OWN UP, which is the one shape variant that survived the
+  // cull and the reason a segmented picker was never a row of `Button`s: every button variant gives its
+  // cell an edge and a corner, and that puts a seam down the middle of the group.
+  //
+  // The five value assertions this claim used to be made with live in test/label-notice-boxes.test.tsx,
+  // migrated onto `.vb-tabs-grouped` verbatim — the group IS the segmented control now. What is asserted
+  // here is the HANDOVER, which is the part neither file said: every one of the four things the cell
+  // declares for itself outside a group is declared by the group instead.
+  it('the group owns the box and the cell gives its own up', () => {
+    const { container } = render(
+      <Tabs
+        grouped
+        label="Mode"
+        items={[
+          { value: 'a', label: 'one' },
+          { value: 'b', label: 'two' },
+        ]}
+        value={null}
+        onChange={() => {}}
+      />,
     );
-    expect(state).toEqual([
-      'var(--text) / var(--border) / no glow',
-      'var(--accent) / var(--border) / var(--glow)',
-      'var(--text) / var(--accent) / no glow',
-      'no ink of its own / var(--accent) / var(--glow)',
+    const group = container.querySelector('.vb-tabs-grouped');
+    const cell = container.querySelector('.vb-tab');
+    if (!group || !cell) throw new Error('Tabs grouped rendered nothing');
+    const g = box(group);
+    const c = box(cell);
+    // The four the group takes: the edge, the corner, the height and the clip that makes them one box.
+    expect([g.border, g['border-radius'], g.height, g.overflow]).toEqual([
+      '1px solid var(--border)',
+      '6px',
+      '28px',
+      'hidden',
     ]);
-    expect(new Set(state).size).toBe(4);
-    // …and the fourth's ink is on its child, which is the second answer to "what does selected colour?"
-    expect(
-      box(at('<div class="cards-tab active"><button class="cards-tab-label">x</button></div>', 'button'))
-        .color,
-    ).toBe('var(--text)');
+    // And the four the cell gives up. `height: auto` rather than a number is what makes the harness's
+    // "a cell is exactly 2px shorter than its group" derivable from the page instead of asserted here.
+    expect([c.border, c['border-radius'] ?? 'no corner', c.height, c['max-width']]).toEqual([
+      'none',
+      'no corner',
+      'auto',
+      'none',
+    ]);
+    // The divider between cells is all that is left of the cell's edge, and the last one drops it.
+    expect(c['border-right']).toBe('1px solid var(--border)');
+    expect(box(cell, ':last-child')['border-right']).toBe('none');
   });
 
-  // `.cards-tab` IS NOT A TAB BUTTON AT ALL, which is the mirror of Phase 5b's reading of
-  // `.cards-tab-label`: that was the label inside a tab, and this is the box around one. It contains
-  // two controls — the label and a close `✕` — so it declares no padding and takes no click itself.
-  it('.cards-tab declares no padding, because the controls inside it do', () => {
-    expect(box(el('cards-tab')).padding).toBeUndefined();
-    expect(box(el('cards-tab-label', 'button')).padding).toBe('2px 2px 2px 8px');
+  // THE `✕`'s PULL BELONGS TO A TAB AND NOT TO WHATEVER FOLLOWS ONE, and this is here because the first
+  // spelling of it did not say that. `.vb-tab + .vb-btn-bare` matched ANY bare `Button` after a cell, and
+  // `dock/UtilityDock.tsx` renders exactly one — its collapse toggle, passed as `children`, which lands
+  // immediately after the last cell in a strip that is not `closable` at all. So a strip-level control took
+  // a −4px pull meant for a per-tab close glyph. `[data-tab-close]` is what makes the rule say what it
+  // means, and it costs nothing on the class budget.
+  //
+  // BOTH DIRECTIONS, because the positive alone passes under either selector: the pull is what the old one
+  // got right and the ABSENCE of it on a trailing child is the whole of what it got wrong.
+  it('the close glyph is pulled against its own tab, and a strip-level control is not', () => {
+    const closable = render(
+      <Tabs
+        label="Open cards"
+        closable
+        onClose={() => {}}
+        items={[{ value: 'E-001', label: 'one' }]}
+        value="E-001"
+        onChange={() => {}}
+      />,
+    );
+    const cross = closable.container.querySelector('[data-tab-close]');
+    if (!cross) throw new Error('a closable Tabs rendered no close control');
+    // `calc(-1 * 4px)` and not `calc(-1 * var(--s-2))`: the resolver spends the token, so a value moved
+    // off the scale would read as a different string here.
+    expect(box(cross)['margin-left']).toBe('calc(-1 * 4px)');
+
+    // The dock's shape: NOT closable, and a bare `Button` as `children`. It is the immediate next sibling
+    // of the last cell, which is exactly what the old selector could not tell apart from a close glyph.
+    const dock = render(
+      <Tabs
+        label="Utilities"
+        items={[
+          { value: 'cards', label: 'Cards' },
+          { value: 'logs', label: 'Logs' },
+        ]}
+        value="cards"
+        onChange={() => {}}
+      >
+        <Button variant="bare">x</Button>
+      </Tabs>,
+    );
+    const cells = dock.container.querySelectorAll('.vb-tab');
+    const trailing = cells[cells.length - 1]?.nextElementSibling;
+    if (!trailing) throw new Error('the dock shape rendered no trailing control');
+    expect(trailing.className).toContain('vb-btn-bare');
+    expect(trailing.hasAttribute('data-tab-close')).toBe(false);
+    expect(box(trailing)['margin-left']).toBeUndefined();
   });
 });

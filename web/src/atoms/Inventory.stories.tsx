@@ -146,13 +146,7 @@ export const ControlHeights: StoryObj = {
       {/* THE ONE ROW ALLOWED TO DISAGREE, drawn last so the column above is read as one number. `.tab-btn`
           is gone — it is a `Menu` item at `--ctl-h`, which is why it is up in the column now. */}
       <Measured label="a grouped cell (a part, 2px shorter)" probe=".vb-tabs-grouped .vb-tab">
-        <Tabs
-          grouped
-          label="Mode"
-          items={[{ value: 'a', label: 'a cell' }]}
-          value="a"
-          onChange={() => {}}
-        />
+        <Tabs grouped label="Mode" items={[{ value: 'a', label: 'a cell' }]} value="a" onChange={() => {}} />
       </Measured>
     </Grid>
   ),

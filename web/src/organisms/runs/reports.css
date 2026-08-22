@@ -20,7 +20,7 @@
    `cancelled` are still one colour and still for the reason that was written here: what they have in
    common is no report, and stopping a run is a decision rather than a fault but is still an ending that
    produced nothing. The edge came from `.vb-chip-tone` and is a 50% mix rather than the flat token —
-   see ui/primitives.css. */
+   see atoms/chip.css. */
 .report-chip {
   flex: 0 0 auto;
   text-transform: uppercase; letter-spacing: var(--track);

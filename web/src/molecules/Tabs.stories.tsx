@@ -21,6 +21,10 @@ const meta = {
       { value: 'edit', label: 'Edit' },
       { value: 'preview', label: 'Preview' },
     ],
+    // Required props, so `Playground` typechecks with `render` and no `args` of its own — and the
+    // Controls panel is complete. `Live` overrides both with real state.
+    value: null,
+    onChange: () => {},
   },
 } satisfies Meta<typeof Tabs>;
 export default meta;

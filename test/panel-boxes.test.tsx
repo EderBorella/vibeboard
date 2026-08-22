@@ -33,6 +33,7 @@ import { cleanup, render } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { Surface } from '../web/src/atoms/Surface.js';
 import { BoardsView } from '../web/src/board/BoardsView.js';
+import { Menu } from '../web/src/molecules/Menu.js';
 import type { BoardName, Card, ProjectConfig, ProjectSnapshot } from '../web/src/shared.js';
 // THE CASCADE RESOLVER IS SHARED with test/field-boxes.test.tsx — see test/css-box.tsx. Its own two
 // directions are asserted below, under *the cascade helper separates a state from the resting style*.
@@ -266,14 +267,39 @@ describe('a list row draws no box until the surface lights it', () => {
   // 3px is the token's, and its recorded reason is that every owner report so far has been "I cannot see
   // it". Written as the resolved `3px` and never as `var(--rule)`: an expectation rewritten into the token
   // name compares one literal to the same literal and asserts nothing, which is the Phase 1 finding.
-  it('a selected chat pick keeps its accent left edge', () => {
+  // THE FIXTURE IS THE COMPONENT BECAUSE THE CLASSES THIS NAMED ARE GONE: the session list is
+  // `Menu orientation="list"`, and `.chat-menu-item.active .chat-menu-open` is where the rail used to be
+  // declared. Its deletion in the molecule phase was a FUNCTIONAL REGRESSION rather than a treatment given
+  // up, and nothing named it anywhere — not the commit message's list of what was surrendered, not
+  // `menu.css`, which declared no `border-left` and no `--rule` at all.
+  //
+  // AND THE RAIL IS THE ONLY MARK THE SELECTED SESSION HAS, which is why its loss was not merely a smaller
+  // difference. `.vb-menu-list .vb-menu-item` sets `color: var(--text)` LATER at equal (0,2,0) specificity
+  // than `.vb-menu-item.active`'s `var(--accent)`, so the accent ink never lands in this orientation; and
+  // `.active`'s background is the same one `:hover` draws. Both are asserted as EQUALITIES here, because
+  // "the rail is the only mark" is only a claim if the other two really are indistinguishable — a
+  // fixture that cannot tell two outcomes apart tests neither.
+  it('a selected chat pick keeps its accent left edge, and it is the only mark it has', () => {
     const { container } = render(
-      <div className="chat-menu-item active">
-        <Surface as="button" variant="flat" className="chat-menu-open" data-testid="chat-pick" />
-      </div>,
+      <Menu
+        orientation="list"
+        label="Saved chats"
+        items={[
+          { value: 'a', label: 'the open session' },
+          { value: 'b', label: 'another session' },
+        ]}
+        value="a"
+        onChange={() => {}}
+      />,
     );
-    const pick = container.querySelector('[data-testid="chat-pick"]');
-    expect(box(pick as Element)['border-left']).toBe('3px solid var(--accent)');
+    const [picked, other] = [...container.querySelectorAll('.vb-menu-item')];
+    if (!picked || !other) throw new Error('Menu rendered no items');
+    expect(picked.className).toContain('active');
+    // `3px` and never `var(--rule)`: an expectation rewritten into the token name asserts nothing.
+    expect(box(picked)['border-left']).toBe('3px solid var(--accent)');
+    expect(box(other)['border-left']).toBeUndefined();
+    expect(box(picked).color).toBe(box(other).color);
+    expect(box(picked).background).toBe(box(other, ':hover').background);
   });
 
   it('a disabled execution card stops being a control without losing its box', () => {

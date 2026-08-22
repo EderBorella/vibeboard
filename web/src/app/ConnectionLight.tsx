@@ -47,7 +47,6 @@ export function ConnectionLight({
       state={light}
       // THE HALO IS THIS SURFACE'S, and it is the reason `glow` is a prop rather than a tone: the app's
       // own health is one of the two things in the app worth one, and `--glow` is `none` in two themes.
-      dot={12}
       glow={light === 'online'}
       // A FIXED 12ch BOX, sized to the longest name the light can report, and it is a claim about THIS
       // row rather than about a status chip: the indicator sits left of the tabs, so a label that resized

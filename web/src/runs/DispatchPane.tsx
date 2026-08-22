@@ -155,7 +155,11 @@ export function DispatchPane({
         </details>
       )}
 
-      {error !== null && <Notice as="p" tone="bad">{error}</Notice>}
+      {error !== null && (
+        <Notice as="p" tone="bad">
+          {error}
+        </Notice>
+      )}
 
       <div className="dispatch-foot">
         <Button size="md" onClick={onBack}>

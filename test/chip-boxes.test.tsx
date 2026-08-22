@@ -32,6 +32,7 @@ import type { ComponentProps } from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { Chip } from '../web/src/atoms/Chip.js';
 import { CardTile } from '../web/src/board/CardTile.js';
+import { Menu } from '../web/src/molecules/Menu.js';
 import type { Card } from '../web/src/shared.js';
 import { box } from './css-box.js';
 import { inkIn, inkToken, isColour, THEMES } from './state-ink.js';
@@ -147,16 +148,12 @@ const chips: {
     font: MICRO,
     ink: /--accent-2/,
   },
-  {
-    name: '.tab-badge — the count of runs waiting on you',
-    props: { pill: true, className: 'tab-badge vb-readout' },
-    radius: PILL,
-    font: MICRO,
-    // `--on-accent` retired: it aliased `--on-fill` in two of the three palettes and decided nothing.
-    // The ink a count punched out of an `--accent-2` ground needs is the surface it is punched out of.
-    ink: /--panel-2/,
-    ground: 'var(--accent-2)',
-  },
+  // `.tab-badge` IS NOT IN THIS TABLE ANY MORE, and it is not because the badge went away. The class is
+  // deleted: the attention count is `Menu`'s `badge` option, rendered as `Chip pill fill` with the mono
+  // face. A row here naming `tab-badge` would be a fixture too thin to distinguish two outcomes — the
+  // class draws nothing, so every assertion would be answered by `.vb-chip*` alone and the row would pass
+  // whatever happened to the badge. It is asserted below instead, in the place where its ink is decided,
+  // which is inside a destination. See *the attention badge* after this loop.
   {
     name: '.tile-setup — the project-level barrier',
     props: { tone: 'accent', className: 'tile-setup' },
@@ -189,6 +186,44 @@ describe('the chip family draws one box', () => {
     });
   }
 
+  // THE ATTENTION BADGE, AND ITS INK IS THE ONE THING A `Chip pill fill` CANNOT DECIDE FOR ITSELF. It was
+  // `.tab-badge` — `--panel-2` ink punched out of an `--accent-2` ground — and one badge treatment is the
+  // ruling, so the ground is now the chip's `--panel-2` and the ink is inherited. INHERITED FROM WHAT is
+  // the whole finding: from `.vb-menu-item`, which is `--accent` when you are ON that destination and
+  // `--muted` when you are not. The count exists precisely for when you are NOT there, so inheritance
+  // rendered it muted-on-`--panel-2` in its only useful state. `menu.css` names the ink in one
+  // declaration; asserted in BOTH states, because "it no longer tracks its parent" is an equality claim
+  // and a single render cannot make it.
+  //
+  // THE FIXTURE IS `Menu` AND NOT A `<Chip>` WITH A CLASS LIST, because the rule that decides the ink is a
+  // DESCENDANT rule — `el.matches()` on a detached chip answers about the chip alone, which is how a rule
+  // that only fires inside a destination would read as absent and pass.
+  it.each([
+    ['on the destination it counts', 'execution'],
+    ['on another destination entirely', 'boards'],
+  ])('the attention badge is one pill and one ink, %s', (_where, at) => {
+    const { container } = render(
+      <Menu
+        label="View"
+        items={[
+          { value: 'execution', label: 'Execution', badge: 3 },
+          { value: 'boards', label: 'Boards' },
+        ]}
+        value={at}
+        onChange={() => {}}
+      />,
+    );
+    const badge = container.querySelector('[data-testid="menu-badge"]');
+    if (!badge) throw new Error('Menu rendered no badge');
+    const drawn = box(badge);
+    expect(drawn['border-radius']).toBe(PILL);
+    expect(drawn['font-size']).toBe(MICRO);
+    expect(drawn['font-family']).toBe('var(--font-mono)');
+    expect(drawn.background).toBe('var(--panel-2)');
+    // NOT `--muted` and NOT `--accent`: neither of the two its parent would have handed it.
+    expect(drawn.color).toBe('var(--text)');
+  });
+
   // THE ONE MEMBER OF THE CENSUS THAT MAY LEGITIMATELY NEVER BE A CHIP, pinned so the phase that
   // exempts it by name cannot also move it by accident. It is an inline code span in rendered prose: it
   // means "this is code", it sits mid-sentence, and it is not a discrete labelled thing. Hand-written
@@ -215,7 +250,9 @@ describe('the chip family draws one box', () => {
       '.tag-chip',
       { as: 'button', pill: true, fill: true, tone: 'neutral', className: 'tag-chip vb-readout' },
     ],
-    ['.tab-badge', { pill: true, className: 'tab-badge vb-readout' }],
+    // The attention count, in the spelling `Menu` renders it. `.tab-badge` is gone; `vb-readout` on the
+    // `<Chip>` is what carries the mono face, which is the form Phase 8 established.
+    ['a Menu badge', { pill: true, fill: true, className: 'vb-readout' }],
     // A FOURTH, added by Phase 12: a run's status is machine vocabulary, and `.report-chip` restated
     // `font-family` in its own rule until it named the primitive instead. Its uppercase tracking is
     // still the surface's, which is why the class survives the migration.

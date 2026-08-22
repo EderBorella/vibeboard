@@ -140,7 +140,11 @@ export function SandboxPanel({ state, backend, onChanged }: Props) {
         )}
       </div>
 
-      {error && <Notice as="p" tone="bad">{error}</Notice>}
+      {error && (
+        <Notice as="p" tone="bad">
+          {error}
+        </Notice>
+      )}
       {dialog}
     </>
   );

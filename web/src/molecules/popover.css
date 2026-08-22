@@ -34,7 +34,7 @@
 }
 /* `.conn-pop-{head,detail,next}` ARE GONE, and so is the duplicate set the auto-pilot bar kept:
    `.ap-agent-{heading,detail,next}` said the same three things a hundred and fifty rules further down.
-   Both are `.vb-status-*` in ui/primitives.css now — the balloon's three lines belong to whatever draws
+   Both are `.vb-status-*` in molecules/status-chip.css now — the balloon's three lines belong to whatever draws
    the balloon, and two surfaces each writing their own was how they came to disagree about the size of
    the heading in the first place. */
 

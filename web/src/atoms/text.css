@@ -39,7 +39,7 @@
    are `.vb-empty`'s own two values. */
 .vb-text-lead { font-size: var(--t-body); line-height: 1.5; }
 
-/* ---------- Two shared type utilities, which are the whole of what `ui/primitives.css` left behind ---- */
+/* ---------- Two shared type utilities, which were the whole of what `ui/primitives.css` left behind --- */
 /* A DISCLOSURE GLYPH, AND ITS ONLY JOB IS THE SIZE. Six of them — the board's chevron, the Explorer's
    twisty, the two select carets, the dock's fold and the auto-pilot bar's Details — were drawn at
    `--t-micro`, the step meant for chip text, and the owner could not see them: an 11px triangle is
@@ -51,7 +51,7 @@
    IN THE TEXT ATOM'S SHEET, not a molecule's, and the gate is what decides that: two of the six are
    inside a `<Button>`, and `npm run check:radius-scale` refuses a `font-size` on a button class outside
    the primitive layer. It is a step and a line-height — which is what this file is — and it was the last
-   thing in `ui/primitives.css` that belonged to no component. */
+   thing in the since-dissolved `ui/primitives.css` that belonged to no component. */
 .vb-twist { font-size: var(--t-lead); line-height: 1; flex: none; }
 /* ONE LINE, CLIPPED, IN A CONTROL THAT MAY BE NARROWER THAN ITS LABEL. It was `.vb-trigger-label`, and
    the rename is the point: three molecules need it and only one of them is a trigger — a `Tabs` cell

@@ -41,7 +41,7 @@
    existed: `idle` and `stopped` fell through to the base grey, which is right and was true only by
    omission. The mapping is a table in AutopilotBar.tsx and is pinned by test/state-tones.test.tsx,
    which asserts that pair is ONE colour on purpose. The pulse and its reduced-motion override moved to
-   ui/primitives.css, where the keyframes are. */
+   molecules/status-chip.css, where the keyframes are. */
 
 /* Truncated, with the full text in the drawer rather than in a title attribute — a `title` is
    unreachable on a touch device and invisible to anyone who does not know to hover. */
@@ -133,7 +133,7 @@
    permanently red is one people stop reading, and this bar's whole job is to be read. The guard against
    pressing it by accident is the confirm dialog, which names what dies — not the styling. */
 /* `ghost`, with the ONE thing that is not the variant: it turns dangerous on hover rather than accent.
-   That override works because ui/primitives.css is imported BEFORE every surface sheet — equal
+   That override works because the atom and molecule sheets are imported BEFORE every surface sheet — equal
    specificity, later source — which is the whole reason for that order; see web/src/styles.ts, which is
    the only list of it. `not-allowed` rather than `default` on the
    disabled cursor, because a stop you cannot press is a refusal and not merely an absence. */

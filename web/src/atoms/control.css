@@ -12,7 +12,7 @@
  * `.vb-trigger` SHARES THIS RULE AND IS NOT A SECOND CONTROL. A select trigger is this box with a caret
  * on it — the same 1px border, the same corner, the same ground — and it is a `<button>` because it opens
  * a Popover rather than because it is a different shape. It wears the atom's box the way `StatusChip`
- * wears `Chip`'s; its layout, its hover and its caret stay with the molecule, in ui/primitives.css.
+ * wears `Chip`'s; its layout, its hover and its caret stay with the molecule, in molecules/field.css.
  *
  * HEIGHT, AND NO VERTICAL PADDING. Both halves are the same decision as `Button`'s: the padding was
  * `var(--s-3) var(--s-4)`, so the box's height was 14px of line box plus 12px of padding plus 2px of

@@ -29,7 +29,5 @@ export function BackendPicker({ value, onChange, label, disabled = false, titleF
   // The per-site hover text is computed here and carried on the item, because `titleFor` is this
   // component's contract and the primitive's is a plain list.
   const items = BACKENDS.map((b) => ({ value: b.value, label: b.label, title: titleFor?.(b) }));
-  return (
-    <Tabs grouped items={items} value={value} onChange={onChange} label={label} disabled={disabled} />
-  );
+  return <Tabs grouped items={items} value={value} onChange={onChange} label={label} disabled={disabled} />;
 }

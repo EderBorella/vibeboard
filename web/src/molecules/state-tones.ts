@@ -15,7 +15,7 @@
 // A SURFACE MAY KEEP ITS SHAPE AND MAY NOT CHOOSE ITS COLOUR. The rail on the auto-pilot bar is still
 // a 3px left border, the connection light is still a dot beside a word, the chat error is still a line
 // of prose — but every one of them takes its colour from the row below, through the single custom
-// property `--tone` that ui/primitives.css assigns from this table. There is no second opinion left to
+// property `--tone` that molecules/tones.css assigns from this table. There is no second opinion left to
 // have.
 //
 // WHAT A TONE MEANS, said once so a new state has somewhere to go:
@@ -118,7 +118,7 @@ export type StateName = keyof typeof STATE_TONES;
 export const STATE_NAMES = Object.keys(STATE_TONES) as StateName[];
 
 // THE ONE PLACE A TONE BECOMES A CLASS, and it is the only class name in the app composed from a tone
-// or a state. Five rules in ui/primitives.css assign `--tone` from these, and every role — a chip's
+// or a state. Five rules in molecules/tones.css assign `--tone` from these, and every role — a chip's
 // ink, a dot's fill, a bar's rail — reads that one property. So a surface names WHICH PROPERTY the
 // tone lands on and never which colour it is.
 //

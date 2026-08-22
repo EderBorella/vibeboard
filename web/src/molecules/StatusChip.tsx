@@ -97,9 +97,7 @@ export function StatusChip({
               NO STATE OF ITS OWN either: the trigger carries the tone and the pip's fill inherits it
               through `currentColor`, which is how one row of the table paints a pip and a word together. */}
           <span
-            className={['vb-dot', glow && 'vb-dot-glow', pulse && 'vb-dot-pulse']
-              .filter(Boolean)
-              .join(' ')}
+            className={['vb-dot', glow && 'vb-dot-glow', pulse && 'vb-dot-pulse'].filter(Boolean).join(' ')}
             aria-hidden="true"
           />
           {word}

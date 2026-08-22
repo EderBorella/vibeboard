@@ -69,9 +69,17 @@ const PRIMITIVE_LAYER = [
   ),
 ];
 
-// THE RATCHET, and the number is what the tree holds today rather than what the plan wants. Phase 5 took
-// the union from 443 to this; docs/design-system.md's target is **183** and it is not reached — the
-// remaining work and its measured size are recorded in that document under Phase 5.
+// THE RATCHET, and the number is what the tree holds today rather than what the plan wants. The sweep
+// took the union from 443 to this; the target is **183** and it is not reached.
+//
+// WHERE THE REST IS, MEASURED AND STATED HERE RATHER THAN CITED. 341 today — the 13-sheet primitive layer
+// 58, the surfaces 294, 11 in both. The deletions still named ahead are `Modal` 23 → 5 and `List`/`Row`
+// ~35 → 5, about −48, which lands near **293 against 183**: roughly 110 classes are not accounted for by
+// any named deletion, and that is the owner's to see rather than a gate's to hide.
+// The pointer this paragraph used to carry was FALSE, which is why the number is inline now:
+// `docs/design-system.md`'s own "Phase 5" is an earlier and different phase, it still lists
+// `SegmentedControl` as live and it still reports 457 class selectors. That document is rewritten as the
+// work closes; until then the only number that is true is the one this gate prints.
 //
 // THE TARGET IS 183 AND NOT THE PLAN'S "UNDER 150", which is withdrawn. 150 was derived from ten bespoke
 // surfaces at about eight layout classes each plus roughly thirty primitive classes, and neither term was
@@ -309,8 +317,9 @@ if (unreferenced.length > 0) {
 if (union.size > CLASS_CEILING) {
   console.error(`\n${union.size} class selectors, against a ceiling of ${CLASS_CEILING}.`);
   console.error(`This gate is a RATCHET: it blocks an increase, not the backlog. The target is`);
-  console.error(`${CLASS_TARGET} — see docs/design-system.md. Merge the new shape into a primitive in`);
-  console.error(`web/src/ui/ instead of giving a surface a class of its own.`);
+  console.error(`${CLASS_TARGET} — see docs/design-system.md. Merge the new shape into an atom in`);
+  console.error(`web/src/atoms/ or a molecule in web/src/molecules/ instead of giving a surface a`);
+  console.error(`class of its own.`);
   failed = true;
 }
 

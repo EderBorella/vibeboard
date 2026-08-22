@@ -274,19 +274,52 @@ const MENU_TAG = '<Menu';
 // before this phase: the dock and the cards wrote `role="tab"` and `aria-selected`, the chat menu wrote
 // `role="menu"`. So the population is real rather than hypothetical, and both arms reach ZERO.
 //
-// WHAT IT DOES NOT CATCH, and the limit is real rather than a caveat: a row of buttons hand-rolled with NO
-// role and NO aria at all. The plan's own named plant for this arm — `<div><button className="active">A
-// </button><button>B</button></div>` — is exactly that shape and it exits 0 here, which is recorded rather
-// than papered over. There is no property of such a row that distinguishes it from six legitimate toggles,
-// and a class-name rule would report all six. What DOES hold it is the other end: the cell needs a box,
-// and `check-radius-scale.mjs`'s button-geometry ratchet is at 1/1 with `.board-label` named, so the
-// padding and the step that make a hand-rolled cell look like a tab cannot be declared anywhere.
+// BOTH ARMS ARE BANS ON ARIA TEXT AND NOT CENSUSES OF SHAPE, and the inversion that follows has to be
+// stated rather than left for a reader to discover: a surface that hand-rolls a tab row WITHOUT
+// accessibility passes here, and one that hand-rolls the same row WITH accessibility fails. That is the
+// right way round for the population these arms exist for — every one of the six families wrote a role or
+// an aria attribute, because those are the assertions a cell has to make to be usable at all — but it
+// means a clean run is evidence about ARIA and not about geometry.
+//
+// WHAT IT DOES NOT CATCH, MEASURED BY PLANTING IT RATHER THAN REASONED ABOUT. Three holes, all open:
+//   1. A row of buttons with NO role and NO aria at all. The plan's own named plant for this arm —
+//      `<div><button className="active">A</button><button>B</button></div>` — is exactly that shape, and it
+//      was planted verbatim on a surface and exited 0 here AND on all ten gates. There is no property of
+//      such a row that distinguishes it from six legitimate toggles in this tree (the copilot toggle, the
+//      tag filter's multi-select chips, the board's archive toggle and three list rows), and a class-name
+//      rule would report all six. The plan-named plant is dead: do not record this arm as proved by it.
+//   2. THE FALLBACK ARGUMENT IS ONLY HALF TRUE. It used to read: the cell needs a box, and
+//      `check-radius-scale.mjs`'s button-geometry ratchet is at 1/1, so the padding and the step cannot be
+//      declared anywhere. True of the CLASS spelling — a hand-rolled cell given a box by a class exits 1 on
+//      both radius-scale and class-budget, planted and confirmed. FALSE of the INLINE-STYLE spelling: a
+//      complete hand-rolled tablist with correct ARIA through `role={'tab'}`, its own 28px box, padding,
+//      radius and selected state, all in a `style={{…}}` object, passed radius-scale, box-scale,
+//      class-budget, shape-coverage, scale and name-resolution — six gates and both selection arms.
+//      Nothing in this tree reads inline styles. A NAMED LIMITATION and not an instrument to invent here.
+//   3. Only the TAB arm's owner exclusion is asserted by the self-test (`markFaults(…, 'fixture.tsx')`
+//      above). The menu arm's is the same function with a different array, so it is left unasserted
+//      deliberately rather than by oversight — said here so the asymmetry is not read as a gap.
 const TAB_OWNER = join('web', 'src', 'molecules', 'Tabs.tsx');
 const MENU_OWNER = join('web', 'src', 'molecules', 'Menu.tsx');
-// Written out with their quotes, so `role="tabpanel"` is not a `role="tab"` and `role="menubar"` is not a
-// `role="menu"` — the closing quote is the `(?![\w-])` guard this file needs everywhere else.
-const TAB_MARKS = ['role="tablist"', 'role="tab"', 'aria-selected'];
-const MENU_MARKS = ['role="menu"', 'role="menuitem"', 'aria-current'];
+// REGEXES AND NOT LITERALS, AND THE REASON IS THAT THE LITERALS COULD NOT SEE THEIR OWN OWNERS. A raw
+// `String.indexOf('role="tab"')` is quote-bound on BOTH sides of the attribute, so it is evaded by the JSX
+// expression spelling — which is exactly what `Tabs.tsx:86` (`role={grouped ? undefined : 'tab'}`) and
+// `Menu.tsx:69` (`role={list ? 'menuitem' : undefined}`) write. A hand-rolled row copied from either owner
+// therefore passed both arms. Planted and confirmed: the two owners' own idiom exited 0 on both arms; it
+// exits 1 now, and rows 10-13 of `MARK_FIXTURE` are what stop the hole reopening.
+// THE CLOSING QUOTE IS STILL THE GUARD, moved from the attribute text to the quoted VALUE: `'tabpanel'` is
+// not `'tab'` and `'menubar'` is not `'menu'`, which rows 4 and 9 of the fixture assert. `[^>]` is what
+// keeps a match inside one tag.
+const TAB_MARKS = [
+  /role\s*=\s*[^>]{0,60}?['"]tablist['"]/,
+  /role\s*=\s*[^>]{0,60}?['"]tab['"]/,
+  /aria-selected/,
+];
+const MENU_MARKS = [
+  /role\s*=\s*[^>]{0,60}?['"]menuitem['"]/,
+  /role\s*=\s*[^>]{0,60}?['"]menu['"]/,
+  /aria-current/,
+];
 const TAB_CEILING = 0;
 const MENU_CEILING = 0;
 
@@ -298,10 +331,11 @@ function markFaults(sources, marks, owner) {
   for (const { file, code } of sources) {
     if (file === owner) continue;
     for (const mark of marks) {
-      let at = code.indexOf(mark);
-      while (at >= 0) {
-        findings.push(`${file}:${lineOf(code, at)} ${mark} — a cell of a mutually-exclusive set`);
-        at = code.indexOf(mark, at + 1);
+      // A FRESH `g` COPY PER FILE PER MARK. A shared `lastIndex` on a literal in the array above would
+      // carry over between files and skip whole matches — the defect is silent and looks like a clean run.
+      // The finding prints the MATCHED TEXT rather than the pattern, so a report names the spelling it found.
+      for (const m of code.matchAll(new RegExp(mark.source, 'g'))) {
+        findings.push(`${file}:${lineOf(code, m.index)} ${m[0]} — a cell of a mutually-exclusive set`);
       }
     }
   }
@@ -743,16 +777,31 @@ const MARK_FIXTURE = [
   '  <button role="menuitem" aria-current="page">Boards</button>',
   '</div>',
   '<div role="menubar">not a menu</div>',
+  // ROWS 10-13 ARE PLANT 4b: the spelling the two OWNERS use. `role={grouped ? undefined : 'tab'}` and
+  // `role={list ? 'menuitem' : undefined}` are copied off `Tabs.tsx` and `Menu.tsx`, and the literal marks
+  // this file used to carry were blind to both — a hand-rolled row lifted from either component passed.
+  "<div role={grouped ? undefined : 'tablist'} aria-label={label}>",
+  "  <button role={grouped ? undefined : 'tab'} aria-selected={v === value}>A</button>",
+  "<div role={list ? 'menu' : undefined}>",
+  "  <button role={list ? 'menuitem' : undefined} aria-current={at ? 'page' : undefined}>B</button>",
 ].join('\n');
 
+// SORTED, so the order is lexicographic on the file:line prefix and `:10` sorts before `:2`. Rows 10-13
+// are plant 4b's — if either expression row disappears from this list the arm is blind to its own owners.
 const TAB_SELF_TEST_WANT = [
   'fixture.tsx:1 role="tablist" — a cell of a mutually-exclusive set',
+  "fixture.tsx:10 role={grouped ? undefined : 'tablist' — a cell of a mutually-exclusive set",
+  'fixture.tsx:11 aria-selected — a cell of a mutually-exclusive set',
+  "fixture.tsx:11 role={grouped ? undefined : 'tab' — a cell of a mutually-exclusive set",
   'fixture.tsx:2 aria-selected — a cell of a mutually-exclusive set',
   'fixture.tsx:2 role="tab" — a cell of a mutually-exclusive set',
   'seg .mu@16',
 ].join(' | ');
 
 const MENU_SELF_TEST_WANT = [
+  "fixture.tsx:12 role={list ? 'menu' — a cell of a mutually-exclusive set",
+  'fixture.tsx:13 aria-current — a cell of a mutually-exclusive set',
+  "fixture.tsx:13 role={list ? 'menuitem' — a cell of a mutually-exclusive set",
   'fixture.tsx:6 role="menu" — a cell of a mutually-exclusive set',
   'fixture.tsx:7 aria-current — a cell of a mutually-exclusive set',
   'fixture.tsx:7 role="menuitem" — a cell of a mutually-exclusive set',
@@ -954,12 +1003,14 @@ function report(shape, ceiling, phase, lines) {
   if (lines.length > ceiling) {
     if (ceiling === 0) {
       console.error(`\n${head}. This shape is FULLY MIGRATED and this census BLOCKS AT ZERO: every`);
-      console.error(`finding below is a new hand-rolled instance. Render it with the primitive in`);
-      console.error(`web/src/ui/ instead of declaring the shape again.\n`);
+      console.error(`finding below is a new hand-rolled instance. Render it with the atom in`);
+      console.error(`web/src/atoms/ or the molecule in web/src/molecules/ instead of declaring the`);
+      console.error(`shape again.\n`);
     } else {
       console.error(`\n${head}, against a ceiling of ${ceiling}. This census is a RATCHET: it blocks an`);
       console.error(`increase, not the backlog — ${phase} drives it down. Render the new one with the`);
-      console.error(`primitive in web/src/ui/ instead of declaring the shape again.\n`);
+      console.error(`atom in web/src/atoms/ or the molecule in web/src/molecules/ instead of declaring`);
+      console.error(`the shape again.\n`);
     }
     for (const line of lines) console.error(`  ${line}`);
     failed = true;

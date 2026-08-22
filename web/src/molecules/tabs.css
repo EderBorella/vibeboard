@@ -29,8 +29,18 @@
 /* THE CLOSE GLYPH SITS AGAINST ITS OWN TAB, AND THAT IS ALL `.cards-tab` WAS DOING THAT MATTERED. A
    `<button>` inside a `<button>` is invalid and unclickable, so a closable tab is two controls; without
    this the strip's gap would separate a tab from its own `✕` exactly as much as from the next tab. One
-   declaration on an adjacent sibling rather than a wrapper element with a class of its own. */
-.vb-tab + .vb-btn-bare { margin-left: calc(-1 * var(--s-2)); }
+   declaration on an adjacent sibling rather than a wrapper element with a class of its own.
+   SELECTED ON THE ATTRIBUTE `Tabs` SETS AND NOT ON `.vb-btn-bare`: the latter matched any bare button
+   following a cell, and `dock/UtilityDock.tsx` renders one — its collapse toggle, passed as `children`,
+   so the immediate next sibling of the LAST cell in a strip that is not `closable` at all. A strip-level
+   control was taking a per-tab pull. An attribute selector costs nothing on the class budget. */
+.vb-tab + [data-tab-close] { margin-left: calc(-1 * var(--s-2)); }
+/* THE `✕` GOES ACCENT ON HOVER AND NOT RED, AND THAT REVERSES A RECORDED DECISION. `.cards-tab-x:hover`
+   declared `color: var(--danger)`, argued as *"Closing a tab is a small destruction, so it goes red rather
+   than accent"*. Refuted: closing a card tab destroys nothing — the card is a file on disk and the tab is
+   a view of it — so `--danger` on a non-destructive control is the miscue this design system has spent the
+   whole sweep removing. It takes `atoms/button.css`'s bare hover, which is `--accent`. Written here so the
+   next reader who finds the red in the history does not put it back. */
 /* THE CELL. `--ctl-h` and no vertical padding, for `Button`'s reason: a padded box's height is emergent,
    and four families each arrived at a different one — 22.4px, 24px, 25.8px badged, 17.75px.
    `max-width` is the card tabs' 220px, kept for every cell: a tab is a label you can read at a glance,

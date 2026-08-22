@@ -190,11 +190,15 @@ describe('DispatchPane', () => {
     // Both are switch rows where only the highlight says which is selected. With none marked, the
     // form silently claims nothing is chosen when something always is.
     render(<DispatchPane {...props} />);
-    expect(screen.getByText('Claude').className).toContain('active');
-    expect(screen.getByText('OpenCode').className).not.toContain('active');
-    // Scoped by the group's accessible name rather than by `.mode-btn`, which is `.vb-seg-cell` since
-    // the SegmentedControl merge — and both groups on this form render it, so an unscoped count is 2.
-    // `.active` stays: it is the highlight, which is what this test is about.
+    // ON THE CELL AND NOT ON THE TEXT NODE. `getByText` returned whatever element held the text, which was
+    // the `<button>` only by accident; a `Tabs` cell's label is a `<span class="vb-clip">` inside it, so the
+    // class this read became the clip's. A GROUPED cell is a value picker rather than a view switch, so it
+    // carries neither `role="tab"` nor `aria-selected` — see molecules/Tabs.tsx — and `.active` really is
+    // the only thing that says which one is chosen, which is what this test is about.
+    expect(screen.getByRole('button', { name: 'Claude' }).className).toContain('active');
+    expect(screen.getByRole('button', { name: 'OpenCode' }).className).not.toContain('active');
+    // Scoped by the group's accessible name rather than by `.vb-tab`, which both groups on this form
+    // render, so an unscoped count is 2.
     const modes = screen.getByRole('group', { name: 'Mode' });
     expect(modes.querySelectorAll('.active')).toHaveLength(1);
   });

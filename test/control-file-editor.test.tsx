@@ -50,23 +50,31 @@ describe('ControlFileEditor', () => {
     expect(screen.getByText(`${DOCS_DIR}/design.md •`)).toBeTruthy();
   });
 
+  // ON `role="tab"`, WHICH IS WHAT THESE THREE ARE NOW. The views were `.control-tabs button` — a bare
+  // `<button>` with no role at all — and they are `Tabs` cells, so the role the row asserts is the one
+  // `getByRole` has to ask for. It is the stronger claim as well as the true one: it says the strip is a
+  // tablist and not three buttons that happen to sit together.
   it('offers Edit and Preview, and Fields only where fields mean something', () => {
     mount();
-    expect(screen.queryByRole('button', { name: 'Fields' })).toBeNull();
-    expect(screen.getByRole('button', { name: 'Edit' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Preview' })).toBeTruthy();
+    expect(screen.queryByRole('tab', { name: 'Fields' })).toBeNull();
+    expect(screen.getByRole('tab', { name: 'Edit' })).toBeTruthy();
+    expect(screen.getByRole('tab', { name: 'Preview' })).toBeTruthy();
 
     cleanup();
     mount({ fieldsAvailable: true, fields: <p>the fields</p>, view: 'fields' });
-    expect(screen.getByRole('button', { name: 'Fields' })).toBeTruthy();
+    expect(screen.getByRole('tab', { name: 'Fields' })).toBeTruthy();
     expect(screen.getByText('the fields')).toBeTruthy();
   });
 
+  // ON `aria-selected` AND NOT ON A CLASS LIST. `.className` was `'active'` against `''`, which is a claim
+  // about how `Tabs` spells its state; `selected` is the contract a tablist makes, and `getByRole` reads it
+  // through the accessibility tree rather than through the DOM. Both directions asserted, because a row
+  // that marked EVERY cell selected would satisfy the positive alone.
   it('marks the active view and reports a switch', () => {
     const calls = mount({ view: 'preview' });
-    expect(screen.getByRole('button', { name: 'Preview' }).className).toBe('active');
-    expect(screen.getByRole('button', { name: 'Edit' }).className).toBe('');
-    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    expect(screen.getByRole('tab', { name: 'Preview', selected: true })).toBeTruthy();
+    expect(screen.getByRole('tab', { name: 'Edit', selected: false })).toBeTruthy();
+    fireEvent.click(screen.getByRole('tab', { name: 'Edit' }));
     expect(calls.onView.mock.calls).toEqual([['edit']]);
   });
 

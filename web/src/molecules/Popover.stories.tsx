@@ -12,8 +12,8 @@ export const Playground: StoryObj = {
     <div style={{ padding: '1rem 1rem 12rem' }}>
       <Popover label="What this explains" trigger="? How it works" triggerTitle="Open the explanation">
         <p style={{ margin: 0 }}>
-          Escape closes it, and so does a click outside — in the CAPTURE phase, so a selection that
-          overshoots the panel cannot close the thing being read from.
+          Escape closes it, and so does a click outside — in the CAPTURE phase, so a selection that overshoots
+          the panel cannot close the thing being read from.
         </p>
       </Popover>
     </div>

@@ -1,5 +1,5 @@
-/* CHIP — a marker box you read. Split out of ui/primitives.css, and it loads BEFORE atoms/readout.css
- * and before what is left of ui/primitives.css, because both of those relationships are decided by
+/* CHIP — a marker box you read. Split out of the since-dissolved ui/primitives.css, and it loads BEFORE
+ * atoms/readout.css and before molecules/status-chip.css, because both of those relationships are decided by
  * source order and not by specificity: `.vb-readout` puts the mono face on a chip and `.vb-status` puts
  * a step up on one, and each is (0,1,0) against this file's (0,1,0). See web/src/styles.ts.
  *

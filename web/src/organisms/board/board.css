@@ -46,7 +46,7 @@
   color: var(--text);
 }
 .board-label:hover { color: var(--accent); }
-/* The size is `.vb-twist`'s — see ui/primitives.css. What is left here is the colour, which is this
+/* The size is `.vb-twist`'s — see atoms/text.css. What is left here is the colour, which is this
    surface's, and the fixed width that stops the label sliding as the glyph swaps. */
 .board-chevron { color: var(--accent); width: 0.8em; }
 

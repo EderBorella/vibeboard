@@ -19,7 +19,8 @@ import { Tabs } from './Tabs';
 //   2. THE TOP ROW'S `--glow`. A halo on a destination made the header's current tab the brightest thing
 //      on a board with work actually running on it.
 //   3. THE `sm` STEP. `.vb-seg-cell-sm` was `--t-micro` in a `--t-small` row, which is the shape of the
-//      10.88px incident this design system has ruled on twice.
+//      10.88px incident this design system has ruled on twice. Its BOX was already 26px — see `SEG` below
+//      for the transcription defect that reported 12px here and what it would have told the owner.
 //
 // THE OLD ROWS CARRY THEIR OWN DECLARATIONS INLINE, because their classes are deleted in the same commit
 // that adds this story. Quoted verbatim from the six rules — see the git history of `top-tabs.css`,
@@ -83,7 +84,9 @@ function Grid({ children }: { children: ReactNode }) {
 // The six rules, transcribed. `text-transform` and `letter-spacing` are on the dock's row and nowhere
 // else; the top row is the only one with a shadow; the cards row is the only one whose SELECTED state
 // colours a child rather than itself.
-const OLD_STRIP: CSSProperties = { display: 'flex', alignItems: 'center', gap: '4px' };
+// `alignItems` is this story's and not `.topbar-tabs`'s, which declared none — it keeps a one-row strip on
+// the grid's centre line and cannot affect a cell's height.
+const OLD_STRIP: CSSProperties = { display: 'flex', alignItems: 'center', gap: 'var(--s-2)' };
 const TAB_BTN: CSSProperties = {
   background: 'var(--panel-2)',
   color: 'var(--accent)',
@@ -137,11 +140,24 @@ const CONTROL_TAB: CSSProperties = {
   padding: 'var(--s-2) var(--s-4)',
   fontSize: 'var(--t-small)',
 };
+// THE ONE TRANSCRIPTION THAT WAS WRONG, and it was wrong on the row the whole reversal is argued on.
+// `SEG` omitted `.vb-seg`'s `height`/`min-height`, so with no height on the group and no vertical padding
+// on the cell the cell collapsed to its 11px line box and this story reported **12.00px** — telling the
+// owner the `sm` cell was 12px and that the change was 12px → 26px, i.e. that a small box had grown by
+// half again. It was 26px. The change is 26px → 26px, and the ONLY thing given up on this row is the FONT
+// STEP: `--t-micro` in a `--t-small` row. `SEG_CELL` also omitted the divider, so the drawn group showed
+// no seam between its two cells — and "the group owns one border, the cells are clipped, a divider between
+// them" is one of the three things this row exists to show. Both restored; see the git history of
+// `ui/primitives.css` at 6c3ca93 for the rule as it stood at the moment of deletion.
+// `width: max-content` is NOT in the rule: it is here because the grid's middle column is `1fr` and a
+// flex group would otherwise span it. It cannot touch the height, which is what this column reports.
 const SEG: CSSProperties = {
   display: 'flex',
   border: '1px solid var(--border)',
   borderRadius: 'var(--r-md)',
   overflow: 'hidden',
+  height: 'var(--ctl-h)',
+  minHeight: 'var(--ctl-h)',
   width: 'max-content',
 };
 const SEG_CELL: CSSProperties = {
@@ -149,6 +165,7 @@ const SEG_CELL: CSSProperties = {
   color: 'var(--on-fill)',
   fontWeight: 600,
   border: 'none',
+  borderRight: '1px solid var(--border)',
   padding: '0 var(--s-4)',
   fontSize: 'var(--t-small)',
 };
@@ -212,7 +229,10 @@ export const SixFacesAndTwo: StoryObj = {
           </button>
         </div>
       </Measured>
-      <Measured label="6 — .vb-seg-cell-sm (the backend picker)" probe="button">
+      <Measured
+        label="6 — .vb-seg-cell-sm (the backend picker) — 26px already; the STEP is what goes, not the box"
+        probe="button"
+      >
         <div style={SEG}>
           <button type="button" style={{ ...SEG_CELL, fontSize: 'var(--t-micro)' }}>
             Claude Code
@@ -222,6 +242,7 @@ export const SixFacesAndTwo: StoryObj = {
             style={{
               ...SEG_CELL,
               fontSize: 'var(--t-micro)',
+              borderRight: 'none',
               background: 'var(--panel-2)',
               color: 'var(--muted)',
             }}

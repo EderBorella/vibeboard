@@ -2,7 +2,8 @@
  * one surface rule; it is `Field`'s whole sheet now, and it took `ui/primitives.css`'s BYTE POSITION with
  * the other molecule sheets so the dissolution of that file is a move and not a cascade change — see
  * web/src/styles.ts. The one rule that was already here (`.vb-field textarea`) moved UP with it, which is
- * safe at (0,1,1): nothing else in the tree declares `resize` at that specificity or above.
+ * safe at (0,1,1): nothing else in the tree declares `resize` at that specificity. The six that do declare
+ * it are all (0,2,0) or higher, so they win on specificity whatever the order — the move cannot reach them.
  *
  * The BOX its control draws is `atoms/control.css` as of the atom layer, and the descendant selector that
  * used to hand it out — `.vb-field input, .vb-field textarea, .vb-field select`, (0,1,1) and therefore

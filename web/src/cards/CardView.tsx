@@ -31,7 +31,8 @@ export function CardView({ card, config, allCards, onOpenCard, onPatch, onLinks 
     className: string,
   ) =>
     onPatch ? (
-      <Field inline
+      <Field
+        inline
         value={card[key] ?? ''}
         label={label}
         placeholder={placeholder}
@@ -56,7 +57,8 @@ export function CardView({ card, config, allCards, onOpenCard, onPatch, onLinks 
       </FigureRow>
 
       {onPatch ? (
-        <Field inline
+        <Field
+          inline
           value={csv(card.tags)}
           label="tags"
           placeholder="+ tags"
@@ -91,7 +93,8 @@ export function CardView({ card, config, allCards, onOpenCard, onPatch, onLinks 
       <CardLinks card={card} allCards={allCards} onOpenCard={onOpenCard} onLinks={onLinks} />
 
       {onPatch ? (
-        <Field inline
+        <Field
+          inline
           value={card.body}
           label="body"
           placeholder="+ body"

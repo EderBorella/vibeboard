@@ -168,7 +168,7 @@ export default {
     'web/src/copilot/useCopilot.ts',
     'web/src/cards/CardView.tsx',
     'web/src/cards/CardLinks.tsx',
-    'web/src/ui/InlineField.tsx',
+    'web/src/molecules/Field.tsx',
     'web/src/cards/LinkPicker.tsx',
     'web/src/cards/RawPane.tsx',
     'web/src/cards/CardsPane.tsx',

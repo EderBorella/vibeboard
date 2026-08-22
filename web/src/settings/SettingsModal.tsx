@@ -20,6 +20,8 @@ import { clampToCaps, resolveChoice } from '../copilot/choice';
 // "Claude" in the dock that obeys it.
 import { BACKENDS } from '../copilot/format';
 import { ModelPicker } from '../models/ModelPicker';
+import { Field } from '../molecules/Field';
+import { Notice } from '../molecules/Notice';
 import {
   type AutopilotConfig,
   BOARD_LABELS,
@@ -31,9 +33,7 @@ import {
   DEFAULT_CONTEXT_BUDGET,
   type ProjectConfig,
 } from '../shared';
-import { Notice } from '../molecules/Notice';
 import { SignInPanel } from '../signin/SignInPanel';
-import { Field } from '../molecules/Field';
 import { useAction } from '../useAction';
 import { useFetched } from '../useFetched';
 import { parseCsv } from '../viewmodel';

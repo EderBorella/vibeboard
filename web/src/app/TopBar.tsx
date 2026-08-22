@@ -131,7 +131,7 @@ export function TopBar({
       )}
       <div className="topbar-right">
         {/* NOT A `Field`: the top bar carries no labels, and the value this shows is its own name. It
-            takes the primitive's box through `.vb-ctl`, which is what primitives.css names it for. */}
+            takes the primitive's box through `.vb-ctl`, which is what atoms/control.css names it for. */}
         <Control as="select" value={theme} title="Theme" onChange={(e) => onTheme(e.target.value)}>
           {THEMES.map((t) => (
             <option key={t.value} value={t.value}>

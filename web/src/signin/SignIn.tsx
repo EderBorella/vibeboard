@@ -43,7 +43,9 @@ export function SignIn({ phase, onRetry }: Props) {
           <>
             {/* The whole reason this screen exists: it says WHY. A single red "unauthorized" is what
                 sent the user looking for a token they had no way to know about. */}
-            <Notice as="p" tone="bad">{phase.reason}</Notice>
+            <Notice as="p" tone="bad">
+              {phase.reason}
+            </Notice>
             {phase.retry && (
               <p className="vb-field">
                 <button type="button" onClick={onRetry}>

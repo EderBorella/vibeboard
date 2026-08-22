@@ -101,6 +101,12 @@ export function Tabs({
             <Button
               variant="bare"
               size="sm"
+              // THE ATTRIBUTE IS THE SELECTOR, and it is here so `molecules/tabs.css` can pull the `✕`
+              // against its own cell without a wrapper class. `.vb-tab + .vb-btn-bare` matched ANY bare
+              // button following a cell — the dock's collapse toggle is exactly that, passed as
+              // `children` — so a strip-level control took a per-tab pull. `check:class-budget` counts
+              // class selectors, so this costs nothing and the rule says what it means.
+              data-tab-close=""
               title={`Close ${item.value}`}
               onClick={() => onClose?.(item.value)}
             >

@@ -14,10 +14,6 @@
   display: grid; grid-template-columns: 1fr auto; align-items: stretch; gap: var(--s-1);
   max-height: 320px; overflow-y: auto; padding: var(--s-2); box-shadow: var(--glow), var(--lift);
 }
-.vb-menu-list > .vb-menu-item { grid-column: 1; }
-/* THE TRAILING CONTROL, placed by position rather than by a class of its own. `:not(.vb-menu-item)` is
-   the discriminator and it is load-bearing: `+ *` would put every item after the first in column two. */
-.vb-menu-item + :not(.vb-menu-item) { grid-column: 2; }
 /* The empty state is the caller's node and has no item before it, so it lands in column one and is given
    the inset a sentence needs. It was `.chat-menu > .vb-text-quiet`. */
 .vb-menu-list > .vb-text-quiet { padding: var(--s-4); }
@@ -34,11 +30,24 @@
   font-family: var(--font-display); font-size: var(--t-small); letter-spacing: var(--track);
   cursor: pointer;
 }
+/* THE GRID PLACEMENT SITS BELOW THE BASE BLOCK, not above it with the rest of `.vb-menu-list`: both
+   selectors are more specific than `.vb-menu-item`, and above it they were a descending-specificity
+   ordering (`lint/style/noDescendingSpecificity`). `grid-column` is declared nowhere else in the tree,
+   so the move has no cascade consequence.
+   THE TRAILING CONTROL is placed by position rather than by a class of its own. `:not(.vb-menu-item)` is
+   the discriminator and it is load-bearing: `+ *` would put every item after the first in column two. */
+.vb-menu-list > .vb-menu-item { grid-column: 1; }
+.vb-menu-item + :not(.vb-menu-item) { grid-column: 2; }
 .vb-menu-item:hover { color: var(--text); }
 /* ACCENT INK SAYS "YOU ARE HERE" and that is the whole visible difference from a selected tab. The
    `--glow` the top row wore is gone: a halo on a destination made the header's current tab the brightest
    thing on a board with work running on it. */
 .vb-menu-item.active { color: var(--accent); background: var(--panel-2); border-color: var(--border); }
+/* A COUNT IS NOT ITS PARENT'S STATE. The attention badge is a `Chip pill fill` with inherited ink, and it
+   inherits from the item: `--accent` when you are ON Execution and `--muted` when you are not. The count
+   exists precisely for when you are NOT there, so inheritance rendered it muted in its only useful state.
+   One declaration rather than a tone class — the ground is already the chip's. */
+.vb-menu-item .vb-chip-fill { color: var(--text); }
 /* A LIST ITEM IS TWO LINES AND A FULL ROW, which is the only thing the two orientations disagree about:
    `.chat-menu-open` was a column of a title and a `Readout`, and its height is its content's. */
 .vb-menu-list .vb-menu-item {
@@ -47,6 +56,12 @@
   font-family: inherit; font-size: var(--t-small); color: var(--text);
 }
 .vb-menu-list .vb-menu-item:hover { background: var(--panel-2); }
+/* THE RAIL IS THE ONLY THING THAT MARKS THE SELECTED SESSION. In `list` orientation the rule above sets
+   `color: var(--text)` at equal specificity and later than `.vb-menu-item.active`, so the accent ink never
+   lands; and `.active`'s background is the same one `:hover` draws. Without this the chosen session is
+   indistinguishable from the one under the pointer. `.chat-menu-item.active .chat-menu-open` drew it and
+   its deletion was a functional regression, not a treatment given up. Goes to `Row`'s `rail` in Phase 6. */
+.vb-menu-list .vb-menu-item.active { border-left: var(--rule) solid var(--accent); }
 
 /* The click-catcher behind an open list. `--z-pop` under the list itself, which is later in the DOM. */
 .vb-menu-backdrop { position: fixed; inset: 0; z-index: var(--z-pop); }

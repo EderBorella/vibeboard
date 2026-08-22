@@ -2,6 +2,7 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Field } from '../web/src/molecules/Field.js';
+import { box } from './css-box.js';
 
 afterEach(cleanup);
 
@@ -115,7 +116,8 @@ describe('Field inline', () => {
   it('ignores a click on a link inside a multiline value', () => {
     // Rendered markdown contains anchors; following one must not open the editor over it.
     const { container } = render(
-      <Field inline
+      <Field
+        inline
         value="see docs"
         label="body"
         onCommit={vi.fn()}
@@ -139,7 +141,19 @@ describe('Field inline editor details', () => {
     fireEvent.click(screen.getByTitle('Edit title'));
     const input = screen.getByLabelText('title');
     expect(document.activeElement).toBe(input);
-    expect(input.className).toBe('inline-edit');
+    // `.vb-ctl` ARRIVING HERE IS THE ATOM LAYER WORKING, not a leak. `Field inline` renders a `<Control>`,
+    // so the box comes with the element; `.inline-edit` is only what is NOT the box. Asserted as the exact
+    // list rather than a `toContain`, because the ORDER is the claim — the atom first, the surface over it.
+    expect(input.className.split(' ')).toEqual(['vb-ctl', 'inline-edit']);
+    // AND THE BOX REALLY IS THE CONTROL'S, which the class list alone does not say. Resolved out of the
+    // sheets: the ground, the corner and the hairline are atoms/control.css's, and `.inline-edit` decides
+    // the edge's COLOUR and nothing else about it — read as a pair, so a lost `border-color` cannot pass as
+    // a lost `border`. `6px` and never `var(--r-md)`: an expectation rewritten into the token asserts nothing.
+    const drawn = box(input);
+    expect(drawn.background).toBe('var(--bg)');
+    expect(drawn['border-radius']).toBe('6px');
+    expect(drawn.border).toBe('1px solid var(--border)');
+    expect(drawn['border-color']).toBe('var(--accent)');
   });
 
   it('does not commit on any key that is not Enter', () => {

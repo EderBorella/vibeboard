@@ -1,4 +1,5 @@
-/* BUTTON — a control box you press. Split out of ui/primitives.css at the byte position it held, so the
+/* BUTTON — a control box you press. Split out of the since-dissolved ui/primitives.css at the byte
+ * position it held, so the
  * cascade is unchanged: see web/src/styles.ts, which imports the six atom sheets where that one file was.
  *
  * `border: 1px solid transparent` on the base rather than per variant: a variant that sets only a colour

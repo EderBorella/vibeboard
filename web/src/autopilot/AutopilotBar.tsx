@@ -151,9 +151,6 @@ function AgentChip({ agent }: { agent: ReturnType<typeof agentStatus> }) {
     // exactly the states a person only reaches once something has gone wrong.
     <StatusChip
       state={agent.state}
-      // 7px: the transport dot two elements to the left is the PROJECT's state and the light in the top
-      // bar is the APP's, and this is a property of one of them.
-      dot={7}
       word={agent.word}
       advice={agent.advice ?? { heading: agent.word, detail: agent.title }}
       title={agent.title}

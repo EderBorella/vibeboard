@@ -56,12 +56,19 @@ describe('TopBar', () => {
     expect(screen.getByTitle('Theme')).toBeTruthy();
   });
 
+  // ON THE CONTROL AND ON `aria-current`, NOT ON THE TEXT NODE AND NOT ON A CLASS. `getByText` returned
+  // whatever element happened to hold the text, which was the `<button>` only by accident — the label is a
+  // `<span class="vb-clip">` inside it now, so the class this asserted became the clip's. It was already
+  // the wrong claim before that: `active` is a CLASS and `aria-current="page"` is the CONTRACT `Menu`
+  // states and the shape census reads. `getByRole('button', { name })` is the destination itself.
+  const destination = (name: string): HTMLElement => screen.getByRole('button', { name });
+
   it('marks the active tab and reports clicks', () => {
     const onTab = vi.fn();
     render(<TopBar {...props} tab="control" onTab={onTab} />);
-    expect(screen.getByText('Project Control').className).toContain('active');
-    expect(screen.getByText('Boards').className).not.toContain('active');
-    screen.getByText('Boards').click();
+    expect(destination('Project Control').getAttribute('aria-current')).toBe('page');
+    expect(destination('Boards').getAttribute('aria-current')).toBeNull();
+    destination('Boards').click();
     expect(onTab).toHaveBeenCalledWith('boards');
   });
 
@@ -70,10 +77,10 @@ describe('TopBar', () => {
     // had ever clicked this one or checked that it highlights.
     const onTab = vi.fn();
     render(<TopBar {...props} tab="execution" onTab={onTab} />);
-    expect(screen.getByText('Execution').className).toContain('active');
-    expect(screen.getByText('Boards').className).not.toContain('active');
-    expect(screen.getByText('Project Control').className).not.toContain('active');
-    screen.getByText('Execution').click();
+    expect(destination('Execution').getAttribute('aria-current')).toBe('page');
+    expect(destination('Boards').getAttribute('aria-current')).toBeNull();
+    expect(destination('Project Control').getAttribute('aria-current')).toBeNull();
+    destination('Execution').click();
     expect(onTab).toHaveBeenCalledWith('execution');
   });
 
@@ -81,9 +88,9 @@ describe('TopBar', () => {
     // The two are easy to conflate: both are file panes, and both carry `.control` in the DOM.
     const onTab = vi.fn();
     render(<TopBar {...props} tab="explorer" onTab={onTab} />);
-    expect(screen.getByText('Explorer').className).toContain('active');
-    expect(screen.getByText('Project Control').className).not.toContain('active');
-    screen.getByText('Explorer').click();
+    expect(destination('Explorer').getAttribute('aria-current')).toBe('page');
+    expect(destination('Project Control').getAttribute('aria-current')).toBeNull();
+    destination('Explorer').click();
     expect(onTab).toHaveBeenCalledWith('explorer');
   });
 
@@ -308,9 +315,9 @@ describe('TopBar visibility and labels', () => {
     ['control', 'Project Control'],
   ] as const)('marks the %s tab active', (tab, label) => {
     render(<TopBar {...withProps({ tab })} />);
-    expect(screen.getByText(label).className).toContain('active');
+    expect(screen.getByRole('button', { name: label }).getAttribute('aria-current')).toBe('page');
     const other = label === 'Boards' ? 'Project Control' : 'Boards';
-    expect(screen.getByText(other).className).not.toContain('active');
+    expect(screen.getByRole('button', { name: other }).getAttribute('aria-current')).toBeNull();
   });
 
   it('offers every theme, with the current one selected', () => {

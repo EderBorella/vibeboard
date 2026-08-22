@@ -32,6 +32,8 @@
 //   - the empty states' `font-style`: seven italic, ten not, with nothing distinguishing them;
 //   - the notices' `line-height` (1.45 / 1.5 / 1.55) and the triggers' vertical padding.
 // What IS pinned in each family is the thing a person can see and somebody chose: an ink, a hue, a size.
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { cleanup, render } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { Surface } from '../web/src/atoms/Surface.js';
@@ -177,10 +179,7 @@ describe('the empty-state lines', () => {
   });
 
   it('a menu list decides its own inset, and the line inside it decides nothing', () => {
-    const el = at(
-      '<div class="vb-menu vb-menu-list"><p class="vb-text vb-text-quiet">x</p></div>',
-      'p',
-    );
+    const el = at('<div class="vb-menu vb-menu-list"><p class="vb-text vb-text-quiet">x</p></div>', 'p');
     expect(box(el).padding).toBe('8px');
   });
 
@@ -310,10 +309,26 @@ describe('the segmented control', () => {
   // `.backend-toggle` were byte-identical, `.mode-btn` and `.bt-btn` were identical apart from one size
   // step, and `.backend-toggle-md .bt-btn` restated `.mode-btn`'s padding and font-size verbatim. Taken
   // as multisets, the four classes declared 36 things with 19 distinct values; `.vb-seg`,
-  // `.vb-seg-cell` and `.vb-seg-cell-sm` declare 19, and the distinct sets are identical — nothing added,
-  // nothing removed, nothing changed.
+  // `.vb-seg-cell` and `.vb-seg-cell-sm` declared 19, and the distinct sets were identical — nothing
+  // added, nothing removed, nothing changed.
+  //
+  // THE VALUES BELOW ARE UNCHANGED AND THE SELECTORS ARE NOT, and that distinction is the whole of what
+  // the molecule phase did to this family. `.vb-seg` / `.vb-seg-cell` are `Tabs grouped`:
+  // `.vb-tabs-grouped` and `.vb-tabs-grouped .vb-tab`. Every expectation here survived the migration
+  // verbatim — which is the claim that says the group really is the same shape under a different name,
+  // and it is a claim a rewritten expectation could not have made. Not one of them was rewritten into a
+  // `var(...)` string: `box()` resolves through the sheets, so `6px` is `6px`.
+  //
+  // THE FIXTURE IS `at()` AND NOT `label()`, because the cell's rules are DESCENDANT rules now. A
+  // detached `<button class="vb-tab">` reaches the base cell and nothing else, so every assertion about
+  // what the GROUP takes away from a cell would read as absent and pass — the fixture-too-thin failure
+  // this file's own header records twice.
+  const group = () => label('vb-tabs vb-tabs-grouped', 'div');
+  const cell = (state = '') =>
+    at(`<div class="vb-tabs vb-tabs-grouped"><button class="vb-tab${state}">x</button></div>`, 'button');
+
   it('the group owns the border and the corner', () => {
-    const b = box(label('vb-seg', 'div'));
+    const b = box(group());
     expect(b.border).toBe('1px solid var(--border)');
     expect(b['border-radius']).toBe('6px');
     // The clip is what makes one box out of many cells, and without it the corners show through.
@@ -323,50 +338,61 @@ describe('the segmented control', () => {
   // AND THE CELL OWNS NEITHER, which is the reason Phases 3 and 4 both refused to make these `Button`s:
   // every Button variant gives the cell its own border and radius, which puts a seam down the middle.
   it('a cell has no border and no corner of its own', () => {
-    const b = box(label('vb-seg-cell', 'button'));
+    const b = box(cell());
     expect(b.border).toBe('none');
     expect(b['border-radius']).toBeUndefined();
     expect(b['border-right']).toBe('1px solid var(--border)');
   });
 
   it('the last cell drops the divider', () => {
-    expect(box(label('vb-seg-cell', 'button'), ':last-child')['border-right']).toBe('none');
+    expect(box(cell(), ':last-child')['border-right']).toBe('none');
   });
 
   it('the chosen cell is filled, not outlined', () => {
-    const b = box(label('vb-seg-cell active', 'button'));
+    const b = box(cell(' active'));
     expect(b.background).toBe('var(--accent-fill)');
     expect(b.color).toBe('var(--on-fill)');
   });
 
-  // The `sm` step is the ONLY thing the four classes disagreed about, and `.backend-toggle-md .bt-btn`
-  // is the file's own proof of that: it wrote `.mode-btn`'s two values out again.
+  // THE SUBJECT OF THIS TEST WAS DELETED ON PURPOSE, so it is the mirror claim rather than a rewrite.
+  // `sm` was the only thing the four classes disagreed about, and after the atom phase it was one
+  // property rather than two: the group declared `--ctl-h` and the cells stretched to fill it, so the
+  // vertical padding went, which left `.vb-seg-cell-sm`'s horizontal half restating the base cell's
+  // `0 var(--s-4)` value for value. What remained was an 11px label in a 12px row — the 10.88px incident
+  // this design system has ruled on twice — and `Tabs` drops it. So what is pinned is that the STEP IS
+  // GONE AND CANNOT RETURN: exactly one `font-size` is declared anywhere in the cell's sheet, and it is
+  // the row's own. A second one is how a `sm` cell comes back, whatever it is called.
   //
-  // AND AFTER THE ATOM PHASE IT IS ONE PROPERTY RATHER THAN TWO. `sm` was a shorter box AND a smaller
-  // label; the group declares `--ctl-h` now and the cells stretch to fill it, so the vertical padding
-  // went — which left `.vb-seg-cell-sm`'s horizontal half restating the base cell's `0 var(--s-4)` value
-  // for value. A declaration that looks like a choice and changes nothing is the `.link-option`
-  // `font-size` defect, so it is deleted rather than pinned here. `size` on a segmented group is now
-  // exactly what `size` on a `Button` is: not a height.
-  it('sm is the only difference between the two cells there ever was', () => {
-    const md = box(label('vb-seg-cell', 'button'));
-    const sm = box(label('vb-seg-cell vb-seg-cell-sm', 'button'));
-    const moved = Object.keys(md).filter((k) => md[k] !== sm[k]);
-    expect(moved.sort()).toEqual(['font-size']);
+  // Read from the source rather than from a resolved box on purpose: a box can only be asked about a
+  // fixture, and a `.vb-tab-sm` nobody wrote a fixture for would be invisible to it.
+  it('the sm step is gone from the cell, and there is no second font-size to bring it back', () => {
+    const sheet = readFileSync(join(process.cwd(), 'web', 'src', 'molecules', 'tabs.css'), 'utf8');
+    const sizes = [...sheet.matchAll(/font-size\s*:\s*([^;}]+)/g)].map(([, v]) => v.trim());
+    expect(sizes).toEqual(['var(--t-small)']);
+    // And it resolves to the row's step and not to the micro one the `sm` cell wore.
+    expect(box(cell())['font-size']).toBe('0.75rem');
   });
 
   // Asserted on the declarations that identified them rather than on an empty box: a `<button>` always
   // matches the type reset in design/reset.css, so its box is never empty and `toEqual([])` would be
   // a claim about that reset instead of about these classes.
-  it.each([['mode-group'], ['backend-toggle'], ['backend-toggle-md'], ['mode-btn'], ['bt-btn']])(
-    '.%s is gone',
-    (cls) => {
-      const b = box(label(cls, 'button'));
-      expect(b.background).toBeUndefined();
-      expect(b['border-right']).toBeUndefined();
-      expect(b.overflow).toBeUndefined();
-    },
-  );
+  // `.vb-seg`, `.vb-seg-cell` and `.vb-seg-cell-sm` join the list: the three primitive names died with
+  // the four surface ones, and a negative is what stops any of the seven creeping back.
+  it.each([
+    ['mode-group'],
+    ['backend-toggle'],
+    ['backend-toggle-md'],
+    ['mode-btn'],
+    ['bt-btn'],
+    ['vb-seg'],
+    ['vb-seg-cell'],
+    ['vb-seg-cell-sm'],
+  ])('.%s is gone', (cls) => {
+    const b = box(label(cls, 'button'));
+    expect(b.background).toBeUndefined();
+    expect(b['border-right']).toBeUndefined();
+    expect(b.overflow).toBeUndefined();
+  });
 });
 
 describe('the archived row', () => {

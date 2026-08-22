@@ -12,13 +12,20 @@
   min-width: 0;
 }
 .inline-view:hover { border-color: var(--border); background: var(--bg); }
-/* THE BOX IS `Control`'s NOW and what is left is the two things that are not the box: the accent EDGE,
-   which says "you are editing this", and the type, which is the prose the value sits in rather than a
-   form control's step. `border-color` and not `border`, so the atom's hairline width is untouched.
+/* THE BOX IS `Control`'s NOW and what is left is the accent EDGE, which says "you are editing this", the
+   type, which is the prose the value sits in rather than a form control's step, and the three things a
+   control that must not MOVE when it opens cannot take from the atom. `border-color` and not `border`, so
+   the atom's hairline width is untouched.
    `height: auto` because a card title is edited at `--t-title` and `--ctl-h` is one line at `--t-body`;
-   the read-only face above has no height either, and the two have to be the same box. */
+   the read-only face above has no height either, and the two have to be the same box.
+   THE PADDING AND THE `min-height` FLOOR ARE THE REST OF THAT SAME SENTENCE, and both were lost when the
+   box moved to the atom. `.vb-ctl` is `0 var(--s-4)` with a 28px floor; `.inline-view` above is
+   `var(--s-1) var(--s-3)` with none — so the value slid 4px sideways and the row grew 3px the moment it
+   was clicked. That is the GEOMETRIC objection molecules/Field.tsx says `Control` answered, so it has to
+   be answered here rather than restated. Same values `.inline-edit` carried before the merge. */
 .inline-edit {
-  width: 100%; height: auto; border-color: var(--accent);
+  width: 100%; height: auto; min-height: 0; border-color: var(--accent);
+  padding: var(--s-1) var(--s-3);
   font: inherit; font-family: inherit; resize: vertical;
 }
 .inline-edit:focus { outline: none; }

@@ -111,7 +111,7 @@ export function Chip({
   const Tag = as;
   // `vb-chip-tone` carries the ink and the edge and the `vb-tone-*` class carries the colour, so a chip
   // with neither prop keeps `color: inherit` — the run-id chips inside a toned `.filed-entry` would
-  // otherwise take that entry's tone by inheritance. See ui/primitives.css.
+  // otherwise take that entry's tone by inheritance. See atoms/chip.css and molecules/tones.css.
   const classes = chipClasses({
     pill,
     fill,

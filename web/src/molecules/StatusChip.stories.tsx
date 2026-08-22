@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { STATE_NAMES } from './state-tones';
 import { StatusChip } from './StatusChip';
+import { STATE_NAMES } from './state-tones';
 
 // FOUR STATE INDICATORS AS ONE, AND THE PIP IS ABSORBED. They agreed on the colour and on nothing else:
 // three sizes, two shapes, and three different answers to "where does the explanation live". All four are

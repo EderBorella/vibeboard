@@ -227,12 +227,12 @@ describe('TopBar', () => {
   // an HTTP URL, so a path built from it reaches readFileSync as `http://localhost/...` and throws. The
   // same trap is called out in vitest.config.ts for the same reason.
   it('reserves no fixed width for the label, so the chip is as wide as its word', () => {
-    const css = readFileSync(join(process.cwd(), 'web', 'src', 'styles.css'), 'utf8');
+    const css = readFileSync(join(process.cwd(), 'web', 'src', 'organisms', 'topbar', 'topbar.css'), 'utf8');
     // ANCHORED TO THE START OF A LINE. Unanchored, `\.conn-text\s*\{` also matches the tail of
     // `.conn-status:hover .conn-text {`, and once that rule was added the test began reading its
     // `color` declaration and failing — a false alarm from a regex that matched the wrong rule.
     const rule = /^\.conn-text\s*\{([^}]*)\}/m.exec(css);
-    expect(rule, '.conn-text rule not found in web/src/styles.css').toBeTruthy();
+    expect(rule, '.conn-text rule not found in web/src/organisms/topbar/topbar.css').toBeTruthy();
     expect(rule?.[1], 'the fixed width is back').not.toMatch(/width:/);
     expect(rule?.[1]).toMatch(/white-space:\s*nowrap/);
   });
@@ -243,7 +243,7 @@ describe('TopBar', () => {
   // between the dot's right edge and the first glyph went from an intended 6.4px to 30.7px. jsdom
   // computes no layout, so the stylesheet is again the only place this can be held.
   it('left-aligns the label inside its fixed box, which a button does not do by default', () => {
-    const css = readFileSync(join(process.cwd(), 'web', 'src', 'styles.css'), 'utf8');
+    const css = readFileSync(join(process.cwd(), 'web', 'src', 'organisms', 'topbar', 'topbar.css'), 'utf8');
     const rule = /^\.conn-status\s*\{([^}]*)\}/m.exec(css);
     expect(rule, '.conn-status rule not found').toBeTruthy();
     expect(rule?.[1]).toMatch(/text-align:\s*left/);

@@ -1,0 +1,18 @@
+/* ---------- Dispatch (the details step, inside the cards pane) ---------- */
+.dispatch { display: flex; flex-direction: column; gap: var(--s-4); }
+.dispatch-head { display: flex; align-items: center; gap: var(--s-4); }
+/* `.dispatch-back` is gone outright: a bordered `←` with an accent hover is `default`, exactly. */
+.dispatch-title { margin: 0; font-family: var(--font-display); font-size: var(--t-lead); }
+.dispatch-desc { margin: 0; font-size: var(--t-body); color: var(--muted); }
+/* A SENTENCE, so it is not a readout — only the run id inside it is, which is the signature's whole
+   claim: mono means the machine measured it. It was entirely mono before, which said the prose was
+   machine-written too. */
+.dispatch-continues { margin: 0; font-size: var(--t-small); color: var(--accent-2); }
+.dispatch-row { display: flex; align-items: center; gap: var(--s-4); flex-wrap: wrap; }
+.dispatch-row .vb-trigger { flex: 1; min-width: 0; }
+.dispatch > .vb-input { width: 100%; resize: vertical; }
+.dispatch-attach { font-size: var(--t-body); border: 1px solid var(--border); border-radius: var(--r-md); padding: var(--s-3) var(--s-4); }
+.dispatch-attach summary { cursor: pointer; color: var(--muted); }
+.dispatch .vb-hint { margin: 0.3rem 0; }
+.dispatch-foot { display: flex; justify-content: flex-end; gap: var(--s-4); margin-top: 0.2rem; }
+

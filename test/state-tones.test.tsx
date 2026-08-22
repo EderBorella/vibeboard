@@ -94,9 +94,18 @@ const TINTED = [
   '--tone',
 ] as const;
 
+// EVERY SHEET THE APP LOADS, out of the app's own list: `styles.css` is 47 layer files now, and a
+// hand-written list of them would go stale on the phase that adds a sheet — silently, because a rule
+// this census never reads is a rule it never objects to.
+const SHEETS = [
+  ...readFileSync(join(process.cwd(), 'web', 'src', 'styles.ts'), 'utf8').matchAll(
+    /^\s*import\s+'\.\/([^']+\.css)';/gm,
+  ),
+].map(([, file]) => file);
+
 const RULES: { sel: string; body: string }[] = (() => {
   const out: { sel: string; body: string }[] = [];
-  for (const file of ['styles.css', join('ui', 'primitives.css')]) {
+  for (const file of SHEETS) {
     const css = readFileSync(join(process.cwd(), 'web', 'src', file), 'utf8').replace(
       /\/\*[\s\S]*?\*\//g,
       '',
@@ -104,6 +113,15 @@ const RULES: { sel: string; body: string }[] = (() => {
     for (const m of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
       out.push({ sel: (m[1] ?? '').trim(), body: m[2] ?? '' });
     }
+  }
+  // A CENSUS OF NOTHING PASSES EVERY CLAIM IT MAKES, so the sheet list is floored where it is read. The
+  // list comes out of `styles.ts` by regex: if that stops matching, `RULES` is empty and every tone
+  // assertion below compares an element against no rules at all.
+  if (out.length < 200) {
+    throw new Error(
+      `${out.length} rule(s) read from ${SHEETS.length} sheet(s) named in web/src/styles.ts — the ` +
+        `stylesheet list or the rule regex has stopped matching, so this census is vacuous.`,
+    );
   }
   return out;
 })();

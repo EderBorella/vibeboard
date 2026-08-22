@@ -1,0 +1,76 @@
+/* ---------- Execution (the run dashboard) ---------- */
+/* A GRID, which is what it was already written for. `.exec-ledger` below carries
+   `grid-column: 1 / -1` — a property that does NOTHING against a flex parent, so the ledger sat in the
+   row as a flex item and shoved the three columns to the right. Measured at 1600px with the copilot
+   hidden: ~870px of dead space on the left, the DONE column running off the viewport edge, and run
+   titles cut mid-word ("The product can be run the way t", "Call POST /api/foundation/smoke ").
+   `--exec-cols` comes from ExecutionView's own COLUMNS constant, so the track count cannot disagree with
+   the number of columns rendered. `auto-fit` was tried first and was wrong: it makes as many tracks as
+   FIT, not as many as there are children, so at 1600px it produced six 247px tracks and the three
+   columns sat in the first four of them — narrower than before the fix. */
+.execution {
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+  padding: 1.1rem;
+  display: grid;
+  grid-template-columns: repeat(var(--exec-cols, 3), minmax(14rem, 1fr));
+  gap: 0.9rem;
+  align-items: start;
+  align-content: start;
+  background: var(--wash);
+}
+/* A `Panel` with the `raised` variant. No `flex` basis: the parent is a grid and the track sizes this
+   box, and the `min-width: 0` that stops a long unbroken run title pushing its track past its share —
+   the fault that let those titles reach the viewport edge and get cut — is now `.vb-panel`'s, for every
+   Panel rather than for this one. */
+.exec-column { gap: var(--s-4); padding: var(--s-4); }
+.exec-head {
+  display: flex; align-items: center; gap: var(--s-4); margin: 0;
+  font-family: var(--font-display); font-size: var(--t-small);
+  text-transform: uppercase; letter-spacing: 0.1em;
+}
+/* A `Panel` with the `inset` variant. It is the same object as a `.tile` — a record in a column on a
+   `--panel` parent — and it sat on `--bg` while the tile sat on `--panel-2`, which nobody chose. */
+.exec-run {
+  display: flex; flex-direction: column; gap: var(--s-2); align-items: flex-start;
+}
+.exec-run-top { display: flex; align-items: baseline; gap: var(--s-3); width: 100%; }
+/* The run's actions, side by side. `.exec-run` is a flex column, so without this every button is its
+   own row — Dismiss and Clear failed tries stacked, which reads as two unrelated controls rather than
+   the pair of answers to one failed run. Wraps, so ForgiveAttempts' result and error lines (both
+   `flex-basis: 100%`) still take a line of their own underneath. */
+.exec-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2); width: 100%; }
+.exec-skill { font-size: var(--t-small); }
+/* Cost takes the push-right when present, so cost and elapsed sit together at the end of the row. */
+/* Cost takes the push-right when present, so cost and elapsed sit together at the end of the row. Both
+   are `Readout`s now, and the pair rule below is the same claim the two classes made by hand. */
+.exec-run-top > .vb-readout { margin-left: auto; }
+/* AFTER the plain `.exec-when` above, not before it. At (0,2,0) the adjacent form won either way, so
+   this is a move and not a change — but the descending order read as though the plain rule was meant
+   to override it, which is the opposite of what happens. */
+.exec-run-top > .vb-readout + .vb-readout { margin-left: 0; }
+/* A `Panel` with the `flat` variant. WRAPS: a card title is arbitrary user text and several are long
+   file paths with no spaces, so without this they set the column's minimum content width and pushed
+   past the track. `cursor: default` on a disabled one is the primitive's now; the dimming is this
+   surface's, because it says "already dealt with" rather than "not a control". */
+.exec-card { overflow-wrap: anywhere; width: 100%; }
+.exec-card:hover:not(:disabled) { border-color: var(--accent); }
+.exec-card:disabled { opacity: 0.7; }
+/* THE TITLE WRAPS HERE, overriding `.link-title`'s `white-space: nowrap`.
+   `.link-title` (see the link picker) asks for one line with an ellipsis — but it is an inline
+   `<span>`, and `overflow` and `text-overflow` do nothing on an inline box. So the ellipsis never
+   arrived and only the `nowrap` took effect: a long card title rendered as one unbreakable line and
+   ran straight out of its grid track. Measured in chromium against a real title at a 279px track:
+   230px of overhang, and the column's scrollWidth 508 against a client width of 279.
+   Scoped to `.exec-card` rather than fixed on `.link-title`, because the other users of that class
+   sit in a constrained block where truncating really is what is wanted. */
+.exec-card .link-title { white-space: normal; overflow: visible; }
+.exec-summary { margin: 0; color: var(--muted); font-size: var(--t-small); line-height: 1.35; overflow-wrap: anywhere; }
+/* `Chip pill` plus `vb-readout` for the mono face. The ground is `--accent-2` rather than `fill`'s
+   `--panel-2` because this badge is the one ambient signal that a run wants a decision — a count on a
+   panel ground would read as furniture. Not a `tone`: `--accent-2` is outside the closed five. */
+.tab-badge {
+  margin-left: 0.35rem; background: var(--accent-2); color: var(--on-accent);
+}
+

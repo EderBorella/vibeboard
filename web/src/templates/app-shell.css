@@ -1,0 +1,13 @@
+/* Exactly one viewport tall, clipped — the boards and copilot scroll internally so the
+   page itself never scrolls (keeps the copilot input box on screen). dvh handles mobile
+   browser chrome.
+   `@supports` RATHER THAN TWO `height` DECLARATIONS IN ONE RULE. The pair was the older idiom for
+   the same thing — a browser that does not know `dvh` drops the second at parse time and keeps
+   `100vh` — but written that way it is indistinguishable from an accidental duplicate property, which
+   is what a linter reads it as. Same computed height in both kinds of browser; the intent is now
+   stated instead of inferred. */
+.app-shell { height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+@supports (height: 100dvh) {
+  .app-shell { height: 100dvh; }
+}
+

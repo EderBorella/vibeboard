@@ -53,7 +53,7 @@ const OFF_SCALE_ON_PURPOSE = new Map([
     'inherit',
     'On the scale BY CONSTRUCTION rather than by exception: it defers to the ancestor, and every ' +
       'ancestor that names a size is checked here, with the chain terminating at `body`, which names ' +
-      '`--t-body`. Used by the form-control reset at the top of styles.css, which exists to stop a ' +
+      '`--t-body`. Used by the form-control reset in web/src/design/reset.css, which exists to stop a ' +
       "control taking the UA's off-scale 13.3333px.",
   ],
 ]);

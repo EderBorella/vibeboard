@@ -1,0 +1,12 @@
+/* Raw pane (the card's file, inside the dock) */
+.raw-pane { flex: 1; display: flex; flex-direction: column; gap: var(--s-3); min-height: 0; }
+/* 8rem was the floor a collapsed flex parent left it sitting on. It is the FLOOR, not the size — the
+   `flex: 1` above is what makes it fill — but a floor you can actually edit in is worth having for any
+   context where the parent has no height to give. */
+.raw-pane .raw-area { flex: 1; min-height: 14rem; }
+.raw-foot { display: flex; align-items: center; justify-content: flex-end; gap: var(--s-4); }
+.raw-foot > .vb-error { margin-right: auto; }
+/* A TOGGLE, and its "on" state is now the `primary` variant rather than an `.active` class of its own —
+   which is what `.cards-raw.active`'s accent fill already was, written twice. Layout is what is left. */
+.cards-tabs > .push { flex: 0 0 auto; }
+

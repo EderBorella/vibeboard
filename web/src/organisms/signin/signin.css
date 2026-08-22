@@ -1,0 +1,41 @@
+/* ---------- Signing in ----------
+   The approval prompt borrows `.halt`'s backdrop and card: it is the same kind of object — the one
+   thing on screen, blocking, explaining itself — and a second look-alike would drift from it. */
+
+/* What the asking browser calls itself. A `Panel` with the `inset` variant — a quoted block of machine
+   text, which is the same object `.markdown pre` is and now the same box. Monospace and wrapping,
+   because it is a User-Agent: long, punctuation-dense, and not prose. `break-all` so a 60-character
+   token-like string cannot widen the dialog past the viewport. The `margin: 0` went with the `<p>`: a
+   Panel is a `<div>` and takes no paragraph margins to cancel. */
+.signin-label {
+  font-family: var(--font-mono);
+  font-size: var(--t-small);
+  word-break: break-all;
+}
+/* Refuse first, and it keeps `.halt .vb-btn`'s accent — the reflex click and the reflex Enter
+   both have to land on "no". Allow sits beside it as the quiet one. */
+.signin-actions {
+  display: flex;
+  gap: var(--s-4);
+  align-items: center;
+  margin-top: 0.2rem;
+}
+
+/* One signed-in browser, in Settings. */
+.signin-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: var(--s-4) 0;
+  border-bottom: 1px solid var(--border);
+}
+.signin-row:last-of-type { border-bottom: none; }
+.signin-row-label { font-size: var(--t-body); word-break: break-all; }
+/* `Chip pill neutral`. The lowercase stays: the label beside it is whatever the browser called itself,
+   and this word is deliberately not shouting next to it. */
+.signin-this {
+  margin-left: 0.35rem;
+  text-transform: lowercase;
+  white-space: nowrap;
+}

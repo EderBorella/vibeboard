@@ -1,0 +1,115 @@
+/* ---------- Copilot dock (shrink side-by-side) ---------- */
+.copilot {
+  flex: 0 1 400px;
+  min-width: 280px;
+  max-width: 420px;
+  display: flex; flex-direction: column;
+  border-left: 1px solid var(--border);
+  background: var(--panel);
+  min-height: 0;
+}
+.copilot-head { display: flex; align-items: center; gap: var(--s-4); padding: var(--s-4) 0.75rem; border-bottom: 1px solid var(--border); }
+.copilot-title { font-weight: 700; font-family: var(--font-display); text-transform: uppercase; letter-spacing: 0.14em; }
+.copilot-title::before { content: "◈ "; color: var(--accent); }
+
+/* The same control in a form rather than a dense row. Settings used to render its own button group at
+   this size, from its own list; the scale was the ONLY thing the two copies disagreed about that was
+   deliberate — the label was drift. */
+
+/* Chat switcher */
+.copilot-chatbar { display: flex; align-items: center; gap: var(--s-3); padding: var(--s-3) 0.75rem; border-bottom: 1px solid var(--border); }
+.chat-switcher { position: relative; flex: 1; min-width: 0; }
+/* "+ New" must not break across two lines when the switcher beside it is wide. */
+.chat-new { white-space: nowrap; }
+.chat-menu-backdrop { position: fixed; inset: 0; z-index: 20; }
+/* A `Panel` with the `raised` variant: the ground, the edge and the 10px corner were that variant's own
+   three values. Its flex column is a no-op here and that is checked rather than assumed — every child of
+   this menu is a full-width block with `margin: 0`, so nothing in it has margins to stop collapsing. The
+   float, the shadow and the inset are what a menu adds to a raised surface. */
+.chat-menu { position: absolute; z-index: 21; top: calc(100% + 4px); left: 0; right: 0; max-height: 320px; overflow-y: auto; box-shadow: var(--glow), 0 6px 24px rgba(0,0,0,0.4); padding: var(--s-2); }
+/* The menu decides its own inset; the line inside it decides nothing. */
+.chat-menu > .vb-empty { padding: var(--s-4); }
+.chat-menu-item { display: flex; align-items: stretch; gap: var(--s-2); border-radius: var(--r-md); }
+.chat-menu-item.active { background: var(--panel-2); }
+.chat-menu-item:hover { background: var(--panel-2); }
+/* A `Panel` with the `flat` variant; the active row's accent left edge is below and still overrides
+   the primitive's transparent border, which is a colour and a width rather than a box. */
+.chat-menu-open { flex: 1; display: flex; flex-direction: column; gap: 0.1rem; color: var(--text); }
+.chat-menu-item.active .chat-menu-open { border-left: 2px solid var(--accent); }
+.chat-menu-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--t-small); }
+/* `Chip pill neutral` owns the box AND the colour now; this keeps the treatment.
+   A BACKEND NAME IS NOT A STATE, which is the ruling that removed the two rules that were here. They
+   spent `--accent` and `--accent-2` — the palette's primary and its secondary — on which of two agents
+   a chat ran on, and that is the same category error as `--accent-2` meaning both "the secondary hue"
+   and "needs attention": a whole vocabulary of two, with no row in any table it could have had one in.
+   The WORD says which, in 700-weight uppercase, which is why it is rendered at all. `.conn-status`
+   already rests on exactly that bargain for the three of its states that share a colour. */
+.chat-backend {
+  margin-right: 0.4rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
+  vertical-align: middle;
+}
+/* `--accent-2` and not `--danger`: deleting a chat is confirmed, and this row already has a red `✕`
+   nowhere near it. The distinction was deliberate before the migration and survives it. */
+.chat-del:hover:not(:disabled) { color: var(--accent-2); }
+
+.copilot-controls { display: flex; align-items: center; flex-wrap: wrap; gap: var(--s-4); padding: var(--s-4) 0.75rem; border-bottom: 1px solid var(--border); }
+/* `.copilot-actions` IS GONE and so is the wrapper it named. Its button declared `Button`'s `default`
+   `sm` box value for value — the same `--panel-2` ground, `--text` ink, `--border` edge, `--r-md`
+   corner, `var(--s-2) var(--s-4)` padding, `--t-small` size and the same disabled dimming — so it is
+   that Button now. What was left of the wrapper was `margin-left: auto`, which is `.push`, beside a
+   `display: flex` and a `gap` that had one child to separate from nothing. The button sits directly in
+   `.copilot-controls`, which is already the flex row with the gap. */
+.copilot-selects { display: flex; gap: var(--s-4); padding: 0 0.75rem var(--s-4); border-bottom: 1px solid var(--border); }
+/* The row decides how its controls sit; the box is `.vb-input`'s. */
+.copilot-selects > .vb-input { flex: 1; }
+.copilot-selects select:disabled { opacity: 0.5; }
+/* THE ROLE THIS SURFACE GIVES ITS TONE: ink, on the wrapper, so the `Dot` inside takes it through
+   `currentColor` — the construction `.conn-status` uses and for its reason: only the wrapper knows the
+   state, and it colours the pip and the word beside it together.
+   THREE RULES DIED HERE AND THEY WERE THE MECHANISM NOBODY COUNTED. `.ok` and `.down` were bare class
+   names — no `[data-state]`, no tone, nothing that looked like a state — so this pair is missing from
+   the six vocabularies docs/design-system.md measured. `--accent` and `--danger` picked by hand, and the
+   healthy case coloured the pip and not the word, which is the same asymmetry the agent chip had. The
+   halo is a `Dot` prop now: `--glow` is `none` in two of the three themes, so it cannot belong to a
+   tone. */
+/* THE ROW, AND NO LONGER THE INDICATOR. The `font-size` and the `color: var(--tone, …)` are gone: what
+   sits in here is a `StatusChip`, which brings both. This row's remaining job is the panel's own rhythm —
+   the same `0.75rem` gutter and the same rule underneath as every other row in the dock. */
+.copilot-status { display: flex; align-items: center; gap: var(--s-3); padding: var(--s-2) 0.75rem; border-bottom: 1px solid var(--border); }
+/* THE ROW THAT HAD NO CLASS. The Authorise button sat in a bare `<div>` while its six siblings each padded
+   themselves by `0.75rem`, so the one control that grants write access to the project was flush against
+   the dock's left edge and touching the board behind it. Nobody chose that. */
+.copilot-authority { padding: var(--s-4) 0.75rem; border-bottom: 1px solid var(--border); }
+.copilot-body { flex: 1; overflow-y: auto; padding: 0.75rem; display: flex; flex-direction: column; gap: var(--s-4); }
+/* THE ROLE THIS SURFACE GIVES ITS TONE: ink, and only the `error` kind carries one — see CopilotPanel.
+   `inherit` is the fallback, which is what a bubble with no state has always rendered. Nothing above a
+   `.msg` in the tree sets `--tone`, so this cannot pick one up by accident. */
+.msg { font-size: var(--t-body); line-height: 1.45; white-space: pre-wrap; word-break: break-word; color: var(--tone, inherit); }
+.msg-user { align-self: flex-end; background: var(--accent-fill); color: var(--on-fill); padding: var(--s-3) var(--s-4); border-radius: var(--r-lg) var(--r-lg) var(--r-sm) var(--r-lg); max-width: 85%; }
+.msg-assistant { background: var(--panel-2); border: 1px solid var(--border); padding: var(--s-3) var(--s-4); border-radius: var(--r-lg) var(--r-lg) var(--r-lg) var(--r-sm); max-width: 90%; }
+.msg-thinking { color: var(--muted); font-style: italic; font-size: var(--t-small); }
+/* `.msg-tool` IS GONE: a tool name is machine vocabulary and the rule was `Readout` `small` `accent`
+   written out by hand. `msg-tool` still reaches the wrapper through `msg-${it.kind}`, and there is
+   nothing left for it to say — the line's only child is the readout. See copilot/CopilotPanel.tsx. */
+/* `.msg-error` IS GONE. It declared `color: var(--danger)` — a state's colour, chosen on a surface,
+   which is the whole subject of Phase 13 — and a `font-size: var(--t-body)` that restated `.msg`'s own.
+   The line is the `error` row of ui/state-tones.ts now, and it gets its ink from `--tone` through
+   `.vb-tone-bad`. The four other `msg-*` classes stay: a bubble's geometry and a thinking line's
+   quietness are shapes, and the chat may keep its own. */
+.msg-running { color: var(--muted); font-style: italic; }
+/* CENTRED, not baseline-aligned, and the harness is why: `ReadoutLine` aligns on the baseline because
+   its parts are text at two sizes — but this row's last item is the context METER, a 5px bar with no
+   baseline of its own, and on a baseline it hung 1.5px below the figures beside it. Check 7 named the row
+   as wrapping. A graphic in a row of text is the one case where centring the boxes is right. */
+.copilot-readout {
+  align-items: center; gap: var(--s-2) 0.75rem; padding: var(--s-3) 0.75rem;
+  border-top: 1px solid var(--border);
+}
+.ctx { margin-left: auto; display: flex; align-items: center; gap: var(--s-3); }
+.ctx-bar { width: 60px; height: 5px; background: var(--panel-2); border-radius: var(--r-pill); overflow: hidden; }
+.ctx-fill { display: block; height: 100%; background: var(--accent); }
+.ctx-warn { color: var(--accent-2); }
+.ctx-warn .ctx-fill { background: var(--accent-2); }
+.copilot-input { display: flex; gap: var(--s-4); padding: var(--s-4) 0.75rem; border-top: 1px solid var(--border); }
+.copilot-input > .vb-input { flex: 1; resize: none; }
+

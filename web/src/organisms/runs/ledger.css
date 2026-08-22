@@ -1,0 +1,16 @@
+/* The ledger lines: what a project or a card has spent, and which cap will stop it. Quiet by
+   default — a number you only look at when you are asking — and tabular so digits line up. */
+/* BOTH LEDGERS ARE `ReadoutLine` — see ui/Readout.tsx. Five classes wrote this row by hand and agreed on
+   everything except a gap nobody chose. What is left is where each one sits: the project ledger spans the
+   whole execution grid, and a card's sits under its report list. */
+.execution > .vb-readout-block { grid-column: 1 / -1; margin-bottom: 0.6rem; }
+.reports > .vb-readout-block { margin-top: 0.45rem; }
+/* The way out of a card the machine spent, on the same line as the count it clears. Quiet by default —
+   it is an escape hatch, not the thing you came to the card to do — which is the `ghost` variant, and
+   it no longer has to borrow the report row's Stop styling because there is one Button. Nothing is left
+   for this class to say, so the class is gone; the two prose lines below keep theirs. */
+.reports-forgiven { flex-basis: 100%; opacity: 0.85; }
+/* The server's refusal, on its own line so it is not read as part of the ledger it sits under. */
+.reports-forgive-error { flex-basis: 100%; color: var(--danger); }
+
+

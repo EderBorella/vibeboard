@@ -1,0 +1,15 @@
+/* A USER-PREFERENCE OVERRIDE IS THE ONE PLACE `!important` IS THE MECHANISM AND NOT A SHORTCUT.
+   `*` has specificity (0,0,0), so every class in this file outranks it; without `!important` this rule
+   would lose to the first animated class and the whole guarantee would be decorative. It is a blanket
+   catch for animations added later — `.ap-dot-running`, the only one in the file today, is also
+   stopped specifically further down — so narrowing the selector to raise its specificity would defeat
+   the point of having it. */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    /* biome-ignore lint/complexity/noImportantStyles: `*` is specificity (0,0,0) and every animated class outranks it — see above */
+    animation-duration: 0.01ms !important;
+    /* biome-ignore lint/complexity/noImportantStyles: `*` is specificity (0,0,0) and every transitioned class outranks it — see above */
+    transition-duration: 0.01ms !important;
+  }
+}
+

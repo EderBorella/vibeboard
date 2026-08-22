@@ -1,0 +1,7 @@
+/* ---------- Work area: boards + copilot ---------- */
+.work { flex: 1; display: flex; min-height: 0; }
+
+/* The left column: the active view above, the utility dock below. Keeps the dock out of the
+   copilot's space — it docks, it does not overlay. */
+.work-main { flex: 1; min-width: 0; display: flex; flex-direction: column; min-height: 0; }
+

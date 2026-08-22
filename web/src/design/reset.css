@@ -1,0 +1,34 @@
+:root { color-scheme: dark; }
+
+* { box-sizing: border-box; }
+
+/* A UA stylesheet gives every form control its own font-size — 13.3333px in Chromium — which is not a
+   step on the scale and is not the size of the text beside it. Three controls on the board were
+   sitting on it (`.copilot-x`, `.btn-primary`, `.btn-secondary`), and the class of defect is
+   open-ended: any new button that forgets a font-size gets it. Removing the cause rather than
+   patching the three. `font-size` only, not the `font` shorthand: a textarea's UA monospace is a
+   separate decision, and several rules below make it deliberately. A rule that names its own step
+   still wins — a class beats a type selector. */
+button, input, select, textarea { font-size: inherit; }
+
+/* THE DEFAULT IS ON THE SCALE, and it has to be stated here or the scale has a hole in it. Nothing
+   set a body font-size, so every element that did not name one inherited the UA's 16px — 94 of the
+   233 elements the browser measures on the board, and 16px is not a step. Naming it makes `--t-body`
+   what "UI text" means and leaves the rem-based steps untouched, since rem is root-relative and this
+   is not the root. */
+body {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: var(--t-body);
+  background: var(--bg);
+  color: var(--text);
+}
+
+/* Themed scrollbars */
+* { scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+*::-webkit-scrollbar { width: 9px; height: 9px; }
+*::-webkit-scrollbar-thumb { background: var(--border); border-radius: var(--r-pill); }
+*::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+

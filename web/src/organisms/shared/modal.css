@@ -1,0 +1,13 @@
+/* ---------- Card editor modal ---------- */
+.modal-backdrop {
+  position: fixed; inset: 0; background: rgba(0, 0, 0, 0.6);
+  display: flex; align-items: center; justify-content: center; padding: 1.5rem; z-index: 20;
+}
+/* A `Panel` with the `raised` variant, and it was that variant DECLARATION FOR DECLARATION — the ground,
+   the edge, the 10px corner and the flex column, which is exactly the head-over-scrolling-body stack
+   Phase 4 said every raised consumer wanted. Only the measure is left. */
+.modal { width: 100%; max-width: 620px; max-height: 90vh; }
+.modal-head { display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); }
+.modal-title { font-weight: 600; font-family: var(--font-display); letter-spacing: 0.04em; }
+/* `.modal-close` is gone outright — it was the `bare` variant and nothing else. */
+.modal-body { padding: 1rem; overflow-y: auto; display: flex; flex-direction: column; gap: 0.7rem; }

@@ -1,0 +1,288 @@
+/* THE BOARD'S ONE SCROLL REGION, and that is the whole of it — vertical AND horizontal.
+   It used to be four: this box scrolled vertically and each `.board-columns` row scrolled sideways on
+   its own. Three independent horizontal scrollers is the worst available arrangement for three rows
+   that are meant to read as one table, because scrolling one row moves its columns out from under the
+   row above — the shared grid the comment on `.board-columns` argues for is only true while every row
+   sits at scroll offset zero. And it was not theoretical: measured at 1440×900 with the copilot open,
+   each row clipped 40px of its own content at the container edge, cutting "Drop a card here" mid-word
+   in the fifth column with no scrollbar of its own in view. At 900px it clipped 580px.
+   One region means one gesture, on the box the reader is already scrolling. */
+.boards {
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+  padding: 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+  background: var(--wash);
+  container: vbboards / inline-size;
+  /* Named once so `--track-fit` below cannot disagree with the `gap` it subtracts. It was written out
+     as a literal `0.7rem` in both places, so changing the gap would have silently left the track
+     arithmetic measuring a gap that no longer existed. */
+  --board-gap: 0.7rem;
+}
+
+/* ---------- Board ---------- */
+.board { display: flex; flex-direction: column; gap: var(--s-4); }
+.board-label {
+  display: flex;
+  align-items: center;
+  gap: var(--s-4);
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  border-left: 3px solid var(--accent);
+  padding: 0.15rem var(--s-4);
+  cursor: pointer;
+  font-family: var(--font-display);
+  font-size: var(--t-body);
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--text);
+}
+.board-label:hover { color: var(--accent); }
+/* The size is `.vb-twist`'s — see ui/primitives.css. What is left here is the colour, which is this
+   surface's, and the fixed width that stops the label sliding as the glyph swaps. */
+.board-chevron { color: var(--accent); width: 0.8em; }
+
+.board-head { display: flex; align-items: center; gap: var(--s-4); }
+/* The archive toggle appears only once a board has archived cards, so it never advertises a
+   drawer with nothing in it. `Chip pill fill` owns the box and `vb-readout` the mono face — the count
+   in it is a measured fact, which is the same reason the board's own count badge borrows the treatment.
+   What is left is where it sits in the head. */
+.board-archive { flex: 0 0 auto; }
+.board-archive:hover { color: var(--accent); border-color: var(--accent); }
+.board-archive.active { color: var(--accent); border-color: var(--accent); box-shadow: var(--glow); }
+
+/* A GRID OF `--max-cols` TRACKS, not a flex row, so every board's columns are the same width and their
+   edges line up down the page. The boards are stacked and read as one table; three independently-flexing
+   rows put a 79px step between them (measured: Features 383px, Product and Engineering 304px).
+   `minmax(var(--col-w), 1fr)` keeps the basis as a floor and shares the slack, so there is no void at a
+   wide viewport and a many-column project still overflows into the scroll this container already had.
+   A board with fewer columns than the widest simply leaves its last tracks empty, which is honest — the
+   Features board really does have one fewer column than the other two. */
+.board-columns {
+  display: grid;
+  /* THE FLOOR IS THE SMALLER OF WHAT WE WANT AND WHAT FITS.
+     `minmax(var(--col-w), 1fr)` alone forced a horizontal scroll in the DEFAULT configuration: with the
+     copilot open the board area is 1200px, and five tracks at the 288px floor the `min-width: 1160`
+     query sets need 1284px before gaps. That query was written for a fixed flex row, where a wider
+     column cost nothing; against a shared track count it raises the floor exactly when there are more
+     tracks to fit.
+     `--track-fit` is what one track can actually have at this width. Clamping between a readable floor
+     and `--col-w` means: fit exactly when it fits, grow past it via `1fr` when there is slack, and
+     scroll only once a track would be too narrow to read — which is the one case where scrolling is
+     the right answer rather than a symptom.
+
+     THE FLOOR IS 180px, AND IT IS A COLUMN'S OWN MIN-CONTENT WIDTH ROUNDED UP. Measured in chromium
+     off a `width: min-content` clone: `.column` is 179px, driven by its head at 177px — the title's
+     letter-spacing plus the bracket pseudo-elements, the count and the `+`. A `.tile` is only 93px, so
+     the head is what sets the floor and not the cards.
+     It was 200px, which is above anything on the board needs and was the direct cause of a clipped
+     column at 1440px: five tracks at 200px plus four gaps want 1044.8px and the board area is 1005px
+     with the copilot open, so the grid overflowed by 40px for an 8px-per-track shortfall. At 180px the
+     five columns FIT at 1440px with nothing cut, and scroll as one region at 1200px and 900px, where
+     the board area is 765px and 465px against the 944.8px five legible columns need.
+
+     THIS NUMBER WAS 144px FOR ONE ITERATION AND THAT WAS A MEASUREMENT ERROR WORTH RECORDING, because
+     the instrument that produced it was the very blind spot this phase exists to close. 144px was
+     chosen by sweeping the floor and counting TEXT elements wider than their own box, which reports 0
+     findings at every floor from 144px to 200px — it cannot see this fault at all. What it missed:
+     below 180px the column HEAD overflows its own box, and the `+` button renders outside the
+     column's border in the gutter between columns. A flex container with no text of its own and
+     `overflow: visible` neither clips nor scrolls, so no walk in the harness examined it. Screenshots
+     at 1200px and 900px showed it immediately. Check 9 now asserts the head fits inside the column at
+     all three widths, so this floor cannot be lowered past it again. */
+  --track-fit: calc((100% - (var(--max-cols, 4) - 1) * var(--board-gap)) / var(--max-cols, 4));
+  grid-template-columns: repeat(
+    var(--max-cols, 4),
+    minmax(clamp(180px, var(--track-fit), var(--col-w)), 1fr)
+  );
+  gap: var(--board-gap);
+  align-items: flex-start;
+  /* NO `overflow-x` AND NO BOTTOM PADDING. Both belonged to the scroller this row used to be: the
+     padding was clearance for a scrollbar of its own. Overflow now reaches `.boards`, which is the
+     board's one scroll region — see there for why three were wrong. */
+}
+
+/* ---------- Archive drawer ---------- */
+/* Deliberately not column-shaped: archived cards have no position, and a row of full tiles
+   would read as a fifth column you could drag into. */
+/* A `Panel` with the `raised` variant. The DASH is the one thing it keeps of its own box, and it is
+   the treatment rather than the geometry: a drawer of archived cards is a temporary thing hanging off
+   the board, and the dashed edge says so. A border STYLE cannot shift the row — the width is still the
+   primitive's 1px — which is the same argument the ghost Button's dash rests on. */
+.archive-drawer {
+  gap: var(--s-2);
+  max-height: 14rem;
+  overflow-y: auto;
+  border-style: dashed;
+  padding: var(--s-4);
+}
+/* A `Panel` with the `inset` variant — and the one of the ten whose padding the primitive did not move:
+   `var(--s-3) var(--s-4)` is what this row already said, which is why it is the value `inset` took. All
+   that is left is how the row arranges its three cells. */
+.archive-item {
+  display: flex;
+  align-items: center;
+  gap: var(--s-4);
+}
+.archive-meta { display: flex; align-items: baseline; gap: var(--s-4); flex: 0 0 auto; }
+.archive-title {
+  flex: 1; min-width: 0; text-align: left;
+  background: transparent; border: none; color: var(--text);
+  /* NO `font-size`: it declared `var(--t-body)`, which is what `body` already gives it — the same dead
+     declaration Phase 4 found on `.cv-link`. The type reset above turns the UA's 13.3333px into
+     `inherit`, so the class had nothing to add. */
+  cursor: pointer; font-family: inherit;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.archive-title:hover { color: var(--accent); }
+.archive-actions { display: flex; align-items: center; gap: var(--s-3); flex: 0 0 auto; }
+/* `.archive-restore` shared this rule and is now `default` — hover included, which `.vb-btn-default`
+   already says. The `<select>` beside it is `.vb-input` as of Phase 9; the muted ink is all it kept,
+   because a secondary restore must not read as loudly as the button it sits next to. */
+.archive-column { color: var(--muted); }
+
+/* ---------- Column ---------- */
+/* `.column` IS A `Panel` WITH THE `raised` VARIANT AND A HEADER, and it has no rule of its own left.
+   What used to be here: a `--panel` ground, `1px solid var(--border)`, `border-radius: var(--radius)`,
+   `display: flex; flex-direction: column` and `min-width: 0`. `Panel`'s `raised` variant is every one
+   of them at the same values, and `.column-head` is `.vb-panel-head`.
+   The two arguments the old comment carried are both still stated, because deleting a rule must not
+   delete its reason: a column GROWS to share the width and never shrinks below a floor — that is
+   `minmax(clamp(...), 1fr)` on the track above, and it replaced a fixed `flex: 0 0 var(--col-w)` basis
+   that left ~400px of void on a 1600px viewport. And `min-width: 0` is there because a grid item's
+   automatic minimum is its content, which would otherwise let a long unbroken card title push its
+   track past the share the grid gave it; that guard now lives on `.vb-panel`, once, for every
+   Panel. */
+.column-over { border-color: var(--accent); box-shadow: var(--glow); }
+.column-title {
+  font-family: var(--font-display);
+  font-size: var(--t-body);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+.column-title::before { content: "["; color: var(--accent); margin-right: 0.3em; }
+.column-title::after { content: "]"; color: var(--accent); margin-left: 0.3em; }
+/* `bare` owns the box and the hover; `push` is where it sits. */
+.column-body {
+  padding: var(--tile-gap);
+  display: flex;
+  flex-direction: column;
+  gap: var(--tile-gap);
+  overflow-y: auto;
+  /* Show ~3 fixed-height cards, then scroll inside the column. */
+  max-height: calc(var(--tile-h) * 3 + var(--tile-gap) * 4);
+  /* AND THE SCROLLBAR IS THIS COLUMN'S OWN, louder than the app's, because the app's could not do the
+     one job it has here. The global rule is `thin` with a `--border` thumb — furniture, correctly quiet
+     on a log or a chat, where you already know there is more text below. A column is the opposite case:
+     the max-height above is what hides the fourth card, so this scrollbar is the ONLY thing on screen
+     that says a fourth card exists. The owner reported reading three cards and forgetting the rest, on
+     every column, which is that. Wider, and a thumb at `--muted` against a `--panel` track: two tokens
+     apart rather than the one the `--border`-on-`--panel` pair was, so the trough is visible even when
+     the thumb is at the top. */
+  scrollbar-width: auto;
+  scrollbar-color: var(--muted) var(--panel);
+}
+/* AND THE SAME TWO CLAIMS IN THE OTHER VOCABULARY, because two engines read two different ones and this
+   is the one element where the difference is the whole point.
+   `background-color` and NOT the `background` shorthand, in both thumb rules. The shorthand resets
+   `background-clip` to `border-box`, so writing the hover colour with it would silently undo the
+   transparent-border inset the rule above it draws — the thumb would jump 6px wider under the pointer.
+   WHAT THE HARNESS CAN AND CANNOT SEE, recorded here so nobody reads check 12 as more than it is:
+   headless Chromium draws OVERLAY scrollbars whatever it is launched with — `offsetWidth - clientWidth`
+   is 0 on a scrolling element under `--disable-features=OverlayScrollbar` as well as without it, which
+   was measured rather than assumed. So the RENDERED width of this scrollbar is not asserted anywhere.
+   What check 12 does assert is that these declarations land on `.column-body` and are not the app-wide
+   `*` rule's `thin`/`--border` reaching it by inheritance, which is the way this would actually break. */
+.column-body::-webkit-scrollbar { width: 14px; }
+.column-body::-webkit-scrollbar-track { background-color: var(--panel); }
+.column-body::-webkit-scrollbar-thumb {
+  background-color: var(--muted);
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+.column-body::-webkit-scrollbar-thumb:hover { background-color: var(--accent); }
+.column-empty {
+  color: var(--muted); font-size: var(--t-small); text-align: center;
+  padding: 0.9rem var(--s-4); border: 1px dashed var(--border); border-radius: var(--r-md);
+}
+
+/* ---------- Card tile (fixed size) ---------- */
+/* A `Panel` with the `inset` variant. The 2px ACCENT LEFT EDGE stays here and is the one thing about
+   this box the surface decides: it is 2px where the primitive's is 1px, and it is what says which board
+   a card belongs to. `cursor: pointer` is the surface's too — a tile is a `role="group"` rather than a
+   `<button>`, so `button.vb-panel`'s pointer does not reach it. */
+.tile {
+  height: var(--tile-h);
+  flex: 0 0 var(--tile-h); /* don't let flex shrink the card — overflow into the column scroll instead */
+  overflow: hidden;
+  border-left: 2px solid var(--accent);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+.tile:hover { border-color: var(--accent); box-shadow: var(--glow); }
+.tile-head { display: flex; align-items: center; gap: var(--s-3); }
+/* A `✕` that ARCHIVES goes red on hover rather than accent — a colour the surface owns, and the one
+   thing `bare` cannot decide for it. Reached through the row, because the `margin-left: auto` that used
+   to be `.tile-archive`'s whole other declaration is now `push`. */
+.tile-head > .push:hover:not(:disabled) { color: var(--danger); }
+/* ONE LINE, ellipsised — and it was a two-line clamp until the owner measured what that actually drew.
+   A `.tile` is a FIXED `--tile-h`, and the title's second line was the first thing past the budget once
+   the head, the summary's two lines and the tag row had taken theirs: the clamp allowed a line the box
+   then cut through the middle of, so a long title rendered as one line of text and one line of half
+   glyphs. A row that cannot be read is worse than a row that is not there, so the clamp now matches
+   what the box can actually show and the rest goes to `…`. */
+.tile-title {
+  font-size: var(--t-body); font-weight: 600; line-height: 1.25;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.tile-summary {
+  color: var(--muted); font-size: var(--t-small); line-height: 1.3;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.tile-group {
+  font-size: var(--t-micro); color: var(--accent-2);
+  text-transform: uppercase; letter-spacing: 0.06em;
+}
+.tile-tags { display: flex; flex-wrap: wrap; gap: var(--s-2); margin-top: auto; overflow: hidden; max-height: 1.3rem; }
+/* `Chip pill neutral` owns the box and the ink. The ground is the one thing a tag still decides:
+   `--panel` is a shade off the `--panel-2` a tile is drawn on, where `fill`'s `--panel-2` would make
+   the tag disappear into the card. */
+.tag { background: var(--panel); }
+/* A tag on a tile is a real button wherever it can filter the board (CardTile's onTag), and a `Chip`
+   may be one. The cursor and the inherited face are `button.vb-chip`'s now; the hover is the tile's. */
+.tag-btn:hover { color: var(--accent); border-color: var(--accent); }
+
+/* ---------- Tag filter bar ---------- */
+.tag-filter { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-3); }
+/* `Chip as="button" pill fill` plus `vb-readout`: the box, the ground and the mono face all come from
+   the primitives, and what the filter bar still decides is the two states below. */
+.tag-chip:hover { color: var(--accent); border-color: var(--accent); }
+.tag-chip.active {
+  color: var(--on-fill); background: var(--accent-fill);
+  border-color: var(--accent); box-shadow: var(--glow);
+}
+/* The count is quieter than the tag it counts. A DESCENDANT RULE and not a class of its own: the only
+   other thing `.tag-chip-count` said was `font-size: var(--t-micro)`, which is what it already
+   inherited from the chip around it — a dead declaration of the kind Phase 4 found on `.cv-link` and
+   Phase 5b on `.archive-title`. */
+.tag-chip > span { opacity: 0.7; }
+/* The underline is what makes it read as a link rather than a control, which is deliberate here: it
+   undoes a filter rather than doing anything to the project. Not a geometry. */
+.tag-filter-clear { text-decoration: underline; }
+
+/* ---------- Responsive: 3 thresholds on the board area (reacts to copilot too) ---------- */
+@container vbboards (max-width: 720px) {
+  .boards { --col-w: 208px; --tile-h: 96px; }
+  .tile-title { font-size: var(--t-body); }
+}
+@container vbboards (min-width: 1160px) {
+  .boards { --col-w: 288px; --tile-h: 124px; }
+}
+

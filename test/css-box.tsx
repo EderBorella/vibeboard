@@ -13,10 +13,21 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const WEB = join(process.cwd(), 'web', 'src');
-// PRIMITIVES FIRST, exactly as main.tsx imports them: a surface may override a primitive's colour at
-// equal specificity, so source order is what decides. Reading them the other way round would report
-// the primitive's value where the surface's is what renders.
-const SHEETS = ['ui/primitives.css', 'styles.css'].map((f) => readFileSync(join(WEB, f), 'utf8'));
+// IN THE APP'S OWN CASCADE ORDER, READ OUT OF THE APP'S OWN LIST. A surface may override a primitive's
+// colour at equal specificity, so source order is what decides — reading them the other way round would
+// report the primitive's value where the surface's is what renders.
+//
+// `styles.ts` IS THE ORDER, and taking it from there rather than restating it is the point: the split of
+// `styles.css` made this 48 files, and a resolver carrying its own copy of a 48-line cascade would
+// silently disagree with the app the first time a phase inserts a sheet. The two token files are read
+// separately below, so they are the only ones dropped.
+const SHEET_ORDER = [
+  ...readFileSync(join(WEB, 'styles.ts'), 'utf8').matchAll(/^\s*import\s+'\.\/([^']+\.css)';/gm),
+].map(([, file]) => file);
+const TOKEN_FILES = ['design/tokens.css', 'design/themes.css'];
+const SHEETS = SHEET_ORDER.filter((f) => !TOKEN_FILES.includes(f)).map((f) =>
+  readFileSync(join(WEB, f), 'utf8'),
+);
 
 // The geometry tokens, resolved to the pixel values design/tokens.css gives them, so a rule that moves
 // from `var(--radius)` to `var(--r-lg)` reads as the same 10px it renders as. Colour tokens are left as
@@ -33,7 +44,18 @@ const SHEETS = ['ui/primitives.css', 'styles.css'].map((f) => readFileSync(join(
 // resolver is inert, every box assertion compares one literal to the same literal, and the suite passes
 // while asserting nothing. Not one expectation was rewritten to a `var()` string; the resolver was
 // widened instead.
-const TOKEN_FILES = ['design/tokens.css', 'design/themes.css'];
+//
+// THE SPLIT IS THE SAME TRAP ONE LAYER OUT, which is why the sheet list is no longer written here
+// either: a resolver reading no sheets at all resolves every box to `{}`, and an empty box passes every
+// assertion of the form "if it declares X then X is right".
+const SHEET_FLOOR = 20;
+if (SHEETS.length < SHEET_FLOOR) {
+  throw new Error(
+    `css-box read ${SHEETS.length} stylesheet(s) out of web/src/styles.ts, against a floor of ` +
+      `${SHEET_FLOOR}. The resolver is inert: every box would resolve to {} and every box assertion ` +
+      `would compare nothing to nothing.`,
+  );
+}
 // The names worth resolving to a value rather than left as a claim: the three scales, the two heights,
 // the rule width, the tracking, the elevation and the four layers.
 const GEOMETRY = /^--(t|s|r)-|^--(ctl-h|mark-h|rule|track|lift)$|^--z-/;
@@ -112,7 +134,7 @@ function safeMatches(el: Element, selector: string): boolean {
 }
 
 // A COARSE SPECIFICITY, and it is not decoration: it was added because a flat source-order flatten got
-// a real answer wrong. `button, input, select, textarea { font-size: inherit }` lives in styles.css,
+// a real answer wrong. `button, input, select, textarea { font-size: inherit }` lives in design/reset.css,
 // which is loaded AFTER ui/primitives.css — so once the input box moved into the primitive, source order
 // alone reported every text box in the app as `font-size: inherit`, while the browser gives the class
 // (0,1,0) the win over the type selector (0,0,1). Ids, then classes/attributes/pseudo-classes, then

@@ -1,0 +1,21 @@
+/* The Explorer's tree. One flat list of rows indented by depth, not nested elements, so tab order
+   and reading order are the same thing. Wider than the control list: paths run deep. */
+.explorer-list { width: 320px; gap: 0.1rem; }
+.explorer-head { position: sticky; top: -0.75rem; background: var(--wash); z-index: 1; padding-top: 0.15rem; }
+/* `Panel`'s `flat` padding is symmetric, and the 2px this rule shaved off the right was not a
+   decision anybody made. `gap` is layout and stays. */
+.explorer-item { gap: var(--s-2); }
+/* Fixed width so names line up whether or not a row has a twisty. */
+/* The size is `.vb-twist`'s. The box widens with it: at 0.7rem an 11px glyph fitted and a 15px one did
+   not, and the overflow pushed every name in the tree half a character to the right. */
+.explorer-twist { width: 0.9rem; flex-shrink: 0; color: var(--muted); }
+.explorer-icon { flex-shrink: 0; font-size: var(--t-small); }
+.explorer-item > .vb-readout { flex-shrink: 0; }
+/* The tail of a capped listing. Deliberately not styled as an error — the folder is fine, the
+   listing is simply not all of it. */
+.explorer-more { font-size: var(--t-micro); padding: 0.2rem var(--s-4); }
+.explorer-actions { display: flex; gap: 0.1rem; }
+.explorer-actions button:disabled { opacity: 0.3; cursor: not-allowed; }
+/* Where a dragged entry would land. */
+.explorer-over { background: var(--panel-2); border-color: var(--accent); box-shadow: var(--glow); }
+

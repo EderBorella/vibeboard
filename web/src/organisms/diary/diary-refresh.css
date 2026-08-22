@@ -1,0 +1,7 @@
+/* A REFRESH IS NOT THE MAIN ACTION IN ITS PANE, and it was being drawn as one. `.diary-refresh` had no
+   rule at all, so it stretched to the width of its flex column: 690px in the Project Log and 1240px in
+   "What agents filed", which made a minor repeatable button the single most prominent element in each
+   pane — above the log it refreshes. `align-self: flex-start` is the idiom this stylesheet already uses
+   for exactly this, on `.sandbox-action > .vb-btn`. */
+.diary-refresh { align-self: flex-start; }
+

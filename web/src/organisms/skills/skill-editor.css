@@ -1,0 +1,12 @@
+/* ---------- Skill editor (fields view in Project Control) ---------- */
+.skill-editor { display: flex; flex-direction: column; gap: var(--s-4); padding: 0.8rem 1.1rem; overflow-y: auto; }
+.skill-row { display: flex; align-items: center; gap: var(--s-4); }
+/* The rail label and the box are the primitive's. What the editor still says is that a field takes the
+   slack beside its label, and that the prompt is a monospace box you can drag taller. */
+.skill-row > .vb-input { flex: 1; min-width: 0; }
+.skill-editor textarea.vb-input { resize: vertical; font-family: var(--font-mono); }
+.skill-scope { border: 1px solid var(--border); border-radius: var(--r-md); padding: var(--s-3) 0.7rem var(--s-4); margin: 0; }
+.skill-scope legend { font-size: var(--t-small); color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; padding: 0 var(--s-2); }
+.skill-scope .vb-hint { margin: 0 0 0.3rem; }
+.skill-foot { display: flex; justify-content: flex-end; }
+

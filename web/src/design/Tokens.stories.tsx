@@ -162,7 +162,8 @@ function loadedCss(): string {
 // rather than on a closing bracket — counting `var(--tone)` misses the two live fallback declarations.
 //
 // AND THE NAME HAS TO END WHERE THE MATCH ENDS, which `\b` does not give: `-` is a non-word character,
-// so `var(--track\b` matched `var(--track-fit)` at styles.css:347 and this page reported `--track` — a
+// so `var(--track\b` matched `var(--track-fit)` at organisms/board/board.css:101 and this page reported
+// `--track` — a
 // token with zero consumers, signed for in `UNCONSUMED` until Phase 3 — as spent once. A wrong count here
 // is worse than none: every N−1 argument for the token set is made from these numbers.
 const consumersOf = (css: string, name: string): number =>

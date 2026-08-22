@@ -16,7 +16,7 @@
  * margin — or for a non-geometry treatment a surface genuinely owns (monospace, uppercase, a
  * letter-spacing, a state colour outside the five tones). Not for a padding.
  *
- * Loaded BEFORE styles.css, so a surface can still override a primitive's COLOUR at equal
+ * Loaded BEFORE every surface sheet — see web/src/styles.ts — so a surface can still override a primitive's COLOUR at equal
  * specificity — the emergency stop is a `default` button with a danger hover, a `✕` that deletes goes
  * red, and the connection light tints its own dot. What stops that override becoming a geometry is the
  * check, not the cascade.
@@ -108,7 +108,7 @@
 
 .vb-dot-pulse { animation: vb-dot-pulse 1.6s ease-in-out infinite; }
 @keyframes vb-dot-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
-/* Named as well as caught by the blanket `*` rule in styles.css: that one shortens the duration to
+/* Named as well as caught by the blanket `*` rule in design/motion.css: that one shortens the duration to
    0.01ms, which is a pulse nobody sees but still a compositor layer per frame. */
 @media (prefers-reduced-motion: reduce) {
   .vb-dot-pulse { animation: none; }
@@ -124,7 +124,7 @@
    here they are all (0,1,0) and the later rule wins, which is the cascade doing what it is for.
    On a `<span>` every one of these renders exactly what a span already rendered: a span inherits its
    face and its line-height, and has no ground. `font-size` needs no line: `.vb-chip` at (0,1,0) already
-   outranks styles.css's `button, input, select, textarea` reset at (0,0,1). */
+   outranks design/reset.css's `button, input, select, textarea` reset at (0,0,1). */
 .vb-chip {
   display: inline-flex; align-items: center; gap: var(--s-2);
   border: 1px solid var(--border); border-radius: var(--r-sm);

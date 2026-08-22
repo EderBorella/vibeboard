@@ -1,0 +1,4 @@
+/* THE FIELD IS A PRIMITIVE — see ui/Field.tsx and the Field block of ui/primitives.css. What was here:
+   the column, the label's size and colour, and the box on every input and textarea inside it. A textarea
+   inside a Field still resizes vertically, which is the one thing the primitive leaves to the surface. */
+.vb-field textarea { resize: vertical; }

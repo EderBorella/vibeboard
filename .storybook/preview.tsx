@@ -1,14 +1,11 @@
 import type { Decorator, Preview } from '@storybook/react-vite';
 import { useEffect } from 'react';
-// THE SAME FOUR FILES THE APP LOADS, IN THE SAME ORDER, and the order is load-bearing rather than tidy:
-// `primitives.css` comes BEFORE `styles.css` so a surface can still override a primitive's COLOUR at
-// equal specificity — the emergency stop is a ghost button with a danger hover, the connection light
-// tints its own dot. Loading them the other way round here would make this workbench show a cascade the
-// app does not have, which is worse than showing nothing.
-import '../web/src/design/tokens.css';
-import '../web/src/design/themes.css';
-import '../web/src/ui/primitives.css';
-import '../web/src/styles.css';
+// THE SAME SHEETS THE APP LOADS, IN THE SAME ORDER, and it is the app's own list rather than a copy of
+// it: the order is load-bearing — `ui/primitives.css` comes before every surface sheet so a surface can
+// still override a primitive's COLOUR at equal specificity — and a workbench showing a cascade the app
+// does not have is worse than one showing nothing. Fifty files is far past what a second copy could
+// be trusted to keep in step, so there is only one. See web/src/styles.ts.
+import '../web/src/styles';
 
 // EVERY STORY IN EVERY THEME, because a geometry claim about one theme is a claim about none — the rule
 // `visual/support/fixtures.ts` already runs the browser harness by. The three are not skins: `themes.css`

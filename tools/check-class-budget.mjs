@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 //
-// Two claims about the CLASS SELECTORS in web/src/styles.css and web/src/ui/primitives.css.
+// Two claims about the CLASS SELECTORS in every stylesheet under web/src.
 //
 //   1. Every one of them is referenced from web/src — literally, or through a class name composed at
 //      run time from a prefix and a value. BLOCKING at zero.
@@ -48,7 +48,11 @@ import { codeOf, lineOf, walk as walkFiles } from './lib/source.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const CORPUS = 'web/src';
-const SHEETS = [join('web', 'src', 'styles.css'), join('web', 'src', 'ui', 'primitives.css')];
+// EVERY SHEET IN THE CORPUS, DISCOVERED RATHER THAN LISTED. It was the two names `styles.css` and
+// `ui/primitives.css`; the split made those 48 files, and a hand-written list of 48 is a list that goes
+// stale the first time a phase adds a layer sheet — which would drop its classes out of the count
+// silently, and the count is a ratchet.
+const PRIMITIVES = join('web', 'src', 'ui', 'primitives.css');
 
 // THE RATCHET, and the number is what the tree holds today rather than what the plan wants. Phase 5 took
 // the union from 443 to this; docs/design-system.md's target is **183** and it is not reached — the
@@ -98,7 +102,7 @@ const PARSE_FLOOR = 40;
 
 // The walk, the line counter and the comment blanker are `tools/lib/source.mjs`; the rule scanner and
 // the selector reader are `tools/lib/css.mjs`. One copy each — see that file's header.
-// A SMOKE ALARM, NOT A TARGET: two css files and a hundred components, floored an order of magnitude
+// A SMOKE ALARM, NOT A TARGET: 48 css files and a hundred components, floored an order of magnitude
 // below each so deleting a file never fails the run. See walk() in lib/source.mjs for why it is here.
 const FLOOR = { '.css': 2, '.ts': 10, '.tsx': 20 };
 const walk = (ext) => walkFiles(ROOT, CORPUS, ext, FLOOR[ext] ?? 1);
@@ -106,8 +110,8 @@ const walk = (ext) => walkFiles(ROOT, CORPUS, ext, FLOOR[ext] ?? 1);
 // THE METHOD IS THE DOCUMENT'S, and it has to be: three different answers have been quoted for this
 // property, and a target expressed against a number nobody can reproduce is not a target. Strip
 // comments, take the selector text before each `{`, skip at-rule preludes, extract every `.name` token,
-// count the DISTINCT names — and the union across both stylesheets, because `vb-btn` and `vb-dot` are
-// named in styles.css too.
+// count the DISTINCT names — and the union across every stylesheet, because `vb-btn` and `vb-dot` are
+// named by the surfaces too.
 export function classesIn(css) {
   // `rulesOf` is the brace matcher, `shapedRules` drops the at-rule preludes and `classesOf` reads the
   // `.name` tokens — the same three the other gates use, so a selector this file counts is a selector
@@ -195,8 +199,17 @@ const allCode = sources.map((s) => s.code).join('\n');
 const prefixes = [...new Set(prefixesOf(allCode))];
 const vocabulary = vocabularyOf(allCode);
 
-const perSheet = SHEETS.map((file) => ({ file, names: classesIn(readFileSync(join(ROOT, file), 'utf8')) }));
+const perSheet = walk('.css').map((file) => ({
+  file,
+  names: classesIn(readFileSync(join(ROOT, file), 'utf8')),
+}));
 const union = new Set(perSheet.flatMap(({ names }) => [...names]));
+// The two numbers the record quotes, and they are still the two that mean something: what the primitives
+// name, and what the surfaces name between them. Printing 48 per-file counts would bury both.
+const primitives = perSheet.find(({ file }) => file === PRIMITIVES)?.names ?? new Set();
+const surfaces = new Set(
+  perSheet.filter(({ file }) => file !== PRIMITIVES).flatMap(({ names }) => [...names]),
+);
 
 // Where each dynamic prefix is composed, so a failing run can be read against the source rather than
 // against this file's opinion of it.
@@ -210,9 +223,8 @@ for (const { file, code } of sources) {
 const unreferenced = [...union].filter((cls) => !referenced(cls, sources, prefixes, vocabulary)).sort();
 
 console.log(
-  `class budget: ${union.size} distinct class selector(s) — ${perSheet
-    .map(({ file, names }) => `${file} ${names.size}`)
-    .join(', ')}`,
+  `class budget: ${union.size} distinct class selector(s) across ${perSheet.length} sheet(s) — ` +
+    `${PRIMITIVES} ${primitives.size}, the surfaces ${surfaces.size}`,
 );
 console.log(
   `dynamic composition: ${prefixes.length} prefix(es) resolved against ${vocabulary.size} quoted value(s) — ${[

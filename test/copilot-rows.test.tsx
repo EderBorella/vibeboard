@@ -71,7 +71,7 @@ describe('the copilot dock', () => {
   it('every row in the list resolves to a rule', () => {
     for (const row of ROWS) {
       const resolved = box(el(row));
-      expect(Object.keys(resolved).length, `.${row} matched no rule in web/src/styles.css`).toBeGreaterThan(
+      expect(Object.keys(resolved).length, `.${row} matched no rule in any sheet web/src/styles.ts loads`).toBeGreaterThan(
         0,
       );
     }

@@ -1,0 +1,47 @@
+/* THE SPLIT (decision 48). The diary is a 68ch reading column, so the right-hand half costs nothing that
+   was being used — and what agents filed belongs beside the narrative rather than behind another tab. */
+.log-split { flex: 1; min-width: 0; display: flex; overflow: hidden; }
+.filed {
+  flex: 0 1 42%; min-width: 0; overflow-y: auto; background: var(--wash);
+  border-left: 1px solid var(--border);
+  padding: 1.25rem 1.5rem; display: flex; flex-direction: column; gap: 1rem;
+}
+/* Narrow enough that the two columns stop being two columns: the diary keeps the width, and this stacks
+   under it rather than becoming a gutter neither half can be read in. */
+@media (max-width: 1100px) {
+  .log-split { flex-direction: column; overflow-y: auto; }
+  .filed { flex: none; border-left: none; border-top: 1px solid var(--border); }
+}
+
+.filed-list { list-style: none; display: flex; flex-direction: column; gap: 0.1rem; }
+/* THE ROLE THIS SURFACE GIVES ITS TONE: the left rail, and nothing else — the entry's own text stays
+   `--text` and `--muted`. Three `[data-state]` rules became this one declaration, and the claim they
+   carried is unchanged: an active finding is the one asking for something, and a dismissed one is kept
+   for what its reason says and must not read as still open.
+   `var(--warn, #b8860b)` DIED HERE. It was the last of that fallback in the tree — dead since every
+   theme defined `--warn`, and the comment 200 lines above at `.tile-suggestions` already said it had
+   been removed while it went on living on the next surface along.
+   `dismissed` moves from `--border` to `--muted`, which is the `neutral` tone: a rail the same colour as
+   every other border was not a state, it was the absence of one, and "dismissed" is a decision somebody
+   took. */
+.filed-entry {
+  display: flex; flex-direction: column; gap: 0.2rem;
+  padding: var(--s-4) 0 var(--s-4) 0.75rem;
+  border-left: 2px solid var(--tone, var(--border));
+}
+.filed-state {
+  font-family: var(--font-display); text-transform: uppercase; letter-spacing: 0.1em;
+  font-size: var(--t-micro); color: var(--text);
+}
+/* ONE CHIP PER LINE IN THIS COLUMN, because a row of them cannot be made to fit. A run id alone is
+   144px of a 266px line, so any second reference wraps — and the fix must not depend on how many
+   references the fixture happens to carry: with `run` and `card` the row fits and with `became` as well
+   it does not, which is a wrap no gate here would ever see. Stacked, they are a column of figures that
+   lines up on its left edge, which is the claim the readout makes; wrapped, they were the one it
+   refuses. The diary's own `.diary-about` stays a row: it has 408px. */
+.filed-entry .diary-about { flex-direction: column; align-items: flex-start; }
+.filed-title { font-size: var(--t-lead); line-height: 1.5; color: var(--text); }
+.filed-text { font-size: var(--t-body); line-height: 1.5; color: var(--muted); }
+/* Why it was said no to. Quiet, and italic so it does not read as part of the finding itself. */
+.filed-reason { font-size: var(--t-body); line-height: 1.5; color: var(--muted); font-style: italic; }
+

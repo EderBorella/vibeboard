@@ -1,0 +1,14 @@
+.settings-section { font-family: var(--font-display); text-transform: uppercase; letter-spacing: 0.12em; font-size: var(--t-small); color: var(--accent); margin-top: 0.4rem; border-bottom: 1px solid var(--border); padding-bottom: var(--s-2); }
+.settings-section:first-child { margin-top: 0; }
+/* A hint says how something works; this says what will be refused. Ochre rather than danger: nothing
+   is broken yet, and a save that is about to be rejected must not look like one that already failed. */
+/* Each blocker is a sentence naming what to change, so they are set as prose rather than as status
+   chips — there is nothing to scan, only something to read and do. */
+.blockers { list-style: none; display: flex; flex-direction: column; gap: var(--s-2); font-size: var(--t-small); }
+.blockers li { padding-left: 0.9rem; position: relative; color: var(--text); line-height: 1.5; }
+.blockers li::before { content: "→"; position: absolute; left: 0; color: var(--warn, var(--danger)); }
+.ready-ok { font-size: var(--t-small); color: var(--accent); }
+
+.settings-row { display: flex; gap: 0.75rem; }
+.settings-row .vb-field { flex: 1; }
+

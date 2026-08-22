@@ -1,0 +1,25 @@
+/* Inline editing: a field looks like text until hovered, and becomes an input on click. */
+.inline-view {
+  background: transparent; border: 1px solid transparent; border-radius: var(--r-md);
+  color: inherit; font: inherit; text-align: left; cursor: text;
+  padding: 0.1rem var(--s-3); margin: -0.1rem -0.35rem; width: 100%;
+  display: block;
+  /* A <button> is a flex item whose automatic minimum size is its content on ONE line, and that
+     beats width:100% — which is why an editable description ran off the pane while the body (a div)
+     wrapped. Without this, the fix is invisible in the read-only view and absent in the edit one. */
+  min-width: 0;
+}
+.inline-view:hover { border-color: var(--border); background: var(--bg); }
+.inline-edit {
+  width: 100%; background: var(--bg); color: var(--text);
+  border: 1px solid var(--accent); border-radius: var(--r-md);
+  padding: 0.1rem var(--s-3); font: inherit; font-family: inherit; resize: vertical;
+}
+.inline-edit:focus { outline: none; }
+/* The title keeps its display face while editable. */
+.cv-title.inline-view, .cv-title.inline-edit { font-family: var(--font-display); font-size: var(--t-title); }
+.cv-group.inline-view { width: auto; display: inline-block; }
+.cv-tags-edit { min-height: 1.4rem; }
+.cv-links .vb-label { display: flex; align-items: center; gap: var(--s-4); }
+.cv-link-edit { text-decoration: underline; }
+

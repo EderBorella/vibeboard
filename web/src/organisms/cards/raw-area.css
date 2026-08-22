@@ -1,0 +1,4 @@
+/* The face, because a card's file is machine text. The BOX is `.vb-input`'s as of Phase 9, and before
+   that there was none: a whole file in the browser's own textarea chrome. `font-size` went with it — the
+   primitive says `--t-body` and this restated it. */
+.raw-area { font-family: var(--font-mono); }

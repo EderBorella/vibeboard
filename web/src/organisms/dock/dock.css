@@ -1,0 +1,37 @@
+/* ---------- Utility dock (bottom of the work column) ---------- */
+.dock {
+  flex: 0 0 auto;
+  display: flex; flex-direction: column;
+  min-height: 0;
+  border-top: 1px solid var(--border);
+  background: var(--panel);
+}
+.dock-strip { display: flex; align-items: center; gap: var(--s-2); padding: var(--s-2) var(--s-4); }
+.dock-tab {
+  display: inline-flex; align-items: center; gap: var(--s-3);
+  background: transparent; border: 1px solid transparent; color: var(--muted);
+  border-radius: var(--r-md); padding: 0.2rem var(--s-4); cursor: pointer;
+  font-family: var(--font-display); font-size: var(--t-small);
+  text-transform: uppercase; letter-spacing: 0.08em;
+}
+.dock-tab:hover { color: var(--text); }
+.dock-tab.active { color: var(--text); background: var(--panel-2); border-color: var(--border); }
+/* SIZED BY ITS CONTENT, capped at 38vh — EXCEPT where a pane exists to be filled.
+   It was `height: 38vh` outright, so the dock reserved 38% of the viewport whatever was in it: 414px of
+   empty panel to display the words "No card open." on a 1000px-tall screen, while the boards above had
+   471px for content needing 1438px.
+   Content-sizing alone was not enough, and the shortfall is worth stating because it is not obvious. A
+   flex child asking for `flex: 1` needs a parent with a DEFINITE height to take a share of. Under
+   `height: 38vh` the raw card editor filled the dock; under `max-height` there is nothing to
+   distribute, so it collapsed to exactly its `min-height` — measured at 128px holding 289px of text,
+   inside a dock body of 230px, with 250px of the cap going spare. The pane wanted to fill the box and
+   the box wanted to fit the pane.
+   So a pane whose whole job is to be filled says so, and gets the definite height back. Everything else
+   — the one-line empty states, the short lists — still gives its space away. */
+.dock-body { max-height: 38vh; min-height: 0; display: flex; }
+.dock-body:has(.raw-pane), .dock-body:has(.control-editor) { height: 38vh; }
+/* Spelled out: the UA rule for [hidden] loses to the display declarations above, so a hidden pane
+   would still be laid out. Both levels matter — the body when folded, a pane when another is up. */
+.dock-body[hidden], .dock-pane[hidden] { display: none; }
+.dock-pane { flex: 1; min-width: 0; min-height: 0; display: flex; }
+

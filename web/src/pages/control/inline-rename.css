@@ -1,0 +1,6 @@
+/* Inline rename: sits exactly where the list row was, so the row appears to become editable. Accent at
+   REST, because it only exists while it is being typed into — which is why the primitive's focus rule is
+   not what does the work here. */
+.control-list .vb-input, .explorer-list .vb-input { width: 100%; border-color: var(--accent); }
+.control-list .vb-input:focus, .explorer-list .vb-input:focus { box-shadow: var(--glow); }
+

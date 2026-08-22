@@ -1,0 +1,81 @@
+/* ---------- Reports (a card's run history, and one report) ---------- */
+/* Deliberately not link-shaped: chips and times, so it cannot be mistaken for the card links. */
+.reports { display: flex; flex-direction: column; gap: var(--s-2); border-top: 1px solid var(--border); padding-top: var(--s-4); }
+.report-row { display: flex; align-items: center; gap: var(--s-3); }
+/* A `Panel` with the `flat` variant. What is left is where the box sits and how it lays its parts out;
+   the undrawn box, the corner, the padding and the inherited type are the primitive's. */
+.report-open { flex: 1; display: flex; align-items: baseline; gap: var(--s-4); }
+.report-open:hover { border-color: var(--accent); }
+/* `Chip pill` owns the box and `vb-readout` on the `<Chip>` owns the monospaced face — a status is
+   machine vocabulary, so it says so by naming the primitive rather than by restating `font-family`,
+   which is the form `.board-archive`, `.tag-chip` and `.tab-badge` took in Phase 8. What is left is
+   the uppercase tracking and `flex: 0 0 auto`, which is the row's decision.
+   AND THE FIVE STATE RULES ARE GONE, which is Phase 13. They were the second-largest vocabulary and
+   the argument for keeping them was that the statuses "are not `tone`s" — `attention` was `--accent-2`
+   and `running`/`queued` were `--text`, "which is no tone at all". The measurement is what overturned
+   that: `running` on this chip was `--text` while the same word on the top bar's chip was `--accent-2`
+   and on the auto-pilot bar's rail was `--accent`. Three colours, one fact, three surfaces read
+   together. `attention` takes `--warn` — the attention token — and `running`/`queued` take `--accent`,
+   which is what "in flight" is worth everywhere else in the app. `failed`, `interrupted` and
+   `cancelled` are still one colour and still for the reason that was written here: what they have in
+   common is no report, and stopping a run is a decision rather than a fault but is still an ending that
+   produced nothing. The edge came from `.vb-chip-tone` and is a 50% mix rather than the flat token —
+   see ui/primitives.css. */
+.report-chip {
+  flex: 0 0 auto;
+  text-transform: uppercase; letter-spacing: 0.06em;
+}
+.report-skill { flex: 0 0 auto; font-size: var(--t-small); }
+/* Money reads as data, not prose: mono, so a card's runs line up down the column. */
+/* The cost and the elapsed time are `Readout`s. What the row still decides is that neither shrinks —
+   the summary beside them takes the slack. */
+.report-open > .vb-readout { flex: 0 0 auto; }
+.report-summary {
+  flex: 1; min-width: 0; color: var(--muted); font-size: var(--t-small);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+/* `ghost` Buttons, both of them, with the one colour each surface owns: Stop turns dangerous and
+   Dismiss turns accent. Everything else — the box, the quiet muted ink, the dashed border — is the
+   variant. They were two near-identical classes and `.reports-forgive` was a third copy of the same
+   declarations; its own comment said it "borrows the report row's Stop styling rather than inventing a
+   third small button", which is what this replaces. */
+.report-stop { flex: 0 0 auto; }
+.report-stop:hover:not(:disabled) { color: var(--danger); border-color: var(--danger); }
+/* A run that has been dealt with is history: still readable, no longer shouting. Dimmed rather than
+   greyed — repainting the chip muted threw away the one thing it encodes, which is HOW the run ended,
+   and left "Stopped" and "Needs you · dealt with" looking identical. The "· dealt with" text says it
+   was answered; the colour is still free to say what it was. */
+.report-row.resolved .report-chip { opacity: 0.6; }
+.report-row.resolved .report-skill { color: var(--muted); }
+.report-dismiss { flex: 0 0 auto; align-self: flex-start; }
+
+.report { display: flex; flex-direction: column; gap: var(--s-4); overflow-wrap: anywhere; }
+.report-head { display: flex; align-items: center; gap: var(--s-4); }
+.report-title { margin: 0; font-family: var(--font-display); font-size: var(--t-lead); }
+.report-meta { display: flex; flex-wrap: wrap; gap: 0.2rem 1rem; margin: 0; font-size: var(--t-small); }
+.report-meta div { display: flex; gap: var(--s-3); }
+.report-meta dt { color: var(--muted); }
+/* Every value in this list is a `Readout` `plain` — see runs/ReportPane.tsx. What is left is the
+   margin a `<dd>` arrives with. */
+.report-meta dd { margin: 0; }
+.report-lead { margin: 0; font-size: var(--t-lead); padding-left: 0.7rem; border-left: 3px solid var(--accent); }
+.report-note { margin: 0; font-size: var(--t-body); color: var(--accent-2); }
+.report-prompt { margin: 0; font-size: var(--t-body); color: var(--muted); }
+.report-prompt-label { text-transform: uppercase; letter-spacing: 0.06em; font-size: var(--t-micro); }
+.report-body { border-top: 1px solid var(--border); padding-top: var(--s-3); }
+.report-created { display: flex; flex-direction: column; gap: 0.2rem; }
+.report-foot { display: flex; align-items: center; justify-content: flex-end; gap: var(--s-4); }
+
+/* Options on a report that needs attention. The agent's suggestions and the fixed ones look the
+   same on purpose — they all lead to the same editable prompt. */
+.options { display: flex; flex-direction: column; gap: var(--s-2); border-top: 1px solid var(--border); padding-top: var(--s-4); }
+.options-warn { margin: 0; font-size: var(--t-small); color: var(--danger); }
+/* Left-aligned because an option is a whole sentence. `.option-fixed { border-style: dashed }` WENT WITH
+   THE MIGRATION and its removal is a fix, not a casualty: this section's own comment says "the agent's
+   suggestions and the fixed ones look the same on purpose — they all lead to the same editable prompt",
+   and the dash was the one thing making them look different. Dashed also now means "explains", which a
+   button that starts a run does not. */
+.option-btn { text-align: left; }
+.options-close { display: flex; align-items: center; gap: var(--s-4); margin-top: 0.2rem; }
+.options-close-label { font-size: var(--t-small); color: var(--muted); margin-right: auto; }
+

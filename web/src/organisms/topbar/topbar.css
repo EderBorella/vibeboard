@@ -1,0 +1,150 @@
+/* ---------- Top bar ---------- */
+/* WRAPS RATHER THAN PUSHING ITS CONTROLS OFF THE EDGE.
+   It was one non-wrapping row, so at 820px the whole right-hand group — the theme select, the settings
+   gear, Switch project and the COPILOT TOGGLE — was simply off-screen. That is circular: the copilot
+   takes half the width at that size, and the one control that would give the board its space back had
+   scrolled out of reach. Screenshotted at 820px, which is where it was found.
+   Wrapping makes this two rows when it has to be. A taller header at a narrow width is a cost; an
+   unreachable control is a dead end. */
+/* BASELINE, not centre. The bar is a row of text at four different sizes — brand `--t-lead`, project
+   name `--t-body`, connection state `--t-small`, tab labels `--t-small` (measured before Phase 2
+   collapsed them onto the scale: 16, 13.6, 11.52 and 12.48px) — and `align-items: center` centres each item's
+   LINE BOX. A line box scales with its font, so centring boxes of different sizes puts their baselines at
+   different heights, which is what the eye actually reads. Measured with a zero-size inline probe (whose
+   bottom margin edge sits exactly on the baseline it joins): brand 28.09, name 26.59, state 26.59, tabs
+   27.09 — three distinct baselines within 1.5px, enough to read as "not quite lined up" without being
+   obviously broken.
+   The controls on the right stay centred: a <select> has a baseline of its own that has nothing to do with
+   the text beside it, and aligning to it drags the whole cluster. See .topbar-right below. */
+.topbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.75rem;
+  padding: var(--s-4) 1rem;
+  background: linear-gradient(var(--panel), var(--panel));
+  border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; z-index: 5;
+}
+/* The one thing in the bar that was never sized: it rode the UA's 16px, which is off the scale.
+   `--t-lead` is the nearest step, and it keeps the brand the largest text in the row — which is the
+   hierarchy the baseline alignment below was written to serve. */
+.brand {
+  font-family: var(--font-display);
+  font-size: var(--t-lead);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.22em;
+  color: var(--text);
+}
+.brand::before { content: "▚ "; color: var(--accent); }
+/* Truncates rather than forcing the row to wrap. A long project name is the most likely thing to make
+   the bar overflow, and it is the least important thing on it.
+   `max-width` is what makes that true, and the first version omitted it: measured with a 240-character
+   name at 1100px, the name truncated AND the bar still grew from 85px to 105px, because nothing stopped
+   it claiming 1068 of the 1100 first. `flex-wrap` resolves before shrinking, so without a cap the two
+   changes in that commit worked against each other. */
+.project-name {
+  color: var(--muted);
+  font-size: var(--t-body);
+  letter-spacing: 0.02em;
+  min-width: 0;
+  max-width: 22ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* `flex: 0 0 auto` so the escape hatches are the LAST thing to give way, never squeezed to nothing.
+   `align-self: center` opts this cluster out of the bar's baseline alignment: these are controls, not
+   prose, and a flex container donates its FIRST item's baseline — here a <select>, whose baseline is a
+   UA-defined thing unrelated to the words beside it. */
+/* THE ONE LAYOUT UTILITY IN THIS FILE, and it is a deliberate exception rather than the start of a set.
+   SEVEN classes existed whose entire content was `margin-left: auto` — `.column-add`, `.mp-modal-close`,
+   `.copilot-reset`, `.dock-collapse`, `.copilot-x`, `.tile-archive` and `.cards-raw` — which is seven
+   names for one declaration, and Phase 3 measured them as exactly that. Naming the thing they all say
+   ("this one goes to the far end of its row") is the merge; adding a second utility beside it is the
+   utility framework docs/design-system.md refuses, so there is not one. */
+.push { margin-left: auto; }
+
+.topbar-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  align-self: center;
+  gap: var(--s-4);
+  flex: 0 0 auto;
+}
+/* `.switch-btn` shared this and is now `default`; `.theme-select` was the `<select>` half of it, at four
+   call sites, and it is `.vb-input` as of Phase 9 — the pointer and the accent hover it declared are now
+   what primitives.css says about every select. The class died outright. */
+/* PRESSED, which is not one of the five voices: the copilot toggle is lit while the panel is open, and a
+   filled `primary` would make a view toggle look like the page's one action. A colour and a glow only. */
+.switch-btn.active { border-color: var(--accent); color: var(--accent); box-shadow: var(--glow); }
+/* The live-connection indicator: dot plus the state in words.
+   FIXED WIDTH, and that is the whole reason the label sits in its own element. The four states are
+   `open`, `closed`, `connecting` and `unauthorized`, so the text swings between 4 and 12 characters —
+   and this sits to the LEFT of the tabs, so every one of those changes would shove the tab row sideways
+   while you were aiming at it. `12ch` is the longest state name, stated in the unit that makes the number
+   mean something: widen this only if a fifth, longer state is added to ConnState in web/src/ws.ts.
+   `ch` is the advance of "0", and lowercase letters are narrower, so it has margin without measuring. */
+/* THE BASELINE GYMNASTICS ARE GONE WITH `.conn`, and the reason they existed is worth keeping because it
+   explains why nothing replaced them. The indicator was `align-items: baseline` with the dot opted out via
+   `.conn { align-self: center }`: a flex container donates the baseline of its first baseline-aligned
+   item, the dot comes first in the DOM, and an empty span's baseline is its bottom edge — so the whole
+   indicator hung off a circle unless the circle was excluded. As a `StatusChip` it is a drawn box that
+   centres its own contents, and `.pop-wrap` below is what sits on the row's baseline. */
+/* The anchor for any popover. `position: relative` on a wrapper rather than on the button, so the panel
+   is positioned against the whole control and is not clipped by the button's own box.
+   NO `align-self`, AND THE DELETED DECLARATION IS WORTH RECORDING WITH ITS OWN DEFENCE. It was
+   `align-self: baseline`, on the reason that "the one in the top bar sits in a baseline-aligned row" plus
+   the claim that it "is harmless anywhere else, since align-self only means anything to a flex or grid
+   child". The first half is true and the second half stopped being true the moment a second surface had a
+   popover: `.ap-bar-row` is `align-items: center`, and every chip in it was a flex child overriding that
+   row's own alignment. Measured on the live board — the state chip sat 2.88px above the centre line and the
+   agent chip 1.88px, against 0.00 for every button beside them, which is exactly what the owner could see.
+   WITHOUT THE DECLARATION EACH WRAPPER TAKES ITS OWN ROW'S RULE: baseline in the top bar, which is what the
+   original reason wanted and gets by inheritance, and centre on the auto-pilot bar. A default beats an
+   override that has to be right for every surface at once. */
+.pop-wrap { position: relative; display: inline-flex; flex: 0 0 auto; }
+/* THE BOX IS `StatusChip`'s NOW, and eleven declarations went with it. This rule used to undo the UA
+   button styles by hand — `background: none; border: 0; padding: 0; margin: 0` — set its own font-size
+   and letter-spacing, and declare `color: var(--tone, var(--muted))`, which is the one role the surface
+   was choosing and the one the primitive now chooses for all four indicators. `.vb-chip.vb-chip-tone`
+   makes the ink and the edge, `.vb-status` the step and the focus ring. See ui/StatusChip.tsx.
+   WHAT IS LEFT IS THIS ROW'S, and only this row's: the word is `text-align: left` inside its fixed box,
+   because a `<button>` centres its text by UA default — so the label sat 24px in from where the dot
+   leaves off and shuffled sideways as the state name changed length. The fixed width exists to stop the
+   TABS moving, not to make the label wander inside it. */
+.conn-status { text-align: left; }
+/* NO FIXED WIDTH, AND THE REASON IT HAD ONE IS WITHDRAWN RATHER THAN FORGOTTEN. It was `width: 12ch`,
+   sized to `unauthorized`, the longest name the light can report — so a reconnect could not change the
+   label's width and shove the tab row sideways while you were aiming at it. Measured, that reserved 91.6px
+   for a 40.8px word: half of the app's own health indicator was empty space to the right of it, inside a
+   drawn box that made the emptiness visible in a way a bare word never did.
+   THE TRADE IS RE-TAKEN, not overlooked. The tabs now shift by up to ~50px, but only on the transition
+   between `online` and one of the two longest failure names — a moment when the tab you were aiming at is
+   not the thing that just went wrong. Permanent slack in exchange for a rare jump was the wrong way round.
+   `nowrap` stays: the word must not break, whatever the box does. */
+.conn-text { white-space: nowrap; }
+/* NINE `[data-state]` RULES ARE GONE FROM HERE, and they were the largest of the six vocabularies. Six
+   words, four tokens, three of them for three shades of "not right" on one control: `--danger` for
+   `closed`, `--warn` for `offline`, `--accent-2` for `failing`. What each of them decided is now one row
+   in ui/state-tones.ts and the ink declaration on `.conn-status` above.
+   `online`, not `open`: the four socket states are transport words, and `open` describes a WebSocket
+   rather than anything a person is trying to do. `online`/`offline` is the pair that means something at
+   a glance — and `offline` is the one that is NOT about the connection at all: the server is right
+   there, the project simply cannot run anything because a dependency is missing.
+   THE THREE THAT NOW SHARE A COLOUR ARE DISTINGUISHED BY THE WORD, which is the bargain this control
+   already struck and stated: `--accent-2` and `--warn` are the SAME amber in two of the three themes,
+   so `failing` and `offline` already rendered identically there and the word was already what told them
+   apart. `closed` and `unauthorized` join `--danger` for the same reason — a colour cannot say which of
+   five remedies applies, and `.conn-text` plus the balloon are what do. That is also why `.conn-text` is
+   a fixed 12ch box sized to the longest name the light can report. */
+/* LAST OF THE `.conn-text` RULES, and the position is the point. At (0,2,0) it outranks the wrapper's
+   inherited ink and won wherever it was written, so this is a move and not a change — but written first
+   it was a descending-specificity trap: the next person adding a `.conn-status[data-state] .conn-text`
+   above would reasonably expect the later rule to win, and it would not. Hover deliberately drops the
+   state colour: while you are pointing at the indicator it is a control, not a status. */
+.conn-status:hover .conn-text { color: var(--text); }
+

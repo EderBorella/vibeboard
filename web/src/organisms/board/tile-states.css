@@ -1,0 +1,24 @@
+/* THREE STATE WORDS IN THREE TONES, ONE SHAPE. All three are `Chip`s now — `accent`, `warn` and `bad` —
+   and the tone carries the ink and the edge. Only two of the three ever declared a box, which is why no
+   shape census could see this family at all and why the distinction below is asserted by
+   test/chip-boxes.test.tsx instead: three tones a refactor could collapse into one is the defect this
+   phase exists not to ship, and the tones are MEASURED per theme there rather than trusted to differ
+   because they name different tokens.
+   The project-level barrier. The accent rather than ochre: this is not a warning, it is the card the
+   whole board is waiting on, and it should read as structure rather than as a problem. */
+.tile-setup {
+  text-transform: uppercase; letter-spacing: 0.08em; white-space: nowrap;
+}
+
+/* Work an agent found and deliberately did not do. Ochre, not the accent: a card carrying this is
+   not failing, but it is not plainly done either, and those two must not look the same. `tone="warn"`
+   is `--warn` with no fallback, where this rule carried `var(--warn, #b8860b)` — a fallback that has
+   been dead since every theme defined the token. */
+.tile-suggestions { white-space: nowrap; }
+
+/* A blocked task somewhere under this card. Danger rather than ochre, and the strongest of the three:
+   a story in Done carrying one has finished with a real failure inside it, which is a different fact
+   from work deliberately left behind. */
+.tile-problem { white-space: nowrap; }
+
+

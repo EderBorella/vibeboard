@@ -1,0 +1,55 @@
+/* The project log. A reading surface rather than a dashboard: one column, generous line height, and the
+   structure kept quiet so the prose is what the eye lands on. */
+.diary {
+  flex: 1; min-width: 0; overflow-y: auto; background: var(--wash);
+  padding: 1.25rem 1.5rem; display: flex; flex-direction: column; gap: 1rem;
+}
+.diary-head { display: flex; flex-direction: column; gap: var(--s-2); max-width: 68ch; }
+.diary-head h2 {
+  font-family: var(--font-display); text-transform: uppercase; letter-spacing: 0.1em;
+  font-size: var(--t-lead); color: var(--text);
+}
+.diary-lede { color: var(--muted); font-size: var(--t-body); line-height: 1.5; }
+
+.diary-compose { display: flex; gap: var(--s-4); align-items: flex-start; max-width: 68ch; }
+/* ON THE PANEL GROUND RATHER THAN THE APP GROUND, and this is the box that argument belongs to: `.diary`
+   declares `background: var(--wash)`, and `--wash` is `none` in classic-dark — so `--bg` on `--bg` would
+   render as no box at all. It was written on the suggestions composer instead, whose pane has no ground of
+   its own and takes the dock's `--panel`, exactly as `.modal` and `.gate-card` do; both of those put their
+   boxes on `--bg`, and that one now does too. Measured in test/control-boxes.test.tsx. */
+.diary-compose > .vb-input {
+  flex: 1; resize: vertical; min-height: 2.6rem; background: var(--panel-2); line-height: 1.45;
+}
+.diary > .vb-error, .suggestions-pane > .vb-error { max-width: 68ch; }
+
+.diary-empty {
+  display: flex; flex-direction: column; align-items: flex-start; gap: var(--s-4);
+  color: var(--muted); font-size: var(--t-lead); padding: 1.5rem 0;
+}
+
+.diary-list {
+  list-style: none; display: flex; flex-direction: column; gap: 0.1rem; max-width: 68ch;
+}
+.diary-entry {
+  display: flex; flex-direction: column; gap: 0.2rem;
+  padding: var(--s-4) 0 var(--s-4) 0.75rem;
+  border-left: 2px solid var(--border);
+}
+/* The kind, encoded in the rail as well as the word: a run, a checkup, a lifecycle event and a human's own
+   note are read at different times for different reasons, and colour is how a long file stays scannable.
+   All FOUR are named — `note` was added with the kind itself and inherited `run`'s token, so the one class
+   that exists to separate human prose from the machine's looked exactly like the machine's commonest
+   entry. The default above covers a kind from a future version rather than rendering it railless. */
+.diary-entry[data-kind='run'] { border-left-color: var(--border); }
+.diary-entry[data-kind='checkup'] { border-left-color: var(--accent); }
+.diary-entry[data-kind='lifecycle'] { border-left-color: var(--muted); }
+.diary-entry[data-kind='note'] { border-left-color: var(--accent-2); }
+
+.diary-kind {
+  font-family: var(--font-display); text-transform: uppercase; letter-spacing: 0.1em;
+  font-size: var(--t-micro); color: var(--text);
+}
+.diary-about { display: flex; flex-wrap: wrap; gap: var(--s-3); }
+.diary-outcome { color: var(--text); }
+.diary-text { line-height: 1.55; font-size: var(--t-lead); }
+

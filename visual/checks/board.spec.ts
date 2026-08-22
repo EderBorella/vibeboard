@@ -64,7 +64,7 @@ const FLOOR = {
 // own scroll offset: the shared grid is only true while every row sits at zero.
 const SCROLL_REGION = 'main.boards';
 
-// THE MEASURED LEGIBILITY FLOOR OF A COLUMN TRACK, from web/src/styles.css: a `.column`'s own
+// THE MEASURED LEGIBILITY FLOOR OF A COLUMN TRACK, from web/src/organisms/board/board.css: a `.column`'s own
 // min-content width, 179px, rounded up. Asserted so a floor lowered by accident is a failure rather
 // than a silent change of look — and it has already been lowered by accident once, to 144px, which put
 // the column head's `+` button outside the column's border in the gutter. See `headOverflows`.

@@ -342,7 +342,7 @@ describe('the segmented control', () => {
   });
 
   // Asserted on the declarations that identified them rather than on an empty box: a `<button>` always
-  // matches the type reset at the top of styles.css, so its box is never empty and `toEqual([])` would be
+  // matches the type reset in design/reset.css, so its box is never empty and `toEqual([])` would be
   // a claim about that reset instead of about these classes.
   it.each([['mode-group'], ['backend-toggle'], ['backend-toggle-md'], ['mode-btn'], ['bt-btn']])(
     '.%s is gone',

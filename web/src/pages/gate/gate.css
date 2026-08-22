@@ -1,0 +1,32 @@
+/* ---------- Project gate ---------- */
+.gate { flex: 1; display: flex; justify-content: center; padding: 2.5rem 1rem; overflow: auto; }
+.gate-card {
+  width: 100%; max-width: 520px;
+  background: var(--panel); border: 1px solid var(--border);
+  border-radius: var(--r-lg); padding: 1.5rem;
+}
+.gate-card h2 { margin: 0 0 1rem; font-family: var(--font-display); letter-spacing: 0.04em; }
+.gate-card h3 { margin: 1.5rem 0 0.5rem; font-size: var(--t-lead); color: var(--muted); }
+.gate-list { list-style: none; margin: 0 0 1rem; padding: 0; display: flex; flex-direction: column; gap: var(--s-3); }
+/* A `Panel as="button"` with the `inset` variant. A project in the recents list has no VOICE — it is a
+   region of a list that takes a click, which is the line Phase 4 drew between the two primitives — and
+   it draws its box at rest, which is what `inset` is and `flat` is not. `text-align`, the ink, the
+   pointer and the box are all the primitive's now; the stack of name over path is this list's. */
+.gate-list button {
+  width: 100%; display: flex; flex-direction: column; gap: 0.15rem;
+}
+.gate-list button:hover { border-color: var(--accent); }
+.gate-list-name { font-weight: 600; }
+.gate .vb-field { margin-top: 0.75rem; }
+.gate-row { display: flex; gap: var(--s-4); }
+.gate .vb-input { flex: 1; }
+.gate button:not(.gate-list button) {
+  background: var(--accent-fill); color: var(--on-fill); border: none;
+  border-radius: var(--r-md); padding: 0 0.9rem; font-weight: 600; cursor: pointer;
+}
+.gate button:disabled { opacity: 0.5; cursor: default; }
+.gate-preview { margin-top: 0.6rem; font-size: var(--t-small); color: var(--muted); }
+/* `.gate-preview code` is with the other two inline code spans, beside `.markdown code`. */
+.gate .vb-hint { margin-top: 0.3rem; }
+.gate .vb-notice { margin-top: 1rem; }
+

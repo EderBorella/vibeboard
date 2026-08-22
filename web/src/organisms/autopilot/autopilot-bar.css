@@ -1,0 +1,211 @@
+/* ---------- Auto-pilot transport strip ----------
+   Stacked directly under the header, so the thing the app is FOR has a control on the page rather than
+   four clicks inside a settings modal. Tone-coloured on the left edge only: the strip is present at all
+   times, and a full-width colour change on every state would fight the boards for attention. */
+/* THE ROLE THIS SURFACE GIVES ITS TONE: the 3px left rail, and nothing else — the strip is on screen at
+   all times and a full-width colour change on every state would fight the boards for attention.
+   FOUR CLASSES DIED HERE. They were composed as `ap-bar-${model.tone}`, so a literal grep for any of
+   them found nothing — the *Risks* defect — and each named its own token, including the second
+   `var(--ok, #3fb950)` fallback in this file, dead since every theme defined `--ok`. `idle` had no rule
+   at all and fell through to `--border`; it is the `neutral` grey now, which is what the transport dot
+   two elements to the right already was. */
+.ap-bar {
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+  border-left: 3px solid var(--tone, var(--border));
+  font-size: var(--t-body);
+}
+
+.ap-bar-row {
+  display: flex;
+  align-items: center;
+  gap: var(--s-4);
+  padding: var(--s-3) 0.75rem;
+  /* The status can be long — a stall names the cards that are stuck — so it is the part that shrinks. */
+  min-width: 0;
+}
+
+/* `.ap-transport` HAS NO RULE LEFT AT ALL, and the `min-width: 6.5rem` that was here is the measurement
+   worth recording. It was argued as "wider than its label needs, because it is the control anybody on this
+   strip is looking for and a target you have to aim at is one you misclick" — and measured, it made the
+   button 104px wide around 49px of ink. Over half the control was empty, which does not read as a bigger
+   target; it reads as a button that does not know what it is for. The owner withdrew the argument.
+   WHAT IT ALSO BOUGHT, so the cost is stated: the box no longer holds still across its labels, so it grows
+   by about 15px for the moment it says `Starting…` and the controls after it shift with it. A transient on
+   a click, against 55px of permanent slack.
+   `.ap-transport-stop`, the `:disabled` opacity and the duplicate `:focus-visible` went in an earlier
+   phase: the first is the `default` variant, the second is on `.vb-btn:disabled`, and the third restated
+   the file-wide `:focus-visible` rule at the top. */
+
+/* THE TRANSPORT DOT IS `Dot` NOW. It was five classes — one shape and four tones, of which only three
+   existed: `idle` and `stopped` fell through to the base grey, which is right and was true only by
+   omission. The mapping is a table in AutopilotBar.tsx and is pinned by test/state-tones.test.tsx,
+   which asserts that pair is ONE colour on purpose. The pulse and its reduced-motion override moved to
+   ui/primitives.css, where the keyframes are. */
+
+/* Truncated, with the full text in the drawer rather than in a title attribute — a `title` is
+   unreachable on a touch device and invisible to anyone who does not know to hover. */
+/* `flex: 0 1 auto` AND NO LONGER `flex: 1`, which is the declaration that made the row one queue. Taking
+   all the slack is what left the two groups after it jammed against the right-hand edge with nothing
+   between them — and now that the groups position themselves with auto margins, a child that eats the
+   free space would leave those margins nothing to work with. It still SHRINKS, and it is still the only
+   thing on the row that does: a stall names the cards that are stuck, and that sentence has to give way
+   to the controls rather than push them off the strip. */
+.ap-status {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+}
+
+/* WHICH AGENT, AND WHETHER IT CAN RUN — AND NOW IT IS DRAWN AS THE PAIR IT ALWAYS WAS.
+   The row's tail read as one undifferentiated queue of controls: the backend selector, the agent's state,
+   Details, How it works and Settings, five things at the same distance from each other, of which two are
+   a statement about the project and three are buttons. So the pair takes a box of its own and a wider gap
+   before the buttons that follow it — the same argument `.ap-agent`'s own `gap` already made one level
+   down, that these two are useless apart. A selector with no state does not say the run will start, and a
+   state with no selector does not say what it is a state OF.
+   `--s-6` AND NOT A MARGIN ON THE BUTTONS: the separation is a property of this group's right-hand edge,
+   and putting it on the three controls would need it removed again from whichever of them happens to be
+   first once the gate acknowledgement appears and disappears.
+   `flex: none` because `.ap-status` above already takes the slack: without it the pair would be squeezed
+   by a long stall message, and the state word is exactly what you need when the message is long. */
+.ap-agent {
+  display: inline-flex; align-items: center; gap: var(--s-3); flex: none;
+  border: 1px solid var(--border); border-radius: var(--r-md);
+  /* NO VERTICAL PADDING, measured on the live board rather than reasoned about: at `--s-2` this box came
+     out 29.8px tall against 20px buttons on the same row — the group meant to make the pair legible was
+     the tallest thing on the strip, which is the inconsistency it was added to remove. The segmented
+     control inside is 19.8px and sets the floor, so the box is its own border and nothing else. */
+  /* NO `margin-right`. It was `--s-6`, a hand-made gap before the buttons that followed this group in one
+     long queue. The gap is the layout's now: this group and `.ap-bar-end` each take `margin-left: auto`,
+     which splits the free space between them and is what puts this one in the middle. */
+  padding: 0 var(--s-3);
+}
+/* `.ap-agent-state` IS GONE — SIX DECLARATIONS AND A `button.` QUALIFIER — and it is the one indicator
+   whose deletion is worth recording, because two of its rules were arguments against the shape it has now.
+   It said `NOT Button, deliberately, and this is the counter-example that keeps the primitive honest: the
+   whole point of this element is that it does NOT read as a control` — and it said the element `IS a button
+   precisely when there is something wrong`. Both were coherent and both are withdrawn: an indicator that
+   becomes a control only once the project is broken is one nobody has ever pressed, so the affordance is
+   missing at exactly the moment it is needed. All four indicators are `StatusChip` now and all four are
+   buttons in every state. ui/StatusChip.tsx carries the census.
+   `button.ap-agent-state` undid the UA button styles by hand and warned, correctly, that `font: inherit`
+   would reset the font-size and grow the chip from 10.88px to 13.12px the moment it had something to say.
+   `.vb-status` sets one step for all four, so there is nothing left to grow between states.
+   THE FOUR `[data-state]` RULES WENT IN PHASE 13 and their vocabulary was the worst of the six: `ok`,
+   `bad`, `warn` and `unknown` — TONE NAMES used as state names, so `ok` mapped to `--muted` and a reader
+   could not tell whether the word meant a state or a colour. They are `ready`, `blocked`, `failing` and
+   `checking`, and `failing` is the SAME ROW the connection light uses for the same fact: the last runs
+   died before reaching a model. */
+
+/* THE WAY OUT OF A STALLED PROJECT, sized like the other controls in this bar rather than like the card
+   report list it borrowed from. Measured: it came out at 10.88px with 1.6px of padding against 12.16px and
+   4px for Settings and the expander, so the one action on a stopped project read as a caption. */
+.ap-bar-remedy { display: flex; align-items: center; gap: var(--s-4); flex-wrap: wrap; }
+/* THE ROW'S RIGHT-HAND END — what explains the bar, and where to go to change it. The owner's layout:
+   `|Start|Emergency stop|   |Backend selector|   |How it works|Settings|`, three groups rather than the
+   one undifferentiated queue this row had become, with the controls that ACT on the loop at the left, the
+   agent and its state floating in the middle, and the explanations isolated at the right.
+   `margin-left: auto` HERE AND ON `.ap-agent`, rather than `justify-content: space-between` on the row.
+   The row's first children are a group without a wrapper, and space-between would spread those apart too.
+   `flex: none` ONCE, where `.ap-inline` said it three times — one on each of the buttons now inside this
+   box. That class is gone and this is what replaced it; a group that cannot shrink does not need its
+   children to say so individually. */
+.ap-bar-end {
+  display: flex; align-items: center; gap: var(--s-4);
+  margin-left: auto; flex: none;
+}
+/* LAYOUT ONLY. `Button` owns the box; `flex: none` is what this row decides, because `.ap-status` beside
+   it takes the slack and a long stall message must not squeeze the controls.
+   `.ap-remedy-btn` is the `default` variant — the ONE action on a stopped project. The three quiet
+   controls that shared this rule are `ghost`, which the owner ruled carries a DASHED border: dashed reads
+   as explanatory rather than actionable, which is exactly what "How it works" is, and it keeps the box the
+   same width as a solid button. They are inside `.ap-bar-end` now. */
+.ap-remedy-btn { flex: none; }
+/* The `:disabled` word goes grey as well as pale. `.vb-btn:disabled` sets the opacity; this says the
+   ink, which is the part that distinguished a spent remedy from a busy one. */
+.ap-remedy-btn:disabled { color: var(--muted); }
+
+/* The emergency stop, on the bar. Quiet until hovered, then unmistakably dangerous: a control that is
+   permanently red is one people stop reading, and this bar's whole job is to be read. The guard against
+   pressing it by accident is the confirm dialog, which names what dies — not the styling. */
+/* `ghost`, with the ONE thing that is not the variant: it turns dangerous on hover rather than accent.
+   That override works because primitives.css is loaded BEFORE styles.css — equal specificity, later
+   source — which is the whole reason for that order. `not-allowed` rather than `default` on the
+   disabled cursor, because a stop you cannot press is a refusal and not merely an absence. */
+.ap-kill { flex: none; }
+.ap-kill:hover:not(:disabled) { border-color: var(--danger); color: var(--danger); }
+.ap-kill:disabled { cursor: not-allowed; }
+
+/* LAST in the row, and the only control here that disappears when used — so nothing sits after it to
+   jump leftwards when it goes. `margin-left: auto` would push it to the far edge and reintroduce exactly
+   that shift for the buttons before it, so it does NOT get one. */
+/* The `default` variant with its own tint — a colour, which a caller may override, and not a geometry,
+   which it may not. `--accent-2` is every theme's secondary/attention colour, so this follows the theme
+   instead of pinning an amber that fights three of the five palettes. */
+.ap-review-gates {
+  flex: none;
+  background: color-mix(in srgb, var(--accent-2) 14%, transparent);
+  border-color: var(--accent-2);
+  font-weight: 500;
+}
+
+.ap-bar-error {
+  padding: var(--s-3) 0.75rem var(--s-4);
+  color: var(--danger);
+  font-size: var(--t-small);
+  /* Wraps. Both of these carry sentences that quote git or name several cards, and a refusal nobody can
+     read to the end is the dead end this whole strip exists to remove. */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* Why the loop stopped. NOT ellipsised, unlike `.ap-status` — that one is a row and this one is prose. */
+.ap-bar-detail {
+  padding: 0 0.75rem var(--s-4);
+  color: var(--muted);
+  font-size: var(--t-small);
+  line-height: 1.45;
+  max-width: 90ch;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* Two columns, because the two questions are independent: what it is doing now, and what would stop it
+   starting. Stacks on a narrow screen rather than shrinking both to unreadable. */
+.ap-drawer {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
+  gap: 1rem;
+  padding: 0.2rem 0.75rem 0.7rem;
+  border-top: 1px solid var(--border);
+}
+.ap-drawer-head {
+  font-size: var(--t-micro);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 0.35rem;
+}
+.ap-work { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--s-2); }
+.ap-work li { font-size: var(--t-body); }
+.ap-waiting { color: var(--muted); font-size: var(--t-small); }
+
+/* The instructions. Taller than the card modal and scrolling inside itself: it is prose, and prose that
+   pushes its own close button off the screen is prose nobody finishes. */
+.ap-help { max-width: 44rem; }
+.ap-help-body { overflow-y: auto; max-height: 70vh; padding: 1rem; line-height: 1.55; }
+.ap-help-body h3 {
+  margin: 1.2rem 0 0.4rem;
+  font-size: var(--t-lead);
+  letter-spacing: 0.03em;
+  color: var(--accent);
+}
+.ap-help-body h3:first-child { margin-top: 0; }
+.ap-help-body p { margin: 0 0 0.6rem; font-size: var(--t-body); }
+.ap-help-body ul { margin: 0 0 0.6rem; padding-left: 1.1rem; font-size: var(--t-body); }
+.ap-help-body li { margin-bottom: 0.25rem; }
+/* `.ap-help-body code` is with the other two inline code spans, beside `.markdown code`. */

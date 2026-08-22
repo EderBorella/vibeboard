@@ -980,3 +980,93 @@ test('13. the state indicators are one shape', async ({ board, theme }) => {
       `BUTTON at ${chips[0]?.fontSize} with a ${chips[0]?.borderWidth} edge`,
   );
 });
+
+// CHECK 14 — THE AUTO-PILOT BAR READS AS THREE GROUPS. The owner's layout, drawn by him as
+// `|Start|Emergency stop|   |Backend selector|   |How it works|Settings|`.
+//
+// IT IS A REGRESSION GUARD ON A ROW THAT HAS NOW BEEN WRONG IN BOTH DIRECTIONS, which is why it is worth
+// a check of its own rather than a line in check 12. First everything was jammed at the right: `.ap-status`
+// held `flex: 1`, so the sentence took every spare pixel and the selector, the state and the three buttons
+// after it were pushed hard against the right-hand edge in one queue. Removing the state chip from the top
+// bar then moved the whole queue to the LEFT and left the right half of the strip empty. Neither shape was
+// chosen; both were what one `flex` declaration happened to produce.
+//
+// MEASURED AS EDGES, not as `justify-content`. The layout is two `margin-left: auto` declarations, and a
+// computed style would only report that they are there — it would not catch a `flex: 1` reappearing on a
+// sibling, which is exactly what would silently eat them. So this reads where the boxes actually land.
+const EDGE_SLACK = 2; // sub-pixel, plus the padding box vs the border box on the row itself.
+
+test('14. the auto-pilot bar reads as three groups', async ({ board, theme }) => {
+  const seen = await board.evaluate(() => {
+    const row = document.querySelector<HTMLElement>('[data-testid="ap-bar"] .ap-bar-row');
+    if (!row) return null;
+    const style = getComputedStyle(row);
+    const box = row.getBoundingClientRect();
+    const at = (sel: string) => {
+      const el = row.querySelector<HTMLElement>(sel);
+      return el ? { left: el.getBoundingClientRect().left, right: el.getBoundingClientRect().right } : null;
+    };
+    // THE LEFT GROUP'S RIGHT EDGE IS THE RIGHTMOST OF EVERYTHING THAT IS NOT ONE OF THE OTHER TWO GROUPS,
+    // and computing it this way rather than naming a control is what makes the gap below a GAP. The first
+    // version measured from the emergency stop, which is not the last thing in that group — the loop's state
+    // chip and its sentence follow it — so it was measuring the distance ACROSS those, not the space after
+    // them. It passed with the middle group's `push` deleted, on the chip's own width. Planted and caught.
+    const left = Array.from(row.children)
+      .filter((c) => !c.classList.contains('ap-agent') && !c.classList.contains('ap-bar-end'))
+      .map((c) => c.getBoundingClientRect().right);
+    return {
+      content: {
+        left: box.left + Number.parseFloat(style.paddingLeft),
+        right: box.right - Number.parseFloat(style.paddingRight),
+      },
+      leftGroup: { count: left.length, right: Math.max(...left) },
+      transport: at('[data-testid="ap-transport"]'),
+      kill: at('[data-testid="ap-kill"]'),
+      agent: at('[data-testid="ap-agent"]'),
+      end: at('.ap-bar-end'),
+    };
+  });
+
+  expect(seen, 'no auto-pilot bar row on the board').not.toBeNull();
+  const { content, transport, kill, agent, end } = seen ?? {};
+  for (const [name, part] of Object.entries({ transport, kill, agent, end })) {
+    expect(part, `${name} is not on the row`).not.toBeNull();
+  }
+  if (!content || !transport || !kill || !agent || !end) return;
+
+  // THE LEFT GROUP STARTS AT THE LEFT EDGE, and the emergency stop is beside it rather than adrift.
+  expect(
+    Math.abs(transport.left - content.left),
+    'the transport is not at the row’s left edge',
+  ).toBeLessThanOrEqual(EDGE_SLACK);
+  expect(kill.left).toBeGreaterThan(transport.right - 1);
+
+  // THE RIGHT GROUP ENDS AT THE RIGHT EDGE. This is the half the owner asked for twice, from both sides.
+  expect(
+    Math.abs(end.right - content.right),
+    'the explanations are not at the row’s right edge',
+  ).toBeLessThanOrEqual(EDGE_SLACK);
+
+  // AND THE AGENT GROUP IS BETWEEN THEM, WITH REAL SPACE ON BOTH SIDES. The gaps are what make this three
+  // groups rather than three adjacent things: a bar whose middle group is touching one of its neighbours is
+  // the queue this check exists to refuse. Floored well under the ~200px each gap measures at 1440, so
+  // ordinary content growth cannot fail it — a queue reads as single-digit gaps, not as a hundred pixels.
+  expect(seen?.leftGroup.count, 'nothing in the left group to measure from').toBeGreaterThan(1);
+  const before = agent.left - (seen?.leftGroup.right ?? 0);
+  const after = end.left - agent.right;
+  expect(agent.left, 'the agent group is left of the controls that act').toBeGreaterThan(kill.right);
+  expect(end.left, 'the agent group is right of the explanations').toBeGreaterThan(agent.right);
+  expect(before, `only ${before.toFixed(1)}px between the left group and the agent group`).toBeGreaterThan(
+    24,
+  );
+  expect(after, `only ${after.toFixed(1)}px between the agent group and the explanations`).toBeGreaterThan(
+    24,
+  );
+
+  console.log(
+    `[${theme}] bar layout: transport at ${transport.left.toFixed(0)} (edge ${content.left.toFixed(0)}), ` +
+      `left group ends ${(seen?.leftGroup.right ?? 0).toFixed(0)}, gap ${before.toFixed(0)}px, ` +
+      `agent ${agent.left.toFixed(0)}–${agent.right.toFixed(0)}, ` +
+      `gap ${after.toFixed(0)}px, end ends ${end.right.toFixed(0)} (edge ${content.right.toFixed(0)})`,
+  );
+});

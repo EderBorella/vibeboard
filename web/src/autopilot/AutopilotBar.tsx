@@ -365,60 +365,12 @@ export function AutopilotBar({
             provider does not say what it is a state OF — which was the position before this, with
             auto-pilot silently taking the copilot's setting and reporting readiness for it under no
             name at all. */}
-        <span className="ap-agent" data-testid="ap-agent">
-          <BackendPicker
-            value={backend}
-            disabled={switching !== null}
-            label="Which agent auto-pilot runs"
-            titleFor={(b) =>
-              `Run agents on ${b.label}. Saved as this project's default, so the copilot and manual runs use it too.`
-            }
-            onChange={chooseBackend}
-          />
-          <AgentChip agent={agent} />
-        </span>
-
-        {model.expandable && (
-          // `ghost`, and this is the call the owner left open. A disclosure toggle EXPLAINS: it reveals
-          // the bar's own detail and changes nothing in the project — same category as "How it works",
-          // which shows prose where this shows numbers. Both are dashed; everything on this row that
-          // acts on the run is solid.
-          <Button
-            variant="ghost"
-            className="ap-inline"
-            aria-expanded={open}
-            onClick={() => setOpen((v) => !v)}
-            data-testid="ap-expand"
-          >
-            <span className="vb-twist">{open ? '▾' : '▸'}</span> {open ? 'Hide' : 'Details'}
-          </Button>
-        )}
-        {/* THE ghost, and the one the owner ruled on: a help affordance explains, which is what the
-            dashed border says. */}
-        <Button
-          variant="ghost"
-          className="ap-inline"
-          onClick={() => setHelpOpen(true)}
-          title="How auto-pilot works"
-          data-testid="ap-help-btn"
-        >
-          ? How it works
-        </Button>
-        {/* Acts: it takes you to a surface where caps and columns are changed. Navigation is not
-            explanation, so it is solid. */}
-        <Button
-          className="ap-inline"
-          onClick={onSettings}
-          title="Caps, the columns that mean finished, and where a blocked card goes"
-          data-testid="ap-settings-link"
-        >
-          Settings
-        </Button>
-
         {/*
-          LAST IN THE ROW, deliberately. It is the one blocker a person CLEARS rather than fixes, so it
-          is the one control that vanishes the moment it is used — and anything after it would jump
-          leftwards as it went. Nothing is after it.
+          WITH THE CONTROLS THAT ACT, which is where it belongs and is now also where it can safely sit.
+          It was LAST IN THE ROW on this reasoning: it is the one blocker a person CLEARS rather than fixes,
+          so it is the one control that vanishes the moment it is used, and anything after it would jump
+          leftwards as it went. That constraint is gone — the two groups after it are pinned by auto
+          margins, so they do not move when this appears or disappears, and nothing else is to its right.
 
           It used to live inside this bar's drawer, behind a disclosure arrow, while Settings offered a
           Start button and no way to clear the block at all. A user was told to read the commands in
@@ -443,6 +395,66 @@ export function AutopilotBar({
             I have read the gate commands
           </Button>
         )}
+
+        {/* THE MIDDLE OF THE ROW, and the `push` is what puts it there. `margin-left: auto` on this and on
+            `.ap-bar-end` below splits the free space in two, so the group floats between the controls that
+            act on the loop and the controls that explain it. Two auto margins rather than
+            `justify-content: space-between` on the row: the row's first four children are a group of their
+            own without a wrapper, and space-between would spread those four apart as well. */}
+        <span className="ap-agent push" data-testid="ap-agent">
+          <BackendPicker
+            value={backend}
+            disabled={switching !== null}
+            label="Which agent auto-pilot runs"
+            titleFor={(b) =>
+              `Run agents on ${b.label}. Saved as this project's default, so the copilot and manual runs use it too.`
+            }
+            onChange={chooseBackend}
+          />
+          <AgentChip agent={agent} />
+        </span>
+
+        {/* THE RIGHT-HAND END: what EXPLAINS the bar and where to go to change it. Isolated from the
+            controls that act on the loop, which is the owner's layout — the three of these had been
+            sitting in the same undifferentiated queue as the Start button.
+            `.ap-inline` IS GONE, and this wrapper is why: it was `flex: none` written three times, once on
+            each of these buttons, and a group that does not shrink does not need its children to say so
+            individually. */}
+        <div className="ap-bar-end">
+          {model.expandable && (
+            // `ghost`, and this is the call the owner left open. A disclosure toggle EXPLAINS: it reveals
+            // the bar's own detail and changes nothing in the project — same category as "How it works",
+            // which shows prose where this shows numbers. Both are dashed; everything on this row that
+            // acts on the run is solid.
+            <Button
+              variant="ghost"
+              aria-expanded={open}
+              onClick={() => setOpen((v) => !v)}
+              data-testid="ap-expand"
+            >
+              <span className="vb-twist">{open ? '▾' : '▸'}</span> {open ? 'Hide' : 'Details'}
+            </Button>
+          )}
+          {/* THE ghost, and the one the owner ruled on: a help affordance explains, which is what the
+            dashed border says. */}
+          <Button
+            variant="ghost"
+            onClick={() => setHelpOpen(true)}
+            title="How auto-pilot works"
+            data-testid="ap-help-btn"
+          >
+            ? How it works
+          </Button>
+          {/* Acts: it takes you to a surface where caps and columns are changed. Navigation is not
+            explanation, so it is solid. */}
+          <Button
+            onClick={onSettings}
+            title="Caps, the columns that mean finished, and where a blocked card goes"
+            data-testid="ap-settings-link"
+          >
+            Settings
+          </Button>
+        </div>
       </div>
 
       {/* One banner for both actions. They cannot be in flight together — each disables its own

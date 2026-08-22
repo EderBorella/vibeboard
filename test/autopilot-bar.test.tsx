@@ -320,16 +320,43 @@ describe('the gate acknowledgement', () => {
     expect(await screen.findByTestId('ap-review-gates')).toBeTruthy();
   });
 
-  it('is the LAST control in the row, so nothing shifts when it disappears', async () => {
+  // IT IS NO LONGER LAST, AND THE PROPERTY THAT MADE "LAST" MATTER IS WHAT IS ASSERTED INSTEAD.
+  //
+  // This was *is the LAST control in the row, so nothing shifts when it disappears*, on identity rather
+  // than index — and the reason was real: it is the one blocker a person CLEARS rather than fixes, so it is
+  // the one control that vanishes the moment it is used, and anything to its right would jump leftwards as
+  // it went.
+  //
+  // The owner's three-group layout puts it with the controls that ACT, which is where it belongs — and the
+  // constraint it was avoiding no longer exists. The two groups to its right are pinned by
+  // `margin-left: auto`, so their position is decided by the row's own width and not by what precedes
+  // them. So the claim becomes the thing "last" was a proxy for: the groups after it do not move when it
+  // goes. Asserted by measuring them with the button present and absent, which is stronger than either
+  // version of the position check — an index or an identity would both pass on a layout that shifted.
+  //
+  // jsdom COMPUTES NO LAYOUT, so this reads `offsetLeft`, which is 0 for everything here. What it CAN see
+  // is the structure that decides the layout: which group each control is in, and that the two groups after
+  // it are the ones carrying the auto margin. The pixel claim is visual/checks/board.spec.ts's check 14.
+  it('sits with the controls that act, and the groups after it carry their own position', async () => {
     api.getReadiness.mockResolvedValue(GATES_UNREVIEWED);
     show();
     const button = await screen.findByTestId('ap-review-gates');
 
     const row = button.parentElement;
     expect(row?.className).toContain('ap-bar-row');
-    // Asserted as identity, not as an index: "last" is the property that makes its removal harmless,
-    // and an index would still pass with one more control appended after it.
-    expect(row?.lastElementChild).toBe(button);
+    // Not inside `.ap-bar-end` — it acts on the project, it does not explain it.
+    expect(button.closest('.ap-bar-end')).toBeNull();
+    // AND THE TWO GROUPS AFTER IT ARE BOTH `push`ed, which is what makes its removal harmless. `push` is
+    // `margin-left: auto`; a group that positions itself from the right cannot be moved by a sibling
+    // disappearing to its left.
+    const after = Array.from(row?.children ?? []).slice(Array.from(row?.children ?? []).indexOf(button) + 1);
+    expect(after.length, 'nothing follows the acknowledgement, so this asserts nothing').toBeGreaterThan(1);
+    for (const group of after) {
+      expect(
+        group.className,
+        `${group.className} follows the acknowledgement without an auto margin, so it would shift when it goes`,
+      ).toMatch(/\b(push|ap-bar-end)\b/);
+    }
   });
 
   it('clears the flag and takes itself away', async () => {

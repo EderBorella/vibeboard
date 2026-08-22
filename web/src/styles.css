@@ -1626,8 +1626,14 @@ body {
 
 /* Truncated, with the full text in the drawer rather than in a title attribute — a `title` is
    unreachable on a touch device and invisible to anyone who does not know to hover. */
+/* `flex: 0 1 auto` AND NO LONGER `flex: 1`, which is the declaration that made the row one queue. Taking
+   all the slack is what left the two groups after it jammed against the right-hand edge with nothing
+   between them — and now that the groups position themselves with auto margins, a child that eats the
+   free space would leave those margins nothing to work with. It still SHRINKS, and it is still the only
+   thing on the row that does: a stall names the cards that are stuck, and that sentence has to give way
+   to the controls rather than push them off the strip. */
 .ap-status {
-  flex: 1;
+  flex: 0 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1654,7 +1660,10 @@ body {
      out 29.8px tall against 20px buttons on the same row — the group meant to make the pair legible was
      the tallest thing on the strip, which is the inconsistency it was added to remove. The segmented
      control inside is 19.8px and sets the floor, so the box is its own border and nothing else. */
-  padding: 0 var(--s-3); margin-right: var(--s-6);
+  /* NO `margin-right`. It was `--s-6`, a hand-made gap before the buttons that followed this group in one
+     long queue. The gap is the layout's now: this group and `.ap-bar-end` each take `margin-left: auto`,
+     which splits the free space between them and is what puts this one in the middle. */
+  padding: 0 var(--s-3);
 }
 /* `.ap-agent-state` IS GONE — SIX DECLARATIONS AND A `button.` QUALIFIER — and it is the one indicator
    whose deletion is worth recording, because two of its rules were arguments against the shape it has now.
@@ -1677,14 +1686,26 @@ body {
    report list it borrowed from. Measured: it came out at 10.88px with 1.6px of padding against 12.16px and
    4px for Settings and the expander, so the one action on a stopped project read as a caption. */
 .ap-bar-remedy { display: flex; align-items: center; gap: var(--s-4); flex-wrap: wrap; }
-/* LAYOUT ONLY, all of them. `Button` owns the box; `flex: none` is what this row decides, because
-   `.ap-status` beside them takes the slack and a long stall message must not squeeze the controls.
-   `.ap-remedy-btn` is the `default` variant — the ONE action on a stopped project — and the three
-   quiet ones are `ghost`, which the owner ruled carries a DASHED border: dashed reads as explanatory
-   rather than actionable, which is exactly what "How it works" is, and it keeps the box the same
-   width as a solid button.
-   Three separate classes became one, because there was never a difference between them. */
-.ap-remedy-btn, .ap-inline { flex: none; }
+/* THE ROW'S RIGHT-HAND END — what explains the bar, and where to go to change it. The owner's layout:
+   `|Start|Emergency stop|   |Backend selector|   |How it works|Settings|`, three groups rather than the
+   one undifferentiated queue this row had become, with the controls that ACT on the loop at the left, the
+   agent and its state floating in the middle, and the explanations isolated at the right.
+   `margin-left: auto` HERE AND ON `.ap-agent`, rather than `justify-content: space-between` on the row.
+   The row's first children are a group without a wrapper, and space-between would spread those apart too.
+   `flex: none` ONCE, where `.ap-inline` said it three times — one on each of the buttons now inside this
+   box. That class is gone and this is what replaced it; a group that cannot shrink does not need its
+   children to say so individually. */
+.ap-bar-end {
+  display: flex; align-items: center; gap: var(--s-4);
+  margin-left: auto; flex: none;
+}
+/* LAYOUT ONLY. `Button` owns the box; `flex: none` is what this row decides, because `.ap-status` beside
+   it takes the slack and a long stall message must not squeeze the controls.
+   `.ap-remedy-btn` is the `default` variant — the ONE action on a stopped project. The three quiet
+   controls that shared this rule are `ghost`, which the owner ruled carries a DASHED border: dashed reads
+   as explanatory rather than actionable, which is exactly what "How it works" is, and it keeps the box the
+   same width as a solid button. They are inside `.ap-bar-end` now. */
+.ap-remedy-btn { flex: none; }
 /* The `:disabled` word goes grey as well as pale. `.vb-btn:disabled` sets the opacity; this says the
    ink, which is the part that distinguished a spent remedy from a busy one. */
 .ap-remedy-btn:disabled { color: var(--muted); }

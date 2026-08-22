@@ -1650,7 +1650,11 @@ body {
 .ap-agent {
   display: inline-flex; align-items: center; gap: var(--s-3); flex: none;
   border: 1px solid var(--border); border-radius: var(--r-md);
-  padding: var(--s-2) var(--s-3); margin-right: var(--s-6);
+  /* NO VERTICAL PADDING, measured on the live board rather than reasoned about: at `--s-2` this box came
+     out 29.8px tall against 20px buttons on the same row — the group meant to make the pair legible was
+     the tallest thing on the strip, which is the inconsistency it was added to remove. The segmented
+     control inside is 19.8px and sets the floor, so the box is its own border and nothing else. */
+  padding: 0 var(--s-3); margin-right: var(--s-6);
 }
 /* `.ap-agent-state` IS GONE — SIX DECLARATIONS AND A `button.` QUALIFIER — and it is the one indicator
    whose deletion is worth recording, because two of its rules were arguments against the shape it has now.

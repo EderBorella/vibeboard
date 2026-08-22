@@ -814,9 +814,19 @@ test('12. the affordances are big enough to see', async ({ board, theme }) => {
       // "everything is one size" false by construction and therefore unassertable.
       const controls = Array.from(
         document.querySelectorAll<HTMLElement>('[data-testid="ap-bar"] .ap-bar-row button:not(.vb-seg-cell)'),
-      ).map((b) => ({ id: b.dataset.testid ?? b.className, px: getComputedStyle(b).fontSize }));
+      ).map((b) => ({
+        id: b.dataset.testid ?? b.className,
+        px: getComputedStyle(b).fontSize,
+        h: rect(b).height,
+      }));
+      // The bordered group around the backend selector and the agent's state. Its own height, because a
+      // group drawn to make two things read as a pair must not become the tallest thing on the row —
+      // which it was, at 29.8px against 20px buttons, until the padding came off it. Found by taking a
+      // screenshot of the live board and looking at it, which no assertion in this file was doing.
+      const group = document.querySelector<HTMLElement>('[data-testid="ap-bar"] .ap-agent');
       return {
         controls,
+        group: group ? rect(group).height : null,
         titles: titles.length,
         // HEIGHT OVER LINE-HEIGHT, rounded. A `-webkit-box` clamped to two lines is twice as tall as a
         // `nowrap` one and reports the same single client rect, so height is the only thing that tells
@@ -868,6 +878,25 @@ test('12. the affordances are big enough to see', async ({ board, theme }) => {
     new Set(seen.controls.map((c) => c.px)).size,
     `the auto-pilot bar's controls are not one size: ${seen.controls.map((c) => `${c.id} ${c.px}`).join(', ')}`,
   ).toBe(1);
+  // 5. AND NOTHING ON THE ROW IS MEANINGFULLY TALLER THAN THE TRANSPORT. The bordered group around the
+  //    backend selector came out 29.8px against 20px buttons — the box drawn to make two things read as a
+  //    pair was the tallest thing on the strip, which is the inconsistency it was added to remove.
+  //
+  //    AGAINST THE TRANSPORT AND NOT AGAINST THE TALLEST, which was the first version and was weaker than
+  //    it looked: `ap-expand` measures 21px because the bigger disclosure glyph inside it sets its line
+  //    box, so a ceiling of `max + 1` was 22px and the group slid under it. The reference has to be a
+  //    control whose height nothing in this change moved.
+  const transport = seen.controls.find((c) => c.id === 'ap-transport')?.h ?? 0;
+  expect(transport, 'no transport button on the row to measure against').toBeGreaterThan(0);
+  expect(seen.group, 'the auto-pilot bar has no .ap-agent group').not.toBeNull();
+  const tall = [
+    ...seen.controls.map((c) => ({ id: c.id, h: c.h })),
+    { id: '.ap-agent', h: seen.group ?? 0 },
+  ].filter((c) => c.h > transport + 2);
+  expect(
+    tall,
+    `taller than the ${transport}px transport by more than 2px: ${tall.map((c) => `${c.id} ${c.h}px`).join(', ')}`,
+  ).toEqual([]);
   for (const bar of seen.bars) {
     // `auto` and not `thin`: the app-wide rule is `thin`, so this is the assertion that the column's own
     // rule is reaching the element at all.
@@ -890,7 +919,7 @@ test('12. the affordances are big enough to see', async ({ board, theme }) => {
 
   console.log(
     `[${theme}] affordances: ${seen.titles} titles all on one line, ${seen.twists} glyphs at or above ` +
-      `${TWIST_FLOOR}px, ${seen.controls.length} controls at ${seen.controls[0]?.px}, ` +
+      `${TWIST_FLOOR}px, ${seen.controls.length} controls at ${seen.controls[0]?.px}, group ${seen.group}px, ` +
       `${seen.scrolling}/${seen.columns} columns scrolling, asking for ` +
       `${seen.bars.map((b) => `${b.width} ${b.color}`).join(' | ')}`,
   );

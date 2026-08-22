@@ -131,7 +131,7 @@ That is the whole case for this work, and for the gate in Phase 0.
 
 ## What is NOT wrong, and must survive
 
-**The three themes are the considered part of this codebase.** `web/src/themes.css` carries measured
+**The three themes are the considered part of this codebase.** `web/src/design/themes.css` carries measured
 contrast ratios, a deliberate split between `--accent` as ink and `--accent-fill` as a fill (because a
 light theme cannot use one value for both), and per-theme decisions with reasons attached — *"no glow: a
 halo on a light ground reads as a smudge rather than as light."*

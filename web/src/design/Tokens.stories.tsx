@@ -109,7 +109,7 @@ const GROUPS: Group[] = [
   },
   {
     title: 'Palette',
-    note: 'Fifteen per theme, every one carrying a measured-contrast or per-theme argument in design/themes.css. Switch the theme in the toolbar: this is the half that changes.',
+    note: 'Sixteen per theme today, fifteen once `--on-accent` retires, and every one carries a measured-contrast or per-theme argument in design/themes.css. Switch the theme in the toolbar: this is the half that changes.',
     rows: [
       { name: '--bg', means: 'the ground', kind: 'colour' },
       { name: '--panel', means: 'chrome', kind: 'colour' },
@@ -160,8 +160,13 @@ function loadedCss(): string {
 
 // `var(--x, var(--y))` spends BOTH names, so the count is anchored on the opening `var(` and the name
 // rather than on a closing bracket — counting `var(--tone)` misses the two live fallback declarations.
+//
+// AND THE NAME HAS TO END WHERE THE MATCH ENDS, which `\b` does not give: `-` is a non-word character,
+// so `var(--track\b` matched `var(--track-fit)` at styles.css:347 and this page reported `--track` — a
+// token with zero consumers, signed for in `UNCONSUMED` until Phase 3 — as spent once. A wrong count here
+// is worse than none: every N−1 argument for the token set is made from these numbers.
 const consumersOf = (css: string, name: string): number =>
-  css.match(new RegExp(`var\\(\\s*${name}\\b`, 'g'))?.length ?? 0;
+  css.match(new RegExp(`var\\(\\s*${name}(?![\\w-])`, 'g'))?.length ?? 0;
 
 interface Resolved {
   value: string;
@@ -215,7 +220,16 @@ function specimen(kind: Kind, value: string): ReactNode {
 
 function Cell({ children }: { children: ReactNode }) {
   return (
-    <div style={{ fontSize: '0.6875rem', fontFamily: 'var(--font-mono)', opacity: 0.75 }}>{children}</div>
+    <div
+      style={{
+        fontSize: '0.6875rem',
+        fontFamily: 'var(--font-mono)',
+        opacity: 0.75,
+        overflowWrap: 'anywhere',
+      }}
+    >
+      {children}
+    </div>
   );
 }
 
@@ -260,7 +274,11 @@ function Vocabulary() {
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: 'max-content max-content max-content max-content 1fr',
+              // THE VALUE COLUMN IS BOUNDED AND THE OTHERS ARE NOT, because one value is 170 characters
+              // long: `--wash` is two radial gradients in the two themes that have one, and on `max-content`
+              // it took this grid to 1435px inside a 1280px frame. The whole point of the page is every
+              // name at once, and a page whose last column is off the right edge does not do that.
+              gridTemplateColumns: 'max-content minmax(0, 24ch) max-content max-content 1fr',
               gap: '0.4rem 1rem',
               alignItems: 'center',
             }}

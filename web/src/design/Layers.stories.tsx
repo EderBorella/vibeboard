@@ -18,22 +18,48 @@ const meta = {
 } satisfies Meta;
 export default meta;
 
-const LAYERS = [
+// A GROUND TAKES THE INK THE PALETTE MEASURED FOR IT, and getting that wrong made five of these twelve
+// labels unreadable: `--text` on `--accent-fill` is 1.97:1 in cyberpunk and 2.24:1 in classic-dark, and
+// `--text` on `--danger` is 2.15–2.63:1 in all three. `--accent-fill` has an ink and its name is
+// `--on-fill` — design/themes.css measures that pair at 7.41:1 and says so — which fixes three of the five.
+//
+// `--danger` HAS NO MEASURED INK, so it stops being a ground rather than acquiring one: no palette pair
+// clears 4.5:1 on it (`--on-fill` reaches 6.37 and 5.86 in the dark themes and 2.30 in marshmallow, whose
+// danger is a dark red), and inventing a value is out — the plan changes no palette value anywhere. The
+// hue moves to a `--rule` rail instead, which is what `--rule` is for: an edge that carries meaning.
+interface Layer {
+  token: string;
+  means: string;
+  ground: string;
+  ink: string;
+  rail?: string;
+}
+
+const LAYERS: Layer[] = [
   {
     token: '--z-chrome',
     means: 'sticky chrome — a top bar, a column head, .explorer-head',
     ground: 'var(--panel)',
+    ink: 'var(--text)',
   },
   {
     token: '--z-pop',
     means: 'menus, popovers, and their own backdrops on the SAME layer',
     ground: 'var(--panel-2)',
+    ink: 'var(--text)',
   },
-  { token: '--z-modal', means: 'a modal and its backdrop', ground: 'var(--accent-fill)' },
+  {
+    token: '--z-modal',
+    means: 'a modal and its backdrop',
+    ground: 'var(--accent-fill)',
+    ink: 'var(--on-fill)',
+  },
   {
     token: '--z-alert',
     means: 'a confirm raised from INSIDE a modal, and the halt overlay',
-    ground: 'var(--danger)',
+    ground: 'var(--panel)',
+    ink: 'var(--text)',
+    rail: 'var(--danger)',
   },
 ];
 
@@ -61,7 +87,9 @@ export const FourLayers: StoryObj = {
             height: 96,
             zIndex: `var(${layer.token})`,
             background: layer.ground,
+            color: layer.ink,
             border: '1px solid var(--border)',
+            borderLeft: layer.rail ? `var(--rule) solid ${layer.rail}` : '1px solid var(--border)',
             borderRadius: 'var(--r-lg)',
             boxShadow: 'var(--lift)',
             padding: 'var(--s-5)',

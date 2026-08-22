@@ -1,2 +1,5 @@
-.empty { margin: auto; color: var(--muted); padding: 3rem; }
+/* 48px → 24px, and it is invisible: `margin: auto` centres the content, so this padding is clearance
+   from the pane's edges rather than rhythm — and the pane is always far wider than 48px. The same
+   applies to `.gate` (40px) and `.control-blank` (32px), the other two `margin: auto` blanks. */
+.empty { margin: auto; color: var(--muted); padding: var(--s-7); }
 

@@ -11,11 +11,11 @@
    The reason was true of `.diary-compose`, which really is on `--wash`, and it is written there now. */
 .suggestions-actions > .vb-input { flex: 1; min-width: 12rem; }
 .suggestions-became { color: var(--accent); font-size: var(--t-body); }
-.suggestions-list { list-style: none; display: flex; flex-direction: column; gap: 0.1rem; min-height: 0; }
+.suggestions-list { list-style: none; display: flex; flex-direction: column; gap: var(--s-1); min-height: 0; }
 .suggestions-row { border-left: 2px solid var(--border); }
 /* The one the buttons act on. Marked, because two rows and one action bar is otherwise a guess. */
 .suggestions-row.picked { border-left-color: var(--accent); background: var(--wash); }
 /* A `Panel` with the `flat` variant. Its padding was `var(--s-4)` all round and is now `var(--s-3)
    var(--s-4)` — 2px shorter, on the scale, and the same as every other row in the app. */
-.suggestions-pick { width: 100%; display: flex; flex-direction: column; gap: 0.2rem; align-items: flex-start; }
+.suggestions-pick { width: 100%; display: flex; flex-direction: column; gap: var(--s-2); align-items: flex-start; }
 

@@ -27,7 +27,8 @@
 //
 // WHAT IS DELIBERATELY NOT PINNED, family by family, because pinning a value the merge exists to
 // normalise would make the suite a description of the old code:
-//   - the labels' `letter-spacing`: five values across fourteen classes (0.06 / 0.08 / 0.1 / 0.12em);
+//   - the labels' `letter-spacing`: it was five values across fourteen classes (0.06 / 0.08 / 0.1 /
+//     0.12em) and is `var(--track)` everywhere as of the space-and-tracking sweep;
 //   - the empty states' `font-style`: seven italic, ten not, with nothing distinguishing them;
 //   - the notices' `line-height` (1.45 / 1.5 / 1.55) and the triggers' vertical padding.
 // What IS pinned in each family is the thing a person can see and somebody chose: an ink, a hue, a size.
@@ -205,7 +206,7 @@ describe('the tinted notice boxes', () => {
   it.each(TONES)('.%s is one 6px box', (cls) => {
     const b = box(label(cls, 'div'));
     expect(b['border-radius']).toBe('6px');
-    expect(b.padding).toBe('8px 0.7rem');
+    expect(b.padding).toBe('8px 12px');
   });
 
   // THE INK IS PART OF THE TONE, and this is the assertion that says so: `bad` is danger ink because a
@@ -236,7 +237,7 @@ describe('the tinted notice boxes', () => {
     const b = box(label('vb-notice vb-notice-bad control-disclaimer', 'div'));
     expect(b.color).toBe('var(--text)');
     expect(b.background).toContain('var(--danger');
-    expect(b.margin).toBe('0.6rem 0.9rem 0');
+    expect(b.margin).toBe('12px 16px 0');
     expect(b['border-radius']).toBe('6px');
   });
 

@@ -2,15 +2,15 @@
 .card-skills {
   flex: 0 0 11rem; min-width: 0; overflow-y: auto;
   display: flex; flex-direction: column; gap: var(--s-3);
-  padding: 0.7rem var(--s-4); border-left: 1px solid var(--border); background: var(--panel-2);
+  padding: var(--s-5) var(--s-4); border-left: 1px solid var(--border); background: var(--panel-2);
 }
 .cs-head {
-  margin: 0 0 0.1rem; font-family: var(--font-display); font-size: var(--t-small);
-  text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted);
+  margin: 0 0 var(--s-1); font-family: var(--font-display); font-size: var(--t-small);
+  text-transform: uppercase; letter-spacing: var(--track); color: var(--muted);
 }
 /* A skill's name is prose of arbitrary length in a narrow rail, so it reads from the left like the list
    it is. Alignment is layout, and the only thing left of this rule. */
 .cs-action { text-align: left; }
-.cs-empty { margin-top: 0.2rem; font-size: var(--t-micro); }
-.card-skills > .vb-error { margin: 0.3rem 0 0; cursor: help; }
+.cs-empty { margin-top: var(--s-2); font-size: var(--t-micro); }
+.card-skills > .vb-error { margin: var(--s-2) 0 0; cursor: help; }
 

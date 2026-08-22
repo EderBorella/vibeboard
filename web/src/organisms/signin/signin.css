@@ -18,7 +18,7 @@
   display: flex;
   gap: var(--s-4);
   align-items: center;
-  margin-top: 0.2rem;
+  margin-top: var(--s-2);
 }
 
 /* One signed-in browser, in Settings. */
@@ -26,7 +26,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.75rem;
+  gap: var(--s-5);
   padding: var(--s-4) 0;
   border-bottom: 1px solid var(--border);
 }
@@ -35,7 +35,7 @@
 /* `Chip pill neutral`. The lowercase stays: the label beside it is whatever the browser called itself,
    and this word is deliberately not shouting next to it. */
 .signin-this {
-  margin-left: 0.35rem;
+  margin-left: var(--s-3);
   text-transform: lowercase;
   white-space: nowrap;
 }

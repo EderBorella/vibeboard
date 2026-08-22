@@ -7,7 +7,7 @@
    The project-level barrier. The accent rather than ochre: this is not a warning, it is the card the
    whole board is waiting on, and it should read as structure rather than as a problem. */
 .tile-setup {
-  text-transform: uppercase; letter-spacing: 0.08em; white-space: nowrap;
+  text-transform: uppercase; letter-spacing: var(--track); white-space: nowrap;
 }
 
 /* Work an agent found and deliberately did not do. Ochre, not the accent: a card carrying this is

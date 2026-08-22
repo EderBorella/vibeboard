@@ -33,7 +33,12 @@ function el(classes: string): Element {
 // The dock's own gutter, written once. Every row below is asserted against THIS rather than against each
 // other: a mutual comparison passes when all seven drift together, which is the one change that would
 // actually be deliberate and the one this test has no opinion about.
-const GUTTER = '0.75rem';
+//
+// `12px` AND NOT `'var(--s-5)'`, and the distinction is the whole reason test/css-box.tsx resolves tokens:
+// the gutter was `0.75rem` until the space sweep and is `var(--s-5)` now, which is the SAME twelve pixels.
+// Writing the token name here would make the assertion compare a literal to itself the moment the
+// resolver stopped working, which is the dangerous repair that file's own header warns about.
+const GUTTER = '12px';
 
 const ROWS = [
   'copilot-head',

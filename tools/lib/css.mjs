@@ -7,7 +7,7 @@ import { lineOf } from './source.mjs';
 // selector.
 //
 // Comments are BLANKED and not removed, so every offset still maps to its real line — the repair
-// `check-type-scale.mjs` needed after it read a comment's prose as a declaration and reported
+// `check-scale.mjs` needed after it read a comment's prose as a declaration and reported
 // `.cv-links { display: flex` as a font size.
 //
 // THE SELECTOR CURSOR IS RESET AT `{` AS WELL AS AT `}` AND `;`, and that line is load-bearing: without

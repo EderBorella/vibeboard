@@ -19,8 +19,10 @@ import type { ButtonHTMLAttributes, ReactNode, Ref } from 'react';
 //
 // Asking "which of the four would have to lie" of each of those gets the same answer twelve times —
 // ALL FOUR, because every one of them draws a box and these have none. Twelve identical answers is not
-// twelve survivors, it is a missing voice: exactly the reasoning that gave `--t-display` its first
-// consumer in Phase 2, where the scale turned out not to be short. Here it was.
+// twelve survivors, it is a missing voice: exactly the reasoning that gave the type scale's top step a
+// consumer in Phase 2, where the scale turned out not to be short. Here it was. (That step was
+// `--t-display` and it has since retired — one consumer is not a step — which does not weaken the shape
+// of the argument, only that instance of it.)
 export type ButtonVariant = 'primary' | 'default' | 'ghost' | 'danger' | 'bare';
 export type ButtonSize = 'sm' | 'md';
 

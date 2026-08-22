@@ -266,7 +266,7 @@ describe('a field label has a treatment now, because Field asks for one', () => 
     const label = container.querySelector('.vb-label');
     if (!label) throw new Error('Field rendered no label');
     expect(box(label)['text-transform']).toBe('uppercase');
-    expect(box(label)['letter-spacing']).toBe('0.06em');
+    expect(box(label)['letter-spacing']).toBe('0.08em');
     expect(box(label).width).toBeUndefined();
   });
 

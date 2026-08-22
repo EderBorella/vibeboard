@@ -1,15 +1,19 @@
 /* Rendered markdown (preview pane) */
 .markdown { line-height: 1.6; color: var(--text); }
-.markdown h1, .markdown h2, .markdown h3 { font-family: var(--font-display); margin: 1rem 0 0.5rem; }
-/* `--t-display` ON h1, and the reason is that nearest-step collapsed a heading level. `1.3rem` and
-   `1.1rem` both rounded to `--t-title`, so h1 and h2 rendered identically at 18px — a preview with
-   two heading levels that look the same has one. `--t-display` is the scale's "one big number per
-   surface" step, and the largest heading of a rendered document is exactly that; it also had no
-   consumer at all until here, which is what a defined-and-unused step eventually costs. */
-.markdown h1 { font-size: var(--t-display); } .markdown h2 { font-size: var(--t-title); } .markdown h3 { font-size: var(--t-lead); }
-.markdown p { margin: 0.5rem 0; }
-.markdown ul, .markdown ol { margin: 0.5rem 0 0.5rem 1.3rem; }
-.markdown li { margin: 0.2rem 0; }
+.markdown h1, .markdown h2, .markdown h3 { font-family: var(--font-display); margin: var(--s-6) 0 var(--s-4); }
+/* THE LADDER SLID DOWN ONE STEP, and h1 is 24px → 18px. `--t-display` was defined for "the one big
+   number per surface" and this markdown `h1` was the only rule that ever spent it — a step carrying one
+   consumer, and not the one it was named for. The reason this rule ORIGINALLY reached for it stands and
+   is answered a different way: `1.3rem` and `1.1rem` both round to `--t-title`, so h1 and h2 would have
+   rendered identically at 18px, and a preview with two heading levels that look the same has one. Three
+   distinct levels off `--t-title`/`--t-lead`/`--t-body` keeps that, one step lower. */
+.markdown h1 { font-size: var(--t-title); } .markdown h2 { font-size: var(--t-lead); } .markdown h3 { font-size: var(--t-body); }
+/* BLOCK FLOW, WHERE MARGINS COLLAPSE — which is why these numbers are not the same claim a flex
+   column's `gap` makes: `--s-4` above and `--s-4` below is 8px between two paragraphs, not 16px. The
+   list indent is the one that moved a whole step, 20.8px → 24px, and it is the only visible one. */
+.markdown p { margin: var(--s-4) 0; }
+.markdown ul, .markdown ol { margin: var(--s-4) 0 var(--s-4) var(--s-7); }
+.markdown li { margin: var(--s-2) 0; }
 /* THE THREE INLINE CODE SPANS, TOGETHER, AND ALL THREE ARE MONO-CENSUS EXCEPTIONS RATHER THAN
    READOUTS. A `<code>` in running prose means "this is code" — it is not a measurement, so the
    signature's claim (*if it is monospaced, the machine measured it*) is not the claim being made; the
@@ -19,10 +23,13 @@
    is `--t-body`, and it is what `.gate-preview` already inherited. `.markdown code` keeps its own rule
    because it also draws a box, which is why it is `check-shape-coverage.mjs`'s one chip exemption. */
 .gate-preview code, .ap-help-body code { font-family: var(--font-mono); font-size: var(--t-small); color: var(--accent); }
-.markdown code { font-family: var(--font-mono); font-size: var(--t-small); background: var(--panel-2); padding: 0.05rem var(--s-2); border-radius: var(--r-sm); }
-.markdown pre { background: var(--panel-2); border: 1px solid var(--border); border-radius: var(--r-md); padding: 0.7rem; overflow-x: auto; }
+/* 0.8px → 2px of vertical padding, so an inline code span in prose gains 2.4px of height. It was below
+   the floor of the gap band that used to stand in for this scale, which is how a value that small
+   survived at all. */
+.markdown code { font-family: var(--font-mono); font-size: var(--t-small); background: var(--panel-2); padding: var(--s-1) var(--s-2); border-radius: var(--r-sm); }
+.markdown pre { background: var(--panel-2); border: 1px solid var(--border); border-radius: var(--r-md); padding: var(--s-5); overflow-x: auto; }
 .markdown pre code { background: transparent; padding: 0; }
 .markdown a { color: var(--accent); }
-.markdown blockquote { margin: 0.5rem 0; padding-left: 0.8rem; border-left: 3px solid var(--border); color: var(--muted); }
-.markdown hr { border: none; border-top: 1px solid var(--border); margin: 1rem 0; }
+.markdown blockquote { margin: var(--s-4) 0; padding-left: var(--s-5); border-left: 3px solid var(--border); color: var(--muted); }
+.markdown hr { border: none; border-top: 1px solid var(--border); margin: var(--s-6) 0; }
 

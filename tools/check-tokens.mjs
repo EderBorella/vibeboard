@@ -48,7 +48,7 @@ const DESIGN = 'web/src/design';
 const CORPUS = 'web/src';
 
 // A SMOKE ALARM, NOT A TARGET — see walk() in lib/source.mjs. An order of magnitude under the real
-// counts (80 definitions, 48 names, 3 themes, 4 stylesheets).
+// counts (75 definitions, 45 names, 3 themes, 4 stylesheets).
 const FLOOR = { defs: 20, themes: 3 };
 
 // A NAME MAY BE DEFINED BEFORE ANYTHING READS IT, and this is where that is signed for: the phase that
@@ -56,11 +56,6 @@ const FLOOR = { defs: 20, themes: 3 };
 // notes/atomic-revamp-plan.md's.
 /** @type {Map<string, string>} */
 const UNCONSUMED = new Map([
-  [
-    '--s-7',
-    'Phase 3 — the 176 hand-written space lengths go onto the scale; the 24px step is the one no rule has asked for yet',
-  ],
-  ['--track', 'Phase 3 — 34 letter-spacing declarations collapse onto it'],
   ['--ctl-h', 'Phase 4 — Button, Control and the tab faces declare their own height'],
   ['--mark-h', 'Phase 4 — Chip and the markers declare theirs'],
   ['--rule', 'Phase 4 — the eleven border-left rails, 6:5 between 3px and 2px by nothing'],
@@ -72,7 +67,7 @@ const UNCONSUMED = new Map([
 ]);
 
 // A COLOUR IN THE GEOMETRY BLOCK, ON PURPOSE, with its reason — the precedent is
-// check-radius-scale.mjs's `50%` and check-type-scale.mjs's `inherit`.
+// check-radius-scale.mjs's `50%` and check-scale.mjs's `inherit`.
 /** @type {Map<string, string>} */
 const COLOUR_IN_TOKENS_ON_PURPOSE = new Map([
   [
@@ -123,8 +118,9 @@ export function definitionsOf(sheets) {
   return defs;
 }
 
-// Every `var(--name)` in the corpus, with where it was first seen. The design files are IN the corpus:
-// `--on-fill: var(--on-accent)` is a real consumer, and the alias is exactly why.
+// Every `var(--name)` in the corpus, with where it was first seen. The design files are IN the corpus,
+// because a token defined in one of them may be spent by another: `--on-fill: var(--on-accent)` was a
+// real consumer for two of the three palettes, and that alias is exactly why `--on-accent` is now gone.
 export function referencesOf(sheets) {
   const refs = new Map();
   for (const { file, css } of sheets) {

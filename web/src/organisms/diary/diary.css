@@ -2,11 +2,11 @@
    structure kept quiet so the prose is what the eye lands on. */
 .diary {
   flex: 1; min-width: 0; overflow-y: auto; background: var(--wash);
-  padding: 1.25rem 1.5rem; display: flex; flex-direction: column; gap: 1rem;
+  padding: var(--s-7) var(--s-7); display: flex; flex-direction: column; gap: var(--s-6);
 }
 .diary-head { display: flex; flex-direction: column; gap: var(--s-2); max-width: 68ch; }
 .diary-head h2 {
-  font-family: var(--font-display); text-transform: uppercase; letter-spacing: 0.1em;
+  font-family: var(--font-display); text-transform: uppercase; letter-spacing: var(--track);
   font-size: var(--t-lead); color: var(--text);
 }
 .diary-lede { color: var(--muted); font-size: var(--t-body); line-height: 1.5; }
@@ -24,15 +24,15 @@
 
 .diary-empty {
   display: flex; flex-direction: column; align-items: flex-start; gap: var(--s-4);
-  color: var(--muted); font-size: var(--t-lead); padding: 1.5rem 0;
+  color: var(--muted); font-size: var(--t-lead); padding: var(--s-7) 0;
 }
 
 .diary-list {
-  list-style: none; display: flex; flex-direction: column; gap: 0.1rem; max-width: 68ch;
+  list-style: none; display: flex; flex-direction: column; gap: var(--s-1); max-width: 68ch;
 }
 .diary-entry {
-  display: flex; flex-direction: column; gap: 0.2rem;
-  padding: var(--s-4) 0 var(--s-4) 0.75rem;
+  display: flex; flex-direction: column; gap: var(--s-2);
+  padding: var(--s-4) 0 var(--s-4) var(--s-5);
   border-left: 2px solid var(--border);
 }
 /* The kind, encoded in the rail as well as the word: a run, a checkup, a lifecycle event and a human's own
@@ -46,7 +46,7 @@
 .diary-entry[data-kind='note'] { border-left-color: var(--accent-2); }
 
 .diary-kind {
-  font-family: var(--font-display); text-transform: uppercase; letter-spacing: 0.1em;
+  font-family: var(--font-display); text-transform: uppercase; letter-spacing: var(--track);
   font-size: var(--t-micro); color: var(--text);
 }
 .diary-about { display: flex; flex-wrap: wrap; gap: var(--s-3); }

@@ -1,7 +1,7 @@
 /* The Explorer's tree. One flat list of rows indented by depth, not nested elements, so tab order
    and reading order are the same thing. Wider than the control list: paths run deep. */
-.explorer-list { width: 320px; gap: 0.1rem; }
-.explorer-head { position: sticky; top: -0.75rem; background: var(--wash); z-index: 1; padding-top: 0.15rem; }
+.explorer-list { width: 320px; gap: var(--s-1); }
+.explorer-head { position: sticky; top: -0.75rem; background: var(--wash); z-index: 1; padding-top: var(--s-1); }
 /* `Panel`'s `flat` padding is symmetric, and the 2px this rule shaved off the right was not a
    decision anybody made. `gap` is layout and stays. */
 .explorer-item { gap: var(--s-2); }
@@ -13,8 +13,8 @@
 .explorer-item > .vb-readout { flex-shrink: 0; }
 /* The tail of a capped listing. Deliberately not styled as an error — the folder is fine, the
    listing is simply not all of it. */
-.explorer-more { font-size: var(--t-micro); padding: 0.2rem var(--s-4); }
-.explorer-actions { display: flex; gap: 0.1rem; }
+.explorer-more { font-size: var(--t-micro); padding: var(--s-2) var(--s-4); }
+.explorer-actions { display: flex; gap: var(--s-1); }
 .explorer-actions button:disabled { opacity: 0.3; cursor: not-allowed; }
 /* Where a dragged entry would land. */
 .explorer-over { background: var(--panel-2); border-color: var(--accent); box-shadow: var(--glow); }

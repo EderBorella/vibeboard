@@ -34,19 +34,18 @@ interface Group {
 const GROUPS: Group[] = [
   {
     title: 'Type',
-    note: 'Five steps at 11 / 12 / 13 / 15 / 18px, and the sixth retires with its one consumer.',
+    note: 'Five steps at 11 / 12 / 13 / 15 / 18px. `--t-display` (24px) is gone: one consumer, and not the one it was named for. See Design/Type for the specimens.',
     rows: [
       { name: '--t-micro', means: 'chips, state words, tags', kind: 'type' },
       { name: '--t-small', means: 'controls, secondary text', kind: 'type' },
       { name: '--t-body', means: 'default UI text', kind: 'type' },
       { name: '--t-lead', means: 'panel headings', kind: 'type' },
       { name: '--t-title', means: 'surface titles', kind: 'type' },
-      { name: '--t-display', means: 'no number in the app is set in it', kind: 'type', retires: 'Phase 3' },
     ],
   },
   {
     title: 'Space',
-    note: 'The 2px grid. No eighth step: a value between two of these is a value nobody can name.',
+    note: 'The 2px grid, and every step now has consumers — 176 hand-written lengths landed on it. No eighth step: a value between two of these is a value nobody can name. See Design/Space.',
     rows: [
       { name: '--s-1', means: 'hairline separation', kind: 'space' },
       { name: '--s-2', means: 'inside a chip', kind: 'space' },
@@ -55,7 +54,6 @@ const GROUPS: Group[] = [
       { name: '--s-5', means: 'between groups', kind: 'space' },
       { name: '--s-6', means: 'panel padding', kind: 'space' },
       { name: '--s-7', means: 'between sections', kind: 'space' },
-      { name: '--tile-gap', means: '8.8px — a token off its own scale', kind: 'space', retires: 'Phase 3' },
     ],
   },
   {
@@ -109,7 +107,7 @@ const GROUPS: Group[] = [
   },
   {
     title: 'Palette',
-    note: 'Sixteen per theme today, fifteen once `--on-accent` retires, and every one carries a measured-contrast or per-theme argument in design/themes.css. Switch the theme in the toolbar: this is the half that changes.',
+    note: 'Fifteen per theme, and every one carries a measured-contrast or per-theme argument in design/themes.css. Switch the theme in the toolbar: this is the half that changes.',
     rows: [
       { name: '--bg', means: 'the ground', kind: 'colour' },
       { name: '--panel', means: 'chrome', kind: 'colour' },
@@ -125,12 +123,6 @@ const GROUPS: Group[] = [
       { name: '--warn', means: 'a warning, in the palette it is in', kind: 'colour' },
       { name: '--ok', means: 'a good outcome', kind: 'colour' },
       { name: '--wash', means: 'the signature behind the boards', kind: 'colour' },
-      {
-        name: '--on-accent',
-        means: 'an alias of nothing — its consumer becomes a Chip fill',
-        kind: 'colour',
-        retires: 'Phase 3',
-      },
       {
         name: '--scan',
         means: 'a theme token nothing ever read, in all three palettes',
@@ -163,8 +155,7 @@ function loadedCss(): string {
 //
 // AND THE NAME HAS TO END WHERE THE MATCH ENDS, which `\b` does not give: `-` is a non-word character,
 // so `var(--track\b` matched `var(--track-fit)` at organisms/board/board.css:101 and this page reported
-// `--track` — a
-// token with zero consumers, signed for in `UNCONSUMED` until Phase 3 — as spent once. A wrong count here
+// `--track` — then a token with zero consumers, signed for in `UNCONSUMED` until Phase 3 — as spent once. A wrong count here
 // is worse than none: every N−1 argument for the token set is made from these numbers.
 const consumersOf = (css: string, name: string): number =>
   css.match(new RegExp(`var\\(\\s*${name}(?![\\w-])`, 'g'))?.length ?? 0;

@@ -1,9 +1,9 @@
 /* ---------- Top tabs (Boards | Project Control) ---------- */
-.topbar-tabs { display: flex; gap: var(--s-2); margin-left: 0.5rem; }
+.topbar-tabs { display: flex; gap: var(--s-2); margin-left: var(--s-4); }
 .tab-btn {
   background: transparent; color: var(--muted); border: 1px solid transparent;
-  border-radius: var(--r-md); padding: var(--s-2) 0.7rem; font-size: var(--t-small); cursor: pointer;
-  font-family: var(--font-display); letter-spacing: 0.04em;
+  border-radius: var(--r-md); padding: var(--s-2) var(--s-5); font-size: var(--t-small); cursor: pointer;
+  font-family: var(--font-display); letter-spacing: var(--track);
 }
 .tab-btn:hover { color: var(--text); }
 .tab-btn.active { color: var(--accent); border-color: var(--border); background: var(--panel-2); box-shadow: var(--glow); }

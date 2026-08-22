@@ -13,6 +13,11 @@
  * `--scan` WAS HERE, IN ALL THREE BLOCKS, AND IS GONE: a theme token with zero consumers in any
  * stylesheet. Deleted in this phase rather than a later one precisely because nothing reads it — a
  * name with no consumer cannot split the revert of the phase that would have retired it.
+ *
+ * `--on-accent` WAS HERE TOO, AND WENT FOR A DIFFERENT REASON: it was an alias. Two of the three blocks
+ * wrote `--on-fill: var(--on-accent)`, which is a name that decides nothing, so those two take the value
+ * directly. Its one rule-level consumer was `.tab-badge`, and the ink it wanted there is stated at the
+ * site now — see pages/execution/execution.css.
  */
 
 /* Default palette = Cyberpunk (also applied when no data-theme is set, avoiding FOUC). */
@@ -26,7 +31,6 @@
   --muted: #7f9aa3;
   --accent: #14b8a6;        /* teal — primary */
   --accent-2: #f59e0b;      /* amber — secondary */
-  --on-accent: #04120f;     /* text on accent fills */
   --danger: #ff5c6c;
   /* Referenced by styles.css and previously defined NOWHERE, so every theme fell through to a hardcoded
      fallback chosen for a dark ground — which the light theme then inherited. Tied to each theme's own
@@ -38,7 +42,7 @@
      it can be; `--accent-fill` only ever has `--on-fill` written on top of it, so it is free. For a dark
      theme the two are the same thing. */
   --accent-fill: var(--accent);
-  --on-fill: var(--on-accent);
+  --on-fill: #04120f;
   --glow: 0 0 14px rgba(20, 184, 166, 0.40);
   /* Signature: hazy teal→amber wash behind the boards. */
   --wash:
@@ -69,7 +73,6 @@
   --muted: #746d60;
   --accent: #2f7a50;        /* green, and the LIGHTEST one that still reads as text — see below */
   --accent-2: #8a6420;      /* warm ochre, the beige's own accent rather than a second hue */
-  --on-accent: #ffffff;
   --danger: #c0392f;
   /* Deep enough to be read at 0.7rem on a near-white panel, which the inherited dark-theme amber was
      not: #b8860b came out at 3.5:1 against this ground and `--warn` is used as a TEXT colour. */
@@ -103,12 +106,11 @@
   --muted: #9aa3b2;
   --accent: #5b9dff;
   --accent-2: #e6b450;
-  --on-accent: #0b1220;
   --danger: #e06c75;
   --warn: #e6b450;
   --ok: #3fb950;
   --accent-fill: var(--accent);
-  --on-fill: var(--on-accent);
+  --on-fill: #0b1220;
   --glow: none;
   --wash: none;
 }

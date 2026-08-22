@@ -10,7 +10,7 @@
 // WHY THIS EXISTS BESIDE `npm run visual`, WHICH ALREADY ASSERTS THE FIRST ONE.
 //
 // It does not assert the same thing, and Phase 2 proved the gap by planting a defect: `0.81rem` on
-// `.exec-head`, an Execution-tab-only rule, made `npm run check:type-scale` exit 1 while `npm run
+// `.exec-head`, an Execution-tab-only rule, made `npm run check:scale` exit 1 while `npm run
 // visual` exited 0 on the same tree. The harness measures the BOARD — 232 elements, six radius values
 // — and the stylesheet authors radii on the Execution tab, in settings, in drawers, in card panes and
 // in the copilot's message bubbles, none of which the board view opens. Before Phase 3 the file held
@@ -87,7 +87,7 @@ const OFF_SCALE_ON_PURPOSE = new Map([
 // The RADIUS floor went the same way, and it had already fired. It was 60 against 65 declarations when
 // Phase 5's sweep began; the segmented-control merge took the tree to **59**, and the run failed saying
 // *"only 59 border-radius found, against a floor of 60. This check is vacuous"* about a check that was
-// working perfectly and had just been given less work to do. `tools/check-type-scale.mjs` had its own
+// working perfectly and had just been given less work to do. `tools/check-scale.mjs` had its own
 // version of this five away from firing and lost its floors in the same commit.
 //
 // The flaw is structural in both cases: every count this file measures SHRINKS as the sweep succeeds,
@@ -115,8 +115,9 @@ const OFF_SCALE_ON_PURPOSE = new Map([
 //   `.cards-tab-label` `.dock-tab` `.tab-btn` — tabs, and Phase 5b measured them and did NOT build a
 //                      `Tabs`. `.cards-tab-label` is not a tab at all — it is the ellipsised label inside
 //                      one, with `border: none` and no corner — and the two real tabs disagree on the two
-//                      things a tab primitive would have to own: the face (`.tab-btn` is not uppercase at
-//                      0.04em tracking, `.dock-tab` is uppercase at 0.08em) and the selected state
+//                      things a tab primitive would have to own: the face (`.tab-btn` is not uppercase,
+//                      `.dock-tab` is — the tracking stopped disagreeing once both took `--track`) and
+//                      the selected state
 //                      (`.tab-btn` goes accent with a `--glow`, `.dock-tab` goes `--text` with none).
 //                      Two consumers disagreeing on both of a primitive's decisions is a primitive that
 //                      would carry one variant each, which is a name that decides nothing.
@@ -168,7 +169,7 @@ const rules = (file) => rulesOf(file, readFileSync(join(ROOT, file), 'utf8'));
 // because the brace matcher is the other half of what can silently stop matching.
 // What is wrong with ONE corner value, or null if nothing is. Its own function because three branches
 // inside three loops is what the complexity metric punishes, and the metric punishes nesting far harder
-// than length — the same repair `fontSizeFault` is in tools/check-type-scale.mjs.
+// than length — the same repair `fontSizeFault` is in tools/check-scale.mjs.
 function cornerFault(value) {
   if (OFF_SCALE_ON_PURPOSE.has(value)) return null;
   const token = /^var\((--[\w-]+)\)$/.exec(value)?.[1];

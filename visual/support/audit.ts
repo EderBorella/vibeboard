@@ -71,18 +71,15 @@ export interface FocusAudit {
   offenders: Offender[];
 }
 
-// The six steps of docs/design-system.md, BY NAME. The pixel values are deliberately not written
-// here: they are read back out of the page, so this check cannot disagree with themes.css about what
-// `--t-body` is. A token whose value is wrong is drift's business; an element whose size is not on
+// The FIVE steps of docs/design-system.md, BY NAME. The pixel values are deliberately not written
+// here: they are read back out of the page, so this check cannot disagree with design/tokens.css about
+// what `--t-body` is. A token whose value is wrong is drift's business; an element whose size is not on
 // the scale at all is this one's.
-export const TYPE_SCALE = [
-  '--t-micro',
-  '--t-small',
-  '--t-body',
-  '--t-lead',
-  '--t-title',
-  '--t-display',
-] as const;
+//
+// `--t-display` WAS THE SIXTH AND IS GONE. It carried one consumer — a markdown `h1` — and not the one
+// it was named for, so the heading ladder in atoms/prose.css slid down onto the three steps below it.
+// Removing the NAME here narrows this check: a 24px computed size is now a finding, which is the point.
+export const TYPE_SCALE = ['--t-micro', '--t-small', '--t-body', '--t-lead', '--t-title'] as const;
 
 // The four radius steps of docs/design-system.md, BY NAME, for the reason the type scale is: the pixel
 // values are read back out of the page, so this check cannot disagree with themes.css about them.

@@ -6,15 +6,16 @@
    referenced by one rule in this file — so `complete` is `ok` and `running` is `accent`, and the two are
    further apart than the amber-and-teal pair they were. What that argument was really protecting is the
    distinction, and the table keeps it while this file no longer has an opinion about the tokens.
-   `color: var(--muted)` WENT WITH THEM, and it had to: styles.css loads after ui/primitives.css, so at
+   `color: var(--muted)` WENT WITH THEM, and it had to: every surface sheet is imported after
+   ui/primitives.css — see web/src/styles.ts — so at
    equal specificity this rule beat `.vb-chip-tone` and the chip would have rendered grey in all four
    states. It was the fallback for `stopped`, which had no rule of its own — and `stopped` is the
    `neutral` tone, which is that same `--muted`. Nothing is lost. */
-.ap-chip { letter-spacing: 0.03em; text-transform: lowercase; }
+.ap-chip { text-transform: lowercase; }
 
 .ap-controls {
   display: flex;
   gap: var(--s-4);
-  margin: 0.4rem 0 0.2rem;
+  margin: var(--s-3) 0 var(--s-2);
 }
 

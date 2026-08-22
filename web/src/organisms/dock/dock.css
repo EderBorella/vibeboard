@@ -10,9 +10,9 @@
 .dock-tab {
   display: inline-flex; align-items: center; gap: var(--s-3);
   background: transparent; border: 1px solid transparent; color: var(--muted);
-  border-radius: var(--r-md); padding: 0.2rem var(--s-4); cursor: pointer;
+  border-radius: var(--r-md); padding: var(--s-2) var(--s-4); cursor: pointer;
   font-family: var(--font-display); font-size: var(--t-small);
-  text-transform: uppercase; letter-spacing: 0.08em;
+  text-transform: uppercase; letter-spacing: var(--track);
 }
 .dock-tab:hover { color: var(--text); }
 .dock-tab.active { color: var(--text); background: var(--panel-2); border-color: var(--border); }

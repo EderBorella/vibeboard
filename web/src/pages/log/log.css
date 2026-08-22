@@ -4,7 +4,7 @@
 .filed {
   flex: 0 1 42%; min-width: 0; overflow-y: auto; background: var(--wash);
   border-left: 1px solid var(--border);
-  padding: 1.25rem 1.5rem; display: flex; flex-direction: column; gap: 1rem;
+  padding: var(--s-7) var(--s-7); display: flex; flex-direction: column; gap: var(--s-6);
 }
 /* Narrow enough that the two columns stop being two columns: the diary keeps the width, and this stacks
    under it rather than becoming a gutter neither half can be read in. */
@@ -13,7 +13,7 @@
   .filed { flex: none; border-left: none; border-top: 1px solid var(--border); }
 }
 
-.filed-list { list-style: none; display: flex; flex-direction: column; gap: 0.1rem; }
+.filed-list { list-style: none; display: flex; flex-direction: column; gap: var(--s-1); }
 /* THE ROLE THIS SURFACE GIVES ITS TONE: the left rail, and nothing else — the entry's own text stays
    `--text` and `--muted`. Three `[data-state]` rules became this one declaration, and the claim they
    carried is unchanged: an active finding is the one asking for something, and a dismissed one is kept
@@ -25,12 +25,12 @@
    every other border was not a state, it was the absence of one, and "dismissed" is a decision somebody
    took. */
 .filed-entry {
-  display: flex; flex-direction: column; gap: 0.2rem;
-  padding: var(--s-4) 0 var(--s-4) 0.75rem;
+  display: flex; flex-direction: column; gap: var(--s-2);
+  padding: var(--s-4) 0 var(--s-4) var(--s-5);
   border-left: 2px solid var(--tone, var(--border));
 }
 .filed-state {
-  font-family: var(--font-display); text-transform: uppercase; letter-spacing: 0.1em;
+  font-family: var(--font-display); text-transform: uppercase; letter-spacing: var(--track);
   font-size: var(--t-micro); color: var(--text);
 }
 /* ONE CHIP PER LINE IN THIS COLUMN, because a row of them cannot be made to fit. A run id alone is

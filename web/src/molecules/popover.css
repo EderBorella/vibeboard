@@ -10,7 +10,7 @@
   z-index: 20;
   width: max-content;
   max-width: 46ch;
-  padding: 0.7rem 0.85rem;
+  padding: var(--s-5) var(--s-5);
   background: var(--panel-2);
   border: 1px solid var(--border);
   border-radius: var(--r-lg);

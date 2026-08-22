@@ -1,14 +1,14 @@
 /* ---------- Project Control tab ---------- */
 .control { flex: 1; min-width: 0; display: flex; background: var(--wash); }
 .control-list {
-  width: 260px; flex-shrink: 0; overflow-y: auto; padding: 0.75rem;
-  border-right: 1px solid var(--border); display: flex; flex-direction: column; gap: 0.9rem;
+  width: 260px; flex-shrink: 0; overflow-y: auto; padding: var(--s-5);
+  border-right: 1px solid var(--border); display: flex; flex-direction: column; gap: var(--s-6);
 }
-.control-group { display: flex; flex-direction: column; gap: 0.15rem; }
+.control-group { display: flex; flex-direction: column; gap: var(--s-1); }
 .control-group-head {
   display: flex; align-items: center; justify-content: space-between;
-  font-family: var(--font-display); text-transform: uppercase; letter-spacing: 0.12em;
-  font-size: var(--t-micro); color: var(--muted); padding: 0 0.15rem 0.15rem;
+  font-family: var(--font-display); text-transform: uppercase; letter-spacing: var(--track);
+  font-size: var(--t-micro); color: var(--muted); padding: 0 var(--s-1) var(--s-1);
 }
 /* Accent at rest, not on hover: a `＋` that creates is the affordance of the group head it sits in, and
    a muted one reads as disabled. */
@@ -23,11 +23,11 @@
    one of the five tones and must not be forced into one — themes.css gives it a different value from
    `--warn` in marshmallow — so the ink stays here, as `.ap-chip`'s does. */
 .control-tag {
-  text-transform: uppercase; letter-spacing: 0.08em; color: var(--accent-2);
+  text-transform: uppercase; letter-spacing: var(--track); color: var(--accent-2);
 }
 /* Where the dragged card will land. Sits in the gap between tiles. */
 .drop-line {
-  height: 2px; margin: 2px 0; border-radius: var(--r-pill);
+  height: 2px; margin: var(--s-1) 0; border-radius: var(--r-pill);
   background: var(--accent); box-shadow: var(--glow);
 }
 

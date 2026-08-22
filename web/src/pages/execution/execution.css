@@ -12,10 +12,10 @@
   flex: 1;
   min-width: 0;
   overflow: auto;
-  padding: 1.1rem;
+  padding: var(--s-6);
   display: grid;
   grid-template-columns: repeat(var(--exec-cols, 3), minmax(14rem, 1fr));
-  gap: 0.9rem;
+  gap: var(--s-6);
   align-items: start;
   align-content: start;
   background: var(--wash);
@@ -28,7 +28,7 @@
 .exec-head {
   display: flex; align-items: center; gap: var(--s-4); margin: 0;
   font-family: var(--font-display); font-size: var(--t-small);
-  text-transform: uppercase; letter-spacing: 0.1em;
+  text-transform: uppercase; letter-spacing: var(--track);
 }
 /* A `Panel` with the `inset` variant. It is the same object as a `.tile` — a record in a column on a
    `--panel` parent — and it sat on `--bg` while the tile sat on `--panel-2`, which nobody chose. */
@@ -69,8 +69,14 @@
 .exec-summary { margin: 0; color: var(--muted); font-size: var(--t-small); line-height: 1.35; overflow-wrap: anywhere; }
 /* `Chip pill` plus `vb-readout` for the mono face. The ground is `--accent-2` rather than `fill`'s
    `--panel-2` because this badge is the one ambient signal that a run wants a decision — a count on a
-   panel ground would read as furniture. Not a `tone`: `--accent-2` is outside the closed five. */
+   panel ground would read as furniture. Not a `tone`: `--accent-2` is outside the closed five.
+   THE INK IS THE SURFACE THIS COUNT IS PUNCHED OUT OF, and that is what `--on-accent` was for — a name
+   that also aliased `--on-fill` in two of the three palettes and therefore decided nothing. `--panel-2`
+   is the one token whose value tracks the ground it has to be legible on: near-black in the two dark
+   palettes, white in the light one, which is exactly what the retired name held. `--on-fill` is the
+   wrong substitute and was measured as such: marshmallow's is a dark green mixed for a PALE fill, and on
+   ochre it reads 2.34:1. */
 .tab-badge {
-  margin-left: 0.35rem; background: var(--accent-2); color: var(--on-accent);
+  margin-left: var(--s-3); background: var(--accent-2); color: var(--panel-2);
 }
 

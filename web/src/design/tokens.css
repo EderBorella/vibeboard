@@ -23,32 +23,35 @@
   --font-display: "Roboto Condensed", "Arial Narrow", ui-sans-serif, system-ui, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
 
-  /* Card sizing (responsive overrides live in the container queries in organisms/board/board.css). */
+  /* Card sizing (responsive overrides live in the container queries in organisms/board/board.css).
+   * `--tile-gap: 0.55rem` WAS HERE AND IS GONE: 8.8px, a token off the app's own space scale, spent by
+   * three declarations that all wanted `--s-4`. The column's `max-height` calc that read it goes
+   * 371.2px → 368px, which is the only visible consequence. `--board-gap` in board.css went the same
+   * way and for the same reason. */
   --tile-h: 112px;
-  --tile-gap: 0.55rem;
   --col-w: 248px;
 
   /* Type, space and radius: ONE definition for all three themes, on purpose. See
-   * docs/design-system.md — these three scales replace 27 authored font sizes, a 0.25–0.6rem gap band
-   * and 8 radius values.
+   * docs/design-system.md — these three scales replace 27 authored font sizes, 176 hand-written space
+   * lengths and 8 radius values. The gap band that used to be enforced instead of the scale is gone:
+   * `npm run check:scale` now claims that nothing in the file is off the scale at all.
    */
 
   /* Whole pixels at the 16px default base, and the rem values are chosen to land there: 0.6875rem is
    * exactly 11px. Fractional steps are what produced a button at 10.88px inside a 12.16px bar — two
    * sizes nobody could name, so nobody could see they disagreed. Do not "tidy" these to round rems.
    * The ratio is deliberately not constant: the working range is compressed because a cockpit's text
-   * is small and dense, and --t-display separates because a heading has to win.
+   * is small and dense, and the top two steps separate because a heading has to win.
    */
   --t-micro: 0.6875rem;   /* 11px — chips, state words, dot labels, tags */
   --t-small: 0.75rem;     /* 12px — controls, secondary text, table cells */
   --t-body: 0.8125rem;    /* 13px — default UI text, card titles on the board */
   --t-lead: 0.9375rem;    /* 15px — panel headings, an open card's title */
   --t-title: 1.125rem;    /* 18px — surface titles */
-  /* Retires in Phase 3 WITH its one consumer, and the argument is a measurement rather than taste: the
-   * step exists to carry "the one big number per surface" and no number in the app is set in it. Its
-   * actual consumer is a markdown `h1`, which takes `--t-title`, with `h2`/`h3` on `--t-lead`/`--t-body`
-   * — three heading levels off three steps the scale already has. */
-  --t-display: 1.5rem;    /* 24px — the one big number per surface */
+  /* `--t-display: 1.5rem` WAS HERE AND IS GONE, and the argument was a measurement rather than taste:
+   * the step existed to carry "the one big number per surface" and no number in the app was set in it.
+   * Its only consumer was a markdown `h1`, which now takes `--t-title`, with `h2`/`h3` on
+   * `--t-lead`/`--t-body` — three heading levels off three steps the scale already had. Five steps. */
 
   /* A 2px grid, in px rather than rem: these are gaps and paddings between boxes whose own sizes are
    * already px (--tile-h, --col-w), and a space that rescaled with the root font while its container
@@ -84,9 +87,10 @@
    */
   --rule: 3px;
 
-  /* THE UPPERCASE CHROME TREATMENT. 34 letter-spacing declarations, 12 values, three real decisions;
-   * 25 of them collapse here. `.brand`'s 0.22em and `.vb-readout`'s -0.01em stay as named exceptions
-   * with their reasons in the gate, on the precedent of `50%` and `inherit`.
+  /* THE UPPERCASE CHROME TREATMENT. 34 letter-spacing declarations, 12 values, three real decisions:
+   * 27 collapsed here, five were deleted as noise with a unit on it (0.01em to 0.04em on 11–13px text
+   * is a tenth of a pixel), and `.brand`'s 0.22em and `.vb-readout`'s -0.01em stay as named exceptions
+   * with their reasons in check-scale.mjs, on the precedent of `50%` and `inherit`.
    */
   --track: 0.08em;
 

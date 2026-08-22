@@ -11,16 +11,15 @@
   flex: 1;
   min-width: 0;
   overflow: auto;
-  padding: 1.1rem;
+  padding: var(--s-6);
   display: flex;
   flex-direction: column;
-  gap: 1.1rem;
+  gap: var(--s-6);
   background: var(--wash);
   container: vbboards / inline-size;
-  /* Named once so `--track-fit` below cannot disagree with the `gap` it subtracts. It was written out
-     as a literal `0.7rem` in both places, so changing the gap would have silently left the track
-     arithmetic measuring a gap that no longer existed. */
-  --board-gap: 0.7rem;
+  /* `--board-gap: 0.7rem` WAS HERE and the name is no longer needed. It existed so `--track-fit` below
+     could not disagree with the `gap` it subtracts — both were once a literal `0.7rem`. `--s-5` is that
+     single name now, one layer up, so the alias only stood between the arithmetic and the scale. */
 }
 
 /* ---------- Board ---------- */
@@ -34,12 +33,16 @@
   background: transparent;
   border: none;
   border-left: 3px solid var(--accent);
-  padding: 0.15rem var(--s-4);
+  padding: var(--s-1) var(--s-4);
   cursor: pointer;
   font-family: var(--font-display);
   font-size: var(--t-body);
   text-transform: uppercase;
-  letter-spacing: 0.16em;
+  /* 0.16em → 0.08em, THE LARGEST TRACKING CHANGE IN THE APP, and it shortens every board heading by
+     roughly a character's width. 0.16em was double what any other caps label in the tree used and
+     nothing chose the difference; a heading that is loose enough to read as spaced-out lettering is
+     competing with the wordmark, which is the one element allowed to do that. */
+  letter-spacing: var(--track);
   color: var(--text);
 }
 .board-label:hover { color: var(--accent); }
@@ -95,12 +98,12 @@
      `overflow: visible` neither clips nor scrolls, so no walk in the harness examined it. Screenshots
      at 1200px and 900px showed it immediately. Check 9 now asserts the head fits inside the column at
      all three widths, so this floor cannot be lowered past it again. */
-  --track-fit: calc((100% - (var(--max-cols, 4) - 1) * var(--board-gap)) / var(--max-cols, 4));
+  --track-fit: calc((100% - (var(--max-cols, 4) - 1) * var(--s-5)) / var(--max-cols, 4));
   grid-template-columns: repeat(
     var(--max-cols, 4),
     minmax(clamp(180px, var(--track-fit), var(--col-w)), 1fr)
   );
-  gap: var(--board-gap);
+  gap: var(--s-5);
   align-items: flex-start;
   /* NO `overflow-x` AND NO BOTTOM PADDING. Both belonged to the scroller this row used to be: the
      padding was clearance for a scrollbar of its own. Overflow now reaches `.boards`, which is the
@@ -163,19 +166,20 @@
   font-family: var(--font-display);
   font-size: var(--t-body);
   text-transform: uppercase;
-  letter-spacing: 0.1em;
+  letter-spacing: var(--track);
 }
-.column-title::before { content: "["; color: var(--accent); margin-right: 0.3em; }
-.column-title::after { content: "]"; color: var(--accent); margin-left: 0.3em; }
+.column-title::before { content: "["; color: var(--accent); margin-right: var(--s-2); }
+.column-title::after { content: "]"; color: var(--accent); margin-left: var(--s-2); }
 /* `bare` owns the box and the hover; `push` is where it sits. */
 .column-body {
-  padding: var(--tile-gap);
+  padding: var(--s-4);
   display: flex;
   flex-direction: column;
-  gap: var(--tile-gap);
+  gap: var(--s-4);
   overflow-y: auto;
-  /* Show ~3 fixed-height cards, then scroll inside the column. */
-  max-height: calc(var(--tile-h) * 3 + var(--tile-gap) * 4);
+  /* Show ~3 fixed-height cards, then scroll inside the column. 368px, and it was 371.2px: the gap this
+     multiplies was `--tile-gap`, a token 0.8px off the app's own grid. */
+  max-height: calc(var(--tile-h) * 3 + var(--s-4) * 4);
   /* AND THE SCROLLBAR IS THIS COLUMN'S OWN, louder than the app's, because the app's could not do the
      one job it has here. The global rule is `thin` with a `--border` thumb — furniture, correctly quiet
      on a log or a chat, where you already know there is more text below. A column is the opposite case:
@@ -208,7 +212,7 @@
 .column-body::-webkit-scrollbar-thumb:hover { background-color: var(--accent); }
 .column-empty {
   color: var(--muted); font-size: var(--t-small); text-align: center;
-  padding: 0.9rem var(--s-4); border: 1px dashed var(--border); border-radius: var(--r-md);
+  padding: var(--s-6) var(--s-4); border: 1px dashed var(--border); border-radius: var(--r-md);
 }
 
 /* ---------- Card tile (fixed size) ---------- */
@@ -224,7 +228,7 @@
   cursor: pointer;
   display: flex;
   flex-direction: column;
-  gap: 0.2rem;
+  gap: var(--s-2);
 }
 .tile:hover { border-color: var(--accent); box-shadow: var(--glow); }
 .tile-head { display: flex; align-items: center; gap: var(--s-3); }
@@ -248,7 +252,7 @@
 }
 .tile-group {
   font-size: var(--t-micro); color: var(--accent-2);
-  text-transform: uppercase; letter-spacing: 0.06em;
+  text-transform: uppercase; letter-spacing: var(--track);
 }
 .tile-tags { display: flex; flex-wrap: wrap; gap: var(--s-2); margin-top: auto; overflow: hidden; max-height: 1.3rem; }
 /* `Chip pill neutral` owns the box and the ink. The ground is the one thing a tag still decides:

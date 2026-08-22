@@ -146,7 +146,9 @@ const chips: {
     props: { pill: true, className: 'tab-badge vb-readout' },
     radius: PILL,
     font: MICRO,
-    ink: /--on-accent/,
+    // `--on-accent` retired: it aliased `--on-fill` in two of the three palettes and decided nothing.
+    // The ink a count punched out of an `--accent-2` ground needs is the surface it is punched out of.
+    ink: /--panel-2/,
     ground: 'var(--accent-2)',
   },
   {
@@ -190,7 +192,7 @@ describe('the chip family draws one box', () => {
     expect(drawn['font-family']).toBe('var(--font-mono)');
     expect(drawn['font-size']).toBe(SMALL);
     expect(drawn['border-radius']).toBe(SM);
-    expect(drawn.padding).toBe('0.05rem 4px');
+    expect(drawn.padding).toBe('2px 4px');
     expect(drawn.background).toBe('var(--panel-2)');
   });
 

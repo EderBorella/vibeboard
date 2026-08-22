@@ -36,14 +36,16 @@ const SHEETS = SHEET_ORDER.filter((f) => !TOKEN_FILES.includes(f)).map((f) =>
 // BOTH FILES ARE READ, and reading only one is the trap this phase walked into deliberately. Phase 1 of
 // notes/atomic-revamp-plan.md split `themes.css` into design/tokens.css and design/themes.css, so a
 // resolver pointed at the old name would still have found a file — one that now holds nothing but
-// colour — and every geometry `var()` would have stopped resolving. 88 assertions compare a resolved box
-// to an exact string, so they all go red in one run.
+// colour — and every geometry `var()` would have stopped resolving. 121 assertions across seven files
+// compare a resolved box to an exact string, so they all go red in one run. (Phase 1's note said 88;
+// counted, it is 121, and a number nobody re-counts is how the rest of this paragraph gets ignored.)
 //
-// THAT FAILURE HAS A DANGEROUS REPAIR AND IT IS NOT THIS ONE: eighty-eight red assertions are exactly
-// the number somebody makes green by pasting the token name into the expectation. At that point the
-// resolver is inert, every box assertion compares one literal to the same literal, and the suite passes
-// while asserting nothing. Not one expectation was rewritten to a `var()` string; the resolver was
-// widened instead.
+// THAT FAILURE HAS A DANGEROUS REPAIR AND IT IS NOT THIS ONE: a hundred and twenty-one red assertions are
+// exactly the number somebody makes green by pasting the token name into the expectation. At that point
+// the resolver is inert, every box assertion compares one literal to the same literal, and the suite
+// passes while asserting nothing. Not one expectation has ever been rewritten to a `var()` string; the
+// resolver was widened instead, and the space-and-tracking sweep — which really did move dozens of these
+// values — held the same line: `'8px 0.65rem'` became `'8px 12px'`, never `'8px var(--s-5)'`.
 //
 // THE SPLIT IS THE SAME TRAP ONE LAYER OUT, which is why the sheet list is no longer written here
 // either: a resolver reading no sheets at all resolves every box to `{}`, and an empty box passes every

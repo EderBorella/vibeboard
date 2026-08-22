@@ -1,7 +1,13 @@
 // THE CASCADE, IN ONE PLACE. `styles.css` — 116KB, 309 classes, 22 sections in one file — is 47 files
 // now, one per layer surface, and this is the only list of them that exists: the app loads it, the
-// Storybook preview loads it, `test/css-box.tsx` resolves boxes through it and
-// `npm run check:split` proves the concatenation of it is the old file byte for byte.
+// Storybook preview loads it and `test/css-box.tsx` resolves boxes through it.
+//
+// `npm run check:split` PROVED THE SPLIT WAS A MOVE — the 47 concatenated in this order were the old
+// file byte for byte — and it is gone, with its 116KB witness, in the commit that put the hand-written
+// lengths onto the space scale. That commit changes 176 declarations on purpose, so the claim is false
+// by design from here on, and a gate nobody can run pointing at a file nobody reads is worse than none.
+// What replaced it as the guard on this ORDER is `npm run visual`: `ui/primitives.css` moved to the end
+// put a 15.5px span in a 14.0px flex row on all three themes, which is 21 failing checks.
 //
 // ONE LIST RATHER THAN TWO, and that is the whole reason this is a module and not 47 imports in
 // `main.tsx`. `.storybook/preview.tsx` already carried a second copy of the four-line version with a
@@ -11,9 +17,9 @@
 //
 // THE ORDER IS THE OLD FILE'S OWN ORDER, and it is load-bearing rather than tidy. Equal-specificity
 // rules are decided by source order, so every part is imported at the position its bytes held inside
-// `styles.css`. That is what makes the split a move: `npm run check:split` fails the moment a part is
-// reordered, edited or resliced, and `npm run visual` would report drift on the surfaces where two rules
-// meet.
+// `styles.css`. That is what made the split a move, and it is what still has to hold: `npm run visual`
+// reports drift on the surfaces where two rules meet, which is the only instrument left now that the
+// byte-identity gate has gone.
 //
 // Bare side-effect imports, so biome's import sorting leaves them where they are: each one is a barrier
 // rather than a member of a sortable group. Sorting them would be a silent cascade change.
@@ -46,8 +52,8 @@ import './ui/primitives.css';
 // declares none of the three — its only non-class selectors are `button.vb-chip`, `button.vb-panel`
 // and `select.vb-input`, all (0,1,1) and so above every reset rule here whatever the order. Lifting
 // this above the primitives was planted and changed NOTHING the browser harness could see, on any of
-// the three themes. It stays where its bytes were, and `npm run check:split` pins the position — not
-// because this pair contends, but because the pair below it does: `ui/primitives.css` moved to the end
+// the three themes. It stays where its bytes were, and the browser harness is what pins the position —
+// not because this pair contends, but because the pair below it does: `ui/primitives.css` moved to the end
 // put a 15.5px span in a 14.0px flex row on all three themes.
 import './design/reset.css';
 import './templates/app-shell.css';

@@ -23,7 +23,7 @@
    see ui/primitives.css. */
 .report-chip {
   flex: 0 0 auto;
-  text-transform: uppercase; letter-spacing: 0.06em;
+  text-transform: uppercase; letter-spacing: var(--track);
 }
 .report-skill { flex: 0 0 auto; font-size: var(--t-small); }
 /* Money reads as data, not prose: mono, so a card's runs line up down the column. */
@@ -52,18 +52,18 @@
 .report { display: flex; flex-direction: column; gap: var(--s-4); overflow-wrap: anywhere; }
 .report-head { display: flex; align-items: center; gap: var(--s-4); }
 .report-title { margin: 0; font-family: var(--font-display); font-size: var(--t-lead); }
-.report-meta { display: flex; flex-wrap: wrap; gap: 0.2rem 1rem; margin: 0; font-size: var(--t-small); }
+.report-meta { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-6); margin: 0; font-size: var(--t-small); }
 .report-meta div { display: flex; gap: var(--s-3); }
 .report-meta dt { color: var(--muted); }
 /* Every value in this list is a `Readout` `plain` — see runs/ReportPane.tsx. What is left is the
    margin a `<dd>` arrives with. */
 .report-meta dd { margin: 0; }
-.report-lead { margin: 0; font-size: var(--t-lead); padding-left: 0.7rem; border-left: 3px solid var(--accent); }
+.report-lead { margin: 0; font-size: var(--t-lead); padding-left: var(--s-5); border-left: 3px solid var(--accent); }
 .report-note { margin: 0; font-size: var(--t-body); color: var(--accent-2); }
 .report-prompt { margin: 0; font-size: var(--t-body); color: var(--muted); }
-.report-prompt-label { text-transform: uppercase; letter-spacing: 0.06em; font-size: var(--t-micro); }
+.report-prompt-label { text-transform: uppercase; letter-spacing: var(--track); font-size: var(--t-micro); }
 .report-body { border-top: 1px solid var(--border); padding-top: var(--s-3); }
-.report-created { display: flex; flex-direction: column; gap: 0.2rem; }
+.report-created { display: flex; flex-direction: column; gap: var(--s-2); }
 .report-foot { display: flex; align-items: center; justify-content: flex-end; gap: var(--s-4); }
 
 /* Options on a report that needs attention. The agent's suggestions and the fixed ones look the
@@ -76,6 +76,6 @@
    and the dash was the one thing making them look different. Dashed also now means "explains", which a
    button that starts a run does not. */
 .option-btn { text-align: left; }
-.options-close { display: flex; align-items: center; gap: var(--s-4); margin-top: 0.2rem; }
+.options-close { display: flex; align-items: center; gap: var(--s-4); margin-top: var(--s-2); }
 .options-close-label { font-size: var(--t-small); color: var(--muted); margin-right: auto; }
 

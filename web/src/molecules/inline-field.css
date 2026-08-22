@@ -2,7 +2,7 @@
 .inline-view {
   background: transparent; border: 1px solid transparent; border-radius: var(--r-md);
   color: inherit; font: inherit; text-align: left; cursor: text;
-  padding: 0.1rem var(--s-3); margin: -0.1rem -0.35rem; width: 100%;
+  padding: var(--s-1) var(--s-3); margin: calc(-1 * var(--s-1)) calc(-1 * var(--s-3)); width: 100%;
   display: block;
   /* A <button> is a flex item whose automatic minimum size is its content on ONE line, and that
      beats width:100% — which is why an editable description ran off the pane while the body (a div)
@@ -13,7 +13,7 @@
 .inline-edit {
   width: 100%; background: var(--bg); color: var(--text);
   border: 1px solid var(--accent); border-radius: var(--r-md);
-  padding: 0.1rem var(--s-3); font: inherit; font-family: inherit; resize: vertical;
+  padding: var(--s-1) var(--s-3); font: inherit; font-family: inherit; resize: vertical;
 }
 .inline-edit:focus { outline: none; }
 /* The title keeps its display face while editable. */

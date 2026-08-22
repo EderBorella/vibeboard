@@ -147,15 +147,15 @@ describe('the raised surfaces — a --panel ground, a --border edge and a 10px c
     // The SHORTHAND, because that is what the rule writes: `box()` resolves the cascade but does not
     // expand `margin` into its four sides, so asking for `margin-bottom` here answers `undefined` — which
     // is the same value a deleted declaration would answer, and would have passed as `not.toBe`.
-    expect(box(el('vb-status-head', 'strong')).margin).toBe('0 0 0.35rem');
+    expect(box(el('vb-status-head', 'strong')).margin).toBe('0 0 6px');
     expect(box(el('vb-status-detail', 'p')).margin).toBe('0');
     // The one boundary that still has a margin on it, and it is on the LOWER of the two elements.
-    expect(box(el('vb-status-next', 'p'))['margin-top']).toBe('0.5rem');
+    expect(box(el('vb-status-next', 'p'))['margin-top']).toBe('8px');
   });
 
   it('the gate card stacks headings whose margins meet', () => {
-    expect(box(at('<div class="gate-card"><ul class="gate-list"></ul></div>', 'ul')).margin).toBe('0 0 1rem');
-    expect(box(at('<div class="gate-card"><h3>h</h3></div>', 'h3')).margin).toBe('1.5rem 0 0.5rem');
+    expect(box(at('<div class="gate-card"><ul class="gate-list"></ul></div>', 'ul')).margin).toBe('0 0 16px');
+    expect(box(at('<div class="gate-card"><h3>h</h3></div>', 'h3')).margin).toBe('24px 0 8px');
   });
 });
 
@@ -213,7 +213,7 @@ describe('the nested boxes — a drawn edge and the smaller 6px corner', () => {
     const b = drawn(inside('markdown', 'pre'));
     expect(b.ground).toBe('var(--panel-2)');
     expect(b.edge).toBe('1px solid var(--border) + no colour of its own');
-    expect(box(inside('markdown', 'pre')).padding).toBe('0.7rem');
+    expect(box(inside('markdown', 'pre')).padding).toBe('12px');
   });
 
   it('.msg-assistant keeps FOUR corners and a tail, which Panel has no way to say', () => {
@@ -221,7 +221,7 @@ describe('the nested boxes — a drawn edge and the smaller 6px corner', () => {
   });
 
   it(".control-tabs button keeps a tab's padding, and it is a tab", () => {
-    expect(box(inside('control-tabs', 'button')).padding).toBe('0.2rem 8px');
+    expect(box(inside('control-tabs', 'button')).padding).toBe('4px 8px');
   });
 
   // `.copilot-actions button` WAS `Button` `default` `sm` DECLARATION FOR DECLARATION, which is the whole
@@ -300,6 +300,10 @@ describe('the four tabs disagree about every decision a Tabs primitive would own
     expect(new Set(resting).size).toBe(3);
   });
 
+  // THE TRACKING STOPPED BEING PART OF THE DISAGREEMENT, and that narrows this claim by exactly one
+  // property: `.dock-tab` was 0.08em against `.tab-btn`'s 0.04em, and both are `var(--track)` now. What
+  // the four still disagree about is the FAMILY and the CASE — one uppercase display, one sentence-case
+  // display, two declining a face in two different places — which is the part the Tabs refusal rests on.
   it('the FACE is four answers across four tabs', () => {
     const face = Object.entries(TABS).map(([, target]) => {
       const b = box(target);
@@ -307,7 +311,7 @@ describe('the four tabs disagree about every decision a Tabs primitive would own
     });
     expect(face).toEqual([
       'var(--font-display) / uppercase / 0.08em',
-      'var(--font-display) / — / 0.04em',
+      'var(--font-display) / — / 0.08em',
       '— / — / —',
       '— / — / —',
     ]);
@@ -343,6 +347,6 @@ describe('the four tabs disagree about every decision a Tabs primitive would own
   // two controls — the label and a close `✕` — so it declares no padding and takes no click itself.
   it('.cards-tab declares no padding, because the controls inside it do', () => {
     expect(box(el('cards-tab')).padding).toBeUndefined();
-    expect(box(el('cards-tab-label', 'button')).padding).toBe('0.18rem 0.1rem 0.18rem 8px');
+    expect(box(el('cards-tab-label', 'button')).padding).toBe('2px 2px 2px 8px');
   });
 });

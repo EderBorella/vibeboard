@@ -1,7 +1,7 @@
 /* Typed confirmation: for the actions that destroy more than the one thing they name. */
 .confirm-require {
   display: flex; flex-direction: column; gap: var(--s-2);
-  font-size: var(--t-small); color: var(--muted); margin-bottom: 0.9rem;
+  font-size: var(--t-small); color: var(--muted); margin-bottom: var(--s-6);
 }
 .confirm-require .vb-input { font-family: var(--font-mono); }
 .confirm-go:disabled { opacity: 0.45; cursor: not-allowed; }

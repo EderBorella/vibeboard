@@ -65,7 +65,7 @@ const SURVIVORS = new Map([
 
 // The census's own question, asked here the same way `tools/check-shape-coverage.mjs` asks it: which
 // rules outside the primitive stylesheet declare the monospaced face. Comments are stripped, because a
-// rule quoted in prose is not a rule — the defect `check-type-scale.mjs` had before it blanked them.
+// rule quoted in prose is not a rule — the defect `check-scale.mjs` had before it blanked them.
 // THE SURFACES, WHICH ARE 47 FILES RATHER THAN ONE — read out of `web/src/styles.ts`, the app's own
 // cascade list, so a sheet added by a later phase is censused by existing. The three dropped are the
 // three that are not surfaces: `ui/primitives.css` is the primitive stylesheet this census is asking

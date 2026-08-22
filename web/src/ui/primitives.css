@@ -170,20 +170,20 @@ button.vb-chip { cursor: pointer; }
    opposite of the request.
    THE FOCUS RING IS HERE and it was on `.conn-status` alone. All four are buttons now — that is the
    ruling — so all four need one, and `.vb-chip` deliberately has none: a chip is usually a `<span>`. */
-.vb-status { font-size: var(--t-small); letter-spacing: 0.04em; white-space: nowrap; }
+.vb-status { font-size: var(--t-small); white-space: nowrap; }
 .vb-status:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 /* THE BALLOON'S THREE LINES, ONCE. They were six classes — `.conn-pop-{head,detail,next}` and
    `.ap-agent-{heading,detail,next}` — declaring the same three things at the same values, because the
    two surfaces that had a balloon each wrote one. */
 .vb-status-head {
-  display: block; margin: 0 0 0.35rem;
-  font-size: var(--t-body); font-weight: 600; color: var(--text); letter-spacing: 0.01em;
+  display: block; margin: 0 0 var(--s-3);
+  font-size: var(--t-body); font-weight: 600; color: var(--text);
 }
 .vb-status-detail,
 .vb-status-next { margin: 0; font-size: var(--t-small); line-height: 1.45; color: var(--muted); }
 /* Separated from the detail above it, because they have different authors: the detail is the server's
    sentence and this is our advice about it. */
-.vb-status-next { margin-top: 0.5rem; color: var(--text); opacity: 0.75; }
+.vb-status-next { margin-top: var(--s-4); color: var(--text); opacity: 0.75; }
 
 /* ---------- SegmentedControl ---------- */
 /* THE GROUP OWNS ONE BORDER AND ONE CORNER AND CLIPS ITS CELLS, which is exactly why Phases 3 and 4 both
@@ -200,9 +200,10 @@ button.vb-chip { cursor: pointer; }
   border: none; border-right: 1px solid var(--border);
   padding: var(--s-2) var(--s-4); font-size: var(--t-small); cursor: pointer;
 }
-/* `0.18rem` stays as authored rather than going to `--s-1`: it is below the 0.25rem floor the space scale
-   deliberately does not claim, where the nearest step is a 2-6x change on what is a hairline. */
-.vb-seg-cell-sm { padding: 0.18rem var(--s-4); font-size: var(--t-micro); }
+/* `0.18rem` STOOD HERE ON AN ARGUMENT THAT NO LONGER EXISTS: it was below the 0.25rem floor of a gap
+   band that claimed neither end of itself, so the value was legal by omission. There is no band now —
+   nothing in the file is off the scale — and 2.88px goes to `--s-1`, which shortens the cell by 1.76px. */
+.vb-seg-cell-sm { padding: var(--s-1) var(--s-4); font-size: var(--t-micro); }
 .vb-seg-cell:last-child { border-right: none; }
 .vb-seg-cell.active { background: var(--accent-fill); color: var(--on-fill); font-weight: 600; }
 .vb-seg-cell:disabled { opacity: 0.6; cursor: default; }
@@ -236,7 +237,7 @@ button.vb-chip { cursor: pointer; }
 .vb-panel-inset { background: var(--panel-2); border-color: var(--border); }
 .vb-panel-head {
   display: flex; align-items: center; gap: var(--s-4);
-  padding: var(--s-4) 0.65rem; border-bottom: 1px solid var(--border);
+  padding: var(--s-4) var(--s-5); border-bottom: 1px solid var(--border);
 }
 /* A Panel that takes a click is still a control. `:disabled` keeps the box and drops the affordance,
    which is what `.exec-card` said by hand. */
@@ -301,7 +302,7 @@ button.vb-panel:disabled { cursor: default; }
    So the two are separated by what they decide: the RAIL is a width, the CAPS is a face. `margin: 0`
    belongs here because a caps label is a label whatever element carries it, and half of these are
    headings that would otherwise take the UA's paragraph margins. */
-.vb-label-caps { text-transform: uppercase; letter-spacing: 0.06em; margin: 0; }
+.vb-label-caps { text-transform: uppercase; letter-spacing: var(--track); margin: 0; }
 /* The label in a fixed-width rail beside its control, which the skill editor and the dispatch pane each
    wrote their own of at 6rem and 5.5rem — half a rem apart, and nobody chose either. */
 .vb-label-rail { width: 6rem; flex: 0 0 auto; }
@@ -427,7 +428,7 @@ select.vb-input:hover:not(:disabled), .vb-field select:hover:not(:disabled) { bo
    `var(--warn, var(--danger))` fallback, exactly as `.settings-warn` wrote it. */
 .vb-notice {
   font-size: var(--t-body); line-height: 1.5;
-  border: 1px solid transparent; border-radius: var(--r-md); padding: var(--s-4) 0.7rem;
+  border: 1px solid transparent; border-radius: var(--r-md); padding: var(--s-4) var(--s-5);
 }
 .vb-notice-bad {
   color: var(--danger);

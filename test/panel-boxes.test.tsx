@@ -196,7 +196,7 @@ describe('a raised surface draws a panel ground, a border and a 10px corner', ()
     expect(drawn['border-bottom']).toBe('1px solid var(--border)');
     expect(drawn.display).toBe('flex');
     expect(drawn['align-items']).toBe('center');
-    expect(drawn.padding).toBe('8px 0.65rem');
+    expect(drawn.padding).toBe('8px 12px');
   });
 });
 

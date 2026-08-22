@@ -1,26 +1,26 @@
 .control-editor { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
 .control-editor-head {
-  display: flex; align-items: center; gap: var(--s-4); padding: var(--s-4) 0.9rem;
+  display: flex; align-items: center; gap: var(--s-4); padding: var(--s-4) var(--s-6);
   border-bottom: 1px solid var(--border); background: var(--panel);
 }
-.control-tabs { display: flex; gap: var(--s-2); margin-left: 0.5rem; }
+.control-tabs { display: flex; gap: var(--s-2); margin-left: var(--s-4); }
 .control-tabs button {
   background: var(--panel-2); color: var(--muted); border: 1px solid var(--border);
-  border-radius: var(--r-md); padding: 0.2rem var(--s-4); font-size: var(--t-small); cursor: pointer;
+  border-radius: var(--r-md); padding: var(--s-2) var(--s-4); font-size: var(--t-small); cursor: pointer;
 }
 .control-tabs button.active { color: var(--text); border-color: var(--accent); }
 .control-editor-actions { margin-left: auto; display: flex; gap: var(--s-3); }
 /* `.btn-danger` was here — `Button`'s `danger` variant at `md`, so it sits level with the Save beside it. */
 /* The prose ink is the surface's and the shell's inset is the shell's; the box is the primitive's. */
-.control-disclaimer { margin: 0.6rem 0.9rem 0; color: var(--text); }
+.control-disclaimer { margin: var(--s-5) var(--s-6) 0; color: var(--text); }
 /* The box is `.vb-input`'s as of Phase 9. What is left is the pane's inset, the fact that this one
    fills its pane, and the monospaced face — which is the CONTENT being machine text, not a measurement,
    so it is not a `Readout`. */
 .control-textarea {
-  flex: 1; margin: 0.75rem 0.9rem; resize: none;
+  flex: 1; margin: var(--s-5) var(--s-6); resize: none;
   font-family: var(--font-mono); line-height: 1.5;
 }
-.control-preview { flex: 1; overflow-y: auto; padding: 0.75rem 1.1rem; }
-.control-blank { margin: auto; color: var(--muted); padding: 2rem; }
-.control-editor > .vb-error, .explorer-list > .vb-error { padding: var(--s-4) 0.9rem; }
+.control-preview { flex: 1; overflow-y: auto; padding: var(--s-5) var(--s-6); }
+.control-blank { margin: auto; color: var(--muted); padding: var(--s-7); }
+.control-editor > .vb-error, .explorer-list > .vb-error { padding: var(--s-4) var(--s-6); }
 

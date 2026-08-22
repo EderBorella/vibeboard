@@ -3310,6 +3310,47 @@ noticed they could not. One of the three carries a title far too long for a tile
 title that fits cannot distinguish "clamped to one line and ellipsised" from "clamped to two and cut
 through the middle".
 
+### The owner's second pass — one indicator, and the slack measured
+
+Three more, from looking at the result of the first pass. The interesting one is that **the merge had
+missed the fifth indicator by counting four**: the auto-pilot bar's own state was a bare `Dot` beside a
+sentence, so `complete` was still "a green ball" rather than the chip `complete` is everywhere else.
+
+**Two indicators for one loop, and neither was a summary of the other.** The header said `auto-pilot
+running` where the bar said `4 dispatches · E-004 · implement`; on a stop the header named the reason
+while the bar said `Stopped.` The owner ruled one of the two goes, and it is the header's: the surface
+with the Start button on it is where a person watches the loop. `chipFor` moved to `transport.ts` as
+`wordFor`, `.ap-chip` moved with it, and `TopBar` no longer takes an `autopilot` prop at all.
+
+**What that costs, stated rather than glossed:** the header is on every tab and the bar is only on Boards,
+so a loop that stops while you are reading the Project Log no longer says so where you are looking. Taken
+deliberately against the worse problem, which is two indicators for one fact with no rule about which is
+authoritative.
+
+**`status` may now be empty, and that reversed a documented contract.** It was *"always a sentence, never
+blank: a strip that says nothing is a strip nobody trusts"* — right while the row was the only statement
+of the state. With a chip beside it, `Stopped.`, `Finished.` and `Not started.` were the chip's own word
+again with a full stop after it, so those three states say nothing in the row. `Halted.` lost only its
+first word: what is left is the part the chip cannot fit and a person does not expect, that a halt takes
+the chat and the manual runs down with it. Eleven tests moved from `topbar.test.tsx` to
+`autopilot-bar.test.tsx` and five changed the field they assert; the transport suite's *is never blank*
+became *always says what state it is in, even where the row says nothing*, on the same three states.
+
+**The empty space was measured, not eyeballed, and both numbers are worth keeping.** `.ap-transport`'s
+`min-width: 6.5rem` — argued as *"a target you have to aim at is one you misclick"* — made the button
+**104px wide around 49px of ink**. `.conn-text`'s `width: 12ch`, sized to `unauthorized` so a reconnect
+could not shove the tab row sideways, reserved **91.6px for a 40.8px word**. Both arguments were coherent
+and both are withdrawn: over half of each control was empty, and as *drawn* chips that emptiness is
+visible in a way it never was on a bare word. After: **67.4×20** and **70.8×16**. `.vb-btn-sm`'s vertical
+padding went `--s-2` → `--s-1` with them, app-wide, because a 24px box around 14px of ink is over a third
+empty and the row has to stay one height.
+
+**Two gates caught leftovers this pass, which is the argument for having them.**
+`check:name-resolution` failed on `className="ap-transport"` — a name at a call site with no rule behind
+it, styling nothing, the exact defect it was written for. And `noExcessiveCognitiveComplexity` refused
+`autopilotAdvice` once the idle branch went in; the fix was flattening it into `notStartedAdvice` rather
+than raising a ceiling, which is what that rule is usually pointing at.
+
 ## Risks, and what would stop this
 
 - **Class renames break tests.** There are **106** `querySelector('.class')` calls in the React tests — Phase 9 migrated one and its own characterisation suite added five, all five of which ARE the subject (`.vb-field` and `.vb-label`, whose treatment is the claim), the same shape as Phase 4's; 102 before it, and Phase 8 migrated six, four to `data-testid` and two to a `testId` the primitive takes as a named prop, and moved a seventh assertion off an exact-`className` comparison that a composing primitive would have pinned; 108 before it and unchanged across Phase 5b, which took two out and put two back and says so under *Selector migrations*; 127 before Phase 5, which migrated nineteen —

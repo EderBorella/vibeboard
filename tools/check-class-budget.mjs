@@ -84,7 +84,10 @@ const SHEETS = [join('web', 'src', 'styles.css'), join('web', 'src', 'ui', 'prim
 // `.vb-twist`, which is a font-size for six disclosure glyphs drawn at the chip step. Plus
 // `.copilot-authority`, a row that had never had a class and therefore never had the gutter its six
 // siblings all have.
-const CLASS_CEILING = 362;
+// 362 before the owner's second pass, 361 after it: `.ap-transport` lost its whole rule — a `min-width`
+// that measured 104px around 49px of ink — and `.ap-chip` moved from the top bar to the auto-pilot bar's
+// own chip rather than being added again.
+const CLASS_CEILING = 361;
 const CLASS_TARGET = 183;
 
 // Anti-vacuity floor on the SELECTOR PARSER, not on the class count: a regex that stops matching reports

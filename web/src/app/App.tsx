@@ -274,7 +274,6 @@ export function App() {
         onToggleCopilot={() => setCopilotOpen((v) => !v)}
         onSettings={() => setSettingsOpen(true)}
         onSwitchProject={() => setShowGate(true)}
-        autopilot={autopilot.state}
         {...lightProps(conn, sandbox)}
       />
 

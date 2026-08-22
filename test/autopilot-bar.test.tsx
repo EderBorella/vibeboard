@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { STOP_REASONS } from '../src/core/dispatch-gate.js';
 import type { AutopilotState, Readiness, RunList, SandboxState } from '../web/src/api.js';
 import type { CopilotConfig } from '../web/src/shared.js';
 
@@ -444,6 +445,95 @@ describe('which agent auto-pilot runs', () => {
   });
 });
 
+// THE LOOP'S OWN STATE, AS ONE CHIP, AND THESE CLAIMS ARRIVED FROM test/topbar.test.tsx. Eleven tests
+// there asserted a second auto-pilot indicator beside the project name; the owner ruled that one of the
+// two goes, and the one that stays is on the surface with the Start button. So the claims move rather than
+// being deleted — the word per state, the reason on a stop, `complete` as the only success, the balloon
+// and the tooltip with its fallback.
+//
+// TWO THINGS ARE DELIBERATELY DIFFERENT HERE. The word is `running` and not `auto-pilot running`: the
+// prefix existed because that chip sat beside a project name with no other context, and on the bar that
+// runs the loop nothing else is in question. And `idle` renders a chip that says `not started`, where the
+// header rendered none at all — a chip per tab was noise, and a bar whose whole subject is the loop
+// saying nothing about it is worse than noise.
+describe('the loop’s own state, as one chip', () => {
+  const chip = (): HTMLElement => screen.getByTestId('ap-chip');
+  const at = (over: Partial<AutopilotState>): AutopilotState => ({ ...IDLE, state: 'stopped', ...over });
+
+  it('says the state in one word, and carries it as an attribute', () => {
+    show({ state: { ...IDLE, state: 'running', iteration: 1 } });
+    expect(chip().textContent).toBe('running');
+    expect(chip().getAttribute('data-state')).toBe('running');
+  });
+
+  it('says halted, whatever the reason was', () => {
+    show({ state: at({ state: 'halted', reason: 'killed' }) });
+    expect(chip().textContent).toBe('halted');
+    expect(chip().getAttribute('data-state')).toBe('halted');
+  });
+
+  it('names the reason it stopped', () => {
+    show({ state: at({ reason: 'exhausted' }) });
+    expect(chip().textContent).toBe('exhausted');
+  });
+
+  // The one state the header hid and this one does not. See the note above.
+  it('says so while nothing has started, where the header showed nothing', () => {
+    show({ state: IDLE });
+    expect(chip().textContent).toBe('not started');
+    expect(chip().getAttribute('data-state')).toBe('idle');
+  });
+
+  // The line the study draws, on screen: only one of these ended with the work done. Over STOP_REASONS
+  // rather than a hand-written list, so a reason added later fails this until somebody decides which side
+  // of the line it is on — which is the property the core test has and this one used to lack.
+  it('styles only `complete` as a success', () => {
+    for (const reason of STOP_REASONS) {
+      cleanup();
+      show({ state: at({ reason }) });
+      const success = chip().getAttribute('data-state') === 'complete';
+      expect(success, reason).toBe(reason === 'complete');
+    }
+  });
+
+  // THE STOP SENTENCE IS THE SERVER'S AND REACHES THE BALLOON VERBATIM. It names the branch the loop could
+  // not create and quotes git underneath, which is exactly the string a `title` was cutting off.
+  it('opens to the loop’s own stop sentence', () => {
+    const said = 'Nothing can move E-004, E-007 — check that every column that holds a card is routed.';
+    show({ state: at({ reason: 'stalled', detail: said }) });
+
+    expect(chip().tagName).toBe('BUTTON');
+    expect(screen.queryByRole('dialog')).toBeNull();
+    fireEvent.click(chip());
+    const balloon = screen.getByRole('dialog');
+    expect(balloon.querySelector('.vb-status-detail')?.textContent).toBe(said);
+    // Our heading names the stop; the server's sentence is the detail. Same split as `lightAdvice`.
+    expect(balloon.querySelector('.vb-status-head')?.textContent).toBe('Auto-pilot stopped: stalled');
+  });
+
+  // `next` IS ABSENT ON A SUCCESS, which is `LightAdvice`'s contract: an instruction implies something is
+  // wrong, and a finished run is not a fault. The dialog is fetched before the query so this cannot pass
+  // against a balloon that failed to open at all.
+  it('gives a finished run no instruction, because there is nothing to do', () => {
+    show({ state: at({ reason: 'complete' }) });
+    fireEvent.click(chip());
+    const balloon = screen.getByRole('dialog');
+    expect(balloon.querySelector('.vb-status-head')?.textContent).toBe('Auto-pilot finished');
+    expect(balloon.querySelector('.vb-status-next')).toBeNull();
+  });
+
+  // THE TOOLTIP IS THE ROW'S SENTENCE, AND FALLS BACK TO THE WORD. A halt has a sentence the chip cannot
+  // fit — a halt takes the chat and the manual runs down with it — and a stop has none, because
+  // `statusFor` returns nothing for the state whose row was the chip's own word in a full stop.
+  it('titles itself with the row’s sentence, or with its own word when there is none', () => {
+    show({ state: at({ state: 'halted' }) });
+    expect(chip().getAttribute('title')).toBe('Everything in this project was stopped.');
+    cleanup();
+    show({ state: at({ reason: 'exhausted' }) });
+    expect(chip().getAttribute('title')).toBe('exhausted');
+  });
+});
+
 describe('whether that agent can actually run', () => {
   it('says so when the server reports nothing wrong', async () => {
     show();
@@ -565,8 +655,11 @@ describe('why it stopped, readable in full', () => {
     // bug — so this asserts the full text is present.
     expect(detail.textContent).toBe(LONG);
 
-    // And the row stays short, so nothing is relying on the ellipsised element to carry it.
-    expect(screen.getByTestId('ap-status').textContent).toBe('Stopped.');
+    // AND THE ROW SAYS NOTHING AT ALL, which is stronger than the `Stopped.` it used to assert: the row is
+    // an ellipsised one-liner, so anything it carried was a candidate for being the truncated copy of this
+    // sentence. The chip two elements to the left says `stalled`; the element is not rendered.
+    expect(screen.queryByTestId('ap-status')).toBeNull();
+    expect(screen.getByTestId('ap-chip').textContent).toBe('stalled');
   });
 
   it('says nothing when there is nothing to explain', async () => {

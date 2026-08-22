@@ -5,7 +5,6 @@ import { join } from 'node:path';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { STOP_REASONS } from '../src/core/dispatch-gate.js';
-import type { AutopilotState } from '../web/src/api.js';
 import {
   LIGHT_STATES,
   type LightState,
@@ -207,25 +206,35 @@ describe('TopBar', () => {
     expect(container.querySelector('.conn-text')?.textContent).toBe(state);
   });
 
-  // The indicator sits LEFT of the tabs, so a label that resized with its text would shove the tab row
-  // sideways on every reconnect — which is the entire reason the width is fixed.
+  // THE FIXED WIDTH IS GONE, AND ITS TEST BECOMES THE ASSERTION THAT IT STAYS GONE. This was *reserves a
+  // fixed width for the label, so a state change cannot move the tabs*, against `width: 12ch` — sized to
+  // `unauthorized`, the longest name the light can report, so that a reconnect could not shove the tab row
+  // sideways while you were aiming at it.
   //
-  // ASSERTED AGAINST THE STYLESHEET SOURCE, not through jsdom. jsdom loads no CSS and computes no
-  // layout, so `getComputedStyle(...).width` answers '' whatever the rule says: a test written that way
-  // passes with the declaration deleted, which is worse than no test. Reading the file is the only thing
-  // here that fails when the property goes.
+  // THE OWNER RE-TOOK THAT TRADE, on a measurement: the box reserved 91.6px for a 40.8px word, so half of
+  // the app's own health indicator was empty space to the right of it — and as a drawn chip, that emptiness
+  // is visible in a way it never was on a bare word. The tabs can now shift by ~50px, but only on the
+  // transition between `online` and one of the two longest failure names, which is a moment when the tab
+  // you were aiming at is not the thing that just went wrong.
+  //
+  // ASSERTED AGAINST THE STYLESHEET SOURCE, not through jsdom, for the reason it always was: jsdom loads no
+  // CSS and computes no layout, so `getComputedStyle(...).width` answers '' whatever the rule says. A test
+  // written that way would pass with the declaration deleted — and would also pass with it restored, which
+  // is what this now needs to catch. `nowrap` is asserted in the same breath because it is the half of the
+  // old rule that survives: the word must not break, whatever the box does.
   //
   // `process.cwd()` rather than `import.meta.url`: this file runs under jsdom, where import.meta.url is
   // an HTTP URL, so a path built from it reaches readFileSync as `http://localhost/...` and throws. The
   // same trap is called out in vitest.config.ts for the same reason.
-  it('reserves a fixed width for the label, so a state change cannot move the tabs', () => {
+  it('reserves no fixed width for the label, so the chip is as wide as its word', () => {
     const css = readFileSync(join(process.cwd(), 'web', 'src', 'styles.css'), 'utf8');
     // ANCHORED TO THE START OF A LINE. Unanchored, `\.conn-text\s*\{` also matches the tail of
     // `.conn-status:hover .conn-text {`, and once that rule was added the test began reading its
     // `color` declaration and failing — a false alarm from a regex that matched the wrong rule.
     const rule = /^\.conn-text\s*\{([^}]*)\}/m.exec(css);
     expect(rule, '.conn-text rule not found in web/src/styles.css').toBeTruthy();
-    expect(rule?.[1]).toMatch(/width:\s*12ch/);
+    expect(rule?.[1], 'the fixed width is back').not.toMatch(/width:/);
+    expect(rule?.[1]).toMatch(/white-space:\s*nowrap/);
   });
 
   // The label is LEFT-aligned inside that fixed box, and this is not cosmetic pedantry: a <button>
@@ -240,15 +249,24 @@ describe('TopBar', () => {
     expect(rule?.[1]).toMatch(/text-align:\s*left/);
   });
 
-  // The number 12 is not arbitrary and must not drift from what it is sized for. If a fifth state is
-  // added to ConnState, or one is renamed longer, the label starts truncating or the width stops being
-  // the longest name — silently, because nothing about a CSS length says what it was measured against.
-  // Against LIGHT_STATES, the DISPLAYED vocabulary, not ConnState. It read ConnState until `offline`
-  // was added — a word the light shows that the socket has never heard of — at which point the test was
-  // measuring the wrong set and would have passed while the label truncated.
-  it('sizes that width to the longest state name the light can report', () => {
+  // THE `12` THIS PINNED WAS THE WIDTH'S OWN JUSTIFICATION, and with the width gone the number has nothing
+  // to be right about — a length in `ch` says nothing about what it was measured against, which is exactly
+  // why it needed a test. What survives is the claim underneath it: every state the light can report is
+  // rendered in FULL, whatever the box is, so a longer state name added later cannot be silently truncated.
+  // Read from the DOM now rather than from the vocabulary's own lengths, which is the stronger direction —
+  // the old version compared `LIGHT_STATES` against a constant and would have passed while the label was
+  // being clipped by something else.
+  it('renders every state name in full, whatever the box measures', () => {
     expect(LIGHT_STATES.length).toBeGreaterThan(1);
-    expect(Math.max(...LIGHT_STATES.map((s) => s.length))).toBe(12);
+    for (const state of LIGHT_STATES) {
+      cleanup();
+      const { container } = render(<TopBar {...props} light={state} />);
+      const label = container.querySelector('.conn-text');
+      expect(label?.textContent, state).toBe(state);
+      // AND NOTHING IS CUT. `text-overflow` would be the mechanism, and the assertion is on the absence of
+      // one anywhere on the element: an ellipsis here would hide `unauthorized` behind `unauthoriz…`.
+      expect(label?.className ?? '', state).not.toContain('ellips');
+    }
   });
 });
 
@@ -349,115 +367,40 @@ describe('the tabs', () => {
   });
 });
 
-describe('the auto-pilot chip', () => {
-  const state = (over: Partial<AutopilotState>): AutopilotState => ({
-    state: 'stopped',
-    iteration: 0,
-    ...over,
-  });
-
-  const chip = (): HTMLElement | null => document.querySelector('[data-testid="ap-chip"]');
+// THE HEADER NO LONGER SAYS ANYTHING ABOUT AUTO-PILOT, and this is what is left of the eleven tests that
+// asserted the chip that used to be here. Every one of their claims moved to test/autopilot-bar.test.tsx —
+// the word per state, the reason on a stop, `complete` as the only success, the balloon, the tooltip and
+// its fallback — because the chip moved, not because the claims stopped mattering. The owner's ruling: two
+// indicators for one loop, on two surfaces, with no rule about which was authoritative.
+//
+// WHAT IS ASSERTED HERE IS THE ABSENCE, over every stop reason and both other states, on the header's TEXT
+// rather than on a test id — so bringing a second indicator back under any class, id or wording fails this.
+// The old version of this file checked only that the stop SENTENCE was absent; the state word is now
+// absent too, and the sentence claim is kept inside it.
+describe('the header says nothing about the loop', () => {
   const header = (): HTMLElement | null => document.querySelector('header.topbar');
 
-  // The sentence belongs to `ap-bar-detail`, which wraps it under the auto-pilot bar's row for every state
-  // that has one. The header once carried a second copy, as an unbounded flex sibling that pushed the tabs
-  // and the buttons right. Asserted on the header's TEXT rather than on the old test id, so bringing the
-  // duplicate back under any class or id fails this.
-  it('does not repeat the stop sentence in the header, whatever the stop was', () => {
+  it('carries neither the reason nor the sentence, whatever the stop was', () => {
     const said = 'Nothing can move E-004, E-007 — check that every column that holds a card is routed.';
     for (const reason of STOP_REASONS) {
       cleanup();
-      render(<TopBar {...props} autopilot={state({ state: 'stopped', reason, detail: said })} />);
-      expect(header()?.textContent).not.toContain(said);
-    }
-    cleanup();
-    render(<TopBar {...props} autopilot={state({ state: 'halted', detail: said })} />);
-    expect(header()?.textContent).not.toContain(said);
-  });
-
-  // The chip keeping the sentence as its `title` is already asserted by 'carries the detail as its tooltip'
-  // below, which predates this fix and needs no second copy. What had no cover is the fallback.
-  it('falls back to the chip word when the stop said nothing', () => {
-    render(<TopBar {...props} autopilot={state({ state: 'stopped', reason: 'exhausted' })} />);
-    expect(chip()?.getAttribute('title')).toBe('exhausted');
-  });
-
-  // THE CHIP OPENS NOW, and it was the only one of the four indicators that could not. Its whole
-  // explanation was the `title` the test above asserts — which truncates, needs a hover, and is
-  // unreachable on a touch device, on the one indicator that is on screen from every tab.
-  //
-  // THE STOP SENTENCE IS THE SERVER'S AND MUST REACH THE BALLOON VERBATIM. It names the branch the loop
-  // could not create and quotes git underneath, so this is exactly the string a tooltip was cutting off.
-  // The test above proves the header does not RENDER it beside the chip; this proves it is one click away.
-  it('opens to the loop’s own stop sentence, which the tooltip was truncating', () => {
-    const said = 'Nothing can move E-004, E-007 — check that every column that holds a card is routed.';
-    render(<TopBar {...props} autopilot={state({ state: 'stopped', reason: 'stalled', detail: said })} />);
-
-    const it_ = chip();
-    expect(it_?.tagName).toBe('BUTTON');
-    expect(screen.queryByRole('dialog')).toBeNull();
-    fireEvent.click(it_ as HTMLElement);
-    const balloon = screen.getByRole('dialog');
-    expect(balloon.querySelector('.vb-status-detail')?.textContent).toBe(said);
-    // Our heading names the stop; the server's sentence is the detail. Same split as `lightAdvice`.
-    expect(balloon.querySelector('.vb-status-head')?.textContent).toBe('Auto-pilot stopped: stalled');
-  });
-
-  // `next` IS ABSENT ON A SUCCESS, which is `LightAdvice`'s contract and the reason it is asserted rather
-  // than assumed: an instruction implies something is wrong, and a finished run is not a fault. A `?.` on
-  // the query would make this pass against a balloon that failed to open at all, so the dialog is fetched
-  // first and asserted to exist.
-  it('gives a finished run no instruction, because there is nothing to do', () => {
-    render(<TopBar {...props} autopilot={state({ state: 'stopped', reason: 'complete' })} />);
-    fireEvent.click(chip() as HTMLElement);
-    const balloon = screen.getByRole('dialog');
-    expect(balloon.querySelector('.vb-status-head')?.textContent).toBe('Auto-pilot finished');
-    expect(balloon.querySelector('.vb-status-next')).toBeNull();
-  });
-
-  it('says nothing at all while the project is idle', () => {
-    render(<TopBar {...props} autopilot={state({ state: 'idle' })} />);
-    expect(chip()).toBeNull();
-  });
-
-  it('says nothing before the first answer', () => {
-    render(<TopBar {...props} autopilot={null} />);
-    expect(chip()).toBeNull();
-  });
-
-  it('says when auto-pilot is running', () => {
-    render(<TopBar {...props} autopilot={state({ state: 'running' })} />);
-    expect(chip()?.textContent).toBe('auto-pilot running');
-    expect(chip()?.getAttribute('data-state')).toBe('running');
-  });
-
-  it('says halted, whatever the reason was', () => {
-    render(<TopBar {...props} autopilot={state({ state: 'halted', reason: 'killed' })} />);
-    expect(chip()?.textContent).toBe('halted');
-    expect(chip()?.getAttribute('data-state')).toBe('halted');
-  });
-
-  it('names the reason it stopped', () => {
-    render(<TopBar {...props} autopilot={state({ state: 'stopped', reason: 'exhausted' })} />);
-    expect(chip()?.textContent).toBe('exhausted');
-  });
-
-  // The line the study draws, on screen: only one of these ended with the work done.
-  // Over STOP_REASONS, not a hand-written list. The list here omitted `killed` and `unreadable` — both
-  // added during the slice that wrote it — so the UI half lacked the property the core test has: a reason
-  // added later fails this until someone decides which side of the line it is on.
-  it('styles only `complete` as a success', () => {
-    for (const reason of STOP_REASONS) {
-      cleanup();
-      render(<TopBar {...props} autopilot={state({ state: 'stopped', reason })} />);
-      const success = chip()?.getAttribute('data-state') === 'complete';
-      expect(success, reason).toBe(reason === 'complete');
+      render(<TopBar {...props} />);
+      const text = header()?.textContent ?? '';
+      expect(text, reason).not.toContain(said);
+      // The reason word itself. `complete` and `stopped` are the two that could plausibly appear in
+      // other chrome, so this is the assertion that would catch a chip returning under a new name.
+      expect(text, reason).not.toContain(reason);
     }
   });
 
-  // A halt carries the sentence that explains it; the chip is one word, so the sentence is the tooltip.
-  it('carries the detail as its tooltip', () => {
-    render(<TopBar {...props} autopilot={state({ state: 'halted', detail: 'You stopped everything.' })} />);
-    expect(chip()?.getAttribute('title')).toBe('You stopped everything.');
+  // ANTI-VACUITY, and it is not decoration: `TopBar` no longer takes an `autopilot` prop at all, so the
+  // loop above renders the same markup on every iteration and would pass against a header that renders
+  // NOTHING. This is what says the header still exists and still carries the things it is supposed to.
+  it('still renders the project name, the light and the tabs', () => {
+    render(<TopBar {...props} />);
+    const text = header()?.textContent ?? '';
+    expect(text).toContain('Demo');
+    expect(text).toContain('online');
+    expect(text).toContain('Boards');
   });
 });

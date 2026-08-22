@@ -16,13 +16,12 @@ import { BackendPicker } from '../copilot/BackendPicker';
 import { resolveChoice } from '../copilot/choice';
 import type { CopilotConfig } from '../shared';
 import { Button } from '../ui/Button';
-import { Dot } from '../ui/Dot';
 import { StatusChip } from '../ui/StatusChip';
 import { stateClass } from '../ui/state-tones';
 import { useAction } from '../useAction';
 import { AutopilotHelp } from './AutopilotHelp';
 import { ForgiveDerivation } from './ForgiveDerivation';
-import { type TransportState, transportModel } from './transport';
+import { type TransportModel, transportModel } from './transport';
 import { useReadiness } from './useReadiness';
 
 interface Props {
@@ -163,16 +162,35 @@ function AgentChip({ agent }: { agent: ReturnType<typeof agentStatus> }) {
   );
 }
 
-// THE LOCAL `DOT_TONE` TABLE IS GONE. It mapped the five transport states onto five tone names right
-// here, which made this file the third place in the app with an opinion about what `complete` is worth —
-// and it disagreed with the top bar's chip, where the same state was `--accent`. The dot names the state
-// and ui/state-tones.ts answers, exactly as every other indicator now does.
+// THE LOOP'S OWN STATE, AS THE SAME CHIP AS EVERY OTHER STATE IN THE APP — and it is the last of the
+// five to arrive, which is the owner's point: the previous pass unified four indicators and left this one
+// a bare dot beside a sentence, so `complete` was still "a green ball" rather than the chip `complete` is
+// everywhere else.
 //
-// `idle` and `stopped` are still ONE colour and it is now said rather than true by omission — they are
-// both the `neutral` row. `running` is the only one that moves; the pulse belongs to the Dot because the
-// reduced-motion override that switches it off has to sit beside the keyframes.
-function ToneDot({ state }: { state: TransportState }) {
-  return <Dot size={8} state={state} pulse={state === 'running'} testId="ap-tone-dot" />;
+// IT REPLACES THE TOP BAR'S CHIP TOO, and that is the ruling rather than a side effect: the app had TWO
+// auto-pilot indicators, one on the bar that runs the loop and one beside the project name, and neither
+// was a summary of the other — the top bar's said `auto-pilot running` where this said `4 dispatches ·
+// E-004 · implement`. One of the two had to go and it is not the one on the surface with the Start button.
+//
+// WHAT THAT COSTS, stated because it is a real loss: the top bar is on every tab and this bar is only on
+// Boards, so a loop that stops while you are reading the Project Log no longer says so where you are
+// looking. The board is where a person watches the loop, and two indicators disagreeing about which one
+// is authoritative was the worse of the two problems.
+//
+// THE PULSE belongs to the `Dot` because the `prefers-reduced-motion` override that switches it off has
+// to sit beside the keyframes. `idle` and `stopped` are ONE colour, said rather than true by omission.
+function TransportChip({ model }: { model: TransportModel }) {
+  return (
+    <StatusChip
+      state={model.state}
+      word={model.word}
+      advice={model.advice}
+      title={model.status || model.word}
+      pulse={model.state === 'running'}
+      className="ap-chip"
+      testId="ap-chip"
+    />
+  );
 }
 
 // THE ONE BIG BUTTON. Its own component for the reason AgentChip is: the bar sits on the
@@ -197,7 +215,10 @@ function Transport({
       // colour rather than in a box: the emergency stop, Settings and How it works are all `sm`, so `md`
       // made the play button a step taller than the row it sits in and pushed the whole strip's height
       // off the tabs above it. The owner asked for the normal size.
-      className="ap-transport"
+      // NO `className`. It carried `.ap-transport`, whose only declaration was the `min-width` the owner
+      // withdrew — and `npm run check:name-resolution` is what caught the leftover: a class named at a
+      // call site and defined by no rule styles nothing, which is the defect that gate exists for. The
+      // test id stays; it is what the suite and the harness select on.
       data-testid="ap-transport"
       disabled={control.disabled}
       title={control.title}
@@ -329,10 +350,15 @@ export function AutopilotBar({
           <span aria-hidden="true">✕</span> Emergency stop
         </Button>
 
-        <ToneDot state={model.state} />
-        <span className="ap-status" data-testid="ap-status">
-          {model.status}
-        </span>
+        <TransportChip model={model} />
+        {/* ONLY WHEN THERE IS ONE. `status` is empty for the two states whose row was the chip's own word
+            in a full stop — see `statusFor` — and an empty flex child with `flex: 1` still takes the
+            slack, which would leave the controls after it pushed to the far right for no visible reason. */}
+        {model.status && (
+          <span className="ap-status" data-testid="ap-status">
+            {model.status}
+          </span>
+        )}
 
         {/* WHICH AGENT, and whether that agent can run. The two belong together and neither is useful
             alone: a provider name with no state does not say the run will start, and a state with no

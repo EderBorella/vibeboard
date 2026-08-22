@@ -1,8 +1,5 @@
-import { type AutopilotState, isSuccessReason } from '../api';
-import { autopilotAdvice, type TransportState } from '../autopilot/transport';
 import { Button } from '../ui/Button';
 import { Chip } from '../ui/Chip';
-import { StatusChip } from '../ui/StatusChip';
 import { ConnectionLight } from './ConnectionLight';
 import type { LightState, RecentFailure, RefusalKind } from './connection-light';
 
@@ -29,20 +26,6 @@ const TABS = [
 
 export type MainTab = (typeof TABS)[number]['value'];
 
-// What auto-pilot is doing, in one word. `complete` is the ONLY stop styled as a success: an exhausted
-// budget, a reached cap and a stalled board all end tidily and none of them means the work is done —
-// "an error or an exhausted budget never counts as success".
-// `state` AND NOT `tone`: these four words are rows in ui/state-tones.ts, and the same four the
-// transport strip and its dot use. They were typed `string` and read by a stylesheet that gave
-// `running` the palette's SECONDARY while the bar below gave the same word the primary.
-function chipFor(state: AutopilotState): { label: string; state: TransportState } | null {
-  if (state.state === 'idle') return null; // nothing to say, and a chip per tab would be noise
-  if (state.state === 'running') return { label: 'auto-pilot running', state: 'running' };
-  if (state.state === 'halted') return { label: 'halted', state: 'halted' };
-  const reason = state.reason ?? 'stopped';
-  return { label: reason, state: isSuccessReason(reason) ? 'complete' : 'stopped' };
-}
-
 interface Props {
   // False while loading, on the project gate, or with no project open — everything except the
   // brand, the theme picker and the connection dot is hidden behind it.
@@ -59,8 +42,6 @@ interface Props {
   onToggleCopilot: () => void;
   onSettings: () => void;
   onSwitchProject: () => void;
-  // Absent until the first answer, and absent for a project with nothing to say.
-  autopilot?: AutopilotState | null;
   // Already decided by `lightFor` — this component renders the answer and does not compute it. The
   // precedence between a dead socket and a project that cannot run is a rule, and a rule living in JSX
   // is a rule nothing can test on its own.
@@ -88,14 +69,12 @@ export function TopBar({
   onToggleCopilot,
   onSettings,
   onSwitchProject,
-  autopilot,
   light,
   lightTitle,
   agentRefusal,
   refusalKind,
   recentFailure,
 }: Props) {
-  const chip = autopilot ? chipFor(autopilot) : null;
   return (
     <header className="topbar">
       <span className="brand">VibeBoard</span>
@@ -118,35 +97,22 @@ export function TopBar({
         refusalKind={refusalKind}
         recentFailure={recentFailure}
       />
-      {showProject && chip && autopilot && (
-        // `state`, AND IT IS A ROW IN THE TABLE NOW. The note here used to argue that "the palette does
-        // not fit the five" because `running` was `--accent-2`, the palette's secondary, which is not
-        // `--warn` in marshmallow. That defended a token this surface had picked: the same `running`
-        // rendered `--text` on a report chip and `--accent` on the auto-pilot bar's rail, three colours
-        // for one fact. `--warn` is the attention token, `--accent-2` is a hue, and `running` is
-        // `accent` wherever it is said. See ui/state-tones.ts.
-        // A `StatusChip`, AND THE CHANGE A PERSON WILL NOTICE IS THAT IT NOW OPENS. It was the only one
-        // of the four indicators with no dot and no way to read its explanation: `title={detail}` put
-        // the loop's own stop sentence — which names the branch it could not create and quotes git
-        // underneath — into a tooltip that truncates it, on the one indicator that is on screen from
-        // every tab. `autopilotAdvice` is where that sentence goes now.
-        <StatusChip
-          state={chip.state}
-          dot={8}
-          word={chip.label}
-          advice={autopilotAdvice(autopilot)}
-          title={autopilot.detail ?? chip.label}
-          className="ap-chip"
-          testId="ap-chip"
-        />
-      )}
-      {/* The SENTENCE is not here, and the reasoning that put it here is worth keeping because it was true when
-          it was written: `whyStuck` names WHICH cards are stuck and why, and all of it once lived in a `title`
-          attribute — unreachable on a touch device, invisible to anyone who does not know to hover. What made
-          that false is `ap-bar-detail`, which renders the same string below the auto-pilot bar's row, wrapping,
-          for every state that has one. So a second copy bought nothing and cost the layout: an unbounded flex
-          sibling, so one long sentence shoved the tabs and the buttons right. The chip's `title` keeps it as a
-          supplement — a supplement is fine, a duplicate that moves the tabs is not. */}
+      {/* AND NO AUTO-PILOT CHIP. There were two indicators for one loop — one here beside the project name
+          and one on the bar that runs it — and they were not a summary and a detail of each other: this said
+          `auto-pilot running` while the bar said `4 dispatches · E-004 · implement`, and on a stop this said
+          the reason while the bar said `Stopped.` The owner ruled that one of the two goes, and it is this
+          one: the surface with the Start button on it is where a person watches the loop.
+          WHAT IT COSTS is that the header is on every tab and the bar is only on Boards, so a loop that
+          stops while you are reading the Project Log no longer says so where you are looking. That is a real
+          loss and it was taken deliberately against the worse problem, which is two indicators for one fact
+          with no rule about which of them is authoritative.
+          `.ap-chip` moved with it — the class is on the bar's chip now — and `chipFor` moved to
+          autopilot/transport.ts as `wordFor`, where the loop's other display decisions already live. */}
+      {/* AND THE STOP SENTENCE WAS NEVER HERE EITHER, which is the older half of the same argument and is
+          worth keeping now that the chip has gone with it: `whyStuck` names which cards are stuck and why, it
+          once lived in a `title` nobody hovers, and rendering it in the header made it an unbounded flex
+          sibling that shoved the tabs and the buttons right. It lives in `ap-bar-detail`, wrapping, below the
+          bar's row. */}
       {showProject && (
         <div className="topbar-tabs" role="group" aria-label="View">
           {TABS.map(({ value, label }) => (

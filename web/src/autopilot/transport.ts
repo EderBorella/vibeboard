@@ -24,10 +24,19 @@ interface ActiveWork {
   waiting: boolean;
 }
 
-interface TransportModel {
+export interface TransportModel {
   // The one big button. `kind` is what it does, not what it looks like.
   control: { kind: 'play' | 'stop'; disabled: boolean; label: string; title: string };
-  // Always a sentence, never blank: a strip that says nothing is a strip nobody trusts.
+  // WHAT THE CHIP OPENS ONTO. In the model rather than computed at the call site so the sentences are
+  // asserted directly, which is the reason this whole module exists.
+  advice: StatusAdvice;
+  // THE STATE IN ONE WORD, for the chip. It was `chipFor` in app/TopBar.tsx until the owner ruled that
+  // the top bar does not need a second auto-pilot indicator — see `wordFor`.
+  word: string;
+  // WHAT THE WORD CANNOT SAY, and it MAY now be empty. It used to be "always a sentence, never blank: a
+  // strip that says nothing is a strip nobody trusts" — which was right while the row's only statement
+  // of the state was this string. With the chip beside it, `Stopped.` and `Not started.` were the chip's
+  // word again in a full stop, so those two states say nothing here and the chip says it once.
   status: string;
   state: TransportState;
   doing: ActiveWork[];
@@ -65,6 +74,19 @@ function stateOf(state: AutopilotState | null): TransportState {
   // tidily and neither means the work is done.
   const reason = state.reason ?? 'stopped';
   return isSuccessReason(reason) ? 'complete' : 'stopped';
+}
+
+// THE STATE AS A CHIP'S WORD. This is `app/TopBar.tsx`'s `chipFor` moved here, minus its
+// `auto-pilot running` — the prefix existed because that chip sat beside a project name with no other
+// context, and on the bar that runs the loop it is the only thing the row could be about.
+//
+// A STOP IS NAMED BY ITS REASON. `stalled`, `exhausted`, `capped` and `killed` are four different things
+// to do next, and `stopped` is the fallback for a stop that arrived without one — not a fifth reason.
+function wordFor(state: AutopilotState | null): string {
+  if (!state || state.state === 'idle') return 'not started';
+  if (state.state === 'running') return 'running';
+  if (state.state === 'halted') return 'halted';
+  return state.reason ?? 'stopped';
 }
 
 function workFrom(runs: RunList): ActiveWork[] {
@@ -107,7 +129,30 @@ function detailFor(state: AutopilotState | null): string | null {
 //
 // `next` IS ABSENT ON A SUCCESS, deliberately, and it is the same contract `LightAdvice` states: an
 // instruction implies something is wrong, so a finished run gets no instruction.
-export function autopilotAdvice(state: AutopilotState): StatusAdvice {
+// NOT STARTED, and it splits on whether anything is stopping it — which is the one thing a person opening
+// this chip on an idle project wants to know, and it was two clicks into the drawer.
+//
+// ITS OWN FUNCTION because `autopilotAdvice` went past the cognitive-complexity ceiling with this branch
+// inline, and the fix for that rule is FLATTENING rather than a longer function: a ternary inside an early
+// return is two levels of nesting the four branches below it do not have.
+function notStartedAdvice(missing: string[]): StatusAdvice {
+  const heading = 'Auto-pilot has not started';
+  if (missing.length === 0) {
+    return {
+      heading,
+      detail: 'Nothing has been dispatched on this project yet.',
+      next: 'Press play to start the loop.',
+    };
+  }
+  return {
+    heading,
+    detail: `There ${missing.length === 1 ? 'is' : 'are'} ${NOT_READY(missing.length)}.`,
+    next: 'Open Details on this bar to see what they are.',
+  };
+}
+
+export function autopilotAdvice(state: AutopilotState | null, missing: string[] = []): StatusAdvice {
+  if (!state || state.state === 'idle') return notStartedAdvice(missing);
   if (state.state === 'running') {
     const n = state.iteration;
     return {
@@ -142,7 +187,10 @@ export function autopilotAdvice(state: AutopilotState): StatusAdvice {
 // The ROW. Short by construction: anything that needs room goes to `detailFor` instead.
 function statusFor(state: AutopilotState | null, doing: ActiveWork[], missing: string[]): string {
   if (state?.state === 'halted') {
-    return 'Halted. Everything in this project was stopped.';
+    // The word `Halted` came off the front of this when the chip beside it started carrying it. What is
+    // left is the part the chip cannot fit and a person does not expect: a halt stops the chat and the
+    // manual runs too, not only the loop.
+    return 'Everything in this project was stopped.';
   }
   if (state?.state === 'running') {
     const n = state.iteration;
@@ -154,13 +202,11 @@ function statusFor(state: AutopilotState | null, doing: ActiveWork[], missing: s
     return `${counted} · ${work}`;
   }
   if (missing.length > 0) return NOT_READY(missing.length);
-  if (state?.state === 'stopped') {
-    // Two words, because `detail` already carries the loop's own full sentence — the server stores
-    // `stopSentence(reason, detail)`, canned explanation and specifics together — and that now has a
-    // block of its own to wrap in.
-    return state.reason && isSuccessReason(state.reason) ? 'Finished.' : 'Stopped.';
-  }
-  return 'Not started.';
+  // NOTHING, for the two states whose whole row was the chip's own word. This returned `Finished.` or
+  // `Stopped.` — and before that the loop's entire explanation, which is why `detail` exists — and the
+  // chip now says `complete` or `stalled` two elements to the left. `Not started.` went the same way.
+  // The full sentence is still rendered, in `ap-bar-detail`, wrapping.
+  return '';
 }
 
 export function transportModel(input: {
@@ -197,6 +243,8 @@ export function transportModel(input: {
 
   return {
     control,
+    word: wordFor(state),
+    advice: autopilotAdvice(state, missing),
     status: statusFor(state, doing, missing),
     detail: detailFor(state),
     state: stateOf(state),

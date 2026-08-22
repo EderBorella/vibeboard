@@ -36,7 +36,11 @@
 }
 .vb-btn:disabled { opacity: 0.5; cursor: default; }
 
-.vb-btn-sm { padding: var(--s-2) var(--s-4); font-size: var(--t-small); }
+/* `--s-1` VERTICALLY, AND IT IS THE OWNER'S SECOND PASS OVER THIS BOX. At `--s-2` a `sm` button measured
+   24px tall around 14px of ink — 10px of it padding and border, so over a third of the control was empty
+   space above and below a 12px word. 20px now. Horizontal stays `--s-4`: a label needs room from the edge
+   it sits against, and nobody has ever complained about that one. */
+.vb-btn-sm { padding: var(--s-1) var(--s-4); font-size: var(--t-small); }
 .vb-btn-md { padding: var(--s-4) var(--s-6); font-size: var(--t-body); }
 
 /* THE FIVE VOICES. `primary` is the one action, `default` is everything ordinary, `ghost` explains,

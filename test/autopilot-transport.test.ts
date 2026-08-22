@@ -74,9 +74,20 @@ describe('which control is offered', () => {
 });
 
 describe('the status line', () => {
-  it('is never blank', () => {
+  // `status` MAY NOW BE BLANK, AND `word` IS WHAT MUST NOT BE. This was *is never blank* — "a strip that
+  // says nothing is a strip nobody trusts" — and it was right while this string was the row's only
+  // statement of the state. The chip beside it carries the state now, so for these three the row was the
+  // chip's own word again with a full stop after it. The claim moves rather than being dropped: the SAME
+  // three states, asserted on the field that is now the one carrying them.
+  it('always says what state it is in, even where the row says nothing', () => {
     for (const state of [null, IDLE, { ...IDLE, state: 'stopped' as const }]) {
-      expect(model({ state }).status.length).toBeGreaterThan(0);
+      const m = model({ state });
+      expect(m.word.length, 'the chip must always have a word').toBeGreaterThan(0);
+      expect(m.status, 'and these three are exactly the states whose row is empty').toBe('');
+      // The balloon is the third statement, and it is never empty either — a chip that opens onto
+      // nothing teaches people that opening it is not worth it.
+      expect(m.advice.heading.length).toBeGreaterThan(0);
+      expect(m.advice.detail.length).toBeGreaterThan(0);
     }
   });
 
@@ -111,13 +122,21 @@ describe('the status line', () => {
     // The row stays a row; the explanation moves to `detail`, which the bar renders in its own wrapping
     // block. It used to BE the status — one line, ellipsised — so these sentences, which quote git and
     // name several cards, were cut exactly where they got useful.
-    expect(m.status).toBe('Stopped.');
+    // AND THE ONE-WORD REASON IS THE CHIP'S. `status` was `Stopped.` here, which is the word `stopped`
+    // with a full stop, beside a chip that already says `stalled` — so the row says nothing and the
+    // reason is asserted where it now lives.
+    expect(m.word).toBe('stalled');
+    expect(m.status).toBe('');
     expect(m.detail).toBe('E-002 and E-005 are blocked on their gates');
   });
 
-  it('says FINISHED rather than stopped for the one reason that is a success', () => {
+  it('says COMPLETE rather than stopped for the one reason that is a success', () => {
     const m = model({ state: { ...IDLE, state: 'stopped', reason: 'complete' } });
-    expect(m.status).toBe('Finished.');
+    // The word was `Finished.` in the row; it is the reason itself in the chip, and `complete` is the
+    // only reason `isSuccessReason` admits. `state` is the tone's route and is checked beside it, because
+    // the word alone would pass on a chip painted like a failure.
+    expect(m.word).toBe('complete');
+    expect(m.state).toBe('complete');
   });
 
   it('carries no detail while running or idle — there is nothing to explain', () => {
@@ -134,7 +153,11 @@ describe('the status line', () => {
 
   it('explains a halt, with the reason below rather than truncated into the row', () => {
     const m = model({ state: { ...IDLE, state: 'halted', detail: 'Killed at your request.' } });
-    expect(m.status).toBe('Halted. Everything in this project was stopped.');
+    // The word `Halted` came off the front of this sentence when the chip started carrying it. What is
+    // left is the part the chip cannot fit and a person does not expect — a halt stops the chat and the
+    // manual runs too — so the row is NOT empty for this state, unlike the two above.
+    expect(m.word).toBe('halted');
+    expect(m.status).toBe('Everything in this project was stopped.');
     expect(m.detail).toBe('Killed at your request.');
   });
 });
@@ -186,7 +209,12 @@ describe('what is missing', () => {
   it('claims nothing before the answer has arrived', () => {
     const m = model({ readiness: null });
     expect(m.missing).toEqual([]);
-    expect(m.status).toBe('Not started.');
+    expect(m.word).toBe('not started');
+    expect(m.status).toBe('');
+    // AND THE BALLOON MUST NOT INVENT A BLOCKER IT HAS NOT BEEN TOLD ABOUT. `missing` is empty because
+    // nothing has answered yet, which is not the same as "nothing is wrong" — the advice for an idle
+    // project splits on that list, so this is the branch that must take the no-blockers side.
+    expect(m.advice.detail).toBe('Nothing has been dispatched on this project yet.');
   });
 });
 

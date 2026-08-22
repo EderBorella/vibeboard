@@ -228,14 +228,21 @@ describe('the nested boxes — a drawn edge and the smaller 6px corner', () => {
   // argument for the migration: it wrote out the primitive's own six values by hand. The class is gone, so
   // what is pinned now is the six values themselves — if any of them moved, the claim of equality that
   // licensed deleting the rule would have been false.
-  it('the Compact button is default/sm, which is what the deleted rule wrote by hand', () => {
+  //
+  // AND ONE OF THEM HAS MOVED, deliberately: the vertical padding is `--s-1` where the deleted rule wrote
+  // `4px`. Measured in a browser, `--s-2` made a `sm` button 24px tall around 14px of ink — over a third of
+  // the control empty above and below a 12px word — and the owner asked for it back. Recorded here rather
+  // than quietly updated, because this test's SUBJECT is a historical equality: five of the six values are
+  // still what that rule wrote, and this one is now a decision taken after it.
+  it('the Compact button is default/sm, with the vertical padding the owner tightened', () => {
     const { container } = render(<Button size="sm">Compact</Button>);
     const b = box(container.firstElementChild as Element);
     expect(b.background).toBe('var(--panel-2)');
     expect(b.color).toBe('var(--text)');
     expect(b['border-color']).toBe('var(--border)');
     expect(b['border-radius']).toBe('6px');
-    expect(b.padding).toBe('4px 8px');
+    // `2px 8px`. The horizontal half is untouched — a label needs room from the edge it sits against.
+    expect(b.padding).toBe('2px 8px');
     expect(b['font-size']).toBe('0.75rem');
   });
 });

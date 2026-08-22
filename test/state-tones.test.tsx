@@ -258,12 +258,17 @@ describe('the auto-pilot bar says its state in a way a glance can tell apart', (
     expectGroups('the bar', measured);
   });
 
-  it('gives the transport dot a distinct marker per tone', async () => {
+  // THE DOT IS INSIDE THE CHIP NOW, and `ap-tone-dot` is gone with the bare `<Dot>` it named. So this
+  // reads the chip's own tint rather than the dot's: the chip is the element that knows the state, and the
+  // dot inside it takes the fill from `currentColor`, which is the construction every indicator in the app
+  // now shares. `ownTint` and not `marker` for that reason — the tone is ON this element, not on an
+  // ancestor, and reading the subtree would let the dot's inherited colour answer for the chip's.
+  it('gives the transport chip a distinct marker per tone', async () => {
     const markers = new Map<string, string>();
     for (const [name, state] of AUTOPILOT_STATES) {
       cleanup();
       await bar(state);
-      markers.set(name, ownTint(screen.getByTestId('ap-tone-dot')));
+      markers.set(name, ownTint(screen.getByTestId('ap-chip')));
     }
     // `idle` and `stopped` ARE THE SAME GREY, deliberately: neither is a fault and neither is
     // progress, and no rule for either exists — both fall through to the dot's default. Recorded
@@ -271,7 +276,7 @@ describe('the auto-pilot bar says its state in a way a glance can tell apart', (
     // is the pair a name-comparing version of this test called a difference.
     expect(markers.get('idle'), 'idle and stopped are one colour, by omission').toBe(markers.get('stopped'));
     const loud = new Map([...markers].filter(([name]) => name !== 'stopped'));
-    expectAllDistinct('the transport dot', loud);
+    expectAllDistinct('the transport chip', loud);
   });
 
   it('distinguishes the play control from the stop control', async () => {
@@ -323,7 +328,7 @@ describe('the auto-pilot bar says its state in a way a glance can tell apart', (
   });
 });
 
-describe('the top bar chip', () => {
+describe('the top bar', () => {
   const props = {
     showProject: true,
     projectName: 'Demo',
@@ -343,15 +348,15 @@ describe('the top bar chip', () => {
     recentFailure: null,
   };
 
-  it('gives each auto-pilot state a distinct marker', () => {
-    const markers = new Map<string, string>();
-    for (const [name, state] of AUTOPILOT_STATES) {
-      if (!state || state.state === 'idle') continue; // idle renders no chip at all, on purpose
-      cleanup();
-      render(<TopBar {...props} autopilot={state} />);
-      markers.set(name, marker(screen.getByTestId('ap-chip')));
-    }
-    expectAllDistinct('the top bar chip', markers);
+  // ITS AUTO-PILOT CHIP IS GONE, and *gives each auto-pilot state a distinct marker* went with it — the
+  // claim is asserted one describe above, on the bar, which is where the chip now lives. What is left here
+  // is the guard: the header must carry exactly ONE toned indicator, the connection light. A second one
+  // returning is the thing this file exists to notice, because two indicators for one fact is how a
+  // vocabulary splits in the first place.
+  it('carries exactly one toned indicator, the connection light', () => {
+    const { container } = render(<TopBar {...props} />);
+    const toned = Array.from(container.querySelectorAll('[data-state]'));
+    expect(toned.map((el) => (el as HTMLElement).dataset.testid)).toEqual(['conn-status']);
   });
 
   // THE SIX NEED FIVE DIFFERENT RESPONSES AND A COLOUR CANNOT SAY WHICH — which was written here as an

@@ -156,7 +156,16 @@ body {
    leaves off and shuffled sideways as the state name changed length. The fixed width exists to stop the
    TABS moving, not to make the label wander inside it. */
 .conn-status { text-align: left; }
-.conn-text { width: 12ch; white-space: nowrap; }
+/* NO FIXED WIDTH, AND THE REASON IT HAD ONE IS WITHDRAWN RATHER THAN FORGOTTEN. It was `width: 12ch`,
+   sized to `unauthorized`, the longest name the light can report — so a reconnect could not change the
+   label's width and shove the tab row sideways while you were aiming at it. Measured, that reserved 91.6px
+   for a 40.8px word: half of the app's own health indicator was empty space to the right of it, inside a
+   drawn box that made the emptiness visible in a way a bare word never did.
+   THE TRADE IS RE-TAKEN, not overlooked. The tabs now shift by up to ~50px, but only on the transition
+   between `online` and one of the two longest failure names — a moment when the tab you were aiming at is
+   not the thing that just went wrong. Permanent slack in exchange for a rare jump was the wrong way round.
+   `nowrap` stays: the word must not break, whatever the box does. */
+.conn-text { white-space: nowrap; }
 /* NINE `[data-state]` RULES ARE GONE FROM HERE, and they were the largest of the six vocabularies. Six
    words, four tokens, three of them for three shades of "not right" on one control: `--danger` for
    `closed`, `--warn` for `offline`, `--accent-2` for `failing`. What each of them decided is now one row
@@ -1597,15 +1606,17 @@ body {
   min-width: 0;
 }
 
-/* The transport control. Wider than its label needs, because it is the one button on this strip anybody
-   is looking for, and a target you have to aim at is one you misclick. */
-/* LAYOUT ONLY. The box is `Button variant=primary|default size=md`; what is left is the one thing the
-   bar decides — that the transport is wider than its label needs, because it is the control anybody on
-   this strip is looking for and a target you have to aim at is one you misclick.
-   `.ap-transport-stop`, the `:disabled` opacity and the duplicate `:focus-visible` all went with it: the
-   first is the `default` variant, the second is on `.vb-btn:disabled`, and the third restated the
-   file-wide `:focus-visible` rule at the top. */
-.ap-transport { min-width: 6.5rem; }
+/* `.ap-transport` HAS NO RULE LEFT AT ALL, and the `min-width: 6.5rem` that was here is the measurement
+   worth recording. It was argued as "wider than its label needs, because it is the control anybody on this
+   strip is looking for and a target you have to aim at is one you misclick" — and measured, it made the
+   button 104px wide around 49px of ink. Over half the control was empty, which does not read as a bigger
+   target; it reads as a button that does not know what it is for. The owner withdrew the argument.
+   WHAT IT ALSO BOUGHT, so the cost is stated: the box no longer holds still across its labels, so it grows
+   by about 15px for the moment it says `Starting…` and the controls after it shift with it. A transient on
+   a click, against 55px of permanent slack.
+   `.ap-transport-stop`, the `:disabled` opacity and the duplicate `:focus-visible` went in an earlier
+   phase: the first is the `default` variant, the second is on `.vb-btn:disabled`, and the third restated
+   the file-wide `:focus-visible` rule at the top. */
 
 /* THE TRANSPORT DOT IS `Dot` NOW. It was five classes — one shape and four tones, of which only three
    existed: `idle` and `stopped` fell through to the base grey, which is right and was true only by

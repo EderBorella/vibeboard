@@ -209,11 +209,15 @@ const PROBES: Probe[] = [
     ] as [StateName, AutopilotState][]
   ).flatMap(([name, autopilot]): Probe[] => [
     {
-      surface: 'ap-chip (top bar)',
+      // WAS `ap-chip (top bar)`, AND THE MOVE IS THE POINT OF THIS ROW. The loop was said in THREE places
+      // at once — the header's chip, the bar's rail and the bar's transport dot — and the header's copy is
+      // gone: two surfaces for one fact, not three. The chip is on the bar now, and it is the element that
+      // knows the state, so `color` is still the role read.
+      surface: 'ap-chip (the bar)',
       role: 'color',
       state: name,
       find: async () => {
-        render(<TopBar {...topBarProps} autopilot={autopilot} />);
+        await bar(autopilot);
         return found('[data-testid="ap-chip"]');
       },
     },
@@ -226,15 +230,11 @@ const PROBES: Probe[] = [
         return found('[data-testid="ap-bar"]');
       },
     },
-    {
-      surface: 'transport dot',
-      role: 'background',
-      state: name,
-      find: async () => {
-        await bar(autopilot);
-        return found('[data-testid="ap-tone-dot"]');
-      },
-    },
+    // THE TRANSPORT DOT HAS NO PROBE OF ITS OWN ANY MORE, and it is not an omission: `ap-tone-dot` named a
+    // bare `<Dot state=…>` beside the row's sentence, and the dot is inside the chip now with no state of
+    // its own — it takes its fill from the chip's `currentColor`. A probe on it would be reading the row
+    // above by inheritance and reporting it as a second surface agreeing, which is the shape of vacuous
+    // agreement this file exists to refuse. test/state-tones.test.tsx asserts the chip's own tint.
   ]),
 
   // Whether the selected agent can run. `failing` is the row it SHARES with the connection light above,

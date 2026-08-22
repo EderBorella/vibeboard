@@ -3,11 +3,11 @@ import { addDiaryEntry, type DiaryEntry } from '../api';
 import { Button } from '../atoms/Button';
 import { Chip } from '../atoms/Chip';
 import { Control } from '../atoms/Control';
-import { ReadoutLine } from '../atoms/Readout';
 import { Text } from '../atoms/Text';
+import { FigureRow } from '../molecules/FigureRow';
+import { stateClass } from '../molecules/state-tones';
 import { MAX_ENTRY_TEXT, type Suggestion } from '../shared';
 import { useSuggestions } from '../suggestions/useSuggestions';
-import { stateClass } from '../ui/state-tones';
 import { useAction } from '../useAction';
 import { useDiary } from './useDiary';
 
@@ -60,12 +60,12 @@ const DiaryList = memo(function DiaryList({ entries }: { entries: DiaryEntry[] }
     <ol className="diary-list">
       {ordered.map(({ entry, at }) => (
         <li className="diary-entry" data-kind={entry.kind} key={`${at}-${entry.at}`}>
-          <ReadoutLine>
+          <FigureRow>
             <span className="diary-kind">{entry.kind}</span>
             <time dateTime={entry.at}>{when(entry.at)}</time>
             <About entry={entry} />
             {entry.outcome && <span className="diary-outcome">{entry.outcome}</span>}
-          </ReadoutLine>
+          </FigureRow>
           <p className="diary-text">{entry.text}</p>
         </li>
       ))}
@@ -86,19 +86,19 @@ function FiledList({ suggestions }: { suggestions: Suggestion[] }) {
       {/* `stateClass` beside the attribute, and it is not decoration: React types every `data-*` as
           `any`, so `data-state={s.state}` alone would compile for a state with no row in the table and
           the rail would silently take whatever colour it inherited. The call is what the compiler
-          checks — see ui/state-tones.ts. */}
+          checks — see molecules/state-tones.ts. */}
       {ordered.map((s) => (
         <li className={`filed-entry ${stateClass(s.state)}`} data-state={s.state} key={s.id}>
           {/* TWO LINES, NOT ONE WRAPPED ONE. This column is 42% of the split and its readout block held
               four figures — a state, a full locale timestamp and up to three id chips, 366px of content
               in a 266px line — so it wrapped, and check 7 read it as what it was: a row of figures that
-              does not align. A `ReadoutLine` of the two facts the entry is ABOUT ITSELF fits (188px),
+              does not align. A `FigureRow` of the two facts the entry is ABOUT ITSELF fits (188px),
               and the ids it POINTS AT are a `.diary-about` group, which the diary beside it already
               uses for exactly that. Stacked rather than wrapped in this column — see pages/log/log.css. */}
-          <ReadoutLine>
+          <FigureRow>
             <span className="filed-state">{s.state}</span>
             <time dateTime={s.created}>{when(s.created)}</time>
-          </ReadoutLine>
+          </FigureRow>
           {/* Only what is there: a project-level finding carries no card, and an invented dash for
               every absent field would make every row look the same shape. */}
           {(s.run || s.card || s.became) && (

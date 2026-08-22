@@ -13,9 +13,9 @@ import { Text } from '../atoms/Text';
 import { killProjectRequest } from '../confirm/requests';
 import { useConfirm } from '../confirm/useConfirm';
 import { errorText } from '../errors';
+import { Field } from '../molecules/Field';
 import { useAccounting } from '../runs/useAccounting';
 import { type AutopilotConfig, BLOCKED_BOARDS, BOARD_LABELS, type ProjectConfig } from '../shared';
-import { Field } from '../ui/Field';
 import { useReadiness } from './useReadiness';
 
 // The lifecycle as it will actually be executed, plus what is stopping it.

@@ -83,7 +83,7 @@ export function ModelPicker({ models, value, defaultModel, onChange, disabled }:
   return (
     <div className="mp">
       <button className="vb-trigger" disabled={disabled} onClick={() => setOpen(true)} title={value}>
-        <Readout className="vb-trigger-label">
+        <Readout className="vb-clip">
           {selected?.free ? '🆓 ' : ''}
           {label}
         </Readout>

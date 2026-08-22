@@ -3,12 +3,9 @@
   display: flex; align-items: center; gap: var(--s-4); padding: var(--s-4) var(--s-6);
   border-bottom: 1px solid var(--border); background: var(--panel);
 }
-.control-tabs { display: flex; gap: var(--s-2); margin-left: var(--s-4); }
-.control-tabs button {
-  background: var(--panel-2); color: var(--muted); border: 1px solid var(--border);
-  border-radius: var(--r-md); padding: var(--s-2) var(--s-4); font-size: var(--t-small); cursor: pointer;
-}
-.control-tabs button.active { color: var(--text); border-color: var(--accent); }
+/* `.control-tabs` IS GONE — the three views are a `Tabs` (molecules/tabs.css). It was the fourth
+   hand-rolled tab family, and the only one whose cell had no class of its own: three declarations on a
+   descendant `button`, which is why `check:radius-scale` could see it and no class census could. */
 .control-editor-actions { margin-left: auto; display: flex; gap: var(--s-3); }
 /* `.btn-danger` was here — `Button`'s `danger` variant at `md`, so it sits level with the Save beside it. */
 /* The prose ink is the surface's and the shell's inset is the shell's; the box is the primitive's. */

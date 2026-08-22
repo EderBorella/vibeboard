@@ -3,7 +3,8 @@ import { type AppSettings, getAppSettings, setDebugLog } from '../api';
 import { Readout } from '../atoms/Readout';
 import { Text } from '../atoms/Text';
 import { errorText } from '../errors';
-import { Field } from '../ui/Field';
+import { Field } from '../molecules/Field';
+import { Notice } from '../molecules/Notice';
 import { useAction } from '../useAction';
 
 // WHERE TO LOOK WHEN SOMETHING GOES WRONG, and the one switch that changes what is there.
@@ -71,7 +72,7 @@ export function DiagnosticsPanel() {
         </div>
       )}
 
-      {error && <div className="vb-notice vb-notice-warn">{error}</div>}
+      {error && <Notice tone="warn">{error}</Notice>}
     </>
   );
 }

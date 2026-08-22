@@ -1,9 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
-import { Dot } from '../ui/Dot';
-import { Field } from '../ui/Field';
-import { SegmentedControl } from '../ui/SegmentedControl';
-import { StatusChip } from '../ui/StatusChip';
+import { Field } from '../molecules/Field';
+import { StatusChip } from '../molecules/StatusChip';
+import { Tabs } from '../molecules/Tabs';
 import { Button } from './Button';
 import { Chip } from './Chip';
 import { Control } from './Control';
@@ -27,11 +26,11 @@ import { Readout } from './Readout';
 //
 // THE ROWS THAT ARE EXPECTED TO DISAGREE ARE NAMED AS SUCH, DRAWN LAST, AND THERE ARE FOUR. Operable: a
 // segmented CELL is 2px shorter than its group because the group owns the border, which is geometry
-// rather than an oversight; and `.tab-btn` is one of the four tab faces no atom owns yet, deleted in
-// Phases 5 and 6 rather than patched here — patching a class you are about to delete is migration
-// scaffolding. Marker: a `Readout` is a treatment on a `<span>` and not a box at all, and a `Dot` is a
-// circle whose height IS its width. Everything above those lines is one number, and the point of drawing
-// the exceptions at the bottom is that the column above them can be read in one glance.
+// rather than an oversight, and it is the only one left in the operable column — `.tab-btn`, `.dock-tab`
+// and `.cards-tab-label` were three of the four faces no atom owned, and the molecule layer deleted all
+// three rather than patching them. Marker: a `Readout` is a treatment on a `<span>` and not a box at all,
+// and the pip is a circle whose height IS its width. Everything above those lines is one number, and the
+// point of drawing the exceptions at the bottom is that the column above them can be read in one glance.
 const meta = {
   title: 'Audit/Control inventory',
   parameters: { layout: 'padded' },
@@ -106,8 +105,11 @@ export const ControlHeights: StoryObj = {
       <Measured label="Button sm bare">
         <Button variant="bare">✕</Button>
       </Measured>
-      <Measured label="SegmentedControl md">
-        <SegmentedControl
+      {/* ONE GROUP WHERE THERE WERE TWO SIZES. `SegmentedControl` is `Tabs grouped`, and `sm` is gone —
+          an 11px cell in a 12px row is the shape of the 10.88px incident. */}
+      <Measured label="Tabs grouped">
+        <Tabs
+          grouped
           label="Mode"
           items={[
             { value: 'a', label: 'Claude' },
@@ -117,13 +119,12 @@ export const ControlHeights: StoryObj = {
           onChange={() => {}}
         />
       </Measured>
-      <Measured label="SegmentedControl sm">
-        <SegmentedControl
-          label="Mode"
-          size="sm"
+      <Measured label="Tabs (a cell)" probe=".vb-tab">
+        <Tabs
+          label="View"
           items={[
-            { value: 'a', label: 'Claude' },
-            { value: 'b', label: 'OpenCode' },
+            { value: 'a', label: 'Fields' },
+            { value: 'b', label: 'Edit' },
           ]}
           value="a"
           onChange={() => {}}
@@ -142,18 +143,16 @@ export const ControlHeights: StoryObj = {
           <option value="cyberpunk">Cyberpunk</option>
         </Control>
       </Measured>
-      {/* THE TWO ROWS ALLOWED TO DISAGREE, drawn last so the column above is read as one number. */}
-      <Measured label="vb-seg-cell (a part, 2px shorter)" probe=".vb-seg-cell">
-        <span className="vb-seg">
-          <button type="button" className="vb-seg-cell active">
-            a cell
-          </button>
-        </span>
-      </Measured>
-      <Measured label=".tab-btn (Phase 5 deletes it)">
-        <button type="button" className="tab-btn">
-          Boards
-        </button>
+      {/* THE ONE ROW ALLOWED TO DISAGREE, drawn last so the column above is read as one number. `.tab-btn`
+          is gone — it is a `Menu` item at `--ctl-h`, which is why it is up in the column now. */}
+      <Measured label="a grouped cell (a part, 2px shorter)" probe=".vb-tabs-grouped .vb-tab">
+        <Tabs
+          grouped
+          label="Mode"
+          items={[{ value: 'a', label: 'a cell' }]}
+          value="a"
+          onChange={() => {}}
+        />
       </Measured>
     </Grid>
   ),
@@ -197,16 +196,15 @@ export const MarkerHeights: StoryObj = {
       {/* THE TWO ROWS ALLOWED TO DISAGREE HERE, and neither is a marker BOX. A `Readout` is a TREATMENT —
           mono, tabular numerals, one tracking exception — on a `<span>` that declares no height at all,
           so what it reports is the line box of whatever it sits in; that is what taking the step of the
-          atom around it MEANS. A `Dot` is a circle, so its height IS its width and it cannot be
-          `--mark-h` without ceasing to be one — the reason `check:box-scale` names all three pip sizes. */}
+          atom around it MEANS. The pip is a circle, so its height IS its width and it cannot be
+          `--mark-h` without ceasing to be one — the reason `check:box-scale` names it by hand. ONE pip
+          where there were three: `Dot` had three sizes and one consumer, which is the `StatusChip` above. */}
       <Measured label="Readout (a treatment, not a box)">
         <Readout>1 234 ms</Readout>
       </Measured>
-      <Measured label="Dot 12 (a circle is a width)">
+      <Measured label="the pip (a circle is a width)" probe=".vb-dot">
         <span style={{ display: 'inline-flex', gap: '0.5rem', alignItems: 'center' }}>
-          <Dot size={7} state="ready" />
-          <Dot size={8} state="running" />
-          <Dot size={12} state="failing" />
+          <span className="vb-dot vb-tone-ok" />
         </span>
       </Measured>
     </Grid>

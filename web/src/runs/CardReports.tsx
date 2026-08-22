@@ -1,9 +1,10 @@
 import type { CardLedgerData, RunRecord, RunStatus } from '../api';
 import { Button } from '../atoms/Button';
 import { Chip } from '../atoms/Chip';
-import { Readout, ReadoutLine } from '../atoms/Readout';
+import { Readout } from '../atoms/Readout';
 import { Surface } from '../atoms/Surface';
 import { Text } from '../atoms/Text';
+import { FigureRow } from '../molecules/FigureRow';
 import type { Card } from '../shared';
 import { ForgiveAttempts } from './ForgiveAttempts';
 import { costLabel, usageTotal } from './format';
@@ -108,7 +109,7 @@ function CardLedger({
   // dialog's backdrop with it and a `div` inside a `p` is closed by the parser before it is reached —
   // the dialog would be rendered outside the tree React thinks it put it in.
   return (
-    <ReadoutLine testId="reports-ledger">
+    <FigureRow testId="reports-ledger">
       <Readout>{usageTotal(spend)}</Readout>
       {/* The count and the way to clear it, in the same line. Offered from the first spent attempt
           rather than only at the cap: a card blocked by the machine is worth clearing before it runs
@@ -121,6 +122,6 @@ function CardLedger({
           <ForgiveAttempts board={card.board} card={card.id} onForgiven={onForgiven} />
         </>
       )}
-    </ReadoutLine>
+    </FigureRow>
   );
 }

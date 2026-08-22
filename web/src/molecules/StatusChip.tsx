@@ -1,6 +1,5 @@
 import type { ReactNode } from 'react';
 import { chipClasses } from '../atoms/Chip';
-import { Dot, type DotSize } from './Dot';
 import { Popover } from './Popover';
 import type { StateName } from './state-tones';
 
@@ -48,13 +47,12 @@ export function StatusChip({
   advice,
   title,
   label,
-  dot = 8,
   glow,
   pulse,
   className,
   testId,
 }: {
-  // A row in ui/state-tones.ts. The tone reaches the ink, the edge and the dot's fill from that one row.
+  // A row in molecules/state-tones.ts. The tone reaches the ink, the edge and the dot's fill from that one row.
   state: StateName;
   word: ReactNode;
   advice: StatusAdvice;
@@ -64,10 +62,13 @@ export function StatusChip({
   // The accessible name of the PANEL. Defaults to the heading, which is what it is about — a caller
   // passes its own only when the heading is too terse to announce on its own.
   label?: string;
-  dot?: DotSize;
-  // The halo is emphasis and not a tone — see ui/Dot.tsx. Two surfaces spend it: the app's own health
-  // and the copilot's backend.
+  // THE HALO IS EMPHASIS AND NOT A TONE, which is measured rather than tidy: `.conn-online .conn` had one
+  // and `.ap-dot-running` did not, so a tone that carried it would light a pip that was never lit. Two
+  // surfaces spend it — the app's own health and the copilot's backend — and `--glow` is `none` in two of
+  // the three themes, which is the other reason it cannot belong to a tone.
   glow?: boolean;
+  // The pip pulses while the loop runs. The `prefers-reduced-motion` override that switches it off lives
+  // beside the keyframes, which is why the motion is the primitive's and not the caller's.
   pulse?: boolean;
   // Layout, and a surface's own non-geometry treatment. Not a hole for a padding.
   className?: string;
@@ -88,9 +89,19 @@ export function StatusChip({
       triggerState={state}
       trigger={
         <>
-          {/* NO STATE OF ITS OWN: the trigger carries the tone and the dot's fill inherits it through
-              `currentColor`, which is how one row of the table paints a pip and a word together. */}
-          <Dot size={dot} glow={glow} pulse={pulse} />
+          {/* THE PIP, ABSORBED. It was `Dot` — a component with THREE sizes, a `state` prop and one
+              consumer, which is this file. One size is left: 7px, 8px and 12px were the agent chip, the
+              transport and the connection light, and nothing chose the spread — the light was 12px
+              because it was written first and largest. `aria-hidden` unconditionally, because a pip is
+              never the only statement of a state here: the word beside it always says the same thing.
+              NO STATE OF ITS OWN either: the trigger carries the tone and the pip's fill inherits it
+              through `currentColor`, which is how one row of the table paints a pip and a word together. */}
+          <span
+            className={['vb-dot', glow && 'vb-dot-glow', pulse && 'vb-dot-pulse']
+              .filter(Boolean)
+              .join(' ')}
+            aria-hidden="true"
+          />
           {word}
         </>
       }

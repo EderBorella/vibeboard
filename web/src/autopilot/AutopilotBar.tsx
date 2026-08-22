@@ -16,9 +16,9 @@ import { killProjectRequest } from '../confirm/requests';
 import { useConfirm } from '../confirm/useConfirm';
 import { BackendPicker } from '../copilot/BackendPicker';
 import { resolveChoice } from '../copilot/choice';
+import { StatusChip } from '../molecules/StatusChip';
+import { stateClass } from '../molecules/state-tones';
 import type { CopilotConfig } from '../shared';
-import { StatusChip } from '../ui/StatusChip';
-import { stateClass } from '../ui/state-tones';
 import { useAction } from '../useAction';
 import { AutopilotHelp } from './AutopilotHelp';
 import { ForgiveDerivation } from './ForgiveDerivation';
@@ -92,7 +92,7 @@ const REFUSAL_WORD: Record<'docker' | 'credential' | 'attached' | 'backend', str
 // vocabulary — and `ok` was then painted `--muted` by a rule in styles.css, so the word `ok` meant one
 // thing in this file and another in the stylesheet. `failing` is now literally the same row the
 // connection light uses, which is the point: one fault, one word, one colour, whichever corner of the
-// chrome reports it. See ui/state-tones.ts.
+// chrome reports it. See molecules/state-tones.ts.
 export function agentStatus(sandbox: SandboxState | null): {
   word: string;
   state: 'ready' | 'blocked' | 'failing' | 'checking';

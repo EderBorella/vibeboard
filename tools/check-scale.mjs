@@ -94,7 +94,7 @@ const TRACKING_ON_PURPOSE = new Map([
   ],
   [
     '-0.01em',
-    "`.vb-readout` in web/src/ui/primitives.css — one third of the signature's own definition in " +
+    "`.vb-readout` in web/src/atoms/readout.css — one third of the signature's own definition in " +
       'docs/design-system.md (*The signature: the readout*), beside `font-family: var(--font-mono)` and ' +
       '`font-variant-numeric: tabular-nums`. NEGATIVE, and the tracking token is positive: this is the ' +
       'opposite decision from the chrome treatment rather than a different amount of it.',

@@ -1,4 +1,4 @@
-import { SegmentedControl } from '../ui/SegmentedControl';
+import { Tabs } from '../molecules/Tabs';
 import { BACKENDS } from './format';
 
 interface Props {
@@ -13,10 +13,8 @@ interface Props {
   // project default and moves the copilot and manual dispatches with it. One shared sentence would
   // have to be vague enough to be true of both, which is how a control comes to promise nothing.
   titleFor?: (backend: { value: string; label: string }) => string;
-  // The dock and the auto-pilot bar are dense rows; Settings is a form with room. Same control, two
-  // scales — this is the only thing the three call sites disagreed about while each kept its own copy
-  // of the markup, and Settings' copy had drifted to a different label for the same backend.
-  size?: 'sm' | 'md';
+  // NO `size` ANY MORE. `.vb-seg-cell-sm` was `--t-micro` on the two dense rows, and an 11px cell in a
+  // 12px row is the shape of the 10.88px incident this design system has ruled on twice. One face.
 }
 
 // THE ONE BACKEND SELECTOR. Three surfaces choose between the same two agents — the copilot dock, the
@@ -27,18 +25,11 @@ interface Props {
 // It renders the list and nothing else. WHAT a change means is the caller's — a session override in the
 // dock, a write to the project config in the bar — because those are genuinely different acts, and a
 // component that decided between them would be the place the difference gets lost.
-export function BackendPicker({ value, onChange, label, disabled = false, titleFor, size = 'sm' }: Props) {
+export function BackendPicker({ value, onChange, label, disabled = false, titleFor }: Props) {
   // The per-site hover text is computed here and carried on the item, because `titleFor` is this
   // component's contract and the primitive's is a plain list.
   const items = BACKENDS.map((b) => ({ value: b.value, label: b.label, title: titleFor?.(b) }));
   return (
-    <SegmentedControl
-      items={items}
-      value={value}
-      onChange={onChange}
-      label={label}
-      size={size}
-      disabled={disabled}
-    />
+    <Tabs grouped items={items} value={value} onChange={onChange} label={label} disabled={disabled} />
   );
 }

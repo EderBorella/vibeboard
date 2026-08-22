@@ -33,32 +33,6 @@ interface Props {
   children?: ReactNode;
 }
 
-// A LINE of figures rather than one — the two ledgers, a card's meta row, a diary entry's meta row. It is
-// the `block` half of the treatment: `Readout` is a fact, `ReadoutLine` is the row a handful of them are
-// read across, and it carries the wrap and the gap so five surfaces stop each choosing their own.
-//
-// IT IS A MOLECULE WEARING AN ATOM'S SHEET until Phase 5 gives `FigureRow` a file of its own. Moving the
-// rule now would move it in the cascade, which is a change rather than a move.
-export function ReadoutLine({
-  className,
-  testId,
-  children,
-  as = 'div',
-}: {
-  className?: string;
-  testId?: string;
-  children?: ReactNode;
-  // `p` where the line really is a paragraph of the document, which two of the five are.
-  as?: 'div' | 'p';
-}) {
-  const Tag = as;
-  return (
-    <Tag className={['vb-readout-block', className].filter(Boolean).join(' ')} data-testid={testId}>
-      {children}
-    </Tag>
-  );
-}
-
 export function Readout({ title, className, testId, children }: Props) {
   return (
     <span className={['vb-readout', className].filter(Boolean).join(' ')} title={title} data-testid={testId}>

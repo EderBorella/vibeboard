@@ -99,11 +99,20 @@ const CORPUS = 'web/src';
 // its own file. LISTED AND NOT A DIRECTORY GLOB — `web/src/atoms/prose.css` sits in the same directory and
 // is the markdown SURFACE, and a glob would have excused every declaration in it, including two of the
 // mono census's own named survivors.
-const PRIMITIVES = join('web', 'src', 'ui', 'primitives.css');
 const ATOM_SHEETS = ['button', 'chip', 'control', 'readout', 'surface', 'text'].map((name) =>
   join('web', 'src', 'atoms', `${name}.css`),
 );
-const PRIMITIVE_LAYER = [PRIMITIVES, ...ATOM_SHEETS];
+// THIRTEEN SHEETS AS OF THE MOLECULE LAYER, and `ui/primitives.css` is not one of them because it is
+// gone: what was left of it WAS this layer — the tone table, the pip, the status chip, the segmented
+// control, the field and its trigger, the notice — and it is seven files beside the six atoms now.
+// LISTED AND NOT A DIRECTORY GLOB for the reason above, and now twice over: `molecules/inline-field.css`
+// and `molecules/popover.css` hold SURFACE rules (the card view's editable face, the panel that floats),
+// and both are findings this census is supposed to keep counting — `.inline-view` and `.popover` are two
+// of the five panels left.
+const MOLECULE_SHEETS = ['tones', 'status-chip', 'tabs', 'menu', 'field', 'notice', 'figure-row'].map(
+  (name) => join('web', 'src', 'molecules', `${name}.css`),
+);
+const PRIMITIVE_LAYER = [...ATOM_SHEETS, ...MOLECULE_SHEETS];
 
 // ---------------------------------------------------------------------------------------------------
 // THE CEILINGS. Each is what the tree holds today, measured by this file on 2026-08-21, and each is the
@@ -125,13 +134,19 @@ const CHIP_CEILING = 0;
 // 11's ten split in two — three raised surfaces (`.modal`, `.mp-modal`, `.chat-menu`) that were
 // `raised`'s own trio, and seven nested boxes that became Panel's third variant, `inset`, plus
 // `.copilot-actions button`, which was `Button` `default` `sm` written out by hand.
-// THE TEN THAT REMAIN each have a reason in docs/design-system.md, Phase 11, and none of the reasons is
-// "it has its own padding": four are tabs and the refusal was re-taken against four candidates rather
-// than cited from the measurement of two; `.popover` and `.gate-card` are documents whose adjacent
-// vertical margins collapse, which `raised`'s flex column would stop; `.markdown pre` has no element to
-// put a primitive on; `.msg-assistant` has four corners and a tail; and `InlineField`'s two are one
-// control in two states that must share one padding. NEVER RAISE IT.
-const PANEL_CEILING = 10;
+// **5 AFTER THE MOLECULE LAYER**, and the five that went are all one phase's work. FOUR WERE TABS —
+// `.tab-btn`, `.dock-tab`, `.cards-tab` and `.control-tabs button` each drew a 1px box with a corner and
+// a ground, which is what made them read as panels to this census and as buttons to
+// `check-radius-scale.mjs` at the same time. They are `Tabs` and `Menu` cells, in the primitive layer,
+// and the refusal recorded here against four candidates is reversed in §8.1 of the plan. THE FIFTH is
+// `.inline-edit`: `Field inline` renders a `<Control>` now, so the border, the corner and the ground it
+// declared are the atom's and what is left is an accent EDGE.
+// THE FIVE THAT REMAIN each have a reason and none of them is "it has its own padding": `.popover` and
+// `.gate-card` are documents whose adjacent vertical margins collapse, which `raised`'s flex column would
+// stop; `.markdown pre` has no element to put a primitive on; `.msg-assistant` has four corners and a
+// tail; and `.inline-view` is the read-only half of one control in two states, which must share one box
+// with the editor above and therefore cannot be a `Surface`. NEVER RAISE IT.
+const PANEL_CEILING = 5;
 // MONO — 14 as Phase 7 measured it, 11 after Phase 8's three chips, and **7 after Phase 12**, which is
 // the phase that owned the row. Three went to the primitive: `.report-chip` names `vb-readout` on its
 // `<Chip>` (the form Phase 8 established), `.msg-tool` IS `Readout` `small` `accent` and its rule is
@@ -152,10 +167,11 @@ const MONO_CEILING = 3;
 // OFF_SCALE_ON_PURPOSE as the Dot's one remaining hand-rolled instance since Phase 3 — and it is a `Dot`
 // now. Blocking at zero, which is what a census at zero is for.
 const DOT_CEILING = 0;
-// SEGMENTED CONTROL — ZERO, and it has been zero since Phase 5b built the primitive out of the four
-// classes that were one shape. Gated anyway: a group that clips its own cells is a shape somebody will
-// write again, and this is the row of the coverage table that had no gate at all.
-const SEG_CEILING = 0;
+// SEGMENTED CONTROL — FOLDED INTO THE TAB ARM AND NO LONGER ITS OWN ROW, which is the molecule layer's
+// doing and is stated here rather than left as a dead 0/0. `SegmentedControl` is `Tabs grouped`: a group
+// that draws one border and clips its cells IS a tab strip with the corners taken off, so a rule shaped
+// like one is an un-migrated `Tabs` and belongs in the census that says so. `segFault` is unchanged and
+// still runs — see TAB_ARM below, which counts its findings alongside the JSX ones.
 
 // THE ONE EXEMPTION, BY NAME AND WITH ITS REASON ON IT — the form `check-radius-scale.mjs`'s
 // OFF_SCALE_ON_PURPOSE established, for the same argument: a shape that is deliberately not the
@@ -174,7 +190,7 @@ const CHIP_EXEMPT = new Map([
 //
 // It was 35 of 42: a literal control whose nearest enclosing `<Field>` region does not contain it. That
 // asked a narrower question than the one this file exists to ask. The question is *how much of this shape
-// is still hand-rolled?*, and `ui/primitives.css` answers it in two ways on purpose — the sentence is
+// is still hand-rolled?*, and the primitive layer answers it in two ways on purpose — the sentence is
 // beside `.vb-ctl` and it names its own three cases: "`.vb-ctl` is the same box for a control that is
 // not inside a Field — an inline rename, a model search, a typed confirmation." A control wearing
 // `.vb-ctl` has the primitive's box; counting it as hand-rolled is the same category error as counting
@@ -187,13 +203,16 @@ const CHIP_EXEMPT = new Map([
 // primitive along, and it is the stricter half: it refuses a border, a corner, a padding or a size on any
 // surface class that lands on an `<input>`, `<textarea>` or `<select>`.
 //
-// BOTH ARMS READ 2 AND BOTH TWOS ARE `ui/InlineField.tsx`, which docs/design-system.md rules OUT of
-// `Field`'s scope BY NAME — its commit-on-blur is behaviour, not a box, and Phase 5 proved that behaviour
-// live before leaving it alone. They are NOT exempted here: a census that quietly drops its own known
-// survivors is how a backlog stops being visible, so they are counted, printed and ratcheted at 2.
-// Phase 9 migrated 15 controls onto `<Field>` and put the other 18 on `.vb-ctl`; under the OLD rule the
-// number would read 20, and both are stated in docs/design-system.md rather than only the better one.
-const CONTROL_CEILING = 2;
+// IT WAS 2, AND BOTH TWOS WERE `molecules/Field.tsx` — ruled out of `Field`'s scope BY NAME on the ground
+// that a commit-on-blur editor is one control in two states that must share one padding, and no primitive
+// owned that box. **IT IS ZERO NOW AND IT BLOCKS**, because the atom layer answered the objection rather
+// than the census being relaxed: `InlineField` is `Field inline` and its two literal controls are
+// `<Control>`s, so the box arrives with the element. What `.inline-edit` still declares is an accent EDGE
+// and the type of the prose it sits in, neither of which is the box.
+// A `<Control>` IS NOT COUNTED BY ARM 1 BY CONSTRUCTION — it HAS the box — so this reaching zero is a
+// claim about literal `<input>`, `<select>` and `<textarea>` tags: every one of them in the tree is inside
+// a `<Field>` or wears `.vb-ctl`. Phase 9 migrated 15 onto `<Field>` and put 18 on `.vb-ctl`.
+const CONTROL_CEILING = 0;
 // ARM 2's own ceiling is ZERO, and it blocks: no surface class in the tree decides a control's box. The
 // first draft of this constant was 2, for `.inline-edit`'s border/corner/padding and
 // `.cv-title.inline-edit`'s size — and neither is reachable, which is a LIMIT worth stating rather than a
@@ -206,8 +225,9 @@ const CONTROL_GEOMETRY_CEILING = 0;
 
 const CHIP_FONT = ['var(--t-micro)', 'var(--t-small)'];
 // A chip's corner, and the primitive's own two: `--r-sm` square-ish, `--r-pill` for a state word or a
-// tag. `--r-md` is a button's and a panel's corner, which is what keeps `.tab-btn` and `.dock-tab` — tabs,
-// refused a primitive by Phase 5b with a measurement — out of a census they are not in the family of.
+// tag. `--r-md` is a button's and a panel's corner, which is what kept `.tab-btn` and `.dock-tab` out of a
+// census they were not in the family of. Both are `Tabs`/`Menu` cells now and the point still stands: a
+// tab wears a button's corner, so this discriminator is what stops the tab arm and the chip arm colliding.
 const CHIP_RADIUS = ['var(--r-pill)', 'var(--r-sm)'];
 // THE LITERAL ELEMENTS, for arm 1: is this control's box the primitive's? `<Control>` is not here, because
 // a `<Control>` HAS the box by construction and counting it would make arm 1's backlog unreadable.
@@ -227,13 +247,77 @@ const CONTROL_BOX_CLASS = 'vb-ctl';
 // arm 2 blind and the run still exited 0 — the self-test was asserting its own argument. That is the same
 // failure as a self-test carrying its own regex, one level along.
 const CHIP_TAG = '<Chip';
+const TAB_TAG = '<Tabs';
+const MENU_TAG = '<Menu';
+
+// ---------------------------------------------------------------------------------------------------
+// THE TWO NEW ARMS — one per component, and TWO rather than one because the components are two.
+//
+// Six things in this app were a row or list of mutually-exclusive cells: the five top destinations, the
+// chat session list, the dock's panes, the open cards, the editor's three views and the two value
+// pickers. Nineteen classes, six faces, six selected states and six heights. They are `Tabs` and `Menu`
+// now, and the LINE BETWEEN THEM is the reason a census that accepted either would be the wrong
+// instrument: `Tabs` switch what you are LOOKING AT and the surface stays; a `Menu` takes you SOMEWHERE
+// ELSE. An arm that took either would not notice a navigation row hand-rolled as tabs, which is the shape
+// §4.4 of the plan exists to separate.
+//
+// THE DISCRIMINATOR IS ARIA AND NOT A CLASS NAME, and that is a decision worth stating because the
+// obvious alternative was measured and rejected. The obvious signal is the SELECTION WORD: a `className`
+// that conditionally adds `active` to a `<button>`. Six sites in the tree still do exactly that and NONE
+// of them is a tab or a menu — the copilot toggle (`.switch-btn`), the tag filter's chips (which are
+// MULTI-select, so not mutually exclusive at all), the board's archive toggle, and three list rows the
+// organism phase owns as `Row`. An arm built on `active` would therefore point at a backlog it cannot
+// clear, which is the one thing this file's own header refuses.
+// `aria-selected` and `role="tab"` mean "one of a mutually-exclusive set of VIEWS"; `role="menuitem"` and
+// `aria-current` mean "one of a set of DESTINATIONS, and this is where you are". Those are the assertions
+// a hand-rolled cell has to make to be usable at all, and every one of the six families made one of them
+// before this phase: the dock and the cards wrote `role="tab"` and `aria-selected`, the chat menu wrote
+// `role="menu"`. So the population is real rather than hypothetical, and both arms reach ZERO.
+//
+// WHAT IT DOES NOT CATCH, and the limit is real rather than a caveat: a row of buttons hand-rolled with NO
+// role and NO aria at all. The plan's own named plant for this arm — `<div><button className="active">A
+// </button><button>B</button></div>` — is exactly that shape and it exits 0 here, which is recorded rather
+// than papered over. There is no property of such a row that distinguishes it from six legitimate toggles,
+// and a class-name rule would report all six. What DOES hold it is the other end: the cell needs a box,
+// and `check-radius-scale.mjs`'s button-geometry ratchet is at 1/1 with `.board-label` named, so the
+// padding and the step that make a hand-rolled cell look like a tab cannot be declared anywhere.
+const TAB_OWNER = join('web', 'src', 'molecules', 'Tabs.tsx');
+const MENU_OWNER = join('web', 'src', 'molecules', 'Menu.tsx');
+// Written out with their quotes, so `role="tabpanel"` is not a `role="tab"` and `role="menubar"` is not a
+// `role="menu"` — the closing quote is the `(?![\w-])` guard this file needs everywhere else.
+const TAB_MARKS = ['role="tablist"', 'role="tab"', 'aria-selected'];
+const MENU_MARKS = ['role="menu"', 'role="menuitem"', 'aria-current'];
+const TAB_CEILING = 0;
+const MENU_CEILING = 0;
+
+// Every mark in one file, with its line. Reads `codeOf` output for the reason arm 1 of the control census
+// had to: this very file's header names `role="tab"` in prose four times, and a raw read would have
+// counted every one of them as a hand-rolled tab.
+function markFaults(sources, marks, owner) {
+  const findings = [];
+  for (const { file, code } of sources) {
+    if (file === owner) continue;
+    for (const mark of marks) {
+      let at = code.indexOf(mark);
+      while (at >= 0) {
+        findings.push(`${file}:${lineOf(code, at)} ${mark} — a cell of a mutually-exclusive set`);
+        at = code.indexOf(mark, at + 1);
+      }
+    }
+  }
+  return findings.sort();
+}
 // What a census counts as adoption, printed beside its backlog so the ratio is visible on every run.
 const ADOPTION = [
   { shape: 'chip', tags: [CHIP_TAG] },
   { shape: 'panel', tags: ['<Surface'] },
-  { shape: 'mono', tags: ['<Readout', '<ReadoutLine'] },
-  { shape: 'dot', tags: ['<Dot'] },
-  { shape: 'seg', tags: ['<SegmentedControl'] },
+  { shape: 'mono', tags: ['<Readout', '<FigureRow'] },
+  // `<Dot` IS GONE AND THE PIP IS NOT A COMPONENT ANY MORE: it had three sizes and exactly one consumer,
+  // which is `StatusChip`, so the census counts that consumer instead. A hand-rolled circle is still a
+  // finding — `dotFault` is unchanged.
+  { shape: 'dot', tags: ['<StatusChip'] },
+  { shape: 'tab', tags: [TAB_TAG] },
+  { shape: 'menu', tags: [MENU_TAG] },
   { shape: 'control', tags: ['<Field', CONTROL_COMPONENT] },
   { shape: 'control-geometry', tags: ['<Field', CONTROL_COMPONENT] },
   { shape: 'boxless-chip', tags: [CHIP_TAG] },
@@ -286,7 +370,7 @@ function tagClasses(sources, tag) {
 
 // ---------- the three CSS shapes, one predicate each ----------
 // A CHIP is the primitive's own declaration set written by hand: a small font-size, a chip's corner and
-// a padding. See `.vb-chip` in ui/primitives.css, which says exactly those three things.
+// a padding. See `.vb-chip` in atoms/chip.css, which says exactly those three things.
 function chipFault(rule) {
   if (CHIP_EXEMPT.has(rule.selector)) return null;
   if (!CHIP_FONT.includes(declValue(rule.body, 'font-size'))) return null;
@@ -365,7 +449,6 @@ const censuses = (onChip) => [
   { shape: 'panel', ceiling: PANEL_CEILING, fault: panelFault, phase: 'Phase 11' },
   { shape: 'mono', ceiling: MONO_CEILING, fault: monoFault, phase: 'unassigned' },
   { shape: 'dot', ceiling: DOT_CEILING, fault: dotFault, phase: 'at zero — blocking' },
-  { shape: 'seg', ceiling: SEG_CEILING, fault: segFault, phase: 'at zero — blocking' },
 ];
 
 function censusOf(ruleList, fault) {
@@ -556,8 +639,11 @@ const CSS_SELF_TEST_WANT = [
   'panel .delta@7 .epsilon@8 .nu@17',
   'mono .eta@10 .theta@11',
   'dot .lambda@15',
-  'seg .mu@16',
 ].join(' | ');
+// `.mu@16` IS THE SEGMENTED GROUP AND IT MOVED RATHER THAN LEAVING. `segFault` is folded into the tab
+// arm, so its fixture row is asserted there — see TAB_SELF_TEST_WANT — and `.nu@17` stays in the panel
+// row above as the false finding the discriminator refuses: a modal is a clipped bordered flex box WITH a
+// ground. Deleting the row from this list without asserting it elsewhere is how a census goes quiet.
 
 function cssSelfTest() {
   const ruleList = shapedRules(rulesOf('fixture.css', CSS_FIXTURE));
@@ -641,6 +727,51 @@ const BOXLESS_SELF_TEST_WANT = [
   '.untoned — on a <Chip> with no tone at fixture.tsx:3',
   '.rowed — named at fixture.tsx:4 and not on a <Chip>',
 ].join(' | ');
+
+// THE TWO NEW ARMS' FIXTURE, and every row is a way one of them can go quiet: a mark on a tag (the
+// finding), the same mark inside a COMMENT (which must not count — this file's own header names all six
+// marks in prose), a `role="tabpanel"` and a `role="menubar"` that must NOT match the shorter marks, and a
+// cross-arm row: a `role="menu"` must be a MENU finding and never a tab one, which is the whole reason
+// there are two arms.
+const MARK_FIXTURE = [
+  '<div role="tablist" aria-label="View">',
+  '  <button role="tab" aria-selected={true}>A</button>',
+  '</div>',
+  '<div role="tabpanel">not a tab</div>',
+  '// role="tab" named in a comment is not a tab',
+  '<div role="menu">',
+  '  <button role="menuitem" aria-current="page">Boards</button>',
+  '</div>',
+  '<div role="menubar">not a menu</div>',
+].join('\n');
+
+const TAB_SELF_TEST_WANT = [
+  'fixture.tsx:1 role="tablist" — a cell of a mutually-exclusive set',
+  'fixture.tsx:2 aria-selected — a cell of a mutually-exclusive set',
+  'fixture.tsx:2 role="tab" — a cell of a mutually-exclusive set',
+  'seg .mu@16',
+].join(' | ');
+
+const MENU_SELF_TEST_WANT = [
+  'fixture.tsx:6 role="menu" — a cell of a mutually-exclusive set',
+  'fixture.tsx:7 aria-current — a cell of a mutually-exclusive set',
+  'fixture.tsx:7 role="menuitem" — a cell of a mutually-exclusive set',
+].join(' | ');
+
+function markSelfTest() {
+  const sources = [{ file: 'fixture.tsx', code: codeOf(MARK_FIXTURE) }];
+  // The OWNER argument is exercised too, and it is the one that would silence the whole arm if it were
+  // wrong: the same fixture read as its own owner must report nothing.
+  if (markFaults(sources, TAB_MARKS, 'fixture.tsx').length > 0) return 'tab arm: the owner file was counted';
+  const seg = censusOf(shapedRules(rulesOf('fixture.css', CSS_FIXTURE)), segFault).map(
+    (f) => `${f.selector}@${f.site.split(':')[1]}`,
+  );
+  const tab = [...markFaults(sources, TAB_MARKS, TAB_OWNER), ['seg', ...seg].join(' ')].join(' | ');
+  if (tab !== TAB_SELF_TEST_WANT) return `tab arm: expected\n  ${TAB_SELF_TEST_WANT}\ngot\n  ${tab}`;
+  const menu = markFaults(sources, MENU_MARKS, MENU_OWNER).join(' | ');
+  if (menu !== MENU_SELF_TEST_WANT) return `menu arm: expected\n  ${MENU_SELF_TEST_WANT}\ngot\n  ${menu}`;
+  return null;
+}
 
 function boxlessSelfTest() {
   const sources = [{ file: 'fixture.tsx', code: codeOf(BOXLESS_FIXTURE) }];
@@ -802,7 +933,8 @@ console.log(
 
 // Before any finding is printed, because a green run on a pattern that matched nothing is the worse
 // failure — the same order `check-radius-scale.mjs` prints in, and for the same reason.
-const parserFault = cssSelfTest() ?? controlSelfTest() ?? siteSelfTest() ?? boxlessSelfTest();
+const parserFault =
+  cssSelfTest() ?? controlSelfTest() ?? siteSelfTest() ?? boxlessSelfTest() ?? markSelfTest();
 if (parserFault) {
   console.error(`\nthe parser is broken: ${parserFault}.`);
   console.error(`A census here is vacuous — it would report zero findings whatever the tree holds. Fix the`);
@@ -848,10 +980,31 @@ for (const { shape, ceiling, fault, phase } of censuses(onChip)) {
   );
 }
 
+// THE TWO NEW ARMS. The tab arm carries the FOLDED SEGMENTED CENSUS with it: a clipped bordered group is
+// `Tabs grouped` with the corners taken off, and counting it here rather than as its own 0/0 row is what
+// keeps the fold visible.
+report(
+  'tab',
+  TAB_CEILING,
+  'at zero — blocking',
+  [
+    ...markFaults(sources, TAB_MARKS, TAB_OWNER),
+    ...censusOf(cssRules, segFault).map(
+      (f) => `${f.site} ${f.selector} — ${f.detail}  (used at ${siteOf(f.selector, sites)})`,
+    ),
+  ].map((line) => `${line}  → render it with <Tabs>`),
+);
+report(
+  'menu',
+  MENU_CEILING,
+  'at zero — blocking',
+  markFaults(sources, MENU_MARKS, MENU_OWNER).map((line) => `${line}  → render it with <Menu>`),
+);
+
 report(
   'control',
   CONTROL_CEILING,
-  'ui/InlineField.tsx, ruled out of Field by name',
+  'InlineField absorbed as `Field inline` — at zero, blocking',
   rawControls.map((c) => `${c.site} <${c.tag}> — its box comes from neither a <Field> nor .vb-ctl`),
 );
 
@@ -860,7 +1013,7 @@ report(
 report(
   'control-geometry',
   CONTROL_GEOMETRY_CEILING,
-  'ui/InlineField.tsx, ruled out of Field by name',
+  'at zero — blocking',
   censusOf(cssRules, (rule) => controlGeometryFault(rule, onControl)).map(
     (f) => `${f.site} ${f.selector} — ${f.detail}  (used at ${siteOf(f.selector, sites)})`,
   ),
@@ -877,7 +1030,8 @@ for (const [selector, reason] of CHIP_EXEMPT) console.log(`chip-shaped, EXEMPT: 
 if (failed) process.exit(1);
 
 console.log(
-  `all six shape censuses, both control arms and the box-less list are at or under their ceilings; ` +
+  `all four shape censuses, both selection arms, both control arms and the box-less list are at or ` +
+    `under their ceilings; ` +
     `${controls.length - rawControls.length} of ${controls.length} control(s) take the primitive's box ` +
     `(${controls.filter((c) => c.inField).length} in a <Field>, ` +
     `${controls.filter((c) => !c.inField && c.boxed).length} on .${CONTROL_BOX_CLASS})`,

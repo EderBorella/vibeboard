@@ -3,8 +3,8 @@ import type { Skill } from '../api';
 import { Button } from '../atoms/Button';
 import { Control } from '../atoms/Control';
 import { Text } from '../atoms/Text';
+import { Field } from '../molecules/Field';
 import { BOARD_LABELS, BOARDS, type BoardName, type ProjectConfig } from '../shared';
-import { Field } from '../ui/Field';
 import { slugify } from '../viewmodel';
 
 interface Props {

@@ -110,7 +110,7 @@
    button styles by hand — `background: none; border: 0; padding: 0; margin: 0` — set its own font-size
    and letter-spacing, and declare `color: var(--tone, var(--muted))`, which is the one role the surface
    was choosing and the one the primitive now chooses for all four indicators. `.vb-chip.vb-chip-tone`
-   makes the ink and the edge, `.vb-status` the step and the focus ring. See ui/StatusChip.tsx.
+   makes the ink and the edge, `.vb-status` the step and the focus ring. See molecules/StatusChip.tsx.
    WHAT IS LEFT IS THIS ROW'S, and only this row's: the word is `text-align: left` inside its fixed box,
    because a `<button>` centres its text by UA default — so the label sat 24px in from where the dot
    leaves off and shuffled sideways as the state name changed length. The fixed width exists to stop the
@@ -129,7 +129,7 @@
 /* NINE `[data-state]` RULES ARE GONE FROM HERE, and they were the largest of the six vocabularies. Six
    words, four tokens, three of them for three shades of "not right" on one control: `--danger` for
    `closed`, `--warn` for `offline`, `--accent-2` for `failing`. What each of them decided is now one row
-   in ui/state-tones.ts and the ink declaration on `.conn-status` above.
+   in molecules/state-tones.ts and the ink declaration on `.conn-status` above.
    `online`, not `open`: the four socket states are transport words, and `open` describes a WebSocket
    rather than anything a person is trying to do. `online`/`offline` is the pair that means something at
    a glance — and `offline` is the one that is NOT about the connection at all: the server is right

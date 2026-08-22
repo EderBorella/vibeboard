@@ -46,7 +46,8 @@ export interface Surface {
 // that reason. It is not a loose match: `Project Log` and `Project Control` share a first word and both
 // are anchored past it.
 function tab(page: Page, label: string) {
-  return page.locator('.topbar-tabs button').filter({ hasText: new RegExp(`^${label}`) });
+  // `.vb-menu` and not `.topbar-tabs`: the five destinations are a `Menu` row as of the molecule layer.
+  return page.locator('.vb-menu button').filter({ hasText: new RegExp(`^${label}`) });
 }
 
 async function gone(page: Page, selector: string): Promise<void> {
@@ -159,7 +160,7 @@ export const SURFACES: Surface[] = [
       await expect(page.locator('.cardview .cv-title')).toBeVisible();
       await gone(page, '.cards-gone');
       // Tabs of its own, which is the half of this surface a board-only harness could never see.
-      await expect(page.locator('.cards-tab').first()).toBeVisible();
+      await expect(page.locator('.cards-tabs .vb-tab').first()).toBeVisible();
       // The skill rail, and the card's own run list — both of which only exist beside an open card.
       await expect(page.locator('aside.card-skills')).toBeVisible();
       await expect(page.locator('section.reports')).toBeVisible();

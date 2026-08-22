@@ -2,7 +2,7 @@
 
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
-import { Popover } from '../web/src/ui/Popover.js';
+import { Popover } from '../web/src/molecules/Popover.js';
 
 afterEach(cleanup);
 

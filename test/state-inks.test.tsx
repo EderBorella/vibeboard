@@ -27,7 +27,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AutopilotState, Readiness, RunList, RunRecord, SandboxState } from '../web/src/api.js';
 import { LIGHT_STATES } from '../web/src/app/connection-light.js';
 import type { CopilotConfig, Suggestion } from '../web/src/shared.js';
-import { STATE_TONES, type StateName, TONES, type Tone } from '../web/src/ui/state-tones.js';
+import { STATE_TONES, type StateName, TONES, type Tone } from '../web/src/molecules/state-tones.js';
 import { inkIn, isColour, THEMES } from './state-ink.js';
 
 const api = vi.hoisted(() => ({

@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { Button } from '../atoms/Button';
 import { Chip } from '../atoms/Chip';
 import { Readout } from '../atoms/Readout';
-import { Surface } from '../atoms/Surface';
 import { Text } from '../atoms/Text';
+import { Menu } from '../molecules/Menu';
 import type { ChatMeta } from '../shared';
 import { backendLabel, relTime } from './format';
 
@@ -34,55 +34,59 @@ export function ChatSwitcher({ chats, currentChatId, backend, running, onOpen, o
           onClick={() => setChatMenu((v) => !v)}
           title="Chat history"
         >
-          <span className="vb-trigger-label">{currentTitle}</span>
+          <span className="vb-clip">{currentTitle}</span>
           <span className="vb-caret vb-twist">▾</span>
         </button>
+        {/* `Menu list`: picking a session takes you somewhere else, and it dismisses — which is the half
+            of the definition a `Tabs` never has. Five classes went: the floating box, the row, the
+            two-line button, the ellipsised title and the backdrop are all the molecule's, and what was
+            left of `.chat-menu-item` — a wrapper whose only job was to keep a row's delete glyph beside
+            it — is a grid column instead. */}
         {chatMenu && (
-          <>
-            <div className="chat-menu-backdrop" onClick={() => setChatMenu(false)} />
-            <Surface className="chat-menu" role="menu">
-              {chats.length === 0 && <Text role="hint">No saved chats yet</Text>}
-              {chats.map((c) => (
-                <div key={c.id} className={`chat-menu-item${c.id === currentChatId ? ' active' : ''}`}>
-                  <Surface
-                    as="button"
-                    variant="flat"
-                    className="chat-menu-open"
-                    data-testid="chat-menu-open"
-                    onClick={() => {
-                      onOpen(c.id, backend);
-                      setChatMenu(false);
-                    }}
-                    title={c.title}
-                  >
-                    <span className="chat-menu-title">
-                      {/* `tone` AND NOT `state`, because a backend name is not a state of anything —
-                          see the ruling at `.chat-backend` in organisms/copilot/copilot.css. It was
-                          `state={c.backend}`
-                          against two rules that spent the palette's primary and secondary on which of
-                          two agents this chat ran on. */}
-                      <Chip pill tone="neutral" className="chat-backend">
-                        {backendLabel(c.backend)}
-                      </Chip>
-                      {c.title}
-                    </span>
-                    <Readout>
-                      {relTime(c.updatedAt)} · {c.messageCount} msg
-                    </Readout>
-                  </Surface>
-                  <Button
-                    variant="bare"
-                    size="sm"
-                    className="chat-del"
-                    title="Delete chat"
-                    onClick={() => onDelete(c.id)}
-                  >
-                    ✕
-                  </Button>
-                </div>
-              ))}
-            </Surface>
-          </>
+          <Menu
+            orientation="list"
+            label="Chat history"
+            onDismiss={() => setChatMenu(false)}
+            value={currentChatId ?? null}
+            onChange={(id) => {
+              onOpen(id, backend);
+              setChatMenu(false);
+            }}
+            items={chats.map((c) => ({
+              value: c.id,
+              title: c.title,
+              label: (
+                <>
+                  {/* `tone` AND NOT `state`, because a backend name is not a state of anything —
+                      see the ruling at `.chat-backend` in organisms/copilot/copilot.css. It was
+                      `state={c.backend}` against two rules that spent the palette's primary and
+                      secondary on which of two agents this chat ran on. */}
+                  <Chip pill tone="neutral" className="chat-backend">
+                    {backendLabel(c.backend)}
+                  </Chip>
+                  {c.title}
+                </>
+              ),
+              meta: (
+                <Readout>
+                  {relTime(c.updatedAt)} · {c.messageCount} msg
+                </Readout>
+              ),
+              trailing: (
+                <Button
+                  variant="bare"
+                  size="sm"
+                  className="chat-del"
+                  title="Delete chat"
+                  onClick={() => onDelete(c.id)}
+                >
+                  ✕
+                </Button>
+              ),
+            }))}
+          >
+            {chats.length === 0 && <Text role="hint">No saved chats yet</Text>}
+          </Menu>
         )}
       </div>
       <Button size="sm" className="chat-new" disabled={running} onClick={onNew} title="Start a fresh chat">

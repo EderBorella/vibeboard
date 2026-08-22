@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { Control } from '../atoms/Control';
 import { Readout } from '../atoms/Readout';
 import { renderMarkdown } from '../markdown';
+import { Tabs } from '../molecules/Tabs';
 
 // The chrome around an editable file: which path is open, which view of it you are looking at, and
 // what you can do to it. Shared by Project Control (a control document, sometimes as fields) and the
@@ -44,14 +45,15 @@ export function EditorShell({ path, dirty, views, view, onView, actions, notice,
           {path}
           {dirty ? ' •' : ''}
         </Readout>
+        {/* `Tabs`: one file, three views, and the editor stays. `.control-tabs button` was the fourth
+            hand-rolled tab family and the only one with no class of its own on the cell at all. */}
         {views.length > 0 && (
-          <div className="control-tabs" role="group" aria-label="View">
-            {views.map((v) => (
-              <button key={v} className={view === v ? 'active' : ''} onClick={() => onView(v)}>
-                {VIEW_LABELS[v]}
-              </button>
-            ))}
-          </div>
+          <Tabs
+            label="View"
+            items={views.map((v) => ({ value: v, label: VIEW_LABELS[v] }))}
+            value={view}
+            onChange={(v) => onView(v as EditorView)}
+          />
         )}
         <div className="control-editor-actions">{actions}</div>
       </div>

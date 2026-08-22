@@ -3,6 +3,7 @@ import { rebuildBoxes, restartOpencodeServer, type SandboxState, takeOverOpencod
 import { Button } from '../atoms/Button';
 import { Text } from '../atoms/Text';
 import { useConfirm } from '../confirm/useConfirm';
+import { Notice } from '../molecules/Notice';
 import { useAction } from '../useAction';
 
 interface Props {
@@ -59,7 +60,7 @@ export function SandboxPanel({ state, backend, onChanged }: Props) {
       <div className="settings-section">Agent sandbox</div>
       <div className="vb-field">
         {state.ok ? (
-          <p className="vb-notice vb-notice-ok">
+          <Notice as="p" tone="ok">
             {/* This list is a copy. The box's mounts are the source of truth — src/server/containers.ts —
                 and it has drifted from this text twice. Change one, change both. */}
             <strong>Every agent runs in a container.</strong> Agents can build your project and cannot write
@@ -67,23 +68,23 @@ export function SandboxPanel({ state, backend, onChanged }: Props) {
             instructions injected into every turn, the project log, suggestions, chat transcripts,
             <code>.git/hooks</code> or <code>.git/config</code>. VibeBoard's own credential is not in the
             container at all. They reach the internet but not your local network.
-          </p>
+          </Notice>
         ) : (
-          <p className="vb-notice vb-notice-warn">
+          <Notice as="p" tone="warn">
             {/* Said plainly, because it is the whole product on this machine: after the one-path
                 ruling there is no degraded mode to fall back to. */}
             <strong>Agents are disabled.</strong> {state.reason} The board, the explorer and these settings
             work normally — but dispatching a run or sending a chat message will be refused until Docker is
             available and the agent image is built.
-          </p>
+          </Notice>
         )}
         {/* Shown whenever it is set, not only when the sandbox is missing: a working image is not
             enough on its own, because a server we did not spawn is not in a box. */}
         {state.backend === 'attached' && (
-          <p className="vb-notice vb-notice-warn">
+          <Notice as="p" tone="warn">
             Attached to an OpenCode server VibeBoard did not start ({state.attachedUrl}), so its filesystem
             access cannot be restricted.
-          </p>
+          </Notice>
         )}
       </div>
 
@@ -139,7 +140,7 @@ export function SandboxPanel({ state, backend, onChanged }: Props) {
         )}
       </div>
 
-      {error && <p className="vb-notice vb-notice-bad">{error}</p>}
+      {error && <Notice as="p" tone="bad">{error}</Notice>}
       {dialog}
     </>
   );

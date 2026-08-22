@@ -1,6 +1,7 @@
 import { Button } from '../atoms/Button';
 import type { CardRef } from '../dock/tabs';
 import { resolveTab } from '../dock/tabs';
+import { Tabs } from '../molecules/Tabs';
 import type { Card } from '../shared';
 
 interface Props {
@@ -29,29 +30,19 @@ export function CardTabs({
   onToggleRaw,
 }: Props) {
   return (
-    <div className="cards-tabs" role="tablist">
-      {tabs.map((t) => (
-        <span key={t.id} className={`cards-tab${t.id === activeTabId ? ' active' : ''}`}>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={t.id === activeTabId}
-            className="cards-tab-label"
-            onClick={() => onFocus(t.id)}
-          >
-            {resolveTab(t, live)?.title ?? t.id}
-          </button>
-          <Button
-            variant="bare"
-            size="sm"
-            className="cards-tab-x"
-            title={`Close ${t.id}`}
-            onClick={() => onClose(t.id)}
-          >
-            ✕
-          </Button>
-        </span>
-      ))}
+    // `Tabs closable`. THE SELECTED INK IS THE CELL'S OWN NOW: `.cards-tab.active` coloured its CHILD and
+    // drew the border on itself, which is why this family read as neither a tab nor a label to any census.
+    // `.cards-tabs` survives as two declarations that are genuinely this strip's — it is the only tab row
+    // in the app that scrolls sideways and the only one with a rule under it.
+    <Tabs
+      label="Open cards"
+      className="cards-tabs"
+      closable
+      items={tabs.map((t) => ({ value: t.id, label: resolveTab(t, live)?.title ?? t.id }))}
+      value={activeTabId}
+      onChange={onFocus}
+      onClose={onClose}
+    >
       {rawAvailable && (
         <Button
           variant={rawActive ? 'primary' : 'default'}
@@ -65,6 +56,6 @@ export function CardTabs({
           Raw
         </Button>
       )}
-    </div>
+    </Tabs>
   );
 }

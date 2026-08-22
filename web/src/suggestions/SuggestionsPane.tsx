@@ -3,12 +3,12 @@ import { cardSuggestion, patchSuggestion } from '../api';
 import { Button } from '../atoms/Button';
 import { Chip } from '../atoms/Chip';
 import { Control } from '../atoms/Control';
-import { ReadoutLine } from '../atoms/Readout';
 import { Surface } from '../atoms/Surface';
 import { Text } from '../atoms/Text';
+import { FigureRow } from '../molecules/FigureRow';
+import { asState } from '../molecules/state-tones';
 import type { Suggestion, SuggestionLevel } from '../shared';
 import { SUGGESTION_LEVELS } from '../shared';
-import { asState } from '../ui/state-tones';
 import { useAction } from '../useAction';
 
 // The dock's second occupant (decision 48): what agents filed, and the two things a person may do with
@@ -152,7 +152,7 @@ export function SuggestionsPane({ suggestions, failed, onRefresh, onApply }: Pro
                 // NO TONE CLASS BESIDE IT, and that is deliberate: this rail says which row the action
                 // bar acts on (`.picked`), not what state the finding is in — the state is a word in the
                 // row. So the attribute is a hook for tests and for reading the DOM, and nothing here
-                // decides a colour. See ui/state-tones.ts; the value is `SuggestionState`, every member
+                // decides a colour. See molecules/state-tones.ts; the value is `SuggestionState`, every member
                 // of which has a row, so giving it the rail later is one declaration.
                 data-state={asState(s.state)}
               >
@@ -164,7 +164,7 @@ export function SuggestionsPane({ suggestions, failed, onRefresh, onApply }: Pro
                   onClick={() => pick(s.id)}
                 >
                   <span className="filed-title">{s.title}</span>
-                  <ReadoutLine as="div">
+                  <FigureRow as="div">
                     <time dateTime={s.created}>{when(s.created)}</time>
                     {/* Which run filed it, and the card it was filed FROM. Only what is there: a
                         project-level finding has no card. */}
@@ -178,7 +178,7 @@ export function SuggestionsPane({ suggestions, failed, onRefresh, onApply }: Pro
                         {s.card}
                       </Chip>
                     )}
-                  </ReadoutLine>
+                  </FigureRow>
                   {s.body && <span className="filed-text">{s.body}</span>}
                 </Surface>
               </li>

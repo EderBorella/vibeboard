@@ -3,7 +3,7 @@
 // THE SIGNATURE'S OWN SENTENCE, ASSERTED — *if it is monospaced, the machine measured it; if it is not,
 // a person wrote it.* Phase 12 of docs/design-system.md.
 //
-// `npm run check:shape-coverage` counts the rules outside `ui/primitives.css` that declare
+// `npm run check:shape-coverage` counts the rules outside the primitive layer that declare
 // `font-family: var(--font-mono)`, and a count is all it can be: a ratchet at 7 reads exactly the same
 // whether the seven are the seven that were reasoned about or seven somebody added last week. So the
 // test here is not the number. It is the two halves of the sentence:
@@ -67,18 +67,21 @@ const SURVIVORS = new Map([
 // The census's own question, asked here the same way `tools/check-shape-coverage.mjs` asks it: which
 // rules outside the primitive stylesheet declare the monospaced face. Comments are stripped, because a
 // rule quoted in prose is not a rule — the defect `check-scale.mjs` had before it blanked them.
-// THE SURFACES, WHICH ARE 47 FILES RATHER THAN ONE — read out of `web/src/styles.ts`, the app's own
+// THE SURFACES, WHICH ARE MANY FILES RATHER THAN ONE — read out of `web/src/styles.ts`, the app's own
 // cascade list, so a sheet added by a later phase is censused by existing. The three dropped are the
-// three that are not surfaces: `ui/primitives.css` is the primitive stylesheet this census is asking
-// about the outside of, and the two token files declare properties rather than a face. Filtered rather
+// ones that are not surfaces: the primitive layer is what this census is asking about the outside of,
+// and the two token files declare properties rather than a face. Filtered rather
 // than left in for tidiness — `--font-mono` is DEFINED in `design/tokens.css`, so a census that reads it
 // as a surface is one `font-family` away from reporting the definition as a hand-rolled exception.
-// THE PRIMITIVE LAYER IS SEVEN SHEETS since the atom phase, and every one of them has to be dropped here
-// for the reason `ui/primitives.css` always was: this census asks what is OUTSIDE the primitive, and
-// `atoms/readout.css` is where the signature is declared. `atoms/prose.css` is deliberately NOT on the
-// list — it is the markdown surface, and two of the three survivors below are its rules.
+// THE PRIMITIVE LAYER IS THIRTEEN SHEETS since the molecule phase, and every one of them has to be
+// dropped here for the reason `ui/primitives.css` always was: this census asks what is OUTSIDE the
+// primitive, and `atoms/readout.css` is where the signature is declared. That file is not on the list
+// because it no longer exists — what was left of it WAS the molecule layer, and it is seven files now.
+// `molecules/notice.css` is one of them and it matters: `.vb-notice code` declares the mono face, and
+// counting it would report the primitive that ended five surface copies as a sixth.
+// `atoms/prose.css`, `molecules/inline-field.css` and `molecules/popover.css` are deliberately NOT on the
+// list — they are surfaces — and two of the three survivors below are `prose.css`'s rules.
 const NOT_A_SURFACE = [
-  'ui/primitives.css',
   'design/tokens.css',
   'design/themes.css',
   'atoms/button.css',
@@ -87,6 +90,13 @@ const NOT_A_SURFACE = [
   'atoms/readout.css',
   'atoms/surface.css',
   'atoms/text.css',
+  'molecules/tones.css',
+  'molecules/status-chip.css',
+  'molecules/tabs.css',
+  'molecules/menu.css',
+  'molecules/field.css',
+  'molecules/notice.css',
+  'molecules/figure-row.css',
 ];
 const SURFACE_SHEETS = [
   ...readFileSync(join(process.cwd(), 'web', 'src', 'styles.ts'), 'utf8').matchAll(

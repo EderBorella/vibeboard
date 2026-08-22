@@ -2,9 +2,10 @@ import type { CSSProperties } from 'react';
 import type { RunRecord } from '../api';
 import { Button } from '../atoms/Button';
 import { Chip } from '../atoms/Chip';
-import { Readout, ReadoutLine } from '../atoms/Readout';
+import { Readout } from '../atoms/Readout';
 import { Surface } from '../atoms/Surface';
 import { Text } from '../atoms/Text';
+import { FigureRow } from '../molecules/FigureRow';
 import type { Card } from '../shared';
 import { ForgiveAttempts } from './ForgiveAttempts';
 import { costLabel, usageTotal } from './format';
@@ -67,12 +68,12 @@ export function ExecutionView({
   return (
     <main className="execution" style={{ '--exec-cols': COLUMNS.length } as CSSProperties}>
       {accounting && (
-        <ReadoutLine as="p">
+        <FigureRow as="p">
           <Readout>{usageTotal(accounting.project)}</Readout>
           {/* S10: which cap will actually stop this project. A dollar figure beside a budget that can
               never trip would tell the reader the opposite of the truth. */}
           {accounting.cap && <Readout>{accounting.cap.why}</Readout>}
-        </ReadoutLine>
+        </FigureRow>
       )}
       {COLUMNS.map((column) => {
         const group = grouped[column.key];

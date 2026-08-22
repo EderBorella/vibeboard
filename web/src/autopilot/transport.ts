@@ -1,5 +1,5 @@
 import { type AutopilotState, isSuccessReason, type Readiness, type RunList, type RunRecord } from '../api';
-import type { StatusAdvice } from '../ui/StatusChip';
+import type { StatusAdvice } from '../molecules/StatusChip';
 
 // What the transport strip shows, as data rather than as JSX.
 //
@@ -9,7 +9,7 @@ import type { StatusAdvice } from '../ui/StatusChip';
 // sentence, and the last few defects in this feature all hid behind exactly that.
 
 // THE STATE THE STRIP IS IN, and it was called `Tone` until Phase 13. These are state names — a tone
-// is one of the five colours in ui/state-tones.ts, and calling the state a tone is what let three
+// is one of the five colours in molecules/state-tones.ts, and calling the state a tone is what let three
 // surfaces each hold their own translation of it. `AutopilotBar` had a `DOT_TONE` table doing exactly
 // that and disagreeing with the top bar's chip about `complete`.
 export type TransportState = 'idle' | 'running' | 'stopped' | 'complete' | 'halted';

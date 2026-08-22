@@ -7,6 +7,7 @@ import { Text } from '../atoms/Text';
 import { revokeDeviceRequest, signOutEverythingRequest } from '../confirm/requests';
 import type { Confirmer } from '../confirm/useConfirm';
 import { errorText } from '../errors';
+import { Notice } from '../molecules/Notice';
 import { useAction } from '../useAction';
 
 interface Props {
@@ -130,7 +131,7 @@ export function SignInPanel({ confirm }: Props) {
         Sign every browser out
       </Button>
 
-      {error && <div className="vb-notice vb-notice-warn">{error}</div>}
+      {error && <Notice tone="warn">{error}</Notice>}
     </>
   );
 }

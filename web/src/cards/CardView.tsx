@@ -1,9 +1,10 @@
 import { Chip } from '../atoms/Chip';
-import { Readout, ReadoutLine } from '../atoms/Readout';
+import { Readout } from '../atoms/Readout';
 import { Text } from '../atoms/Text';
 import { renderMarkdown } from '../markdown';
+import { Field } from '../molecules/Field';
+import { FigureRow } from '../molecules/FigureRow';
 import { BOARD_LABELS, type Card, type CardFrontmatterPatch, type ProjectConfig } from '../shared';
-import { InlineField } from '../ui/InlineField';
 import { cardPlace, csv, parseCsv } from '../viewmodel';
 import { CardLinks } from './CardLinks';
 
@@ -30,7 +31,7 @@ export function CardView({ card, config, allCards, onOpenCard, onPatch, onLinks 
     className: string,
   ) =>
     onPatch ? (
-      <InlineField
+      <Field inline
         value={card[key] ?? ''}
         label={label}
         placeholder={placeholder}
@@ -44,7 +45,7 @@ export function CardView({ card, config, allCards, onOpenCard, onPatch, onLinks 
     <article className="cardview">
       {onPatch ? field('title', 'title', 'Untitled', 'cv-title') : <h2 className="cv-title">{card.title}</h2>}
 
-      <ReadoutLine>
+      <FigureRow>
         <span>
           {BOARD_LABELS[card.board]} › {cardPlace(config, card)}
         </span>
@@ -52,10 +53,10 @@ export function CardView({ card, config, allCards, onOpenCard, onPatch, onLinks 
         {onPatch
           ? field('group', 'group', '+ group', 'cv-group')
           : card.group && <span className="cv-group">{card.group}</span>}
-      </ReadoutLine>
+      </FigureRow>
 
       {onPatch ? (
-        <InlineField
+        <Field inline
           value={csv(card.tags)}
           label="tags"
           placeholder="+ tags"
@@ -90,7 +91,7 @@ export function CardView({ card, config, allCards, onOpenCard, onPatch, onLinks 
       <CardLinks card={card} allCards={allCards} onOpenCard={onOpenCard} onLinks={onLinks} />
 
       {onPatch ? (
-        <InlineField
+        <Field inline
           value={card.body}
           label="body"
           placeholder="+ body"

@@ -1,0 +1,16 @@
+/* THE TONE → TOKEN TABLE, AND THE ONLY PLACE IN ANY STYLESHEET THAT DECIDES A STATE'S COLOUR.
+ * Five rules where twenty-six `[data-state]` rules across six surfaces used to each pick a token by
+ * hand. Which STATE is which tone is in molecules/state-tones.ts, where the compiler can check it; what a
+ * tone is WORTH is here, where the palette is.
+ * Nothing below names a state. A surface's own rule says which PROPERTY the tone lands on — ink, fill, a
+ * left rail — and `--tone` is what carries it there, so one tone can legitimately be two properties
+ * without being two colours. tools/check-state-tones.mjs holds that at zero.
+ *
+ * A TABLE AND NOT A COMPONENT, which is why it is a sheet of its own: it was the head of
+ * `ui/primitives.css` and it belongs to no one molecule. It keeps that file's byte position, first among
+ * the molecule sheets — see web/src/styles.ts. */
+.vb-tone-neutral { --tone: var(--muted); }
+.vb-tone-accent { --tone: var(--accent); }
+.vb-tone-ok { --tone: var(--ok); }
+.vb-tone-warn { --tone: var(--warn); }
+.vb-tone-bad { --tone: var(--danger); }

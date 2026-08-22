@@ -59,16 +59,22 @@ const CORPUS = 'web/src';
 // The radius scale is geometry, so it lives in design/tokens.css rather than in design/themes.css —
 // the split Phase 1 of notes/atomic-revamp-plan.md made structural and `check:tokens` keeps.
 const TOKENS_FILE = 'web/src/design/tokens.css';
-// THE PRIMITIVE LAYER, AND IT IS SEVEN SHEETS RATHER THAN ONE. `ui/primitives.css` was the only place a
-// button's geometry could be decided; the atom phase gave each of the six atoms its own file, so the set
-// is that file plus those six. LISTED AND NOT A DIRECTORY GLOB: `web/src/atoms/prose.css` sits in the
-// same directory and is NOT an atom sheet — it is the markdown surface — and a glob would have excused
-// every geometry declaration in it.
-const PRIMITIVES = join('web', 'src', 'ui', 'primitives.css');
+// THE PRIMITIVE LAYER, AND IT IS THIRTEEN SHEETS. `ui/primitives.css` was the only place a button's
+// geometry could be decided; the atom phase gave each of the six atoms its own file, and the molecule
+// phase dissolved what was left of that file into seven — the tone table, the pip and its chip, `Tabs`,
+// `Menu`, the field and its trigger, and the notice. A `Tabs` cell IS a button and declares a padding, a
+// step and a height, which is exactly what this claim refuses OUTSIDE this layer: the whole point of the
+// merge is that six surfaces stop doing it.
+// LISTED AND NOT A DIRECTORY GLOB, twice over: `web/src/atoms/prose.css` is the markdown SURFACE, and
+// `web/src/molecules/inline-field.css` and `popover.css` hold surface rules of their own — a glob over
+// either directory would have excused them.
 const ATOM_SHEETS = ['button', 'chip', 'control', 'readout', 'surface', 'text'].map((name) =>
   join('web', 'src', 'atoms', `${name}.css`),
 );
-const PRIMITIVE_LAYER = new Set([PRIMITIVES, ...ATOM_SHEETS]);
+const MOLECULE_SHEETS = ['tones', 'status-chip', 'tabs', 'menu', 'field', 'notice', 'figure-row'].map(
+  (name) => join('web', 'src', 'molecules', `${name}.css`),
+);
+const PRIMITIVE_LAYER = new Set([...ATOM_SHEETS, ...MOLECULE_SHEETS]);
 const RADIUS_SCALE = ['--r-sm', '--r-md', '--r-lg', '--r-pill'];
 
 // A VALUE MAY BE OFF THE SCALE ON PURPOSE, and then it is written here with its reason rather than
@@ -138,8 +144,23 @@ const OFF_SCALE_ON_PURPOSE = new Map([
 // `.cards-tab-x`, `.res-del`, `.chat-del`, `.tile-archive`, `.column-add`, `.control-new`, `.mp-star`,
 // `.dock-collapse`, `.tag-filter-clear`, `.cv-link-edit`.
 //
+// 8 BEFORE THE ATOM PHASE, 4 AFTER IT, **1 AFTER THE MOLECULE LAYER**, and the three that went are the
+// three tab faces this file has named as tabs for two phases running:
+//   `.tab-btn`          — a `Menu` item. The five destinations were the one family that changes the whole
+//                         screen, so they left through `Menu` rather than through `Tabs`; it is the same
+//                         class either way.
+//   `.dock-tab`         — a `Tabs` cell, and its selected state is the one that survived the merge of
+//                         four. Its uppercase did not.
+//   `.cards-tab-label`  — never a tab at all: it was the ellipsised LABEL inside one, with `border: none`
+//                         and no corner. It is `.vb-clip` inside a `.vb-tab` now, which is the same three
+//                         overflow declarations said once for three molecules.
+// The refusal Phase 5b recorded here — "two consumers disagreeing on both of a primitive's decisions is a
+// primitive that would carry one variant each" — is REVERSED, and on evidence rather than taste: there
+// were never two consumers, there were SIX, and §8.1 of notes/atomic-revamp-plan.md is the argument.
+// THE ONE THAT REMAINS is `.board-label`, a collapsible section heading with a 3px accent left edge. It
+// resolves in the organism phase as a `Row`, which empties this ratchet.
 // NEVER raise this: a ratchet that moves the wrong way is a gate switched off in place.
-const BUTTON_GEOMETRY_CEILING = 4;
+const BUTTON_GEOMETRY_CEILING = 1;
 
 // `height` AND `min-height` JOINED THIS LIST IN THE ATOM PHASE, and the same four classes are in the
 // census before and after — the tab and label faces the plan deliberately does NOT patch, because it

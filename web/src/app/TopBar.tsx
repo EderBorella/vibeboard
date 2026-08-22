@@ -1,6 +1,6 @@
 import { Button } from '../atoms/Button';
-import { Chip } from '../atoms/Chip';
 import { Control } from '../atoms/Control';
+import { Menu } from '../molecules/Menu';
 import { ConnectionLight } from './ConnectionLight';
 import type { LightState, RecentFailure, RefusalKind } from './connection-light';
 
@@ -114,24 +114,20 @@ export function TopBar({
           once lived in a `title` nobody hovers, and rendering it in the header made it an unbounded flex
           sibling that shoved the tabs and the buttons right. It lives in `ap-bar-detail`, wrapping, below the
           bar's row. */}
+      {/* A `Menu` AND NOT `Tabs`: these five change the whole screen, and the badge counts runs waiting on
+          somewhere you are NOT. `.tab-badge`'s `--accent-2` ground went with it — one badge treatment, so
+          the count reads the same here as on a dock pane. */}
       {showProject && (
-        <div className="topbar-tabs" role="group" aria-label="View">
-          {TABS.map(({ value, label }) => (
-            <button
-              type="button"
-              key={value}
-              className={`tab-btn${tab === value ? ' active' : ''}`}
-              onClick={() => onTab(value)}
-            >
-              {label}
-              {value === 'execution' && attentionCount > 0 && (
-                <Chip pill className="tab-badge vb-readout" testId="tab-badge">
-                  {attentionCount}
-                </Chip>
-              )}
-            </button>
-          ))}
-        </div>
+        <Menu
+          label="View"
+          items={TABS.map(({ value, label }) => ({
+            value,
+            label,
+            badge: value === 'execution' && attentionCount > 0 ? attentionCount : undefined,
+          }))}
+          value={tab}
+          onChange={(value) => onTab(value as MainTab)}
+        />
       )}
       <div className="topbar-right">
         {/* NOT A `Field`: the top bar carries no labels, and the value this shows is its own name. It

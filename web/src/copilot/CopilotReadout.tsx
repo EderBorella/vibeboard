@@ -1,5 +1,6 @@
-import { Readout, ReadoutLine } from '../atoms/Readout';
+import { Readout } from '../atoms/Readout';
 import { formatCost } from '../format';
+import { FigureRow } from '../molecules/FigureRow';
 import { fmtK } from './format';
 import type { CopilotStats } from './useCopilot';
 
@@ -11,7 +12,7 @@ export function CopilotReadout({ stats, budget }: { stats: CopilotStats; budget:
   const nearFull = stats.contextTokens > budget * 0.8;
 
   return (
-    <ReadoutLine className="copilot-readout">
+    <FigureRow className="copilot-readout">
       <Readout title="cumulative session cost">{formatCost(stats.costUsd)}</Readout>
       <Readout>{stats.turns} turns</Readout>
       <Readout>{(stats.lastDurationMs / 1000).toFixed(1)}s</Readout>
@@ -25,6 +26,6 @@ export function CopilotReadout({ stats, budget }: { stats: CopilotStats; budget:
         ctx <Readout>{fmtK(stats.contextTokens)}</Readout>
         {nearFull ? ' · consider /compact' : ''}
       </span>
-    </ReadoutLine>
+    </FigureRow>
   );
 }

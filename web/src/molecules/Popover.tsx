@@ -30,7 +30,7 @@ export function Popover({
   // `.ap-agent-state` is a bare span when the agent is healthy and this button when it is not, and a
   // test that had to know which was asserting on the implementation.
   triggerTestId?: string;
-  // A ROW IN ui/state-tones.ts, and no longer "the caller's own state vocabulary". The trigger gets the
+  // A ROW IN molecules/state-tones.ts, and no longer "the caller's own state vocabulary". The trigger gets the
   // tone class as well as the attribute, so the two surfaces that reach the DOM through this prop — the
   // connection light and the auto-pilot bar's agent chip — take their colour from the same table a Chip
   // does rather than from a rule of their own. It was a `string` until Phase 13.

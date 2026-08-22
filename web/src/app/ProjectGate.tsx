@@ -4,7 +4,8 @@ import { Control } from '../atoms/Control';
 import { Readout } from '../atoms/Readout';
 import { Surface } from '../atoms/Surface';
 import { Text } from '../atoms/Text';
-import { Field } from '../ui/Field';
+import { Field } from '../molecules/Field';
+import { Notice } from '../molecules/Notice';
 import { useAction } from '../useAction';
 import { slugify } from '../viewmodel';
 
@@ -141,7 +142,7 @@ export function ProjectGate({ onOpened }: Props) {
           </div>
         )}
 
-        {error && <div className="vb-notice vb-notice-bad">{error}</div>}
+        {error && <Notice tone="bad">{error}</Notice>}
       </div>
     </div>
   );

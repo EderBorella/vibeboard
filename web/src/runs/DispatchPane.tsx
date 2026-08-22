@@ -7,9 +7,10 @@ import { Text } from '../atoms/Text';
 import { BackendPicker } from '../copilot/BackendPicker';
 import { clampToCaps } from '../copilot/choice';
 import { ModelPicker } from '../models/ModelPicker';
+import { Field } from '../molecules/Field';
+import { Notice } from '../molecules/Notice';
+import { Tabs } from '../molecules/Tabs';
 import { backendCaps, type Card } from '../shared';
-import { Field } from '../ui/Field';
-import { SegmentedControl } from '../ui/SegmentedControl';
 
 interface Props {
   skill: Skill;
@@ -118,7 +119,8 @@ export function DispatchPane({
       </Field>
 
       <Field as="div" layout="rail" label="Mode" className="dispatch-row">
-        <SegmentedControl
+        <Tabs
+          grouped
           items={caps.modes.map((m) => ({ value: m.value, label: m.label, title: m.hint }))}
           value={clamped.mode}
           onChange={setMode}
@@ -153,7 +155,7 @@ export function DispatchPane({
         </details>
       )}
 
-      {error !== null && <p className="vb-notice vb-notice-bad">{error}</p>}
+      {error !== null && <Notice as="p" tone="bad">{error}</Notice>}
 
       <div className="dispatch-foot">
         <Button size="md" onClick={onBack}>

@@ -1,0 +1,52 @@
+/* MENU — the two families that take you somewhere else: the five top destinations and the chat session
+ * list. See molecules/Menu.tsx for why this is not `Tabs` with a seventh option.
+ *
+ * IMPORTED AT `ui/primitives.css`'s BYTE POSITION with the other molecule sheets — see web/src/styles.ts. */
+
+.vb-menu { display: flex; align-items: center; gap: var(--s-2); min-width: 0; }
+/* THE FLOATING LIST. `Surface raised` draws the ground, the edge and the corner; what is here is where it
+   sits, how tall it may get, and the lift that says it is above the page. `top` in `--s-2` rather than
+   the 4px `.chat-menu` wrote, which is the same value with a name.
+   A GRID AND NOT A COLUMN, and it is what deletes the wrapper `.chat-menu-item` was: an item and the
+   control that acts on it are two cells of one row, so `trailing` needs no element around the pair. */
+.vb-menu-list {
+  position: absolute; z-index: var(--z-pop); top: calc(100% + var(--s-2)); left: 0; right: 0;
+  display: grid; grid-template-columns: 1fr auto; align-items: stretch; gap: var(--s-1);
+  max-height: 320px; overflow-y: auto; padding: var(--s-2); box-shadow: var(--glow), var(--lift);
+}
+.vb-menu-list > .vb-menu-item { grid-column: 1; }
+/* THE TRAILING CONTROL, placed by position rather than by a class of its own. `:not(.vb-menu-item)` is
+   the discriminator and it is load-bearing: `+ *` would put every item after the first in column two. */
+.vb-menu-item + :not(.vb-menu-item) { grid-column: 2; }
+/* The empty state is the caller's node and has no item before it, so it lands in column one and is given
+   the inset a sentence needs. It was `.chat-menu > .vb-text-quiet`. */
+.vb-menu-list > .vb-text-quiet { padding: var(--s-4); }
+
+/* THE DESTINATION. `--font-display` and `--track` survive here and not on a `Tabs` cell, because a
+   destination is a NAME — the app's own vocabulary for its five places — where a tab is a label on a
+   pane. The uppercase does not: `.dock-tab` was the only one wearing it and it made the row wider than
+   its words. */
+.vb-menu-item {
+  display: inline-flex; align-items: center; gap: var(--s-3); min-width: 0;
+  height: var(--ctl-h); min-height: var(--ctl-h); padding: 0 var(--s-5);
+  background: transparent; color: var(--muted);
+  border: 1px solid transparent; border-radius: var(--r-md);
+  font-family: var(--font-display); font-size: var(--t-small); letter-spacing: var(--track);
+  cursor: pointer;
+}
+.vb-menu-item:hover { color: var(--text); }
+/* ACCENT INK SAYS "YOU ARE HERE" and that is the whole visible difference from a selected tab. The
+   `--glow` the top row wore is gone: a halo on a destination made the header's current tab the brightest
+   thing on a board with work running on it. */
+.vb-menu-item.active { color: var(--accent); background: var(--panel-2); border-color: var(--border); }
+/* A LIST ITEM IS TWO LINES AND A FULL ROW, which is the only thing the two orientations disagree about:
+   `.chat-menu-open` was a column of a title and a `Readout`, and its height is its content's. */
+.vb-menu-list .vb-menu-item {
+  flex-direction: column; align-items: stretch; gap: var(--s-1);
+  height: auto; min-height: var(--ctl-h); padding: var(--s-2) var(--s-4);
+  font-family: inherit; font-size: var(--t-small); color: var(--text);
+}
+.vb-menu-list .vb-menu-item:hover { background: var(--panel-2); }
+
+/* The click-catcher behind an open list. `--z-pop` under the list itself, which is later in the DOM. */
+.vb-menu-backdrop { position: fixed; inset: 0; z-index: var(--z-pop); }

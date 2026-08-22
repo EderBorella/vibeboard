@@ -1,4 +1,4 @@
-import { StatusChip } from '../ui/StatusChip';
+import { StatusChip } from '../molecules/StatusChip';
 import { type LightState, lightAdvice, type RecentFailure, type RefusalKind } from './connection-light';
 
 // The light, as a button that explains itself.
@@ -35,7 +35,7 @@ export function ConnectionLight({
     // like, because it was the only one that already explained itself on a click. What it gives up is its
     // own box: `.conn-status` declared a border, a padding, a background and a font-size of its own, which
     // was four decisions about a shape three other indicators were also making separately. See
-    // ui/StatusChip.tsx for the census.
+    // molecules/StatusChip.tsx for the census.
     //
     // THE STATE IS STILL AN ATTRIBUTE and not a class built at run time from `conn-${light}`. Six classes
     // lived only inside that template string, so a literal grep for any of them found nothing and all six

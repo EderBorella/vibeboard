@@ -1,0 +1,68 @@
+/* TABS — four families, one component. See molecules/Tabs.tsx for which answer won on each of the four
+ * things they disagreed about.
+ *
+ * IMPORTED AT `ui/primitives.css`'s BYTE POSITION, with the other molecule sheets, so the split of that
+ * file is a MOVE and not a cascade change — see web/src/styles.ts. Every rule here is (0,1,0) or (0,2,0)
+ * and sits above every surface sheet, which is what lets a surface still say where a strip goes. */
+
+/* THE STRIP. `padding` here rather than on three surface classes: `.dock-strip`, `.topbar-tabs` and
+   `.cards-tabs` each inset their row from the container edge and each wrote it themselves — 8px of
+   horizontal inset in all three, which is what says it belongs to the strip. */
+.vb-tabs {
+  display: flex; align-items: center; gap: var(--s-2);
+  padding: var(--s-2) var(--s-4); min-width: 0;
+}
+/* THE GROUP DRAWS ONE BORDER AND ONE CORNER AND CLIPS ITS CELLS, which is why a segmented picker was
+   never a row of `Button`s: every button variant gives its cell an edge and a corner, and that puts a
+   seam down the middle of the group.
+   THE GROUP DECLARES THE HEIGHT AND THE CELLS STRETCH INTO IT — the atom layer's rule applied to the one
+   control that is really two boxes. A cell is 2px shorter than the group by construction, because the
+   group's own hairline is inside its 28px, and the browser harness derives that 2 from the page rather
+   than asserting it as a number.
+   `min-height` for atoms/button.css's reason: a declared height is shrinkable in a column flex parent.
+   `width: max-content` so the group is as wide as its cells and not as wide as the row it sits in. */
+.vb-tabs-grouped {
+  align-items: stretch; gap: 0; padding: 0; width: max-content;
+  border: 1px solid var(--border); border-radius: var(--r-md); overflow: hidden;
+  height: var(--ctl-h); min-height: var(--ctl-h);
+}
+/* THE CLOSE GLYPH SITS AGAINST ITS OWN TAB, AND THAT IS ALL `.cards-tab` WAS DOING THAT MATTERED. A
+   `<button>` inside a `<button>` is invalid and unclickable, so a closable tab is two controls; without
+   this the strip's gap would separate a tab from its own `✕` exactly as much as from the next tab. One
+   declaration on an adjacent sibling rather than a wrapper element with a class of its own. */
+.vb-tab + .vb-btn-bare { margin-left: calc(-1 * var(--s-2)); }
+/* THE CELL. `--ctl-h` and no vertical padding, for `Button`'s reason: a padded box's height is emergent,
+   and four families each arrived at a different one — 22.4px, 24px, 25.8px badged, 17.75px.
+   `max-width` is the card tabs' 220px, kept for every cell: a tab is a label you can read at a glance,
+   and the only strip that ever had a long one is the one that clamped it. */
+.vb-tab {
+  display: inline-flex; align-items: center; gap: var(--s-3); flex: 0 0 auto; max-width: 220px;
+  height: var(--ctl-h); min-height: var(--ctl-h); padding: 0 var(--s-4);
+  background: transparent; color: var(--muted); border: 1px solid transparent;
+  font-family: inherit; font-size: var(--t-small); cursor: pointer;
+}
+/* THE CORNER IS THE UNGROUPED CELL'S AND THE GROUP'S, NEVER BOTH — a cell inside a clipped group draws
+   none, and `border-radius: 0` is not a step on the scale, so the base declares no corner at all rather
+   than declaring one for a `0` to undo. `npm run check:radius-scale` is what makes that the cheaper
+   spelling: an exception map entry for `0` would excuse every squared corner in the tree. */
+.vb-tabs:not(.vb-tabs-grouped) .vb-tab { border-radius: var(--r-md); }
+.vb-tab:hover:not(:disabled) { color: var(--text); }
+/* ONE SELECTED STATE, AND IT IS THE DOCK'S. `--accent` ink with a `--glow` belongs to a DESTINATION —
+   see molecules/menu.css — and `--accent-fill` reads as the primary action rather than as the current
+   view. `--text` on `--panel-2` with a visible edge is the one of the four that says only "this one". */
+.vb-tab.active { color: var(--text); background: var(--panel-2); border-color: var(--border); }
+.vb-tab:disabled { opacity: 0.6; cursor: default; }
+
+/* INSIDE A GROUP THE CELL GIVES UP ITS OWN BOX: the edge, the corner and the height are the group's, and
+   what is left is a divider between cells. `height: auto` rather than a number — the cell fills the
+   group's 28px by stretching, which is what makes the 2px derivable. */
+.vb-tabs-grouped .vb-tab {
+  height: auto; min-height: 0; max-width: none;
+  background: var(--panel-2); border: none; border-right: 1px solid var(--border);
+}
+.vb-tabs-grouped .vb-tab:last-child { border-right: none; }
+/* The inverted cell, which is the one place a tab may wear a fill: a value picker's chosen option is a
+   statement about the project's configuration and not about which pane you are reading. */
+.vb-tabs-grouped .vb-tab.active {
+  background: var(--accent-fill); color: var(--on-fill); font-weight: 600;
+}

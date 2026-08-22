@@ -6,16 +6,9 @@
   border-top: 1px solid var(--border);
   background: var(--panel);
 }
-.dock-strip { display: flex; align-items: center; gap: var(--s-2); padding: var(--s-2) var(--s-4); }
-.dock-tab {
-  display: inline-flex; align-items: center; gap: var(--s-3);
-  background: transparent; border: 1px solid transparent; color: var(--muted);
-  border-radius: var(--r-md); padding: var(--s-2) var(--s-4); cursor: pointer;
-  font-family: var(--font-display); font-size: var(--t-small);
-  text-transform: uppercase; letter-spacing: var(--track);
-}
-.dock-tab:hover { color: var(--text); }
-.dock-tab.active { color: var(--text); background: var(--panel-2); border-color: var(--border); }
+/* THE STRIP AND ITS TABS ARE `Tabs` — see molecules/tabs.css. `.dock-strip` was a flex row with a gap and
+   an 8px inset, which all three tab strips wrote for themselves and is the molecule's now; `.dock-tab`'s
+   selected state is the one that survived the merge of four, and its uppercase is the one that did not. */
 /* SIZED BY ITS CONTENT, capped at 38vh — EXCEPT where a pane exists to be filled.
    It was `height: 38vh` outright, so the dock reserved 38% of the viewport whatever was in it: 414px of
    empty panel to display the words "No card open." on a 1000px-tall screen, while the boards above had

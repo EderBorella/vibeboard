@@ -67,16 +67,10 @@
    sit in a constrained block where truncating really is what is wanted. */
 .exec-card .link-title { white-space: normal; overflow: visible; }
 .exec-summary { margin: 0; color: var(--muted); font-size: var(--t-small); line-height: 1.35; overflow-wrap: anywhere; }
-/* `Chip pill` plus `vb-readout` for the mono face. The ground is `--accent-2` rather than `fill`'s
-   `--panel-2` because this badge is the one ambient signal that a run wants a decision — a count on a
-   panel ground would read as furniture. Not a `tone`: `--accent-2` is outside the closed five.
-   THE INK IS THE SURFACE THIS COUNT IS PUNCHED OUT OF, and that is what `--on-accent` was for — a name
-   that also aliased `--on-fill` in two of the three palettes and therefore decided nothing. `--panel-2`
-   is the one token whose value tracks the ground it has to be legible on: near-black in the two dark
-   palettes, white in the light one, which is exactly what the retired name held. `--on-fill` is the
-   wrong substitute and was measured as such: marshmallow's is a dark green mixed for a PALE fill, and on
-   ochre it reads 2.34:1. */
-.tab-badge {
-  margin-left: var(--s-3); background: var(--accent-2); color: var(--panel-2);
-}
-
+/* `.tab-badge` IS GONE, and with it the stray this file held: it was the TOP BAR's attention count,
+   living here because that is where its bytes fell in `styles.css`. `Menu`'s `badge` option renders it —
+   `Chip pill fill` with the mono face, which is what the dock's own count already was.
+   WHAT WAS GIVEN UP, said plainly rather than dropped: the `--accent-2` ground, argued here as "the one
+   ambient signal that a run wants a decision", and the `--panel-2` ink that tracked it. One badge
+   treatment is the plan's ruling — two grounds for one shape is two things to keep in step — and the
+   count is still the only thing in the header that is not a word. */

@@ -132,7 +132,8 @@ export function tokenReferences(sheets) {
 // ---------- resolution ----------
 // The right-hand half of a composed name: every quoted word and every bare number in the corpus. The
 // same method as `check-class-budget.mjs`'s `vocabularyOf`, and the numbers are not a widening for
-// convenience — `` `vb-dot-${size}` `` composes three real classes out of a `7 | 8 | 12` union.
+// convenience — `` `vb-dot-${size}` `` composed three real classes out of a `7 | 8 | 12` union until the
+// molecule layer absorbed the pip into `StatusChip` and left one size. See check-class-budget.mjs.
 export function vocabularyOf(code) {
   const out = new Set();
   for (const m of code.matchAll(/'([^'\n]*)'|"([^"\n]*)"/g)) {

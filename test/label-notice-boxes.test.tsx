@@ -176,8 +176,11 @@ describe('the empty-state lines', () => {
     expect(extra).not.toContain('font-style');
   });
 
-  it('the chat menu decides its own inset, and the line inside it decides nothing', () => {
-    const el = at('<div class="chat-menu"><p class="vb-text vb-text-quiet">x</p></div>', 'p');
+  it('a menu list decides its own inset, and the line inside it decides nothing', () => {
+    const el = at(
+      '<div class="vb-menu vb-menu-list"><p class="vb-text vb-text-quiet">x</p></div>',
+      'p',
+    );
     expect(box(el).padding).toBe('8px');
   });
 
@@ -275,7 +278,7 @@ describe('the two select triggers', () => {
   });
 
   it('the label takes the slack and ellipsises; the caret does not shrink', () => {
-    const lab = box(label('vb-trigger-label'));
+    const lab = box(label('vb-clip'));
     expect(lab.flex).toBe('1');
     expect(lab['text-overflow']).toBe('ellipsis');
     expect(box(label('vb-caret')).flex).toBe('none');

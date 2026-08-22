@@ -2,8 +2,8 @@ import type { ModelOption } from '../api';
 import { Button } from '../atoms/Button';
 import { Control } from '../atoms/Control';
 import { ModelPicker } from '../models/ModelPicker';
+import { Tabs } from '../molecules/Tabs';
 import type { BackendCaps } from '../shared';
-import { SegmentedControl } from '../ui/SegmentedControl';
 
 interface Props {
   // Modes and efforts are backend-specific; the caller passes the caps of the backend in force.
@@ -38,7 +38,8 @@ export function CopilotControls({
   return (
     <>
       <div className="copilot-controls">
-        <SegmentedControl
+        <Tabs
+          grouped
           items={caps.modes.map((m) => ({ value: m.value, label: m.label, title: m.hint }))}
           value={effMode}
           onChange={onMode}

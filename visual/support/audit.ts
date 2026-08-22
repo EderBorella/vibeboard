@@ -206,10 +206,14 @@ function pageBoxes(root: string | null): { elements: number; fontSizes: Tally; r
 //
 // A CONTROL IS WHAT YOU OPERATE and a MARKER IS WHAT YOU READ, and the populations are selected the way a
 // person would point at them rather than by class: a control is a `<button>`, an `<input>`, a `<select>`,
-// a `<textarea>` or anything with an explicit widget role; a marker is a `.vb-chip`. `.vb-seg-cell` is
+// a `<textarea>` or anything with an explicit widget role; a marker is a `.vb-chip`. A GROUPED TAB CELL is
 // EXCLUDED from the control tally and the reason is geometric rather than aesthetic — a cell inside a
 // group that owns the border is 2px shorter than the group by construction, because the group's own 1px
 // edge is inside its 28px. The group is the control you operate and the group is what carries `--ctl-h`.
+// It was `.vb-seg` and `.vb-seg-cell`; `SegmentedControl` is `Tabs grouped` as of the molecule layer, so
+// the selectors are `.vb-tabs-grouped` and the `.vb-tab` inside one. Written as a DESCENDANT rather than
+// as a class of its own, because a grouped cell no longer has one — the same `.vb-tab` is a full-height
+// control on the four ungrouped strips, and excluding it by class would drop nine real controls.
 function pageHeights(root: string | null): { controlHeights: Tally; markerHeights: Tally } {
   function population(scope: string | null): Element[] {
     if (!scope) return Array.from(document.querySelectorAll('*'));
@@ -222,7 +226,8 @@ function pageHeights(root: string | null): { controlHeights: Tally; markerHeight
   const bump = (tally: Tally, key: string): void => {
     tally[key] = (tally[key] ?? 0) + 1;
   };
-  const CONTROL = 'button, input, select, textarea, [role="button"], [role="tab"], .vb-trigger, .vb-seg';
+  const CONTROL =
+    'button, input, select, textarea, [role="button"], [role="tab"], .vb-trigger, .vb-tabs-grouped';
   for (const el of population(root)) {
     const style = getComputedStyle(el);
     if (style.visibility === 'hidden' || style.display === 'none' || Number(style.opacity) === 0) continue;
@@ -231,7 +236,7 @@ function pageHeights(root: string | null): { controlHeights: Tally; markerHeight
     // Rounded to a tenth: sub-pixel layout puts 27.99 and 28.01 on one 28px rule, and a tally keyed on
     // the raw float would report a NEW value every run.
     const px = `${Math.round(box.height * 10) / 10}px`;
-    if (el.matches(CONTROL) && !el.classList.contains('vb-seg-cell')) bump(controlHeights, px);
+    if (el.matches(CONTROL) && !el.matches('.vb-tabs-grouped .vb-tab')) bump(controlHeights, px);
     if (el.classList.contains('vb-chip')) bump(markerHeights, px);
   }
   return { controlHeights, markerHeights };

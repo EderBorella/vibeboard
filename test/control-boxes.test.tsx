@@ -36,7 +36,7 @@ import { cleanup, render } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { Control } from '../web/src/atoms/Control.js';
 import { Surface } from '../web/src/atoms/Surface.js';
-import { Field } from '../web/src/ui/Field.js';
+import { Field } from '../web/src/molecules/Field.js';
 import { box } from './css-box.js';
 
 afterEach(cleanup);
@@ -241,7 +241,7 @@ describe('every box that declares a height also declares the floor it may not be
     ['a button', '<button class="vb-btn vb-btn-default vb-btn-md"></button>', 'button', '28px'],
     ['a control', '<input class="vb-ctl"/>', 'input', '28px'],
     ['a select trigger', '<button class="vb-trigger"></button>', 'button', '28px'],
-    ['a segmented group', '<div class="vb-seg"></div>', 'div', '28px'],
+    ['a grouped tab strip', '<div class="vb-tabs vb-tabs-grouped"></div>', 'div', '28px'],
     ['a chip', '<span class="vb-chip"></span>', 'span', '16px'],
   ])('%s', (_name, html, sel, px) => {
     const drawn = box(at(html, sel));

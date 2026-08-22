@@ -1,5 +1,5 @@
 import type { MouseEvent, ReactNode } from 'react';
-import { type StateName, stateClass, type Tone, toneClass } from '../ui/state-tones';
+import { type StateName, stateClass, type Tone, toneClass } from '../molecules/state-tones';
 
 // THE CHIP. Tags, state words, counts and badges — the same bordered pill rebuilt by hand at a dozen
 // sites, each with its own radius, padding and font-size.
@@ -14,7 +14,7 @@ import { type StateName, stateClass, type Tone, toneClass } from '../ui/state-to
 // bar's chip and `--accent` on the auto-pilot bar's rail — one fact, three colours, on three surfaces a
 // person reads in one glance. `--accent-2` is the secondary HUE; `--warn` is the attention token; and a
 // state that wants attention takes the attention token wherever it is said. So `state` is a
-// `StateName` now, ui/state-tones.ts maps it to a tone, and a surface has nothing left to choose.
+// `StateName` now, molecules/state-tones.ts maps it to a tone, and a surface has nothing left to choose.
 //
 // `tone` SURVIVES for the markers that are not states of anything: a tag, a count, the three words on a
 // card tile. Both props reach the same five `.vb-tone-*` rules, which is what makes the shared tone set
@@ -50,7 +50,7 @@ interface Props {
   // A CLOSED SET, for `Surface`'s reason: `as` says what the box is in the document — a label or a
   // control — and an open tag would make this a general element factory whose geometry claim is empty.
   as?: ChipTag;
-  // A row in ui/state-tones.ts. See above.
+  // A row in molecules/state-tones.ts. See above.
   state?: StateName;
   title?: string;
   // Layout, and a surface's own non-geometry treatment (mono, uppercase, letter-spacing).

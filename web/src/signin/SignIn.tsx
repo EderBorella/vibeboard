@@ -1,4 +1,5 @@
 import { Text } from '../atoms/Text';
+import { Notice } from '../molecules/Notice';
 import type { SigninPhase } from './driver';
 
 interface Props {
@@ -42,7 +43,7 @@ export function SignIn({ phase, onRetry }: Props) {
           <>
             {/* The whole reason this screen exists: it says WHY. A single red "unauthorized" is what
                 sent the user looking for a token they had no way to know about. */}
-            <p className="vb-notice vb-notice-bad">{phase.reason}</p>
+            <Notice as="p" tone="bad">{phase.reason}</Notice>
             {phase.retry && (
               <p className="vb-field">
                 <button type="button" onClick={onRetry}>

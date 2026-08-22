@@ -818,32 +818,39 @@ test('12. the affordances are big enough to see', async ({ board, theme }) => {
       // Every control on the auto-pilot bar's row, as computed sizes. The transport was a step taller
       // than everything beside it.
       //
-      // `:not(.vb-seg-cell)` AND THE EXCLUSION IS MEASURED RATHER THAN ASSUMED: with it left in, this
-      // reported `vb-seg-cell-sm 11px` against everything else's 12px. A segmented control's cells are
-      // one primitive with one border and one corner, sized a step down on purpose — they are the parts
-      // of a single control, not controls sitting on this row, and folding them in would make the claim
-      // "everything is one size" false by construction and therefore unassertable. The atom phase made
-      // that argument GEOMETRIC as well as typographic: the group declares `--ctl-h` and its cells fill
-      // it, so a cell is 2px shorter than the group because the group's own 1px edge is inside its 28px.
+      // THE EXCLUSION IS MEASURED RATHER THAN ASSUMED: with it left in, this reported an 11px cell
+      // against everything else's 12px. A grouped tab strip's cells are one primitive with one border and
+      // one corner — they are the parts of a single control, not controls sitting on this row, and folding
+      // them in would make the claim "everything is one size" false by construction and therefore
+      // unassertable. The atom phase made that argument GEOMETRIC as well as typographic: the group
+      // declares `--ctl-h` and its cells fill it, so a cell is 2px shorter than the group because the
+      // group's own 1px edge is inside its 28px.
+      // THE STEP DIFFERENCE IS GONE AS OF THE MOLECULE LAYER — `.vb-seg-cell-sm` was the only `--t-micro`
+      // cell and `Tabs` has no `sm` — so this exclusion is now about the HEIGHT alone. It is a descendant
+      // selector rather than a class, because a grouped cell has no class of its own: the same `.vb-tab`
+      // is a full-height control on the four ungrouped strips.
       const controls = Array.from(
-        document.querySelectorAll<HTMLElement>('[data-testid="ap-bar"] .ap-bar-row button:not(.vb-seg-cell)'),
-      ).map((b) => ({
-        id: b.dataset.testid ?? b.className,
-        px: getComputedStyle(b).fontSize,
-        h: rect(b).height,
-      }));
+        document.querySelectorAll<HTMLElement>('[data-testid="ap-bar"] .ap-bar-row button'),
+      )
+        .filter((b) => !b.matches('.vb-tabs-grouped .vb-tab'))
+        .map((b) => ({
+          id: b.dataset.testid ?? b.className,
+          px: getComputedStyle(b).fontSize,
+          h: rect(b).height,
+        }));
       // EVERY CONTROL ON THE WHOLE SURFACE, which is the widening the atom phase pays for. The row above
       // is one strip; this is every box on the board you can operate — the chrome's buttons, the theme
       // select, a tile's archive glyph, a column's `+`, the segmented group. One height, and it is
       // asserted as a SET of size 1 rather than as 28px, for check 13's reason: a deliberate step change
       // belongs in the drift baseline, and `controlHeights` now records it there.
-      // FOUR CLASSES ARE NAMED OUT, AND THE NAMING IS THE RATCHET. `.tab-btn`, `.dock-tab`,
-      // `.cards-tab-label` and `.board-label` are the control boxes no primitive owns — the plan
-      // deliberately does NOT give them `--ctl-h` in the atom phase, because `Tabs`, `Menu` and `Row`
-      // delete all four in Phases 5 and 6 and patching a class you are about to delete is migration
-      // scaffolding. Excluded BY NAME rather than by "everything that is not an atom", so the list
-      // shrinks to nothing in the commit that deletes them and this claim becomes the whole surface.
-      const NOT_AN_ATOM_YET = ['tab-btn', 'dock-tab', 'cards-tab-label', 'board-label'];
+      // ONE CLASS IS NAMED OUT, AND IT WAS FOUR. `.tab-btn`, `.dock-tab` and `.cards-tab-label` were the
+      // three tab faces no primitive owned, and the molecule layer DELETED all three rather than patching
+      // them — they are `Menu` items and `Tabs` cells at `--ctl-h`, so they are inside the claim now
+      // instead of beside it. `.board-label` is a collapsible section heading with a 3px accent left edge
+      // and it resolves in the organism phase as a `Row`, which empties this list and makes this claim the
+      // whole surface. Excluded BY NAME rather than by "everything that is not an atom", which is what
+      // makes the list shrink visibly in the commit that deletes each one.
+      const NOT_AN_ATOM_YET = ['board-label'];
       const shown = (el: HTMLElement): boolean => {
         const style = getComputedStyle(el);
         if (style.visibility === 'hidden' || style.display === 'none') return false;
@@ -853,7 +860,8 @@ test('12. the affordances are big enough to see', async ({ board, theme }) => {
         id: el.dataset.testid ?? (el.className || el.tagName),
         h: Math.round(rect(el).height * 10) / 10,
       });
-      const OPERABLE = 'button, input, select, textarea, [role="button"], [role="tab"], .vb-trigger, .vb-seg';
+      const OPERABLE =
+        'button, input, select, textarea, [role="button"], [role="tab"], .vb-trigger, .vb-tabs-grouped';
       const operable = Array.from(document.querySelectorAll<HTMLElement>(OPERABLE)).filter(shown);
       // THREE THINGS COME OUT OF THE ONE-HEIGHT POPULATION AND EACH IS CLAIMED SOMEWHERE ELSE, because a
       // population with a silent exclusion in it is how this repository has lost a claim twice. The first
@@ -871,25 +879,25 @@ test('12. the affordances are big enough to see', async ({ board, theme }) => {
       //   card's whole file is not. The copilot composer measured 47px. Asserted below as a floor rather
       //   than excluded, which is the part a silent filter would have thrown away.
       //
-      //   A SEGMENTED CELL IS A PART OF A GROUP. See the note above `controls`, and the derived claim
+      //   A GROUPED TAB CELL IS A PART OF A GROUP. See the note above `controls`, and the derived claim
       //   below: the group owns the border, so a cell is exactly 2px shorter.
       const isMarker = (el: HTMLElement): boolean => el.classList.contains('vb-chip');
       const surfaceControls = operable
-        .filter((el) => !el.classList.contains('vb-seg-cell'))
+        .filter((el) => !el.matches('.vb-tabs-grouped .vb-tab'))
         .filter((el) => !NOT_AN_ATOM_YET.some((cls) => el.classList.contains(cls)))
         .filter((el) => !isMarker(el))
         .filter((el) => el.tagName !== 'TEXTAREA')
         .map(measured);
       const areas = operable.filter((el) => el.tagName === 'TEXTAREA').map(measured);
       // A CELL AND ITS OWN GROUP, PAIRED, so the 2px is derived from the group on the page rather than
-      // asserted as a number. `.vb-seg-cell` was excluded from every height claim in this file with the
+      // asserted as a number. A grouped cell is excluded from every height claim in this file with the
       // comment that including it "would make the claim everything is one size false by construction" —
       // which is true and is only half an answer, because an excluded cell that collapsed to 12px would
       // pass. It is 2px shorter than the group that clips it, and that is checkable.
-      const cells = Array.from(document.querySelectorAll<HTMLElement>('.vb-seg'))
+      const cells = Array.from(document.querySelectorAll<HTMLElement>('.vb-tabs-grouped'))
         .filter(shown)
         .flatMap((group) =>
-          Array.from(group.querySelectorAll<HTMLElement>('.vb-seg-cell'))
+          Array.from(group.querySelectorAll<HTMLElement>('.vb-tab'))
             .filter(shown)
             .map((cell) => ({
               id: cell.dataset.testid ?? (cell.className || cell.tagName),
@@ -983,7 +991,7 @@ test('12. the affordances are big enough to see', async ({ board, theme }) => {
   // is not a control: it is a bordered box drawn AROUND one — the backend picker's segmented group at
   // `--ctl-h` — plus the agent's state chip. `* { box-sizing: border-box }` puts a box's own border
   // INSIDE its declared height, so a container that draws a hairline around a full-height control is 2px
-  // taller by construction, which is the `.vb-seg-cell` argument in the other direction: a cell inside a
+  // taller by construction, which is the grouped-tab-cell argument in the other direction: a cell inside a
   // bordered group is 2px SHORTER for the same reason. The 2 is named as the group's own edge and
   // asserted exactly, so a vertical padding coming back or a child growing still fails — which a `+ 2`
   // ceiling would not have caught. It measured 30px against a 28px transport when this claim first ran.
@@ -1057,7 +1065,7 @@ test('12. the affordances are big enough to see', async ({ board, theme }) => {
 });
 
 // CHECK 13 — THE STATE INDICATORS ARE ONE SHAPE. The owner counted four implementations in one glance
-// across two rows of chrome, and the merge in ui/StatusChip.tsx is what this holds in place.
+// across two rows of chrome, and the merge in molecules/StatusChip.tsx is what this holds in place.
 //
 // THE CLAIM IS NOT "they share a colour" — Phase 13 already did that, and it is asserted by
 // test/state-tones.test.tsx without a browser. It is that they share a BOX and an AFFORDANCE: same

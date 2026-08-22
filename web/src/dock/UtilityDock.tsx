@@ -1,5 +1,5 @@
 import { Button } from '../atoms/Button';
-import { Chip } from '../atoms/Chip';
+import { Tabs } from '../molecules/Tabs';
 import { activePane, type DockPane } from './panes';
 
 interface Props {
@@ -19,24 +19,15 @@ export function UtilityDock({ panes, activeId, onPane, collapsed, onCollapse }: 
 
   return (
     <section className="dock" aria-label="Utilities">
-      <div className="dock-strip" role="tablist">
-        {panes.map((p) => (
-          <button
-            key={p.id}
-            type="button"
-            role="tab"
-            aria-selected={p.id === active.id}
-            className={`dock-tab${p.id === active.id ? ' active' : ''}`}
-            onClick={() => onPane(p.id)}
-          >
-            {p.label}
-            {p.badge !== undefined && (
-              <Chip pill fill className="vb-readout" testId="dock-badge">
-                {p.badge}
-              </Chip>
-            )}
-          </button>
-        ))}
+      {/* `Tabs` AND NOT `Menu`: the dock stays and the pane inside it changes, which is the whole line
+          between the two. The collapse toggle is a member of the STRIP rather than of any tab, which is
+          what `children` is for — it was already a sibling of the cells. */}
+      <Tabs
+        label="Utilities"
+        items={panes.map((p) => ({ value: p.id, label: p.label, badge: p.badge }))}
+        value={active.id}
+        onChange={onPane}
+      >
         <Button
           variant="bare"
           size="sm"
@@ -47,7 +38,7 @@ export function UtilityDock({ panes, activeId, onPane, collapsed, onCollapse }: 
         >
           <span className="vb-twist">{collapsed ? '▴' : '▾'}</span>
         </Button>
-      </div>
+      </Tabs>
 
       {/* Hidden rather than unmounted while collapsed, so a keepMounted pane survives folding the
           dock away as well as switching pane. `.dock-body[hidden]` is spelled out in the CSS: the

@@ -71,13 +71,14 @@ const Z_LAYERS = ['--z-chrome', '--z-pop', '--z-modal', '--z-alert'];
 /** @type {Map<string, string>} */
 const OFF_SCALE_ON_PURPOSE = new Map([
   [
-    '.vb-dot-7 | 7px',
+    '.vb-dot | 8px',
     'A CIRCLE IS A WIDTH AND A HEIGHT, and it cannot be one of the two box heights without ceasing to ' +
-      'be a circle. Two of the three pip sizes go in Phase 5, when StatusChip absorbs Dot and one size ' +
-      'is left; `50%` is off the radius scale in the same file for the same reason.',
+      'be a circle. `50%` is off the radius scale in the same file for the same reason. ONE ROW WHERE ' +
+      'THERE WERE THREE: `.vb-dot-7`, `-8` and `-12` were the agent chip, the transport and the ' +
+      'connection light, and nothing chose the spread — the light was 12px because it was written first ' +
+      'and largest. `StatusChip` absorbed the pip and one size is left, which is what the atom phase ' +
+      'said this row was waiting for.',
   ],
-  ['.vb-dot-8 | 8px', 'The transport pip — see .vb-dot-7.'],
-  ['.vb-dot-12 | 12px', 'The connection light — see .vb-dot-7.'],
   [
     '.popover::before | 8px',
     'A ROTATED SQUARE. The popover’s pointer is an 8×8 box turned 45°, so its height IS its width by ' +

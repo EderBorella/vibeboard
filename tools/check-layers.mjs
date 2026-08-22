@@ -53,7 +53,7 @@ const FLOOR = { '.css': 2, '.ts': 10, '.tsx': 20 };
 const walk = (ext) => walkFiles(ROOT, CORPUS, ext, FLOOR[ext] ?? 1);
 const read = (file) => readFileSync(join(ROOT, file), 'utf8');
 
-// `web/src/organisms/board/board.css` → `board`; `web/src/ui/primitives.css` → null, which reads as
+// `web/src/organisms/board/board.css` → `board`; `web/src/atoms/text.css` → null, which reads as
 // open: the primitives are the layer every surface spends.
 export function scopeOf(file) {
   const path = file.slice(`${CORPUS}/`.length);

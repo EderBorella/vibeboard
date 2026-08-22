@@ -53,14 +53,19 @@ const CORPUS = 'web/src';
 // stale the first time a phase adds a layer sheet — which would drop its classes out of the count
 // silently, and the count is a ratchet. The list below is the opposite direction and is safe for it: it
 // only SPLITS a total that is already discovered, so a sheet missing from it lands in the other column.
-// THE PRIMITIVE LAYER, and it is seven sheets since the atom phase: what is left of `ui/primitives.css`
-// plus one file per atom. Documentary here — the ratchet is on the UNION — but the split of the count
-// into "what the primitives name" and "what the surfaces name between them" is the pair the record
-// quotes, and reading only the old file would have moved 40 classes into the surfaces' column overnight.
+// Documentary here — the ratchet is on the UNION — but the split of the count into "what the shared
+// layer names" and "what the surfaces name between them" is the pair the record quotes.
+// THIRTEEN SHEETS AND NOT SEVEN AS OF THE MOLECULE LAYER, and `ui/primitives.css` is not among them
+// because it no longer exists: what was left of it — the tone table, the pip, the status chip, the
+// segmented control, the field, the select trigger and the notice — WAS the molecule layer, and it is
+// seven sheets beside the six atoms now. Reading only the atoms would have moved 29 classes into the
+// surfaces' column overnight, which is the same mistake the atom phase caught one layer down.
 const PRIMITIVE_LAYER = [
-  join('web', 'src', 'ui', 'primitives.css'),
   ...['button', 'chip', 'control', 'readout', 'surface', 'text'].map((name) =>
     join('web', 'src', 'atoms', `${name}.css`),
+  ),
+  ...['tones', 'status-chip', 'tabs', 'menu', 'field', 'notice', 'figure-row'].map((name) =>
+    join('web', 'src', 'molecules', `${name}.css`),
   ),
 ];
 
@@ -112,7 +117,20 @@ const PRIMITIVE_LAYER = [
 //             `.vb-surface*`. Nine of the thirteen are the renames' other half.
 // The renames net to zero on purpose and are worth their churn for one reason: one vocabulary, one word
 // per thing. `Panel` meant six things in this tree and `.vb-input` named a class that is now a component.
-const CLASS_CEILING = 354;
+// 354 before the MOLECULE LAYER, 341 after it, and the arithmetic is 21 out against 8 in:
+//   OUT (21)  the six families' nineteen — `.tab-btn` `.tab-badge` `.topbar-tabs`, `.chat-menu` and its
+//             four, `.dock-tab` `.dock-strip`, `.cards-tab` `.cards-tab-label` `.cards-tab-x`,
+//             `.control-tabs` and `.vb-seg` `.vb-seg-cell` `.vb-seg-cell-sm` — minus `.cards-tabs`, which
+//             SURVIVES as two declarations no other tab strip has (it is the only one that scrolls and the
+//             only one with a rule under it); plus three the plan did not name: `.vb-dot-7`, `.vb-dot-8`
+//             and `.vb-dot-12`, because `Dot` had three sizes and exactly ONE consumer, and
+//             `.vb-trigger-label`, which is a rename.
+//   IN (8)    `.vb-tabs` `.vb-tabs-grouped` `.vb-tab`; `.vb-menu` `.vb-menu-list` `.vb-menu-item`
+//             `.vb-menu-backdrop`; `.vb-clip`, which is `.vb-trigger-label`'s other half and now serves
+//             three molecules rather than one.
+// SIX FACES, SIX SELECTED STATES AND SIX HEIGHTS BECAME TWO COMPONENTS AND SEVEN CLASSES. `.active` is
+// not counted here in either direction: it is one name for the whole app and it survives on the toggles.
+const CLASS_CEILING = 341;
 const CLASS_TARGET = 183;
 
 // Anti-vacuity floor on the SELECTOR PARSER, not on the class count: a regex that stops matching reports
@@ -155,10 +173,15 @@ export function vocabularyOf(code) {
   for (const m of code.matchAll(/'([^'\n]*)'|"([^"\n]*)"/g)) {
     for (const word of (m[1] ?? m[2] ?? '').split(/[\s|,]+/)) if (word) out.add(word);
   }
-  // NUMBERS TOO, and they are not a widening for convenience: `Dot`'s size is a `7 | 8 | 12` union, so
-  // `` `vb-dot-${size}` `` composes three real classes out of values that are numeric literals rather
-  // than quoted strings. Leaving them out reported all three as dead — the exact defect this check
+  // NUMBERS TOO, and they were not a widening for convenience: `Dot`'s size was a `7 | 8 | 12` union, so
+  // `` `vb-dot-${size}` `` composed three real classes out of values that are numeric literals rather
+  // than quoted strings, and leaving them out reported all three as dead — the exact defect this check
   // exists to prevent, produced by the check itself.
+  // THAT CONSUMER IS GONE AS OF THE MOLECULE LAYER: `StatusChip` absorbed the pip, one size is left and
+  // `.vb-dot` is a literal. Measured: with this clause removed the census still reports zero
+  // unreferenced classes. It stays because a numerically composed name is a real shape and the cost of
+  // being wrong about it is a deleted rule, not a missed finding — but it has no consumer today, which is
+  // stated here so the next reader is not looking for one.
   for (const m of code.matchAll(/(?<![\w-])\d+(?![\w-])/g)) out.add(m[0]);
   return out;
 }

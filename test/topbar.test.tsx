@@ -13,7 +13,7 @@ import {
 } from '../web/src/app/connection-light.js';
 import type { MainTab } from '../web/src/app/TopBar.js';
 import { TopBar } from '../web/src/app/TopBar.js';
-import { STATE_TONES } from '../web/src/ui/state-tones.js';
+import { STATE_TONES } from '../web/src/molecules/state-tones.js';
 
 afterEach(cleanup);
 
@@ -98,10 +98,10 @@ describe('TopBar', () => {
     // The badge is the only ambient signal that a run needs a decision. At zero it must be absent
     // rather than a "0" — an empty badge reads as something to do.
     render(<TopBar {...props} attentionCount={0} />);
-    expect(document.querySelector('[data-testid="tab-badge"]')).toBeNull();
+    expect(document.querySelector('[data-testid="menu-badge"]')).toBeNull();
     cleanup();
     render(<TopBar {...props} attentionCount={3} />);
-    expect(document.querySelector('[data-testid="tab-badge"]')?.textContent).toBe('3');
+    expect(document.querySelector('[data-testid="menu-badge"]')?.textContent).toBe('3');
   });
 
   it('reports a theme change', () => {
@@ -172,7 +172,7 @@ describe('TopBar', () => {
   //
   // READ THROUGH THE TABLE rather than out of the stylesheet, because the stylesheet no longer names a
   // state at all: nine `.conn-status[data-state='…']` rules became one `color: var(--tone)` declaration
-  // and one row per state in web/src/ui/state-tones.ts. A regex over styles.css would now match nothing
+  // and one row per state in web/src/molecules/state-tones.ts. A regex over styles.css would now match nothing
   // and pass, which is why the assertion moved rather than being deleted.
   it('separates failing from online, and shares its tone with offline', () => {
     expect(STATE_TONES.failing).not.toBe(STATE_TONES.online);

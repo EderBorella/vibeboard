@@ -31,8 +31,9 @@ import {
   DEFAULT_CONTEXT_BUDGET,
   type ProjectConfig,
 } from '../shared';
+import { Notice } from '../molecules/Notice';
 import { SignInPanel } from '../signin/SignInPanel';
-import { Field } from '../ui/Field';
+import { Field } from '../molecules/Field';
 import { useAction } from '../useAction';
 import { useFetched } from '../useFetched';
 import { parseCsv } from '../viewmodel';
@@ -156,7 +157,7 @@ export function SettingsModal({ config, onClose, onSaved, autopilot, onAutopilot
                 so switching here reveals that backend's saved choice instead of overwriting it with a
                 built-in default. Nothing is written until Save — unlike the auto-pilot bar's copy of
                 this control, which writes on the click because a bar has no Save button to wait for. */}
-            <BackendPicker value={backend} label="Backend" size="md" onChange={setBackend} />
+            <BackendPicker value={backend} label="Backend" onChange={setBackend} />
           </Field>
           <Field as="div" label="Default model">
             <ModelPicker
@@ -214,7 +215,7 @@ export function SettingsModal({ config, onClose, onSaved, autopilot, onAutopilot
             // Only when there is a block to break. Adding a column is free now that nothing routes — the
             // lifecycle is code (ruling 52) — but REMOVING the terminal or blocked column is still refused,
             // and being refused at Save with no warning beforehand is a dead end.
-            <div className="vb-notice vb-notice-warn" data-testid="columns-warning">
+            <Notice tone="warn" testId="columns-warning">
               <strong>Auto-pilot reads two of these columns by name.</strong> Renaming one is carried across
               for you.{' '}
               <strong>
@@ -222,7 +223,7 @@ export function SettingsModal({ config, onClose, onSaved, autopilot, onAutopilot
               </strong>{' '}
               until you change what names it: edit <code>terminal</code> and <code>blockedColumn</code> in{' '}
               <code>.vibeboard/config.yaml</code> in the same change.
-            </div>
+            </Notice>
           )}
           {BOARDS.map((b) => (
             <Field key={b} label={`${BOARD_LABELS[b]} columns`}>
@@ -280,7 +281,7 @@ export function SettingsModal({ config, onClose, onSaved, autopilot, onAutopilot
               the settings" — and because signing everything out is the only way to replace one. */}
           <SignInPanel confirm={confirm} />
 
-          {error && <div className="vb-notice vb-notice-bad">{error}</div>}
+          {error && <Notice tone="bad">{error}</Notice>}
         </div>
 
         <div className="modal-foot">

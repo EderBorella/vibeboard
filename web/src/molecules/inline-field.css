@@ -1,4 +1,6 @@
-/* Inline editing: a field looks like text until hovered, and becomes an input on click. */
+/* Inline editing: a field looks like text until hovered, and becomes a `Control` on click. It is
+ * `Field inline` as of the molecule layer — see molecules/Field.tsx, which absorbed `InlineField` once
+ * `--ctl-h` and the `Control` atom answered the geometric objection that had kept it separate. */
 .inline-view {
   background: transparent; border: 1px solid transparent; border-radius: var(--r-md);
   color: inherit; font: inherit; text-align: left; cursor: text;
@@ -10,10 +12,14 @@
   min-width: 0;
 }
 .inline-view:hover { border-color: var(--border); background: var(--bg); }
+/* THE BOX IS `Control`'s NOW and what is left is the two things that are not the box: the accent EDGE,
+   which says "you are editing this", and the type, which is the prose the value sits in rather than a
+   form control's step. `border-color` and not `border`, so the atom's hairline width is untouched.
+   `height: auto` because a card title is edited at `--t-title` and `--ctl-h` is one line at `--t-body`;
+   the read-only face above has no height either, and the two have to be the same box. */
 .inline-edit {
-  width: 100%; background: var(--bg); color: var(--text);
-  border: 1px solid var(--accent); border-radius: var(--r-md);
-  padding: var(--s-1) var(--s-3); font: inherit; font-family: inherit; resize: vertical;
+  width: 100%; height: auto; border-color: var(--accent);
+  font: inherit; font-family: inherit; resize: vertical;
 }
 .inline-edit:focus { outline: none; }
 /* The title keeps its display face while editable. */

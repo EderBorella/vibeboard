@@ -1,4 +1,63 @@
-/* THE FIELD IS A PRIMITIVE — see ui/Field.tsx and the Field block of ui/primitives.css. What was here:
-   the column, the label's size and colour, and the box on every input and textarea inside it. A textarea
-   inside a Field still resizes vertically, which is the one thing the primitive leaves to the surface. */
+/* THE FORM FIELD, and the select trigger that shares its control's box. This file was four lines holding
+ * one surface rule; it is `Field`'s whole sheet now, and it took `ui/primitives.css`'s BYTE POSITION with
+ * the other molecule sheets so the dissolution of that file is a move and not a cascade change — see
+ * web/src/styles.ts. The one rule that was already here (`.vb-field textarea`) moved UP with it, which is
+ * safe at (0,1,1): nothing else in the tree declares `resize` at that specificity or above.
+ *
+ * The BOX its control draws is `atoms/control.css` as of the atom layer, and the descendant selector that
+ * used to hand it out — `.vb-field input, .vb-field textarea, .vb-field select`, (0,1,1) and therefore
+ * above every surface rule — is gone with it: a caller passes `<Control>`.
+ * What is left here is the field's own layout, which is what a field is. */
+.vb-field { display: flex; flex-direction: column; gap: var(--s-2); }
+/* A checkbox reads left-to-right — the control, then what it does — and a rail label reads label-then-box.
+   Everything else holds a value and is label-above. */
+.vb-field-row { flex-direction: row; align-items: center; gap: var(--s-4); }
+/* THE FIXED-WIDTH RAIL A LABEL SITS IN, and it is `.vb-label-rail` renamed rather than moved: it is a
+   WIDTH, so it belongs to the field and not to the face, and calling it after the label is how the two
+   got confused twice. The skill editor and the dispatch pane each wrote their own at 6rem and 5.5rem —
+   half a rem apart, and nobody chose either. */
+.vb-field-rail { width: 6rem; flex: 0 0 auto; }
+/* A DECISION'S LABEL IS CONTENT, NOT A FIELD NAME, which is why the check layout overrides `.vb-text`
+   rather than the base changing. Measured, not chosen: five checkbox rows labelled themselves at the
+   surrounding size and ink — `.link-option` at four sites (the link picker, the dispatch attachments,
+   and the skill editor's boards and columns) plus Diagnostics' bare span — against one at the label
+   step's muted 12px. A card title or a file path shrunk to 12px muted reads as furniture, and it is the
+   thing being chosen. The pointer is `.link-option`'s, and it is behaviour a `<label>` already has: the
+   words are a click target, so they must look like one. */
+.vb-field-check { cursor: pointer; }
+/* A ROW, because a decision's label is often more than one part — an id and a title, a path — and
+   `.link-option` laid those out itself while they were its own children. The gap is `.link-option`'s.
+   (0,2,0) against the atom's (0,1,0), so this wins wherever the two sheets sit. */
+.vb-field-check > .vb-text {
+  display: flex; align-items: center; gap: var(--s-4); min-width: 0;
+  font-size: var(--t-body); color: var(--text);
+}
+.vb-field-check input { cursor: pointer; }
+/* A textarea inside a Field still resizes vertically, which is the one thing the primitive leaves to the
+   surface. */
 .vb-field textarea { resize: vertical; }
+
+/* A SELECT TRIGGER IS A CONTROL'S BOX WITH A CARET ON IT, and docs/design-system.md has said so twice
+   without either of them becoming one: Phase 3 and Phase 4 both listed `.chat-current` and `.mp-trigger`
+   as "an `<input>` that happens to be a button" and left them out. The box is shared with `.vb-ctl` in
+   atoms/control.css — one rule naming both, the way `StatusChip` wears `Chip`'s classes rather than
+   copying them — and what is here is the parts that are the trigger's: the layout, the caret and the hover.
+   THE TWO DIFFERENCES BETWEEN THE TWO TRIGGERS WERE NOT CHOSEN. The chat switcher sat on `--panel-2` and
+   the model picker on `--bg`, while nine of the ten text boxes `Field` took chose `--bg`; and their
+   vertical paddings were two pixels apart. Both take the control's box now, which also puts them at
+   `--t-body` beside the real inputs they share a row with — a control at 12px next to an input at 13px is
+   the shape of the 10.88px incident.
+   The hover makes the same statement `:focus` makes on an input: this is the control you are about to
+   use. It is a hover rather than a focus because a trigger is reached by pointer far more than by tab,
+   and `:focus-visible` still draws the app's ring on top. */
+.vb-trigger {
+  width: 100%; display: flex; align-items: center; gap: var(--s-3);
+  text-align: left; cursor: pointer;
+}
+.vb-trigger:hover:not(:disabled) { border-color: var(--accent); }
+.vb-trigger:disabled { opacity: 0.5; cursor: default; }
+/* ONE CARET, AND IT WAS TWO. `.mp-caret` was `--muted` at the trigger's own size and `.chat-caret` was
+   `--accent` at `--t-micro` — the same glyph in the same role, and nothing chose the difference. Muted,
+   because a caret is furniture on a control whose border already answers the hover; an accent caret
+   shouts where the border has already spoken. */
+.vb-caret { color: var(--muted); flex: none; }

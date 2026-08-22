@@ -58,7 +58,7 @@ const tokensOf = (text) =>
     .filter(Boolean);
 
 // A STRING BEING COMPARED IS A VALUE, NOT A CLASS, and this line was written because the reader
-// reported `.rail` as a class named at `ui/Field.tsx` — the operand of `layout === 'rail'` in the
+// reported `.rail` as a class named at `molecules/Field.tsx` — the operand of `layout === 'rail'` in the
 // ternary that CHOOSES the class list. A gate reading code → CSS then had a finding that was an artefact
 // of its own parser rather than anything in the tree. Blanked rather than dropped, so offsets keep
 // meaning lines, and both orders, because `'x' === y` is the same expression written the other way.

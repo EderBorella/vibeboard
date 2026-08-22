@@ -1,8 +1,8 @@
 import { Readout } from '../atoms/Readout';
 import { Surface } from '../atoms/Surface';
 import { Text } from '../atoms/Text';
+import { Field } from '../molecules/Field';
 import { BOARD_LABELS, BOARDS, type Card } from '../shared';
-import { Field } from '../ui/Field';
 
 // The link picker: cards grouped by board, boards with nothing to offer omitted.
 export function LinkPicker({

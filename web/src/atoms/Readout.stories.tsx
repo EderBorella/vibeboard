@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { Readout, ReadoutLine } from './Readout';
+import { FigureRow } from '../molecules/FigureRow';
+import { Readout } from './Readout';
 
 // NO OPTIONS AT ALL, AND THAT IS THE STORY. A readout is a TREATMENT — mono, tabular numerals, one
 // tracking exception — and nine classes (four sizes, four tones, `quiet`) became one because a figure sits
@@ -40,11 +41,11 @@ export const InContext: Story = {
       <span style={{ fontSize: '0.75rem', color: 'var(--muted)' }}>
         a muted 12px line with <Readout>449ms</Readout> in it
       </span>
-      <ReadoutLine>
+      <FigureRow>
         <Readout>$0.42</Readout>
         <Readout>12 turns</Readout>
         <Readout>vb-1042</Readout>
-      </ReadoutLine>
+      </FigureRow>
     </div>
   ),
 };

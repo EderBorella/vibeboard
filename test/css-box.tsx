@@ -137,7 +137,7 @@ function safeMatches(el: Element, selector: string): boolean {
 
 // A COARSE SPECIFICITY, and it is not decoration: it was added because a flat source-order flatten got
 // a real answer wrong. `button, input, select, textarea { font-size: inherit }` lives in design/reset.css,
-// which is loaded AFTER ui/primitives.css — so once the input box moved into the primitive, source order
+// which is loaded AFTER the atom sheets — so once the input box moved into the primitive, source order
 // alone reported every text box in the app as `font-size: inherit`, while the browser gives the class
 // (0,1,0) the win over the type selector (0,0,1). Ids, then classes/attributes/pseudo-classes, then
 // elements; equal specificity falls back to source order, which is the rule the cascade really uses.

@@ -1,8 +1,9 @@
-// THE CASCADE, IN ONE PLACE. `styles.css` — 116KB, 309 classes, 22 sections in one file — is 47 files
-// now, one per layer surface, plus the primitive layer above them, and this is the only list of them
-// that exists: the app loads it, the Storybook preview loads it and `test/css-box.tsx` resolves boxes
-// through it. 55 sheets, and it was 50 before the atom layer gave each of the six atoms a file of its
-// own and `organisms/cards/raw-area.css` lost its only rule to `Control`'s `mono` option.
+// THE CASCADE, IN ONE PLACE. `styles.css` — 116KB, 309 classes, 22 sections in one file — is a file per
+// layer surface now, plus the primitive layer above them, and this is the only list of them that exists:
+// the app loads it, the Storybook preview loads it and `test/css-box.tsx` resolves boxes through it.
+// 59 sheets: 50 at the split, 55 once the atom layer gave each of the six atoms a file of its own, and 59
+// now that `ui/primitives.css` has become the seven molecule sheets it always was — six in, one out, and
+// `organisms/topbar/top-tabs.css` gone with `.tab-btn` and `.topbar-tabs`, its only two rules.
 //
 // `npm run check:split` PROVED THE SPLIT WAS A MOVE — the 47 concatenated in this order were the old
 // file byte for byte — and it is gone, with its 116KB witness, in the commit that put the hand-written
@@ -26,7 +27,7 @@
 // Bare side-effect imports, so biome's import sorting leaves them where they are: each one is a barrier
 // rather than a member of a sortable group. Sorting them would be a silent cascade change.
 //
-// SEVEN PARTS HOLD A RULE THAT BELONGS TO A DIFFERENT SURFACE, and they hold it deliberately: the old
+// SIX PARTS HOLD A RULE THAT BELONGS TO A DIFFERENT SURFACE, and they hold it deliberately: the old
 // file scattered a handful of rules away from their own section, and gathering them would move them in
 // the cascade, which is a change rather than a move. They are the backlog `npm run check:layers`
 // reports, and the phase that moves the components is the phase that re-homes them:
@@ -35,8 +36,9 @@
 //   `.link-title` / `.links-*`       in organisms/cards/card-view.css — the link picker's, shared
 //   `.drop-line`                     in pages/control/control.css     — the board's drag indicator
 //   `.gate-preview code`             in atoms/prose.css               — one rule for two surfaces
-//   `.tab-badge`                     in pages/execution/execution.css — the dock's tab count
 //   `.cv-*` overrides                in molecules/inline-field.css    — the card view's editable face
+// `.tab-badge` in pages/execution/execution.css WAS THE SEVENTH and it is discharged rather than moved:
+// the top bar's attention count is `Menu`'s `badge` option, so the rule is deleted and the stray with it.
 
 // Geometry before colour, and both before anything that spends them: the primitives are one layer and
 // the split is what `npm run check:tokens` asserts.
@@ -62,8 +64,26 @@ import './atoms/chip.css';
 import './atoms/surface.css';
 import './atoms/control.css';
 import './atoms/readout.css';
+// `.vb-readout-block` WAS THE TAIL OF `atoms/readout.css` and it is `FigureRow`'s, not `Readout`'s — a
+// molecule's class in an atom's sheet, kept there with a comment saying the phase that moved the molecules
+// would move it. Imported here, at the byte position that tail held, so it is a move.
+import './molecules/figure-row.css';
 import './atoms/text.css';
-import './ui/primitives.css';
+// `ui/primitives.css` IS GONE, AND THESE SIX SHEETS HOLD ITS BYTES IN ITS ORDER. It was "what is left of
+// the primitive stylesheet" — the tone table, the pip, the status chip, the segmented control, the field,
+// the select trigger and the notice — which is the MOLECULE layer, waiting for the phase that moved the
+// molecules. Each is imported at the position its rules held inside that file, so the dissolution is a
+// move: the tones first, then the pip and the chip that wears it, then the segmented control's position
+// (which `Tabs grouped` now occupies, with `Menu` beside it), then the field and its trigger, then the
+// notice. `.vb-twist` and `.vb-clip` went UP into `atoms/text.css` instead — they are a type step and an
+// overflow, they belong to no component, and `check:radius-scale` requires the first to sit in the
+// primitive layer because two of its six consumers are inside a `<Button>`.
+import './molecules/tones.css';
+import './molecules/status-chip.css';
+import './molecules/tabs.css';
+import './molecules/menu.css';
+import './molecules/field.css';
+import './molecules/notice.css';
 
 // AFTER the primitives although it is a design file, and the reason is BYTES rather than cascade: the
 // UA control reset opened `styles.css`, and the phase that made this list a list may not move a rule.
@@ -84,7 +104,6 @@ import './templates/work-area.css';
 import './organisms/board/board.css';
 import './pages/gate/gate.css';
 import './organisms/shared/modal.css';
-import './molecules/field.css';
 import './organisms/settings/settings.css';
 import './organisms/shared/confirm.css';
 import './organisms/shared/model-picker.css';
@@ -99,7 +118,6 @@ import './molecules/inline-field.css';
 import './organisms/cards/raw-pane.css';
 import './organisms/copilot/copilot.css';
 import './design/motion.css';
-import './organisms/topbar/top-tabs.css';
 import './pages/control/control.css';
 import './pages/explorer/explorer.css';
 import './organisms/shared/confirm-typed.css';

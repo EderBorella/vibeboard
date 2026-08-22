@@ -51,8 +51,8 @@ describe('UtilityDock', () => {
     expect(cards.getAttribute('aria-selected')).toBe('false');
     // Exact class, not a substring: this is the bytes the CSS keys off, and `not.toContain` is
     // satisfied by any wrong class at all.
-    expect(terminal.className).toBe('dock-tab active');
-    expect(cards.className).toBe('dock-tab');
+    expect(terminal.className).toBe('vb-tab active');
+    expect(cards.className).toBe('vb-tab');
     cards.click();
     expect(onPane.mock.calls).toEqual([['cards']]);
   });
@@ -66,7 +66,7 @@ describe('UtilityDock', () => {
     );
     expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual(['CARDS3', 'TERMINAL0', 'LOGS']);
     // Counting the elements, not the text: an empty badge span reads the same as none at all.
-    expect(container.querySelectorAll('[data-testid="dock-badge"]')).toHaveLength(2);
+    expect(container.querySelectorAll('[data-testid="tab-badge"]')).toHaveLength(2);
   });
 
   it('hides the body when collapsed instead of unmounting it', () => {

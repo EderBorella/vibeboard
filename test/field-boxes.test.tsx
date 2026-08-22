@@ -32,7 +32,7 @@
 import { cleanup, render } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { Control } from '../web/src/atoms/Control.js';
-import { Field } from '../web/src/ui/Field.js';
+import { Field } from '../web/src/molecules/Field.js';
 import { box } from './css-box.js';
 
 afterEach(cleanup);

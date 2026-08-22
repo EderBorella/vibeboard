@@ -15,15 +15,3 @@
 .vb-readout {
   font-family: var(--font-mono); font-variant-numeric: tabular-nums; letter-spacing: -0.01em;
 }
-/* A LINE of figures, which five surfaces each wrote their own version of: the two ledgers, a card's meta
-   row, a diary entry's and a filed finding's. They agreed on everything except a gap nobody chose —
-   8/8px, 3.2/14.4px and 8/8px — so the row is shared and the surfaces keep only where it sits.
-   `baseline` and not `center`: the parts are text at two sizes, and centring line boxes of different
-   sizes puts their baselines at different heights, which is the argument `.topbar` already makes.
-   IT IS `ReadoutLine`'S AND NOT `Readout`'S, so it is a molecule's class living in an atom's sheet
-   until Phase 5 gives `FigureRow` a file. Kept here rather than moved twice: the phase that moves the
-   molecules is the phase that moves it, because moving a rule changes its position in the cascade. */
-.vb-readout-block {
-  display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--s-2) var(--s-5);
-  margin: 0; font-size: var(--t-small); color: var(--muted);
-}

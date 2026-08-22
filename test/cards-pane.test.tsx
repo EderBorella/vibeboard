@@ -104,9 +104,10 @@ describe('CardsPane', () => {
     const [first, second] = screen.getAllByRole('tab');
     expect(second.getAttribute('aria-selected')).toBe('true');
     expect(first.getAttribute('aria-selected')).toBe('false');
-    // Exact classes on the wrappers: that is what the CSS highlights the active tab by.
-    expect(first.parentElement?.className).toBe('cards-tab');
-    expect(second.parentElement?.className).toBe('cards-tab active');
+    // Exact classes on the cells: that is what the CSS highlights the active tab by. It was the WRAPPER
+    // before `Tabs closable` — `.cards-tab` drew a box round the pair and coloured its child's ink.
+    expect(first.className).toBe('vb-tab');
+    expect(second.className).toBe('vb-tab active');
     // The body is the active card, not the first tab.
     expect(bodyTitle(container)).toBe('title of E-002');
   });

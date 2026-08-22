@@ -1,0 +1,37 @@
+/* THE TINTED NOTICE, and five classes drew it. `.vb-error-box`, `.settings-warn`, `.control-disclaimer`
+ * and `.sandbox-state` each declared the same box — a `--r-md` corner, `var(--s-4) 0.7rem` of padding and
+ * a 1px border — and differed only in hue and in a line-height nobody chose (1.45 / 1.5 / 1.55, three
+ * values for one property). `.sandbox-ok` and `.sandbox-off` were already a tone SET written by hand on
+ * top of `.sandbox-state`, which is what says this shape wanted a tone axis rather than four more names.
+ * The rules merged in Phase 13; the twelve hand-written class PAIRS at the call sites merged into
+ * molecules/Notice.tsx here.
+ *
+ * THREE TONES AND THE INK IS PART OF THE TONE. `bad` is danger ink because a refusal IS the answer to
+ * what you just did; `warn` and `ok` are prose ink because they are conditions you can read and act on,
+ * which is `.control-disclaimer`'s own argument — "set as prose rather than as status".
+ * `--warn` and `--danger` are NOT interchangeable: design/themes.css gives them different values in
+ * marshmallow and equal ones in the other two, and argues that by name. So a caution keeps `--warn` with
+ * its `var(--warn, var(--danger))` fallback, exactly as `.settings-warn` wrote it. */
+.vb-notice {
+  font-size: var(--t-body); line-height: 1.5;
+  border: 1px solid transparent; border-radius: var(--r-md); padding: var(--s-4) var(--s-5);
+}
+.vb-notice-bad {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  border-color: color-mix(in srgb, var(--danger) 35%, transparent);
+}
+.vb-notice-warn {
+  color: var(--text);
+  background: color-mix(in srgb, var(--warn, var(--danger)) 10%, transparent);
+  border-color: color-mix(in srgb, var(--warn, var(--danger)) 32%, transparent);
+}
+.vb-notice-ok {
+  color: var(--text);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 30%, transparent);
+}
+/* Inline code inside a notice is machine vocabulary in a sentence, which `.settings-warn code` already
+   said. Two stacked notices need separating, which `.sandbox-state + .sandbox-state` already said. */
+.vb-notice code { font-family: var(--font-mono); font-size: var(--t-small); }
+.vb-notice + .vb-notice { margin-top: var(--s-3); }

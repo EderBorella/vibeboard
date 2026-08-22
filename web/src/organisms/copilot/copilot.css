@@ -23,22 +23,9 @@
 .chat-switcher { position: relative; flex: 1; min-width: 0; }
 /* "+ New" must not break across two lines when the switcher beside it is wide. */
 .chat-new { white-space: nowrap; }
-.chat-menu-backdrop { position: fixed; inset: 0; z-index: var(--z-pop); }
-/* A `Surface` with the `raised` variant: the ground, the edge and the 10px corner were that variant's own
-   three values. Its flex column is a no-op here and that is checked rather than assumed — every child of
-   this menu is a full-width block with `margin: 0`, so nothing in it has margins to stop collapsing. The
-   float, the shadow and the inset are what a menu adds to a raised surface. */
-.chat-menu { position: absolute; z-index: var(--z-pop); top: calc(100% + 4px); left: 0; right: 0; max-height: 320px; overflow-y: auto; box-shadow: var(--glow), var(--lift); padding: var(--s-2); }
-/* The menu decides its own inset; the line inside it decides nothing. */
-.chat-menu > .vb-text-quiet { padding: var(--s-4); }
-.chat-menu-item { display: flex; align-items: stretch; gap: var(--s-2); border-radius: var(--r-md); }
-.chat-menu-item.active { background: var(--panel-2); }
-.chat-menu-item:hover { background: var(--panel-2); }
-/* A `Surface` with the `flat` variant; the active row's accent left edge is below and still overrides
-   the primitive's transparent border, which is a colour and a width rather than a box. */
-.chat-menu-open { flex: 1; display: flex; flex-direction: column; gap: var(--s-1); color: var(--text); }
-.chat-menu-item.active .chat-menu-open { border-left: var(--rule) solid var(--accent); }
-.chat-menu-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--t-small); }
+/* THE HISTORY MENU IS A `Menu list` — see molecules/menu.css. Five classes went with it: the floating
+   box, the row, the two-line button, the ellipsised title and the backdrop. `.chat-switcher` above stays
+   because it is the ANCHOR the menu is positioned against, which is genuinely this surface's. */
 /* `Chip pill neutral` owns the box AND the colour now; this keeps the treatment.
    A BACKEND NAME IS NOT A STATE, which is the ruling that removed the two rules that were here. They
    spent `--accent` and `--accent-2` — the palette's primary and its secondary — on which of two agents
@@ -96,7 +83,7 @@
    nothing left for it to say — the line's only child is the readout. See copilot/CopilotPanel.tsx. */
 /* `.msg-error` IS GONE. It declared `color: var(--danger)` — a state's colour, chosen on a surface,
    which is the whole subject of Phase 13 — and a `font-size: var(--t-body)` that restated `.msg`'s own.
-   The line is the `error` row of ui/state-tones.ts now, and it gets its ink from `--tone` through
+   The line is the `error` row of molecules/state-tones.ts now, and it gets its ink from `--tone` through
    `.vb-tone-bad`. The four other `msg-*` classes stay: a bubble's geometry and a thinking line's
    quietness are shapes, and the chat may keep its own. */
 .msg-running { color: var(--muted); font-style: italic; }

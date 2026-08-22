@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import type { ControlFile } from '../api';
 import { Button } from '../atoms/Button';
+import { Notice } from '../molecules/Notice';
 import { EditorBody, EditorShell, type EditorView } from '../ui/EditorShell';
 
 // A control file as opened for editing: its listing metadata plus the content on disk.
@@ -69,11 +70,11 @@ export function ControlFileEditor({
       }
       notice={
         file.managed && (
-          <div className="vb-notice vb-notice-bad control-disclaimer" role="alert">
+          <Notice tone="bad" className="control-disclaimer" role="alert">
             ⚠ <strong>{file.name}</strong> is managed by VibeBoard — the copilot won’t edit it, and it steers
             how the boards work. Edit only if you know what you’re doing. For your own standing instructions,
             use <strong>INSTRUCTIONS.md</strong> instead.
-          </div>
+          </Notice>
         )
       }
     >

@@ -91,7 +91,7 @@
    precisely when there is something wrong`. Both were coherent and both are withdrawn: an indicator that
    becomes a control only once the project is broken is one nobody has ever pressed, so the affordance is
    missing at exactly the moment it is needed. All four indicators are `StatusChip` now and all four are
-   buttons in every state. ui/StatusChip.tsx carries the census.
+   buttons in every state. molecules/StatusChip.tsx carries the census.
    `button.ap-agent-state` undid the UA button styles by hand and warned, correctly, that `font: inherit`
    would reset the font-size and grow the chip from 10.88px to 13.12px the moment it had something to say.
    `.vb-status` sets one step for all four, so there is nothing left to grow between states.

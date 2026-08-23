@@ -10,15 +10,15 @@ import { type StubbedBrowser, stubBrowser } from './browser-stubs.js';
 // The fix is in the wrapper every call already went through, not at the six call sites, so the
 // dishonest shape is unreachable rather than merely corrected.
 
-type Api = typeof import('../web/src/api.js');
-type Token = typeof import('../web/src/token.js');
+type Api = typeof import('../web/src/lib/api.js');
+type Token = typeof import('../web/src/lib/token.js');
 
 // api.ts memoises its unauthorized handler and token.ts memoises the URL read, so each test needs its
 // own module registry — otherwise a 401 in one test signs out the browser the next one asserts on.
 async function fresh(signedIn = true): Promise<{ api: Api; token: Token; browser: StubbedBrowser }> {
   vi.resetModules();
   const browser = stubBrowser({ signedIn });
-  return { api: await import('../web/src/api.js'), token: await import('../web/src/token.js'), browser };
+  return { api: await import('../web/src/lib/api.js'), token: await import('../web/src/lib/token.js'), browser };
 }
 
 // A credential arriving, as the server does it: the cookie comes back on the response, and the client
@@ -244,7 +244,7 @@ describe('the diary POST', () => {
   });
 
   // It sent no content-type, so a real server answered 415 and no test noticed: every caller-side
-  // test of this function mocks web/src/api.js at its boundary, so the request never left the process.
+  // test of this function mocks web/src/lib/api.js at its boundary, so the request never left the process.
   it('sends a content-type, which is what Fastify refuses without', async () => {
     const { api } = await fresh();
     const fetchMock = answering(200, '{"entry":{"at":"2026-08-07T00:00:00.000Z","kind":"note","text":"x"}}');

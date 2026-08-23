@@ -2,8 +2,8 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MAX_ENTRY_TEXT } from '../src/core/diary.js';
-import type { DiaryEntry } from '../web/src/api.js';
-import type { Suggestion } from '../web/src/shared.js';
+import type { DiaryEntry } from '../web/src/lib/api.js';
+import type { Suggestion } from '../web/src/lib/shared.js';
 import { box } from './css-box.js';
 
 const api = vi.hoisted(() => ({
@@ -11,8 +11,8 @@ const api = vi.hoisted(() => ({
   addDiaryEntry: vi.fn(),
   listSuggestions: vi.fn(),
 }));
-vi.mock('../web/src/api.js', () => api);
-vi.mock('../web/src/api', () => api);
+vi.mock('../web/src/lib/api.js', () => api);
+vi.mock('../web/src/lib/api', () => api);
 
 // The shared socket, faked the way the REAL one is keyed: one object per `bump`, memoised. The first
 // version ignored its argument and returned a fresh literal per render, which un-gated two things at once —
@@ -54,10 +54,10 @@ const ws = vi.hoisted(() => {
     count: (bump: number) => (subscribers.get(bump) ?? new Set()).size,
   };
 });
-vi.mock('../web/src/ws.js', () => ({ useSharedWs: ws.useSharedWs }));
-vi.mock('../web/src/ws', () => ({ useSharedWs: ws.useSharedWs }));
+vi.mock('../web/src/lib/ws.js', () => ({ useSharedWs: ws.useSharedWs }));
+vi.mock('../web/src/lib/ws', () => ({ useSharedWs: ws.useSharedWs }));
 
-const { DiaryView } = await import('../web/src/diary/DiaryView.js');
+const { DiaryView } = await import('../web/src/organisms/diary/DiaryView.js');
 
 afterEach(() => {
   cleanup();
@@ -346,7 +346,7 @@ describe('the split — what agents filed', () => {
       api.listDiary.mockResolvedValue([]);
       api.listSuggestions.mockResolvedValue([full()]);
       render(<DiaryView bump={0} />);
-      const line = await found('.filed-list .vb-readout-block');
+      const line = await found('.filed-list .vb-figure-row');
       // TWO, not four: the state and when it was filed. `.filed-state` first, then the `<time>`.
       expect([...line.children].map((c) => c.tagName)).toEqual(['SPAN', 'TIME']);
       expect(line.querySelector('.filed-state')?.textContent).toBe('active');

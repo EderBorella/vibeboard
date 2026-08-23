@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatBytes } from '../web/src/explorer/format.js';
+import { formatBytes } from '../web/src/organisms/explorer/format.js';
 
 describe('formatBytes', () => {
   it('is empty for a size that was never reported', () => {

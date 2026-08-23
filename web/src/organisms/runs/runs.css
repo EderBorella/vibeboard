@@ -22,10 +22,6 @@
    common is no report, and stopping a run is a decision rather than a fault but is still an ending that
    produced nothing. The edge came from `.vb-chip-tone` and is a 50% mix rather than the flat token —
    see atoms/chip.css. */
-.report-chip {
-  flex: 0 0 auto;
-  text-transform: uppercase; letter-spacing: var(--track);
-}
 .report-skill { flex: 0 0 auto; font-size: var(--t-small); }
 /* Money reads as data, not prose: mono, so a card's runs line up down the column. */
 /* The cost and the elapsed time are `Readout`s. What the row still decides is that neither shrinks —
@@ -35,20 +31,8 @@
   flex: 1; min-width: 0; color: var(--muted); font-size: var(--t-small);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-/* `ghost` Buttons, both of them, with the one colour each surface owns: Stop turns dangerous and
-   Dismiss turns accent. Everything else — the box, the quiet muted ink, the dashed border — is the
-   variant. They were two near-identical classes and `.reports-forgive` was a third copy of the same
-   declarations; its own comment said it "borrows the report row's Stop styling rather than inventing a
-   third small button", which is what this replaces. */
-.report-stop { flex: 0 0 auto; }
-.report-stop:hover:not(:disabled) { color: var(--danger); border-color: var(--danger); }
-/* A run that has been dealt with is history: still readable, no longer shouting. Dimmed rather than
-   greyed — repainting the chip muted threw away the one thing it encodes, which is HOW the run ended,
-   and left "Stopped" and "Needs you · dealt with" looking identical. The "· dealt with" text says it
-   was answered; the colour is still free to say what it was. */
-.vb-row.resolved .report-chip { opacity: 0.6; }
 .vb-row.resolved .report-skill { color: var(--muted); }
-.report-dismiss { flex: 0 0 auto; align-self: flex-start; }
+/* `.report-dismiss` IS IN `pages/execution/execution.css` — the execution page is its only reader. */
 
 .report { display: flex; flex-direction: column; gap: var(--s-4); overflow-wrap: anywhere; }
 .report-head { display: flex; align-items: center; gap: var(--s-4); }
@@ -88,13 +72,33 @@
    whole execution grid, and a card's sits under its report list. */
 /* The project ledger's placement is `pages/execution/execution.css`'s: it named that page's class from
    here, and a class defined in two scoped directories has no owner. */
-.reports > .vb-readout-block { margin-top: var(--s-4); }
+.reports > .vb-figure-row { margin-top: var(--s-4); }
+/* ---------- Dispatch (the details step; it renders inside the cards pane) ----------
+   IT WAS IN `organisms/cards/cards.css`, because that is where it renders. `DispatchPane.tsx` is the only
+   reader of all nine, so the cards surface owned nine classes it never named — the layer gate's largest
+   single finding. */
+.dispatch { display: flex; flex-direction: column; gap: var(--s-4); }
+.dispatch-head { display: flex; align-items: center; gap: var(--s-4); }
+/* `.dispatch-back` is gone outright: a bordered `←` with an accent hover is `default`, exactly. */
+.dispatch-title { margin: 0; font-family: var(--font-display); font-size: var(--t-lead); }
+.dispatch-desc { margin: 0; font-size: var(--t-body); color: var(--muted); }
+/* A SENTENCE, so it is not a readout — only the run id inside it is, which is the signature's whole
+   claim: mono means the machine measured it. It was entirely mono before, which said the prose was
+   machine-written too. */
+.dispatch-continues { margin: 0; font-size: var(--t-small); color: var(--accent-2); }
+/* A `.vb-row`, and the WRAP is the one thing that is genuinely this surface's: the dispatch step sits in
+   a dock pane that can be 280px wide, and a rail label beside a control that cannot wrap overflows it. */
+.dispatch-row { flex-wrap: wrap; }
+.dispatch-row .vb-trigger { flex: 1; min-width: 0; }
+.dispatch > .vb-ctl { width: 100%; resize: vertical; }
+.dispatch-attach { font-size: var(--t-body); border: 1px solid var(--border); border-radius: var(--r-md); padding: var(--s-3) var(--s-4); }
+.dispatch-attach summary { cursor: pointer; color: var(--muted); }
+.dispatch .vb-text-quiet { margin: var(--s-2) 0; }
+.dispatch-foot { display: flex; justify-content: flex-end; gap: var(--s-4); margin-top: var(--s-2); }
+
 /* The way out of a card the machine spent, on the same line as the count it clears. Quiet by default —
    it is an escape hatch, not the thing you came to the card to do — which is the `ghost` variant, and
    it no longer has to borrow the report row's Stop styling because there is one Button. Nothing is left
    for this class to say, so the class is gone; the two prose lines below keep theirs. */
-.reports-forgiven { flex-basis: 100%; opacity: 0.85; }
-/* The server's refusal, on its own line so it is not read as part of the ledger it sits under. */
-.reports-forgive-error { flex-basis: 100%; color: var(--danger); }
 
 

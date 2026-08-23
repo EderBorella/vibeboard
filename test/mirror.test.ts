@@ -11,12 +11,12 @@ import * as coreSkills from '../src/core/skills.js';
 import * as coreSuggestions from '../src/core/suggestions.js';
 import * as core from '../src/core/types.js';
 import * as serverSnapshot from '../src/server/boards/snapshot.js';
-import * as webApi from '../web/src/api.js';
-import * as webRuns from '../web/src/runs/viewmodel.js';
-import * as web from '../web/src/shared.js';
-import * as webSkills from '../web/src/skills/filter.js';
+import * as webApi from '../web/src/lib/api.js';
+import * as webRuns from '../web/src/organisms/runs/viewmodel.js';
+import * as web from '../web/src/lib/shared.js';
+import * as webSkills from '../web/src/organisms/skills/filter.js';
 
-// web/src/shared.ts hand-mirrors the server's wire contract across the tsc/Vite boundary
+// web/src/lib/shared.ts hand-mirrors the server's wire contract across the tsc/Vite boundary
 // (the two sides need different module resolution — see the cleanup plan, section E).
 // The mirror is deliberate; silent drift is not. These assertions are the guard rail.
 describe('web/shared mirrors src/core', () => {
@@ -31,7 +31,7 @@ describe('web/shared mirrors src/core', () => {
     expect([...web.BLOCKED_BOARDS]).toEqual([...coreAutopilot.BLOCKED_BOARDS]);
   });
 
-  // Slice D hand-mirrored six types into web/src/api.ts and extended nothing here. `STOP_REASONS` gained
+  // Slice D hand-mirrored six types into web/src/lib/api.ts and extended nothing here. `STOP_REASONS` gained
   // `unreadable` DURING that slice, which is precisely the change this guard exists to catch: the TopBar
   // renders an unknown reason as a raw word with neutral styling, so drift is silent on screen too.
   it('mirrors the auto-pilot state names and stop reasons', () => {
@@ -166,7 +166,7 @@ describe('web/shared mirrors src/core', () => {
 
 // THE MONEY RULE, on both sides of a boundary neither side can cross. `src/core/money.ts` formats the
 // figures in sentences the SERVER generates (the auto-pilot budget line, rendered verbatim in the bar);
-// `web/src/format.ts` formats every figure the browser computes. One rule, two homes, because `web/` is
+// `web/src/lib/format.ts` formats every figure the browser computes. One rule, two homes, because `web/` is
 // bundler-resolved and `src/` is NodeNext.
 //
 // This exists because the divergence already happened twice: two web formatters once rendered $0.50 as
@@ -175,7 +175,7 @@ describe('web/shared mirrors src/core', () => {
 // and above — because a single value cannot tell four thresholds apart.
 describe('the money rule is the same on both sides', () => {
   it('formats every case identically', async () => {
-    const web = await import('../web/src/format.js');
+    const web = await import('../web/src/lib/format.js');
     for (const amount of coreMoney.MONEY_CASES) {
       expect(web.formatCost(amount), `at ${amount}`).toBe(coreMoney.formatUsd(amount));
     }
@@ -191,7 +191,7 @@ describe('the money rule is the same on both sides', () => {
   });
 
   it('answers a non-number rather than throwing, on both sides', async () => {
-    const web = await import('../web/src/format.js');
+    const web = await import('../web/src/lib/format.js');
     expect(coreMoney.formatUsd(null as unknown as number)).toBe('not a number');
     expect(web.formatCost(null as unknown as number)).toBe('not a number');
   });

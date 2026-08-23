@@ -2,11 +2,11 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DOCS_DIR, RESOURCES_DIR, skillRel } from '../src/core/layout.js';
-import type { CardLedgerData, RunRecord } from '../web/src/api.js';
-import { ActiveReport } from '../web/src/runs/ActiveReport.js';
-import { CardReports } from '../web/src/runs/CardReports.js';
-import { ReportPane } from '../web/src/runs/ReportPane.js';
-import type { Card, ProjectConfig } from '../web/src/shared.js';
+import type { CardLedgerData, RunRecord } from '../web/src/lib/api.js';
+import { ActiveReport } from '../web/src/organisms/runs/ActiveReport.js';
+import { CardReports } from '../web/src/organisms/runs/CardReports.js';
+import { ReportPane } from '../web/src/organisms/runs/ReportPane.js';
+import type { Card, ProjectConfig } from '../web/src/lib/shared.js';
 
 afterEach(cleanup);
 

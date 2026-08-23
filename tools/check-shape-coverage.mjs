@@ -138,7 +138,8 @@ const CHIP_CEILING = 0;
 // `.tab-btn`, `.dock-tab`, `.cards-tab` and `.control-tabs button` each drew a 1px box with a corner and
 // a ground, which is what made them read as panels to this census and as buttons to
 // `check-radius-scale.mjs` at the same time. They are `Tabs` and `Menu` cells, in the primitive layer,
-// and the refusal recorded here against four candidates is reversed in §8.1 of the plan. THE FIFTH is
+// and the refusal recorded here against four candidates is reversed in docs/design-system.md, *The atomic
+// revamp: `Tabs` and `Menu` overturn a twice-taken refusal*. THE FIFTH is
 // `.inline-edit`: `Field inline` renders a `<Control>` now, so the border, the corner and the ground it
 // declared are the atom's and what is left is an accent EDGE.
 // THE FIVE THAT REMAIN each have a reason and none of them is "it has its own padding": `.popover` and
@@ -259,7 +260,8 @@ const MENU_TAG = '<Menu';
 // now, and the LINE BETWEEN THEM is the reason a census that accepted either would be the wrong
 // instrument: `Tabs` switch what you are LOOKING AT and the surface stays; a `Menu` takes you SOMEWHERE
 // ELSE. An arm that took either would not notice a navigation row hand-rolled as tabs, which is the shape
-// §4.4 of the plan exists to separate.
+// the atomic revamp's two-component answer exists to separate — docs/design-system.md, *The atomic
+// revamp: `Tabs` and `Menu` overturn a twice-taken refusal*.
 //
 // THE DISCRIMINATOR IS ARIA AND NOT A CLASS NAME, and that is a decision worth stating because the
 // obvious alternative was measured and rejected. The obvious signal is the SELECTION WORD: a `className`

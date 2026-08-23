@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { createControlFile, getState, patchConfig, putSkill } from '../web/src/api.js';
+import { createControlFile, getState, patchConfig, putSkill } from '../web/src/lib/api.js';
 import { STUB_TOKEN, stubBrowser } from './browser-stubs.js';
 
-// The client half of the boundary. Every call in web/src/api.ts goes through one wrapper, so this
+// The client half of the boundary. Every call in web/src/lib/api.ts goes through one wrapper, so this
 // covers all of them — and what it proves has changed: the wrapper must attach NO credential and must
 // ask for the cookie to be sent.
 //
@@ -49,7 +49,7 @@ describe('what the page can tell about being signed in', () => {
   it('reads the hint cookie, and exposes no way to read the credential', async () => {
     vi.resetModules();
     stubBrowser({ signedIn: true });
-    const mod = await import('../web/src/token.js');
+    const mod = await import('../web/src/lib/token.js');
 
     expect(mod.signedIn()).toBe(true);
     // The credential is HttpOnly, so it is not in `document.cookie` at all — and nothing in this module
@@ -61,7 +61,7 @@ describe('what the page can tell about being signed in', () => {
   it('is not signed in without the hint', async () => {
     vi.resetModules();
     stubBrowser({ signedIn: false });
-    const { signedIn } = await import('../web/src/token.js');
+    const { signedIn } = await import('../web/src/lib/token.js');
     expect(signedIn()).toBe(false);
   });
 
@@ -71,7 +71,7 @@ describe('what the page can tell about being signed in', () => {
     vi.resetModules();
     const browser = stubBrowser({ signedIn: false });
     browser.cookies.set('vb.in', 'yes');
-    const { signedIn } = await import('../web/src/token.js');
+    const { signedIn } = await import('../web/src/lib/token.js');
     expect(signedIn()).toBe(false);
   });
 
@@ -80,14 +80,14 @@ describe('what the page can tell about being signed in', () => {
     const browser = stubBrowser({ signedIn: false });
     browser.cookies.set('vb', 'the-credential');
     browser.cookies.set('vb.inbox', '1');
-    const { signedIn } = await import('../web/src/token.js');
+    const { signedIn } = await import('../web/src/lib/token.js');
     expect(signedIn()).toBe(false);
   });
 
   it('signing out locally drops the hint and bumps the generation', async () => {
     vi.resetModules();
     const browser = stubBrowser({ signedIn: true });
-    const { signedIn, signOutLocally, credentialGeneration } = await import('../web/src/token.js');
+    const { signedIn, signOutLocally, credentialGeneration } = await import('../web/src/lib/token.js');
     const before = credentialGeneration();
 
     signOutLocally();
@@ -104,7 +104,7 @@ describe('a credential this browser already holds', () => {
   it('is read out of the launch URL and taken out of the address bar', async () => {
     vi.resetModules();
     const browser = stubBrowser({ signedIn: false, href: 'http://localhost:4610/?token=from-the-link' });
-    const { legacyToken } = await import('../web/src/token.js');
+    const { legacyToken } = await import('../web/src/lib/token.js');
 
     expect(legacyToken()).toBe('from-the-link');
     expect(browser.replaced).toEqual(['http://localhost:4610/']);
@@ -119,7 +119,7 @@ describe('a credential this browser already holds', () => {
   it('answers the same on a second read', async () => {
     vi.resetModules();
     stubBrowser({ signedIn: false, href: 'http://localhost:4610/?token=from-the-link' });
-    const { legacyToken } = await import('../web/src/token.js');
+    const { legacyToken } = await import('../web/src/lib/token.js');
 
     expect(legacyToken()).toBe('from-the-link');
     expect(legacyToken()).toBe('from-the-link');
@@ -128,7 +128,7 @@ describe('a credential this browser already holds', () => {
   it('falls back to the pre-cookie localStorage key', async () => {
     vi.resetModules();
     stubBrowser({ signedIn: false, legacy: STUB_TOKEN });
-    const { legacyToken } = await import('../web/src/token.js');
+    const { legacyToken } = await import('../web/src/lib/token.js');
     expect(legacyToken()).toBe(STUB_TOKEN);
   });
 
@@ -139,7 +139,7 @@ describe('a credential this browser already holds', () => {
       legacy: STUB_TOKEN,
       href: 'http://localhost:4610/?token=from-the-link',
     });
-    const { legacyToken, forgetLegacyToken } = await import('../web/src/token.js');
+    const { legacyToken, forgetLegacyToken } = await import('../web/src/lib/token.js');
     expect(legacyToken()).toBe('from-the-link');
 
     forgetLegacyToken();
@@ -151,7 +151,7 @@ describe('a credential this browser already holds', () => {
   it('is absent on an ordinary load', async () => {
     vi.resetModules();
     stubBrowser();
-    const { legacyToken } = await import('../web/src/token.js');
+    const { legacyToken } = await import('../web/src/lib/token.js');
     expect(legacyToken()).toBe('');
   });
 });

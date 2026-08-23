@@ -58,7 +58,7 @@ export interface CardFrontmatter {
 
 // The frontmatter field set, as data. An interface has no runtime keys, so nothing could compare the web
 // hand-mirror with this one — the same gap `AUTOPILOT_CONFIG_KEYS` exists to close. Asserted against
-// web/src/shared.ts in test/mirror.test.ts.
+// web/src/lib/shared.ts in test/mirror.test.ts.
 //
 // The order is the order `serializeCard` writes them in, which is the order a person reads them in a diff.
 export const CARD_FRONTMATTER_KEYS = [

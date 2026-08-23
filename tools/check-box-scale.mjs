@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 //
-// FOUR CLAIMS ABOUT THE BOXES, over every `.css` under web/src. Phase 4 of notes/atomic-revamp-plan.md.
+// FOUR CLAIMS ABOUT THE BOXES, over every `.css` under web/src. The atomic revamp's Phase 4 — see
+// docs/design-system.md, *The atomic revamp: the boxes*.
 //
 // Run it with: npm run check:box-scale
 //

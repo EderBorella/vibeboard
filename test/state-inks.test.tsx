@@ -24,10 +24,10 @@
 // test/chip-boxes.test.tsx and test/state-tones.test.tsx all use. The resolver is test/state-ink.tsx.
 import { cleanup, render, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { AutopilotState, Readiness, RunList, RunRecord, SandboxState } from '../web/src/api.js';
-import { LIGHT_STATES } from '../web/src/app/connection-light.js';
+import type { AutopilotState, Readiness, RunList, RunRecord, SandboxState } from '../web/src/lib/api.js';
+import { LIGHT_STATES } from '../web/src/organisms/topbar/connection-light.js';
 import { STATE_TONES, type StateName, TONES, type Tone } from '../web/src/molecules/state-tones.js';
-import type { CopilotConfig, Suggestion } from '../web/src/shared.js';
+import type { CopilotConfig, Suggestion } from '../web/src/lib/shared.js';
 import { inkIn, isColour, THEMES } from './state-ink.js';
 
 const api = vi.hoisted(() => ({
@@ -41,12 +41,12 @@ const api = vi.hoisted(() => ({
   addDiaryEntry: vi.fn(),
   isSuccessReason: (reason: string) => reason === 'complete',
 }));
-vi.mock('../web/src/api.js', () => api);
+vi.mock('../web/src/lib/api.js', () => api);
 
-const { AutopilotBar } = await import('../web/src/autopilot/AutopilotBar.js');
-const { TopBar } = await import('../web/src/app/TopBar.js');
-const { CardReports } = await import('../web/src/runs/CardReports.js');
-const { DiaryView } = await import('../web/src/diary/DiaryView.js');
+const { AutopilotBar } = await import('../web/src/organisms/autopilot/AutopilotBar.js');
+const { TopBar } = await import('../web/src/organisms/topbar/TopBar.js');
+const { CardReports } = await import('../web/src/organisms/runs/CardReports.js');
+const { DiaryView } = await import('../web/src/organisms/diary/DiaryView.js');
 
 const COPILOT: CopilotConfig = { backend: 'claude-code', backends: {} };
 const NO_RUNS: RunList = { runs: [], active: [], queued: [] };
@@ -285,14 +285,14 @@ const PROBES: Probe[] = [
 
 // The suggestions the Project Log renders come from a hook rather than a prop, so the three states are
 // supplied through the same fetch the component really makes.
-vi.mock('../web/src/suggestions/useSuggestions.js', () => ({
+vi.mock('../web/src/organisms/suggestions/useSuggestions.js', () => ({
   useSuggestions: () => ({
     suggestions: [filed('active'), filed('actioned'), filed('dismissed')],
     failed: false,
     refresh: vi.fn(),
   }),
 }));
-vi.mock('../web/src/diary/useDiary.js', () => ({
+vi.mock('../web/src/organisms/diary/useDiary.js', () => ({
   useDiary: () => ({ entries: [], failed: false, refresh: vi.fn(), add: vi.fn() }),
 }));
 

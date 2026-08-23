@@ -60,6 +60,11 @@
    constrained block where truncating really is what is wanted. */
 .exec-card .vb-clip { white-space: normal; overflow: visible; }
 .exec-summary { margin: 0; color: var(--muted); font-size: var(--t-small); line-height: 1.35; overflow-wrap: anywhere; }
+/* THE ONE ACTION ON A RUN THAT NEEDS ANSWERING, and this page is its only caller. It was in
+   `organisms/runs/runs.css` beside `.report-stop`, which really is shared and is in `organisms/shared/`
+   now; this one never was. A `ghost` Button: `align-self: flex-start` because `.exec-actions` wraps and a
+   stretched button in a wrapped row is as wide as the widest line. */
+.report-dismiss { flex: 0 0 auto; align-self: flex-start; }
 /* `.tab-badge` IS GONE, and with it the stray this file held: it was the TOP BAR's attention count,
    living here because that is where its bytes fell in `styles.css`. `Menu`'s `badge` option renders it —
    `Chip pill fill` with the mono face, which is what the dock's own count already was.
@@ -71,4 +76,4 @@
 /* THE PROJECT LEDGER SPANS THE WHOLE EXECUTION GRID, and this rule was in the runs organism's sheet naming
    this page's class — a class defined in two scoped directories has no owner. Both ledgers are
    `FigureRow`s; where each sits is all that is left, and each surface says its own. */
-.execution > .vb-readout-block { grid-column: 1 / -1; margin-bottom: var(--s-5); }
+.execution > .vb-figure-row { grid-column: 1 / -1; margin-bottom: var(--s-5); }

@@ -2,7 +2,8 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { type ReactNode, useEffect, useState } from 'react';
 
 // THE WHOLE VOCABULARY ON ONE PAGE, and it is the owner's acceptance surface for the primitive layer
-// rather than documentation of it. `notes/atomic-revamp-plan.md` §3 argues every token against N−1 with a
+// rather than documentation of it. `docs/design-system.md` (*The atomic revamp: the token set*) argues
+// every token against N−1 with a
 // consumer count; a count in a document is an argument, and this is the thing itself — every name, the
 // value it actually resolves to in the theme currently selected, how many declarations spend it, and a
 // specimen you can compare against the one above it.
@@ -20,8 +21,8 @@ interface Row {
   name: string;
   means: string;
   kind: Kind;
-  // Struck through, with the phase that takes it away. `notes/atomic-revamp-plan.md` §3.1 — four names,
-  // each of which fails the owner's own test that a token justify its existence.
+  // Struck through, with the phase that takes it away. `docs/design-system.md`, *The atomic revamp: the
+  // token set* — four names, each of which fails the owner's own test that a token justify its existence.
   retires?: string;
 }
 

@@ -8,10 +8,10 @@ const api = vi.hoisted(() => ({
   listControlFiles: vi.fn(),
   dispatchRun: vi.fn(),
 }));
-vi.mock('../web/src/api.js', () => api);
-vi.mock('../web/src/api', () => api);
+vi.mock('../web/src/lib/api.js', () => api);
+vi.mock('../web/src/lib/api', () => api);
 
-const { useDispatch } = await import('../web/src/runs/useDispatch.js');
+const { useDispatch } = await import('../web/src/organisms/runs/useDispatch.js');
 
 const models = (...ids: string[]) => ids.map((id) => ({ id, free: true }));
 

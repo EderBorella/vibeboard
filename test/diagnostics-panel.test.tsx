@@ -12,8 +12,8 @@ const api = vi.hoisted(() => ({
   getAppSettings: vi.fn(),
   setDebugLog: vi.fn(),
 }));
-vi.mock('../web/src/api.js', () => api);
-const { DiagnosticsPanel } = await import('../web/src/settings/DiagnosticsPanel.js');
+vi.mock('../web/src/lib/api.js', () => api);
+const { DiagnosticsPanel } = await import('../web/src/organisms/settings/DiagnosticsPanel.js');
 
 afterEach(cleanup);
 beforeEach(() => {

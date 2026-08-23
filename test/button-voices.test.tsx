@@ -14,10 +14,10 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { CardTile } from '../web/src/board/CardTile.js';
-import { Column } from '../web/src/board/Column.js';
-import { CardTabs } from '../web/src/cards/CardTabs.js';
-import type { Card } from '../web/src/shared.js';
+import { CardTile } from '../web/src/organisms/board/CardTile.js';
+import { Column } from '../web/src/organisms/board/Column.js';
+import { CardTabs } from '../web/src/organisms/cards/CardTabs.js';
+import type { Card } from '../web/src/lib/shared.js';
 
 afterEach(cleanup);
 

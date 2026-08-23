@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { FsNode } from '../web/src/api.js';
-import { canDropInto, nameOf, parentOf } from '../web/src/explorer/paths.js';
+import type { FsNode } from '../web/src/lib/api.js';
+import { canDropInto, nameOf, parentOf } from '../web/src/organisms/explorer/paths.js';
 
 const node = (path: string, kind: FsNode['kind'] = 'file'): FsNode => ({
   path,

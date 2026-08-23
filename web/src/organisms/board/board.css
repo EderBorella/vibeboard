@@ -253,10 +253,6 @@
   text-transform: uppercase; letter-spacing: var(--track);
 }
 .tile-tags { display: flex; flex-wrap: wrap; gap: var(--s-2); margin-top: auto; overflow: hidden; max-height: 1.3rem; }
-/* `Chip pill neutral` owns the box and the ink. The ground is the one thing a tag still decides:
-   `--panel` is a shade off the `--panel-2` a tile is drawn on, where `fill`'s `--panel-2` would make
-   the tag disappear into the card. */
-.tag { background: var(--panel); }
 /* A tag on a tile is a real button wherever it can filter the board (CardTile's onTag), and a `Chip`
    may be one. The cursor and the inherited face are `button.vb-chip`'s now; the hover is the tile's. */
 .tag-btn:hover { color: var(--accent); border-color: var(--accent); }

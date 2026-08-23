@@ -9,14 +9,14 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 // remedy was to move the card's result files out of its folder by hand, which destroys the history
 // explaining why it was blocked.
 const api = vi.hoisted(() => ({ forgiveCardAttempts: vi.fn(async () => ({ forgiven: 3 })) }));
-vi.mock('../web/src/api.js', () => api);
-vi.mock('../web/src/api', () => api);
+vi.mock('../web/src/lib/api.js', () => api);
+vi.mock('../web/src/lib/api', () => api);
 
-const { ForgiveAttempts } = await import('../web/src/runs/ForgiveAttempts.js');
-const { CardReports } = await import('../web/src/runs/CardReports.js');
+const { ForgiveAttempts } = await import('../web/src/organisms/runs/ForgiveAttempts.js');
+const { CardReports } = await import('../web/src/organisms/runs/CardReports.js');
 
-import type { CardLedgerData, RunRecord } from '../web/src/api.js';
-import type { Card } from '../web/src/shared.js';
+import type { CardLedgerData, RunRecord } from '../web/src/lib/api.js';
+import type { Card } from '../web/src/lib/shared.js';
 
 afterEach(() => {
   cleanup();

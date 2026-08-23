@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { useFetched } from '../web/src/useFetched.js';
+import { useFetched } from '../web/src/lib/useFetched.js';
 
 // The cancel flag and the refetch trigger are pinned by the hooks that use them
 // (use-skills, use-runs, use-card-runs, use-dispatch). What is pinned HERE is the part those hooks

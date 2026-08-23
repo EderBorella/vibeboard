@@ -4,10 +4,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { stubBrowser } from './browser-stubs.js';
 
 const api = vi.hoisted(() => ({ getAutopilotState: vi.fn() }));
-vi.mock('../web/src/api.js', () => api);
-vi.mock('../web/src/api', () => api);
+vi.mock('../web/src/lib/api.js', () => api);
+vi.mock('../web/src/lib/api', () => api);
 
-const { useAutopilot } = await import('../web/src/useAutopilot.js');
+const { useAutopilot } = await import('../web/src/lib/useAutopilot.js');
 
 // Two sources, and the socket half is the one that matters: an emergency stop in ANOTHER tab must raise
 // the overlay here. Without it, a tab left open would show a working app over a project whose agents are

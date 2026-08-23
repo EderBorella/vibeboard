@@ -35,9 +35,9 @@ const h = vi.hoisted(() => {
   };
 });
 
-vi.mock('../web/src/ws.js', () => ({ useSharedWs: (bump: number) => h.get(bump) }));
+vi.mock('../web/src/lib/ws.js', () => ({ useSharedWs: (bump: number) => h.get(bump) }));
 
-import { useSnapshot } from '../web/src/useSnapshot.js';
+import { useSnapshot } from '../web/src/lib/useSnapshot.js';
 
 const push = (bump: number, msg: Record<string, unknown>): void => {
   act(() => {

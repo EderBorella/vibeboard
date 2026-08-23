@@ -1,13 +1,13 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { AutopilotState } from '../web/src/api.js';
+import type { AutopilotState } from '../web/src/lib/api.js';
 
 const api = vi.hoisted(() => ({ restartAutopilot: vi.fn() }));
-vi.mock('../web/src/api.js', () => api);
-vi.mock('../web/src/api', () => api);
+vi.mock('../web/src/lib/api.js', () => api);
+vi.mock('../web/src/lib/api', () => api);
 
-const { HaltOverlay } = await import('../web/src/autopilot/HaltOverlay.js');
+const { HaltOverlay } = await import('../web/src/organisms/autopilot/HaltOverlay.js');
 
 afterEach(() => {
   cleanup();

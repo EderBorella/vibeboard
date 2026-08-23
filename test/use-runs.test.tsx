@@ -3,10 +3,10 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const api = vi.hoisted(() => ({ listRuns: vi.fn() }));
-vi.mock('../web/src/api.js', () => api);
-vi.mock('../web/src/api', () => api);
+vi.mock('../web/src/lib/api.js', () => api);
+vi.mock('../web/src/lib/api', () => api);
 
-const { useRuns } = await import('../web/src/runs/useRuns.js');
+const { useRuns } = await import('../web/src/organisms/runs/useRuns.js');
 
 const list = (...ids: string[]) => ({
   runs: ids.map((run) => ({

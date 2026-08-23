@@ -4,10 +4,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { skillRel } from '../src/core/layout.js';
 
 const api = vi.hoisted(() => ({ listSkills: vi.fn() }));
-vi.mock('../web/src/api.js', () => api);
-vi.mock('../web/src/api', () => api);
+vi.mock('../web/src/lib/api.js', () => api);
+vi.mock('../web/src/lib/api', () => api);
 
-const { useSkills } = await import('../web/src/skills/useSkills.js');
+const { useSkills } = await import('../web/src/organisms/skills/useSkills.js');
 
 const catalogue = (slug: string) => ({
   skills: [

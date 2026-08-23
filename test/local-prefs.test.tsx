@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { useCollapsedBoards, useDockCollapsed, useTheme } from '../web/src/useLocalPrefs.js';
+import { useCollapsedBoards, useDockCollapsed, useTheme } from '../web/src/lib/useLocalPrefs.js';
 
 // These preferences belong to the browser, not the project. The storage keys are load-bearing:
 // changing one silently loses everybody's saved preference, so they are asserted literally.

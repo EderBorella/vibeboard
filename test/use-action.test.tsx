@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, renderHook } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { useAction } from '../web/src/useAction.js';
+import { useAction } from '../web/src/lib/useAction.js';
 
 describe('useAction', () => {
   it('is busy for as long as the call is, and not after a refusal', async () => {

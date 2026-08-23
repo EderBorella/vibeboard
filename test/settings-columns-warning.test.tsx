@@ -27,11 +27,11 @@ const api = vi.hoisted(() => ({
   getAppSettings: vi.fn().mockRejectedValue(new Error('not what this test is about')),
   setDebugLog: vi.fn(),
 }));
-vi.mock('../web/src/api.js', () => api);
+vi.mock('../web/src/lib/api.js', () => api);
 
-const { SettingsModal } = await import('../web/src/settings/SettingsModal.js');
+const { SettingsModal } = await import('../web/src/organisms/settings/SettingsModal.js');
 
-import type { ProjectConfig } from '../web/src/shared.js';
+import type { ProjectConfig } from '../web/src/lib/shared.js';
 
 afterEach(cleanup);
 

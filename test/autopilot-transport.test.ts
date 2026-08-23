@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { AutopilotState, Readiness, RunList, RunRecord } from '../web/src/api.js';
-import { transportModel } from '../web/src/autopilot/transport.js';
+import type { AutopilotState, Readiness, RunList, RunRecord } from '../web/src/lib/api.js';
+import { transportModel } from '../web/src/organisms/autopilot/transport.js';
 
 // The decisions behind the transport strip, asserted directly. The alternative is mocking four hooks to
 // check a sentence, and every defect in this feature so far has hidden behind exactly that.

@@ -6,9 +6,9 @@ const api = vi.hoisted(() => ({
   approveSignin: vi.fn().mockResolvedValue({ ok: true }),
   refuseSignin: vi.fn().mockResolvedValue({ ok: true }),
 }));
-vi.mock('../web/src/api.js', () => api);
+vi.mock('../web/src/lib/api.js', () => api);
 
-const { ApprovalPrompt } = await import('../web/src/signin/ApprovalPrompt.js');
+const { ApprovalPrompt } = await import('../web/src/organisms/signin/ApprovalPrompt.js');
 
 afterEach(cleanup);
 beforeEach(() => {

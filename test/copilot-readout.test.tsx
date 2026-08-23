@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
-import { CopilotReadout } from '../web/src/copilot/CopilotReadout.js';
-import type { CopilotStats } from '../web/src/copilot/useCopilot.js';
-import { formatCost } from '../web/src/format.js';
+import { CopilotReadout } from '../web/src/organisms/copilot/CopilotReadout.js';
+import type { CopilotStats } from '../web/src/organisms/copilot/useCopilot.js';
+import { formatCost } from '../web/src/lib/format.js';
 
 afterEach(cleanup);
 

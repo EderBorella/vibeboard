@@ -32,11 +32,6 @@
    directories has no owner, which is the second claim `npm run check:layers` makes and now blocks on. */
 .diary > .vb-text-error { max-width: 68ch; }
 
-.diary-empty {
-  display: flex; flex-direction: column; align-items: flex-start; gap: var(--s-4);
-  color: var(--muted); font-size: var(--t-lead); padding: var(--s-7) 0;
-}
-
 /* A `List`, and the measure is what is left. */
 .diary-list { max-width: 68ch; }
 /* `.diary-entry` IS GONE — a `Row stack rail` on a `Surface flat`. THE FOUR KIND RULES ARE WHAT REMAIN,
@@ -68,7 +63,8 @@
    RENDERED BY `diary/DiaryView.tsx`, WHICH IS WHY IT IS HERE. It was `pages/log/log.css`, and the layer
    gate's finding was exact: the page's sheet owned six classes its own surface never named, while the
    organism that renders them is this one. `.log-split` went to `templates/app-shell.css`, which is where
-   §2.5 of the plan lists it, and `pages/log/log.css` has nothing left to hold. */
+   the atomic revamp puts it (docs/design-system.md, *The atomic revamp: the layer tree*), and
+   `pages/log/log.css` has nothing left to hold. */
 .filed {
   flex: 0 1 42%; min-width: 0; overflow-y: auto; background: var(--wash);
   border-left: 1px solid var(--border);
@@ -91,8 +87,6 @@
   font-family: var(--font-display); text-transform: uppercase; letter-spacing: var(--track);
   font-size: var(--t-micro); color: var(--text);
 }
-.filed-title { font-size: var(--t-lead); line-height: 1.5; color: var(--text); }
-.filed-text { font-size: var(--t-body); line-height: 1.5; color: var(--muted); }
 /* Why it was said no to. Quiet, and italic so it does not read as part of the finding itself. */
 .filed-reason { font-size: var(--t-body); line-height: 1.5; color: var(--muted); font-style: italic; }
 

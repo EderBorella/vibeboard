@@ -1,12 +1,22 @@
 #!/usr/bin/env node
 //
-// NOTHING IN THE FILE IS OFF THE SCALE. Three claims over `web/src/**/*.css`, all blocking at zero:
+// NOTHING IN THE FILE IS OFF THE SCALE. Four claims over `web/src/**/*.css`, all blocking at zero:
 //
 //   1. Every authored `font-size` is one of the FIVE steps of the type scale.
 //   2. Every authored `gap`, `padding` and `margin` value is `0`, a keyword, a percentage, `auto`,
 //      `var(--s-1)`…`var(--s-7)`, a `calc()` built only from those steps, or a row in an exception map
 //      with its reason.
 //   3. Every authored `letter-spacing` is `var(--track)`, `normal`, or a row in an exception map.
+//   4. Every authored `top`, `right`, `bottom`, `left` and `inset` is the same set of values as claim 2,
+//      or a row in an exception map with its reason.
+//
+// CLAIM 4 IS NEW AND IT CLOSED THE LAST HAND-WRITTEN LENGTH IN THE TREE. `top`/`inset` was in NO gate in
+// this repository — not this one, not `check-box-scale.mjs`, not the browser harness, which measures
+// computed boxes and not offsets — and `.explorer-head { top: -0.75rem }` sat through six phases of a
+// sweep whose whole subject is hand-written lengths. An offset is a space value: it is measured in the
+// same pixels, chosen by the same eye, and there is no reason for it to be on a different grid. What it
+// allows that claim 2 does not is a PERCENTAGE INSIDE A `calc()` — `top: calc(100% + var(--s-2))` is how
+// a panel hangs under its trigger, and `padding: calc(100% + …)` is not a thing anybody writes.
 //
 // Run it with: npm run check:scale
 //
@@ -51,7 +61,8 @@ const CORPUS = 'web/src';
 // declaration invalid at computed-value time — so the element silently inherits and the file passes a
 // check that only ever read the shape of the name.
 // The scales are geometry, so they live in design/tokens.css and not in design/themes.css — the split
-// Phase 1 of notes/atomic-revamp-plan.md made structural, and `npm run check:tokens` is what keeps it.
+// the atomic revamp's Phase 1 made structural, and `npm run check:tokens` is what keeps it. The scales
+// themselves are argued in docs/design-system.md, *The atomic revamp: the space scale*.
 const TOKENS_FILE = 'web/src/design/tokens.css';
 // FIVE, and `--t-display` is the one that went. It existed to carry "the one big number per surface" and
 // no number in the app was ever set in it; its only consumer was a markdown `h1`, which the scale had
@@ -101,6 +112,26 @@ const TRACKING_ON_PURPOSE = new Map([
   ],
 ]);
 
+// THE ONE DRAWN OBJECT WHOSE OFFSETS ARE NOT SPACING, and it is written here with its reason on the
+// precedent of `50%` in check-radius-scale.mjs. Keyed by VALUE like the other two maps, and both rows are
+// pruned and counted by the run below, so a second consumer is a finding.
+/** @type {Map<string, string>} */
+const OFFSET_ON_PURPOSE = new Map([
+  [
+    'top:-5px',
+    "`.popover::before` in web/src/molecules/popover.css — THE POINTER, and its offsets are a DRAWING " +
+      'rather than a rhythm. It is an 8px square rotated 45°, so its visible tip is half of an 11.3px ' +
+      'diagonal: the number that puts the tip on the panel edge is derived from the square, not chosen ' +
+      'from a spacing grid, and rounding it to `--s-5` (12px) detaches the pointer from the panel.',
+  ],
+  [
+    'left:14px',
+    '`.popover::before` in web/src/molecules/popover.css — the same drawing: the pointer sits under the ' +
+      "left end of the trigger, inside the panel's own `--s-5` padding, and the step either side of 14px " +
+      'puts it half over the corner radius.',
+  ],
+]);
+
 // `font: 14px/1.2 sans-serif` SETS A FONT SIZE AND THE PATTERN ABOVE CANNOT SEE IT — the shorthand is
 // the way round this check, so it is closed here rather than left as a hole. `font: inherit` and
 // `font: 400 …` carry no length and are fine; the file uses the former in a dozen places deliberately.
@@ -138,6 +169,10 @@ const FONT_SIZE = /font-size:\s*([^;}]+?)\s*(?=[;}])/g;
 const SPACE =
   /(?:^|[;{\s])(gap|row-gap|column-gap|margin(?:-top|-right|-bottom|-left)?|padding(?:-top|-right|-bottom|-left)?):([^;}]*)/g;
 const LETTER_SPACING = /letter-spacing:\s*([^;}]+?)\s*(?=[;}])/g;
+// The four physical offsets and the logical shorthands. Anchored on a boundary for `SPACE`'s reason and
+// one sharper: without it `border-left:` and `border-top-left-radius:` both match `left:`/`top:`.
+const OFFSET =
+  /(?:^|[;{\s])(top|right|bottom|left|inset(?:-block|-inline)?(?:-start|-end)?):([^;}]*)/g;
 // One level of nesting is enough for every `calc()` a space value has: the contents are an EXPRESSION and
 // not a list of atoms, so they are lifted out and checked separately before the value is split.
 const CALC = /calc\(([^()]*(?:\([^()]*\)[^()]*)*)\)/g;
@@ -178,19 +213,26 @@ function spaceAtomFault(atom) {
 // literal is gone — `.inline-view` pulls its own box out by a step so an editable field does not move when
 // it becomes an input — and `-2px` in an exception map is the hand-written value this phase exists to
 // remove. So the expression must name at least one step and may contain no length of its own.
-function calcFault(inner) {
+//
+// `allowPercent` IS CLAIM 4'S ONE DIFFERENCE, and it is a real distinction rather than a relaxation: an
+// offset is measured against its containing block, so `calc(100% + var(--s-2))` — how a panel hangs under
+// its trigger — is a step away from an edge the browser computes. A padding is measured against nothing,
+// so the same expression there is a value nobody chose. Exercised in BOTH directions by the fixture.
+function calcFault(inner, allowPercent = false) {
   const names = [...inner.matchAll(/var\(\s*(--[\w-]+)\s*\)/g)].map((m) => m[1]);
   if (names.length === 0) return `calc(${inner}) — names no step of the space scale`;
   const off = names.find((name) => !SPACE_SCALE.includes(name));
   if (off) return `calc(${inner}) — var(${off}) is not one of the ${SPACE_SCALE.length} steps`;
-  const length = LENGTH.exec(inner.replace(/var\(\s*--[\w-]+\s*\)/g, ' '));
+  let rest = inner.replace(/var\(\s*--[\w-]+\s*\)/g, ' ');
+  if (allowPercent) rest = rest.replace(/-?\d*\.?\d+%/g, ' ');
+  const length = LENGTH.exec(rest);
   return length ? `calc(${inner}) — the hand-written length ${length[0]}` : null;
 }
 
-function spaceFaults(property, rawValue) {
+function spaceFaults(property, rawValue, allowPercent = false) {
   const faults = [];
   const value = rawValue.replace(CALC, (_whole, inner) => {
-    const fault = calcFault(inner);
+    const fault = calcFault(inner, allowPercent);
     if (fault) faults.push(fault);
     return ' ';
   });
@@ -278,6 +320,25 @@ function trackingArm(text, site) {
   return { count, findings, used };
 }
 
+/** @returns {{ count: number, findings: {site: string, detail: string}[], used: {key: string, site: string}[] }} */
+function offsetArm(text, site) {
+  const findings = [];
+  const used = [];
+  let count = 0;
+  for (const match of text.matchAll(OFFSET)) {
+    count += 1;
+    const key = `${match[1]}:${match[2].trim()}`;
+    if (OFFSET_ON_PURPOSE.has(key)) {
+      used.push({ key, site: site(match.index) });
+      continue;
+    }
+    for (const detail of spaceFaults(match[1], match[2], true)) {
+      findings.push({ site: site(match.index), detail });
+    }
+  }
+  return { count, findings, used };
+}
+
 export function scan(file, raw) {
   // COMMENTS ARE BLANKED, NOT READ. This check scanned the raw file, so any comment that mentioned
   // `font-size:` or `padding:` in prose was parsed as a declaration and the words after it as its
@@ -294,19 +355,21 @@ export function scan(file, raw) {
   const type = typeArm(text, site);
   const space = spaceArm(text, site);
   const tracking = trackingArm(text, site);
+  const offset = offsetArm(text, site);
 
   return {
     fontSizes: type.count,
     spaces: space.count,
     trackings: tracking.count,
-    findings: [...type.findings, ...space.findings, ...tracking.findings],
+    offsets: offset.count,
+    findings: [...type.findings, ...space.findings, ...tracking.findings, ...offset.findings],
     // Keyed `property:value`, not by value alone: `inherit` is a legal font-size exception, and one
     // shared key on the value alone would let either arm prune the other's row.
     //
     // A LIST OF SITES RATHER THAN A SET OF KEYS, and that is what makes the uniqueness claim below
     // checkable: an exception keyed by VALUE spreads silently, so the number of rules using it has to
     // be visible to the run.
-    exceptionsUsed: [...type.used, ...space.used, ...tracking.used],
+    exceptionsUsed: [...type.used, ...space.used, ...tracking.used, ...offset.used],
   };
 }
 
@@ -338,6 +401,11 @@ const FIXTURE = `
 .kappa { letter-spacing: normal; margin: calc(-1 * 4px) }
 .lambda { padding: calc(var(--s-3) + 3px) }
 .mu { padding: calc(var(--ctl-h) - var(--s-2)) }
+.nu { top: calc(100% + var(--s-2)); left: 0 }
+.xi { top: calc(100% + var(--s-2) + 0.5rem); bottom: -0.75rem }
+.omicron::before { top: -5px; left: 14px }
+.pi { border-left: 2px solid red; text-align: left }
+.rho { inset: 0 auto }
 `;
 
 // 4 font-size (alpha, delta, epsilon, zeta — NOT the comment's), 8 gap/padding/margin (alpha, gamma's
@@ -351,10 +419,22 @@ const FIXTURE = `
 // separate ways a `calc()` can be a loophole, and `calcFault` has exactly three branches. `.mu` is the
 // third, which nothing exercised: a `--ctl-h`-tall gap would have passed a check whose whole claim is
 // that a space value is one of seven steps.
+//
+// CLAIM 4'S FIVE LINES, and each is one thing the arm has to get right. `.nu` is the legal shape — a
+// percentage inside a `calc()` beside a step — and it must NOT be a finding, which is the `allowPercent`
+// branch; `.xi` is the same expression with a step, a percentage AND a hand-written length in it, which
+// is the case `allowPercent` must not swallow, beside a bare `rem` that is `.explorer-head`'s
+// six-phase-old `top: -0.75rem` exactly. `.omicron::before` is the two rows of
+// `OFFSET_ON_PURPOSE`, so the map is exercised rather than merely present. `.pi` IS THE BOUNDARY AND IT IS
+// THE ONE THAT MATTERS MOST: without `(?:^|[;{\s])` the pattern reads `border-left: 2px solid red` as an
+// offset of `2px solid red` and every border in the tree becomes a finding — a gate that cries wolf on 40
+// rules is a gate that gets deleted. It contributes NOTHING to the count, which is what proves it. `.rho`
+// is the shorthand with two atoms.
 const SELF_TEST_WANT = [
   '4 font-size',
   '8 gap/padding/margin',
   '3 letter-spacing',
+  '7 offset',
   'fixture.css:7 font-size: 0.81rem — not a step on the scale',
   'fixture.css:8 font-size: var(--t-nope) — not one of the 5 steps',
   // Two spaces after `sans-serif`, and that is the parser's real output rather than a typo here:
@@ -369,104 +449,135 @@ const SELF_TEST_WANT = [
   'fixture.css:14 padding: calc(var(--s-3) + 3px) — the hand-written length 3px',
   'fixture.css:15 padding: calc(var(--ctl-h) - var(--s-2)) — var(--ctl-h) is not one of the 7 steps',
   'fixture.css:12 letter-spacing: 0.05em — not var(--track), `normal`, or a named exception',
+  'fixture.css:17 top: calc(100% + var(--s-2) + 0.5rem) — the hand-written length 0.5rem',
+  'fixture.css:17 bottom: -0.75rem — not on the space scale',
 ].join(' | ');
 
 function parserSelfTest() {
-  const { fontSizes, spaces, trackings, findings } = scan('fixture.css', FIXTURE);
+  const { fontSizes, spaces, trackings, offsets, findings, exceptionsUsed } = scan('fixture.css', FIXTURE);
   const got = [
     `${fontSizes} font-size`,
     `${spaces} gap/padding/margin`,
     `${trackings} letter-spacing`,
+    `${offsets} offset`,
     ...findings.map(({ site, detail }) => `${site} ${detail}`),
   ].join(' | ');
-  return got === SELF_TEST_WANT ? null : `expected\n  ${SELF_TEST_WANT}\ngot\n  ${got}`;
+  if (got !== SELF_TEST_WANT) return `expected\n  ${SELF_TEST_WANT}\ngot\n  ${got}`;
+  // THE EXCEPTION MAP HAS TO BE REACHED, not merely declared. `.omicron::before` uses both rows, and a
+  // fixture that only checked the findings would pass with the map never consulted — which is how a
+  // hardcoded allowance ends up outside the stale-row audit, the fault this file's own claim 3 records.
+  // `.zeta`'s `font-size: inherit` comes first because `typeArm` runs first — the order of the arms in
+  // `scan` is load-bearing here for the same reason it is in `SELF_TEST_WANT`.
+  const keys = exceptionsUsed.map(({ key }) => key).join(',');
+  const want = 'font-size:inherit,top:-5px,left:14px';
+  return keys === want ? null : `exception map not reached: [${keys}] against [${want}]`;
 }
 
-/** @type {{ site: string, detail: string }[]} */
-const findings = [];
-/** @type {Map<string, string[]>} keyed `property:value`, valued by the sites that use it */
-const exceptionsUsed = new Map();
-let fontSizes = 0;
-let spaces = 0;
-let trackings = 0;
+// THE CENSUS RUNS ONLY WHEN THIS FILE IS THE COMMAND, and that is a fix rather than a style: `scan` is
+// exported, and with the census at module top level ANY import of it ran the whole gate — walked 41
+// stylesheets, printed two report lines and called `process.exit(1)` on a finding, from inside whatever
+// imported it. Two agents have tripped over it. Nothing imports this file today; the export is what makes
+// that a latent trap rather than a bug, and a latent trap that has already caught somebody twice is worth
+// one line.
+function main() {
+  /** @type {{ site: string, detail: string }[]} */
+  const findings = [];
+  /** @type {Map<string, string[]>} keyed `property:value`, valued by the sites that use it */
+  const exceptionsUsed = new Map();
+  let fontSizes = 0;
+  let spaces = 0;
+  let trackings = 0;
+  let offsets = 0;
 
-for (const file of cssFiles()) {
-  const seen = scan(file, readFileSync(join(ROOT, file), 'utf8'));
-  fontSizes += seen.fontSizes;
-  spaces += seen.spaces;
-  trackings += seen.trackings;
-  findings.push(...seen.findings);
-  for (const { key, site } of seen.exceptionsUsed) {
-    if (!exceptionsUsed.has(key)) exceptionsUsed.set(key, []);
-    exceptionsUsed.get(key)?.push(site);
+  for (const file of cssFiles()) {
+    const seen = scan(file, readFileSync(join(ROOT, file), 'utf8'));
+    fontSizes += seen.fontSizes;
+    spaces += seen.spaces;
+    trackings += seen.trackings;
+    offsets += seen.offsets;
+    findings.push(...seen.findings);
+    for (const { key, site } of seen.exceptionsUsed) {
+      if (!exceptionsUsed.has(key)) exceptionsUsed.set(key, []);
+      exceptionsUsed.get(key)?.push(site);
+    }
   }
-}
 
-console.log(
-  `scale: ${fontSizes} font-size, ${spaces} gap/padding/margin and ${trackings} letter-spacing ` +
-    `declaration(s) across ${cssFiles().length} file(s) in ${CORPUS}`,
-);
+  console.log(
+    `scale: ${fontSizes} font-size, ${spaces} gap/padding/margin, ${trackings} letter-spacing and ` +
+      `${offsets} offset declaration(s) across ${cssFiles().length} file(s) in ${CORPUS}`,
+  );
 
-// Before the findings, because a green run on a pattern that matched nothing is the worse failure.
-const parserFault = parserSelfTest();
-if (parserFault) {
-  console.error(`\nthe scale parser is broken: ${parserFault}`);
-  console.error(`\nThis check is vacuous — it would report nothing whatever the stylesheets hold. Fix the`);
-  console.error(`pattern in tools/check-scale.mjs; do NOT relax the fixture.`);
-  process.exit(1);
-}
-
-// An exception nothing exercises is an exception that would pass an empty tree, so a stale row is a
-// finding in its own right — the mechanism check-tokens.mjs applies to `UNCONSUMED`.
-//
-// AND A SECOND CONSUMER IS A FINDING TOO, which it was not: both maps are keyed by VALUE, and the
-// reason written down for that — *"both values are unique in the tree, and a selector-keyed map would
-// need this check to become rule-aware for two rows"* — was an ASSUMPTION the run never tested.
-// Pasting `.brand`'s wordmark tracking onto `.dock-tab` exited 0: one rule's argued exception had
-// silently become the app's second-choice tracking value, and nothing here could see it. Counting the
-// sites turns the stated reason into a checked one without making this file rule-aware, which is the
-// cheapest repair that closes it. `inherit` is the row that must be allowed many consumers — it is
-// allowed BY CONSTRUCTION rather than by exception (see its reason), so it is excluded by name.
-const EXCEPTION_MAY_REPEAT = new Set(['font-size:inherit']);
-const EXCEPTIONS = [
-  ...[...OFF_SCALE_ON_PURPOSE].map(([value, reason]) => ['font-size', value, reason]),
-  ...[...TRACKING_ON_PURPOSE].map(([value, reason]) => ['letter-spacing', value, reason]),
-];
-for (const [property, value, reason] of EXCEPTIONS) {
-  const key = `${property}:${value}`;
-  const sites = exceptionsUsed.get(key);
-  if (!sites) {
-    findings.push({
-      site: 'tools/check-scale.mjs',
-      detail: `\`${property}: ${value}\` is written down as off the scale on purpose (${reason.slice(0, 60)}…) and no rule uses it — delete the row`,
-    });
-    continue;
+  // Before the findings, because a green run on a pattern that matched nothing is the worse failure.
+  const parserFault = parserSelfTest();
+  if (parserFault) {
+    console.error(`\nthe scale parser is broken: ${parserFault}`);
+    console.error(`\nThis check is vacuous — it would report nothing whatever the stylesheets hold. Fix the`);
+    console.error(`pattern in tools/check-scale.mjs; do NOT relax the fixture.`);
+    process.exit(1);
   }
-  if (sites.length > 1 && !EXCEPTION_MAY_REPEAT.has(key)) {
-    findings.push({
-      site: 'tools/check-scale.mjs',
-      detail:
-        `\`${property}: ${value}\` is one rule's argued exception (${reason.slice(0, 60)}…) and ` +
-        `${sites.length} rules use it: ${sites.join(', ')} — an exception with a second consumer is a ` +
-        `value, so either put the second one on the scale or the reason no longer holds`,
-    });
+
+  // An exception nothing exercises is an exception that would pass an empty tree, so a stale row is a
+  // finding in its own right — the mechanism check-tokens.mjs applies to `UNCONSUMED`.
+  //
+  // AND A SECOND CONSUMER IS A FINDING TOO, which it was not: both maps are keyed by VALUE, and the
+  // reason written down for that — *"both values are unique in the tree, and a selector-keyed map would
+  // need this check to become rule-aware for two rows"* — was an ASSUMPTION the run never tested.
+  // Pasting `.brand`'s wordmark tracking onto `.dock-tab` exited 0: one rule's argued exception had
+  // silently become the app's second-choice tracking value, and nothing here could see it. Counting the
+  // sites turns the stated reason into a checked one without making this file rule-aware, which is the
+  // cheapest repair that closes it. `inherit` is the row that must be allowed many consumers — it is
+  // allowed BY CONSTRUCTION rather than by exception (see its reason), so it is excluded by name.
+  const EXCEPTION_MAY_REPEAT = new Set(['font-size:inherit']);
+  const EXCEPTIONS = [
+    ...[...OFF_SCALE_ON_PURPOSE].map(([value, reason]) => ['font-size', value, reason]),
+    ...[...TRACKING_ON_PURPOSE].map(([value, reason]) => ['letter-spacing', value, reason]),
+    // Already keyed `property:value`, because an offset's exception is about one SIDE of one box: `-5px` is
+    // a reason for `top` and not for `left`, and a value-only key would let either prune the other's row.
+    ...[...OFFSET_ON_PURPOSE].map(([key, reason]) => [
+      key.slice(0, key.indexOf(':')),
+      key.slice(key.indexOf(':') + 1),
+      reason,
+    ]),
+  ];
+  for (const [property, value, reason] of EXCEPTIONS) {
+    const key = `${property}:${value}`;
+    const sites = exceptionsUsed.get(key);
+    if (!sites) {
+      findings.push({
+        site: 'tools/check-scale.mjs',
+        detail: `\`${property}: ${value}\` is written down as off the scale on purpose (${reason.slice(0, 60)}…) and no rule uses it — delete the row`,
+      });
+      continue;
+    }
+    if (sites.length > 1 && !EXCEPTION_MAY_REPEAT.has(key)) {
+      findings.push({
+        site: 'tools/check-scale.mjs',
+        detail:
+          `\`${property}: ${value}\` is one rule's argued exception (${reason.slice(0, 60)}…) and ` +
+          `${sites.length} rules use it: ${sites.join(', ')} — an exception with a second consumer is a ` +
+          `value, so either put the second one on the scale or the reason no longer holds`,
+      });
+    }
   }
+
+  if (findings.length > 0) {
+    console.error(`\n${findings.length} declaration(s) off the scale:\n`);
+    for (const { site, detail } of findings) console.error(`  ${site} — ${detail}`);
+    console.error(`\nGive each one the nearest step: --t-micro 11px, --t-small 12px, --t-body 13px,`);
+    console.error(`--t-lead 15px, --t-title 18px; --s-1 2px, --s-2 4px, --s-3 6px, --s-4 8px, --s-5 12px,`);
+    console.error(`--s-6 16px, --s-7 24px; --track 0.08em.`);
+    console.error(`Do NOT add a step. If a surface looks wrong on the nearest one, the surface is wrong —`);
+    console.error(`see docs/design-system.md. A value that is off the scale ON PURPOSE goes in`);
+    console.error(`OFF_SCALE_ON_PURPOSE or TRACKING_ON_PURPOSE with its reason.`);
+    process.exit(1);
+  }
+
+  console.log(
+    `all ${fontSizes} font-size declarations are one of the ${TYPE_SCALE.length} type steps; all ${spaces} ` +
+      `space and ${offsets} offset declarations are on the ${SPACE_SCALE.length}-step grid; all ` +
+      `${trackings} letter-spacings are var(${TRACK}) or one of the ${TRACKING_ON_PURPOSE.size} named ` +
+      `exceptions`,
+  );
 }
 
-if (findings.length > 0) {
-  console.error(`\n${findings.length} declaration(s) off the scale:\n`);
-  for (const { site, detail } of findings) console.error(`  ${site} — ${detail}`);
-  console.error(`\nGive each one the nearest step: --t-micro 11px, --t-small 12px, --t-body 13px,`);
-  console.error(`--t-lead 15px, --t-title 18px; --s-1 2px, --s-2 4px, --s-3 6px, --s-4 8px, --s-5 12px,`);
-  console.error(`--s-6 16px, --s-7 24px; --track 0.08em.`);
-  console.error(`Do NOT add a step. If a surface looks wrong on the nearest one, the surface is wrong —`);
-  console.error(`see docs/design-system.md. A value that is off the scale ON PURPOSE goes in`);
-  console.error(`OFF_SCALE_ON_PURPOSE or TRACKING_ON_PURPOSE with its reason.`);
-  process.exit(1);
-}
-
-console.log(
-  `all ${fontSizes} font-size declarations are one of the ${TYPE_SCALE.length} type steps; all ${spaces} ` +
-    `space declarations are on the ${SPACE_SCALE.length}-step grid; all ${trackings} letter-spacings are ` +
-    `var(${TRACK}) or one of the ${TRACKING_ON_PURPOSE.size} named exceptions`,
-);
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();

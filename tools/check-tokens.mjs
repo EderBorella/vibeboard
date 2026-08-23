@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 //
-// THE PRIMITIVE LAYER, AND THREE CLAIMS ABOUT IT. Phase 1 of notes/atomic-revamp-plan.md, over
-// `web/src/design/*.css` — the geometry block and the three palettes, which were one file until this
+// THE PRIMITIVE LAYER, AND THREE CLAIMS ABOUT IT. Phase 1 of the atomic revamp — docs/design-system.md,
+// *The atomic revamp: the token set* — over `web/src/design/*.css` — the geometry block and the three palettes, which were one file until this
 // phase split them.
 //
 // Run it with: npm run check:tokens
@@ -52,8 +52,8 @@ const CORPUS = 'web/src';
 const FLOOR = { defs: 20, themes: 3 };
 
 // A NAME MAY BE DEFINED BEFORE ANYTHING READS IT, and this is where that is signed for: the phase that
-// spends it, so the row can be deleted by the commit that does. Every phase number is
-// notes/atomic-revamp-plan.md's.
+// spends it, so the row can be deleted by the commit that does. Every phase number is the ATOMIC REVAMP's
+// — docs/design-system.md, Part Five — and not Parts One to Four's, which number from 1 as well.
 // EMPTY, AND THAT IS THE ATOM PHASE PAYING ITS BILL. All eight rows that stood here — `--ctl-h`,
 // `--mark-h`, `--rule`, `--lift` and the four `--z-*` names — were signed for by Phase 4, and Phase 4
 // spent them: the two heights on Button, Chip, Control and the segmented group, the rule on twelve
@@ -324,7 +324,7 @@ if (failed) process.exit(1);
 
 // PRINTED IN FULL ON A PASSING RUN, because the vocabulary is the deliverable of this layer and a list
 // nobody sees is a list nobody keeps. Consumers first: it is the number every argument in
-// notes/atomic-revamp-plan.md §3 is made from.
+// docs/design-system.md's *The atomic revamp: the token set* is made from.
 console.log(`\nthe shared block — geometry, elevation and layers:`);
 for (const d of defs.filter((x) => x.scope === null)) {
   const n = refs.get(d.name)?.count ?? 0;

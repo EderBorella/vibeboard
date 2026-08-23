@@ -5,3 +5,10 @@
    copilot's space — it docks, it does not overlay. */
 .work-main { flex: 1; min-width: 0; display: flex; flex-direction: column; min-height: 0; }
 
+/* THE TWO-COLUMN FILE PANE — a list on the left, an editor on the right — and it is here because TWO
+   pages wear it: Project Control and the Explorer, which renders `class="control explorer"` and adds a
+   width. It was `pages/control/control.css`'s, so the Explorer read another page's class and the layer
+   gate reported it. Named `.control` after the first of the two rather than renamed: the rename costs both
+   call sites plus `test/work-area.test.tsx` and `visual/support/surfaces.ts`, which select on it. */
+.control { flex: 1; min-width: 0; display: flex; background: var(--wash); }
+

@@ -5,7 +5,8 @@
    screen. A caller that needs different dimensions passes its own class alongside. */
 .popover {
   position: absolute;
-  top: calc(100% + 0.5rem);
+  /* One step below the trigger. `0.5rem` until claim 4 of `npm run check:scale` arrived; the same 8px. */
+  top: calc(100% + var(--s-4));
   left: 0;
   z-index: var(--z-pop);
   width: max-content;
@@ -18,6 +19,21 @@
   text-align: left;
   letter-spacing: normal;
 }
+/* THE ANCHOR FOR ANY POPOVER. `position: relative` on a wrapper rather than on the button, so the panel
+   is positioned against the whole control and is not clipped by the button's own box. It was in
+   `organisms/topbar/topbar.css`, where `Popover.tsx` — a molecule — had to read a surface's class to get
+   it, which is the one direction the layer gate refuses outright.
+   NO `align-self`, AND THE DELETED DECLARATION IS WORTH RECORDING WITH ITS OWN DEFENCE. It was
+   `align-self: baseline`, on the reason that "the one in the top bar sits in a baseline-aligned row" plus
+   the claim that it "is harmless anywhere else, since align-self only means anything to a flex or grid
+   child". The first half is true and the second half stopped being true the moment a second surface had a
+   popover: `.ap-bar-row` is `align-items: center`, and every chip in it was a flex child overriding that
+   row's own alignment. Measured on the live board — the state chip sat 2.88px above the centre line and
+   the agent chip 1.88px, against 0.00 for every button beside them.
+   WITHOUT THE DECLARATION EACH WRAPPER TAKES ITS OWN ROW'S RULE: baseline in the top bar, which is what
+   the original reason wanted and gets by inheritance, and centre on the auto-pilot bar. */
+.pop-wrap { position: relative; display: inline-flex; flex: 0 0 auto; }
+
 /* The pointer, drawn as a rotated square so it inherits the panel's own background and border and
    cannot drift out of sync with the theme. */
 .popover::before {

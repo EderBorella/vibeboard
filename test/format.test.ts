@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatCost, isMoney } from '../web/src/format.js';
+import { formatCost, isMoney } from '../web/src/lib/format.js';
 
 describe('formatCost', () => {
   it('keeps four decimals for sub-cent runs, which is most of them', () => {

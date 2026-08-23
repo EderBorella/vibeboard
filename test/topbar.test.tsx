@@ -10,9 +10,9 @@ import {
   type LightState,
   type RecentFailure,
   type RefusalKind,
-} from '../web/src/app/connection-light.js';
-import type { MainTab } from '../web/src/app/TopBar.js';
-import { TopBar } from '../web/src/app/TopBar.js';
+} from '../web/src/organisms/topbar/connection-light.js';
+import type { MainTab } from '../web/src/organisms/topbar/TopBar.js';
+import { TopBar } from '../web/src/organisms/topbar/TopBar.js';
 import { STATE_TONES } from '../web/src/molecules/state-tones.js';
 
 afterEach(cleanup);

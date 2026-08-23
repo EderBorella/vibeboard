@@ -2,7 +2,7 @@
  * -----------------------------------------------
  * Each theme is a `:root[data-theme="<key>"] { … }` block of custom properties.
  * To ADD A THEME: copy a block below, rename the key, tweak the values, then add the same key to
- * THEMES in web/src/app/TopBar.tsx so it shows in the dropdown, and rebuild.
+ * THEMES in web/src/organisms/topbar/TopBar.tsx so it shows in the dropdown, and rebuild.
  *
  * Geometry, elevation and layers are NOT here — they are design/tokens.css, one definition for all
  * three themes. `npm run check:tokens` holds the line in both directions and also holds the one that

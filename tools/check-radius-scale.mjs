@@ -58,10 +58,11 @@ import { walk as walkFiles } from './lib/source.mjs';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const CORPUS = 'web/src';
 // The radius scale is geometry, so it lives in design/tokens.css rather than in design/themes.css —
-// the split Phase 1 of notes/atomic-revamp-plan.md made structural and `check:tokens` keeps.
+// the split the atomic revamp's Phase 1 made structural and `check:tokens` keeps. See
+// docs/design-system.md, *The atomic revamp: the radius scale*.
 const TOKENS_FILE = 'web/src/design/tokens.css';
 // FIFTEEN SHEETS AS OF THE ORGANISM LAYER, and the two that joined are `Modal`'s and `List`/`Row`'s.
-// `organisms/shared/` is the SHARED layer by construction — §2.4 of the plan puts three components there
+// `organisms/shared/` is the SHARED layer by construction — the atomic revamp puts three components there
 // "because ≥4 surfaces each built one by hand", and `check-layers.mjs` has read it as an OPEN layer since
 // the split. A `Row` rendered as a `<button>` declares a padding for the same reason a `Tabs` cell does:
 // nineteen surfaces stop doing it. `organisms/shared/shared.css` is NOT among them — it is the two
@@ -75,8 +76,10 @@ const TOKENS_FILE = 'web/src/design/tokens.css';
 // step and a height, which is exactly what this claim refuses OUTSIDE this layer: the whole point of the
 // merge is that six surfaces stop doing it.
 // LISTED AND NOT A DIRECTORY GLOB, twice over: `web/src/atoms/prose.css` is the markdown SURFACE, and
-// `web/src/molecules/inline-field.css` and `popover.css` hold surface rules of their own — a glob over
-// either directory would have excused them.
+// `web/src/molecules/popover.css` holds surface rules of its own — a glob over either directory would
+// have excused them. (`molecules/inline-field.css` stood in this sentence and has not existed since the
+// organism phase folded it into `field.css`; a gate naming a file nobody can open is a gate nobody
+// checks.)
 const ATOM_SHEETS = ['button', 'chip', 'control', 'readout', 'surface', 'text'].map((name) =>
   join('web', 'src', 'atoms', `${name}.css`),
 );
@@ -168,7 +171,8 @@ const OFF_SCALE_ON_PURPOSE = new Map([
 //                         overflow declarations said once for three molecules.
 // The refusal Phase 5b recorded here — "two consumers disagreeing on both of a primitive's decisions is a
 // primitive that would carry one variant each" — is REVERSED, and on evidence rather than taste: there
-// were never two consumers, there were SIX, and §8.1 of notes/atomic-revamp-plan.md is the argument.
+// were never two consumers, there were SIX. The argument is docs/design-system.md, *The atomic revamp:
+// `Tabs` and `Menu` overturn a twice-taken refusal*, which is written beside the refusal it reverses.
 // **0 AFTER THE ORGANISM LAYER**, and `.board-label` is what went. It was "a collapsible section heading
 // with a 3px accent left edge", and it is a `Row rail="accent" interactive` on a `Surface flat` now: the
 // rail is `--rule` × `--tone`, the padding is the variant's and the pointer is `.vb-row-hit`'s. What is

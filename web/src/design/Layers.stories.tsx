@@ -2,7 +2,8 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 
 // A STACKING ORDER IS THE ONE PRIMITIVE YOU CANNOT SEE IN A LIST. `Design/Tokens` prints 5 / 20 / 60 / 80
 // and four numbers in a column tell you nothing about whether the confirm dialog clears the modal it was
-// raised from — which is the exact path `notes/atomic-revamp-plan.md` §3.3 argues the four layers on, and
+// raised from — which is the exact path `docs/design-system.md` (*The atomic revamp: the four layers*)
+// argues the four layers on, and
 // the exact path `organisms/autopilot/halt.css` gets wrong today with a comment claiming the opposite
 // of its code.
 //

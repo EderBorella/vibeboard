@@ -21,9 +21,9 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { AutopilotState, Readiness, RunList, RunRecord, SandboxState } from '../web/src/api.js';
-import { LIGHT_STATES } from '../web/src/app/connection-light.js';
-import type { CopilotConfig } from '../web/src/shared.js';
+import type { AutopilotState, Readiness, RunList, RunRecord, SandboxState } from '../web/src/lib/api.js';
+import { LIGHT_STATES } from '../web/src/organisms/topbar/connection-light.js';
+import type { CopilotConfig } from '../web/src/lib/shared.js';
 
 const api = vi.hoisted(() => ({
   getReadiness: vi.fn(),
@@ -35,11 +35,11 @@ const api = vi.hoisted(() => ({
   cancelRun: vi.fn(),
   isSuccessReason: (reason: string) => reason === 'complete',
 }));
-vi.mock('../web/src/api.js', () => api);
+vi.mock('../web/src/lib/api.js', () => api);
 
-const { AutopilotBar } = await import('../web/src/autopilot/AutopilotBar.js');
-const { TopBar } = await import('../web/src/app/TopBar.js');
-const { CardReports } = await import('../web/src/runs/CardReports.js');
+const { AutopilotBar } = await import('../web/src/organisms/autopilot/AutopilotBar.js');
+const { TopBar } = await import('../web/src/organisms/topbar/TopBar.js');
+const { CardReports } = await import('../web/src/organisms/runs/CardReports.js');
 
 const COPILOT: CopilotConfig = { backend: 'claude-code', backends: {} };
 const NO_RUNS: RunList = { runs: [], active: [], queued: [] };

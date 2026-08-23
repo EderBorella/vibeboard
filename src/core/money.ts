@@ -7,7 +7,7 @@
 // in the same view said "$13.57 usage", because THAT number went through the web formatter. The same
 // amount, twice, differently, a line apart.
 //
-// THE RULE IS MIRRORED IN `web/src/format.ts`, deliberately and unavoidably: `web/` is bundler-resolved
+// THE RULE IS MIRRORED IN `web/src/lib/format.ts`, deliberately and unavoidably: `web/` is bundler-resolved
 // and `src/` is NodeNext with mandatory `.js` extensions, so neither side can import the other. The pair
 // is pinned by `test/mirror.test.ts` over a shared table of amounts — which is the only thing that stops
 // this becoming the third silent core↔web divergence in this codebase.

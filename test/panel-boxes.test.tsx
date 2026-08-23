@@ -32,10 +32,10 @@
 import { cleanup, render } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { Surface } from '../web/src/atoms/Surface.js';
-import { BoardsView } from '../web/src/board/BoardsView.js';
+import { BoardsView } from '../web/src/organisms/board/BoardsView.js';
 import { Menu } from '../web/src/molecules/Menu.js';
 import { Modal } from '../web/src/organisms/shared/Modal.js';
-import type { BoardName, Card, ProjectConfig, ProjectSnapshot } from '../web/src/shared.js';
+import type { BoardName, Card, ProjectConfig, ProjectSnapshot } from '../web/src/lib/shared.js';
 // THE CASCADE RESOLVER IS SHARED with test/field-boxes.test.tsx — see test/css-box.tsx. Its own two
 // directions are asserted below, under *the cascade helper separates a state from the resting style*.
 import { box } from './css-box.js';

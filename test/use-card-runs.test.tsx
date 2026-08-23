@@ -3,10 +3,10 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const api = vi.hoisted(() => ({ listCardRuns: vi.fn() }));
-vi.mock('../web/src/api.js', () => api);
-vi.mock('../web/src/api', () => api);
+vi.mock('../web/src/lib/api.js', () => api);
+vi.mock('../web/src/lib/api', () => api);
 
-const { useCardRuns } = await import('../web/src/runs/useCardRuns.js');
+const { useCardRuns } = await import('../web/src/organisms/runs/useCardRuns.js');
 
 // The endpoint answers with the runs AND that card's ledger line, so the mock has to as well: a mock
 // keyed differently from the real thing tests a shape nothing serves.

@@ -8,7 +8,15 @@
 .explorer-list .vb-ctl { width: 100%; border-color: var(--accent); }
 .explorer-list .vb-ctl:focus { box-shadow: var(--glow); }
 .explorer-list > .vb-text-error { padding: var(--s-4) var(--s-6); }
-.explorer-head { position: sticky; top: -0.75rem; background: var(--wash); z-index: var(--z-chrome); padding-top: var(--s-1); }
+/* STICKS AT MINUS ONE STEP, and the negative is the point: the list's own `padding` puts 12px above the
+   first row, and a head that stuck at `top: 0` left that gap showing as a band of `--wash` above it while
+   the rows scrolled underneath. It was `-0.75rem` — the LAST hand-written length in the tree, and it
+   survived six phases of a sweep about hand-written lengths because `top` was in no gate. `npm run
+   check:scale`'s fourth claim is what closes that; the value is the same 12px. */
+.explorer-head {
+  position: sticky; top: calc(-1 * var(--s-5)); background: var(--wash);
+  z-index: var(--z-chrome); padding-top: var(--s-1);
+}
 /* `Surface`'s `flat` padding is symmetric, and the 2px this rule shaved off the right was not a
    decision anybody made. `gap` is layout and stays. */
 .explorer-item { gap: var(--s-2); }

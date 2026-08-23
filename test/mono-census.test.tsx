@@ -33,10 +33,10 @@ const api = vi.hoisted(() => ({
   getModelStatus: vi.fn().mockResolvedValue(null),
   listModels: vi.fn().mockResolvedValue([]),
 }));
-vi.mock('../web/src/api.js', () => api);
-vi.mock('../web/src/api', () => api);
+vi.mock('../web/src/lib/api.js', () => api);
+vi.mock('../web/src/lib/api', () => api);
 
-const { CopilotPanel } = await import('../web/src/copilot/CopilotPanel.js');
+const { CopilotPanel } = await import('../web/src/organisms/copilot/CopilotPanel.js');
 
 afterEach(cleanup);
 

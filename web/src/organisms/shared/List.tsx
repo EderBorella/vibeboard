@@ -22,8 +22,13 @@ import type { HTMLAttributes, ReactNode } from 'react';
 // `.control-list` keeps 16px because `pages/control/control.css` is imported after this sheet, and
 // `.gate-card .gate-list` keeps 6px because it has to outrank `.vb-list` from a sheet imported BEFORE it —
 // see `styles.ts`. That second one shipped dead. One declaration is the price; a silent 2px is not.
+// `'nav'` IS THE FOURTH TAG AND IT IS NOT A WIDENING FOR CONVENIENCE. `ControlFileList` renders the file
+// list as a `<nav>` — it is the page's navigation between files, and the element is the accessibility
+// claim — and with no `nav` here it hand-wrote `className="vb-list control-list"`, which is a caller
+// reaching past the component to its class. A component whose tag set cannot express a real call site
+// gets bypassed, and a bypassed component stops being where the shape is decided.
 interface Props extends Omit<HTMLAttributes<HTMLElement>, 'children' | 'className'> {
-  as?: 'div' | 'ul' | 'ol';
+  as?: 'div' | 'ul' | 'ol' | 'nav';
   className?: string;
   children?: ReactNode;
 }

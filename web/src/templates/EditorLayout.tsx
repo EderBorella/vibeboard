@@ -1,10 +1,11 @@
 import type { ReactNode } from 'react';
 import { Control } from '../atoms/Control';
 import { Readout } from '../atoms/Readout';
-import { renderMarkdown } from '../markdown';
+import { renderMarkdown } from '../lib/markdown';
 import { Tabs } from '../molecules/Tabs';
 
-// IT WAS `ui/EditorShell` AND IT WAS THE WRONG LAYER, which is §2.7 of the plan: a shared primitive
+// IT WAS `ui/EditorShell` AND IT WAS THE WRONG LAYER, which is the whole subject of the atomic revamp's
+// template layer (docs/design-system.md, *The atomic revamp: the layer tree*): a shared primitive
 // living in `ui/` that wrote FIVE of Project Control's own class names — `control-editor-head`,
 // `control-tabs`, `control-editor-actions`, `control-textarea`, `control-preview`. A shared thing
 // reaching into one feature's stylesheet is the exact inversion `npm run check:layers` exists to refuse,

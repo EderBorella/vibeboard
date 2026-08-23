@@ -2,9 +2,9 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { skillRel } from '../src/core/layout.js';
-import type { Skill } from '../web/src/api.js';
-import type { ProjectConfig } from '../web/src/shared.js';
-import { SkillEditor } from '../web/src/skills/SkillEditor.js';
+import type { Skill } from '../web/src/lib/api.js';
+import type { ProjectConfig } from '../web/src/lib/shared.js';
+import { SkillEditor } from '../web/src/organisms/skills/SkillEditor.js';
 
 afterEach(cleanup);
 

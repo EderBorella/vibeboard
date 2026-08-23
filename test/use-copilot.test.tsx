@@ -37,9 +37,9 @@ const h = vi.hoisted(() => {
   };
 });
 
-vi.mock('../web/src/ws.js', () => ({ useSharedWs: (bump: number) => h.get(bump) }));
+vi.mock('../web/src/lib/ws.js', () => ({ useSharedWs: (bump: number) => h.get(bump) }));
 
-import { useCopilot } from '../web/src/copilot/useCopilot.js';
+import { useCopilot } from '../web/src/organisms/copilot/useCopilot.js';
 
 const fake = h.get(0);
 

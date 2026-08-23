@@ -1,13 +1,6 @@
-.settings-section { font-family: var(--font-display); text-transform: uppercase; letter-spacing: var(--track); font-size: var(--t-small); color: var(--accent); margin-top: var(--s-3); border-bottom: 1px solid var(--border); padding-bottom: var(--s-2); }
-.settings-section:first-child { margin-top: 0; }
-/* A hint says how something works; this says what will be refused. Ochre rather than danger: nothing
-   is broken yet, and a save that is about to be rejected must not look like one that already failed. */
-/* Each blocker is a sentence naming what to change, so they are set as prose rather than as status
-   chips — there is nothing to scan, only something to read and do. */
-.blockers { list-style: none; display: flex; flex-direction: column; gap: var(--s-2); font-size: var(--t-small); }
-.blockers li { padding-left: var(--s-6); position: relative; color: var(--text); line-height: 1.5; }
-.blockers li::before { content: "→"; position: absolute; left: 0; color: var(--warn, var(--danger)); }
-.ready-ok { font-size: var(--t-small); color: var(--accent); }
+/* `.blockers` AND `.ready-ok` ARE IN `organisms/autopilot/autopilot.css`. Both were read from the
+   auto-pilot bar and its panel and from nowhere in Settings — a rule in this sheet that this surface
+   never named, which is two of the layer gate's cross-surface reads. */
 
 /* `.settings-row` AND ITS DESCENDANT RULE ARE GONE — a `Row` with `.vb-row-main` on each of the two
    fields, which is the shared name for "this cell takes the slack" that five families spelled five ways.

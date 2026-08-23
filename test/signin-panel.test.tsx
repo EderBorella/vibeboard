@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ConfirmRequest } from '../web/src/confirm/useConfirm.js';
+import type { ConfirmRequest } from '../web/src/lib/useConfirm.js';
 
 const STATE = {
   devices: [
@@ -29,8 +29,8 @@ const api = vi.hoisted(() => ({
   revokeDevice: vi.fn().mockResolvedValue(undefined),
   signOutEverything: vi.fn().mockResolvedValue({ ok: true }),
 }));
-vi.mock('../web/src/api.js', () => api);
-const { SignInPanel } = await import('../web/src/signin/SignInPanel.js');
+vi.mock('../web/src/lib/api.js', () => api);
+const { SignInPanel } = await import('../web/src/organisms/signin/SignInPanel.js');
 
 afterEach(cleanup);
 beforeEach(() => {
@@ -95,7 +95,7 @@ describe('this browser’s credential', () => {
   it('does not import the module that used to hold the token', async () => {
     // A `authToken` import here would mean the panel still expects a readable credential, and the
     // transport has come back. The module no longer exports one, so this is a real constraint.
-    const token = await import('../web/src/token.js');
+    const token = await import('../web/src/lib/token.js');
     expect(Object.keys(token)).not.toContain('authToken');
   });
 });

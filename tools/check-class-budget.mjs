@@ -4,9 +4,9 @@
 //
 //   1. Every one of them is referenced from web/src — literally, or through a class name composed at
 //      run time from a prefix and a value. BLOCKING at zero.
-//   2. How many there are, against a ratchet. BLOCKING on any increase. The target is 183.
-//   3. How many LAYOUT classes each surface names, against a per-surface ceiling of 4. REPORTING, and it
-//      is pointed at a backlog of fifteen surfaces — see PER_SURFACE below.
+//   2. How many there are, against a ratchet. BLOCKING on any increase. The target is 146.
+//   3. How many LAYOUT classes each surface names, against a per-surface ceiling of 4. A ratchet on the
+//      COUNT OF SURFACES over that ceiling — see PER_SURFACE below.
 //
 // A NAIVE IMPLEMENTATION OF CLAIM 1 DELETES LIVE CODE, and this is the check docs/design-system.md's
 // *Risks* section was written to stop being written badly. Classes are named nowhere as literals when
@@ -71,32 +71,25 @@ const PRIMITIVE_LAYER = [
   ),
 ];
 
-// THE RATCHET, and the number is what the tree holds today rather than what the plan wants. The sweep
-// took the union from 443 to this; the target is **183** and it is not reached.
+// THE RATCHET, and the number is what the tree holds today rather than what the plan wants. The sweep took
+// the union from 443 to this; the target is **146** and it is not reached. THE SEVEN-PHASE PROGRAMME ENDS
+// HERE, so this is the closing number and the shortfall is the owner's to rule on rather than a gate's to
+// hide. The derivation of 146, the gap, and where the gap sits are all in `CLASS_TARGET` below, and they
+// are written into `docs/design-system.md` as 183 was.
 //
-// WHERE THE REST IS, MEASURED AND STATED HERE RATHER THAN CITED. 307 today — the 13-sheet primitive layer
-// 60, the surfaces 261, 14 in both. THE ORGANISM PHASE WAS THE LAST ONE WITH A NAMED DELETION IN IT, so
-// this is the number the plan's own programme ends on, and the shortfall is the owner's to rule on rather
-// than a gate's to hide:
+// WHERE THE 259 SURFACE CLASSES LIVE, counted per directory rather than estimated: runs 35, board 32,
+// copilot 27, cards 25, autopilot 22, diary 17, execution 12, explorer 11, skills 10, control 9,
+// suggestions 8, gate 8, topbar 6, dock 3, signin 3, settings 2 — 230 across the sixteen feature
+// directories — plus `organisms/shared/` **41**, `templates/` 17 and the two sheets in an open directory
+// that are really surfaces (`atoms/prose.css`, `molecules/popover.css`). These do not sum to 259: 22
+// classes are shared then specialised and are counted in both columns.
 //
-//   The two targets ARE reconciled as of this commit and the answer is §5.3's **146** — 183's derivation
-//   is the one the plan withdraws by name; see `CLASS_TARGET` below for the term-by-term count and for
-//   where the 161 that remains actually sits. Nothing named in notes/atomic-revamp-plan.md accounts for
-//   it, which is the finding rather than a gap in the reading.
-//
-//   WHERE THE 261 SURFACE CLASSES ACTUALLY LIVE, counted per directory rather than estimated: cards 38,
-//   board 33, runs 29, copilot 27, diary 20, autopilot 19, control 13, templates 12, execution 11,
-//   explorer 11, skills 10, gate 9, suggestions 8, topbar 7, settings 5, signin 5, dock 3, and 26 in
-//   `organisms/shared/` (Modal 5, List/Row 5, the picker 12, the confirm 1, plus `.danger`, `.on`,
-//   `.picked`-shaped state words). §5.3's allowance is FOUR per surface, and the four largest hold 127
-//   between them. Every one of the four is a surface whose remaining classes are TYPE FACES and one-off
-//   POSITIONS rather than boxes — `.tile-title`, `.msg-user`, `.report-meta dd`, `.diary-kind` — which is
-//   a different category from the fourteen families §1.7 measured, and no phase of this plan has a
-//   programme for it. That is the finding, stated where the number is.
-// The pointer this paragraph used to carry was FALSE, which is why the number is inline now:
-// `docs/design-system.md`'s own "Phase 5" is an earlier and different phase, it still lists
-// `SegmentedControl` as live and it still reports 457 class selectors. That document is rewritten as the
-// work closes; until then the only number that is true is the one this gate prints.
+// `organisms/shared/` WENT FROM 26 TO 41 IN THIS PHASE AND THAT IS A REAL COST, stated where the number
+// is. Thirteen classes moved there to close `check:layers` — each one a shape two features wear, each one
+// named after whichever feature wrote it first. It buys the structural claim (a class lives in a directory
+// that says who may read it) and it does NOT buy a smaller number. The target wants ten there. Nine of the
+// thirteen are TYPE FACES, and the ruling that would actually collapse them — that a surface may not have
+// a type face of its own, so they become `Text` options — is the owner's, not a phase's.
 //
 // 183 WAS ITSELF WITHDRAWN — see CLASS_TARGET below, which is 146. What follows is why 183 replaced an
 // earlier 150, kept because it is the record of how a target gets derived from an uncounted term twice:
@@ -179,10 +172,24 @@ const PRIMITIVE_LAYER = [
 //   IN (10)   `.vb-modal` + four; `.vb-list` `.vb-row` `.vb-row-rail` `.vb-row-hit` `.vb-row-main`.
 // The renames in it net to zero: `.control-editor{,-head}` → `.vb-editor{,-head}` and `.control-textarea`
 // → `.vb-editor-body`, which is the template taking its own names off one feature's stylesheet.
-const CLASS_CEILING = 307;
-// THE TARGET IS 146. Two numbers stood in this tree for two phases — this constant said 183 and §5.3 of
-// the plan says 146 — and the gate PRINTED 183 at the developer, so the reconciliation is the gate's to
-// make. 146 wins because 183's derivation is the one that was withdrawn, by name: 183 = 17 surfaces × 8
+// 307 before TEMPLATES AND PAGES, 305 after it, and the arithmetic is 2 out against 0 in:
+//   OUT (2)   `.filed-text` — `font-size: var(--t-body); line-height: 1.5; color: var(--muted)`, which is
+//             `Text lead` declaration for declaration, at both of its call sites; and
+//             `.reports-forgive-error` — `flex-basis: 100%` (what the result line beside it already says)
+//             plus `color: var(--danger)`, which is `Text error`.
+//   IN (0)    nothing. Nineteen classes MOVED between sheets to take `check:layers` to zero, and a move is
+//             not a deletion: `.tag`, `.cv-link-btn`, `.control-{new,tag,empty}`, `.diary-empty`,
+//             `.filed-title`, `.settings-section`, `.signin-row{,-label}`, `.report-{chip,stop}` and
+//             `.reports-forgiven` to `organisms/shared/`; `.control` and `.gate{,-card,-preview}` to
+//             `templates/`; `.pop-wrap` to `molecules/popover.css`. `.vb-readout-block` became
+//             `.vb-figure-row`, which is a rename and nets to zero.
+// THE PHASE THAT WAS MEANT TO CLOSE THIS NUMBER MOVED FILES, NOT CLASSES, and that is worth stating
+// plainly rather than leaving to be inferred from a flat ratchet: the TREE and the COUNT are two
+// different claims, and only one of them was reachable by moving 115 files.
+const CLASS_CEILING = 305;
+// THE TARGET IS 146, and the derivation is in docs/design-system.md, *The atomic revamp: the class target
+// is 146*. Two numbers stood in this tree for two phases — this constant said 183 and the revamp said
+// 146 — and the gate PRINTED 183 at the developer, so the reconciliation was the gate's to make. 146 wins because 183's derivation is the one that was withdrawn, by name: 183 = 17 surfaces × 8
 // layout classes + 47 primitive classes, where the 8 is recorded as *"inherited from the plan and marked
 // as inherited"* — never measured against a surface built to it — and the 47 assumed the shared layer
 // stayed a six-primitive set rather than becoming a full atomic layer. The paragraph below that argues for
@@ -192,16 +199,31 @@ const CLASS_CEILING = 307;
 // Surface 5), molecules 26 (Field 4, Tabs 5, Menu 4, StatusChip 5, Popover 3, Notice 4, FigureRow 1),
 // shared organisms 10 (Modal 5, List/Row 5), globals 5, surface layout 76 (19 surfaces × 4).
 //
-// AND THE GAP IS 161, WHICH IS NOT A DELETION PROGRAMME ANY PHASE OF THE PLAN CARRIES. Measured against
-// the three terms this gate can see: the 13-sheet primitive layer is **60** against §5.3's 29 + 26 = 55;
-// `organisms/shared/` is **27** against its 10 (Modal 5 and List/Row 5 are exact — the other 17 are the
-// picker, the confirm and three state words, which are surfaces living in a shared directory); the 16
-// feature directories hold **249** against its 76. So the whole shortfall is the surface-layout term, and
-// the remainder is type faces and one-off positions rather than boxes — `.tile-title`, `.msg-user`,
-// `.report-meta dd`, `.diary-kind`. Getting to 76 means either a shared "one-off position" vocabulary,
-// which `docs/design-system.md` refuses as a utility framework, or deciding that a surface may not have a
-// type face of its own, so those become `Text` options. That is the owner's ruling to make, and it is a
-// plannable change of the same kind as `Readout` losing its nine options — not a number a gate can hide.
+// AND THE GAP AT THE END OF THE SEVEN PHASES IS **159**, WHICH IS NOT A DELETION PROGRAMME ANY PHASE OF
+// THE PLAN CARRIED. Measured against the three terms this gate can see:
+//
+//   primitive layer      **60**  against 29 + 26 = 55   — essentially done; five over, and every one of
+//                                                         the five is a real option on a real component.
+//   organisms/shared/    **41**  against 10             — Modal 5 and List/Row 5 are EXACT. The other 31
+//                                                         are the picker, the confirm, three state words
+//                                                         and the thirteen this phase moved in: surfaces
+//                                                         living in a shared directory because two
+//                                                         surfaces each render them.
+//   16 feature dirs     **230**  against 19 × 4 = 76    — the whole shortfall, 154 of the 159.
+//
+// SO THE GAP IS ONE TERM AND ITS CHARACTER IS KNOWN: **type faces and one-off positions, not boxes.**
+// `.tile-title`, `.msg-user`, `.report-meta dd`, `.diary-kind`, `.filed-state`, `.diary-kind`,
+// `.dispatch-title` — a surface deciding how ITS words are set. The fourteen big families measured were
+// drawing boxes and the six phases before this one took the boxes away; nothing in the plan addresses the
+// faces, and a phase that invented a programme for them would be deciding a design question.
+//
+// THE TWO WAYS TO 76, AND BOTH ARE THE OWNER'S CALL RATHER THAN A GATE'S:
+//   1. A shared "one-off position" vocabulary — which `docs/design-system.md` refuses by name as the
+//      utility framework this project exists without.
+//   2. A ruling that a surface may not have a type face of its own, so the ~150 face classes become
+//      options on `Text`. That is the same shape of change as `Readout` losing its nine options in the
+//      atom phase: plannable, measurable, and it changes how the app LOOKS in about a hundred places.
+// Neither is a number a gate can hide, and this gate's job is to have left it measured and located.
 const CLASS_TARGET = 146;
 
 // Anti-vacuity floor on the SELECTOR PARSER, not on the class count: a regex that stops matching reports
@@ -374,13 +396,15 @@ if (parserFault) {
   process.exit(1);
 }
 
-// CLAIM 3 — A PER-SURFACE CEILING, and it is what turns §5.3's 4-per-surface allowance from an estimate
+// CLAIM 3 — A PER-SURFACE CEILING, and it is what turns the 4-per-surface allowance from an estimate
 // into a claim. The 8-per-surface figure the old 183 rested on was never that: the plan records it as
 // "inherited from the plan and marked as inherited", never measured against a surface built to it.
 //
-// THE PER-SURFACE ZERO IS POINTED AT A BACKLOG OF FIFTEEN SURFACES — which is exactly the condition this
-// repository refuses to make blocking. It reaches zero when `organisms/cards` gets from 38 to 4, and its
-// remainder is type faces rather than boxes, so that is not a commit anybody can write today.
+// THE PER-SURFACE ZERO IS POINTED AT A BACKLOG OF THIRTEEN SURFACES — which is exactly the condition this
+// repository refuses to make blocking. It reaches zero when `organisms/runs` gets from 35 to 4, and its
+// remainder is type faces rather than boxes, so that is not a commit anybody can write today. Fifteen
+// before this phase and thirteen after it: `organisms/settings` (2) and `organisms/signin` (3) came inside
+// the allowance, because what they held was two other surfaces' shapes.
 //
 // SO THE CLAIM IS A RATCHET ON THE COUNT OF OVER-BUDGET SURFACES, and it is the second thing this arm
 // lacked. As shipped it set `failed` from nothing at all: the plan's own planted defect — a fifth layout
@@ -394,7 +418,7 @@ if (parserFault) {
 // is a selector the surface spends, so it counts — but it is why the per-surface figures are a proxy and
 // the ratchet is on the COUNT OF SURFACES over the line rather than on any one of them.
 const PER_SURFACE = 4;
-const OVER_BUDGET_CEILING = 15;
+const OVER_BUDGET_CEILING = 13;
 // The 16 feature directories under `organisms/` and `pages/`. `organisms/shared/` is the shared layer and
 // not a surface: its classes are `Modal`'s and `List`'s, which every surface spends. Counting them against
 // a 4-per-SURFACE allowance would be counting the primitives twice. Its own function so `selfTest` can go

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { activePane, type DockPane } from '../web/src/dock/panes.js';
+import { activePane, type DockPane } from '../web/src/organisms/dock/panes.js';
 
 const pane = (id: string): DockPane => ({ id, label: id, render: () => null });
 

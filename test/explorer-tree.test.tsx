@@ -1,13 +1,13 @@
 // @vitest-environment jsdom
 import { act, cleanup, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { DirListing, FsNode } from '../web/src/api.js';
+import type { DirListing, FsNode } from '../web/src/lib/api.js';
 
 const api = vi.hoisted(() => ({ listDir: vi.fn() }));
-vi.mock('../web/src/api.js', () => api);
-vi.mock('../web/src/api', () => api);
+vi.mock('../web/src/lib/api.js', () => api);
+vi.mock('../web/src/lib/api', () => api);
 
-const { flatten, useTree } = await import('../web/src/explorer/useTree.js');
+const { flatten, useTree } = await import('../web/src/organisms/explorer/useTree.js');
 
 const dir = (path: string, name = path.split('/').pop() ?? path): FsNode => ({
   path,

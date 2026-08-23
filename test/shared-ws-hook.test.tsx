@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { useSharedWs } from '../web/src/ws.js';
+import { useSharedWs } from '../web/src/lib/ws.js';
 import { stubBrowser } from './browser-stubs.js';
 
 // The module keeps ONE socket per `bump`, so the board and the copilot share it and switching

@@ -2,10 +2,11 @@
 // layer surface now, plus the primitive layer above them, and this is the only list of them that exists:
 // the app loads it, the Storybook preview loads it and `test/css-box.tsx` resolves boxes through it.
 //
-// 41 SHEETS WHERE THERE WERE 59, AND THAT IS THE §5.1 TREE FINALLY ARRIVING. The 47 parts the split
-// produced were an artefact of the BYTE-IDENTITY CONTIGUITY CONSTRAINT and never of the plan: a rule could
+// 41 SHEETS WHERE THERE WERE 59, AND THAT IS THE LAYER TREE FINALLY ARRIVING — docs/design-system.md,
+// *The atomic revamp: the layer tree*. The 47 parts the split
+// produced were an artefact of the BYTE-IDENTITY CONTIGUITY CONSTRAINT and never of the tree: a rule could
 // only leave `styles.css` at the byte position it already held, so a surface whose rules were scattered
-// across four sections became four files. §5.1 asks for one `.css` beside every component and every
+// across four sections became four files. The tree asks for one `.css` beside every component and every
 // organism directory, and twelve directories held two to five. They are merged here — each merged sheet
 // imported at the position its FIRST member's bytes held, so the order among the parts is unchanged and
 // only their position relative to other directories moves. Every directory is now at one sheet except the
@@ -63,7 +64,7 @@ import './atoms/readout.css';
 import './molecules/figure-row.css';
 import './atoms/text.css';
 // THE MOLECULE LAYER, at the byte position `ui/primitives.css` held. `molecules/field.css` ABSORBED
-// `molecules/inline-field.css` in this phase, which is the merge §4.1 argued for one layer down: `Field`
+// `molecules/inline-field.css` in this phase, which is the merge the molecule layer argued for: `Field`
 // took `InlineField` as an option and the two sheets stayed apart for a phase. The five `.cv-*` overrides
 // that file also held are the card view's and went with the card view. The move is upward in the cascade,
 // from after `design/reset.css` to before it, and it is safe by specificity rather than by luck: the only
@@ -75,6 +76,13 @@ import './molecules/tabs.css';
 import './molecules/menu.css';
 import './molecules/field.css';
 import './molecules/notice.css';
+// POPOVER JOINS THE MOLECULE GROUP, and until this phase it was three sheets down among the surfaces —
+// after `templates/app-shell.css` and `organisms/topbar/topbar.css`, where its bytes fell. It could not
+// move while `organisms/shared/list.css` sat below the surfaces: lifting the shared organisms above them
+// without lifting this would have put an ORGANISM above a MOLECULE, which is the layer order backwards.
+// The two moves are one move. Verified by an independent flip analysis rather than by reasoning: no
+// contending pair in the tree changes order — see the note on the shared organisms below.
+import './molecules/popover.css';
 
 // AFTER the primitives although it is a design file, and the reason is BYTES rather than cascade: the
 // UA control reset opened `styles.css`, and the phase that made this list a list may not move a rule.
@@ -83,31 +91,38 @@ import './molecules/notice.css';
 // not because this pair contends, but because the pair below it does: `ui/primitives.css` moved to the end
 // put a 15.5px span in a 14.0px flex row on all three themes.
 import './design/reset.css';
+// THE TWO SHARED ORGANISMS, ABOVE EVERY SURFACE SHEET — WHICH IS WHAT THE PARAGRAPH THAT USED TO STAND
+// HERE SAID WAS PHASE 7'S JOB. It was at `.modal-*`'s byte position, five surface sheets down
+// (`templates/app-shell.css`, `organisms/topbar/topbar.css`, `templates/work-area.css`,
+// `organisms/board/board.css`, `pages/gate/gate.css`), so an equal-specificity override of a `.vb-list` or
+// `.vb-row` property in those five LOST. One did: `.gate-list`'s 6px gap became 2px silently, and the
+// repair was a (0,2,0) selector bought to outrank a sheet that should never have been above it.
+//
+// IT WAS NOT MOVED IN THE ORGANISM PHASE ON PURPOSE, and the recorded reason was that doing so "would
+// invalidate the phase's 0-flipped-pairs proof". That reason does not survive this phase: the proof was
+// the instrument, not the goal, and it is re-run here OVER THIS REORDER. Measured, over all 508 rules:
+// **47 contending pairs** in the tree (equal specificity, a shared class token, a shared property), of
+// which **3 change relative order** and all three are the same false positive — `.vb-row-hit.active`
+// against `.switch-btn.active`, `.board-archive.active` and `.tag-chip.active`, which overlap ONLY on
+// `.active`, the app's one selection word. No element can carry two of those: `.vb-row-hit` is emitted
+// by `Row interactive` and nothing else, and the other three are on a `Button` and two `Chip`s.
+// **Excluding `.active` from the overlap, zero pairs flip.**
+//
+// `list.css` AFTER `atoms/surface.css` IS STILL LOAD-BEARING and is unchanged: the UA list reset in it is
+// keyed on the element for that reason — see that file. `shared.css` after `list.css` for the same reason
+// one layer up: `.signin-row` declares `display`, `align-items` and `gap` at `.vb-row`'s own specificity.
+import './organisms/shared/modal.css';
+import './organisms/shared/list.css';
+import './organisms/shared/shared.css';
 // `templates/globals.css` IS GONE INTO THIS FILE: it was one rule, `.empty`, and a one-rule sheet for a
 // class the shell owns is a file with nothing in it. `.control-blank` was that rule a second time, four
 // import lines away, and it is deleted rather than merged.
 import './templates/app-shell.css';
 import './organisms/topbar/topbar.css';
-import './molecules/popover.css';
 import './templates/work-area.css';
 import './organisms/board/board.css';
 import './pages/gate/gate.css';
-// THE TWO SHARED ORGANISMS, at `.modal-*`'s byte position — which is where the family they replace was.
-// `list.css` is here so that the surfaces which override a row land after it (`.explorer-item`'s gap,
-// `.dispatch-row`'s wrap, `.signin-row`'s rule, `.picked`'s rail colour, the diary's four kinds): an
-// override that lands before the thing it overrides is not an override. It sits AFTER `atoms/surface.css`,
-// which is why the UA list reset in it is keyed on the element — see that file.
-//
-// IT IS NOT ABOVE *EVERY* SURFACE SHEET, WHICH THIS PARAGRAPH USED TO CLAIM. Five come first —
-// `templates/app-shell.css`, `organisms/topbar/topbar.css`, `templates/work-area.css`,
-// `organisms/board/board.css` and `pages/gate/gate.css` — so an equal-specificity override of a `.vb-list`
-// or `.vb-row` property in those five LOSES. One did: `.gate-list`'s 6px gap became 2px silently. Until
-// Phase 7 straightens this order, a `.vb-list`/`.vb-row` override in those five sheets has to outrank the
-// shared rule rather than merely follow it.
-import './organisms/shared/modal.css';
-import './organisms/shared/list.css';
 import './organisms/settings/settings.css';
-import './organisms/shared/shared.css';
 import './organisms/copilot/copilot.css';
 import './organisms/cards/cards.css';
 import './organisms/diary/diary.css';

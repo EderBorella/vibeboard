@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { lightProps } from '../web/src/app/shell.js';
+import { lightProps } from '../web/src/templates/shell.js';
 
 // THE HOP THAT COULD NOT BE TESTED, and was measured to be untestable rather than assumed so.
 //

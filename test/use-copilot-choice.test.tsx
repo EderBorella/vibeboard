@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { act, renderHook } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import type { CopilotConfig } from '../web/src/shared.js';
-import { useCopilotChoice } from '../web/src/useCopilotChoice.js';
+import type { CopilotConfig } from '../web/src/lib/shared.js';
+import { useCopilotChoice } from '../web/src/lib/useCopilotChoice.js';
 
 const configured = (over: Partial<CopilotConfig> = {}): CopilotConfig =>
   ({

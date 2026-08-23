@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { DirListing, FileRead, FsNode } from '../web/src/api.js';
-import type { ProjectSnapshot } from '../web/src/shared.js';
+import type { DirListing, FileRead, FsNode } from '../web/src/lib/api.js';
+import type { ProjectSnapshot } from '../web/src/lib/shared.js';
 
 const api = vi.hoisted(() => ({
   listDir: vi.fn(),
@@ -14,10 +14,10 @@ const api = vi.hoisted(() => ({
   deleteFsTree: vi.fn(),
   moveFsNode: vi.fn(),
 }));
-vi.mock('../web/src/api.js', () => api);
-vi.mock('../web/src/api', () => api);
+vi.mock('../web/src/lib/api.js', () => api);
+vi.mock('../web/src/lib/api', () => api);
 
-const { ExplorerView } = await import('../web/src/explorer/ExplorerView.js');
+const { ExplorerView } = await import('../web/src/pages/explorer/ExplorerView.js');
 
 afterEach(cleanup);
 // A rejecting mock must be `...Once` here — see the note in explorer-tree.test.tsx.

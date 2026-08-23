@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { useDock } from '../web/src/dock/useDock.js';
+import { useDock } from '../web/src/organisms/dock/useDock.js';
 
 beforeEach(() => localStorage.clear());
 

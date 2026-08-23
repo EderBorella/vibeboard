@@ -2,8 +2,8 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { STOP_REASONS } from '../src/core/dispatch-gate.js';
-import type { AutopilotState, Readiness, RunList, SandboxState } from '../web/src/api.js';
-import type { CopilotConfig } from '../web/src/shared.js';
+import type { AutopilotState, Readiness, RunList, SandboxState } from '../web/src/lib/api.js';
+import type { CopilotConfig } from '../web/src/lib/shared.js';
 
 const api = vi.hoisted(() => ({
   getReadiness: vi.fn(),
@@ -15,9 +15,9 @@ const api = vi.hoisted(() => ({
   // Re-exported by the module under test's import of ../api, so the real one must be present.
   isSuccessReason: (reason: string) => reason === 'complete',
 }));
-vi.mock('../web/src/api.js', () => api);
+vi.mock('../web/src/lib/api.js', () => api);
 
-const { AutopilotBar } = await import('../web/src/autopilot/AutopilotBar.js');
+const { AutopilotBar } = await import('../web/src/organisms/autopilot/AutopilotBar.js');
 
 const IDLE: AutopilotState = { state: 'idle', iteration: 0 };
 // A real config block, both slots filled. Two backends and two remembered models, because a fixture

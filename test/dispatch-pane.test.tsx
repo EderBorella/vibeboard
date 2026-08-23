@@ -2,9 +2,9 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DOCS_DIR, RESOURCES_DIR, skillRel } from '../src/core/layout.js';
-import type { DispatchRequest, RunRecord, Skill } from '../web/src/api.js';
-import { DispatchPane } from '../web/src/runs/DispatchPane.js';
-import type { Card } from '../web/src/shared.js';
+import type { DispatchRequest, RunRecord, Skill } from '../web/src/lib/api.js';
+import { DispatchPane } from '../web/src/organisms/runs/DispatchPane.js';
+import type { Card } from '../web/src/lib/shared.js';
 
 const API = `${DOCS_DIR}/api.md`;
 const SPEC = `${RESOURCES_DIR}/spec.md`;

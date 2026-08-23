@@ -1,18 +1,36 @@
 # The design system, and how it lands in phases
 
-**Status: Part One (Phases 0–5) and Part Two's Phase 6 done (2026-08-21). The class count is 374 against a target of 183 — re-derived on
-2026-08-21 from the measured surface count, with the plan's *under 150* withdrawn as unreachable at its
-own allowance. What stands between 380 and 183 is measured under Phase 5b.** Phase 0 built the instrument and
-measured, touching no stylesheet; Phase 1 added the 17 tokens and nothing that consumes them; Phase 2
-collapsed the type and space values onto them, which is the first phase that changes rendering. This page is
-the argument and the sequence; the work is phased so each phase ships on its own and can be reverted on its
-own.
+**STATUS, AND WHAT THIS PAGE NOW IS.** Parts One to Four are the *scale-and-primitives* programme,
+Phases 0–14, all shipped 2026-08-21. **Part Five is the ATOMIC REVAMP, Phases 1–7, and it is the current
+state of the system.** The two programmes both number their phases from 1, so a bare "Phase 5" on this page
+is ambiguous by construction: **Parts One to Four's phase numbers are the OLD programme's**, and every
+reference to the atomic revamp names its part. A gate comment that cites "Phase 5" without saying which is
+a bug, and one has already been fixed for that reason.
+
+**The closing numbers, measured 2026-08-23 and not estimated:**
+
+| | at the start (2026-08-20) | now |
+|---|---|---|
+| class selectors | **457** | **305** |
+| stylesheets under `web/src/` | 2 (`styles.css` 116KB + `ui/primitives.css`) | **41**, one per component and per organism directory |
+| type steps | 27 authored sizes | **5** (`--t-display` retired) |
+| token definitions / names | 74 / 40 | **75 / 45** |
+| hand-written space, tracking and offset lengths | ~250 | **0** |
+| source gates | 5 | **10**, plus 4 typechecks |
+| cross-surface class reads | not measured | **0, blocking** |
+
+The class target is **146** and it is not reached; the gap is **159**, located term by term in
+*The atomic revamp: the class target is 146* below. Reading order if you are new: *What is actually wrong*,
+then *The system*, then **Part Five**. Parts One to Four are the record of how each number got where it is,
+and they are worth reading as argument rather than as description.
 
 ---
 
 ## What is actually wrong
 
-Measured against `web/src/styles.css` and `web/src/*.tsx` on 2026-08-20, not estimated:
+Measured against `web/src/styles.css` and `web/src/*.tsx` on 2026-08-20, not estimated. **These are the
+OPENING measurements and they are kept as such** — `styles.css` does not exist any more and the class count
+is 305; the table is the diagnosis this whole page answers, not a description of the tree:
 
 | Measurement | Value | What it means |
 |---|---|---|
@@ -154,8 +172,14 @@ component library that brings its own design language is refused for that reason
 --t-body     0.8125rem   13px   default UI text, card titles on the board
 --t-lead     0.9375rem   15px   panel headings, an open card's title
 --t-title    1.125rem    18px   surface titles
---t-display  1.5rem      24px   the one big number per surface
+--t-display  1.5rem      24px   RETIRED — see below
 ```
+
+**IT IS FIVE STEPS NOW, NOT SIX.** `--t-display` is deleted, and the argument is in *The atomic revamp: the
+token set*: it existed to carry "the one big number per surface", no number in the app was ever set in it,
+and its only consumer was `.markdown h1` — which has three steps below it to draw a heading ladder with.
+Everything below in this section is the six-step argument as it was made; the sixth step is the one thing
+in it that did not survive being measured against its consumers. `npm run check:scale` blocks at five.
 
 **Whole pixels at the 16px default base, deliberately.** Fractional rem values are what produced `10.88px`
 and `13.12px` in the incident above — two sizes nobody could name, so nobody could see they disagreed. A
@@ -236,7 +260,7 @@ hand many times over.
 | `Panel` **(built, Phase 4)** | board columns, drawers, the halt card, the nine full-bleed list rows | `flat` \| `raised`, optional header slot, `as` of `div`\|`section`\|`button` |
 | `Readout` **(built, Phase 5)** | the signature above: every duration, cost, token count, run id | inline (`Readout`, sizes `micro`\|`small`\|`body`\|`plain`, tones `muted`\|`accent`\|`accent2`\|`text`, `quiet`) \| block (`ReadoutLine`) |
 | `Field` **(built, Phase 5)** | settings inputs, the gate form, the skill editor, the dispatch pane — **not** `InlineField`, whose commit-on-blur is behaviour and stays where it is | label + control + hint + error, `layout` of `stack`\|`rail`\|`check`, plus `.vb-trigger` for the two select triggers |
-| `SegmentedControl` **(built, Phase 5b)** | `.mode-group` + `.backend-toggle` (byte-identical) and `.mode-btn` + `.bt-btn` (identical apart from one size step) | sizes `sm` \| `md`; the GROUP owns the one border and corner and clips its cells |
+| ~~`SegmentedControl`~~ **DELETED — it is `Tabs grouped`; see *The atomic revamp: `Tabs` and `Menu` overturn a twice-taken refusal*** | `.mode-group` + `.backend-toggle` (byte-identical) and `.mode-btn` + `.bt-btn` (identical apart from one size step) | sizes `sm` \| `md`; the GROUP owns the one border and corner and clips its cells |
 
 **Six was the plan's count and seven is the tree's, and the seventh was added by measurement rather
 than by design.** `SegmentedControl` exists because four classes were already one shape and the
@@ -295,7 +319,9 @@ rests on — and its hover ink is overridable, because a `✕` that deletes goes
 **`Field` is last and least urgent** — it has the fewest sites and the most bespoke behaviour (inline
 commit-on-blur editing). If the budget runs out, stopping before it leaves a coherent system.
 
-What these are **not**: they are local components in `web/src/ui/`, styled with the existing CSS variables.
+What these are **not**: they are local components — **in `web/src/atoms/`, `web/src/molecules/` and
+`web/src/organisms/shared/` now; `web/src/ui/` does not exist, see *The atomic revamp: the layer tree*** —
+styled with the existing CSS variables.
 No new dependency, no CSS-in-JS, no utility framework. The behaviour-only libraries (Radix, Base UI) were
 considered and are not needed for this: they solve complex widget behaviour — a menu, a combobox — and the
 gap measured here is a *visual* vocabulary, which they deliberately do not supply.
@@ -2458,7 +2484,7 @@ without the fix** — which is this phase's whole gate. The one that changes wha
 
 ### 1 — the board's primary control could not be operated without a mouse
 
-`web/src/board/CardTile.tsx` was a `<div className="tile">` with an `onClick`, no `tabIndex` and no
+`web/src/organisms/board/CardTile.tsx` was a `<div className="tile">` with an `onClick`, no `tabIndex` and no
 `onKeyDown`. Fourteen tiles on the owner's board and three on the harness fixture could not be reached or
 opened from the keyboard, and **none of them was in the focus gate's population at all** — which is why no
 check had ever said so: check 6 is a ratchet on a COUNT, and an element that is not focusable takes its own
@@ -2660,7 +2686,7 @@ drift compares the value SET. The set did not move in either phase. No other rec
 Execution and settings measurable, and `.archive-title` needing `.archive-item` to stop padding itself.
 Both remain as Phase 5b left them, with their measurements.
 
-**Revert:** `web/src/board/CardTile.tsx` (the role, label, `tabIndex` and `onKeyDown`), the `.cards-body`
+**Revert:** `web/src/organisms/board/CardTile.tsx` (the role, label, `tabIndex` and `onKeyDown`), the `.cards-body`
 flex column in `styles.css`, one line of `vitest.config.ts`, `RUN_TIME_TOKENS` and `paneBoxHeight` in
 `visual/support/audit.ts`, checks 5, 6 and 10 in `visual/checks/board.spec.ts`, the token block in
 `surfaces.spec.ts`, three baseline files, the at-rule reset and fixture in `tools/check-radius-scale.mjs`,
@@ -3375,10 +3401,10 @@ than raising a ceiling, which is what that rule is usually pointing at.
 
   | site | composes | classes it creates |
   |---|---|---|
-  | `web/src/autopilot/AutopilotBar.tsx:126` | `` `ap-agent-state ap-agent-${agent.tone}` `` | `ap-agent-ok` `-warn` `-bad` `-unknown` |
-  | `web/src/autopilot/AutopilotBar.tsx:130` | `` `ap-agent-dot ap-agent-dot-${agent.tone}` `` | `ap-agent-dot-ok` `-warn` `-bad` |
-  | `web/src/autopilot/AutopilotBar.tsx:253` | `` `ap-bar ap-bar-${model.tone}` `` | `ap-bar-running` `-halted` `-stopped` `-complete` |
-  | `web/src/autopilot/AutopilotBar.tsx:280` | `` `ap-dot ap-dot-${model.tone}` `` | `ap-dot-running` `-halted` `-complete` |
+  | `web/src/organisms/autopilot/AutopilotBar.tsx:126` | `` `ap-agent-state ap-agent-${agent.tone}` `` | `ap-agent-ok` `-warn` `-bad` `-unknown` |
+  | `web/src/organisms/autopilot/AutopilotBar.tsx:130` | `` `ap-agent-dot ap-agent-dot-${agent.tone}` `` | `ap-agent-dot-ok` `-warn` `-bad` |
+  | `web/src/organisms/autopilot/AutopilotBar.tsx:253` | `` `ap-bar ap-bar-${model.tone}` `` | `ap-bar-running` `-halted` `-stopped` `-complete` |
+  | `web/src/organisms/autopilot/AutopilotBar.tsx:280` | `` `ap-dot ap-dot-${model.tone}` `` | `ap-dot-running` `-halted` `-complete` |
 
   And the rest of the 36, for the same reason and by the same mechanism: `AutopilotBar.tsx:257`
   (`ap-transport-stop`), `app/TopBar.tsx:115` (`ap-running` `ap-halted` `ap-complete`),
@@ -3397,7 +3423,7 @@ than raising a ceiling, which is what that rule is usually pointing at.
   of dynamic prefixes with the composing `file:line` beside each — never a plain literal grep.** The
   allow-list is the cheaper of the two and the one that rots: it needs its own check that every prefix in
   it still has a composing call site, or it becomes a licence to keep dead classes.
-- **`web/src/shared.ts` is a deliberate hand-mirror** of `src/core/` types, guarded by a test. It is not
+- **`web/src/lib/shared.ts` is a deliberate hand-mirror** of `src/core/` types, guarded by a test. It is not
   to be "deduplicated" by any phase here.
 - **A phase that cannot show a clean gate does not ship.** Reverting one phase must not require unpicking
   another, which is why tokens are added before anything consumes them.
@@ -3412,3 +3438,261 @@ than raising a ceiling, which is what that rule is usually pointing at.
 - No new typeface and no webfont. The three font stacks in `themes.css` stay; the signature is a treatment
   of type already present, not a new face.
 - No behaviour change, no dark/light logic change, no fourth theme.
+
+---
+
+# Part Five — the atomic revamp, Phases 1–7
+
+**DONE 2026-08-23.** This part is the current state of the system. It carries the argument that used to live
+in a working document outside the repository, and it is here for one reason: **thirteen committed source
+comments cited that document by path, and it is gitignored — so every one of them was a dangling pointer in
+every clone.** `docs/README.md` states the rule and scoped it to `docs/`; the rule is the same for a gate.
+Those comments now cite the sections below by name.
+
+**Phase numbers in this part are the atomic revamp's, not Parts One to Four's.** They are a different
+programme with a different subject: the first fourteen phases put every *value* on a scale and built six
+primitives; these seven put every *class* in a layer and every component in a directory that says who may
+read it.
+
+## The atomic revamp: the token set
+
+**74 definitions and 40 distinct names before; 75 and 45 after.** The definition count is deliberately flat,
+and saying so plainly is the honest framing: **this was never a plan to have fewer tokens, it was a plan to
+have no hand-written values.** The ~250 hand-authored lengths, tracks, widths, shadows and layer numbers went
+to zero. Every family was tested against N−1 — could this name be deleted and its consumers absorbed by the
+name next to it — and four names failed their own test and went.
+
+**The four deletions.** `--scan` had zero consumers in three palettes. `--tile-gap` was `0.55rem` (8.8px), a
+token off its own scale, whose three consumers were all `var(--s-4)` (8px). `--on-accent` was an alias.
+`--t-display` is the one that needed an argument, because the six-step scale above is a recorded decision:
+the step exists to carry *"the one big number per surface"* and **no number in the app was ever set in it.**
+Its only consumer was a markdown `h1`, and the scale has three steps below it to draw a heading ladder with.
+Five steps at 11 / 12 / 13 / 15 / 18px, and the thinnest has four consumers.
+
+**Six names added, every one covering at least six declarations:** `--ctl-h` 28px (the height of every box
+you operate — a `--t-small` line box plus two `--s-3` plus two hairlines), `--mark-h` 16px (the height of
+every box you read — eleven heights existed and a badge could change a tab's), `--rule` 3px (an edge that
+carries meaning: eleven `border-left` rails, one role, split 6:5 between 3px and 2px by nothing at all),
+`--track` 0.08em (34 declarations, 12 values, three real decisions), `--lift` (four shadows and seven blur
+radii saying one thing), and the four `--z-*` layers.
+
+**`npm run check:tokens` is what holds it**: every property defined is referenced or signed for with the
+phase that spends it, every property defined in one `[data-theme]` block is defined in all three, and the
+shared block defines no colour while the theme blocks define no geometry. It exists because `--scan` sat in
+three palettes with no consumer for three palettes' worth of history, and because `--warn` was referenced by
+`styles.css` and defined by NO theme, so every theme fell through to a hardcoded dark-ground fallback and
+the light one wore it.
+
+## The atomic revamp: the space scale
+
+Seven steps — 2 4 6 8 12 16 24px — and **after Phase 3 every step has at least ten consumers**, drawn from
+176 hand-written lengths. The two credible merges both fail: `--s-6`/`--s-7` because a section gap equal to
+a panel's inner padding deletes the hierarchy between "inside this box" and "between these boxes", and
+dropping `--s-1` sends a ten-declaration hairline cluster (`0.1rem`, `0.05rem`) to 4px, which is 2.5× on a
+hairline.
+
+`npm run check:scale` makes four claims, all blocking at zero: every authored `font-size` is one of the five
+type steps; every `gap`, `padding` and `margin` value is on the seven-step grid; every `letter-spacing` is
+`var(--track)`, `normal` or a named exception; and — added in Phase 7 — **every `top`, `right`, `bottom`,
+`left` and `inset` is on the same grid.** That fourth claim closed the last hand-written length in the tree:
+`.explorer-head { top: -0.75rem }` survived six phases of a sweep about hand-written lengths because `top`
+was in no gate at all, not this one, not `check:box-scale`, and not the browser harness, which measures
+computed boxes and not offsets. An offset is a space value; there is no reason for it to be on a different
+grid. The one thing it allows that the space claim does not is a percentage inside a `calc()` —
+`top: calc(100% + var(--s-2))` is how a panel hangs under its trigger — and the one exception is the
+popover's pointer, whose two offsets are a *drawing* (an 8px square rotated 45°) rather than a rhythm.
+
+## The atomic revamp: the radius scale
+
+**Four values plus `50%`, and both gates stay blocking at zero.** `--r-sm` 4px, `--r-md` 6px, `--r-lg` 10px,
+`--r-pill` 999px. `--r-sm`'s four consumers are the chip, the two chat-bubble tail corners and
+`.markdown code`; merging it into `--r-md` puts a 6px corner on a 16px chip — 37% of its height, which reads
+as a failed pill and collides with `pill`, and it flattens the bubble's tail. `50%` stays a **named
+exception** rather than becoming a token: it is a circle, and it cannot be expressed as a length without
+knowing the box width.
+
+`npm run check:radius-scale` carries a second and sharper claim beside the scale: **no class rendered on a
+`<button>`, a `<Button>` or a `Surface as="button"` may declare its own geometry outside the primitive
+layer.** That ratchet went 56 → **0/0**. Twice it was found blind to a tag — `<Row as="button">` in the
+organism phase — and both times a padding and a radius had exited 0 against a ceiling of zero, which is why
+its `TAGS` list is now the thing to check first when a geometry finding looks impossible.
+
+## The atomic revamp: the four layers
+
+`--z-chrome` 5, `--z-pop` 20, `--z-modal` 60, `--z-alert` 80, and N−1 fails on a real path: a confirm raised
+from inside the settings modal must clear the modal, so alert ≠ modal; a popover must clear sticky chrome, so
+pop ≠ chrome. The `20`/`21` adjacency that used to exist disappeared by construction — a menu and its
+backdrop both take `--z-pop` and DOM order decides, which is what should have decided all along. And it
+corrected a real defect: `.halt-backdrop`'s comment claimed it sat above the confirm dialog while the code
+put it 20 below.
+
+**`Design/Layers` in Storybook is the acceptance surface**, and building it found five of twelve labels under
+4.5:1. `--danger` has no measured ink in the marshmallow theme (2.30:1), so it appears there as a `--rule`
+rail rather than as a ground; the worst pair on that page is now 6.88:1.
+
+## The atomic revamp: the boxes
+
+**Every box declares its own height, and there are two heights: 28px for what you operate and 16px for what
+you read.** `npm run check:box-scale` makes four claims over every `.css` under `web/src`, all blocking at
+zero: every authored `height`/`min-height` is `var(--ctl-h)`, `var(--mark-h)`, `var(--tile-h)`, `0`, `auto`,
+`100%`, a viewport unit or a named exception; every border WIDTH is `1px`, `var(--rule)` or `0`; every
+`box-shadow` is `var(--glow)`, `var(--lift)`, a comma-pair of the two, or `none`; and every `z-index` is one
+of the four `--z-*` names.
+
+It is a separate file from the radius gate for a structural reason worth keeping: that gate's second
+instrument is a ratchet on a CLASS COUNT, and a count cannot see a new property on a class it has already
+counted — `height: 30px` on an existing class moves no count. Its exception map is keyed on the SELECTOR
+rather than on the value, so each row is exercised by exactly one rule and a row no rule exercises is itself
+a finding.
+
+**The atom phase's headline is a warning about planted defects, not about boxes.** The working plan said that
+restoring `line-height: inherit` on `.vb-chip` would make the height claim exit 1 and called the plant "live
+today". It does not: with `height: var(--mark-h)` declared, line-height cannot move the box. Withdrawing the
+*height* is what fails it. Trusting the plan would have recorded the claim as proved on a probe that tests
+nothing — and four consecutive phases of that plan named plants that could not reach their claims.
+
+## The atomic revamp: the layer tree
+
+```
+web/src/
+  design/     tokens.css themes.css reset.css motion.css      — no components, no classes
+  atoms/      Button Chip Control Text Readout Surface        — .tsx + .css each, plus prose.css
+  molecules/  Field Tabs Menu StatusChip Popover Notice FigureRow + state-tones.ts
+  organisms/
+    shared/   Modal List Row, and the shapes more than one feature wears
+    board/ autopilot/ copilot/ dock/ runs/ cards/ control/ explorer/ diary/ skills/
+    suggestions/ settings/ signin/ topbar/
+  templates/  App WorkArea EditorLayout + app-shell.css work-area.css editor-layout.css
+  pages/      control/ execution/ explorer/ gate/ signin/
+  lib/        api/  the hooks  format.ts token.ts errors.ts markdown.tsx ws.ts
+    shared.ts THE HAND-MIRROR of src/core/ — never deduplicated, guarded by test/mirror.test.ts
+  main.tsx  styles.ts
+```
+
+**One `.css` beside every component and every organism directory**, imported by `web/src/styles.ts`, which is
+the single ordered list of all 41 sheets — the app loads it, the Storybook preview loads it, and
+`test/css-box.tsx` resolves boxes through it. A second copy of that order would drift silently, and a
+workbench showing a cascade the app does not have is worse than one showing nothing.
+
+**`npm run check:layers` is the claim the tree exists to make, and it blocks at zero on both halves:**
+
+1. A class defined under `atoms/`, `molecules/`, `organisms/shared/`, `templates/` or `design/` may be
+   referenced from anywhere. That is what a shared layer IS.
+2. A class defined under `organisms/<name>/` or `pages/<name>/` may be referenced only from `<name>`. A
+   surface's own class read by a second surface is either a shared shape wearing a private name, or a
+   coincidence waiting to be broken by whoever edits it.
+3. A class declared in two SCOPED directories and no open layer is an ORPHAN: it has no owner.
+
+**The scope is a surface NAME and not a path**, which is what makes `pages/control/` and
+`organisms/control/` one surface — they are one feature seen from two layers. It is also the half of the gate
+that was wrong for a phase: the reader took the first path segment, so once a component lived at
+`organisms/board/` its surface read as `organisms` and every scoped class in the tree became a finding. That
+was found by simulating the file move against the census before making it, which is the only reason it was
+not found as 231 findings.
+
+**44 cross-surface reads → 0.** Thirteen closed on the file move alone, with no rule touched. The other
+thirty-one were not a path problem and no file move could have closed them: two surfaces really do each
+render a card's tag, a filed suggestion, a signed-in browser, a panel section heading, a report chip.
+Thirteen classes moved to `organisms/shared/shared.css`, four to `templates/`, one to
+`molecules/popover.css`, twelve to whichever surface actually names them, and two were deleted as `Text`
+options. **That closes the structural claim and buys nothing on the count — see below.**
+
+## The atomic revamp: the class target is 146
+
+**183 is withdrawn and so is *under 150*.** 183 was 17 surfaces × 8 layout classes + 47 primitive classes,
+where the 8 is recorded in its own source as *"inherited from the plan and marked as inherited"* — never
+measured against a surface built to it — and the 47 assumed the shared layer stayed a six-primitive set
+rather than becoming a full atomic layer. Re-derived with every term counted:
+
+| term | count | how |
+|---|---|---|
+| atoms | **29** | Button 8, Chip 4, tones 5, Control 1, Text 5, Readout 1, Surface 5 |
+| molecules | **26** | Field 4, Tabs 5, Menu 4, StatusChip 5, Popover 3, Notice 4, FigureRow 1 |
+| shared organisms | **10** | Modal 5, List/Row 5 |
+| globals | **5** | the shell, the prose renderer |
+| surface layout | **76** | 19 surfaces × 4 |
+| **target** | **146** | |
+
+**The tree closes at 305, so the gap is 159, and it is ONE TERM.** Measured 2026-08-23:
+
+| | measured | target | over |
+|---|---|---|---|
+| the 13-sheet primitive layer | **60** | 55 | 5 — essentially done, and each of the five is a real option on a real component |
+| `organisms/shared/` | **41** | 10 | 31 — Modal 5 and List/Row 5 are EXACT; the rest are the picker, the confirm, three state words and the thirteen shapes two surfaces each wear |
+| the 16 feature directories | **230** | 76 | **154** |
+
+**And the character of the 154 is known: type faces and one-off positions, not boxes.** `.tile-title`,
+`.msg-user`, `.report-meta dd`, `.diary-kind`, `.filed-state`, `.dispatch-title` — a surface deciding how
+ITS words are set. The fourteen big families the first measurement found were drawing *boxes*, and six
+phases took the boxes away; nothing in the programme addressed the faces. There are two ways to 76 and
+**both are design decisions rather than gate work**:
+
+1. A shared "one-off position" vocabulary — which is the utility framework this page refuses by name.
+2. **A ruling that a surface may not have a type face of its own**, so roughly 150 face classes become
+   options on `Text`. That is the same shape of change as `Readout` losing eight of its nine options: it is
+   plannable, it is measurable, and it changes how the app looks in about a hundred places.
+
+`npm run check:class-budget` holds the ratchet at 305 and prints the target beside it. **The ratchet is never
+raised.** It also holds a per-surface ceiling of four, as a ratchet on the COUNT of surfaces over it — 13
+today, down from 15 — because a blocking zero there is pointed at the same 154.
+
+## The atomic revamp: `Tabs` and `Menu` overturn a twice-taken refusal
+
+**This page refused a `Tabs` primitive twice** — once on three candidates, once on four, and *"refused
+harder"* the second time — and `test/panel-twenty.test.tsx` pinned the comparison table so the reasons could
+not rot. The argument was: **four answers to the face, four to the selected state.**
+
+**That argument is inverted by the direction the revamp is written under. Six surfaces disagreeing about
+what a selected cell looks like IS the defect**; it is not evidence that they are six different things. Six
+families became two components and seven classes.
+
+**What was given up is real and is listed here rather than discovered later:** the top row lost its accent
+glow, the dock's tabs lost their uppercase and tracking, and the open-card tabs lost the selected treatment
+that coloured their child's ink instead of their own. `Audit/Tab inventory` in Storybook exists so those
+three are visible beside their replacements.
+
+**The refusal was half right, and that half is `Menu`.** Its strongest case was that the top row is not the
+same object as the others — and it is not: it changes the whole screen rather than a region of it. Collapsing
+all six into one component would have flattened a real distinction to win a class. Two components keep it and
+cost four classes over the one-component version. **When `test/panel-twenty.test.tsx` was updated, its tab
+table was not deleted** — it is the record of what the six faces were, with this section cited beside it.
+Deleting a rule must not delete its reason.
+
+## The atomic revamp: the figure row
+
+`.vb-figure-row` — a line of figures, `display: flex`, wrapping, `align-items: baseline`. **It was
+`.vb-readout-block` until Phase 7**, in the readout atom's sheet, which is a molecule's class in an atom's
+file; the molecule phase moved the rule and deferred the rename because this page argued the row BY NAME in
+seven places and a rename with its argument left behind strands all seven. Both landed in the same commit.
+Historical phase records above keep the old name deliberately: that is what the class was called then.
+
+`baseline` and not `center`, for the top bar's reason: the parts are text at two sizes, and centring line
+boxes of different sizes puts their baselines at different heights.
+
+**Two findings about it are still open and are still reported by the browser harness:** two wrapped rows on
+the Project Log, *"4 children span 33.0px, tallest is 15.5px"*. The rule permits the wrap and the surfaces
+give it 266px, and a wrapped figure row is a column of figures that does not align — which is the one thing
+the row exists to claim. The diary's own `.diary-about` stays a row because it has 408px.
+
+## The atomic revamp: the seven phases, and what each one actually proved
+
+| # | phase | what shipped | the headline |
+|---|---|---|---|
+| 1 | **Primitives** | `design/tokens.css` + `design/themes.css`; six names added, `--scan` deleted; `check:tokens` | **All five planted defects failed as required.** The dangerous repair of the self-test left **48/48 assertions passing while asserting nothing** |
+| 2 | **The split** | `styles.css` → 47 contiguous part files; `styles.ts` as the one manifest; `check:split` (temporary) + `check:layers` (reporting) | Byte-identity independently verified. **`check:split` was blind to the boundary between the 47 parts and the 3 sheets they override** — the one move the manifest says must not be made exited 0 |
+| 3 | **Scale** | 176 space atoms and 34 letter-spacings onto the scale; `check-type-scale` → `check:scale`, three blocking claims | **Two browser checks held a hardcoded `.toBe(6)` for the type-step count and ABORTED before the drift comparison** — so the NEW/GONE list the whole Tier 4 discipline depends on had never printed |
+| 4 | **Atoms** | `Button` `Chip` `Control` `Text` `Readout` `Surface`; `check:box-scale` | Every control 28px and every marker 16px, asserted and true. **The plan's own planted defects were dead** — see *the boxes* above |
+| 5 | **Molecules** | six tab/menu families → `Tabs` + `Menu`; `ui/primitives.css` dissolved into seven molecule sheets | Proved a pure move by an independent flip analysis: 552 → 539 rules, 231 → 209 contending pairs, **0 reordered**. Two functional regressions were unnamed by anybody: a selected chat session lost its rail AND its ink, and an inline edit slid 4px sideways on click |
+| 6 | **Organisms** | `Modal` (23 classes → 5), `List` + `Row` (~35 → 5); 59 sheets → 41; `check:layers` orphan claim blocking | **A throwing arm ate the drift list for the third time**: one crash in the audit took 45 of 51 failures with it, including the drift comparison. And a live contrast regression the app would have shipped — `--accent` on three settings spans at **4.00:1** in marshmallow — was hidden behind it |
+| 7 | **Templates & pages** | **115 files** into the tree; `check:layers` at **0, blocking**; `check:scale`'s offset claim; the class budget closes at **305** | The ordering hazard is closed rather than recorded: every arm of the overflow check is `expect.soft`, so a red arm can no longer hide the arms after it. **Three phases running, that is what ate the report** |
+
+**The gate set: four typechecks and ten source gates.** `check:citations`, `check:scale`,
+`check:radius-scale`, `check:box-scale`, `check:class-budget`, `check:shape-coverage`,
+`check:name-resolution`, `check:state-tones`, `check:tokens`, `check:layers`. `npm run check` runs all
+fourteen. Beside them: `npx --no-install vitest run`, and `npm run visual` — 102 browser checks × 3 themes
+plus a per-surface drift baseline that fails NEW and GONE symmetrically.
+
+**And the rule this programme has re-learned in six of its seven phases: a gate is not proved by passing.**
+It is proved by planting the defect it claims to catch, watching it fail, and restoring it. Seven gates in
+this repository have been shown worthless that way, and a plan's own named planted defects were dead for
+four consecutive phases. Distrust the green tick; earn it.

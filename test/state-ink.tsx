@@ -17,8 +17,9 @@ import { box } from './css-box.js';
 
 export const THEMES = ['cyberpunk', 'marshmallow', 'classic-dark'];
 
-// The palettes only. Geometry left this file for design/tokens.css in Phase 1 of
-// notes/atomic-revamp-plan.md, and a colour resolver has no business reading it.
+// The palettes only. Geometry left this file for design/tokens.css in the atomic revamp's Phase 1 — see
+// docs/design-system.md, *The atomic revamp: the token set* — and a colour resolver has no business
+// reading it.
 const THEMES_CSS = readFileSync(join(process.cwd(), 'web', 'src', 'design', 'themes.css'), 'utf8');
 
 // The palette a theme really has: `:root` carries the shared block and each `[data-theme=…]` overrides

@@ -1,22 +1,22 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { Accounting, RunRecord } from '../web/src/api.js';
+import type { Accounting, RunRecord } from '../web/src/lib/api.js';
 
 // The dashboard fetches the project's ledger on mount. Mocked here for two reasons: the arithmetic has
 // its own tests (accounting.test.ts) and does not need proving twice, and an unmocked fetch in jsdom
 // fails silently — which would leave every assertion below passing over a ledger that never rendered.
 const accounting = vi.hoisted(() => ({ current: null as Accounting | null }));
-vi.mock('../web/src/api.js', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../web/src/api.js')>()),
+vi.mock('../web/src/lib/api.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../web/src/lib/api.js')>()),
   getAccounting: async () => {
     if (!accounting.current) throw new Error('no ledger in this test');
     return accounting.current;
   },
 }));
 
-import { ExecutionView } from '../web/src/runs/ExecutionView.js';
-import type { Card } from '../web/src/shared.js';
+import { ExecutionView } from '../web/src/pages/execution/ExecutionView.js';
+import type { Card } from '../web/src/lib/shared.js';
 
 afterEach(cleanup);
 

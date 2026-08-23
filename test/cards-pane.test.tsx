@@ -12,13 +12,13 @@ const api = vi.hoisted(() => ({
   cancelRun: vi.fn(async () => ({ ok: true })),
   resolveRun: vi.fn(async () => ({ run: {} })),
 }));
-vi.mock('../web/src/api.js', () => api);
-vi.mock('../web/src/api', () => api);
+vi.mock('../web/src/lib/api.js', () => api);
+vi.mock('../web/src/lib/api', () => api);
 
-const { CardsPane } = await import('../web/src/cards/CardsPane.js');
+const { CardsPane } = await import('../web/src/organisms/cards/CardsPane.js');
 
-import type { CardRef } from '../web/src/dock/tabs.js';
-import type { Card, ProjectConfig } from '../web/src/shared.js';
+import type { CardRef } from '../web/src/organisms/dock/tabs.js';
+import type { Card, ProjectConfig } from '../web/src/lib/shared.js';
 
 afterEach(cleanup);
 

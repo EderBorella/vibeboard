@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { skillRel } from '../src/core/layout.js';
-import type { Skill } from '../web/src/api.js';
-import { skillsForCard } from '../web/src/skills/filter.js';
+import type { Skill } from '../web/src/lib/api.js';
+import { skillsForCard } from '../web/src/organisms/skills/filter.js';
 
 const skill = (over: Partial<Skill> = {}): Skill => ({
   slug: 's',

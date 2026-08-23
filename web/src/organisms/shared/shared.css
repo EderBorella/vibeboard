@@ -1,6 +1,7 @@
-/* THE TWO ORGANISMS IN THIS DIRECTORY THAT ARE `Modal`'S CALLERS rather than `Modal` itself: the confirm
- * dialog and the model picker. One sheet per surface (§5.1), and these are one surface's worth of layout
- * between them — 47 part files were the byte-identity contiguity constraint, not the tree.
+/* THE SHARED ORGANISM LAYER'S OWN SHEET: `Modal`'s two callers, and the thirteen shapes that more than
+ * one feature wears. One sheet per surface — docs/design-system.md, *The atomic revamp: the layer tree* —
+ * and these are one surface's worth of layout between
+ * them — 47 part files were the byte-identity contiguity constraint, not the tree.
  *
  * `.mp` WAS THE SECOND OF THE SEVEN MISFILED STRAYS, sitting at the head of the confirm dialog's sheet
  * because that is where its bytes fell in `styles.css`. It is the picker's anchor and it is with the
@@ -49,3 +50,83 @@
 .mp-pick-bot > .vb-readout { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mp-badges { flex: 0 0 auto; display: flex; align-items: center; gap: var(--s-2); font-size: var(--t-small); }
 .mp-empty { padding: var(--s-5) var(--s-4); }
+
+/* ---------- THIRTEEN SHAPES MORE THAN ONE FEATURE WEARS ----------
+ * THE LAYER GATE'S WHOLE REMAINING BACKLOG WAS THIS, and the remedy is the gate's own words: "move it to
+ * organisms/shared/, atoms/ or molecules/". Moving the components closed 13 of the 44 cross-surface reads
+ * outright — a class read only from the surface that owns it, once that surface's components live in its
+ * directory — and it could not close these, because no directory a component lives in makes two surfaces
+ * into one. Each of the thirteen is what the gate calls "a shared shape wearing a private name".
+ *
+ * THE NAMES ARE KEPT AND THE NAMES ARE WRONG. `.tag` is not the board's, `.filed-title` is not the diary's
+ * and `.signin-row` is not signing in's; each is named after whichever surface wrote it first. Renaming
+ * buys nothing any gate can see and costs every call site plus the tests that select on them. The
+ * correction that IS worth making is the one the class budget names: nine of the thirteen are TYPE FACES,
+ * and a type face belongs to `Text` rather than to a surface. That is the owner's ruling — see
+ * `CLASS_TARGET` in tools/check-class-budget.mjs, where the remaining gap is located term by term — and it
+ * is a larger change than moving a rule between two sheets. */
+
+/* A CARD'S TAG, on a tile (board) and in the card view (cards). `Chip pill neutral` owns the box and the
+   ink. The ground is the one thing a tag still decides: `--panel` is a shade off the `--panel-2` a tile is
+   drawn on, where `fill`'s `--panel-2` would make the tag disappear into the card. */
+.tag { background: var(--panel); }
+/* A LINK TO A CARD, in the card view's link list and in a run report. A `Surface` with the `flat` variant;
+   `width: fit-content` is the one thing left: a link is as wide as its text, unlike every other row here,
+   so the hover border traces the words rather than the column. */
+.cv-link-btn { width: fit-content; }
+.cv-link-btn:hover { border-color: var(--accent); }
+.cv-link-btn:hover .vb-clip { color: var(--accent); }
+/* A FILE LIST'S THREE MARKS, worn by Project Control's list and by the Explorer's tree. Accent at rest,
+   not on hover: a `＋` that creates is the affordance of the group head it sits in, and a muted one reads
+   as disabled. */
+.control-new { color: var(--accent); }
+/* A `Chip` with no `pill`, which is the square-ish corner the primitive defaults to. `--accent-2` is not
+   one of the five tones and must not be forced into one — themes.css gives it a different value from
+   `--warn` in marshmallow — so the ink stays here, as `.ap-chip`'s does. */
+.control-tag {
+  text-transform: uppercase; letter-spacing: var(--track); color: var(--accent-2);
+}
+.control-empty { padding: 0 var(--s-4); }
+/* AN EMPTY COLUMN, in the Project Log and in the dock's Suggestions pane. Not `.empty`: that one is
+   `margin: auto` centred furniture, and this is the first thing in a column that has an action under it. */
+.diary-empty {
+  display: flex; flex-direction: column; align-items: flex-start; gap: var(--s-4);
+  color: var(--muted); font-size: var(--t-lead); padding: var(--s-7) 0;
+}
+/* WHAT AN AGENT FILED, read in the Project Log's right-hand column and in the Suggestions pane. The body
+   line beside this was `.filed-text` and is DELETED: `font-size: var(--t-body); line-height: 1.5;
+   color: var(--muted)` is `Text lead` declaration for declaration, which is what both call sites render
+   now. This one is a step above that and is not any `Text` option. */
+.filed-title { font-size: var(--t-lead); line-height: 1.5; color: var(--text); }
+/* A SECTION HEADING INSIDE A PANEL — Settings' three, the auto-pilot panel's and the sign-in panel's. */
+.settings-section { font-family: var(--font-display); text-transform: uppercase; letter-spacing: var(--track); font-size: var(--t-small); color: var(--accent); margin-top: var(--s-3); border-bottom: 1px solid var(--border); padding-bottom: var(--s-2); }
+.settings-section:first-child { margin-top: 0; }
+/* ONE SIGNED-IN BROWSER, listed in Settings' diagnostics and in the sign-in panel. AFTER `list.css` in the
+   cascade and it has to be: `.vb-row` declares `display`, `align-items` and `gap` at the same (0,1,0). */
+.signin-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-5);
+  padding: var(--s-4) 0;
+  border-bottom: 1px solid var(--border);
+}
+.signin-row:last-of-type { border-bottom: none; }
+.signin-row-label { font-size: var(--t-body); word-break: break-all; }
+/* HOW A RUN ENDED, on a card's report row (runs) and on the execution page's run list. `report-stop` is a
+   `ghost` Button with the one colour the surface owns; the box, the quiet muted ink and the dashed border
+   are the variant's. */
+.report-chip {
+  flex: 0 0 auto;
+  text-transform: uppercase; letter-spacing: var(--track);
+}
+/* A run that has been dealt with is history: still readable, no longer shouting. Dimmed rather than
+   greyed — repainting the chip muted threw away the one thing it encodes, which is HOW the run ended. */
+.vb-row.resolved .report-chip { opacity: 0.6; }
+.report-stop { flex: 0 0 auto; }
+.report-stop:hover:not(:disabled) { color: var(--danger); border-color: var(--danger); }
+/* WHAT A FORGIVE CLEARED, reported by the card button (runs) and by the project one (autopilot). Its own
+   line in a wrapping row, which is what `flex-basis: 100%` is for.
+   `.reports-forgive-error` IS DELETED: it said this plus `color: var(--danger)`, which is `Text error` —
+   so the error line is a `Text error` wearing this class, and one shape is one class again. */
+.reports-forgiven { flex-basis: 100%; opacity: 0.85; }

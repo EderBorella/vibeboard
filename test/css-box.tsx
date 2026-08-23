@@ -34,7 +34,7 @@ const SHEETS = SHEET_ORDER.filter((f) => !TOKEN_FILES.includes(f)).map((f) =>
 // names: `--panel` is a different colour in each theme and the token IS the claim.
 //
 // BOTH FILES ARE READ, and reading only one is the trap this phase walked into deliberately. Phase 1 of
-// notes/atomic-revamp-plan.md split `themes.css` into design/tokens.css and design/themes.css, so a
+// the atomic revamp split `themes.css` into design/tokens.css and design/themes.css, so a
 // resolver pointed at the old name would still have found a file — one that now holds nothing but
 // colour — and every geometry `var()` would have stopped resolving. 121 assertions across seven files
 // compare a resolved box to an exact string, so they all go red in one run. (Phase 1's note said 88;

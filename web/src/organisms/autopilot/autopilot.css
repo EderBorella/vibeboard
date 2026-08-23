@@ -151,6 +151,18 @@
    ink, which is the part that distinguished a spent remedy from a busy one. */
 .ap-remedy-btn:disabled { color: var(--muted); }
 
+/* WHAT WILL BE REFUSED, and why it is not a hint: a hint says how something works, this says what a save
+   is about to be rejected for. Ochre rather than danger — nothing is broken yet. Each blocker is a
+   sentence naming what to change, so they are set as prose rather than as status chips: there is nothing
+   to scan, only something to read and do.
+   IT WAS IN `organisms/settings/settings.css` and Settings never named it. The readiness list is the
+   auto-pilot bar's and its panel's, which is what the layer gate's two findings on it said. */
+.blockers { list-style: none; display: flex; flex-direction: column; gap: var(--s-2); font-size: var(--t-small); }
+.blockers li { padding-left: var(--s-6); position: relative; color: var(--text); line-height: 1.5; }
+.blockers li::before { content: "→"; position: absolute; left: 0; color: var(--warn, var(--danger)); }
+/* The other side of the same answer: nothing is blocking. */
+.ready-ok { font-size: var(--t-small); color: var(--accent); }
+
 /* The emergency stop, on the bar. Quiet until hovered, then unmistakably dangerous: a control that is
    permanently red is one people stop reading, and this bar's whole job is to be read. The guard against
    pressing it by accident is the confirm dialog, which names what dies — not the styling. */

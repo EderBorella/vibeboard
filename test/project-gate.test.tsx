@@ -7,9 +7,9 @@ const api = vi.hoisted(() => ({
   openProject: vi.fn(),
   scaffoldProject: vi.fn().mockResolvedValue({ snapshot: {} }),
 }));
-vi.mock('../web/src/api.js', () => api);
+vi.mock('../web/src/lib/api.js', () => api);
 
-const { ProjectGate } = await import('../web/src/app/ProjectGate.js');
+const { ProjectGate } = await import('../web/src/pages/gate/ProjectGate.js');
 
 afterEach(() => {
   cleanup();

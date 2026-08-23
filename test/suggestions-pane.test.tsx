@@ -1,16 +1,16 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { Suggestion } from '../web/src/shared.js';
+import type { Suggestion } from '../web/src/lib/shared.js';
 
 // The pane fetches nothing itself: WorkArea holds the list, because the dock's BADGE needs the count
 // whether or not the pane is the one on screen. What the pane owns is the two actions, and those it
 // sends itself — so the api module is what is faked here.
 const api = vi.hoisted(() => ({ patchSuggestion: vi.fn(), cardSuggestion: vi.fn() }));
-vi.mock('../web/src/api.js', () => api);
-vi.mock('../web/src/api', () => api);
+vi.mock('../web/src/lib/api.js', () => api);
+vi.mock('../web/src/lib/api', () => api);
 
-const { SuggestionsPane } = await import('../web/src/suggestions/SuggestionsPane.js');
+const { SuggestionsPane } = await import('../web/src/organisms/suggestions/SuggestionsPane.js');
 
 afterEach(() => {
   cleanup();

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { errorText as serverErrorText } from '../src/server/errors.js';
-import { errorText as webErrorText } from '../web/src/errors.js';
+import { errorText as webErrorText } from '../web/src/lib/errors.js';
 
 // Two homes, because the two trees compile under different module resolutions. Asserted together so the
 // pair cannot drift into two answers for the same throw, which is the whole reason a shared helper was

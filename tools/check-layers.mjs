@@ -11,42 +11,43 @@
 //
 // Run it with: npm run check:layers
 //
-// HALF BLOCKING, AND THE HALF THAT IS NOT HAS A CEILING. The organism phase is where the whole gate was
-// meant to go blocking. It cannot: **44 cross-surface reads remain**, against 0 orphans, and a blocking
-// gate pointed at a backlog is a gate everybody learns to bypass. What is refused is a gate that is at zero
-// and still says nothing, and a backlog with no number on it:
+// FULLY BLOCKING, AT ZERO, AS OF THE COMMIT THAT MOVED THE TREE. Both claims. The organism phase could not
+// get here — it recorded **44 cross-surface reads** and ratcheted them, because a blocking gate pointed at a
+// backlog is a gate everybody learns to bypass — and it said exactly what would close them:
 //
-//   ORPHANS ARE AT ZERO AND THAT CLAIM NOW BLOCKS. It did not when this phase shipped it, and "it could
-//   block today" is what the file said — so `.zz-orphan` in two scoped directories printed `— ORPHAN` and
-//   exited 0. 23 split classes became 19, and all 19 are a shared class a surface specialises (`.vb-ctl`
-//   and eight surfaces saying where their own copy sits, `.vb-modal.ap-help`'s own measure), which has an
-//   owner. The seven that were genuine —
-//   `.push`, `.link-title`, `.raw-pane`, `.control-editor`, `.execution`, `.explorer-list`,
-//   `.suggestions-pane`, `.diary-about` — are gone.
+//   THE 44 WERE ONE FAULT, NOT 44: the STYLESHEETS were in the layer tree and the COMPONENTS were not.
+//   Phase 7 moved 115 files, and **13 of the 44 closed on the move alone with no rule touched** — a class
+//   read only by the surface that owns it, once that surface's components live in its directory. The eight
+//   `.exec-*` read from `runs/ExecutionView.tsx`, which the tree says IS `pages/Execution`, and the top
+//   bar's seven read from `app/TopBar.tsx`, which is a chrome organism, were 15 of them between them.
 //
-//   THE 44 ARE A RATCHET, blocking on an increase. Reporting-only with no ceiling made 45 as green as 44,
-//   which is how the plan's own planted defect (`.board-columns` read from `copilot/CopilotPanel.tsx`)
-//   exited 0.
+//   THE OTHER 31 WERE NOT A PATH PROBLEM AND NO FILE MOVE COULD HAVE CLOSED THEM: a shared shape wearing a
+//   private name. Two surfaces really do each render a card's tag, a filed suggestion, a signed-in browser,
+//   a panel section heading, a report chip. **Thirteen classes moved to `organisms/shared/shared.css`** —
+//   this gate's own prescription, and the comment at the head of that section says plainly which of them
+//   are candidates for an atom option instead, and that the move buys the structure and not the count.
+//   `.control` and the three `.gate*` went to `templates/` (a frame two PAGES wear IS a template),
+//   `.pop-wrap` to `molecules/popover.css` (the anchor belongs to the thing it anchors, and a MOLECULE was
+//   reading a surface's class, which is the one direction this gate refuses outright), the nine
+//   `.dispatch*` and `.blockers`/`.ready-ok` and `.report-dismiss` to the surface that actually names them,
+//   and two — `.filed-text` and `.reports-forgive-error` — were deleted as `Text` options.
 //
-//   THE 44 THAT REMAIN ARE ONE FAULT, NOT 44: the STYLESHEETS have moved into the §5.1 tree and the
-//   COMPONENTS have not. `pages/execution/execution.css` holds eight classes and every one of them is read
-//   from `web/src/runs/ExecutionView.tsx` — which §5.2 says IS `pages/Execution`. `organisms/topbar/`'s
-//   seven are read from `web/src/app/TopBar.tsx`, which §5.2 says is a chrome organism. Between them those
-//   two files account for 15 of the 44. Phase 7 moves the 67 `.tsx` and 61 `.ts` files, and this claim
-//   goes blocking in that commit — not because the count is inconvenient here, but because the thing that
-//   fixes it is a file move this phase's boundary does not contain.
+//   ORPHANS WERE ALREADY AT ZERO AND ALREADY BLOCKED. They did not block when the organism phase shipped
+//   the claim, and "it could block today" is what the file said — so `.zz-orphan` declared in two scoped
+//   directories printed `— ORPHAN` and exited 0. Every split in this tree includes the open layer, which is
+//   an owner: `.vb-ctl` and eight surfaces saying where their own copy sits, `.vb-modal.ap-help`'s own
+//   measure, `.gate` and `.gate-card` specialised by the page inside the frame.
 //
 // WHAT THIS PHASE DID FIX IS THE INSTRUMENT, and that was the larger of the two problems: 72 findings
 // became 44 by narrowing the READER (see below), and 28 of the 72 were a class name that happens to be an
 // ordinary English word. A gate whose report is 39% noise cannot be made blocking whatever the tree holds,
 // because nobody can tell which line to act on.
 //
-// THE SCOPE IS A SURFACE NAME AND NOT A PATH, and that is deliberate rather than sloppy: the stylesheets
-// moved into `organisms/<name>/` and `pages/<name>/` in this phase while the components that wear the
-// classes are still at `web/src/<name>/`. Comparing full paths would report every scoped class in the
-// tree as a violation — a number with no information in it — so `organisms/board/board.css` and
-// `web/src/board/CardTile.tsx` are read as the same surface, `board`. When the components move, the
-// comparison keeps meaning exactly what it means now.
+// THE SCOPE IS A SURFACE NAME AND NOT A PATH, and now that the components have moved it is one rule applied
+// on both sides — see `surfaceOf`, which was the other half of the fault. A name rather than a path is also
+// what makes `pages/<name>/` and `organisms/<name>/` ONE surface, which the tree needs:
+// `ProjectControl.tsx` is `pages/control/` and `ControlFileList.tsx` is `organisms/control/`, and they
+// share one stylesheet because they are one feature seen from two layers.
 //
 // A REFERENCE IS A CLASS NAME IN A `className` POSITION, and the paragraph that stood here said the
 // opposite. It claimed a reference was "counted GENEROUSLY, in the direction that UNDER-reports … an
@@ -103,10 +104,25 @@ export function scopeOf(file) {
   return path.slice(scoped.length).split('/')[0] ?? null;
 }
 
-// The surface a reference is made FROM: `web/src/board/CardTile.tsx` → `board`, and a loose file at the
-// root of the corpus → null, which matches no scope and so is always a finding rather than never one.
+// The surface a reference is made FROM, and it is `scopeOf`'s rule applied to a component rather than a
+// second rule: `organisms/board/CardTile.tsx` → `board`, `lib/markdown.tsx` → `lib`, `main.tsx` → null.
+//
+// IT READ THE FIRST PATH SEGMENT UNTIL THIS PHASE, and that was the other half of the fault. Once
+// `CardTile.tsx` lived at `organisms/board/` it reported the surface as `organisms`, so EVERY scoped class
+// in the tree became a finding — the organism phase's comment claimed "when the components move, the
+// comparison keeps meaning exactly what it means now", and it did not. Found by simulating the move
+// against this census before making it, which is the only reason it was not found as 231 findings.
+//
+// AN OPEN-LAYER FILE IS `null` AND THAT IS THE POINT, not an omission: an atom, a molecule or a template
+// that names a surface's class matches no scope, so it is ALWAYS a finding. `Popover.tsx` reaching for
+// `.pop-wrap` out of the top bar's sheet was exactly that, and it is the one direction of this fault that
+// is never a naming accident — a shared component cannot depend on a feature.
 export function surfaceOf(file) {
-  const parts = file.slice(`${CORPUS}/`.length).split('/');
+  const path = file.slice(`${CORPUS}/`.length);
+  if (OPEN.some((layer) => path.startsWith(layer))) return null;
+  const scoped = SCOPED.find((layer) => path.startsWith(layer));
+  if (scoped) return path.slice(scoped.length).split('/')[0] ?? null;
+  const parts = path.split('/');
   return parts.length > 1 ? parts[0] : null;
 }
 
@@ -200,8 +216,14 @@ function scopeSelfTest() {
   if (scopeOf(`${CORPUS}/pages/log/log.css`) !== 'log') return 'scopeOf: a page';
   if (scopeOf(`${CORPUS}/organisms/shared/modal.css`) !== null) return 'scopeOf: shared is not open';
   if (scopeOf(`${CORPUS}/molecules/popover.css`) !== null) return 'scopeOf: a molecule is not open';
-  if (surfaceOf(`${CORPUS}/board/CardTile.tsx`) !== 'board') return 'surfaceOf: a component';
-  if (surfaceOf(`${CORPUS}/markdown.tsx`) !== null) return 'surfaceOf: a loose file';
+  if (surfaceOf(`${CORPUS}/organisms/board/CardTile.tsx`) !== 'board') return 'surfaceOf: a component';
+  // BOTH HALVES OF THE PAIR, because the whole gate turns on the two functions agreeing. `pages/control/`
+  // and `organisms/control/` are ONE surface and a sheet in either is that surface's; an open-layer
+  // component is no surface at all, which is what makes a molecule reading a feature's class a finding.
+  if (surfaceOf(`${CORPUS}/pages/control/ProjectControl.tsx`) !== 'control') return 'surfaceOf: a page';
+  if (surfaceOf(`${CORPUS}/molecules/Popover.tsx`) !== null) return 'surfaceOf: a molecule is no surface';
+  if (surfaceOf(`${CORPUS}/lib/api/http.ts`) !== 'lib') return 'surfaceOf: lib is its own surface';
+  if (surfaceOf(`${CORPUS}/main.tsx`) !== null) return 'surfaceOf: a loose file';
   // THE PRELUDE CARRIES A CLASS TOKEN ON PURPOSE. With `@media (min-width: 1px)` this fixture could not
   // distinguish `shapedRules()` from no filter at all — a prelude with no dot in it reads as zero
   // definitions either way — and dropping the call was planted and passed here.
@@ -300,9 +322,9 @@ for (const { scope } of findings) perScope.set(scope, (perScope.get(scope) ?? 0)
 // THE SAME POPULATION `check:class-budget` COUNTS, so the floor is set against that number and not an
 // order of magnitude below it. 40 was: a planted `classesOf` narrowed to `/\.([a-z]+)/g` lost 244 of the
 // 307 classes in this tree — an 80%-blind parser — and walked straight past a floor of 40 while
-// `check:class-budget` and `check:name-resolution` both failed. 250 is 307 less the 57 Phase 7 may still
-// delete; the commit that takes the budget below 250 lowers this in the same commit, which is the ratchet
-// discipline every other number in this repository already follows.
+// `check:class-budget` and `check:name-resolution` both failed. **305 today**, and 250 is the floor: the
+// commit that takes the budget below 250 lowers this in the same commit, which is the ratchet discipline
+// every other number in this repository already follows.
 const PARSE_FLOOR = 250;
 if (owners.size < PARSE_FLOOR) {
   console.error(`\nonly ${owners.size} class(es) found across ${sheets.length} sheet(s), against a floor`);
@@ -334,21 +356,21 @@ for (const [cls, owner] of split) {
   );
 }
 
-// TWO CLAIMS, AND THEY ARE AT DIFFERENT PLACES. A cross-surface READ is a ratchet; a split across two
-// SCOPED directories is an ORPHAN and blocks at zero. A split that includes the open layer is neither —
-// see `orphaned`.
+// TWO CLAIMS, BOTH AT ZERO, BOTH BLOCKING. A cross-surface READ and a split across two SCOPED directories
+// with no open layer in it. A split that includes the open layer is neither — see `orphaned`.
 //
-// NEITHER IS REPORTING-ONLY ANY MORE, and that is the price of the reads not reaching zero in this phase.
-// A claim at zero that does not block is a gate switched off in place: `.zz-orphan` declared in both
-// `organisms/board/` and `organisms/cards/` was planted, PRINTED as an ORPHAN, and exited 0. And a ratchet
-// is what a backlog gets instead of nothing: the plan's own planted defect — `.board-columns` read from
-// `web/src/copilot/CopilotPanel.tsx` — also exited 0, because 45 reads were as green as 44.
+// THE CEILING IS ZERO AND IT IS NOT A RATCHET ANY MORE. It was 44 for one phase, on the rule this
+// repository follows and has broken: never point a blocking gate at a backlog, because a gate that must be
+// bypassed teaches everybody to ignore it. The backlog is gone, so the ceiling goes with it in the same
+// commit — which is the other half of that rule and the half that is usually forgotten.
 //
-// The reads go to zero, and this ceiling with them, in the commit that moves the 67 `.tsx` files. What
-// closes them is that file move and not a rule anybody can rewrite here. Do NOT widen the reader to make
-// the number look better — 28 of the 72 findings this gate used to report were a class name that happens
-// to be an ordinary word — and do NOT raise the ceiling: a cross-surface read added here is the fault.
-const CROSS_SURFACE_CEILING = 44;
+// DO NOT RAISE IT, and do not widen the reader to make a number look better: 28 of the 72 findings this
+// gate once reported were a class name that happens to be an ordinary English word, and narrowing the
+// reader is what made a blocking gate possible at all. A new cross-surface read has three honest answers
+// and they are in preference order: move the class to `atoms/` or `molecules/` as an option on a component
+// that already exists; move it to `organisms/shared/`; or move the READER into the surface that owns the
+// class. Adding a second copy under a second name is not one of them.
+const CROSS_SURFACE_CEILING = 0;
 let failed = false;
 
 if (orphans.length > 0) {
@@ -360,15 +382,15 @@ if (orphans.length > 0) {
 }
 if (findings.length > CROSS_SURFACE_CEILING) {
   console.error(
-    `\n${findings.length} cross-surface read(s), against a ceiling of ${CROSS_SURFACE_CEILING}. The` +
-      ` backlog is Phase 7's file move; an INCREASE is a new class of the fault and is refused here.`,
+    `\n${findings.length} cross-surface read(s), against zero. A surface's own class read by a second` +
+      ` surface is a shared shape wearing a private name. Make it an option on an atom or a molecule, or` +
+      ` move it to organisms/shared/, or move the reader into the surface that owns the class.`,
   );
   failed = true;
 }
 
 console.log(
-  `layer scope: ${findings.length}/${CROSS_SURFACE_CEILING} cross-surface read(s) — blocking on an ` +
-    `increase; ${orphans.length} orphan(s) — blocking at zero; ` +
-    `${split.length} class(es) shared then specialised`,
+  `layer scope: ${findings.length} cross-surface read(s) and ${orphans.length} orphan(s) — both ` +
+    `blocking at zero; ${split.length} class(es) shared then specialised`,
 );
 if (failed) process.exit(1);

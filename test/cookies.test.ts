@@ -104,8 +104,8 @@ describe('the name the client mirrors', () => {
   // web/ is a separate tsc project and cannot import from src/, so the hint's name is written down in
   // both. A mirror nobody checks is a mirror that drifts — and this one drifting means a browser that
   // signs in and then believes it did not, for ever.
-  it('is the same string in web/src/token.ts', () => {
-    const client = readFileSync(new URL('../web/src/token.ts', import.meta.url), 'utf8');
+  it('is the same string in web/src/lib/token.ts', () => {
+    const client = readFileSync(new URL('../web/src/lib/token.ts', import.meta.url), 'utf8');
     expect(client).toContain(`const HINT_COOKIE = '${HINT_COOKIE}';`);
   });
 });

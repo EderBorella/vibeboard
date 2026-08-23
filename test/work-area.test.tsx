@@ -38,13 +38,13 @@ const api = vi.hoisted(() => ({
   getRaw: vi.fn(async () => ''),
   putRaw: vi.fn(async () => undefined),
 }));
-vi.mock('../web/src/api.js', () => api);
-vi.mock('../web/src/api', () => api);
+vi.mock('../web/src/lib/api.js', () => api);
+vi.mock('../web/src/lib/api', () => api);
 
-const { WorkArea } = await import('../web/src/app/WorkArea.js');
+const { WorkArea } = await import('../web/src/templates/WorkArea.js');
 
-import type { MainTab } from '../web/src/app/TopBar.js';
-import type { BoardName, Card, ProjectConfig, ProjectSnapshot, Suggestion } from '../web/src/shared.js';
+import type { MainTab } from '../web/src/organisms/topbar/TopBar.js';
+import type { BoardName, Card, ProjectConfig, ProjectSnapshot, Suggestion } from '../web/src/lib/shared.js';
 
 afterEach(cleanup);
 

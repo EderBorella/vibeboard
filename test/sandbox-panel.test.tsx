@@ -7,11 +7,11 @@ const api = vi.hoisted(() => ({
   takeOverOpencodeServer: vi.fn().mockResolvedValue({ ok: true, url: 'http://127.0.0.1:2' }),
   rebuildBoxes: vi.fn().mockResolvedValue({ ok: true, removed: 2 }),
 }));
-vi.mock('../web/src/api.js', () => api);
+vi.mock('../web/src/lib/api.js', () => api);
 
-const { SandboxPanel } = await import('../web/src/settings/SandboxPanel.js');
+const { SandboxPanel } = await import('../web/src/organisms/settings/SandboxPanel.js');
 
-import type { SandboxState } from '../web/src/api.js';
+import type { SandboxState } from '../web/src/lib/api.js';
 
 afterEach(() => {
   cleanup();

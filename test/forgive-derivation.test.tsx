@@ -11,10 +11,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 // README might be too thin to derive from. Clearing them meant deleting files out of `project-runs/` by
 // hand: undiscoverable, and it destroys the only account of why the project was stuck.
 const api = vi.hoisted(() => ({ forgiveProjectAttempts: vi.fn(async () => ({ forgiven: 3 })) }));
-vi.mock('../web/src/api.js', () => api);
-vi.mock('../web/src/api', () => api);
+vi.mock('../web/src/lib/api.js', () => api);
+vi.mock('../web/src/lib/api', () => api);
 
-const { ForgiveDerivation } = await import('../web/src/autopilot/ForgiveDerivation.js');
+const { ForgiveDerivation } = await import('../web/src/organisms/autopilot/ForgiveDerivation.js');
 
 afterEach(() => {
   cleanup();

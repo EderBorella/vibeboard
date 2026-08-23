@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { BACKENDS, backendLabel, fmtK, relTime } from '../web/src/copilot/format.js';
+import { BACKENDS, backendLabel, fmtK, relTime } from '../web/src/organisms/copilot/format.js';
 
 afterEach(() => vi.useRealTimers());
 

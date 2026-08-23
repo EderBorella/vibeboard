@@ -35,13 +35,13 @@ const api = vi.hoisted(() => ({
   listModels: vi.fn(async () => []),
   getModelStatus: vi.fn(async () => ({ up: true })),
 }));
-vi.mock('../web/src/api.js', () => api);
-vi.mock('../web/src/api', () => api);
+vi.mock('../web/src/lib/api.js', () => api);
+vi.mock('../web/src/lib/api', () => api);
 
-const { ProjectControl } = await import('../web/src/control/ProjectControl.js');
-const { CopilotPanel } = await import('../web/src/copilot/CopilotPanel.js');
+const { ProjectControl } = await import('../web/src/pages/control/ProjectControl.js');
+const { CopilotPanel } = await import('../web/src/organisms/copilot/CopilotPanel.js');
 
-import type { ProjectConfig, ProjectSnapshot } from '../web/src/shared.js';
+import type { ProjectConfig, ProjectSnapshot } from '../web/src/lib/shared.js';
 
 afterEach(cleanup);
 

@@ -2,7 +2,7 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DOCS_DIR, POINTER_FILES } from '../src/core/layout.js';
-import { ControlFileEditor, type OpenFile } from '../web/src/control/ControlFileEditor.js';
+import { ControlFileEditor, type OpenFile } from '../web/src/organisms/control/ControlFileEditor.js';
 
 const [CLAUDE_MD] = POINTER_FILES;
 

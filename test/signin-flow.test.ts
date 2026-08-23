@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { ApiError, type SigninCollected } from '../web/src/api.js';
-import { POLL_LIMIT, runSignin, type SigninDeps, type SigninPhase } from '../web/src/signin/driver.js';
+import { ApiError, type SigninCollected } from '../web/src/lib/api.js';
+import { POLL_LIMIT, runSignin, type SigninDeps, type SigninPhase } from '../web/src/organisms/signin/driver.js';
 
 // The browser's half of signing in, driven directly. Its calls and its clock are injected, so the
 // whole flow is exercised without a DOM and without waiting two minutes for a TTL.
@@ -351,7 +351,7 @@ describe('what the driver never does', () => {
 // browser into "waiting for approval" — for a request nobody made, needing an approval nobody can give.
 describe('the once-per-page guard', () => {
   it('runs the flow a single time for two overlapping starts', async () => {
-    const { once } = await import('../web/src/useSignin.js');
+    const { once } = await import('../web/src/lib/useSignin.js');
     let started = 0;
     let settle: (v: boolean) => void = () => {};
     const run = (): Promise<boolean> => {
@@ -370,7 +370,7 @@ describe('the once-per-page guard', () => {
   });
 
   it('lets a later start run, so Try again works', async () => {
-    const { once } = await import('../web/src/useSignin.js');
+    const { once } = await import('../web/src/lib/useSignin.js');
     let started = 0;
     const run = async (): Promise<boolean> => {
       started += 1;
@@ -386,7 +386,7 @@ describe('the once-per-page guard', () => {
   // A rejected flow must clear the guard too, or one network failure would leave sign-in permanently
   // unable to start again for the life of the page.
   it('clears itself when the flow throws', async () => {
-    const { once } = await import('../web/src/useSignin.js');
+    const { once } = await import('../web/src/lib/useSignin.js');
     await expect(
       once(async () => {
         throw new Error('boom');

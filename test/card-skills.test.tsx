@@ -2,9 +2,9 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { skillRel } from '../src/core/layout.js';
-import type { InvalidSkill, Skill } from '../web/src/api.js';
-import type { Card } from '../web/src/shared.js';
-import { CardSkills } from '../web/src/skills/CardSkills.js';
+import type { InvalidSkill, Skill } from '../web/src/lib/api.js';
+import type { Card } from '../web/src/lib/shared.js';
+import { CardSkills } from '../web/src/organisms/skills/CardSkills.js';
 
 afterEach(cleanup);
 

@@ -309,7 +309,15 @@ test('3. nothing overflows', async ({ board, theme }) => {
   const clipped = styles.clipping.offenders.filter(
     (o) => (o.where.split(' > ').pop() ?? '') !== SCROLL_REGION,
   );
-  expect(
+  // SOFT, AND EVERY ARM IN THIS TEST FROM HERE DOWN IS. THREE PHASES RUNNING, A RED OR THROWING ARM ATE
+  // THE ARMS AFTER IT: Phase 3 with a hardcoded `.toBe(6)`, Phase 5 with `assertExamined`, Phase 6 with
+  // `pageClamped` crashing `auditStyles` and taking 45 of 51 failures — including the drift comparison —
+  // with it. Each time the report the discipline depends on was simply absent, and each time it looked
+  // like a smaller failure than it was. A hard `expect` here means the clamp floor below, and the
+  // document's own width AND HEIGHT below that, are conditional on this line being green — which is
+  // exactly the ordering hazard the organism phase recorded as still live. `expect.soft` records the
+  // failure and carries on, so a red run reports every arm and the test still fails.
+  expect.soft(
     clipped.map((o) => `${o.where} — ${o.detail}`),
     `boxes clipped by an ancestor that scrolls:\n${lines(styles.clipping.offenders)}`,
   ).toEqual([]);
@@ -325,8 +333,8 @@ test('3. nothing overflows', async ({ board, theme }) => {
   // `CLAMP_FLOOR` was unreachable inside the page and threw. At 40px against every ellipsised box it was
   // red on two legitimate labels in all three themes; against clipping boxes only it is zero, measured.
   report(theme, 'clamped', styles.clamped.examined, styles.clamped.offenders);
-  expect(styles.clamped.examined, 'no ellipsised box was examined at all').toBeGreaterThan(0);
-  expect(
+  expect.soft(styles.clamped.examined, 'no ellipsised box was examined at all').toBeGreaterThan(0);
+  expect.soft(
     styles.clamped.offenders.map((o) => `${o.where} — ${o.detail}`),
     `ellipsised boxes clipped below the readable floor:\n${lines(styles.clamped.offenders)}`,
   ).toEqual([]);
@@ -342,10 +350,12 @@ test('3. nothing overflows', async ({ board, theme }) => {
   for (const width of WIDTHS) {
     await board.setViewportSize({ width, height: 900 });
     const doc = await documentOverflow(board);
-    expect(doc.scrollWidth, `the document scrolls sideways at ${width}px`).toBeLessThanOrEqual(
+    expect.soft(doc.scrollWidth, `the document scrolls sideways at ${width}px`).toBeLessThanOrEqual(
       doc.clientWidth,
     );
-    expect(
+    // The arm that had never printed. It is LAST in the test and it is the one nobody has seen fail or
+    // pass under a red clamp; soft above is what makes reaching it unconditional.
+    expect.soft(
       doc.scrollHeight,
       `the app shell is taller than the viewport at ${width}px, and it does not scroll — ` +
         `${doc.scrollHeight}px of content in ${doc.clientHeight}px, so the difference is unreachable`,

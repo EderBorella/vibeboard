@@ -1,11 +1,11 @@
 // @vitest-environment jsdom
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { DiaryEntry } from '../web/src/api.js';
+import type { DiaryEntry } from '../web/src/lib/api.js';
 
 const api = vi.hoisted(() => ({ listDiary: vi.fn() }));
-vi.mock('../web/src/api.js', () => api);
-vi.mock('../web/src/api', () => api);
+vi.mock('../web/src/lib/api.js', () => api);
+vi.mock('../web/src/lib/api', () => api);
 
 // The shared socket, faked the way the REAL one is keyed: one object per `bump`, memoised. The first
 // version ignored its argument and returned a fresh literal per render, which un-gated two things at once —
@@ -47,10 +47,10 @@ const ws = vi.hoisted(() => {
     count: (bump: number) => (subscribers.get(bump) ?? new Set()).size,
   };
 });
-vi.mock('../web/src/ws.js', () => ({ useSharedWs: ws.useSharedWs }));
-vi.mock('../web/src/ws', () => ({ useSharedWs: ws.useSharedWs }));
+vi.mock('../web/src/lib/ws.js', () => ({ useSharedWs: ws.useSharedWs }));
+vi.mock('../web/src/lib/ws', () => ({ useSharedWs: ws.useSharedWs }));
 
-const { useDiary } = await import('../web/src/diary/useDiary.js');
+const { useDiary } = await import('../web/src/organisms/diary/useDiary.js');
 
 afterEach(() => {
   cleanup();

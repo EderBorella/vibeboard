@@ -22,12 +22,12 @@ export default {
   // process through the VIBEBOARD_CLAUDE_BIN shim, and with 19 concurrent runners a spawn can take
   // seconds to start. At a 5s run timeout that lost the race and failed the DRY RUN — before any
   // mutant existed — so the timeouts there are deliberately generous.
-  // - types.ts / web/src/shared.ts: type declarations. The src<->web mirror is guarded by
+  // - types.ts / web/src/lib/shared.ts: type declarations. The src<->web mirror is guarded by
   //   test/mirror.test.ts instead.
-  // - web/src/api.ts and all of web/src/api/ EXCEPT http.ts: the twenty-six test files that touch the
+  // - web/src/lib/api.ts and all of web/src/lib/api/ EXCEPT http.ts: the twenty-six test files that touch the
   //   feature modules mock the whole module, and the rest import only its types, so no mutant in them
   //   can be killed. Verified against Stryker's own FileMatcher after the split rather than assumed —
-  //   no pattern below reaches `web/src/api/`, which is the same trap the block above warns about
+  //   no pattern below reaches `web/src/lib/api/`, which is the same trap the block above warns about
   //   arriving through a split. http.ts is the exception and IS listed with the web block, because
   //   test/api-honesty.test.ts loads the real module and asserts on the chokepoint itself.
   // - the React components with no test — App, Board, Column, CardTile, ArchiveDrawer, the two
@@ -136,63 +136,63 @@ export default {
     // Web modules with their own tests. The shared helpers first: moving code out of a mutated file
     // into an unmutated one loses the coverage silently, and every one of these was extracted from
     // files already in this list.
-    'web/src/format.ts',
-    'web/src/errors.ts',
-    // The one network chokepoint, split out of web/src/api.ts and measurable for the first time:
+    'web/src/lib/format.ts',
+    'web/src/lib/errors.ts',
+    // The one network chokepoint, split out of web/src/lib/api.ts and measurable for the first time:
     // test/api-honesty.test.ts drives the real module through a stubbed fetch and pins the `res.ok`
     // check, the 401 rules and the 409 allowance. The feature modules around it stay excluded above.
-    'web/src/api/http.ts',
-    'web/src/useFetched.ts',
-    'web/src/useAction.ts',
-    'web/src/markdown.tsx',
-    'web/src/viewmodel.ts',
-    'web/src/ws.ts',
-    'web/src/dock/panes.ts',
-    'web/src/dock/tabs.ts',
-    'web/src/dock/useCardTabs.ts',
-    'web/src/dock/useDock.ts',
-    'web/src/skills/filter.ts',
-    'web/src/skills/useSkills.ts',
-    'web/src/runs/useCardRuns.ts',
-    'web/src/runs/useRuns.ts',
-    'web/src/runs/useDispatch.ts',
-    'web/src/runs/viewmodel.ts',
-    'web/src/runs/format.ts',
-    'web/src/confirm/useConfirm.tsx',
-    'web/src/confirm/requests.ts',
-    'web/src/copilot/choice.ts',
-    'web/src/copilot/format.ts',
-    'web/src/useSnapshot.ts',
-    'web/src/useLocalPrefs.ts',
-    'web/src/useCopilotChoice.ts',
-    'web/src/copilot/useCopilot.ts',
-    'web/src/cards/CardView.tsx',
-    'web/src/cards/CardLinks.tsx',
+    'web/src/lib/api/http.ts',
+    'web/src/lib/useFetched.ts',
+    'web/src/lib/useAction.ts',
+    'web/src/lib/markdown.tsx',
+    'web/src/lib/viewmodel.ts',
+    'web/src/lib/ws.ts',
+    'web/src/organisms/dock/panes.ts',
+    'web/src/organisms/dock/tabs.ts',
+    'web/src/organisms/dock/useCardTabs.ts',
+    'web/src/organisms/dock/useDock.ts',
+    'web/src/organisms/skills/filter.ts',
+    'web/src/organisms/skills/useSkills.ts',
+    'web/src/organisms/runs/useCardRuns.ts',
+    'web/src/organisms/runs/useRuns.ts',
+    'web/src/organisms/runs/useDispatch.ts',
+    'web/src/organisms/runs/viewmodel.ts',
+    'web/src/organisms/runs/format.ts',
+    'web/src/lib/useConfirm.tsx',
+    'web/src/organisms/shared/requests.ts',
+    'web/src/organisms/copilot/choice.ts',
+    'web/src/organisms/copilot/format.ts',
+    'web/src/lib/useSnapshot.ts',
+    'web/src/lib/useLocalPrefs.ts',
+    'web/src/lib/useCopilotChoice.ts',
+    'web/src/organisms/copilot/useCopilot.ts',
+    'web/src/organisms/cards/CardView.tsx',
+    'web/src/organisms/cards/CardLinks.tsx',
     'web/src/molecules/Field.tsx',
-    'web/src/cards/LinkPicker.tsx',
-    'web/src/cards/RawPane.tsx',
-    'web/src/cards/CardsPane.tsx',
-    'web/src/cards/CardsBody.tsx',
-    'web/src/board/BoardsView.tsx',
-    'web/src/app/WorkArea.tsx',
-    'web/src/runs/ActiveReport.tsx',
-    'web/src/skills/CardSkills.tsx',
-    'web/src/runs/DispatchPane.tsx',
-    'web/src/runs/CardReports.tsx',
-    'web/src/cards/CardTabs.tsx',
-    'web/src/runs/ReportPane.tsx',
-    'web/src/runs/ReportOptions.tsx',
-    'web/src/runs/ExecutionView.tsx',
-    'web/src/skills/SkillEditor.tsx',
-    'web/src/dock/UtilityDock.tsx',
+    'web/src/organisms/cards/LinkPicker.tsx',
+    'web/src/organisms/cards/RawPane.tsx',
+    'web/src/organisms/cards/CardsPane.tsx',
+    'web/src/organisms/cards/CardsBody.tsx',
+    'web/src/organisms/board/BoardsView.tsx',
+    'web/src/templates/WorkArea.tsx',
+    'web/src/organisms/runs/ActiveReport.tsx',
+    'web/src/organisms/skills/CardSkills.tsx',
+    'web/src/organisms/runs/DispatchPane.tsx',
+    'web/src/organisms/runs/CardReports.tsx',
+    'web/src/organisms/cards/CardTabs.tsx',
+    'web/src/organisms/runs/ReportPane.tsx',
+    'web/src/organisms/runs/ReportOptions.tsx',
+    'web/src/pages/execution/ExecutionView.tsx',
+    'web/src/organisms/skills/SkillEditor.tsx',
+    'web/src/organisms/dock/UtilityDock.tsx',
     // ModelPicker.tsx is deliberately NOT here. Its decision logic — which models to show and in
     // what order — was lifted into model-filter.ts, which IS measured; what is left is a modal of
     // chips, and its residue was 85 unreached JSX string and attribute mutants. Owner's ruling
     // (2026-07-27): test the small shells, exclude this one and say why.
-    'web/src/models/model-filter.ts',
-    'web/src/models/model-format.ts',
-    'web/src/board/TagFilter.tsx',
-    'web/src/app/TopBar.tsx',
+    'web/src/organisms/shared/model-filter.ts',
+    'web/src/organisms/shared/model-format.ts',
+    'web/src/organisms/board/TagFilter.tsx',
+    'web/src/organisms/topbar/TopBar.tsx',
   ],
 
   // perTest runs only the tests that actually cover each mutant, which is what keeps this in

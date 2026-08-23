@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { clampToCaps, isOverridden, resolveChoice } from '../web/src/copilot/choice.js';
+import { clampToCaps, isOverridden, resolveChoice } from '../web/src/organisms/copilot/choice.js';
 
 const configured = {
   backend: 'claude-code',

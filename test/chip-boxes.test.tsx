@@ -31,9 +31,9 @@ import { cleanup, render } from '@testing-library/react';
 import type { ComponentProps } from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { Chip } from '../web/src/atoms/Chip.js';
-import { CardTile } from '../web/src/board/CardTile.js';
+import { CardTile } from '../web/src/organisms/board/CardTile.js';
 import { Menu } from '../web/src/molecules/Menu.js';
-import type { Card } from '../web/src/shared.js';
+import type { Card } from '../web/src/lib/shared.js';
 import { box } from './css-box.js';
 import { inkIn, inkToken, isColour, THEMES } from './state-ink.js';
 

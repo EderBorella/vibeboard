@@ -30,7 +30,20 @@
    The second of the strays: it lived in the top bar's sheet, and the toggle it lights is app chrome. */
 .switch-btn.active { border-color: var(--accent); color: var(--accent); box-shadow: var(--glow); }
 
-/* THE SPLIT (decision 48). §2.5 of the plan lists this among `AppShell`'s holes, and that is where it is
+/* THE FULL-SCREEN FRAME BEFORE A PROJECT IS OPEN, worn by the project gate and by the sign-in page. It
+   was `pages/gate/gate.css`'s; a frame two pages wear is a template's, which is what the layer gate's
+   three findings on it were saying. `.gate-card` is the 520px card in the middle of it and `.gate-preview`
+   the muted line under a picked path. */
+.gate { flex: 1; display: flex; justify-content: center; padding: var(--s-7) var(--s-6); overflow: auto; }
+.gate-card {
+  width: 100%; max-width: 520px;
+  background: var(--panel); border: 1px solid var(--border);
+  border-radius: var(--r-lg); padding: var(--s-7);
+}
+.gate-preview { margin-top: var(--s-5); font-size: var(--t-small); color: var(--muted); }
+
+/* THE SPLIT (decision 48). The atomic revamp's template layer lists this among `AppShell`'s holes — see
+   docs/design-system.md, *The atomic revamp: the layer tree* — and that is where it is
    now: it was `pages/log/log.css`'s, and the component that renders it is `diary/DiaryView.tsx`, so the
    page's sheet owned a class its own surface never named. The diary is a 68ch reading column, so the
    right-hand half costs nothing that was being used. */

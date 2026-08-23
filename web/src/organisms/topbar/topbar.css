@@ -78,7 +78,7 @@
    `open`, `closed`, `connecting` and `unauthorized`, so the text swings between 4 and 12 characters —
    and this sits to the LEFT of the tabs, so every one of those changes would shove the tab row sideways
    while you were aiming at it. `12ch` is the longest state name, stated in the unit that makes the number
-   mean something: widen this only if a fifth, longer state is added to ConnState in web/src/ws.ts.
+   mean something: widen this only if a fifth, longer state is added to ConnState in web/src/lib/ws.ts.
    `ch` is the advance of "0", and lowercase letters are narrower, so it has margin without measuring. */
 /* THE BASELINE GYMNASTICS ARE GONE WITH `.conn`, and the reason they existed is worth keeping because it
    explains why nothing replaced them. The indicator was `align-items: baseline` with the dot opted out via
@@ -86,19 +86,10 @@
    item, the dot comes first in the DOM, and an empty span's baseline is its bottom edge — so the whole
    indicator hung off a circle unless the circle was excluded. As a `StatusChip` it is a drawn box that
    centres its own contents, and `.pop-wrap` below is what sits on the row's baseline. */
-/* The anchor for any popover. `position: relative` on a wrapper rather than on the button, so the panel
-   is positioned against the whole control and is not clipped by the button's own box.
-   NO `align-self`, AND THE DELETED DECLARATION IS WORTH RECORDING WITH ITS OWN DEFENCE. It was
-   `align-self: baseline`, on the reason that "the one in the top bar sits in a baseline-aligned row" plus
-   the claim that it "is harmless anywhere else, since align-self only means anything to a flex or grid
-   child". The first half is true and the second half stopped being true the moment a second surface had a
-   popover: `.ap-bar-row` is `align-items: center`, and every chip in it was a flex child overriding that
-   row's own alignment. Measured on the live board — the state chip sat 2.88px above the centre line and the
-   agent chip 1.88px, against 0.00 for every button beside them, which is exactly what the owner could see.
-   WITHOUT THE DECLARATION EACH WRAPPER TAKES ITS OWN ROW'S RULE: baseline in the top bar, which is what the
-   original reason wanted and gets by inheritance, and centre on the auto-pilot bar. A default beats an
-   override that has to be right for every surface at once. */
-.pop-wrap { position: relative; display: inline-flex; flex: 0 0 auto; }
+/* `.pop-wrap` IS IN `molecules/popover.css` — the anchor belongs to the thing it anchors, and
+   `Popover.tsx`, a molecule, was reading a class out of this surface's sheet, which is the one direction
+   the layer gate refuses outright. Its whole argument, including the defence of the deleted `align-self`,
+   moved with it. */
 /* THE BOX IS `StatusChip`'s NOW, and eleven declarations went with it. This rule used to undo the UA
    button styles by hand — `background: none; border: 0; padding: 0; margin: 0` — set its own font-size
    and letter-spacing, and declare `color: var(--tone, var(--muted))`, which is the one role the surface

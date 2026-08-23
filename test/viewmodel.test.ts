@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Card, ProjectConfig } from '../web/src/shared.js';
+import type { Card, ProjectConfig } from '../web/src/lib/shared.js';
 import {
   canPlace,
   cardPlace,
@@ -15,7 +15,7 @@ import {
   slugify,
   tagCounts,
   toggleTag,
-} from '../web/src/viewmodel.js';
+} from '../web/src/lib/viewmodel.js';
 
 const config: ProjectConfig = {
   name: 'T',

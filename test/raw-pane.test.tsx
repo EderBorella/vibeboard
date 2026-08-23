@@ -1,16 +1,16 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Card } from '../web/src/shared.js';
+import type { Card } from '../web/src/lib/shared.js';
 
 const api = vi.hoisted(() => ({
   getRaw: vi.fn(async () => '---\nid: E-001\n---\n\nfile body'),
   putRaw: vi.fn(async () => undefined),
 }));
-vi.mock('../web/src/api.js', () => api);
-vi.mock('../web/src/api', () => api);
+vi.mock('../web/src/lib/api.js', () => api);
+vi.mock('../web/src/lib/api', () => api);
 
-const { RawPane } = await import('../web/src/cards/RawPane.js');
+const { RawPane } = await import('../web/src/organisms/cards/RawPane.js');
 
 afterEach(cleanup);
 beforeEach(() => {

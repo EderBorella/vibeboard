@@ -9,7 +9,8 @@ import { useEffect, useState } from 'react';
 //
 // THIS IS THE PHASE'S OWN EVIDENCE. 176 hand-written lengths landed on these seven, carrying 32 distinct
 // values — `0.75rem` twenty-eight times, `1rem` eighteen, `0.2rem` seventeen, `0.9rem` fifteen — and the
-// argument for refusing an eighth step was made on the numbers in `notes/atomic-revamp-plan.md` §3.2.
+// argument for refusing an eighth step was made on the numbers in `docs/design-system.md`
+// (*The atomic revamp: the space scale*).
 // This is the same argument as a thing rather than as a table: every value that moved is written beside
 // the step it moved onto, so the owner can see WHICH crowd each step absorbed and judge whether it should
 // have been two. The four counts above were re-counted off the diff; three of them were wrong first time,

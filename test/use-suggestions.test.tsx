@@ -1,13 +1,13 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { Suggestion, SuggestionState } from '../web/src/shared.js';
+import type { Suggestion, SuggestionState } from '../web/src/lib/shared.js';
 
 const api = vi.hoisted(() => ({ listSuggestions: vi.fn() }));
-vi.mock('../web/src/api.js', () => api);
-vi.mock('../web/src/api', () => api);
+vi.mock('../web/src/lib/api.js', () => api);
+vi.mock('../web/src/lib/api', () => api);
 
-const { useSuggestions } = await import('../web/src/suggestions/useSuggestions.js');
+const { useSuggestions } = await import('../web/src/organisms/suggestions/useSuggestions.js');
 
 afterEach(() => {
   cleanup();

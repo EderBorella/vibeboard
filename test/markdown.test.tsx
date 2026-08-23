@@ -2,7 +2,7 @@
 
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
-import { renderMarkdown } from '../web/src/markdown.js';
+import { renderMarkdown } from '../web/src/lib/markdown.js';
 
 // The same contract the string-based renderer was characterised against, now asserted on the DOM
 // React produces. renderMarkdown returns nodes, so there is no HTML string to inspect.

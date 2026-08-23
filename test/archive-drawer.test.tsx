@@ -6,12 +6,12 @@ const api = vi.hoisted(() => ({
   listArchive: vi.fn(async () => [] as unknown[]),
   restoreCard: vi.fn(async () => undefined),
 }));
-vi.mock('../web/src/api.js', () => api);
-vi.mock('../web/src/api', () => api);
+vi.mock('../web/src/lib/api.js', () => api);
+vi.mock('../web/src/lib/api', () => api);
 
-const { ArchiveDrawer } = await import('../web/src/board/ArchiveDrawer.js');
+const { ArchiveDrawer } = await import('../web/src/organisms/board/ArchiveDrawer.js');
 
-import type { ArchivedCard, ProjectConfig } from '../web/src/shared.js';
+import type { ArchivedCard, ProjectConfig } from '../web/src/lib/shared.js';
 
 afterEach(() => {
   cleanup();

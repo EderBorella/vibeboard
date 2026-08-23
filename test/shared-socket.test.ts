@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ConnState } from '../web/src/ws.js';
-import { BACKOFF_CEILING_MS, backoffMs, SharedSocket } from '../web/src/ws.js';
+import type { ConnState } from '../web/src/lib/ws.js';
+import { BACKOFF_CEILING_MS, backoffMs, SharedSocket } from '../web/src/lib/ws.js';
 import { type StubbedBrowser, stubBrowser } from './browser-stubs.js';
 
 // The client's shared socket is the one piece of the two-sockets-into-one change that the
@@ -285,7 +285,7 @@ describe('a socket with no credential', () => {
   });
 
   it('opens nothing at all, and says why', async () => {
-    const { SharedSocket: Fresh } = await import('../web/src/ws.js');
+    const { SharedSocket: Fresh } = await import('../web/src/lib/ws.js');
     const s = new Fresh();
     const seen: ConnState[] = [];
     s.onConn((c) => seen.push(c));
@@ -300,7 +300,7 @@ describe('a socket with no credential', () => {
 
   it('does not retry, because nothing was tried', async () => {
     vi.useFakeTimers();
-    const { SharedSocket: Fresh } = await import('../web/src/ws.js');
+    const { SharedSocket: Fresh } = await import('../web/src/lib/ws.js');
     const s = new Fresh();
     s.acquire();
     vi.advanceTimersByTime(600_000);
@@ -404,7 +404,7 @@ describe('a handshake that is refused', () => {
     // already the thing that fixes it.
     stubBrowser({ signedIn: false });
     vi.resetModules();
-    const { SharedSocket: Fresh } = await import('../web/src/ws.js');
+    const { SharedSocket: Fresh } = await import('../web/src/lib/ws.js');
     let probes = 0;
     const s = new Fresh(() => {
       probes += 1;
@@ -436,22 +436,22 @@ describe('a handshake that is refused', () => {
 describe('a socket waiting for a credential', () => {
   async function withoutCredential(): Promise<{
     browser: StubbedBrowser;
-    ws: typeof import('../web/src/ws.js');
-    token: typeof import('../web/src/token.js');
+    ws: typeof import('../web/src/lib/ws.js');
+    token: typeof import('../web/src/lib/token.js');
   }> {
     const browser = stubBrowser({ signedIn: false });
     vi.resetModules();
     return {
       browser,
-      ws: await import('../web/src/ws.js'),
-      token: await import('../web/src/token.js'),
+      ws: await import('../web/src/lib/ws.js'),
+      token: await import('../web/src/lib/token.js'),
     };
   }
 
   // A credential arriving, as the server does it: it sets the cookies on its answer, and the client is
   // only told. There is no value for the client to hold any more — which is the whole change, since a
   // per-tab copy of a credential is what let one tab fail for ever.
-  function arrives(browser: StubbedBrowser, token: typeof import('../web/src/token.js')): void {
+  function arrives(browser: StubbedBrowser, token: typeof import('../web/src/lib/token.js')): void {
     browser.cookies.set('vb.in', '1');
     token.credentialArrived();
   }

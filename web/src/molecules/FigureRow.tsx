@@ -22,7 +22,7 @@ export function FigureRow({
 }) {
   const Tag = as;
   return (
-    <Tag className={['vb-readout-block', className].filter(Boolean).join(' ')} data-testid={testId}>
+    <Tag className={['vb-figure-row', className].filter(Boolean).join(' ')} data-testid={testId}>
       {children}
     </Tag>
   );

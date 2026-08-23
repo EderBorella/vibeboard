@@ -2,7 +2,8 @@ import type { ButtonHTMLAttributes, HTMLAttributes, ReactNode } from 'react';
 import { Surface, type SurfaceVariant } from '../../atoms/Surface';
 import type { Tone } from '../../molecules/state-tones';
 
-// ROW — one line of a list. Nineteen families built this by hand (§2.4 of the plan) and disagreed about
+// ROW — one line of a list. Nineteen families built this by hand — the census is in docs/design-system.md,
+// *The atomic revamp: the seven phases*, Phase 6 — and disagreed about
 // four things, none of which anybody chose: the gap, the rail width, how a cell takes the slack, and what
 // selected looks like. See organisms/shared/list.css for the measurements.
 //

@@ -6,10 +6,10 @@ const api = vi.hoisted(() => ({
   getResources: vi.fn(async () => [] as unknown[]),
   putResources: vi.fn(async () => undefined),
 }));
-vi.mock('../web/src/api.js', () => api);
-vi.mock('../web/src/api', () => api);
+vi.mock('../web/src/lib/api.js', () => api);
+vi.mock('../web/src/lib/api', () => api);
 
-const { ResourcesEditor } = await import('../web/src/control/ResourcesEditor.js');
+const { ResourcesEditor } = await import('../web/src/organisms/control/ResourcesEditor.js');
 
 afterEach(() => {
   cleanup();

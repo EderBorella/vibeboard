@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ReportOptions } from '../web/src/runs/ReportOptions.js';
+import { ReportOptions } from '../web/src/organisms/runs/ReportOptions.js';
 
 afterEach(cleanup);
 

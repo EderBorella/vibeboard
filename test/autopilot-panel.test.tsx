@@ -16,13 +16,13 @@ const api = vi.hoisted(() => ({
   killAutopilot: vi.fn(),
   startAutopilot: vi.fn(),
 }));
-vi.mock('../web/src/api.js', () => api);
-vi.mock('../web/src/api', () => api);
+vi.mock('../web/src/lib/api.js', () => api);
+vi.mock('../web/src/lib/api', () => api);
 
-const { AutopilotPanel } = await import('../web/src/autopilot/AutopilotPanel.js');
+const { AutopilotPanel } = await import('../web/src/organisms/autopilot/AutopilotPanel.js');
 
-import type { Readiness } from '../web/src/api.js';
-import type { ProjectConfig } from '../web/src/shared.js';
+import type { Readiness } from '../web/src/lib/api.js';
+import type { ProjectConfig } from '../web/src/lib/shared.js';
 
 afterEach(() => {
   cleanup();
@@ -74,7 +74,7 @@ type PanelProps = Parameters<typeof AutopilotPanel>[0];
 // C2's minimal control. An endpoint nobody can press is a feature that does not exist — and a control whose
 // refusal is invisible is the dead end this design refuses to ship, which is what most of these are about.
 describe('the start control', () => {
-  const state = (over: Partial<import('../web/src/api.js').AutopilotState> = {}) => ({
+  const state = (over: Partial<import('../web/src/lib/api.js').AutopilotState> = {}) => ({
     state: 'idle' as const,
     iteration: 0,
     ...over,

@@ -2,8 +2,8 @@
 
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
-import { ConnectionLight } from '../web/src/app/ConnectionLight.js';
-import { LIGHT_STATES } from '../web/src/app/connection-light.js';
+import { ConnectionLight } from '../web/src/organisms/topbar/ConnectionLight.js';
+import { LIGHT_STATES } from '../web/src/organisms/topbar/connection-light.js';
 
 afterEach(cleanup);
 

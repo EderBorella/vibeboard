@@ -1,4 +1,5 @@
-/* LIST AND ROW — nineteen list-and-row families in five classes. §2.4 of the plan names them:
+/* LIST AND ROW — nineteen list-and-row families in five classes, and they are named in
+ * docs/design-system.md, *The atomic revamp: the seven phases*:
  * `.control-item`, `.explorer-item`, `.mp-item`, `.filed-entry`, `.diary-entry`, `.suggestions-row`,
  * `.gate-row`, `.report-row`, `.signin-row`, `.settings-row`, `.dispatch-row`, `.skill-row`,
  * `.resource-row`, `.exec-run`, `.archive-item`, `.links-list`, `.cv-links`, `.res-*`, `.board-label`.

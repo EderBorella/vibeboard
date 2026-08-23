@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { ModelOption } from '../web/src/api.js';
-import { compareModels, type ModelFilter, matchesFilter } from '../web/src/models/model-filter.js';
+import type { ModelOption } from '../web/src/lib/api.js';
+import { compareModels, type ModelFilter, matchesFilter } from '../web/src/organisms/shared/model-filter.js';
 
 const model = (id: string, over: Partial<ModelOption> = {}): ModelOption =>
   ({ id, name: id, free: false, caps: { toolCall: true, vision: false }, ...over }) as ModelOption;

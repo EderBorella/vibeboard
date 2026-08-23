@@ -1,9 +1,16 @@
 /* ---------- Project Control tab ---------- */
-.control { flex: 1; min-width: 0; display: flex; background: var(--wash); }
-/* A `List` plus a width. */
+/* `.control` IS IN `templates/work-area.css`. It is the two-column file pane, and the EXPLORER wears it
+   too — `<section class="control explorer">` — so it is a page frame shared by two pages, which is what a
+   template is. It was one of the layer gate's cross-surface reads for exactly that reason. */
+/* A `List as="nav"` PLUS A WIDTH, and three of its seven declarations are gone: `display: flex`,
+   `flex-direction: column` and `min-width: 0` are `.vb-list`'s, said once. They were here because the
+   call site hand-wrote `className="vb-list control-list"` on a bare `<nav>` — `List` had no `nav` tag —
+   so nobody could tell which of the two classes was deciding what. The `--s-6` gap stays and has to: it
+   is one of the five `List` names in its own comment as owing a gap, and this sheet is imported after
+   `list.css`. */
 .control-list {
   width: 260px; flex-shrink: 0; overflow-y: auto; padding: var(--s-5);
-  border-right: 1px solid var(--border); display: flex; flex-direction: column; gap: var(--s-6);
+  border-right: 1px solid var(--border); gap: var(--s-6);
 }
 .control-group { display: flex; flex-direction: column; gap: var(--s-1); }
 /* `.control-group-head` IS GONE — a `.vb-row` and a `Text caps`, with `push` on the `＋`. It was one of
@@ -11,25 +18,15 @@
    tree rendered it, so one surface's heading was another's by accident of which sheet the bytes fell in.
    The `--t-micro` step went with it; `Text`'s `--t-small` is one step up and is what a group heading
    beside a list of files reads at everywhere else in the app. */
-/* Accent at rest, not on hover: a `＋` that creates is the affordance of the group head it sits in, and
-   a muted one reads as disabled. */
-.control-new { color: var(--accent); }
 /* `.control-item`, its hover, its selected state and `.control-item-name` ARE GONE — a
    `Row variant="flat" interactive`, and the second and third of the layer gate's four findings: the
    Explorer's tree wore Project Control's row class and its label class. The three declarations
    `.control-item-name` made are `.vb-clip`'s, said once for the whole tree.
    The gap moved from `--s-3` to the `Row`'s `--s-4`: seven gaps existed across nineteen row families and
    nothing chose the spread. */
-/* A `Chip` with no `pill`, which is the square-ish corner the primitive defaults to. `--accent-2` is not
-   one of the five tones and must not be forced into one — themes.css gives it a different value from
-   `--warn` in marshmallow — so the ink stays here, as `.ap-chip`'s does. */
-.control-tag {
-  text-transform: uppercase; letter-spacing: var(--track); color: var(--accent-2);
-}
 /* `.drop-line` was the BOARD's drag indicator, not this page's, and it is `organisms/board/board.css`'s
    now — the fourth of the seven misfiled strays `styles.ts` named. */
 
-.control-empty { padding: 0 var(--s-4); }
 
 
 /* Inline rename: sits exactly where the list row was, so the row appears to become editable. Accent at

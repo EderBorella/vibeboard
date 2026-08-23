@@ -1,13 +1,18 @@
 /* FIGURE ROW — a line of figures. It was `.vb-readout-block` in atoms/readout.css, a molecule's class in
- * an atom's sheet, kept there with a comment saying the phase that moved the molecules would move it.
+ * an atom's sheet; the molecule phase moved the rule and deferred the rename, because
+ * `docs/design-system.md` argued this row BY NAME in seven places and a rename with the argument left
+ * behind strands all seven.
  *
- * MOVED, NOT RENAMED, and the reason is the record rather than taste: `docs/design-system.md` argues this
- * row by name in seven places, including the two browser findings about wrapped rows that are still open.
- * A rename would strand all seven. The class name goes when that argument is rewritten in Phase 7.
+ * RENAMED NOW, WITH THE ARGUMENT. `.vb-readout-block` said "a block of readouts", which is what it was
+ * before `FigureRow` existed and is not what it is: three of the four children of the commonest one are
+ * not readouts at all, and the row's own claim — figures align on a baseline down a column — is the
+ * molecule's rather than the atom's. `docs/design-system.md` is rewritten in the same commit, so the two
+ * still-open browser findings about wrapped rows are argued under the name the tree now uses. The
+ * historical phase records keep the old name deliberately: that is what the class was called then.
  *
  * `baseline` and not `center`: the parts are text at two sizes, and centring line boxes of different
  * sizes puts their baselines at different heights — the argument `.topbar` already makes. */
-.vb-readout-block {
+.vb-figure-row {
   display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--s-2) var(--s-5);
   margin: 0; font-size: var(--t-small); color: var(--muted);
 }

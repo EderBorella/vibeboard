@@ -151,7 +151,7 @@ export function SuggestionsPane({ suggestions, failed, onRefresh, onApply }: Pro
             )}
           </div>
 
-          <List as="ol" className="suggestions-list">
+          <List as="ol" fill>
             {suggestions.map((s) => (
               <Row
                 as="li"

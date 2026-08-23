@@ -166,7 +166,7 @@
    auto-pilot bar's and its panel's, which is what the layer gate's two findings on it said. */
 /* `List as="ul"` DRAWS THE COLUMN AND CANCELS THE BULLET at both call sites, so the gap and the step are
    all this keeps: `.vb-list` is `--s-1` and a list of sentences reads tighter than a list of rows. */
-.blockers { gap: var(--s-2); font-size: var(--t-small); }
+.blockers { font-size: var(--t-small); }
 .blockers li { padding-left: var(--s-6); position: relative; color: var(--text); line-height: 1.5; }
 .blockers li::before { content: "→"; position: absolute; left: 0; color: var(--warn, var(--danger)); }
 /* The other side of the same answer — nothing is blocking — and it is `Text ink="accent"`: `--t-small` is

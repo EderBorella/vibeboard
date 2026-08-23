@@ -88,7 +88,8 @@ function NodeRow(props: NodeRowProps) {
       variant="flat"
       interactive
       active={active}
-      className={`explorer-item${over ? ' explorer-over' : ''}`}
+      gap={2}
+      className={over ? 'explorer-over' : undefined}
       data-testid="explorer-item"
       style={indent(depth)}
       title={title(node)}
@@ -143,7 +144,7 @@ function NodeRow(props: NodeRowProps) {
           </Text>
         </Chip>
       )}
-      <Readout>{formatBytes(node.size)}</Readout>
+      <Readout className="vb-fixed">{formatBytes(node.size)}</Readout>
     </Row>
   );
 }

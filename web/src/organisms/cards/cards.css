@@ -1,8 +1,9 @@
 /* A `Surface` with the `inset` variant. It sat on `--bg` where the same box on a `--panel` parent sits on
    `--panel-2` four times over, and nothing chose the difference. */
-.links-list {
-  display: flex; flex-direction: column; gap: var(--s-2); max-height: 180px; overflow-y: auto;
-}
+/* THE COLUMN, THE GAP AND THE SCROLL ARE THE LIST'S — this element is a `Surface inset` WEARING
+   `.vb-list`, so it takes the attributes directly rather than through `List`'s props. What is left is the
+   180px ceiling, which is this pane's own and no atom's. */
+.links-list { max-height: 180px; }
 /* AN EYEBROW LABEL, AND THE FACE IS `Text caps size="micro"` NOW. The uppercase, the tracking, the muted
    ink and — as of this wave — the step are all the atom's. WHAT IS LEFT IS THE PICKER'S OWN VERTICAL
    RHYTHM, and it does not reduce to the parent's `gap`: the two margins are different steps and the first
@@ -35,7 +36,7 @@
    specificity, so it reset the size, and the button and the plain `<div>` beside it matched only by
    accident of what they inherited. That is the shape of the 10.88px incident. Stated once, here. */
 /* A `List`, and the step is the one thing left. */
-.cv-links { gap: var(--s-2); font-size: var(--t-body); }
+.cv-links { font-size: var(--t-body); }
 .cv-link { display: flex; gap: var(--s-4); align-items: baseline; }
 /* A link is a button wherever it can actually open the card (CardView's onOpenCard). */
 .cv-body { border-top: 1px solid var(--border); padding-top: var(--s-3); }

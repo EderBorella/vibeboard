@@ -23,9 +23,10 @@
   position: sticky; top: calc(-1 * var(--s-5)); background: var(--wash);
   z-index: var(--z-chrome); padding-top: var(--s-1);
 }
-/* `Surface`'s `flat` padding is symmetric, and the 2px this rule shaved off the right was not a
-   decision anybody made. `gap` is layout and stays. */
-.explorer-item { gap: var(--s-2); }
+/* `.explorer-item` IS GONE. Its `gap: var(--s-2)` is `Row`'s own `gap` option now, and the size rule it
+   anchored — `> .vb-readout { flex-shrink: 0 }` — is `.vb-fixed` on the readout, which is `flex: none` and
+   says the same thing where the element is rather than through a descendant selector. A class kept alive
+   only to be the left-hand side of one rule is a class the call site can carry instead. */
 /* Fixed width so names line up whether or not a row has a twisty. */
 /* The size is `.vb-twist`'s and so is the `flex: none`; the muted ink is `Text`'s default. The box widens
    with the glyph: at 0.7rem an 11px one fitted and a 15px one did not, and the overflow pushed every name
@@ -38,7 +39,7 @@
 .explorer-twist { width: var(--t-lead); }
 /* `.explorer-icon` IS GONE — a `Text ink="inherit"` (its step is the atom's default, and the ink is the
    row's, which changes on hover) on `.vb-fixed`. */
-.explorer-item > .vb-readout { flex-shrink: 0; }
+
 /* The tail of a capped listing. Deliberately not styled as an error — the folder is fine, the
    listing is simply not all of it.
    THE STEP IS `Text size="micro"` AND IT WAS DEAD WHERE IT WAS. This class is on the WRAPPER and the words

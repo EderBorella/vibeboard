@@ -9,8 +9,8 @@
    is one of the five `List` names in its own comment as owing a gap, and this sheet is imported after
    `list.css`. */
 .control-list {
-  width: 260px; flex-shrink: 0; overflow-y: auto; padding: var(--s-5);
-  border-right: 1px solid var(--border); gap: var(--s-6);
+  width: 260px; flex-shrink: 0; padding: var(--s-5);
+  border-right: 1px solid var(--border);
 }
 /* `.control-group` IS GONE — `Stack direction="column" gap={1}`, declaration for declaration. */
 /* `.control-group-head` IS GONE — a `.vb-row` and a `Text caps`, with `push` on the `＋`. It was one of

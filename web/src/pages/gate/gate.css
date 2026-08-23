@@ -22,7 +22,9 @@
  * THE 16px UNDER THE LIST IS GONE: it was the one declaration here that needed the extra weight — to beat
  * `ul.vb-list, ol.vb-list { margin: 0 }` at (0,1,1) — and the card's own `gap` is what says it now. With
  * nothing left to outrank, the atom's `margin: 0` is what the list takes. */
-.gate-card .gate-list { gap: var(--s-3); }
+/* `.gate-list`'s GAP IS `List gap={3}` NOW, and the (0,2,0) weight bought to outrank `.vb-list` goes with
+   it — the whole reason that specificity existed was to win a gap. The class name survives only as the
+   left-hand side of `.gate button:not(.gate-list button)` below. */
 /* A `Row as="li" stack variant="inset" interactive`. A project in the recents list has no VOICE — it is a
    region of a list that takes a click, which is the line Phase 4 drew between the two primitives — and it
    draws its box at rest, which is what `inset` is and `flat` is not. The stack of name over path is

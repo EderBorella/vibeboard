@@ -138,7 +138,7 @@ export function ModelPicker({ models, value, defaultModel, onChange, disabled }:
             {filtered.length} of {models.length} models
           </Readout>
 
-          <List className="mp-list">
+          <List fill scroll className="mp-list">
             {filtered.map((m) => (
               // A `Row` with a star before the pick. `rail="accent"` is what `.mp-def`'s hand-written
               // `border-left` was; `interactive`/`active` are `.mp-item:hover` and `.mp-sel`.

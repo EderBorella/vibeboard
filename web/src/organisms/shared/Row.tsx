@@ -1,4 +1,5 @@
 import type { ButtonHTMLAttributes, HTMLAttributes, ReactNode } from 'react';
+import type { StackGap } from '../../atoms/Stack';
 import { Surface, type SurfaceVariant } from '../../atoms/Surface';
 import type { Tone } from '../../design/state-tones';
 
@@ -28,6 +29,10 @@ export interface RowProps extends Omit<HTMLAttributes<HTMLElement>, 'children' |
   // Two lines rather than a line of cells. Five of the nineteen stacked, and `.vb-list` is the same
   // column-with-a-gap a list of rows is — one class, both jobs.
   stack?: boolean;
+  // THE GAP BETWEEN A ROW'S CELLS, and `.explorer-item` was it written alone: `gap: var(--s-2)` and
+  // nothing else, because a file row's icon, name and marker sit tighter than a list row's cells. Reaches
+  // BOTH classes, because `stack` decides which one this element wears — a stacked row is `.vb-list`.
+  gap?: StackGap;
   // The cells before and after the one that takes the slack: a twisty, a star, a `✕`. Rendered around
   // `children`, which is wrapped in `.vb-row-main` only when either is present — a row with no lead and
   // no trail has nothing to take the slack FROM.
@@ -46,6 +51,7 @@ export function Row({
   interactive,
   active,
   stack,
+  gap,
   lead,
   trail,
   className,
@@ -78,13 +84,20 @@ export function Row({
     // `plain` is a `<div>` or an `<li>` only, and asking for a plain button is asking for `flat`.
     const Tag = as === 'button' ? 'div' : as;
     return (
-      <Tag className={classes} {...rest}>
+      <Tag className={classes} data-gap={gap === undefined ? undefined : String(gap)} {...rest}>
         {inner}
       </Tag>
     );
   }
   return (
-    <Surface variant={variant} as={as} className={classes} disabled={disabled} {...rest}>
+    <Surface
+      variant={variant}
+      as={as}
+      className={classes}
+      data-gap={gap === undefined ? undefined : String(gap)}
+      disabled={disabled}
+      {...rest}
+    >
       {inner}
     </Surface>
   );

@@ -175,7 +175,7 @@ export function AutopilotPanel({
       {failed && <Text role="hint">Could not read this project’s readiness.</Text>}
       {readiness?.ok && <Text ink="accent">Everything auto-pilot needs is in place.</Text>}
       {readiness && !readiness.ok && (
-        <List as="ul" className="blockers">
+        <List as="ul" gap={2} className="blockers">
           {readiness.blockers.map((b) => (
             <li key={b}>{b}</li>
           ))}

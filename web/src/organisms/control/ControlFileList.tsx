@@ -43,7 +43,7 @@ export function ControlFileList({
   onCancelRename,
 }: Props) {
   return (
-    <List as="nav" className="control-list">
+    <List as="nav" gap={6} scroll className="control-list">
       {groups.map((g) => (
         <Stack direction="column" gap={1} key={g.key}>
           {/* A `Row` and a `Text caps`, where `.control-group-head` was a flex row plus the caps face —

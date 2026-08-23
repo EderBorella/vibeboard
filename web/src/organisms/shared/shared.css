@@ -29,7 +29,14 @@
 .mp-chip:hover { border-color: var(--accent); }
 .mp-chip.on { background: var(--accent-fill); color: var(--on-fill); border-color: var(--accent); font-weight: 600; }
 .vb-modal > .vb-readout { padding: 0 var(--s-6) var(--s-2); }
-.mp-list { flex: 1; overflow-y: auto; padding: 0 var(--s-4) var(--s-4); }
+/* `flex: 1` AND `overflow-y` ARE `List fill scroll` NOW. The padding stays because `List` has no `pad`
+   option and is not getting one: it already carries `gap`, `fill` and `scroll`, which is most of `Stack`'s
+   surface, and a fourth copy would settle the question the wrong way. `.vb-list` IS a `Stack` column plus
+   the UA list reset — `display: flex; flex-direction: column; gap: var(--s-1); min-width: 0` — so the
+   answer is for `List` to COMPOSE `Stack` and inherit all of them, not to grow them one at a time. That
+   touches nine call sites and two equal-specificity flex rules, so it is its own change. This padding is
+   what it costs until then. */
+.mp-list { padding: 0 var(--s-4) var(--s-4); }
 /* `.mp-item`, `.mp-sel`, `.mp-def`, `.mp-pick` and `.mp-name` ARE GONE — five classes into a `Row`:
    the arrangement, the hover ground, the selected state, the default's accent rail and the cell that
    takes the slack. `.mp-pick`'s `color: var(--text)` went with them, and its removal is a fix rather

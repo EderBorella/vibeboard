@@ -34,7 +34,7 @@ export function CardLinks({ card, allCards, onOpenCard, onLinks }: Props) {
     : undefined;
 
   return (
-    <List className="cv-links">
+    <List gap={2} className="cv-links">
       <Text>
         Linked cards
         {onLinks && (

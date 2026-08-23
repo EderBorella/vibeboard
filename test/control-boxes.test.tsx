@@ -461,3 +461,38 @@ describe('what Control renders, tag by tag', () => {
     expect(shape(<Control as="textarea" />)).toBe('textarea vb-ctl -');
   });
 });
+
+// `List` AND `Row` CAN SAY A GAP, A FILL AND A SCROLL, and this pins it because nothing else can. Five
+// list families each spelled the gap a different way and `.explorer-item` was a `Row`'s gap written alone;
+// the options replace all six spellings. THE ATTRIBUTE HAS TO BEAT THE BASE CLASS: `.vb-list` declares
+// `gap: var(--s-1)`, so an option that lost on specificity or order would render the default silently and
+// every one of these migrations would be wrong by 2px with nothing to show it.
+describe('what List and Row can say about a column', () => {
+  const listBox = (attrs: string): Record<string, string> =>
+    box(at(`<ul class="vb-list" ${attrs}></ul>`, 'ul'));
+
+  it('a gap on a List beats the base --s-1, on every step', () => {
+    // Read as resolved px: `box()` resolves the space tokens, which is what makes "beats the base"
+    // checkable rather than a claim about two strings that both say `var(...)`.
+    //  and not : the rule writes a bare zero, which is what the resolver reports.
+    expect(listBox('data-gap="0"').gap).toBe('0');
+    expect(listBox('data-gap="4"').gap).toBe('8px');
+    expect(listBox('data-gap="7"').gap).toBe('24px');
+    // The base, so the comparison above is against something real.
+    expect(listBox('').gap).toBe('2px');
+  });
+
+  it('a gap on a Row reaches the row class too, because `stack` swaps which one it wears', () => {
+    expect(box(at('<div class="vb-row" data-gap="2"></div>', 'div')).gap).toBe('4px');
+    expect(box(at('<div class="vb-list" data-gap="2"></div>', 'div')).gap).toBe('4px');
+  });
+
+  it('fill is the pair that lets a list shrink below its content, and scroll is separate', () => {
+    // `min-height: 0` alone was `.suggestions-list`'s entire content — one third of this, written alone.
+    const filled = listBox('data-grow');
+    expect(filled.flex).toBe('1');
+    expect(filled['min-height']).toBe('0');
+    expect(filled['overflow-y']).toBeUndefined();
+    expect(listBox('data-scroll')['overflow-y']).toBe('auto');
+  });
+});

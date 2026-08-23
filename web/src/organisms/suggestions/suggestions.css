@@ -13,7 +13,7 @@
 .suggestions-actions > .vb-ctl { flex: 1; min-width: 12rem; }
 /* `.suggestions-became` IS GONE — a `Text ink="accent" lead`. */
 /* A `List`, and the scroll floor is what is left. */
-.suggestions-list { min-height: 0; }
+/* `.suggestions-list` IS GONE — `min-height: 0` is one third of `List fill`, written alone. */
 /* `.suggestions-row` IS GONE — a `Row stack rail`, and the rail's default IS the `var(--rule) solid
    var(--border)` this declared. */
 /* The one the buttons act on. Marked, because two rows and one action bar is otherwise a guess. */

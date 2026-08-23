@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Button } from '../../atoms/Button';
 import { Chip } from '../../atoms/Chip';
 import { Control } from '../../atoms/Control';
+import { Stack } from '../../atoms/Stack';
 import { Surface } from '../../atoms/Surface';
 import { Text } from '../../atoms/Text';
 import { cardSuggestion, patchSuggestion } from '../../lib/api';
@@ -86,12 +87,12 @@ export function SuggestionsPane({ suggestions, failed, onRefresh, onApply }: Pro
   if (failed) {
     return (
       <div className="suggestions-pane">
-        <div className="diary-empty">
+        <Stack direction="column" align="start" gap={4} className="diary-empty">
           <p>Could not read what agents filed.</p>
           <Button size="md" onClick={onRefresh}>
             Try again
           </Button>
-        </div>
+        </Stack>
       </div>
     );
   }
@@ -101,9 +102,9 @@ export function SuggestionsPane({ suggestions, failed, onRefresh, onApply }: Pro
       {picked === undefined ? (
         // Said out loud: an empty pane reads as a broken one, and this is the surface a person opens
         // precisely to find out whether anything is waiting.
-        <div className="diary-empty">
+        <Stack direction="column" align="start" gap={4} className="diary-empty">
           <p>Nothing has been filed in this project yet.</p>
-        </div>
+        </Stack>
       ) : (
         <>
           {/* The actions at the top, on the picked suggestion, and Dismiss in its own colour. */}
@@ -168,7 +169,9 @@ export function SuggestionsPane({ suggestions, failed, onRefresh, onApply }: Pro
                   data-testid="suggestions-pick"
                   onClick={() => pick(s.id)}
                 >
-                  <span className="filed-title">{s.title}</span>
+                  <Text lead ink="strong" className="filed-title">
+                    {s.title}
+                  </Text>
                   <FigureRow as="div">
                     <time dateTime={s.created}>{when(s.created)}</time>
                     {/* Which run filed it, and the card it was filed FROM. Only what is there: a

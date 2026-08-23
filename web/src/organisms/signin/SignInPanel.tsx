@@ -57,7 +57,9 @@ export function SignInPanel({ confirm }: Props) {
 
   return (
     <>
-      <div className="settings-section">Signed-in browsers</div>
+      <Text caps ink="accent" className="settings-section">
+        Signed-in browsers
+      </Text>
       <Text role="hint">
         The first browser to open this board is let in automatically. Every one after that has to be allowed
         from a browser that is already in.
@@ -108,13 +110,17 @@ export function SignInPanel({ confirm }: Props) {
         </Text>
       )}
 
-      <div className="settings-section">This browser's credential</div>
+      <Text caps ink="accent" className="settings-section">
+        This browser's credential
+      </Text>
       <Text role="hint">
         Held by the browser itself and not readable by this page, so there is nothing here to show, copy or
         leak. You never need to handle it. To replace it, sign every browser out below.
       </Text>
 
-      <div className="settings-section">Start over</div>
+      <Text caps ink="accent" className="settings-section">
+        Start over
+      </Text>
       <Text role="hint">
         Signs out every browser above, including this one, and forgets their credentials. The next page load
         on this machine signs itself in again — which is how you replace a credential you think somebody else

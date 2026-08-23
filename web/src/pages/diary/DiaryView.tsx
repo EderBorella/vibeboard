@@ -2,6 +2,7 @@ import { memo, useMemo, useState } from 'react';
 import { Button } from '../../atoms/Button';
 import { Chip } from '../../atoms/Chip';
 import { Control } from '../../atoms/Control';
+import { Stack } from '../../atoms/Stack';
 import { Text } from '../../atoms/Text';
 import { addDiaryEntry, type DiaryEntry } from '../../lib/api';
 import { MAX_ENTRY_TEXT, type Suggestion } from '../../lib/shared';
@@ -136,7 +137,9 @@ function FiledList({ suggestions }: { suggestions: Suggestion[] }) {
               )}
             </span>
           )}
-          <p className="filed-title">{s.title}</p>
+          <Text lead ink="strong" className="filed-title">
+            {s.title}
+          </Text>
           {/* `.filed-text` IS DELETED: it was `--t-body`, 1.5 and `--muted`, which is `Text lead`
               declaration for declaration. */}
           {s.body && <Text lead>{s.body}</Text>}
@@ -162,17 +165,17 @@ function FiledColumn({ bump }: { bump: number }) {
         </Button>
       </div>
       {failed ? (
-        <div className="diary-empty">
+        <Stack direction="column" align="start" gap={4} className="diary-empty">
           <p>Could not read what agents filed.</p>
           <Button size="md" onClick={refresh}>
             Try again
           </Button>
-        </div>
+        </Stack>
       ) : suggestions.length === 0 ? (
         // Said out loud, like the diary's own empty state: an empty column reads as a broken one.
-        <div className="diary-empty">
+        <Stack direction="column" align="start" gap={4} className="diary-empty">
           <p>Nothing has been filed in this project yet.</p>
-        </div>
+        </Stack>
       ) : (
         <FiledList suggestions={suggestions} />
       )}
@@ -248,18 +251,18 @@ export function DiaryView({ bump }: { bump: number }) {
         <div aria-live="assertive">{error && <Text role="error">{error}</Text>}</div>
 
         {failed ? (
-          <div className="diary-empty">
+          <Stack direction="column" align="start" gap={4} className="diary-empty">
             <p>Could not read this project’s log.</p>
             <Button size="md" onClick={refresh}>
               Try again
             </Button>
-          </div>
+          </Stack>
         ) : entries.length === 0 ? (
           // Said out loud. An empty screen would read as a broken one, and this is the file a reader comes
           // to precisely when they want to know what has been going on.
-          <div className="diary-empty">
+          <Stack direction="column" align="start" gap={4} className="diary-empty">
             <p>Nothing has happened in this project yet.</p>
-          </div>
+          </Stack>
         ) : (
           <DiaryList entries={entries} />
         )}

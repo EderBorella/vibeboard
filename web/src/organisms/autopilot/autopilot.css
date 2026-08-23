@@ -13,11 +13,9 @@
    `neutral` tone, which is that same `--muted`. Nothing is lost. */
 .ap-chip { text-transform: lowercase; }
 
-.ap-controls {
-  display: flex;
-  gap: var(--s-4);
-  margin: var(--s-3) 0 var(--s-2);
-}
+/* `align="stretch"` at the call sites, not the `Stack` default: this row holds a button beside a line of
+   progress text, and the row was never centred — centring it would move the sentence. */
+.ap-controls { margin: var(--s-3) 0 var(--s-2); }
 
 
 /* ---------- Auto-pilot transport strip ----------
@@ -38,10 +36,9 @@
   font-size: var(--t-body);
 }
 
+/* A `Stack` carries the row; the inset and the shrink are what is left. The class NAME is load-bearing
+   beyond the declarations: visual/checks/board.spec.ts's checks 12 and 14 read the row through it. */
 .ap-bar-row {
-  display: flex;
-  align-items: center;
-  gap: var(--s-4);
   padding: var(--s-3) var(--s-5);
   /* The status can be long — a stall names the cards that are stuck — so it is the part that shrinks. */
   min-width: 0;
@@ -73,6 +70,9 @@
    free space would leave those margins nothing to work with. It still SHRINKS, and it is still the only
    thing on the row that does: a stall names the cards that are stuck, and that sentence has to give way
    to the controls rather than push them off the strip. */
+/* NOT `.vb-clip`, and the difference is the declaration above: the atom is `flex: 1`, which is exactly
+   what was removed here. Nor a `Text`: this line inherits `.ap-bar`'s `--t-body`, and the atom's face is
+   `--t-small` at a 1.45 line — a step down and a taller line box on the row that sets the strip's height. */
 .ap-status {
   flex: 0 1 auto;
   min-width: 0;
@@ -95,7 +95,8 @@
    `flex: none` because `.ap-status` above already takes the slack: without it the pair would be squeezed
    by a long stall message, and the state word is exactly what you need when the message is long. */
 .ap-agent {
-  display: inline-flex; align-items: center; gap: var(--s-3); flex: none;
+  /* The row itself is a `Stack gap={3}`; what is left is the box that makes the pair one thing. */
+  flex: none;
   border: 1px solid var(--border); border-radius: var(--r-md);
   /* NO VERTICAL PADDING, measured on the live board rather than reasoned about: at `--s-2` this box came
      out 29.8px tall against 20px buttons on the same row — the group meant to make the pair legible was
@@ -123,10 +124,9 @@
    `checking`, and `failing` is the SAME ROW the connection light uses for the same fact: the last runs
    died before reaching a model. */
 
-/* THE WAY OUT OF A STALLED PROJECT, sized like the other controls in this bar rather than like the card
-   report list it borrowed from. Measured: it came out at 10.88px with 1.6px of padding against 12.16px and
-   4px for Settings and the expander, so the one action on a stopped project read as a caption. */
-.ap-bar-remedy { display: flex; align-items: center; gap: var(--s-4); flex-wrap: wrap; }
+/* `.ap-bar-remedy` IS GONE — it was a wrapping flex row and nothing else, which is `Stack gap={4} wrap`.
+   The wrap is load-bearing: `.reports-forgiven`'s `flex-basis: 100%` is what puts the result on its own
+   line, so a row that cannot wrap would put it beside the button and squeeze both. */
 /* THE ROW'S RIGHT-HAND END — what explains the bar, and where to go to change it. The owner's layout:
    `|Start|Emergency stop|   |Backend selector|   |How it works|Settings|`, three groups rather than the
    one undifferentiated queue this row had become, with the controls that ACT on the loop at the left, the
@@ -135,18 +135,21 @@
    The row's first children are a group without a wrapper, and space-between would spread those apart too.
    `flex: none` ONCE, where `.ap-inline` said it three times — one on each of the buttons now inside this
    box. That class is gone and this is what replaced it; a group that cannot shrink does not need its
-   children to say so individually. */
+   children to say so individually.
+   IT IS `Stack className="push vb-fixed"` DECLARATION FOR DECLARATION AND IT STAYS ANYWAY, because the
+   NAME is read where the declarations are not: visual/checks/board.spec.ts's check 14 measures this
+   group's right-hand edge through `.ap-bar-end` and excludes it from the left group by the same token, so
+   deleting the name blinds the one check that holds the three-group layout. */
 .ap-bar-end {
   display: flex; align-items: center; gap: var(--s-4);
   margin-left: auto; flex: none;
 }
-/* LAYOUT ONLY. `Button` owns the box; `flex: none` is what this row decides, because `.ap-status` beside
-   it takes the slack and a long stall message must not squeeze the controls.
+/* `flex: none` IS `.vb-fixed` NOW — the atom exists for these six one-declaration classes and this is one
+   of them. What is left is the ink, which no atom carries.
    `.ap-remedy-btn` is the `default` variant — the ONE action on a stopped project. The three quiet
    controls that shared this rule are `ghost`, which the owner ruled carries a DASHED border: dashed reads
    as explanatory rather than actionable, which is exactly what "How it works" is, and it keeps the box the
    same width as a solid button. They are inside `.ap-bar-end` now. */
-.ap-remedy-btn { flex: none; }
 /* The `:disabled` word goes grey as well as pale. `.vb-btn:disabled` sets the opacity; this says the
    ink, which is the part that distinguished a spent remedy from a busy one. */
 .ap-remedy-btn:disabled { color: var(--muted); }
@@ -157,11 +160,13 @@
    to scan, only something to read and do.
    IT WAS IN `organisms/settings/settings.css` and Settings never named it. The readiness list is the
    auto-pilot bar's and its panel's, which is what the layer gate's two findings on it said. */
-.blockers { list-style: none; display: flex; flex-direction: column; gap: var(--s-2); font-size: var(--t-small); }
+/* `List as="ul"` DRAWS THE COLUMN AND CANCELS THE BULLET at both call sites, so the gap and the step are
+   all this keeps: `.vb-list` is `--s-1` and a list of sentences reads tighter than a list of rows. */
+.blockers { gap: var(--s-2); font-size: var(--t-small); }
 .blockers li { padding-left: var(--s-6); position: relative; color: var(--text); line-height: 1.5; }
 .blockers li::before { content: "→"; position: absolute; left: 0; color: var(--warn, var(--danger)); }
-/* The other side of the same answer: nothing is blocking. */
-.ready-ok { font-size: var(--t-small); color: var(--accent); }
+/* The other side of the same answer — nothing is blocking — and it is `Text ink="accent"`: `--t-small` is
+   the atom's own step, so the class said nothing but the colour. */
 
 /* The emergency stop, on the bar. Quiet until hovered, then unmistakably dangerous: a control that is
    permanently red is one people stop reading, and this bar's whole job is to be read. The guard against
@@ -170,8 +175,9 @@
    That override works because the atom and molecule sheets are imported BEFORE every surface sheet — equal
    specificity, later source — which is the whole reason for that order; see web/src/styles.ts, which is
    the only list of it. `not-allowed` rather than `default` on the
-   disabled cursor, because a stop you cannot press is a refusal and not merely an absence. */
-.ap-kill { flex: none; }
+   disabled cursor, because a stop you cannot press is a refusal and not merely an absence.
+   `flex: none` IS `.vb-fixed` NOW, for the reason stack.css names this class in: it was one declaration
+   under a private name, six times over. */
 .ap-kill:hover:not(:disabled) { border-color: var(--danger); color: var(--danger); }
 .ap-kill:disabled { cursor: not-allowed; }
 
@@ -188,22 +194,24 @@
   font-weight: 500;
 }
 
+/* THE INK AND THE STEP ARE `Text role="error"` — danger at `--t-small`, declaration for declaration.
+   `display: block` IS THE PRICE OF THAT AND IT IS ONE DECLARATION FOR THREE: `.ap-bar` is block flow, and
+   an atom that is always a `<span>` takes no vertical padding and no measure while it is inline. */
 .ap-bar-error {
+  display: block;
   padding: var(--s-3) var(--s-5) var(--s-4);
-  color: var(--danger);
-  font-size: var(--t-small);
   /* Wraps. Both of these carry sentences that quote git or name several cards, and a refusal nobody can
      read to the end is the dead end this whole strip exists to remove. */
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
 
-/* Why the loop stopped. NOT ellipsised, unlike `.ap-status` — that one is a row and this one is prose. */
+/* Why the loop stopped. NOT ellipsised, unlike `.ap-status` — that one is a row and this one is prose.
+   Muted, `--t-small`, 1.45 is the `Text` default exactly, so the face is the atom's and the measure is
+   this surface's. `display: block` for `.ap-bar-error`'s reason. */
 .ap-bar-detail {
+  display: block;
   padding: 0 var(--s-5) var(--s-4);
-  color: var(--muted);
-  font-size: var(--t-small);
-  line-height: 1.45;
   max-width: 90ch;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -218,16 +226,14 @@
   padding: var(--s-2) var(--s-5) var(--s-5);
   border-top: 1px solid var(--border);
 }
-.ap-drawer-head {
-  font-size: var(--t-micro);
-  letter-spacing: var(--track);
-  text-transform: uppercase;
-  color: var(--muted);
-  margin-bottom: var(--s-3);
-}
-.ap-work { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--s-2); }
+/* `Text caps` IS THE FACE and the step is all that is left: `--t-micro` is not a `Text` option and must not
+   become one — a chip's step on a column head is this drawer's own decision. The space under it is the
+   cell's `Stack gap={3}` rather than a margin here, which is what stopped it being a margin on a span. */
+.ap-drawer-head { font-size: var(--t-micro); }
+/* `List as="ul"` draws the column and cancels the bullet; the tighter gap is this list's. */
+.ap-work { gap: var(--s-2); }
 .ap-work li { font-size: var(--t-body); }
-.ap-waiting { color: var(--muted); font-size: var(--t-small); }
+/* `.ap-waiting` IS GONE: muted at `--t-small` is the `Text` default under a second name. */
 
 /* The instructions. Taller than the card modal and scrolling inside itself: it is prose, and prose that
    pushes its own close button off the screen is prose nobody finishes.

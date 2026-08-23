@@ -162,7 +162,9 @@ export function SettingsModal({ config, onClose, onSaved, autopilot, onAutopilot
         </>
       }
     >
-      <div className="settings-section">Copilot</div>
+      <Text caps ink="accent" className="settings-section">
+        Copilot
+      </Text>
       <Field as="div" label="Backend">
         {/* Only the selected backend changes: each backend's model/effort live in their own slot,
                 so switching here reveals that backend's saved choice instead of overwriting it with a
@@ -216,7 +218,9 @@ export function SettingsModal({ config, onClose, onSaved, autopilot, onAutopilot
 
       {sandbox && <SandboxPanel state={sandbox} backend={backend} onChanged={loadSandbox} />}
 
-      <div className="settings-section">Boards</div>
+      <Text caps ink="accent" className="settings-section">
+        Boards
+      </Text>
       <Text role="hint">
         Columns are comma-separated (left→right). Renaming one moves its folder, so its cards come with it. A
         column that still holds cards can't be removed, and renaming and reordering in the same save is
@@ -262,7 +266,9 @@ export function SettingsModal({ config, onClose, onSaved, autopilot, onAutopilot
         onAutopilotChanged={onAutopilotChanged}
       />
 
-      <div className="settings-section">Cards</div>
+      <Text caps ink="accent" className="settings-section">
+        Cards
+      </Text>
       <Row>
         <Field label="Miniature length" className="vb-row-main">
           <Control

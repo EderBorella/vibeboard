@@ -3,6 +3,7 @@ import { Button } from '../../atoms/Button';
 import { Chip } from '../../atoms/Chip';
 import { Control } from '../../atoms/Control';
 import { Readout } from '../../atoms/Readout';
+import { Stack } from '../../atoms/Stack';
 import { Surface } from '../../atoms/Surface';
 import { Text } from '../../atoms/Text';
 import type { ModelOption } from '../../lib/api';
@@ -113,7 +114,7 @@ export function ModelPicker({ models, value, defaultModel, onChange, disabled }:
             onChange={(e) => setQuery(e.target.value)}
           />
 
-          <div className="mp-filters">
+          <Stack gap={3} wrap className="mp-filters">
             {chip(toolOnly, setToolOnly, '🔧 Tool use')}
             {chip(freeOnly, setFreeOnly, '🆓 Free')}
             {chip(visionOnly, setVisionOnly, '👁 Vision')}
@@ -131,7 +132,7 @@ export function ModelPicker({ models, value, defaultModel, onChange, disabled }:
                 </option>
               ))}
             </Control>
-          </div>
+          </Stack>
 
           <Readout>
             {filtered.length} of {models.length} models

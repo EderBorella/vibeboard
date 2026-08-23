@@ -59,11 +59,13 @@ describe('the uppercase section labels', () => {
   // it. Every one is uppercase; the ink is the column somebody chose and the tracking is the one nobody
   // did. `.mp-def-tag` is on the list in docs/design-system.md and is NOT one of these: it carries a
   // border and a pill radius, which makes it a Chip that happens to be uppercase.
+  // `.ap-drawer-head` AND `.settings-section` HAVE LEFT THIS TABLE and are asserted on their own below:
+  // both render a `Text caps` now, so the uppercase is the atom's and the accent is a data attribute
+  // rather than a declaration — a class-only fixture cannot express either, and would report `undefined`
+  // for both while the call sites draw exactly what this table claimed.
   const LABELS: [string, string][] = [
     ['cs-head', 'var(--muted)'],
-    ['ap-drawer-head', 'var(--muted)'],
     ['links-group', 'var(--muted)'],
-    ['settings-section', 'var(--accent)'],
     ['diary-kind', 'var(--text)'],
     ['filed-state', 'var(--text)'],
     ['tile-group', 'var(--accent-2)'],
@@ -76,6 +78,20 @@ describe('the uppercase section labels', () => {
 
   it.each(LABELS)('.%s keeps its own ink, %s', (cls, ink) => {
     expect(box(label(cls)).color).toBe(ink);
+  });
+
+  // THE TWO THAT ARE A `Text caps` NOW, in the spelling their call sites write. The claim is the one the
+  // table above made — this label is uppercase, and it keeps its OWN ink rather than the atom's muted
+  // default — and the fixture carries `data-ink` because that is where the ink went. A class-list-only
+  // version of this would be vacuous: `.vb-text` supplies muted, so the accent case would pass on nothing.
+  it.each([
+    ['ap-drawer-head', '', 'var(--muted)'],
+    ['settings-section', 'accent', 'var(--accent)'],
+  ])('.%s is the caps face over its own ink, %s', (cls, ink, expected) => {
+    const attr = ink === '' ? '' : ` data-ink="${ink}"`;
+    const b = box(at(`<span class="vb-text vb-text-caps ${cls}"${attr}>L</span>`, 'span'));
+    expect(b['text-transform']).toBe('uppercase');
+    expect(b.color).toBe(expected);
   });
 
   // The two that name NO ink and inherit one. Merging them onto a primitive that names `--muted` would
@@ -192,8 +208,11 @@ describe('the empty-state lines', () => {
     expect(box(label(cls, 'div')).margin).toBe('auto');
   });
 
+  // A `Stack direction="column"` draws it now, so the fixture carries `data-dir` — and the claim is
+  // STRONGER than it was: the old version asserted `display: flex` alone, which a row satisfies too.
   it('.diary-empty is a flex column, not a line', () => {
-    expect(box(label('diary-empty', 'div')).display).toBe('flex');
+    const b = box(at('<div class="vb-stack diary-empty" data-dir="column">L</div>', 'div'));
+    expect([b.display, b['flex-direction']]).toEqual(['flex', 'column']);
   });
 });
 

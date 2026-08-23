@@ -44,7 +44,9 @@ export function DiagnosticsPanel() {
 
   return (
     <>
-      <div className="settings-section">Diagnostics</div>
+      <Text caps ink="accent" className="settings-section">
+        Diagnostics
+      </Text>
       <Text role="hint">
         Auto-pilot's errors are always written to its log, whether this is on or not. Turning it on keeps the
         ordinary tick-by-tick output too, which is what you want when you are working out why the loop did

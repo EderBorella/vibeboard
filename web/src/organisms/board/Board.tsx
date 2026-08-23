@@ -49,7 +49,7 @@ export function Board({
   const displayNames = config.boards[board].columns;
 
   return (
-    <Stack direction="column" gap={4} as="section">
+    <Stack direction="column" gap={4} as="section" testId="board">
       <Stack gap={4}>
         {/* A `Row` with an accent rail, and it now names NO class of its own: `.board-label` was the caps
             face and the `--text` ink, which are `Text caps ink="strong"` on the label itself. Selected in
@@ -66,7 +66,12 @@ export function Board({
           <Text ink="accent" className="board-chevron vb-twist">
             {collapsed ? '▸' : '▾'}
           </Text>
-          <Text caps ink="strong">
+          {/* `size="body"` AND NOT THE DEFAULT, and the drift baseline is what caught it: `.board-label`
+              declared no `font-size` at all, so it INHERITED the body's 13px, and `Text`'s default is
+              `--t-small`. Migrating it silently dropped all three board headings a step — three text
+              elements moving 13px -> 12px in the recorded histogram, which is the only place it showed.
+              A heading losing emphasis is not a class-count win, so the step is named here. */}
+          <Text caps ink="strong" size="body">
             {label}
           </Text>
           <Chip pill fill className="vb-readout" testId="board-count">

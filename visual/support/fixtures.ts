@@ -118,7 +118,13 @@ async function openBoard(page: Page, theme: Theme, baseURL: string): Promise<voi
   await expect(page.locator('.gate')).toHaveCount(0);
   // Three boards, and cards on them — the scaffolder's sample cards. A board with no tiles renders
   // almost nothing, and a check that examines nothing passes.
-  await expect(page.locator('section.board')).toHaveCount(3);
+  // KEYED ON THE TEST HANDLE, NOT ON `.board`. Phase 8 turned the board into a `<Stack as="section">` and
+  // deleted the class, and this line is what broke: every one of the 108 tests failed in the FIXTURE,
+  // before a single check ran. That is the fourth time in this sweep a conformance selector has been
+  // keyed on a style class — after `.ap-bar-end`, `.cards-gone` and `NOT_AN_ATOM_YET` — and it is the
+  // worst of the four, because the other three would have gone quietly vacuous while this one took the
+  // whole harness down. A test may depend on a `data-testid`; it may not depend on a class surviving.
+  await expect(page.locator('[data-testid="board"]')).toHaveCount(3);
   expect(await page.locator('.tile').count()).toBeGreaterThan(0);
   await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
 }

@@ -67,7 +67,7 @@ export const SURFACES: Surface[] = [
     open: async () => {},
     prove: async (page) => {
       await expect(page.locator('main.boards')).toBeVisible();
-      await expect(page.locator('section.board')).toHaveCount(3);
+      await expect(page.locator('[data-testid="board"]')).toHaveCount(3);
       await expect(page.locator('.tile').first()).toBeVisible();
     },
     floor: { elements: 150, text: 80, contrast: 80, focus: 30 },

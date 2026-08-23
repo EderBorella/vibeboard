@@ -18,20 +18,20 @@
       "controlHeights": [
         "16px",
         "28px",
-        "30px",
+        "32.8px",
         "47px"
       ],
       "markerHeights": [
         "16px"
       ],
       "examined": {
-        "elements": 276,
+        "elements": 282,
         "textElements": 143,
         "overflow": 118,
         "clipping": 38,
         "contrast": 143,
         "tokens": 49,
-        "rows": 26,
+        "rows": 29,
         "focus": 66
       },
       "findings": {
@@ -68,7 +68,7 @@
         "16px"
       ],
       "examined": {
-        "elements": 165,
+        "elements": 170,
         "textElements": 86,
         "overflow": 64,
         "clipping": 12,
@@ -110,7 +110,7 @@
         "16px"
       ],
       "examined": {
-        "elements": 169,
+        "elements": 171,
         "textElements": 84,
         "overflow": 65,
         "clipping": 15,
@@ -154,7 +154,7 @@
         "16px"
       ],
       "examined": {
-        "elements": 187,
+        "elements": 200,
         "textElements": 90,
         "overflow": 50,
         "clipping": 13,
@@ -189,14 +189,14 @@
       "controlHeights": [
         "16px",
         "28px",
-        "29px",
+        "31.4px",
         "47px"
       ],
       "markerHeights": [
         "16px"
       ],
       "examined": {
-        "elements": 146,
+        "elements": 152,
         "textElements": 73,
         "overflow": 49,
         "clipping": 12,
@@ -234,14 +234,14 @@
         "28px",
         "29.4px",
         "29px",
-        "30.5px",
+        "31.4px",
         "46.8px"
       ],
       "markerHeights": [
         "16px"
       ],
       "examined": {
-        "elements": 57,
+        "elements": 58,
         "textElements": 35,
         "overflow": 30,
         "clipping": 3,
@@ -353,7 +353,7 @@
         "16px"
       ],
       "examined": {
-        "elements": 62,
+        "elements": 66,
         "textElements": 31,
         "overflow": 22,
         "clipping": 5,
@@ -409,10 +409,10 @@
     }
   },
   "fontSizes": {
-    "13px": 152,
+    "13px": 155,
     "15px": 8,
-    "12px": 95,
-    "11px": 21
+    "12px": 97,
+    "11px": 22
   },
   "fontSizesOnText": {
     "15px": 8,
@@ -428,13 +428,13 @@
     "4px": 4
   },
   "examined": {
-    "elements": 276,
+    "elements": 282,
     "textElements": 143,
     "overflow": 118,
     "clipping": 38,
     "contrast": 143,
     "tokens": 49,
-    "rows": 26,
+    "rows": 29,
     "focus": 66,
     "focusUnfocusable": 1
   },

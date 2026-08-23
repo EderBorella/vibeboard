@@ -98,7 +98,10 @@
    This is not a `<Button>`: `StatusChip` hands the class to `Popover`, which renders its own `<button>`
    carrying `chipClasses` — so `.vb-btn[data-align='start']` matches nothing here, and neither molecule
    takes an `align`. Closing it means a prop on both, which is a change to the molecule layer. */
-.conn-status { text-align: left; }
+/* `text-align: left` IS GONE FROM HERE and is `StatusChip`'s `triggerAlign` now — it was the last
+   `text-align` in the tree. It could not be `Button align="start"` because this is not a `Button`: the
+   connection light is a `Popover` trigger wearing `chipClasses`, so the option had to go on the molecule
+   that renders the button. The class itself stays, for the hover rule below. */
 /* NO FIXED WIDTH, AND THE REASON IT HAD ONE IS WITHDRAWN RATHER THAN FORGOTTEN. It was `width: 12ch`,
    sized to `unauthorized`, the longest name the light can report — so a reconnect could not change the
    label's width and shove the tab row sideways while you were aiming at it. Measured, that reserved 91.6px

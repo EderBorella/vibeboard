@@ -114,7 +114,7 @@ export function ModelPicker({ models, value, defaultModel, onChange, disabled }:
             onChange={(e) => setQuery(e.target.value)}
           />
 
-          <Stack gap={3} wrap className="mp-filters">
+          <Stack gap={3} wrap pad={[0, 6, 3]}>
             {chip(toolOnly, setToolOnly, '🔧 Tool use')}
             {chip(freeOnly, setFreeOnly, '🆓 Free')}
             {chip(visionOnly, setVisionOnly, '👁 Vision')}

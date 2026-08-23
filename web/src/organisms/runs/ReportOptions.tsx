@@ -49,7 +49,7 @@ export function ReportOptions({
     // class still says, because `pad` sets a whole axis and this is one edge of one.
     // `align="start"` IS NOT WANTED HERE and the column default is what draws it: the option buttons are
     // full-width rows you pick, which is the same claim `align="start"` on the buttons' text makes.
-    <Stack as="section" label="What next" direction="column" gap={2} edge="top" className="options">
+    <Stack as="section" label="What next" direction="column" gap={2} edge="top" pad={[4, 0, 0]}>
       <Text caps>What next?</Text>
       {!canContinue && (
         <Text role="error">

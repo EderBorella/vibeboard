@@ -53,16 +53,35 @@ const GUTTER = '12px';
 // that class's own `padding` shorthand. Both resolve to the same twelve pixels, which is the point — a row
 // is either padded by the dock gutter or it is a defect, and how it says so is not the claim.
 //
-// THE TWO THAT KEEP A CLASS KEEP IT FOR A REASON THAT IS NOT THE PADDING. `.copilot-selects` pads
-// `0 var(--s-5) var(--s-4)` — asymmetric in the block axis, where `pad` is one value per axis — and both it
-// and `.copilot-input` are the selector their `.vb-ctl` child's `flex`/`resize` is written against.
+// AND THE SIXTH ROW JOINED THEM WHEN `pad` LEARNED CSS'S THREE-VALUE SHAPE. `.copilot-selects` pads
+// `0 var(--s-5) var(--s-4)` — asymmetric in the block axis — which the first cut of the atom could not say,
+// because it wrote `padding-block` and that sets BOTH edges. `pad={[0, 5, 4]}` says it exactly.
+// `.copilot-input` keeps its class, and NOT for the padding: it is the selector its `.vb-ctl` child's
+// `flex`/`resize` is written against.
+// THE ATTRIBUTES ARE `data-pad-t`/`data-pad-b` AND NOT `data-pad-y`, for that same repair. A fixture left
+// on the old name would assert against an attribute no rule reads — green, and measuring nothing.
 const ROWS: [name: string, markup: string][] = [
-  ['copilot-head', '<div class="vb-stack" data-pad-y="4" data-pad-x="5" data-edge="bottom">x</div>'],
-  ['copilot-chatbar', '<div class="vb-stack" data-pad-y="3" data-pad-x="5" data-edge="bottom">x</div>'],
-  ['copilot-controls', '<div class="vb-stack" data-pad-y="4" data-pad-x="5" data-edge="bottom">x</div>'],
-  ['copilot-selects', '<div class="copilot-selects">x</div>'],
-  ['copilot-status', '<div class="vb-stack" data-pad-y="2" data-pad-x="5" data-edge="bottom">x</div>'],
-  ['copilot-authority', '<div class="vb-stack" data-pad-y="4" data-pad-x="5" data-edge="bottom">x</div>'],
+  [
+    'copilot-head',
+    '<div class="vb-stack" data-pad-t="4" data-pad-b="4" data-pad-x="5" data-edge="bottom">x</div>',
+  ],
+  [
+    'copilot-chatbar',
+    '<div class="vb-stack" data-pad-t="3" data-pad-b="3" data-pad-x="5" data-edge="bottom">x</div>',
+  ],
+  [
+    'copilot-controls',
+    '<div class="vb-stack" data-pad-t="4" data-pad-b="4" data-pad-x="5" data-edge="bottom">x</div>',
+  ],
+  ['copilot-selects', '<div class="vb-stack" data-pad-t="0" data-pad-b="4" data-pad-x="5">x</div>'],
+  [
+    'copilot-status',
+    '<div class="vb-stack" data-pad-t="2" data-pad-b="2" data-pad-x="5" data-edge="bottom">x</div>',
+  ],
+  [
+    'copilot-authority',
+    '<div class="vb-stack" data-pad-t="4" data-pad-b="4" data-pad-x="5" data-edge="bottom">x</div>',
+  ],
   ['copilot-input', '<div class="copilot-input">x</div>'],
 ];
 

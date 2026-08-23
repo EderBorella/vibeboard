@@ -50,7 +50,15 @@ export function CardReports({ card, runs, account, onOpen, onCancel, onForgiven 
     // `<section aria-label>` IS A `Stack` NOW — the tag and the name are what kept the flex column here.
     // `edge="top"` is the hairline; the `padding-top` stays on the class because `pad` sets a whole axis
     // and this is one edge of one.
-    <Stack as="section" label="Reports" direction="column" gap={2} edge="top" className="reports">
+    <Stack
+      as="section"
+      label="Reports"
+      direction="column"
+      gap={2}
+      edge="top"
+      pad={[4, 0, 0]}
+      className="reports"
+    >
       <Text caps>Reports</Text>
       {[...runs].reverse().map((r) => (
         <Row key={r.run} className={r.resolved ? 'resolved' : undefined}>

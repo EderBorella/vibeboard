@@ -56,7 +56,7 @@ export function CopilotControls({
       </Stack>
 
       {/* `align="stretch"`: this row named no `align-items`, so its two selects fill its height. */}
-      <Stack align="stretch" className="copilot-selects">
+      <Stack align="stretch" pad={[0, 5, 4]} className="copilot-selects">
         <ModelPicker
           models={models}
           value={effModel}

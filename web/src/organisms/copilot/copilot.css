@@ -74,7 +74,7 @@
    bottom — it sits directly under `.copilot-controls`, so a top inset would double that row's — and `pad`
    is one value per axis. The two rules below are the second reason: both are about what a `.vb-ctl` CHILD
    does, which no attribute on this element can say. */
-.copilot-selects { padding: 0 var(--s-5) var(--s-4); border-bottom: 1px solid var(--border); }
+.copilot-selects { border-bottom: 1px solid var(--border); }
 /* The row decides how its controls sit; the box is `.vb-ctl`'s. */
 .copilot-selects > .vb-ctl { flex: 1; }
 .copilot-selects select:disabled { opacity: 0.5; }

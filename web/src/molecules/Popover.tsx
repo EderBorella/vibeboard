@@ -15,6 +15,7 @@ export function Popover({
   trigger,
   triggerClassName,
   triggerTitle,
+  triggerAlign,
   triggerTestId,
   triggerState,
   className,
@@ -26,6 +27,11 @@ export function Popover({
   trigger: ReactNode;
   triggerClassName?: string;
   triggerTitle?: string;
+  // A LEADING LABEL ON THE TRIGGER. `.conn-status` was `text-align: left` and nothing else — the last
+  // `text-align` in the tree — and `Button`'s `align` could not reach it, because this trigger is not a
+  // `Button`: it is this component's own `<button>` wearing `chipClasses`. Forwarded rather than left to
+  // the caller's `triggerClassName` so it stays an option instead of going back to being a class.
+  triggerAlign?: 'start';
   // ON THE TRIGGER, so one selector finds a control whether or not it happens to have a balloon —
   // `.ap-agent-state` is a bare span when the agent is healthy and this button when it is not, and a
   // test that had to know which was asserting on the implementation.
@@ -75,6 +81,7 @@ export function Popover({
           [triggerClassName, triggerState && stateClass(triggerState)].filter(Boolean).join(' ') || undefined
         }
         title={triggerTitle}
+        data-align={triggerAlign}
         data-testid={triggerTestId}
         data-state={triggerState}
         aria-expanded={open}

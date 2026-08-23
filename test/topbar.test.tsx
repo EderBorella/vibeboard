@@ -249,11 +249,25 @@ describe('TopBar', () => {
   // and then shuffled about as the state name changed length. Measured in a real browser — the gap
   // between the dot's right edge and the first glyph went from an intended 6.4px to 30.7px. jsdom
   // computes no layout, so the stylesheet is again the only place this can be held.
+  // THE DECLARATION MOVED TO THE ATOM IN PHASE 8 AND THIS ASSERTION GOT STRONGER FOR IT. `.conn-status`
+  // held `text-align: left` and nothing else — the last `text-align` in the tree — and it is
+  // `StatusChip`'s `triggerAlign` now. It could not become `Button align="start"`, because the light is
+  // not a `Button`: it is a `Popover` trigger wearing `chipClasses`, so the option lives on the molecule
+  // that renders the button.
+  // TWO HALVES, BECAUSE EITHER ONE ALONE IS VACUOUS. A rule nothing carries draws nothing, and an
+  // attribute no rule reads is inert — and the second is the one that would have shipped silently, since
+  // `Button`'s own `.vb-btn[data-align]` selector cannot match this element.
   it('left-aligns the label inside its fixed box, which a button does not do by default', () => {
-    const css = readFileSync(join(process.cwd(), 'web', 'src', 'organisms', 'topbar', 'topbar.css'), 'utf8');
-    const rule = /^\.conn-status\s*\{([^}]*)\}/m.exec(css);
-    expect(rule, '.conn-status rule not found').toBeTruthy();
+    const css = readFileSync(join(process.cwd(), 'web', 'src', 'atoms', 'chip.css'), 'utf8');
+    const rule = /button\[data-align='start'\]\s*\{([^}]*)\}/m.exec(css);
+    expect(rule, "the button[data-align='start'] rule is gone from atoms/chip.css").toBeTruthy();
     expect(rule?.[1]).toMatch(/text-align:\s*left/);
+    expect(rule?.[1]).toMatch(/justify-content:\s*flex-start/);
+  });
+
+  it('and the connection light actually asks for it', () => {
+    render(<TopBar {...props} />);
+    expect(screen.getByTestId('conn-status').getAttribute('data-align')).toBe('start');
   });
 
   // THE `12` THIS PINNED WAS THE WIDTH'S OWN JUSTIFICATION, and with the width gone the number has nothing

@@ -56,3 +56,9 @@ button.vb-chip { cursor: pointer; }
    border-color at all. Mixing `--muted` into `--border` only greys the grey, and `.tag`, `.signin-this`
    and `.mp-chip` are the boxes that would have moved. */
 .vb-chip.vb-chip-tone.vb-tone-neutral { border-color: var(--border); }
+
+/* A LEADING LABEL, on a chip that is a button. `.conn-status` was `text-align: left` and nothing else —
+   the last `text-align` in the tree — and `Button[data-align]` cannot reach it: the connection light is a
+   `Popover` trigger wearing `chipClasses`, not a `<Button>`. Keyed on the attribute alone rather than on
+   `.vb-chip[data-align]` so the same option works on any trigger this molecule renders. */
+button[data-align='start'] { justify-content: flex-start; text-align: left; }

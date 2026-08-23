@@ -5,7 +5,6 @@
    THE `padding-top` IS WHY THE NAME SURVIVES, and it is the one gap `pad` has: `pad={[N, M]}` sets
    `padding-block`, which is BOTH edges, and this is the top edge alone. A single-edge padding has no
    spelling on the atom. Same for `.options` below. */
-.reports { padding-top: var(--s-4); }
 /* `.report-row` IS GONE — a `Row`. `.resolved` stays as the state the row wears; the two rules under it
    are keyed on `.vb-row` so they cannot reach a `.resolved` that is not one. */
 /* A `Surface` with the `flat` variant. What is left is where the box sits and how it lays its parts out;
@@ -69,7 +68,6 @@
 /* Options on a report that needs attention. The agent's suggestions and the fixed ones look the
    same on purpose — they all lead to the same editable prompt. */
 /* `Stack as="section" label="What next"` now. See `.reports` for why the `padding-top` cannot follow it. */
-.options { padding-top: var(--s-4); }
 /* `.options-warn` IS GONE — `Text role="error"`, which is what danger ink on a refusal means. */
 /* Left-aligned because an option is a whole sentence. `.option-fixed { border-style: dashed }` WENT WITH
    THE MIGRATION and its removal is a fix, not a casualty: this section's own comment says "the agent's

@@ -56,21 +56,35 @@
    `.copilot-status`, `.copilot-controls`, `.copilot-selects` and `.copilot-input` are six names for
    "a row with a gap, some padding, and a rule under it".
    A surviving one-declaration class IS the exception this work exists to remove, so the atom takes the
-   declaration. Both axes are separate attributes because 26 of the paddings in the tree are two values
-   (`var(--s-4) var(--s-5)`), and both are attributes rather than classes for the reason the whole file is:
-   `check:class-budget` counts class selectors, so sixteen padding steps and two edges cost nothing.
+   declaration. Every edge is a separate attribute because 26 of the paddings in the tree are two values
+   (`var(--s-4) var(--s-5)`) and several are three — and they are attributes rather than classes for the
+   reason the whole file is: `check:class-budget` counts class selectors, so 24 padding rules cost nothing.
+   THE BLOCK AXIS IS TWO EDGES AND NOT ONE, and the first cut got that wrong. It wrote `padding-block`,
+   which sets BOTH — so a single-edge padding had no spelling at all, and that one gap kept six classes
+   alive on its own: `.reports` and `.options` (`padding-top` only), `.mp-filters` (`0 / x / --s-3`),
+   `.cv-body` and `.explorer-head` (`padding-top` only) and `.copilot-selects` (asymmetric). The prop takes
+   CSS's own three shapes rather than growing two more names: `N`, `[block, inline]`, `[top, inline, bottom]`.
    SPECIFICITY, and it is deliberate: these are (0,1,1) against a surface class's (0,1,0), so a `Stack`
    that says `pad` beats a surface that still declares padding on the same element WHATEVER the import
    order. That is the right direction — the atom is meant to win — but it means a half-finished migration
    is visible rather than silent, which is what the browser checks are for. */
-.vb-stack[data-pad-y='0'] { padding-block: 0; }
-.vb-stack[data-pad-y='1'] { padding-block: var(--s-1); }
-.vb-stack[data-pad-y='2'] { padding-block: var(--s-2); }
-.vb-stack[data-pad-y='3'] { padding-block: var(--s-3); }
-.vb-stack[data-pad-y='4'] { padding-block: var(--s-4); }
-.vb-stack[data-pad-y='5'] { padding-block: var(--s-5); }
-.vb-stack[data-pad-y='6'] { padding-block: var(--s-6); }
-.vb-stack[data-pad-y='7'] { padding-block: var(--s-7); }
+.vb-stack[data-pad-t='0'] { padding-top: 0; }
+.vb-stack[data-pad-t='1'] { padding-top: var(--s-1); }
+.vb-stack[data-pad-t='2'] { padding-top: var(--s-2); }
+.vb-stack[data-pad-t='3'] { padding-top: var(--s-3); }
+.vb-stack[data-pad-t='4'] { padding-top: var(--s-4); }
+.vb-stack[data-pad-t='5'] { padding-top: var(--s-5); }
+.vb-stack[data-pad-t='6'] { padding-top: var(--s-6); }
+.vb-stack[data-pad-t='7'] { padding-top: var(--s-7); }
+
+.vb-stack[data-pad-b='0'] { padding-bottom: 0; }
+.vb-stack[data-pad-b='1'] { padding-bottom: var(--s-1); }
+.vb-stack[data-pad-b='2'] { padding-bottom: var(--s-2); }
+.vb-stack[data-pad-b='3'] { padding-bottom: var(--s-3); }
+.vb-stack[data-pad-b='4'] { padding-bottom: var(--s-4); }
+.vb-stack[data-pad-b='5'] { padding-bottom: var(--s-5); }
+.vb-stack[data-pad-b='6'] { padding-bottom: var(--s-6); }
+.vb-stack[data-pad-b='7'] { padding-bottom: var(--s-7); }
 
 .vb-stack[data-pad-x='0'] { padding-inline: 0; }
 .vb-stack[data-pad-x='1'] { padding-inline: var(--s-1); }

@@ -25,7 +25,6 @@
    treatment, which is the same ruling that gave the five destinations one badge. */
 .mp { position: relative; flex: 1; min-width: 0; }
 /* A `Stack gap={3} wrap`; the inset that lines the filters up with the modal's head is what is left. */
-.mp-filters { padding: 0 var(--s-6) var(--s-3); }
 /* `Chip as="button" pill fill neutral` owns the box; these two are the filter's states. */
 .mp-chip:hover { border-color: var(--accent); }
 .mp-chip.on { background: var(--accent-fill); color: var(--on-fill); border-color: var(--accent); font-weight: 600; }

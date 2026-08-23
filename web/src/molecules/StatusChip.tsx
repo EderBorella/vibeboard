@@ -84,6 +84,7 @@ export function StatusChip({
         toned: true,
         className: ['vb-status', className].filter(Boolean).join(' '),
       })}
+      triggerAlign="start"
       triggerTitle={title}
       triggerTestId={testId}
       triggerState={state}

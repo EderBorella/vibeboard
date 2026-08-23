@@ -41,9 +41,11 @@ interface Props {
   align?: StackAlign;
   wrap?: boolean;
   justify?: 'end' | 'between' | 'center';
-  // ONE VALUE IS BOTH AXES, a pair is `[block, inline]` — the spelling CSS itself uses, and the shape 26
-  // of the tree's paddings already had.
-  pad?: StackGap | [StackGap, StackGap];
+  // CSS'S OWN THREE SHAPES, and no more props: `N` is every edge, `[block, inline]` is the pair 26 of the
+  // tree's paddings already had, and `[top, inline, bottom]` is the three-value shorthand. The first cut
+  // wrote `padding-block` for the pair, which sets BOTH block edges — so a `padding-top` on its own could
+  // not be said at all, and that single gap kept six classes alive.
+  pad?: StackGap | [StackGap, StackGap] | [StackGap, StackGap, StackGap];
   // The single hairline that separates one row from the next. Four borders is a `Surface`.
   edge?: 'top' | 'bottom';
   as?: StackTag;
@@ -77,7 +79,11 @@ export const Stack = forwardRef<HTMLElement, Props>(function Stack(
   },
   ref,
 ) {
-  const [padY, padX] = Array.isArray(pad) ? pad : [pad, pad];
+  const [padT, padX, padB] = Array.isArray(pad)
+    ? pad.length === 3
+      ? pad
+      : [pad[0], pad[1], pad[0]]
+    : [pad, pad, pad];
   // ONE NARROW CAST, AND NOT `any`, and the two attempts before it are worth recording because both were
   // worse. `ref as any` suppresses a lint rule that is usually pointing at something real. Widening the tag
   // to `ElementType` fails outright: TypeScript then requires the ref to satisfy EVERY tag in the union at
@@ -94,7 +100,8 @@ export const Stack = forwardRef<HTMLElement, Props>(function Stack(
       data-align={align}
       data-wrap={wrap ? '' : undefined}
       data-justify={justify}
-      data-pad-y={padY === undefined ? undefined : String(padY)}
+      data-pad-t={padT === undefined ? undefined : String(padT)}
+      data-pad-b={padB === undefined ? undefined : String(padB)}
       data-pad-x={padX === undefined ? undefined : String(padX)}
       data-edge={edge}
       aria-label={label}

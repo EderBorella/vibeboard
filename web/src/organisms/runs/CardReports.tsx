@@ -63,12 +63,18 @@ export function CardReports({ card, runs, account, onOpen, onCancel, onForgiven 
             <Chip pill state={r.status} className="report-chip vb-readout" testId="report-chip">
               {r.resolved ? `${LABELS[r.status]} · dealt with` : LABELS[r.status]}
             </Chip>
-            <span className="report-skill">{r.skill}</span>
+            {/* `ink="strong"` because the class named no ink and inherited the row's; `.report-skill`
+                survives only to dim it once the run has been dealt with. */}
+            <Text ink="strong" className="report-skill vb-fixed">
+              {r.skill}
+            </Text>
             {/* Cost only, and only when reported: the row has one line, and the full breakdown is
                 one click away in the report itself. */}
             {costLabel(r.usage) && <Readout testId="report-cost">{costLabel(r.usage)}</Readout>}
             <Readout testId="report-when">{when(r)}</Readout>
-            <span className="report-summary">{r.summary ?? r.note ?? ''}</span>
+            <Text className="vb-clip" testId="report-summary">
+              {r.summary ?? r.note ?? ''}
+            </Text>
           </Surface>
           {(r.status === 'running' || r.status === 'queued') && (
             // Acts — it cancels a live run. `.report-stop` still owns the danger-on-hover colour.

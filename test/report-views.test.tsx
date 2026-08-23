@@ -184,7 +184,7 @@ describe('CardReports', () => {
         onCancel={vi.fn()}
       />,
     );
-    expect(document.querySelector('.report-summary')?.textContent).toBe('');
+    expect(document.querySelector('[data-testid="report-summary"]')?.textContent).toBe('');
   });
 
   it('prefers the agent’s summary, and falls back to VibeBoard’s note', () => {
@@ -201,10 +201,9 @@ describe('CardReports', () => {
         onCancel={vi.fn()}
       />,
     );
-    expect([...document.querySelectorAll('.report-summary')].map((e) => e.textContent)).toEqual([
-      'The agent finished without writing a report.',
-      'did the thing',
-    ]);
+    expect(
+      [...document.querySelectorAll('[data-testid="report-summary"]')].map((e) => e.textContent),
+    ).toEqual(['The agent finished without writing a report.', 'did the thing']);
   });
 
   it.each([
@@ -558,8 +557,8 @@ describe('ReportPane', () => {
     expect(screen.queryByText('Attached')).toBeNull();
     expect(screen.queryByText('Dealt with')).toBeNull();
     expect(document.querySelector('.report-lead')).toBeNull();
-    expect(document.querySelector('.report-note')).toBeNull();
-    expect(document.querySelector('.report-prompt')).toBeNull();
+    expect(document.querySelector('[data-testid="report-note"]')).toBeNull();
+    expect(document.querySelector('[data-testid="report-prompt"]')).toBeNull();
   });
 
   it('lists what was attached, comma separated', () => {
@@ -575,7 +574,9 @@ describe('ReportPane', () => {
         record={run({ status: 'attention', summary: undefined, note: 'The agent wrote no report.' })}
       />,
     );
-    expect(document.querySelector('.report-note')?.textContent).toBe('The agent wrote no report.');
+    expect(document.querySelector('[data-testid="report-note"]')?.textContent).toBe(
+      'The agent wrote no report.',
+    );
     expect(document.querySelector('.report-lead')).toBeNull();
   });
 
@@ -650,13 +651,15 @@ describe('ActiveReport', () => {
     // The EXACT set: E-999 was never on the board, but E-010 is — so asserting only that E-999 is
     // absent would pass just as well if the filter were dropped entirely.
     expect(
-      [...document.querySelectorAll('.report-created [data-testid="created-id"]')].map((e) => e.textContent),
+      [...document.querySelectorAll('[data-testid="report-created"] [data-testid="created-id"]')].map(
+        (e) => e.textContent,
+      ),
     ).toEqual(['E-041']);
   });
 
   it('links nothing when the run created nothing', () => {
     render(<ActiveReport {...props} record={run()} />);
-    expect(document.querySelector('.report-created')).toBeNull();
+    expect(document.querySelector('[data-testid="report-created"]')).toBeNull();
   });
 
   it('hands the resolved skill to the continuation', () => {

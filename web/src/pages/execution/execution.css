@@ -25,21 +25,29 @@
    the fault that let those titles reach the viewport edge and get cut — is now `.vb-surface`'s, for every
    Panel rather than for this one. */
 .exec-column { gap: var(--s-4); padding: var(--s-4); }
+/* THE CAPS FACE MOVED TO A `Text caps` ON THE LABEL ITSELF; what is left is the `<h3>`'s, and it is an
+   `<h3>` because it heads the column. `Stack` renders no heading tag and `Text` no children beside its
+   own, so the flex row and the count chip stay here — and the step stays with them: dropping it would
+   leave the heading at the UA's 1.17em and grow the line box the row is measured on.
+   THE DISPLAY FAMILY STAYS TOO, pending the ruling that puts it on `.vb-text-caps` — six classes are
+   display-family + caps + track, and the merge is Group A's edit to make, not this one's. */
 .exec-head {
   display: flex; align-items: center; gap: var(--s-4); margin: 0;
   font-family: var(--font-display); font-size: var(--t-small);
-  text-transform: uppercase; letter-spacing: var(--track);
 }
 /* `.exec-run` IS GONE — a `Row stack variant="inset"`, which is the same object as a `.tile`: a record in
    a column on a `--panel` parent. `align-items: flex-start` went with it, and its three children each
    declare `width: 100%`, so a stretched row draws the same boxes. */
-.exec-run-top { display: flex; align-items: baseline; gap: var(--s-3); width: 100%; }
+/* A `Stack align="baseline"`; the full width is what is left, and it is what makes the row fill the
+   stretched column rather than shrink to its chips. */
+.exec-run-top { width: 100%; }
 /* The run's actions, side by side. `.exec-run` is a flex column, so without this every button is its
    own row — Dismiss and Clear failed tries stacked, which reads as two unrelated controls rather than
    the pair of answers to one failed run. Wraps, so ForgiveAttempts' result and error lines (both
-   `flex-basis: 100%`) still take a line of their own underneath. */
-.exec-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2); width: 100%; }
-.exec-skill { font-size: var(--t-small); }
+   `flex-basis: 100%`) still take a line of their own underneath. A `Stack gap={2} wrap` now; the full
+   width is all that is left of it. */
+.exec-actions { width: 100%; }
+/* `.exec-skill` IS GONE — `--t-small` is `Text`'s own step, and the row's ink is `ink="strong"`. */
 /* Cost takes the push-right when present, so cost and elapsed sit together at the end of the row. */
 /* Cost takes the push-right when present, so cost and elapsed sit together at the end of the row. Both
    are `Readout`s now, and the pair rule below is the same claim the two classes made by hand. */
@@ -59,12 +67,15 @@
    Scoped to `.exec-card` rather than fixed on the shared class, because the other users of it sit in a
    constrained block where truncating really is what is wanted. */
 .exec-card .vb-clip { white-space: normal; overflow: visible; }
-.exec-summary { margin: 0; color: var(--muted); font-size: var(--t-small); line-height: 1.35; overflow-wrap: anywhere; }
+/* A `Text`; the tighter line and the break are what is left. Tighter than the atom's 1.45 because this
+   is a two-or-three-line paraphrase inside a dashboard row, not prose. */
+.exec-summary { line-height: 1.35; overflow-wrap: anywhere; }
 /* THE ONE ACTION ON A RUN THAT NEEDS ANSWERING, and this page is its only caller. It was in
    `organisms/runs/runs.css` beside `.report-stop`, which really is shared and is in `organisms/shared/`
    now; this one never was. A `ghost` Button: `align-self: flex-start` because `.exec-actions` wraps and a
-   stretched button in a wrapped row is as wide as the widest line. */
-.report-dismiss { flex: 0 0 auto; align-self: flex-start; }
+   stretched button in a wrapped row is as wide as the widest line. Don't-shrink is `.vb-fixed` on the
+   button; the self-alignment is the one thing left. */
+.report-dismiss { align-self: flex-start; }
 /* `.tab-badge` IS GONE, and with it the stray this file held: it was the TOP BAR's attention count,
    living here because that is where its bytes fell in `styles.css`. `Menu`'s `badge` option renders it —
    `Chip pill fill` with the mono face, which is what the dock's own count already was.

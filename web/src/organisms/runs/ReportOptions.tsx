@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Button } from '../../atoms/Button';
 import { Control } from '../../atoms/Control';
+import { Stack } from '../../atoms/Stack';
 import { Text } from '../../atoms/Text';
 
 interface ColumnChoice {
@@ -46,10 +47,10 @@ export function ReportOptions({
     <section className="options" aria-label="What next">
       <Text caps>What next?</Text>
       {!canContinue && (
-        <p className="options-warn">
+        <Text role="error">
           The skill this run used is no longer in the project, so there is nothing to continue with. Closing
           the card still works.
-        </p>
+        </Text>
       )}
 
       {options.map((option) => (
@@ -86,8 +87,8 @@ export function ReportOptions({
         Write my own input
       </Button>
 
-      <div className="options-close">
-        <span className="options-close-label">Ignore and close</span>
+      <Stack gap={4} className="options-close">
+        <Text className="options-close-label">Ignore and close</Text>
         {/* NOT a `Field`: an action row. "Ignore and close" names the BUTTON, and the select is one of
             its two operands — a Field's label names one control. */}
         <Control
@@ -109,7 +110,7 @@ export function ReportOptions({
         >
           Close card
         </Button>
-      </div>
+      </Stack>
     </section>
   );
 }

@@ -357,9 +357,10 @@ describe('the split — what agents filed', () => {
       api.listSuggestions.mockResolvedValue([full()]);
       render(<DiaryView bump={0} />);
       const row = await found('.filed-list > *');
-      const refs = row.querySelector('.diary-about') as HTMLElement;
-      // A sibling of the readout line, not a child of it — `.diary-about` is what the diary beside this
-      // column already uses for exactly this, so the group costs no class.
+      const refs = row.querySelector('[data-testid="diary-about"]') as HTMLElement;
+      // A sibling of the readout line, not a child of it. BY TEST ID AND NOT BY CLASS, because Phase 8
+      // deleted `.diary-about`: it was `display: flex; flex-wrap: wrap; gap`, which is a `Stack`, so the
+      // group now costs no class at all rather than one shared with the diary beside it.
       expect(refs.parentElement).toBe(row);
       expect([...refs.children].map((c) => c.textContent)).toEqual(['run-7', 'P-001', 'became C-042']);
     });
@@ -369,13 +370,16 @@ describe('the split — what agents filed', () => {
       api.listSuggestions.mockResolvedValue([suggestion({ run: undefined })]);
       render(<DiaryView bump={0} />);
       await waitFor(() => expect(filed().querySelector('.filed-list > *')).toBeTruthy());
-      expect(filed().querySelector('.diary-about')).toBeNull();
+      expect(filed().querySelector('[data-testid="diary-about"]')).toBeNull();
     });
 
     // THE HALF jsdom CANNOT SEE is the layout, so the rule is read out of the stylesheets instead. A
     // stacked group is a column of figures that lines up on its left edge whether it holds one
     // reference or three; a row of them fits with two and wraps with three, and the harness fixture
     // carries two — so a row would have passed every gate here and still been wrong.
+    // THE RULE IS THE ATOM'S NOW and the resolver reaches it through `data-dir`/`data-align` rather than
+    // through a class, which is the same cascade question asked of the same element: `direction="column"`
+    // and `align="start"` on one side, a plain row on the other.
     it('stacks that group in this column, because a row of ids cannot be made to fit', async () => {
       // BOTH COLUMNS RENDER A GROUP, so the claim is a comparison rather than an assertion about one
       // element: a fixture with only the filed side could not tell "stacked in the narrow column" from
@@ -383,11 +387,13 @@ describe('the split — what agents filed', () => {
       api.listDiary.mockResolvedValue([entry({ card: 'P-001', iteration: 1 })]);
       api.listSuggestions.mockResolvedValue([full()]);
       render(<DiaryView bump={0} />);
-      const refs = await found('.diary-about');
+      const refs = await found('[data-testid="diary-about"]');
       const drawn = box(refs);
       expect(drawn['flex-direction']).toBe('column');
       expect(drawn['align-items']).toBe('flex-start');
-      const inTheDiary = screen.getByLabelText('Project log').querySelector('.diary-about') as Element;
+      const inTheDiary = screen
+        .getByLabelText('Project log')
+        .querySelector('[data-testid="diary-about"]') as Element;
       expect(box(inTheDiary)['flex-direction']).toBeUndefined();
     });
   });

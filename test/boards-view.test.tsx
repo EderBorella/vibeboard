@@ -62,8 +62,11 @@ const props = {
 };
 
 // The head button holds a chevron, the label, and the card count as one text node run.
+//
+// BY TEST ID AND NOT BY CLASS, because `.board-label` no longer exists: the caps face and the `--text` ink
+// it carried are `Text caps ink="strong"` on the label itself, so the button has no class of its own.
 const boardLabels = (): string[] =>
-  [...document.querySelectorAll('.board-label')].map((e) =>
+  [...document.querySelectorAll('[data-testid="board-head"]')].map((e) =>
     (e.textContent ?? '').replace(/[▸▾]/g, '').replace(/\d+$/, ''),
   );
 
@@ -164,7 +167,9 @@ describe('BoardsView', () => {
 
   it('shows a board as collapsed when the shell says it is', () => {
     render(<BoardsView {...props} collapsed={new Set<BoardName>(['product'])} />);
-    const heads = [...document.querySelectorAll('.board-label')].map((e) => e.getAttribute('aria-expanded'));
+    const heads = [...document.querySelectorAll('[data-testid="board-head"]')].map((e) =>
+      e.getAttribute('aria-expanded'),
+    );
     expect(heads).toEqual(['true', 'false', 'true']);
   });
 

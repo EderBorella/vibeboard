@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { Chip } from '../../atoms/Chip';
+import { Stack } from '../../atoms/Stack';
+import { Text } from '../../atoms/Text';
 import type { BoardName, Card, ProjectConfig } from '../../lib/shared';
 import { cardsByColumn, columnSlugs } from '../../lib/viewmodel';
 import { Row } from '../shared/Row';
@@ -47,22 +49,26 @@ export function Board({
   const displayNames = config.boards[board].columns;
 
   return (
-    <section className="board">
-      <div className="board-head">
-        {/* A `Row` with an accent rail. `.board-label` keeps its display FACE and no geometry at all —
-            which is what empties `check:radius-scale`'s button ratchet to 0/0: its `font-size` was
-            `var(--t-body)`, the value `body` already gives it, and its padding is `flat`'s. */}
+    <Stack direction="column" gap={4} as="section">
+      <Stack gap={4}>
+        {/* A `Row` with an accent rail, and it now names NO class of its own: `.board-label` was the caps
+            face and the `--text` ink, which are `Text caps ink="strong"` on the label itself. Selected in
+            the tests by `data-testid` for exactly that reason. */}
         <Row
           as="button"
           variant="flat"
           rail="accent"
           interactive
-          className="board-label"
+          data-testid="board-head"
           onClick={onToggle}
           aria-expanded={!collapsed}
         >
-          <span className="board-chevron vb-twist">{collapsed ? '▸' : '▾'}</span>
-          {label}
+          <Text ink="accent" className="board-chevron vb-twist">
+            {collapsed ? '▸' : '▾'}
+          </Text>
+          <Text caps ink="strong">
+            {label}
+          </Text>
           <Chip pill fill className="vb-readout" testId="board-count">
             {cards.length}
           </Chip>
@@ -73,7 +79,7 @@ export function Board({
             pill
             fill
             tone="neutral"
-            className={`board-archive vb-readout${showArchive ? ' active' : ''}`}
+            className={`board-archive vb-fixed vb-readout${showArchive ? ' active' : ''}`}
             testId="board-archive"
             title={showArchive ? 'Hide the archive' : 'Show archived cards'}
             ariaExpanded={showArchive}
@@ -82,7 +88,7 @@ export function Board({
             🗄 {archivedCount}
           </Chip>
         )}
-      </div>
+      </Stack>
       {!collapsed && (
         <>
           {showArchive && (
@@ -110,6 +116,6 @@ export function Board({
           </div>
         </>
       )}
-    </section>
+    </Stack>
   );
 }

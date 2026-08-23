@@ -2,6 +2,7 @@ import { memo, useMemo, useState } from 'react';
 import { Button } from '../../atoms/Button';
 import { Chip } from '../../atoms/Chip';
 import { Control } from '../../atoms/Control';
+import { Stack } from '../../atoms/Stack';
 import { Text } from '../../atoms/Text';
 import { addDiaryEntry, type DiaryEntry } from '../../lib/api';
 import { MAX_ENTRY_TEXT, type Suggestion } from '../../lib/shared';
@@ -43,13 +44,13 @@ function About({ entry }: { entry: DiaryEntry }) {
   if (entry.skill) bits.push(entry.skill);
   if (bits.length === 0) return null;
   return (
-    <span className="diary-about">
+    <Stack wrap gap={3} testId="diary-about">
       {bits.map((bit) => (
         <Chip pill className="vb-readout" testId="diary-chip" key={bit}>
           {bit}
         </Chip>
       ))}
-    </span>
+    </Stack>
   );
 }
 
@@ -66,10 +67,12 @@ const DiaryList = memo(function DiaryList({ entries }: { entries: DiaryEntry[] }
         // palette's secondary hue and Phase 13 ruled it is not a state).
         <Row as="li" stack variant="flat" rail data-kind={entry.kind} key={`${at}-${entry.at}`}>
           <FigureRow>
-            <span className="diary-kind">{entry.kind}</span>
+            <Text caps ink="strong" className="diary-kind">
+              {entry.kind}
+            </Text>
             <time dateTime={entry.at}>{when(entry.at)}</time>
             <About entry={entry} />
-            {entry.outcome && <span className="diary-outcome">{entry.outcome}</span>}
+            {entry.outcome && <Text ink="strong">{entry.outcome}</Text>}
           </FigureRow>
           <p className="diary-text">{entry.text}</p>
         </Row>
@@ -112,13 +115,15 @@ function FiledList({ suggestions }: { suggestions: Suggestion[] }) {
               and the ids it POINTS AT are a `.diary-about` group, which the diary beside it already
               uses for exactly that. Stacked rather than wrapped in this column — see pages/log/log.css. */}
           <FigureRow>
-            <span className="filed-state">{s.state}</span>
+            <Text caps ink="strong" className="filed-state">
+              {s.state}
+            </Text>
             <time dateTime={s.created}>{when(s.created)}</time>
           </FigureRow>
           {/* Only what is there: a project-level finding carries no card, and an invented dash for
               every absent field would make every row look the same shape. */}
           {(s.run || s.card || s.became) && (
-            <span className="diary-about vb-list">
+            <Stack direction="column" gap={3} align="start" testId="diary-about">
               {s.run && (
                 <Chip pill className="vb-readout">
                   {s.run}
@@ -134,13 +139,17 @@ function FiledList({ suggestions }: { suggestions: Suggestion[] }) {
                   became {s.became}
                 </Chip>
               )}
-            </span>
+            </Stack>
           )}
           <p className="filed-title">{s.title}</p>
           {/* `.filed-text` IS DELETED: it was `--t-body`, 1.5 and `--muted`, which is `Text lead`
-              declaration for declaration. */}
+              declaration for declaration. `.filed-reason` was that plus the italic, which is `hint`. */}
           {s.body && <Text lead>{s.body}</Text>}
-          {s.reason && <p className="filed-reason">{s.reason}</p>}
+          {s.reason && (
+            <Text lead role="hint">
+              {s.reason}
+            </Text>
+          )}
         </Row>
       ))}
     </List>
@@ -151,16 +160,16 @@ function FiledColumn({ bump }: { bump: number }) {
   const { suggestions, failed, refresh } = useSuggestions(bump);
   return (
     <section className="filed" aria-label="What agents filed">
-      <div className="diary-head">
+      <Stack direction="column" gap={2} className="diary-head">
         <h2>What agents filed</h2>
-        <p className="diary-lede">
+        <Text lead>
           Work an agent noticed and deliberately did not do. Nothing blocks on one and nothing is lost; triage
           them in the Suggestions pane.
-        </p>
+        </Text>
         <Button size="md" className="diary-refresh" onClick={refresh}>
           Refresh suggestions
         </Button>
-      </div>
+      </Stack>
       {failed ? (
         <div className="diary-empty">
           <p>Could not read what agents filed.</p>
@@ -206,21 +215,21 @@ export function DiaryView({ bump }: { bump: number }) {
     // diary list never uses. Both are the record of what happened while nobody was watching.
     <div className="log-split">
       <section className="diary" aria-label="Project log">
-        <div className="diary-head">
+        <Stack direction="column" gap={2} className="diary-head">
           <h2>Project log</h2>
-          <p className="diary-lede">
+          <Text lead>
             One line per event — what happened to this project, in order. Auto-pilot will write here after
             every dispatch and whenever it stops; add your own for anything you did by hand.
-          </p>
+          </Text>
           {/* Always reachable, not only after a failed read. New entries arrive over the socket, and a dropped
             socket is invisible: reconnecting does not change `bump`, and the server replays only the board
             snapshot on connect — so without this the log can sit silently stale with no way to ask again. */}
           <Button size="md" className="diary-refresh" onClick={refresh}>
             Refresh
           </Button>
-        </div>
+        </Stack>
 
-        <div className="diary-compose">
+        <Stack align="start" gap={4} className="diary-compose">
           {/* NOT a `Field`: a composer's label is its placeholder and the button beside it. */}
           <Control
             as="textarea"
@@ -243,7 +252,7 @@ export function DiaryView({ bump }: { bump: number }) {
           >
             {busy ? 'Adding…' : 'Add entry'}
           </Button>
-        </div>
+        </Stack>
         {/* `assertive`, not `polite`: the entry was NOT written, and the box still holds what was typed. */}
         <div aria-live="assertive">{error && <Text role="error">{error}</Text>}</div>
 

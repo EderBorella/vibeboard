@@ -107,7 +107,7 @@ const CONTROLS: [name: string, el: () => Element][] = [
   ['a report column select', () => at('<div class="report-foot"><select class="vb-ctl"/></div>', 'select')],
   [
     'the archive restore-elsewhere select',
-    () => at('<div class="archive-actions"><select class="vb-ctl archive-column"/></div>', 'select'),
+    () => at('<div class="vb-stack vb-fixed"><select class="vb-ctl archive-column"/></div>', 'select'),
   ],
   [
     'the model picker provider filter',
@@ -272,7 +272,7 @@ describe('the survivors that differ, and what each one still says', () => {
   it('the archive restore-elsewhere select keeps a muted ink', () => {
     // A secondary restore must not read as loudly as the Restore button beside it. An ink somebody
     // chose is the accepted survivor reason; a padding of its own is not.
-    const el = at('<div class="archive-actions"><select class="vb-ctl archive-column"/></div>', 'select');
+    const el = at('<div class="vb-stack vb-fixed"><select class="vb-ctl archive-column"/></div>', 'select');
     expect(box(el).color).toBe('var(--muted)');
   });
 

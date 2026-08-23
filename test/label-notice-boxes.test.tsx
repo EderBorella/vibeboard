@@ -64,9 +64,6 @@ describe('the uppercase section labels', () => {
     ['ap-drawer-head', 'var(--muted)'],
     ['links-group', 'var(--muted)'],
     ['settings-section', 'var(--accent)'],
-    ['diary-kind', 'var(--text)'],
-    ['filed-state', 'var(--text)'],
-    ['tile-group', 'var(--accent-2)'],
     ['cv-group', 'var(--accent-2)'],
   ];
 
@@ -76,6 +73,45 @@ describe('the uppercase section labels', () => {
 
   it.each(LABELS)('.%s keeps its own ink, %s', (cls, ink) => {
     expect(box(label(cls)).color).toBe(ink);
+  });
+
+  // THREE OF THE EIGHT ARE A `Text` NOW, AND THE TABLE IS THE SAME TWO CLAIMS ABOUT THE SAME ELEMENT.
+  // Phase 8's caps ruling is what moved them: `.vb-text-caps` carries `--font-display` as well as the
+  // `text-transform` and the tracking — which is what these three wrote by hand — and an ink that is
+  // nobody's state is `data-ink`. So the fixture is the element AS RENDERED, class list and attribute,
+  // and it is written out here rather than reached through `label()` for exactly the reason this file
+  // already gives: a fixture that cannot carry the attribute cannot see the rule that draws the ink.
+  // What each class still says is a STEP — `--t-micro` for all three of the ones below — which has no
+  // `Text` option and did not get one.
+  const MIGRATED: [string, string, string][] = [
+    ['diary-kind', 'strong', 'var(--text)'],
+    ['filed-state', 'strong', 'var(--text)'],
+    ['tile-group', 'accent2', 'var(--accent-2)'],
+  ];
+  const migrated = (cls: string, ink: string): Element =>
+    at(`<span class="vb-text vb-text-caps ${cls}" data-ink="${ink}">L</span>`, 'span');
+
+  it.each(MIGRATED)('.%s is uppercase, through the caps atom', (cls, ink) => {
+    expect(box(migrated(cls, ink))['text-transform']).toBe('uppercase');
+  });
+
+  it.each(MIGRATED)('.%s keeps its own ink, %s → %s', (cls, ink, colour) => {
+    expect(box(migrated(cls, ink)).color).toBe(colour);
+  });
+
+  // AND THE INK IS THE ATTRIBUTE'S RATHER THAN THE ATOM'S DEFAULT, asserted as the negative it replaces:
+  // without `data-ink` all three would render `--muted`, which is the silent change a class list alone
+  // could not tell from a correct one.
+  it('a caps line with no ink named takes the atom’s muted default', () => {
+    expect(box(label('vb-text vb-text-caps diary-kind')).color).toBe('var(--muted)');
+  });
+
+  // THE CAPS FACE INCLUDES THE FAMILY as of Phase 8, and eight classes wrote it beside the transform.
+  // Asserted here because nothing else in the tree does: a `caps` that lost the family again would leave
+  // every assertion above green while every eyebrow in the app rendered in the body face — which is how
+  // `.control-group-head` lost it in the first place.
+  it('.vb-text-caps carries the display family the eight wrote by hand', () => {
+    expect(box(label('vb-text vb-text-caps'))['font-family']).toBe('var(--font-display)');
   });
 
   // The two that name NO ink and inherit one. Merging them onto a primitive that names `--muted` would
@@ -409,8 +445,12 @@ describe('the archived row', () => {
     expect(box(el).padding).toBe('6px 8px');
   });
 
+  // AND THE FIXTURE MOVED AGAIN IN PHASE 8, FOR THE SAME REASON THE ASSERTION DID NOT: the row's `flex: 1`,
+  // its `min-width: 0`, its three overflow declarations and its `text-align: left` are `.vb-clip` — that
+  // utility declaration for declaration — so the class list at the call site is what changed and what the
+  // box draws is not. What `.archive-title` still says on its own is the UA button reset.
   it('.archive-title is a full-bleed borderless row inside it', () => {
-    const b = box(label('archive-title', 'button'));
+    const b = box(label('archive-title vb-clip', 'button'));
     expect(b.border).toBe('none');
     expect(b.flex).toBe('1');
     expect(b['text-align']).toBe('left');

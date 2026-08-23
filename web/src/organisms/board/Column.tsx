@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { Button } from '../../atoms/Button';
 import { Chip } from '../../atoms/Chip';
+import { Stack } from '../../atoms/Stack';
 import { Surface } from '../../atoms/Surface';
+import { Text } from '../../atoms/Text';
 import type { BoardName, Card } from '../../lib/shared';
 import { CardTile } from './CardTile';
 
@@ -63,7 +65,10 @@ export function Column({
       data-testid="column"
       header={
         <>
-          <span className="column-title">{title}</span>
+          {/* `caps` is the display face and `lead` the `--t-body` step; the brackets are the class. */}
+          <Text caps lead className="column-title">
+            {title}
+          </Text>
           <Chip pill fill className="vb-readout" testId="column-count">
             {cards.length}
           </Chip>
@@ -100,8 +105,8 @@ export function Column({
       }
       onDrop={onDrop ? release : undefined}
     >
-      <div className="column-body">
-        {cards.length === 0 && <div className="column-empty">Drop a card here</div>}
+      <Stack direction="column" gap={4} className="column-body">
+        {cards.length === 0 && <Text className="column-empty">Drop a card here</Text>}
         {cards.map((c, i) => (
           <div
             key={c.id}
@@ -133,7 +138,7 @@ export function Column({
           </div>
         ))}
         {gap !== null && gap >= cards.length && cards.length > 0 && <div className="drop-line" />}
-      </div>
+      </Stack>
     </Surface>
   );
 }

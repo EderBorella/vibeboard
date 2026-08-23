@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Button } from '../../atoms/Button';
 import { Control } from '../../atoms/Control';
 import { Readout } from '../../atoms/Readout';
+import { Stack } from '../../atoms/Stack';
 import { Surface } from '../../atoms/Surface';
 import { Text } from '../../atoms/Text';
 import { listArchive, restoreCard } from '../../lib/api';
@@ -91,14 +92,14 @@ export function ArchiveDrawer({ board, config, count, onOpen }: Props) {
     <Surface className="archive-drawer" data-testid="archive-drawer">
       {cards.map((c) => (
         <Row variant="inset" key={c.id}>
-          <div className="archive-meta">
+          <Stack align="baseline" gap={4} className="vb-fixed">
             <Readout>{c.id}</Readout>
             <Readout>{when(c.archived)}</Readout>
-          </div>
-          <button className="archive-title" onClick={() => onOpen?.(c)} title="Open this card">
+          </Stack>
+          <button className="archive-title vb-clip" onClick={() => onOpen?.(c)} title="Open this card">
             {c.title}
           </button>
-          <div className="archive-actions">
+          <Stack gap={3} className="vb-fixed">
             <Button size="sm" onClick={() => restore(c)}>
               Restore → {labelOf(c.restoreTo)}
             </Button>
@@ -122,7 +123,7 @@ export function ArchiveDrawer({ board, config, count, onOpen }: Props) {
                 </option>
               ))}
             </Control>
-          </div>
+          </Stack>
         </Row>
       ))}
     </Surface>

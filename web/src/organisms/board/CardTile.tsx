@@ -1,7 +1,9 @@
 import { Button } from '../../atoms/Button';
 import { Chip } from '../../atoms/Chip';
 import { Readout } from '../../atoms/Readout';
+import { Stack } from '../../atoms/Stack';
 import { Surface } from '../../atoms/Surface';
+import { Text } from '../../atoms/Text';
 import type { Card } from '../../lib/shared';
 import { miniature } from '../../lib/viewmodel';
 
@@ -79,7 +81,7 @@ export function CardTile({
         onOpen?.(card);
       }}
     >
-      <div className="tile-head">
+      <Stack gap={3} className="tile-head">
         <Readout>{card.id}</Readout>
         {/* THREE STATE WORDS IN THREE TONES, and the tones are the meaning rather than the styling —
             see the three rules in organisms/board/tile-states.css and test/chip-boxes.test.tsx, which
@@ -144,12 +146,18 @@ export function CardTile({
             ✕
           </Button>
         )}
-      </div>
+      </Stack>
       <div className="tile-title">{card.title}</div>
-      {summary && <div className="tile-summary">{summary}</div>}
-      {card.group && <div className="tile-group">{card.group}</div>}
+      {summary && <Text className="tile-summary">{summary}</Text>}
+      {/* The group a card belongs to, as an eyebrow over the title: `caps` is the face and `accent2` the
+          hue the tile chose. The `--t-micro` step is all the class still says. */}
+      {card.group && (
+        <Text caps ink="accent2" className="tile-group">
+          {card.group}
+        </Text>
+      )}
       {card.tags.length > 0 && (
-        <div className="tile-tags">
+        <Stack wrap gap={2} className="tile-tags">
           {card.tags.map((t) =>
             onTag ? (
               <Chip
@@ -174,7 +182,7 @@ export function CardTile({
               </Chip>
             ),
           )}
-        </div>
+        </Stack>
       )}
     </Surface>
   );

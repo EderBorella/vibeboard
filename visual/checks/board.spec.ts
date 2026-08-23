@@ -973,7 +973,10 @@ test('12. the affordances are big enough to see', async ({ board, theme }) => {
       // group drawn to make two things read as a pair must not become the tallest thing on the row —
       // which it was, at 29.8px against 20px buttons, until the padding came off it. Found by taking a
       // screenshot of the live board and looking at it, which no assertion in this file was doing.
-      const group = document.querySelector<HTMLElement>('[data-testid="ap-bar"] .ap-agent');
+      // `.ap-agent`'s BOX IS GONE, so there is no group box left to measure. The element survives as the
+      // middle of the bar's three groups and check 14 still measures it by `data-testid` — what went is the
+      // 1px edge this claim was an equation about.
+      const group = null;
       return {
         controls,
         surfaceControls,
@@ -1042,30 +1045,17 @@ test('12. the affordances are big enough to see', async ({ board, theme }) => {
   //    control whose height nothing in this change moved.
   const transport = seen.controls.find((c) => c.id === 'ap-transport')?.h ?? 0;
   expect(transport, 'no transport button on the row to measure against').toBeGreaterThan(0);
-  expect(seen.group, 'the auto-pilot bar has no .ap-agent group').not.toBeNull();
-  // THE `+ 2` TOLERANCE IS GONE, and its deletion is the point of the atom phase rather than a tidy-up:
-  // a tolerance is what you need when the answer is EMERGENT. It was padding plus a line box plus a
-  // border, so `ap-expand` measured a pixel more than its neighbours because the bigger disclosure glyph
-  // inside it set its line box — and a ceiling of `max + 1` was then wide enough for the bordered group
-  // to slide under at 29.8px. Every one of these declares `--ctl-h` now, so the comparison is exact.
-  const tall = [...seen.controls.map((c) => ({ id: c.id, h: c.h }))].filter((c) => c.h > transport);
-  expect(
-    tall,
-    `taller than the ${transport}px transport: ${tall.map((c) => `${c.id} ${c.h}px`).join(', ')}`,
-  ).toEqual([]);
-  // AND THE GROUP IS EXACTLY ITS OWN EDGE TALLER, WHICH IS AN EQUATION AND NOT A TOLERANCE. `.ap-agent`
-  // is not a control: it is a bordered box drawn AROUND one — the backend picker's segmented group at
-  // `--ctl-h` — plus the agent's state chip. `* { box-sizing: border-box }` puts a box's own border
-  // INSIDE its declared height, so a container that draws a hairline around a full-height control is 2px
-  // taller by construction, which is the grouped-tab-cell argument in the other direction: a cell inside a
-  // bordered group is 2px SHORTER for the same reason. The 2 is named as the group's own edge and
-  // asserted exactly, so a vertical padding coming back or a child growing still fails — which a `+ 2`
-  // ceiling would not have caught. It measured 30px against a 28px transport when this claim first ran.
-  expect(
-    seen.group,
-    `the .ap-agent group is ${seen.group}px around a ${transport}px control, which is neither that height
-     nor that height plus its own 1px edge top and bottom`,
-  ).toBe(transport + 2);
+  // THE GROUP-BOX EQUATION IS DELETED WITH THE BOX IT MEASURED, and the reason is recorded rather than the
+  // assertion quietly dropped. It said `.ap-agent` is exactly its own 1px edge taller than the control it
+  // wraps — 30px around a 28px transport — and it was a good claim: an exact equation rather than a `+ 2`
+  // ceiling, so a vertical padding coming back or a child growing both failed it. The box is gone on the
+  // owner's call (6px horizontally and nothing vertically, and symmetry would have made it 42px), so the
+  // equation now has no subject: an assertion about a border that no element draws is the vacuous kind this
+  // file keeps deleting rather than rewording.
+  // WHAT STILL COVERS THIS. A child growing is claim 6 above — every control on the surface is one height,
+  // and the backend picker inside is `--ctl-h` like the rest. The pair still reading as one thing is
+  // check 14's three-group measurement, which is keyed on `data-testid` and unaffected. What is NOT covered
+  // any more is a padding appearing on that element, because nothing draws its edge to measure against.
   // 6. AND EVERY CONTROL ON THE SURFACE IS ONE HEIGHT. Ten unchosen control heights is the measured
   //    diagnosis behind the whole revamp, and this is the assertion that says there is one — the artefact
   //    that answers the owner's original complaint. It is deliberately the WHOLE surface and not the one
@@ -1135,7 +1125,7 @@ test('12. the affordances are big enough to see', async ({ board, theme }) => {
 
   console.log(
     `[${theme}] affordances: ${seen.titles} titles all on one line, ${seen.twists} glyphs at or above ` +
-      `${TWIST_FLOOR}px, ${seen.controls.length} controls at ${seen.controls[0]?.px}, group ${seen.group}px, ` +
+      `${TWIST_FLOOR}px, ${seen.controls.length} controls at ${seen.controls[0]?.px}, ` +
       `${seen.scrolling}/${seen.columns} columns scrolling, asking for ` +
       `${seen.bars.map((b) => `${b.width} ${b.color}`).join(' | ')}`,
   );

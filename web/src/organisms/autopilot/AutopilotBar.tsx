@@ -407,7 +407,14 @@ export function AutopilotBar({
             act on the loop and the controls that explain it. Two auto margins rather than
             `justify-content: space-between` on the row: the row's first four children are a group of their
             own without a wrapper, and space-between would spread those four apart as well. */}
-        <Stack gap={3} className="ap-agent push" testId="ap-agent">
+        {/* THE BORDERED BOX AROUND THIS PAIR IS GONE, on the owner's call. It drew 6px between its edge
+            and the backend picker HORIZONTALLY and nothing vertically — the 28px picker touched the border
+            top and bottom — and making it symmetric was not available: `padding: var(--s-3)` all round
+            takes the box to 42px against a 28px transport button, which is the group becoming the tallest
+            thing on the strip. That is the exact defect the box's own comment recorded being fixed at
+            29.8px, so the choice was an asymmetric box or no box. The ELEMENT stays: it is the middle of
+            the bar's three groups and `.push` on it is what splits the free space. */}
+        <Stack gap={3} className="vb-fixed push" testId="ap-agent">
           <BackendPicker
             value={backend}
             disabled={switching !== null}

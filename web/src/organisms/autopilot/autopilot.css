@@ -99,19 +99,15 @@
    first once the gate acknowledgement appears and disappears.
    `flex: none` because `.ap-status` above already takes the slack: without it the pair would be squeezed
    by a long stall message, and the state word is exactly what you need when the message is long. */
-.ap-agent {
-  /* The row itself is a `Stack gap={3}`; what is left is the box that makes the pair one thing. */
-  flex: none;
-  border: 1px solid var(--border); border-radius: var(--r-md);
-  /* NO VERTICAL PADDING, measured on the live board rather than reasoned about: at `--s-2` this box came
-     out 29.8px tall against 20px buttons on the same row — the group meant to make the pair legible was
-     the tallest thing on the strip, which is the inconsistency it was added to remove. The segmented
-     control inside is 19.8px and sets the floor, so the box is its own border and nothing else. */
-  /* NO `margin-right`. It was `--s-6`, a hand-made gap before the buttons that followed this group in one
-     long queue. The gap is the layout's now: this group and the one at the row's end each take `.push`,
-     which splits the free space between them and is what puts this one in the middle. */
-  padding: 0 var(--s-3);
-}
+/* `.ap-agent` IS GONE. Its box — a 1px edge, a `--r-md` corner and `padding: 0 var(--s-3)` — is removed on
+   the owner's call: 6px horizontally and nothing vertically read as wrong, and symmetry was not on offer.
+   `padding: var(--s-3)` all round takes the box to 42px around a 28px control, and this rule's own comment
+   recorded that being fixed once already at 29.8px against 20px buttons. The last declaration left was
+   `flex: none`, which is `.vb-fixed`, so the element carries that and the class is deleted.
+   WHAT THE BOX WAS FOR is worth keeping: it made the backend picker and the agent's state read as one
+   thing rather than two controls that happen to be adjacent. That is now said by the `Stack`'s own
+   `gap={3}` against the row's `--s-4` — tighter inside the pair than between the pair and its neighbours —
+   and by `.push` on both this group and the row's end, which puts this one in the middle. */
 /* `.ap-agent-state` IS GONE — SIX DECLARATIONS AND A `button.` QUALIFIER — and it is the one indicator
    whose deletion is worth recording, because two of its rules were arguments against the shape it has now.
    It said `NOT Button, deliberately, and this is the counter-example that keeps the primitive honest: the

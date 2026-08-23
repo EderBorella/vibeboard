@@ -244,7 +244,7 @@ const PRIMITIVE_LAYER = [
 // gap", so every surface that needed one named it after itself. Buying that atom for one name is the
 // cheapest trade available in this tree, and every option on it is a `data-` attribute precisely so that
 // it stays one name — `Modal`'s precedent from the organism phase, applied to layout.
-const CLASS_CEILING = 232;
+const CLASS_CEILING = 231;
 // THE TARGET IS 146, and the derivation is in docs/design-system.md, *The atomic revamp: the class target
 // is 146*. Two numbers stood in this tree for two phases — this constant said 183 and the revamp said
 // 146 — and the gate PRINTED 183 at the developer, so the reconciliation was the gate's to make. 146 wins because 183's derivation is the one that was withdrawn, by name: 183 = 17 surfaces × 8

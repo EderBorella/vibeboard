@@ -87,9 +87,10 @@ describe('the uppercase section labels', () => {
   // state is `data-ink`. So the fixture is the element AS RENDERED, class list and attribute, written out
   // here rather than reached through `label()` for the reason this file already gives: a fixture that
   // cannot carry the attribute cannot see the rule that draws the ink.
-  // What each class still says is a STEP — `--t-micro` for five of the seven — except `.cs-head`, which
-  // says the 2px UNDER its one line: a gap is uniform across a column, and one child wanting more room
-  // below itself is the thing `Stack gap` cannot express.
+  // What each class still says is a STEP — `--t-micro` for five of the seven. `.cs-head` HAS LEFT THIS
+  // TABLE: the 2px under its one line was the last thing it held, and the sweep that licensed a visual
+  // change folded it into `.card-skills`'s `gap` — a column's space between its children is the column's,
+  // even when one of them wanted more. It is in `GONE` below.
   // AN EMPTY INK IS NOT A MISSING ROW: it is the two that keep the atom's muted default, and asserting
   // them here is what distinguishes "the default is right" from "the attribute was dropped".
   // AND FOUR OF THESE HAVE NO CLASS LEFT TO NAME, as of wave 2 — `.diary-kind`, `.filed-state`,
@@ -99,10 +100,6 @@ describe('the uppercase section labels', () => {
   // alone, so the row would pass whatever happened to the element. They are asserted below on the
   // attribute pair, plus a negative that says the classes are really gone.
   const MIGRATED: [string, string, string][] = [
-    // `.cs-head` is here and `.ap-drawer-head` is NOT, and the difference is whether a class survives:
-    // the skills head kept a `margin-bottom` so its face is still worth asserting against its class list,
-    // while the drawer head kept nothing and is in `GONE` below.
-    ['cs-head', '', 'var(--muted)'],
     ['links-group', '', 'var(--muted)'],
     ['settings-section', 'accent', 'var(--accent)'],
   ];
@@ -170,6 +167,17 @@ describe('the uppercase section labels', () => {
     expect(box(label(cls))['font-size']).toBeUndefined();
   });
 
+  // THE TWO SKILLS-RAIL LINES ARE GONE, and the declaration each held is what is asserted: a
+  // `margin-bottom` under the head and a `margin-top` over the empty line, both now `.card-skills`'s
+  // `gap={3}`. Named side by side because the pair is the same fold at two boundaries of one column, and
+  // asserted as the property rather than as an empty object because `box()` resolves the universal rules
+  // in `design/reset.css` as well.
+  it.each([['cs-head'], ['cs-empty']])('.%s is gone, its margin folded into the rail’s gap', (cls) => {
+    const b = box(label(cls));
+    expect(b['margin-bottom']).toBeUndefined();
+    expect(b['margin-top']).toBeUndefined();
+  });
+
   // THE DEFECT, NOW FIXED. It was written as the contract and marked `it.fails`, so it flipped the
   // moment the rule existed rather than being quietly reworded — which is the whole point of pinning a
   // known bug. `.vb-label-rail` is a width and nothing else now, so this is the only thing that says the
@@ -216,7 +224,9 @@ describe('the empty-state lines', () => {
     'vb-text vb-text-quiet vb-text-lead',
     'vb-text vb-text-quiet',
     'mp-empty vb-text vb-text-quiet vb-text-lead',
-    'cs-empty vb-text vb-text-quiet vb-text-lead',
+    // NEITHER `.cs-empty` NOR `.cards-gone` IS HERE ANY MORE, and two groups each removed one of them in
+    // parallel — which is how the merge surfaced that the row for a DELETED class is not a weaker
+    // assertion, it is a vacuous one: the class contributes nothing, so the row passes on the atom alone.
     'control-empty vb-text vb-text-quiet',
     'explorer-more vb-text vb-text-quiet',
   ];
@@ -252,18 +262,24 @@ describe('the empty-state lines', () => {
     expect(box(label('cards-gone', 'p')).padding).toBeUndefined();
   });
 
+  // AND `.cs-empty` THE SAME WAY, for the margin it took: a per-child `margin-top` on one line of a column
+  // whose gap now says it for every line.
+  it('.cs-empty is gone, and it took a margin rather than an ink with it', () => {
+    expect(box(label('cs-empty', 'p'))['margin-top']).toBeUndefined();
+  });
+
   // THE FOUR THAT SURVIVE CARRY ONLY WHAT THE SURFACE CAN DECIDE — an inset or a size — which is the
   // same result Phase 3 measured: 19 of its 27 migrated classes still had a real declaration left. A
   // survivor that still named an ink or a font-style would mean the merge had not actually happened.
   it.each([
     ['mp-empty', 'padding'],
     ['control-empty', 'padding'],
-    // THESE TWO NO LONGER KEEP A STEP, and that is the wave that gave `Text` a `size`: both were one
-    // `--t-micro`, which is `size="micro"` now. `.explorer-more`'s was DEAD where it was — the class is on
-    // the wrapper and the words are in a `<Text>` inside it, so `.vb-text`'s `--t-small` won. What each
-    // still says is where the line sits.
+    // `.explorer-more` NO LONGER KEEPS A STEP, and that is the wave that gave `Text` a `size`: it was one
+    // `--t-micro`, which is `size="micro"` now, and it was DEAD where it was — the class is on the wrapper
+    // and the words are in a `<Text>` inside it, so `.vb-text`'s `--t-small` won. What it still says is
+    // where the line sits, and it says it because the wrapper carries its indent through `style`, which
+    // `Stack` does not take. `.cs-empty` WAS THE FIFTH AND IS GONE: its `margin-top` is a gap now.
     ['explorer-more', 'padding'],
-    ['cs-empty', 'margin-top'],
   ])('.%s keeps only its %s', (cls, prop) => {
     const own = box(label(cls, 'p'));
     const shared = box(label('vb-text vb-text-quiet vb-text-lead', 'p'));

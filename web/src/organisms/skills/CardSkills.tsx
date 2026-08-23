@@ -32,7 +32,7 @@ export function CardSkills({ card, skills, invalid, onRun }: Props) {
       pad={[5, 4]}
       className="card-skills"
     >
-      <Text as="h3" caps className="cs-head">
+      <Text as="h3" caps>
         Skills
       </Text>
       {mine.map((s) => (
@@ -49,7 +49,7 @@ export function CardSkills({ card, skills, invalid, onRun }: Props) {
         </Button>
       ))}
       {mine.length === 0 && (
-        <Text role="hint" lead size="micro" className="cs-empty">
+        <Text role="hint" lead size="micro" testId="cs-empty">
           No skills for this column. Add one in Project Control → Skills.
         </Text>
       )}

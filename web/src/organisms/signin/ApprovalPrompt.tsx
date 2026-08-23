@@ -75,7 +75,7 @@ export function ApprovalPrompt({ pending, onError }: Props) {
         part that cannot.
         {pending.length > 1 && ` ${pending.length - 1} more waiting after this one.`}
       </Text>
-      <Stack gap={4} className="signin-actions">
+      <Stack gap={4}>
         {/* Refuse first in the DOM as well as visually, so tab order and reading order agree. */}
         <Button
           variant="primary"

@@ -44,14 +44,10 @@
 .resources-table { flex: 1; overflow-y: auto; }
 /* `.resource-row` IS GONE — a `Row`, and its gap moved from `--s-3` to `--s-4` with the other six. */
 /* `.resource-row input` was `.vb-ctl` DECLARATION FOR DECLARATION, focus rule included, and it died
-   in Phase 9.
-   `.res-title`, `.res-url` AND `.res-note` ARE GONE, AND THE ROW DIVIDES EVENLY NOW. They were `flex: 1`,
-   `1.4` and `1.2` — three shares of one row that nobody chose, and the only reason stack.css could not
-   fold them into the fill it already owns. All three cells are `.vb-clip` (`flex: 1; min-width: 0`), which
-   is what "this cell takes the slack" is spelled as everywhere else. In an 822px row that is 228/320/274px
-   → 274px each; the URL cell, which is the one that holds a long unbroken string, loses 46px. `min-width:
-   0` is a gain that came with it: an `<input>`'s intrinsic minimum is its `size` attribute, so the old
-   shares stopped dividing at all once the pane was narrow. */
+   in Phase 9. `.res-title`, `.res-url` and `.res-note` ARE GONE TOO: 1, 1.4 and 1.2 were three shares
+   nobody chose — no phase or report records the decision — and all three are `.vb-row-main`, the shared
+   name for "this cell takes the slack", so the row divides evenly: 27.8/38.9/33.3% of the row's free
+   space becomes a third each, and every cell also gains the `min-width: 0` a bare `flex` does not. */
 .res-del:hover:not(:disabled) { color: var(--danger); }
 
 

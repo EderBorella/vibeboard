@@ -60,11 +60,10 @@
    the seven misfiled strays `styles.ts` named — app-wide rules living in the top bar's sheet because that
    is where their bytes fell — and the top bar is not where an app-wide utility belongs. */
 
-/* A `Stack gap={4}` on `.push` (the `margin-left: auto`) and `.vb-fixed` (the `flex: none` that keeps the
-   escape hatches from being squeezed to nothing). `align-self` is the one thing neither says. */
-.topbar-right {
-  align-self: center;
-}
+/* `.topbar-right` IS GONE — a `Stack gap={4}` on `.push` (the `margin-left: auto`), `.vb-fixed` (the
+   `flex: none` that keeps the escape hatches from being squeezed to nothing) and `.vb-self-center`, which
+   is `align-self` said once in `atoms/stack.css` for the whole tree. The argument above is why the cluster
+   opts out of the bar's baseline, and it is unchanged. */
 /* `.switch-btn` shared this and is now `default`; `.theme-select` was the `<select>` half of it, at four
    call sites, and it is `.vb-ctl` as of Phase 9 — the pointer and the accent hover it declared are now
    what atoms/control.css says about every select. The class died outright. */

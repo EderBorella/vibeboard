@@ -64,15 +64,11 @@ const FLOOR = { defs: 20, themes: 3 };
 // The claim that made the emptiness reachable is the SECOND half of claim 1: a name that has acquired a
 // consumer and kept its row is a finding too, so this map cannot rot into an allow-list. Leaving one row
 // here would have failed the run.
-// `--measure`'s ROW STOOD FOR ONE COMMIT AND THREE GROUPS SPENT IT IN PARALLEL, which is why all three
-// deleted this row and the merge had to pick one wording. Its consumers now: `.diary-head`,
-// `.diary-compose`, `.diary > .vb-text-error` and `.diary-list` (four of the hand-written `68ch` the token
-// was created to name), `.ap-help` (was `44rem`) and `.gate-card` (was `520px`). Six, from three sheets.
-// EMPTY AGAIN IS THE POINT. The second half of claim 1 fails a name that has acquired a consumer and kept
-// its row, which is what stops this map rotting into an allow-list — and each of the three groups planted
-// exactly that and watched it exit 1.
+// `--measure` WAS THE NINTH ROW AND IS SPENT: `.gate-card`'s 520px is `var(--measure)` as of the sweep
+// that accepts a visual change to reach the scale, so the row goes with the commit that spent it — which
+// is claim 1's second half doing its job, since a referenced name with a row still here is a finding.
 /** @type {Map<string, string>} */
-const UNCONSUMED = new Map();
+const UNCONSUMED = new Map([]);
 
 // A COLOUR IN THE GEOMETRY BLOCK, ON PURPOSE, with its reason — the precedent is
 // check-radius-scale.mjs's `50%` and check-scale.mjs's `inherit`.

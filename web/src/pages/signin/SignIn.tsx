@@ -34,7 +34,7 @@ export function SignIn({ phase, onRetry }: Props) {
             {/* The address, so the user can tell their own request apart from somebody else's. The
                 User-Agent is deliberately NOT repeated here — it means nothing to the person reading
                 this screen, and it is the approving end that needs to recognise the device. */}
-            <Text as="p" className="gate-preview">
+            <Text as="p">
               That message will show this address: <code>{phase.address}</code>
             </Text>
             <Text role="hint">Leave this page open — it continues on its own once you allow it.</Text>
@@ -48,10 +48,13 @@ export function SignIn({ phase, onRetry }: Props) {
             <Notice as="p" tone="bad">
               {phase.reason}
             </Notice>
+            {/* A `<div>` and not a `<p>`: the card spaces its children with a `gap` now, and a UA
+                paragraph margin would add 13px to it — the hand-written space the scale exists to
+                remove. It holds a button, not prose. */}
             {phase.retry && (
-              <p className="vb-field">
+              <div className="vb-field">
                 <Button onClick={onRetry}>Try again</Button>
-              </p>
+              </div>
             )}
           </>
         )}

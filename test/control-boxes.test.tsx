@@ -103,7 +103,7 @@ function checkRow(): { row: Element; label: Element; check: Element } {
 const CONTROLS: [name: string, el: () => Element][] = [
   [
     'the top bar theme select',
-    () => at('<div class="topbar-right"><select class="vb-ctl"/></div>', 'select'),
+    () => at('<div class="vb-stack push vb-fixed vb-self-center"><select class="vb-ctl"/></div>', 'select'),
   ],
   ['the dispatch effort select', () => inField('select')],
   ['a report column select', () => at('<div class="report-foot"><select class="vb-ctl"/></div>', 'select')],
@@ -128,9 +128,15 @@ const CONTROLS: [name: string, el: () => Element][] = [
     () => at('<div class="diary-compose"><textarea class="vb-ctl"></textarea></div>', 'textarea'),
   ],
   ['the control editor body', () => at('<textarea class="vb-ctl vb-editor-body"></textarea>', 'textarea')],
-  // `.vb-clip` where `.res-title` was: the three cells divide the row evenly now and the share is the
-  // atom's, not a class per column. The claim here is the BOX, which neither declares.
-  ['a links registry cell', () => at('<div class="vb-row"><input class="vb-ctl vb-clip"/></div>', 'input')],
+  // `.vb-row-main` where `.res-title` was: the three cells divide the row evenly now and the share is the
+  // shared name's, not a class per column. Two groups migrated this in parallel and one reached for
+  // `.vb-clip` — same `flex: 1; min-width: 0`, but it also carries `text-overflow: ellipsis`, which on an
+  // unfocused `<input>` draws an ellipsis the row never asked for. The claim here is the BOX, which
+  // neither class declares.
+  [
+    'a links registry cell',
+    () => at('<div class="vb-row"><input class="vb-ctl vb-row-main"/></div>', 'input'),
+  ],
   [
     'the raw card file',
     () => at('<div class="raw-pane"><textarea class="vb-ctl raw-area"></textarea></div>', 'textarea'),

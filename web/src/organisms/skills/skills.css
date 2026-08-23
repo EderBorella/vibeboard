@@ -6,22 +6,18 @@
   flex: 0 0 11rem; min-width: 0; overflow-y: auto;
   border-left: 1px solid var(--border); background: var(--panel-2);
 }
-/* A `Text as="h3" caps`: the display family, the uppercase, the tracking, the `--t-small` step, the muted
-   ink and the `margin: 0` are all the atom's. The extra 2px UNDER this one line is not — a gap is uniform
-   across a column and this is one child asking for more room below itself, which is the one thing
-   `Stack gap` cannot say. */
-.cs-head { margin-bottom: var(--s-1); }
-/* `.cs-action` IS GONE — `Button align="start"`. A skill's name is prose of arbitrary length in a narrow
-   rail, so it reads from the left like the list it is, and that was one declaration under a name. */
-/* The step is `Text size="micro"`; the 4px above it is this line's own, for `.cs-head`'s reason. */
-.cs-empty { margin-top: var(--s-2); }
-.card-skills > .vb-text-error { margin: var(--s-2) 0 0; cursor: help; }
+/* `.cs-head`, `.cs-empty` AND THE ERROR LINE'S MARGIN ARE GONE — the rail's `gap={3}` is the whole of
+   the space between its children now. Each of the three was one child asking for its own room (2px under
+   the head, 4px above the empty line, 4px above the warning), which is exactly what a uniform column
+   cannot say — so the column became uniform: 8/10/10px at those three boundaries, 6px at all of them.
+   `.cs-action` IS GONE TOO — `Button align="start"`: a skill's name is prose of arbitrary length in a
+   narrow rail, so it reads from the left like the list it is. */
+.card-skills > .vb-text-error { cursor: help; }
 
 
 /* ---------- Skill editor (fields view in Project Control) ---------- */
-/* The column, its gap and its inset are a `Stack direction="column" gap={4} pad={[5,6]}`. The scroller is
-   what is left, and `overflow` is a frame's business rather than a gap's. */
-.skill-editor { overflow-y: auto; }
+/* The column, its gap, its inset and the SCROLLER are a `Stack direction="column" gap={4} pad={[5,6]}
+   scroll`. The class stays because two rules below name it as their parent, and it declares nothing. */
 /* `.skill-row` IS GONE — it was `.vb-row` declaration for declaration. */
 /* The rail label and the box are the primitive's. What the editor still says is that a field takes the
    slack beside its label, and that the prompt is a monospace box you can drag taller. */

@@ -1,26 +1,38 @@
 /* ---------- Project gate ---------- */
-/* `.gate`, `.gate-card` AND `.gate-preview` ARE IN `templates/app-shell.css`. They are the full-screen
-   frame the app wears BEFORE a project is open, and the sign-in page wears the same three — which made
-   them three of the layer gate's cross-surface reads. What is left here is the project picker's own, and
-   the two names still appear below as the parents of rules that ARE this page's. */
-.gate-card h2 { margin: 0 0 var(--s-6); font-family: var(--font-display); letter-spacing: var(--track); }
-.gate-card h3 { margin: var(--s-7) 0 var(--s-4); font-size: var(--t-lead); color: var(--muted); }
+/* `.gate` AND `.gate-card` ARE IN `templates/app-shell.css`. They are the full-screen frame the app wears
+   BEFORE a project is open, and the sign-in page wears both — which made them two of the layer gate's
+   cross-surface reads. `.gate-preview` was the third and is gone: it held a `margin-top` and the card's
+   own `gap` says it now. What is left here is the project picker's own, and the two names still appear
+   below as the parents of rules that ARE this page's. */
+/* `margin: 0` AND NOT A STEP, at both: the card is a flex column with a `gap` as of the sweep that spends
+   `--measure`, so 16px under the title and 24px/8px around the second heading are gone — a heading asking
+   for its own room is what the gap replaces, and in a flex column the two would ADD rather than collapse.
+   The declaration stays because there is no heading reset in `design/reset.css` and a UA `<h2>` margin is
+   1em of a 1.5em face: what these rules cancel is the browser's, not a step of ours. */
+.gate-card h2 { margin: 0; font-family: var(--font-display); letter-spacing: var(--track); }
+.gate-card h3 { margin: 0; font-size: var(--t-lead); color: var(--muted); }
 /* A `List`, and the measure and the looser column are what is left: this is a page's one list, not a row
    of adjacent rows.
  *
- * THE PARENT IS STILL HERE AND HALF ITS REASON IS GONE. When this was written `list.css` was imported
- * BELOW this sheet, so `.vb-list { gap: var(--s-1) }` won the gap at equal specificity on order — 6px
- * became 2px, silently — and (0,2,0) was bought to outrank it. `list.css` is above every surface sheet as
- * of Phase 7, so the gap would now win on its own. THE MARGIN STILL NEEDS THE PARENT: `ul.vb-list,
- * ol.vb-list { margin: 0 }` is (0,1,1) and beats a bare `.gate-list` whatever the order. One selector for
- * two declarations that need different amounts of it; do not shorten it back for the gap's sake. */
-.gate-card .gate-list { margin: 0 0 var(--s-6); gap: var(--s-3); }
+ * THE PARENT IS STILL HERE AND ITS REASON IS GONE — LEFT AS HARMLESS WEIGHT. When this was written
+ * `list.css` was imported BELOW this sheet, so `.vb-list { gap: var(--s-1) }` won the gap at equal
+ * specificity on order — 6px became 2px, silently — and (0,2,0) was bought to outrank it. `list.css` is
+ * above every surface sheet as of Phase 7, so the gap wins on its own, and the (0,2,0) is what keeps it
+ * correct if that order ever moves back.
+ * THE 16px UNDER THE LIST IS GONE: it was the one declaration here that needed the extra weight — to beat
+ * `ul.vb-list, ol.vb-list { margin: 0 }` at (0,1,1) — and the card's own `gap` is what says it now. With
+ * nothing left to outrank, the atom's `margin: 0` is what the list takes. */
+.gate-card .gate-list { gap: var(--s-3); }
 /* A `Row as="li" stack variant="inset" interactive`. A project in the recents list has no VOICE — it is a
    region of a list that takes a click, which is the line Phase 4 drew between the two primitives — and it
    draws its box at rest, which is what `inset` is and `flat` is not. The stack of name over path is
    `.vb-list`'s and the hover edge is `.vb-row-hit`'s, so both rules that were here are gone.
    `.gate-list-name` IS GONE TOO — `Text weight="medium"`, which is the one declaration it held. */
-.gate .vb-field { margin-top: var(--s-5); }
+/* `.gate .vb-field`, `.gate .vb-text-quiet` AND `.gate .vb-notice` ARE GONE — 12px, 4px and 16px of
+   `margin-top`, three answers to one question that the card's `gap` now answers once. Three molecules
+   reaching for a margin because their PARENT could not space its children is what a flex column with a
+   gap is for; the two hints that took 4px and the notice that took 16px take 12px like everything else in
+   the card, which is the uniform column the fold buys. */
 /* `.gate-row` IS GONE — a `Row`, at the one call site it had. */
 .gate .vb-ctl { flex: 1; }
 .gate button:not(.gate-list button) {
@@ -31,6 +43,4 @@
 /* AN INLINE `<code>` IN PROSE IS A TYPE SELECTOR NOW, in atoms/prose.css — see there. It was
    `.gate-preview code, .ap-help-body code`: one rule naming TWO surfaces from inside an atom's sheet,
    which is the fifth of the seven misfiled strays and the shape the layer gate exists to refuse. */
-.gate .vb-text-quiet { margin-top: var(--s-2); }
-.gate .vb-notice { margin-top: var(--s-6); }
 

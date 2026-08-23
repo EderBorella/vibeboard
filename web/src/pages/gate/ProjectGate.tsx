@@ -139,13 +139,13 @@ export function ProjectGate({ onOpened }: Props) {
           </Row>
         </Field>
         {relativeParent && (
-          <Text as="p" className="gate-preview">
+          <Text as="p">
             Give an absolute path, starting with <code>/</code>. A relative one is resolved against
             VibeBoard's own folder rather than yours.
           </Text>
         )}
         {targetPath && (
-          <Text as="p" className="gate-preview">
+          <Text as="p">
             Creates <code>{targetPath}</code>
           </Text>
         )}

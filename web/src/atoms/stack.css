@@ -49,6 +49,44 @@
 
 .vb-stack[data-wrap] { flex-wrap: wrap; }
 
+/* PADDING AND AN EDGE, AND THE MEASUREMENT THAT SAYS THEY BELONG HERE. The first cut of this atom carried
+   direction, gap and alignment only, and the first surface migrated onto it deleted ONE class out of
+   fifty-one. Every other class survived — and survived for the same reason each time: after the flex row
+   moved onto `Stack`, what was left was a padding and a border. `.copilot-head`, `.copilot-chatbar`,
+   `.copilot-status`, `.copilot-controls`, `.copilot-selects` and `.copilot-input` are six names for
+   "a row with a gap, some padding, and a rule under it".
+   A surviving one-declaration class IS the exception this work exists to remove, so the atom takes the
+   declaration. Both axes are separate attributes because 26 of the paddings in the tree are two values
+   (`var(--s-4) var(--s-5)`), and both are attributes rather than classes for the reason the whole file is:
+   `check:class-budget` counts class selectors, so sixteen padding steps and two edges cost nothing.
+   SPECIFICITY, and it is deliberate: these are (0,1,1) against a surface class's (0,1,0), so a `Stack`
+   that says `pad` beats a surface that still declares padding on the same element WHATEVER the import
+   order. That is the right direction — the atom is meant to win — but it means a half-finished migration
+   is visible rather than silent, which is what the browser checks are for. */
+.vb-stack[data-pad-y='0'] { padding-block: 0; }
+.vb-stack[data-pad-y='1'] { padding-block: var(--s-1); }
+.vb-stack[data-pad-y='2'] { padding-block: var(--s-2); }
+.vb-stack[data-pad-y='3'] { padding-block: var(--s-3); }
+.vb-stack[data-pad-y='4'] { padding-block: var(--s-4); }
+.vb-stack[data-pad-y='5'] { padding-block: var(--s-5); }
+.vb-stack[data-pad-y='6'] { padding-block: var(--s-6); }
+.vb-stack[data-pad-y='7'] { padding-block: var(--s-7); }
+
+.vb-stack[data-pad-x='0'] { padding-inline: 0; }
+.vb-stack[data-pad-x='1'] { padding-inline: var(--s-1); }
+.vb-stack[data-pad-x='2'] { padding-inline: var(--s-2); }
+.vb-stack[data-pad-x='3'] { padding-inline: var(--s-3); }
+.vb-stack[data-pad-x='4'] { padding-inline: var(--s-4); }
+.vb-stack[data-pad-x='5'] { padding-inline: var(--s-5); }
+.vb-stack[data-pad-x='6'] { padding-inline: var(--s-6); }
+.vb-stack[data-pad-x='7'] { padding-inline: var(--s-7); }
+
+/* ONE EDGE, NOT FOUR. Every border a migrated row was left holding was a single hairline separating it
+   from the row above or below — `1px solid var(--border)`, nineteen times in the tree, never a colour or a
+   width of its own. A box with four borders is a `Surface`, which already exists and already says so. */
+.vb-stack[data-edge='top'] { border-top: 1px solid var(--border); }
+.vb-stack[data-edge='bottom'] { border-bottom: 1px solid var(--border); }
+
 /* `end` is `justify-content`, not `align-items`: the two `raho-foot`/`report-foot` rows that wanted it
    were pushing a button pair to the trailing edge, which is the main axis. */
 .vb-stack[data-justify='end'] { justify-content: flex-end; }

@@ -91,3 +91,25 @@ export const WhatShrinks: Story = {
     </div>
   ),
 };
+
+// PADDING AND AN EDGE, the two options the first migrated surface proved were missing. Six classes in one
+// directory were "a row with a gap, some padding, and a rule under it" — which is this, and which is why
+// that surface deleted one class out of fifty-one before these existed.
+export const PadAndEdge: Story = {
+  render: () => (
+    <Stack direction="column" gap={0} align="stretch">
+      <Stack pad={[3, 5]} edge="bottom" gap={4}>
+        <Text ink="strong">a head</Text>
+        <Button size="sm" className="push">
+          act
+        </Button>
+      </Stack>
+      <Stack pad={[2, 5]} edge="bottom" gap={3}>
+        <Text>a status line under it</Text>
+      </Stack>
+      <Stack pad={5} gap={3}>
+        <Text>and a body with one padding on both axes</Text>
+      </Stack>
+    </Stack>
+  ),
+};

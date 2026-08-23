@@ -1,12 +1,14 @@
 /* Session-override notice: the dock's controls don't write the project default, so say so
-   rather than leaving the user to wonder why Settings still shows something else. */
+   rather than leaving the user to wonder why Settings still shows something else.
+   The row itself is a `Stack`; `--t-micro` is what has no `Text` option, so the face stays here. */
 .copilot-override {
-  display: flex; align-items: center; gap: var(--s-4);
   font-size: var(--t-micro); color: var(--muted);
   padding: var(--s-2) var(--s-4);
 }
 
-.copilot-warn { padding: var(--s-3) var(--s-5); font-size: var(--t-small); color: var(--danger); background: color-mix(in srgb, var(--danger) 12%, transparent); border-bottom: 1px solid var(--border); }
+/* THE TINT IS THE BOX AND THE INK IS THE LINE'S. `--t-small` + `--danger` is `Text role="error"` value
+   for value, so the sentence says it at the call site and what is left here is the tinted strip. */
+.copilot-warn { padding: var(--s-3) var(--s-5); background: color-mix(in srgb, var(--danger) 12%, transparent); border-bottom: 1px solid var(--border); }
 
 /* ---------- Copilot dock (shrink side-by-side) ---------- */
 .copilot {
@@ -18,7 +20,13 @@
   background: var(--panel);
   min-height: 0;
 }
-.copilot-head { display: flex; align-items: center; gap: var(--s-4); padding: var(--s-4) var(--s-5); border-bottom: 1px solid var(--border); }
+/* THE SEVEN ROWS OF THE DOCK ARE `Stack`s NOW, AND WHAT SURVIVES IS THE GUTTER AND THE RULE. Six of them
+   declared `align-items: center; display: flex; gap` — the same signature at three different gaps, which
+   is the largest single cluster the surface census found and the reason the layout atom exists. The gap is
+   an attribute on the `Stack`; the `var(--s-5)` gutter and the 1px rule are genuinely this panel's rhythm
+   and no atom has anything to say about them. test/copilot-rows.test.tsx asserts all seven against the
+   gutter, so the half that stays is the half that test reads. */
+.copilot-head { padding: var(--s-4) var(--s-5); border-bottom: 1px solid var(--border); }
 /* 0.14em → 0.08em, and the dock's title visibly tightens. It was the second-loosest tracking in the
    tree after `.board-label`'s, and a panel heading is not a wordmark. */
 .copilot-title { font-weight: 700; font-family: var(--font-display); text-transform: uppercase; letter-spacing: var(--track); }
@@ -29,7 +37,7 @@
    deliberate — the label was drift. */
 
 /* Chat switcher */
-.copilot-chatbar { display: flex; align-items: center; gap: var(--s-3); padding: var(--s-3) var(--s-5); border-bottom: 1px solid var(--border); }
+.copilot-chatbar { padding: var(--s-3) var(--s-5); border-bottom: 1px solid var(--border); }
 .chat-switcher { position: relative; flex: 1; min-width: 0; }
 /* "+ New" must not break across two lines when the switcher beside it is wide. */
 .chat-new { white-space: nowrap; }
@@ -51,14 +59,16 @@
    nowhere near it. The distinction was deliberate before the migration and survives it. */
 .chat-del:hover:not(:disabled) { color: var(--accent-2); }
 
-.copilot-controls { display: flex; align-items: center; flex-wrap: wrap; gap: var(--s-4); padding: var(--s-4) var(--s-5); border-bottom: 1px solid var(--border); }
+.copilot-controls { padding: var(--s-4) var(--s-5); border-bottom: 1px solid var(--border); }
 /* `.copilot-actions` IS GONE and so is the wrapper it named. Its button declared `Button`'s `default`
    `sm` box value for value — the same `--panel-2` ground, `--text` ink, `--border` edge, `--r-md`
    corner, `var(--s-2) var(--s-4)` padding, `--t-small` size and the same disabled dimming — so it is
    that Button now. What was left of the wrapper was `margin-left: auto`, which is `.push`, beside a
    `display: flex` and a `gap` that had one child to separate from nothing. The button sits directly in
-   `.copilot-controls`, which is already the flex row with the gap. */
-.copilot-selects { display: flex; gap: var(--s-4); padding: 0 var(--s-5) var(--s-4); border-bottom: 1px solid var(--border); }
+   the `.copilot-controls` row, which is the `Stack` that carries the gap. */
+/* `align="stretch"` on the `Stack` and not the row default: this one and `.copilot-input` named NO
+   `align-items`, so their two controls have always filled the row's height. */
+.copilot-selects { padding: 0 var(--s-5) var(--s-4); border-bottom: 1px solid var(--border); }
 /* The row decides how its controls sit; the box is `.vb-ctl`'s. */
 .copilot-selects > .vb-ctl { flex: 1; }
 .copilot-selects select:disabled { opacity: 0.5; }
@@ -74,7 +84,7 @@
 /* THE ROW, AND NO LONGER THE INDICATOR. The `font-size` and the `color: var(--tone, …)` are gone: what
    sits in here is a `StatusChip`, which brings both. This row's remaining job is the panel's own rhythm —
    the same `--s-5` gutter and the same rule underneath as every other row in the dock. */
-.copilot-status { display: flex; align-items: center; gap: var(--s-3); padding: var(--s-2) var(--s-5); border-bottom: 1px solid var(--border); }
+.copilot-status { padding: var(--s-2) var(--s-5); border-bottom: 1px solid var(--border); }
 /* THE ROW THAT HAD NO CLASS. The Authorise button sat in a bare `<div>` while its six siblings each padded
    themselves by the dock gutter, so the one control that grants write access to the project was flush
    against the dock's left edge and touching the board behind it. Nobody chose that.
@@ -87,15 +97,21 @@
 .msg { font-size: var(--t-body); line-height: 1.45; white-space: pre-wrap; word-break: break-word; color: var(--tone, inherit); }
 .msg-user { align-self: flex-end; background: var(--accent-fill); color: var(--on-fill); padding: var(--s-3) var(--s-4); border-radius: var(--r-lg) var(--r-lg) var(--r-sm) var(--r-lg); max-width: 85%; }
 .msg-assistant { background: var(--panel-2); border: 1px solid var(--border); padding: var(--s-3) var(--s-4); border-radius: var(--r-lg) var(--r-lg) var(--r-lg) var(--r-sm); max-width: 90%; }
-.msg-thinking { color: var(--muted); font-style: italic; font-size: var(--t-small); }
+/* `.msg-thinking` IS GONE: `--t-small` muted italic is `Text role="hint"` declaration for declaration,
+   and the span it sat on is a CHILD of `.msg` rather than the same element — so no organism rule contends
+   with `.vb-text` for the step or the ink. `.msg-running` could not follow it: that one shares its element
+   with `.msg`, whose `--t-body` and `color: var(--tone, inherit)` win on source order, so a `Text` there
+   would have lost the muted grey. Its `color: var(--muted)` is the reason it survives below. */
 /* `.msg-tool` IS GONE: a tool name is machine vocabulary and the rule was `Readout` `small` `accent`
    written out by hand. `msg-tool` still reaches the wrapper through `msg-${it.kind}`, and there is
    nothing left for it to say — the line's only child is the readout. See copilot/CopilotPanel.tsx. */
 /* `.msg-error` IS GONE. It declared `color: var(--danger)` — a state's colour, chosen on a surface,
    which is the whole subject of Phase 13 — and a `font-size: var(--t-body)` that restated `.msg`'s own.
    The line is the `error` row of molecules/state-tones.ts now, and it gets its ink from `--tone` through
-   `.vb-tone-bad`. The four other `msg-*` classes stay: a bubble's geometry and a thinking line's
-   quietness are shapes, and the chat may keep its own. */
+   `.vb-tone-bad`. THREE of the four other `msg-*` classes stay — `.msg-thinking` went to `Text` above:
+   a bubble's geometry is a shape, and the chat may keep its own. `.msg-user` and `.msg-assistant` show
+   NO literal call site and are not dead: `msg-${item.kind}` composes both names at run time, which is
+   the pattern `check:class-budget` resolves and the reason they look unreferenced. */
 .msg-running { color: var(--muted); font-style: italic; }
 /* CENTRED, not baseline-aligned, and the harness is why: `ReadoutLine` aligns on the baseline because
    its parts are text at two sizes — but this row's last item is the context METER, a 5px bar with no
@@ -110,6 +126,6 @@
 .ctx-fill { display: block; height: 100%; background: var(--accent); }
 .ctx-warn { color: var(--accent-2); }
 .ctx-warn .ctx-fill { background: var(--accent-2); }
-.copilot-input { display: flex; gap: var(--s-4); padding: var(--s-4) var(--s-5); border-top: 1px solid var(--border); }
+.copilot-input { padding: var(--s-4) var(--s-5); border-top: 1px solid var(--border); }
 .copilot-input > .vb-ctl { flex: 1; resize: none; }
 

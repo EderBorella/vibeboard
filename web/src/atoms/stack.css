@@ -144,6 +144,17 @@
    classes alive on one declaration each, which is the exception this file exists to remove. */
 .vb-stack[data-grow] { flex: 1; min-width: 0; min-height: 0; }
 .vb-stack[data-shrink] { min-width: 0; min-height: 0; }
+/* SPAN YOUR CONTAINER EVEN IF THE UA WOULD SHRINK YOU TO FIT, and the defect that bought it is worth
+   stating exactly. A `<button>`'s `width` is `auto`, which for a button means SHRINK-TO-FIT rather than
+   the `stretch` a `<div>` gets — so `Row as="button" stack` sized itself to its non-flexible content and
+   ignored the 470px its container was offering. Measured in the model picker: a 135.3px pick row inside a
+   470.2px `.vb-row-main`, which put the capability glyphs hard against the model id instead of at the
+   trailing edge, because `.vb-clip`'s `flex: 1` can only take slack that exists.
+   `.vb-row` HAS DECLARED `width: 100%` ALL ALONG FOR THIS REASON — and `Row stack` emits `.vb-list`
+   INSTEAD of `.vb-row`, so the stacked form silently lost it. `Row` sets this whenever it stacks, which
+   makes the two forms agree. A no-op on every block-level row in the tree (an `<li>` or a `<div>` already
+   fills its parent); it changes only the shrink-to-fit ones, which is exactly the set that was wrong. */
+.vb-stack[data-wide] { width: 100%; }
 .vb-stack[data-scroll] { overflow-y: auto; }
 
 /* ONE CHILD OPTING OUT OF ITS PARENT'S ALIGNMENT, and the parent's `align` cannot say it: five classes

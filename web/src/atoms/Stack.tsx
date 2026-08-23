@@ -71,6 +71,10 @@ interface Props {
   shrink?: boolean;
   // A pane that scrolls. Four classes were `overflow-y: auto` and nothing else.
   scroll?: boolean;
+  // SPAN THE CONTAINER even where the UA would shrink to fit. Only a `<button>` (and a few other
+  // shrink-to-fit boxes) needs it — see stack.css. `Row` sets it whenever it stacks, because `.vb-row`
+  // has always declared `width: 100%` and the stacked form emits `.vb-list` instead and lost it.
+  wide?: boolean;
   as?: StackTag;
   // THE ACCESSIBLE NAME, and three of the four surfaces migrated onto this atom reported its absence as
   // the reason a class survived. `.reports`, `.options`, `.report`, `.dispatch`, `.card-skills` and `.dock`
@@ -96,6 +100,7 @@ export const Stack = forwardRef<HTMLElement, Props>(function Stack(
     fill,
     shrink,
     scroll,
+    wide,
     as: Tag = 'div',
     label,
     title,
@@ -133,6 +138,7 @@ export const Stack = forwardRef<HTMLElement, Props>(function Stack(
       data-grow={fill ? '' : undefined}
       data-shrink={shrink ? '' : undefined}
       data-scroll={scroll ? '' : undefined}
+      data-wide={wide ? '' : undefined}
       aria-label={label}
       title={title}
       data-testid={testId}

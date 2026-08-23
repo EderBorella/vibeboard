@@ -78,6 +78,10 @@ export function Row({
   // HOISTED, because the same two expressions appeared in both return branches and the rule that fired is
   // cognitive complexity, which counts NESTING. Naming them once flattens it and says what they are.
   const dir = stack ? 'column' : undefined;
+  // FULL WIDTH WHENEVER IT STACKS, because `.vb-row` declares `width: 100%` and `.vb-list` — which the
+  // stacked form emits INSTEAD — does not. A `<button>` shrinks to fit, so `Row as="button" stack` was
+  // sizing to its content and leaving its container's slack unclaimed. See atoms/stack.css.
+  const wide = stack ? '' : undefined;
   // `--s-1` for a stacked row and `--s-4` for a line of cells: the two gaps `.vb-list` and `.vb-row`
   // declared before either of them wore the atom.
   const gapStep = String(gap ?? (stack ? 1 : 4));
@@ -96,7 +100,7 @@ export function Row({
     // `plain` is a `<div>` or an `<li>` only, and asking for a plain button is asking for `flat`.
     const Tag = as === 'button' ? 'div' : as;
     return (
-      <Tag className={classes} data-dir={dir} data-gap={gapStep} {...rest}>
+      <Tag className={classes} data-dir={dir} data-gap={gapStep} data-wide={wide} {...rest}>
         {inner}
       </Tag>
     );
@@ -108,6 +112,7 @@ export function Row({
       className={classes}
       data-dir={dir}
       data-gap={gapStep}
+      data-wide={wide}
       disabled={disabled}
       {...rest}
     >

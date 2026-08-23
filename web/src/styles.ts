@@ -93,11 +93,17 @@ import './templates/work-area.css';
 import './organisms/board/board.css';
 import './pages/gate/gate.css';
 // THE TWO SHARED ORGANISMS, at `.modal-*`'s byte position — which is where the family they replace was.
-// `list.css` is imported HERE, above every surface sheet, for the reason every shared layer is: eight
-// surfaces override a row (`.explorer-item`'s gap, `.dispatch-row`'s wrap, `.signin-row`'s rule,
-// `.picked`'s rail colour, the diary's four kinds) and an override that lands before the thing it
-// overrides is not an override. It sits AFTER `atoms/surface.css`, which is why the UA list reset in it is
-// keyed on the element — see that file.
+// `list.css` is here so that the surfaces which override a row land after it (`.explorer-item`'s gap,
+// `.dispatch-row`'s wrap, `.signin-row`'s rule, `.picked`'s rail colour, the diary's four kinds): an
+// override that lands before the thing it overrides is not an override. It sits AFTER `atoms/surface.css`,
+// which is why the UA list reset in it is keyed on the element — see that file.
+//
+// IT IS NOT ABOVE *EVERY* SURFACE SHEET, WHICH THIS PARAGRAPH USED TO CLAIM. Five come first —
+// `templates/app-shell.css`, `organisms/topbar/topbar.css`, `templates/work-area.css`,
+// `organisms/board/board.css` and `pages/gate/gate.css` — so an equal-specificity override of a `.vb-list`
+// or `.vb-row` property in those five LOSES. One did: `.gate-list`'s 6px gap became 2px silently. Until
+// Phase 7 straightens this order, a `.vb-list`/`.vb-row` override in those five sheets has to outrank the
+// shared rule rather than merely follow it.
 import './organisms/shared/modal.css';
 import './organisms/shared/list.css';
 import './organisms/settings/settings.css';

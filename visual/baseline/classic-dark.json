@@ -1,5 +1,5 @@
 {
-  "recorded": "2026-08-22",
+  "recorded": "2026-08-23",
   "surfaces": {
     "boards": {
       "fontSizes": [
@@ -17,8 +17,8 @@
       ],
       "controlHeights": [
         "16px",
-        "20px",
         "28px",
+        "30px",
         "47px"
       ],
       "markerHeights": [
@@ -199,7 +199,7 @@
         "elements": 146,
         "textElements": 73,
         "overflow": 49,
-        "clipping": 13,
+        "clipping": 12,
         "contrast": 73,
         "tokens": 49,
         "rows": 15,
@@ -221,6 +221,7 @@
         "11px",
         "12px",
         "13px",
+        "15px",
         "18px"
       ],
       "radii": [
@@ -228,13 +229,13 @@
         "999px"
       ],
       "controlHeights": [
-        "21px",
         "25.5px",
-        "27px",
+        "28.5px",
         "28px",
+        "29.4px",
         "29px",
         "30.5px",
-        "42.8px"
+        "46.8px"
       ],
       "markerHeights": [
         "16px"
@@ -313,7 +314,7 @@
       "examined": {
         "elements": 127,
         "textElements": 80,
-        "overflow": 77,
+        "overflow": 76,
         "clipping": 14,
         "contrast": 80,
         "tokens": 49,
@@ -352,10 +353,10 @@
         "16px"
       ],
       "examined": {
-        "elements": 57,
+        "elements": 62,
         "textElements": 31,
-        "overflow": 23,
-        "clipping": 4,
+        "overflow": 22,
+        "clipping": 5,
         "contrast": 31,
         "tokens": 49,
         "rows": 5,
@@ -388,7 +389,7 @@
       "examined": {
         "elements": 8,
         "textElements": 4,
-        "overflow": 4,
+        "overflow": 3,
         "clipping": 1,
         "contrast": 4,
         "tokens": 49,
@@ -422,7 +423,7 @@
   "radii": {
     "999px": 96,
     "50%": 12,
-    "6px": 268,
+    "6px": 280,
     "10px": 56,
     "4px": 4
   },

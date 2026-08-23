@@ -79,9 +79,10 @@ const PRIMITIVE_LAYER = [
 // this is the number the plan's own programme ends on, and the shortfall is the owner's to rule on rather
 // than a gate's to hide:
 //
-//   The plan's §5.3 target is **146**; `CLASS_TARGET` below still says **183** and nobody has reconciled
-//   the two (carried forward from the molecule layer as item 0i). Against 146 the gap is **161**; against
-//   183 it is **124**. Nothing named in notes/atomic-revamp-plan.md accounts for either.
+//   The two targets ARE reconciled as of this commit and the answer is §5.3's **146** — 183's derivation
+//   is the one the plan withdraws by name; see `CLASS_TARGET` below for the term-by-term count and for
+//   where the 161 that remains actually sits. Nothing named in notes/atomic-revamp-plan.md accounts for
+//   it, which is the finding rather than a gap in the reading.
 //
 //   WHERE THE 261 SURFACE CLASSES ACTUALLY LIVE, counted per directory rather than estimated: cards 38,
 //   board 33, runs 29, copilot 27, diary 20, autopilot 19, control 13, templates 12, execution 11,
@@ -96,6 +97,9 @@ const PRIMITIVE_LAYER = [
 // `docs/design-system.md`'s own "Phase 5" is an earlier and different phase, it still lists
 // `SegmentedControl` as live and it still reports 457 class selectors. That document is rewritten as the
 // work closes; until then the only number that is true is the one this gate prints.
+//
+// 183 WAS ITSELF WITHDRAWN — see CLASS_TARGET below, which is 146. What follows is why 183 replaced an
+// earlier 150, kept because it is the record of how a target gets derived from an uncounted term twice:
 //
 // THE TARGET IS 183 AND NOT THE PLAN'S "UNDER 150", which is withdrawn. 150 was derived from ten bespoke
 // surfaces at about eight layout classes each plus roughly thirty primitive classes, and neither term was
@@ -176,7 +180,29 @@ const PRIMITIVE_LAYER = [
 // The renames in it net to zero: `.control-editor{,-head}` → `.vb-editor{,-head}` and `.control-textarea`
 // → `.vb-editor-body`, which is the template taking its own names off one feature's stylesheet.
 const CLASS_CEILING = 307;
-const CLASS_TARGET = 183;
+// THE TARGET IS 146. Two numbers stood in this tree for two phases — this constant said 183 and §5.3 of
+// the plan says 146 — and the gate PRINTED 183 at the developer, so the reconciliation is the gate's to
+// make. 146 wins because 183's derivation is the one that was withdrawn, by name: 183 = 17 surfaces × 8
+// layout classes + 47 primitive classes, where the 8 is recorded as *"inherited from the plan and marked
+// as inherited"* — never measured against a surface built to it — and the 47 assumed the shared layer
+// stayed a six-primitive set rather than becoming a full atomic layer. The paragraph below that argues for
+// 183 is kept as the record of a withdrawn number, not as the target.
+//
+// 146 IS COUNTED TERM BY TERM: atoms 29 (Button 8, Chip 4, tones 5, Control 1, Text 5, Readout 1,
+// Surface 5), molecules 26 (Field 4, Tabs 5, Menu 4, StatusChip 5, Popover 3, Notice 4, FigureRow 1),
+// shared organisms 10 (Modal 5, List/Row 5), globals 5, surface layout 76 (19 surfaces × 4).
+//
+// AND THE GAP IS 161, WHICH IS NOT A DELETION PROGRAMME ANY PHASE OF THE PLAN CARRIES. Measured against
+// the three terms this gate can see: the 13-sheet primitive layer is **60** against §5.3's 29 + 26 = 55;
+// `organisms/shared/` is **27** against its 10 (Modal 5 and List/Row 5 are exact — the other 17 are the
+// picker, the confirm and three state words, which are surfaces living in a shared directory); the 16
+// feature directories hold **249** against its 76. So the whole shortfall is the surface-layout term, and
+// the remainder is type faces and one-off positions rather than boxes — `.tile-title`, `.msg-user`,
+// `.report-meta dd`, `.diary-kind`. Getting to 76 means either a shared "one-off position" vocabulary,
+// which `docs/design-system.md` refuses as a utility framework, or deciding that a surface may not have a
+// type face of its own, so those become `Text` options. That is the owner's ruling to make, and it is a
+// plannable change of the same kind as `Readout` losing its nine options — not a number a gate can hide.
+const CLASS_TARGET = 146;
 
 // Anti-vacuity floor on the SELECTOR PARSER, not on the class count: a regex that stops matching reports
 // zero findings, exits 0 and looks exactly like success. This one is safe from the trap Phase 3's button
@@ -272,6 +298,14 @@ function selfTest() {
   // anywhere, which is exactly the shape of a renamed dynamic class. `commented-only` is not in the CSS
   // fixture's rules at all (it is inside a comment there too), so it cannot be one.
   if (dead.join(',') !== 'beta-nope') return `resolution: findings were [${dead.join(',')}]`;
+  // CLAIM 3'S READER, on a fixture the tree cannot move. Both directions and the exclusion: renaming the
+  // two layer prefixes was planted and printed `0 of 0 surface(s)` and exited 0, so a fixture that only
+  // proved the positive would have passed with the whole population gone.
+  if (surfaceDirOf('web/src/organisms/board/board.css') !== 'board') return 'surface: an organism';
+  if (surfaceDirOf('web/src/pages/gate/gate.css') !== 'gate') return 'surface: a page';
+  if (surfaceDirOf('web/src/organisms/shared/list.css') !== null) return 'surface: shared is not one';
+  if (surfaceDirOf('web/src/templates/app-shell.css') !== null) return 'surface: a template is not one';
+  if (surfaceDirOf('web/src/atoms/button.css') !== null) return 'surface: an atom is not one';
   return null;
 }
 
@@ -344,36 +378,73 @@ if (parserFault) {
 // into a claim. The 8-per-surface figure the old 183 rested on was never that: the plan records it as
 // "inherited from the plan and marked as inherited", never measured against a surface built to it.
 //
-// REPORTING, AND POINTED AT A BACKLOG OF FIFTEEN SURFACES — which is exactly the condition this repository
-// refuses to make blocking. It goes blocking in the commit that reaches zero over-budget surfaces, which
-// on today's counts is not a commit anybody can write: `organisms/cards` is at 38 against 4 and its
-// remainder is type faces, not boxes. The number is the point of printing it.
+// THE PER-SURFACE ZERO IS POINTED AT A BACKLOG OF FIFTEEN SURFACES — which is exactly the condition this
+// repository refuses to make blocking. It reaches zero when `organisms/cards` gets from 38 to 4, and its
+// remainder is type faces rather than boxes, so that is not a commit anybody can write today.
+//
+// SO THE CLAIM IS A RATCHET ON THE COUNT OF OVER-BUDGET SURFACES, and it is the second thing this arm
+// lacked. As shipped it set `failed` from nothing at all: the plan's own planted defect — a fifth layout
+// class in `organisms/diary/` — moved the printed line from `diary 20` to `diary 21` and contributed
+// nothing to the exit code, and the 1 it got came from the 307 ceiling on the way past. Two classes into
+// `organisms/dock/`, the ONE under-budget surface, is the plant that reaches THIS claim: it takes dock from
+// 3 to 5 and the count from 15 to 16, and it now fails.
+//
+// A SURFACE'S TALLY IS EVERY CLASS ITS OWN SHEET NAMES, including a shared one it specialises: `autopilot`
+// is 20 rather than 19 because `.vb-modal.ap-help` has to name `.vb-modal` to outrank `[data-size]`. That
+// is a selector the surface spends, so it counts — but it is why the per-surface figures are a proxy and
+// the ratchet is on the COUNT OF SURFACES over the line rather than on any one of them.
 const PER_SURFACE = 4;
+const OVER_BUDGET_CEILING = 15;
+// The 16 feature directories under `organisms/` and `pages/`. `organisms/shared/` is the shared layer and
+// not a surface: its classes are `Modal`'s and `List`'s, which every surface spends. Counting them against
+// a 4-per-SURFACE allowance would be counting the primitives twice. Its own function so `selfTest` can go
+// through the code the census uses — the third thing this arm lacked, and plant G10e is why: renaming the
+// two layer prefixes to `organismsXX/`/`pagesXX/` printed `0 of 0 surface(s) over a ceiling of 4` and
+// exited 0. Every other claim in this file has a floor and a fixture; this one had neither.
+export function surfaceDirOf(file) {
+  const path = file.slice('web/src/'.length);
+  const scoped = ['organisms/', 'pages/'].find((layer) => path.startsWith(layer));
+  if (!scoped) return null;
+  const dir = path.slice(scoped.length).split('/')[0];
+  return dir === 'shared' || !dir ? null : dir;
+}
 const surfaceDirs = new Map();
 for (const { file, names } of perSheet) {
   if (PRIMITIVE_LAYER.includes(file)) continue;
-  const path = file.slice('web/src/'.length);
-  const scoped = ['organisms/', 'pages/'].find((layer) => path.startsWith(layer));
-  if (!scoped) continue;
-  const dir = path.slice(scoped.length).split('/')[0];
-  // `organisms/shared/` is the shared layer and not a surface: its classes are `Modal`'s and `List`'s,
-  // which every surface spends. Counting them against a 4-per-SURFACE allowance would be counting the
-  // primitives twice.
-  if (dir === 'shared') continue;
+  const dir = surfaceDirOf(file);
+  if (!dir) continue;
   if (!surfaceDirs.has(dir)) surfaceDirs.set(dir, new Set());
   for (const cls of names) surfaceDirs.get(dir).add(cls);
+}
+// ANTI-VACUITY, and it is the floor G10e walked past. A reader that finds no surfaces reports `0 of 0` and
+// exits 0, which reads identically to a tree with four classes per surface. 12 against the 16 that exist.
+const SURFACE_FLOOR = 12;
+if (surfaceDirs.size < SURFACE_FLOOR) {
+  console.error(`\nonly ${surfaceDirs.size} surface directory(ies) found, against a floor of`);
+  console.error(`${SURFACE_FLOOR}. The layer prefixes have stopped matching, so this claim is vacuous.`);
+  process.exit(1);
 }
 const overBudget = [...surfaceDirs]
   .filter(([, names]) => names.size > PER_SURFACE)
   .sort((a, b) => b[1].size - a[1].size);
 console.log(
-  `per surface: ${overBudget.length} of ${surfaceDirs.size} surface(s) over a ceiling of ${PER_SURFACE}` +
+  `per surface: ${overBudget.length}/${OVER_BUDGET_CEILING} of ${surfaceDirs.size} surface(s) over a ` +
+    `ceiling of ${PER_SURFACE}` +
     (overBudget.length > 0
       ? ` — ${overBudget.map(([dir, names]) => `${dir} ${names.size}`).join(', ')}`
       : ''),
 );
 
 let failed = false;
+
+if (overBudget.length > OVER_BUDGET_CEILING) {
+  console.error(
+    `\n${overBudget.length} surface(s) over the ceiling of ${PER_SURFACE}, against ` +
+      `${OVER_BUDGET_CEILING}. A surface that was inside its allowance has left it — the new class belongs` +
+      ` in an atom, a molecule or organisms/shared/, not in a sixteenth surface's own sheet.`,
+  );
+  failed = true;
+}
 
 if (unreferenced.length > 0) {
   console.error(`\n${unreferenced.length} class selector(s) referenced from nowhere in ${CORPUS}:\n`);

@@ -112,8 +112,8 @@ export const Blocking: Story = {
       <>
         <p>Everything in this project was stopped. Halted at 14:02 on 21 August.</p>
         <Text lead>
-          Nothing will be dispatched, and no agent or backend will be started for this project — not even
-          by the chat.
+          Nothing will be dispatched, and no agent or backend will be started for this project — not even by
+          the chat.
         </Text>
         <Surface variant="inset" className="signin-label">
           Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36

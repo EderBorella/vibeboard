@@ -218,8 +218,11 @@
 .ap-waiting { color: var(--muted); font-size: var(--t-small); }
 
 /* The instructions. Taller than the card modal and scrolling inside itself: it is prose, and prose that
-   pushes its own close button off the screen is prose nobody finishes. */
-.ap-help { max-width: 44rem; }
+   pushes its own close button off the screen is prose nobody finishes.
+ *
+ * `.vb-modal` IS LOAD-BEARING, not decoration: `Modal` writes its measure as `.vb-modal[data-size='lg']`,
+ * which is (0,2,0), so a bare `.ap-help` at (0,1,0) lost and this card was silently 620px. */
+.vb-modal.ap-help { max-width: 44rem; }
 .ap-help-body { overflow-y: auto; max-height: 70vh; padding: var(--s-6); line-height: 1.55; }
 .ap-help-body h3 {
   margin: var(--s-6) 0 var(--s-3);

@@ -42,8 +42,9 @@
 //     invisible to it, and `.copilot-actions button` really is one of them.
 //   - anything about an `<a>`, a `<div role="button">` or an `<input type="submit">`.
 // The `<Button className>` hole USED to be on this list, and reading `<Button>` closed it — see the
-// comment on TAGS. It was not hypothetical either: it opened up the moment 27 classes migrated, and
-// `<Surface as="button">` is the same hole reopened by Phase 4 and closed in the same commit.
+// comment on TAGS. It was not hypothetical either: it opened up the moment 27 classes migrated;
+// `<Surface as="button">` is the same hole reopened by Phase 4, and `<Row as="button">` the same hole
+// reopened by Phase 6 — each closed one commit late, which is the pattern worth reading the TAGS note for.
 // It is a real subset of "no rule outside the primitive block declares geometry for a button-shaped
 // element", stated so nobody mistakes it for the whole.
 
@@ -341,6 +342,10 @@ const FIXTURE = [
   // `.archive-drawer`'s legitimate padding as a fault.
   '<Surface as="button" variant="flat" className="eta">x</Surface>',
   '<Surface variant="raised" className="theta">x</Surface>',
+  // And a `Row`, both directions, because this is the tag whose absence let two plants through a ceiling
+  // of zero: a row that is a button is in the population, a row that is an `<li>` is not.
+  '<Row as="button" variant="flat" className="kappa">x</Row>',
+  '<Row as="li" stack className="lambda">x</Row>',
   // None of these is a button, and a pattern that swept them up would inflate the census.
   '<ButtonRow className="epsilon">x</ButtonRow>',
   '<PanelHead className="iota">x</PanelHead>',
@@ -356,7 +361,7 @@ function parserSelfTest() {
   const seen = TAGS.flatMap(({ tag, requires }) => shapedTags(FIXTURE, tag, requires)).flatMap((t) =>
     classesIn(t.attrs),
   );
-  const want = 'alpha,beta,gamma,delta,eta';
+  const want = 'alpha,beta,gamma,delta,eta,kappa';
   // Not sorted: TAGS' order is part of what is asserted, so `<button`'s two come before `<Button`'s.
   return seen.join(',') === want ? null : `expected [${want}], parsed [${seen.join(',')}]`;
 }
@@ -377,11 +382,21 @@ function parserSelfTest() {
 // to come back through a prop the check cannot see. So the tag carries a REQUIREMENT, read out of the
 // same attribute text: a Panel is in the population when it says `as="button"`.
 //
+// `<Row as="button">` IS PHASE 6'S VERSION OF THE SAME HOLE, AND IT REOPENED IT. The organism phase put
+// six rows on `<Row as="button">` — `.board-label` (Board.tsx), `.explorer-item` (FileTree.tsx),
+// `.report-open` (CardReports.tsx) and two in ControlFileList.tsx — and none of the three tags above sees
+// one, so `padding: var(--s-3) var(--s-5)` planted on `.board-label` and `border-radius: var(--r-md)` on
+// `.explorer-item` both exited **0** against a ceiling of zero. The 0/0 below was true; the sentence at
+// :180 that the next such padding "fails the run rather than raising a number" was not, for any `<Row>`.
+// Qualified the same way and for the same reason: a `Row` is usually an `<li>` or a `<div>`, and a stacked
+// row may legitimately pad itself.
+//
 // Both primitives document `className` as layout-only. This is what makes that documentation a gate.
 const TAGS = [
   { tag: '<button', requires: null },
   { tag: '<Button', requires: null },
   { tag: '<Surface', requires: /\bas="button"/ },
+  { tag: '<Row', requires: /\bas="button"/ },
 ];
 
 // Every opening tag of `tag` that also satisfies `requires`, which is how `<Surface as="button">` is
@@ -433,7 +448,7 @@ console.log(
   `radius scale: ${radiusDecls} border-radius declaration(s) across ${walk('.css').length} file(s) in ${CORPUS}`,
 );
 console.log(
-  `button geometry: ${onButton.size} class(es) literal on a ${TAGS.map((t) => t.tag).join(', ')} (Surface only when it says as="button"), ${geometry.length} of them given geometry outside the ${PRIMITIVE_LAYER.size}-sheet primitive layer`,
+  `button geometry: ${onButton.size} class(es) literal on a ${TAGS.map((t) => `${t.tag}${t.requires ? ' as="button"' : ''}`).join(', ')}, ${geometry.length} of them given geometry outside the ${PRIMITIVE_LAYER.size}-sheet primitive layer`,
 );
 
 // Before the findings, because a green run on a pattern that matched nothing is the worse failure.

@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { Button } from '../atoms/Button';
 import { Readout } from '../atoms/Readout';
-import { List } from '../organisms/shared/List';
 import { Surface } from '../atoms/Surface';
 import { Text } from '../atoms/Text';
+import { List } from '../organisms/shared/List';
 import type { Card } from '../shared';
 import { linkedCards } from '../viewmodel';
 import { LinkPicker } from './LinkPicker';

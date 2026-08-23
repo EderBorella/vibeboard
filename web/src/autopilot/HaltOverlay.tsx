@@ -70,9 +70,8 @@ export function HaltOverlay({ state, onRestarted }: { state: AutopilotState; onR
         {state.detail ?? 'Everything in this project was stopped.'} Halted {readable(state)}.
       </p>
       <Text lead>
-        Nothing will be dispatched, and no agent or backend will be started for this project — not even by
-        the chat. Restarting brings the project back to idle; auto-pilot stays off until you start it
-        yourself.
+        Nothing will be dispatched, and no agent or backend will be started for this project — not even by the
+        chat. Restarting brings the project back to idle; auto-pilot stays off until you start it yourself.
       </Text>
       {error && (
         <Text role="error" lead>

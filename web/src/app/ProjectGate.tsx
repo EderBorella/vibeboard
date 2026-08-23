@@ -4,9 +4,9 @@ import { Control } from '../atoms/Control';
 import { Readout } from '../atoms/Readout';
 import { Text } from '../atoms/Text';
 import { Field } from '../molecules/Field';
+import { Notice } from '../molecules/Notice';
 import { List } from '../organisms/shared/List';
 import { Row } from '../organisms/shared/Row';
-import { Notice } from '../molecules/Notice';
 import { useAction } from '../useAction';
 import { slugify } from '../viewmodel';
 

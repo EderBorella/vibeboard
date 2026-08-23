@@ -69,25 +69,25 @@ export function ApprovalPrompt({ pending, onError }: Props) {
         {first.label}
       </Surface>
       <Text lead>
-          Allow it only if that is you, on a device you are holding. Anything allowed here can read this
-          board, start agents and edit files in your projects. What it calls itself can be faked — the address
-          is the part that cannot.
+        Allow it only if that is you, on a device you are holding. Anything allowed here can read this board,
+        start agents and edit files in your projects. What it calls itself can be faked — the address is the
+        part that cannot.
         {pending.length > 1 && ` ${pending.length - 1} more waiting after this one.`}
       </Text>
-        <div className="signin-actions">
-          {/* Refuse first in the DOM as well as visually, so tab order and reading order agree. */}
-          <Button
-            variant="primary"
-            size="md"
-            ref={refuseRef}
-            onClick={() => void decide(first.id, false)}
-            disabled={busy !== null}
-          >
-            Refuse
-          </Button>
-          <Button size="md" onClick={() => void decide(first.id, true)} disabled={busy !== null}>
-            Allow
-          </Button>
+      <div className="signin-actions">
+        {/* Refuse first in the DOM as well as visually, so tab order and reading order agree. */}
+        <Button
+          variant="primary"
+          size="md"
+          ref={refuseRef}
+          onClick={() => void decide(first.id, false)}
+          disabled={busy !== null}
+        >
+          Refuse
+        </Button>
+        <Button size="md" onClick={() => void decide(first.id, true)} disabled={busy !== null}>
+          Allow
+        </Button>
       </div>
     </Modal>
   );

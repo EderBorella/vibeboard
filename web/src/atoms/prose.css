@@ -28,8 +28,15 @@
    thing wherever it appears, so the selector is the element; `.markdown code` below is (0,1,1) and still
    wins where it also draws a box. Two more `<code>` spans in the tree — the config path in Settings and
    the asking browser's address in the sign-in prompt — rendered unstyled and now read the same as the
-   other two, which is the point of an element rule rather than a per-surface one. */
-code { font-family: var(--font-mono); font-size: var(--t-small); color: var(--accent); }
+   other two, which is the point of an element rule rather than a per-surface one.
+ *
+ * NO `color` — AND THAT IS THE PRICE OF WIDENING THE SELECTOR, MEASURED. `--accent` came with the two
+ * surface rules this replaced; carried onto every `<code>` it put the three spans in Settings' columns
+ * warning at 4.00:1 (rgb(47,122,80) on rgb(228,225,220)) in marshmallow, against Tier 3's 4.5:1 floor,
+ * on a surface whose contrast count was 0. An element rule may only carry what is true for the element
+ * everywhere, and an ink that depends on the ground behind it is not. What `<code>` means is that the
+ * content is machine text, which the family and the step already say. */
+code { font-family: var(--font-mono); font-size: var(--t-small); }
 /* 0.8px → 2px of vertical padding, so an inline code span in prose gains 2.4px of height. It was below
    the floor of the gap band that used to stand in for this scale, which is how a value that small
    survived at all. */

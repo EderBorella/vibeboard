@@ -916,33 +916,51 @@ function pageFocus(root: string | null): FocusAudit {
   return { examined, unfocusable, offenders };
 }
 
-// AN ELLIPSISED BOX MUST STILL BE READABLE. The floor is 40px, which is about six characters at
-// `--t-micro` and four at `--t-body` — enough to tell two tabs apart, and far below anything in this tree
-// today, because a floor near the true number fails the run the first time somebody legitimately narrows a
-// pane. What it catches is the fault the overflow walk used to: a cell clamped to nothing.
+// AN ELLIPSISED BOX THAT IS ACTUALLY CLIPPING MUST STILL BE READABLE.
 //
-// AND A ZERO-WIDTH ELLIPSISED BOX IS THE COLLAPSE CASE, which is why the guard is `> 0` and not
-// `!== 0`: `pageOverflow` skips a zero box as invisible and `pageClipping` skips it too, so a label whose
-// flex basis went to nothing was invisible to all three walks at once.
-const CLAMP_FLOOR = 40;
+// Two corrections to the version that shipped, both measured. First, `CLAMP_FLOOR` lived at module scope
+// while this function is serialised into the page, so every call threw `CLAMP_FLOOR is not defined` and
+// took `auditStyles` — and with it checks 1, 2, 3, 4, 5, 7 and 12 and the drift comparison — down with it.
+// It is declared here, inside the only function that reads it.
+//
+// Second, the old comment claimed 40px was "far below anything in this tree today". It is not: the dock's
+// "Cards" tab is 34.33px and the copilot's "Plan" tab 25.53px, each sized to its own four- or five-letter
+// label and each perfectly legible. A width on its own cannot tell a short label from a squeezed one, so
+// the arm now asks the question it always said it asked ("a cell clamped to nothing"): the box must be
+// OVERFLOWING its own content AND narrower than the floor. A label that fits is not clamped, whatever it
+// measures — which is why the floor can stay generous at 40px instead of being lowered to clear real content.
+//
+// AND A ZERO-WIDTH ELLIPSISED BOX IS STILL THE COLLAPSE CASE: at width 0 any text at all makes
+// `scrollWidth > clientWidth`, so it is a finding. `pageOverflow` skips a zero box as invisible and
+// `pageClipping` skips it too, so a label whose flex basis went to nothing is seen by this walk alone.
 function pageClamped(root: string | null): Findings {
+  const CLAMP_FLOOR = 40;
   const scope = root ? document.querySelector(root) : document.body;
   if (!scope) return { examined: 0, offenders: [] };
+
+  function name(el: Element): string {
+    const id = el.getAttribute('data-testid');
+    const cls = typeof el.className === 'string' ? el.className.trim().split(/\s+/)[0] : '';
+    return `${el.tagName.toLowerCase()}${id ? `[${id}]` : cls ? `.${cls}` : ''}`;
+  }
+
+  function eligible(el: Element, style: CSSStyleDeclaration): boolean {
+    if (style.textOverflow !== 'ellipsis') return false;
+    if (style.visibility === 'hidden' || style.display === 'none') return false;
+    return el.getBoundingClientRect().height > 0;
+  }
+
   const offenders: Offender[] = [];
   let examined = 0;
   for (const el of [scope, ...Array.from(scope.querySelectorAll('*'))]) {
     const style = getComputedStyle(el);
-    if (style.textOverflow !== 'ellipsis') continue;
-    if (style.visibility === 'hidden' || style.display === 'none') continue;
-    const box = el.getBoundingClientRect();
-    if (box.height === 0) continue;
+    if (!eligible(el, style)) continue;
     examined += 1;
-    if (box.width >= CLAMP_FLOOR) continue;
-    const id = el.getAttribute('data-testid');
-    const name = typeof el.className === 'string' ? el.className.trim().split(/\s+/)[0] : '';
+    const width = el.getBoundingClientRect().width;
+    if (el.scrollWidth <= el.clientWidth || width >= CLAMP_FLOOR) continue;
     offenders.push({
-      where: `${el.tagName.toLowerCase()}${id ? `[${id}]` : name ? `.${name}` : ''}`,
-      detail: `${box.width.toFixed(2)}px of ellipsised text, against a floor of ${CLAMP_FLOOR}px`,
+      where: name(el),
+      detail: `${width.toFixed(2)}px of clipped text, against a floor of ${CLAMP_FLOOR}px`,
     });
   }
   return { examined, offenders };

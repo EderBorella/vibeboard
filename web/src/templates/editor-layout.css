@@ -13,7 +13,21 @@
   border-bottom: 1px solid var(--border); background: var(--panel);
 }
 /* THE BODY SLOT, whichever view fills it: a `Control mono` you type into or rendered markdown you read.
-   `resize: none` is the textarea's alone — a box that fills its pane has nothing to be dragged into. */
-.vb-editor-body { flex: 1; overflow-y: auto; padding: var(--s-5) var(--s-6); line-height: 1.5; }
-textarea.vb-editor-body { resize: none; }
+   `resize: none` is the textarea's alone — a box that fills its pane has nothing to be dragged into.
+ *
+ * THE INSET IS NOT SHARED, AND THE HEADER ABOVE WAS WRONG TO SAY NOTHING CHOSE THE DIFFERENCE. It said
+ * of `.control-textarea` and `.control-preview`: "One wrote its inset as a margin and the other as a
+ * padding; nothing chose the difference". Something did. A scrolling `<div>` wants the inset INSIDE the
+ * scroller, so it is a padding; a `<textarea>` already carries `atoms/control.css`'s `0 var(--s-4)`, so an
+ * inset written as padding OVERRIDES the atom — measured 12px 16px where every other control is 0 8px,
+ * which is `test/control-boxes.test.tsx:171` and `check:shape-coverage`'s control-geometry census, and the
+ * latter blocks at zero. The margin is what kept the atom's box intact before the merge.
+ *
+ * The preview's padding hangs off `.markdown` rather than an element-qualified `.vb-editor-body`, because
+ * `controlGeometryFault` reads the CLASS and not the element: `div.vb-editor-body { padding }` cannot
+ * reach a control and still fails the census (verified, exit 1). Both classes already exist, so the
+ * placement costs nothing. */
+.vb-editor-body { flex: 1; overflow-y: auto; }
+.vb-editor > .markdown { padding: var(--s-5) var(--s-6); }
+textarea.vb-editor-body { margin: var(--s-5) var(--s-6); resize: none; line-height: 1.5; }
 .vb-editor > .vb-text-error { padding: var(--s-4) var(--s-6); }

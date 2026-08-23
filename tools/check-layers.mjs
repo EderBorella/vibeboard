@@ -11,14 +11,22 @@
 //
 // Run it with: npm run check:layers
 //
-// STILL REPORTING ONLY, AND THE ORGANISM PHASE IS WHERE IT WAS MEANT TO GO BLOCKING. It did not, and the
-// number is why: **44 cross-surface reads remain**, against 0 orphans. That is not a refusal to finish the
-// job, it is what the job turned out to be — and it is measured rather than estimated:
+// HALF BLOCKING, AND THE HALF THAT IS NOT HAS A CEILING. The organism phase is where the whole gate was
+// meant to go blocking. It cannot: **44 cross-surface reads remain**, against 0 orphans, and a blocking
+// gate pointed at a backlog is a gate everybody learns to bypass. What is refused is a gate that is at zero
+// and still says nothing, and a backlog with no number on it:
 //
-//   ORPHANS ARE AT ZERO AND THAT CLAIM COULD BLOCK TODAY. 23 split classes became 18, and all 18 are a
-//   shared class a surface specialises (`.vb-ctl` and eight surfaces saying where their own copy sits),
-//   which has an owner. The seven that were genuine — `.push`, `.link-title`, `.raw-pane`,
-//   `.control-editor`, `.execution`, `.explorer-list`, `.suggestions-pane`, `.diary-about` — are gone.
+//   ORPHANS ARE AT ZERO AND THAT CLAIM NOW BLOCKS. It did not when this phase shipped it, and "it could
+//   block today" is what the file said — so `.zz-orphan` in two scoped directories printed `— ORPHAN` and
+//   exited 0. 23 split classes became 19, and all 19 are a shared class a surface specialises (`.vb-ctl`
+//   and eight surfaces saying where their own copy sits, `.vb-modal.ap-help`'s own measure), which has an
+//   owner. The seven that were genuine —
+//   `.push`, `.link-title`, `.raw-pane`, `.control-editor`, `.execution`, `.explorer-list`,
+//   `.suggestions-pane`, `.diary-about` — are gone.
+//
+//   THE 44 ARE A RATCHET, blocking on an increase. Reporting-only with no ceiling made 45 as green as 44,
+//   which is how the plan's own planted defect (`.board-columns` read from `copilot/CopilotPanel.tsx`)
+//   exited 0.
 //
 //   THE 44 THAT REMAIN ARE ONE FAULT, NOT 44: the STYLESHEETS have moved into the §5.1 tree and the
 //   COMPONENTS have not. `pages/execution/execution.css` holds eight classes and every one of them is read
@@ -114,29 +122,41 @@ export function definitionsOf(file, css) {
 // THE TEXT OF EVERY `className` / `classList` EXPRESSION IN A FILE. Brace-matched rather than
 // regex-terminated, because the expression is routinely a ternary or a template with nested braces and a
 // flat regex stops at the first `}` — which is inside the interpolation, not at the end of the attribute.
+//
+// THE QUOTES ARE KEPT and that is not cosmetic: the caller reads STRING LITERALS out of each region, so a
+// region that is already the bare contents of one holds no literal for it to find. Planted by accident and
+// caught by the fixture below, which is what a self-test is for.
+function quotedRegion(code, i) {
+  const quote = code[i];
+  if (quote !== '"' && quote !== "'") return null;
+  const end = code.indexOf(quote, i + 1);
+  return end === -1 ? '' : code.slice(i, end + 1);
+}
+
+// An unterminated expression yields everything to the end of the file rather than nothing: a region that is
+// too long makes the reader looser, and a reference this gate misses is a finding it does not make.
+function bracedRegion(code, i) {
+  const open = code[i];
+  if (open !== '{' && open !== '(') return null;
+  const close = open === '{' ? '}' : ')';
+  let depth = 0;
+  for (let j = i; j < code.length; j += 1) {
+    if (code[j] === open) depth += 1;
+    else if (code[j] === close) {
+      depth -= 1;
+      if (depth === 0) return code.slice(i, j + 1);
+    }
+  }
+  return code.slice(i);
+}
+
 export function classAttributes(code) {
   const out = [];
   for (const m of code.matchAll(/\bclassName\s*=\s*|\bclassList\.(?:add|remove|toggle|contains)\s*\(/g)) {
     let i = m.index + m[0].length;
     while (code[i] === ' ' || code[i] === '\n') i += 1;
-    const open = code[i];
-    if (open === '"' || open === "'") {
-      const end = code.indexOf(open, i + 1);
-      // THE QUOTES ARE KEPT and that is not cosmetic: the caller reads STRING LITERALS out of each region,
-      // so a region that is already the bare contents of one holds no literal for it to find. Planted by
-      // accident and caught by the fixture below, which is what a self-test is for.
-      if (end !== -1) out.push(code.slice(i, end + 1));
-      continue;
-    }
-    if (open !== '{' && open !== '(') continue;
-    const close = open === '{' ? '}' : ')';
-    let depth = 0;
-    let j = i;
-    for (; j < code.length; j += 1) {
-      if (code[j] === open) depth += 1;
-      else if (code[j] === close && (depth -= 1) === 0) break;
-    }
-    out.push(code.slice(i, j + 1));
+    const region = quotedRegion(code, i) ?? bracedRegion(code, i);
+    if (region) out.push(region);
   }
   return out;
 }
@@ -171,7 +191,11 @@ const orphaned = (scopes) => scopes.size > 1 && ![...scopes].includes(null);
 // scoped class read from its own surface is silent, the same class read from another surface is a
 // finding, and an open-layer class read from anywhere is silent — a self-test that only proved the
 // finding would pass with the scope rule inverted.
-function selfTest() {
+//
+// THREE FUNCTIONS AND NOT ONE, for the reason `check-shape-coverage.mjs` composes five: one chain of
+// twenty assertions scores 20 on the cognitive-complexity gate, and the answer to that is smaller
+// functions rather than a suppression on the file that decides what this gate can see.
+function scopeSelfTest() {
   if (scopeOf(`${CORPUS}/organisms/board/board.css`) !== 'board') return 'scopeOf: an organism';
   if (scopeOf(`${CORPUS}/pages/log/log.css`) !== 'log') return 'scopeOf: a page';
   if (scopeOf(`${CORPUS}/organisms/shared/modal.css`) !== null) return 'scopeOf: shared is not open';
@@ -183,6 +207,10 @@ function selfTest() {
   // definitions either way — and dropping the call was planted and passed here.
   const defs = definitionsOf('fixture.css', '.alpha { color: red }\n@supports selector(.gamma) { .beta {} }');
   if (defs.map((d) => d.cls).join(',') !== 'alpha,beta') return `definitionsOf: [${defs.map((d) => d.cls)}]`;
+  return null;
+}
+
+function readerSelfTest() {
   if (!names(codeOf('const a = <div className="alpha" />;'), 'alpha')) return 'names: a literal';
   if (names(codeOf('// .alpha is named only here\n'), 'alpha')) return 'names: a comment counted';
   // BOTH BOUNDARIES, because an accusation is the only thing this gate produces. `names()` reduced to
@@ -202,20 +230,26 @@ function selfTest() {
   if (names(codeOf("const t = useLocalPrefs('alpha');"), 'alpha')) return 'names: a string outside className';
   // AND THE OTHER DIRECTION, because a reader that finds nothing reports nothing and exits 0. A ternary
   // and a joined array are the two spellings this tree actually writes, and a flat regex reading up to the
-  // first `}` stops inside the interpolation of the first.
-  const ternary = 'const a = <div className={on ? `alpha ${x}` : "beta"} />;';
+  // first `}` stops inside the interpolation of the first. The ternary is a template literal with the
+  // placeholder escaped, for line 195's reason: the two characters have to be in the fixture, and a lint
+  // suppression must not stand where the reason should be.
+  const ternary = `const a = <div className={on ? \`alpha \${x}\` : "beta"} />;`;
   if (!names(codeOf(ternary), 'alpha') || !names(codeOf(ternary), 'beta')) return 'names: a ternary';
   const joined = "const b = <div className={['alpha', flag && 'beta'].join(' ')} />;";
   if (!names(codeOf(joined), 'beta')) return 'names: a joined array';
-  // A class defined in a SCOPED directory and in the OPEN layer has an owner — the open layer — and is not
-  // an orphan. Two scoped directories and no open one is.
+  return null;
+}
+
+// A class defined in a SCOPED directory and in the OPEN layer has an owner — the open layer — and is not
+// an orphan. Two scoped directories and no open one is.
+function orphanSelfTest() {
   if (orphaned(new Set([null, 'board']))) return 'orphaned: an open layer plus a surface';
   if (!orphaned(new Set(['board', 'cards']))) return 'orphaned: two surfaces';
   if (orphaned(new Set(['board']))) return 'orphaned: one surface is not a split at all';
   return null;
 }
 
-const fault = selfTest();
+const fault = scopeSelfTest() ?? readerSelfTest() ?? orphanSelfTest();
 if (fault) {
   console.error(`\nthe layer reader is broken: ${fault}.`);
   console.error(`The report would be about nothing. Fix tools/check-layers.mjs; do NOT relax the fixture.`);
@@ -263,7 +297,13 @@ for (const [cls, owner] of scoped) {
 const perScope = new Map();
 for (const { scope } of findings) perScope.set(scope, (perScope.get(scope) ?? 0) + 1);
 
-const PARSE_FLOOR = 40;
+// THE SAME POPULATION `check:class-budget` COUNTS, so the floor is set against that number and not an
+// order of magnitude below it. 40 was: a planted `classesOf` narrowed to `/\.([a-z]+)/g` lost 244 of the
+// 307 classes in this tree — an 80%-blind parser — and walked straight past a floor of 40 while
+// `check:class-budget` and `check:name-resolution` both failed. 250 is 307 less the 57 Phase 7 may still
+// delete; the commit that takes the budget below 250 lowers this in the same commit, which is the ratchet
+// discipline every other number in this repository already follows.
+const PARSE_FLOOR = 250;
 if (owners.size < PARSE_FLOOR) {
   console.error(`\nonly ${owners.size} class(es) found across ${sheets.length} sheet(s), against a floor`);
   console.error(`of ${PARSE_FLOOR}. The selector reader has stopped matching, so this report is vacuous.`);
@@ -289,16 +329,46 @@ for (const { cls, scope, site, readers } of findings) {
 for (const [cls, owner] of split) {
   // `null` is the open layer, and it printed as an empty string — `defined in autopilot and settings and`.
   const where = [...owner.scopes].map((scope) => scope ?? 'the shared layer').join(' and ');
-  console.log(`  .${cls} is defined in ${where}${orphaned(owner.scopes) ? ' — ORPHAN' : ''}: ${owner.sites.join(', ')}`);
+  console.log(
+    `  .${cls} is defined in ${where}${orphaned(owner.scopes) ? ' — ORPHAN' : ''}: ${owner.sites.join(', ')}`,
+  );
 }
 
-// TWO CLAIMS, AND THEY ARE AT DIFFERENT PLACES. A cross-surface READ is a finding; a split across two
-// SCOPED directories is an ORPHAN. A split that includes the open layer is neither — see `orphaned`.
+// TWO CLAIMS, AND THEY ARE AT DIFFERENT PLACES. A cross-surface READ is a ratchet; a split across two
+// SCOPED directories is an ORPHAN and blocks at zero. A split that includes the open layer is neither —
+// see `orphaned`.
 //
-// EXIT 0 WHILE THE READS ARE NON-ZERO, and the header says why: what closes them is Phase 7's file move,
-// not a rule anybody can rewrite here. Do NOT widen the reader to make the number look better — 28 of the
-// 72 findings this gate used to report were a class name that happens to be an ordinary word.
+// NEITHER IS REPORTING-ONLY ANY MORE, and that is the price of the reads not reaching zero in this phase.
+// A claim at zero that does not block is a gate switched off in place: `.zz-orphan` declared in both
+// `organisms/board/` and `organisms/cards/` was planted, PRINTED as an ORPHAN, and exited 0. And a ratchet
+// is what a backlog gets instead of nothing: the plan's own planted defect — `.board-columns` read from
+// `web/src/copilot/CopilotPanel.tsx` — also exited 0, because 45 reads were as green as 44.
+//
+// The reads go to zero, and this ceiling with them, in the commit that moves the 67 `.tsx` files. What
+// closes them is that file move and not a rule anybody can rewrite here. Do NOT widen the reader to make
+// the number look better — 28 of the 72 findings this gate used to report were a class name that happens
+// to be an ordinary word — and do NOT raise the ceiling: a cross-surface read added here is the fault.
+const CROSS_SURFACE_CEILING = 44;
+let failed = false;
+
+if (orphans.length > 0) {
+  console.error(
+    `\n${orphans.length} orphan(s): a class declared in two scoped directories and no open layer has no` +
+      ` owner. Move it to organisms/shared/, atoms/ or molecules/, or give the two copies two names.`,
+  );
+  failed = true;
+}
+if (findings.length > CROSS_SURFACE_CEILING) {
+  console.error(
+    `\n${findings.length} cross-surface read(s), against a ceiling of ${CROSS_SURFACE_CEILING}. The` +
+      ` backlog is Phase 7's file move; an INCREASE is a new class of the fault and is refused here.`,
+  );
+  failed = true;
+}
+
 console.log(
-  `reporting only: ${findings.length} cross-surface read(s), ${orphans.length} orphan(s), ` +
+  `layer scope: ${findings.length}/${CROSS_SURFACE_CEILING} cross-surface read(s) — blocking on an ` +
+    `increase; ${orphans.length} orphan(s) — blocking at zero; ` +
     `${split.length} class(es) shared then specialised`,
 );
+if (failed) process.exit(1);

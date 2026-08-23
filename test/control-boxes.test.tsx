@@ -126,10 +126,7 @@ const CONTROLS: [name: string, el: () => Element][] = [
     () => at('<div class="diary-compose"><textarea class="vb-ctl"></textarea></div>', 'textarea'),
   ],
   ['the control editor body', () => at('<textarea class="vb-ctl vb-editor-body"></textarea>', 'textarea')],
-  [
-    'a links registry cell',
-    () => at('<div class="vb-row"><input class="vb-ctl res-title"/></div>', 'input'),
-  ],
+  ['a links registry cell', () => at('<div class="vb-row"><input class="vb-ctl res-title"/></div>', 'input')],
   [
     'the raw card file',
     () => at('<div class="raw-pane"><textarea class="vb-ctl raw-area"></textarea></div>', 'textarea'),

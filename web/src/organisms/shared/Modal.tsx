@@ -51,6 +51,11 @@ interface Props {
   bodyClassName?: string;
   // The card's own measure, where none of the three sizes is it: the auto-pilot help is 44rem of prose.
   // Layout only, and not a padding — the body's inset is `bodyClassName`'s.
+  //
+  // AND IT CANNOT OUTRANK `data-size` OR `data-tone` ON ITS OWN. That is the whole price of expressing the
+  // options as attributes: `.vb-modal[data-size='lg']` is (0,2,0) and a bare `.ap-help` is (0,1,0), so
+  // this escape hatch was a dead 44rem and the help card shipped 84px narrower than it asked for. A rule
+  // here must be written `.vb-modal.ap-help { … }` to reach (0,2,0) and win on order.
   className?: string;
   role?: 'dialog' | 'alertdialog';
   label?: string;

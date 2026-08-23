@@ -318,13 +318,17 @@ test('3. nothing overflows', async ({ board, theme }) => {
   // again. Both walks above skip `text-overflow: ellipsis`, and `.vb-clip` declares one — so once every
   // tab and menu label was a `.vb-clip`, "check 3 can report an overflowing tab" stopped being true and
   // fifteen labels left the examined population in one commit. An ellipsis is a licence to CUT text, not
-  // a licence to have none, so the claim is a floor on the box rather than a comparison of two widths.
-  // Blocking at zero from the commit that adds it: it was zero on the first run.
+  // a licence to have none, so the claim is a floor on the box — but only on a box that is genuinely
+  // cutting its text, because a four-letter tab is narrow without being clamped (`audit.ts`).
+  //
+  // "It was zero on the first run" is what the commit that added this said, and it had never run at all:
+  // `CLAMP_FLOOR` was unreachable inside the page and threw. At 40px against every ellipsised box it was
+  // red on two legitimate labels in all three themes; against clipping boxes only it is zero, measured.
   report(theme, 'clamped', styles.clamped.examined, styles.clamped.offenders);
   expect(styles.clamped.examined, 'no ellipsised box was examined at all').toBeGreaterThan(0);
   expect(
     styles.clamped.offenders.map((o) => `${o.where} — ${o.detail}`),
-    `ellipsised boxes clamped below the readable floor:\n${lines(styles.clamped.offenders)}`,
+    `ellipsised boxes clipped below the readable floor:\n${lines(styles.clamped.offenders)}`,
   ).toEqual([]);
 
   // And the document itself, at the three widths the board's shared column grid is designed around.

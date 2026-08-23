@@ -195,7 +195,9 @@ export const SURFACES: Surface[] = [
       await page.locator('.vb-modal[data-size="lg"]').waitFor({ state: 'visible' });
     },
     prove: async (page) => {
-      await expect(page.locator('.vb-modal[data-size="lg"] .vb-modal-head > .vb-clip')).toHaveText('Settings');
+      await expect(page.locator('.vb-modal[data-size="lg"] .vb-modal-head > .vb-clip')).toHaveText(
+        'Settings',
+      );
       // AT LEAST three, asserted as "the third one is there" so the assertion retries while the modal
       // mounts. Not an exact count: the modal renders twelve section headings today and pinning that
       // would make adding a setting a failing gate.
@@ -214,7 +216,9 @@ export const SURFACES: Surface[] = [
       await page.locator('.vb-modal[data-tone="accent"]').waitFor({ state: 'visible' });
     },
     prove: async (page) => {
-      await expect(page.locator('.vb-modal[data-tone="accent"] .vb-modal-head > .vb-clip')).toHaveText('Choose a model');
+      await expect(page.locator('.vb-modal[data-tone="accent"] .vb-modal-head > .vb-clip')).toHaveText(
+        'Choose a model',
+      );
       // Models, not an empty state. The default backend's catalogue is the four Claude aliases and
       // needs no network, so this is a real list rather than `.mp-empty`.
       await expect(page.locator('[data-testid="mp-pick"]').first()).toBeVisible();

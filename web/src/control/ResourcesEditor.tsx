@@ -3,21 +3,23 @@ import { getResources, putResources, type ResourceLink } from '../api';
 import { Button } from '../atoms/Button';
 import { Control } from '../atoms/Control';
 import { Readout } from '../atoms/Readout';
-import { Row } from '../organisms/shared/Row';
 import { errorText } from '../errors';
+import { Row } from '../organisms/shared/Row';
 import { useAction } from '../useAction';
 
 // The links registry (.vibeboard/resources.yaml) — a small editable table of external
 // references the user (and copilot) can consult. It owns its own rows and dirty flag because
 // nothing outside this pane reads them; only errors are handed back up to the shared banner.
 // Rows carry a client-only id so React keys survive a delete: an index key would hand the
-// removed row's DOM node (and its focus) to its neighbour.
-type Row = ResourceLink & { rowId: string };
+// removed row's DOM node (and its focus) to its neighbour. Named `ResourceRow` and not `Row`: the
+// `Row` component is imported four lines above and a type sharing its name shadows nothing at runtime
+// but reads as though it does.
+type ResourceRow = ResourceLink & { rowId: string };
 let seq = 0;
-const withId = (l: ResourceLink): Row => ({ ...l, rowId: `r${seq++}` });
+const withId = (l: ResourceLink): ResourceRow => ({ ...l, rowId: `r${seq++}` });
 
 export function ResourcesEditor({ onError }: { onError: (e: string | null) => void }) {
-  const [links, setLinks] = useState<Row[]>([]);
+  const [links, setLinks] = useState<ResourceRow[]>([]);
   const [dirty, setDirty] = useState(false);
   // This pane has no banner of its own: only errors are handed back up to the shared one.
   const { busy, run } = useAction(onError);

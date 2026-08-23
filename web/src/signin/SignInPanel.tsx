@@ -3,12 +3,12 @@ import { getSigninState, revokeDevice, type SigninDevice, signOutEverything } fr
 import { Button } from '../atoms/Button';
 import { Chip } from '../atoms/Chip';
 import { Readout } from '../atoms/Readout';
-import { Row } from '../organisms/shared/Row';
 import { Text } from '../atoms/Text';
 import { revokeDeviceRequest, signOutEverythingRequest } from '../confirm/requests';
 import type { Confirmer } from '../confirm/useConfirm';
 import { errorText } from '../errors';
 import { Notice } from '../molecules/Notice';
+import { Row } from '../organisms/shared/Row';
 import { useAction } from '../useAction';
 
 interface Props {
@@ -98,7 +98,7 @@ export function SignInPanel({ confirm }: Props) {
           >
             Sign out
           </Button>
-        </div>
+        </Row>
       ))}
 
       {devices.length === 0 && !error && (

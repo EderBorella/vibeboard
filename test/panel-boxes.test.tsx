@@ -34,6 +34,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { Surface } from '../web/src/atoms/Surface.js';
 import { BoardsView } from '../web/src/board/BoardsView.js';
 import { Menu } from '../web/src/molecules/Menu.js';
+import { Modal } from '../web/src/organisms/shared/Modal.js';
 import type { BoardName, Card, ProjectConfig, ProjectSnapshot } from '../web/src/shared.js';
 // THE CASCADE RESOLVER IS SHARED with test/field-boxes.test.tsx — see test/css-box.tsx. Its own two
 // directions are asserted below, under *the cascade helper separates a state from the resting style*.
@@ -110,7 +111,10 @@ function boards(): HTMLElement {
 // directions are asserted directly, on a rule that declares the same property at rest and on hover.
 describe('the cascade helper separates a state from the resting style', () => {
   it('keeps a :hover rule out of the resting box, and in the hover one', () => {
-    const el = row('vb-row');
+    // `.vb-row-hit` AND NOT `.vb-row`, and the difference is the whole point of the split: `.vb-row` is
+    // the layout half and declares no ground at all, so it could not exercise the resolver's two
+    // directions — a helper's own case has to be read off a rule that declares the same property twice.
+    const el = row('vb-row-hit');
     expect(box(el).background).toBe('transparent');
     expect(box(el, ':hover').background).toBe('var(--panel-2)');
   });
@@ -185,7 +189,19 @@ describe('a raised surface draws a panel ground, a border and a 10px corner', ()
   }
 
   it('the halt card keeps its danger border, which is a colour and not a box', () => {
-    expect(box(raised('halt'))['border-color']).toBe('var(--danger)');
+    // OFF THE COMPONENT, because the tone is a `data-tone` attribute now and not a class: `.halt` is
+    // gone and `raised('halt')` builds a class list, which can express no attribute. The resolver reads
+    // attribute selectors perfectly well — it was the fixture that could not reach one.
+    const { container } = render(
+      <Modal tone="danger" blocking title="Halted" onClose={() => {}}>
+        why
+      </Modal>,
+    );
+    const card = container.querySelector('.vb-modal');
+    if (!card) throw new Error('Modal rendered no card');
+    expect(box(card)['border-color']).toBe('var(--danger)');
+    // The box itself is the primitive's — a tone decides a colour and nothing else.
+    expect(box(card).border).toBe('1px solid var(--border)');
   });
 
   it("the column head is a bordered row above the column's body", () => {
@@ -295,8 +311,15 @@ describe('a list row draws no box until the surface lights it', () => {
     const [picked, other] = [...container.querySelectorAll('.vb-menu-item')];
     if (!picked || !other) throw new Error('Menu rendered no items');
     expect(picked.className).toContain('active');
-    // `3px` and never `var(--rule)`: an expectation rewritten into the token name asserts nothing.
-    expect(box(picked)['border-left']).toBe('3px solid var(--accent)');
+    // THE RAIL AND THE TONE ARE READ AS A PAIR, which is what the molecule/organism split made of this:
+    // `.vb-row-rail` writes the edge once and takes its colour from whichever `.vb-tone-*` sits beside it,
+    // so the accent is in `--tone` and not in the shorthand. Asserting the shorthand alone would pass with
+    // the tone class dropped and the rail drawn `--border` grey, which is the regression the molecule
+    // phase actually shipped. `3px` and never `var(--rule)`: an expectation rewritten into the token name
+    // asserts nothing — and `var(--accent)` here is the value the tone rule assigns, not the rail's.
+    expect(picked.className).toContain('vb-tone-accent');
+    expect(box(picked)['border-left']).toBe('3px solid var(--tone, var(--border))');
+    expect(box(picked)['--tone']).toBe('var(--accent)');
     expect(box(other)['border-left']).toBeUndefined();
     expect(box(picked).color).toBe(box(other).color);
     expect(box(picked).background).toBe(box(other, ':hover').background);

@@ -86,14 +86,25 @@ const DiaryList = memo(function DiaryList({ entries }: { entries: DiaryEntry[] }
 // later checkup re-raising the same finding.
 function FiledList({ suggestions }: { suggestions: Suggestion[] }) {
   const ordered = useMemo(() => [...suggestions].reverse(), [suggestions]);
+  // `filed-list` declares nothing now that `List` owns the column's layout — it is kept as the handle
+  // three readers reach this column by (`visual/support/surfaces.ts`, `test/diary-view.test.tsx`,
+  // `test/state-inks.test.tsx`), and dropping it silently emptied all three.
   return (
-    <List as="ol">
+    <List as="ol" className="filed-list">
       {/* `stateClass` beside the attribute, and it is not decoration: React types every `data-*` as
           `any`, so `data-state={s.state}` alone would compile for a state with no row in the table and
           the rail would silently take whatever colour it inherited. The call is what the compiler
           checks — see molecules/state-tones.ts. */}
       {ordered.map((s) => (
-        <Row as="li" stack variant="flat" rail className={stateClass(s.state)} data-state={s.state} key={s.id}>
+        <Row
+          as="li"
+          stack
+          variant="flat"
+          rail
+          className={stateClass(s.state)}
+          data-state={s.state}
+          key={s.id}
+        >
           {/* TWO LINES, NOT ONE WRAPPED ONE. This column is 42% of the split and its readout block held
               four figures — a state, a full locale timestamp and up to three id chips, 366px of content
               in a 266px line — so it wrapped, and check 7 read it as what it was: a row of figures that

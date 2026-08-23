@@ -4,9 +4,9 @@ import { Button } from '../atoms/Button';
 import { Control } from '../atoms/Control';
 import { Readout } from '../atoms/Readout';
 import { Surface } from '../atoms/Surface';
-import { Row } from '../organisms/shared/Row';
 import { Text } from '../atoms/Text';
 import { errorText } from '../errors';
+import { Row } from '../organisms/shared/Row';
 import type { ArchivedCard, BoardName, ProjectConfig } from '../shared';
 import { columnSlugs } from '../viewmodel';
 

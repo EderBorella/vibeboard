@@ -30,6 +30,7 @@ import type { SurfaceVariant } from '../web/src/atoms/Surface.js';
 import { Surface } from '../web/src/atoms/Surface.js';
 import { Menu } from '../web/src/molecules/Menu.js';
 import { Tabs } from '../web/src/molecules/Tabs.js';
+import { Modal } from '../web/src/organisms/shared/Modal.js';
 import { box } from './css-box.js';
 
 afterEach(cleanup);
@@ -58,6 +59,22 @@ function panel(variant: SurfaceVariant, className?: string, as?: 'button'): Elem
   const { container } = render(<Surface variant={variant} className={className} as={as} />);
   const it = container.firstElementChild;
   if (!it) throw new Error(`Panel rendered nothing for ${variant} ${className ?? ''}`);
+  return it;
+}
+
+// AND A `Modal` AS THE ORGANISM RENDERS IT, for the same reason and one more: its options are `data-`
+// ATTRIBUTES rather than classes, so `panel()` and `el()` — which build class lists — cannot express one
+// at all. `at()` could, by hand-writing `class="… vb-modal" data-tone="accent"`, and that is the drifting
+// fixture this file's header refuses. `test/css-box.tsx` resolves attribute selectors; it was the fixtures
+// that could not reach them.
+function modal(props: Partial<ComponentProps<typeof Modal>> = {}): Element {
+  const { container } = render(
+    <Modal title="x" onClose={() => {}} {...props}>
+      y
+    </Modal>,
+  );
+  const it = container.querySelector('.vb-modal');
+  if (!it) throw new Error('Modal rendered no card');
   return it;
 }
 
@@ -104,12 +121,10 @@ describe('the raised surfaces — a --panel ground, a --border edge and a 10px c
     it(`.${name} draws a 10px corner on ${ground}`, () => {
       const b = drawn(MIGRATED.has(name) ? panel('raised', name) : el(name));
       expect(b.ground).toBe(ground);
-      // The model picker's modal is the one with a colour of its own — see below.
-      expect(b.edge).toBe(
-        name === 'vb-modal'
-          ? '1px solid var(--border) + var(--accent)'
-          : '1px solid var(--border) + no colour of its own',
-      );
+      // EVERY ONE OF THEM, INCLUDING `.vb-modal`, AND THAT IS THE PHASE'S CHANGE. `.mp-modal`'s accent
+      // edge used to be `.vb-modal`'s own; the tone is a separate axis now (`[data-tone]`), so the plain
+      // card has no colour of its own and the picker asks for one. Asserted below, off the component.
+      expect(b.edge).toBe('1px solid var(--border) + no colour of its own');
       expect(b.radius).toBe('10px');
     });
   }
@@ -121,9 +136,12 @@ describe('the raised surfaces — a --panel ground, a --border edge and a 10px c
   // 2px edge would be silently overruled here. It becomes a `border-color` in this phase, which is the
   // form the emergency stop's danger hover and `.control-disclaimer`'s prose ink already use.
   it('a tone="accent" modal decides a colour and nothing else about its edge', () => {
-    const b = box(panel('raised', 'vb-modal'));
+    const b = box(modal({ tone: 'accent' }));
     expect(b['border-color']).toBe('var(--accent)');
     expect(b.border).toBe('1px solid var(--border)');
+    // AND A PLAIN ONE ASKS FOR NOTHING, which is what makes the line above a claim about the tone rather
+    // than about `.vb-modal`: two outcomes from one fixture, not one.
+    expect(box(modal())['border-color']).toBeUndefined();
   });
 
   // A CLASS NAMED AT A CALL SITE AND DEFINED BY NO RULE — the third of these, after `.vb-label-caps`

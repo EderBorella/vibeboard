@@ -162,137 +162,130 @@ export function SettingsModal({ config, onClose, onSaved, autopilot, onAutopilot
         </>
       }
     >
-          <div className="settings-section">Copilot</div>
-          <Field as="div" label="Backend">
-            {/* Only the selected backend changes: each backend's model/effort live in their own slot,
+      <div className="settings-section">Copilot</div>
+      <Field as="div" label="Backend">
+        {/* Only the selected backend changes: each backend's model/effort live in their own slot,
                 so switching here reveals that backend's saved choice instead of overwriting it with a
                 built-in default. Nothing is written until Save — unlike the auto-pilot bar's copy of
                 this control, which writes on the click because a bar has no Save button to wait for. */}
-            <BackendPicker value={backend} label="Backend" onChange={setBackend} />
-          </Field>
-          <Field as="div" label="Default model">
-            <ModelPicker
-              models={models}
-              value={model}
-              defaultModel={backendDefaults(backend).model}
-              onChange={setModel}
-            />
-          </Field>
-          <Field label={`Default ${backend === 'opencode' ? 'variant' : 'effort'}`}>
-            <Control
-              as="select"
-              value={clampToCaps({ backend, model, effort }, 'plan').effort}
-              onChange={(e) => setEffort(e.target.value)}
-            >
-              {caps.efforts.map((e) => (
-                <option key={e.value} value={e.value}>
-                  {e.label}
-                </option>
-              ))}
-            </Control>
-          </Field>
-          <Field label="Keep last N chats">
-            <Control
-              type="number"
-              min={1}
-              value={keepChats}
-              onChange={(e) => setKeepChats(Number(e.target.value))}
-            />
-          </Field>
-          <Field label="Context window (tokens)">
-            <Control
-              type="number"
-              min={1000}
-              step={1000}
-              value={contextBudget}
-              onChange={(e) => setContextBudget(Number(e.target.value))}
-            />
-          </Field>
-          <Text role="hint">
-            What the context bar treats as full. Set it to the window of the model you actually use —{' '}
-            {DEFAULT_CONTEXT_BUDGET.toLocaleString()} over-reports occupancy several times over on a
-            million-token model.
-          </Text>
-
-          {sandbox && <SandboxPanel state={sandbox} backend={backend} onChanged={loadSandbox} />}
-
-          <div className="settings-section">Boards</div>
-          <Text role="hint">
-            Columns are comma-separated (left→right). Renaming one moves its folder, so its cards come with
-            it. A column that still holds cards can't be removed, and renaming and reordering in the same save
-            is refused — do those one at a time.
-          </Text>
-          {config.autopilot && (
-            // Only when there is a block to break. Adding a column is free now that nothing routes — the
-            // lifecycle is code (ruling 52) — but REMOVING the terminal or blocked column is still refused,
-            // and being refused at Save with no warning beforehand is a dead end.
-            <Notice tone="warn" testId="columns-warning">
-              <strong>Auto-pilot reads two of these columns by name.</strong> Renaming one is carried across
-              for you.{' '}
-              <strong>
-                Removing the column a board finishes in, or engineering's blocked column, will be refused
-              </strong>{' '}
-              until you change what names it: edit <code>terminal</code> and <code>blockedColumn</code> in{' '}
-              <code>.vibeboard/config.yaml</code> in the same change.
-            </Notice>
-          )}
-          {BOARDS.map((b) => (
-            <Field key={b} label={`${BOARD_LABELS[b]} columns`}>
-              <Control
-                value={columns[b]}
-                onChange={(e) => setColumns((c) => ({ ...c, [b]: e.target.value }))}
-              />
-            </Field>
+        <BackendPicker value={backend} label="Backend" onChange={setBackend} />
+      </Field>
+      <Field as="div" label="Default model">
+        <ModelPicker
+          models={models}
+          value={model}
+          defaultModel={backendDefaults(backend).model}
+          onChange={setModel}
+        />
+      </Field>
+      <Field label={`Default ${backend === 'opencode' ? 'variant' : 'effort'}`}>
+        <Control
+          as="select"
+          value={clampToCaps({ backend, model, effort }, 'plan').effort}
+          onChange={(e) => setEffort(e.target.value)}
+        >
+          {caps.efforts.map((e) => (
+            <option key={e.value} value={e.value}>
+              {e.label}
+            </option>
           ))}
+        </Control>
+      </Field>
+      <Field label="Keep last N chats">
+        <Control
+          type="number"
+          min={1}
+          value={keepChats}
+          onChange={(e) => setKeepChats(Number(e.target.value))}
+        />
+      </Field>
+      <Field label="Context window (tokens)">
+        <Control
+          type="number"
+          min={1000}
+          step={1000}
+          value={contextBudget}
+          onChange={(e) => setContextBudget(Number(e.target.value))}
+        />
+      </Field>
+      <Text role="hint">
+        What the context bar treats as full. Set it to the window of the model you actually use —{' '}
+        {DEFAULT_CONTEXT_BUDGET.toLocaleString()} over-reports occupancy several times over on a million-token
+        model.
+      </Text>
 
-          <Field layout="check" label="Enforce 1-to-many relations on boards">
-            <input
-              type="checkbox"
-              checked={enforceOneParent}
-              onChange={(e) => setEnforceOneParent(e.target.checked)}
-            />
-          </Field>
-          <Text role="hint">
-            A card gets one parent on the board above it — features → product → engineering. Off by default,
-            because linking a card to two places is legitimate when you mean it. Agent runs are held to this
-            rule either way: it is the hierarchy auto-pilot rolls up, and an agent cannot mean “see also”.
-          </Text>
+      {sandbox && <SandboxPanel state={sandbox} backend={backend} onChanged={loadSandbox} />}
 
-          <AutopilotPanel
-            config={config}
-            onCaps={setApCaps}
-            autopilot={autopilot}
-            onAutopilotChanged={onAutopilotChanged}
+      <div className="settings-section">Boards</div>
+      <Text role="hint">
+        Columns are comma-separated (left→right). Renaming one moves its folder, so its cards come with it. A
+        column that still holds cards can't be removed, and renaming and reordering in the same save is
+        refused — do those one at a time.
+      </Text>
+      {config.autopilot && (
+        // Only when there is a block to break. Adding a column is free now that nothing routes — the
+        // lifecycle is code (ruling 52) — but REMOVING the terminal or blocked column is still refused,
+        // and being refused at Save with no warning beforehand is a dead end.
+        <Notice tone="warn" testId="columns-warning">
+          <strong>Auto-pilot reads two of these columns by name.</strong> Renaming one is carried across for
+          you.{' '}
+          <strong>
+            Removing the column a board finishes in, or engineering's blocked column, will be refused
+          </strong>{' '}
+          until you change what names it: edit <code>terminal</code> and <code>blockedColumn</code> in{' '}
+          <code>.vibeboard/config.yaml</code> in the same change.
+        </Notice>
+      )}
+      {BOARDS.map((b) => (
+        <Field key={b} label={`${BOARD_LABELS[b]} columns`}>
+          <Control value={columns[b]} onChange={(e) => setColumns((c) => ({ ...c, [b]: e.target.value }))} />
+        </Field>
+      ))}
+
+      <Field layout="check" label="Enforce 1-to-many relations on boards">
+        <input
+          type="checkbox"
+          checked={enforceOneParent}
+          onChange={(e) => setEnforceOneParent(e.target.checked)}
+        />
+      </Field>
+      <Text role="hint">
+        A card gets one parent on the board above it — features → product → engineering. Off by default,
+        because linking a card to two places is legitimate when you mean it. Agent runs are held to this rule
+        either way: it is the hierarchy auto-pilot rolls up, and an agent cannot mean “see also”.
+      </Text>
+
+      <AutopilotPanel
+        config={config}
+        onCaps={setApCaps}
+        autopilot={autopilot}
+        onAutopilotChanged={onAutopilotChanged}
+      />
+
+      <div className="settings-section">Cards</div>
+      <Row>
+        <Field label="Miniature length" className="vb-row-main">
+          <Control
+            type="number"
+            value={miniatureChars}
+            onChange={(e) => setMiniatureChars(Number(e.target.value))}
           />
+        </Field>
+        <Field label="ID padding" className="vb-row-main">
+          <Control type="number" value={idPadding} onChange={(e) => setIdPadding(Number(e.target.value))} />
+        </Field>
+      </Row>
 
-          <div className="settings-section">Cards</div>
-          <Row>
-            <Field label="Miniature length" className="vb-row-main">
-              <Control
-                type="number"
-                value={miniatureChars}
-                onChange={(e) => setMiniatureChars(Number(e.target.value))}
-              />
-            </Field>
-            <Field label="ID padding" className="vb-row-main">
-              <Control
-                type="number"
-                value={idPadding}
-                onChange={(e) => setIdPadding(Number(e.target.value))}
-              />
-            </Field>
-          </Row>
-
-          {/* Both of these save themselves and are NOT part of what the Save button writes: they are
+      {/* Both of these save themselves and are NOT part of what the Save button writes: they are
               app-level, stored outside every project, so a project-config patch is the wrong carrier. */}
-          <DiagnosticsPanel />
+      <DiagnosticsPanel />
 
-          {/* Last, because nobody comes to Settings for it: sign-in is meant to be something the user
+      {/* Last, because nobody comes to Settings for it: sign-in is meant to be something the user
               never touches. It is here so the credential is FINDABLE — "unless he wants to check in
               the settings" — and because signing everything out is the only way to replace one. */}
-          <SignInPanel confirm={confirm} />
+      <SignInPanel confirm={confirm} />
 
-          {error && <Notice tone="bad">{error}</Notice>}
+      {error && <Notice tone="bad">{error}</Notice>}
     </Modal>
   );
 }

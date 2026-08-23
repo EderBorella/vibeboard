@@ -12,13 +12,13 @@ import {
 import { type LightAdvice, lightAdvice } from '../app/connection-light';
 import { Button } from '../atoms/Button';
 import { Text } from '../atoms/Text';
-import { List } from '../organisms/shared/List';
 import { killProjectRequest } from '../confirm/requests';
 import { useConfirm } from '../confirm/useConfirm';
 import { BackendPicker } from '../copilot/BackendPicker';
 import { resolveChoice } from '../copilot/choice';
 import { StatusChip } from '../molecules/StatusChip';
 import { stateClass } from '../molecules/state-tones';
+import { List } from '../organisms/shared/List';
 import type { CopilotConfig } from '../shared';
 import { useAction } from '../useAction';
 import { AutopilotHelp } from './AutopilotHelp';

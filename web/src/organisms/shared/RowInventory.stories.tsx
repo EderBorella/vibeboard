@@ -11,6 +11,10 @@ import { Row } from './Row';
 // WHAT THEY DISAGREED ABOUT, MEASURED FROM THE NINETEEN RULES:
 //   THE GAP — seven values across nineteen families: `--s-1` ×2, `--s-2` ×3, `--s-3` ×5, `--s-4` ×6,
 //     `--s-5` ×2, plus one with none. Nothing chose the spread; `Row` is `--s-4`, which six already were.
+//     This table is the measured one. `List.tsx` said "fourteen of the nineteen used `--s-1`" against the
+//     ×2 here — two artefacts in one commit disagreeing by a factor of seven about the number that
+//     justifies `List` having no `gap` option. Corrected there, off the ten LIST-shaped classes, which is
+//     the population that question is about.
 //   THE RAIL — eleven `border-left` rails, split 6:5 between 3px and 2px, with `--tone`, `--accent` and
 //     `--border` each appearing on BOTH sides of that split. That is the measurement `--rule` was created
 //     for one phase earlier, and this is the phase where one declaration reads it.
@@ -34,14 +38,27 @@ export default meta;
 // A height built from padding plus a line box plus a border is written down nowhere, which is exactly how
 // nineteen of them accumulated. `probe` names the element the row is ABOUT: measuring the wrapper would
 // report the LIST's gap rather than the row's own box.
+//
+// AND IT MEASURES AFTER THE FONTS LAND, which is the same failure `Audit/Tab inventory` had in the column
+// nobody was reading: a single `useEffect` fires before the web fonts finish loading and before the page's
+// scrollbar appears, so every WIDTH here was reported 12px too wide in all three themes — 934 for a box
+// that is 922. `document.fonts.ready` is the first half; a `ResizeObserver` is the second, because the
+// scrollbar arrives when the story grows rather than when the fonts do.
 function Measured({ children }: { children: ReactNode }) {
   const host = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState('—');
   useEffect(() => {
     const el = host.current?.querySelector('[data-probe]');
     if (!(el instanceof HTMLElement)) return;
-    const box = el.getBoundingClientRect();
-    setSize(`${box.height.toFixed(2)} × ${box.width.toFixed(0)}`);
+    const read = () => {
+      const box = el.getBoundingClientRect();
+      setSize(`${box.height.toFixed(2)} × ${box.width.toFixed(0)}`);
+    };
+    read();
+    void document.fonts.ready.then(read);
+    const observer = new ResizeObserver(read);
+    observer.observe(el);
+    return () => observer.disconnect();
   }, []);
   return (
     <>
@@ -160,10 +177,14 @@ export const Inline = {
       ))}
       <Readout>&lt;Row&gt;</Readout>
       <Measured>
-        <div data-probe className="vb-row">
+        {/* THE COMPONENT AND NOT `className="vb-row"`, which is what this cell used to be. Rename the class
+            and a hand-written one silently stops being styled while still reporting a number — the exact
+            drift the header above and `test/panel-twenty.test.tsx:51` both record. `Stacked` already did
+            it this way. */}
+        <Row data-probe>
           <span className="vb-clip">config/agents.md</span>
           <Readout>2.1 kB</Readout>
-        </div>
+        </Row>
       </Measured>
       <Readout>s-4</Readout>
     </div>
@@ -204,7 +225,10 @@ export const Stacked = {
 export const Selected = {
   render: () => (
     <List>
-      <Row variant="flat" style={{ background: 'var(--panel-2)', borderColor: 'var(--accent)', color: 'var(--accent)' }}>
+      <Row
+        variant="flat"
+        style={{ background: 'var(--panel-2)', borderColor: 'var(--accent)', color: 'var(--accent)' }}
+      >
         <Readout>.control-item.active</Readout>
         <span className="vb-clip">ground + edge + ink</span>
       </Row>

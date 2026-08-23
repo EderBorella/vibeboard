@@ -11,13 +11,14 @@ a bug, and one has already been fixed for that reason.
 
 | | at the start (2026-08-20) | now |
 |---|---|---|
-| class selectors | **457** | **305** |
+| class selectors | **457** | **232** |
 
 The 457 is measured, at `85cfa06` (2026-08-20, the last commit before any of this work).
 `tools/check-class-budget.mjs` said the sweep started from **443**; 443 reproduces at no commit and is
 withdrawn. There are two honest starts and they answer different questions: the design-system work took
-**457 → 361**, and the seven atomic phases took **361 → 305** (measured at `0f983f2`, the commit the plan
-starts from).
+**457 → 361**, and the atomic phases took **361 → 232** (measured at `0f983f2`, the commit the plan starts
+from). The seven-phase plan closed at 305; Phase 8, which the plan did not contain, took the remaining 73 —
+see *the class count* at the end of Part Five for why the plan could not have.
 | stylesheets under `web/src/` | 2 (`styles.css` 116KB + `ui/primitives.css`) | **41**, one per component and per organism directory |
 | type steps | 27 authored sizes | **5** (`--t-display` retired) |
 | token definitions / names | 74 / 40 | **75 / 45** |
@@ -36,7 +37,7 @@ and they are worth reading as argument rather than as description.
 
 Measured against `web/src/styles.css` and `web/src/*.tsx` on 2026-08-20, not estimated. **These are the
 OPENING measurements and they are kept as such** — `styles.css` does not exist any more and the class count
-is 305; the table is the diagnosis this whole page answers, not a description of the tree:
+is 232; the table is the diagnosis this whole page answers, not a description of the tree:
 
 | Measurement | Value | What it means |
 |---|---|---|
@@ -3447,7 +3448,7 @@ than raising a ceiling, which is what that rule is usually pointing at.
 
 ---
 
-# Part Five — the atomic revamp, Phases 1–7
+# Part Five — the atomic revamp, Phases 1–8
 
 **DONE 2026-08-23.** This part is the current state of the system. It carries the argument that used to live
 in a working document outside the repository, and it is here for one reason: **thirteen committed source
@@ -3457,8 +3458,8 @@ Those comments now cite the sections below by name.
 
 **Phase numbers in this part are the atomic revamp's, not Parts One to Four's.** They are a different
 programme with a different subject: the first fourteen phases put every *value* on a scale and built six
-primitives; these seven put every *class* in a layer and every component in a directory that says who may
-read it.
+primitives; these eight put every *class* in a layer, every component in a directory that says who may read
+it, and every shape in a component that owns it.
 
 ## The atomic revamp: the token set
 
@@ -3663,7 +3664,13 @@ rather than becoming a full atomic layer. Re-derived with every term counted:
 | surface layout | **76** | 19 surfaces × 4 |
 | **target** | **146** | |
 
-**The tree closes at 305, so the gap is 159 — one DOMINANT term and three real secondary ones.** The
+**This section was written when the tree closed at 305 and the gap was 159. Phase 8 took it to 232 and the
+gap to 86** — see *the class count* at the end of this part, which also argues that **146 is the number to
+revisit rather than the tree**: it was derived as 76 surface-layout classes with no surface ever built to
+it, and the 30 classes still holding one declaration are not duplicates. The decomposition below is kept
+because its ARITHMETIC is the thing worth having, and because the correction it records is worth keeping.
+
+**At 305 the gap was 159 — one DOMINANT term and three real secondary ones.** The
 decomposition that stood here read `60 vs 55`, `41 vs 10`, `230 vs 76`; its over-counts are 5 + 31 + 154 =
 **190 rather than 159**, it omitted `templates/` entirely, and its 230 was a sum in which 17 classes are
 declared in two feature sheets. Re-measured 2026-08-23, mapped onto this page's own five terms:
@@ -3751,7 +3758,7 @@ the Project Log, *"4 children span 33.0px, tallest is 15.5px"*. The rule permits
 give it 266px, and a wrapped figure row is a column of figures that does not align — which is the one thing
 the row exists to claim. The diary's own `.diary-about` stays a row because it has 408px.
 
-## The atomic revamp: the seven phases, and what each one actually proved
+## The atomic revamp: the eight phases, and what each one actually proved
 
 | # | phase | what shipped | the headline |
 |---|---|---|---|
@@ -3763,6 +3770,8 @@ the row exists to claim. The diary's own `.diary-about` stays a row because it h
 | 6 | **Organisms** | `Modal` (23 classes → 5), `List` + `Row` (~35 → 5); 59 sheets → 41; `check:layers` orphan claim blocking | **A throwing arm ate the drift list for the third time**: one crash in the audit took 45 of 51 failures with it, including the drift comparison. And a live contrast regression the app would have shipped — `--accent` on three settings spans at **4.00:1** in marshmallow — was hidden behind it |
 | 7 | **Templates & pages** | **115 files** into the tree; `check:layers` at **0, blocking**; `check:scale`'s offset claim; the class budget closes at **305** | The ordering hazard is closed rather than recorded: every arm of the overflow check is `expect.soft`, so a red arm can no longer hide the arms after it. **Three phases running, that is what ate the report** |
 
+| 8 | **The count** | the layout atom nobody built; `Text` gets its own scale; `Control` gets a checkbox and a trigger; `List`/`Row` compose `Stack`; `check:layers` claim 3 | **The plan's diagnosis was wrong, and that is why its target was unreachable.** It assumed a hundred type faces to argue about. A census found **63 redundant names in 27 clusters because there was no layout atom** — see *the class count* below |
+
 **The gate set: four typechecks and ten source gates.** `check:citations`, `check:scale`,
 `check:radius-scale`, `check:box-scale`, `check:class-budget`, `check:shape-coverage`,
 `check:name-resolution`, `check:state-tones`, `check:tokens`, `check:layers`. `npm run check` runs all
@@ -3773,3 +3782,182 @@ plus a per-surface drift baseline that fails NEW and GONE symmetrically.
 It is proved by planting the defect it claims to catch, watching it fail, and restoring it. Seven gates in
 this repository have been shown worthless that way, and a plan's own named planted defects were dead for
 four consecutive phases. Distrust the green tick; earn it.
+
+## The atomic revamp: the class count, and the census that found what the plan missed
+
+**DONE 2026-08-23.** Phase 8. The seven-phase plan closed at **305 classes against a target of 146** with no
+programme for the gap, and it had a diagnosis for why: the remainder was *"type faces and one-off
+positions"*, so reaching the target would be a ruling on how many distinct type treatments the app may have.
+
+**That diagnosis was wrong, and it is worth saying exactly how.** A census of all 246 surface classes,
+grouped by the **shape** of what they declare — property names, never values — found **63 redundant names
+inside 27 clusters**. The four largest were one idea each:
+
+| names | the one idea |
+|---|---|
+| 9 | `margin: 0` |
+| 6 | `display: flex; flex-direction: column; gap` |
+| 6 | `flex: none` / `flex: 0 0 auto` |
+| 5 | `align-items: center; display: flex; gap` |
+| 5 | `white-space: nowrap` |
+| 2 | the whole ellipsis set |
+
+**None of them was a bad decision. There was no layout atom.** Seven phases built `Button`, `Chip`,
+`Control`, `Text`, `Readout`, `Surface`, `Tabs`, `Menu`, `Modal`, `List` and `Row` — eleven components, and
+not one of them could say *a row with a gap*. So every surface that needed one named it after itself. And
+fourteen of those names were asking for atoms that already existed: `margin: 0` was `Text`'s, the whole
+ellipsis set was `.vb-clip`.
+
+### `.vb-stack`, and why every option is an attribute
+
+Two classes were added — `.vb-stack` and `.vb-fixed` — and **the ratchet went UP by two for the only time in
+eight phases**, because they are the instrument that took it down by seventy.
+
+Every option on the atoms below is a `data-` attribute, and that is the whole reason the count falls while
+the vocabulary grows: **`check:class-budget` counts class selectors.** `Modal`'s `data-size` set the
+precedent in Phase 6 for the same reason. A `gap` spelled as classes would have been seven names.
+
+| component | options added in this phase |
+|---|---|
+| `Stack` | `direction` `gap` 0–7 `align` `wrap` `justify` `pad` (CSS's three shapes) `edge` `fill` `scroll` `label` `title` `ref`, 17 tags |
+| `Text` | `size` (the whole type scale, plus `inherit`) `weight` `family` `as` `ink` `nowrap` `underline` `lower` |
+| `Control` | `type="checkbox"|"radio"` → `data-kind="check"`; `as="trigger"` |
+| `Button` | `align="start"` |
+| `Popover` | `triggerAlign` |
+| `List` / `Row` | `gap`, and `fill`/`scroll` on `List` |
+| token | `--measure: 68ch` — four answers to "how wide may prose get" (68ch ×2, 44rem, 520px) became one |
+
+**`--measure` is in `ch` and not `px` deliberately:** a measure is counted in *characters*, so it tracks the
+step it is set at instead of drifting when the type does.
+
+### What each wave taught, and it was the same lesson three times
+
+Five groups ran in parallel against an atom that had only direction, gap and alignment. They deleted 9, 11,
+1, 3 and 4 classes and reported the same cause independently: **the atom was narrower than the DOM.**
+
+- **`Text` could say two of the five type steps** (`--t-small` by default, `--t-body` through `lead`), so
+  twelve classes held exactly one `font-size`.
+- **`Text` was always a `<span>`**, so a residue that is a vertical margin could not move at all — and a
+  `<Text>` around a `<Button>`'s label recoloured it, which is why five classes on `Button` and `Chip` could
+  not reach `caps` or `ink`.
+- **`Stack` rendered no `aria-label`**, so nine labelled landmarks kept a class purely to stay findable by
+  `getByLabelText`.
+- **`Stack` could not carry a padding or an edge.** Six classes in the copilot directory alone were
+  "a row with a gap, some padding, and a rule under it".
+
+After the atoms grew, **48 classes still held exactly one declaration — and not one was a duplicate.** With
+the visual change licensed by the owner, fifteen more went: nine per-child margins became one uniform
+`Stack gap` per column, three `flex: 1 / 1.2 / 1.4` became one even share, four prose widths became
+`--measure`.
+
+**`organisms/settings/settings.css` reached zero rules and is deleted. Settings is the first surface in this
+tree that draws nothing of its own** — every box on it is an atom, a molecule or a shared organism.
+
+### The layers were not a hierarchy, and nothing could see it
+
+`check:layers` had two claims and both were about **stylesheets**. Nothing checked the **modules** — which
+is how `atoms/Chip.tsx` came to import `molecules/state-tones`, putting the base of the pyramid in debt to
+the layer above it, through eight phases of work on exactly this. Measured: **nine upward imports, which
+were three faults.**
+
+| fault | why | fix |
+|---|---|---|
+| atoms → molecules | `state-tones.ts` is the **tone table** — 26 states onto 5 tones, read by an atom, two molecules, three organisms and a page. A token table is a primitive. | → `design/` |
+| organisms → templates | `EditorLayout` is rendered by `pages/explorer` **and** `organisms/control`. A frame two features share is an organism. | → `organisms/shared/` |
+| templates → pages ×7 | `App` and `WorkArea` choose *which page renders*. That is a router, and a router is above what it routes to. | → `shell/`, ranked above `pages` |
+
+**Claim 3, blocking at zero:** a module may import its own layer or any below it —
+`design → atoms → molecules → organisms → templates → pages → shell` — never above. `lib/` and the loose
+modules have no layer and anyone may import them, and that is not a loophole: **a layer is about what
+draws, and `lib/api` draws nothing.**
+
+### No surface reinvents a primitive, and the excuse that allowed it is withdrawn
+
+Eleven literal `<button>`/`<input>` sat outside the atom and molecule layers. **Six were checkboxes, and
+they were not sloppiness:** a tick has an intrinsic box the browser draws, `.vb-ctl`'s 28px height and
+horizontal padding stretch it into a slab, and no primitive owned that. `Control` takes the `type` now and
+withdraws the box.
+
+So `check:shape-coverage`'s arm 1 no longer excuses a literal control inside a `<Field>` — the loophole all
+six lived in. **The only route to the box is `.vb-ctl`, which means the element is a `<Control>`.** Zero,
+blocking, in the commit that reached it.
+
+`.msg-assistant` is the one class still drawing a box `Surface` draws, and **that is a ruling rather than an
+omission**: the corner is asymmetric — a tail — and `.msg-user` mirrors it on an `--accent-fill` ground that
+is no variant at all. Routing one through `Surface` would split a matched pair across two mechanisms. One
+shape with two options *is* the pattern; a third bubble with a third corner would not be.
+
+### `List` and `Row` compose `Stack`
+
+`.vb-row` was `display: flex; align-items: center; gap: var(--s-4)` plus three declarations of its own.
+`.vb-list` was those same three with `flex-direction: column` and a tighter gap. **Both were `.vb-stack`
+written again** — and the commit before had just given `List` a `gap`, a `fill` and a `scroll`, which was
+three more copies of options the atom already had.
+
+They render the atom now and keep only what they add: `.vb-row` 6 declarations → 3, `.vb-list` 4 → 1, and
+eleven attribute rules deleted from `list.css` because they were copies of `atoms/stack.css`'s. Four
+hand-written `.vb-list` sites turned out to be `Row`/`List` spelled out longhand.
+
+**`List.tsx` had refused a `gap` option in writing, and the refusal is overturned by decision rather than by
+the count changing.** It is still 5 of 10 for `--s-1`, and the argument that a plurality is not a majority
+was sound. What it did not price is that the other five each spelled the gap a **different** way, so one
+shape had five spellings. The declaration was the honest cost, and the honest cost turned out to be the
+thing worth removing. The paragraph is kept in that file as the record of what was weighed.
+
+### What this phase got wrong, and how each was found
+
+Not one of these was found by a passing gate.
+
+1. **Five conformance selectors were the reason a style class existed** — `.ap-bar-end`, `.cards-gone`,
+   `NOT_AN_ATOM_YET`, `section.board`, `.archive-title`. The fourth is the worst: the fixture that opens the
+   board asserted `page.locator('section.board')`, and the sweep turned the board into a `<Stack
+   as="section">`. **All 108 browser tests failed in the fixture, before one check ran.** The other four
+   would have gone quietly vacuous. **A check must not be the reason a class survives, and a filter keyed on
+   a NAME goes inert the moment the name is retired** — which is precisely what `NOT_AN_ATOM_YET` did,
+   silently admitting a 31.4px row into a 28px population.
+2. **`Stack fill` emitted `data-fill`, a name already taken by a semantic flag.** `dock.css` reads
+   `.dock-body:has([data-fill]) { height: 38vh }` and the harness resolves the open dock pane with
+   `querySelector('[data-fill]')`. A `fill` on any always-mounted pane inside the dock would have pinned the
+   dock to 38vh at rest — the exact fault check 10 exists to measure. Renamed `data-grow`. Found by a
+   migration agent refusing to apply it and saying why.
+3. **`Control as="trigger"` rendered a literal `<trigger>` element** — invalid HTML, not focusable — and a
+   checkbox rendered with no `data-kind`, because a later edit replaced the block both lived in. **All 4,501
+   unit tests passed.** jsdom builds an unknown element without complaint. Caught by the browser harness's
+   focus walk examining one or two fewer elements per surface than recorded.
+4. **The checkbox reset set `border: none`, and `.vb-ctl:focus` trades the outline for an accent BORDER** —
+   so two settings checkboxes matched `:focus-visible` and nothing about them changed. A tick with no focus
+   ring. That rule's own comment claimed a checkbox "is not a `<Control>`, so it falls through to the global
+   ring": true when written, false the moment this phase landed.
+5. **The board headings silently lost a step.** `.board-label` declared no `font-size` — it inherited the
+   body's 13px — and `Text`'s default is `--t-small`. Visible nowhere except three text elements moving in
+   the recorded histogram.
+6. **`PARSE_FLOOR` was 250 while the tree held 305**, so the first phase to delete its way to 249 failed the
+   run **for succeeding**. Third anti-vacuity floor in this repository to do that. It is a smoke alarm, not
+   a target.
+7. **My first test for the composition was vacuous, and three planted defects proved it.** Every fixture was
+   a hand-written class list, so it asserted the *stylesheet*; the composition is a claim about the
+   *markup*. Render assertions catch four of five. The fifth — putting the flex box back on `.vb-list` —
+   changes **nothing that renders**, because the element already has it from `.vb-stack`, so it needed a
+   **negative**: a duplication with no visible effect cannot be measured, only denied.
+
+### Where it closes, and what the target now means
+
+**361 → 232.** The ratchet is at 232 with zero slack, proved by plant. 41 sheets. Reinvention and layer
+direction both blocking at zero.
+
+**232 against a target of 146, and the target is the number to revisit rather than the tree.** It was
+derived as 76 surface-layout classes with no surface ever built to it. The 30 classes still holding exactly
+one declaration are **not duplicates** — the three waves killed every one of those. What is left is:
+
+- hover and `:disabled` inks — **no atom expresses a state, and one may not be added**: `check:state-tones`
+  holds the tone table at five and a sixth would make its own census disagree with itself;
+- parent-selector anchors, where the class exists to be the left-hand side of a descendant rule;
+- off-scale lengths that are genuine one-offs, and per-child margins where a `Stack` gap is uniform.
+
+Getting from here to 76 is not another merge. It is a ruling that a surface may not have a hover ink or a
+measure of its own — a design decision about the app, not a mechanical one.
+
+**And one gate gap worth naming: no gate in this repository reads a `width`.** `check:scale` covers font
+sizes, gaps, paddings, margins, letter-spacing and offsets. Several values this phase moved rest on a
+reading of the declaration being deleted and on the browser run, nothing else — and the drift baseline
+records font sizes, radii and the two height sets, so it cannot see a gap or a padding at all.

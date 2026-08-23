@@ -88,19 +88,19 @@ export function ResourcesEditor({ onError }: { onError: (e: string | null) => vo
         {links.map((l, i) => (
           <Row key={l.rowId}>
             <Control
-              className="res-title"
+              className="vb-clip"
               placeholder="Title"
               value={l.title}
               onChange={(e) => update(i, { title: e.target.value })}
             />
             <Control
-              className="res-url"
+              className="vb-clip"
               placeholder="https://…"
               value={l.url}
               onChange={(e) => update(i, { url: e.target.value })}
             />
             <Control
-              className="res-note"
+              className="vb-clip"
               placeholder="Note (optional)"
               value={l.note ?? ''}
               onChange={(e) => update(i, { note: e.target.value })}

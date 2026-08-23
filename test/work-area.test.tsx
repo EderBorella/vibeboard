@@ -351,9 +351,10 @@ describe('WorkArea', () => {
     // the layout rests on: `.exec-run` is a flex column, so two buttons that are its direct children
     // stack no matter what else is styled. They must share one action row instead.
     expect(dismiss?.parentElement).toBe(forgive?.parentElement);
-    // The exact class list, not a substring: `.exec-actions` declares only `width: 100%` now, so the
-    // wrapping flex row the claim above rests on is `.vb-stack`'s and has to be named to be asserted.
-    expect(dismiss?.parentElement?.className).toBe('vb-stack exec-actions');
+    // The exact class list, not a substring: `.exec-actions` IS GONE — its `width: 100%` was the parent
+    // `.vb-list`'s own stretch said twice — so the wrapping flex row this claim rests on is `.vb-stack`
+    // and nothing else, which is what the assertion has to say for the row to be pinned at all.
+    expect(dismiss?.parentElement?.className).toBe('vb-stack');
   });
 
   // A project run — a checkup or the bootstrap — has no card, so there is no attempt tally to clear

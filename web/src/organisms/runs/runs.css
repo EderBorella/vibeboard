@@ -76,12 +76,11 @@
    button that starts a run does not. */
 /* `.option-btn` IS GONE — `Button align="start"`. It was `text-align: left` and nothing else, at three
    call sites in this file's one component, and undoing a primitive's centring is the primitive's job. */
-/* A `Stack`; the extra top margin is this row's, deliberately doubling the list's own gap so the close
-   row reads as the answer under the options rather than one more of them.
-   AND THAT IS WHY IT IS NOT THE PARENT'S `gap`. A margin between siblings usually is — but this one is an
-   INCREMENT on one child of a column that already has a gap, so folding it into `.options`'s `gap={2}`
-   would move every option button as well as this row. `Stack` has no per-child margin, correctly. */
-.options-close { margin-top: var(--s-2); }
+/* `.options-close` IS GONE AND THE COLUMN IS UNIFORM. It was `margin-top: var(--s-2)` — an INCREMENT on
+   one child of a `gap={2}` column, doubling the list's own gap so the close row read as the answer under
+   the options rather than one more of them. The space above it goes 8px → 4px, the step every other row in
+   that column already uses, and the row is told apart by what it holds rather than by 4px. A per-child
+   margin is the parent's gap, and `Stack` has no other kind. */
 /* `.push` is `margin-left: auto` and this is the other side — the label holds the leading edge while the
    select and the button sit at the trailing one. */
 .options-close-label { margin-right: auto; }
@@ -120,11 +119,9 @@
 .dispatch-attach { font-size: var(--t-body); border: 1px solid var(--border); border-radius: var(--r-md); padding: var(--s-3) var(--s-4); }
 .dispatch-attach summary { cursor: pointer; color: var(--muted); }
 .dispatch .vb-text-quiet { margin: var(--s-2) 0; }
-/* A `Stack justify="end"`; the top margin is the one thing left, and it sets the footer apart from the
-   last field rather than repeating the column's rhythm — which is exactly why it is NOT the parent's
-   `gap`. `.dispatch` is a `gap={4}` column and this adds `--s-2` before ONE child of it; folded into the
-   gap it would move all seven. See `.options-close`, which is the same shape. */
-.dispatch-foot { margin-top: var(--s-2); }
+/* `.dispatch-foot` IS GONE, for `.options-close`'s reason: `margin-top: var(--s-2)` before ONE child of a
+   `gap={4}` column set the footer apart from the last field by 12px where every other row is 8px apart.
+   The rhythm is uniform now. */
 
 /* The way out of a card the machine spent, on the same line as the count it clears. Quiet by default —
    it is an escape hatch, not the thing you came to the card to do — which is the `ghost` variant, and

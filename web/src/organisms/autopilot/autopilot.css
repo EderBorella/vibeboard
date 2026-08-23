@@ -16,8 +16,11 @@
    before: a bare `<Text>` forced `--t-small` and `--muted` onto a chip that had chosen both. */
 
 /* `align="stretch"` at the call sites, not the `Stack` default: this row holds a button beside a line of
-   progress text, and the row was never centred — centring it would move the sentence. */
-.ap-controls { margin: var(--s-3) 0 var(--s-2); }
+   progress text, and the row was never centred — centring it would move the sentence.
+   `.ap-controls` IS GONE AND THE COLUMN IS UNIFORM NOW. It was `margin: var(--s-3) 0 var(--s-2)` on three
+   rows of a `.vb-modal-body`, which is a flex column with a `--s-5` gap — so the space above these rows was
+   18px and below them 16px, against 12px everywhere else in the panel. Two extra steps nobody chose, and a
+   `Stack` has no per-child margin, correctly. */
 
 
 /* ---------- Auto-pilot transport strip ----------
@@ -239,8 +242,13 @@
    pushes its own close button off the screen is prose nobody finishes.
  *
  * `.vb-modal` IS LOAD-BEARING, not decoration: `Modal` writes its measure as `.vb-modal[data-size='lg']`,
- * which is (0,2,0), so a bare `.ap-help` at (0,1,0) lost and this card was silently 620px. */
-.vb-modal.ap-help { max-width: 44rem; }
+ * which is (0,2,0), so a bare `.ap-help` at (0,1,0) lost and this card was silently 620px.
+ *
+ * `--measure` AND NOT `44rem`: 704px was one of four answers to "how wide may a paragraph get", and the
+ * diary had already made the same decision in `ch`. The card gets narrower by whatever 44rem exceeds 68ch
+ * at the body step — the token's own note puts 44rem at about 70ch — and a measure counted in characters
+ * tracks the type instead of drifting from it. See design/tokens.css. */
+.vb-modal.ap-help { max-width: var(--measure); }
 .ap-help-body { overflow-y: auto; max-height: 70vh; padding: var(--s-6); line-height: 1.55; }
 .ap-help-body h3 {
   margin: var(--s-6) 0 var(--s-3);

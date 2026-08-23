@@ -175,7 +175,7 @@ export function DispatchPane({
 
       {/* `align="stretch"` and not the atom's centring: the class declared no `align-items`, so the two
           buttons filled the row's height and still do. */}
-      <Stack gap={4} justify="end" align="stretch" className="dispatch-foot">
+      <Stack gap={4} justify="end" align="stretch">
         <Button size="md" onClick={onBack}>
           Cancel
         </Button>

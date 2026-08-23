@@ -64,10 +64,13 @@ const FLOOR = { defs: 20, themes: 3 };
 // The claim that made the emptiness reachable is the SECOND half of claim 1: a name that has acquired a
 // consumer and kept its row is a finding too, so this map cannot rot into an allow-list. Leaving one row
 // here would have failed the run.
-// `--measure`'s ROW STOOD HERE FOR ONE COMMIT AND THE SWEEP SPENT IT: `.diary-head`, `.diary-compose`,
-// `.diary > .vb-text-error` and `.diary-list` read it in organisms/diary/diary.css, which is four of the
-// hand-written `68ch` the token was created to name. Empty again, which is the state the second half of
-// claim 1 requires — a name that has acquired a consumer and kept its row is a finding of its own.
+// `--measure`'s ROW STOOD FOR ONE COMMIT AND THREE GROUPS SPENT IT IN PARALLEL, which is why all three
+// deleted this row and the merge had to pick one wording. Its consumers now: `.diary-head`,
+// `.diary-compose`, `.diary > .vb-text-error` and `.diary-list` (four of the hand-written `68ch` the token
+// was created to name), `.ap-help` (was `44rem`) and `.gate-card` (was `520px`). Six, from three sheets.
+// EMPTY AGAIN IS THE POINT. The second half of claim 1 fails a name that has acquired a consumer and kept
+// its row, which is what stops this map rotting into an allow-list — and each of the three groups planted
+// exactly that and watched it exit 1.
 /** @type {Map<string, string>} */
 const UNCONSUMED = new Map();
 

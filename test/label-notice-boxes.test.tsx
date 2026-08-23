@@ -62,7 +62,12 @@ describe('the uppercase section labels', () => {
   const LABELS: [string, string][] = [
     ['cs-head', 'var(--muted)'],
     ['ap-drawer-head', 'var(--muted)'],
-    ['links-group', 'var(--muted)'],
+    // THE CLASS LIST THE CALL SITE ACTUALLY RENDERS, which is what this file asserts on and why the
+    // migration does not weaken it: `.links-group` is a `<Text caps>` now, so the uppercase and the
+    // muted ink come from the atom and the surface class keeps only `--t-micro` and its margins. The
+    // expectations are untouched — the same 'uppercase' and the same `var(--muted)` — and the fixture
+    // is the one line-92 idiom applied to a name that has finished migrating.
+    ['vb-text vb-text-caps links-group', 'var(--muted)'],
     ['settings-section', 'var(--accent)'],
     ['cv-group', 'var(--accent-2)'],
   ];

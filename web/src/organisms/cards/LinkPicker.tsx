@@ -22,7 +22,9 @@ export function LinkPicker({
         if (group.length === 0) return null;
         return (
           <div key={b}>
-            <div className="links-group">{BOARD_LABELS[b]}</div>
+            <Text caps className="links-group">
+              {BOARD_LABELS[b]}
+            </Text>
             {group.map((c) => (
               <Field
                 key={c.id}

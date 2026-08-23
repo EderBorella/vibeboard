@@ -1,5 +1,6 @@
 import { Button } from '../../atoms/Button';
 import { Control } from '../../atoms/Control';
+import { Stack } from '../../atoms/Stack';
 import type { ModelOption } from '../../lib/api';
 import type { BackendCaps } from '../../lib/shared';
 import { Tabs } from '../../molecules/Tabs';
@@ -37,7 +38,7 @@ export function CopilotControls({
 }: Props) {
   return (
     <>
-      <div className="copilot-controls">
+      <Stack wrap className="copilot-controls">
         <Tabs
           grouped
           items={caps.modes.map((m) => ({ value: m.value, label: m.label, title: m.hint }))}
@@ -52,9 +53,10 @@ export function CopilotControls({
         <Button className="push" onClick={onCompact} disabled={running} title="Compact the conversation">
           Compact
         </Button>
-      </div>
+      </Stack>
 
-      <div className="copilot-selects">
+      {/* `align="stretch"`: this row named no `align-items`, so its two selects fill its height. */}
+      <Stack align="stretch" className="copilot-selects">
         <ModelPicker
           models={models}
           value={effModel}
@@ -71,7 +73,7 @@ export function CopilotControls({
             </option>
           ))}
         </Control>
-      </div>
+      </Stack>
     </>
   );
 }

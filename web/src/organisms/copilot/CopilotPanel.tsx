@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Button } from '../../atoms/Button';
 import { Control } from '../../atoms/Control';
 import { Readout } from '../../atoms/Readout';
+import { Stack } from '../../atoms/Stack';
 import { Text } from '../../atoms/Text';
 import { getModelStatus, listModels, type ModelOption, type ModelStatus } from '../../lib/api';
 import { backendCaps, backendDefaults } from '../../lib/shared';
@@ -42,7 +43,7 @@ function BackendStatus({ status }: { status: ModelStatus }) {
     // THE TWO NUMBERS MOVE INTO THE BALLOON rather than being dropped. That is where the other three
     // indicators put their detail, and neither number is something you read at a glance: an uptime
     // percentage is what you go and check once the word has told you to.
-    <div className="copilot-status">
+    <Stack gap={3} className="copilot-status">
       <StatusChip
         state={state}
         word={state}
@@ -53,12 +54,14 @@ function BackendStatus({ status }: { status: ModelStatus }) {
         glow={status.up}
         testId="copilot-status"
       />
-    </div>
+    </Stack>
   );
 }
 
 // ONE CHAT LINE. `data-state` ONLY FOR THE KIND THAT IS A STATE: `msg-user` and `msg-assistant` are
-// bubble GEOMETRY and `msg-thinking`/`msg-running` are quietness — the chat may keep its own shape.
+// bubble GEOMETRY and `msg-running` is quietness — the chat may keep its own shape. `.msg-thinking` is
+// gone: it was `Text role="hint"` value for value, on a span that is a child of `.msg` rather than `.msg`
+// itself, so nothing contended with the atom for the step or the ink.
 // `.msg-error` was the one that decided a colour, `--danger`, outside any table; it is the `error` row
 // now and the class is gone.
 //
@@ -76,7 +79,8 @@ function MessageLine({ item }: { item: TranscriptItem }) {
         // `--t-small` accent mono — which is `Readout` `small` `accent` value for value.
         <Readout>⚙ {item.toolName}</Readout>
       ) : item.kind === 'thinking' ? (
-        <span className="msg-thinking">{item.text}</span>
+        // `--t-small` muted italic, which is this atom's default face plus the hint role.
+        <Text role="hint">{item.text}</Text>
       ) : (
         item.text
       )}
@@ -185,7 +189,7 @@ export function CopilotPanel({
 
   return (
     <aside className="copilot">
-      <div className="copilot-head">
+      <Stack className="copilot-head">
         <span className="copilot-title">Copilot</span>
         <BackendPicker
           value={backend}
@@ -202,7 +206,7 @@ export function CopilotPanel({
         <Button variant="bare" className="push" onClick={onClose} title="Hide (session keeps running)">
           ✕
         </Button>
-      </div>
+      </Stack>
 
       <ChatSwitcher
         chats={chats}
@@ -286,16 +290,20 @@ export function CopilotPanel({
       />
 
       {overridden && (
-        <div className="copilot-override">
+        <Stack className="copilot-override">
           Just for this session — the project default is unchanged.
           <Button size="sm" className="push" onClick={onReset} disabled={running}>
             Use default
           </Button>
-        </div>
+        </Stack>
       )}
       {noTools && (
         <div className="copilot-warn" role="alert">
-          ⚠ This model can’t use tools — the copilot can’t create or edit cards. Pick a 🔧 model.
+          {/* `role="error"` IS THE `--t-small` DANGER LINE THE CLASS DECLARED BY HAND. The tinted strip
+              stays a class: a `color-mix` ground is this warning's own and no atom carries one. */}
+          <Text role="error">
+            ⚠ This model can’t use tools — the copilot can’t create or edit cards. Pick a 🔧 model.
+          </Text>
         </div>
       )}
       {status && <BackendStatus status={status} />}
@@ -315,7 +323,9 @@ export function CopilotPanel({
 
       <CopilotReadout stats={stats} budget={contextBudget} />
 
-      <div className="copilot-input">
+      {/* `align="stretch"` is what the row named no `align-items` for: the textarea and the button beside
+          it have always filled its height. */}
+      <Stack align="stretch" className="copilot-input">
         {/* NOT a `Field`: a composer's label is its placeholder and the Send button beside it. */}
         <Control
           as="textarea"
@@ -339,7 +349,7 @@ export function CopilotPanel({
             Send
           </Button>
         )}
-      </div>
+      </Stack>
 
       {dialog}
     </aside>

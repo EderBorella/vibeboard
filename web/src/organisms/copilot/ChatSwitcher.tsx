@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Button } from '../../atoms/Button';
 import { Chip } from '../../atoms/Chip';
 import { Readout } from '../../atoms/Readout';
+import { Stack } from '../../atoms/Stack';
 import { Text } from '../../atoms/Text';
 import type { ChatMeta } from '../../lib/shared';
 import { Menu } from '../../molecules/Menu';
@@ -26,7 +27,7 @@ export function ChatSwitcher({ chats, currentChatId, backend, running, onOpen, o
   const currentTitle = chats.find((c) => c.id === currentChatId)?.title ?? 'New chat';
 
   return (
-    <div className="copilot-chatbar">
+    <Stack gap={3} className="copilot-chatbar">
       <div className="chat-switcher">
         <button
           className="vb-trigger"
@@ -92,6 +93,6 @@ export function ChatSwitcher({ chats, currentChatId, backend, running, onOpen, o
       <Button size="sm" className="chat-new" disabled={running} onClick={onNew} title="Start a fresh chat">
         + New
       </Button>
-    </div>
+    </Stack>
   );
 }

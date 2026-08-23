@@ -104,7 +104,12 @@ export function ExecutionView({
               return (
                 <Row key={record.run} stack variant="inset">
                   <Stack align="baseline" gap={3} className="exec-run-top">
-                    <Chip pill state={record.status} className="report-chip vb-readout" testId="report-chip">
+                    <Chip
+                      pill
+                      state={record.status}
+                      className="report-chip vb-readout vb-fixed"
+                      testId="report-chip"
+                    >
                       {record.status}
                     </Chip>
                     <Text ink="strong">{record.skill}</Text>
@@ -139,7 +144,7 @@ export function ExecutionView({
                     <Stack gap={2} wrap className="exec-actions">
                       {stoppable && (
                         <Button
-                          className="report-stop"
+                          className="report-stop vb-fixed"
                           data-testid="report-stop"
                           title={`Stop the ${record.skill} run on ${subject}`}
                           onClick={() => onCancel(record)}

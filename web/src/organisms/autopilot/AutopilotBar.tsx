@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Button } from '../../atoms/Button';
+import { Stack } from '../../atoms/Stack';
 import { Text } from '../../atoms/Text';
 import {
   type AutopilotState,
@@ -328,7 +329,7 @@ export function AutopilotBar({
     // `.ap-bar` now and the state's tone is the table's. `idle` had no rule at all and fell through to
     // `--border`; it is the `neutral` grey now, which is what the transport dot beside it already was.
     <div className={`ap-bar ${stateClass(model.state)}`} data-state={model.state} data-testid="ap-bar">
-      <div className="ap-bar-row">
+      <Stack gap={4} className="ap-bar-row">
         <Transport control={model.control} onAct={act} />
 
         {/* Beside the transport, because it IS transport — the most destructive kind. Quiet until you
@@ -340,7 +341,7 @@ export function AutopilotBar({
             geometry, which it may not. (b) Not `ghost`: the dashed border reads as EXPLANATORY, and an
             emergency stop is the most actionable control on the board. It looked like a footnote. */}
         <Button
-          className="ap-kill"
+          className="ap-kill vb-fixed"
           disabled={model.emergency.disabled || busy !== null}
           title={model.emergency.title}
           data-testid="ap-kill"
@@ -400,7 +401,7 @@ export function AutopilotBar({
             act on the loop and the controls that explain it. Two auto margins rather than
             `justify-content: space-between` on the row: the row's first four children are a group of their
             own without a wrapper, and space-between would spread those four apart as well. */}
-        <span className="ap-agent push" data-testid="ap-agent">
+        <Stack gap={3} className="ap-agent push" testId="ap-agent">
           <BackendPicker
             value={backend}
             disabled={switching !== null}
@@ -411,7 +412,7 @@ export function AutopilotBar({
             onChange={chooseBackend}
           />
           <AgentChip agent={agent} />
-        </span>
+        </Stack>
 
         {/* THE RIGHT-HAND END: what EXPLAINS the bar and where to go to change it. Isolated from the
             controls that act on the loop, which is the owner's layout — the three of these had been
@@ -454,14 +455,14 @@ export function AutopilotBar({
             Settings
           </Button>
         </div>
-      </div>
+      </Stack>
 
       {/* One banner for both actions. They cannot be in flight together — each disables its own
           control — and a refused backend write is as much "the server said no" as a refused start. */}
       {(error ?? switchError) && (
-        <div className="ap-bar-error" data-testid="ap-bar-error">
+        <Text role="error" className="ap-bar-error" testId="ap-bar-error">
           {error ?? switchError}
-        </div>
+        </Text>
       )}
 
       {/*
@@ -471,9 +472,9 @@ export function AutopilotBar({
         that twice and got the text out of the DOM by hand the second time.
       */}
       {model.detail && (
-        <div className="ap-bar-detail" data-testid="ap-bar-detail">
+        <Text className="ap-bar-detail" testId="ap-bar-detail">
           {model.detail}
-        </div>
+        </Text>
       )}
 
       {/*
@@ -486,31 +487,39 @@ export function AutopilotBar({
         unfinished run would land as an attempt of its own moments later — which is why the server refuses it
         too rather than only the button.
       */}
-      <div className="ap-bar-remedy" data-testid="ap-bar-remedy">
+      {/* WRAPS, and that is the one thing this row decides: `.reports-forgiven`'s `flex-basis: 100%` puts
+          the result on its own line under the button. */}
+      <Stack gap={4} wrap testId="ap-bar-remedy">
         <ForgiveDerivation reason={state?.reason} onForgiven={onChanged} />
-      </div>
+      </Stack>
 
       {open && (
         <div className="ap-drawer" data-testid="ap-drawer">
-          <div>
-            <div className="ap-drawer-head">Working on</div>
+          {/* The space under each head is the cell's gap rather than a margin on the head — which is what
+              lets the head be a `Text`, since a margin on an inline span draws nothing. */}
+          <Stack direction="column" gap={3}>
+            <Text caps className="ap-drawer-head">
+              Working on
+            </Text>
             {model.doing.length === 0 ? (
               <Text role="hint" lead>
                 Nothing is running.
               </Text>
             ) : (
-              <ul className="ap-work">
+              <List as="ul" className="ap-work">
                 {model.doing.map((w) => (
                   <li key={w.run}>
                     <strong>{w.label}</strong> · {w.skill}
-                    {w.waiting && <span className="ap-waiting"> waiting for a slot</span>}
+                    {w.waiting && <Text> waiting for a slot</Text>}
                   </li>
                 ))}
-              </ul>
+              </List>
             )}
-          </div>
-          <div>
-            <div className="ap-drawer-head">Stopping it from starting</div>
+          </Stack>
+          <Stack direction="column" gap={3}>
+            <Text caps className="ap-drawer-head">
+              Stopping it from starting
+            </Text>
             {model.missing.length === 0 ? (
               <Text role="hint" lead>
                 Nothing — it is ready to run.
@@ -522,7 +531,7 @@ export function AutopilotBar({
                 ))}
               </List>
             )}
-          </div>
+          </Stack>
         </div>
       )}
 

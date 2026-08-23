@@ -66,7 +66,12 @@ export function ReportPane({
         <Text ink="strong" className="report-title">
           {record.skill} <Readout>on {card.id}</Readout>
         </Text>
-        <Chip pill state={record.status} className="report-chip vb-readout" testId="report-chip">
+        <Chip
+          pill
+          state={record.status}
+          className="report-chip vb-readout vb-fixed"
+          testId="report-chip"
+        >
           {record.status}
         </Chip>
       </Stack>

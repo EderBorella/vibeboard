@@ -59,16 +59,18 @@ describe('the uppercase section labels', () => {
   // it. Every one is uppercase; the ink is the column somebody chose and the tracking is the one nobody
   // did. `.mp-def-tag` is on the list in docs/design-system.md and is NOT one of these: it carries a
   // border and a pill radius, which makes it a Chip that happens to be uppercase.
+  // `.ap-drawer-head` AND `.settings-section` HAVE LEFT THIS TABLE and are asserted on their own below:
+  // both render a `Text caps` now, so the uppercase is the atom's and the accent is a data attribute
+  // rather than a declaration — a class-only fixture cannot express either, and would report `undefined`
+  // for both while the call sites draw exactly what this table claimed.
   const LABELS: [string, string][] = [
     ['cs-head', 'var(--muted)'],
-    ['ap-drawer-head', 'var(--muted)'],
-    // THE CLASS LIST THE CALL SITE ACTUALLY RENDERS, which is what this file asserts on and why the
-    // migration does not weaken it: `.links-group` is a `<Text caps>` now, so the uppercase and the
-    // muted ink come from the atom and the surface class keeps only `--t-micro` and its margins. The
-    // expectations are untouched — the same 'uppercase' and the same `var(--muted)` — and the fixture
-    // is the one line-92 idiom applied to a name that has finished migrating.
-    ['vb-text vb-text-caps links-group', 'var(--muted)'],
-    ['settings-section', 'var(--accent)'],
+    // SIX ROWS LEFT THIS TABLE IN PHASE 8 AND THEY ARE ALL IN `MIGRATED` BELOW. Three groups migrated
+    // these in parallel and each rewrote this table for its own two or three, which is what made the
+    // merge conflict: `.ap-drawer-head` and `.settings-section`, `.links-group`, and `.diary-kind` /
+    // `.filed-state` / `.tile-group`. A row here asserts what a hand-written CLASS LIST draws; once the
+    // ink moves to `data-ink` a class list cannot express it, and the accent cases would have passed on
+    // `.vb-text`'s muted default. One table, one fixture idiom, six rows — not three half-migrations.
     ['cv-group', 'var(--accent-2)'],
   ];
 
@@ -80,21 +82,26 @@ describe('the uppercase section labels', () => {
     expect(box(label(cls)).color).toBe(ink);
   });
 
-  // THREE OF THE EIGHT ARE A `Text` NOW, AND THE TABLE IS THE SAME TWO CLAIMS ABOUT THE SAME ELEMENT.
+  // SIX OF THE EIGHT ARE A `Text` NOW, AND THE TABLE IS THE SAME TWO CLAIMS ABOUT THE SAME ELEMENT.
   // Phase 8's caps ruling is what moved them: `.vb-text-caps` carries `--font-display` as well as the
-  // `text-transform` and the tracking — which is what these three wrote by hand — and an ink that is
-  // nobody's state is `data-ink`. So the fixture is the element AS RENDERED, class list and attribute,
-  // and it is written out here rather than reached through `label()` for exactly the reason this file
-  // already gives: a fixture that cannot carry the attribute cannot see the rule that draws the ink.
-  // What each class still says is a STEP — `--t-micro` for all three of the ones below — which has no
-  // `Text` option and did not get one.
+  // `text-transform` and the tracking — which is what these wrote by hand — and an ink that is nobody's
+  // state is `data-ink`. So the fixture is the element AS RENDERED, class list and attribute, written out
+  // here rather than reached through `label()` for the reason this file already gives: a fixture that
+  // cannot carry the attribute cannot see the rule that draws the ink.
+  // What each class still says is a STEP — `--t-micro` for five of the six — which has no `Text` option
+  // and did not get one.
+  // AN EMPTY INK IS NOT A MISSING ROW: it is the two that keep the atom's muted default, and asserting
+  // them here is what distinguishes "the default is right" from "the attribute was dropped".
   const MIGRATED: [string, string, string][] = [
+    ['ap-drawer-head', '', 'var(--muted)'],
+    ['links-group', '', 'var(--muted)'],
+    ['settings-section', 'accent', 'var(--accent)'],
     ['diary-kind', 'strong', 'var(--text)'],
     ['filed-state', 'strong', 'var(--text)'],
     ['tile-group', 'accent2', 'var(--accent-2)'],
   ];
   const migrated = (cls: string, ink: string): Element =>
-    at(`<span class="vb-text vb-text-caps ${cls}" data-ink="${ink}">L</span>`, 'span');
+    at(`<span class="vb-text vb-text-caps ${cls}"${ink === '' ? '' : ` data-ink="${ink}"`}>L</span>`, 'span');
 
   it.each(MIGRATED)('.%s is uppercase, through the caps atom', (cls, ink) => {
     expect(box(migrated(cls, ink))['text-transform']).toBe('uppercase');
@@ -105,9 +112,9 @@ describe('the uppercase section labels', () => {
   });
 
   // AND THE INK IS THE ATTRIBUTE'S RATHER THAN THE ATOM'S DEFAULT, asserted as the negative it replaces:
-  // without `data-ink` all three would render `--muted`, which is the silent change a class list alone
-  // could not tell from a correct one.
-  it('a caps line with no ink named takes the atom’s muted default', () => {
+  // without `data-ink` the four that name one would render `--muted`, which is the silent change a class
+  // list alone could not tell from a correct one.
+  it('a caps line with no ink named takes the atom\u2019s muted default', () => {
     expect(box(label('vb-text vb-text-caps diary-kind')).color).toBe('var(--muted)');
   });
 
@@ -233,8 +240,11 @@ describe('the empty-state lines', () => {
     expect(box(label(cls, 'div')).margin).toBe('auto');
   });
 
+  // A `Stack direction="column"` draws it now, so the fixture carries `data-dir` — and the claim is
+  // STRONGER than it was: the old version asserted `display: flex` alone, which a row satisfies too.
   it('.diary-empty is a flex column, not a line', () => {
-    expect(box(label('diary-empty', 'div')).display).toBe('flex');
+    const b = box(at('<div class="vb-stack diary-empty" data-dir="column">L</div>', 'div'));
+    expect([b.display, b['flex-direction']]).toEqual(['flex', 'column']);
   });
 });
 

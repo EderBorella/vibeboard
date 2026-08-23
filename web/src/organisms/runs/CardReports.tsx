@@ -60,7 +60,7 @@ export function CardReports({ card, runs, account, onOpen, onCancel, onForgiven 
           >
             {/* A resolved run keeps its chip — it did end needing you — but says it was answered,
                 so the history reads as history rather than a row still asking. */}
-            <Chip pill state={r.status} className="report-chip vb-readout" testId="report-chip">
+            <Chip pill state={r.status} className="report-chip vb-readout vb-fixed" testId="report-chip">
               {r.resolved ? `${LABELS[r.status]} · dealt with` : LABELS[r.status]}
             </Chip>
             {/* `ink="strong"` because the class named no ink and inherited the row's; `.report-skill`
@@ -79,7 +79,7 @@ export function CardReports({ card, runs, account, onOpen, onCancel, onForgiven 
           {(r.status === 'running' || r.status === 'queued') && (
             // Acts — it cancels a live run. `.report-stop` still owns the danger-on-hover colour.
             <Button
-              className="report-stop"
+              className="report-stop vb-fixed"
               data-testid="report-stop"
               title={`Stop the ${r.skill} run`}
               onClick={() => onCancel(r)}

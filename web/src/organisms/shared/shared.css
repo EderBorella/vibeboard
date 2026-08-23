@@ -24,7 +24,8 @@
    thing on screen, and the glow. The uppercase title is the one treatment given up — one title
    treatment, which is the same ruling that gave the five destinations one badge. */
 .mp { position: relative; flex: 1; min-width: 0; }
-.mp-filters { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-3); padding: 0 var(--s-6) var(--s-3); }
+/* A `Stack gap={3} wrap`; the inset that lines the filters up with the modal's head is what is left. */
+.mp-filters { padding: 0 var(--s-6) var(--s-3); }
 /* `Chip as="button" pill fill neutral` owns the box; these two are the filter's states. */
 .mp-chip:hover { border-color: var(--accent); }
 .mp-chip.on { background: var(--accent-fill); color: var(--on-fill); border-color: var(--accent); font-weight: 600; }
@@ -88,18 +89,32 @@
 }
 .control-empty { padding: 0 var(--s-4); }
 /* AN EMPTY COLUMN, in the Project Log and in the dock's Suggestions pane. Not `.empty`: that one is
-   `margin: auto` centred furniture, and this is the first thing in a column that has an action under it. */
-.diary-empty {
-  display: flex; flex-direction: column; align-items: flex-start; gap: var(--s-4);
-  color: var(--muted); font-size: var(--t-lead); padding: var(--s-7) 0;
-}
+   `margin: auto` centred furniture, and this is the first thing in a column that has an action under it.
+   `Stack direction="column" align="start" gap={4}` is the arrangement; the ink, the step and the space it
+   sits in are what the surface still decides. `align="start"` and not the column default: the action under
+   the sentence is as wide as its words, and a stretched column made it the width of the pane. */
+.diary-empty { color: var(--muted); font-size: var(--t-lead); padding: var(--s-7) 0; }
 /* WHAT AN AGENT FILED, read in the Project Log's right-hand column and in the Suggestions pane. The body
    line beside this was `.filed-text` and is DELETED: `font-size: var(--t-body); line-height: 1.5;
    color: var(--muted)` is `Text lead` declaration for declaration, which is what both call sites render
-   now. This one is a step above that and is not any `Text` option. */
-.filed-title { font-size: var(--t-lead); line-height: 1.5; color: var(--text); }
-/* A SECTION HEADING INSIDE A PANEL — Settings' three, the auto-pilot panel's and the sign-in panel's. */
-.settings-section { font-family: var(--font-display); text-transform: uppercase; letter-spacing: var(--track); font-size: var(--t-small); color: var(--accent); margin-top: var(--s-3); border-bottom: 1px solid var(--border); padding-bottom: var(--s-2); }
+   now. This one is `Text lead ink="strong"` — the 1.5 line and `var(--text)` exactly — with the STEP left
+   behind, because `--t-lead` has no option and must not be given one: three steps with a name each is what
+   the scale is for. The Project Log wrote it on a `<p>` and the Suggestions pane on a `<span>`, so the
+   diary's title also carried a UA paragraph margin nobody chose; the atom is a span at both. */
+.filed-title { font-size: var(--t-lead); }
+/* A SECTION HEADING INSIDE A PANEL — Settings' three, the auto-pilot panel's and the sign-in panel's.
+   `Text caps ink="accent"` carries the face: the uppercase, the tracking, `--t-small` and the accent ink
+   are four of the eight declarations and none of them was this surface's decision. What is left is the
+   RULE UNDER THE WORDS, which is the only thing that makes this a section rather than a label.
+   `font-family` STAYS UNTIL `.vb-text-caps` CARRIES IT. The display family belongs on the caps face — six
+   classes are display + uppercase + track — but that is an atom edit and only Group A of this phase may
+   make it. If it lands, this declaration is redundant and should go with the same commit's census. */
+.settings-section {
+  font-family: var(--font-display);
+  margin-top: var(--s-3);
+  border-bottom: 1px solid var(--border);
+  padding-bottom: var(--s-2);
+}
 .settings-section:first-child { margin-top: 0; }
 /* ONE SIGNED-IN BROWSER, listed in Settings' diagnostics and in the sign-in panel. AFTER `list.css` in the
    cascade and it has to be: `.vb-row` declares `display`, `align-items` and `gap` at the same (0,1,0). */
@@ -116,14 +131,14 @@
 /* HOW A RUN ENDED, on a card's report row (runs) and on the execution page's run list. `report-stop` is a
    `ghost` Button with the one colour the surface owns; the box, the quiet muted ink and the dashed border
    are the variant's. */
-.report-chip {
-  flex: 0 0 auto;
-  text-transform: uppercase; letter-spacing: var(--track);
-}
+/* `flex: 0 0 auto` IS `.vb-fixed` at all three call sites — stack.css names this class among the six it
+   was written for. The caps stay here rather than moving to `Text`: this is a `Chip`, and the caps face is
+   an option on the text atom that a chip cannot reach. */
+.report-chip { text-transform: uppercase; letter-spacing: var(--track); }
 /* A run that has been dealt with is history: still readable, no longer shouting. Dimmed rather than
    greyed — repainting the chip muted threw away the one thing it encodes, which is HOW the run ended. */
 .vb-row.resolved .report-chip { opacity: 0.6; }
-.report-stop { flex: 0 0 auto; }
+/* `.vb-fixed` for the shrink; the danger hover is the one thing the surface owns. */
 .report-stop:hover:not(:disabled) { color: var(--danger); border-color: var(--danger); }
 /* WHAT A FORGIVE CLEARED, reported by the card button (runs) and by the project one (autopilot). Its own
    line in a wrapping row, which is what `flex-basis: 100%` is for.

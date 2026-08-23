@@ -76,7 +76,7 @@ export function ForgiveDerivation({ reason, onForgiven }: Props) {
           The result and error lines below stay on the shared classes — those are prose. */}
       <Button
         variant="default"
-        className="ap-remedy-btn"
+        className="ap-remedy-btn vb-fixed"
         disabled={busy !== null}
         onClick={() => void clear()}
       >

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Button } from '../../atoms/Button';
 import { Control } from '../../atoms/Control';
+import { Stack } from '../../atoms/Stack';
 import { Text } from '../../atoms/Text';
 import {
   type AutopilotState,
@@ -98,7 +99,9 @@ export function AutopilotPanel({
   if (!ap) {
     return (
       <>
-        <div className="settings-section">Auto-pilot</div>
+        <Text caps ink="accent" className="settings-section">
+          Auto-pilot
+        </Text>
         <Text role="hint">
           This project has no autopilot block in its config, so there is no lifecycle to run. Projects created
           before auto-pilot are upgraded in one pass once the work lands — until then this is an honest
@@ -110,13 +113,17 @@ export function AutopilotPanel({
 
   return (
     <>
-      <div className="settings-section">Auto-pilot</div>
+      <Text caps ink="accent" className="settings-section">
+        Auto-pilot
+      </Text>
       <Text role="hint">
         The lifecycle is fixed (ruling 52): auto-pilot derives where a project is from the board and looks up
         what to do next. It is not a setting, so there is no table here to edit — only the caps below, the
         columns that mean finished, and where a blocked card goes.
       </Text>
-      <div className="settings-section">Caps</div>
+      <Text caps ink="accent" className="settings-section">
+        Caps
+      </Text>
       <Text role="hint">
         {/* S10: the number that will actually stop this project, in words. A dollar dial beside a
             budget that can never trip tells the reader the opposite of the truth. */}
@@ -166,7 +173,7 @@ export function AutopilotPanel({
       <Text role="hint">Before auto-pilot can start:</Text>
       {readiness === null && !failed && <Text role="hint">Checking…</Text>}
       {failed && <Text role="hint">Could not read this project’s readiness.</Text>}
-      {readiness?.ok && <div className="ready-ok">Everything auto-pilot needs is in place.</div>}
+      {readiness?.ok && <Text ink="accent">Everything auto-pilot needs is in place.</Text>}
       {readiness && !readiness.ok && (
         <List as="ul" className="blockers">
           {readiness.blockers.map((b) => (
@@ -204,12 +211,14 @@ function StartControl({
 
   return (
     <>
-      <div className="settings-section">Running</div>
+      <Text caps ink="accent" className="settings-section">
+        Running
+      </Text>
       <Text role="hint">
         Auto-pilot walks the board on its own: it picks a card, runs its phase's skill, checks the work, and
         moves the card only if the check passes. It stops on its own when there is nothing left it can do.
       </Text>
-      <div className="ap-controls">
+      <Stack align="stretch" gap={4} className="ap-controls">
         <Button
           variant="primary"
           size="md"
@@ -233,7 +242,7 @@ function StartControl({
           </Text>
         )}
         {halted && <Text role="hint">Halted. Restart it from the overlay first.</Text>}
-      </div>
+      </Stack>
       {/* The blockers again, next to the button, because the list further up the panel is easy to scroll
           past — and this is the moment somebody wants to know. */}
       {!running && readiness && !readiness.ok && (
@@ -251,7 +260,7 @@ function StartControl({
         Not a duplicate of the bar's for the sake of it: wherever Start is, the way past this has to be.
       */}
       {(readiness?.unreviewedGates?.length ?? 0) > 0 && (
-        <div className="ap-controls">
+        <Stack align="stretch" gap={4} className="ap-controls">
           <Button
             size="md"
             data-testid="ap-panel-review-gates"
@@ -264,7 +273,7 @@ function StartControl({
           >
             I have read the gate commands
           </Button>
-        </div>
+        </Stack>
       )}
       {error && <div className="settings-error">{error}</div>}
     </>
@@ -294,12 +303,14 @@ function StopControls({ state, refresh }: { state: AutopilotState | null; refres
 
   return (
     <>
-      <div className="settings-section">Stopping</div>
+      <Text caps ink="accent" className="settings-section">
+        Stopping
+      </Text>
       <Text role="hint">
         A soft stop leaves the app alone: chat, manual runs and the board carry on, and only dispatching
         stops. An emergency stop kills every agent in this project and halts it until you restart it.
       </Text>
-      <div className="ap-controls">
+      <Stack align="stretch" gap={4} className="ap-controls">
         <Button
           size="md"
           // Nothing to stop when it is not running, and refused outright while halted.
@@ -320,7 +331,7 @@ function StopControls({ state, refresh }: { state: AutopilotState | null; refres
         >
           Emergency stop
         </Button>
-      </div>
+      </Stack>
       {error && <div className="settings-error">{error}</div>}
       {dialog}
     </>

@@ -62,7 +62,9 @@ export function SandboxPanel({ state, backend, onChanged }: Props) {
 
   return (
     <>
-      <div className="settings-section">Agent sandbox</div>
+      <Text caps ink="accent" className="settings-section">
+        Agent sandbox
+      </Text>
       <div className="vb-field">
         {state.ok ? (
           <Notice as="p" tone="ok">

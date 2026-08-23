@@ -38,8 +38,10 @@ export function CardLinks({ card, allCards, onOpenCard, onLinks }: Props) {
       <Text>
         Linked cards
         {onLinks && (
-          <Button variant="bare" size="sm" className="cv-link-edit" onClick={() => setPicking((v) => !v)}>
-            {picking ? 'Done' : 'Change'}
+          <Button variant="bare" size="sm" onClick={() => setPicking((v) => !v)}>
+            <Text size="inherit" ink="inherit" underline>
+              {picking ? 'Done' : 'Change'}
+            </Text>
           </Button>
         )}
       </Text>

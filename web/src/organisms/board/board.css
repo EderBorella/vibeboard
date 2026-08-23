@@ -238,9 +238,8 @@
   line-height: 1.3;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
-/* A `Text caps ink="accent2"`, and the STEP is what a class still has to say: `--t-micro` has no `Text`
-   option and one may not be invented for it. */
-.tile-group { font-size: var(--t-micro); }
+/* `.tile-group` IS GONE — `Text caps ink="accent2" size="micro"`. The step became an attribute when the
+   atom grew the whole type scale, which is the one declaration this class had left. */
 /* A `Stack wrap gap={2}`. The clamp is the tile's: one row of tags, and the rest is cut rather than
    allowed to push the fixed box. */
 .tile-tags { margin-top: auto; overflow: hidden; max-height: 1.3rem; }
@@ -266,9 +265,9 @@
    inherited from the chip around it — a dead declaration of the kind Phase 4 found on `.cv-link` and
    Phase 5b on `.archive-title`. */
 .tag-chip > span { opacity: 0.7; }
-/* The underline is what makes it read as a link rather than a control, which is deliberate here: it
-   undoes a filter rather than doing anything to the project. Not a geometry. */
-.tag-filter-clear { text-decoration: underline; }
+/* `.tag-filter-clear` IS GONE — `Text underline` on the button's own label, and `ink="inherit"` is what
+   keeps it tracking `bare`'s hover. The underline is still the claim: this control undoes a filter rather
+   than doing anything to the project, so it reads as a link. */
 
 /* ---------- Responsive: 3 thresholds on the board area (reacts to copilot too) ---------- */
 @container vbboards (max-width: 720px) {
@@ -286,22 +285,17 @@
    test/chip-boxes.test.tsx instead: three tones a refactor could collapse into one is the defect this
    phase exists not to ship, and the tones are MEASURED per theme there rather than trusted to differ
    because they name different tokens.
-   The project-level barrier. The accent rather than ochre: this is not a warning, it is the card the
-   whole board is waiting on, and it should read as structure rather than as a problem. */
-.tile-setup {
-  text-transform: uppercase; letter-spacing: var(--track); white-space: nowrap;
-}
-
-/* Work an agent found and deliberately did not do. Ochre, not the accent: a card carrying this is
-   not failing, but it is not plainly done either, and those two must not look the same. `tone="warn"`
-   is `--warn` with no fallback, where this rule carried `var(--warn, #b8860b)` — a fallback that has
-   been dead since every theme defined the token. */
-.tile-suggestions { white-space: nowrap; }
-
-/* A blocked task somewhere under this card. Danger rather than ochre, and the strongest of the three:
-   a story in Done carrying one has finished with a real failure inside it, which is a different fact
-   from work deliberately left behind. */
-.tile-problem { white-space: nowrap; }
+   ALL THREE CLASSES ARE GONE and the three tones are not: `tone=` is a `Chip` prop and it is what carries
+   the meaning, which is why test/chip-boxes.test.tsx measures the three through `CardTile` itself rather
+   than through a class list. What the classes still held was a face — `.tile-setup`'s uppercase and
+   tracking are `Text caps`, and all three needed `nowrap` so a glyph and its count stay on one line —
+   and a face on the label inside the chip is `Text` with `size="inherit" ink="inherit"`, which leaves the
+   chip's own step and tone alone.
+   The project-level barrier is the accent rather than ochre: it is not a warning, it is the card the
+   whole board is waiting on, and it should read as structure rather than as a problem. Ochre is work an
+   agent found and deliberately did not do — not failing, but not plainly done either. Danger is the
+   strongest of the three: a story in Done carrying a blocked card has finished with a real failure
+   inside it, which is a different fact from work deliberately left behind. */
 
 
 

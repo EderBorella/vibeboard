@@ -93,34 +93,41 @@ export function CardTile({
           // structure, not a problem.
           <Chip
             tone="accent"
-            className="tile-setup"
             testId="tile-setup"
             title="The setup feature — nothing outside it runs until it is done"
           >
-            setup
+            {/* `.tile-setup` WAS THE FACE AND NOTHING ELSE — uppercase, the tracking and a `nowrap` — so it
+                is `Text caps nowrap` on the label. `size`/`ink` are `inherit` because the chip already
+                decides both: its step is `--t-micro` and its ink is the tone this state means. */}
+            <Text size="inherit" ink="inherit" caps nowrap>
+              setup
+            </Text>
           </Chip>
         )}
         {openSuggestions > 0 && (
           // `warn` — not failing, but not plainly done either.
           <Chip
             tone="warn"
-            className="tile-suggestions"
             testId="tile-suggestions"
             title={`${openSuggestions} open ${openSuggestions === 1 ? 'suggestion' : 'suggestions'}`}
           >
-            ⚑ {openSuggestions}
+            {/* The glyph and its count on one line, which is all `.tile-suggestions` ever said. */}
+            <Text size="inherit" ink="inherit" nowrap>
+              ⚑ {openSuggestions}
+            </Text>
           </Chip>
         )}
         {blocked.length > 0 && (
           // `bad`, the strongest of the three: a real failure inside something that says it finished.
           <Chip
             tone="bad"
-            className="tile-problem"
             testId="tile-problem"
             // Every one of them, not just the first: the ids are what a person goes and looks at.
             title={`Carrying ${blocked.length === 1 ? 'a blocked card' : `${blocked.length} blocked cards`}: ${blocked.join(', ')}`}
           >
-            ⚠ {blocked.length}
+            <Text size="inherit" ink="inherit" nowrap>
+              ⚠ {blocked.length}
+            </Text>
           </Chip>
         )}
         {card.links.length > 0 && (
@@ -149,10 +156,10 @@ export function CardTile({
       </Stack>
       <div className="tile-title">{card.title}</div>
       {summary && <Text className="tile-summary">{summary}</Text>}
-      {/* The group a card belongs to, as an eyebrow over the title: `caps` is the face and `accent2` the
-          hue the tile chose. The `--t-micro` step is all the class still says. */}
+      {/* The group a card belongs to, as an eyebrow over the title: `caps` is the face, `accent2` the hue
+          the tile chose, and `micro` the step `.tile-group` used to be. */}
       {card.group && (
-        <Text caps ink="accent2" className="tile-group">
+        <Text caps ink="accent2" size="micro">
           {card.group}
         </Text>
       )}

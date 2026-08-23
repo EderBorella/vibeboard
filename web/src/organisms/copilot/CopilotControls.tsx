@@ -38,7 +38,7 @@ export function CopilotControls({
 }: Props) {
   return (
     <>
-      <Stack wrap className="copilot-controls">
+      <Stack wrap pad={[4, 5]} edge="bottom">
         <Tabs
           grouped
           items={caps.modes.map((m) => ({ value: m.value, label: m.label, title: m.hint }))}

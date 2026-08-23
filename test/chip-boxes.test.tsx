@@ -154,13 +154,11 @@ const chips: {
   // class draws nothing, so every assertion would be answered by `.vb-chip*` alone and the row would pass
   // whatever happened to the badge. It is asserted below instead, in the place where its ink is decided,
   // which is inside a destination. See *the attention badge* after this loop.
-  {
-    name: '.tile-setup — the project-level barrier',
-    props: { tone: 'accent', className: 'tile-setup' },
-    radius: SM,
-    font: MICRO,
-    ink: /--accent\b/,
-  },
+  // `.tile-setup` IS NOT IN THIS TABLE ANY MORE, for `.tab-badge`'s reason exactly: the class is deleted —
+  // it was `text-transform`, `--track` and a `nowrap`, which is `Text caps nowrap` on the label inside the
+  // chip — so a row naming it would be a fixture too thin to distinguish two outcomes. Every assertion
+  // would be answered by `.vb-chip*` alone and the row would pass whatever happened to the barrier. Its
+  // tone is claimed below, through `CardTile`, which is the fixture that can actually fail on it.
   {
     name: '.signin-this — which browser you are on',
     props: { pill: true, tone: 'neutral', className: 'signin-this' },
@@ -408,12 +406,20 @@ describe('the three tile state words stay three', () => {
 
   // The three are ONE SHAPE, which is what makes them a tone axis rather than three surfaces. Same
   // size, same corner, same nowrap: only the ink and the edge differ.
+  //
+  // THE NOWRAP IS ON THE LABEL AND NO LONGER ON THE CHIP, and it is read off the child for that reason.
+  // `.tile-setup`, `.tile-suggestions` and `.tile-problem` each declared one `white-space: nowrap` — three
+  // names for "a glyph and its count stay on one line" — and it is `Text nowrap` on the label now. Read
+  // through the element rather than assumed: a `nowrap` dropped at a call site is invisible in jsdom, so
+  // the assertion has to find the span that carries it.
   it('renders the three at one size, one corner and never wrapped', () => {
-    for (const { el } of tileStates()) {
+    for (const { name, el } of tileStates()) {
       const drawn = box(el);
       expect(drawn['font-size']).toBe(MICRO);
       expect(drawn['border-radius']).toBe(SM);
-      expect(drawn['white-space']).toBe('nowrap');
+      const label = el.firstElementChild;
+      if (!label) throw new Error(`${name} rendered no label to measure`);
+      expect(box(label)['white-space']).toBe('nowrap');
     }
   });
 });

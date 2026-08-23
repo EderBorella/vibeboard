@@ -1,10 +1,9 @@
-/* Session-override notice: the dock's controls don't write the project default, so say so
-   rather than leaving the user to wonder why Settings still shows something else.
-   The row itself is a `Stack`; `--t-micro` is what has no `Text` option, so the face stays here. */
-.copilot-override {
-  font-size: var(--t-micro); color: var(--muted);
-  padding: var(--s-2) var(--s-4);
-}
+/* `.copilot-override` IS GONE. Session-override notice: the dock's controls don't write the project
+   default, so say so rather than leaving the user to wonder why Settings still shows something else.
+   `--t-micro` and `--muted` are `Text size="micro"` on the sentence — muted is the atom's own default —
+   and the strip's `var(--s-2) var(--s-4)` inset is `Stack pad`. It pads itself by `--s-4` rather than by
+   the dock gutter on purpose: it is the one strip that reads as an aside inside the dock rather than as a
+   row of it, which is why test/copilot-rows.test.tsx names it as an exclusion. */
 
 /* THE TINT IS THE BOX AND THE INK IS THE LINE'S. `--t-small` + `--danger` is `Text role="error"` value
    for value, so the sentence says it at the call site and what is left here is the tinted strip. */
@@ -20,13 +19,18 @@
   background: var(--panel);
   min-height: 0;
 }
-/* THE SEVEN ROWS OF THE DOCK ARE `Stack`s NOW, AND WHAT SURVIVES IS THE GUTTER AND THE RULE. Six of them
-   declared `align-items: center; display: flex; gap` — the same signature at three different gaps, which
-   is the largest single cluster the surface census found and the reason the layout atom exists. The gap is
-   an attribute on the `Stack`; the `var(--s-5)` gutter and the 1px rule are genuinely this panel's rhythm
-   and no atom has anything to say about them. test/copilot-rows.test.tsx asserts all seven against the
-   gutter, so the half that stays is the half that test reads. */
-.copilot-head { padding: var(--s-4) var(--s-5); border-bottom: 1px solid var(--border); }
+/* FIVE OF THE SEVEN ROWS OF THE DOCK HAVE NO CLASS AT ALL NOW, and this is the block the layout atom's
+   `pad`/`edge` were added FOR. Six of the seven declared `align-items: center; display: flex; gap` — the
+   largest single cluster the surface census found — and when that moved to `Stack` in wave 1 what was left
+   was a padding and a hairline, which the atom could not carry. It can: `.copilot-head`,
+   `.copilot-chatbar`, `.copilot-controls`, `.copilot-status` and `.copilot-authority` were
+   `pad={[N,5]} edge="bottom"` written out five times, and they are that now.
+   TWO SURVIVE AND NEITHER IS THE PADDING'S FAULT. `.copilot-selects` pads `0 var(--s-5) var(--s-4)` —
+   asymmetric in the block axis, where `pad` is one value per axis — and both it and `.copilot-input` are
+   still the selector their `.vb-ctl` child's `flex`/`resize` is written against, which is a rule about a
+   descendant rather than a box on this element. See them below.
+   test/copilot-rows.test.tsx asserts all seven against the gutter either way: `data-pad-x` and a
+   `padding` shorthand resolve to the same twelve pixels. */
 /* 0.14em → 0.08em, and the dock's title visibly tightens. It was the second-loosest tracking in the
    tree after `.board-label`'s, and a panel heading is not a wordmark. */
 .copilot-title { font-weight: 700; font-family: var(--font-display); text-transform: uppercase; letter-spacing: var(--track); }
@@ -37,10 +41,9 @@
    deliberate — the label was drift. */
 
 /* Chat switcher */
-.copilot-chatbar { padding: var(--s-3) var(--s-5); border-bottom: 1px solid var(--border); }
 .chat-switcher { position: relative; flex: 1; min-width: 0; }
-/* "+ New" must not break across two lines when the switcher beside it is wide. */
-.chat-new { white-space: nowrap; }
+/* `.chat-new` IS GONE — `Text nowrap` on the button's label, which is the whole of what it said: "+ New"
+   must not break across two lines when the switcher beside it is wide. */
 /* THE HISTORY MENU IS A `Menu list` — see molecules/menu.css. Five classes went with it: the floating
    box, the row, the two-line button, the ellipsised title and the backdrop. `.chat-switcher` above stays
    because it is the ANCHOR the menu is positioned against, which is genuinely this surface's. */
@@ -59,7 +62,6 @@
    nowhere near it. The distinction was deliberate before the migration and survives it. */
 .chat-del:hover:not(:disabled) { color: var(--accent-2); }
 
-.copilot-controls { padding: var(--s-4) var(--s-5); border-bottom: 1px solid var(--border); }
 /* `.copilot-actions` IS GONE and so is the wrapper it named. Its button declared `Button`'s `default`
    `sm` box value for value — the same `--panel-2` ground, `--text` ink, `--border` edge, `--r-md`
    corner, `var(--s-2) var(--s-4)` padding, `--t-small` size and the same disabled dimming — so it is
@@ -67,7 +69,11 @@
    `display: flex` and a `gap` that had one child to separate from nothing. The button sits directly in
    the `.copilot-controls` row, which is the `Stack` that carries the gap. */
 /* `align="stretch"` on the `Stack` and not the row default: this one and `.copilot-input` named NO
-   `align-items`, so their two controls have always filled the row's height. */
+   `align-items`, so their two controls have always filled the row's height.
+   AND THIS IS ONE OF THE TWO ROWS THAT KEEP A CLASS. Its padding is `0` at the top and `--s-4` at the
+   bottom — it sits directly under `.copilot-controls`, so a top inset would double that row's — and `pad`
+   is one value per axis. The two rules below are the second reason: both are about what a `.vb-ctl` CHILD
+   does, which no attribute on this element can say. */
 .copilot-selects { padding: 0 var(--s-5) var(--s-4); border-bottom: 1px solid var(--border); }
 /* The row decides how its controls sit; the box is `.vb-ctl`'s. */
 .copilot-selects > .vb-ctl { flex: 1; }
@@ -81,15 +87,14 @@
    healthy case coloured the pip and not the word, which is the same asymmetry the agent chip had. The
    halo is a `Dot` prop now: `--glow` is `none` in two of the three themes, so it cannot belong to a
    tone. */
-/* THE ROW, AND NO LONGER THE INDICATOR. The `font-size` and the `color: var(--tone, …)` are gone: what
-   sits in here is a `StatusChip`, which brings both. This row's remaining job is the panel's own rhythm —
-   the same `--s-5` gutter and the same rule underneath as every other row in the dock. */
-.copilot-status { padding: var(--s-2) var(--s-5); border-bottom: 1px solid var(--border); }
-/* THE ROW THAT HAD NO CLASS. The Authorise button sat in a bare `<div>` while its six siblings each padded
-   themselves by the dock gutter, so the one control that grants write access to the project was flush
-   against the dock's left edge and touching the board behind it. Nobody chose that.
-   test/copilot-rows.test.tsx asserts all seven against the gutter rather than against each other. */
-.copilot-authority { padding: var(--s-4) var(--s-5); border-bottom: 1px solid var(--border); }
+/* `.copilot-status` IS GONE, AND IT WAS NO LONGER THE INDICATOR. The `font-size` and the
+   `color: var(--tone, …)` went when a `StatusChip` took both; the panel's own rhythm — the `--s-5` gutter
+   and the rule underneath — is `pad={[2,5]} edge="bottom"`.
+   `.copilot-authority` IS GONE TOO, AND IT IS THE ROW THAT HAD NO CLASS. The Authorise button sat in a
+   bare `<div>` while its six siblings each padded themselves by the dock gutter, so the one control that
+   grants write access to the project was flush against the dock's left edge and touching the board behind
+   it. Nobody chose that; the row simply never got a class — and now none of the five needs one, which is
+   the arrangement in which that defect could not have happened. */
 .copilot-body { flex: 1; overflow-y: auto; padding: var(--s-5); display: flex; flex-direction: column; gap: var(--s-4); }
 /* THE ROLE THIS SURFACE GIVES ITS TONE: ink, and only the `error` kind carries one — see CopilotPanel.
    `inherit` is the fallback, which is what a bubble with no state has always rendered. Nothing above a
@@ -126,6 +131,10 @@
 .ctx-fill { display: block; height: 100%; background: var(--accent); }
 .ctx-warn { color: var(--accent-2); }
 .ctx-warn .ctx-fill { background: var(--accent-2); }
+/* THE SECOND ROW THAT KEEPS A CLASS, and the padding is not why. `pad={[4,5]} edge="top"` says the box
+   exactly — but the rule under it is about a CHILD, and a composer's textarea taking the row's width
+   without growing on drag is this surface's claim rather than the control's. Moving the box onto the atom
+   and leaving the class behind for one descendant rule would be two mechanisms for one row. */
 .copilot-input { padding: var(--s-4) var(--s-5); border-top: 1px solid var(--border); }
 .copilot-input > .vb-ctl { flex: 1; resize: none; }
 

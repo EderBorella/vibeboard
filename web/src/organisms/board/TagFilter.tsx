@@ -1,5 +1,6 @@
 import { Button } from '../../atoms/Button';
 import { Chip } from '../../atoms/Chip';
+import { Text } from '../../atoms/Text';
 import type { TagCount } from '../../lib/viewmodel';
 
 interface Props {
@@ -40,8 +41,13 @@ export function TagFilter({ tags, active, onToggle, onClear }: Props) {
         </Chip>
       ))}
       {active.length > 0 && (
-        <Button variant="bare" size="sm" className="tag-filter-clear" onClick={onClear}>
-          Clear filter
+        <Button variant="bare" size="sm" onClick={onClear}>
+          {/* `.tag-filter-clear` WAS ONE `text-decoration` — the underline that makes this read as a link
+              rather than as a control, because it undoes a filter rather than touching the project.
+              `ink="inherit"` is what keeps it following `bare`'s accent hover. */}
+          <Text size="inherit" ink="inherit" underline>
+            Clear filter
+          </Text>
         </Button>
       )}
     </div>

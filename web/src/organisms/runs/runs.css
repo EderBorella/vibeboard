@@ -22,47 +22,59 @@
    common is no report, and stopping a run is a decision rather than a fault but is still an ending that
    produced nothing. The edge came from `.vb-chip-tone` and is a 50% mix rather than the flat token —
    see atoms/chip.css. */
-.report-skill { flex: 0 0 auto; font-size: var(--t-small); }
 /* Money reads as data, not prose: mono, so a card's runs line up down the column. */
 /* The cost and the elapsed time are `Readout`s. What the row still decides is that neither shrinks —
    the summary beside them takes the slack. */
 .report-open > .vb-readout { flex: 0 0 auto; }
-.report-summary {
-  flex: 1; min-width: 0; color: var(--muted); font-size: var(--t-small);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
+/* `.report-summary` IS GONE — `--t-small` muted is `Text`'s default face, and the five overflow
+   declarations under it were `.vb-clip` written out longhand.
+   `.report-skill` DECLARES NOTHING AT REST: the step is `Text`'s default and `flex: 0 0 auto` is
+   `.vb-fixed`. The name survives for the state below, which no atom expresses — a row that has been
+   dealt with goes quiet, and the `Text` on it asks for `--text` at rest. */
 .vb-row.resolved .report-skill { color: var(--muted); }
 /* `.report-dismiss` IS IN `pages/execution/execution.css` — the execution page is its only reader. */
 
+/* NOT A `Stack`, and the reason is the `<article aria-label>`: the layout atom renders neither an
+   `article` nor an `aria-label`, so the flex column it would have carried stays here. Same for
+   `.reports`, `.options` and `.dispatch` — see the report on this phase. */
 .report { display: flex; flex-direction: column; gap: var(--s-4); overflow-wrap: anywhere; }
-.report-head { display: flex; align-items: center; gap: var(--s-4); }
-.report-title { margin: 0; font-family: var(--font-display); font-size: var(--t-lead); }
+/* `.report-head` IS GONE — `<Stack as="header">`. */
+.report-title { font-family: var(--font-display); font-size: var(--t-lead); }
+/* THE TWO-AXIS GAP IS WHY THIS IS NOT A `Stack`: `var(--s-2) var(--s-6)` is a row gap and a column gap,
+   and `data-gap` takes one step. The `margin: 0` and the step are the `<dl>`'s own — its children are
+   `dt`/`dd` pairs, so it cannot be a `Text` either. */
 .report-meta { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-6); margin: 0; font-size: var(--t-small); }
 .report-meta div { display: flex; gap: var(--s-3); }
 .report-meta dt { color: var(--muted); }
 /* Every value in this list is a `Readout` `plain` — see runs/ReportPane.tsx. What is left is the
    margin a `<dd>` arrives with. */
 .report-meta dd { margin: 0; }
-.report-lead { margin: 0; font-size: var(--t-lead); padding-left: var(--s-5); border-left: var(--rule) solid var(--accent); }
-.report-note { margin: 0; font-size: var(--t-body); color: var(--accent-2); }
-.report-prompt { margin: 0; font-size: var(--t-body); color: var(--muted); }
-.report-prompt-label { text-transform: uppercase; letter-spacing: var(--track); font-size: var(--t-micro); }
+/* The step is `--t-lead`, which `Text` has no option for; the quoted edge is this surface's. */
+.report-lead { font-size: var(--t-lead); padding-left: var(--s-5); border-left: var(--rule) solid var(--accent); }
+/* `.report-note` AND `.report-prompt` ARE GONE — `Text lead` with `ink="accent2"` and without. */
+/* The caps face and the ink are `Text`'s; `--t-micro` is a step it has no option for. */
+.report-prompt-label { font-size: var(--t-micro); }
 .report-body { border-top: 1px solid var(--border); padding-top: var(--s-3); }
-.report-created { display: flex; flex-direction: column; gap: var(--s-2); }
-.report-foot { display: flex; align-items: center; justify-content: flex-end; gap: var(--s-4); }
+/* `.report-created` and `.report-foot` ARE GONE — `<Stack direction="column" gap={2}>` and
+   `<Stack gap={4} justify="end">`. */
 
 /* Options on a report that needs attention. The agent's suggestions and the fixed ones look the
    same on purpose — they all lead to the same editable prompt. */
+/* The `<section aria-label="What next">` is what keeps the flex column here rather than on a `Stack`. */
 .options { display: flex; flex-direction: column; gap: var(--s-2); border-top: 1px solid var(--border); padding-top: var(--s-4); }
-.options-warn { margin: 0; font-size: var(--t-small); color: var(--danger); }
+/* `.options-warn` IS GONE — `Text role="error"`, which is what danger ink on a refusal means. */
 /* Left-aligned because an option is a whole sentence. `.option-fixed { border-style: dashed }` WENT WITH
    THE MIGRATION and its removal is a fix, not a casualty: this section's own comment says "the agent's
    suggestions and the fixed ones look the same on purpose — they all lead to the same editable prompt",
    and the dash was the one thing making them look different. Dashed also now means "explains", which a
    button that starts a run does not. */
 .option-btn { text-align: left; }
-.options-close { display: flex; align-items: center; gap: var(--s-4); margin-top: var(--s-2); }
-.options-close-label { font-size: var(--t-small); color: var(--muted); margin-right: auto; }
+/* A `Stack` now; the extra top margin is this row's, deliberately doubling the list's own gap so the
+   close row reads as the answer under the options rather than one more of them. */
+.options-close { margin-top: var(--s-2); }
+/* `.push` is `margin-left: auto` and this is the other side — the label holds the leading edge while the
+   select and the button sit at the trailing one. */
+.options-close-label { margin-right: auto; }
 
 
 /* The ledger lines: what a project or a card has spent, and which cap will stop it. Quiet by
@@ -77,15 +89,15 @@
    IT WAS IN `organisms/cards/cards.css`, because that is where it renders. `DispatchPane.tsx` is the only
    reader of all nine, so the cards surface owned nine classes it never named — the layer gate's largest
    single finding. */
+/* The `<section aria-label>` is what keeps the flex column here rather than on a `Stack`. */
 .dispatch { display: flex; flex-direction: column; gap: var(--s-4); }
-.dispatch-head { display: flex; align-items: center; gap: var(--s-4); }
+/* `.dispatch-head` IS GONE — `<Stack as="header">`. */
 /* `.dispatch-back` is gone outright: a bordered `←` with an accent hover is `default`, exactly. */
-.dispatch-title { margin: 0; font-family: var(--font-display); font-size: var(--t-lead); }
-.dispatch-desc { margin: 0; font-size: var(--t-body); color: var(--muted); }
+.dispatch-title { font-family: var(--font-display); font-size: var(--t-lead); }
+/* `.dispatch-desc` IS GONE — `Text lead`. */
 /* A SENTENCE, so it is not a readout — only the run id inside it is, which is the signature's whole
    claim: mono means the machine measured it. It was entirely mono before, which said the prose was
-   machine-written too. */
-.dispatch-continues { margin: 0; font-size: var(--t-small); color: var(--accent-2); }
+   machine-written too. `.dispatch-continues` IS GONE with it: the sentence is a `Text ink="accent2"`. */
 /* A `.vb-row`, and the WRAP is the one thing that is genuinely this surface's: the dispatch step sits in
    a dock pane that can be 280px wide, and a rail label beside a control that cannot wrap overflows it. */
 .dispatch-row { flex-wrap: wrap; }
@@ -94,7 +106,9 @@
 .dispatch-attach { font-size: var(--t-body); border: 1px solid var(--border); border-radius: var(--r-md); padding: var(--s-3) var(--s-4); }
 .dispatch-attach summary { cursor: pointer; color: var(--muted); }
 .dispatch .vb-text-quiet { margin: var(--s-2) 0; }
-.dispatch-foot { display: flex; justify-content: flex-end; gap: var(--s-4); margin-top: var(--s-2); }
+/* A `Stack justify="end"`; the top margin is the one thing left, and it sets the footer apart from the
+   last field rather than repeating the column's rhythm. */
+.dispatch-foot { margin-top: var(--s-2); }
 
 /* The way out of a card the machine spent, on the same line as the count it clears. Quiet by default —
    it is an escape hatch, not the thing you came to the card to do — which is the `ghost` variant, and

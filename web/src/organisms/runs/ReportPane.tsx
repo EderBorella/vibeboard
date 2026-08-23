@@ -3,6 +3,7 @@ import { Button } from '../../atoms/Button';
 import { Chip } from '../../atoms/Chip';
 import { Control } from '../../atoms/Control';
 import { Readout } from '../../atoms/Readout';
+import { Stack } from '../../atoms/Stack';
 import { Surface } from '../../atoms/Surface';
 import { Text } from '../../atoms/Text';
 import type { RunRecord } from '../../lib/api';
@@ -56,17 +57,19 @@ export function ReportPane({
 
   return (
     <article className="report" aria-label={`Report from ${record.skill} on ${card.id}`}>
-      <header className="report-head">
+      <Stack as="header" gap={4}>
         <Button size="sm" onClick={onBack} title="Back to the card">
           ←
         </Button>
-        <h3 className="report-title">
+        {/* `ink="strong"` because the class named no ink and inherited the body's: the atom's default is
+            muted, and a title is not. */}
+        <Text ink="strong" className="report-title">
           {record.skill} <Readout>on {card.id}</Readout>
-        </h3>
+        </Text>
         <Chip pill state={record.status} className="report-chip vb-readout" testId="report-chip">
           {record.status}
         </Chip>
-      </header>
+      </Stack>
 
       {/* Every definition here is a machine fact — a model id, two timestamps, a token and cost line —
           so each is a `Readout`. `plain` because the list has already decided its size and colour;
@@ -123,13 +126,24 @@ export function ReportPane({
         )}
       </dl>
 
-      {record.summary && <p className="report-lead">{record.summary}</p>}
+      {record.summary && (
+        <Text ink="strong" className="report-lead">
+          {record.summary}
+        </Text>
+      )}
       {/* VibeBoard's own words, shown when the agent left none of its own. */}
-      {record.note && <p className="report-note">{record.note}</p>}
+      {record.note && (
+        <Text lead ink="accent2" testId="report-note">
+          {record.note}
+        </Text>
+      )}
       {record.prompt && (
-        <p className="report-prompt">
-          <span className="report-prompt-label">You asked:</span> {record.prompt}
-        </p>
+        <Text lead testId="report-prompt">
+          <Text caps className="report-prompt-label">
+            You asked:
+          </Text>{' '}
+          {record.prompt}
+        </Text>
       )}
 
       {record.report.trim() ? (
@@ -141,7 +155,7 @@ export function ReportPane({
       )}
 
       {createdCards.length > 0 && (
-        <div className="report-created">
+        <Stack direction="column" gap={2} testId="report-created">
           <Text>Cards this run created</Text>
           {createdCards.map((c) => (
             <Surface
@@ -156,7 +170,7 @@ export function ReportPane({
               <Readout testId="created-id">{c.id}</Readout> <span className="vb-clip">{c.title}</span>
             </Surface>
           ))}
-        </div>
+        </Stack>
       )}
 
       {/* A run still waiting on someone gets options; one that succeeded gets a move. Both are the
@@ -176,7 +190,7 @@ export function ReportPane({
       )}
 
       {record.status === 'success' && (
-        <div className="report-foot">
+        <Stack gap={4} justify="end">
           {/* NOT a `Field`: an action row, and its own first option — "Choose a column…" — names it. */}
           <Control
             as="select"
@@ -199,7 +213,7 @@ export function ReportPane({
           >
             Move card
           </Button>
-        </div>
+        </Stack>
       )}
     </article>
   );

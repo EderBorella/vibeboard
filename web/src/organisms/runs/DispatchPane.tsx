@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Button } from '../../atoms/Button';
 import { Control } from '../../atoms/Control';
 import { Readout } from '../../atoms/Readout';
+import { Stack } from '../../atoms/Stack';
 import { Text } from '../../atoms/Text';
 import type { DispatchRequest, ModelOption, RunRecord, Skill } from '../../lib/api';
 import { backendCaps, type Card } from '../../lib/shared';
@@ -79,19 +80,21 @@ export function DispatchPane({
 
   return (
     <section className="dispatch" aria-label={`Run ${skill.name} on ${card.id}`}>
-      <header className="dispatch-head">
+      <Stack as="header" gap={4}>
         <Button size="sm" onClick={onBack} title="Back to the card">
           ←
         </Button>
-        <h3 className="dispatch-title">
+        {/* `ink="strong"`: the class named no ink and inherited the body's, and the atom's default is
+            muted. */}
+        <Text ink="strong" className="dispatch-title">
           {skill.name} <Readout>on {card.id}</Readout>
-        </h3>
-      </header>
-      <p className="dispatch-desc">{skill.description}</p>
+        </Text>
+      </Stack>
+      <Text lead>{skill.description}</Text>
       {previous && (
-        <p className="dispatch-continues">
+        <Text ink="accent2">
           Continues run <Readout>{previous.run}</Readout>. Its report goes to the agent with this one.
-        </p>
+        </Text>
       )}
 
       {/* `as="div"` for the three rows whose control is a custom picker rather than a form element: a
@@ -161,14 +164,16 @@ export function DispatchPane({
         </Notice>
       )}
 
-      <div className="dispatch-foot">
+      {/* `align="stretch"` and not the atom's centring: the class declared no `align-items`, so the two
+          buttons filled the row's height and still do. */}
+      <Stack gap={4} justify="end" align="stretch" className="dispatch-foot">
         <Button size="md" onClick={onBack}>
           Cancel
         </Button>
         <Button variant="primary" size="md" disabled={busy} onClick={dispatch}>
           {busy ? 'A run is in flight' : `Run ${skill.name}`}
         </Button>
-      </div>
+      </Stack>
     </section>
   );
 }

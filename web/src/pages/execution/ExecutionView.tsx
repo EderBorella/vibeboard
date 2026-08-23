@@ -2,6 +2,7 @@ import type { CSSProperties } from 'react';
 import { Button } from '../../atoms/Button';
 import { Chip } from '../../atoms/Chip';
 import { Readout } from '../../atoms/Readout';
+import { Stack } from '../../atoms/Stack';
 import { Surface } from '../../atoms/Surface';
 import { Text } from '../../atoms/Text';
 import type { RunRecord } from '../../lib/api';
@@ -87,7 +88,10 @@ export function ExecutionView({
             aria-label={column.label}
           >
             <h3 className="exec-head">
-              {column.label}
+              {/* `ink="strong"`: the class named no ink, which the label suite pins as its contract. */}
+              <Text caps ink="strong">
+                {column.label}
+              </Text>
               <Chip pill fill className="vb-readout" testId="exec-count">
                 {group.length}
               </Chip>
@@ -99,18 +103,18 @@ export function ExecutionView({
               const stoppable = active.includes(record.run) || queued.includes(record.run);
               return (
                 <Row key={record.run} stack variant="inset">
-                  <div className="exec-run-top">
+                  <Stack align="baseline" gap={3} className="exec-run-top">
                     <Chip pill state={record.status} className="report-chip vb-readout" testId="report-chip">
                       {record.status}
                     </Chip>
-                    <span className="exec-skill">{record.skill}</span>
+                    <Text ink="strong">{record.skill}</Text>
                     {/* What it cost, beside how long it took — the two things a dashboard row is
                         actually asked. Absent while a run is still in flight. */}
                     {costLabel(record.usage) && (
                       <Readout testId="exec-cost">{costLabel(record.usage)}</Readout>
                     )}
                     <Readout testId="exec-when">{elapsed(record, now)}</Readout>
-                  </div>
+                  </Stack>
                   <Surface
                     as="button"
                     variant="flat"
@@ -125,14 +129,14 @@ export function ExecutionView({
                     <span className="vb-clip">{card?.title ?? (record.card ? '(gone)' : '')}</span>
                   </Surface>
                   {(record.summary || record.note) && (
-                    <p className="exec-summary">{record.summary ?? record.note}</p>
+                    <Text className="exec-summary">{record.summary ?? record.note}</Text>
                   )}
                   {/* A ROW OF ITS OWN, because `.exec-run` is a flex COLUMN — every direct child of it
                       lands on its own line, so two sibling buttons stacked rather than sitting together.
                       Wrapping, so the result and error lines ForgiveAttempts renders (both
                       `flex-basis: 100%`) still break underneath the buttons rather than squeezing them. */}
                   {(stoppable || column.key === 'attention') && (
-                    <div className="exec-actions">
+                    <Stack gap={2} wrap className="exec-actions">
                       {stoppable && (
                         <Button
                           className="report-stop"
@@ -145,7 +149,7 @@ export function ExecutionView({
                       )}
                       {column.key === 'attention' && (
                         <Button
-                          className="report-dismiss"
+                          className="report-dismiss vb-fixed"
                           data-testid="report-dismiss"
                           title={`Mark the ${record.skill} run on ${subject} dealt with`}
                           onClick={() => onResolve(record)}
@@ -160,7 +164,7 @@ export function ExecutionView({
                       {column.key === 'attention' && record.card && record.board && (
                         <ForgiveAttempts board={record.board} card={record.card} onForgiven={onForgiven} />
                       )}
-                    </div>
+                    </Stack>
                   )}
                 </Row>
               );

@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { STOP_REASONS } from '../src/core/dispatch-gate.js';
-import { STATE_TONES } from '../web/src/molecules/state-tones.js';
+import { STATE_TONES } from '../web/src/design/state-tones.js';
 import {
   LIGHT_STATES,
   type LightState,
@@ -179,7 +179,7 @@ describe('TopBar', () => {
   //
   // READ THROUGH THE TABLE rather than out of the stylesheet, because the stylesheet no longer names a
   // state at all: nine `.conn-status[data-state='…']` rules became one `color: var(--tone)` declaration
-  // and one row per state in web/src/molecules/state-tones.ts. A regex over styles.css would now match nothing
+  // and one row per state in web/src/design/state-tones.ts. A regex over styles.css would now match nothing
   // and pass, which is why the assertion moved rather than being deleted.
   it('separates failing from online, and shares its tone with offline', () => {
     expect(STATE_TONES.failing).not.toBe(STATE_TONES.online);

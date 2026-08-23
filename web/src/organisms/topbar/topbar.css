@@ -115,7 +115,7 @@
 /* NINE `[data-state]` RULES ARE GONE FROM HERE, and they were the largest of the six vocabularies. Six
    words, four tokens, three of them for three shades of "not right" on one control: `--danger` for
    `closed`, `--warn` for `offline`, `--accent-2` for `failing`. What each of them decided is now one row
-   in molecules/state-tones.ts and the ink declaration on `.conn-status` above.
+   in design/state-tones.ts and the ink declaration on `.conn-status` above.
    `online`, not `open`: the four socket states are transport words, and `open` describes a WebSocket
    rather than anything a person is trying to do. `online`/`offline` is the pair that means something at
    a glance — and `offline` is the one that is NOT about the connection at all: the server is right

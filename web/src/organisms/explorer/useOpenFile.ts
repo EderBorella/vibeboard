@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { type FileRead, putFsFile, readFsFile } from '../../lib/api';
 import { errorText } from '../../lib/errors';
 import { useAction } from '../../lib/useAction';
-import type { EditorView } from '../../templates/EditorLayout';
+import type { EditorView } from '../shared/EditorLayout';
 
 // The one file the Explorer has open: what it is, the editor buffer, and the two calls that move
 // bytes. Split from ExplorerView so the buffer's rules — never clobber unsaved typing, never save a

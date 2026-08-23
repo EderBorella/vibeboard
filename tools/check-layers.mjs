@@ -76,7 +76,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { classesOf, rulesOf, shapedRules } from './lib/css.mjs';
-import { codeOf, walk as walkFiles } from './lib/source.mjs';
+import { codeOf, lineOf, walk as walkFiles } from './lib/source.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const CORPUS = 'web/src';
@@ -350,7 +350,96 @@ const SPLIT_CEILING = 22;
 // `check:class-budget` and `check:name-resolution` both failed. **305 today**, and 250 is the floor: the
 // commit that takes the budget below 250 lowers this in the same commit, which is the ratchet discipline
 // every other number in this repository already follows.
-const PARSE_FLOOR = 250;
+// ---------------------------------------------------------------------------------------------------
+// CLAIM 3 — THE ARROWS POINT ONE WAY. Blocking at zero.
+//
+// The other two claims are about STYLESHEETS: which surface may read which class. This one is about
+// MODULES, and nothing in this repository could see it — which is how `atoms/Chip.tsx` came to import
+// `molecules/state-tones`, putting the base of the pyramid in debt to the layer above it. Eight phases
+// of work on tokens, atoms, molecules and organisms, and the one thing that decides whether any of it is
+// a HIERARCHY rather than six directories went unchecked the whole time.
+//
+// A module may import its own layer or any layer BELOW it, never above:
+//     design -> atoms -> molecules -> organisms -> templates -> pages -> shell
+// `lib/` and the loose modules at the root of `web/src` have no layer: they are data and plumbing, and
+// anyone may import them. That is not a loophole — a layer is about what draws, and `lib/api` draws
+// nothing.
+//
+// WHY `shell` IS ABOVE `pages` AND NOT A TEMPLATE. `App.tsx` and `WorkArea.tsx` choose WHICH page renders.
+// That is a router, and a router is above the things it routes to. They sat in `templates/` and produced
+// seven upward imports on their own — which read as seven violations when the real fault was one
+// misfiling. The frames they draw are still templates; `templates/app-shell.css` and `work-area.css` did
+// not move.
+const LAYERS = ['design', 'atoms', 'molecules', 'organisms', 'templates', 'pages', 'shell'];
+const NO_LAYER = -1;
+const layerOf = (rel) => {
+  const seg = rel.split('/')[0];
+  const at = LAYERS.indexOf(seg);
+  return at === -1 ? NO_LAYER : at;
+};
+
+// Resolve a relative specifier against the importing file's own directory, the way the bundler does.
+export const resolveSpec = (fromRel, spec) => {
+  const out = fromRel.split('/').slice(0, -1);
+  for (const part of spec.split('/')) {
+    if (part === '.' || part === '') continue;
+    if (part === '..') out.pop();
+    else out.push(part);
+  }
+  return out.join('/').replace(/\.(ts|tsx|js|jsx)$/, '');
+};
+
+const importFaults = (files, read) => {
+  const faults = [];
+  for (const rel of files) {
+    const mine = layerOf(rel);
+    if (mine === NO_LAYER) continue;
+    const code = codeOf(read(rel));
+    for (const m of code.matchAll(/from '(\.[^']*)'/g)) {
+      const target = resolveSpec(rel, m[1]);
+      const theirs = layerOf(target);
+      if (theirs === NO_LAYER || theirs <= mine) continue;
+      faults.push({
+        line: lineOf(code, m.index ?? 0),
+        rel,
+        target,
+        from: LAYERS[mine],
+        to: LAYERS[theirs],
+      });
+    }
+  }
+  return faults;
+};
+
+// SELF-TEST, and it has to carry BOTH directions plus the no-layer case, because a resolver that returned
+// a constant would satisfy a one-sided fixture. The three rows are: an atom reaching up (a fault), a page
+// reaching down (never a fault), and an organism reaching into `lib/` (never a fault, and the row that
+// stops the arm being tightened into nonsense later).
+const IMPORT_FIXTURE = new Map([
+  ['atoms/Alpha.tsx', "import { x } from '../molecules/beta';\n"],
+  ['pages/gate/Gamma.tsx', "import { y } from '../../atoms/Alpha';\n"],
+  ['organisms/runs/Delta.tsx', "import { z } from '../../lib/api';\n"],
+]);
+
+const importSelfTest = () => {
+  const got = importFaults([...IMPORT_FIXTURE.keys()], (rel) => IMPORT_FIXTURE.get(rel) ?? '');
+  const want = 'atoms/Alpha.tsx atoms->molecules';
+  const seen = got.map((f) => `${f.rel} ${f.from}->${f.to}`).join(' | ');
+  if (got.length !== 1 || seen !== want) {
+    console.error(
+      `tools/check-layers.mjs — the import reader is broken: expected exactly \`${want}\`, got \`${seen || '(nothing)'}\`.`,
+    );
+    return false;
+  }
+  return true;
+};
+
+// A SMOKE ALARM AND NOT A TARGET, and this number was 250 while the tree held 305 — so the first phase to
+// delete its way to 249 failed the run FOR SUCCEEDING. That is the third anti-vacuity floor in this
+// repository to do exactly that, and the rule the corpus walk already states is the fix: set it far below
+// the real count, because a floor near the true number is a second ratchet nobody meant to add. The
+// ratchet on the count lives in check-class-budget.mjs and is the only place it should.
+const PARSE_FLOOR = 100;
 
 // TWO CLAIMS, BOTH AT ZERO, BOTH BLOCKING. A cross-surface READ, and a split no open-layer rule owns.
 //
@@ -458,9 +547,32 @@ function main() {
     failed = true;
   }
 
+  // CLAIM 3 — the arrows. Walked over every `.tsx`/`.ts` under the corpus, stories excluded by the shared
+  // walk for the reason `tools/lib/source.mjs` gives: a story is a demonstration, not a call site.
+  const modules = [...walkFiles(ROOT, CORPUS, '.tsx', 40), ...walkFiles(ROOT, CORPUS, '.ts', 20)].map((f) =>
+    f.slice(`${CORPUS}/`.length),
+  );
+  const arrows = importFaults(modules, (rel) => readFileSync(join(ROOT, CORPUS, rel), 'utf8'));
+  if (!importSelfTest()) failed = true;
+  if (arrows.length > 0) {
+    console.error(
+      `\n${arrows.length} import(s) point UP the layers, against zero. A module may import its own layer` +
+        ` or any below it — ${LAYERS.join(' -> ')} — and never above. \`lib/\` and the loose modules have no` +
+        ` layer and may be imported by anyone. Move the shared thing DOWN, or move the importer up.`,
+    );
+    for (const a of arrows) {
+      console.error(`  ${CORPUS}/${a.rel}:${a.line}  ${a.from} -> ${a.to}  (${a.target})`);
+    }
+    failed = true;
+  }
+
   console.log(
     `layer scope: ${findings.length} cross-surface read(s) and ${orphans.length} unowned split(s) — both ` +
       `blocking at zero; ${exempt.length}/${SPLIT_CEILING} shared then specialised`,
+  );
+  console.log(
+    `layer direction: ${arrows.length} upward import(s) across ${modules.length} module(s) — blocking at` +
+      ` zero; ${LAYERS.join(' -> ')}`,
   );
   if (failed) process.exit(1);
 }

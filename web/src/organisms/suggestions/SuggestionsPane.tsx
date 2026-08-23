@@ -5,12 +5,12 @@ import { Control } from '../../atoms/Control';
 import { Stack } from '../../atoms/Stack';
 import { Surface } from '../../atoms/Surface';
 import { Text } from '../../atoms/Text';
+import { asState } from '../../design/state-tones';
 import { cardSuggestion, patchSuggestion } from '../../lib/api';
 import type { Suggestion, SuggestionLevel } from '../../lib/shared';
 import { SUGGESTION_LEVELS } from '../../lib/shared';
 import { useAction } from '../../lib/useAction';
 import { FigureRow } from '../../molecules/FigureRow';
-import { asState } from '../../molecules/state-tones';
 import { List } from '../shared/List';
 import { Row } from '../shared/Row';
 
@@ -162,7 +162,7 @@ export function SuggestionsPane({ suggestions, failed, onRefresh, onApply }: Pro
                 // NO TONE CLASS BESIDE IT, and that is deliberate: this rail says which row the action
                 // bar acts on (`.picked`), not what state the finding is in — the state is a word in the
                 // row. So the attribute is a hook for tests and for reading the DOM, and nothing here
-                // decides a colour. See molecules/state-tones.ts; the value is `SuggestionState`, every member
+                // decides a colour. See design/state-tones.ts; the value is `SuggestionState`, every member
                 // of which has a row, so giving it the rail later is one declaration.
                 data-state={asState(s.state)}
               >

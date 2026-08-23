@@ -235,7 +235,7 @@ describe('whether the drawer is worth opening', () => {
 });
 
 // `state` AND NOT `tone`, and the values are unchanged: Phase 13 renamed the FIELD because these five
-// are state names — a tone is one of the five colours in web/src/molecules/state-tones.ts, and calling the
+// are state names — a tone is one of the five colours in web/src/design/state-tones.ts, and calling the
 // state a tone is what let three surfaces each hold their own translation of it.
 describe('the transport state', () => {
   it.each([

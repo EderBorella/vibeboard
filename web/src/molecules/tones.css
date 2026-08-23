@@ -1,6 +1,6 @@
 /* THE TONE → TOKEN TABLE, AND THE ONLY PLACE IN ANY STYLESHEET THAT DECIDES A STATE'S COLOUR.
  * Five rules where twenty-six `[data-state]` rules across six surfaces used to each pick a token by
- * hand. Which STATE is which tone is in molecules/state-tones.ts, where the compiler can check it; what a
+ * hand. Which STATE is which tone is in design/state-tones.ts, where the compiler can check it; what a
  * tone is WORTH is here, where the palette is.
  * Nothing below names a state. A surface's own rule says which PROPERTY the tone lands on — ink, fill, a
  * left rail — and `--tone` is what carries it there, so one tone can legitimately be two properties

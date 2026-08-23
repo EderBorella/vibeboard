@@ -24,7 +24,7 @@ import {
 } from '../../organisms/explorer/requests';
 import { useOpenFile } from '../../organisms/explorer/useOpenFile';
 import { useTree } from '../../organisms/explorer/useTree';
-import { EditorBody, EditorLayout } from '../../templates/EditorLayout';
+import { EditorBody, EditorLayout } from '../../organisms/shared/EditorLayout';
 
 interface Props {
   // Bumps whenever the project changes on disk, so the tree and the open file follow along.

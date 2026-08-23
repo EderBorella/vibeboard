@@ -53,7 +53,7 @@ import { codeOf, lineOf, walk as walkFiles } from './lib/source.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const CORPUS = 'web/src';
-const TABLE = 'web/src/molecules/state-tones.ts';
+const TABLE = 'web/src/design/state-tones.ts';
 
 // A SMOKE ALARM, NOT A TARGET — see walk() in lib/source.mjs. An order of magnitude under the real
 // counts (26 rows, 9 `data-state` sites, 3 stylesheets).
@@ -356,7 +356,7 @@ if (unchecked.length > 0) {
     `${unchecked.length} data-state expression(s) the compiler cannot check:`,
     unchecked.map((s) => `${s.file}:${s.line} — data-state={${s.expression}}`),
     `React types every \`data-*\` as \`any\`. Put a \`stateClass(…)\` in the same tag if the surface takes\n` +
-      `a colour from the state, or wrap it in \`asState(…)\` if it does not. See web/src/molecules/state-tones.ts.`,
+      `a colour from the state, or wrap it in \`asState(…)\` if it does not. See web/src/design/state-tones.ts.`,
   );
 }
 
@@ -366,7 +366,7 @@ if (naming.length > 0) {
   fail(
     `${naming.length} stylesheet rule(s) name a state:`,
     naming.map((f) => `${f.at} — ${f.selector}  (${f.why.join(', ')})`),
-    `A STATE'S COLOUR IS DECIDED IN ONE PLACE, and it is web/src/molecules/state-tones.ts. A rule that names a\n` +
+    `A STATE'S COLOUR IS DECIDED IN ONE PLACE, and it is web/src/design/state-tones.ts. A rule that names a\n` +
       `state is a second opinion about it, and twenty-six of them made \`running\` three different\n` +
       `colours on three surfaces a person reads together. Say WHICH PROPERTY the tone lands on —\n` +
       `\`color: var(--tone)\`, \`border-left-color: var(--tone)\` — and let the table say which colour.`,

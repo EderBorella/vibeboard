@@ -1,4 +1,4 @@
-/* The state chip in the top bar. `Chip pill` owns the box and molecules/state-tones.ts owns the colour; this
+/* The state chip in the top bar. `Chip pill` owns the box and design/state-tones.ts owns the colour; this
    keeps the treatment.
    THREE STATE RULES ARE GONE AND THE CLAIM UNDER THEM SURVIVES INTACT. It said "there is no success
    token in the palette and `complete` must not borrow the working colour: they are the two states a

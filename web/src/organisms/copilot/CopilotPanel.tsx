@@ -4,12 +4,12 @@ import { Control } from '../../atoms/Control';
 import { Readout } from '../../atoms/Readout';
 import { Stack } from '../../atoms/Stack';
 import { Text } from '../../atoms/Text';
+import { stateClass } from '../../design/state-tones';
 import { getModelStatus, listModels, type ModelOption, type ModelStatus } from '../../lib/api';
 import { backendCaps, backendDefaults } from '../../lib/shared';
 import { useConfirm } from '../../lib/useConfirm';
 import { useFetched } from '../../lib/useFetched';
 import { StatusChip } from '../../molecules/StatusChip';
-import { stateClass } from '../../molecules/state-tones';
 import { BackendPicker } from './BackendPicker';
 import { ChatSwitcher } from './ChatSwitcher';
 import { CopilotControls } from './CopilotControls';
@@ -22,7 +22,7 @@ const NO_MODELS: ModelOption[] = [];
 // THE FIFTH MECHANISM, AND NO CENSUS COUNTED IT. `.copilot-status.ok` and `.down` were bare class names
 // that picked `--accent` and `--danger` by hand — neither looked like a state, so the six vocabularies
 // docs/design-system.md measured were really seven. `available`/`unavailable` are rows in
-// molecules/state-tones.ts now, the word is computed once instead of three times, and the halo is a `Dot` prop
+// design/state-tones.ts now, the word is computed once instead of three times, and the halo is a `Dot` prop
 // rather than a colour rule of its own.
 //
 // Its own component because the panel sits on the cognitive-complexity limit and this is a conditional

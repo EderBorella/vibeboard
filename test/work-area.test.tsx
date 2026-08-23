@@ -41,7 +41,7 @@ const api = vi.hoisted(() => ({
 vi.mock('../web/src/lib/api.js', () => api);
 vi.mock('../web/src/lib/api', () => api);
 
-const { WorkArea } = await import('../web/src/templates/WorkArea.js');
+const { WorkArea } = await import('../web/src/shell/WorkArea.js');
 
 import type { BoardName, Card, ProjectConfig, ProjectSnapshot, Suggestion } from '../web/src/lib/shared.js';
 import type { MainTab } from '../web/src/organisms/topbar/TopBar.js';

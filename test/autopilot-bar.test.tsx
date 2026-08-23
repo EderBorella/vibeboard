@@ -657,7 +657,7 @@ describe('whether that agent can actually run', () => {
     // `checking` AND NOT `unknown`, and it is the same claim about a renamed value. This surface's four
     // states were `ok`, `bad`, `warn` and `unknown` — three of them TONE names used as state names, so
     // `ok` was a state here and a colour in the stylesheet, where it was then painted `--muted`. They
-    // are `ready`, `blocked`, `failing` and `checking` now; see web/src/molecules/state-tones.ts.
+    // are `ready`, `blocked`, `failing` and `checking` now; see web/src/design/state-tones.ts.
     expect(badge.getAttribute('data-state')).toBe('checking');
     // AND THE TONE CLASS BESIDE IT, because the attribute alone is what was vacuous once already: it
     // says which state this is and nothing about whether the state reaches a colour. `neutral` is the

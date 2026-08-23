@@ -4,7 +4,7 @@ import { Button } from '../../atoms/Button';
 import { Chip } from '../../atoms/Chip';
 import { Readout } from '../../atoms/Readout';
 import { Text } from '../../atoms/Text';
-import { TONES } from '../../molecules/state-tones';
+import { TONES } from '../../design/state-tones';
 import { List } from './List';
 import { Row } from './Row';
 

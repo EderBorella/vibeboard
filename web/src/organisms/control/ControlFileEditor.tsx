@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { Button } from '../../atoms/Button';
 import type { ControlFile } from '../../lib/api';
 import { Notice } from '../../molecules/Notice';
-import { EditorBody, EditorLayout, type EditorView } from '../../templates/EditorLayout';
+import { EditorBody, EditorLayout, type EditorView } from '../shared/EditorLayout';
 
 // A control file as opened for editing: its listing metadata plus the content on disk.
 export type OpenFile = ControlFile & { content: string };

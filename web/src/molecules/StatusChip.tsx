@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { chipClasses } from '../atoms/Chip';
+import type { StateName } from '../design/state-tones';
 import { Popover } from './Popover';
-import type { StateName } from './state-tones';
 
 // A STATE, AS A CHIP YOU CAN CLICK FOR THE REST OF THE SENTENCE.
 //
@@ -52,7 +52,7 @@ export function StatusChip({
   className,
   testId,
 }: {
-  // A row in molecules/state-tones.ts. The tone reaches the ink, the edge and the dot's fill from that one row.
+  // A row in design/state-tones.ts. The tone reaches the ink, the edge and the dot's fill from that one row.
   state: StateName;
   word: ReactNode;
   advice: StatusAdvice;

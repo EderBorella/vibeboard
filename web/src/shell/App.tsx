@@ -35,7 +35,7 @@ import { useSkills } from '../organisms/skills/useSkills';
 import { type MainTab, TopBar } from '../organisms/topbar/TopBar';
 import { ProjectGate } from '../pages/gate/ProjectGate';
 import { SignIn } from '../pages/signin/SignIn';
-import { chooseContent, lightProps, rebindOnSignIn } from './shell';
+import { chooseContent, lightProps, rebindOnSignIn } from '../templates/shell';
 import { WorkArea } from './WorkArea';
 
 export function App() {

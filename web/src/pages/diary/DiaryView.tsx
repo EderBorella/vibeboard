@@ -4,11 +4,11 @@ import { Chip } from '../../atoms/Chip';
 import { Control } from '../../atoms/Control';
 import { Stack } from '../../atoms/Stack';
 import { Text } from '../../atoms/Text';
+import { stateClass } from '../../design/state-tones';
 import { addDiaryEntry, type DiaryEntry } from '../../lib/api';
 import { MAX_ENTRY_TEXT, type Suggestion } from '../../lib/shared';
 import { useAction } from '../../lib/useAction';
 import { FigureRow } from '../../molecules/FigureRow';
-import { stateClass } from '../../molecules/state-tones';
 import { useDiary } from '../../organisms/diary/useDiary';
 import { List } from '../../organisms/shared/List';
 import { Row } from '../../organisms/shared/Row';
@@ -97,7 +97,7 @@ function FiledList({ suggestions }: { suggestions: Suggestion[] }) {
       {/* `stateClass` beside the attribute, and it is not decoration: React types every `data-*` as
           `any`, so `data-state={s.state}` alone would compile for a state with no row in the table and
           the rail would silently take whatever colour it inherited. The call is what the compiler
-          checks — see molecules/state-tones.ts. */}
+          checks — see design/state-tones.ts. */}
       {ordered.map((s) => (
         <Row
           as="li"

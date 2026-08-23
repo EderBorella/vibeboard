@@ -112,7 +112,7 @@
    nothing left for it to say — the line's only child is the readout. See copilot/CopilotPanel.tsx. */
 /* `.msg-error` IS GONE. It declared `color: var(--danger)` — a state's colour, chosen on a surface,
    which is the whole subject of Phase 13 — and a `font-size: var(--t-body)` that restated `.msg`'s own.
-   The line is the `error` row of molecules/state-tones.ts now, and it gets its ink from `--tone` through
+   The line is the `error` row of design/state-tones.ts now, and it gets its ink from `--tone` through
    `.vb-tone-bad`. THREE of the four other `msg-*` classes stay — `.msg-thinking` went to `Text` above:
    a bubble's geometry is a shape, and the chat may keep its own. `.msg-user` and `.msg-assistant` show
    NO literal call site and are not dead: `msg-${item.kind}` composes both names at run time, which is

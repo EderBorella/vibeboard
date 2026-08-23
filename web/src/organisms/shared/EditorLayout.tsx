@@ -1,9 +1,9 @@
 import type { ReactNode } from 'react';
-import { Control } from '../atoms/Control';
-import { Readout } from '../atoms/Readout';
-import { Stack } from '../atoms/Stack';
-import { renderMarkdown } from '../lib/markdown';
-import { Tabs } from '../molecules/Tabs';
+import { Control } from '../../atoms/Control';
+import { Readout } from '../../atoms/Readout';
+import { Stack } from '../../atoms/Stack';
+import { renderMarkdown } from '../../lib/markdown';
+import { Tabs } from '../../molecules/Tabs';
 
 // IT WAS `ui/EditorShell` AND IT WAS THE WRONG LAYER, which is the whole subject of the atomic revamp's
 // template layer (docs/design-system.md, *The atomic revamp: the layer tree*): a shared primitive

@@ -1,6 +1,6 @@
 import type { ButtonHTMLAttributes, HTMLAttributes, ReactNode } from 'react';
 import { Surface, type SurfaceVariant } from '../../atoms/Surface';
-import type { Tone } from '../../molecules/state-tones';
+import type { Tone } from '../../design/state-tones';
 
 // ROW — one line of a list. Nineteen families built this by hand — the census is in docs/design-system.md,
 // *The atomic revamp: the seven phases*, Phase 6 — and disagreed about

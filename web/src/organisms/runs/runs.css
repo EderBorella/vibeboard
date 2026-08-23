@@ -83,7 +83,10 @@
    margin is the parent's gap, and `Stack` has no other kind. */
 /* `.push` is `margin-left: auto` and this is the other side — the label holds the leading edge while the
    select and the button sit at the trailing one. */
-.options-close-label { margin-right: auto; }
+/* `.options-close-label` IS GONE. It was `margin-right: auto` on child 1 of a three-child row, which is
+   `push` on child 2 — the same rendering, and `push` is the utility seven classes already collapsed into.
+   Found by the sweep agent that migrated this row and reported it as a one-line ruling rather than taking
+   it, because the rules listed `margin-right: auto` as unreachable. It was reachable from the other side. */
 
 
 /* The ledger lines: what a project or a card has spent, and which cap will stop it. Quiet by

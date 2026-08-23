@@ -116,8 +116,11 @@
    `.push` (`margin-left: auto`) is the precedent for a one-declaration layout utility here, and it earned
    its place the same way: one name for what seven classes each said once.
    THE FILL HALF IS NOT HERE. `flex: 1; min-width: 0` is `.vb-clip` already, wherever the child is text —
-   which is both of the two classes that wanted it. The three that remain (`.res-title`, `.res-url`,
-   `.res-note`) are 1, 1.4 and 1.2, three genuinely different shares of a row, and they stay surfaces'. */
+   which is both of the two classes that wanted it. `.res-title`, `.res-url` and `.res-note` USED TO BE
+   NAMED HERE as three genuinely different shares of a row that stayed the surface's — 1, 1.4 and 1.2. They
+   are gone: no phase or report recorded that decision, so with the visual change licensed all three became
+   `.vb-row-main` and the row divides evenly. A comment that names survivors goes stale the moment they
+   stop surviving, which is why this one says what happened instead. */
 .vb-fixed { flex: none; }
 
 /* THE FRAME OPTIONS, AND THEY EXIST BECAUSE HOLDING THE UI STILL WAS WHAT KEPT 47 CLASSES ALIVE.

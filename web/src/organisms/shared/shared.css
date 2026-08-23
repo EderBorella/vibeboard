@@ -165,3 +165,15 @@
    which is the only thing it read (now fixed in visual/support/audit.ts). (0,2,0) beats `.reports-forgiven`
    at (0,1,0), and it adds no class NAME, so neither ratchet moves. */
 .reports-forgiven.vb-text-error { opacity: 1; }
+
+/* ---- FROM `organisms/settings/settings.css`, WHICH IS DELETED --------------------------------------
+   That sheet reached ZERO RULES in the sweep and was carrying only its own history, so the history moved
+   here — to the sheet that holds what Settings still shares — and the file went. A sheet with no rules is
+   a line in the manifest with no payload.
+   SETTINGS IS THE FIRST SURFACE IN THE TREE TO DRAW NOTHING OF ITS OWN. Every box on it is an atom, a
+   molecule or a shared organism: `Modal`, `Field`, `Control`, `Text`, `Notice`, `Row`, `Stack`, `Button`.
+   `.blockers` and `.ready-ok` went to `organisms/autopilot/autopilot.css` — both were read from the
+   auto-pilot bar and its panel and from nowhere in Settings, which is two of the layer gate's
+   cross-surface reads. `.settings-row` and its descendant rule became a `Row` with `.vb-row-main` on each
+   of its two fields, the shared name for "this cell takes the slack" that five families spelled five ways.
+   `.sandbox-action`'s `align-self` is `.vb-self-start`. */

@@ -127,7 +127,10 @@ import './organisms/topbar/topbar.css';
 import './templates/work-area.css';
 import './organisms/board/board.css';
 import './pages/gate/gate.css';
-import './organisms/settings/settings.css';
+// `organisms/settings/settings.css` WAS IMPORTED HERE AND IS DELETED. It reached zero rules in the sweep:
+// Settings is the first surface in this tree that draws nothing of its own — every box on it is an atom, a
+// molecule or a shared organism. Its history moved to `organisms/shared/shared.css`, which holds what it
+// still shares. 41 sheets now, not 42.
 import './organisms/copilot/copilot.css';
 import './organisms/cards/cards.css';
 import './organisms/diary/diary.css';

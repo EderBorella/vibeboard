@@ -182,7 +182,11 @@ export const SURFACES: Surface[] = [
       // Panels without it, so an empty archive cannot be mistaken for a measured one.
       await expect(page.locator('[data-testid="archive-drawer"]')).toBeVisible();
       await expect(page.locator('[data-testid="archive-drawer"] > .vb-row').first()).toBeVisible();
-      await expect(page.locator('.archive-title').first()).toBeVisible();
+      // KEYED ON THE TEST HANDLE, not on `.archive-title`. This selector was the only thing keeping that
+      // class alive — it is one declaration (`color: var(--text)`) and a `<Text ink="strong">` inside the
+      // bare Button says it. Fifth time in this sweep a conformance check has been the reason a style
+      // class exists, after `.ap-bar-end`, `.cards-gone`, `NOT_AN_ATOM_YET` and `section.board`.
+      await expect(page.locator('[data-testid="archive-title"]').first()).toBeVisible();
     },
     floor: { elements: 8, text: 4, contrast: 4, focus: 2 },
   },

@@ -50,6 +50,13 @@ interface Props {
   edge?: 'top' | 'bottom';
   // TAKE THE SPACE THE PARENT HAS, and shrink below your content when asked — `flex: 1` with both
   // `min-*: 0`, which is the trio that makes a scroller actually scroll. Six classes were exactly this.
+  // THE ATTRIBUTE IS `data-grow` AND NOT `data-fill`, AND THAT IS A COLLISION I WALKED INTO. `data-fill`
+  // was already taken, by a SEMANTIC flag meaning "this pane exists to be filled": `dock.css` reads
+  // `.dock-body:has([data-fill]) { height: 38vh }` and `visual/support/audit.ts` resolves the open pane
+  // with `querySelector('[data-fill]')` and reports its first class name. Three surfaces write it by hand.
+  // So a `Stack fill` on any always-mounted box inside the dock would have pinned the dock body to 38vh at
+  // rest — the exact fault check 10's first assertion exists to measure — and shadowed the real pane in the
+  // harness. Two meanings, one attribute name, and only one of them is layout.
   fill?: boolean;
   // A pane that scrolls. Four classes were `overflow-y: auto` and nothing else.
   scroll?: boolean;
@@ -111,7 +118,7 @@ export const Stack = forwardRef<HTMLElement, Props>(function Stack(
       data-pad-b={padB === undefined ? undefined : String(padB)}
       data-pad-x={padX === undefined ? undefined : String(padX)}
       data-edge={edge}
-      data-fill={fill ? '' : undefined}
+      data-grow={fill ? '' : undefined}
       data-scroll={scroll ? '' : undefined}
       aria-label={label}
       title={title}

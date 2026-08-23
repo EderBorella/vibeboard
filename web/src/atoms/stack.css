@@ -128,9 +128,11 @@
    `fill` IS THREE DECLARATIONS AND NOT ONE, because the two `min-*` are what stop a flex child refusing to
    shrink below its content — the bug that makes a scroller never scroll. Written together, they cannot be
    half-remembered.
+   `data-grow` AND NOT `data-fill`: that name is already a semantic flag the dock and the browser harness
+   read (`.dock-body:has([data-fill])`, and `audit.ts` resolving the open pane by it). See `Stack.tsx`.
    NOT A VIEWPORT FRAME. `100vh` and `100dvh` stay on `.app-shell`: an app-height chain is one decision
    made once, and an atom that could say it would invite the second one. */
-.vb-stack[data-fill] { flex: 1; min-width: 0; min-height: 0; }
+.vb-stack[data-grow] { flex: 1; min-width: 0; min-height: 0; }
 .vb-stack[data-scroll] { overflow-y: auto; }
 
 /* `.vb-self-start` / `.vb-self-center` BELONG HERE AND ARE NOT HERE YET, deliberately: five classes are

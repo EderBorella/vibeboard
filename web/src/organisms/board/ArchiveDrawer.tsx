@@ -99,6 +99,7 @@ export function ArchiveDrawer({ board, config, count, onOpen }: Props) {
           <Button
             variant="bare"
             className="archive-title vb-clip"
+            data-testid="archive-title"
             onClick={() => onOpen?.(c)}
             title="Open this card"
           >

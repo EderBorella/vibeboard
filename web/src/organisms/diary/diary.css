@@ -7,19 +7,27 @@
 
 
 /* The project log. A reading surface rather than a dashboard: one column, generous line height, and the
-   structure kept quiet so the prose is what the eye lands on. */
+   structure kept quiet so the prose is what the eye lands on.
+   THE COLUMN AND ITS GAP STAY HERE, and `.filed` below is the same case: both are `<section>`s with an
+   `aria-label`, which `Stack` cannot carry — it names five layout options and forwards nothing else — so
+   a `Stack` here would trade a labelled region for three declarations. */
 .diary {
   flex: 1; min-width: 0; overflow-y: auto; background: var(--wash);
   padding: var(--s-7); display: flex; flex-direction: column; gap: var(--s-6);
 }
-.diary-head { display: flex; flex-direction: column; gap: var(--s-2); max-width: 68ch; }
+/* A `Stack direction="column" gap={2}`; the MEASURE is what a heading block still decides. */
+.diary-head { max-width: 68ch; }
+/* AN `<h2>` AND NOT A `Text`, because the heading is the document's structure rather than a face — so
+   `caps` cannot reach it and the three declarations it merges are written here for the fourth time.
+   `--t-lead` has no `Text` option either. */
 .diary-head h2 {
   font-family: var(--font-display); text-transform: uppercase; letter-spacing: var(--track);
   font-size: var(--t-lead); color: var(--text);
 }
-.diary-lede { color: var(--muted); font-size: var(--t-body); line-height: 1.5; }
+/* `.diary-lede` IS GONE — `--muted`, `--t-body` and 1.5 is `Text lead` declaration for declaration. */
 
-.diary-compose { display: flex; gap: var(--s-4); align-items: flex-start; max-width: 68ch; }
+/* A `Stack align="start" gap={4}`; the measure is the composer's. */
+.diary-compose { max-width: 68ch; }
 /* ON THE PANEL GROUND RATHER THAN THE APP GROUND, and this is the box that argument belongs to: `.diary`
    declares `background: var(--wash)`, and `--wash` is `none` in classic-dark — so `--bg` on `--bg` would
    render as no box at all. It was written on the suggestions composer instead, whose pane has no ground of
@@ -50,12 +58,17 @@
 .vb-row-rail[data-kind='lifecycle'] { border-left-color: var(--muted); }
 .vb-row-rail[data-kind='note'] { border-left-color: var(--accent-2); }
 
-.diary-kind {
-  font-family: var(--font-display); text-transform: uppercase; letter-spacing: var(--track);
-  font-size: var(--t-micro); color: var(--text);
-}
-.diary-about { display: flex; flex-wrap: wrap; gap: var(--s-3); }
-.diary-outcome { color: var(--text); }
+/* A `Text caps ink="strong"` — the caps atom carries the display family as of this phase — and the STEP
+   is the one thing left: `--t-micro` has no `Text` option and one may not be invented for it. */
+.diary-kind { font-size: var(--t-micro); }
+/* `.diary-about` IS GONE — a `Stack wrap gap={3}` in the diary and a `Stack direction="column" gap={3}
+   align="start"` in the narrow column, which is the same two shapes the class and its `.vb-list`
+   compound rule spelled between them. One chip per line in that column, because a run id alone is 144px
+   of a 266px line, so any second reference wrapped; stacked, the automatic minimum is the widest single
+   chip and the `min-width: 0` the list gave it is not load-bearing. */
+/* `.diary-outcome` IS GONE — `color: var(--text)` is `ink="strong"`, which is what fourteen classes said. */
+/* Neither the 1.55 nor the `--t-lead` step has a `Text` option, and inventing one for a single reading
+   surface is what this phase is for the opposite of. A `<p>` in prose. */
 .diary-text { line-height: 1.55; font-size: var(--t-lead); }
 
 
@@ -83,19 +96,13 @@
    `neutral` tone: a rail the same colour as every other border was not a state, it was the absence of
    one, and "dismissed" is a decision somebody took. Both claims survive the class; `--tone` and
    `--rule` are what carry them, and `.vb-row-rail` is where they meet. */
-.filed-state {
-  font-family: var(--font-display); text-transform: uppercase; letter-spacing: var(--track);
-  font-size: var(--t-micro); color: var(--text);
-}
-/* Why it was said no to. Quiet, and italic so it does not read as part of the finding itself. */
-.filed-reason { font-size: var(--t-body); line-height: 1.5; color: var(--muted); font-style: italic; }
+/* A `Text caps ink="strong"`, exactly as `.diary-kind` is, and the STEP is what is left of both. They are
+   two one-declaration classes saying the same `--t-micro` a step apart in this file; merging them would be
+   naming a suggestion's state after the diary's kind, which is a lie in a name. */
+.filed-state { font-size: var(--t-micro); }
+/* `.filed-reason` IS GONE — `--t-body`, 1.5, `--muted` and italic is `Text lead role="hint"`. Why it was
+   said no to, quiet and italic so it does not read as part of the finding itself. */
 
 
-/* ONE CHIP PER LINE IN THIS COLUMN, because a row of them cannot be made to fit. A run id alone is 144px
-   of a 266px line, so any second reference wraps — and the fix must not depend on how many references the
-   fixture happens to carry. Stacked, they are a column of figures that lines up on its left edge, which
-   is the claim the readout makes; wrapped, they were the one it refuses. The diary's own `.diary-about`
-   stays a row: it has 408px. IT IS `.vb-list` AT THE CALL SITE NOW rather than a descendant rule keyed on
-   `.filed-entry`, which is the class that stopped existing; `align-items` is all that is left, because a
-   list stretches its rows and a row of chips must not stretch. */
-.diary-about.vb-list { align-items: flex-start; }
+/* ONE CHIP PER LINE IN THIS COLUMN is `Stack direction="column" align="start"` at the call site now —
+   see the note where `.diary-about` was. The diary's own group stays a row: it has 408px. */

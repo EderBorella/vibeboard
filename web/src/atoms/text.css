@@ -47,8 +47,16 @@
 /* THE CAPS FACE, AND IT WAS NAMED AT EIGHT CALL SITES BEFORE IT EXISTED: `vb-label-caps` was written in
    SkillEditor's three rail labels and DispatchPane's five and no stylesheet contained the string, because
    the tracking and the `text-transform` sat on the RAIL — which is why seven of the eight looked right
-   anyway and a caps label with no rail rendered in lower case. */
-.vb-text-caps { text-transform: uppercase; letter-spacing: var(--track); }
+   anyway and a caps label with no rail rendered in lower case.
+   AND THE FAMILY IS PART OF THE FACE, which is what seven surface classes had already decided by hand:
+   `.board-label` and `.column-title` (board.css), `.diary-kind`, `.filed-state` and `.diary-head h2`
+   (diary.css), `.settings-section` (shared.css), `.copilot-title` (copilot.css) and `.exec-head`
+   (execution.css) each wrote `--font-display` beside this same `text-transform` and `--track`. One face,
+   eight hand-written copies. `--font-display` IS the caps treatment by the token's own definition — see
+   design/Type.stories.tsx, "chrome caps — the label on a control" — so a `caps` that did not carry it
+   was a face missing its third declaration, which is how `.control-group-head` lost the family silently
+   when it became a `Text caps` and nothing failed. */
+.vb-text-caps { text-transform: uppercase; letter-spacing: var(--track); font-family: var(--font-display); }
 /* ONE STEP UP, and it earns its name on the empty states: an empty pane is the only thing on the surface,
    and reading it at the step meant for a field's label made it furniture. `--t-body` and the looser line
    are `.vb-empty`'s own two values. */

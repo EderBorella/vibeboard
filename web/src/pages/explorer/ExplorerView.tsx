@@ -228,11 +228,15 @@ export function ExplorerView({ snapshot }: Props) {
             {file.kind === 'text' ? (
               <EditorBody view={open.view} draft={open.draft} onDraft={open.edit} />
             ) : (
-              <div className="empty">{unopenable(file)}</div>
+              <Text lead className="empty">
+                {unopenable(file)}
+              </Text>
             )}
           </EditorLayout>
         ) : (
-          <div className="empty">Select a file to view or edit it.</div>
+          <Text lead className="empty">
+            Select a file to view or edit it.
+          </Text>
         )}
         {(error ?? open.error) && <Text role="error">{error ?? open.error}</Text>}
       </div>

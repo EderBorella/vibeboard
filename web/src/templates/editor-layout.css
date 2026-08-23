@@ -8,8 +8,9 @@
  *   `.control-blank` — `margin: auto; color: var(--muted); padding: var(--s-7)`, which is `.empty`
  *     declaration for declaration, in the same layer, four import lines apart. */
 .vb-editor { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
+/* The row is a `Stack gap={4}`; what is left is the band it draws. */
 .vb-editor-head {
-  display: flex; align-items: center; gap: var(--s-4); padding: var(--s-4) var(--s-6);
+  padding: var(--s-4) var(--s-6);
   border-bottom: 1px solid var(--border); background: var(--panel);
 }
 /* THE BODY SLOT, whichever view fills it: a `Control mono` you type into or rendered markdown you read.

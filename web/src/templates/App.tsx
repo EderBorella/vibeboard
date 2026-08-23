@@ -1,4 +1,5 @@
 import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { Text } from '../atoms/Text';
 import {
   archiveCard,
   cancelRun,
@@ -200,10 +201,19 @@ export function App() {
   });
   let content: ReactNode;
   if (which === 'signin') content = <SignIn phase={signin.phase} onRetry={signin.retry} />;
-  else if (which === 'loading') content = <div className="empty">Loading…</div>;
+  else if (which === 'loading')
+    content = (
+      <Text lead className="empty">
+        Loading…
+      </Text>
+    );
   else if (which === 'gate') content = <ProjectGate onOpened={onOpened} />;
   else if (which === 'empty' || !snapshot)
-    content = <div className="empty">{conn === 'open' ? 'No project open.' : 'Connecting…'}</div>;
+    content = (
+      <Text lead className="empty">
+        {conn === 'open' ? 'No project open.' : 'Connecting…'}
+      </Text>
+    );
   else
     content = (
       <WorkArea

@@ -245,7 +245,9 @@ export function ProjectControl({ snapshot }: Props) {
             onDelete={remove}
           />
         ) : (
-          <div className="empty">Select a file to view or edit, or create a new one.</div>
+          <Text lead className="empty">
+            Select a file to view or edit, or create a new one.
+          </Text>
         )}
         {error && <Text role="error">{error}</Text>}
       </div>

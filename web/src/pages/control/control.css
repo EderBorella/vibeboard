@@ -12,7 +12,7 @@
   width: 260px; flex-shrink: 0; overflow-y: auto; padding: var(--s-5);
   border-right: 1px solid var(--border); gap: var(--s-6);
 }
-.control-group { display: flex; flex-direction: column; gap: var(--s-1); }
+/* `.control-group` IS GONE — `Stack direction="column" gap={1}`, declaration for declaration. */
 /* `.control-group-head` IS GONE — a `.vb-row` and a `Text caps`, with `push` on the `＋`. It was one of
    the layer gate's four findings and the plainest of them: Project Control owned it and the EXPLORER's
    tree rendered it, so one surface's heading was another's by accident of which sheet the bytes fell in.
@@ -39,7 +39,8 @@
 
 
 /* Resources links registry */
-.resources-table { flex: 1; overflow-y: auto; padding: var(--s-5) var(--s-6); display: flex; flex-direction: column; gap: var(--s-3); }
+/* The column and its gap are a `Stack direction="column" gap={3}`; the scroller is what is left. */
+.resources-table { flex: 1; overflow-y: auto; padding: var(--s-5) var(--s-6); }
 /* `.resource-row` IS GONE — a `Row`, and its gap moved from `--s-3` to `--s-4` with the other six. */
 /* `.resource-row input` was `.vb-ctl` DECLARATION FOR DECLARATION, focus rule included, and it died
    in Phase 9. Only the three widths are the row's own. */

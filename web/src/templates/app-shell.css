@@ -15,7 +15,9 @@
 /* 48px → 24px, and it is invisible: `margin: auto` centres the content, so this padding is clearance
    from the pane's edges rather than rhythm — and the pane is always far wider than 48px. The same
    applies to `.gate` (40px) and `.control-blank` (32px), the other two `margin: auto` blanks. */
-.empty { margin: auto; color: var(--muted); padding: var(--s-7); }
+/* The ink is `Text`'s — every call site renders `<Text lead>`, `lead` because an empty pane is the only
+   thing on its surface and reads at the body step. Where the line SITS is what is left. */
+.empty { margin: auto; padding: var(--s-7); }
 
 
 /* THE ONE LAYOUT UTILITY IN THE TREE, and it is here rather than in the top bar's sheet because it is

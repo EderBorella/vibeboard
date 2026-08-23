@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Control } from '../atoms/Control';
 import { Readout } from '../atoms/Readout';
+import { Stack } from '../atoms/Stack';
 import { renderMarkdown } from '../lib/markdown';
 import { Tabs } from '../molecules/Tabs';
 
@@ -47,7 +48,7 @@ interface ShellProps {
 export function EditorLayout({ path, dirty, views, view, onView, actions, notice, children }: ShellProps) {
   return (
     <>
-      <div className="vb-editor-head">
+      <Stack gap={4} className="vb-editor-head">
         <Readout testId="editor-path">
           {path}
           {dirty ? ' •' : ''}
@@ -63,7 +64,7 @@ export function EditorLayout({ path, dirty, views, view, onView, actions, notice
           />
         )}
         <div className="vb-row push">{actions}</div>
-      </div>
+      </Stack>
       {notice}
       {children}
     </>

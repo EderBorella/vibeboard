@@ -14,10 +14,8 @@
 }
 /* Refuse first, and it keeps `.halt .vb-btn`'s accent — the reflex click and the reflex Enter
    both have to land on "no". Allow sits beside it as the quiet one. */
+/* A `Stack gap={4}`; the step away from the sentence above it is what the class still says. */
 .signin-actions {
-  display: flex;
-  gap: var(--s-4);
-  align-items: center;
   margin-top: var(--s-2);
 }
 /* `Chip pill neutral`. The lowercase stays: the label beside it is whatever the browser called itself,

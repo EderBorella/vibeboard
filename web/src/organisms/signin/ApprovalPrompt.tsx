@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Button } from '../../atoms/Button';
+import { Stack } from '../../atoms/Stack';
 import { Surface } from '../../atoms/Surface';
 import { Text } from '../../atoms/Text';
 import { approveSignin, refuseSignin, type SigninPending } from '../../lib/api';
@@ -74,7 +75,7 @@ export function ApprovalPrompt({ pending, onError }: Props) {
         part that cannot.
         {pending.length > 1 && ` ${pending.length - 1} more waiting after this one.`}
       </Text>
-      <div className="signin-actions">
+      <Stack gap={4} className="signin-actions">
         {/* Refuse first in the DOM as well as visually, so tab order and reading order agree. */}
         <Button
           variant="primary"
@@ -88,7 +89,7 @@ export function ApprovalPrompt({ pending, onError }: Props) {
         <Button size="md" onClick={() => void decide(first.id, true)} disabled={busy !== null}>
           Allow
         </Button>
-      </div>
+      </Stack>
     </Modal>
   );
 }

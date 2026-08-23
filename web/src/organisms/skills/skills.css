@@ -16,14 +16,17 @@
 
 
 /* ---------- Skill editor (fields view in Project Control) ---------- */
-.skill-editor { display: flex; flex-direction: column; gap: var(--s-4); padding: var(--s-5) var(--s-6); overflow-y: auto; }
+/* The column and its gap are a `Stack direction="column" gap={4}`; the inset and the scroller are the
+   editor's own. */
+.skill-editor { padding: var(--s-5) var(--s-6); overflow-y: auto; }
 /* `.skill-row` IS GONE — it was `.vb-row` declaration for declaration. */
 /* The rail label and the box are the primitive's. What the editor still says is that a field takes the
    slack beside its label, and that the prompt is a monospace box you can drag taller. */
 .skill-editor .vb-ctl { flex: 1; min-width: 0; }
 .skill-editor textarea.vb-ctl { resize: vertical; }
 .skill-scope { border: 1px solid var(--border); border-radius: var(--r-md); padding: var(--s-3) var(--s-5) var(--s-4); margin: 0; }
-.skill-scope legend { font-size: var(--t-small); color: var(--muted); text-transform: uppercase; letter-spacing: var(--track); padding: 0 var(--s-2); }
+/* The face is a `Text caps` inside the legend; the notch it cuts in the border is the fieldset's. */
+.skill-scope legend { padding: 0 var(--s-2); }
 .skill-scope .vb-text-quiet { margin: 0 0 var(--s-2); }
-.skill-foot { display: flex; justify-content: flex-end; }
+/* `.skill-foot` IS GONE — a `Stack justify="end"` around the one button it holds. */
 

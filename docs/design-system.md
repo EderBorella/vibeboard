@@ -11,12 +11,12 @@ a bug, and one has already been fixed for that reason.
 
 | | at the start (2026-08-20) | now |
 |---|---|---|
-| class selectors | **457** | **232** |
+| class selectors | **457** | **230** |
 
 The 457 is measured, at `85cfa06` (2026-08-20, the last commit before any of this work).
 `tools/check-class-budget.mjs` said the sweep started from **443**; 443 reproduces at no commit and is
 withdrawn. There are two honest starts and they answer different questions: the design-system work took
-**457 → 361**, and the atomic phases took **361 → 232** (measured at `0f983f2`, the commit the plan starts
+**457 → 361**, and the atomic phases took **361 → 230** (measured at `0f983f2`, the commit the plan starts
 from). The seven-phase plan closed at 305; Phase 8, which the plan did not contain, took the remaining 73 —
 see *the class count* at the end of Part Five for why the plan could not have.
 | stylesheets under `web/src/` | 2 (`styles.css` 116KB + `ui/primitives.css`) | **41**, one per component and per organism directory |
@@ -37,7 +37,7 @@ and they are worth reading as argument rather than as description.
 
 Measured against `web/src/styles.css` and `web/src/*.tsx` on 2026-08-20, not estimated. **These are the
 OPENING measurements and they are kept as such** — `styles.css` does not exist any more and the class count
-is 232; the table is the diagnosis this whole page answers, not a description of the tree:
+is 230; the table is the diagnosis this whole page answers, not a description of the tree:
 
 | Measurement | Value | What it means |
 |---|---|---|
@@ -3942,10 +3942,10 @@ Not one of these was found by a passing gate.
 
 ### Where it closes, and what the target now means
 
-**361 → 232.** The ratchet is at 232 with zero slack, proved by plant. 41 sheets. Reinvention and layer
+**361 → 230.** The ratchet is at 230 with zero slack, proved by plant. 41 sheets. Reinvention and layer
 direction both blocking at zero.
 
-**232 against a target of 146, and the target is the number to revisit rather than the tree.** It was
+**230 against a target of 146, and the target is the number to revisit rather than the tree.** It was
 derived as 76 surface-layout classes with no surface ever built to it. The 30 classes still holding exactly
 one declaration are **not duplicates** — the three waves killed every one of those. What is left is:
 

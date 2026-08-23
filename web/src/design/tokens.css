@@ -87,6 +87,15 @@
    */
   --rule: 3px;
 
+  /* HOW WIDE A LINE OF PROSE MAY GET, and it was four separate answers with nothing choosing between
+   * them: the diary's entries and its composer said `68ch`, the auto-pilot's help modal said `44rem`
+   * (about 70ch at the body step) and the gate's card said `520px` (about 62ch). All four are the same
+   * decision — a paragraph you can read without losing the line — and 68ch is the one two of them
+   * already made. In `ch` and not `px` deliberately: a measure is counted in CHARACTERS, so it tracks
+   * the step it is set at instead of drifting when the type does.
+   */
+  --measure: 68ch;
+
   /* THE UPPERCASE CHROME TREATMENT. 34 letter-spacing declarations, 12 values, three real decisions:
    * 27 collapsed here, five were deleted as noise with a unit on it (0.01em to 0.04em on 11–13px text
    * is a tenth of a pixel), and `.brand`'s 0.22em and `.vb-readout`'s -0.01em stay as named exceptions

@@ -119,3 +119,21 @@
    which is both of the two classes that wanted it. The three that remain (`.res-title`, `.res-url`,
    `.res-note`) are 1, 1.4 and 1.2, three genuinely different shares of a row, and they stay surfaces'. */
 .vb-fixed { flex: none; }
+
+/* THE FRAME OPTIONS, AND THEY EXIST BECAUSE HOLDING THE UI STILL WAS WHAT KEPT 47 CLASSES ALIVE.
+   A census of the survivors found none of them was a duplicate — they were off-scale sizes, per-child
+   margins, and full-height chains: `flex: 1` with `min-height: 0`, and `overflow-y: auto`. Those two
+   shapes appear on ten classes between them and neither is a decision any of the ten made; they are what
+   you write to make a pane fill its parent and scroll. So the atom says them.
+   `fill` IS THREE DECLARATIONS AND NOT ONE, because the two `min-*` are what stop a flex child refusing to
+   shrink below its content — the bug that makes a scroller never scroll. Written together, they cannot be
+   half-remembered.
+   NOT A VIEWPORT FRAME. `100vh` and `100dvh` stay on `.app-shell`: an app-height chain is one decision
+   made once, and an atom that could say it would invite the second one. */
+.vb-stack[data-fill] { flex: 1; min-width: 0; min-height: 0; }
+.vb-stack[data-scroll] { overflow-y: auto; }
+
+/* `.vb-self-start` / `.vb-self-center` BELONG HERE AND ARE NOT HERE YET, deliberately: five classes are
+   `align-self` and nothing else, but a class that lands before its consumers is dead code and
+   `check:class-budget` is right to refuse it — there is no UNCONSUMED map for classes, only for tokens.
+   They arrive in the commit that spends them. */

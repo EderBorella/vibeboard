@@ -48,6 +48,11 @@ interface Props {
   pad?: StackGap | [StackGap, StackGap] | [StackGap, StackGap, StackGap];
   // The single hairline that separates one row from the next. Four borders is a `Surface`.
   edge?: 'top' | 'bottom';
+  // TAKE THE SPACE THE PARENT HAS, and shrink below your content when asked — `flex: 1` with both
+  // `min-*: 0`, which is the trio that makes a scroller actually scroll. Six classes were exactly this.
+  fill?: boolean;
+  // A pane that scrolls. Four classes were `overflow-y: auto` and nothing else.
+  scroll?: boolean;
   as?: StackTag;
   // THE ACCESSIBLE NAME, and three of the four surfaces migrated onto this atom reported its absence as
   // the reason a class survived. `.reports`, `.options`, `.report`, `.dispatch`, `.card-skills` and `.dock`
@@ -70,6 +75,8 @@ export const Stack = forwardRef<HTMLElement, Props>(function Stack(
     justify,
     pad,
     edge,
+    fill,
+    scroll,
     as: Tag = 'div',
     label,
     title,
@@ -104,6 +111,8 @@ export const Stack = forwardRef<HTMLElement, Props>(function Stack(
       data-pad-b={padB === undefined ? undefined : String(padB)}
       data-pad-x={padX === undefined ? undefined : String(padX)}
       data-edge={edge}
+      data-fill={fill ? '' : undefined}
+      data-scroll={scroll ? '' : undefined}
       aria-label={label}
       title={title}
       data-testid={testId}

@@ -3,7 +3,6 @@ import { Button } from '../../atoms/Button';
 import { Chip } from '../../atoms/Chip';
 import { Control } from '../../atoms/Control';
 import { Stack } from '../../atoms/Stack';
-import { Surface } from '../../atoms/Surface';
 import { Text } from '../../atoms/Text';
 import { asState } from '../../design/state-tones';
 import { cardSuggestion, patchSuggestion } from '../../lib/api';
@@ -166,10 +165,11 @@ export function SuggestionsPane({ suggestions, failed, onRefresh, onApply }: Pro
                 // of which has a row, so giving it the rail later is one declaration.
                 data-state={asState(s.state)}
               >
-                <Surface
+                <Row
                   as="button"
                   variant="flat"
-                  className="vb-list suggestions-pick"
+                  stack
+                  className="suggestions-pick"
                   data-testid="suggestions-pick"
                   onClick={() => pick(s.id)}
                 >
@@ -193,7 +193,7 @@ export function SuggestionsPane({ suggestions, failed, onRefresh, onApply }: Pro
                   </FigureRow>
                   {/* `Text lead`, not `.filed-text` — see DiaryView, which rendered the same line. */}
                   {s.body && <Text lead>{s.body}</Text>}
-                </Surface>
+                </Row>
               </Row>
             ))}
           </List>

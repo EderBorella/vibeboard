@@ -4,7 +4,6 @@ import { Chip } from '../../atoms/Chip';
 import { Control } from '../../atoms/Control';
 import { Readout } from '../../atoms/Readout';
 import { Stack } from '../../atoms/Stack';
-import { Surface } from '../../atoms/Surface';
 import { Text } from '../../atoms/Text';
 import type { ModelOption } from '../../lib/api';
 import { List } from './List';
@@ -162,13 +161,7 @@ export function ModelPicker({ models, value, defaultModel, onChange, disabled }:
                   </Button>
                 }
               >
-                <Surface
-                  as="button"
-                  variant="flat"
-                  className="vb-list"
-                  data-testid="mp-pick"
-                  onClick={() => pick(m.id)}
-                >
+                <Row as="button" variant="flat" stack data-testid="mp-pick" onClick={() => pick(m.id)}>
                   <span className="mp-pick-top">
                     <span className="vb-clip">{m.name ?? m.id}</span>
                     {m.id === defaultModel && (
@@ -187,7 +180,7 @@ export function ModelPicker({ models, value, defaultModel, onChange, disabled }:
                       {m.caps?.vision && <span title="Vision">👁</span>}
                     </span>
                   </span>
-                </Surface>
+                </Row>
               </Row>
             ))}
             {filtered.length === 0 && (

@@ -1,9 +1,9 @@
 import { Control } from '../../atoms/Control';
 import { Readout } from '../../atoms/Readout';
-import { Surface } from '../../atoms/Surface';
 import { Text } from '../../atoms/Text';
 import { BOARD_LABELS, BOARDS, type Card } from '../../lib/shared';
 import { Field } from '../../molecules/Field';
+import { Row } from '../shared/Row';
 
 // The link picker: cards grouped by board, boards with nothing to offer omitted.
 export function LinkPicker({
@@ -17,7 +17,7 @@ export function LinkPicker({
 }) {
   if (linkable.length === 0) return <Text role="hint">No other cards yet to link.</Text>;
   return (
-    <Surface variant="inset" className="vb-list links-list" data-gap="2" data-scroll>
+    <Row stack variant="inset" gap={2} className="links-list">
       {BOARDS.map((b) => {
         const group = linkable.filter((c) => c.board === b);
         if (group.length === 0) return null;
@@ -43,6 +43,6 @@ export function LinkPicker({
           </div>
         );
       })}
-    </Surface>
+    </Row>
   );
 }

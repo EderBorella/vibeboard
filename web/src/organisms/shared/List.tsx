@@ -1,5 +1,6 @@
-import type { HTMLAttributes, ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import type { StackGap } from '../../atoms/Stack';
+import { Stack } from '../../atoms/Stack';
 
 // LIST — a column of `Row`s with a gap. Six of the nineteen families were a `<ul>` and every one of them
 // cancelled `list-style` itself; the other thirteen were a `<div>` with `flex-direction: column` and one
@@ -34,7 +35,15 @@ import type { StackGap } from '../../atoms/Stack';
 // claim — and with no `nav` here it hand-wrote `className="vb-list control-list"`, which is a caller
 // reaching past the component to its class. A component whose tag set cannot express a real call site
 // gets bypassed, and a bypassed component stops being where the shape is decided.
-interface Props extends Omit<HTMLAttributes<HTMLElement>, 'children' | 'className'> {
+// NAMED RATHER THAN SPREAD, and the reason is a trap this component walked into the moment it started
+// rendering a `Stack`. It used to extend `HTMLAttributes` and spread `{...rest}` onto its own tag, which
+// was fine when the tag was its own; a `Stack` deliberately does NOT spread unknown props — `Text` and
+// `Chip` say why, a spread lets a caller pass `style` and put a margin back on a box the atom owns — so
+// the spread became a SILENT DROP. TypeScript does not catch it: excess property checks do not apply to a
+// spread. No call site passes anything extra today, so nothing was broken; the next one to pass an
+// `aria-label` or an `onClick` would have been, with nothing to show it. Listing the props makes that a
+// compile error instead.
+interface Props {
   as?: 'div' | 'ul' | 'ol' | 'nav';
   // THE `gap` OPTION EXISTS NOW AND THE REFUSAL ABOVE IS WITHDRAWN — by decision, not because the count
   // changed. It is still 5 of 10 for `--s-1`, and the argument that a plurality is not a majority was
@@ -49,20 +58,32 @@ interface Props extends Omit<HTMLAttributes<HTMLElement>, 'children' | 'classNam
   fill?: boolean;
   scroll?: boolean;
   className?: string;
+  // The accessible name, forwarded to `Stack`'s own `label`. Four list families are landmarks.
+  label?: string;
+  testId?: string;
   children?: ReactNode;
 }
 
-export function List({ as = 'div', gap, fill, scroll, className, children, ...rest }: Props) {
-  const Tag = as;
+// IT RENDERS A `Stack`, WHICH IS THE WHOLE POINT. `.vb-list` was `display: flex; flex-direction: column;
+// gap: var(--s-1); min-width: 0` — the atom's column with a tighter gap, written a second time — and
+// growing `gap`, `fill` and `scroll` onto it was three more copies of options `Stack` already had. So the
+// component composes the atom and the class keeps ONE declaration plus the UA list reset. That is the
+// difference between a design system and a directory of components that look alike.
+export function List({ as = 'div', gap, fill, scroll, className, label, testId, children }: Props) {
   return (
-    <Tag
+    <Stack
+      as={as}
+      direction="column"
+      // `--s-1` AND NOT THE ATOM'S `--s-4`, because a list of adjacent rows reads tighter than a row of
+      // cells and the rows carry their own padding. It was `.vb-list`'s own gap; it is this default now.
+      gap={gap ?? 1}
+      fill={fill}
+      scroll={scroll}
       className={['vb-list', className].filter(Boolean).join(' ')}
-      data-gap={gap === undefined ? undefined : String(gap)}
-      data-grow={fill ? '' : undefined}
-      data-scroll={scroll ? '' : undefined}
-      {...rest}
+      label={label}
+      testId={testId}
     >
       {children}
-    </Tag>
+    </Stack>
   );
 }

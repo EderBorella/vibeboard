@@ -39,6 +39,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { Control } from '../web/src/atoms/Control.js';
 import { Surface } from '../web/src/atoms/Surface.js';
 import { Field } from '../web/src/molecules/Field.js';
+import { List } from '../web/src/organisms/shared/List.js';
+import { Row } from '../web/src/organisms/shared/Row.js';
 import { box } from './css-box.js';
 
 afterEach(cleanup);
@@ -462,29 +464,69 @@ describe('what Control renders, tag by tag', () => {
   });
 });
 
-// `List` AND `Row` CAN SAY A GAP, A FILL AND A SCROLL, and this pins it because nothing else can. Five
-// list families each spelled the gap a different way and `.explorer-item` was a `Row`'s gap written alone;
-// the options replace all six spellings. THE ATTRIBUTE HAS TO BEAT THE BASE CLASS: `.vb-list` declares
-// `gap: var(--s-1)`, so an option that lost on specificity or order would render the default silently and
-// every one of these migrations would be wrong by 2px with nothing to show it.
-describe('what List and Row can say about a column', () => {
+// `List` AND `Row` COMPOSE `Stack`, AND THIS IS WHERE THAT IS TRUE OR SILENTLY FALSE. `.vb-list` was
+// `display: flex; flex-direction: column; gap: var(--s-1); min-width: 0` and `.vb-row` was the atom's row
+// plus three declarations — both were `.vb-stack` written again. They render a `Stack` now and their
+// classes keep only what they ADD, so every fixture here is the REAL class list: `vb-stack vb-list`, which
+// is what the component emits. A fixture naming `.vb-list` alone would resolve no gap at all and a test
+// asserting that would be pinning the absence of the atom.
+describe('List and Row compose Stack', () => {
   const listBox = (attrs: string): Record<string, string> =>
-    box(at(`<ul class="vb-list" ${attrs}></ul>`, 'ul'));
+    box(at(`<ul class="vb-stack vb-list" ${attrs}></ul>`, 'ul'));
 
-  it('a gap on a List beats the base --s-1, on every step', () => {
-    // Read as resolved px: `box()` resolves the space tokens, which is what makes "beats the base"
-    // checkable rather than a claim about two strings that both say `var(...)`.
-    //  and not : the rule writes a bare zero, which is what the resolver reports.
-    expect(listBox('data-gap="0"').gap).toBe('0');
-    expect(listBox('data-gap="4"').gap).toBe('8px');
-    expect(listBox('data-gap="7"').gap).toBe('24px');
-    // The base, so the comparison above is against something real.
-    expect(listBox('').gap).toBe('2px');
+  it('a list is the atom column, and its own class adds one declaration', () => {
+    // The direction and the gap are the atom's, through the attributes `List` passes it.
+    const b = listBox('data-dir="column" data-gap="1"');
+    expect(b.display).toBe('flex');
+    expect(b['flex-direction']).toBe('column');
+    expect(b.gap).toBe('2px');
+    // And the one thing a list adds: it may shrink below its widest row.
+    expect(b['min-width']).toBe('0');
   });
 
-  it('a gap on a Row reaches the row class too, because `stack` swaps which one it wears', () => {
-    expect(box(at('<div class="vb-row" data-gap="2"></div>', 'div')).gap).toBe('4px');
-    expect(box(at('<div class="vb-list" data-gap="2"></div>', 'div')).gap).toBe('4px');
+  it('every gap step resolves, so the option is not a default in disguise', () => {
+    expect(listBox('data-dir="column" data-gap="0"').gap).toBe('0');
+    expect(listBox('data-dir="column" data-gap="4"').gap).toBe('8px');
+    expect(listBox('data-dir="column" data-gap="7"').gap).toBe('24px');
+  });
+
+  it('a row is the atom row plus width and alignment, and its default gap is --s-4', () => {
+    const b = box(at('<div class="vb-stack vb-row" data-gap="4"></div>', 'div'));
+    expect(b.display).toBe('flex');
+    expect(b['align-items']).toBe('center');
+    expect(b.gap).toBe('8px');
+    expect(b.width).toBe('100%');
+    expect(b['text-align']).toBe('left');
+  });
+
+  it('a stacked row is a list, which is why one gap option reaches both', () => {
+    // `Row stack` swaps `.vb-row` for `.vb-list` and passes `column` with `--s-1`.
+    const b = box(at('<li class="vb-stack vb-list" data-dir="column" data-gap="1"></li>', 'li'));
+    expect(b['flex-direction']).toBe('column');
+    expect(b.gap).toBe('2px');
+  });
+
+  // AND NEITHER CLASS MAY TAKE THE ATOM'S BOX BACK, asserted as the negative it is. This is the one
+  // planted defect the render tests above cannot catch: putting `display: flex; flex-direction: column;
+  // gap` back on `.vb-list` changes NOTHING that renders — the element already gets all three from
+  // `.vb-stack` — so every measurement stays green while the duplication the composition removed quietly
+  // returns. A duplication with no visible effect needs a negative, not a measurement.
+  it('.vb-list declares min-width and nothing else', () => {
+    const own = box(at('<ul class="vb-list"></ul>', 'ul'));
+    expect(own['min-width']).toBe('0');
+    expect(own.display).toBeUndefined();
+    expect(own['flex-direction']).toBeUndefined();
+    expect(own.gap).toBeUndefined();
+  });
+
+  it('.vb-row declares its width and its alignment and nothing the atom already says', () => {
+    const own = box(at('<div class="vb-row"></div>', 'div'));
+    expect(own.width).toBe('100%');
+    expect(own['text-align']).toBe('left');
+    expect(own['min-width']).toBe('0');
+    expect(own.display).toBeUndefined();
+    expect(own['align-items']).toBeUndefined();
+    expect(own.gap).toBeUndefined();
   });
 
   it('fill is the pair that lets a list shrink below its content, and scroll is separate', () => {
@@ -494,5 +536,41 @@ describe('what List and Row can say about a column', () => {
     expect(filled['min-height']).toBe('0');
     expect(filled['overflow-y']).toBeUndefined();
     expect(listBox('data-scroll')['overflow-y']).toBe('auto');
+  });
+});
+
+// AND WHAT THE COMPONENTS ACTUALLY RENDER, which the suite above cannot see and I proved it cannot: three
+// planted defects — `Row` dropping `vb-stack`, `List` rendering a row instead of a column, `.vb-list`
+// taking its own flex box back — ALL PASSED against it. Every fixture up there is a hand-written class
+// list, so it asserts the STYLESHEET; the composition is a claim about the MARKUP, and only a render can
+// hold it. This is the same shape of hole that let `Control as="trigger"` ship as a `<trigger>` element.
+describe('what List and Row emit', () => {
+  const shape = (el: ReactElement): string => {
+    const { container } = render(el);
+    const n = container.firstElementChild as HTMLElement;
+    return `${n.tagName.toLowerCase()} [${n.className}] dir=${n.dataset.dir ?? '-'} gap=${n.dataset.gap ?? '-'}`;
+  };
+
+  it('a List is a Stack column at --s-1, wearing both classes', () => {
+    expect(shape(<List as="ul" />)).toBe('ul [vb-stack vb-list] dir=column gap=1');
+  });
+
+  it('and its gap, fill and scroll are the atom’s attributes', () => {
+    const { container } = render(
+      <List as="ol" gap={5} fill scroll>
+        x
+      </List>,
+    );
+    const n = container.firstElementChild as HTMLElement;
+    expect(n.dataset.gap).toBe('5');
+    expect(n.dataset.grow).toBe('');
+    expect(n.dataset.scroll).toBe('');
+  });
+
+  it('a Row is a Stack row at --s-4, and stacked it becomes the list', () => {
+    expect(shape(<Row />)).toBe('div [vb-stack vb-row] dir=- gap=4');
+    expect(shape(<Row stack />)).toBe('div [vb-stack vb-list] dir=column gap=1');
+    // An explicit gap wins over both defaults, which is what `.explorer-item` needed.
+    expect(shape(<Row gap={2} />)).toBe('div [vb-stack vb-row] dir=- gap=2');
   });
 });

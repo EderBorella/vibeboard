@@ -6,6 +6,7 @@ import { Readout } from '../../atoms/Readout';
 import { Stack } from '../../atoms/Stack';
 import { Text } from '../../atoms/Text';
 import type { FsNode } from '../../lib/api';
+import { List } from '../shared/List';
 import { Row } from '../shared/Row';
 import { formatBytes } from './format';
 import { canDropInto } from './paths';
@@ -207,7 +208,7 @@ export function FileTree(props: Props) {
   // a file dragged into a folder could never come back out.
   const rootDroppable = canDropInto(dragging, '');
   return (
-    <nav className="vb-list explorer-list">
+    <List as="nav" className="explorer-list">
       <div
         className={`vb-row explorer-head${over === '' ? ' explorer-over' : ''}`}
         onDragOver={
@@ -307,6 +308,6 @@ export function FileTree(props: Props) {
           />
         );
       })}
-    </nav>
+    </List>
   );
 }

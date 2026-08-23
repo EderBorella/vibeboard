@@ -3,7 +3,9 @@
 /* THE COLUMN, THE GAP AND THE SCROLL ARE THE LIST'S — this element is a `Surface inset` WEARING
    `.vb-list`, so it takes the attributes directly rather than through `List`'s props. What is left is the
    180px ceiling, which is this pane's own and no atom's. */
-.links-list { max-height: 180px; }
+/* The column and the gap are the `Row stack`'s. What is left is the 180px ceiling and the scroll it
+   implies — `Row` has no `scroll` option and is not getting one for a single site. */
+.links-list { max-height: 180px; overflow-y: auto; }
 /* AN EYEBROW LABEL, AND THE FACE IS `Text caps size="micro"` NOW. The uppercase, the tracking, the muted
    ink and — as of this wave — the step are all the atom's. WHAT IS LEFT IS THE PICKER'S OWN VERTICAL
    RHYTHM, and it does not reduce to the parent's `gap`: the two margins are different steps and the first

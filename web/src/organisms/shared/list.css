@@ -20,12 +20,12 @@
  * default serves a row with no state at all. */
 
 /* `min-width: 0` for `.vb-surface`'s reason: a flex item's automatic minimum is its content. */
-.vb-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--s-1);
-  min-width: 0;
-}
+/* ONE DECLARATION AND THE UA RESET. This was `display: flex; flex-direction: column; gap: var(--s-1);
+   min-width: 0` — the atom's column with a tighter gap, written a second time — and `List` renders a
+   `Stack direction="column" gap={1}` now, so the flex, the direction and the gap all come from the one
+   place they are defined. `min-width: 0` is what a list adds: a column inside a flex parent must be
+   allowed to shrink below its widest row or the row's own ellipsis never engages. */
+.vb-list { min-width: 0; }
 /* THE UA LIST RESET IS ON THE ELEMENT AND NOT ON THE CLASS, and that is load-bearing rather than tidy:
    this sheet is imported AFTER `atoms/surface.css`, so a bare `padding: 0` here would beat `flat`'s and
    `inset`'s `var(--s-3) var(--s-4)` at equal specificity and collapse every stacked row that draws a box.
@@ -37,10 +37,10 @@ ul.vb-list, ol.vb-list { list-style: none; margin: 0; padding: 0; }
    `baseline` are a figure beside a word, which is `FigureRow`'s claim and not a row's.
    `width: 100%` and `text-align: left` are what a row rendered as a `<button>` needs and a UA does not
    give it — six of the nineteen are `<button>`s and five of the six wrote both by hand. */
+/* THREE DECLARATIONS, NOT SIX. `display: flex; align-items: center; gap: var(--s-4)` were `.vb-stack`
+   exactly — the atom, written again — and `Row` wears `.vb-stack` now. What a row ADDS is that it fills
+   its list's width and reads left, and that it may shrink below its content. */
 .vb-row {
-  display: flex;
-  align-items: center;
-  gap: var(--s-4);
   min-width: 0;
   width: 100%;
   text-align: left;
@@ -65,26 +65,11 @@ ul.vb-list, ol.vb-list { list-style: none; margin: 0; padding: 0; }
    overflow is NOT here: a stacked cell must be allowed to wrap, and `.vb-clip` is the one-line case. */
 .vb-row-main { flex: 1; min-width: 0; }
 
-/* THE GAP, THE FILL AND THE SCROLL AS ATTRIBUTES, which is the refusal at the top of `List.tsx` being
-   withdrawn by decision rather than by the count changing. It is still 5 of 10 for `--s-1`; what the
-   original argument did not price is that the other five each spelled the gap a DIFFERENT way, so one
-   shape had five spellings. The declaration was the honest cost, and the honest cost was the thing worth
-   removing.
-   BOTH CLASSES, because `Row`'s `stack` option decides which one the element wears: a stacked row IS a
-   `.vb-list`. One attribute, two selectors, and a row and a list can therefore say the same thing.
-   (0,1,1) AGAINST (0,1,0), so an attribute beats the base gap whatever the import order — and beats a
-   surface class that still declares one, which is what makes a half-finished migration visible. */
-.vb-list[data-gap='0'], .vb-row[data-gap='0'] { gap: 0; }
-.vb-list[data-gap='1'], .vb-row[data-gap='1'] { gap: var(--s-1); }
-.vb-list[data-gap='2'], .vb-row[data-gap='2'] { gap: var(--s-2); }
-.vb-list[data-gap='3'], .vb-row[data-gap='3'] { gap: var(--s-3); }
-.vb-list[data-gap='4'], .vb-row[data-gap='4'] { gap: var(--s-4); }
-.vb-list[data-gap='5'], .vb-row[data-gap='5'] { gap: var(--s-5); }
-.vb-list[data-gap='6'], .vb-row[data-gap='6'] { gap: var(--s-6); }
-.vb-list[data-gap='7'], .vb-row[data-gap='7'] { gap: var(--s-7); }
+/* THE GAP, THE FILL AND THE SCROLL RULES THAT STOOD HERE ARE GONE, and that is the composition landing:
+   they were eleven copies of `atoms/stack.css`'s own attribute rules, added to this sheet because `Row`
+   and `List` drew their own flex box. They render a `Stack` now, so every element they produce wears
+   `.vb-stack` and the atom's rules reach it directly. Eleven rules deleted, nothing lost. */
 
 /* `data-grow` AND `data-scroll` ARE THE SAME NAMES `Stack` USES, deliberately: one vocabulary for one
    idea, so a reader who knows what `fill` means on a Stack does not have to learn a second word here.
    `data-fill` is NOT that name — it is a semantic flag the dock and the browser harness read. */
-.vb-list[data-grow] { flex: 1; min-height: 0; }
-.vb-list[data-scroll] { overflow-y: auto; }

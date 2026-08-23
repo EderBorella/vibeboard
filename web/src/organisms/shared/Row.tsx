@@ -59,7 +59,13 @@ export function Row({
   disabled,
   ...rest
 }: RowProps) {
+  // `vb-stack` ALWAYS, AND THAT IS THE COMPOSITION. `.vb-row` was `display: flex; align-items: center;
+  // gap: var(--s-4)` plus three declarations of its own, and `.vb-list` was the same three with
+  // `flex-direction: column` and a tighter gap. Both of them were the ATOM, written again — so both now
+  // wear it and keep only what they add: a row adds `width: 100%` and `text-align: left`, a list adds the
+  // UA list reset. The direction and the gap come from `Stack`'s own attributes below.
   const classes = [
+    'vb-stack',
     stack ? 'vb-list' : 'vb-row',
     rail !== undefined && rail !== false && 'vb-row-rail',
     typeof rail === 'string' && `vb-tone-${rail}`,
@@ -69,6 +75,12 @@ export function Row({
   ]
     .filter(Boolean)
     .join(' ');
+  // HOISTED, because the same two expressions appeared in both return branches and the rule that fired is
+  // cognitive complexity, which counts NESTING. Naming them once flattens it and says what they are.
+  const dir = stack ? 'column' : undefined;
+  // `--s-1` for a stacked row and `--s-4` for a line of cells: the two gaps `.vb-list` and `.vb-row`
+  // declared before either of them wore the atom.
+  const gapStep = String(gap ?? (stack ? 1 : 4));
   const inner =
     lead === undefined && trail === undefined ? (
       children
@@ -84,7 +96,7 @@ export function Row({
     // `plain` is a `<div>` or an `<li>` only, and asking for a plain button is asking for `flat`.
     const Tag = as === 'button' ? 'div' : as;
     return (
-      <Tag className={classes} data-gap={gap === undefined ? undefined : String(gap)} {...rest}>
+      <Tag className={classes} data-dir={dir} data-gap={gapStep} {...rest}>
         {inner}
       </Tag>
     );
@@ -94,7 +106,8 @@ export function Row({
       variant={variant}
       as={as}
       className={classes}
-      data-gap={gap === undefined ? undefined : String(gap)}
+      data-dir={dir}
+      data-gap={gapStep}
       disabled={disabled}
       {...rest}
     >

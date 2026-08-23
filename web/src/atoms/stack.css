@@ -1,0 +1,68 @@
+/* THE LAYOUT ATOM, AND THE MEASUREMENT THAT SAYS IT HAD TO EXIST.
+   A census of all 246 surface classes grouped them by the SHAPE of what they declare — property names,
+   not values — and found 63 redundant names inside 27 clusters. The four largest were one idea each:
+   `display: flex; flex-direction: column; gap` on six classes, `align-items: center; display: flex; gap`
+   on five, `flex: 0 0 auto`/`flex: none` on six, and `margin: 0` on NINE. Nothing was wrong with any of
+   them. They existed because THERE WAS NO LAYOUT ATOM: six phases built Button, Chip, Control, Text,
+   Readout, Surface, Tabs, Menu, Modal, List and Row, and not one of them can say "a column with a gap",
+   so every surface that needed one named it after itself.
+
+   ONE CLASS, AND EVERY OPTION IS AN ATTRIBUTE. `Modal` set this precedent in Phase 6 for the same reason
+   — `data-size`/`data-tone` hold no class token, so eight answers cost one name. A `gap` prop spelled as
+   classes would have been seven (`.vb-stack-gap-1` … `-7`), which is the mistake this file exists to
+   undo. `check:class-budget` counts class selectors; the attribute selectors below are free.
+
+   THE GAP IS THE SPACE SCALE AND NOTHING ELSE. `data-gap` takes 0–7 and resolves through `var(--s-N)`,
+   so a stack cannot invent a rhythm — the same claim `check:scale` makes about every hand-written length.
+   The default is `--s-4`, the step 26 of the 63 already used.
+
+   WHAT THIS IS NOT: a utility framework. The plan refused one by name and was right to. There is one
+   component here with five options, not a vocabulary of position classes — a surface still owns its own
+   one-offs, and the 94 signatures held by exactly one class are staying exactly where they are. */
+
+.vb-stack {
+  display: flex;
+  align-items: center;
+  gap: var(--s-4);
+}
+
+/* `column` inverts the default alignment as well as the axis, because a stretched column is what all six
+   of the merged column classes wanted and a centred one is what none of them did. */
+.vb-stack[data-dir='column'] {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.vb-stack[data-align='start'] { align-items: flex-start; }
+.vb-stack[data-align='baseline'] { align-items: baseline; }
+.vb-stack[data-align='stretch'] { align-items: stretch; }
+.vb-stack[data-align='center'] { align-items: center; }
+
+.vb-stack[data-gap='0'] { gap: 0; }
+.vb-stack[data-gap='1'] { gap: var(--s-1); }
+.vb-stack[data-gap='2'] { gap: var(--s-2); }
+.vb-stack[data-gap='3'] { gap: var(--s-3); }
+.vb-stack[data-gap='4'] { gap: var(--s-4); }
+.vb-stack[data-gap='5'] { gap: var(--s-5); }
+.vb-stack[data-gap='6'] { gap: var(--s-6); }
+.vb-stack[data-gap='7'] { gap: var(--s-7); }
+
+.vb-stack[data-wrap] { flex-wrap: wrap; }
+
+/* `end` is `justify-content`, not `align-items`: the two `raho-foot`/`report-foot` rows that wanted it
+   were pushing a button pair to the trailing edge, which is the main axis. */
+.vb-stack[data-justify='end'] { justify-content: flex-end; }
+.vb-stack[data-justify='between'] { justify-content: space-between; }
+
+/* DON'T SHRINK — A CLASS AND NOT AN ATTRIBUTE, and the reason is a footgun I walked into writing this
+   file. Six surface classes were `flex: none` or `flex: 0 0 auto` and nothing else — `.ap-kill`,
+   `.ap-remedy-btn`, `.board-archive`, `.report-skill`, `.report-chip`, `.report-stop` — so the obvious
+   spelling was `.vb-stack > [data-flex='fixed']`, free of a class. It does not work: five of those six sit
+   on a `<Button>` or a `<Chip>`, and neither atom spreads unknown props, so `data-flex` would be dropped
+   silently at runtime and the story demonstrating it would have looked right while proving nothing.
+   `.push` (`margin-left: auto`) is the precedent for a one-declaration layout utility here, and it earned
+   its place the same way: one name for what seven classes each said once.
+   THE FILL HALF IS NOT HERE. `flex: 1; min-width: 0` is `.vb-clip` already, wherever the child is text —
+   which is both of the two classes that wanted it. The three that remain (`.res-title`, `.res-url`,
+   `.res-note`) are 1, 1.4 and 1.2, three genuinely different shares of a row, and they stay surfaces'. */
+.vb-fixed { flex: none; }

@@ -16,6 +16,14 @@ import type { ReactNode } from 'react';
 // two of the nine sites that had one.
 export type TextRole = 'label' | 'hint' | 'error';
 
+// INK IS NOT A ROLE, and the census is what separates them. Sixteen surface classes had a colour as their
+// entire content — `.chat-del`, `.ctx-warn` and `.mp-star` were `--accent-2`; `.control-new` and
+// `.ready-ok` were `--accent`; `.diary-outcome` and `.filed-title` were `--text`. None of them is a thing
+// the interface is DOING, which is what `role` means, so they cannot be roles; and none is one of the five
+// named states, so they must not borrow `--tone` (see `text.css`). `strong` is the one that recurs most:
+// it means "louder than the default muted", which is all fourteen `color: var(--text)` classes said.
+export type TextInk = 'strong' | 'accent' | 'accent2' | 'inherit';
+
 interface Props {
   role?: TextRole;
   // THE CAPS FACE, AND IT IS A FACE RATHER THAN A LAYOUT. It was written at eight call sites before any
@@ -26,6 +34,10 @@ interface Props {
   // ONE STEP UP, and it earns its name on the empty states: an empty pane is the only thing on the
   // surface, and reading it at a field label's step made it furniture.
   lead?: boolean;
+  ink?: TextInk;
+  // Five classes were `white-space: nowrap` and nothing else. Distinct from `.vb-clip`, which also takes
+  // the space and ellipsises — these five are short labels that must stay on one line at their own width.
+  nowrap?: boolean;
   title?: string;
   // Layout only — where the line sits, never how it is set.
   className?: string;
@@ -40,7 +52,7 @@ interface Props {
 // `<p>`s or headings taking the UA's paragraph margins — which nobody chose, and which is exactly the
 // hand-written space the scale exists to remove. A span carries no margins of its own and inherits its
 // display from the row it is dropped into, so a caller that wants a block puts it in one.
-export function Text({ role = 'label', caps, lead, title, className, testId, children }: Props) {
+export function Text({ role = 'label', caps, lead, ink, nowrap, title, className, testId, children }: Props) {
   const classes = [
     'vb-text',
     // `label` is the base face and names no class of its own: it is what the other two are a variation
@@ -52,7 +64,13 @@ export function Text({ role = 'label', caps, lead, title, className, testId, chi
     className,
   ];
   return (
-    <span className={classes.filter(Boolean).join(' ')} title={title} data-testid={testId}>
+    <span
+      className={classes.filter(Boolean).join(' ')}
+      title={title}
+      data-ink={ink}
+      data-nowrap={nowrap ? '' : undefined}
+      data-testid={testId}
+    >
       {children}
     </span>
   );

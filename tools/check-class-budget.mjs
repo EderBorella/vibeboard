@@ -57,13 +57,13 @@ const CORPUS = 'web/src';
 // only SPLITS a total that is already discovered, so a sheet missing from it lands in the other column.
 // Documentary here — the ratchet is on the UNION — but the split of the count into "what the shared
 // layer names" and "what the surfaces name between them" is the pair the record quotes.
-// THIRTEEN SHEETS AND NOT SEVEN AS OF THE MOLECULE LAYER, and `ui/primitives.css` is not among them
+// FOURTEEN SHEETS AND NOT SEVEN AS OF THE MOLECULE LAYER, and `ui/primitives.css` is not among them
 // because it no longer exists: what was left of it — the tone table, the pip, the status chip, the
 // segmented control, the field, the select trigger and the notice — WAS the molecule layer, and it is
 // seven sheets beside the six atoms now. Reading only the atoms would have moved 29 classes into the
 // surfaces' column overnight, which is the same mistake the atom phase caught one layer down.
 const PRIMITIVE_LAYER = [
-  ...['button', 'chip', 'control', 'readout', 'surface', 'text'].map((name) =>
+  ...['button', 'chip', 'control', 'readout', 'surface', 'text', 'stack'].map((name) =>
     join('web', 'src', 'atoms', `${name}.css`),
   ),
   ...['tones', 'status-chip', 'tabs', 'menu', 'field', 'notice', 'figure-row'].map((name) =>
@@ -235,7 +235,16 @@ const PRIMITIVE_LAYER = [
 // THE PHASE THAT WAS MEANT TO CLOSE THIS NUMBER MOVED FILES, NOT CLASSES, and that is worth stating
 // plainly rather than leaving to be inferred from a flat ratchet: the TREE and the COUNT are two
 // different claims, and only one of them was reachable by moving 115 files.
-const CLASS_CEILING = 305;
+// THIS RATCHET GOES UP BY TWO, AND IT IS THE ONLY TIME IN EIGHT PHASES THAT IT HAS. The classes are
+// `.vb-stack` and `.vb-fixed`, and the reason it is worth a ratchet increase is that it is the instrument the next commit
+// uses to take the number down by roughly a hundred. A census of all 246 surface classes, grouped by the
+// SHAPE of what they declare rather than by value, found 63 redundant names inside 27 clusters — a column
+// with a gap written six times, a centred row with a gap five times, `flex: none` six times, `margin: 0`
+// NINE times. None of them was a bad decision; there was simply no atom that could say "a row with a
+// gap", so every surface that needed one named it after itself. Buying that atom for one name is the
+// cheapest trade available in this tree, and every option on it is a `data-` attribute precisely so that
+// it stays one name — `Modal`'s precedent from the organism phase, applied to layout.
+const CLASS_CEILING = 307;
 // THE TARGET IS 146, and the derivation is in docs/design-system.md, *The atomic revamp: the class target
 // is 146*. Two numbers stood in this tree for two phases — this constant said 183 and the revamp said
 // 146 — and the gate PRINTED 183 at the developer, so the reconciliation was the gate's to make. 146 wins because 183's derivation is the one that was withdrawn, by name: 183 = 17 surfaces × 8

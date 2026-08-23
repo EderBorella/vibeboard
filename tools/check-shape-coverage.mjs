@@ -99,10 +99,10 @@ const CORPUS = 'web/src';
 // its own file. LISTED AND NOT A DIRECTORY GLOB — `web/src/atoms/prose.css` sits in the same directory and
 // is the markdown SURFACE, and a glob would have excused every declaration in it, including two of the
 // mono census's own named survivors.
-const ATOM_SHEETS = ['button', 'chip', 'control', 'readout', 'surface', 'text'].map((name) =>
+const ATOM_SHEETS = ['button', 'chip', 'control', 'readout', 'surface', 'text', 'stack'].map((name) =>
   join('web', 'src', 'atoms', `${name}.css`),
 );
-// THIRTEEN SHEETS AS OF THE MOLECULE LAYER, and `ui/primitives.css` is not one of them because it is
+// FOURTEEN SHEETS AS OF THE MOLECULE LAYER, and `ui/primitives.css` is not one of them because it is
 // gone: what was left of it WAS this layer — the tone table, the pip, the status chip, the segmented
 // control, the field and its trigger, the notice — and it is seven files beside the six atoms now.
 // LISTED AND NOT A DIRECTORY GLOB for the reason above, and now twice over: `molecules/inline-field.css`

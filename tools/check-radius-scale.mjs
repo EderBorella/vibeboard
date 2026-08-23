@@ -80,7 +80,7 @@ const TOKENS_FILE = 'web/src/design/tokens.css';
 // have excused them. (`molecules/inline-field.css` stood in this sentence and has not existed since the
 // organism phase folded it into `field.css`; a gate naming a file nobody can open is a gate nobody
 // checks.)
-const ATOM_SHEETS = ['button', 'chip', 'control', 'readout', 'surface', 'text'].map((name) =>
+const ATOM_SHEETS = ['button', 'chip', 'control', 'readout', 'surface', 'text', 'stack'].map((name) =>
   join('web', 'src', 'atoms', `${name}.css`),
 );
 const MOLECULE_SHEETS = ['tones', 'status-chip', 'tabs', 'menu', 'field', 'notice', 'figure-row'].map(

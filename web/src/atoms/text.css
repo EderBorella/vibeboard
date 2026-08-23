@@ -20,6 +20,21 @@
 .vb-text {
   font-size: var(--t-small); color: var(--muted); line-height: 1.45; margin: 0;
 }
+
+/* INK AND NOWRAP ARE ATTRIBUTES, AND THE REASON IS THE COUNT. The surface census found sixteen classes
+   whose ENTIRE content was a colour — `.chat-del` and `.ctx-warn` and `.mp-star` were `--accent-2`,
+   `.control-new` and `.ready-ok` were `--accent`, `.diary-outcome` and `.filed-title` were `--text` —
+   and five more whose entire content was `white-space: nowrap`. Twenty-one names for two ideas.
+   Spelled as classes these would be four more (`.vb-text-strong`, `-accent`, `-accent2`, `-nowrap`);
+   spelled as attributes they are free, which is `Modal`'s `data-size` precedent applied to ink.
+   NOT ROUTED THROUGH `--tone`: the tone table is five named STATES and `npm run check:state-tones`
+   holds it at five. An id drawn in the accent is not a state, and borrowing the mechanism would have
+   made the gate's census disagree with itself. */
+.vb-text[data-ink='strong'] { color: var(--text); }
+.vb-text[data-ink='accent'] { color: var(--accent); }
+.vb-text[data-ink='accent2'] { color: var(--accent-2); }
+.vb-text[data-ink='inherit'] { color: inherit; }
+.vb-text[data-nowrap] { white-space: nowrap; }
 /* THE ITALIC IS THE INTERFACE TALKING ABOUT ITSELF. A hint says how something works and an empty state
    says there is nothing here; both are the app's own voice rather than content, which is the same
    distinction the readout draws between a measured fact and a written sentence. Four of the six hints in

@@ -63,6 +63,11 @@ import './atoms/control.css';
 import './atoms/readout.css';
 import './molecules/figure-row.css';
 import './atoms/text.css';
+// `atoms/stack.css` LAST IN THE ATOM GROUP, and the position is a claim rather than a habit: every rule in
+// it is `.vb-stack[data-…]` at (0,1,1) or `.vb-stack > [data-flex]` at (0,1,1), so nothing above can
+// outrank it on specificity and nothing below needs to. It contends with no other atom — no other sheet in
+// this group declares `gap`, `flex-direction` or `align-items` on a class these elements carry.
+import './atoms/stack.css';
 // THE MOLECULE LAYER, at the byte position `ui/primitives.css` held. `molecules/field.css` ABSORBED
 // `molecules/inline-field.css` in this phase, which is the merge the molecule layer argued for: `Field`
 // took `InlineField` as an option and the two sheets stayed apart for a phase. The five `.cv-*` overrides

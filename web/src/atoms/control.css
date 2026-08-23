@@ -68,8 +68,19 @@ select.vb-ctl:hover:not(:disabled) { border-color: var(--accent); }
    an intrinsic box the browser draws, and `.vb-ctl`'s 28px height and horizontal padding stretch it into
    a slab. Six surfaces hand-rolled `<input type="checkbox">` to avoid exactly that — a shape the design
    system draws, drawn again outside it. `Control` takes the type and withdraws the box. */
-.vb-ctl[data-kind='check'] {
+/* `input.vb-ctl[data-kind='check']` — (0,2,1) AND THAT WEIGHT IS BOUGHT ON PURPOSE. A tick must not grow,
+   and four surfaces say `flex: 1` or `width: 100%` on a descendant `.vb-ctl` at (0,2,0) meaning "the
+   controls in this pane fill their row" — written when a control meant a text field. Since the checkbox
+   migration a control can be a tick, so those rules caught them too, and the effect is not subtle:
+   Chromium CENTRES the widget inside a stretched checkbox, so the tick's position tracked the LABEL's
+   width and a column of them read as a diagonal. Measured in the skill editor at 651px wide.
+   ONE RULE IN THE ATOM RATHER THAN A `:not()` AT FOUR SURFACES, because the class of defect is
+   open-ended: any pane that says its controls fill their row will do this to the next tick added to it.
+   An element + a class + an attribute outranks two classes, so this wins against a one-ancestor surface
+   rule; a two-ancestor one would still beat it, and that is the limit. */
+input.vb-ctl[data-kind='check'] {
   height: auto; min-height: 0; width: auto; padding: 0;
+  flex: none;
   /* No `border-radius` here: the box is borderless and transparent, so a corner would draw nothing —
      and `0` is not a step on the radius scale, which `npm run check:radius-scale` is right to refuse. */
   background: none; border: none;

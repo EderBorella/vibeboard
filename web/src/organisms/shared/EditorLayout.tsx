@@ -63,7 +63,15 @@ export function EditorLayout({ path, dirty, views, view, onView, actions, notice
             onChange={(v) => onView(v as EditorView)}
           />
         )}
-        <div className="vb-row push">{actions}</div>
+        {/* A CLUSTER OF ACTIONS, NOT A ROW, and it was `<div className="vb-row push">` — which broke twice
+            over. `.vb-row` declares `width: 100%`, so it demanded the whole head, squeezed the three-tab
+            strip beside it from its natural width down to 96px and left `margin-left: auto` no free space
+            to push into: Delete rendered ON TOP of Preview. And the composition change took `display: flex`
+            off `.vb-row` — it is the atom's now — so it was not even a row any more. A `Stack` is what it
+            always meant: a flex line with a gap, no width of its own, pushed right. */}
+        <Stack gap={3} className="push">
+          {actions}
+        </Stack>
       </Stack>
       {notice}
       {children}

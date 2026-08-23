@@ -574,3 +574,26 @@ describe('what List and Row emit', () => {
     expect(shape(<Row gap={2} />)).toBe('div [vb-stack vb-row] dir=- gap=2');
   });
 });
+
+// A TICK MUST NOT GROW, and this is a regression test for a defect the whole gate set could not see.
+// Four surfaces say `flex: 1` or `width: 100%` on a descendant `.vb-ctl` at (0,2,0), meaning "the controls
+// in this pane fill their row" — written when a control meant a text field. The checkbox migration made a
+// tick a `<Control>`, so those rules caught them too, and Chromium CENTRES the widget inside a stretched
+// checkbox: the tick's position tracked the LABEL's width and a column of them read as a diagonal.
+// Measured in the skill editor at 651px wide against a 13px control.
+// ASSERTED AS THE SPECIFICITY CONTEST IT IS, with the surface rule in the fixture — the atom's rule is
+// (0,2,1) on purpose, and a version of it that lost would leave every assertion about `data-kind` green.
+describe('a checkbox does not grow, whatever its pane says about controls', () => {
+  it('the atom outranks a surface saying its controls fill the row', () => {
+    const el = at(
+      '<div class="skill-editor"><input class="vb-ctl" data-kind="check" type="checkbox"/></div>',
+      'input',
+    );
+    expect(box(el).flex).toBe('none');
+  });
+
+  it('and a text field in the same pane still fills it', () => {
+    const el = at('<div class="skill-editor"><input class="vb-ctl"/></div>', 'input');
+    expect(box(el).flex).toBe('1');
+  });
+});

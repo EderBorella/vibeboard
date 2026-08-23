@@ -49,6 +49,120 @@ function openTitle(record: RunRecord, card: Card | undefined): string {
   return 'This run is about the project, not a card';
 }
 
+// ONE RUN, AS ITS OWN COMPONENT, and the gate is what asked for it rather than taste. This block was the
+// body of a `.map` nested inside another `.map` inside `ExecutionView`, which scored 16 against a ceiling
+// of 15 — the same rule that already made `openTitle` a function above, doing its job a second time on the
+// same file. EXTRACTED RATHER THAN SUPPRESSED: the rule was pointing at real nesting, and nesting is what
+// the metric punishes far more heavily than length, so flattening one level is worth more here than any
+// amount of shortening. The four decisions the row makes are now props, decided by the caller that has the
+// lists to decide them with — which is also why `stoppable` and `attention` are booleans and not the
+// `active`/`queued` arrays and a column key: this component renders one run and should not be able to ask
+// about any other.
+function RunRow({
+  record,
+  card,
+  stoppable,
+  attention,
+  now,
+  onOpenCard,
+  onCancel,
+  onResolve,
+  onForgiven,
+}: {
+  record: RunRecord;
+  card: Card | undefined;
+  stoppable: boolean;
+  attention: boolean;
+  now: number;
+  onOpenCard: (card: Card, run: RunRecord) => void;
+  onCancel: (run: RunRecord) => void;
+  onResolve: (run: RunRecord) => void;
+  onForgiven: () => void;
+}) {
+  const subject = runSubject(record);
+  return (
+    <Row stack variant="inset">
+      <Stack align="baseline" gap={3}>
+        <Chip pill state={record.status} caps className="vb-readout vb-fixed" testId="report-chip">
+          {record.status}
+        </Chip>
+        <Text ink="strong">{record.skill}</Text>
+        {/* What it cost, beside how long it took — the two things a dashboard row is actually asked.
+            Absent while a run is still in flight.
+            `push` ON WHICHEVER OF THE PAIR COMES FIRST, and that is the repair: the rule this replaces was
+            `.exec-run-top > .vb-readout { margin-left: auto }`, meaning "the cost takes the push-right".
+            But the status chip beside it wears `vb-readout` too — it wants the mono face — so it matched as
+            well, and TWO auto margins in a flex row SPLIT the free space between them. Every chip was
+            pushed right by half of whatever slack that row had, so a column of them read as random. `push`
+            says which element, at the site, where it can be seen. */}
+        {costLabel(record.usage) ? (
+          <>
+            <Readout className="push" testId="exec-cost">
+              {costLabel(record.usage)}
+            </Readout>
+            <Readout testId="exec-when">{elapsed(record, now)}</Readout>
+          </>
+        ) : (
+          <Readout className="push" testId="exec-when">
+            {elapsed(record, now)}
+          </Readout>
+        )}
+      </Stack>
+      <Surface
+        as="button"
+        variant="flat"
+        className="exec-card"
+        data-testid="exec-card"
+        // A run whose card has gone can still be read; there is just nothing to open.
+        disabled={card === undefined}
+        title={openTitle(record, card)}
+        onClick={() => card && onOpenCard(card, record)}
+      >
+        <Readout>{subject}</Readout>{' '}
+        <span className="vb-clip">{card?.title ?? (record.card ? '(gone)' : '')}</span>
+      </Surface>
+      {(record.summary || record.note) && (
+        <Text className="exec-summary">{record.summary ?? record.note}</Text>
+      )}
+      {/* A ROW OF ITS OWN, because `.exec-run` is a flex COLUMN — every direct child of it lands on its own
+          line, so two sibling buttons stacked rather than sitting together. Wrapping, so the result and
+          error lines ForgiveAttempts renders (both `flex-basis: 100%`) still break underneath the buttons
+          rather than squeezing them. */}
+      {(stoppable || attention) && (
+        <Stack gap={2} wrap>
+          {stoppable && (
+            <Button
+              className="report-stop vb-fixed"
+              data-testid="report-stop"
+              title={`Stop the ${record.skill} run on ${subject}`}
+              onClick={() => onCancel(record)}
+            >
+              Stop
+            </Button>
+          )}
+          {attention && (
+            <Button
+              className="report-dismiss vb-fixed"
+              data-testid="report-dismiss"
+              title={`Mark the ${record.skill} run on ${subject} dealt with`}
+              onClick={() => onResolve(record)}
+            >
+              Dismiss
+            </Button>
+          )}
+          {/* BESIDE DISMISS, because the two are the pair of answers to a failed run and this column is
+              where a person actually meets one. Dismiss says "I have read this"; this says "stop it
+              counting against the card". Offered only for a run that HAS a card — a project run has no
+              attempt tally to clear. */}
+          {attention && record.card && record.board && (
+            <ForgiveAttempts board={record.board} card={record.card} onForgiven={onForgiven} />
+          )}
+        </Stack>
+      )}
+    </Row>
+  );
+}
+
 // Every run in the project, in three columns: what is happening, what is waiting for a decision,
 // and what came back. Failed and interrupted runs sit under "Requires attention" rather than
 // "Done" — burying a broken run under successes is how it goes unnoticed for a week.
@@ -97,99 +211,20 @@ export function ExecutionView({
               </Chip>
             </h3>
             {group.length === 0 && <Text role="hint">Nothing here.</Text>}
-            {group.map((record) => {
-              const card = cards.find((c) => c.id === record.card);
-              const subject = runSubject(record);
-              const stoppable = active.includes(record.run) || queued.includes(record.run);
-              return (
-                <Row key={record.run} stack variant="inset">
-                  <Stack align="baseline" gap={3}>
-                    <Chip
-                      pill
-                      state={record.status}
-                      caps
-                      className="vb-readout vb-fixed"
-                      testId="report-chip"
-                    >
-                      {record.status}
-                    </Chip>
-                    <Text ink="strong">{record.skill}</Text>
-                    {/* What it cost, beside how long it took — the two things a dashboard row is
-                        actually asked. Absent while a run is still in flight.
-                        `push` ON WHICHEVER OF THE PAIR COMES FIRST, and that is the repair: the rule this
-                        replaces was `.exec-run-top > .vb-readout { margin-left: auto }`, meaning "the cost
-                        takes the push-right". But the status chip beside it wears `vb-readout` too — it
-                        wants the mono face — so it matched as well, and TWO auto margins in a flex row
-                        SPLIT the free space between them. Every chip was pushed right by half of whatever
-                        slack that row had, so a column of them read as random. `push` says which element,
-                        at the site, where it can be seen. */}
-                    {costLabel(record.usage) ? (
-                      <>
-                        <Readout className="push" testId="exec-cost">
-                          {costLabel(record.usage)}
-                        </Readout>
-                        <Readout testId="exec-when">{elapsed(record, now)}</Readout>
-                      </>
-                    ) : (
-                      <Readout className="push" testId="exec-when">
-                        {elapsed(record, now)}
-                      </Readout>
-                    )}
-                  </Stack>
-                  <Surface
-                    as="button"
-                    variant="flat"
-                    className="exec-card"
-                    data-testid="exec-card"
-                    // A run whose card has gone can still be read; there is just nothing to open.
-                    disabled={card === undefined}
-                    title={openTitle(record, card)}
-                    onClick={() => card && onOpenCard(card, record)}
-                  >
-                    <Readout>{subject}</Readout>{' '}
-                    <span className="vb-clip">{card?.title ?? (record.card ? '(gone)' : '')}</span>
-                  </Surface>
-                  {(record.summary || record.note) && (
-                    <Text className="exec-summary">{record.summary ?? record.note}</Text>
-                  )}
-                  {/* A ROW OF ITS OWN, because `.exec-run` is a flex COLUMN — every direct child of it
-                      lands on its own line, so two sibling buttons stacked rather than sitting together.
-                      Wrapping, so the result and error lines ForgiveAttempts renders (both
-                      `flex-basis: 100%`) still break underneath the buttons rather than squeezing them. */}
-                  {(stoppable || column.key === 'attention') && (
-                    <Stack gap={2} wrap>
-                      {stoppable && (
-                        <Button
-                          className="report-stop vb-fixed"
-                          data-testid="report-stop"
-                          title={`Stop the ${record.skill} run on ${subject}`}
-                          onClick={() => onCancel(record)}
-                        >
-                          Stop
-                        </Button>
-                      )}
-                      {column.key === 'attention' && (
-                        <Button
-                          className="report-dismiss vb-fixed"
-                          data-testid="report-dismiss"
-                          title={`Mark the ${record.skill} run on ${subject} dealt with`}
-                          onClick={() => onResolve(record)}
-                        >
-                          Dismiss
-                        </Button>
-                      )}
-                      {/* BESIDE DISMISS, because the two are the pair of answers to a failed run and
-                          this column is where a person actually meets one. Dismiss says "I have read
-                          this"; this says "stop it counting against the card". Offered only for a run
-                          that HAS a card — a project run has no attempt tally to clear. */}
-                      {column.key === 'attention' && record.card && record.board && (
-                        <ForgiveAttempts board={record.board} card={record.card} onForgiven={onForgiven} />
-                      )}
-                    </Stack>
-                  )}
-                </Row>
-              );
-            })}
+            {group.map((record) => (
+              <RunRow
+                key={record.run}
+                record={record}
+                card={cards.find((c) => c.id === record.card)}
+                stoppable={active.includes(record.run) || queued.includes(record.run)}
+                attention={column.key === 'attention'}
+                now={now}
+                onOpenCard={onOpenCard}
+                onCancel={onCancel}
+                onResolve={onResolve}
+                onForgiven={onForgiven}
+              />
+            ))}
           </Surface>
         );
       })}

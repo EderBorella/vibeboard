@@ -147,7 +147,12 @@ const CHIP_CEILING = 0;
 // stop; `.markdown pre` has no element to put a primitive on; `.msg-assistant` has four corners and a
 // tail; and `.inline-view` is the read-only half of one control in two states, which must share one box
 // with the editor above and therefore cannot be a `Surface`. NEVER RAISE IT.
-const PANEL_CEILING = 5;
+// THREE, AND IT WAS FIVE. `.gate-card` left in the reinvention sweep — it was hand-drawing a `--panel`
+// ground, a `--border` edge and a `--r-lg` corner, which is `Surface variant="raised"` value for value, so
+// both call sites render the primitive and the class kept only its 520px measure and its inset. The
+// ratchet comes down in the commit that vacates it, which is the half of this repository's own rule that
+// usually gets forgotten.
+const PANEL_CEILING = 3;
 // MONO — 14 as Phase 7 measured it, 11 after Phase 8's three chips, and **7 after Phase 12**, which is
 // the phase that owned the row. Three went to the primitive: `.report-chip` names `vb-readout` on its
 // `<Chip>` (the form Phase 8 established), `.msg-tool` IS `Readout` `small` `accent` and its rule is
@@ -579,12 +584,22 @@ function controlsIn(file, text) {
         tag,
         classes,
         inField,
-        // The two routes to the primitive's box, and `where` is printed so a reader can see which.
-        boxed: inField || classes.includes(CONTROL_BOX_CLASS),
-        where: inField
-          ? '<Field>'
-          : classes.includes(CONTROL_BOX_CLASS)
-            ? `.${CONTROL_BOX_CLASS}`
+        // THE `<Field>` EXCUSE IS WITHDRAWN, and the reason is the same one this file already gives for
+        // `.inline-edit`: the atom layer answered the objection rather than the census being relaxed.
+        // A literal control inside a `<Field>` was excused because the Field owned the LAYOUT and no
+        // primitive owned a CHECKBOX — a tick has an intrinsic box the browser draws, and `.vb-ctl`'s
+        // 28px height and horizontal padding stretch it into a slab. So six surfaces wrote
+        // `<input type="checkbox">` inside a `<Field>` and this arm was right not to blame them.
+        // `Control` takes the type now and withdraws the box (`.vb-ctl[data-kind='check']`), so there is
+        // nowhere left in the tree that a literal control is the honest answer. THE ONLY ROUTE IS
+        // `.vb-ctl`, which means the element is a `<Control>`: the atom is what puts that class on.
+        // `inField` is still MEASURED and still printed, because which of the two a finding is tells the
+        // reader whether it needs a `<Field>` around it or just the atom.
+        boxed: classes.includes(CONTROL_BOX_CLASS),
+        where: classes.includes(CONTROL_BOX_CLASS)
+          ? `.${CONTROL_BOX_CLASS}`
+          : inField
+            ? '<Field>, which is no longer an excuse'
             : 'nothing',
       };
     }),
@@ -735,11 +750,17 @@ const CONTROL_CSS_FIXTURE = [
 ].join('\n');
 
 const CONTROL_SELF_TEST_WANT = [
-  // FIVE, and the first draft of this line said four: the two `<Field>` regions cover one control each
-  // and three tags carry `.vb-ctl`. The fixture was right and the expectation was wrong, which is what
-  // a fixture the tree cannot move is for. `<Control>` adds none: it is not a literal control.
-  'boxed 5',
-  'findings fixture.tsx:4 input nothing, fixture.tsx:5 input nothing, fixture.tsx:12 textarea nothing',
+  // THREE, AND IT WAS FIVE UNTIL THE `<Field>` EXCUSE WAS WITHDRAWN. The two controls a `<Field>` region
+  // covered are findings now: the only route to the box is `.vb-ctl`, which means the element is a
+  // `<Control>`. So `boxed` counts the three tags carrying that class and nothing else. `<Control>` still
+  // adds none of its own — it is not a literal control.
+  // THE TWO NEW ROWS ARE THE POINT OF THE CHANGE, and they are why this expectation is written out in full
+  // rather than as a count: a fixture that only counted would have passed 3-for-3 against a reader that
+  // had stopped seeing `<Field>` at all.
+  'boxed 3',
+  'findings fixture.tsx:1 input <Field>, which is no longer an excuse,' +
+    ' fixture.tsx:4 input nothing, fixture.tsx:5 input nothing,' +
+    ' fixture.tsx:10 select <Field>, which is no longer an excuse, fixture.tsx:12 textarea nothing',
   'geometry .own-box — geometry on a control — border-radius, padding' +
     ' | .inline-edit — geometry on a control — border' +
     ' | .ctl-own-box — geometry on a control — height',
@@ -1058,7 +1079,11 @@ report(
   'control',
   CONTROL_CEILING,
   'InlineField absorbed as `Field inline` — at zero, blocking',
-  rawControls.map((c) => `${c.site} <${c.tag}> — its box comes from neither a <Field> nor .vb-ctl`),
+  rawControls.map(
+    (c) =>
+      `${c.site} <${c.tag}> — a literal control: its box comes from ${c.where}. Render <Control> instead` +
+      ` (a checkbox or a radio takes \`type\` and the atom withdraws the text box).`,
+  ),
 );
 
 // ARM 2, reported as its own census because it answers the other direction and would be invisible folded

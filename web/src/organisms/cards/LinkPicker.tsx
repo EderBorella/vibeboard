@@ -1,3 +1,4 @@
+import { Control } from '../../atoms/Control';
 import { Readout } from '../../atoms/Readout';
 import { Surface } from '../../atoms/Surface';
 import { Text } from '../../atoms/Text';
@@ -36,7 +37,7 @@ export function LinkPicker({
                   </>
                 }
               >
-                <input type="checkbox" checked={links.includes(c.id)} onChange={() => onToggle(c.id)} />
+                <Control type="checkbox" checked={links.includes(c.id)} onChange={() => onToggle(c.id)} />
               </Field>
             ))}
           </div>

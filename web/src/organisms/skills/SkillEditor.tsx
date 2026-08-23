@@ -82,7 +82,7 @@ export function SkillEditor({ skill, config, busy, onSave }: Props) {
         <Text role="hint">Nothing ticked means every board.</Text>
         {BOARDS.map((board) => (
           <Field key={board} layout="check" label={BOARD_LABELS[board]}>
-            <input type="checkbox" checked={boards.includes(board)} onChange={() => toggleBoard(board)} />
+            <Control type="checkbox" checked={boards.includes(board)} onChange={() => toggleBoard(board)} />
           </Field>
         ))}
       </fieldset>
@@ -94,7 +94,7 @@ export function SkillEditor({ skill, config, busy, onSave }: Props) {
         <Text role="hint">Nothing ticked means every column.</Text>
         {columnChoices.map(([slug, label]) => (
           <Field key={slug} layout="check" label={label}>
-            <input
+            <Control
               type="checkbox"
               checked={columns.includes(slug)}
               onChange={() =>

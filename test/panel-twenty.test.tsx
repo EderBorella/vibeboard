@@ -115,7 +115,11 @@ describe('the raised surfaces — a --panel ground, a --border edge and a 10px c
   ];
 
   // The two that are NOT `Surface`s are still written as class lists, because that is what they are.
-  const MIGRATED = new Set(['modal', 'vb-modal', 'chat-menu']);
+  // `.gate-card` JOINED THEM IN THE REINVENTION SWEEP. It was the last class in the tree hand-drawing a
+  // `--panel` ground, a `--border` edge and a `--r-lg` corner — `Surface variant="raised"` value for value
+  // — so both call sites render the primitive and the class keeps only its 520px measure and its inset.
+  // The fixture has to ask the primitive for its markup or it tests a class that draws nothing.
+  const MIGRATED = new Set(['modal', 'vb-modal', 'chat-menu', 'gate-card']);
 
   for (const [name, ground] of RAISED) {
     it(`.${name} draws a 10px corner on ${ground}`, () => {

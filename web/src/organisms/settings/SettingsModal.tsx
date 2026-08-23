@@ -247,7 +247,7 @@ export function SettingsModal({ config, onClose, onSaved, autopilot, onAutopilot
       ))}
 
       <Field layout="check" label="Enforce 1-to-many relations on boards">
-        <input
+        <Control
           type="checkbox"
           checked={enforceOneParent}
           onChange={(e) => setEnforceOneParent(e.target.checked)}

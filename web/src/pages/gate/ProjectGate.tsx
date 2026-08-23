@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
+import { Button } from '../../atoms/Button';
 import { Control } from '../../atoms/Control';
 import { Readout } from '../../atoms/Readout';
+import { Surface } from '../../atoms/Surface';
 import { Text } from '../../atoms/Text';
 import { listProjects, openProject, type ProjectRef, scaffoldProject } from '../../lib/api';
 import { useAction } from '../../lib/useAction';
@@ -78,7 +80,7 @@ export function ProjectGate({ onOpened }: Props) {
 
   return (
     <div className="gate">
-      <div className="gate-card">
+      <Surface variant="raised" className="gate-card">
         <h2>Open a project</h2>
 
         {projects.length > 0 ? (
@@ -128,12 +130,12 @@ export function ProjectGate({ onOpened }: Props) {
               placeholder="my-project"
               onChange={(e) => setNewName(toNamePattern(e.target.value))}
             />
-            <button
+            <Button
               disabled={busy !== null || !targetPath}
               onClick={() => run(() => scaffoldProject(targetPath, nameSlug))}
             >
               Create
-            </button>
+            </Button>
           </Row>
         </Field>
         {relativeParent && (
@@ -149,7 +151,7 @@ export function ProjectGate({ onOpened }: Props) {
         )}
 
         {error && <Notice tone="bad">{error}</Notice>}
-      </div>
+      </Surface>
     </div>
   );
 }

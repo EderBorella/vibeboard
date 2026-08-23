@@ -32,7 +32,9 @@
 // It asserts the BOX A CLASS LIST DRAWS, resolved out of the stylesheets by test/css-box.tsx, because
 // jsdom loads no CSS. The paddings ARE pinned here, unlike test/field-boxes.test.tsx: this suite's whole
 // subject was a set of boxes nobody chose, and six of the fifteen differences were the padding.
+
 import { cleanup, render } from '@testing-library/react';
+import type { ReactElement } from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { Control } from '../web/src/atoms/Control.js';
 import { Surface } from '../web/src/atoms/Surface.js';
@@ -264,7 +266,7 @@ describe('the survivors that differ, and what each one still says', () => {
     // `.vb-surface-raised`, and the fixture has to ask the primitive for its own markup or it quietly
     // tests a class that no longer draws anything. The CLAIM is unchanged.
     expect(box(panel('modal')).background).toBe('var(--panel)');
-    expect(box(at('<div class="gate-card"></div>', 'div')).background).toBe('var(--panel)');
+    expect(box(panel('gate-card')).background).toBe('var(--panel)');
     const el = at('<div class="suggestions-actions"><input class="vb-ctl"/></div>', 'input');
     expect(box(el).background).toBe(PRIMITIVE.ground);
   });
@@ -411,5 +413,43 @@ describe('the model picker filter row, resolved', () => {
     const search = at('<div class="vb-modal"><input class="vb-ctl"/></div>', 'input');
     expect(box(select).padding).toBe(box(search).padding);
     expect(box(select)['border-radius']).toBe(box(search)['border-radius']);
+  });
+});
+
+// WHAT THE ATOM RENDERS, and this exists because the tree shipped it wrong twice in one sitting. Phase 8
+// gave `Control` two options that let six surfaces and two triggers stop hand-rolling a primitive — and
+// both were lost to a later edit that replaced the block they lived in. The atom rendered a literal
+// `<trigger>` element (invalid HTML, not focusable) and a checkbox with no `data-kind`, and THE ENTIRE
+// UNIT SUITE PASSED: 4,501 tests, jsdom building an unknown element without complaint. What caught it was
+// the browser harness noticing its focus walk examined one or two fewer elements per surface than it had
+// recorded — an instrument that only runs at the end of a phase.
+//
+// So the claim is pinned where it is cheap to run. Three renders, and each asserts the thing that was
+// actually wrong: the TAG (a trigger is a `<button>`), the ATTRIBUTE (a tick withdraws the box), and that
+// the default is untouched.
+describe('what Control renders, tag by tag', () => {
+  const shape = (el: ReactElement): string => {
+    const { container } = render(el);
+    const node = container.firstElementChild as HTMLElement;
+    return `${node.tagName.toLowerCase()} ${node.className} ${node.dataset.kind ?? '-'}`;
+  };
+
+  it('a trigger is a BUTTON wearing both the box and the trigger face', () => {
+    // `as="trigger"` is the only value that is not its own tag. Rendered as `<trigger>` it looked right in
+    // every jsdom test and was unreachable by Tab in a browser.
+    expect(shape(<Control as="trigger">x</Control>)).toBe('button vb-ctl vb-trigger -');
+  });
+
+  it('a checkbox withdraws the text box through data-kind', () => {
+    // Without the attribute the tick wears `.vb-ctl`'s 28px height and horizontal padding and renders as a
+    // slab, which is the reason six surfaces hand-rolled `<input type="checkbox">` in the first place.
+    expect(shape(<Control type="checkbox" />)).toBe('input vb-ctl check');
+    expect(shape(<Control type="radio" />)).toBe('input vb-ctl check');
+  });
+
+  it('and a text field and a select are unchanged by either', () => {
+    expect(shape(<Control />)).toBe('input vb-ctl -');
+    expect(shape(<Control as="select" />)).toBe('select vb-ctl -');
+    expect(shape(<Control as="textarea" />)).toBe('textarea vb-ctl -');
   });
 });

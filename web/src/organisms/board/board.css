@@ -122,11 +122,12 @@
    NO `font-size`: it declared `var(--t-body)`, which is what `body` already gives it — the same dead
    declaration Phase 4 found on `.cv-link`. The type reset above turns the UA's 13.3333px into `inherit`,
    so the class had nothing to add. */
-.archive-title {
-  background: transparent; border: none; color: var(--text);
-  cursor: pointer; font-family: inherit;
-}
-.archive-title:hover { color: var(--accent); }
+/* ONE DECLARATION, AND IT WAS FIVE. This was a hand-rolled `<button>`, so four of them were the UA reset
+   — `background: transparent`, `border: none`, `cursor: pointer`, `font-family: inherit` — which is what
+   `.vb-btn` and `.vb-btn-bare` already say, and the `:hover` accent is `.vb-btn-bare:hover` value for
+   value. It is a `Button variant="bare"` now, so all five went. What is left is the one thing this title
+   actually decides: a card's title is the loud thing in its row, where a bare button is muted by default. */
+.archive-title { color: var(--text); }
 /* `.archive-restore` shared this rule and is now `default` — hover included, which `.vb-btn-default`
    already says. The `<select>` beside it is `.vb-ctl` as of Phase 9; the muted ink is all it kept,
    because a secondary restore must not read as loudly as the button it sits next to. */

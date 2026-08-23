@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Button } from '../../atoms/Button';
 import { Chip } from '../../atoms/Chip';
+import { Control } from '../../atoms/Control';
 import { Readout } from '../../atoms/Readout';
 import { Stack } from '../../atoms/Stack';
 import { Text } from '../../atoms/Text';
@@ -29,15 +30,10 @@ export function ChatSwitcher({ chats, currentChatId, backend, running, onOpen, o
   return (
     <Stack gap={3} pad={[3, 5]} edge="bottom">
       <div className="chat-switcher">
-        <button
-          className="vb-trigger"
-          disabled={running}
-          onClick={() => setChatMenu((v) => !v)}
-          title="Chat history"
-        >
+        <Control as="trigger" disabled={running} onClick={() => setChatMenu((v) => !v)} title="Chat history">
           <span className="vb-clip">{currentTitle}</span>
           <span className="vb-caret vb-twist">▾</span>
-        </button>
+        </Control>
         {/* `Menu list`: picking a session takes you somewhere else, and it dismisses — which is the half
             of the definition a `Tabs` never has. Five classes went: the floating box, the row, the
             two-line button, the ellipsised title and the backdrop are all the molecule's, and what was

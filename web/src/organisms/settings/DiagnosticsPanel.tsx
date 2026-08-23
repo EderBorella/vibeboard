@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Control } from '../../atoms/Control';
 import { Readout } from '../../atoms/Readout';
 import { Text } from '../../atoms/Text';
 import { type AppSettings, getAppSettings, setDebugLog } from '../../lib/api';
@@ -54,7 +55,7 @@ export function DiagnosticsPanel() {
       </Text>
 
       <Field layout="check" label="Verbose auto-pilot log">
-        <input
+        <Control
           type="checkbox"
           checked={settings?.debugLog ?? false}
           disabled={settings === null || busy !== null}

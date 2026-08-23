@@ -1,3 +1,5 @@
+import { Button } from '../../atoms/Button';
+import { Surface } from '../../atoms/Surface';
 import { Text } from '../../atoms/Text';
 import { Notice } from '../../molecules/Notice';
 import type { SigninPhase } from '../../organisms/signin/driver';
@@ -16,7 +18,7 @@ interface Props {
 export function SignIn({ phase, onRetry }: Props) {
   return (
     <div className="gate">
-      <div className="gate-card">
+      <Surface variant="raised" className="gate-card">
         <h2>{phase.phase === 'waiting' ? 'Waiting to be let in' : 'Signing in'}</h2>
         {phase.phase === 'claiming' && <Text role="hint">Signing this browser in…</Text>}
 
@@ -48,14 +50,12 @@ export function SignIn({ phase, onRetry }: Props) {
             </Notice>
             {phase.retry && (
               <p className="vb-field">
-                <button type="button" onClick={onRetry}>
-                  Try again
-                </button>
+                <Button onClick={onRetry}>Try again</Button>
               </p>
             )}
           </>
         )}
-      </div>
+      </Surface>
     </div>
   );
 }

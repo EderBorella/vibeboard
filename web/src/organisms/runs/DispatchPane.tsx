@@ -161,7 +161,7 @@ export function DispatchPane({
           </Text>
           {attachable.map((path) => (
             <Field key={path} layout="check" label={<span className="vb-clip">{path}</span>}>
-              <input type="checkbox" checked={attachments.includes(path)} onChange={() => toggle(path)} />
+              <Control type="checkbox" checked={attachments.includes(path)} onChange={() => toggle(path)} />
             </Field>
           ))}
         </details>

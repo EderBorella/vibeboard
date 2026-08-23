@@ -46,9 +46,32 @@ textarea.vb-ctl { height: auto; }
    because the class of defect is open-ended. A checkbox is no longer reachable by this rule at all: it
    is not a `<Control>`, so it falls through to the app's global `:focus-visible` ring instead of needing
    two `:not()`s to keep it. */
-.vb-ctl:focus { outline: none; border-color: var(--accent); }
+/* AND `:not([data-kind='check'])` IS LOAD-BEARING, which the sentence above got wrong the moment a
+   checkbox became a `<Control>`. It said a tick "is not a `<Control>`, so it falls through to the app's
+   global `:focus-visible` ring" — true when it was written, false as of Phase 8. A tick now wears
+   `.vb-ctl`, and this rule trades the outline for an accent BORDER, which the check reset withdraws: so
+   the two settings checkboxes matched `:focus-visible` and nothing about them changed. Found by the
+   browser harness's focus ratchet going 0 -> 2, not by any unit test. Excluded here rather than given a
+   ring of its own, because the global ring in `design/reset.css` is already the right answer for a box
+   the browser draws. */
+.vb-ctl:not([data-kind='check']):focus {
+  outline: none;
+  border-color: var(--accent);
+}
 /* A SELECT IS A CONTROL YOU POINT AT, and five of the tree's seven said so by hand while two said
    nothing. The hover makes the same statement `:focus` makes on an input — this is the control you are
    about to use — and a native select is that affordance without the caret. */
 select.vb-ctl { cursor: pointer; }
 select.vb-ctl:hover:not(:disabled) { border-color: var(--accent); }
+
+/* A TICK IS NOT A TEXT FIELD. The box above is for something you type into; a checkbox and a radio have
+   an intrinsic box the browser draws, and `.vb-ctl`'s 28px height and horizontal padding stretch it into
+   a slab. Six surfaces hand-rolled `<input type="checkbox">` to avoid exactly that — a shape the design
+   system draws, drawn again outside it. `Control` takes the type and withdraws the box. */
+.vb-ctl[data-kind='check'] {
+  height: auto; min-height: 0; width: auto; padding: 0;
+  /* No `border-radius` here: the box is borderless and transparent, so a corner would draw nothing —
+     and `0` is not a step on the radius scale, which `npm run check:radius-scale` is right to refuse. */
+  background: none; border: none;
+  accent-color: var(--accent); cursor: pointer;
+}

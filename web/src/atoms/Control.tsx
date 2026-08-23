@@ -1,4 +1,10 @@
-import type { InputHTMLAttributes, Ref, SelectHTMLAttributes, TextareaHTMLAttributes } from 'react';
+import type {
+  ButtonHTMLAttributes,
+  InputHTMLAttributes,
+  Ref,
+  SelectHTMLAttributes,
+  TextareaHTMLAttributes,
+} from 'react';
 
 // THE CONTROL: a box that holds a value. An `<input>`, a `<select>` or a `<textarea>`, all drawing the
 // same box, which is what `.vb-input` was — applied by hand at 22 sites, plus a descendant selector on
@@ -14,7 +20,12 @@ import type { InputHTMLAttributes, Ref, SelectHTMLAttributes, TextareaHTMLAttrib
 //
 // `as` IS A CLOSED SET, for `Surface`'s and `Chip`'s reason: it says what the control IS, and an open
 // tag would make this a general element factory whose geometry claim is empty.
-export type ControlTag = 'input' | 'select' | 'textarea';
+// `trigger` IS A CONTROL AND NOT A BUTTON, and the stylesheet had already decided that: `.vb-trigger`
+// shares `.vb-ctl`'s box rule by name at the top of `control.css`, because it is the stand-in for a
+// `<select>` when the choice is too rich for one — the chat history and the model picker. Two surfaces
+// were hand-rolling `<button className="vb-trigger">`, which is the last shape in the tree that a
+// primitive drew and no primitive owned.
+export type ControlTag = 'input' | 'select' | 'textarea' | 'trigger';
 
 // EACH ELEMENT'S OWN ATTRIBUTES, KEYED BY THE TAG, and it was an INTERSECTION of the three until a
 // typecheck said what an intersection really means here. `InputHTMLAttributes & SelectHTMLAttributes &
@@ -31,12 +42,14 @@ type Attributes = {
   input: InputHTMLAttributes<HTMLInputElement>;
   select: SelectHTMLAttributes<HTMLSelectElement>;
   textarea: TextareaHTMLAttributes<HTMLTextAreaElement>;
+  trigger: ButtonHTMLAttributes<HTMLButtonElement>;
 };
 
 type TagElement = {
   input: HTMLInputElement;
   select: HTMLSelectElement;
   textarea: HTMLTextAreaElement;
+  trigger: HTMLButtonElement;
 };
 
 // `className` IS LAYOUT ONLY, exactly as it is on Button, Chip and Surface — `flex`, `min-width`, a
@@ -58,11 +71,29 @@ type Props<T extends ControlTag> = Omit<Attributes[T], 'className' | 'ref'> & {
 };
 
 export function Control<T extends ControlTag = 'input'>({ as, mono, className, ...rest }: Props<T>) {
-  const Tag = (as ?? 'input') as 'input';
-  const classes = ['vb-ctl', mono && 'vb-ctl-mono', className].filter(Boolean).join(' ');
+  // `trigger` IS THE ONLY VALUE THAT IS NOT ITS OWN TAG, and this line was lost once already: a later edit
+  // to the class list below replaced the whole block and reverted it, so the atom rendered a literal
+  // `<trigger>` element. It is invalid HTML, it is not focusable, and THE WHOLE UNIT SUITE PASSED — 4,501
+  // tests, jsdom happily building an unknown element. What caught it was the browser harness's focus walk
+  // examining one or two fewer elements per surface than it had recorded.
+  const Tag = (as === 'trigger' ? 'button' : (as ?? 'input')) as 'input';
+  // `'vb-trigger'` IS A LITERAL IN THIS LIST and not appended to a template string, because
+  // `check:class-budget` reads class names as whole tokens out of the source: built as
+  // `` `${classes} vb-trigger` `` the name is still there to a human and invisible to the gate, which
+  // reported the rule as referenced from nowhere the moment the two hand-rolled call sites went.
+  const classes = ['vb-ctl', mono && 'vb-ctl-mono', as === 'trigger' && 'vb-trigger', className]
+    .filter(Boolean)
+    .join(' ');
+  // A TICK IS NOT A TEXT FIELD, and this option is what let six surfaces stop hand-rolling one. The box
+  // above — 28px tall, a border, a corner, `padding: 0 var(--s-4)` — is for something you type into. A
+  // checkbox and a radio have an intrinsic box the browser draws, and wearing `.vb-ctl` stretches it into
+  // a slab, which is exactly why six `<input type="checkbox">` sat outside the primitive. `data-kind`
+  // withdraws the box; it is an attribute and not a second class, like every option in this layer.
+  const type = (rest as { type?: string }).type;
+  const kind = type === 'checkbox' || type === 'radio' ? 'check' : undefined;
   // THE ONE CAST, and it is JSX's limit rather than a gap in the types above: a tag chosen at run time
   // cannot be checked against a per-tag attribute map, and there is no `T` in scope for the intrinsic
   // element the compiler picks. The caller's props were already checked against `Props<T>`, which is
-  // where the contract lives; nothing here reads `rest`.
-  return <Tag className={classes} {...(rest as Attributes['input'])} />;
+  // where the contract lives.
+  return <Tag className={classes} data-kind={kind} {...(rest as Attributes['input'])} />;
 }

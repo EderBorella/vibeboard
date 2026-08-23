@@ -37,11 +37,11 @@
    three findings on it were saying. `.gate-card` is the 520px card in the middle of it and `.gate-preview`
    the muted line under a picked path. */
 .gate { flex: 1; display: flex; justify-content: center; padding: var(--s-7) var(--s-6); overflow: auto; }
-.gate-card {
-  width: 100%; max-width: 520px;
-  background: var(--panel); border: 1px solid var(--border);
-  border-radius: var(--r-lg); padding: var(--s-7);
-}
+/* THE GROUND, THE EDGE AND THE CORNER ARE `Surface variant="raised"` NOW, and they were a hand-rolled copy
+   of it: `--panel`, `1px solid var(--border)`, `--r-lg` — the atom's three declarations, written again.
+   Both call sites render a `<Surface>`, so what is left here is the 520px measure and the inset, which are
+   this card's own. It was one of only two classes in the tree still drawing a box the design system draws. */
+.gate-card { width: 100%; max-width: 520px; padding: var(--s-7); }
 /* A `Text as="p"`, and the tag is what unblocked it: the step and the muted ink were always the atom's
    default, but `Text` rendered a `<span>` and a vertical margin does not apply to an inline box — so this
    class could not be reduced at all until `as` existed. The margin is what is left, and it stays: it

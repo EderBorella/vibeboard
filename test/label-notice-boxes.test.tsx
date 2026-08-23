@@ -502,15 +502,24 @@ describe('the archived row', () => {
     expect(box(el).padding).toBe('6px 8px');
   });
 
-  // AND THE FIXTURE MOVED AGAIN IN PHASE 8, FOR THE SAME REASON THE ASSERTION DID NOT: the row's `flex: 1`,
-  // its `min-width: 0`, its three overflow declarations and its `text-align: left` are `.vb-clip` — that
-  // utility declaration for declaration — so the class list at the call site is what changed and what the
-  // box draws is not. What `.archive-title` still says on its own is the UA button reset.
+  // AND THE UA RESET LEFT THE CLASS IN THE REINVENTION SWEEP. `.archive-title` was a hand-rolled
+  // `<button>`, so four of its five declarations were `background: transparent`, `border: none`,
+  // `cursor: pointer` and `font-family: inherit` — which is `.vb-btn` plus `.vb-btn-bare`, and its
+  // `:hover` accent was `.vb-btn-bare:hover` value for value. It is a `Button variant="bare"` now.
+  // THE FIXTURE IS THE CALL SITE'S OWN CLASS LIST, because that is the only way the claim stays true of
+  // what renders: asked of `archive-title` alone the border now answers `undefined`, and a test that
+  // then asserted `undefined` would be pinning the absence of a rule rather than the presence of a box.
+  // What the class still decides is one thing — the ink — and it is asserted last.
   it('.archive-title is a full-bleed borderless row inside it', () => {
-    const b = box(label('archive-title vb-clip', 'button'));
-    expect(b.border).toBe('none');
+    const b = box(label('vb-btn vb-btn-bare vb-btn-sm archive-title vb-clip', 'button'));
+    // No VISIBLE edge, which is what "borderless" meant: the atom keeps a transparent 1px so the box is
+    // the same width as a bordered button beside it.
+    expect(b.border).toBe('1px solid transparent');
     expect(b.flex).toBe('1');
     expect(b['text-align']).toBe('left');
+    // The one declaration left, and the reason the class survives at all: a card's title is the loud
+    // thing in its row, where a bare button is muted by default.
+    expect(b.color).toBe('var(--text)');
   });
 
   // IT DECLARED A `font-size` THAT ONLY RESTATED WHAT IT INHERITED — `var(--t-body)`, which `body` gives

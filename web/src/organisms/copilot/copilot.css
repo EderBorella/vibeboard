@@ -101,6 +101,15 @@
    `.msg` in the tree sets `--tone`, so this cannot pick one up by accident. */
 .msg { font-size: var(--t-body); line-height: 1.45; white-space: pre-wrap; word-break: break-word; color: var(--tone, inherit); }
 .msg-user { align-self: flex-end; background: var(--accent-fill); color: var(--on-fill); padding: var(--s-3) var(--s-4); border-radius: var(--r-lg) var(--r-lg) var(--r-sm) var(--r-lg); max-width: 85%; }
+/* THE TWO BUBBLES ARE A DELIBERATE BESPOKE SHAPE, AND THIS IS THE RULING RATHER THAN AN OVERSIGHT.
+   A reinvention census flagged `.msg-assistant` as the last class in the tree drawing a box the design
+   system draws — its ground, edge and padding are `Surface variant="inset"` value for value. It stays, on
+   two counts. The corner is ASYMMETRIC (`lg lg lg sm` against the user's `lg lg sm lg`): it is a tail, the
+   two mirror each other, and no `Surface` variant draws one. And `.msg-user`'s ground is `--accent-fill`,
+   which is no variant at all — so routing only the assistant through `Surface` would split a matched pair
+   across two mechanisms and read as less consistent, not more.
+   ONE SHAPE WITH TWO OPTIONS IS THE PATTERN, which is what `.msg` plus these two are, composed at run time
+   as `msg-${kind}`. What would NOT be the pattern is a third bubble arriving with its own third corner. */
 .msg-assistant { background: var(--panel-2); border: 1px solid var(--border); padding: var(--s-3) var(--s-4); border-radius: var(--r-lg) var(--r-lg) var(--r-lg) var(--r-sm); max-width: 90%; }
 /* `.msg-thinking` IS GONE: `--t-small` muted italic is `Text role="hint"` declaration for declaration,
    and the span it sat on is a CHILD of `.msg` rather than the same element — so no organism rule contends

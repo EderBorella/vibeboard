@@ -96,9 +96,14 @@ export function ArchiveDrawer({ board, config, count, onOpen }: Props) {
             <Readout>{c.id}</Readout>
             <Readout>{when(c.archived)}</Readout>
           </Stack>
-          <button className="archive-title vb-clip" onClick={() => onOpen?.(c)} title="Open this card">
+          <Button
+            variant="bare"
+            className="archive-title vb-clip"
+            onClick={() => onOpen?.(c)}
+            title="Open this card"
+          >
             {c.title}
-          </button>
+          </Button>
           <Stack gap={3} className="vb-fixed">
             <Button size="sm" onClick={() => restore(c)}>
               Restore → {labelOf(c.restoreTo)}

@@ -1,24 +1,27 @@
-/* Card action rail. Fixed width so the card body keeps a predictable measure whichever card is up. */
+/* Card action rail. Fixed width so the card body keeps a predictable measure whichever card is up.
+   The column, its gap and its inset are a `Stack as="aside" label direction="column" gap={3} pad={[5,4]}`.
+   `border-left` is not `edge` — an edge is the hairline BETWEEN stacked rows, and a rail's is beside it —
+   and a ground is not a layout claim, so those two and the width are what is left. */
 .card-skills {
   flex: 0 0 11rem; min-width: 0; overflow-y: auto;
-  display: flex; flex-direction: column; gap: var(--s-3);
-  padding: var(--s-5) var(--s-4); border-left: 1px solid var(--border); background: var(--panel-2);
+  border-left: 1px solid var(--border); background: var(--panel-2);
 }
-.cs-head {
-  margin: 0 0 var(--s-1); font-family: var(--font-display); font-size: var(--t-small);
-  text-transform: uppercase; letter-spacing: var(--track); color: var(--muted);
-}
-/* A skill's name is prose of arbitrary length in a narrow rail, so it reads from the left like the list
-   it is. Alignment is layout, and the only thing left of this rule. */
-.cs-action { text-align: left; }
-.cs-empty { margin-top: var(--s-2); font-size: var(--t-micro); }
+/* A `Text as="h3" caps`: the display family, the uppercase, the tracking, the `--t-small` step, the muted
+   ink and the `margin: 0` are all the atom's. The extra 2px UNDER this one line is not — a gap is uniform
+   across a column and this is one child asking for more room below itself, which is the one thing
+   `Stack gap` cannot say. */
+.cs-head { margin-bottom: var(--s-1); }
+/* `.cs-action` IS GONE — `Button align="start"`. A skill's name is prose of arbitrary length in a narrow
+   rail, so it reads from the left like the list it is, and that was one declaration under a name. */
+/* The step is `Text size="micro"`; the 4px above it is this line's own, for `.cs-head`'s reason. */
+.cs-empty { margin-top: var(--s-2); }
 .card-skills > .vb-text-error { margin: var(--s-2) 0 0; cursor: help; }
 
 
 /* ---------- Skill editor (fields view in Project Control) ---------- */
-/* The column and its gap are a `Stack direction="column" gap={4}`; the inset and the scroller are the
-   editor's own. */
-.skill-editor { padding: var(--s-5) var(--s-6); overflow-y: auto; }
+/* The column, its gap and its inset are a `Stack direction="column" gap={4} pad={[5,6]}`. The scroller is
+   what is left, and `overflow` is a frame's business rather than a gap's. */
+.skill-editor { overflow-y: auto; }
 /* `.skill-row` IS GONE — it was `.vb-row` declaration for declaration. */
 /* The rail label and the box are the primitive's. What the editor still says is that a field takes the
    slack beside its label, and that the prompt is a monospace box you can drag taller. */

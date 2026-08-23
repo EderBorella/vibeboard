@@ -18,8 +18,8 @@
 /* A `Row as="li" stack variant="inset" interactive`. A project in the recents list has no VOICE — it is a
    region of a list that takes a click, which is the line Phase 4 drew between the two primitives — and it
    draws its box at rest, which is what `inset` is and `flat` is not. The stack of name over path is
-   `.vb-list`'s and the hover edge is `.vb-row-hit`'s, so both rules that were here are gone. */
-.gate-list-name { font-weight: 600; }
+   `.vb-list`'s and the hover edge is `.vb-row-hit`'s, so both rules that were here are gone.
+   `.gate-list-name` IS GONE TOO — `Text weight="medium"`, which is the one declaration it held. */
 .gate .vb-field { margin-top: var(--s-5); }
 /* `.gate-row` IS GONE — a `Row`, at the one call site it had. */
 .gate .vb-ctl { flex: 1; }

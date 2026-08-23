@@ -42,7 +42,12 @@
   background: var(--panel); border: 1px solid var(--border);
   border-radius: var(--r-lg); padding: var(--s-7);
 }
-.gate-preview { margin-top: var(--s-5); font-size: var(--t-small); color: var(--muted); }
+/* A `Text as="p"`, and the tag is what unblocked it: the step and the muted ink were always the atom's
+   default, but `Text` rendered a `<span>` and a vertical margin does not apply to an inline box — so this
+   class could not be reduced at all until `as` existed. The margin is what is left, and it stays: it
+   separates two siblings, which is a `Stack gap`, but `.gate-card` is a 520px drawn box in block flow
+   whose other children are spaced by their own heading margins. */
+.gate-preview { margin-top: var(--s-5); }
 
 /* THE SPLIT (decision 48). The atomic revamp's template layer lists this among `AppShell`'s holes — see
    docs/design-system.md, *The atomic revamp: the layer tree* — and that is where it is

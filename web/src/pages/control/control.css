@@ -39,8 +39,9 @@
 
 
 /* Resources links registry */
-/* The column and its gap are a `Stack direction="column" gap={3}`; the scroller is what is left. */
-.resources-table { flex: 1; overflow-y: auto; padding: var(--s-5) var(--s-6); }
+/* The column, its gap and its inset are a `Stack direction="column" gap={3} pad={[5,6]}`; the frame it
+   fills and the scroller are what is left. */
+.resources-table { flex: 1; overflow-y: auto; }
 /* `.resource-row` IS GONE — a `Row`, and its gap moved from `--s-3` to `--s-4` with the other six. */
 /* `.resource-row input` was `.vb-ctl` DECLARATION FOR DECLARATION, focus rule included, and it died
    in Phase 9. Only the three widths are the row's own. */

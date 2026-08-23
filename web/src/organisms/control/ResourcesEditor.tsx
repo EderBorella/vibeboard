@@ -65,7 +65,7 @@ export function ResourcesEditor({ onError }: { onError: (e: string | null) => vo
 
   return (
     <>
-      <Stack gap={4} className="vb-editor-head">
+      <Stack gap={4} pad={[4, 6]} edge="bottom" className="vb-editor-head">
         <Readout>Links registry{dirty ? ' •' : ''}</Readout>
         <div className="vb-row push">
           <Button size="md" onClick={add}>
@@ -76,7 +76,7 @@ export function ResourcesEditor({ onError }: { onError: (e: string | null) => vo
           </Button>
         </div>
       </Stack>
-      <Stack direction="column" gap={3} className="resources-table">
+      <Stack direction="column" gap={3} pad={[5, 6]} className="resources-table">
         {links.length === 0 && (
           <Text lead className="empty">
             No links yet. Add references the copilot can consult.

@@ -96,7 +96,11 @@ export function ProjectGate({ onOpened }: Props) {
                 disabled={busy !== null}
                 onClick={() => run(() => openProject(p.path))}
               >
-                <span className="gate-list-name">{p.name}</span>
+                {/* `size`/`ink` inherit so the atom changes nothing but the weight — the step and the
+                    ink are the row's. */}
+                <Text weight="medium" size="inherit" ink="inherit">
+                  {p.name}
+                </Text>
                 <Readout>{p.path}</Readout>
               </Row>
             ))}
@@ -133,15 +137,15 @@ export function ProjectGate({ onOpened }: Props) {
           </Row>
         </Field>
         {relativeParent && (
-          <div className="gate-preview">
+          <Text as="p" className="gate-preview">
             Give an absolute path, starting with <code>/</code>. A relative one is resolved against
             VibeBoard's own folder rather than yours.
-          </div>
+          </Text>
         )}
         {targetPath && (
-          <div className="gate-preview">
+          <Text as="p" className="gate-preview">
             Creates <code>{targetPath}</code>
-          </div>
+          </Text>
         )}
 
         {error && <Notice tone="bad">{error}</Notice>}

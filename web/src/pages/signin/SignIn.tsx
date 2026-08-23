@@ -32,9 +32,9 @@ export function SignIn({ phase, onRetry }: Props) {
             {/* The address, so the user can tell their own request apart from somebody else's. The
                 User-Agent is deliberately NOT repeated here — it means nothing to the person reading
                 this screen, and it is the approving end that needs to recognise the device. */}
-            <p className="gate-preview">
+            <Text as="p" className="gate-preview">
               That message will show this address: <code>{phase.address}</code>
-            </p>
+            </Text>
             <Text role="hint">Leave this page open — it continues on its own once you allow it.</Text>
           </>
         )}

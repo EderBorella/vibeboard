@@ -16,26 +16,24 @@
    obviously broken.
    The controls on the right stay centred: a <select> has a baseline of its own that has nothing to do with
    the text beside it, and aligning to it drags the whole cluster. See .topbar-right below. */
-/* THE ROW ITSELF IS A `Stack align="baseline" wrap gap={5}` as of the layout atom — the four
-   declarations above this rule's padding were exactly that, and the reasoning above is why the options
-   read as they do. What is left here is the BAND: its inset, its ground, its edge and the fact that it
-   stays put. */
+/* THE ROW ITSELF IS A `Stack align="baseline" wrap gap={5} pad={[4,6]} edge="bottom"` as of the layout
+   atom — the four declarations above, this rule's inset and the hairline under it were exactly that, and
+   the reasoning above is why the options read as they do. What is left here is the band's GROUND and the
+   fact that it stays put; a gradient and a stacking context are not layout. */
 .topbar {
-  padding: var(--s-4) var(--s-6);
   background: linear-gradient(var(--panel), var(--panel));
-  border-bottom: 1px solid var(--border);
   position: sticky; top: 0; z-index: var(--z-chrome);
 }
 /* The one thing in the bar that was never sized: it rode the UA's 16px, which is off the scale.
    `--t-lead` is the nearest step, and it keeps the brand the largest text in the row — which is the
-   hierarchy the baseline alignment below was written to serve. */
+   hierarchy the baseline alignment below was written to serve. That step, the display family, the 700 and
+   the `--text` ink are a `Text size="lead" family="display" weight="bold" ink="strong"` now.
+   THE TRACKING IS NOT `caps`'s. `.vb-text-caps` carries `var(--track)` beside its `text-transform`, and
+   this is 0.22em — roughly three times it, because a five-letter wordmark is read as a shape rather than
+   as a word. So the pair stays here: taking `caps` would have changed the one number this rule is for. */
 .brand {
-  font-family: var(--font-display);
-  font-size: var(--t-lead);
-  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.22em;
-  color: var(--text);
 }
 .brand::before { content: "▚ "; color: var(--accent); }
 /* Truncates rather than forcing the row to wrap. A long project name is the most likely thing to make
@@ -95,7 +93,11 @@
    WHAT IS LEFT IS THIS ROW'S, and only this row's: the word is `text-align: left` inside its fixed box,
    because a `<button>` centres its text by UA default — so the label sat 24px in from where the dot
    leaves off and shuffled sideways as the state name changed length. The fixed width exists to stop the
-   TABS moving, not to make the label wander inside it. */
+   TABS moving, not to make the label wander inside it.
+   AND `Button align="start"` CANNOT REACH IT, which is why this survived the option being added for it.
+   This is not a `<Button>`: `StatusChip` hands the class to `Popover`, which renders its own `<button>`
+   carrying `chipClasses` — so `.vb-btn[data-align='start']` matches nothing here, and neither molecule
+   takes an `align`. Closing it means a prop on both, which is a change to the molecule layer. */
 .conn-status { text-align: left; }
 /* NO FIXED WIDTH, AND THE REASON IT HAD ONE IS WITHDRAWN RATHER THAN FORGOTTEN. It was `width: 12ch`,
    sized to `unauthorized`, the longest name the light can report — so a reconnect could not change the

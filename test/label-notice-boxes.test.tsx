@@ -64,8 +64,7 @@ describe('the uppercase section labels', () => {
   // rather than a declaration — a class-only fixture cannot express either, and would report `undefined`
   // for both while the call sites draw exactly what this table claimed.
   const LABELS: [string, string][] = [
-    ['cs-head', 'var(--muted)'],
-    // SIX ROWS LEFT THIS TABLE IN PHASE 8 AND THEY ARE ALL IN `MIGRATED` BELOW. Three groups migrated
+    // SEVEN ROWS LEFT THIS TABLE IN PHASE 8 AND THEY ARE ALL IN `MIGRATED` BELOW. Three groups migrated
     // these in parallel and each rewrote this table for its own two or three, which is what made the
     // merge conflict: `.ap-drawer-head` and `.settings-section`, `.links-group`, and `.diary-kind` /
     // `.filed-state` / `.tile-group`. A row here asserts what a hand-written CLASS LIST draws; once the
@@ -88,8 +87,9 @@ describe('the uppercase section labels', () => {
   // state is `data-ink`. So the fixture is the element AS RENDERED, class list and attribute, written out
   // here rather than reached through `label()` for the reason this file already gives: a fixture that
   // cannot carry the attribute cannot see the rule that draws the ink.
-  // What each class still says is a STEP — `--t-micro` for five of the six — which has no `Text` option
-  // and did not get one.
+  // What each class still says is a STEP — `--t-micro` for five of the seven — except `.cs-head`, which
+  // says the 2px UNDER its one line: a gap is uniform across a column, and one child wanting more room
+  // below itself is the thing `Stack gap` cannot express.
   // AN EMPTY INK IS NOT A MISSING ROW: it is the two that keep the atom's muted default, and asserting
   // them here is what distinguishes "the default is right" from "the attribute was dropped".
   // AND FOUR OF THESE HAVE NO CLASS LEFT TO NAME, as of wave 2 — `.diary-kind`, `.filed-state`,
@@ -99,6 +99,10 @@ describe('the uppercase section labels', () => {
   // alone, so the row would pass whatever happened to the element. They are asserted below on the
   // attribute pair, plus a negative that says the classes are really gone.
   const MIGRATED: [string, string, string][] = [
+    // `.cs-head` is here and `.ap-drawer-head` is NOT, and the difference is whether a class survives:
+    // the skills head kept a `margin-bottom` so its face is still worth asserting against its class list,
+    // while the drawer head kept nothing and is in `GONE` below.
+    ['cs-head', '', 'var(--muted)'],
     ['links-group', '', 'var(--muted)'],
     ['settings-section', 'accent', 'var(--accent)'],
   ];
@@ -247,8 +251,12 @@ describe('the empty-state lines', () => {
     ['mp-empty', 'padding'],
     ['cards-gone', 'padding'],
     ['control-empty', 'padding'],
-    ['explorer-more', 'font-size'],
-    ['cs-empty', 'font-size'],
+    // THESE TWO NO LONGER KEEP A STEP, and that is the wave that gave `Text` a `size`: both were one
+    // `--t-micro`, which is `size="micro"` now. `.explorer-more`'s was DEAD where it was — the class is on
+    // the wrapper and the words are in a `<Text>` inside it, so `.vb-text`'s `--t-small` won. What each
+    // still says is where the line sits.
+    ['explorer-more', 'padding'],
+    ['cs-empty', 'margin-top'],
   ])('.%s keeps only its %s', (cls, prop) => {
     const own = box(label(cls, 'p'));
     const shared = box(label('vb-text vb-text-quiet vb-text-lead', 'p'));

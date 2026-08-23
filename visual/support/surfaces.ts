@@ -158,7 +158,9 @@ export const SURFACES: Surface[] = [
       // are the proof, not the drawer.
       await expect(page.locator('[data-testid="dock-body"] .cards-pane')).toBeVisible();
       await expect(page.locator('.cardview .cv-title')).toBeVisible();
-      await gone(page, '.cards-gone');
+      // KEYED ON THE TEST HANDLE, not on `.cards-gone`. Selecting a style class here was the only thing
+      // keeping that class alive — the same fault as check 14 and `.ap-bar-end`, in the same sweep.
+      await gone(page, '[data-testid="cards-gone"]');
       // Tabs of its own, which is the half of this surface a board-only harness could never see.
       await expect(page.locator('.cards-tabs .vb-tab').first()).toBeVisible();
       // The skill rail, and the card's own run list — both of which only exist beside an open card.

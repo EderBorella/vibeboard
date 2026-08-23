@@ -898,7 +898,12 @@ test('12. the affordances are big enough to see', async ({ board, theme }) => {
       // and it resolves in the organism phase as a `Row`, which empties this list and makes this claim the
       // whole surface. Excluded BY NAME rather than by "everything that is not an atom", which is what
       // makes the list shrink visibly in the commit that deletes each one.
-      const NOT_AN_ATOM_YET = ['board-label'];
+      // `NOT_AN_ATOM_YET` IS GONE AND THE LIST IS EMPTY FOR GOOD. It held `board-label` to the end, and
+      // Phase 8 deleted that class — which left the filter matching nothing and silently admitted the row
+      // it was protecting into the one-height population. That is the failure mode this file has now hit
+      // three times: a filter keyed on a NAME goes inert the moment the name is retired, and an inert
+      // filter reads as a clean pass. The exclusion below is keyed on WHAT THE ELEMENT IS, like the other
+      // three, so it cannot rot when a class is renamed.
       const shown = (el: HTMLElement): boolean => {
         const style = getComputedStyle(el);
         if (style.visibility === 'hidden' || style.display === 'none') return false;
@@ -929,14 +934,26 @@ test('12. the affordances are big enough to see', async ({ board, theme }) => {
       //
       //   A GROUPED TAB CELL IS A PART OF A GROUP. See the note above `controls`, and the derived claim
       //   below: the group owns the border, so a cell is exactly 2px shorter.
+      //
+      //   A ROW IS A REGION OF A LIST AND NOT A CONTROL BOX, which is the fourth, and Phase 8 is what
+      //   made it necessary: the board heads are `<Row as="button">` now. `Row`'s own file draws the line
+      //   — "a row you can click is a region of a list rather than a control with a voice, the line
+      //   `Surface` draws between itself and `Button`" — and `atoms/surface.css` says a container's height
+      //   is its content's, which is why nothing in that chain declares one. A board head measures 31.4px
+      //   (a 17.4px caps line plus `--s-3` twice plus a 1px border) and that number is EMERGENT rather
+      //   than chosen, so admitting it as a second constant would re-introduce exactly the defect the atom
+      //   phase deleted the `+ 2` tolerance to expose. Claimed below instead: every row on the surface is
+      //   one height as a SET, which three disagreeing board heads would fail.
       const isMarker = (el: HTMLElement): boolean => el.classList.contains('vb-chip');
+      const isRow = (el: HTMLElement): boolean => el.classList.contains('vb-row');
       const surfaceControls = operable
         .filter((el) => !el.matches('.vb-tabs-grouped .vb-tab'))
-        .filter((el) => !NOT_AN_ATOM_YET.some((cls) => el.classList.contains(cls)))
         .filter((el) => !isMarker(el))
+        .filter((el) => !isRow(el))
         .filter((el) => el.tagName !== 'TEXTAREA')
         .map(measured);
       const areas = operable.filter((el) => el.tagName === 'TEXTAREA').map(measured);
+      const rows = operable.filter(isRow).map(measured);
       // A CELL AND ITS OWN GROUP, PAIRED, so the 2px is derived from the group on the page rather than
       // asserted as a number. A grouped cell is excluded from every height claim in this file with the
       // comment that including it "would make the claim everything is one size false by construction" —
@@ -961,6 +978,7 @@ test('12. the affordances are big enough to see', async ({ board, theme }) => {
         controls,
         surfaceControls,
         areas,
+        rows,
         cells,
         group: group ? rect(group).height : null,
         titles: titles.length,
@@ -1060,6 +1078,17 @@ test('12. the affordances are big enough to see', async ({ board, theme }) => {
     `the board's controls are ${heights.length} heights, not one: ${[...new Set(seen.surfaceControls.map((c) => `${c.h}px`))].join(', ')} — ${seen.surfaceControls
       .map((c) => `${c.id} ${c.h}`)
       .join(', ')}`,
+  ).toBe(1);
+  // 6b. AND EVERY CLICKABLE ROW ON THE SURFACE IS ONE HEIGHT. A row comes out of the population above by
+  //     KIND rather than by name, so this is the claim that protects it: three board heads whose heights
+  //     disagreed would fail here. Asserted as a SET and not against a constant, because a row's height is
+  //     its content's by `Surface`'s own design — pinning a number would make the next label change fail a
+  //     check about nothing, which is how the `+ 2` tolerance got added and then had to be deleted.
+  expect(seen.rows.length, 'no clickable rows on the board to measure').toBeGreaterThan(1);
+  const rowHeights = [...new Set(seen.rows.map((r) => r.h))];
+  expect(
+    rowHeights.length,
+    `the board's rows are ${rowHeights.length} heights, not one: ${rowHeights.map((h) => `${h}px`).join(', ')} — ${seen.rows.map((r) => `${r.id} ${r.h}`).join(', ')}`,
   ).toBe(1);
   // 7. AND THE THREE POPULATIONS THAT ARE NOT ONE-LINE CONTROLS ARE CLAIMED RATHER THAN DROPPED.
   //    A textarea starts at or above the control height — it is the same box with more than one line in

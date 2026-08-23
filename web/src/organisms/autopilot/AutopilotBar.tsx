@@ -183,11 +183,17 @@ function TransportChip({ model }: { model: TransportModel }) {
   return (
     <StatusChip
       state={model.state}
-      word={model.word}
+      // `.ap-chip` IS GONE. Its whole content was `text-transform: lowercase`, and `word` has always
+      // been a node rather than a string — so the case is a `Text lower` on the label, and
+      // `size`/`ink` say `inherit` so the wrapper changes nothing else the chip already decided.
+      word={
+        <Text lower size="inherit" ink="inherit">
+          {model.word}
+        </Text>
+      }
       advice={model.advice}
       title={model.status || model.word}
       pulse={model.state === 'running'}
-      className="ap-chip"
       testId="ap-chip"
     />
   );
@@ -397,7 +403,7 @@ export function AutopilotBar({
         )}
 
         {/* THE MIDDLE OF THE ROW, and the `push` is what puts it there. `margin-left: auto` on this and on
-            `.ap-bar-end` below splits the free space in two, so the group floats between the controls that
+            the end group below splits the free space in two, so the group floats between the controls that
             act on the loop and the controls that explain it. Two auto margins rather than
             `justify-content: space-between` on the row: the row's first four children are a group of their
             own without a wrapper, and space-between would spread those four apart as well. */}
@@ -419,8 +425,12 @@ export function AutopilotBar({
             sitting in the same undifferentiated queue as the Start button.
             `.ap-inline` IS GONE, and this wrapper is why: it was `flex: none` written three times, once on
             each of these buttons, and a group that does not shrink does not need its children to say so
-            individually. */}
-        <div className="ap-bar-end">
+            individually.
+            `.ap-bar-end` IS GONE TOO, and the test handle is what let it go: the class was
+            `margin-left: auto` plus `flex: none` — `.push` and `.vb-fixed` exactly — and the only thing
+            keeping the NAME alive was visual/checks/board.spec.ts reading the group through it. It reads
+            `[data-testid]` now, so the declarations and the handle are both said once. */}
+        <Stack gap={4} className="push vb-fixed" testId="ap-bar-end">
           {model.expandable && (
             // `ghost`, and this is the call the owner left open. A disclosure toggle EXPLAINS: it reveals
             // the bar's own detail and changes nothing in the project — same category as "How it works",
@@ -454,7 +464,7 @@ export function AutopilotBar({
           >
             Settings
           </Button>
-        </div>
+        </Stack>
       </Stack>
 
       {/* One banner for both actions. They cannot be in flight together — each disables its own
@@ -496,9 +506,10 @@ export function AutopilotBar({
       {open && (
         <div className="ap-drawer" data-testid="ap-drawer">
           {/* The space under each head is the cell's gap rather than a margin on the head — which is what
-              lets the head be a `Text`, since a margin on an inline span draws nothing. */}
+              lets the head be a `Text`, since a margin on an inline span draws nothing.
+              `.ap-drawer-head` IS GONE: the step was its only declaration and `size="micro"` is it. */}
           <Stack direction="column" gap={3}>
-            <Text caps className="ap-drawer-head">
+            <Text caps size="micro">
               Working on
             </Text>
             {model.doing.length === 0 ? (
@@ -517,7 +528,7 @@ export function AutopilotBar({
             )}
           </Stack>
           <Stack direction="column" gap={3}>
-            <Text caps className="ap-drawer-head">
+            <Text caps size="micro">
               Stopping it from starting
             </Text>
             {model.missing.length === 0 ? (

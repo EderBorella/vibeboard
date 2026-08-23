@@ -37,8 +37,11 @@
    than a casualty: it beat the selected row's accent ink at equal specificity, so the chosen model's
    name was the one thing in the list that did not say it was chosen. */
 /* A favourite is already lit; it does not need a hover to say so. `--accent-2` at rest is the colour,
-   and `bare`'s muted default is what it overrides. */
-.mp-star { color: var(--accent-2); }
+   and `bare`'s muted default is what it overrides.
+   `.mp-star` IS GONE — `Text ink="accent2"` inside the `<Button>`, for `.control-new`'s reason. It also
+   settles the hover the class was losing: `.vb-btn-bare:hover` is (0,3,0) and beat this rule, so a star
+   that had just said it was lit went `--accent` under the pointer. The ink is on the label now, so the
+   sentence above is finally true of what is drawn. */
 /* `Chip pill accent`, and the border is the one thing it keeps: the tone's edge is a 50% mix with the
    border colour, and this marker is the only place in the picker that states a default. */
 .mp-def-tag {
@@ -79,14 +82,22 @@
 .cv-link-btn:hover .vb-clip { color: var(--accent); }
 /* A FILE LIST'S THREE MARKS, worn by Project Control's list and by the Explorer's tree. Accent at rest,
    not on hover: a `＋` that creates is the affordance of the group head it sits in, and a muted one reads
-   as disabled. */
-.control-new { color: var(--accent); }
+   as disabled.
+   `.control-new` IS GONE, AND `Text ink="accent"` INSIDE THE `<Button>` IS WHY IT COULD GO. A bare
+   `<Text>` used to force `--t-small` and `--muted` onto a button's label, so an ink on a `bare` button was
+   unreachable from the atom and had to be a class; `size="inherit" ink="accent"` changes only the colour.
+   `bare`'s own `:hover` accent is what this already equalled, so the glyph reads the same in both states,
+   which is what "accent at rest, not on hover" was asking for. */
 /* A `Chip` with no `pill`, which is the square-ish corner the primitive defaults to. `--accent-2` is not
    one of the five tones and must not be forced into one — themes.css gives it a different value from
-   `--warn` in marshmallow — so the ink stays here, as `.ap-chip`'s does. */
-.control-tag {
-  text-transform: uppercase; letter-spacing: var(--track); color: var(--accent-2);
-}
+   `--warn` in marshmallow — which is why the ink is `data-ink` rather than `--tone`.
+   `.control-tag` IS GONE, and all three of its declarations went to one nested `Text caps ink="accent2"`.
+   IT WAS BLOCKED ON THE NESTING AND ON NOTHING ELSE: a `<Text>` inside a `<Chip>` used to overwrite the
+   chip's `--t-micro` step with `--t-small`, so the caps face could not be reached from in there and the
+   class wrote all three by hand. `size="inherit"` is what makes it safe.
+   WHAT CHANGES, said rather than smoothed over: `caps` carries `--font-display` as of this phase and this
+   class did not, so the three markers are drawn in the eyebrow face now. That is Phase 8's caps ruling
+   applied, not a decision taken here. */
 .control-empty { padding: 0 var(--s-4); }
 /* AN EMPTY COLUMN, in the Project Log and in the dock's Suggestions pane. Not `.empty`: that one is
    `margin: auto` centred furniture, and this is the first thing in a column that has an action under it.
@@ -100,17 +111,19 @@
    now. This one is `Text lead ink="strong"` — the 1.5 line and `var(--text)` exactly — with the STEP left
    behind, because `--t-lead` has no option and must not be given one: three steps with a name each is what
    the scale is for. The Project Log wrote it on a `<p>` and the Suggestions pane on a `<span>`, so the
-   diary's title also carried a UA paragraph margin nobody chose; the atom is a span at both. */
-.filed-title { font-size: var(--t-lead); }
+   diary's title also carried a UA paragraph margin nobody chose; the atom is a span at both.
+   AND THE STEP IS AN OPTION NOW, so the class is gone: `Text lead size="lead" ink="strong"` is the 1.5
+   line, the `--t-lead` step and `var(--text)` — the three things this shape ever was. `lead` and `size`
+   together are not a contradiction: `lead` is the looser line and `size` outranks its step at (0,1,1). */
 /* A SECTION HEADING INSIDE A PANEL — Settings' three, the auto-pilot panel's and the sign-in panel's.
    `Text caps ink="accent"` carries the face: the uppercase, the tracking, `--t-small` and the accent ink
    are four of the eight declarations and none of them was this surface's decision. What is left is the
    RULE UNDER THE WORDS, which is the only thing that makes this a section rather than a label.
-   `font-family` STAYS UNTIL `.vb-text-caps` CARRIES IT. The display family belongs on the caps face — six
-   classes are display + uppercase + track — but that is an atom edit and only Group A of this phase may
-   make it. If it lands, this declaration is redundant and should go with the same commit's census. */
+   `font-family` IS GONE: `.vb-text-caps` carries the display family as of Phase 8's caps ruling, and this
+   was one of the eight hand-written copies that ruling names. What is left is the rule under the words and
+   the space around them — and it stays a class because this element is a `Text`, not a `Stack`: `pad` and
+   `edge` are the layout atom's, and a section heading is one line of prose rather than a flex box. */
 .settings-section {
-  font-family: var(--font-display);
   margin-top: var(--s-3);
   border-bottom: 1px solid var(--border);
   padding-bottom: var(--s-2);

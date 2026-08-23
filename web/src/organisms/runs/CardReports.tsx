@@ -1,6 +1,7 @@
 import { Button } from '../../atoms/Button';
 import { Chip } from '../../atoms/Chip';
 import { Readout } from '../../atoms/Readout';
+import { Stack } from '../../atoms/Stack';
 import { Surface } from '../../atoms/Surface';
 import { Text } from '../../atoms/Text';
 import type { CardLedgerData, RunRecord, RunStatus } from '../../lib/api';
@@ -46,7 +47,10 @@ function when(record: RunRecord): string {
 export function CardReports({ card, runs, account, onOpen, onCancel, onForgiven }: Props) {
   if (runs.length === 0) return null;
   return (
-    <section className="reports" aria-label="Reports">
+    // `<section aria-label>` IS A `Stack` NOW — the tag and the name are what kept the flex column here.
+    // `edge="top"` is the hairline; the `padding-top` stays on the class because `pad` sets a whole axis
+    // and this is one edge of one.
+    <Stack as="section" label="Reports" direction="column" gap={2} edge="top" className="reports">
       <Text caps>Reports</Text>
       {[...runs].reverse().map((r) => (
         <Row key={r.run} className={r.resolved ? 'resolved' : undefined}>
@@ -90,7 +94,7 @@ export function CardReports({ card, runs, account, onOpen, onCancel, onForgiven 
         </Row>
       ))}
       {account && <CardLedger card={card} account={account} onForgiven={onForgiven} />}
-    </section>
+    </Stack>
   );
 }
 

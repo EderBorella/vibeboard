@@ -141,7 +141,7 @@ function FiledList({ suggestions }: { suggestions: Suggestion[] }) {
               )}
             </Stack>
           )}
-          <Text lead ink="strong" className="filed-title">
+          <Text lead size="lead" ink="strong">
             {s.title}
           </Text>
           {/* `.filed-text` IS DELETED: it was `--t-body`, 1.5 and `--muted`, which is `Text lead`

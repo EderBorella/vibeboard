@@ -54,11 +54,14 @@ export function ControlFileList({
               <Button
                 variant="bare"
                 size="sm"
-                className="control-new push"
+                className="push"
                 title={`New ${g.label.toLowerCase().replace(/s$/, '')}`}
                 onClick={() => onNew(g.key)}
               >
-                ＋
+                {/* `.control-new` IS GONE: the accent is a nested `Text`'s ink. */}
+                <Text size="inherit" ink="accent">
+                  ＋
+                </Text>
               </Button>
             )}
           </Row>
@@ -112,7 +115,14 @@ export function ControlFileList({
                 onDoubleClick={() => onStartRename(f)}
               >
                 <span className="vb-clip">{f.name}</span>
-                {f.managed && <Chip className="control-tag">managed</Chip>}
+                {/* `.control-tag` IS GONE — the caps face and the ink are a nested `Text`'s. */}
+                {f.managed && (
+                  <Chip>
+                    <Text caps size="inherit" ink="accent2">
+                      managed
+                    </Text>
+                  </Chip>
+                )}
               </Row>
             ),
           )}

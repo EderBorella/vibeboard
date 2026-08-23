@@ -128,8 +128,21 @@ function NodeRow(props: NodeRowProps) {
         {icon(node)}
       </Text>
       <span className="vb-clip">{node.name}</span>
-      {node.symlink && <Chip className="control-tag">link</Chip>}
-      {node.escapes && <Chip className="control-tag">outside</Chip>}
+      {/* `.control-tag` IS GONE — the caps face and the ink are a nested `Text`'s. */}
+      {node.symlink && (
+        <Chip>
+          <Text caps size="inherit" ink="accent2">
+            link
+          </Text>
+        </Chip>
+      )}
+      {node.escapes && (
+        <Chip>
+          <Text caps size="inherit" ink="accent2">
+            outside
+          </Text>
+        </Chip>
+      )}
       <Readout>{formatBytes(node.size)}</Readout>
     </Row>
   );
@@ -216,42 +229,37 @@ export function FileTree(props: Props) {
       >
         <span>{dragging && rootDroppable ? 'Drop here for the project root' : 'Files'}</span>
         <Stack gap={1} className="explorer-actions">
-          <Button
-            variant="bare"
-            size="sm"
-            className="control-new"
-            title={`New file in ${where}`}
-            onClick={() => props.onNew('file')}
-          >
-            📄＋
+          <Button variant="bare" size="sm" title={`New file in ${where}`} onClick={() => props.onNew('file')}>
+            {/* `.control-new` IS GONE: the accent ink is a nested `Text`'s at all four. */}
+            <Text size="inherit" ink="accent">
+              📄＋
+            </Text>
           </Button>
           <Button
             variant="bare"
             size="sm"
-            className="control-new"
             title={`New folder in ${where}`}
             onClick={() => props.onNew('dir')}
           >
-            📁＋
+            <Text size="inherit" ink="accent">
+              📁＋
+            </Text>
           </Button>
           <Button
             variant="bare"
             size="sm"
-            className="control-new"
             title={selected ? `Delete ${selected.name}` : 'Select something to delete'}
             disabled={!selected}
             onClick={props.onDelete}
           >
-            ✕
+            <Text size="inherit" ink="accent">
+              ✕
+            </Text>
           </Button>
-          <Button
-            variant="bare"
-            size="sm"
-            className="control-new"
-            title="Re-read the project from disk"
-            onClick={props.onRefresh}
-          >
-            ⟳
+          <Button variant="bare" size="sm" title="Re-read the project from disk" onClick={props.onRefresh}>
+            <Text size="inherit" ink="accent">
+              ⟳
+            </Text>
           </Button>
         </Stack>
       </div>

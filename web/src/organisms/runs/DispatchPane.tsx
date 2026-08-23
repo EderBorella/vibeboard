@@ -79,14 +79,23 @@ export function DispatchPane({
     });
 
   return (
-    <section className="dispatch" aria-label={`Run ${skill.name} on ${card.id}`}>
+    // `<section aria-label>` IS A `Stack` NOW; the name and the tag are what kept the flex column in the
+    // sheet. Nothing of `.dispatch` is left to declare — the NAME survives only because three descendant
+    // rules reach through it (`.dispatch-row .vb-trigger`, `.dispatch > .vb-ctl`, the quiet line's margin).
+    <Stack
+      as="section"
+      label={`Run ${skill.name} on ${card.id}`}
+      direction="column"
+      gap={4}
+      className="dispatch"
+    >
       <Stack as="header" gap={4}>
         <Button size="sm" onClick={onBack} title="Back to the card">
           ←
         </Button>
         {/* `ink="strong"`: the class named no ink and inherited the body's, and the atom's default is
-            muted. */}
-        <Text ink="strong" className="dispatch-title">
+            muted. `.dispatch-title` IS GONE — the display family and the `--t-lead` step are attributes. */}
+        <Text ink="strong" size="lead" family="display">
           {skill.name} <Readout>on {card.id}</Readout>
         </Text>
       </Stack>
@@ -174,6 +183,6 @@ export function DispatchPane({
           {busy ? 'A run is in flight' : `Run ${skill.name}`}
         </Button>
       </Stack>
-    </section>
+    </Stack>
   );
 }

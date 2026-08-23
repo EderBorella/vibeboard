@@ -173,7 +173,7 @@ export function SuggestionsPane({ suggestions, failed, onRefresh, onApply }: Pro
                   data-testid="suggestions-pick"
                   onClick={() => pick(s.id)}
                 >
-                  <Text lead ink="strong" className="filed-title">
+                  <Text lead size="lead" ink="strong">
                     {s.title}
                   </Text>
                   <FigureRow as="div">

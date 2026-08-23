@@ -92,8 +92,11 @@ describe('the uppercase section labels', () => {
   // and did not get one.
   // AN EMPTY INK IS NOT A MISSING ROW: it is the two that keep the atom's muted default, and asserting
   // them here is what distinguishes "the default is right" from "the attribute was dropped".
+  // `.ap-drawer-head` HAS LEFT THIS TABLE AND IS IN `GONE` BELOW: the step was the only thing it still
+  // held, and `--t-micro` is `Text size="micro"` as of wave 2. A row here would name a class that draws
+  // nothing, so both of its assertions would be answered by `.vb-text-caps` alone and the row would pass
+  // whatever happened to the head.
   const MIGRATED: [string, string, string][] = [
-    ['ap-drawer-head', '', 'var(--muted)'],
     ['links-group', '', 'var(--muted)'],
     ['settings-section', 'accent', 'var(--accent)'],
     ['diary-kind', 'strong', 'var(--text)'],
@@ -126,10 +129,20 @@ describe('the uppercase section labels', () => {
     expect(box(label('vb-text vb-text-caps'))['font-family']).toBe('var(--font-display)');
   });
 
-  // The two that name NO ink and inherit one. Merging them onto a primitive that names `--muted` would
-  // be a visible change to whatever they sit in, so they are named here rather than assumed.
-  it.each([['exec-head'], ['report-prompt-label']])('.%s names no ink of its own', (cls) => {
+  // The one that names NO ink and inherits one. Merging it onto a primitive that names `--muted` would
+  // be a visible change to whatever it sits in, so it is named here rather than assumed.
+  // `.report-prompt-label` WAS THE SECOND AND IS IN `GONE` BELOW, for `.ap-drawer-head`'s reason.
+  it.each([['exec-head']])('.%s names no ink of its own', (cls) => {
     expect(box(label(cls)).color).toBeUndefined();
+  });
+
+  // THE TWO STEPS THAT BECAME `size=`, asserted as the negative they replace. Both classes held exactly
+  // one `font-size` — `--t-micro` — and both are now an attribute on the `Text` that was already there.
+  // Asserted rather than deleted from the suite because a class quietly coming back is how a step gets a
+  // second spelling again, and because a live rule here would silently outrank `[data-size]` at equal
+  // specificity from a later sheet.
+  it.each([['ap-drawer-head'], ['report-prompt-label']])('.%s is gone, replaced by the step', (cls) => {
+    expect(box(label(cls))['font-size']).toBeUndefined();
   });
 
   // THE DEFECT, NOW FIXED. It was written as the contract and marked `it.fails`, so it flipped the

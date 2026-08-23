@@ -1,6 +1,11 @@
 /* ---------- Reports (a card's run history, and one report) ---------- */
 /* Deliberately not link-shaped: chips and times, so it cannot be mistaken for the card links. */
-.reports { display: flex; flex-direction: column; gap: var(--s-2); border-top: 1px solid var(--border); padding-top: var(--s-4); }
+/* A `Stack as="section" label="Reports"` DRAWS THE COLUMN AND THE HAIRLINE, which it could not before:
+   the atom rendered neither a `section` nor an `aria-label`, so the whole shape stayed here.
+   THE `padding-top` IS WHY THE NAME SURVIVES, and it is the one gap `pad` has: `pad={[N, M]}` sets
+   `padding-block`, which is BOTH edges, and this is the top edge alone. A single-edge padding has no
+   spelling on the atom. Same for `.options` below. */
+.reports { padding-top: var(--s-4); }
 /* `.report-row` IS GONE — a `Row`. `.resolved` stays as the state the row wears; the two rules under it
    are keyed on `.vb-row` so they cannot reach a `.resolved` that is not one. */
 /* A `Surface` with the `flat` variant. What is left is where the box sits and how it lays its parts out;
@@ -34,12 +39,14 @@
 .vb-row.resolved .report-skill { color: var(--muted); }
 /* `.report-dismiss` IS IN `pages/execution/execution.css` — the execution page is its only reader. */
 
-/* NOT A `Stack`, and the reason is the `<article aria-label>`: the layout atom renders neither an
-   `article` nor an `aria-label`, so the flex column it would have carried stays here. Same for
-   `.reports`, `.options` and `.dispatch` — see the report on this phase. */
-.report { display: flex; flex-direction: column; gap: var(--s-4); overflow-wrap: anywhere; }
-/* `.report-head` IS GONE — `<Stack as="header">`. */
-.report-title { font-family: var(--font-display); font-size: var(--t-lead); }
+/* A `Stack as="article" label={…}` NOW: the `article` tag and the `aria-label` are exactly what the atom
+   was missing, and they were the whole reason this and the three like it kept a flex column of their own.
+   `overflow-wrap` is what is left, and no atom carries it — a report quotes agent output, so an unbroken
+   200-character token has to break somewhere rather than widen the pane. */
+.report { overflow-wrap: anywhere; }
+/* `.report-head` IS GONE — `<Stack as="header">`.
+   `.report-title` IS GONE TOO: the display family and the `--t-lead` step were its only two declarations,
+   and `Text family="display" size="lead"` is both. */
 /* THE TWO-AXIS GAP IS WHY THIS IS NOT A `Stack`: `var(--s-2) var(--s-6)` is a row gap and a column gap,
    and `data-gap` takes one step. The `margin: 0` and the step are the `<dl>`'s own — its children are
    `dt`/`dd` pairs, so it cannot be a `Text` either. */
@@ -49,28 +56,33 @@
 /* Every value in this list is a `Readout` `plain` — see runs/ReportPane.tsx. What is left is the
    margin a `<dd>` arrives with. */
 .report-meta dd { margin: 0; }
-/* The step is `--t-lead`, which `Text` has no option for; the quoted edge is this surface's. */
-.report-lead { font-size: var(--t-lead); padding-left: var(--s-5); border-left: var(--rule) solid var(--accent); }
+/* THE STEP IS `size="lead"` NOW; the quoted edge is this surface's and stays. `border-left` is not
+   `edge`, which is one hairline on the block axis — this is a `--rule`-wide accent bar on the inline one,
+   which is what makes the summary read as quoted. */
+.report-lead { padding-left: var(--s-5); border-left: var(--rule) solid var(--accent); }
 /* `.report-note` AND `.report-prompt` ARE GONE — `Text lead` with `ink="accent2"` and without. */
-/* The caps face and the ink are `Text`'s; `--t-micro` is a step it has no option for. */
-.report-prompt-label { font-size: var(--t-micro); }
+/* `.report-prompt-label` IS GONE: the caps face was already `Text`'s and `--t-micro` is `size="micro"`. */
 .report-body { border-top: 1px solid var(--border); padding-top: var(--s-3); }
 /* `.report-created` and `.report-foot` ARE GONE — `<Stack direction="column" gap={2}>` and
    `<Stack gap={4} justify="end">`. */
 
 /* Options on a report that needs attention. The agent's suggestions and the fixed ones look the
    same on purpose — they all lead to the same editable prompt. */
-/* The `<section aria-label="What next">` is what keeps the flex column here rather than on a `Stack`. */
-.options { display: flex; flex-direction: column; gap: var(--s-2); border-top: 1px solid var(--border); padding-top: var(--s-4); }
+/* `Stack as="section" label="What next"` now. See `.reports` for why the `padding-top` cannot follow it. */
+.options { padding-top: var(--s-4); }
 /* `.options-warn` IS GONE — `Text role="error"`, which is what danger ink on a refusal means. */
 /* Left-aligned because an option is a whole sentence. `.option-fixed { border-style: dashed }` WENT WITH
    THE MIGRATION and its removal is a fix, not a casualty: this section's own comment says "the agent's
    suggestions and the fixed ones look the same on purpose — they all lead to the same editable prompt",
    and the dash was the one thing making them look different. Dashed also now means "explains", which a
    button that starts a run does not. */
-.option-btn { text-align: left; }
-/* A `Stack` now; the extra top margin is this row's, deliberately doubling the list's own gap so the
-   close row reads as the answer under the options rather than one more of them. */
+/* `.option-btn` IS GONE — `Button align="start"`. It was `text-align: left` and nothing else, at three
+   call sites in this file's one component, and undoing a primitive's centring is the primitive's job. */
+/* A `Stack`; the extra top margin is this row's, deliberately doubling the list's own gap so the close
+   row reads as the answer under the options rather than one more of them.
+   AND THAT IS WHY IT IS NOT THE PARENT'S `gap`. A margin between siblings usually is — but this one is an
+   INCREMENT on one child of a column that already has a gap, so folding it into `.options`'s `gap={2}`
+   would move every option button as well as this row. `Stack` has no per-child margin, correctly. */
 .options-close { margin-top: var(--s-2); }
 /* `.push` is `margin-left: auto` and this is the other side — the label holds the leading edge while the
    select and the button sit at the trailing one. */
@@ -89,17 +101,21 @@
    IT WAS IN `organisms/cards/cards.css`, because that is where it renders. `DispatchPane.tsx` is the only
    reader of all nine, so the cards surface owned nine classes it never named — the layer gate's largest
    single finding. */
-/* The `<section aria-label>` is what keeps the flex column here rather than on a `Stack`. */
-.dispatch { display: flex; flex-direction: column; gap: var(--s-4); }
+/* A `Stack as="section" label={…}` NOW, and `.dispatch` DECLARES NOTHING OF ITS OWN: the column, the gap
+   and the tag are all the atom's. The NAME survives only as an ancestor — the three rules below reach a
+   trigger, a control and a quiet line through it — which is why deleting it would buy nothing anyway. */
 /* `.dispatch-head` IS GONE — `<Stack as="header">`. */
 /* `.dispatch-back` is gone outright: a bordered `←` with an accent hover is `default`, exactly. */
-.dispatch-title { font-family: var(--font-display); font-size: var(--t-lead); }
+/* `.dispatch-title` IS GONE — `Text family="display" size="lead"` is the two declarations it held. */
 /* `.dispatch-desc` IS GONE — `Text lead`. */
 /* A SENTENCE, so it is not a readout — only the run id inside it is, which is the signature's whole
    claim: mono means the machine measured it. It was entirely mono before, which said the prose was
    machine-written too. `.dispatch-continues` IS GONE with it: the sentence is a `Text ink="accent2"`. */
 /* A `.vb-row`, and the WRAP is the one thing that is genuinely this surface's: the dispatch step sits in
-   a dock pane that can be 280px wide, and a rail label beside a control that cannot wrap overflows it. */
+   a dock pane that can be 280px wide, and a rail label beside a control that cannot wrap overflows it.
+   NOT `Stack wrap`, and for two reasons: the element is a `Field`, which draws a `.vb-row` rather than a
+   `.vb-stack` and takes no layout options — and the name is load-bearing on the next line, where the
+   trigger inside one of these rows is told to take the slack. */
 .dispatch-row { flex-wrap: wrap; }
 .dispatch-row .vb-trigger { flex: 1; min-width: 0; }
 .dispatch > .vb-ctl { width: 100%; resize: vertical; }
@@ -107,7 +123,9 @@
 .dispatch-attach summary { cursor: pointer; color: var(--muted); }
 .dispatch .vb-text-quiet { margin: var(--s-2) 0; }
 /* A `Stack justify="end"`; the top margin is the one thing left, and it sets the footer apart from the
-   last field rather than repeating the column's rhythm. */
+   last field rather than repeating the column's rhythm — which is exactly why it is NOT the parent's
+   `gap`. `.dispatch` is a `gap={4}` column and this adds `--s-2` before ONE child of it; folded into the
+   gap it would move all seven. See `.options-close`, which is the same shape. */
 .dispatch-foot { margin-top: var(--s-2); }
 
 /* The way out of a card the machine spent, on the same line as the count it clears. Quiet by default —

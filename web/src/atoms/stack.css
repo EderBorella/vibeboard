@@ -91,6 +91,7 @@
    were pushing a button pair to the trailing edge, which is the main axis. */
 .vb-stack[data-justify='end'] { justify-content: flex-end; }
 .vb-stack[data-justify='between'] { justify-content: space-between; }
+.vb-stack[data-justify='center'] { justify-content: center; }
 
 /* DON'T SHRINK — A CLASS AND NOT AN ATTRIBUTE, and the reason is a footgun I walked into writing this
    file. Six surface classes were `flex: none` or `flex: 0 0 auto` and nothing else — `.ap-kill`,

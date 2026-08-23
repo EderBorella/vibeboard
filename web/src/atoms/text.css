@@ -30,6 +30,40 @@
    NOT ROUTED THROUGH `--tone`: the tone table is five named STATES and `npm run check:state-tones`
    holds it at five. An id drawn in the accent is not a state, and borrowing the mechanism would have
    made the gate's census disagree with itself. */
+/* THE STEP IS AN ATTRIBUTE TOO, AND NOT HAVING IT WAS THE SINGLE BIGGEST REASON CLASSES SURVIVED.
+   Three surfaces migrated onto this atom before this block existed and deleted 1, 3 and 4 classes out of
+   51, 48 and 59. Their reports agree on the cause: the type scale has FIVE steps and this atom could say
+   TWO of them — `--t-small` as the default and `--t-body` through `lead` — so every surface whose face was
+   `--t-micro` or `--t-lead` or `--t-title` kept a class holding exactly one `font-size`. `.explorer-more`,
+   `.cs-empty`, `.filed-title`, `.ap-drawer-head`, `.copilot-override`, `.tile-group`, `.cv-group`,
+   `.diary-kind`, `.filed-state`, `.report-prompt-label` and `.brand` were all that one declaration.
+   An atom that cannot express its own scale forces a class per step. Five steps, sixteen weights and a
+   family cost nothing here because they are attributes.
+   `inherit` IS THE ONE THAT MATTERS MOST, and it is what makes this atom safe to NEST. Wrapping a
+   `<Button>`'s or a `<Chip>`'s label in a `<Text>` used to recolour it to `--muted` and resize it to
+   `--t-small`, which is why five classes on those two atoms could not reach `caps` or `ink` and stayed.
+   `size="inherit" ink="inherit"` is a Text that changes nothing except what you ask it to.
+   `lead` IS KEPT BESIDE `size` AND IS NOT A DUPLICATE OF `size="body"`: it is a step AND a looser line
+   (1.5), which is a treatment rather than a step, and it is what the empty states wanted. `size` sets the
+   step alone. Two spellings for two different claims. */
+.vb-text[data-size='micro'] { font-size: var(--t-micro); }
+.vb-text[data-size='small'] { font-size: var(--t-small); }
+.vb-text[data-size='body'] { font-size: var(--t-body); }
+.vb-text[data-size='lead'] { font-size: var(--t-lead); }
+.vb-text[data-size='title'] { font-size: var(--t-title); }
+.vb-text[data-size='inherit'] { font-size: inherit; line-height: inherit; }
+
+/* Two weights, because two is what the tree holds: `.gate-list-name` and `.copilot-title` are 600 and 700
+   and nothing else is either. Named by what they mean rather than by the number, so a third does not get
+   added by someone reaching for the next hundred. */
+.vb-text[data-weight='medium'] { font-weight: 600; }
+.vb-text[data-weight='bold'] { font-weight: 700; }
+
+/* THE FAMILY, and only where a surface genuinely means a different one. `display` is the eyebrow face that
+   `caps` also carries; `mono` is `.signin-label`'s device code, which is a machine string in prose. */
+.vb-text[data-family='display'] { font-family: var(--font-display); }
+.vb-text[data-family='mono'] { font-family: var(--font-mono); }
+
 .vb-text[data-ink='strong'] { color: var(--text); }
 .vb-text[data-ink='accent'] { color: var(--accent); }
 .vb-text[data-ink='accent2'] { color: var(--accent-2); }

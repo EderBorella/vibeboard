@@ -28,6 +28,9 @@ export type StackTag =
   | 'li'
   | 'dl'
   | 'p'
+  | 'h2'
+  | 'h3'
+  | 'h4'
   | 'label'
   | 'form'
   | 'fieldset';
@@ -37,13 +40,19 @@ interface Props {
   gap?: StackGap;
   align?: StackAlign;
   wrap?: boolean;
-  justify?: 'end' | 'between';
+  justify?: 'end' | 'between' | 'center';
   // ONE VALUE IS BOTH AXES, a pair is `[block, inline]` — the spelling CSS itself uses, and the shape 26
   // of the tree's paddings already had.
   pad?: StackGap | [StackGap, StackGap];
   // The single hairline that separates one row from the next. Four borders is a `Surface`.
   edge?: 'top' | 'bottom';
   as?: StackTag;
+  // THE ACCESSIBLE NAME, and three of the four surfaces migrated onto this atom reported its absence as
+  // the reason a class survived. `.reports`, `.options`, `.report`, `.dispatch`, `.card-skills` and `.dock`
+  // are all `<section aria-label>` or `<aside aria-label>` landmarks whose only other content was a column
+  // and a gap — and `screen.getByLabelText('What next')` is a live test contract, so the name could not
+  // simply be dropped. A layout atom that cannot be a named region forces a class per region.
+  label?: string;
   title?: string;
   className?: string;
   testId?: string;
@@ -60,6 +69,7 @@ export const Stack = forwardRef<HTMLElement, Props>(function Stack(
     pad,
     edge,
     as: Tag = 'div',
+    label,
     title,
     className,
     testId,
@@ -87,6 +97,7 @@ export const Stack = forwardRef<HTMLElement, Props>(function Stack(
       data-pad-y={padY === undefined ? undefined : String(padY)}
       data-pad-x={padX === undefined ? undefined : String(padX)}
       data-edge={edge}
+      aria-label={label}
       title={title}
       data-testid={testId}
     >

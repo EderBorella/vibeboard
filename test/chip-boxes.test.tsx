@@ -141,13 +141,10 @@ const chips: {
     font: MICRO,
     ink: /--accent\b/,
   },
-  {
-    name: '.control-tag — a managed file marker',
-    props: { className: 'control-tag' },
-    radius: SM,
-    font: MICRO,
-    ink: /--accent-2/,
-  },
+  // `.control-tag` HAS LEFT THIS TABLE AND IS ASSERTED BELOW, for the reason label-notice-boxes.test.tsx
+  // already gives about six of its own rows: the class is gone and the face it held is now a nested
+  // `Text caps ink="accent2"`, which a bare `className` on a `<Chip>` cannot express. A row here would
+  // read the CHIP's ink — `inherit` — and either fail or, worse, be softened into asserting nothing.
   // `.tab-badge` IS NOT IN THIS TABLE ANY MORE, and it is not because the badge went away. The class is
   // deleted: the attention count is `Menu`'s `badge` option, rendered as `Chip pill fill` with the mono
   // face. A row here naming `tab-badge` would be a fixture too thin to distinguish two outcomes — the
@@ -183,6 +180,33 @@ describe('the chip family draws one box', () => {
       if (ground) expect(drawn.background ?? drawn['background-color']).toBe(ground);
     });
   }
+
+  // THE MANAGED-FILE MARKER, WHOSE FACE IS NOW INSIDE THE CHIP RATHER THAN ON IT. `.control-tag` was
+  // `text-transform: uppercase`, `letter-spacing: var(--track)` and `color: var(--accent-2)` — three
+  // declarations that are one `Text caps ink="accent2"`, and it could not be written that way before: a
+  // `<Text>` inside a `<Chip>` overwrote the chip's `--t-micro` with `--t-small`, so the caps face was
+  // unreachable from in there. `size="inherit"` is what closed that, and the step below is what proves
+  // the wrapper did not undo the box: the CHIP keeps its own corner and its own step, and the LABEL
+  // carries the face. Both halves, because a wrapper that recoloured the word and shrank it would pass
+  // any assertion that read only one of them.
+  it('the managed-file marker is a chip that keeps its box and a label that carries the face', () => {
+    const el = mount(
+      '<span class="vb-chip" data-probe><span class="vb-text vb-text-caps" data-size="inherit" data-ink="accent2">managed</span></span>',
+    );
+    const drawn = box(el);
+    expect([drawn['border-radius'], drawn['font-size']]).toEqual([SM, MICRO]);
+    const word = el.firstElementChild;
+    if (!word) throw new Error('the chip rendered no label');
+    const face = box(word);
+    expect([face['text-transform'], face['letter-spacing'], face.color, face['font-size']]).toEqual([
+      'uppercase',
+      // RESOLVED, not `var(--track)`: `box()` substitutes the space-and-tracking tokens and leaves the
+      // theme colours symbolic, which is why the two neighbours in this tuple are spelled differently.
+      '0.08em',
+      'var(--accent-2)',
+      'inherit',
+    ]);
+  });
 
   // THE ATTENTION BADGE, AND ITS INK IS THE ONE THING A `Chip pill fill` CANNOT DECIDE FOR ITSELF. It was
   // `.tab-badge` — `--panel-2` ink punched out of an `--accent-2` ground — and one badge treatment is the

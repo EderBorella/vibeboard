@@ -44,7 +44,12 @@ export function ReportOptions({
   const createPrompt = `Break this work into separate cards on the boards where they belong, link each one to ${cardId}, and list the ids you created. Do not implement them.`;
 
   return (
-    <section className="options" aria-label="What next">
+    // `<section aria-label>` IS A `Stack` NOW, which is what kept the flex column in the sheet: the atom
+    // rendered neither the tag nor the name. `edge="top"` is the hairline; the `padding-top` is all the
+    // class still says, because `pad` sets a whole axis and this is one edge of one.
+    // `align="start"` IS NOT WANTED HERE and the column default is what draws it: the option buttons are
+    // full-width rows you pick, which is the same claim `align="start"` on the buttons' text makes.
+    <Stack as="section" label="What next" direction="column" gap={2} edge="top" className="options">
       <Text caps>What next?</Text>
       {!canContinue && (
         <Text role="error">
@@ -57,7 +62,7 @@ export function ReportOptions({
         <Button
           size="sm"
           key={option}
-          className="option-btn"
+          align="start"
           data-testid="option-btn"
           disabled={!canContinue}
           onClick={() => onContinue(option)}
@@ -68,7 +73,7 @@ export function ReportOptions({
 
       <Button
         size="sm"
-        className="option-btn"
+        align="start"
         data-testid="option-btn"
         disabled={!canContinue}
         title="Runs an agent to split this into cards, linked to this one"
@@ -78,7 +83,7 @@ export function ReportOptions({
       </Button>
       <Button
         size="sm"
-        className="option-btn"
+        align="start"
         data-testid="option-btn"
         disabled={!canContinue}
         title="Opens the details step with an empty prompt"
@@ -111,6 +116,6 @@ export function ReportOptions({
           Close card
         </Button>
       </Stack>
-    </section>
+    </Stack>
   );
 }

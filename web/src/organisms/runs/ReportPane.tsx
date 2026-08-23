@@ -56,14 +56,23 @@ export function ReportPane({
   const [column, setColumn] = useState(review ? slugify(review) : '');
 
   return (
-    <article className="report" aria-label={`Report from ${record.skill} on ${card.id}`}>
+    // `<article aria-label>` IS A `Stack` NOW — the tag and the accessible name are what kept the flex
+    // column in the sheet. `overflow-wrap` is all the class still says, and no atom carries it.
+    <Stack
+      as="article"
+      label={`Report from ${record.skill} on ${card.id}`}
+      direction="column"
+      gap={4}
+      className="report"
+    >
       <Stack as="header" gap={4}>
         <Button size="sm" onClick={onBack} title="Back to the card">
           ←
         </Button>
         {/* `ink="strong"` because the class named no ink and inherited the body's: the atom's default is
-            muted, and a title is not. */}
-        <Text ink="strong" className="report-title">
+            muted, and a title is not. `.report-title` IS GONE WITH IT: the display family and the
+            `--t-lead` step were its only two declarations and both are attributes now. */}
+        <Text ink="strong" size="lead" family="display">
           {record.skill} <Readout>on {card.id}</Readout>
         </Text>
         <Chip pill state={record.status} className="report-chip vb-readout vb-fixed" testId="report-chip">
@@ -126,8 +135,9 @@ export function ReportPane({
         )}
       </dl>
 
+      {/* The step is the atom's; the quoted edge and its inset are what the class still carries. */}
       {record.summary && (
-        <Text ink="strong" className="report-lead">
+        <Text ink="strong" size="lead" className="report-lead">
           {record.summary}
         </Text>
       )}
@@ -139,7 +149,8 @@ export function ReportPane({
       )}
       {record.prompt && (
         <Text lead testId="report-prompt">
-          <Text caps className="report-prompt-label">
+          {/* `.report-prompt-label` IS GONE: `--t-micro` was its whole content. */}
+          <Text caps size="micro">
             You asked:
           </Text>{' '}
           {record.prompt}
@@ -215,6 +226,6 @@ export function ReportPane({
           </Button>
         </Stack>
       )}
-    </article>
+    </Stack>
   );
 }

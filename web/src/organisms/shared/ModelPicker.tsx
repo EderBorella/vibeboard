@@ -152,11 +152,13 @@ export function ModelPicker({ models, value, defaultModel, onChange, disabled }:
                   <Button
                     variant="bare"
                     size="sm"
-                    className="mp-star"
                     title={favs.has(m.id) ? 'Unfavorite' : 'Favorite'}
                     onClick={() => toggleFav(m.id)}
                   >
-                    {favs.has(m.id) ? '★' : '☆'}
+                    {/* `.mp-star` IS GONE: an ink on a `bare` button's label is a nested `Text` now. */}
+                    <Text size="inherit" ink="accent2">
+                      {favs.has(m.id) ? '★' : '☆'}
+                    </Text>
                   </Button>
                 }
               >

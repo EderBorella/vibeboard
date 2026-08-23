@@ -10,8 +10,10 @@
    the atom sheets — see web/src/styles.ts — so at
    equal specificity this rule beat `.vb-chip-tone` and the chip would have rendered grey in all four
    states. It was the fallback for `stopped`, which had no rule of its own — and `stopped` is the
-   `neutral` tone, which is that same `--muted`. Nothing is lost. */
-.ap-chip { text-transform: lowercase; }
+   `neutral` tone, which is that same `--muted`. Nothing is lost.
+   AND THE CLASS ITSELF IS GONE. `text-transform: lowercase` was all it ever said, and `StatusChip`'s
+   `word` is a node — so a `Text lower` on the label says it with no name at all. It could not be reached
+   before: a bare `<Text>` forced `--t-small` and `--muted` onto a chip that had chosen both. */
 
 /* `align="stretch"` at the call sites, not the `Stack` default: this row holds a button beside a line of
    progress text, and the row was never centred — centring it would move the sentence. */
@@ -103,7 +105,7 @@
      the tallest thing on the strip, which is the inconsistency it was added to remove. The segmented
      control inside is 19.8px and sets the floor, so the box is its own border and nothing else. */
   /* NO `margin-right`. It was `--s-6`, a hand-made gap before the buttons that followed this group in one
-     long queue. The gap is the layout's now: this group and `.ap-bar-end` each take `margin-left: auto`,
+     long queue. The gap is the layout's now: this group and the one at the row's end each take `.push`,
      which splits the free space between them and is what puts this one in the middle. */
   padding: 0 var(--s-3);
 }
@@ -136,22 +138,21 @@
    `flex: none` ONCE, where `.ap-inline` said it three times — one on each of the buttons now inside this
    box. That class is gone and this is what replaced it; a group that cannot shrink does not need its
    children to say so individually.
-   IT IS `Stack className="push vb-fixed"` DECLARATION FOR DECLARATION AND IT STAYS ANYWAY, because the
-   NAME is read where the declarations are not: visual/checks/board.spec.ts's check 14 measures this
-   group's right-hand edge through `.ap-bar-end` and excludes it from the left group by the same token, so
-   deleting the name blinds the one check that holds the three-group layout. */
-.ap-bar-end {
-  display: flex; align-items: center; gap: var(--s-4);
-  margin-left: auto; flex: none;
-}
+   `.ap-bar-end` IS GONE: it was `Stack className="push vb-fixed"` declaration for declaration, and the
+   only thing keeping the NAME alive was check 14 measuring this group through it. That check reads
+   `[data-testid="ap-bar-end"]` now, so the handle a test needs and the declarations a browser needs are
+   no longer the same token. */
 /* `flex: none` IS `.vb-fixed` NOW — the atom exists for these six one-declaration classes and this is one
    of them. What is left is the ink, which no atom carries.
    `.ap-remedy-btn` is the `default` variant — the ONE action on a stopped project. The three quiet
    controls that shared this rule are `ghost`, which the owner ruled carries a DASHED border: dashed reads
    as explanatory rather than actionable, which is exactly what "How it works" is, and it keeps the box the
-   same width as a solid button. They are inside `.ap-bar-end` now. */
+   same width as a solid button. They are inside the row's end group now. */
 /* The `:disabled` word goes grey as well as pale. `.vb-btn:disabled` sets the opacity; this says the
-   ink, which is the part that distinguished a spent remedy from a busy one. */
+   ink, which is the part that distinguished a spent remedy from a busy one.
+   AND IT IS THE STATE RATHER THAN THE BASE, which is why nesting a `Text ink` cannot take it: this class
+   declares nothing at rest, so there is no colour for an attribute to carry — the ink exists only while
+   the button is disabled, and no atom expresses a state. */
 .ap-remedy-btn:disabled { color: var(--muted); }
 
 /* WHAT WILL BE REFUSED, and why it is not a hint: a hint says how something works, this says what a save
@@ -226,10 +227,9 @@
   padding: var(--s-2) var(--s-5) var(--s-5);
   border-top: 1px solid var(--border);
 }
-/* `Text caps` IS THE FACE and the step is all that is left: `--t-micro` is not a `Text` option and must not
-   become one — a chip's step on a column head is this drawer's own decision. The space under it is the
-   cell's `Stack gap={3}` rather than a margin here, which is what stopped it being a margin on a span. */
-.ap-drawer-head { font-size: var(--t-micro); }
+/* `.ap-drawer-head` IS GONE. `Text caps` was already the face and the step was all that was left; the
+   scale is `size="micro"` now, so the head is two attributes and no name. The space under it is still the
+   cell's `Stack gap={3}` rather than a margin here, which is what let the head be a span at all. */
 /* `List as="ul"` draws the column and cancels the bullet; the tighter gap is this list's. */
 .ap-work { gap: var(--s-2); }
 .ap-work li { font-size: var(--t-body); }

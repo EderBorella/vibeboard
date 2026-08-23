@@ -130,3 +130,11 @@
    `.reports-forgive-error` IS DELETED: it said this plus `color: var(--danger)`, which is `Text error` —
    so the error line is a `Text error` wearing this class, and one shape is one class again. */
 .reports-forgiven { flex-basis: 100%; opacity: 0.85; }
+/* THE ERROR LINE TAKES THE MEASURE AND NOT THE DIMMING. The deletion above was argued on `flex-basis`
+   alone; it also handed the error line the `opacity: 0.85` that means "a run that has been dealt with is
+   history", and on danger ink that is 4.46 / 4.27 / 4.09:1 in cyberpunk / classic-dark / marshmallow —
+   under the 4.5 floor in all three. Measured in Chromium against the app's own ordered sheet list; back to
+   5.77 / 5.45 / 5.21 with this. The contrast walk could not see it: `opacity` does not change `color`,
+   which is the only thing it read (now fixed in visual/support/audit.ts). (0,2,0) beats `.reports-forgiven`
+   at (0,1,0), and it adds no class NAME, so neither ratchet moves. */
+.reports-forgiven.vb-text-error { opacity: 1; }

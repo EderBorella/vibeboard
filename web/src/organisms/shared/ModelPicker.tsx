@@ -1,16 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { ModelOption } from '../../lib/api';
 import { Button } from '../../atoms/Button';
 import { Chip } from '../../atoms/Chip';
 import { Control } from '../../atoms/Control';
 import { Readout } from '../../atoms/Readout';
 import { Surface } from '../../atoms/Surface';
 import { Text } from '../../atoms/Text';
+import type { ModelOption } from '../../lib/api';
 import { List } from './List';
 import { Modal } from './Modal';
-import { Row } from './Row';
 import { compareModels, type ModelFilter, matchesFilter } from './model-filter';
 import { fmtCtx, fmtPrice, loadFavs, providerOf, saveFavs } from './model-format';
+import { Row } from './Row';
 
 interface Props {
   models: ModelOption[];

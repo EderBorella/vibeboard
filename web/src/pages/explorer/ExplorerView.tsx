@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { Button } from '../../atoms/Button';
+import { Text } from '../../atoms/Text';
 import {
   createFsNode,
   deleteFsEntry,
@@ -9,18 +11,20 @@ import {
   moveFsNode,
   renameFsNode,
 } from '../../lib/api';
-import { Button } from '../../atoms/Button';
-import { Text } from '../../atoms/Text';
-import { useConfirm } from '../../lib/useConfirm';
 import { errorText } from '../../lib/errors';
 import type { ProjectSnapshot } from '../../lib/shared';
-import { EditorBody, EditorLayout } from '../../templates/EditorLayout';
+import { useConfirm } from '../../lib/useConfirm';
 import { FileTree } from '../../organisms/explorer/FileTree';
 import { formatBytes } from '../../organisms/explorer/format';
 import { nameOf, parentOf } from '../../organisms/explorer/paths';
-import { deleteEmptyFolderRequest, deleteEntryRequest, deleteFolderRequest } from '../../organisms/explorer/requests';
+import {
+  deleteEmptyFolderRequest,
+  deleteEntryRequest,
+  deleteFolderRequest,
+} from '../../organisms/explorer/requests';
 import { useOpenFile } from '../../organisms/explorer/useOpenFile';
 import { useTree } from '../../organisms/explorer/useTree';
+import { EditorBody, EditorLayout } from '../../templates/EditorLayout';
 
 interface Props {
   // Bumps whenever the project changes on disk, so the tree and the open file follow along.

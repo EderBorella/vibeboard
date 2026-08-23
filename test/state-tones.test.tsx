@@ -22,8 +22,8 @@ import { join } from 'node:path';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AutopilotState, Readiness, RunList, RunRecord, SandboxState } from '../web/src/lib/api.js';
-import { LIGHT_STATES } from '../web/src/organisms/topbar/connection-light.js';
 import type { CopilotConfig } from '../web/src/lib/shared.js';
+import { LIGHT_STATES } from '../web/src/organisms/topbar/connection-light.js';
 
 const api = vi.hoisted(() => ({
   getReadiness: vi.fn(),

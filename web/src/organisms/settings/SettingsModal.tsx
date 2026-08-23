@@ -1,4 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
+import { Button } from '../../atoms/Button';
+import { Control } from '../../atoms/Control';
+import { Text } from '../../atoms/Text';
 import {
   type AutopilotState,
   getSandbox,
@@ -7,22 +10,6 @@ import {
   patchConfig,
   type SandboxState,
 } from '../../lib/api';
-import { Button } from '../../atoms/Button';
-import { Control } from '../../atoms/Control';
-import { Text } from '../../atoms/Text';
-import { AutopilotPanel } from '../autopilot/AutopilotPanel';
-import type { Confirmer } from '../../lib/useConfirm';
-import { BackendPicker } from '../copilot/BackendPicker';
-import { clampToCaps, resolveChoice } from '../copilot/choice';
-// The same list the picker renders from, and the reason this file no longer declares its own: the two
-// had drifted to different labels for one backend, so the setting read as "Claude Code" here and
-// "Claude" in the dock that obeys it.
-import { BACKENDS } from '../copilot/format';
-import { ModelPicker } from '../shared/ModelPicker';
-import { Field } from '../../molecules/Field';
-import { Notice } from '../../molecules/Notice';
-import { Modal } from '../shared/Modal';
-import { Row } from '../shared/Row';
 import {
   type AutopilotConfig,
   BOARD_LABELS,
@@ -34,10 +21,23 @@ import {
   DEFAULT_CONTEXT_BUDGET,
   type ProjectConfig,
 } from '../../lib/shared';
-import { SignInPanel } from '../signin/SignInPanel';
 import { useAction } from '../../lib/useAction';
+import type { Confirmer } from '../../lib/useConfirm';
 import { useFetched } from '../../lib/useFetched';
 import { parseCsv } from '../../lib/viewmodel';
+import { Field } from '../../molecules/Field';
+import { Notice } from '../../molecules/Notice';
+import { AutopilotPanel } from '../autopilot/AutopilotPanel';
+import { BackendPicker } from '../copilot/BackendPicker';
+import { clampToCaps, resolveChoice } from '../copilot/choice';
+// The same list the picker renders from, and the reason this file no longer declares its own: the two
+// had drifted to different labels for one backend, so the setting read as "Claude Code" here and
+// "Claude" in the dock that obeys it.
+import { BACKENDS } from '../copilot/format';
+import { Modal } from '../shared/Modal';
+import { ModelPicker } from '../shared/ModelPicker';
+import { Row } from '../shared/Row';
+import { SignInPanel } from '../signin/SignInPanel';
 import { DiagnosticsPanel } from './DiagnosticsPanel';
 import { SandboxPanel } from './SandboxPanel';
 

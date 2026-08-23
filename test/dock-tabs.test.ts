@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { type CardRef, closeTab, nextActive, openTab, resolveTab, tabFor } from '../web/src/organisms/dock/tabs.js';
 import type { Card } from '../web/src/lib/shared.js';
+import {
+  type CardRef,
+  closeTab,
+  nextActive,
+  openTab,
+  resolveTab,
+  tabFor,
+} from '../web/src/organisms/dock/tabs.js';
 
 const card = (id: string, over: Partial<Card> = {}): Card =>
   ({

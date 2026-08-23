@@ -1,9 +1,9 @@
 import { useEffect, useRef } from 'react';
-import { type AutopilotState, restartAutopilot } from '../../lib/api';
 import { Button } from '../../atoms/Button';
 import { Text } from '../../atoms/Text';
-import { Modal } from '../shared/Modal';
+import { type AutopilotState, restartAutopilot } from '../../lib/api';
 import { useAction } from '../../lib/useAction';
+import { Modal } from '../shared/Modal';
 
 // The project is halted: everything in it was killed, and nothing will start again until someone says
 // so. Decision 12 asks for an overlay that STATES THE REASON AND THE TIMESTAMP and carries the way

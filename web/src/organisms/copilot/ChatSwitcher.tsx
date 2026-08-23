@@ -3,8 +3,8 @@ import { Button } from '../../atoms/Button';
 import { Chip } from '../../atoms/Chip';
 import { Readout } from '../../atoms/Readout';
 import { Text } from '../../atoms/Text';
-import { Menu } from '../../molecules/Menu';
 import type { ChatMeta } from '../../lib/shared';
+import { Menu } from '../../molecules/Menu';
 import { backendLabel, relTime } from './format';
 
 interface Props {

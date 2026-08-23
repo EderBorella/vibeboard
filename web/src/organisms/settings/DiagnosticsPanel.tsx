@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
-import { type AppSettings, getAppSettings, setDebugLog } from '../../lib/api';
 import { Readout } from '../../atoms/Readout';
 import { Text } from '../../atoms/Text';
+import { type AppSettings, getAppSettings, setDebugLog } from '../../lib/api';
 import { errorText } from '../../lib/errors';
+import { useAction } from '../../lib/useAction';
 import { Field } from '../../molecules/Field';
 import { Notice } from '../../molecules/Notice';
 import { Row } from '../shared/Row';
-import { useAction } from '../../lib/useAction';
 
 // WHERE TO LOOK WHEN SOMETHING GOES WRONG, and the one switch that changes what is there.
 //

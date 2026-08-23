@@ -1,8 +1,8 @@
-import type { ControlCategory, ControlFile, ControlGroup } from '../../lib/api';
 import { Button } from '../../atoms/Button';
 import { Chip } from '../../atoms/Chip';
 import { Control } from '../../atoms/Control';
 import { Text } from '../../atoms/Text';
+import type { ControlCategory, ControlFile, ControlGroup } from '../../lib/api';
 import { List } from '../shared/List';
 import { Row } from '../shared/Row';
 

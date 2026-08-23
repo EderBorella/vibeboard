@@ -119,7 +119,7 @@ const TRACKING_ON_PURPOSE = new Map([
 const OFFSET_ON_PURPOSE = new Map([
   [
     'top:-5px',
-    "`.popover::before` in web/src/molecules/popover.css — THE POINTER, and its offsets are a DRAWING " +
+    '`.popover::before` in web/src/molecules/popover.css — THE POINTER, and its offsets are a DRAWING ' +
       'rather than a rhythm. It is an 8px square rotated 45°, so its visible tip is half of an 11.3px ' +
       'diagonal: the number that puts the tip on the panel edge is derived from the square, not chosen ' +
       'from a spacing grid, and rounding it to `--s-5` (12px) detaches the pointer from the panel.',
@@ -171,8 +171,7 @@ const SPACE =
 const LETTER_SPACING = /letter-spacing:\s*([^;}]+?)\s*(?=[;}])/g;
 // The four physical offsets and the logical shorthands. Anchored on a boundary for `SPACE`'s reason and
 // one sharper: without it `border-left:` and `border-top-left-radius:` both match `left:`/`top:`.
-const OFFSET =
-  /(?:^|[;{\s])(top|right|bottom|left|inset(?:-block|-inline)?(?:-start|-end)?):([^;}]*)/g;
+const OFFSET = /(?:^|[;{\s])(top|right|bottom|left|inset(?:-block|-inline)?(?:-start|-end)?):([^;}]*)/g;
 // One level of nesting is enough for every `calc()` a space value has: the contents are an EXPRESSION and
 // not a list of atoms, so they are lifted out and checked separately before the value is split.
 const CALC = /calc\(([^()]*(?:\([^()]*\)[^()]*)*)\)/g;
@@ -479,6 +478,50 @@ function parserSelfTest() {
 // imported it. Two agents have tripped over it. Nothing imports this file today; the export is what makes
 // that a latent trap rather than a bug, and a latent trap that has already caught somebody twice is worth
 // one line.
+
+// LIFTED OUT OF `main()` FOR THE COMPLEXITY METRIC, WHICH PUNISHES NESTING. `main()` scored 16 against a
+// ceiling of 15 the moment the census moved inside a function, and this loop — a `for` with a branch and a
+// nested branch — is the deepest thing in it. `biome.jsonc` says raising the ceiling is not the fix. No
+// pattern moves and no claim changes; the maps and the report text are untouched.
+function exceptionFaults(exceptionsUsed) {
+  /** @type {{ site: string, detail: string }[]} */
+  const faults = [];
+  const EXCEPTION_MAY_REPEAT = new Set(['font-size:inherit']);
+  const EXCEPTIONS = [
+    ...[...OFF_SCALE_ON_PURPOSE].map(([value, reason]) => ['font-size', value, reason]),
+    ...[...TRACKING_ON_PURPOSE].map(([value, reason]) => ['letter-spacing', value, reason]),
+    // Already keyed `property:value`, because an offset's exception is about one SIDE of one box: `-5px` is
+    // a reason for `top` and not for `left`, and a value-only key would let either prune the other's row.
+    ...[...OFFSET_ON_PURPOSE].map(([key, reason]) => [
+      key.slice(0, key.indexOf(':')),
+      key.slice(key.indexOf(':') + 1),
+      reason,
+    ]),
+  ];
+  for (const [property, value, reason] of EXCEPTIONS) {
+    const key = `${property}:${value}`;
+    const sites = exceptionsUsed.get(key);
+    if (!sites) {
+      faults.push({
+        site: 'tools/check-scale.mjs',
+        detail: `\`${property}: ${value}\` is written down as off the scale on purpose (${reason.slice(0, 60)}…) and no rule uses it — delete the row`,
+      });
+      continue;
+    }
+    if (sites.length > 1 && !EXCEPTION_MAY_REPEAT.has(key)) {
+      faults.push({
+        site: 'tools/check-scale.mjs',
+        detail:
+          `\`${property}: ${value}\` is one rule's argued exception (${reason.slice(0, 60)}…) and ` +
+          `${sites.length} rules use it: ${sites.join(', ')} — an exception with a second consumer is a ` +
+          `value, so either put the second one on the scale or the reason no longer holds`,
+      });
+    }
+  }
+
+  return faults;
+}
+
 function main() {
   /** @type {{ site: string, detail: string }[]} */
   const findings = [];
@@ -527,38 +570,7 @@ function main() {
   // sites turns the stated reason into a checked one without making this file rule-aware, which is the
   // cheapest repair that closes it. `inherit` is the row that must be allowed many consumers — it is
   // allowed BY CONSTRUCTION rather than by exception (see its reason), so it is excluded by name.
-  const EXCEPTION_MAY_REPEAT = new Set(['font-size:inherit']);
-  const EXCEPTIONS = [
-    ...[...OFF_SCALE_ON_PURPOSE].map(([value, reason]) => ['font-size', value, reason]),
-    ...[...TRACKING_ON_PURPOSE].map(([value, reason]) => ['letter-spacing', value, reason]),
-    // Already keyed `property:value`, because an offset's exception is about one SIDE of one box: `-5px` is
-    // a reason for `top` and not for `left`, and a value-only key would let either prune the other's row.
-    ...[...OFFSET_ON_PURPOSE].map(([key, reason]) => [
-      key.slice(0, key.indexOf(':')),
-      key.slice(key.indexOf(':') + 1),
-      reason,
-    ]),
-  ];
-  for (const [property, value, reason] of EXCEPTIONS) {
-    const key = `${property}:${value}`;
-    const sites = exceptionsUsed.get(key);
-    if (!sites) {
-      findings.push({
-        site: 'tools/check-scale.mjs',
-        detail: `\`${property}: ${value}\` is written down as off the scale on purpose (${reason.slice(0, 60)}…) and no rule uses it — delete the row`,
-      });
-      continue;
-    }
-    if (sites.length > 1 && !EXCEPTION_MAY_REPEAT.has(key)) {
-      findings.push({
-        site: 'tools/check-scale.mjs',
-        detail:
-          `\`${property}: ${value}\` is one rule's argued exception (${reason.slice(0, 60)}…) and ` +
-          `${sites.length} rules use it: ${sites.join(', ')} — an exception with a second consumer is a ` +
-          `value, so either put the second one on the scale or the reason no longer holds`,
-      });
-    }
-  }
+  findings.push(...exceptionFaults(exceptionsUsed));
 
   if (findings.length > 0) {
     console.error(`\n${findings.length} declaration(s) off the scale:\n`);

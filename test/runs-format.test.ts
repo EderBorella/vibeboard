@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { RunUsage } from '../web/src/lib/api.js';
-import { costLabel, formatDuration, formatTokens, usageLine, usageTotal } from '../web/src/organisms/runs/format.js';
+import {
+  costLabel,
+  formatDuration,
+  formatTokens,
+  usageLine,
+  usageTotal,
+} from '../web/src/organisms/runs/format.js';
 
 // `formatCost` itself lives in web/src/lib/format.ts now, shared with the copilot dock — see test/format.test.ts.
 

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { ConnState } from '../web/src/lib/ws.js';
 import {
   LIGHT_STATES,
   lightAdvice,
@@ -6,7 +7,6 @@ import {
   lightTitle,
   type RecentFailure,
 } from '../web/src/organisms/topbar/connection-light.js';
-import type { ConnState } from '../web/src/lib/ws.js';
 
 const REFUSAL = 'Agents are disabled: the agent image vibeboard-agent:latest is not built.';
 const NOTE = 'Failed to authenticate: OAuth session expired.';

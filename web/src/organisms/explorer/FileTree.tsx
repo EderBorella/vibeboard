@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import type { FsNode } from '../../lib/api';
 import { Button } from '../../atoms/Button';
 import { Chip } from '../../atoms/Chip';
 import { Control } from '../../atoms/Control';
 import { Readout } from '../../atoms/Readout';
 import { Text } from '../../atoms/Text';
+import type { FsNode } from '../../lib/api';
 import { Row } from '../shared/Row';
 import { formatBytes } from './format';
 import { canDropInto } from './paths';

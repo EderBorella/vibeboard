@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
-import type { ControlFile } from '../../lib/api';
 import { Button } from '../../atoms/Button';
+import type { ControlFile } from '../../lib/api';
 import { Notice } from '../../molecules/Notice';
 import { EditorBody, EditorLayout, type EditorView } from '../../templates/EditorLayout';
 

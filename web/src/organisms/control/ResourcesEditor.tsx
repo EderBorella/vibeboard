@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
-import { getResources, putResources, type ResourceLink } from '../../lib/api';
 import { Button } from '../../atoms/Button';
 import { Control } from '../../atoms/Control';
 import { Readout } from '../../atoms/Readout';
+import { getResources, putResources, type ResourceLink } from '../../lib/api';
 import { errorText } from '../../lib/errors';
-import { Row } from '../shared/Row';
 import { useAction } from '../../lib/useAction';
+import { Row } from '../shared/Row';
 
 // The links registry (.vibeboard/resources.yaml) — a small editable table of external
 // references the user (and copilot) can consult. It owns its own rows and dirty flag because

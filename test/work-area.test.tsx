@@ -43,8 +43,8 @@ vi.mock('../web/src/lib/api', () => api);
 
 const { WorkArea } = await import('../web/src/templates/WorkArea.js');
 
-import type { MainTab } from '../web/src/organisms/topbar/TopBar.js';
 import type { BoardName, Card, ProjectConfig, ProjectSnapshot, Suggestion } from '../web/src/lib/shared.js';
+import type { MainTab } from '../web/src/organisms/topbar/TopBar.js';
 
 afterEach(cleanup);
 

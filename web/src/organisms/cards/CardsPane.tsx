@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import type { DispatchRequest, InvalidSkill, ModelOption, RunRecord, Skill } from '../../lib/api';
+import type { Card, CardFrontmatterPatch, ProjectConfig } from '../../lib/shared';
 import type { CardRef } from '../dock/tabs';
 import { resolveTab } from '../dock/tabs';
 import { useCardRuns } from '../runs/useCardRuns';
-import type { Card, CardFrontmatterPatch, ProjectConfig } from '../../lib/shared';
 import { CardSkills } from '../skills/CardSkills';
 import { CardsBody } from './CardsBody';
 import { CardTabs } from './CardTabs';

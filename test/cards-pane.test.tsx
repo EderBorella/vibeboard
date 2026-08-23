@@ -17,8 +17,8 @@ vi.mock('../web/src/lib/api', () => api);
 
 const { CardsPane } = await import('../web/src/organisms/cards/CardsPane.js');
 
-import type { CardRef } from '../web/src/organisms/dock/tabs.js';
 import type { Card, ProjectConfig } from '../web/src/lib/shared.js';
+import type { CardRef } from '../web/src/organisms/dock/tabs.js';
 
 afterEach(cleanup);
 

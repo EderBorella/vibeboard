@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { chooseContent, rebindOnSignIn } from '../web/src/templates/shell.js';
 import { SignIn } from '../web/src/pages/signin/SignIn.js';
+import { chooseContent, rebindOnSignIn } from '../web/src/templates/shell.js';
 
 afterEach(cleanup);
 

@@ -1,10 +1,15 @@
 import { useState } from 'react';
-import { rebuildBoxes, restartOpencodeServer, type SandboxState, takeOverOpencodeServer } from '../../lib/api';
 import { Button } from '../../atoms/Button';
 import { Text } from '../../atoms/Text';
+import {
+  rebuildBoxes,
+  restartOpencodeServer,
+  type SandboxState,
+  takeOverOpencodeServer,
+} from '../../lib/api';
+import { useAction } from '../../lib/useAction';
 import { useConfirm } from '../../lib/useConfirm';
 import { Notice } from '../../molecules/Notice';
-import { useAction } from '../../lib/useAction';
 
 interface Props {
   state: SandboxState;

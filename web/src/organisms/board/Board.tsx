@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { Chip } from '../../atoms/Chip';
-import { Row } from '../shared/Row';
 import type { BoardName, Card, ProjectConfig } from '../../lib/shared';
 import { cardsByColumn, columnSlugs } from '../../lib/viewmodel';
+import { Row } from '../shared/Row';
 import { ArchiveDrawer } from './ArchiveDrawer';
 import { Column } from './Column';
 

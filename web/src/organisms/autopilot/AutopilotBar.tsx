@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { Button } from '../../atoms/Button';
+import { Text } from '../../atoms/Text';
 import {
   type AutopilotState,
   acknowledgeGates,
@@ -9,18 +11,16 @@ import {
   softStopAutopilot,
   startAutopilot,
 } from '../../lib/api';
-import { type LightAdvice, lightAdvice } from '../topbar/connection-light';
-import { Button } from '../../atoms/Button';
-import { Text } from '../../atoms/Text';
-import { killProjectRequest } from '../shared/requests';
-import { useConfirm } from '../../lib/useConfirm';
-import { BackendPicker } from '../copilot/BackendPicker';
-import { resolveChoice } from '../copilot/choice';
-import { StatusChip } from '../../molecules/StatusChip';
-import { stateClass } from '../../molecules/state-tones';
-import { List } from '../shared/List';
 import type { CopilotConfig } from '../../lib/shared';
 import { useAction } from '../../lib/useAction';
+import { useConfirm } from '../../lib/useConfirm';
+import { StatusChip } from '../../molecules/StatusChip';
+import { stateClass } from '../../molecules/state-tones';
+import { BackendPicker } from '../copilot/BackendPicker';
+import { resolveChoice } from '../copilot/choice';
+import { List } from '../shared/List';
+import { killProjectRequest } from '../shared/requests';
+import { type LightAdvice, lightAdvice } from '../topbar/connection-light';
 import { AutopilotHelp } from './AutopilotHelp';
 import { ForgiveDerivation } from './ForgiveDerivation';
 import { type TransportModel, transportModel } from './transport';

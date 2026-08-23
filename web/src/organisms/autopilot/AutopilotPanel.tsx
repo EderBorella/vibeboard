@@ -1,4 +1,7 @@
 import { useState } from 'react';
+import { Button } from '../../atoms/Button';
+import { Control } from '../../atoms/Control';
+import { Text } from '../../atoms/Text';
 import {
   type AutopilotState,
   acknowledgeGates,
@@ -7,16 +10,13 @@ import {
   softStopAutopilot,
   startAutopilot,
 } from '../../lib/api';
-import { Button } from '../../atoms/Button';
-import { Control } from '../../atoms/Control';
-import { Text } from '../../atoms/Text';
-import { killProjectRequest } from '../shared/requests';
-import { useConfirm } from '../../lib/useConfirm';
 import { errorText } from '../../lib/errors';
-import { Field } from '../../molecules/Field';
-import { List } from '../shared/List';
-import { useAccounting } from '../runs/useAccounting';
 import { type AutopilotConfig, BLOCKED_BOARDS, BOARD_LABELS, type ProjectConfig } from '../../lib/shared';
+import { useConfirm } from '../../lib/useConfirm';
+import { Field } from '../../molecules/Field';
+import { useAccounting } from '../runs/useAccounting';
+import { List } from '../shared/List';
+import { killProjectRequest } from '../shared/requests';
 import { useReadiness } from './useReadiness';
 
 // The lifecycle as it will actually be executed, plus what is stopping it.

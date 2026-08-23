@@ -22,6 +22,16 @@ const withTheme: Decorator = (Story, context) => {
   return <Story />;
 };
 
+// THE THREE WIDTHS THE PLAN ACCEPTS A PAGE AT. Named here rather than per story so the toolbar offers the
+// same three everywhere and a page story is three `globals` lines rather than three copies of this block.
+// They are viewport widths and not container widths — `app-shell.css` and `diary.css` each carry a
+// `@media (max-width: 1100px)`, so 900 is a different layout and not a narrower one.
+export const WIDTHS = {
+  w900: { name: '900', styles: { width: '900px', height: '900px' }, type: 'desktop' as const },
+  w1200: { name: '1200', styles: { width: '1200px', height: '900px' }, type: 'desktop' as const },
+  w1440: { name: '1440', styles: { width: '1440px', height: '900px' }, type: 'desktop' as const },
+};
+
 const preview: Preview = {
   decorators: [withTheme],
   globalTypes: {
@@ -41,6 +51,7 @@ const preview: Preview = {
     backgrounds: { disable: true },
     layout: 'padded',
     controls: { expanded: true },
+    viewport: { options: WIDTHS },
   },
 };
 

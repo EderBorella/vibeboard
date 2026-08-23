@@ -2,10 +2,10 @@ import { Chip } from '../../atoms/Chip';
 import { Readout } from '../../atoms/Readout';
 import { Text } from '../../atoms/Text';
 import { renderMarkdown } from '../../lib/markdown';
-import { Field } from '../../molecules/Field';
-import { FigureRow } from '../../molecules/FigureRow';
 import { BOARD_LABELS, type Card, type CardFrontmatterPatch, type ProjectConfig } from '../../lib/shared';
 import { cardPlace, csv, parseCsv } from '../../lib/viewmodel';
+import { Field } from '../../molecules/Field';
+import { FigureRow } from '../../molecules/FigureRow';
 import { CardLinks } from './CardLinks';
 
 interface Props {

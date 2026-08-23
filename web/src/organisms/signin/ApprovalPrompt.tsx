@@ -1,10 +1,10 @@
 import { useEffect, useRef } from 'react';
-import { approveSignin, refuseSignin, type SigninPending } from '../../lib/api';
 import { Button } from '../../atoms/Button';
 import { Surface } from '../../atoms/Surface';
 import { Text } from '../../atoms/Text';
-import { Modal } from '../shared/Modal';
+import { approveSignin, refuseSignin, type SigninPending } from '../../lib/api';
 import { useAction } from '../../lib/useAction';
+import { Modal } from '../shared/Modal';
 
 interface Props {
   pending: SigninPending[];

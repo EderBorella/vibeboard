@@ -173,7 +173,7 @@ export default {
     'web/src/organisms/cards/RawPane.tsx',
     'web/src/organisms/cards/CardsPane.tsx',
     'web/src/organisms/cards/CardsBody.tsx',
-    'web/src/organisms/board/BoardsView.tsx',
+    'web/src/pages/board/BoardsView.tsx',
     'web/src/templates/WorkArea.tsx',
     'web/src/organisms/runs/ActiveReport.tsx',
     'web/src/organisms/skills/CardSkills.tsx',

@@ -1,5 +1,5 @@
-import react from '@vitejs/plugin-react';
 import type { StorybookConfig } from '@storybook/react-vite';
+import react from '@vitejs/plugin-react';
 
 // THE WORKBENCH. Every element of the app, on its own, in all three themes.
 //
@@ -29,8 +29,18 @@ import type { StorybookConfig } from '@storybook/react-vite';
 // A CLEAN BUILD IS NOT EVIDENCE HERE, which is the trap worth naming: the first attempted fix produced a
 // bundle with a byte-identical hash to the broken one, so "it rebuilt successfully" meant nothing. The
 // output directory has to be deleted and the story actually rendered in a browser.
+//
+// AND `npm run storybook:build` IS NOT A TYPECHECK — measured, not assumed. It exits 0 on a tree with a
+// hard TS error in it (`.storybook/route-stub.ts`'s `StubHandler | unknown`, which `tsc` rejects and which
+// broke `npm run build`), because esbuild strips types without checking them. Never quote a green Storybook
+// build as evidence about types; `npm run typecheck` ×4 is the only thing that says anything about them.
 const config: StorybookConfig = {
   stories: ['../web/src/**/*.stories.tsx'],
+  // THE ONE ADDON, and it is built in rather than fetched. The plan's acceptance for the page stories is
+  // "each at 900 / 1200 / 1440": the app has two `@media (max-width: 1100px)` rules and a `@container`
+  // query on the boards, so a fixed-width DIV would show the wrong layout at 900 while looking right. The
+  // viewport has to be the real one.
+  addons: ['storybook/viewport'],
   framework: { name: '@storybook/react-vite', options: {} },
   // Dev-only, and never deployed: the app is served by the Fastify process from `dist/web`, which this
   // does not touch. `storybook build` emits to `storybook-static/`, which is gitignored.

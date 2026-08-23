@@ -1,22 +1,22 @@
 import type { DispatchRequest, InvalidSkill, ModelOption, RunList, RunRecord, Skill } from '../lib/api';
-import { BoardsView } from '../organisms/board/BoardsView';
+import type { BoardName, Card, CardFrontmatterPatch, ProjectSnapshot } from '../lib/shared';
+import { DEFAULT_CONTEXT_BUDGET } from '../lib/shared';
+import type { TagCount } from '../lib/viewmodel';
 import { CardsPane } from '../organisms/cards/CardsPane';
-import { ProjectControl } from '../pages/control/ProjectControl';
 import { CopilotPanel } from '../organisms/copilot/CopilotPanel';
 import type { useCopilot } from '../organisms/copilot/useCopilot';
-import { DiaryView } from '../organisms/diary/DiaryView';
 import type { DockPane } from '../organisms/dock/panes';
 import { UtilityDock } from '../organisms/dock/UtilityDock';
 import type { useCardTabs } from '../organisms/dock/useCardTabs';
 import type { Dock } from '../organisms/dock/useDock';
-import { ExplorerView } from '../pages/explorer/ExplorerView';
-import { ExecutionView } from '../pages/execution/ExecutionView';
-import type { BoardName, Card, CardFrontmatterPatch, ProjectSnapshot } from '../lib/shared';
-import { DEFAULT_CONTEXT_BUDGET } from '../lib/shared';
 import { SuggestionsPane } from '../organisms/suggestions/SuggestionsPane';
 import { useSuggestions } from '../organisms/suggestions/useSuggestions';
-import type { TagCount } from '../lib/viewmodel';
 import type { MainTab } from '../organisms/topbar/TopBar';
+import { BoardsView } from '../pages/board/BoardsView';
+import { ProjectControl } from '../pages/control/ProjectControl';
+import { DiaryView } from '../pages/diary/DiaryView';
+import { ExecutionView } from '../pages/execution/ExecutionView';
+import { ExplorerView } from '../pages/explorer/ExplorerView';
 
 // Grouped rather than spread across twenty loose props: each of these is one concern the work area
 // passes through, and naming them keeps the call site readable.

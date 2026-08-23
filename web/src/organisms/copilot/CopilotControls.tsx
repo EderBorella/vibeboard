@@ -1,9 +1,9 @@
-import type { ModelOption } from '../../lib/api';
 import { Button } from '../../atoms/Button';
 import { Control } from '../../atoms/Control';
-import { ModelPicker } from '../shared/ModelPicker';
-import { Tabs } from '../../molecules/Tabs';
+import type { ModelOption } from '../../lib/api';
 import type { BackendCaps } from '../../lib/shared';
+import { Tabs } from '../../molecules/Tabs';
+import { ModelPicker } from '../shared/ModelPicker';
 
 interface Props {
   // Modes and efforts are backend-specific; the caller passes the caps of the backend in force.

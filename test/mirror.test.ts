@@ -12,8 +12,8 @@ import * as coreSuggestions from '../src/core/suggestions.js';
 import * as core from '../src/core/types.js';
 import * as serverSnapshot from '../src/server/boards/snapshot.js';
 import * as webApi from '../web/src/lib/api.js';
-import * as webRuns from '../web/src/organisms/runs/viewmodel.js';
 import * as web from '../web/src/lib/shared.js';
+import * as webRuns from '../web/src/organisms/runs/viewmodel.js';
 import * as webSkills from '../web/src/organisms/skills/filter.js';
 
 // web/src/lib/shared.ts hand-mirrors the server's wire contract across the tsc/Vite boundary

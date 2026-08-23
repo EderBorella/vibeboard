@@ -19,9 +19,14 @@ import type { HTMLAttributes, ReactNode } from 'react';
 // the rows carry their own padding.
 //
 // AND THE OTHER FIVE HAVE TO SAY SO, which is the honest cost of the option not existing. Two do:
-// `.control-list` keeps 16px because `pages/control/control.css` is imported after this sheet, and
-// `.gate-card .gate-list` keeps 6px because it has to outrank `.vb-list` from a sheet imported BEFORE it —
-// see `styles.ts`. That second one shipped dead. One declaration is the price; a silent 2px is not.
+// `.control-list` keeps 16px and `.gate-card .gate-list` keeps 6px. One declaration is the price; a silent
+// 2px is not.
+//
+// `.gate-card .gate-list`'s EXTRA WEIGHT IS NOW REDUNDANT AND THE REASON WRITTEN HERE IS STALE. It was
+// bought at (0,2,0) specifically to outrank `.vb-list` from a sheet imported BEFORE it; the templates phase
+// moved `list.css` above every surface sheet (see `styles.ts`), so `.gate-list` alone would win on order.
+// Left as it is: it is harmless weight, and (0,2,0) is what keeps it correct if the order ever moves back.
+// The declaration is what is load-bearing, not the descendant.
 // `'nav'` IS THE FOURTH TAG AND IT IS NOT A WIDENING FOR CONVENIENCE. `ControlFileList` renders the file
 // list as a `<nav>` — it is the page's navigation between files, and the element is the accessibility
 // claim — and with no `nav` here it hand-wrote `className="vb-list control-list"`, which is a caller

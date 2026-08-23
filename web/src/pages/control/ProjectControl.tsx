@@ -1,4 +1,5 @@
 import { type ReactNode, useCallback, useEffect, useState } from 'react';
+import { Text } from '../../atoms/Text';
 import {
   type ControlCategory,
   type ControlFile,
@@ -11,16 +12,19 @@ import {
   putSkill,
   renameControlFile,
 } from '../../lib/api';
-import { Text } from '../../atoms/Text';
-import { useConfirm } from '../../lib/useConfirm';
 import { errorText } from '../../lib/errors';
 import type { ProjectSnapshot } from '../../lib/shared';
-import { SkillEditor } from '../../organisms/skills/SkillEditor';
-import { useSkills } from '../../organisms/skills/useSkills';
 import { useAction } from '../../lib/useAction';
-import { ControlFileEditor, type ControlView, type OpenFile } from '../../organisms/control/ControlFileEditor';
+import { useConfirm } from '../../lib/useConfirm';
+import {
+  ControlFileEditor,
+  type ControlView,
+  type OpenFile,
+} from '../../organisms/control/ControlFileEditor';
 import { ControlFileList, RESOURCES_SENTINEL } from '../../organisms/control/ControlFileList';
 import { ResourcesEditor } from '../../organisms/control/ResourcesEditor';
+import { SkillEditor } from '../../organisms/skills/SkillEditor';
+import { useSkills } from '../../organisms/skills/useSkills';
 
 interface Props {
   // Bumps whenever the project changes on disk (shared snapshot stream) so the file list and

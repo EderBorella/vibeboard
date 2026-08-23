@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { ApiError, type SigninCollected } from '../web/src/lib/api.js';
-import { POLL_LIMIT, runSignin, type SigninDeps, type SigninPhase } from '../web/src/organisms/signin/driver.js';
+import {
+  POLL_LIMIT,
+  runSignin,
+  type SigninDeps,
+  type SigninPhase,
+} from '../web/src/organisms/signin/driver.js';
 
 // The browser's half of signing in, driven directly. Its calls and its clock are injected, so the
 // whole flow is exercised without a DOM and without waiting two minutes for a TTL.

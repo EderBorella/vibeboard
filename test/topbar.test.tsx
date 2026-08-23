@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { STOP_REASONS } from '../src/core/dispatch-gate.js';
+import { STATE_TONES } from '../web/src/molecules/state-tones.js';
 import {
   LIGHT_STATES,
   type LightState,
@@ -13,7 +14,6 @@ import {
 } from '../web/src/organisms/topbar/connection-light.js';
 import type { MainTab } from '../web/src/organisms/topbar/TopBar.js';
 import { TopBar } from '../web/src/organisms/topbar/TopBar.js';
-import { STATE_TONES } from '../web/src/molecules/state-tones.js';
 
 afterEach(cleanup);
 

@@ -1,17 +1,17 @@
 import type { CSSProperties } from 'react';
-import type { RunRecord } from '../../lib/api';
 import { Button } from '../../atoms/Button';
 import { Chip } from '../../atoms/Chip';
 import { Readout } from '../../atoms/Readout';
 import { Surface } from '../../atoms/Surface';
 import { Text } from '../../atoms/Text';
-import { FigureRow } from '../../molecules/FigureRow';
-import { Row } from '../../organisms/shared/Row';
+import type { RunRecord } from '../../lib/api';
 import type { Card } from '../../lib/shared';
+import { FigureRow } from '../../molecules/FigureRow';
 import { ForgiveAttempts } from '../../organisms/runs/ForgiveAttempts';
 import { costLabel, usageTotal } from '../../organisms/runs/format';
 import { useAccounting } from '../../organisms/runs/useAccounting';
 import { elapsed, groupRuns, runSubject } from '../../organisms/runs/viewmodel';
+import { Row } from '../../organisms/shared/Row';
 
 interface Props {
   runs: RunRecord[];

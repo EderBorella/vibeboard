@@ -1,14 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
-import { getModelStatus, listModels, type ModelOption, type ModelStatus } from '../../lib/api';
 import { Button } from '../../atoms/Button';
 import { Control } from '../../atoms/Control';
 import { Readout } from '../../atoms/Readout';
 import { Text } from '../../atoms/Text';
+import { getModelStatus, listModels, type ModelOption, type ModelStatus } from '../../lib/api';
+import { backendCaps, backendDefaults } from '../../lib/shared';
 import { useConfirm } from '../../lib/useConfirm';
+import { useFetched } from '../../lib/useFetched';
 import { StatusChip } from '../../molecules/StatusChip';
 import { stateClass } from '../../molecules/state-tones';
-import { backendCaps, backendDefaults } from '../../lib/shared';
-import { useFetched } from '../../lib/useFetched';
 import { BackendPicker } from './BackendPicker';
 import { ChatSwitcher } from './ChatSwitcher';
 import { CopilotControls } from './CopilotControls';

@@ -12,6 +12,12 @@ a bug, and one has already been fixed for that reason.
 | | at the start (2026-08-20) | now |
 |---|---|---|
 | class selectors | **457** | **305** |
+
+The 457 is measured, at `85cfa06` (2026-08-20, the last commit before any of this work).
+`tools/check-class-budget.mjs` said the sweep started from **443**; 443 reproduces at no commit and is
+withdrawn. There are two honest starts and they answer different questions: the design-system work took
+**457 → 361**, and the seven atomic phases took **361 → 305** (measured at `0f983f2`, the commit the plan
+starts from).
 | stylesheets under `web/src/` | 2 (`styles.css` 116KB + `ui/primitives.css`) | **41**, one per component and per organism directory |
 | type steps | 27 authored sizes | **5** (`--t-display` retired) |
 | token definitions / names | 74 / 40 | **75 / 45** |
@@ -3563,11 +3569,43 @@ web/src/
     board/ autopilot/ copilot/ dock/ runs/ cards/ control/ explorer/ diary/ skills/
     suggestions/ settings/ signin/ topbar/
   templates/  App WorkArea EditorLayout + app-shell.css work-area.css editor-layout.css
-  pages/      control/ execution/ explorer/ gate/ signin/
+  pages/      board/ control/ diary/ execution/ explorer/ gate/ signin/
   lib/        api/  the hooks  format.ts token.ts errors.ts markdown.tsx ws.ts
     shared.ts THE HAND-MIRROR of src/core/ — never deduplicated, guarded by test/mirror.test.ts
   main.tsx  styles.ts
 ```
+
+**The workbench renders 119 stories in three themes, and the seven pages are among them.** `Pages/Boards`,
+`Pages/Execution`, `Pages/Log`, `Pages/Control`, `Pages/Explorer`, `Pages/Gate`, `Pages/SignIn`, each with an
+`At900`, `At1200` and `At1440` variant. Those are **real viewport widths and not fixed-width containers**:
+`app-shell.css` and `diary.css` each carry a `@media (max-width: 1100px)` and `board.css` two `@container`
+queries, so a `<div style="width:900px">` would show the wrong layout at 900 while looking right. The
+built-in `storybook/viewport` addon supplies the toolbar and the widths are named once in `preview.tsx`.
+
+**The hook-driven ones exist through `.storybook/route-stub.ts`**, which is the correction the plan needed:
+§820 said to use "the fixture data the browser harness already builds in `visual/support/fixtures.ts`", and
+that file builds no app data at all — it is the Playwright theme, baseline and credential module, and the
+harness's data is a real project scaffolded on disk by `visual/run.mjs` through the product's own writers,
+reachable from no iframe. `request()` in `lib/api/http.ts` is the single chokepoint every feature module
+calls, so a route-keyed `globalThis.fetch` under it reaches them all through the code they actually run. An
+unkeyed route is a **loud 501** rather than `{}`, because a stub that answers everything with an empty object
+makes a broken story look like an empty one. **Ten of the fourteen organism directories now have a story**;
+`cards` and `copilot` do not, because `CardsPane` needs a whole `DispatchContext` and `CopilotPanel` takes a
+`ReturnType<typeof useCopilot>`, and `diary` no longer has a component at all — `DiaryView` is `Pages/Log`.
+
+**`templates/PaneLayout` is WITHDRAWN and was never created.** The plan lists three templates; the tree has
+`App` + `app-shell.css`, `WorkArea` + `work-area.css` and `EditorLayout` + `editor-layout.css`. What
+`PaneLayout` was to be already exists as a class: `templates/work-area.css` declares
+`.control { flex: 1; min-width: 0; display: flex; background: var(--wash) }`, the two-column file pane, worn
+by `pages/control/ProjectControl.tsx` and `pages/explorer/ExplorerView.tsx`. The *layer* claim §5.1 exists to
+make is therefore already satisfied; a component would wrap one `<div className="control">` at two call
+sites, delete zero classes and add a file, against the standing rule that a new element must show why an
+existing one cannot do the job. `EditorLayout` earns its existence — two consumers and real chrome — and
+this would not. Two honest costs go with the withdrawal: the class is **named `.control` after one of its two
+consumers**, so it is a shared shape wearing a private name that escapes `check:layers` only by having been
+moved into `templates/` — the same criticism as `organisms/shared/`; and the plan's
+`UtilityDock → Tabs + PaneLayout` line is withdrawn with it, because `dock.css` owns the dock's frame in
+three classes.
 
 **One `.css` beside every component and every organism directory**, imported by `web/src/styles.ts`, which is
 the single ordered list of all 41 sheets — the app loads it, the Storybook preview loads it, and
@@ -3581,14 +3619,26 @@ workbench showing a cascade the app does not have is worse than one showing noth
 2. A class defined under `organisms/<name>/` or `pages/<name>/` may be referenced only from `<name>`. A
    surface's own class read by a second surface is either a shared shape wearing a private name, or a
    coincidence waiting to be broken by whoever edits it.
-3. A class declared in two SCOPED directories and no open layer is an ORPHAN: it has no owner.
+3. A class declared in more than one scope with no open-layer rule that DECLARES anything has no owner.
+4. **22 classes are exempt from claim 2 and the size of that exemption is itself ratcheted.** A class the
+   open layer really owns is not a cross-surface read — `.vb-ctl` is the Control atom's and eight surfaces
+   say where their own copy sits — but that means *adding* an open-layer declaration takes a class off the
+   claim. It used to take only a declaration: an EMPTY rule, `.board-columns { }` in `atoms/text.css`,
+   exempted a class from both claims while changing no rendering and adding no class NAME, so the budget
+   ratchet did not move either — a real cross-surface read plus that one plant exited 0. Now the open rule
+   has to declare something, AND the exempt count is held at 22, so laundering a finding through the open
+   layer is a commit somebody has to write. Measured: **no class in this tree is in two scoped directories
+   without a real open-layer declaration**, so the zero was honest before the repair as well as after it.
 
 **The scope is a surface NAME and not a path**, which is what makes `pages/control/` and
 `organisms/control/` one surface — they are one feature seen from two layers. It is also the half of the gate
 that was wrong for a phase: the reader took the first path segment, so once a component lived at
 `organisms/board/` its surface read as `organisms` and every scoped class in the tree became a finding. That
 was found by simulating the file move against the census before making it, which is the only reason it was
-not found as 231 findings.
+not found as **187 findings** — measured by re-running the census against the same sheets and sources with
+only the reader changed: 305 classes, 213 owned by a surface, 191 of those checked, **0 findings on the
+reader as shipped and 187 on the reader as it was**. "231" was not any quantity in this census and is
+withdrawn.
 
 **44 cross-surface reads → 0.** Thirteen closed on the file move alone, with no rule touched. The other
 thirty-one were not a path problem and no file move could have closed them: two surfaces really do each
@@ -3613,28 +3663,55 @@ rather than becoming a full atomic layer. Re-derived with every term counted:
 | surface layout | **76** | 19 surfaces × 4 |
 | **target** | **146** | |
 
-**The tree closes at 305, so the gap is 159, and it is ONE TERM.** Measured 2026-08-23:
+**The tree closes at 305, so the gap is 159 — one DOMINANT term and three real secondary ones.** The
+decomposition that stood here read `60 vs 55`, `41 vs 10`, `230 vs 76`; its over-counts are 5 + 31 + 154 =
+**190 rather than 159**, it omitted `templates/` entirely, and its 230 was a sum in which 17 classes are
+declared in two feature sheets. Re-measured 2026-08-23, mapped onto this page's own five terms:
 
-| | measured | target | over |
+| §5.3 term | measured | target | over |
 |---|---|---|---|
-| the 13-sheet primitive layer | **60** | 55 | 5 — essentially done, and each of the five is a real option on a real component |
-| `organisms/shared/` | **41** | 10 | 31 — Modal 5 and List/Row 5 are EXACT; the rest are the picker, the confirm, three state words and the thirteen shapes two surfaces each wear |
-| the 16 feature directories | **230** | 76 | **154** |
+| atoms (incl. `tones` 5) | **33** | 29 | +4 |
+| molecules (incl. `Popover`) | **33** | 26 | +7 |
+| shared organisms (`organisms/shared/`) | **42** | 10 | +32 |
+| globals (`templates/` 17 + `design/` 0 + `atoms/prose.css`) | **17** | 5 | +12 |
+| surface layout (16 feature directories, DISTINCT) | **213** | 76 | **+137** |
+| sum of the five terms | 338 | 146 | +192 |
+| less classes counted in two or more terms | −33 | — | — |
+| **DISTINCT UNION — and the union is what ratchets** | **305** | **146** | **+159** |
 
-**And the character of the 154 is known: type faces and one-off positions, not boxes.** `.tile-title`,
+**So it is not "one term".** Surface layout is **+137 of the 159, 86%**, and the other three are real:
+`organisms/shared/` +32, globals +12 (all of it `templates/`, which nobody has looked at), molecules +7.
+Calling it one term writes off about fifty classes the owner could act on. The terms cannot be made to add
+to 159 — 33 classes sit in two terms — so only the union is ratchetable. Two notes on the 42: **ten of them
+are the model picker**, one surface's family, filed in a shared directory only because §5.2 sends `models/`
+there, and therefore exempt from both the per-surface ceiling and the cross-surface claim; and the 42 is not
+41 because this phase's own contrast repair (`.reports-forgiven.vb-text-error`) names `vb-text-error` inside
+that sheet. It adds no class NAME, so the ratchet does not move — a term can grow while the union does not.
+
+**The character of the dominant term is known: type faces and one-off positions, not boxes.** `.tile-title`,
 `.msg-user`, `.report-meta dd`, `.diary-kind`, `.filed-state`, `.dispatch-title` — a surface deciding how
 ITS words are set. The fourteen big families the first measurement found were drawing *boxes*, and six
-phases took the boxes away; nothing in the programme addressed the faces. There are two ways to 76 and
-**both are design decisions rather than gate work**:
+phases took the boxes away; nothing in the programme addressed the faces. There are two routes and **both
+are design decisions rather than gate work**:
 
-1. A shared "one-off position" vocabulary — which is the utility framework this page refuses by name.
-2. **A ruling that a surface may not have a type face of its own**, so roughly 150 face classes become
-   options on `Text`. That is the same shape of change as `Readout` losing eight of its nine options: it is
-   plannable, it is measurable, and it changes how the app looks in about a hundred places.
+1. A shared "one-off position" vocabulary. **Recorded as refused** — it is the utility framework this page
+   refuses by name, and that refusal stands.
+2. **A ruling that a surface may not have a type face of its own**, so face classes become options on
+   `Text`. This is the live one, and the same shape of change as `Readout` losing eight of its nine options.
+
+**But "roughly 150 face classes" is supported by no census in this repository, and the one population that
+HAS been classified came out at about a third.** The thirteen shapes in `organisms/shared/` were read
+declaration by declaration: 4 are certain faces, 7 at the outside, 6 are not faces at all — `.signin-row` is
+a `Row`, `.tag` is a ground, `.control-empty` is padding. So before route 2 is ruled on, somebody has to
+count the faces across the 213. That is an afternoon with the readers that already exist and it turns "159,
+character known" into "159, of which N are faces". `.filed-title` is the cheapest illustration of what such a
+census would find: `--t-lead`/1.5/`--text` is `Text lead` with exactly **one** declaration `Text` does not
+give (`color: var(--text)`, where `Text` is `--muted`), so one `Text` option would take it and several like
+it. That census is the successor card.
 
 `npm run check:class-budget` holds the ratchet at 305 and prints the target beside it. **The ratchet is never
 raised.** It also holds a per-surface ceiling of four, as a ratchet on the COUNT of surfaces over it — 13
-today, down from 15 — because a blocking zero there is pointed at the same 154.
+today, down from 15 — because a blocking zero there is pointed at the same 137.
 
 ## The atomic revamp: `Tabs` and `Menu` overturn a twice-taken refusal
 

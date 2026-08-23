@@ -32,7 +32,17 @@
       // this is the code every later phase's gate depends on.
       "visual/**/*.ts",
       "visual/**/*.mjs",
-      "visual/playwright.config.ts"
+      "visual/playwright.config.ts",
+      // THE WORKBENCH CONFIG, for exactly the reason above, and it took a shipped type error to notice.
+      // `.storybook/**` was in no tsconfig `include` and in no biome glob: `route-stub.ts`'s
+      // `StubHandler | unknown` — a union that reduces to `unknown` — surfaced only because ONE story
+      // imports the module transitively, and `preview.tsx` and `main.ts` were read by nothing at all.
+      // `.storybook/**/*.{ts,tsx}` is now in tsconfig.test.json's `include` too, and the GLOB matters: a
+      // bare `".storybook"` entry silently matches NOTHING, because tsc's file globber skips paths whose
+      // basename begins with a dot. Proved by planting `const x: number = 'not a number'` in
+      // `preview.tsx` — exit 0 with the directory name, exit 2 with the two globs.
+      ".storybook/**/*.ts",
+      ".storybook/**/*.tsx"
     ]
   },
 

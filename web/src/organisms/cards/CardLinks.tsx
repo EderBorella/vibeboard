@@ -3,9 +3,9 @@ import { Button } from '../../atoms/Button';
 import { Readout } from '../../atoms/Readout';
 import { Surface } from '../../atoms/Surface';
 import { Text } from '../../atoms/Text';
-import { List } from '../shared/List';
 import type { Card } from '../../lib/shared';
 import { linkedCards } from '../../lib/viewmodel';
+import { List } from '../shared/List';
 import { LinkPicker } from './LinkPicker';
 
 interface Props {

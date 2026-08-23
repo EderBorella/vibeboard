@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { RunRecord, RunStatus } from '../web/src/lib/api.js';
-import { elapsed, groupFor, groupOf, groupRuns, needsAttention } from '../web/src/organisms/runs/viewmodel.js';
+import {
+  elapsed,
+  groupFor,
+  groupOf,
+  groupRuns,
+  needsAttention,
+} from '../web/src/organisms/runs/viewmodel.js';
 
 const run = (over: Partial<RunRecord> = {}): RunRecord => ({
   run: 'r1',

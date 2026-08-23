@@ -1,17 +1,17 @@
 import { useState } from 'react';
-import { cardSuggestion, patchSuggestion } from '../../lib/api';
 import { Button } from '../../atoms/Button';
 import { Chip } from '../../atoms/Chip';
 import { Control } from '../../atoms/Control';
 import { Surface } from '../../atoms/Surface';
 import { Text } from '../../atoms/Text';
+import { cardSuggestion, patchSuggestion } from '../../lib/api';
+import type { Suggestion, SuggestionLevel } from '../../lib/shared';
+import { SUGGESTION_LEVELS } from '../../lib/shared';
+import { useAction } from '../../lib/useAction';
 import { FigureRow } from '../../molecules/FigureRow';
 import { asState } from '../../molecules/state-tones';
 import { List } from '../shared/List';
 import { Row } from '../shared/Row';
-import type { Suggestion, SuggestionLevel } from '../../lib/shared';
-import { SUGGESTION_LEVELS } from '../../lib/shared';
-import { useAction } from '../../lib/useAction';
 
 // The dock's second occupant (decision 48): what agents filed, and the two things a person may do with
 // one. `UtilityDock` knows nothing about any particular pane, so this is one descriptor in WorkArea plus

@@ -12,5 +12,5 @@
     "esModuleInterop": true,
     "types": ["node", "ws"]
   },
-  "include": ["test", "src", "web/src"]
+  "include": [".storybook/**/*.ts", ".storybook/**/*.tsx", "test", "src", "web/src"]
 }

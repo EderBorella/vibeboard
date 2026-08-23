@@ -9,22 +9,9 @@ import {
   resolveRunRecord,
   setLinks,
 } from '../lib/api';
-import { AutopilotBar } from '../organisms/autopilot/AutopilotBar';
-import { HaltOverlay } from '../organisms/autopilot/HaltOverlay';
-import { archiveCardRequest, stopRunRequest } from '../organisms/shared/requests';
-import { useConfirm } from '../lib/useConfirm';
-import { type CopilotMode, useCopilot } from '../organisms/copilot/useCopilot';
-import { useCardTabs } from '../organisms/dock/useCardTabs';
-import { useDock } from '../organisms/dock/useDock';
-import { useDispatch } from '../organisms/runs/useDispatch';
-import { useRuns } from '../organisms/runs/useRuns';
-import { needsAttention } from '../organisms/runs/viewmodel';
-import { SettingsModal } from '../organisms/settings/SettingsModal';
 import { BOARDS, type BoardName, type Card, type CardFrontmatterPatch } from '../lib/shared';
-import { ApprovalPrompt } from '../organisms/signin/ApprovalPrompt';
-import { SignIn } from '../pages/signin/SignIn';
-import { useSkills } from '../organisms/skills/useSkills';
 import { useAutopilot } from '../lib/useAutopilot';
+import { useConfirm } from '../lib/useConfirm';
 import { useCopilotChoice } from '../lib/useCopilotChoice';
 import { useCollapsedBoards, useTheme } from '../lib/useLocalPrefs';
 import { usePendingSignins } from '../lib/usePendingSignins';
@@ -32,9 +19,22 @@ import { useSandbox } from '../lib/useSandbox';
 import { useSignin } from '../lib/useSignin';
 import { useSnapshot } from '../lib/useSnapshot';
 import { canPlace, presentTags, tagCounts, toggleTag } from '../lib/viewmodel';
-import { ProjectGate } from '../pages/gate/ProjectGate';
-import { chooseContent, lightProps, rebindOnSignIn } from './shell';
+import { AutopilotBar } from '../organisms/autopilot/AutopilotBar';
+import { HaltOverlay } from '../organisms/autopilot/HaltOverlay';
+import { type CopilotMode, useCopilot } from '../organisms/copilot/useCopilot';
+import { useCardTabs } from '../organisms/dock/useCardTabs';
+import { useDock } from '../organisms/dock/useDock';
+import { useDispatch } from '../organisms/runs/useDispatch';
+import { useRuns } from '../organisms/runs/useRuns';
+import { needsAttention } from '../organisms/runs/viewmodel';
+import { SettingsModal } from '../organisms/settings/SettingsModal';
+import { archiveCardRequest, stopRunRequest } from '../organisms/shared/requests';
+import { ApprovalPrompt } from '../organisms/signin/ApprovalPrompt';
+import { useSkills } from '../organisms/skills/useSkills';
 import { type MainTab, TopBar } from '../organisms/topbar/TopBar';
+import { ProjectGate } from '../pages/gate/ProjectGate';
+import { SignIn } from '../pages/signin/SignIn';
+import { chooseContent, lightProps, rebindOnSignIn } from './shell';
 import { WorkArea } from './WorkArea';
 
 export function App() {

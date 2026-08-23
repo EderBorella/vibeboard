@@ -1,11 +1,11 @@
 import { useState } from 'react';
-import type { Skill } from '../../lib/api';
 import { Button } from '../../atoms/Button';
 import { Control } from '../../atoms/Control';
 import { Text } from '../../atoms/Text';
-import { Field } from '../../molecules/Field';
+import type { Skill } from '../../lib/api';
 import { BOARD_LABELS, BOARDS, type BoardName, type ProjectConfig } from '../../lib/shared';
 import { slugify } from '../../lib/viewmodel';
+import { Field } from '../../molecules/Field';
 
 interface Props {
   skill: Skill;

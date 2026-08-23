@@ -3,8 +3,8 @@ import type { BoardName, Card, ProjectSnapshot } from '../../lib/shared';
 import { BOARD_LABELS, BOARDS } from '../../lib/shared';
 import type { TagCount } from '../../lib/viewmodel';
 import { filterByTags } from '../../lib/viewmodel';
-import { Board } from './Board';
-import { TagFilter } from './TagFilter';
+import { Board } from '../../organisms/board/Board';
+import { TagFilter } from '../../organisms/board/TagFilter';
 
 interface Props {
   snapshot: ProjectSnapshot;

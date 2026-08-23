@@ -71,25 +71,60 @@ const PRIMITIVE_LAYER = [
   ),
 ];
 
-// THE RATCHET, and the number is what the tree holds today rather than what the plan wants. The sweep took
-// the union from 443 to this; the target is **146** and it is not reached. THE SEVEN-PHASE PROGRAMME ENDS
+// THE RATCHET, and the number is what the tree holds today rather than what the plan wants. The target is
+// **146** and it is not reached.
+//
+// TWO NUMBERS STOOD FOR ONE START AND THIS FILE HELD THE WRONG ONE. It said 443; docs/design-system.md
+// says 457. Measured with this file's own reader over the tree at each commit: **457** at `85cfa06`
+// (2026-08-20, the last commit before any of this work), **361** at `0f983f2` (2026-08-22, the commit the
+// seven-phase plan starts from), **305** now. 443 reproduces at no commit and is withdrawn. So there are
+// two honest starts and they answer different questions: the design-system work took 457 → 361, and these
+// seven phases took 361 → 305. THE SEVEN-PHASE PROGRAMME ENDS
 // HERE, so this is the closing number and the shortfall is the owner's to rule on rather than a gate's to
 // hide. The derivation of 146, the gap, and where the gap sits are all in `CLASS_TARGET` below, and they
 // are written into `docs/design-system.md` as 183 was.
 //
-// WHERE THE 259 SURFACE CLASSES LIVE, counted per directory rather than estimated: runs 35, board 32,
+// WHERE THE SURFACE CLASSES LIVE, counted per directory rather than estimated: runs 35, board 32,
 // copilot 27, cards 25, autopilot 22, diary 17, execution 12, explorer 11, skills 10, control 9,
-// suggestions 8, gate 8, topbar 6, dock 3, signin 3, settings 2 — 230 across the sixteen feature
-// directories — plus `organisms/shared/` **41**, `templates/` 17 and the two sheets in an open directory
-// that are really surfaces (`atoms/prose.css`, `molecules/popover.css`). These do not sum to 259: 22
-// classes are shared then specialised and are counted in both columns.
+// suggestions 8, gate 8, topbar 6, dock 3, signin 3, settings 2 — **230 summed, 213 distinct** across the
+// sixteen feature directories. 17 of the 230 are counted twice because two feature sheets declare them.
 //
-// `organisms/shared/` WENT FROM 26 TO 41 IN THIS PHASE AND THAT IS A REAL COST, stated where the number
+// `organisms/shared/` WENT FROM 26 TO 42 IN THIS PHASE AND THAT IS A REAL COST, stated where the number
 // is. Thirteen classes moved there to close `check:layers` — each one a shape two features wear, each one
 // named after whichever feature wrote it first. It buys the structural claim (a class lives in a directory
-// that says who may read it) and it does NOT buy a smaller number. The target wants ten there. Nine of the
-// thirteen are TYPE FACES, and the ruling that would actually collapse them — that a surface may not have
-// a type face of its own, so they become `Text` options — is the owner's, not a phase's.
+// that says who may read it) and it does NOT buy a smaller number. The target wants ten there.
+//
+// AND THE 42 IS NOT 41: `.reports-forgiven.vb-text-error`, the contrast repair this phase made, names
+// `vb-text-error` inside this sheet, so it joins this term. It adds no class NAME, so the ratchet below
+// does not move. A term can grow while the union does not, which is the reason the union is the ratchet.
+//
+// "NINE OF THE THIRTEEN ARE TYPE FACES" WAS WRONG AND IS WITHDRAWN. Classified from the declarations:
+//   FACES, reachable by a `Text` option (4)      `.control-tag` (uppercase + track + `--accent-2`),
+//                                                `.filed-title` (`--t-lead`/1.5/`--text`),
+//                                                `.signin-row-label` (`--t-body` + `word-break`),
+//                                                `.report-chip` (uppercase + track, plus a `flex`)
+//   PART FACE, PART SOMETHING ELSE (3)           `.settings-section` (a face plus a `border-bottom` and
+//                                                two margins), `.diary-empty` (a flex column with a gap),
+//                                                `.control-new` (ink only)
+//   NOT FACES AT ALL, and no `Text` ruling reaches them (6)
+//                                                `.tag` (a ground), `.cv-link-btn` (`fit-content` + a
+//                                                hover border), `.control-empty` (padding),
+//                                                `.report-stop` (flex + hover colour),
+//                                                `.reports-forgiven` (flex-basis + opacity), and
+//                                                **`.signin-row`**, which is display/align/gap/padding/
+//                                                border — that is a `Row`, and its own comment admits it
+//                                                re-declares three of `.vb-row`'s at equal specificity and
+//                                                wins only on sheet order.
+// So "a surface may not have a type face of its own" reaches AT MOST 7 of the 13 and cleanly 4. The
+// collapse is worth about that, not thirteen.
+//
+// AND 10 OF THE 42 ARE NOT SHARED AT ALL: `.mp`, `.mp-badges`, `.mp-chip`, `.mp-def-tag`, `.mp-empty`,
+// `.mp-filters`, `.mp-list`, `.mp-pick-bot`, `.mp-pick-top`, `.mp-star` — the model picker's own family,
+// ONE surface, filed here only because §5.2 sends `models/` to `organisms/shared/`. Measured consequence:
+// they are exempt from the per-surface ceiling of 4 AND from `check:layers`'s cross-surface claim, because
+// `organisms/shared/` is an open layer. As `organisms/models/` this term would read 32, there would be a
+// seventeenth feature directory at 10, and the per-surface over-budget count would go 13 → 14, which
+// breaks that ratchet. Recorded rather than done: it is a directory rename against a named §5.2 placement.
 //
 // 183 WAS ITSELF WITHDRAWN — see CLASS_TARGET below, which is 146. What follows is why 183 replaced an
 // earlier 150, kept because it is the record of how a target gets derived from an uncounted term twice:
@@ -174,7 +209,21 @@ const PRIMITIVE_LAYER = [
 // → `.vb-editor-body`, which is the template taking its own names off one feature's stylesheet.
 // 307 before TEMPLATES AND PAGES, 305 after it, and the arithmetic is 2 out against 0 in:
 //   OUT (2)   `.filed-text` — `font-size: var(--t-body); line-height: 1.5; color: var(--muted)`, which is
-//             `Text lead` declaration for declaration, at both of its call sites; and
+//             `Text lead` FOR THOSE THREE DECLARATIONS, at both of its call sites. AND A FOURTH THAT WAS
+//             NOT NAMED, which is a geometry change and not a rewording: the old element was a `<p>` and
+//             nothing in this tree resets `p`, so it carried the UA's `margin-block: 1em` — 13px top and
+//             bottom. `Text`'s base is `margin: 0`. Measured in Chromium against the app's own ordered
+//             sheet list: font-size 13px both, line-height 19.5px both, ink `rgb(127,154,163)` both,
+//             margins 13/13 → 0/0, and **the filed row goes 120.00px → 94.00px, −26.00px, at both call
+//             sites in all three themes**. Tier 4 records no padding, margin, gap or line-height, so the
+//             drift baseline reports NOTHING for this — do not read "zero drift" as "nothing moved".
+//             The predicted `line-height: 1.45 → 1.5` does NOT happen: `.vb-text-lead` sets 1.5, so the
+//             composite is 19.5px before and after. `atoms/Text.tsx` argues for exactly this ("half the
+//             lines this replaces were `<p>`s taking the UA's paragraph margins — which nobody chose"),
+//             so it is the intended change and not a regression; it is the SIZE of it that was missing.
+//             Its twin survives one line away: `.filed-reason` (`diary.css`) is this plus `font-style:
+//             italic`, i.e. `Text lead role="hint"` declaration for declaration. First candidate next pass.
+//             And
 //             `.reports-forgive-error` — `flex-basis: 100%` (what the result line beside it already says)
 //             plus `color: var(--danger)`, which is `Text error`.
 //   IN (0)    nothing. Nineteen classes MOVED between sheets to take `check:layers` to zero, and a move is
@@ -200,30 +249,51 @@ const CLASS_CEILING = 305;
 // shared organisms 10 (Modal 5, List/Row 5), globals 5, surface layout 76 (19 surfaces × 4).
 //
 // AND THE GAP AT THE END OF THE SEVEN PHASES IS **159**, WHICH IS NOT A DELETION PROGRAMME ANY PHASE OF
-// THE PLAN CARRIED. Measured against the three terms this gate can see:
+// THE PLAN CARRIED.
 //
-//   primitive layer      **60**  against 29 + 26 = 55   — essentially done; five over, and every one of
-//                                                         the five is a real option on a real component.
-//   organisms/shared/    **41**  against 10             — Modal 5 and List/Row 5 are EXACT. The other 31
-//                                                         are the picker, the confirm, three state words
-//                                                         and the thirteen this phase moved in: surfaces
-//                                                         living in a shared directory because two
-//                                                         surfaces each render them.
-//   16 feature dirs     **230**  against 19 × 4 = 76    — the whole shortfall, 154 of the 159.
+// THE DECOMPOSITION PRINTED HERE BEFORE WAS WRONG THREE WAYS and it is worth saying how, because the owner
+// acts on this number: it read the three terms as `60 vs 55`, `41 vs 10`, `230 vs 76`, whose over-counts
+// are 5 + 31 + 154 = **190 rather than 159**; it OMITTED `templates/` entirely; and its 230 was a sum of
+// per-directory counts, 17 of which are declared in two feature sheets. Measured 2026-08-23 with this
+// file's own reader, mapped onto §5.3's own five terms — `tones.css` under the atoms term and `popover.css`
+// under molecules, exactly as §5.3 enumerates them:
 //
-// SO THE GAP IS ONE TERM AND ITS CHARACTER IS KNOWN: **type faces and one-off positions, not boxes.**
-// `.tile-title`, `.msg-user`, `.report-meta dd`, `.diary-kind`, `.filed-state`, `.diary-kind`,
-// `.dispatch-title` — a surface deciding how ITS words are set. The fourteen big families measured were
-// drawing boxes and the six phases before this one took the boxes away; nothing in the plan addresses the
-// faces, and a phase that invented a programme for them would be deciding a design question.
+//   §5.3 term                                          measured   target   over
+//   atoms (incl. `tones` 5)                                  33       29     +4
+//   molecules (incl. `Popover`)                              33       26     +7
+//   shared organisms (`organisms/shared/`)                   42       10    +32
+//   globals (`templates/` 17 + `design/` 0 + `prose.css`)    17        5    +12
+//   surface layout (16 feature dirs, DISTINCT)              213       76   +137
+//   sum of the five terms                                   338      146   +192
+//   less classes counted in two or more terms                −33        —      —
+//   DISTINCT UNION — and the union is what ratchets         *305*    *146*  *+159*
 //
-// THE TWO WAYS TO 76, AND BOTH ARE THE OWNER'S CALL RATHER THAN A GATE'S:
-//   1. A shared "one-off position" vocabulary — which `docs/design-system.md` refuses by name as the
-//      utility framework this project exists without.
-//   2. A ruling that a surface may not have a type face of its own, so the ~150 face classes become
-//      options on `Text`. That is the same shape of change as `Readout` losing its nine options in the
-//      atom phase: plannable, measurable, and it changes how the app LOOKS in about a hundred places.
-// Neither is a number a gate can hide, and this gate's job is to have left it measured and located.
+// SO IT IS NOT "ONE TERM". It is ONE DOMINANT term — surface layout, **+137 of the 159, 86%** — plus three
+// real secondary ones: `organisms/shared/` +32 (of which 10 are the model picker, above), globals +12
+// (all of it `templates/`, which nobody has looked at), molecules +7. Calling it one term writes off about
+// fifty classes the owner could act on. The terms do not add to 159 and cannot: 33 classes are in two
+// terms, so only the union is ratchetable.
+//
+// THE CHARACTER OF THE DOMINANT TERM IS KNOWN: **type faces and one-off positions, not boxes.**
+// `.tile-title`, `.msg-user`, `.report-meta dd`, `.diary-kind`, `.filed-state`, `.dispatch-title` — a
+// surface deciding how ITS words are set. The fourteen big families measured were drawing boxes and the six
+// phases before this one took the boxes away.
+//
+// THE TWO ROUTES, AND BOTH ARE THE OWNER'S CALL RATHER THAN A GATE'S:
+//   1. A shared "one-off position" vocabulary. RECORDED AS REFUSED: `docs/design-system.md` refuses it by
+//      name, as the utility framework this project exists without, and that refusal stands.
+//   2. A ruling that a surface may not have a type face of its own, so face classes become options on
+//      `Text`. This is the live one — same shape of change as `Readout` losing its nine options in the atom
+//      phase: plannable, measurable, and it changes how the app LOOKS in about a hundred places.
+//
+// BUT "ROUGHLY 150 FACE CLASSES" IS SUPPORTED BY NO CENSUS IN THIS REPOSITORY, and the one population that
+// HAS been classified declaration by declaration — the thirteen in `organisms/shared/`, above — came out at
+// 4 certain faces and 7 at the outside. About a third, not two thirds. So before route 2 is ruled on,
+// somebody has to count the faces across the 213: an afternoon with the readers that already exist, and it
+// converts the headline from "159, character known" into "159, of which N are faces". That census is the
+// successor card. `.filed-title` is the cheapest single illustration of what it would find:
+// `--t-lead`/1.5/`--text` is `Text lead` with exactly ONE declaration `Text` does not give
+// (`color: var(--text)`, where `Text` is `--muted`), so one `Text` option would take it and several like it.
 const CLASS_TARGET = 146;
 
 // Anti-vacuity floor on the SELECTOR PARSER, not on the class count: a regex that stops matching reports

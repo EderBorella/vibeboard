@@ -14,10 +14,10 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { Card } from '../web/src/lib/shared.js';
 import { CardTile } from '../web/src/organisms/board/CardTile.js';
 import { Column } from '../web/src/organisms/board/Column.js';
 import { CardTabs } from '../web/src/organisms/cards/CardTabs.js';
-import type { Card } from '../web/src/lib/shared.js';
 
 afterEach(cleanup);
 
@@ -72,8 +72,8 @@ describe('the ghost variant is reserved for controls that explain', () => {
     // `ap-help-btn` shows prose; `ap-expand` shows the bar's own numbers. Neither touches the project,
     // which is the whole of the category.
     expect(ghostSites()).toEqual([
-      'autopilot/AutopilotBar.tsx:ap-expand',
-      'autopilot/AutopilotBar.tsx:ap-help-btn',
+      'organisms/autopilot/AutopilotBar.tsx:ap-expand',
+      'organisms/autopilot/AutopilotBar.tsx:ap-help-btn',
     ]);
   });
 

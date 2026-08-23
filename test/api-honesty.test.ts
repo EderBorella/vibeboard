@@ -18,7 +18,11 @@ type Token = typeof import('../web/src/lib/token.js');
 async function fresh(signedIn = true): Promise<{ api: Api; token: Token; browser: StubbedBrowser }> {
   vi.resetModules();
   const browser = stubBrowser({ signedIn });
-  return { api: await import('../web/src/lib/api.js'), token: await import('../web/src/lib/token.js'), browser };
+  return {
+    api: await import('../web/src/lib/api.js'),
+    token: await import('../web/src/lib/token.js'),
+    browser,
+  };
 }
 
 // A credential arriving, as the server does it: the cookie comes back on the response, and the client

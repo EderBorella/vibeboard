@@ -317,10 +317,12 @@ test('3. nothing overflows', async ({ board, theme }) => {
   // document's own width AND HEIGHT below that, are conditional on this line being green — which is
   // exactly the ordering hazard the organism phase recorded as still live. `expect.soft` records the
   // failure and carries on, so a red run reports every arm and the test still fails.
-  expect.soft(
-    clipped.map((o) => `${o.where} — ${o.detail}`),
-    `boxes clipped by an ancestor that scrolls:\n${lines(styles.clipping.offenders)}`,
-  ).toEqual([]);
+  expect
+    .soft(
+      clipped.map((o) => `${o.where} — ${o.detail}`),
+      `boxes clipped by an ancestor that scrolls:\n${lines(styles.clipping.offenders)}`,
+    )
+    .toEqual([]);
 
   // AND THE CLAIM THIS CHECK LOST IN THE MOLECULE LAYER, given back in a form the tree cannot take away
   // again. Both walks above skip `text-overflow: ellipsis`, and `.vb-clip` declares one — so once every
@@ -334,10 +336,12 @@ test('3. nothing overflows', async ({ board, theme }) => {
   // red on two legitimate labels in all three themes; against clipping boxes only it is zero, measured.
   report(theme, 'clamped', styles.clamped.examined, styles.clamped.offenders);
   expect.soft(styles.clamped.examined, 'no ellipsised box was examined at all').toBeGreaterThan(0);
-  expect.soft(
-    styles.clamped.offenders.map((o) => `${o.where} — ${o.detail}`),
-    `ellipsised boxes clipped below the readable floor:\n${lines(styles.clamped.offenders)}`,
-  ).toEqual([]);
+  expect
+    .soft(
+      styles.clamped.offenders.map((o) => `${o.where} — ${o.detail}`),
+      `ellipsised boxes clipped below the readable floor:\n${lines(styles.clamped.offenders)}`,
+    )
+    .toEqual([]);
 
   // And the document itself, at the three widths the board's shared column grid is designed around.
   // A horizontal scrollbar on a cockpit is the fault that has been reported by eye and that jsdom
@@ -350,16 +354,23 @@ test('3. nothing overflows', async ({ board, theme }) => {
   for (const width of WIDTHS) {
     await board.setViewportSize({ width, height: 900 });
     const doc = await documentOverflow(board);
-    expect.soft(doc.scrollWidth, `the document scrolls sideways at ${width}px`).toBeLessThanOrEqual(
-      doc.clientWidth,
-    );
-    // The arm that had never printed. It is LAST in the test and it is the one nobody has seen fail or
-    // pass under a red clamp; soft above is what makes reaching it unconditional.
-    expect.soft(
-      doc.scrollHeight,
-      `the app shell is taller than the viewport at ${width}px, and it does not scroll — ` +
-        `${doc.scrollHeight}px of content in ${doc.clientHeight}px, so the difference is unreachable`,
-    ).toBeLessThanOrEqual(doc.clientHeight);
+    expect
+      .soft(doc.scrollWidth, `the document scrolls sideways at ${width}px`)
+      .toBeLessThanOrEqual(doc.clientWidth);
+    // The arm that had never printed until the templates phase. It is LAST in the test and the one nobody
+    // had seen fail or pass under a red clamp; soft above is what makes reaching it unconditional.
+    //
+    // AND IT IS A WIDTH SWEEP, NOT A HEIGHT SWEEP: `height: 900` is fixed above, so `clientHeight` is 900
+    // at all three widths and what varies is how much the top bar and the auto-pilot strip wrap into. That
+    // is the intended question — a narrow viewport is what grows those two rows — but it means a shell that
+    // only overflows a SHORT viewport is not asked about here.
+    expect
+      .soft(
+        doc.scrollHeight,
+        `the app shell is taller than the viewport at ${width}px, and it does not scroll — ` +
+          `${doc.scrollHeight}px of content in ${doc.clientHeight}px, so the difference is unreachable`,
+      )
+      .toBeLessThanOrEqual(doc.clientHeight);
   }
 });
 

@@ -1,4 +1,10 @@
-import { type AutopilotState, isSuccessReason, type Readiness, type RunList, type RunRecord } from '../../lib/api';
+import {
+  type AutopilotState,
+  isSuccessReason,
+  type Readiness,
+  type RunList,
+  type RunRecord,
+} from '../../lib/api';
 import type { StatusAdvice } from '../../molecules/StatusChip';
 
 // What the transport strip shows, as data rather than as JSX.

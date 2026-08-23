@@ -680,6 +680,38 @@ function pageContrast(root: string | null): Findings {
     return result;
   }
 
+  // THE OPACITY THE EYE GETS, and it is a repair rather than a refinement. `opacity` does not change
+  // `color`, and `style.color` was the only thing read — so `Text error` picking up a neighbour's
+  // `opacity: 0.85` measured 5.21–5.77:1 here and 4.09–4.46:1 on screen, in all three themes, and this
+  // check passed it. Third consecutive phase in which the harness's blind spot, not the tree, was the
+  // regression.
+  //
+  // Walked from the element up to — and NOT through — whichever layer `ground()` stopped at. An opacity
+  // at or above the opaque ground dims the ink and that ground TOGETHER, which is a different question
+  // from this one and would need the colour outside the group to answer.
+  function inkOpacity(el: Element): number {
+    // AN INACTIVE CONTROL IS NOT DIMMED, FOR THIS CHECK'S PURPOSES. WCAG 1.4.3 exempts an inactive UI
+    // component by name, and dimming is how every UI says "disabled" — `.explorer-actions
+    // button:disabled { opacity: 0.3 }` came out at 1.48-1.73:1 the moment `opacity` was read at all, and a
+    // gate that reports a correct design gets switched off.
+    //
+    // BUT IT IS EXEMPTED FROM THE DIMMING AND NOT FROM THE CHECK, which is the narrower of the two and the
+    // one that costs no coverage: dropping these elements out of `eligible()` removed 8 of them across six
+    // surfaces (boards 1, execution 1, diary 2, control 1, explorer 2, settings 1 — four distinct elements,
+    // three of them at opacity 1.00 and 6.88-13.09:1, i.e. passing) and would have needed a baseline
+    // re-record to lower the examined floors. Here they stay examined, at their declared ink, and the
+    // floors do not move. A dimmed ENABLED control is still a finding, which is the case that shipped.
+    if (el.closest('[disabled], [aria-disabled="true"]')) return 1;
+    let value = 1;
+    for (let node: Element | null = el; node; node = node.parentElement) {
+      const style = getComputedStyle(node);
+      const colour = parse(style.backgroundColor);
+      if (colour && colour[3] > 0.999) break;
+      value *= Number(style.opacity);
+    }
+    return value;
+  }
+
   function ratio(fg: Colour, bg: Colour): number {
     const channel = (v: number): number => {
       const c = v / 255;
@@ -703,14 +735,19 @@ function pageContrast(root: string | null): Findings {
     examined += 1;
     const bg = ground(el);
     // Composited on both sides, because an `--accent` at 70% over a panel is what the eye gets
-    // rather than what the token says.
-    const value = ratio(over(fg, bg), bg);
+    // rather than what the token says — and `opacity` is part of that alpha, not a separate matter.
+    const dim = inkOpacity(el);
+    const value = ratio(over([fg[0], fg[1], fg[2], fg[3] * dim], bg), bg);
     if (value >= 4.5) continue;
     const ink = bg
       .slice(0, 3)
       .map((c) => Math.round(c))
       .join(', ');
-    offenders.push({ where: describe(el), detail: `${value.toFixed(2)}:1 (${style.color} on rgb(${ink}))` });
+    const at = dim > 0.999 ? '' : ` at opacity ${dim.toFixed(2)}`;
+    offenders.push({
+      where: describe(el),
+      detail: `${value.toFixed(2)}:1 (${style.color}${at} on rgb(${ink}))`,
+    });
   }
   return { examined, offenders };
 }
@@ -980,6 +1017,10 @@ function pageDocument(): {
   scrollHeight: number;
   clientHeight: number;
 } {
+  // THE OBVIOUS PLANT AGAINST THIS ARM IS DEAD — recorded so the next person does not write it. Both
+  // heights are read off `.app-shell` itself, so `.app-shell { min-height: 200vh }` moves `scrollHeight`
+  // AND `clientHeight` together and exits 0. It has to be planted on a CHILD: `.work { min-height: 200vh }`
+  // fails at 900/1200/1440 in all three themes, which is how the arm was first proved live.
   const el = document.documentElement;
   const shell = document.querySelector('.app-shell');
   return {

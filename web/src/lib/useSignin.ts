@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import { adoptCredential, claimSignin, collectSignin, onUnauthorized, requestSignin } from './api';
 import { runSignin, type SigninPhase } from '../organisms/signin/driver';
+import { adoptCredential, claimSignin, collectSignin, onUnauthorized, requestSignin } from './api';
 import {
   credentialArrived,
   forgetLegacyToken,

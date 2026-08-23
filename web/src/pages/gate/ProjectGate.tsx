@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react';
-import { listProjects, openProject, type ProjectRef, scaffoldProject } from '../../lib/api';
 import { Control } from '../../atoms/Control';
 import { Readout } from '../../atoms/Readout';
 import { Text } from '../../atoms/Text';
+import { listProjects, openProject, type ProjectRef, scaffoldProject } from '../../lib/api';
+import { useAction } from '../../lib/useAction';
+import { slugify } from '../../lib/viewmodel';
 import { Field } from '../../molecules/Field';
 import { Notice } from '../../molecules/Notice';
 import { List } from '../../organisms/shared/List';
 import { Row } from '../../organisms/shared/Row';
-import { useAction } from '../../lib/useAction';
-import { slugify } from '../../lib/viewmodel';
 
 interface Props {
   onOpened: () => void;

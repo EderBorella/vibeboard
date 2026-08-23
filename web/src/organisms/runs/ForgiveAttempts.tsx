@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { forgiveCardAttempts } from '../../lib/api';
 import { Button } from '../../atoms/Button';
 import { Text } from '../../atoms/Text';
-import { useConfirm } from '../../lib/useConfirm';
+import { forgiveCardAttempts } from '../../lib/api';
 import type { BoardName } from '../../lib/shared';
 import { useAction } from '../../lib/useAction';
+import { useConfirm } from '../../lib/useConfirm';
 
 interface Props {
   board: BoardName;

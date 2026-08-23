@@ -1,16 +1,16 @@
 import { useState } from 'react';
-import type { DispatchRequest, ModelOption, RunRecord, Skill } from '../../lib/api';
 import { Button } from '../../atoms/Button';
 import { Control } from '../../atoms/Control';
 import { Readout } from '../../atoms/Readout';
 import { Text } from '../../atoms/Text';
-import { BackendPicker } from '../copilot/BackendPicker';
-import { clampToCaps } from '../copilot/choice';
-import { ModelPicker } from '../shared/ModelPicker';
+import type { DispatchRequest, ModelOption, RunRecord, Skill } from '../../lib/api';
+import { backendCaps, type Card } from '../../lib/shared';
 import { Field } from '../../molecules/Field';
 import { Notice } from '../../molecules/Notice';
 import { Tabs } from '../../molecules/Tabs';
-import { backendCaps, type Card } from '../../lib/shared';
+import { BackendPicker } from '../copilot/BackendPicker';
+import { clampToCaps } from '../copilot/choice';
+import { ModelPicker } from '../shared/ModelPicker';
 
 interface Props {
   skill: Skill;

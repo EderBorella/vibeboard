@@ -1,17 +1,17 @@
 import { memo, useMemo, useState } from 'react';
-import { addDiaryEntry, type DiaryEntry } from '../../lib/api';
 import { Button } from '../../atoms/Button';
 import { Chip } from '../../atoms/Chip';
 import { Control } from '../../atoms/Control';
 import { Text } from '../../atoms/Text';
+import { addDiaryEntry, type DiaryEntry } from '../../lib/api';
+import { MAX_ENTRY_TEXT, type Suggestion } from '../../lib/shared';
+import { useAction } from '../../lib/useAction';
 import { FigureRow } from '../../molecules/FigureRow';
 import { stateClass } from '../../molecules/state-tones';
-import { List } from '../shared/List';
-import { Row } from '../shared/Row';
-import { MAX_ENTRY_TEXT, type Suggestion } from '../../lib/shared';
-import { useSuggestions } from '../suggestions/useSuggestions';
-import { useAction } from '../../lib/useAction';
-import { useDiary } from './useDiary';
+import { useDiary } from '../../organisms/diary/useDiary';
+import { List } from '../../organisms/shared/List';
+import { Row } from '../../organisms/shared/Row';
+import { useSuggestions } from '../../organisms/suggestions/useSuggestions';
 
 // The diary, and the permanent way to add to it.
 //

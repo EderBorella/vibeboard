@@ -111,7 +111,8 @@ export function scopeOf(file) {
 // `CardTile.tsx` lived at `organisms/board/` it reported the surface as `organisms`, so EVERY scoped class
 // in the tree became a finding — the organism phase's comment claimed "when the components move, the
 // comparison keeps meaning exactly what it means now", and it did not. Found by simulating the move
-// against this census before making it, which is the only reason it was not found as 231 findings.
+// against this census before making it, which is the only reason it was not found as 187 findings
+// across the 191 classes this claim checks.
 //
 // AN OPEN-LAYER FILE IS `null` AND THAT IS THE POINT, not an omission: an atom, a molecule or a template
 // that names a surface's class matches no scope, so it is ALWAYS a finding. `Popover.tsx` reaching for
@@ -126,11 +127,15 @@ export function surfaceOf(file) {
   return parts.length > 1 ? parts[0] : null;
 }
 
-// Every class a sheet defines, with the line it is defined on.
+// Every class a sheet defines, with the line it is defined on and whether that rule DECLARES anything.
+// `declares` is load-bearing rather than informational — see `ownedByOpen`: an empty rule used to confer
+// ownership, and therefore exemption from both claims.
 export function definitionsOf(file, css) {
   const out = [];
   for (const rule of shapedRules(rulesOf(file, css))) {
-    for (const cls of classesOf(rule.selector)) out.push({ cls, line: rule.line });
+    // Comments are already blanked by `rulesOf`, so a rule holding nothing but one is empty here too.
+    const declares = rule.body.trim().length > 0;
+    for (const cls of classesOf(rule.selector)) out.push({ cls, line: rule.line, declares });
   }
   return out;
 }
@@ -197,11 +202,18 @@ export function names(code, cls) {
   return words.has(cls) || prefixes.some((prefix) => cls.startsWith(`${prefix}-`));
 }
 
-// WHETHER A SPLIT CLASS IS AN ORPHAN. A class declared in two SCOPED directories has no owner and is a
-// finding; a class declared in a scoped directory AND in an open layer has one — the open layer — and is
-// the ordinary shape of this tree: `.vb-ctl` is the Control atom's and eight surfaces say where their own
-// copy sits. All 18 split classes on this tree are the second kind, which is why the claim can block.
-const orphaned = (scopes) => scopes.size > 1 && ![...scopes].includes(null);
+// WHETHER THE OPEN LAYER REALLY OWNS A SPLIT CLASS, which is what makes a split the ordinary shape of this
+// tree rather than a fault: `.vb-ctl` is the Control atom's and eight surfaces say where their own copy
+// sits, `.gate` and `.gate-card` are a template's specialised by the page inside the frame.
+//
+// "REALLY" MEANS THE OPEN RULE DECLARES SOMETHING, and that word is a repair. Ownership followed from the
+// open layer merely being IN the set, and that was an escape hatch with nothing behind it: an EMPTY rule —
+// `.board-columns { }` in atoms/text.css — exempted the class from BOTH claims. It changes no rendering and
+// adds no class NAME, so `check:class-budget`'s ratchet did not move either. A real cross-surface read plus
+// that one plant exited 0. A finding in this gate could be erased by a change with no effect whatsoever,
+// which is the thing the paragraph at the foot of this file forbids in words.
+const ownedByOpen = (owner) => owner.scopes.has(null) && owner.openDeclares;
+const orphaned = (owner) => owner.scopes.size > 1 && !ownedByOpen(owner);
 
 // THE READER AND THE SCOPE RULE, ON A FIXTURE THE TREE CANNOT MOVE. Both directions are exercised: a
 // scoped class read from its own surface is silent, the same class read from another surface is a
@@ -229,6 +241,11 @@ function scopeSelfTest() {
   // definitions either way — and dropping the call was planted and passed here.
   const defs = definitionsOf('fixture.css', '.alpha { color: red }\n@supports selector(.gamma) { .beta {} }');
   if (defs.map((d) => d.cls).join(',') !== 'alpha,beta') return `definitionsOf: [${defs.map((d) => d.cls)}]`;
+  // AND WHETHER EACH ONE DECLARES ANYTHING, which is what `ownedByOpen` turns on. The fixture already held
+  // one rule of each kind and reported neither, so a `declares` frozen at `true` would have passed here.
+  if (defs.map((d) => (d.declares ? '1' : '0')).join('') !== '10') {
+    return `definitionsOf: declares [${defs.map((d) => d.declares)}]`;
+  }
   return null;
 }
 
@@ -264,60 +281,68 @@ function readerSelfTest() {
 
 // A class defined in a SCOPED directory and in the OPEN layer has an owner — the open layer — and is not
 // an orphan. Two scoped directories and no open one is.
+//
+// BOTH DIRECTIONS OF THE HATCH ARE PINNED HERE, because it is the pair that decides whether this gate can
+// be zeroed by a no-op: an EMPTY open rule must confer nothing (that plant exited 0 for a whole phase), and
+// a real one must still confer ownership, or every ordinary split in this tree turns into a finding and the
+// gate points at a backlog again.
 function orphanSelfTest() {
-  if (orphaned(new Set([null, 'board']))) return 'orphaned: an open layer plus a surface';
-  if (!orphaned(new Set(['board', 'cards']))) return 'orphaned: two surfaces';
-  if (orphaned(new Set(['board']))) return 'orphaned: one surface is not a split at all';
+  const owner = (scopes, openDeclares) => ({ scopes: new Set(scopes), openDeclares });
+  if (orphaned(owner([null, 'board'], true))) return 'orphaned: an open layer plus a surface';
+  if (!orphaned(owner(['board', 'cards'], false))) return 'orphaned: two surfaces';
+  if (orphaned(owner(['board'], false))) return 'orphaned: one surface is not a split at all';
+  if (!orphaned(owner([null, 'board'], false))) return 'orphaned: an EMPTY open rule owns nothing';
+  if (!ownedByOpen(owner([null, 'board'], true))) return 'ownedByOpen: a real open rule does own it';
+  if (ownedByOpen(owner(['board', 'cards'], false))) return 'ownedByOpen: no open layer at all';
   return null;
 }
 
-const fault = scopeSelfTest() ?? readerSelfTest() ?? orphanSelfTest();
-if (fault) {
-  console.error(`\nthe layer reader is broken: ${fault}.`);
-  console.error(`The report would be about nothing. Fix tools/check-layers.mjs; do NOT relax the fixture.`);
-  process.exit(1);
-}
-
-const sheets = walk('.css').map((file) => ({ file, scope: scopeOf(file), css: read(file) }));
-// PARSED ONCE PER FILE AND NOT ONCE PER CLASS. `names()` reads the whole file to answer one question, and
-// the loop below asks it 308 times — 43,000 full-file scans, which is the difference between a gate people
-// run and one they do not.
-const sources = [...walk('.ts'), ...walk('.tsx')].map((file) => {
-  const code = codeOf(read(file));
-  return { file, surface: surfaceOf(file), ...namedClasses(code) };
-});
+// `names()` over an already-parsed file, so the census does not re-read every source once per class.
 const namedBy = ({ words, prefixes }, cls) =>
   words.has(cls) || prefixes.some((prefix) => cls.startsWith(`${prefix}-`));
 
-// Where each class is defined, and which scope owns it.
-const owners = new Map();
-for (const { file, scope, css } of sheets) {
-  for (const { cls, line } of definitionsOf(file, css)) {
-    if (!owners.has(cls)) owners.set(cls, { sites: [], scopes: new Set() });
-    owners.get(cls).sites.push(`${file}:${line}`);
-    owners.get(cls).scopes.add(scope);
+// Where each class is defined, which scopes declare it, and whether an OPEN rule really declares it.
+function ownersOf(sheets) {
+  const owners = new Map();
+  for (const { file, scope, css } of sheets) {
+    for (const { cls, line, declares } of definitionsOf(file, css)) {
+      if (!owners.has(cls)) owners.set(cls, { sites: [], scopes: new Set(), openDeclares: false });
+      const owner = owners.get(cls);
+      owner.sites.push(`${file}:${line}`);
+      owner.scopes.add(scope);
+      if (scope === null && declares) owner.openDeclares = true;
+    }
   }
+  return owners;
 }
 
-const scoped = [...owners].filter(([, o]) => [...o.scopes].some((s) => s !== null));
-const split = scoped.filter(([, o]) => o.scopes.size > 1);
-const orphans = scoped.filter(([, o]) => orphaned(o.scopes));
-
-// A finding is a class whose owning scope is `x` and which is named from a file whose surface is not `x`.
-const findings = [];
-for (const [cls, owner] of scoped) {
-  if (owner.scopes.size > 1) continue;
-  const scope = [...owner.scopes][0];
-  const outside = sources.filter((source) => source.surface !== scope && namedBy(source, cls));
-  if (outside.length > 0) {
+// A finding is a class owned by a surface and named from a file that is not that surface.
+//
+// A CLASS THE OPEN LAYER OWNS IS EXEMPT AND EVERY OTHER SPLIT IS NOT, which is narrower than it was. The
+// test used to be `scopes.size > 1`, so ANY second declaration anywhere took the class off this claim. A
+// split with no declaring open rule is now checked against the UNION of the scopes that declare it, which
+// for the 191 single-scope classes is the same comparison as before, term for term.
+function crossSurfaceReads(scoped, sources) {
+  const findings = [];
+  for (const [cls, owner] of scoped) {
+    if (ownedByOpen(owner)) continue;
+    const outside = sources.filter((source) => !owner.scopes.has(source.surface) && namedBy(source, cls));
+    if (outside.length === 0) continue;
+    const scope = [...owner.scopes]
+      .filter((s) => s !== null)
+      .sort()
+      .join(' and ');
     findings.push({ cls, scope, site: owner.sites[0], readers: outside.map(({ file }) => file) });
   }
+  return findings;
 }
 
-// A backlog counted per surface is a backlog somebody can take one bite out of; a single total is one
-// nobody can start on.
-const perScope = new Map();
-for (const { scope } of findings) perScope.set(scope, (perScope.get(scope) ?? 0) + 1);
+// THE SIZE OF THE BLIND SPOT, RATCHETED. A class the open layer owns is exempt from the cross-surface
+// claim, which is right — `.vb-ctl` is the Control atom's — but it also means ADDING an open-layer
+// declaration erases a finding, and the report printed `22 class(es) shared then specialised` beside
+// `0 cross-surface read(s)` as if it were a decoration rather than the size of what is not checked. With
+// the count ratcheted, laundering a finding through the open layer is a commit somebody has to write.
+const SPLIT_CEILING = 22;
 
 // THE SAME POPULATION `check:class-budget` COUNTS, so the floor is set against that number and not an
 // order of magnitude below it. 40 was: a planted `classesOf` narrowed to `/\.([a-z]+)/g` lost 244 of the
@@ -326,38 +351,8 @@ for (const { scope } of findings) perScope.set(scope, (perScope.get(scope) ?? 0)
 // commit that takes the budget below 250 lowers this in the same commit, which is the ratchet discipline
 // every other number in this repository already follows.
 const PARSE_FLOOR = 250;
-if (owners.size < PARSE_FLOOR) {
-  console.error(`\nonly ${owners.size} class(es) found across ${sheets.length} sheet(s), against a floor`);
-  console.error(`of ${PARSE_FLOOR}. The selector reader has stopped matching, so this report is vacuous.`);
-  process.exit(1);
-}
 
-console.log(
-  `layers: ${owners.size} class(es) across ${sheets.length} sheet(s) — ${scoped.length} owned by a ` +
-    `surface, ${owners.size - scoped.length} in the shared layers`,
-);
-console.log(
-  `layer scope: ${findings.length} scoped class(es) read from outside their own surface` +
-    (perScope.size > 0
-      ? ` — ${[...perScope]
-          .sort((a, b) => b[1] - a[1])
-          .map(([scope, n]) => `${scope} ${n}`)
-          .join(', ')}`
-      : ''),
-);
-for (const { cls, scope, site, readers } of findings) {
-  console.log(`  .${cls} (${scope}, ${site}) read from ${[...new Set(readers)].join(', ')}`);
-}
-for (const [cls, owner] of split) {
-  // `null` is the open layer, and it printed as an empty string — `defined in autopilot and settings and`.
-  const where = [...owner.scopes].map((scope) => scope ?? 'the shared layer').join(' and ');
-  console.log(
-    `  .${cls} is defined in ${where}${orphaned(owner.scopes) ? ' — ORPHAN' : ''}: ${owner.sites.join(', ')}`,
-  );
-}
-
-// TWO CLAIMS, BOTH AT ZERO, BOTH BLOCKING. A cross-surface READ and a split across two SCOPED directories
-// with no open layer in it. A split that includes the open layer is neither — see `orphaned`.
+// TWO CLAIMS, BOTH AT ZERO, BOTH BLOCKING. A cross-surface READ, and a split no open-layer rule owns.
 //
 // THE CEILING IS ZERO AND IT IS NOT A RATCHET ANY MORE. It was 44 for one phase, on the rule this
 // repository follows and has broken: never point a blocking gate at a backlog, because a gate that must be
@@ -371,26 +366,109 @@ for (const [cls, owner] of split) {
 // that already exists; move it to `organisms/shared/`; or move the READER into the surface that owns the
 // class. Adding a second copy under a second name is not one of them.
 const CROSS_SURFACE_CEILING = 0;
-let failed = false;
 
-if (orphans.length > 0) {
-  console.error(
-    `\n${orphans.length} orphan(s): a class declared in two scoped directories and no open layer has no` +
-      ` owner. Move it to organisms/shared/, atoms/ or molecules/, or give the two copies two names.`,
+function printReport({ owners, sheets, scoped, findings, split, exempt }) {
+  const perScope = new Map();
+  for (const { scope } of findings) perScope.set(scope, (perScope.get(scope) ?? 0) + 1);
+  console.log(
+    `layers: ${owners.size} class(es) across ${sheets.length} sheet(s) — ${scoped.length} owned by a ` +
+      `surface, ${owners.size - scoped.length} in the shared layers`,
   );
-  failed = true;
-}
-if (findings.length > CROSS_SURFACE_CEILING) {
-  console.error(
-    `\n${findings.length} cross-surface read(s), against zero. A surface's own class read by a second` +
-      ` surface is a shared shape wearing a private name. Make it an option on an atom or a molecule, or` +
-      ` move it to organisms/shared/, or move the reader into the surface that owns the class.`,
+  const breakdown = [...perScope]
+    .sort((a, b) => b[1] - a[1])
+    .map(([scope, n]) => `${scope} ${n}`)
+    .join(', ');
+  console.log(
+    `layer scope: ${findings.length} scoped class(es) read from outside their own surface` +
+      (breakdown ? ` — ${breakdown}` : ''),
   );
-  failed = true;
+  for (const { cls, scope, site, readers } of findings) {
+    console.log(`  .${cls} (${scope}, ${site}) read from ${[...new Set(readers)].join(', ')}`);
+  }
+  for (const [cls, owner] of split) {
+    // `null` is the open layer, and it printed as an empty string — `defined in autopilot and settings and`.
+    const where = [...owner.scopes].map((scope) => scope ?? 'the shared layer').join(' and ');
+    const mark = orphaned(owner) ? ' — UNOWNED' : '';
+    console.log(`  .${cls} is defined in ${where}${mark}: ${owner.sites.join(', ')}`);
+  }
+  // NAMED, not counted. These are the classes the cross-surface claim does not examine, so a reader asking
+  // what the zero does not cover gets the list rather than a number beside it.
+  console.log(
+    `layer scope: ${exempt.length} class(es) exempt from the cross-surface claim because an open-layer ` +
+      `rule declares them, against a ceiling of ${SPLIT_CEILING}: ` +
+      exempt.map(([cls]) => `.${cls}`).join(' '),
+  );
 }
 
-console.log(
-  `layer scope: ${findings.length} cross-surface read(s) and ${orphans.length} orphan(s) — both ` +
-    `blocking at zero; ${split.length} class(es) shared then specialised`,
-);
-if (failed) process.exit(1);
+function main() {
+  const fault = scopeSelfTest() ?? readerSelfTest() ?? orphanSelfTest();
+  if (fault) {
+    console.error(`\nthe layer reader is broken: ${fault}.`);
+    console.error(`The report would be about nothing. Fix tools/check-layers.mjs; do NOT relax the fixture.`);
+    process.exit(1);
+  }
+
+  const sheets = walk('.css').map((file) => ({ file, scope: scopeOf(file), css: read(file) }));
+  // PARSED ONCE PER FILE AND NOT ONCE PER CLASS. `names()` reads the whole file to answer one question, and
+  // the census asks it 305 times — 43,000 full-file scans, which is the difference between a gate people
+  // run and one they do not.
+  const sources = [...walk('.ts'), ...walk('.tsx')].map((file) => {
+    const code = codeOf(read(file));
+    return { file, surface: surfaceOf(file), ...namedClasses(code) };
+  });
+
+  const owners = ownersOf(sheets);
+  const scoped = [...owners].filter(([, o]) => [...o.scopes].some((s) => s !== null));
+  const split = scoped.filter(([, o]) => o.scopes.size > 1);
+  const orphans = scoped.filter(([, o]) => orphaned(o));
+  const exempt = scoped.filter(([, o]) => ownedByOpen(o));
+  const findings = crossSurfaceReads(scoped, sources);
+
+  if (owners.size < PARSE_FLOOR) {
+    console.error(`\nonly ${owners.size} class(es) found across ${sheets.length} sheet(s), against a floor`);
+    console.error(`of ${PARSE_FLOOR}. The selector reader has stopped matching, so this report is vacuous.`);
+    process.exit(1);
+  }
+
+  printReport({ owners, sheets, scoped, findings, split, exempt });
+
+  let failed = false;
+  if (orphans.length > 0) {
+    console.error(
+      `\n${orphans.length} class(es) declared in more than one scope with no open-layer rule that declares` +
+        ` anything, so nothing owns them. Move to organisms/shared/, atoms/ or molecules/, or give the` +
+        ` copies two names. An EMPTY rule in an open sheet is not an owner.`,
+    );
+    failed = true;
+  }
+  if (findings.length > CROSS_SURFACE_CEILING) {
+    console.error(
+      `\n${findings.length} cross-surface read(s), against zero. A surface's own class read by a second` +
+        ` surface is a shared shape wearing a private name. Make it an option on an atom or a molecule, or` +
+        ` move it to organisms/shared/, or move the reader into the surface that owns the class.`,
+    );
+    failed = true;
+  }
+  if (exempt.length > SPLIT_CEILING) {
+    console.error(
+      `\n${exempt.length} class(es) exempt from the cross-surface claim, against ${SPLIT_CEILING}. Adding an` +
+        ` open-layer declaration takes a class off that claim, so this number is the size of what the zero` +
+        ` does not cover. Lower it or argue the new one here; do NOT raise it to erase a finding.`,
+    );
+    failed = true;
+  }
+
+  console.log(
+    `layer scope: ${findings.length} cross-surface read(s) and ${orphans.length} unowned split(s) — both ` +
+      `blocking at zero; ${exempt.length}/${SPLIT_CEILING} shared then specialised`,
+  );
+  if (failed) process.exit(1);
+}
+
+// THE CENSUS RUNS ONLY WHEN THIS FILE IS THE COMMAND. It was top-level straight-line code, and with six
+// exported functions that made the exports a trap rather than an interface: `await import()` of this module
+// walked 41 stylesheets, printed 24 lines and — with a finding in the tree — called `process.exit(1)` from
+// inside the import, so the importing process DIED and the statement after the `await` never ran. It has
+// caught three agents, one of them reading this gate's own numbers by importing it, which means those
+// numbers came out of a process that may have died mid-report. Same one line as check-scale.mjs.
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();

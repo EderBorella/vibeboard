@@ -1,13 +1,13 @@
 import type { ReactNode } from 'react';
-import { type CardLedgerData, cancelRun, type RunRecord, resolveRun, type Skill } from '../../lib/api';
 import { Text } from '../../atoms/Text';
-import { stopRunRequest } from '../shared/requests';
+import { type CardLedgerData, cancelRun, type RunRecord, resolveRun, type Skill } from '../../lib/api';
+import type { Card, CardFrontmatterPatch, ProjectConfig } from '../../lib/shared';
 import { useConfirm } from '../../lib/useConfirm';
 import type { CardRef } from '../dock/tabs';
 import { ActiveReport } from '../runs/ActiveReport';
 import { CardReports } from '../runs/CardReports';
 import { DispatchPane } from '../runs/DispatchPane';
-import type { Card, CardFrontmatterPatch, ProjectConfig } from '../../lib/shared';
+import { stopRunRequest } from '../shared/requests';
 import type { DispatchContext, View } from './CardsPane';
 import { CardView } from './CardView';
 import { RawPane } from './RawPane';

@@ -1,6 +1,6 @@
-import type { InvalidSkill, Skill } from '../../lib/api';
 import { Button } from '../../atoms/Button';
 import { Text } from '../../atoms/Text';
+import type { InvalidSkill, Skill } from '../../lib/api';
 import type { Card } from '../../lib/shared';
 import { skillsForCard } from './filter';
 

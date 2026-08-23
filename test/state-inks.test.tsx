@@ -25,9 +25,9 @@
 import { cleanup, render, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AutopilotState, Readiness, RunList, RunRecord, SandboxState } from '../web/src/lib/api.js';
-import { LIGHT_STATES } from '../web/src/organisms/topbar/connection-light.js';
-import { STATE_TONES, type StateName, TONES, type Tone } from '../web/src/molecules/state-tones.js';
 import type { CopilotConfig, Suggestion } from '../web/src/lib/shared.js';
+import { STATE_TONES, type StateName, TONES, type Tone } from '../web/src/molecules/state-tones.js';
+import { LIGHT_STATES } from '../web/src/organisms/topbar/connection-light.js';
 import { inkIn, isColour, THEMES } from './state-ink.js';
 
 const api = vi.hoisted(() => ({
@@ -46,7 +46,7 @@ vi.mock('../web/src/lib/api.js', () => api);
 const { AutopilotBar } = await import('../web/src/organisms/autopilot/AutopilotBar.js');
 const { TopBar } = await import('../web/src/organisms/topbar/TopBar.js');
 const { CardReports } = await import('../web/src/organisms/runs/CardReports.js');
-const { DiaryView } = await import('../web/src/organisms/diary/DiaryView.js');
+const { DiaryView } = await import('../web/src/pages/diary/DiaryView.js');
 
 const COPILOT: CopilotConfig = { backend: 'claude-code', backends: {} };
 const NO_RUNS: RunList = { runs: [], active: [], queued: [] };

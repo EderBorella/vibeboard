@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { CardView } from '../web/src/organisms/cards/CardView.js';
 import type { Card, ProjectConfig } from '../web/src/lib/shared.js';
+import { CardView } from '../web/src/organisms/cards/CardView.js';
 
 afterEach(cleanup);
 

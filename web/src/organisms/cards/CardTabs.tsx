@@ -1,8 +1,8 @@
 import { Button } from '../../atoms/Button';
+import type { Card } from '../../lib/shared';
+import { Tabs } from '../../molecules/Tabs';
 import type { CardRef } from '../dock/tabs';
 import { resolveTab } from '../dock/tabs';
-import { Tabs } from '../../molecules/Tabs';
-import type { Card } from '../../lib/shared';
 
 interface Props {
   tabs: CardRef[];

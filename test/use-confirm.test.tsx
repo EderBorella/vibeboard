@@ -3,9 +3,9 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { RunRecord } from '../web/src/lib/api.js';
-import { archiveCardRequest, stopRunRequest } from '../web/src/organisms/shared/requests.js';
-import { type ConfirmRequest, useConfirm } from '../web/src/lib/useConfirm.js';
 import type { Card } from '../web/src/lib/shared.js';
+import { type ConfirmRequest, useConfirm } from '../web/src/lib/useConfirm.js';
+import { archiveCardRequest, stopRunRequest } from '../web/src/organisms/shared/requests.js';
 
 afterEach(cleanup);
 

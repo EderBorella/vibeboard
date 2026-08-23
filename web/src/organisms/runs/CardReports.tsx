@@ -1,12 +1,12 @@
-import type { CardLedgerData, RunRecord, RunStatus } from '../../lib/api';
 import { Button } from '../../atoms/Button';
 import { Chip } from '../../atoms/Chip';
 import { Readout } from '../../atoms/Readout';
 import { Surface } from '../../atoms/Surface';
 import { Text } from '../../atoms/Text';
+import type { CardLedgerData, RunRecord, RunStatus } from '../../lib/api';
+import type { Card } from '../../lib/shared';
 import { FigureRow } from '../../molecules/FigureRow';
 import { Row } from '../shared/Row';
-import type { Card } from '../../lib/shared';
 import { ForgiveAttempts } from './ForgiveAttempts';
 import { costLabel, usageTotal } from './format';
 

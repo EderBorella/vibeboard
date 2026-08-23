@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { act, renderHook } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { useCardTabs } from '../web/src/organisms/dock/useCardTabs.js';
 import type { Card } from '../web/src/lib/shared.js';
+import { useCardTabs } from '../web/src/organisms/dock/useCardTabs.js';
 
 const card = (id: string, over: Partial<Card> = {}): Card =>
   ({

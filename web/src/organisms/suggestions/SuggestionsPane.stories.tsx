@@ -1,6 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import type { ReactElement } from 'react';
-import { EMPTY, installRoutes } from '../../../../.storybook/route-stub';
+import { EMPTY, withRoutes } from '../../../../.storybook/route-stub';
 import type { Suggestion } from '../../lib/shared';
 import { SuggestionsPane } from './SuggestionsPane';
 
@@ -34,25 +33,23 @@ const filed: Suggestion[] = [
 
 // A DECORATOR AND NOT A GLOBAL. `preview.tsx` installs nothing, so a story that does not opt in runs
 // against the absent network and fails loudly if it ever starts fetching — see `.storybook/route-stub.ts`
-// for why an unkeyed route is a 501 rather than `{}`.
-const withRoutes = (Story: () => ReactElement) => {
-  installRoutes({
-    ...EMPTY,
-    // The two writes answer with the record as the SERVER saved it, which is what `onApply` re-renders
-    // from. Echoing the request back would hide the one bug this pane has had: a row going on showing the
-    // state it held before the click.
-    '/api/suggestions': ({ init }) =>
-      init.method === 'PATCH'
-        ? { suggestion: { ...filed[0], state: 'dismissed', reason: 'not this release' } }
-        : { suggestions: filed },
-  });
-  return <Story />;
-};
+// for why an unkeyed route is a 501 rather than `{}`, and for why the install is now torn down on unmount
+// (it was not, and the stub outlived the story).
+const routes = withRoutes({
+  ...EMPTY,
+  // The two writes answer with the record as the SERVER saved it, which is what `onApply` re-renders
+  // from. Echoing the request back would hide the one bug this pane has had: a row going on showing the
+  // state it held before the click.
+  '/api/suggestions': ({ init }) =>
+    init.method === 'PATCH'
+      ? { suggestion: { ...filed[0], state: 'dismissed', reason: 'not this release' } }
+      : { suggestions: filed },
+});
 
 const meta = {
   title: 'Organisms/Suggestions pane',
   component: SuggestionsPane,
-  decorators: [withRoutes],
+  decorators: [routes],
   args: { suggestions: filed, failed: false, onRefresh: () => {}, onApply: () => {} },
 } satisfies Meta<typeof SuggestionsPane>;
 export default meta;

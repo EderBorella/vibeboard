@@ -1,15 +1,15 @@
 import { useCallback, useEffect, useState } from 'react';
-import { getSigninState, revokeDevice, type SigninDevice, signOutEverything } from '../../lib/api';
 import { Button } from '../../atoms/Button';
 import { Chip } from '../../atoms/Chip';
 import { Readout } from '../../atoms/Readout';
 import { Text } from '../../atoms/Text';
-import { revokeDeviceRequest, signOutEverythingRequest } from '../shared/requests';
-import type { Confirmer } from '../../lib/useConfirm';
+import { getSigninState, revokeDevice, type SigninDevice, signOutEverything } from '../../lib/api';
 import { errorText } from '../../lib/errors';
+import { useAction } from '../../lib/useAction';
+import type { Confirmer } from '../../lib/useConfirm';
 import { Notice } from '../../molecules/Notice';
 import { Row } from '../shared/Row';
-import { useAction } from '../../lib/useAction';
+import { revokeDeviceRequest, signOutEverythingRequest } from '../shared/requests';
 
 interface Props {
   // Asked before either irreversible thing here. Both sign a browser out of a live session, and one

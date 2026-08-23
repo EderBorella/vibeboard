@@ -128,7 +128,9 @@ const CONTROLS: [name: string, el: () => Element][] = [
     () => at('<div class="diary-compose"><textarea class="vb-ctl"></textarea></div>', 'textarea'),
   ],
   ['the control editor body', () => at('<textarea class="vb-ctl vb-editor-body"></textarea>', 'textarea')],
-  ['a links registry cell', () => at('<div class="vb-row"><input class="vb-ctl res-title"/></div>', 'input')],
+  // `.vb-clip` where `.res-title` was: the three cells divide the row evenly now and the share is the
+  // atom's, not a class per column. The claim here is the BOX, which neither declares.
+  ['a links registry cell', () => at('<div class="vb-row"><input class="vb-ctl vb-clip"/></div>', 'input')],
   [
     'the raw card file',
     () => at('<div class="raw-pane"><textarea class="vb-ctl raw-area"></textarea></div>', 'textarea'),

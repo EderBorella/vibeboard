@@ -92,7 +92,7 @@ export function ReportOptions({
         Write my own input
       </Button>
 
-      <Stack gap={4} className="options-close">
+      <Stack gap={4}>
         <Text className="options-close-label">Ignore and close</Text>
         {/* NOT a `Field`: an action row. "Ignore and close" names the BUTTON, and the select is one of
             its two operands — a Field's label names one control. */}

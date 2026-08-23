@@ -64,15 +64,11 @@ const FLOOR = { defs: 20, themes: 3 };
 // The claim that made the emptiness reachable is the SECOND half of claim 1: a name that has acquired a
 // consumer and kept its row is a finding too, so this map cannot rot into an allow-list. Leaving one row
 // here would have failed the run.
+// `--measure`'s ROW IS GONE BECAUSE THE SWEEP SPENT IT: `.ap-help` reads it instead of `44rem`. The row had
+// to go in the same commit — the second half of claim 1 fails a name that has acquired a consumer and kept
+// its row, which is what stops this map rotting into an allow-list.
 /** @type {Map<string, string>} */
-const UNCONSUMED = new Map([
-  [
-    '--measure',
-    'The reading measure, landing one commit before the four classes that spend it — `.diary-list` and ' +
-      '`.diary-compose` (68ch), `.ap-help` (44rem) and `.gate-card` (520px), which are four answers to ' +
-      'one question. Spent by the sweep that accepts a visual change to reach the scale.',
-  ],
-]);
+const UNCONSUMED = new Map([]);
 
 // A COLOUR IN THE GEOMETRY BLOCK, ON PURPOSE, with its reason — the precedent is
 // check-radius-scale.mjs's `50%` and check-scale.mjs's `inherit`.

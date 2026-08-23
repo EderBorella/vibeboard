@@ -141,7 +141,7 @@ export function ExecutionView({
                       Wrapping, so the result and error lines ForgiveAttempts renders (both
                       `flex-basis: 100%`) still break underneath the buttons rather than squeezing them. */}
                   {(stoppable || column.key === 'attention') && (
-                    <Stack gap={2} wrap className="exec-actions">
+                    <Stack gap={2} wrap>
                       {stoppable && (
                         <Button
                           className="report-stop vb-fixed"

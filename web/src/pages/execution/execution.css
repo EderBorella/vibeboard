@@ -38,15 +38,15 @@
 /* `.exec-run` IS GONE — a `Row stack variant="inset"`, which is the same object as a `.tile`: a record in
    a column on a `--panel` parent. `align-items: flex-start` went with it, and its three children each
    declare `width: 100%`, so a stretched row draws the same boxes. */
-/* A `Stack align="baseline"`; the full width is what is left, and it is what makes the row fill the
-   stretched column rather than shrink to its chips. */
-.exec-run-top { width: 100%; }
-/* The run's actions, side by side. `.exec-run` is a flex column, so without this every button is its
-   own row — Dismiss and Clear failed tries stacked, which reads as two unrelated controls rather than
-   the pair of answers to one failed run. Wraps, so ForgiveAttempts' result and error lines (both
-   `flex-basis: 100%`) still take a line of their own underneath. A `Stack gap={2} wrap` now; the full
-   width is all that is left of it. */
-.exec-actions { width: 100%; }
+/* A `Stack align="baseline"`. THE `width: 100%` IS GONE AND NOTHING MOVES: the parent is a `Row stack`,
+   whose `.vb-list` is a flex column that sets no `align-items` — so its children already stretch to the
+   full width, and this declaration restated the default. The NAME survives for the two rules below, which
+   reach the readouts through it. */
+/* `.exec-actions` IS GONE — a `Stack gap={2} wrap` and nothing else. Its `width: 100%` was `.vb-list`'s
+   own stretch written out a second time, for `.exec-run-top`'s reason: the parent `Row stack` is a flex
+   column that sets no `align-items`, so a child already fills it. The row's own claim — that the two
+   answers to a failed run sit side by side and that ForgiveAttempts' `flex-basis: 100%` lines still break
+   underneath — is the `gap` and the `wrap`, which are the atom's attributes. */
 /* `.exec-skill` IS GONE — `--t-small` is `Text`'s own step, and the row's ink is `ink="strong"`. */
 /* Cost takes the push-right when present, so cost and elapsed sit together at the end of the row. */
 /* Cost takes the push-right when present, so cost and elapsed sit together at the end of the row. Both
@@ -72,9 +72,10 @@
 .exec-summary { line-height: 1.35; overflow-wrap: anywhere; }
 /* THE ONE ACTION ON A RUN THAT NEEDS ANSWERING, and this page is its only caller. It was in
    `organisms/runs/runs.css` beside `.report-stop`, which really is shared and is in `organisms/shared/`
-   now; this one never was. A `ghost` Button: `align-self: flex-start` because `.exec-actions` wraps and a
+   now; this one never was. A `ghost` Button: `align-self: flex-start` because the actions row wraps and a
    stretched button in a wrapped row is as wide as the widest line. Don't-shrink is `.vb-fixed` on the
-   button; the self-alignment is the one thing left. */
+   button; the self-alignment is the one thing left, and it wants `.vb-self-start` — the utility stack.css
+   is holding until the commit that spends it. */
 .report-dismiss { align-self: flex-start; }
 /* `.tab-badge` IS GONE, and with it the stray this file held: it was the TOP BAR's attention count,
    living here because that is where its bytes fell in `styles.css`. `Menu`'s `badge` option renders it —

@@ -218,7 +218,7 @@ function StartControl({
         Auto-pilot walks the board on its own: it picks a card, runs its phase's skill, checks the work, and
         moves the card only if the check passes. It stops on its own when there is nothing left it can do.
       </Text>
-      <Stack align="stretch" gap={4} className="ap-controls">
+      <Stack align="stretch" gap={4}>
         <Button
           variant="primary"
           size="md"
@@ -260,7 +260,7 @@ function StartControl({
         Not a duplicate of the bar's for the sake of it: wherever Start is, the way past this has to be.
       */}
       {(readiness?.unreviewedGates?.length ?? 0) > 0 && (
-        <Stack align="stretch" gap={4} className="ap-controls">
+        <Stack align="stretch" gap={4}>
           <Button
             size="md"
             data-testid="ap-panel-review-gates"
@@ -310,7 +310,7 @@ function StopControls({ state, refresh }: { state: AutopilotState | null; refres
         A soft stop leaves the app alone: chat, manual runs and the board carry on, and only dispatching
         stops. An emergency stop kills every agent in this project and halts it until you restart it.
       </Text>
-      <Stack align="stretch" gap={4} className="ap-controls">
+      <Stack align="stretch" gap={4}>
         <Button
           size="md"
           // Nothing to stop when it is not running, and refused outright while halted.

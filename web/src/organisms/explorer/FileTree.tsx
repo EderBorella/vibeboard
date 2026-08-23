@@ -3,6 +3,7 @@ import { Button } from '../../atoms/Button';
 import { Chip } from '../../atoms/Chip';
 import { Control } from '../../atoms/Control';
 import { Readout } from '../../atoms/Readout';
+import { Stack } from '../../atoms/Stack';
 import { Text } from '../../atoms/Text';
 import type { FsNode } from '../../lib/api';
 import { Row } from '../shared/Row';
@@ -121,8 +122,11 @@ function NodeRow(props: NodeRowProps) {
           : undefined
       }
     >
-      <span className="explorer-twist vb-twist">{twist}</span>
-      <span className="explorer-icon">{icon(node)}</span>
+      <Text className="explorer-twist vb-twist">{twist}</Text>
+      {/* The ink is the ROW's and moves with its hover, which is what `inherit` says. */}
+      <Text ink="inherit" className="vb-fixed">
+        {icon(node)}
+      </Text>
       <span className="vb-clip">{node.name}</span>
       {node.symlink && <Chip className="control-tag">link</Chip>}
       {node.escapes && <Chip className="control-tag">outside</Chip>}
@@ -211,7 +215,7 @@ export function FileTree(props: Props) {
         }
       >
         <span>{dragging && rootDroppable ? 'Drop here for the project root' : 'Files'}</span>
-        <div className="explorer-actions">
+        <Stack gap={1} className="explorer-actions">
           <Button
             variant="bare"
             size="sm"
@@ -249,7 +253,7 @@ export function FileTree(props: Props) {
           >
             ⟳
           </Button>
-        </div>
+        </Stack>
       </div>
 
       {error && <Text role="error">{error}</Text>}

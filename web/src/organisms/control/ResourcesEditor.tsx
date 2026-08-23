@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { Button } from '../../atoms/Button';
 import { Control } from '../../atoms/Control';
 import { Readout } from '../../atoms/Readout';
+import { Stack } from '../../atoms/Stack';
+import { Text } from '../../atoms/Text';
 import { getResources, putResources, type ResourceLink } from '../../lib/api';
 import { errorText } from '../../lib/errors';
 import { useAction } from '../../lib/useAction';
@@ -63,7 +65,7 @@ export function ResourcesEditor({ onError }: { onError: (e: string | null) => vo
 
   return (
     <>
-      <div className="vb-editor-head">
+      <Stack gap={4} className="vb-editor-head">
         <Readout>Links registry{dirty ? ' •' : ''}</Readout>
         <div className="vb-row push">
           <Button size="md" onClick={add}>
@@ -73,10 +75,12 @@ export function ResourcesEditor({ onError }: { onError: (e: string | null) => vo
             Save
           </Button>
         </div>
-      </div>
-      <div className="resources-table">
+      </Stack>
+      <Stack direction="column" gap={3} className="resources-table">
         {links.length === 0 && (
-          <div className="empty">No links yet. Add references the copilot can consult.</div>
+          <Text lead className="empty">
+            No links yet. Add references the copilot can consult.
+          </Text>
         )}
         {/* NOT `Field`s: this is a table row, and each placeholder is the column heading. A label per
             cell would repeat "Title / URL / Note" once per link. The boxes are the primitive's — the
@@ -106,7 +110,7 @@ export function ResourcesEditor({ onError }: { onError: (e: string | null) => vo
             </Button>
           </Row>
         ))}
-      </div>
+      </Stack>
     </>
   );
 }

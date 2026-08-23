@@ -1,6 +1,7 @@
 import { Button } from '../../atoms/Button';
 import { Chip } from '../../atoms/Chip';
 import { Control } from '../../atoms/Control';
+import { Stack } from '../../atoms/Stack';
 import { Text } from '../../atoms/Text';
 import type { ControlCategory, ControlFile, ControlGroup } from '../../lib/api';
 import { List } from '../shared/List';
@@ -44,7 +45,7 @@ export function ControlFileList({
   return (
     <List as="nav" className="control-list">
       {groups.map((g) => (
-        <div key={g.key} className="control-group">
+        <Stack direction="column" gap={1} key={g.key}>
           {/* A `Row` and a `Text caps`, where `.control-group-head` was a flex row plus the caps face —
               and it was ALSO the Explorer's, which is the layer fault the gate now refuses. */}
           <Row>
@@ -115,7 +116,7 @@ export function ControlFileList({
               </Row>
             ),
           )}
-        </div>
+        </Stack>
       ))}
     </List>
   );

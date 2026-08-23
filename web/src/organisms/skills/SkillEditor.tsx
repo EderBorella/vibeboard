@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Button } from '../../atoms/Button';
 import { Control } from '../../atoms/Control';
+import { Stack } from '../../atoms/Stack';
 import { Text } from '../../atoms/Text';
 import type { Skill } from '../../lib/api';
 import { BOARD_LABELS, BOARDS, type BoardName, type ProjectConfig } from '../../lib/shared';
@@ -62,7 +63,7 @@ export function SkillEditor({ skill, config, busy, onSave }: Props) {
   };
 
   return (
-    <div className="skill-editor">
+    <Stack direction="column" gap={4} className="skill-editor">
       <Field layout="rail" label="Name" className="vb-row">
         <Control value={name} onChange={(e) => touch(setName)(e.target.value)} />
       </Field>
@@ -75,7 +76,9 @@ export function SkillEditor({ skill, config, busy, onSave }: Props) {
       </Field>
 
       <fieldset className="skill-scope">
-        <legend>Boards</legend>
+        <legend>
+          <Text caps>Boards</Text>
+        </legend>
         <Text role="hint">Nothing ticked means every board.</Text>
         {BOARDS.map((board) => (
           <Field key={board} layout="check" label={BOARD_LABELS[board]}>
@@ -85,7 +88,9 @@ export function SkillEditor({ skill, config, busy, onSave }: Props) {
       </fieldset>
 
       <fieldset className="skill-scope">
-        <legend>Columns</legend>
+        <legend>
+          <Text caps>Columns</Text>
+        </legend>
         <Text role="hint">Nothing ticked means every column.</Text>
         {columnChoices.map(([slug, label]) => (
           <Field key={slug} layout="check" label={label}>
@@ -115,7 +120,7 @@ export function SkillEditor({ skill, config, busy, onSave }: Props) {
         />
       </Field>
 
-      <div className="skill-foot">
+      <Stack justify="end">
         <Button
           variant="primary"
           size="md"
@@ -126,7 +131,7 @@ export function SkillEditor({ skill, config, busy, onSave }: Props) {
         >
           Save skill
         </Button>
-      </div>
-    </div>
+      </Stack>
+    </Stack>
   );
 }

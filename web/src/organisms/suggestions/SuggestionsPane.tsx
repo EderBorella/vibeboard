@@ -86,19 +86,19 @@ export function SuggestionsPane({ suggestions, failed, onRefresh, onApply }: Pro
 
   if (failed) {
     return (
-      <div className="suggestions-pane">
+      <Stack direction="column" gap={4} className="suggestions-pane">
         <Stack direction="column" align="start" gap={4} className="diary-empty">
           <p>Could not read what agents filed.</p>
           <Button size="md" onClick={onRefresh}>
             Try again
           </Button>
         </Stack>
-      </div>
+      </Stack>
     );
   }
 
   return (
-    <div className="suggestions-pane">
+    <Stack direction="column" gap={4} className="suggestions-pane">
       {picked === undefined ? (
         // Said out loud: an empty pane reads as a broken one, and this is the surface a person opens
         // precisely to find out whether anything is waiting.
@@ -108,7 +108,7 @@ export function SuggestionsPane({ suggestions, failed, onRefresh, onApply }: Pro
       ) : (
         <>
           {/* The actions at the top, on the picked suggestion, and Dismiss in its own colour. */}
-          <div className="suggestions-actions" data-testid="suggestions-actions">
+          <Stack wrap gap={3} className="suggestions-actions" testId="suggestions-actions">
             <Button variant="danger" size="md" disabled={busy !== null} onClick={() => dismiss(picked.id)}>
               Dismiss
             </Button>
@@ -140,11 +140,15 @@ export function SuggestionsPane({ suggestions, failed, onRefresh, onApply }: Pro
             <Button size="md" onClick={onRefresh}>
               Refresh
             </Button>
-          </div>
+          </Stack>
           {/* `assertive`: the action did NOT happen, and the row is still there. */}
           <div aria-live="assertive">
             {error && <Text role="error">{error}</Text>}
-            {became && <p className="suggestions-became">Carded as {became}.</p>}
+            {became && (
+              <Text ink="accent" lead>
+                Carded as {became}.
+              </Text>
+            )}
           </div>
 
           <List as="ol" className="suggestions-list">
@@ -195,6 +199,6 @@ export function SuggestionsPane({ suggestions, failed, onRefresh, onApply }: Pro
           </List>
         </>
       )}
-    </div>
+    </Stack>
   );
 }

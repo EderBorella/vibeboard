@@ -16,11 +16,11 @@
    obviously broken.
    The controls on the right stay centred: a <select> has a baseline of its own that has nothing to do with
    the text beside it, and aligning to it drags the whole cluster. See .topbar-right below. */
+/* THE ROW ITSELF IS A `Stack align="baseline" wrap gap={5}` as of the layout atom — the four
+   declarations above this rule's padding were exactly that, and the reasoning above is why the options
+   read as they do. What is left here is the BAND: its inset, its ground, its edge and the fact that it
+   stays put. */
 .topbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: var(--s-5);
   padding: var(--s-4) var(--s-6);
   background: linear-gradient(var(--panel), var(--panel));
   border-bottom: 1px solid var(--border);
@@ -44,14 +44,14 @@
    name at 1100px, the name truncated AND the bar still grew from 85px to 105px, because nothing stopped
    it claiming 1068 of the 1100 first. `flex-wrap` resolves before shrinking, so without a cap the two
    changes in that commit worked against each other. */
+/* The face is a `Text lead nowrap` — the body step, the muted ink and the unbreakable line. The CLAMP is
+   this row's, and `.vb-clip` is not it: that utility also takes the slack (`flex: 1`), which here would
+   hold 22ch of empty space open beside a short name and shove the tabs right. */
 .project-name {
-  color: var(--muted);
-  font-size: var(--t-body);
   min-width: 0;
   max-width: 22ch;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 /* `flex: 0 0 auto` so the escape hatches are the LAST thing to give way, never squeezed to nothing.
@@ -62,13 +62,10 @@
    the seven misfiled strays `styles.ts` named — app-wide rules living in the top bar's sheet because that
    is where their bytes fell — and the top bar is not where an app-wide utility belongs. */
 
+/* A `Stack gap={4}` on `.push` (the `margin-left: auto`) and `.vb-fixed` (the `flex: none` that keeps the
+   escape hatches from being squeezed to nothing). `align-self` is the one thing neither says. */
 .topbar-right {
-  margin-left: auto;
-  display: flex;
-  align-items: center;
   align-self: center;
-  gap: var(--s-4);
-  flex: 0 0 auto;
 }
 /* `.switch-btn` shared this and is now `default`; `.theme-select` was the `<select>` half of it, at four
    call sites, and it is `.vb-ctl` as of Phase 9 — the pointer and the accent hover it declared are now

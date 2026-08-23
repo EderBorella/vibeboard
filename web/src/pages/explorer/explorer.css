@@ -21,15 +21,17 @@
    decision anybody made. `gap` is layout and stays. */
 .explorer-item { gap: var(--s-2); }
 /* Fixed width so names line up whether or not a row has a twisty. */
-/* The size is `.vb-twist`'s. The box widens with it: at 0.7rem an 11px glyph fitted and a 15px one did
-   not, and the overflow pushed every name in the tree half a character to the right. */
-.explorer-twist { width: 0.9rem; flex-shrink: 0; color: var(--muted); }
-.explorer-icon { flex-shrink: 0; font-size: var(--t-small); }
+/* The size is `.vb-twist`'s and so is the `flex: none`; the muted ink is `Text`'s default. The box widens
+   with the glyph: at 0.7rem an 11px one fitted and a 15px one did not, and the overflow pushed every name
+   in the tree half a character to the right. */
+.explorer-twist { width: 0.9rem; }
+/* `.explorer-icon` IS GONE — a `Text ink="inherit"` (its step is the atom's default, and the ink is the
+   row's, which changes on hover) on `.vb-fixed`. */
 .explorer-item > .vb-readout { flex-shrink: 0; }
 /* The tail of a capped listing. Deliberately not styled as an error — the folder is fine, the
    listing is simply not all of it. */
 .explorer-more { font-size: var(--t-micro); padding: var(--s-2) var(--s-4); }
-.explorer-actions { display: flex; gap: var(--s-1); }
+/* A `Stack gap={1}`; the disabled affordance is what the class still says. */
 .explorer-actions button:disabled { opacity: 0.3; cursor: not-allowed; }
 /* Where a dragged entry would land. */
 .explorer-over { background: var(--panel-2); border-color: var(--accent); box-shadow: var(--glow); }

@@ -1,5 +1,7 @@
 import { Button } from '../../atoms/Button';
 import { Control } from '../../atoms/Control';
+import { Stack } from '../../atoms/Stack';
+import { Text } from '../../atoms/Text';
 import { Menu } from '../../molecules/Menu';
 import { ConnectionLight } from './ConnectionLight';
 import type { LightState, RecentFailure, RefusalKind } from './connection-light';
@@ -77,9 +79,13 @@ export function TopBar({
   recentFailure,
 }: Props) {
   return (
-    <header className="topbar">
+    <Stack as="header" align="baseline" wrap gap={5} className="topbar">
       <span className="brand">VibeBoard</span>
-      {showProject && <span className="project-name">{projectName}</span>}
+      {showProject && (
+        <Text lead nowrap className="project-name">
+          {projectName}
+        </Text>
+      )}
       {/* Beside the project name rather than at the far right, and labelled. A 9px dot at the end of a row
           of buttons is the last thing anyone looks at, and it is the one thing that says whether ANYTHING
           else on the page is still true.
@@ -129,7 +135,7 @@ export function TopBar({
           onChange={(value) => onTab(value as MainTab)}
         />
       )}
-      <div className="topbar-right">
+      <Stack gap={4} className="push vb-fixed topbar-right">
         {/* NOT A `Field`: the top bar carries no labels, and the value this shows is its own name. It
             takes the primitive's box through `.vb-ctl`, which is what atoms/control.css names it for. */}
         <Control as="select" value={theme} title="Theme" onChange={(e) => onTheme(e.target.value)}>
@@ -154,7 +160,7 @@ export function TopBar({
             {copilotOpen ? 'Hide copilot' : 'Copilot'}
           </Button>
         )}
-      </div>
-    </header>
+      </Stack>
+    </Stack>
   );
 }

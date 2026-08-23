@@ -67,7 +67,7 @@ const DiaryList = memo(function DiaryList({ entries }: { entries: DiaryEntry[] }
         // palette's secondary hue and Phase 13 ruled it is not a state).
         <Row as="li" stack variant="flat" rail data-kind={entry.kind} key={`${at}-${entry.at}`}>
           <FigureRow>
-            <Text caps ink="strong" className="diary-kind">
+            <Text caps ink="strong" size="micro">
               {entry.kind}
             </Text>
             <time dateTime={entry.at}>{when(entry.at)}</time>
@@ -115,7 +115,7 @@ function FiledList({ suggestions }: { suggestions: Suggestion[] }) {
               and the ids it POINTS AT are a `.diary-about` group, which the diary beside it already
               uses for exactly that. Stacked rather than wrapped in this column — see pages/log/log.css. */}
           <FigureRow>
-            <Text caps ink="strong" className="filed-state">
+            <Text caps ink="strong" size="micro" testId="filed-state">
               {s.state}
             </Text>
             <time dateTime={s.created}>{when(s.created)}</time>

@@ -43,7 +43,7 @@ function BackendStatus({ status }: { status: ModelStatus }) {
     // THE TWO NUMBERS MOVE INTO THE BALLOON rather than being dropped. That is where the other three
     // indicators put their detail, and neither number is something you read at a glance: an uptime
     // percentage is what you go and check once the word has told you to.
-    <Stack gap={3} className="copilot-status">
+    <Stack gap={3} pad={[2, 5]} edge="bottom">
       <StatusChip
         state={state}
         word={state}
@@ -189,7 +189,9 @@ export function CopilotPanel({
 
   return (
     <aside className="copilot">
-      <Stack className="copilot-head">
+      {/* THE DOCK GUTTER AND THE RULE UNDER THE ROW ARE `Stack` OPTIONS NOW, on this and four siblings:
+          five classes that each said `padding: var(--s-N) var(--s-5)` and one hairline. */}
+      <Stack pad={[4, 5]} edge="bottom">
         <span className="copilot-title">Copilot</span>
         <BackendPicker
           value={backend}
@@ -240,12 +242,12 @@ export function CopilotPanel({
         The confirm is not ceremony: the grant includes writing the foundation documents, and two of
         those carry commands the server later runs outside the sandbox as you.
       */}
-      {/* A CLASS, because the bare `<div>` this was had no padding and every other row in this panel does
-          — `.copilot-head`, `.copilot-chatbar`, `.copilot-controls`, `.copilot-selects`, `.copilot-status`
-          and `.copilot-input` all pad themselves by `0.75rem`. So the one button in the dock that grants
+      {/* THE ROW THAT NEVER GOT A CLASS, and now no row in the dock needs one. It was a bare `<div>` with
+          no padding while its six siblings each declared the dock gutter, so the one button that grants
           write access to the project sat flush against the panel's left edge, touching the board behind
-          it. Nothing chose that; the row simply never got a class. */}
-      <div className="copilot-authority">
+          it. Nothing chose that — and a gutter that is an attribute on the layout atom is a gutter you
+          cannot forget to write. test/copilot-rows.test.tsx holds all seven to it. */}
+      <Stack pad={[4, 5]} edge="bottom">
         {/* The ternary was `btn-primary`/`btn-secondary` — a toggle whose "on" state is the filled one.
             It is also the one site the ratchet could not see, because a class reaching a `<button>`
             through an expression is not a literal in the attribute text; the check names that gap. */}
@@ -273,7 +275,7 @@ export function CopilotPanel({
         >
           {authorised ? 'Authorised' : 'Authorise'}
         </Button>
-      </div>
+      </Stack>
 
       <CopilotControls
         caps={caps}
@@ -290,8 +292,11 @@ export function CopilotPanel({
       />
 
       {overridden && (
-        <Stack className="copilot-override">
-          Just for this session — the project default is unchanged.
+        // `--s-4` AND NOT THE DOCK GUTTER, deliberately: this is the one strip that reads as an aside
+        // inside the dock rather than as a row of it, which test/copilot-rows.test.tsx names as an
+        // exclusion rather than widening its claim to cover.
+        <Stack pad={[2, 4]}>
+          <Text size="micro">Just for this session — the project default is unchanged.</Text>
           <Button size="sm" className="push" onClick={onReset} disabled={running}>
             Use default
           </Button>

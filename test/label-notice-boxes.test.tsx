@@ -92,13 +92,14 @@ describe('the uppercase section labels', () => {
   // and did not get one.
   // AN EMPTY INK IS NOT A MISSING ROW: it is the two that keep the atom's muted default, and asserting
   // them here is what distinguishes "the default is right" from "the attribute was dropped".
+  // AND THREE OF THE SIX HAVE NO CLASS LEFT TO NAME, as of wave 2. `.diary-kind`, `.filed-state` and
+  // `.tile-group` each held ONE `font-size: var(--t-micro)` after the ink moved, and the step is
+  // `data-size` now — so there is nothing for a class column to hold and they are asserted below, on the
+  // attribute pair alone, plus a negative that says the classes are really gone.
   const MIGRATED: [string, string, string][] = [
     ['ap-drawer-head', '', 'var(--muted)'],
     ['links-group', '', 'var(--muted)'],
     ['settings-section', 'accent', 'var(--accent)'],
-    ['diary-kind', 'strong', 'var(--text)'],
-    ['filed-state', 'strong', 'var(--text)'],
-    ['tile-group', 'accent2', 'var(--accent-2)'],
   ];
   const migrated = (cls: string, ink: string): Element =>
     at(`<span class="vb-text vb-text-caps ${cls}"${ink === '' ? '' : ` data-ink="${ink}"`}>L</span>`, 'span');
@@ -115,7 +116,29 @@ describe('the uppercase section labels', () => {
   // without `data-ink` the four that name one would render `--muted`, which is the silent change a class
   // list alone could not tell from a correct one.
   it('a caps line with no ink named takes the atom\u2019s muted default', () => {
-    expect(box(label('vb-text vb-text-caps diary-kind')).color).toBe('var(--muted)');
+    expect(box(label('vb-text vb-text-caps')).color).toBe('var(--muted)');
+  });
+
+  // THE THREE THAT KEPT NOTHING, and both halves of what they used to say are asserted together because
+  // dropping either one is silent. `.diary-kind` and `.filed-state` were `--t-micro` in `--text`;
+  // `.tile-group` was `--t-micro` in `--accent-2`. The STEP is the half a class held to the end, so it is
+  // named as a resolved value rather than as the token \u2014 see test/css-box.tsx on why.
+  const MICRO_EYEBROWS: [string, string, string][] = [
+    ['.diary-kind and .filed-state', 'strong', 'var(--text)'],
+    ['.tile-group', 'accent2', 'var(--accent-2)'],
+  ];
+  it.each(MICRO_EYEBROWS)('%s is a caps eyebrow at the micro step, ink %s', (_what, ink, colour) => {
+    const el = at(`<span class="vb-text vb-text-caps" data-size="micro" data-ink="${ink}">L</span>`, 'span');
+    const drawn = box(el);
+    expect(drawn['text-transform']).toBe('uppercase');
+    expect(drawn['font-size']).toBe('0.6875rem');
+    expect(drawn.color).toBe(colour);
+  });
+
+  // AND THE THREE CLASSES ARE GONE, as a negative rather than deleted from the suite: a class quietly
+  // coming back is how this family grew a second name for one face before.
+  it.each([['diary-kind'], ['filed-state'], ['tile-group']])('.%s is gone', (cls) => {
+    expect(box(label(cls))['font-size']).toBeUndefined();
   });
 
   // THE CAPS FACE INCLUDES THE FAMILY as of Phase 8, and eight classes wrote it beside the transform.

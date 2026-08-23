@@ -347,9 +347,12 @@ describe('the split — what agents filed', () => {
       api.listSuggestions.mockResolvedValue([full()]);
       render(<DiaryView bump={0} />);
       const line = await found('.filed-list .vb-figure-row');
-      // TWO, not four: the state and when it was filed. `.filed-state` first, then the `<time>`.
+      // TWO, not four: the state and when it was filed. The state word first, then the `<time>`.
       expect([...line.children].map((c) => c.tagName)).toEqual(['SPAN', 'TIME']);
-      expect(line.querySelector('.filed-state')?.textContent).toBe('active');
+      // BY `data-testid` AND NOT BY `.filed-state`, which is gone: the class was one
+      // `font-size: var(--t-micro)` and the step is a `Text` option now. The ORDER is the claim, so the
+      // line still has to be found — a hook, not a face.
+      expect(line.querySelector('[data-testid="filed-state"]')?.textContent).toBe('active');
     });
 
     it('puts the ids it POINTS AT in a group of their own, outside that line', async () => {

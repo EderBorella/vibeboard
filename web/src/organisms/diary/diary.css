@@ -58,9 +58,9 @@
 .vb-row-rail[data-kind='lifecycle'] { border-left-color: var(--muted); }
 .vb-row-rail[data-kind='note'] { border-left-color: var(--accent-2); }
 
-/* A `Text caps ink="strong"` — the caps atom carries the display family as of this phase — and the STEP
-   is the one thing left: `--t-micro` has no `Text` option and one may not be invented for it. */
-.diary-kind { font-size: var(--t-micro); }
+/* `.diary-kind` IS GONE — `Text caps ink="strong" size="micro"`. The step was the one declaration left and
+   it is an attribute now; `.filed-state` below went the same way, so the pair that used to be two names
+   for one `--t-micro` a step apart in this file is no names at all. */
 /* `.diary-about` IS GONE — a `Stack wrap gap={3}` in the diary and a `Stack direction="column" gap={3}
    align="start"` in the narrow column, which is the same two shapes the class and its `.vb-list`
    compound rule spelled between them. One chip per line in that column, because a run id alone is 144px
@@ -96,10 +96,10 @@
    `neutral` tone: a rail the same colour as every other border was not a state, it was the absence of
    one, and "dismissed" is a decision somebody took. Both claims survive the class; `--tone` and
    `--rule` are what carry them, and `.vb-row-rail` is where they meet. */
-/* A `Text caps ink="strong"`, exactly as `.diary-kind` is, and the STEP is what is left of both. They are
-   two one-declaration classes saying the same `--t-micro` a step apart in this file; merging them would be
-   naming a suggestion's state after the diary's kind, which is a lie in a name. */
-.filed-state { font-size: var(--t-micro); }
+/* `.filed-state` IS GONE — `Text caps ink="strong" size="micro"`, exactly as `.diary-kind` is. Merging the
+   two would have been naming a suggestion's state after the diary's kind, which is a lie in a name; the
+   step being an attribute is what made the choice unnecessary. It keeps a `testId`, because
+   test/diary-view.test.tsx reads the line to assert the state word is the FIRST of the two figures. */
 /* `.filed-reason` IS GONE — `--t-body`, 1.5, `--muted` and italic is `Text lead role="hint"`. Why it was
    said no to, quiet and italic so it does not read as part of the finding itself. */
 

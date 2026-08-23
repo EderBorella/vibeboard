@@ -27,7 +27,7 @@ export function ChatSwitcher({ chats, currentChatId, backend, running, onOpen, o
   const currentTitle = chats.find((c) => c.id === currentChatId)?.title ?? 'New chat';
 
   return (
-    <Stack gap={3} className="copilot-chatbar">
+    <Stack gap={3} pad={[3, 5]} edge="bottom">
       <div className="chat-switcher">
         <button
           className="vb-trigger"
@@ -90,8 +90,12 @@ export function ChatSwitcher({ chats, currentChatId, backend, running, onOpen, o
           </Menu>
         )}
       </div>
-      <Button size="sm" className="chat-new" disabled={running} onClick={onNew} title="Start a fresh chat">
-        + New
+      <Button size="sm" disabled={running} onClick={onNew} title="Start a fresh chat">
+        {/* `.chat-new` was one `white-space: nowrap`: "+ New" must not break in two when the switcher
+            beside it is wide. */}
+        <Text size="inherit" ink="inherit" nowrap>
+          + New
+        </Text>
       </Button>
     </Stack>
   );

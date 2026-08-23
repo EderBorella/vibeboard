@@ -48,14 +48,14 @@
    answers to a failed run sit side by side and that ForgiveAttempts' `flex-basis: 100%` lines still break
    underneath — is the `gap` and the `wrap`, which are the atom's attributes. */
 /* `.exec-skill` IS GONE — `--t-small` is `Text`'s own step, and the row's ink is `ink="strong"`. */
-/* Cost takes the push-right when present, so cost and elapsed sit together at the end of the row. */
-/* Cost takes the push-right when present, so cost and elapsed sit together at the end of the row. Both
-   are `Readout`s now, and the pair rule below is the same claim the two classes made by hand. */
-.exec-run-top > .vb-readout { margin-left: auto; }
-/* AFTER the plain `.exec-when` above, not before it. At (0,2,0) the adjacent form won either way, so
-   this is a move and not a change — but the descending order read as though the plain rule was meant
-   to override it, which is the opposite of what happens. */
-.exec-run-top > .vb-readout + .vb-readout { margin-left: 0; }
+/* `.exec-run-top` IS GONE, AND BOTH ITS RULES WITH IT. They said "cost takes the push-right, elapsed
+   follows it" as `> .vb-readout { margin-left: auto }` plus an adjacent-sibling reset — and the status chip
+   in that row wears `vb-readout` as well, because it wants the mono face. So the chip matched too, and TWO
+   auto margins in a flex row SPLIT the free space between them: every chip was pushed right by half of
+   whatever slack its row had, which is different in every row. A column of status chips read as random,
+   which is exactly how the owner described it.
+   The `push` is on the call site now, on whichever of the pair renders first. A selector that reaches
+   "every readout in this row" cannot say WHICH readout, and this row has two kinds. */
 /* A `Surface` with the `flat` variant. WRAPS: a card title is arbitrary user text and several are long
    file paths with no spaces, so without this they set the column's minimum content width and pushed
    past the track. `cursor: default` on a disabled one is the primitive's now; the dimming is this

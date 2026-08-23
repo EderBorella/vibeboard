@@ -103,7 +103,7 @@ export function ExecutionView({
               const stoppable = active.includes(record.run) || queued.includes(record.run);
               return (
                 <Row key={record.run} stack variant="inset">
-                  <Stack align="baseline" gap={3} className="exec-run-top">
+                  <Stack align="baseline" gap={3}>
                     <Chip
                       pill
                       state={record.status}
@@ -114,11 +114,26 @@ export function ExecutionView({
                     </Chip>
                     <Text ink="strong">{record.skill}</Text>
                     {/* What it cost, beside how long it took — the two things a dashboard row is
-                        actually asked. Absent while a run is still in flight. */}
-                    {costLabel(record.usage) && (
-                      <Readout testId="exec-cost">{costLabel(record.usage)}</Readout>
+                        actually asked. Absent while a run is still in flight.
+                        `push` ON WHICHEVER OF THE PAIR COMES FIRST, and that is the repair: the rule this
+                        replaces was `.exec-run-top > .vb-readout { margin-left: auto }`, meaning "the cost
+                        takes the push-right". But the status chip beside it wears `vb-readout` too — it
+                        wants the mono face — so it matched as well, and TWO auto margins in a flex row
+                        SPLIT the free space between them. Every chip was pushed right by half of whatever
+                        slack that row had, so a column of them read as random. `push` says which element,
+                        at the site, where it can be seen. */}
+                    {costLabel(record.usage) ? (
+                      <>
+                        <Readout className="push" testId="exec-cost">
+                          {costLabel(record.usage)}
+                        </Readout>
+                        <Readout testId="exec-when">{elapsed(record, now)}</Readout>
+                      </>
+                    ) : (
+                      <Readout className="push" testId="exec-when">
+                        {elapsed(record, now)}
+                      </Readout>
                     )}
-                    <Readout testId="exec-when">{elapsed(record, now)}</Readout>
                   </Stack>
                   <Surface
                     as="button"

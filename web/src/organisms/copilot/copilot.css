@@ -95,7 +95,11 @@
    grants write access to the project was flush against the dock's left edge and touching the board behind
    it. Nobody chose that; the row simply never got a class — and now none of the five needs one, which is
    the arrangement in which that defect could not have happened. */
-.copilot-body { flex: 1; overflow-y: auto; padding: var(--s-5); display: flex; flex-direction: column; gap: var(--s-4); }
+/* `.copilot-body` IS GONE — `Stack direction="column" gap={4} pad={5} fill scroll`, which is its six
+   declarations one for one plus the two `min-*: 0` the transcript should always have had: a flex child
+   refusing to shrink below its content is what makes a scroller not scroll, and `fill` says all three
+   together. The dock's `[data-fill]` flag is not in play here — the copilot is WorkArea's own aside, not
+   a `.dock-body` pane (see the note on `.cards-body`). */
 /* THE ROLE THIS SURFACE GIVES ITS TONE: ink, and only the `error` kind carries one — see CopilotPanel.
    `inherit` is the fallback, which is what a bubble with no state has always rendered. Nothing above a
    `.msg` in the tree sets `--tone`, so this cannot pick one up by accident. */

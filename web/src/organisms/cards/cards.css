@@ -56,11 +56,20 @@
    by `.raw-area`'s `min-height` — 79px of a definite 342px dock body went unused, and the floor was
    large enough to hide the collapse. Harness check 10 measures the pane against this box's own content
    height for that reason: the dock body is definite, and every pixel of it now reaches the pane. */
+/* AND `Stack fill scroll` CANNOT TAKE THESE THREE, WHICH IS A COLLISION RATHER THAN A FRAME ARGUMENT.
+   `.cards-pane`, `.cards-main` and this box are `flex: 1` + `min-*: 0` + `overflow-y: auto` — the atom's
+   `fill`/`scroll` value for value — but `data-fill` is ALREADY a load-bearing flag inside the dock:
+   `.dock-body:has([data-fill]) { height: 38vh }` is how a pane says "I exist to be filled", and these
+   three are always mounted. A `Stack fill` here would make the dock body definite whatever is open, which
+   is exactly the resting-state fault check 10 measures, and it would also become the `[data-fill]`
+   the harness resolves the pane by. `.cards-pane` is selected by name in `visual/` besides. */
 .cards-body {
   flex: 1; min-width: 0; overflow-y: auto; padding: var(--s-5) var(--s-6);
   display: flex; flex-direction: column;
 }
-.cards-gone { padding: var(--s-6) 0; }
+/* `.cards-gone` IS GONE. It was `padding: var(--s-6) 0` on the empty state's own `Text` — one child
+   asking for a rhythm its container already has — so the sentence sits on `.cards-body`'s `--s-5` inset
+   now and starts 12px from the top rather than 28px. `visual/` had already re-keyed onto the testid. */
 
 
 /* Raw pane (the card's file, inside the dock) */

@@ -313,7 +313,7 @@ export function CopilotPanel({
       )}
       {status && <BackendStatus status={status} />}
 
-      <div className="copilot-body" ref={bodyRef}>
+      <Stack direction="column" gap={4} pad={5} fill scroll ref={bodyRef}>
         {items.length === 0 && (
           <Text role="hint" lead>
             Ask the copilot to work on this project. It runs your configured backend ({backend}) in the
@@ -324,7 +324,7 @@ export function CopilotPanel({
           <MessageLine key={it.id} item={it} />
         ))}
         {running && <div className="msg msg-running">…working</div>}
-      </div>
+      </Stack>
 
       <CopilotReadout stats={stats} budget={contextBudget} />
 

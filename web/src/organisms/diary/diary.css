@@ -1,9 +1,10 @@
-/* A REFRESH IS NOT THE MAIN ACTION IN ITS PANE, and it was being drawn as one. `.diary-refresh` had no
-   rule at all, so it stretched to the width of its flex column: 690px in the Project Log and 1240px in
-   "What agents filed", which made a minor repeatable button the single most prominent element in each
-   pane — above the log it refreshes. `align-self: flex-start` is the idiom this stylesheet already uses
-   for exactly this, on `.sandbox-action > .vb-btn`. */
-.diary-refresh { align-self: flex-start; }
+/* `.diary-refresh` IS GONE, AND THE CLAIM IS THE PARENT'S NOW. It was one `align-self: flex-start`,
+   stopping a minor repeatable button stretching to its column's width — 690px in the Project Log and
+   1240px in "What agents filed". `align="start"` on the two `.diary-head` Stacks says it for every child
+   of the block instead of for one: the heading and its lede shrink-wrap too, and neither renders
+   differently for it — a heading is left-aligned text, and the lede's single line is longer than the
+   measure below, so it still wraps at the measure rather than at its own width.
+   An `align-self` utility would have been a class for two call sites that a parent attribute already has. */
 
 
 /* The project log. A reading surface rather than a dashboard: one column, generous line height, and the
@@ -15,8 +16,10 @@
   flex: 1; min-width: 0; overflow-y: auto; background: var(--wash);
   padding: var(--s-7); display: flex; flex-direction: column; gap: var(--s-6);
 }
-/* A `Stack direction="column" gap={2}`; the MEASURE is what a heading block still decides. */
-.diary-head { max-width: 68ch; }
+/* A `Stack direction="column" gap={2}`; the MEASURE is what a heading block still decides — and it is
+   `--measure` rather than a fourth hand-written `68ch`, which is the token this sheet was signed up to
+   spend (tools/check-tokens.mjs's UNCONSUMED row, now deleted). Same 68ch, one name. */
+.diary-head { max-width: var(--measure); }
 /* AN `<h2>` AND NOT A `Text`, because the heading is the document's structure rather than a face — so
    `caps` cannot reach it and the three declarations it merges are written here for the fourth time.
    `--t-lead` has no `Text` option either. */
@@ -27,7 +30,7 @@
 /* `.diary-lede` IS GONE — `--muted`, `--t-body` and 1.5 is `Text lead` declaration for declaration. */
 
 /* A `Stack align="start" gap={4}`; the measure is the composer's. */
-.diary-compose { max-width: 68ch; }
+.diary-compose { max-width: var(--measure); }
 /* ON THE PANEL GROUND RATHER THAN THE APP GROUND, and this is the box that argument belongs to: `.diary`
    declares `background: var(--wash)`, and `--wash` is `none` in classic-dark — so `--bg` on `--bg` would
    render as no box at all. It was written on the suggestions composer instead, whose pane has no ground of
@@ -38,10 +41,10 @@
 }
 /* `.suggestions-pane`'s half of this pair moved to its own sheet: a class defined in two SCOPED
    directories has no owner, which is the second claim `npm run check:layers` makes and now blocks on. */
-.diary > .vb-text-error { max-width: 68ch; }
+.diary > .vb-text-error { max-width: var(--measure); }
 
 /* A `List`, and the measure is what is left. */
-.diary-list { max-width: 68ch; }
+.diary-list { max-width: var(--measure); }
 /* `.diary-entry` IS GONE — a `Row stack rail` on a `Surface flat`. THE FOUR KIND RULES ARE WHAT REMAIN,
    on the shared rail rather than on a class of its own, because three of the four kinds are not TONES:
    `--accent-2` is the palette's secondary hue and Phase 13 ruled it is not a state colour, `--border` is

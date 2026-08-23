@@ -216,7 +216,6 @@ describe('the empty-state lines', () => {
     'vb-text vb-text-quiet vb-text-lead',
     'vb-text vb-text-quiet',
     'mp-empty vb-text vb-text-quiet vb-text-lead',
-    'cards-gone vb-text vb-text-quiet vb-text-lead',
     'cs-empty vb-text vb-text-quiet vb-text-lead',
     'control-empty vb-text vb-text-quiet',
     'explorer-more vb-text vb-text-quiet',
@@ -228,7 +227,7 @@ describe('the empty-state lines', () => {
     expect(b['font-style']).toBe('italic');
   });
 
-  // THE EIGHT THAT DIED, and they died outright: nothing was left of them once the shared treatment came
+  // THE NINE THAT DIED, and they died outright: nothing was left of them once the shared treatment came
   // out. Asserted as a negative rather than deleted from the suite, because a class quietly coming back
   // is exactly how a family grows a second name again.
   it.each([
@@ -244,12 +243,20 @@ describe('the empty-state lines', () => {
     expect(box(label(cls, 'p')).color).toBeUndefined();
   });
 
-  // THE FIVE THAT SURVIVE CARRY ONLY WHAT THE SURFACE CAN DECIDE — an inset or a size — which is the
+  // `.cards-gone` DIED IN THE SWEEP AND ITS OWN ROW IS WHY: it declared a PADDING and never an ink, so
+  // the negative above cannot see it — asked for `color` the class answered `undefined` while the rule was
+  // still in the sheet, which was measured by putting the rule back. `padding: var(--s-6) 0` was one child
+  // asking for a rhythm `.cards-body`'s `var(--s-5) var(--s-6)` inset already gives it; the empty state is
+  // a bare `Text` now and declares nothing of its own.
+  it('.cards-gone is gone, and it took a padding rather than an ink with it', () => {
+    expect(box(label('cards-gone', 'p')).padding).toBeUndefined();
+  });
+
+  // THE FOUR THAT SURVIVE CARRY ONLY WHAT THE SURFACE CAN DECIDE — an inset or a size — which is the
   // same result Phase 3 measured: 19 of its 27 migrated classes still had a real declaration left. A
   // survivor that still named an ink or a font-style would mean the merge had not actually happened.
   it.each([
     ['mp-empty', 'padding'],
-    ['cards-gone', 'padding'],
     ['control-empty', 'padding'],
     // THESE TWO NO LONGER KEEP A STEP, and that is the wave that gave `Text` a `size`: both were one
     // `--t-micro`, which is `size="micro"` now. `.explorer-more`'s was DEAD where it was — the class is on

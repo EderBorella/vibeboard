@@ -122,6 +122,9 @@ describe('CardSkills', () => {
   it('names the card it would act on', () => {
     render(<CardSkills card={card({ id: 'E-042' })} skills={[skill()]} invalid={[]} />);
     expect(screen.getByLabelText('Skills for E-042')).toBeTruthy();
-    expect(screen.getByText('Skills').className).toBe('cs-head');
+    // A `Text as="h3" caps` now: the display face, the step, the muted ink and the `margin: 0` are the
+    // atom's, and what `.cs-head` still says is the 2px under this one line. Asserted as the whole class
+    // list rather than with a substring, because a dropped `caps` is exactly what a substring would miss.
+    expect(screen.getByText('Skills').className).toBe('vb-text vb-text-caps cs-head');
   });
 });

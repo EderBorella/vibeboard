@@ -29,8 +29,13 @@
    row's, which changes on hover) on `.vb-fixed`. */
 .explorer-item > .vb-readout { flex-shrink: 0; }
 /* The tail of a capped listing. Deliberately not styled as an error — the folder is fine, the
-   listing is simply not all of it. */
-.explorer-more { font-size: var(--t-micro); padding: var(--s-2) var(--s-4); }
+   listing is simply not all of it.
+   THE STEP IS `Text size="micro"` AND IT WAS DEAD WHERE IT WAS. This class is on the WRAPPER and the words
+   are in a `<Text>` inside it, so `.vb-text`'s own `--t-small` beat the inherited `--t-micro` and the line
+   has been rendering a step larger than this rule asked for. Said on the atom, it is what it says.
+   The inset stays: the row carries its indent through `style`, which `Stack` does not take, so the wrapper
+   cannot become one. */
+.explorer-more { padding: var(--s-2) var(--s-4); }
 /* A `Stack gap={1}`; the disabled affordance is what the class still says. */
 .explorer-actions button:disabled { opacity: 0.3; cursor: not-allowed; }
 /* Where a dragged entry would land. */

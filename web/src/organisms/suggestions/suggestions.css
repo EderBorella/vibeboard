@@ -1,10 +1,9 @@
 /* The dock's Suggestions pane. The actions sit at the TOP, on the picked row: they are what the pane is
    for, and a person should not have to scroll a list to reach them. */
-/* The column and its gap are a `Stack direction="column" gap={4}`; what fills the dock and scrolls is
-   the pane's. */
+/* The column, its gap and its inset are a `Stack direction="column" gap={4} pad={4}`; what fills the dock
+   and scrolls is the pane's, and a frame is not a gap between siblings. */
 .suggestions-pane {
-  flex: 1; min-width: 0; min-height: 0;
-  padding: var(--s-4); overflow-y: auto;
+  flex: 1; min-width: 0; min-height: 0; overflow-y: auto;
 }
 /* The row is a `Stack wrap gap={3}`; the cell that takes the slack is what the class still says. */
 /* THE `--panel-2` GROUND IS GONE, and its stated reason is why: "this one sits in a `--wash` pane where

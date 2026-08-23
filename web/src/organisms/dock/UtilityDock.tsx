@@ -1,4 +1,5 @@
 import { Button } from '../../atoms/Button';
+import { Stack } from '../../atoms/Stack';
 import { Tabs } from '../../molecules/Tabs';
 import { activePane, type DockPane } from './panes';
 
@@ -18,7 +19,10 @@ export function UtilityDock({ panes, activeId, onPane, collapsed, onCollapse }: 
   if (!active) return null;
 
   return (
-    <section className="dock" aria-label="Utilities">
+    // A LABELLED LANDMARK IS A `Stack` NOW. The column, the hairline over it and `flex: 0 0 auto` were
+    // three of this class's six declarations and are the atom's; `aria-label` on a `<section>` is what
+    // kept them here. `gap={0}` because the strip sits directly on the body — the atom's default is 8px.
+    <Stack as="section" label="Utilities" direction="column" gap={0} edge="top" className="vb-fixed dock">
       {/* `Tabs` AND NOT `Menu`: the dock stays and the pane inside it changes, which is the whole line
           between the two. The collapse toggle is a member of the STRIP rather than of any tab, which is
           what `children` is for — it was already a sibling of the cells. */}
@@ -52,6 +56,6 @@ export function UtilityDock({ panes, activeId, onPane, collapsed, onCollapse }: 
             </div>
           ))}
       </div>
-    </section>
+    </Stack>
   );
 }

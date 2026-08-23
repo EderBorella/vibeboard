@@ -8,11 +8,9 @@
  *   `.control-blank` — `margin: auto; color: var(--muted); padding: var(--s-7)`, which is `.empty`
  *     declaration for declaration, in the same layer, four import lines apart. */
 .vb-editor { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
-/* The row is a `Stack gap={4}`; what is left is the band it draws. */
-.vb-editor-head {
-  padding: var(--s-4) var(--s-6);
-  border-bottom: 1px solid var(--border); background: var(--panel);
-}
+/* The row, its inset and the hairline under it are a `Stack gap={4} pad={[4,6]} edge="bottom"`. What is
+   left is the GROUND, which is the one thing a band draws that a stack does not. */
+.vb-editor-head { background: var(--panel); }
 /* THE BODY SLOT, whichever view fills it: a `Control mono` you type into or rendered markdown you read.
    `resize: none` is the textarea's alone — a box that fills its pane has nothing to be dragged into.
  *
@@ -27,7 +25,12 @@
  * The preview's padding hangs off `.markdown` rather than an element-qualified `.vb-editor-body`, because
  * `controlGeometryFault` reads the CLASS and not the element: `div.vb-editor-body { padding }` cannot
  * reach a control and still fails the census (verified, exit 1). Both classes already exist, so the
- * placement costs nothing. */
+ * placement costs nothing.
+ *
+ * AND IT IS NOT A `Stack pad`, for two reasons that both matter. The padding is SCOPED to `.vb-editor >`,
+ * and `.vb-editor` is a full-height frame chain rather than a gap between siblings; and this is the prose
+ * surface — a flex column would stop its headings' and paragraphs' margins collapsing, which is the rhythm
+ * markdown is read in. */
 .vb-editor-body { flex: 1; overflow-y: auto; }
 .vb-editor > .markdown { padding: var(--s-5) var(--s-6); }
 textarea.vb-editor-body { margin: var(--s-5) var(--s-6); resize: none; line-height: 1.5; }

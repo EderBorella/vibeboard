@@ -14,7 +14,9 @@
 }
 /* Refuse first, and it keeps `.halt .vb-btn`'s accent — the reflex click and the reflex Enter
    both have to land on "no". Allow sits beside it as the quiet one. */
-/* A `Stack gap={4}`; the step away from the sentence above it is what the class still says. */
+/* A `Stack gap={4}`; the step away from the sentence above it is what the class still says. It is a margin
+   between siblings, which is normally the parent's gap — but the parent is `.vb-modal-body`, whose 12px
+   gap is every modal's, so folding 4px in here would move all of them. */
 .signin-actions {
   margin-top: var(--s-2);
 }

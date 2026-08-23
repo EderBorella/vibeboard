@@ -1,4 +1,5 @@
 import { Button } from '../../atoms/Button';
+import { Stack } from '../../atoms/Stack';
 import { Text } from '../../atoms/Text';
 import type { InvalidSkill, Skill } from '../../lib/api';
 import type { Card } from '../../lib/shared';
@@ -20,13 +21,25 @@ interface Props {
 export function CardSkills({ card, skills, invalid, onRun }: Props) {
   const mine = skillsForCard(skills, card.board, card.columnSlug);
   return (
-    <aside className="card-skills" aria-label={`Skills for ${card.id}`}>
-      <h3 className="cs-head">Skills</h3>
+    // A LABELLED LANDMARK IS A `Stack` NOW, and that is the one thing that kept this class holding a
+    // column, a gap and a padding: `aria-label` is a live test contract (`Skills for E-042`) and the atom
+    // could not carry it. What is left is the rail's width, its left edge and its ground.
+    <Stack
+      as="aside"
+      label={`Skills for ${card.id}`}
+      direction="column"
+      gap={3}
+      pad={[5, 4]}
+      className="card-skills"
+    >
+      <Text as="h3" caps className="cs-head">
+        Skills
+      </Text>
       {mine.map((s) => (
         <Button
           size="sm"
           key={s.slug}
-          className="cs-action"
+          align="start"
           data-testid="cs-action"
           disabled={onRun === undefined}
           title={onRun ? s.description : `${s.description} — archived cards cannot be run`}
@@ -36,7 +49,7 @@ export function CardSkills({ card, skills, invalid, onRun }: Props) {
         </Button>
       ))}
       {mine.length === 0 && (
-        <Text role="hint" lead className="cs-empty">
+        <Text role="hint" lead size="micro" className="cs-empty">
           No skills for this column. Add one in Project Control → Skills.
         </Text>
       )}
@@ -45,6 +58,6 @@ export function CardSkills({ card, skills, invalid, onRun }: Props) {
           ⚠ {invalid.length} skill file{invalid.length === 1 ? '' : 's'} invalid
         </Text>
       )}
-    </aside>
+    </Stack>
   );
 }

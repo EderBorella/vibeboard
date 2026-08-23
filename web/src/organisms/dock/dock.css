@@ -1,9 +1,9 @@
 /* ---------- Utility dock (bottom of the work column) ---------- */
+/* A `Stack as="section" label="Utilities" direction="column" gap={0} edge="top"` on `.vb-fixed`. What is
+   left is the ground and the shrink floor: `min-height: 0` is part of the work column's frame chain — it
+   is what lets the dock's own scroller work rather than anything about the space between its two rows. */
 .dock {
-  flex: 0 0 auto;
-  display: flex; flex-direction: column;
   min-height: 0;
-  border-top: 1px solid var(--border);
   background: var(--panel);
 }
 /* THE STRIP AND ITS TABS ARE `Tabs` — see molecules/tabs.css. `.dock-strip` was a flex row with a gap and

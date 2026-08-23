@@ -175,7 +175,9 @@ function MoreRow({ depth, count }: { depth: number; count: number }) {
     // The indent is a layout and stays on the row that carries it; the face is the atom's. A `style`
     // prop on `Text` would be the hole every other atom refuses — it is where a padding comes back.
     <div className="explorer-more" style={indent(depth)}>
-      <Text role="hint">… {count} more, not shown</Text>
+      <Text role="hint" size="micro">
+        … {count} more, not shown
+      </Text>
     </div>
   );
 }

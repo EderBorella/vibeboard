@@ -79,8 +79,12 @@ export function TopBar({
   recentFailure,
 }: Props) {
   return (
-    <Stack as="header" align="baseline" wrap gap={5} className="topbar">
-      <span className="brand">VibeBoard</span>
+    <Stack as="header" align="baseline" wrap gap={5} pad={[4, 6]} edge="bottom" className="topbar">
+      {/* The face is the atom's — the display family, the `--t-lead` step, 700 and `--text` ink. The
+          0.22em tracking is not `caps`'s `--track` and is the brand's own, which is all the class says. */}
+      <Text family="display" size="lead" weight="bold" ink="strong" className="brand">
+        VibeBoard
+      </Text>
       {showProject && (
         <Text lead nowrap className="project-name">
           {projectName}

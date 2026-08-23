@@ -48,7 +48,7 @@ interface ShellProps {
 export function EditorLayout({ path, dirty, views, view, onView, actions, notice, children }: ShellProps) {
   return (
     <>
-      <Stack gap={4} className="vb-editor-head">
+      <Stack gap={4} pad={[4, 6]} edge="bottom" className="vb-editor-head">
         <Readout testId="editor-path">
           {path}
           {dirty ? ' •' : ''}

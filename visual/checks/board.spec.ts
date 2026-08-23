@@ -1225,8 +1225,13 @@ test('14. the auto-pilot bar reads as three groups', async ({ board, theme }) =>
     // version measured from the emergency stop, which is not the last thing in that group — the loop's state
     // chip and its sentence follow it — so it was measuring the distance ACROSS those, not the space after
     // them. It passed with the middle group's `push` deleted, on the chip's own width. Planted and caught.
+    // KEYED ON THE TEST HANDLE AND NOT ON `.ap-bar-end`, and the reason is that this check was the ONLY
+    // thing keeping that class alive. `.ap-bar-end` declares `margin-left: auto` plus `flex: none`, which
+    // is `.push` and `.vb-fixed` — two utilities that already exist — so the class carries no decision and
+    // exists solely to be selected here. A conformance check must not be the reason a style class survives:
+    // that is the check writing the stylesheet. `data-testid` is what a test is allowed to depend on.
     const left = Array.from(row.children)
-      .filter((c) => !c.classList.contains('ap-agent') && !c.classList.contains('ap-bar-end'))
+      .filter((c) => !['ap-agent', 'ap-bar-end'].includes(c.getAttribute('data-testid') ?? ''))
       .map((c) => c.getBoundingClientRect().right);
     return {
       content: {
@@ -1237,7 +1242,7 @@ test('14. the auto-pilot bar reads as three groups', async ({ board, theme }) =>
       transport: at('[data-testid="ap-transport"]'),
       kill: at('[data-testid="ap-kill"]'),
       agent: at('[data-testid="ap-agent"]'),
-      end: at('.ap-bar-end'),
+      end: at('[data-testid="ap-bar-end"]'),
     };
   });
 

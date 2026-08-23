@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import type { StackGap } from '../../atoms/Stack';
+import type { StackGap, StackPad } from '../../atoms/Stack';
 import { Stack } from '../../atoms/Stack';
 
 // LIST — a column of `Row`s with a gap. Six of the nineteen families were a `<ul>` and every one of them
@@ -57,6 +57,12 @@ interface Props {
   // and `.mp-list` and `.links-list` each wrote both by hand.
   fill?: boolean;
   scroll?: boolean;
+  // THE PADDING, FORWARDED RATHER THAN COPIED — and this is the change the refusal recorded in `shared.css`
+  // asked for by name. That comment declined to give `List` a `pad` because it would be "a fourth copy of
+  // `Stack`'s surface" and said the real answer was for `List` to COMPOSE `Stack` and inherit all of them.
+  // It composes `Stack` as of the previous phase, so there is nothing left to copy: this is the atom's own
+  // prop, its own type, handed straight through. `.mp-list` was a padding and nothing else.
+  pad?: StackPad;
   className?: string;
   // The accessible name, forwarded to `Stack`'s own `label`. Four list families are landmarks.
   label?: string;
@@ -69,7 +75,7 @@ interface Props {
 // growing `gap`, `fill` and `scroll` onto it was three more copies of options `Stack` already had. So the
 // component composes the atom and the class keeps ONE declaration plus the UA list reset. That is the
 // difference between a design system and a directory of components that look alike.
-export function List({ as = 'div', gap, fill, scroll, className, label, testId, children }: Props) {
+export function List({ as = 'div', gap, fill, scroll, pad, className, label, testId, children }: Props) {
   return (
     <Stack
       as={as}
@@ -79,6 +85,7 @@ export function List({ as = 'div', gap, fill, scroll, className, label, testId, 
       gap={gap ?? 1}
       fill={fill}
       scroll={scroll}
+      pad={pad}
       className={['vb-list', className].filter(Boolean).join(' ')}
       label={label}
       testId={testId}

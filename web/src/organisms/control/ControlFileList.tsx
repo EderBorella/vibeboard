@@ -78,9 +78,9 @@ export function ControlFileList({
             </Row>
           )}
           {g.files.length === 0 && g.key !== 'resources' && (
-            <Text role="hint" className="control-empty">
-              — none —
-            </Text>
+            <Stack pad={[0, 4]}>
+              <Text role="hint">— none —</Text>
+            </Stack>
           )}
           {g.files.map((f) =>
             renaming === f.path ? (

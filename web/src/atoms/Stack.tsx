@@ -12,6 +12,9 @@ import { forwardRef, type ReactNode, type Ref } from 'react';
 // atom being narrower than the DOM.
 
 export type StackGap = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
+// NAMED SO THAT `List` CAN FORWARD IT WITHOUT RESTATING IT. A component that copies the shape out by hand
+// is how the two drift, and `List` composes this atom precisely so it does not have to.
+export type StackPad = StackGap | [StackGap, StackGap] | [StackGap, StackGap, StackGap];
 export type StackAlign = 'center' | 'start' | 'baseline' | 'stretch';
 export type StackTag =
   | 'div'
@@ -45,7 +48,7 @@ interface Props {
   // tree's paddings already had, and `[top, inline, bottom]` is the three-value shorthand. The first cut
   // wrote `padding-block` for the pair, which sets BOTH block edges — so a `padding-top` on its own could
   // not be said at all, and that single gap kept six classes alive.
-  pad?: StackGap | [StackGap, StackGap] | [StackGap, StackGap, StackGap];
+  pad?: StackPad;
   // The single hairline that separates one row from the next. Four borders is a `Surface`.
   edge?: 'top' | 'bottom';
   // TAKE THE SPACE THE PARENT HAS, and shrink below your content when asked — `flex: 1` with both
@@ -58,6 +61,14 @@ interface Props {
   // rest — the exact fault check 10's first assertion exists to measure — and shadowed the real pane in the
   // harness. Two meanings, one attribute name, and only one of them is layout.
   fill?: boolean;
+  // THE HALF OF `fill` THAT IS NOT `flex: 1`, and the comment in `stack.css` saying this half "is not here"
+  // is withdrawn. It said `.vb-clip` covers it wherever the child is text, which is true and was the whole
+  // of the case; what it did not price is the box in the MIDDLE — a wrapper that holds a clipping child and
+  // must itself be allowed to shrink, or the clip has nothing to shrink inside and the row overflows.
+  // `.mp-pick-top` and `.mp-pick-bot` are that box, and `min-width: 0` was the only thing left in them that
+  // `Stack` could not say. `fill` is wrong for it: `flex: 1` on a column's child changes how the column
+  // divides its height, which is a different claim from "may shrink".
+  shrink?: boolean;
   // A pane that scrolls. Four classes were `overflow-y: auto` and nothing else.
   scroll?: boolean;
   as?: StackTag;
@@ -83,6 +94,7 @@ export const Stack = forwardRef<HTMLElement, Props>(function Stack(
     pad,
     edge,
     fill,
+    shrink,
     scroll,
     as: Tag = 'div',
     label,
@@ -119,6 +131,7 @@ export const Stack = forwardRef<HTMLElement, Props>(function Stack(
       data-pad-x={padX === undefined ? undefined : String(padX)}
       data-edge={edge}
       data-grow={fill ? '' : undefined}
+      data-shrink={shrink ? '' : undefined}
       data-scroll={scroll ? '' : undefined}
       aria-label={label}
       title={title}

@@ -63,6 +63,11 @@ interface Props {
   // names for "this line is the link". `.ap-chip` was `text-transform: lowercase` and nothing else.
   underline?: boolean;
   lower?: boolean;
+  // BREAK ANYWHERE, for a string with no spaces to break AT. `.signin-row-label` was a step and this, and
+  // the step became an option two phases ago — so this one declaration was the whole of what kept the name
+  // alive across two surfaces. It is `break-all` and not `break-word`: what wears it is a filesystem path
+  // and a device label, which have no word boundaries to prefer.
+  break?: boolean;
   title?: string;
   // Layout only — where the line sits, never how it is set.
   className?: string;
@@ -89,6 +94,7 @@ export function Text({
   nowrap,
   underline,
   lower,
+  break: breakAll,
   title,
   className,
   testId,
@@ -115,6 +121,7 @@ export function Text({
       data-nowrap={nowrap ? '' : undefined}
       data-underline={underline ? '' : undefined}
       data-lower={lower ? '' : undefined}
+      data-break={breakAll ? '' : undefined}
       data-testid={testId}
     >
       {children}

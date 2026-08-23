@@ -125,3 +125,7 @@
    else. Three names, two ideas, zero classes. */
 .vb-text[data-underline] { text-decoration: underline; }
 .vb-text[data-lower] { text-transform: lowercase; }
+/* `break-all` and not `break-word`: `.signin-row-label` wore this on a filesystem path and a device label,
+   neither of which has a word boundary worth preferring. That class was this plus `--t-body`, and the step
+   became an option in Phase 8 — so one declaration was all that held a name alive on two surfaces. */
+.vb-text[data-break] { word-break: break-all; }

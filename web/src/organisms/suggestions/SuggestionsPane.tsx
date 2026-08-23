@@ -86,8 +86,10 @@ export function SuggestionsPane({ suggestions, failed, onRefresh, onApply }: Pro
   if (failed) {
     return (
       <Stack direction="column" gap={4} pad={4} className="suggestions-pane">
-        <Stack direction="column" align="start" gap={4} className="diary-empty">
-          <p>Could not read what agents filed.</p>
+        <Stack direction="column" align="start" gap={4} pad={[7, 0]}>
+          <Text as="p" size="lead">
+            Could not read what agents filed.
+          </Text>
           <Button size="md" onClick={onRefresh}>
             Try again
           </Button>
@@ -101,8 +103,10 @@ export function SuggestionsPane({ suggestions, failed, onRefresh, onApply }: Pro
       {picked === undefined ? (
         // Said out loud: an empty pane reads as a broken one, and this is the surface a person opens
         // precisely to find out whether anything is waiting.
-        <Stack direction="column" align="start" gap={4} className="diary-empty">
-          <p>Nothing has been filed in this project yet.</p>
+        <Stack direction="column" align="start" gap={4} pad={[7, 0]}>
+          <Text as="p" size="lead">
+            Nothing has been filed in this project yet.
+          </Text>
         </Stack>
       ) : (
         <>

@@ -134,8 +134,16 @@
    `data-grow` AND NOT `data-fill`: that name is already a semantic flag the dock and the browser harness
    read (`.dock-body:has([data-fill])`, and `audit.ts` resolving the open pane by it). See `Stack.tsx`.
    NOT A VIEWPORT FRAME. `100vh` and `100dvh` stay on `.app-shell`: an app-height chain is one decision
-   made once, and an atom that could say it would invite the second one. */
+   made once, and an atom that could say it would invite the second one.
+   THE FILL HALF IS HERE AFTER ALL, as `data-shrink`, and the paragraph above claiming it was not is
+   withdrawn. Its case was that `.vb-clip` already carries `flex: 1; min-width: 0` wherever the child is
+   text — true, and it covers the LEAF. It does not cover the box in the middle: a wrapper holding a
+   clipping child must itself be allowed to shrink, or the child has nothing to shrink inside and the row
+   overflows instead of ellipsising. `.mp-pick-top` and `.mp-pick-bot` were that box, and after their
+   `display`, `align-items` and `gap` moved onto this atom, `min-width: 0` was the entire remainder — two
+   classes alive on one declaration each, which is the exception this file exists to remove. */
 .vb-stack[data-grow] { flex: 1; min-width: 0; min-height: 0; }
+.vb-stack[data-shrink] { min-width: 0; min-height: 0; }
 .vb-stack[data-scroll] { overflow-y: auto; }
 
 /* ONE CHILD OPTING OUT OF ITS PARENT'S ALIGNMENT, and the parent's `align` cannot say it: five classes

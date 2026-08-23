@@ -175,16 +175,20 @@ function FiledColumn({ bump }: { bump: number }) {
         </Button>
       </Stack>
       {failed ? (
-        <Stack direction="column" align="start" gap={4} className="diary-empty">
-          <p>Could not read what agents filed.</p>
+        <Stack direction="column" align="start" gap={4} pad={[7, 0]}>
+          <Text as="p" size="lead">
+            Could not read what agents filed.
+          </Text>
           <Button size="md" onClick={refresh}>
             Try again
           </Button>
         </Stack>
       ) : suggestions.length === 0 ? (
         // Said out loud, like the diary's own empty state: an empty column reads as a broken one.
-        <Stack direction="column" align="start" gap={4} className="diary-empty">
-          <p>Nothing has been filed in this project yet.</p>
+        <Stack direction="column" align="start" gap={4} pad={[7, 0]}>
+          <Text as="p" size="lead">
+            Nothing has been filed in this project yet.
+          </Text>
         </Stack>
       ) : (
         <FiledList suggestions={suggestions} />
@@ -261,8 +265,10 @@ export function DiaryView({ bump }: { bump: number }) {
         <div aria-live="assertive">{error && <Text role="error">{error}</Text>}</div>
 
         {failed ? (
-          <Stack direction="column" align="start" gap={4} className="diary-empty">
-            <p>Could not read this project’s log.</p>
+          <Stack direction="column" align="start" gap={4} pad={[7, 0]}>
+            <Text as="p" size="lead">
+              Could not read this project’s log.
+            </Text>
             <Button size="md" onClick={refresh}>
               Try again
             </Button>
@@ -270,8 +276,10 @@ export function DiaryView({ bump }: { bump: number }) {
         ) : entries.length === 0 ? (
           // Said out loud. An empty screen would read as a broken one, and this is the file a reader comes
           // to precisely when they want to know what has been going on.
-          <Stack direction="column" align="start" gap={4} className="diary-empty">
-            <p>Nothing has happened in this project yet.</p>
+          <Stack direction="column" align="start" gap={4} pad={[7, 0]}>
+            <Text as="p" size="lead">
+              Nothing has happened in this project yet.
+            </Text>
           </Stack>
         ) : (
           <DiaryList entries={entries} />

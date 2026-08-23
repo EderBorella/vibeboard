@@ -66,7 +66,9 @@ export function DiagnosticsPanel() {
       {settings && (
         <Row className="signin-row">
           <div>
-            <div className="signin-row-label">Log files</div>
+            <Text as="div" size="body" break>
+              Log files
+            </Text>
             <Readout>
               {settings.autopilotLog ?? 'auto-pilot: not written on this install'}
               <br />

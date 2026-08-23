@@ -223,11 +223,9 @@ describe('the empty-state lines', () => {
   const MERGED = [
     'vb-text vb-text-quiet vb-text-lead',
     'vb-text vb-text-quiet',
-    'mp-empty vb-text vb-text-quiet vb-text-lead',
     // NEITHER `.cs-empty` NOR `.cards-gone` IS HERE ANY MORE, and two groups each removed one of them in
     // parallel — which is how the merge surfaced that the row for a DELETED class is not a weaker
     // assertion, it is a vacuous one: the class contributes nothing, so the row passes on the atom alone.
-    'control-empty vb-text vb-text-quiet',
     'explorer-more vb-text vb-text-quiet',
   ];
 
@@ -262,18 +260,24 @@ describe('the empty-state lines', () => {
     expect(box(label('cards-gone', 'p')).padding).toBeUndefined();
   });
 
+  // `.mp-empty` AND `.control-empty` DIED THE SAME WAY AND FOR THE SAME REASON `.cards-gone` NEEDED ITS
+  // OWN ROW: both declared a PADDING and never an ink, so the `color` negative above is blind to them —
+  // it would pass with the rule still in the sheet. A padding on a line of prose is a box the line does
+  // not own, and the box is a `Stack pad` around it now.
+  it.each([['mp-empty'], ['control-empty']])('.%s is gone, and it took a padding with it', (cls) => {
+    expect(box(label(cls, 'p')).padding).toBeUndefined();
+  });
+
   // AND `.cs-empty` THE SAME WAY, for the margin it took: a per-child `margin-top` on one line of a column
   // whose gap now says it for every line.
   it('.cs-empty is gone, and it took a margin rather than an ink with it', () => {
     expect(box(label('cs-empty', 'p'))['margin-top']).toBeUndefined();
   });
 
-  // THE FOUR THAT SURVIVE CARRY ONLY WHAT THE SURFACE CAN DECIDE — an inset or a size — which is the
+  // THE ONE THAT STILL SURVIVES CARRIES ONLY WHAT THE SURFACE CAN DECIDE — an inset or a size — which is the
   // same result Phase 3 measured: 19 of its 27 migrated classes still had a real declaration left. A
   // survivor that still named an ink or a font-style would mean the merge had not actually happened.
   it.each([
-    ['mp-empty', 'padding'],
-    ['control-empty', 'padding'],
     // `.explorer-more` NO LONGER KEEPS A STEP, and that is the wave that gave `Text` a `size`: it was one
     // `--t-micro`, which is `size="micro"` now, and it was DEAD where it was — the class is on the wrapper
     // and the words are in a `<Text>` inside it, so `.vb-text`'s `--t-small` won. What it still says is

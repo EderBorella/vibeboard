@@ -270,9 +270,9 @@ export function FileTree(props: Props) {
 
       {error && <Text role="error">{error}</Text>}
       {rows.length === 0 && (
-        <Text role="hint" className="control-empty">
-          {busy ? 'Reading…' : '— empty —'}
-        </Text>
+        <Stack pad={[0, 4]}>
+          <Text role="hint">{busy ? 'Reading…' : '— empty —'}</Text>
+        </Stack>
       )}
 
       {rows.map((row) => {

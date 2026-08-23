@@ -72,7 +72,7 @@ export function CardReports({ card, runs, account, onOpen, onCancel, onForgiven 
           >
             {/* A resolved run keeps its chip — it did end needing you — but says it was answered,
                 so the history reads as history rather than a row still asking. */}
-            <Chip pill state={r.status} className="report-chip vb-readout vb-fixed" testId="report-chip">
+            <Chip pill caps state={r.status} className="vb-readout vb-fixed" testId="report-chip">
               {r.resolved ? `${LABELS[r.status]} · dealt with` : LABELS[r.status]}
             </Chip>
             {/* `ink="strong"` because the class named no ink and inherited the row's; `.report-skill`

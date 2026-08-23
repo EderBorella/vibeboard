@@ -52,6 +52,13 @@ interface Props {
   as?: ChipTag;
   // A row in design/state-tones.ts. See above.
   state?: StateName;
+  // THE CAPS FACE, AND IT HAS TO BE HERE BECAUSE A CHIP CANNOT REACH `Text`'S. `shared.css` recorded that
+  // exactly: "the caps stay here rather than moving to `Text`: this is a `Chip`, and the caps face is an
+  // option on the text atom that a chip cannot reach." Nesting a `<Text caps size="inherit">` inside would
+  // work for the transform and bring `--font-display` with it, which is a face change nobody asked for on
+  // a chip whose whole point is a machine-set status word. So the chip says the two declarations itself —
+  // as an attribute, which costs no class name. `.report-chip` was these two and nothing else.
+  caps?: boolean;
   title?: string;
   // Layout, and a surface's own non-geometry treatment (mono, uppercase, letter-spacing).
   className?: string;
@@ -100,6 +107,7 @@ export function Chip({
   fill,
   as = 'span',
   state,
+  caps,
   title,
   className,
   testId,
@@ -128,6 +136,7 @@ export function Chip({
     <Tag
       className={classes}
       data-state={state}
+      data-caps={caps ? '' : undefined}
       data-testid={testId}
       title={title}
       onClick={onClick}

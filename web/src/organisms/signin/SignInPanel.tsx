@@ -68,12 +68,12 @@ export function SignInPanel({ confirm }: Props) {
       {mine && (
         <Row className="signin-row">
           <div>
-            <div className="signin-row-label">
+            <Text as="div" size="body" break>
               {mine.label}{' '}
               <Chip pill tone="neutral" className="signin-this">
                 this browser
               </Chip>
-            </div>
+            </Text>
             <Readout>
               {mine.address} · signed in {mine.created.slice(0, 10)} · last seen {mine.lastSeen}
             </Readout>
@@ -84,7 +84,9 @@ export function SignInPanel({ confirm }: Props) {
       {others.map((d) => (
         <Row className="signin-row" key={d.id}>
           <div>
-            <div className="signin-row-label">{d.label}</div>
+            <Text as="div" size="body" break>
+              {d.label}
+            </Text>
             <Readout>
               {d.address} · signed in {d.created.slice(0, 10)} · last seen {d.lastSeen}
             </Readout>

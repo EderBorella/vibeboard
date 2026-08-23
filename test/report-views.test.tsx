@@ -105,7 +105,7 @@ describe('CardReports', () => {
         onCancel={vi.fn()}
       />,
     );
-    expect([...document.querySelectorAll('.report-chip')].map((e) => e.textContent)).toEqual([
+    expect([...document.querySelectorAll('[data-testid="report-chip"]')].map((e) => e.textContent)).toEqual([
       'Needs you · dealt with',
       'Needs you',
     ]);
@@ -260,7 +260,7 @@ describe('CardReports', () => {
         onCancel={vi.fn()}
       />,
     );
-    expect([...document.querySelectorAll('.report-chip')].map((e) => e.textContent)).toEqual([
+    expect([...document.querySelectorAll('[data-testid="report-chip"]')].map((e) => e.textContent)).toEqual([
       'Interrupted',
       'Failed',
       'Done',

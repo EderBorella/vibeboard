@@ -107,7 +107,8 @@ export function ExecutionView({
                     <Chip
                       pill
                       state={record.status}
-                      className="report-chip vb-readout vb-fixed"
+                      caps
+                      className="vb-readout vb-fixed"
                       testId="report-chip"
                     >
                       {record.status}

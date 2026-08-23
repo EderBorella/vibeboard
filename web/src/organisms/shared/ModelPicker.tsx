@@ -137,7 +137,7 @@ export function ModelPicker({ models, value, defaultModel, onChange, disabled }:
             {filtered.length} of {models.length} models
           </Readout>
 
-          <List fill scroll className="mp-list">
+          <List fill scroll pad={[0, 4, 4]}>
             {filtered.map((m) => (
               // A `Row` with a star before the pick. `rail="accent"` is what `.mp-def`'s hand-written
               // `border-left` was; `interactive`/`active` are `.mp-item:hover` and `.mp-sel`.
@@ -162,31 +162,48 @@ export function ModelPicker({ models, value, defaultModel, onChange, disabled }:
                 }
               >
                 <Row as="button" variant="flat" stack data-testid="mp-pick" onClick={() => pick(m.id)}>
-                  <span className="mp-pick-top">
+                  {/* `.mp-pick-top` and `.mp-pick-bot` WERE A FLEX ROW EACH, and the only thing in them
+                      the atom could not say was `min-width: 0` — which is `shrink` now. The two
+                      `> .vb-readout` child rules go with them: the price does not shrink (`.vb-fixed`) and
+                      the model id takes the slack and ellipsises (`.vb-clip`), both already named. */}
+                  <Stack as="span" align="baseline" gap={4} shrink>
                     <span className="vb-clip">{m.name ?? m.id}</span>
                     {m.id === defaultModel && (
                       <Chip pill tone="accent" className="mp-def-tag">
                         default
                       </Chip>
                     )}
-                    <Readout>{fmtPrice(m)}</Readout>
-                  </span>
-                  <span className="mp-pick-bot">
-                    <Readout>{m.id}</Readout>
-                    <span className="mp-badges">
+                    <Readout className="vb-fixed">{fmtPrice(m)}</Readout>
+                  </Stack>
+                  <Stack as="span" gap={4} shrink>
+                    <Readout className="vb-clip">{m.id}</Readout>
+                    {/* `.mp-badges` was `flex: 0 0 auto`, a row with a gap, and `font-size: var(--t-small)`.
+                        The first is `.vb-fixed` and the second is the atom. THE THIRD WAS REDUNDANT, and it
+                        took the browser harness to establish that rather than reasoning: wrapping the three
+                        glyphs in `<Text>` to carry the step instead grew every pick row by 2.4px on all
+                        three themes — the atom's `line-height: 1.45` against the line box the row already
+                        set — and dropping the wrapper entirely drifted NOTHING. So the row's inherited step
+                        was already `--t-small` and the declaration had been saying it twice. Bare spans,
+                        which is what they were, and the class has nothing left. */}
+                    <Stack as="span" gap={2} className="vb-fixed">
                       {m.contextLength ? <Readout>{fmtCtx(m.contextLength)}</Readout> : null}
                       {m.caps?.toolCall && <span title="Tool use">🔧</span>}
                       {m.caps?.reasoning && <span title="Reasoning">🧠</span>}
                       {m.caps?.vision && <span title="Vision">👁</span>}
-                    </span>
-                  </span>
+                    </Stack>
+                  </Stack>
                 </Row>
               </Row>
             ))}
             {filtered.length === 0 && (
-              <Text role="hint" lead className="mp-empty">
-                No models match the current filters.
-              </Text>
+              // `.mp-empty` WAS A PADDING ON A LINE OF TEXT, and `Text` has no `pad` and is not getting
+              // one: a span is not a box, and giving the type atom a padding would make every face in the
+              // tree a potential layout decision. The box goes outside it, which is what composition means.
+              <Stack pad={[5, 4]}>
+                <Text role="hint" lead>
+                  No models match the current filters.
+                </Text>
+              </Stack>
             )}
           </List>
         </Modal>

@@ -32,6 +32,12 @@ button.vb-chip { cursor: pointer; }
 .vb-chip-pill { border-radius: var(--r-pill); }
 /* A count, not a state: a ground rather than an outline. See atoms/Chip.tsx for the four it replaces. */
 .vb-chip-fill { background: var(--panel-2); }
+/* THE CAPS FACE AS AN ATTRIBUTE, because a chip cannot reach `Text`'s. `.report-chip` was these two
+   declarations and nothing else, on three call sites across two surfaces, and `shared.css` recorded the
+   blocker precisely: nesting a `<Text caps>` would also bring `--font-display`, which is a face change on a
+   machine-set status word nobody asked for. Two declarations, zero class names. NOT the same face as
+   `.vb-text-caps` for that reason — the transform and the tracking without the display family. */
+.vb-chip[data-caps] { text-transform: uppercase; letter-spacing: var(--track); }
 /* INK AND EDGE, ONCE, for a chip that has a tone by either route — a literal `tone` prop or a `state`
    resolved through the table. Five rules became one: the five differed only in which token they named,
    which is exactly the decision that does not belong on a surface.

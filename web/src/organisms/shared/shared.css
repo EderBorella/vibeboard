@@ -36,7 +36,9 @@
    answer is for `List` to COMPOSE `Stack` and inherit all of them, not to grow them one at a time. That
    touches nine call sites and two equal-specificity flex rules, so it is its own change. This padding is
    what it costs until then. */
-.mp-list { padding: 0 var(--s-4) var(--s-4); }
+/* `.mp-list` IS GONE AND THE PARAGRAPH ABOVE IS SPENT. It asked for `List` to COMPOSE `Stack` and inherit
+   `pad` rather than grow a fourth copy of it; `List` composes `Stack` as of the previous phase, so the
+   padding is `List pad={[0, 4, 4]}` — the atom's own prop, forwarded, no new declaration anywhere. */
 /* `.mp-item`, `.mp-sel`, `.mp-def`, `.mp-pick` and `.mp-name` ARE GONE — five classes into a `Row`:
    the arrangement, the hover ground, the selected state, the default's accent rail and the cell that
    takes the slack. `.mp-pick`'s `color: var(--text)` went with them, and its removal is a fix rather
@@ -53,13 +55,18 @@
 .mp-def-tag {
   flex: 0 0 auto; text-transform: uppercase; letter-spacing: var(--track); border-color: var(--accent);
 }
-.mp-pick-top { display: flex; align-items: baseline; gap: var(--s-4); min-width: 0; }
-/* The price is a `Readout`; the row decides it does not shrink, and that the model id takes the slack. */
-.mp-pick-top > .vb-readout { flex: 0 0 auto; }
-.mp-pick-bot { display: flex; align-items: center; gap: var(--s-4); min-width: 0; }
-.mp-pick-bot > .vb-readout { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.mp-badges { flex: 0 0 auto; display: flex; align-items: center; gap: var(--s-2); font-size: var(--t-small); }
-.mp-empty { padding: var(--s-5) var(--s-4); }
+/* `.mp-pick-top`, `.mp-pick-bot` AND `.mp-badges` ARE GONE, AND SO ARE THEIR TWO CHILD RULES. All three
+   were a flex row with a gap; what kept them alive after the atom took that was one declaration each —
+   `min-width: 0` twice, which is `Stack shrink` now, and `flex: 0 0 auto` once, which is `.vb-fixed`. The
+   two `> .vb-readout` rules were the two shares of the row and are named already: the price does not
+   shrink (`.vb-fixed`) and the model id takes the slack and ellipsises (`.vb-clip`). `.mp-badges`'s
+   `font-size: var(--t-small)` WAS SAYING WHAT THE ROW ALREADY SAID, which the browser harness established
+   and reasoning did not: routing the three capability glyphs through a `<Text>` to keep the step grew every
+   pick row 2.4px on all three themes — the type atom's `line-height: 1.45` over the row's own line box —
+   and removing the declaration outright drifted nothing at all. The glyphs stay bare spans.
+   `.mp-empty` IS GONE TOO, and its residue is the one shape `Text` will not take: a padding. A span is
+   not a box, and giving the type atom a `pad` would make every face in the tree a possible layout
+   decision — so the box goes OUTSIDE the line, as a `Stack pad={[5, 4]}`. */
 
 /* ---------- THIRTEEN SHAPES MORE THAN ONE FEATURE WEARS ----------
  * THE LAYER GATE'S WHOLE REMAINING BACKLOG WAS THIS, and the remedy is the gate's own words: "move it to
@@ -104,13 +111,20 @@
    WHAT CHANGES, said rather than smoothed over: `caps` carries `--font-display` as of this phase and this
    class did not, so the three markers are drawn in the eyebrow face now. That is Phase 8's caps ruling
    applied, not a decision taken here. */
-.control-empty { padding: 0 var(--s-4); }
+/* `.control-empty` IS GONE — a padding on a line of text, at two call sites, and `Stack pad={[0, 4]}`
+   around the line says it without a name. See `.mp-empty` above for why the box goes outside the `Text`
+   rather than the atom growing a `pad`. */
 /* AN EMPTY COLUMN, in the Project Log and in the dock's Suggestions pane. Not `.empty`: that one is
    `margin: auto` centred furniture, and this is the first thing in a column that has an action under it.
    `Stack direction="column" align="start" gap={4}` is the arrangement; the ink, the step and the space it
    sits in are what the surface still decides. `align="start"` and not the column default: the action under
    the sentence is as wide as its words, and a stretched column made it the width of the pane. */
-.diary-empty { color: var(--muted); font-size: var(--t-lead); padding: var(--s-7) 0; }
+/* `.diary-empty` IS GONE, and it is the clearest case in this sheet: all six call sites ALREADY rendered a
+   `<Stack direction="column" align="start" gap={4}>` wearing it, so the arrangement was the atom's and the
+   class held three declarations that each have a spelling now. `padding: var(--s-7) 0` is `pad={[7, 0]}`;
+   `--muted` is `Text`'s default ink; `--t-lead` is `size="lead"`. The six bare `<p>`s inside are `<Text
+   as="p" size="lead">` — which also drops the UA paragraph margin they were all carrying unasked, the
+   exact residue the type atom's `margin: 0` exists to remove. */
 /* WHAT AN AGENT FILED, read in the Project Log's right-hand column and in the Suggestions pane. The body
    line beside this was `.filed-text` and is DELETED: `font-size: var(--t-body); line-height: 1.5;
    color: var(--muted)` is `Text lead` declaration for declaration, which is what both call sites render
@@ -146,17 +160,27 @@
   border-bottom: 1px solid var(--border);
 }
 .signin-row:last-of-type { border-bottom: none; }
-.signin-row-label { font-size: var(--t-body); word-break: break-all; }
+/* `.signin-row-label` IS GONE: a step and a break, and the step became an option two phases ago, so one
+   declaration was holding a name alive across two surfaces. `word-break` is a free attribute on `Text` for
+   the reason every option in that atom is one — see atoms/text.css. */
 /* HOW A RUN ENDED, on a card's report row (runs) and on the execution page's run list. `report-stop` is a
    `ghost` Button with the one colour the surface owns; the box, the quiet muted ink and the dashed border
    are the variant's. */
 /* `flex: 0 0 auto` IS `.vb-fixed` at all three call sites — stack.css names this class among the six it
    was written for. The caps stay here rather than moving to `Text`: this is a `Chip`, and the caps face is
    an option on the text atom that a chip cannot reach. */
-.report-chip { text-transform: uppercase; letter-spacing: var(--track); }
-/* A run that has been dealt with is history: still readable, no longer shouting. Dimmed rather than
-   greyed — repainting the chip muted threw away the one thing it encodes, which is HOW the run ended. */
-.vb-row.resolved .report-chip { opacity: 0.6; }
+/* `.report-chip` IS GONE, AND THE REASON RECORDED ABOVE FOR KEEPING IT IS DISCHARGED RATHER THAN WRONG.
+   It said the caps could not move to `Text` because this is a `Chip` and a chip cannot reach the text
+   atom's face — true, and still true. What it did not consider is that the chip could say the two
+   declarations ITSELF, as an attribute, which costs no class name: `Chip caps`. Nesting a `<Text caps>`
+   would have been the wrong fix for a second reason — `.vb-text-caps` carries `--font-display` as of Phase
+   8, and a display face on a machine-set status word is a change nobody asked for. See atoms/chip.css.
+   A run that has been dealt with is history: still readable, no longer shouting. Dimmed rather than
+   greyed — repainting the chip muted threw away the one thing it encodes, which is HOW the run ended.
+   KEYED ON `.vb-chip` NOW, because the name it used to key on is gone. That is a widening from one chip to
+   any chip in a resolved row, and it is safe by inspection rather than by hope: all three call sites render
+   exactly one chip inside the row, which is the status word this rule was always about. */
+.vb-row.resolved .vb-chip { opacity: 0.6; }
 /* `.vb-fixed` for the shrink; the danger hover is the one thing the surface owns. */
 .report-stop:hover:not(:disabled) { color: var(--danger); border-color: var(--danger); }
 /* WHAT A FORGIVE CLEARED, reported by the card button (runs) and by the project one (autopilot). Its own

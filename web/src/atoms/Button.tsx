@@ -36,6 +36,12 @@ export type ButtonSize = 'sm' | 'md';
 interface Props extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'children' | 'className'> {
   variant?: ButtonVariant;
   size?: ButtonSize;
+  // A LEADING LABEL, AND IT IS THREE CLASSES OTHERWISE. `.conn-status`, `.cs-action` and `.option-btn`
+  // each declared `text-align: left` and NOTHING else: all three are full-width buttons in a flex column
+  // — a skill to run, a next step to pick, a connection to inspect — where a centred label reads as a
+  // dialog action rather than as a row you choose. That is one decision written three times, and spelled
+  // as an attribute it costs no class.
+  align?: 'start';
   // Layout only. See above.
   className?: string;
   children?: ReactNode;
@@ -51,7 +57,7 @@ interface Props extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'children'
 // several of these sit in the settings and gate forms — one of them submitting on click would be a
 // behaviour change nothing in this phase asked for. Overridable, because the gate form has a real
 // submit.
-export function Button({ variant = 'default', size = 'sm', className, type, ...rest }: Props) {
+export function Button({ variant = 'default', size = 'sm', align, className, type, ...rest }: Props) {
   const classes = ['vb-btn', `vb-btn-${variant}`, `vb-btn-${size}`, className].filter(Boolean);
-  return <button type={type ?? 'button'} className={classes.join(' ')} {...rest} />;
+  return <button type={type ?? 'button'} className={classes.join(' ')} data-align={align} {...rest} />;
 }

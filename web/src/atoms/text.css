@@ -119,3 +119,9 @@
 .vb-clip {
   flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left;
 }
+
+/* Two more one-declaration classes, spelled as attributes. `.cv-link-edit` and `.tag-filter-clear` were
+   `text-decoration: underline` and nothing else; `.ap-chip` was `text-transform: lowercase` and nothing
+   else. Three names, two ideas, zero classes. */
+.vb-text[data-underline] { text-decoration: underline; }
+.vb-text[data-lower] { text-transform: lowercase; }

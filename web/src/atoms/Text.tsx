@@ -59,6 +59,10 @@ interface Props {
   // Five classes were `white-space: nowrap` and nothing else. Distinct from `.vb-clip`, which also takes
   // the space and ellipsises — these five are short labels that must stay on one line at their own width.
   nowrap?: boolean;
+  // `.cv-link-edit` and `.tag-filter-clear` were `text-decoration: underline` and nothing else — two
+  // names for "this line is the link". `.ap-chip` was `text-transform: lowercase` and nothing else.
+  underline?: boolean;
+  lower?: boolean;
   title?: string;
   // Layout only — where the line sits, never how it is set.
   className?: string;
@@ -83,6 +87,8 @@ export function Text({
   as: Tag = 'span',
   ink,
   nowrap,
+  underline,
+  lower,
   title,
   className,
   testId,
@@ -107,6 +113,8 @@ export function Text({
       data-family={family}
       data-ink={ink}
       data-nowrap={nowrap ? '' : undefined}
+      data-underline={underline ? '' : undefined}
+      data-lower={lower ? '' : undefined}
       data-testid={testId}
     >
       {children}

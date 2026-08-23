@@ -65,3 +65,10 @@
    red, and `.chat-del` goes to `--accent-2`. A colour is the caller's; the box is not. */
 .vb-btn-bare { background: none; color: var(--muted); }
 .vb-btn-bare:hover:not(:disabled) { color: var(--accent); }
+
+/* A LEADING LABEL. `.conn-status`, `.cs-action` and `.option-btn` each declared `text-align: left` and
+   nothing else — three full-width buttons in a flex column where a centred label reads as a dialog action
+   rather than as a row you pick. `justify-content` is the one that actually moves a flex child; the
+   `text-align` those three wrote only ever mattered to a second wrapped line. Both, so the intent holds
+   whether the label wraps or not. */
+.vb-btn[data-align='start'] { justify-content: flex-start; text-align: left; }

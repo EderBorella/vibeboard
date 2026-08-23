@@ -12,7 +12,9 @@
 /* Each action says what it does to the running session. A bare verb on a button that restarts a
    server somebody has work in flight on is not enough to decide with — the hint IS the decision, so it
    is a `vb-hint` like every other. */
-/* `> .vb-btn` since the class became a variant. Still a LAYOUT rule and still the caller's: a button in
-   a flex column stretches to the column's width otherwise, which is what made `.diary-refresh` 1240px. */
-.sandbox-action > .vb-btn { align-self: flex-start; }
+/* `.sandbox-action` IS GONE, AND WITH IT THIS SHEET'S LAST RULE. It was `align-self: flex-start` on the
+   button inside it and nothing else — a button in a flex column stretches to the column's width otherwise,
+   which is what made `.diary-refresh` 1240px — so the three call sites wear `.vb-self-center`'s sibling
+   `.vb-self-start` directly, and a class whose whole job was to be a parent selector for one declaration
+   is not a name worth having. See `atoms/stack.css`. */
 

@@ -14,12 +14,10 @@
 }
 /* Refuse first, and it keeps `.halt .vb-btn`'s accent — the reflex click and the reflex Enter
    both have to land on "no". Allow sits beside it as the quiet one. */
-/* A `Stack gap={4}`; the step away from the sentence above it is what the class still says. It is a margin
-   between siblings, which is normally the parent's gap — but the parent is `.vb-modal-body`, whose 12px
-   gap is every modal's, so folding 4px in here would move all of them. */
-.signin-actions {
-  margin-top: var(--s-2);
-}
+/* `.signin-actions` IS GONE — a `Stack gap={4}` and nothing else now. The 4px it added was a margin
+   between siblings, which IS the parent's gap: `.vb-modal-body`'s 12px is every modal's and folding into
+   it would have moved all of them, so the 4px is simply given up and the button row sits 12px under the
+   sentence above it like every other child of a modal body. 16px → 12px. */
 /* `Chip pill neutral`. The lowercase stays: the label beside it is whatever the browser called itself,
    and this word is deliberately not shouting next to it. */
 .signin-this {

@@ -4,7 +4,13 @@
    here now: the inline rename (Project Control's) and the error line (the editor template's). Both were
    the same fault — a class defined in two scoped directories has no owner, and `npm run check:layers`
    blocks on it as of this phase. */
-.explorer-list { width: 320px; }
+/* 320px → 260px, WHICH IS `.control-list`'S, and the two were two answers to one question: how wide the
+   file list is in the two-column `.control` pane that Project Control and the Explorer both wear. There
+   is no width step in the token set to snap to — `check:scale` reads space, type, tracking and offsets,
+   never a width — so the shared answer is the app's own other one, and a path that ran deep loses 60px
+   of run before it truncates. The class cannot go: three rules below name it as their parent, and
+   wearing `.control-list` instead is a cross-surface read `check:layers` blocks. */
+.explorer-list { width: 260px; }
 .explorer-list .vb-ctl { width: 100%; border-color: var(--accent); }
 .explorer-list .vb-ctl:focus { box-shadow: var(--glow); }
 .explorer-list > .vb-text-error { padding: var(--s-4) var(--s-6); }
@@ -23,8 +29,13 @@
 /* Fixed width so names line up whether or not a row has a twisty. */
 /* The size is `.vb-twist`'s and so is the `flex: none`; the muted ink is `Text`'s default. The box widens
    with the glyph: at 0.7rem an 11px one fitted and a 15px one did not, and the overflow pushed every name
-   in the tree half a character to the right. */
-.explorer-twist { width: 0.9rem; }
+   in the tree half a character to the right.
+   14.4px → 15px, AND IT IS THE STEP THE GLYPH IS SET AT: `0.9rem` was a hand-written length beside
+   `.vb-twist`'s `font-size: var(--t-lead)`, chosen to clear that glyph and then stated in its own units,
+   so the two could drift. A box sized to a glyph is the type step, said once. The class stays because a
+   width is what four of the six twists in the tree do NOT need: this one reserves the column so a file
+   row's name lines up with a folder row's, and neither `Stack` nor `Text` carries a width. */
+.explorer-twist { width: var(--t-lead); }
 /* `.explorer-icon` IS GONE — a `Text ink="inherit"` (its step is the atom's default, and the ink is the
    row's, which changes on hover) on `.vb-fixed`. */
 .explorer-item > .vb-readout { flex-shrink: 0; }

@@ -44,8 +44,10 @@
 .resources-table { flex: 1; overflow-y: auto; }
 /* `.resource-row` IS GONE — a `Row`, and its gap moved from `--s-3` to `--s-4` with the other six. */
 /* `.resource-row input` was `.vb-ctl` DECLARATION FOR DECLARATION, focus rule included, and it died
-   in Phase 9. Only the three widths are the row's own. */
-.res-title { flex: 1; } .res-url { flex: 1.4; } .res-note { flex: 1.2; }
+   in Phase 9. `.res-title`, `.res-url` and `.res-note` ARE GONE TOO: 1, 1.4 and 1.2 were three shares
+   nobody chose — no phase or report records the decision — and all three are `.vb-row-main`, the shared
+   name for "this cell takes the slack", so the row divides evenly: 27.8/38.9/33.3% of the row's free
+   space becomes a third each, and every cell also gains the `min-width: 0` a bare `flex` does not. */
 .res-del:hover:not(:disabled) { color: var(--danger); }
 
 

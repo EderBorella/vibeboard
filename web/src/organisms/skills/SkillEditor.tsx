@@ -63,7 +63,7 @@ export function SkillEditor({ skill, config, busy, onSave }: Props) {
   };
 
   return (
-    <Stack direction="column" gap={4} pad={[5, 6]} className="skill-editor">
+    <Stack direction="column" gap={4} pad={[5, 6]} scroll className="skill-editor">
       <Field layout="rail" label="Name" className="vb-row">
         <Control value={name} onChange={(e) => touch(setName)(e.target.value)} />
       </Field>

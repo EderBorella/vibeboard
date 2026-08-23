@@ -100,8 +100,8 @@ export function SandboxPanel({ state, backend, onChanged }: Props) {
           overwrites the pid file, while the UI reports success and the warning above still stands.
           Take-over is the action that actually resolves that state. */}
       {opencode && state.backend === 'managed' && (
-        <div className="vb-field sandbox-action">
-          <Button size="md" disabled={busy !== null} onClick={() => act('restart')}>
+        <div className="vb-field">
+          <Button className="vb-self-start" size="md" disabled={busy !== null} onClick={() => act('restart')}>
             {busy === 'restart' ? 'Restarting…' : 'Restart server'}
           </Button>
           <Text role="hint">
@@ -112,8 +112,13 @@ export function SandboxPanel({ state, backend, onChanged }: Props) {
       )}
 
       {opencode && state.backend === 'attached' && (
-        <div className="vb-field sandbox-action">
-          <Button size="md" disabled={busy !== null} onClick={() => act('takeover')}>
+        <div className="vb-field">
+          <Button
+            className="vb-self-start"
+            size="md"
+            disabled={busy !== null}
+            onClick={() => act('takeover')}
+          >
             {busy === 'takeover' ? 'Taking over…' : 'Take over with a managed server'}
           </Button>
           <Text role="hint">
@@ -128,8 +133,8 @@ export function SandboxPanel({ state, backend, onChanged }: Props) {
           it. It is here because `ensure` ADOPTS a healthy box rather than remaking it, so a box that has
           drifted — a credential file replaced on the host by rename, leaving the mount on a dead inode —
           survives every restart of VibeBoard and there was no other way to be rid of it. */}
-      <div className="vb-field sandbox-action">
-        <Button size="md" disabled={busy !== null} onClick={() => void rebuild()}>
+      <div className="vb-field">
+        <Button className="vb-self-start" size="md" disabled={busy !== null} onClick={() => void rebuild()}>
           {busy === 'rebuild' ? 'Throwing away…' : 'Rebuild the agent boxes'}
         </Button>
         <Text role="hint">

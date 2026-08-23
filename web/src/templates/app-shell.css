@@ -39,15 +39,16 @@
 .gate { flex: 1; display: flex; justify-content: center; padding: var(--s-7) var(--s-6); overflow: auto; }
 /* THE GROUND, THE EDGE AND THE CORNER ARE `Surface variant="raised"` NOW, and they were a hand-rolled copy
    of it: `--panel`, `1px solid var(--border)`, `--r-lg` — the atom's three declarations, written again.
-   Both call sites render a `<Surface>`, so what is left here is the 520px measure and the inset, which are
-   this card's own. It was one of only two classes in the tree still drawing a box the design system draws. */
-.gate-card { width: 100%; max-width: 520px; padding: var(--s-7); }
-/* A `Text as="p"`, and the tag is what unblocked it: the step and the muted ink were always the atom's
-   default, but `Text` rendered a `<span>` and a vertical margin does not apply to an inline box — so this
-   class could not be reduced at all until `as` existed. The margin is what is left, and it stays: it
-   separates two siblings, which is a `Stack gap`, but `.gate-card` is a 520px drawn box in block flow
-   whose other children are spaced by their own heading margins. */
-.gate-preview { margin-top: var(--s-5); }
+   Both call sites render a `<Surface>`, so what is left here is the measure, the inset and the gap.
+   520px → `var(--measure)`, WHICH IS THE FOURTH ANSWER JOINING THE OTHER THREE: the diary's column and
+   its composer said 68ch, the auto-pilot's help modal 44rem, and this card 520px — about 62ch — for one
+   decision, how wide a paragraph may get. The card grows by roughly 50px at the body step.
+   AND THE GAP IS THE COLUMN'S, because `raised` IS a flex column: six children of this card each carried
+   their own `margin-top` or `margin-bottom` (2/8/12/16/24px, chosen one at a time), and a column's space
+   between its children is the column's. 12px, the step three of the six already used. */
+.gate-card { width: 100%; max-width: var(--measure); padding: var(--s-7); gap: var(--s-5); }
+/* `.gate-preview` IS GONE — it was `margin-top` and nothing else, on a `Text as="p"` that is a child of
+   the card above, and a margin between siblings is that column's gap. */
 
 /* THE SPLIT (decision 48). The atomic revamp's template layer lists this among `AppShell`'s holes — see
    docs/design-system.md, *The atomic revamp: the layer tree* — and that is where it is

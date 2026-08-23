@@ -133,7 +133,14 @@
 .vb-stack[data-fill] { flex: 1; min-width: 0; min-height: 0; }
 .vb-stack[data-scroll] { overflow-y: auto; }
 
-/* `.vb-self-start` / `.vb-self-center` BELONG HERE AND ARE NOT HERE YET, deliberately: five classes are
-   `align-self` and nothing else, but a class that lands before its consumers is dead code and
-   `check:class-budget` is right to refuse it — there is no UNCONSUMED map for classes, only for tokens.
-   They arrive in the commit that spends them. */
+/* ONE CHILD OPTING OUT OF ITS PARENT'S ALIGNMENT, and the parent's `align` cannot say it: five classes
+   in the tree were `align-self` and nothing else. `flex-start` is the one that recurs — a button in a
+   flex column stretches to the column's width otherwise, which is what made `.diary-refresh` 1240px —
+   and it merges `.sandbox-action > .vb-btn` (three call sites in Settings), `.diary-refresh` and
+   `.report-dismiss`. `center` has ONE consumer, `.topbar-right`: the top bar is aligned on the BASELINE
+   and the control cluster at its end must not be, because a `<select>`'s baseline is a UA-defined thing
+   with nothing to do with the words beside it.
+   THEY ARRIVE IN THE COMMIT THAT SPENDS THEM, because a class that lands before its consumers is dead
+   code and `check:class-budget` is right to refuse it — there is no UNCONSUMED map for classes. */
+.vb-self-start { align-self: flex-start; }
+.vb-self-center { align-self: center; }

@@ -178,9 +178,22 @@ describe('the raised surfaces — a --panel ground, a --border edge and a 10px c
     expect(box(el('vb-status-next', 'p'))['margin-top']).toBe('8px');
   });
 
-  it('the gate card stacks headings whose margins meet', () => {
-    expect(box(at('<div class="gate-card"><ul class="gate-list"></ul></div>', 'ul')).margin).toBe('0 0 16px');
-    expect(box(at('<div class="gate-card"><h3>h</h3></div>', 'h3')).margin).toBe('24px 0 8px');
+  // THE MARGINS ARE GONE AND THE CARD'S OWN `gap` IS WHY, which is the reverse of what stood here: this
+  // test asserted 16px under the recents list and 24px/8px around the second heading, and the paragraph
+  // above still says why that mattered — `raised` is a flex column, so those margins ADD to a gap instead
+  // of collapsing into one. The sweep that spends `--measure` folded all six of this card's per-child
+  // margins into one 12px gap, so what is asserted now is the gap AND the absence of each margin: the gap
+  // alone would pass with a stray `margin-top` still on a child, and the absences alone would pass on a
+  // card that spaces nothing at all.
+  it('the gate card spaces its children with one gap and no per-child margin', () => {
+    // The resolved px and never `var(--s-5)`: an expectation written as the token compares one literal to
+    // the same literal and asserts nothing — this file's own rule, and control-boxes' before it.
+    expect(box(panel('raised', 'gate-card')).gap).toBe('12px');
+    expect(box(at('<div class="gate-card"><ul class="gate-list"></ul></div>', 'ul')).margin).toBeUndefined();
+    expect(box(at('<div class="gate-card"><h3>h</h3></div>', 'h3')).margin).toBe('0');
+    expect(box(at('<div class="gate"><div class="vb-field"></div></div>', '.vb-field'))['margin-top']).toBe(
+      undefined,
+    );
   });
 });
 

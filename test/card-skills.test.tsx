@@ -90,11 +90,16 @@ describe('CardSkills', () => {
     render(<CardSkills card={card()} skills={[skill({ boards: ['product'] })]} invalid={[]} />);
     expect(actions()).toHaveLength(0);
     expect(screen.getByText('No skills for this column. Add one in Project Control → Skills.')).toBeTruthy();
+    // The POSITIVE half of the negative below: a `toBeNull()` on a hook nothing ever renders passes for
+    // the wrong reason, which is the fixture-too-thin failure this repository has recorded twice.
+    expect(document.querySelector('[data-testid="cs-empty"]')).not.toBeNull();
   });
 
   it('shows no empty state when the card does have skills', () => {
     render(<CardSkills card={card()} skills={[skill()]} invalid={[]} />);
-    expect(document.querySelector('.cs-empty')).toBeNull();
+    // A `data-testid` and not `.cs-empty`: the class held one `margin-top`, the rail's `gap` says it now,
+    // and a test that selects on a class the sweep deletes turns a visual fix into a red suite.
+    expect(document.querySelector('[data-testid="cs-empty"]')).toBeNull();
   });
 
   it('counts invalid skill files and names each reason on hover', () => {
@@ -122,9 +127,11 @@ describe('CardSkills', () => {
   it('names the card it would act on', () => {
     render(<CardSkills card={card({ id: 'E-042' })} skills={[skill()]} invalid={[]} />);
     expect(screen.getByLabelText('Skills for E-042')).toBeTruthy();
-    // A `Text as="h3" caps` now: the display face, the step, the muted ink and the `margin: 0` are the
-    // atom's, and what `.cs-head` still says is the 2px under this one line. Asserted as the whole class
-    // list rather than with a substring, because a dropped `caps` is exactly what a substring would miss.
-    expect(screen.getByText('Skills').className).toBe('vb-text vb-text-caps cs-head');
+    // A `Text as="h3" caps` AND NOTHING ELSE: the display face, the step, the muted ink and the
+    // `margin: 0` are the atom's, and `.cs-head`'s 2px under this one line is the rail's `gap` now — one
+    // child asking for its own room is what a uniform column replaces. Asserted as the whole class list
+    // rather than with a substring, because a dropped `caps` is exactly what a substring would miss, and
+    // an exact list is also what says the class did not quietly come back.
+    expect(screen.getByText('Skills').className).toBe('vb-text vb-text-caps');
   });
 });

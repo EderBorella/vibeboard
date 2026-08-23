@@ -103,7 +103,7 @@ function checkRow(): { row: Element; label: Element; check: Element } {
 const CONTROLS: [name: string, el: () => Element][] = [
   [
     'the top bar theme select',
-    () => at('<div class="topbar-right"><select class="vb-ctl"/></div>', 'select'),
+    () => at('<div class="vb-stack push vb-fixed vb-self-center"><select class="vb-ctl"/></div>', 'select'),
   ],
   ['the dispatch effort select', () => inField('select')],
   ['a report column select', () => at('<div class="report-foot"><select class="vb-ctl"/></div>', 'select')],
@@ -128,7 +128,10 @@ const CONTROLS: [name: string, el: () => Element][] = [
     () => at('<div class="diary-compose"><textarea class="vb-ctl"></textarea></div>', 'textarea'),
   ],
   ['the control editor body', () => at('<textarea class="vb-ctl vb-editor-body"></textarea>', 'textarea')],
-  ['a links registry cell', () => at('<div class="vb-row"><input class="vb-ctl res-title"/></div>', 'input')],
+  [
+    'a links registry cell',
+    () => at('<div class="vb-row"><input class="vb-ctl vb-row-main"/></div>', 'input'),
+  ],
   [
     'the raw card file',
     () => at('<div class="raw-pane"><textarea class="vb-ctl raw-area"></textarea></div>', 'textarea'),

@@ -139,7 +139,7 @@ export function TopBar({
           onChange={(value) => onTab(value as MainTab)}
         />
       )}
-      <Stack gap={4} className="push vb-fixed topbar-right">
+      <Stack gap={4} className="push vb-fixed vb-self-center">
         {/* NOT A `Field`: the top bar carries no labels, and the value this shows is its own name. It
             takes the primitive's box through `.vb-ctl`, which is what atoms/control.css names it for. */}
         <Control as="select" value={theme} title="Theme" onChange={(e) => onTheme(e.target.value)}>

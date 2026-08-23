@@ -162,13 +162,15 @@ function FiledColumn({ bump }: { bump: number }) {
   const { suggestions, failed, refresh } = useSuggestions(bump);
   return (
     <section className="filed" aria-label="What agents filed">
-      <Stack direction="column" gap={2} className="diary-head">
+      {/* `align="start"` IS `.diary-refresh` AND IT IS THE PARENT'S CLAIM: a refresh button in a stretched
+          column was 1240px wide here. Every child shrink-wraps rather than one opting out — see diary.css. */}
+      <Stack direction="column" gap={2} align="start" className="diary-head">
         <h2>What agents filed</h2>
         <Text lead>
           Work an agent noticed and deliberately did not do. Nothing blocks on one and nothing is lost; triage
           them in the Suggestions pane.
         </Text>
-        <Button size="md" className="diary-refresh" onClick={refresh}>
+        <Button size="md" onClick={refresh}>
           Refresh suggestions
         </Button>
       </Stack>
@@ -217,7 +219,7 @@ export function DiaryView({ bump }: { bump: number }) {
     // diary list never uses. Both are the record of what happened while nobody was watching.
     <div className="log-split">
       <section className="diary" aria-label="Project log">
-        <Stack direction="column" gap={2} className="diary-head">
+        <Stack direction="column" gap={2} align="start" className="diary-head">
           <h2>Project log</h2>
           <Text lead>
             One line per event — what happened to this project, in order. Auto-pilot will write here after
@@ -226,7 +228,7 @@ export function DiaryView({ bump }: { bump: number }) {
           {/* Always reachable, not only after a failed read. New entries arrive over the socket, and a dropped
             socket is invisible: reconnecting does not change `bump`, and the server replays only the board
             snapshot on connect — so without this the log can sit silently stale with no way to ask again. */}
-          <Button size="md" className="diary-refresh" onClick={refresh}>
+          <Button size="md" onClick={refresh}>
             Refresh
           </Button>
         </Stack>

@@ -64,15 +64,12 @@ const FLOOR = { defs: 20, themes: 3 };
 // The claim that made the emptiness reachable is the SECOND half of claim 1: a name that has acquired a
 // consumer and kept its row is a finding too, so this map cannot rot into an allow-list. Leaving one row
 // here would have failed the run.
+// `--measure`'s ROW STOOD HERE FOR ONE COMMIT AND THE SWEEP SPENT IT: `.diary-head`, `.diary-compose`,
+// `.diary > .vb-text-error` and `.diary-list` read it in organisms/diary/diary.css, which is four of the
+// hand-written `68ch` the token was created to name. Empty again, which is the state the second half of
+// claim 1 requires — a name that has acquired a consumer and kept its row is a finding of its own.
 /** @type {Map<string, string>} */
-const UNCONSUMED = new Map([
-  [
-    '--measure',
-    'The reading measure, landing one commit before the four classes that spend it — `.diary-list` and ' +
-      '`.diary-compose` (68ch), `.ap-help` (44rem) and `.gate-card` (520px), which are four answers to ' +
-      'one question. Spent by the sweep that accepts a visual change to reach the scale.',
-  ],
-]);
+const UNCONSUMED = new Map();
 
 // A COLOUR IN THE GEOMETRY BLOCK, ON PURPOSE, with its reason — the precedent is
 // check-radius-scale.mjs's `50%` and check-scale.mjs's `inherit`.

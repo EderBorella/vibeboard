@@ -34,8 +34,10 @@
    and a heading loose enough to read as spaced-out lettering competes with the wordmark — the one element
    allowed to do that. It is `--track` for every eyebrow now, one of the 27 that token collapsed. */
 /* The size is `.vb-twist`'s and the accent is `ink="accent"` — see atoms/text.css. What is left is the
-   fixed width that stops the label sliding as the glyph swaps. */
-.board-chevron { width: 0.8em; }
+   fixed width that stops the label sliding as the glyph swaps, and it is ON THE SCALE now: `0.8em` of
+   `.vb-twist`'s `--t-lead` is 12px, which is `--s-5` exactly, so the reserved box is unchanged and it is
+   no longer a length only this rule knows. No atom carries a width, which is why the class stays. */
+.board-chevron { width: var(--s-5); }
 
 /* The archive toggle appears only once a board has archived cards, so it never advertises a
    drawer with nothing in it. `Chip pill fill` owns the box and `vb-readout` the mono face — the count

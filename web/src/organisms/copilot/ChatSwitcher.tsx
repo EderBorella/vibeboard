@@ -28,7 +28,7 @@ export function ChatSwitcher({ chats, currentChatId, backend, running, onOpen, o
   const currentTitle = chats.find((c) => c.id === currentChatId)?.title ?? 'New chat';
 
   return (
-    <Stack gap={3} pad={[3, 5]} edge="bottom">
+    <Stack gap={3} pad={[4, 5]} edge="bottom">
       <div className="chat-switcher">
         <Control as="trigger" disabled={running} onClick={() => setChatMenu((v) => !v)} title="Chat history">
           <span className="vb-clip">{currentTitle}</span>

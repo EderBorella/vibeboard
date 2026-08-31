@@ -55,8 +55,14 @@ export function CopilotControls({
         </Button>
       </Stack>
 
-      {/* `align="stretch"`: this row named no `align-items`, so its two selects fill its height. */}
-      <Stack align="stretch" pad={[0, 5, 4]} className="copilot-selects">
+      {/* `align="stretch"`: this row named no `align-items`, so its two selects fill its height.
+          THE TOP PADDING WAS `0`, AND IT WAS VISIBLE. The row above declares `edge="bottom"`, so a
+          hairline runs between them — and with no padding above them the two selects sat flush against
+          it, which is what the owner saw. `[0, 5, 4]` was the one asymmetric pad in the dock and the
+          reason `pad` learned CSS's three-value shape at all; the shape stays useful, this row's use of
+          it does not. `[4, 5]` is what the other five rows say, and `edge="bottom"` is the rule the
+          status strip used to draw before it moved into the header. */}
+      <Stack align="stretch" pad={[4, 5]} edge="bottom" className="copilot-selects">
         <ModelPicker
           models={models}
           value={effModel}

@@ -35,7 +35,7 @@ function BackendStatus({ status }: { status: ModelStatus }) {
     `${status.endpoints} provider${status.endpoints === 1 ? '' : 's'}`,
   ].filter(Boolean);
   return (
-    // THE FOURTH INDICATOR, AND IT IS A `StatusChip` NOW. It was a full-width row with the word and two
+    // THE FOURTH INDICATOR, AND IT IS A `StatusChip`. It was a full-width row with the word and two
     // numbers glued to it by ` · `, so the state you were looking for was the shortest thing on a line of
     // three facts — and the row itself was the fifth mechanism no census counted, because `.ok` and
     // `.down` did not look like states.
@@ -43,18 +43,22 @@ function BackendStatus({ status }: { status: ModelStatus }) {
     // THE TWO NUMBERS MOVE INTO THE BALLOON rather than being dropped. That is where the other three
     // indicators put their detail, and neither number is something you read at a glance: an uptime
     // percentage is what you go and check once the word has told you to.
-    <Stack gap={3} pad={[2, 5]} edge="bottom">
-      <StatusChip
-        state={state}
-        word={state}
-        advice={{
-          heading: status.up ? 'This backend is answering' : 'This backend is not answering',
-          detail: facts.join(' · '),
-        }}
-        glow={status.up}
-        testId="copilot-status"
-      />
-    </Stack>
+    //
+    // AND IT HAS NO ROW OF ITS OWN NOW EITHER. The strip it lived in — between the selects and the
+    // transcript — padded itself `[2, 5]`, 4px where every other row in the dock uses 8px, so one chip
+    // was giving the dock a fifth vertical rhythm and a sixth horizontal rule. This is a property OF
+    // the backend, and the backend picker is in the header; it goes beside it. What is left here is
+    // the chip alone, so the caller decides where it sits.
+    <StatusChip
+      state={state}
+      word={state}
+      advice={{
+        heading: status.up ? 'This backend is answering' : 'This backend is not answering',
+        detail: facts.join(' · '),
+      }}
+      glow={status.up}
+      testId="copilot-status"
+    />
   );
 }
 
@@ -123,7 +127,6 @@ export function CopilotPanel({
   const {
     items,
     running,
-    model: activeModel,
     stats,
     chats,
     currentChatId,
@@ -202,7 +205,20 @@ export function CopilotPanel({
           }
           onChange={onBackend}
         />
-        {activeModel && <Readout>{activeModel}</Readout>}
+        {/* THE BACKEND'S STATE, BESIDE THE BACKEND. `status` is null until the probe answers, and it
+            stays null for every backend that is not OpenRouter — so this appears and disappears. It is
+            the one thing in this row that may do that: it sits between the picker and the `push`, so
+            what moves when it arrives is nothing, rather than the ✕. */}
+        {status && <BackendStatus status={status} />}
+        {/* NO MODEL NAME HERE. It used to render the model the SERVER reported for the live session,
+            so it appeared only once a turn had run and was absent in a fresh chat — the same header
+            with and without a name, which is a layout that moves for a reason nobody can see. A name
+            like `opencode/nemotron-3-ultra-free` is 30 characters in a row whose other members are a
+            title, a two-cell picker and a `✕`, and it pushed them out of place.
+
+            The picker below already names the model, and it names the one that will be USED. This
+            named the one in force, which differs only between selecting a model and running the next
+            turn — a distinction worth less than a row that holds still. */}
         {/* Not in the ratchet — Phase 2's control reset took its font-size away, so no rule gave it
             geometry any more — but the same `✕` as nine others, so it goes with them. */}
         <Button variant="bare" className="push" onClick={onClose} title="Hide (session keeps running)">
@@ -311,8 +327,6 @@ export function CopilotPanel({
           </Text>
         </div>
       )}
-      {status && <BackendStatus status={status} />}
-
       <Stack direction="column" gap={4} pad={5} fill scroll ref={bodyRef}>
         {items.length === 0 && (
           <Text role="hint" lead>

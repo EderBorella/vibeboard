@@ -25,11 +25,13 @@
    was a padding and a hairline, which the atom could not carry. It can: `.copilot-head`,
    `.copilot-chatbar`, `.copilot-controls`, `.copilot-status` and `.copilot-authority` were
    `pad={[N,5]} edge="bottom"` written out five times, and they are that now.
-   TWO SURVIVE AND NEITHER IS THE PADDING'S FAULT. `.copilot-selects` pads `0 var(--s-5) var(--s-4)` —
-   asymmetric in the block axis, where `pad` is one value per axis — and both it and `.copilot-input` are
-   still the selector their `.vb-ctl` child's `flex`/`resize` is written against, which is a rule about a
-   descendant rather than a box on this element. See them below.
-   test/copilot-rows.test.tsx asserts all seven against the gutter either way: `data-pad-x` and a
+   SIX ROWS, NOT SEVEN, SINCE THE STATUS MOVED INTO THE HEADER. Its strip padded itself `[2, 5]` — 4px
+   in a dock where every other row uses 8px — so one chip was giving the surface a fifth vertical rhythm
+   and a sixth horizontal rule. The chip sits beside the backend picker it describes now.
+   ONE CLASS SURVIVES ON A ROW, AND IT IS NOT THE PADDING'S FAULT. `.copilot-selects` and
+   `.copilot-input` are still the selector their `.vb-ctl` child's `flex`/`resize` is written against,
+   which is a rule about a descendant rather than a box on this element. See them below.
+   test/copilot-rows.test.tsx asserts all six against the gutter either way: `data-pad-x` and a
    `padding` shorthand resolve to the same twelve pixels. */
 /* 0.14em → 0.08em, and the dock's title visibly tightens. It was the second-loosest tracking in the
    tree after `.board-label`'s, and a panel heading is not a wordmark. */
@@ -70,11 +72,15 @@
    the `.copilot-controls` row, which is the `Stack` that carries the gap. */
 /* `align="stretch"` on the `Stack` and not the row default: this one and `.copilot-input` named NO
    `align-items`, so their two controls have always filled the row's height.
-   AND THIS IS ONE OF THE TWO ROWS THAT KEEP A CLASS. Its padding is `0` at the top and `--s-4` at the
-   bottom — it sits directly under `.copilot-controls`, so a top inset would double that row's — and `pad`
-   is one value per axis. The two rules below are the second reason: both are about what a `.vb-ctl` CHILD
-   does, which no attribute on this element can say. */
-.copilot-selects { border-bottom: 1px solid var(--border); }
+   THE ASYMMETRIC PADDING IS WITHDRAWN, AND THE ARGUMENT FOR IT WAS WRONG. It was `0` at the top on the
+   reasoning that this row sits directly under `.copilot-controls`, so a top inset would double that
+   row's — but that row declares `edge="bottom"`, so a HAIRLINE runs between them, and the two selects
+   sat flush against it. Nothing doubles across a rule. `[4, 5]` is what the other five rows say.
+   ITS BORDER IS THE ATOM'S NOW. This class declared `border-bottom` by hand while five sibling rows
+   said the same thing as `edge="bottom"`; with the padding gone there was no reason left for the
+   exception, and a second spelling of one hairline is what that attribute exists to delete.
+   The two rules below are why the class survives at all: both are about what a `.vb-ctl` CHILD does,
+   which no attribute on this element can say. */
 /* The row decides how its controls sit; the box is `.vb-ctl`'s. */
 .copilot-selects > .vb-ctl { flex: 1; }
 .copilot-selects select:disabled { opacity: 0.5; }
@@ -88,8 +94,8 @@
    halo is a `Dot` prop now: `--glow` is `none` in two of the three themes, so it cannot belong to a
    tone. */
 /* `.copilot-status` IS GONE, AND IT WAS NO LONGER THE INDICATOR. The `font-size` and the
-   `color: var(--tone, …)` went when a `StatusChip` took both; the panel's own rhythm — the `--s-5` gutter
-   and the rule underneath — is `pad={[2,5]} edge="bottom"`.
+   `color: var(--tone, …)` went when a `StatusChip` took both; the row that replaced it is gone too —
+   the chip is in the header now, beside the backend picker whose state it reports.
    `.copilot-authority` IS GONE TOO, AND IT IS THE ROW THAT HAD NO CLASS. The Authorise button sat in a
    bare `<div>` while its six siblings each padded themselves by the dock gutter, so the one control that
    grants write access to the project was flush against the dock's left edge and touching the board behind

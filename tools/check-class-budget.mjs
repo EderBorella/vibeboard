@@ -244,7 +244,21 @@ const PRIMITIVE_LAYER = [
 // gap", so every surface that needed one named it after itself. Buying that atom for one name is the
 // cheapest trade available in this tree, and every option on it is a `data-` attribute precisely so that
 // it stays one name — `Modal`'s precedent from the organism phase, applied to layout.
-const CLASS_CEILING = 221;
+// 221 -> 220 ON 2026-08-31, and the motion phase added NONE of its own.
+//
+// The first cut of `web/src/atoms/Pulse.tsx` declared two — `.vb-pulse` for an inline-flex row with a
+// gap, and `.vb-pulse-dot` for an 8px circle — and the owner had already ruled that a legitimate
+// class must not be blocked by this ratchet. Neither turned out to be legitimate. `check:shape-coverage`
+// caught the dot at once, because its dot census BLOCKS AT ZERO: `.vb-dot` in molecules/status-chip.css
+// is that circle already, tone-aware and `flex: none`, and its 8px is allowed BY NAME in
+// `check:box-scale` — where the hand-rolled `calc(var(--mark-h) / 2)` was a third box height, the exact
+// thing four phases of this design system went to delete. The wrapper was `Stack gap={2}` written out
+// longhand. So the atom spends the primitive layer and declares nothing.
+//
+// The departure is `.msg-running`, the copilot's `…working` line, deleted with the element it styled
+// when `ThinkingIndicator` replaced it. Net −1, and the ceiling is the count with ZERO SLACK: a
+// ratchet sitting above the tree is one that would not notice the next class.
+const CLASS_CEILING = 220;
 // THE TARGET IS 146, and the derivation is in docs/design-system.md, *The atomic revamp: the class target
 // is 146*. Two numbers stood in this tree for two phases — this constant said 183 and the revamp said
 // 146 — and the gate PRINTED 183 at the developer, so the reconciliation was the gate's to make. 146 wins because 183's derivation is the one that was withdrawn, by name: 183 = 17 surfaces × 8

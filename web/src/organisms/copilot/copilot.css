@@ -125,7 +125,13 @@
    and the span it sat on is a CHILD of `.msg` rather than the same element — so no organism rule contends
    with `.vb-text` for the step or the ink. `.msg-running` could not follow it: that one shares its element
    with `.msg`, whose `--t-body` and `color: var(--tone, inherit)` win on source order, so a `Text` there
-   would have lost the muted grey. Its `color: var(--muted)` is the reason it survives below. */
+   would have lost the muted grey.
+   AND `.msg-running` IS GONE NOW TOO, with the line it styled. `…working` was a static string that
+   said the same thing at one second and at three minutes, so it could not tell a model that was
+   thinking from a process that had died — the complaint notes/todo.md records from real use. It is
+   `ThinkingIndicator` instead: a clock that keeps moving, a sentence that changes when the answer is
+   late, and a Stop offered only once silence is genuinely suspicious. Nothing survives of the rule,
+   because the element it was written against no longer exists. */
 /* `.msg-tool` IS GONE: a tool name is machine vocabulary and the rule was `Readout` `small` `accent`
    written out by hand. `msg-tool` still reaches the wrapper through `msg-${it.kind}`, and there is
    nothing left for it to say — the line's only child is the readout. See copilot/CopilotPanel.tsx. */
@@ -136,7 +142,6 @@
    a bubble's geometry is a shape, and the chat may keep its own. `.msg-user` and `.msg-assistant` show
    NO literal call site and are not dead: `msg-${item.kind}` composes both names at run time, which is
    the pattern `check:class-budget` resolves and the reason they look unreferenced. */
-.msg-running { color: var(--muted); font-style: italic; }
 /* CENTRED, not baseline-aligned, and the harness is why: `ReadoutLine` aligns on the baseline because
    its parts are text at two sizes — but this row's last item is the context METER, a 5px bar with no
    baseline of its own, and on a baseline it hung 1.5px below the figures beside it. Check 7 named the row

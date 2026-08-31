@@ -87,6 +87,19 @@ export function useCopilot(bump: number) {
   const streamId = useRef<number | null>(null); // bubble currently being streamed via deltas
   const deltaMode = useRef(false); // true once any delta seen (partial streaming on)
 
+  // LIVENESS, AND IT IS THREE REFS RATHER THAN THREE STATES ON PURPOSE.
+  //
+  // The thinking indicator needs to know when the turn was sent, when anything last arrived, and
+  // whether the answer has started. Holding those in `useState` would re-render the whole transcript
+  // on EVERY event — and `thinking_delta` alone can arrive many times a second while nothing is
+  // rendered from it, so the storm would be invisible and constant. A ref costs nothing and the
+  // indicator reads it on its own tick, which is the only thing that needs the resolution.
+  //
+  // Read by organisms/copilot/ThinkingIndicator.tsx. Milliseconds from `Date.now()`.
+  const sentAt = useRef<number | null>(null); // when the current turn was dispatched
+  const lastEventAt = useRef<number | null>(null); // when ANYTHING last arrived, hidden events included
+  const sawText = useRef(false); // the answer has begun — the indicator yields to the bubble
+
   const push = useCallback((item: Omit<TranscriptItem, 'id'>) => {
     setItems((prev) => [...prev, { ...item, id: nextId.current++ }]);
   }, []);
@@ -142,6 +155,10 @@ export function useCopilot(bump: number) {
 
   const apply = useCallback(
     (e: CopilotEvent) => {
+      // EVERY event, before the switch — including the two the switch drops. `thinking_delta` and
+      // `thinking` render nothing, and they are precisely the proof that a long turn is alive rather
+      // than wedged. Stamping only what is displayed would make a reasoning model look stalled.
+      lastEventAt.current = Date.now();
       switch (e.kind) {
         case 'init':
           setSessionId(e.sessionId);
@@ -153,6 +170,7 @@ export function useCopilot(bump: number) {
           break;
         case 'text_delta':
           deltaMode.current = true;
+          sawText.current = true;
           appendStream('assistant', e.text ?? '');
           break;
         case 'thinking_delta':
@@ -161,6 +179,7 @@ export function useCopilot(bump: number) {
           streamId.current = null;
           break;
         case 'text':
+          sawText.current = true;
           if (!deltaMode.current) push({ kind: 'assistant', text: e.text ?? '' });
           break;
         case 'thinking':
@@ -230,6 +249,14 @@ export function useCopilot(bump: number) {
   const startTurn = useCallback((): void => {
     deltaMode.current = false;
     streamId.current = null;
+    // BOTH CLOCKS START HERE, and `lastEventAt` is seeded rather than left null: the stall timer
+    // measures silence, and silence begins at dispatch. Left null it would have no baseline until the
+    // first event, so a turn that died before answering — the exact case worth catching — would never
+    // reach the stall threshold at all.
+    const now = Date.now();
+    sentAt.current = now;
+    lastEventAt.current = now;
+    sawText.current = false;
   }, []);
 
   const send = useCallback(
@@ -294,5 +321,10 @@ export function useCopilot(bump: number) {
     openChat,
     deleteChat,
     cancel,
+    // The three liveness refs, for the thinking indicator. Refs and not values — see their
+    // declaration for why a state here would re-render the transcript on every hidden delta.
+    sentAt,
+    lastEventAt,
+    sawText,
   };
 }

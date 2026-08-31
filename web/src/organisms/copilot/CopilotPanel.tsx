@@ -15,6 +15,7 @@ import { ChatSwitcher } from './ChatSwitcher';
 import { CopilotControls } from './CopilotControls';
 import { CopilotReadout } from './CopilotReadout';
 import { clampToCaps } from './choice';
+import { ThinkingIndicator } from './ThinkingIndicator';
 import type { CopilotMode, EffortLevel, TranscriptItem, useCopilot } from './useCopilot';
 
 const NO_MODELS: ModelOption[] = [];
@@ -138,6 +139,9 @@ export function CopilotPanel({
     cancel,
     authorised,
     setCopilotAuthority,
+    sentAt,
+    lastEventAt,
+    sawText,
   } = copilot;
   const { confirm, dialog } = useConfirm();
   const [draft, setDraft] = useState('');
@@ -337,7 +341,16 @@ export function CopilotPanel({
         {items.map((it) => (
           <MessageLine key={it.id} item={it} />
         ))}
-        {running && <div className="msg msg-running">…working</div>}
+        {/* THE INDICATOR REPLACES `…working`, which was the whole of the old signal: a static string
+            that said the same thing at one second and at three minutes. It could not distinguish a
+            model that was thinking from a process that had died, which is exactly the complaint
+            notes/todo.md records from real use.
+            `!sawText.current` — once the answer starts arriving the bubble IS the signal, and two
+            things saying "working" is one too many. The ref is read during a render that `items`
+            already triggered, so it is never stale here. */}
+        {running && !sawText.current && (
+          <ThinkingIndicator sentAt={sentAt} lastEventAt={lastEventAt} onCancel={cancel} />
+        )}
       </Stack>
 
       <CopilotReadout stats={stats} budget={contextBudget} />

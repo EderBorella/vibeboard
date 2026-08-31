@@ -567,7 +567,7 @@ describe('ExplorerView — dragging to move', () => {
     fireEvent.click(row('docs'));
     await waitFor(() => expect(screen.getByText('inside.md')).toBeTruthy());
 
-    const header = screen.getByText('Files').parentElement as HTMLElement;
+    const header = screen.getByTestId('explorer-head');
     dragTo(row('inside.md'), header);
     await waitFor(() => expect(api.moveFsNode.mock.calls).toEqual([['docs/inside.md', '']]));
   });
@@ -579,11 +579,14 @@ describe('ExplorerView — dragging to move', () => {
     fireEvent.click(row('docs'));
     await waitFor(() => expect(screen.getByText('inside.md')).toBeTruthy());
 
-    expect(screen.getByText('Files')).toBeTruthy();
+    // The header carries no text at rest, so the ABSENCE is half the claim: the message is the only
+    // thing that ever appears there, and a header that always said something could not be told apart
+    // from one that says the right thing at the right time.
+    expect(screen.queryByText('Drop here for the project root')).toBeNull();
     fireEvent.dragStart(row('inside.md'), { dataTransfer: transfer() });
     expect(screen.getByText('Drop here for the project root')).toBeTruthy();
     fireEvent.dragEnd(row('inside.md'));
-    expect(screen.getByText('Files')).toBeTruthy();
+    expect(screen.queryByText('Drop here for the project root')).toBeNull();
   });
 
   it('does not offer the root to something already in it', async () => {
@@ -593,8 +596,9 @@ describe('ExplorerView — dragging to move', () => {
     await waitFor(() => expect(screen.getByText('a.md')).toBeTruthy());
 
     fireEvent.dragStart(row('a.md'), { dataTransfer: transfer() });
-    expect(screen.getByText('Files')).toBeTruthy();
-    const header = screen.getByText('Files').parentElement as HTMLElement;
+    // Already at the root, so the header must NOT invite the move — it stays silent mid-drag.
+    expect(screen.queryByText('Drop here for the project root')).toBeNull();
+    const header = screen.getByTestId('explorer-head');
     fireEvent.drop(header, { dataTransfer: transfer() });
     expect(api.moveFsNode).not.toHaveBeenCalled();
   });

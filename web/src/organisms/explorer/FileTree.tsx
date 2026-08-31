@@ -210,6 +210,10 @@ export function FileTree(props: Props) {
   return (
     <List as="nav" className="explorer-list">
       <div
+        // The header has no text at rest now, so nothing nameable is left to find it by. A testid
+        // rather than `.explorer-head`: that class exists to make the head sticky, and a test holding
+        // onto it would make the next sweep over the stylesheet a red suite.
+        data-testid="explorer-head"
         className={`vb-row explorer-head${over === '' ? ' explorer-over' : ''}`}
         onDragOver={
           rootDroppable
@@ -231,8 +235,16 @@ export function FileTree(props: Props) {
             : undefined
         }
       >
-        <span>{dragging && rootDroppable ? 'Drop here for the project root' : 'Files'}</span>
-        <Stack gap={1} className="explorer-actions">
+        {/* NO RESTING TITLE. It said "Files" at the head of a list of files, above a tab already
+            labelled Explorer — and it was the widest thing in the row, so swapping it for the drag
+            message moved every button. The message stays, because the header IS the project root's
+            drop target and there is no other cue that it is one.
+
+            `push` keeps the actions against the right edge whether the message is there or not, so
+            the row no longer moves when a drag starts. Without it, removing the title would only
+            change WHEN the shift happens rather than remove it. */}
+        {dragging && rootDroppable && <span>Drop here for the project root</span>}
+        <Stack gap={1} className="explorer-actions push">
           <Button variant="bare" size="sm" title={`New file in ${where}`} onClick={() => props.onNew('file')}>
             {/* `.control-new` IS GONE: the accent ink is a nested `Text`'s at all four. */}
             <Text size="inherit" ink="accent">

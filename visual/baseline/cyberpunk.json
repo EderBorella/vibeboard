@@ -1,5 +1,5 @@
 {
-  "recorded": "2026-08-23",
+  "recorded": "2026-08-31",
   "surfaces": {
     "boards": {
       "fontSizes": [
@@ -30,7 +30,7 @@
         "overflow": 118,
         "clipping": 38,
         "contrast": 143,
-        "tokens": 49,
+        "tokens": 50,
         "rows": 29,
         "focus": 66
       },
@@ -73,7 +73,7 @@
         "overflow": 64,
         "clipping": 12,
         "contrast": 86,
-        "tokens": 49,
+        "tokens": 50,
         "rows": 12,
         "focus": 43
       },
@@ -115,7 +115,7 @@
         "overflow": 65,
         "clipping": 15,
         "contrast": 84,
-        "tokens": 49,
+        "tokens": 50,
         "rows": 10,
         "focus": 39
       },
@@ -159,7 +159,7 @@
         "overflow": 50,
         "clipping": 13,
         "contrast": 90,
-        "tokens": 49,
+        "tokens": 50,
         "rows": 9,
         "focus": 60
       },
@@ -196,12 +196,12 @@
         "16px"
       ],
       "examined": {
-        "elements": 152,
-        "textElements": 73,
-        "overflow": 49,
+        "elements": 151,
+        "textElements": 72,
+        "overflow": 48,
         "clipping": 12,
-        "contrast": 73,
-        "tokens": 49,
+        "contrast": 72,
+        "tokens": 50,
         "rows": 15,
         "focus": 44
       },
@@ -246,7 +246,7 @@
         "overflow": 30,
         "clipping": 3,
         "contrast": 35,
-        "tokens": 49,
+        "tokens": 50,
         "rows": 5,
         "focus": 18
       },
@@ -280,7 +280,7 @@
         "overflow": 3,
         "clipping": 2,
         "contrast": 4,
-        "tokens": 49,
+        "tokens": 50,
         "rows": 1,
         "focus": 3
       },
@@ -316,7 +316,7 @@
         "overflow": 76,
         "clipping": 14,
         "contrast": 80,
-        "tokens": 49,
+        "tokens": 50,
         "rows": 0,
         "focus": 24
       },
@@ -357,7 +357,7 @@
         "overflow": 22,
         "clipping": 5,
         "contrast": 31,
-        "tokens": 49,
+        "tokens": 50,
         "rows": 5,
         "focus": 14
       },
@@ -391,7 +391,7 @@
         "overflow": 3,
         "clipping": 1,
         "contrast": 4,
-        "tokens": 49,
+        "tokens": 50,
         "rows": 0,
         "focus": 2
       },
@@ -422,7 +422,7 @@
   "radii": {
     "999px": 96,
     "50%": 12,
-    "6px": 280,
+    "6px": 276,
     "10px": 56,
     "4px": 4
   },
@@ -432,7 +432,7 @@
     "overflow": 118,
     "clipping": 38,
     "contrast": 143,
-    "tokens": 49,
+    "tokens": 50,
     "rows": 29,
     "focus": 66,
     "focusUnfocusable": 1

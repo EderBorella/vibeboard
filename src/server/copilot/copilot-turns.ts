@@ -116,13 +116,18 @@ export function createCopilotTurns(ctx: AppCtx): {
       // exposure and its limits are stated in full in docs/security/containment.md.
       const credential = await turnCredential(root);
       const modelText = credential ? withCredential(credential.token, text) : text;
-      copilotState(); // running flips true only once send starts; announce optimistically
       const choice = resolveCopilotSelection(session.config?.copilot, {
         backend: opts.backend,
         model: opts.model,
         effort: opts.effort,
       });
       await copilot.send({
+        // ANNOUNCED FROM INSIDE `send`, at the assignment of its turn. This used to be a
+        // `copilotState()` on the line above the call, described as optimistic — and it shipped
+        // `running: false`, because the flag it reads is set inside the method it was announcing
+        // ahead of. The browser therefore learned a turn had started only when it ENDED, and the
+        // copilot's thinking indicator had nothing to mount on. See the hook's comment in copilot.ts.
+        onStart: copilotState,
         cwd: root,
         text: modelText,
         mode: opts.mode,

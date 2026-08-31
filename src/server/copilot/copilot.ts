@@ -29,6 +29,18 @@ interface SendOptions {
   model?: string; // claude: alias/full name · opencode: provider/model
   effort?: EffortLevel; // claude: --effort scale · opencode: --variant scale
   onEvent: (event: CopilotEvent) => void;
+  // FIRED WHEN THE TURN IS REALLY RUNNING, which is the assignment of `#turn` below and nowhere else.
+  //
+  // It exists because the caller could not observe that moment and tried to guess it. `copilot-turns.ts`
+  // broadcast the state immediately BEFORE calling `send`, calling it optimistic — but `state.running`
+  // reads `#turn !== undefined`, so what it actually shipped was `running: false`, and the next
+  // broadcast came from its own `finally`, after the turn had ended. `running: true` never reached a
+  // browser at all, which is why a three-minute turn showed nothing on screen and why the card raised
+  // on 2026-08-10 was filed against the UI.
+  //
+  // A hook rather than a state the caller polls: the only correct instant is inside this method, and
+  // handing it out is cheaper than making the caller ask repeatedly whether it has happened yet.
+  onStart?: () => void;
 }
 
 // FIFTEEN MINUTES, up from three, and the old number was a guess about how long thinking takes.
@@ -136,6 +148,9 @@ export class CopilotSession {
 
     const turn = runAgentTurn(turnOptions);
     this.#turn = turn;
+    // AFTER the assignment, so `state.running` is already true when the caller reads it. Before it,
+    // this is the bug it was added to fix.
+    opts.onStart?.();
     try {
       const result = await turn.done;
       // ONLY IF THIS IS STILL THE CURRENT TURN, and that check is the whole fix.

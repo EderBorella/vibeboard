@@ -41,6 +41,41 @@ describe('copilot over /ws', () => {
     );
     client.close();
   }, 8000);
+
+  // THE STATE THAT SAYS "A TURN IS RUNNING", AND IT WAS NEVER SENT.
+  //
+  // Found 2026-08-31 when the owner watched a 62-second turn with no indicator on screen. The panel
+  // renders its thinking indicator on `running`, and `running` has exactly one source: this message.
+  // `copilot-turns.ts` broadcast the state BEFORE `copilot.send()` — and `state.running` is
+  // `#turn !== undefined`, with `#turn` assigned inside `send`. So the "optimistic" announcement
+  // shipped `running: false`, and the next broadcast was the one in `finally`, after the turn had
+  // ENDED. True was never sent at all.
+  //
+  // That is also the real cause of the card raised 2026-08-10 from real use — a three-minute turn
+  // with nothing on screen changing. The old `…working` line read the same flag and never appeared
+  // either, so the missing signal was diagnosed as a UI gap for three weeks.
+  //
+  // ORDERED AGAINST THE FIRST EVENT, not merely present: a `running: true` that arrives after the
+  // turn's events is useless to the indicator it exists to mount. The test asserts it comes first.
+  it('announces running:true when the turn starts, before any event', async () => {
+    const { app } = await openTestProject({ name: 'Co' });
+
+    const address = await app.listen({ port: 0, host: '127.0.0.1' });
+    const client = wsClient<Msg>(address);
+    await client.open;
+    client.send({ type: 'copilot:send', text: 'hi', mode: 'plan' });
+
+    await client.waitFor((m) => m.type === 'copilot:event' && m.event?.kind === 'result');
+
+    const runningTrueAt = client.messages.findIndex(
+      (m) => m.type === 'copilot:state' && m.state?.running === true,
+    );
+    expect(runningTrueAt, 'no copilot:state with running:true was ever broadcast').toBeGreaterThan(-1);
+
+    const firstEventAt = client.messages.findIndex((m) => m.type === 'copilot:event');
+    expect(runningTrueAt).toBeLessThan(firstEventAt);
+    client.close();
+  }, 8000);
 });
 
 // The dock's controls are a SESSION OVERRIDE: the project config holds the defaults and is the

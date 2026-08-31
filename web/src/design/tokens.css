@@ -119,4 +119,22 @@
   --z-pop: 20;
   --z-modal: 60;
   --z-alert: 80;
+
+  /* MOTION, MIRRORED FROM design/motion.ts — AND ONLY WHAT CSS ACTUALLY ANIMATES.
+   *
+   * The plan said mirror all five names. `check:tokens` refused it, and the refusal was correct: four
+   * of them are read only by JS, so mirroring them would have put four properties in three palettes'
+   * worth of stylesheet with no rule referencing any of them. That is `--scan` exactly, which sat
+   * unconsumed for three palettes and is the reason this gate exists. The mirror is per-consumer, not
+   * per-token: a name arrives here when a CSS rule spends it, and `design/motion.ts` stays the source
+   * for both halves.
+   *
+   * `1600ms` IS NOT A NEW SPEED. `.vb-dot-pulse` in molecules/status-chip.css already animates for
+   * `1.6s`, hand-written; this is the name it should have been spending all along. Milliseconds
+   * rather than seconds so both files spell the value identically and the parity test in
+   * test/motion-tokens.test.ts can compare them without unit maths.
+   *
+   * Geometry rather than colour, so this belongs in the shared block and NOT in a `[data-theme]` one:
+   * a theme that disagreed about how long 1600ms is would be a theme with its own physics. */
+  --motion-duration-slow: 1600ms;
 }

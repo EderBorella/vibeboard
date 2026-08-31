@@ -60,7 +60,12 @@ if (SHEETS.length < SHEET_FLOOR) {
 }
 // The names worth resolving to a value rather than left as a claim: the three scales, the two heights,
 // the rule width, the tracking, the elevation and the four layers.
-const GEOMETRY = /^--(t|s|r)-|^--(ctl-h|mark-h|rule|track|lift)$|^--z-/;
+// `--motion-` JOINED THE LIST when design/motion.ts arrived. A duration is not a colour, which is the
+// line this filter actually draws — the exclusion exists so a theme's ink never resolves here, not to
+// keep the set small. Without the prefix, test/motion-tokens.test.ts asks for a name the map does not
+// hold, `resolve` hands the `var(...)` back unchanged, and the parity claim compares two strings that
+// were never going to match. It failed exactly that way before this line existed.
+const GEOMETRY = /^--(t|s|r)-|^--(ctl-h|mark-h|rule|track|lift)$|^--z-|^--motion-/;
 const TOKENS = new Map(
   TOKEN_FILES.flatMap((file) => [
     ...readFileSync(join(WEB, file), 'utf8').matchAll(/^\s*(--[\w-]+)\s*:\s*([^;]+);/gm),

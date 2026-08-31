@@ -20,7 +20,7 @@
    themes, which is the other reason it cannot belong to a tone. */
 .vb-dot-glow { box-shadow: var(--glow); }
 
-.vb-dot-pulse { animation: vb-dot-pulse 1.6s ease-in-out infinite; }
+.vb-dot-pulse { animation: vb-dot-pulse var(--motion-duration-slow) ease-in-out infinite; }
 @keyframes vb-dot-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
 /* Named as well as caught by the blanket `*` rule in design/motion.css: that one shortens the duration to
    0.01ms, which is a pulse nobody sees but still a compositor layer per frame. */

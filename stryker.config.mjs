@@ -8,6 +8,19 @@
 
 /** @type {import('@stryker-mutator/api/core').PartialStrykerOptions} */
 export default {
+  // `'always'`, NOT THE DEFAULT `true`. The default deletes `.stryker-tmp` after a SUCCESSFUL run
+  // only, so a failed one leaves a full copy of the repository behind — and mutation runs fail often
+  // enough that six sandboxes accumulated by 2026-08-14, two of them dating from 25 July, at 16 MB
+  // each. Gitignored, so invisible to `git status` and easy to forget.
+  //
+  // The second symptom is worse than the disk: while a sandbox exists, `npm run lint` dies with
+  // "Found a nested root configuration", because biome walks into the copy and finds its own
+  // `biome.jsonc`. `.stryker-tmp` is gitignored so biome skips it — but a temp dir named anything
+  // else is not, which is how a probe config broke lint for a whole session.
+  //
+  // The enum is `false | true | 'always'` and is read from the installed schema, not from memory.
+  cleanTempDir: 'always',
+
   packageManager: 'npm',
   testRunner: 'vitest',
 
@@ -174,7 +187,11 @@ export default {
     'web/src/organisms/cards/CardsPane.tsx',
     'web/src/organisms/cards/CardsBody.tsx',
     'web/src/pages/board/BoardsView.tsx',
-    'web/src/templates/WorkArea.tsx',
+    // `shell/`, NOT `templates/` — the component moved in the layer phase and this line did not.
+    // It matched ZERO files, which does not fail: a glob that matches nothing scores green over zero
+    // mutants, so a component with a real test file quietly left the measurement. That is the trap
+    // this file warns about three times; `npm run check:mutate-globs` now refuses it.
+    'web/src/shell/WorkArea.tsx',
     'web/src/organisms/runs/ActiveReport.tsx',
     'web/src/organisms/skills/CardSkills.tsx',
     'web/src/organisms/runs/DispatchPane.tsx',

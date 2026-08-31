@@ -123,6 +123,11 @@ const GONE_ON_PURPOSE = new Set([
   'src/core/rollup.ts',
   'src/core/eligibility.ts',
   'src/index.ts', // `decision 68` — the root barrel, deleted; the row exists so it is not re-added
+  // The path `check-mutate-globs.mjs` exists BECAUSE of: it sat in `stryker.config.mjs`'s mutate list
+  // after the component moved to `web/src/shell/`, matched nothing, and quietly shrank the
+  // measurement. Its row in `by-file.md` has to name it to explain the gate at all, and naming a dead
+  // path is the one thing this check refuses — so it is registered here rather than paraphrased away.
+  'web/src/templates/WorkArea.tsx',
 ]);
 const PATH_IN_ROW = /`((?:src|web\/src|test|tools)\/[\w./-]+\.(?:ts|tsx|mjs|js|css|md))`/g;
 

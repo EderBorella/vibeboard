@@ -542,7 +542,13 @@ describe('AgentRunner.dispatch', () => {
     const final = await settled(root, run);
     expect(final.status).toBe('cancelled');
     expect(final.note).toBe('You stopped this run.');
-  });
+    // 20s LIKE ITS TWO NEIGHBOURS, and it was the only one in the group without it. This spawns a real
+    // child, cancels it, and waits for it to settle, so the 5s default was the whole budget for a spawn
+    // plus a kill plus a settle — it timed out at 5003ms once and passed on three re-runs.
+    // MEASURED BEFORE CHANGING, because a timeout raised on a hunch hides a real slowdown: the test
+    // costs 104ms here, and stayed at 104ms with six copies of the file running at once. That is a 48x
+    // margin, so this is about the bound being inconsistent with its neighbours rather than tight.
+  }, 20_000);
 
   it('fails a run that outlives its timeout', async () => {
     const shim = behaving('hang');

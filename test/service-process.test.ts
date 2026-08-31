@@ -416,7 +416,13 @@ describe('the loop’s output', () => {
     const file = join(await tempDir(), 'autopilot.log');
     const { service } = await harness({ output: file, debugLog: true });
     await service.start();
-    const text = await captured(file, 'shim on stdout');
+    // WAIT ON THE LATER LINE, NOT THE EARLIER ONE. The shim writes stdout then stderr on consecutive
+    // lines, and both land on the same descriptor — so a reader can legitimately observe the state
+    // between the two writes. `captured` returns the file as of the poll that first saw its needle, so
+    // waiting on `'shim on stdout'` and then asserting stderr is a race the test only wins because the
+    // window is sub-millisecond and the box is usually idle.
+    // The sibling test above already waits on stderr and says why; this one was not updated with it.
+    const text = await captured(file, 'shim on stderr');
     expect(text).toContain('shim on stdout');
     expect(text).toContain('shim on stderr');
   });

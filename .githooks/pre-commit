@@ -82,6 +82,29 @@ fi
 ln -s "$REPO/node_modules" "$SNAP/node_modules" || exit 1
 cd "$SNAP" || exit 1
 
+# THE SUITE MUST NEVER INHERIT A POINTER TO THE REPOSITORY IT IS BEING RUN AGAINST, and until this
+# line it did. `git commit` inside a linked worktree exports an ABSOLUTE `GIT_DIR` into the hook's
+# environment; the git tests inherit it, and instead of operating on their own temp fixtures they
+# operate on THIS repository. Observed on 2026-08-17, all of it:
+#
+#   * `.git/config` replaced with a fixture's — `bare = true`, so `git status` in the main checkout
+#     answered "this operation must be run in a work tree", and `hooksPath = .nohooks`, which
+#     silently disabled this gate for every later commit;
+#   * the feature branch moved onto a fixture commit, with two stray branches left behind;
+#   * 56 unrelated failures in the same run, because `ensureRepo`'s `git rev-parse
+#     --is-inside-work-tree` answers TRUE in every temp directory once `GIT_DIR` is absolute, so
+#     `git init` never ran and every scaffold test found no `.git`.
+#
+# Nothing was lost, but recovery was manual and the disabled hook could have gone unnoticed for days.
+#
+# AFTER `git checkout-index` AND NOT BEFORE: that command is the one thing here that legitimately
+# needs the variables, because reading the staged tree is exactly what they point at. Everything
+# below this line runs against `$SNAP` and must not be able to find the real repository at all.
+#
+# All four, not just `GIT_DIR`: `GIT_INDEX_FILE` and `GIT_WORK_TREE` reach a test the same way, and
+# `GIT_COMMON_DIR` is the one a worktree sets that the other three do not imply.
+unset GIT_DIR GIT_INDEX_FILE GIT_WORK_TREE GIT_COMMON_DIR
+
 VITEST=./node_modules/.bin/vitest
 
 # ---- formatting -------------------------------------------------------------------------------

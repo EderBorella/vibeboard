@@ -1,7 +1,7 @@
 import { chmodSync, readdirSync, statSync } from 'node:fs';
-import { rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { removeRunRoot } from './run-tmp.js';
 
 const TEST_DIR = fileURLToPath(new URL('.', import.meta.url));
 
@@ -30,17 +30,17 @@ function makeStubsExecutable(dir: string): void {
 // The root has to exist before the config's `env` block can point at it, so it is made there and only
 // cleaned up here — which is why `setup` does no directory work of its own.
 //
-// If a run is SIGKILLed teardown never fires and one `vibeboard-run-*` tree survives. That is the
-// deliberate trade: one attributable directory per crashed run, instead of hundreds of anonymous ones
-// per successful run.
+// SIGNALS ARE HANDLED IN `vitest.config.ts` NOW, not here: teardown does not run when the process is
+// interrupted, so Ctrl-C used to leak a whole tree every time. Only SIGKILL survives, which is
+// unclosable by construction and stays the deliberate trade — one attributable directory per killed
+// run, instead of hundreds of anonymous ones per successful run.
 export function setup(): void {
   makeStubsExecutable(TEST_DIR);
 }
 
-export async function teardown(): Promise<void> {
-  const root = process.env.VIBEBOARD_TEST_TMP;
-  // Refuse anything that is not one of ours. A teardown that ran `rm -rf` on an empty or unexpected
-  // path is a worse bug than the leak it is fixing.
-  if (!root || !/vibeboard-run-[^/]+$/.test(root)) return;
-  await rm(root, { recursive: true, force: true });
+export function teardown(): void {
+  // THE GUARD AND THE DELETE BOTH LIVE IN `test/run-tmp.ts` NOW, because `vitest.config.ts` needs the
+  // same pair for its signal handlers — and a `rm -rf` whose safety check is written twice is a
+  // `rm -rf` whose two copies will disagree eventually.
+  removeRunRoot(process.env.VIBEBOARD_TEST_TMP);
 }

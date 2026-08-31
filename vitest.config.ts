@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';
+import { removeRunRoot } from './test/run-tmp.js';
 
 // One directory per test RUN, holding every temp project the suite creates, removed by
 // test/global-teardown.ts when the run ends.
@@ -21,6 +22,39 @@ import { defineConfig } from 'vitest/config';
 // in this process, reads the former.
 const RUN_TMP = mkdtempSync(join(tmpdir(), 'vibeboard-run-'));
 process.env.VIBEBOARD_TEST_TMP = RUN_TMP;
+
+// AND REMOVED ON THE WAY OUT, NOT ONLY ON A CLEAN FINISH. `test/global-teardown.ts` handles the normal
+// end of a run; it never fires when the process is signalled, so every Ctrl-C left a whole scaffolded
+// tree behind. Reproduced before fixing rather than assumed: `SIGINT` to a running suite took the count
+// of `/tmp/vibeboard-run-*` from 4 to 5.
+//
+// That is the same class of leak that once put 440,653 trees in `/tmp` and exhausted the filesystem's
+// INODE table — 9.43M of 9.83M — while 61G of block space sat free, where the symptom is one arbitrary
+// test failing per run and looking exactly like flaky code.
+//
+// `once` and an explicit exit: attaching ANY listener to `SIGINT` disables Node's default terminate, so
+// a handler that only cleaned up would hang the suite on Ctrl-C. 130 and 143 are the conventional
+// 128+signal codes, which is what a shell reports for an interrupted process.
+//
+// MEASURED BY NAME, NOT BY COUNT, and the first three attempts to prove this were wrong because of it.
+// Counting `/tmp/vibeboard-run-*` races the directory's own creation and removal: it read 5 mid-run,
+// then 4 a few seconds later, which looked like "vitest cleans up on its own, just slowly" and would
+// have made this change redundant. Capturing the root's NAME first and then asking whether that exact
+// path survives gives the real answer — unpatched SIGINT leaks it, patched does not, and unpatched
+// SIGKILL leaks it either way, which is the documented trade below.
+//
+// `exit` as well, because it catches the paths a signal handler cannot — an unhandled rejection, an
+// explicit non-zero exit. It must be synchronous, which is why `removeRunRoot` is.
+//
+// SIGKILL remains unclosable by construction and stays the documented trade: one attributable directory
+// per killed run, rather than hundreds of anonymous ones per successful one.
+for (const signal of ['SIGINT', 'SIGTERM'] as const) {
+  process.once(signal, () => {
+    removeRunRoot(RUN_TMP);
+    process.exit(signal === 'SIGINT' ? 130 : 143);
+  });
+}
+process.on('exit', () => removeRunRoot(RUN_TMP));
 
 // NO GIT COMMAND THIS SUITE RUNS MAY EVER FIND THIS REPOSITORY'S OWN `.git`.
 //

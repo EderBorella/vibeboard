@@ -336,3 +336,54 @@ describe('a report whose frontmatter YAML refuses', () => {
     expect(parseAgentReport(report('a: b', 'maybe')).verdict).toBeUndefined();
   });
 });
+
+// THE THREE SHAPES THAT WERE READ AS NO VERDICT AT ALL, each observed in a real review run and none of
+// them covered until now. An unreadable verdict is not a cosmetic loss: it counts as an inconclusive
+// review, and three of those push the loop into "an API key, a disk or a model is the likelier cause
+// than the card" — a diagnosis of the machine when the agent had answered correctly.
+describe('a verdict the agent wrote in some other shape', () => {
+  it('reads a bare Verdict line in the body, with markdown emphasis', () => {
+    const report = parseAgentReport(
+      '# Review\n\n**Verdict: `sent-back`**\n\nThe tests do not cover the branch.',
+    );
+    expect(report.verdict).toBe('sent-back');
+  });
+
+  it('reads a verdict from a tagged fence', () => {
+    const report = parseAgentReport(
+      'Here is my answer:\n\n```yaml\nverdict: sent-back\nsummary: needs a test\n```\n',
+    );
+    expect(report.verdict).toBe('sent-back');
+    expect(report.summary).toBe('needs a test');
+  });
+
+  it('reads a verdict from a frontmatter block that was fenced by mistake', () => {
+    const report = parseAgentReport('```\n---\nverdict: done\n---\n```\n\nLooks right.');
+    expect(report.verdict).toBe('done');
+  });
+
+  // PRECEDENCE, and without it the body reader is free to overwrite the contract. A report with real
+  // frontmatter AND a later mention in its prose must answer with the frontmatter.
+  // PRECEDENCE, AND IT TOOK THREE ATTEMPTS TO WRITE A FIXTURE THAT TESTS IT. Two conditions have to
+  // hold at once for the first-wins rule to be reachable at all: YAML must have THROWN, or the rescue
+  // is never consulted; and the second pair must genuinely read as `verdict: x`, or nothing contends.
+  //
+  // The first version used valid frontmatter, so `matter` answered and the rescue was irrelevant. The
+  // second used prose — "I considered whether the verdict: sent-back would be fairer" — whose key
+  // parses as the whole leading clause and is not in the allow-list. Both passed with the guard
+  // deleted, which is the only reason they were caught.
+  it('prefers the block over a later line when YAML has thrown', () => {
+    // The colon-space in an unquoted scalar is the exact shape that threw in the real incident.
+    const report = parseAgentReport(
+      '---\nverdict: done\nsummary: formats pairs as "word: count" strings\n---\n\nverdict: sent-back',
+    );
+    expect(report.verdict).toBe('done');
+  });
+
+  // AND THE NEGATIVE, which is what stops the body reader turning any prose into an answer. A report
+  // that never states a verdict must still come back without one — silence is not success.
+  it('still reports no verdict when the agent never gave one', () => {
+    const report = parseAgentReport('# Review\n\nI read the diff and have some thoughts about it.');
+    expect(report.verdict).toBeUndefined();
+  });
+});

@@ -108,6 +108,46 @@ const COUNT_OPTIONALS = [
   { key: 'pgstart', min: 1 },
 ] as const;
 
+// EVERY FIELD THIS FILE READS, NAMED — and the compiler checks the list is complete.
+//
+// `serialize.ts` has carried `_everyFieldIsWritten` for a long time: add a field to `RunRecord`, forget
+// to write it, and the typecheck fails. Reading had no equivalent, so the guard was one-directional —
+// a new field could be added, written, round-tripped past `npm run check`, and then silently dropped on
+// the way back in. It would not throw and it would not fail a gate; the value would just be gone, and
+// the first symptom would be a dashboard column that is empty for no reason.
+//
+// The three `*_OPTIONALS` lists below are self-describing; these two are not, because they are read by
+// hand — the enum-guarded fields each need their own type predicate, and the required block in
+// `parseRun` reads its keys inline. Both are listed here so the union can be closed.
+const GUARDED_KEYS = ['outcome', 'fault', 'verdict', 'usage', 'verification'] as const;
+const REQUIRED_KEYS = [
+  'run',
+  'card',
+  'board',
+  'skill',
+  'status',
+  'started',
+  'backend',
+  'model',
+  'effort',
+  'mode',
+  'report',
+] as const;
+
+type ParsedKey =
+  | (typeof TEXT_OPTIONALS)[number]
+  | (typeof LIST_OPTIONALS)[number]
+  | (typeof COUNT_OPTIONALS)[number]['key']
+  | (typeof GUARDED_KEYS)[number]
+  | (typeof REQUIRED_KEYS)[number];
+
+// The same shape as `serialize.ts`'s check, pointed the other way: if a `RunRecord` field is not read
+// anywhere above, `Unread` is that field's name rather than `never` and this line stops compiling with
+// the missing name in the error.
+type Unread = Exclude<keyof RunRecord, ParsedKey>;
+const _everyFieldIsRead: Unread extends never ? true : Unread = true;
+void _everyFieldIsRead;
+
 function optionalFields(d: Record<string, unknown>): Partial<RunRecord> {
   const out: Partial<RunRecord> = {};
   for (const { key, min } of COUNT_OPTIONALS) {
@@ -184,23 +224,72 @@ export function parseRun(content: string): RunRecord | null {
 // thing that fails silently a month later, on one card, in a run nobody is watching.
 const RESCUED = ['outcome', 'verdict', 'summary'] as const;
 
+// One `key: value` line, if the key is one the machine acts on. Shared by all three readers below so
+// the quote-stripping and the allow-list exist in one place.
+function readPair(line: string, out: Record<string, string>): void {
+  const at = line.indexOf(':');
+  if (at <= 0) return;
+  // Markdown emphasis around the key, because a model writing prose writes `**Verdict:** sent-back`.
+  const key = line
+    .slice(0, at)
+    .trim()
+    .replace(/^\*+|\*+$/g, '')
+    .toLowerCase();
+  if (!(RESCUED as readonly string[]).includes(key)) return;
+  // FIRST WINS. A report can mention `verdict` again in its own prose — the line the agent wrote as its
+  // answer comes first, and a later mention must not overwrite it.
+  if (out[key] !== undefined) return;
+  // Surrounding quotes and emphasis stripped, because a value that WAS quoted is the one YAML would
+  // have read, and `**sent-back**` is the same answer wearing markdown.
+  out[key] = line
+    .slice(at + 1)
+    .trim()
+    .replace(/^(['"])(.*)\1$/, '$2')
+    .replace(/^\*+|\*+$/g, '')
+    .replace(/^`(.*)`$/, '$1')
+    .trim();
+}
+
+// THREE SHAPES, NOT ONE, and the two it could not see are the ones that cost three review runs.
+//
+// The original reader existed for frontmatter that YAML REFUSED — a colon-space in an unquoted scalar.
+// It required `---` on the first line, so it could not see a verdict written any other way, and three
+// shapes observed in real runs all failed it: a bare `**Verdict: \`sent-back\`**` in the body, a
+// ```yaml fence, and a markdown fence containing frontmatter. Each was read as NO verdict, counted as
+// an inconclusive review, and pushed the loop towards "an API key, a disk or a model is the likelier
+// cause than the card" — when the agent had answered correctly and the machine could not hear it.
+//
+// TWO READERS, IN ORDER, AND THE ORDER IS THE PRIORITY: a real frontmatter block is the contract and
+// wins; a line anywhere else is the fallback. `readPair` keeps the first value it sees, so the body can
+// never overwrite the block.
+//
+// THIS DOES NOT MAKE THE PROMPT'S CONTRACT OPTIONAL. `contracts.ts` still shows the exact frontmatter
+// and says to quote a value containing a colon. A prompt-only fix lowers the odds and cannot close it,
+// which is the argument this whole function was written under; a reader-only fix would licence any
+// shape at all. Both, and the contract is still what is asked for.
 function rescueFrontmatter(content: string): Record<string, string> {
   const lines = content.split('\n');
-  if (lines[0]?.trim() !== '---') return {};
-  const end = lines.indexOf('---', 1);
-  if (end === -1) return {};
   const out: Record<string, string> = {};
-  for (const line of lines.slice(1, end)) {
-    const at = line.indexOf(':');
-    if (at <= 0) continue;
-    const key = line.slice(0, at).trim();
-    if (!(RESCUED as readonly string[]).includes(key)) continue;
-    // Surrounding quotes stripped, because a value that WAS quoted is the one YAML would have read.
-    out[key] = line
-      .slice(at + 1)
-      .trim()
-      .replace(/^(['"])(.*)\1$/, '$2');
+
+  // 1. A frontmatter block, whether or not YAML could read it.
+  if (lines[0]?.trim() === '---') {
+    const end = lines.indexOf('---', 1);
+    if (end !== -1) for (const line of lines.slice(1, end)) readPair(line, out);
   }
+
+  // 2. Any line in the body, INCLUDING inside a fence. A tagged ```yaml block, a bare fence and a
+  //    frontmatter block that was fenced by mistake all reduce to "a line somewhere that reads
+  //    `verdict: x`", so they need no reader of their own.
+  //
+  //    THERE WAS A SEPARATE FENCE READER HERE AND IT IS DELETED, because a planted defect proved it
+  //    was doing nothing: removing it left all three fenced tests passing. Nothing in the code could
+  //    tell the two apart, and code no test can distinguish is code that will rot without anyone
+  //    noticing. The frontmatter reader above still runs FIRST, so the contract still wins.
+  //    Deliberately the weakest reader: it matches any line at all, so it is the one most likely to
+  //    catch a mention rather than an answer — which is why it runs after the block above and, through
+  //    `readPair`'s first-wins rule, cannot overwrite it.
+  for (const line of lines) readPair(line, out);
+
   return out;
 }
 

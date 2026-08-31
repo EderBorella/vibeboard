@@ -46,6 +46,13 @@ Constraints that bind every step:
 8. **Count your replacements when editing by script.** Anchor on enough context to be unique, or
    pass a count of one. A whole-file substitution meant for one site has silently rewritten a
    neighbour here before.
+9. **A symbol named by two concurrent tasks gets one test with no fakes on either side.** Two agents
+   built to a shared contract, `boxCredentialPath()`, and both were right: one moved the credential to
+   a directory mount, the other compared the file's inode on each side to detect staleness. Together
+   they compared a file with itself — equal by construction, on every machine, forever. **Every test
+   passed**, because each injected a fake host inode and a fake docker, so neither ever exercised the
+   real pair. A seam mocked on both sides proves the mock agrees with itself. If your task names a
+   symbol another task also names, one test must call the real thing on both ends.
 9. **Never `npx <tool>`.** The project's script or `./node_modules/.bin/`.
 10. **Never quote a number from truncated output**, and never read a report the run did not write.
 

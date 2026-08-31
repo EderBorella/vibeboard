@@ -84,3 +84,7 @@ edit the nearest plausible thing. This is the single most important constraint o
 - Never shrink the scope silently. If it is bigger than the prompt implied, say so under Attention
   points and let the architect and owner phase it.
 - Never defer. Plan the whole thing.
+- **If two steps of your plan name the same symbol, say so in the plan and require one un-mocked test
+  over it.** Two correct changes to `boxCredentialPath()` cancelled each other out here and the whole
+  suite stayed green, because each side was tested against its own fake. A shared contract is the one
+  place where two passing tests prove less than one.

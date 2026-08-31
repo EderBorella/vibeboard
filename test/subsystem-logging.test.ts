@@ -277,12 +277,14 @@ describe('the OpenCode backend', () => {
     expect(failure?.err).toEqual(error);
     // The session the turn was POSTed to, so the failure can be looked up in opencode's own store.
     expect(failure?.sessionId).toBe('ses_fake');
-    // The transcript still gets one readable line — with the NAME, which is what "Streaming response
-    // failed" on its own was missing.
-    expect(events).toContainEqual({
-      kind: 'text',
-      text: '\n[opencode: ProviderStreamError: Streaming response failed]',
-    });
+    // THE SPLIT THIS TEST IS ABOUT IS UNCHANGED: the whole object goes to the log, one readable line
+    // goes to the transcript. What changed on 2026-08-31 is that the line is an `error` event rather
+    // than a `text` one — a failure is not something the model said — and it leads with a remedy
+    // instead of a payload. The NAME still reaches the user, which is what "Streaming response
+    // failed" on its own was missing, and a 502 classifies as a provider fault, so it offers a retry.
+    const failureEvent = events.find((e) => e.kind === 'error');
+    expect(failureEvent?.text).toContain('ProviderStreamError: Streaming response failed');
+    expect(failureEvent?.retryable).toBe(true);
   });
 
   it('says nothing when the turn worked', async () => {

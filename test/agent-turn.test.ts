@@ -503,9 +503,13 @@ describe('the opencode backend', () => {
     expect(result.stats?.contextTokens).toBe(0);
     expect(result.stats?.outputTokens).toBe(0);
     expect(result.stats?.ok).toBe(false);
-    // And the transcript still says what happened, in the harness's own words — that sentence is what
-    // the stop and both lights quote back to the user.
-    expect(events).toContainEqual({ kind: 'text', text: '\n[opencode failed: fetch failed]' });
+    // And the transcript still says what happened — that sentence is what the stop and both lights
+    // quote back to the user. It is an `error` event since 2026-08-31, not a `text` one: reporting a
+    // failure as something the model said made it unstyleable and left nothing to act on. `fetch
+    // failed` classifies as a provider fault, so it carries a retry.
+    const failure = events.find((e) => e.kind === 'error');
+    expect(failure?.text).toContain('fetch failed');
+    expect(failure?.retryable).toBe(true);
   });
 
   it('claims nothing when the server ANSWERED and then failed', async () => {
@@ -553,18 +557,23 @@ describe('the opencode backend', () => {
     expect(client.opencodeTurn.mock.calls[0][0].system).toContain('Prefer small cards.');
   });
 
-  it('reports a failure as text and a non-zero exit', async () => {
+  it('reports a failure as an error event, a remedy and a non-zero exit', async () => {
     client.opencodeTurn.mockRejectedValueOnce(new Error('connect ECONNREFUSED'));
     const { result, events } = await opencodeTurn();
     expect(result).toEqual({ model: 'opencode/nemotron', exitCode: 1, timedOut: false });
-    expect(events.some((e) => e.kind === 'text' && e.text.includes('[opencode failed:'))).toBe(true);
-    expect(events.some((e) => e.kind === 'text' && e.text.includes('ECONNREFUSED'))).toBe(true);
+    const failure = events.find((e) => e.kind === 'error');
+    // THE RAW CAUSE SURVIVES, in parentheses after the sentence. Dropping it would make an
+    // unrecognised failure undiagnosable, which is the opposite of the problem being fixed.
+    expect(failure?.text).toContain('ECONNREFUSED');
+    // And the remedy is there, which is the half that was missing entirely.
+    expect(failure?.text).toMatch(/try again/i);
+    expect(failure?.retryable).toBe(true);
   });
 
   it('describes a rejection that is not an Error', async () => {
     client.opencodeTurn.mockRejectedValueOnce('the server went away');
     const { events } = await opencodeTurn();
-    expect(events.some((e) => e.kind === 'text' && e.text.includes('the server went away'))).toBe(true);
+    expect(events.some((e) => e.kind === 'error' && e.text.includes('the server went away'))).toBe(true);
   });
 
   it('times out by aborting the request, and does not also blame the client', async () => {

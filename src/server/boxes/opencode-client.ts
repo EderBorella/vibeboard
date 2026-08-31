@@ -1,4 +1,5 @@
 import { Agent, fetch as undiciFetch } from 'undici';
+import { classifyCopilotError } from '../../core/copilot-errors.js';
 import { type CopilotEvent, num } from '../copilot-events.js';
 import { opencodeBaseUrl, opencodeDirectory, opencodeLog } from './opencode-server.js';
 
@@ -86,7 +87,14 @@ export function messageToEvents(data: OcMessageResponse, measuredMs: number): Me
   const tk = info.tokens ?? {};
   const contextTokens = num(tk.input) + num(tk.cache?.read) + num(tk.cache?.write);
   events.push({ kind: 'usage', contextTokens });
-  if (info.error) events.push({ kind: 'text', text: `\n[opencode: ${errorText(info.error)}]` });
+  // A COMPLETED TURN CARRYING AN ERROR IS STILL AN ERROR. This pushed `kind: 'text'`, so the failure
+  // arrived as an ordinary assistant bubble wearing the provider's payload — the exact `[opencode:
+  // UnknownError: {"code":429,…}]` the owner saw on 2026-08-31. `classifyCopilotError` turns it into a
+  // situation and a remedy, and `retryable` is what puts a Retry beside it.
+  if (info.error) {
+    const classified = classifyCopilotError(errorText(info.error));
+    events.push({ kind: 'error', text: classified.sentence, retryable: classified.retryable });
+  }
   events.push({
     kind: 'result',
     sessionId: info.sessionID ?? '',

@@ -24,6 +24,12 @@ export type CopilotEvent =
   | { kind: 'tool_result'; text: string }
   | { kind: 'usage'; contextTokens: number } // per-call window occupancy, from message.usage
   | { kind: 'result'; sessionId: string; stats: ResultStats }
+  // WHAT WENT WRONG, AND WHETHER TO OFFER A RETRY. Added 2026-08-31: the three sites that report a
+  // failed turn all pushed `kind: 'text'`, so a 429 rendered as an ordinary assistant bubble carrying
+  // the provider's raw JSON. `text` is what the MODEL said; an error is not that, and the difference
+  // is what lets the chat style it, and the panel offer a remedy beside it.
+  // `sentence` comes from `core/copilot-errors.ts` and is not reworded downstream.
+  | { kind: 'error'; text: string; retryable: boolean }
   // Incremental (--include-partial-messages) streaming events:
   | { kind: 'block_start'; block: 'text' | 'thinking' | 'tool_use' }
   | { kind: 'text_delta'; text: string }

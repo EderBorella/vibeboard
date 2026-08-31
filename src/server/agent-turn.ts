@@ -2,6 +2,7 @@ import { type ChildProcess, spawn } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { classifyCopilotError } from '../core/copilot-errors.js';
 import { INSTRUCTIONS_FILE } from '../core/layout.js';
 import { groupStartTime, terminateGroup } from '../exec/process-group.js';
 import { boxEnvFor } from './boxes/containers.js';
@@ -246,7 +247,12 @@ function startOpencode(opts: AgentTurnOptions): RunningTurn {
       });
       return { sessionId, model: opts.model, exitCode: 0, timedOut, stats };
     } catch (err) {
-      if (!timedOut) opts.onEvent({ kind: 'text', text: `\n[opencode failed: ${errorText(err)}]` });
+      // AN ERROR, NOT PROSE — the same correction as opencode-client.ts. This wrote the failure into
+      // the transcript as something the model had said, so it could be neither styled nor acted on.
+      if (!timedOut) {
+        const classified = classifyCopilotError(errorText(err));
+        opts.onEvent({ kind: 'error', text: classified.sentence, retryable: classified.retryable });
+      }
       return failedTurn(err, { opts, timedOut, startedAt, ...(stats ? { stats } : {}) });
     } finally {
       clearTimeout(timer);

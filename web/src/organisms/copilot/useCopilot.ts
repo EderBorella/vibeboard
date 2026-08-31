@@ -19,6 +19,10 @@ interface TurnOptions {
 export interface TranscriptItem {
   id: number;
   kind: 'user' | 'assistant' | 'thinking' | 'tool' | 'tool_result' | 'error';
+  // Set on `error` items only. It gates the Retry beside the line: an expired credential fails
+  // identically however many times it is resent, and a button that cannot work teaches people the
+  // control does nothing. Decided on the server — see src/core/copilot-errors.ts.
+  retryable?: boolean;
   text: string;
   toolName?: string;
 }
@@ -41,6 +45,7 @@ interface CopilotEvent {
     | 'usage'
     | 'block_start'
     | 'text_delta'
+    | 'error'
     | 'thinking_delta'
     | 'block_stop';
   text?: string;
@@ -49,6 +54,10 @@ interface CopilotEvent {
   sessionId?: string;
   model?: string;
   contextTokens?: number;
+  // On `error` events only. Whether resending the same message could plausibly work — decided on the
+  // server in src/core/copilot-errors.ts and never re-judged here, for the reason `agentStatus`
+  // states about the auto-pilot bar: one fault must not have two descriptions.
+  retryable?: boolean;
   // `turns` is absent on backends that report no turn count (OpenCode), so it is optional here too —
   // adding undefined to the running total would put NaN in the footer readout.
   stats?: { costUsd: number; durationMs: number; turns?: number; contextTokens: number };
@@ -70,7 +79,7 @@ type WsCopilotMessage =
       stats: CopilotStats;
     }
   | { type: 'copilot:chats'; chats: ChatMeta[]; currentChatId?: string }
-  | { type: 'copilot:error'; error: string };
+  | { type: 'copilot:error'; error: string; retryable?: boolean };
 
 export function useCopilot(bump: number) {
   const [items, setItems] = useState<TranscriptItem[]>([]);
@@ -188,6 +197,12 @@ export function useCopilot(bump: number) {
           streamId.current = null;
           push({ kind: 'tool', text: '', toolName: e.name });
           break;
+        case 'error':
+          // A FAILED TURN ENDS THE STREAM. Clearing `streamId` matters: a turn that errors mid-answer
+          // would otherwise leave the next delta appending to a bubble from the dead turn.
+          streamId.current = null;
+          push({ kind: 'error', text: e.text ?? '', retryable: e.retryable ?? false });
+          break;
         case 'tool_result':
           break; // tool results are noisy; the board reflects file changes
         case 'usage':
@@ -234,7 +249,7 @@ export function useCopilot(bump: number) {
             setCurrentChatId(m.currentChatId);
             break;
           case 'copilot:error':
-            push({ kind: 'error', text: m.error });
+            push({ kind: 'error', text: m.error, retryable: m.retryable ?? false });
             break;
         }
       }),

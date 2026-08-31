@@ -64,22 +64,28 @@ describe('messageToEvents', () => {
       parts: [],
     };
     const { events } = messageToEvents(data, 0);
-    expect(events.some((e) => e.kind === 'text' && e.text.includes('model deprecated'))).toBe(true);
+    // `error`, NOT `text`. It used to be `text`, which is what the model SAID — so a failed turn
+    // arrived as an ordinary assistant bubble that could be neither styled nor acted on.
+    expect(events.some((e) => e.kind === 'error' && e.text.includes('model deprecated'))).toBe(true);
     expect(result(data, 0).stats.ok).toBe(false);
   });
 
   describe('the error it reports', () => {
     // The failure this change exists for: `[opencode: Streaming response failed]` was all a failed
     // run left behind, and it names neither the kind of fault nor the provider that had it.
+    // SINCE 2026-08-31 the composed string is the INPUT to `classifyCopilotError` rather than the
+    // output: what the user reads is a situation and a remedy, with this appended in parentheses so
+    // an unrecognised failure stays diagnosable. These cases still pin the composition.
     it('names the error as well as its message, when both are there and differ', () => {
       const { events } = messageToEvents(
         { info: { error: { name: 'ProviderStreamError', data: { message: 'Streaming response failed' } } } },
         0,
       );
-      expect(events).toContainEqual({
-        kind: 'text',
-        text: '\n[opencode: ProviderStreamError: Streaming response failed]',
-      });
+      // The COMPOSITION is still the subject — name plus message — but it is now the input to
+      // `classifyCopilotError` rather than the whole of what the user reads, so it is asserted as a
+      // substring of the sentence instead of as the sentence.
+      const error = events.find((e) => e.kind === 'error');
+      expect(error?.text).toContain('ProviderStreamError: Streaming response failed');
     });
 
     it('says it once when the name and the message are the same string', () => {
@@ -87,18 +93,19 @@ describe('messageToEvents', () => {
         { info: { error: { name: 'Overloaded', data: { message: 'Overloaded' } } } },
         0,
       );
-      expect(events).toContainEqual({ kind: 'text', text: '\n[opencode: Overloaded]' });
+      const error = events.find((e) => e.kind === 'error');
+      expect(error?.text).toContain('Overloaded');
+      // Once, not twice — that is what this case has always been about.
+      expect(error?.text.match(/Overloaded/g)).toHaveLength(1);
     });
 
     it('falls back to the name, then to a plain word, when there is no message', () => {
-      expect(messageToEvents({ info: { error: { name: 'AuthError' } } }, 0).events).toContainEqual({
-        kind: 'text',
-        text: '\n[opencode: AuthError]',
-      });
-      expect(messageToEvents({ info: { error: {} } }, 0).events).toContainEqual({
-        kind: 'text',
-        text: '\n[opencode: error]',
-      });
+      const named = messageToEvents({ info: { error: { name: 'AuthError' } } }, 0).events.find(
+        (e) => e.kind === 'error',
+      );
+      expect(named?.text).toContain('AuthError');
+      const bare = messageToEvents({ info: { error: {} } }, 0).events.find((e) => e.kind === 'error');
+      expect(bare?.text).toContain('error');
     });
 
     it('threads the WHOLE error object out, not just the part it printed', () => {

@@ -1,4 +1,5 @@
 import { resolveCopilotSelection } from '../../core/copilot-choice.js';
+import { classifyCopilotError } from '../../core/copilot-errors.js';
 import type { Credential } from '../auth/credentials.js';
 import { attachedOpencodeUrl } from '../boxes/opencode-server.js';
 import { agentRefusal } from '../boxes/sandbox.js';
@@ -145,9 +146,12 @@ export function createCopilotTurns(ctx: AppCtx): {
         },
       });
     } catch (err) {
-      const message = errorText(err);
-      chats.recordError(message);
-      broadcast({ type: 'copilot:error', error: message });
+      // CLASSIFIED HERE TOO, so all three failure paths speak one vocabulary. This one already
+      // rendered as an error rather than as prose — it was the only one that did — but it offered no
+      // remedy either, which is the other half of the complaint.
+      const classified = classifyCopilotError(errorText(err));
+      chats.recordError(classified.sentence);
+      broadcast({ type: 'copilot:error', error: classified.sentence, retryable: classified.retryable });
     } finally {
       await chats.flush();
       await broadcastChatList();

@@ -72,8 +72,12 @@ function BackendStatus({ status }: { status: ModelStatus }) {
 //
 // Lifted out of the panel for `BackendStatus`’s reason: two conditionals of its own on a function
 // already at the limit.
-function MessageLine({ item }: { item: TranscriptItem }) {
+function MessageLine({ item, onRetry }: { item: TranscriptItem; onRetry?: () => void }) {
   const error = item.kind === 'error';
+  // OFFERED ON THE LAST ERROR ONLY, and only when the server called the failure retryable. `onRetry`
+  // is absent on every other line, so a transcript scrolled back through does not sprout buttons that
+  // would resend the current message from beside an old failure.
+  const retry = error && item.retryable && onRetry;
   return (
     <div
       className={error ? `msg ${stateClass('error')}` : `msg msg-${item.kind}`}
@@ -88,6 +92,15 @@ function MessageLine({ item }: { item: TranscriptItem }) {
         <Text role="hint">{item.text}</Text>
       ) : (
         item.text
+      )}
+      {retry && (
+        // Inside the bubble rather than beside it: the remedy belongs to the failure it answers, and a
+        // control floating in the transcript would have nothing naming what it retries.
+        <Stack gap={3} pad={[3, 0, 0]}>
+          <Button size="sm" onClick={onRetry} title="Send the same message again">
+            Retry
+          </Button>
+        </Stack>
       )}
     </div>
   );
@@ -193,6 +206,19 @@ export function CopilotPanel({
     send(draft, turnOpts());
     setDraft('');
   };
+
+  // RESEND THE LAST THING THE USER ASKED, WITH THE OPTIONS IN FORCE NOW — deliberately not the ones
+  // the failed turn used. A rate limit is most often answered by switching model, and a Retry that
+  // insisted on the model that was just throttled would be the least useful button on the surface.
+  // `turnOpts()` is the same call `submit` makes, so Retry and Send cannot disagree about what runs.
+  //
+  // The LAST user line rather than a remembered string: the transcript is already the record, and a
+  // separate copy would be a second source that drifts the moment a chat is switched or reopened.
+  const lastUserText = [...items].reverse().find((it) => it.kind === 'user')?.text;
+  const retry = lastUserText && !running ? () => send(lastUserText, turnOpts()) : undefined;
+  // Only the FINAL item may offer it. An error four messages back has been answered by whatever came
+  // after it, and a button there would resend today's message from beside yesterday's failure.
+  const lastId = items.length > 0 ? items[items.length - 1]?.id : undefined;
 
   return (
     <aside className="copilot">
@@ -339,7 +365,7 @@ export function CopilotPanel({
           </Text>
         )}
         {items.map((it) => (
-          <MessageLine key={it.id} item={it} />
+          <MessageLine key={it.id} item={it} onRetry={it.id === lastId ? retry : undefined} />
         ))}
         {/* THE INDICATOR REPLACES `…working`, which was the whole of the old signal: a static string
             that said the same thing at one second and at three minutes. It could not distinguish a

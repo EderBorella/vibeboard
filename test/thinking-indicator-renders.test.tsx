@@ -111,3 +111,52 @@ describe('the thinking indicator in the panel', () => {
     expect(getByRole('button', { name: 'Stop' })).toBeTruthy();
   });
 });
+
+// THE REMEDY BESIDE THE FAILURE. Before this, a 429 arrived as an ordinary assistant bubble carrying
+// the provider's raw JSON and offered nothing to do about it.
+describe('retrying a failed turn', () => {
+  const errored = (retryable: boolean) => ({
+    running: false,
+    items: [
+      { id: 1, kind: 'user' as const, text: 'do the thing' },
+      { id: 2, kind: 'error' as const, text: 'The provider is rate-limiting this model.', retryable },
+    ],
+  });
+
+  it('offers Retry on a retryable error and resends the last user message', () => {
+    const send = vi.fn();
+    panel({ ...errored(true), send });
+    screen.getByRole('button', { name: 'Retry' }).click();
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send.mock.calls[0]?.[0]).toBe('do the thing');
+  });
+
+  // THE ROW WHERE A BUTTON WOULD LIE. An expired credential fails identically however many times it
+  // is resent; offering the control would teach people it does nothing.
+  it('offers no Retry when the server says the failure is not retryable', () => {
+    panel(errored(false));
+    expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull();
+  });
+
+  // AND NOT ON AN OLD ERROR. A failure four messages back has been answered by whatever came after
+  // it; a button there would resend today's message from beside yesterday's failure. Without this the
+  // first test passes on a component that puts Retry on every error line it ever renders.
+  it('offers no Retry on an error that is not the last line', () => {
+    panel({
+      running: false,
+      items: [
+        { id: 1, kind: 'user' as const, text: 'do the thing' },
+        { id: 2, kind: 'error' as const, text: 'rate limited', retryable: true },
+        { id: 3, kind: 'user' as const, text: 'never mind, do this instead' },
+        { id: 4, kind: 'assistant' as const, text: 'done' },
+      ],
+    });
+    expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull();
+  });
+
+  // While a turn is running there is nothing to retry, and a second send would race the first.
+  it('offers no Retry while a turn is running', () => {
+    panel({ ...errored(true), running: true });
+    expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull();
+  });
+});

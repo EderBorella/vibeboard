@@ -53,3 +53,6 @@ test/fixtures/.shim-args.log
 
 # Storybook's static build — a dev workbench, never deployed.
 storybook-static/
+
+# Claude Code: the project setup is committed; per-machine overrides are not.
+.claude/settings.local.json

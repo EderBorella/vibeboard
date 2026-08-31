@@ -132,11 +132,31 @@ const isKind = oneOf(DIARY_KINDS);
 
 // `null` for anything this module did not write. The checkup reasons about what comes back, so a
 // hand-typed line becoming an event would be a fact nobody stated.
+// A TIMESTAMP THIS MODULE COULD HAVE WRITTEN, not merely one shaped like one.
+//
+// `LINE` is a SHAPE: `\d{4}-\d{2}-\d{2}` accepts `9999-99-99`, and `[\d:.]+` accepts `:::` with no
+// digits in it at all. Nothing downstream re-validated — `parseEntry` copied `at` through verbatim —
+// so a hand-edited file could put an impossible date into the checkup's reasoning.
+//
+// `Date.parse` and not a tighter regex: a regex that accepts only real dates has to know about month
+// lengths and leap years, which is a calendar reimplemented in a character class. The round trip is
+// the honest test — parse it, write it back, and require the same string. That also rejects a date
+// that is real but not CANONICAL (`2026-8-01`, a non-Z offset), which is the actual claim: this
+// module wrote it, or it did not.
+function isWrittenHere(at: string): boolean {
+  const ms = Date.parse(at);
+  return Number.isFinite(ms) && new Date(ms).toISOString() === at;
+}
+
 export function parseEntry(line: string): DiaryEntry | null {
   const match = LINE.exec(line);
   if (!match) return null;
   const [, at, kind, rest = ''] = match;
   if (at === undefined || kind === undefined || !isKind(kind)) return null;
+  // THE WHOLE ENTRY, not the field. The module's convention is `null` for anything it did not write,
+  // and an entry whose timestamp is impossible is not an entry with one bad field — there is no
+  // position on a timeline to put it at.
+  if (!isWrittenHere(at)) return null;
 
   // The prose is whatever follows the FIRST em dash separator; everything before it is structure. Split
   // on the separator rather than the character, so an em dash inside a summary stays in the summary.
@@ -157,6 +177,10 @@ export function parseEntry(line: string): DiaryEntry | null {
 // and so is the reader.
 function applyField(entry: DiaryEntry, label: string, value: string): void {
   if (label === 'iteration') {
+    // DECIMAL DIGITS ONLY. `Number('0x10')` is 16 and `Number('1e3')` is 1000 — both integers, both
+    // accepted by the old check, and neither is anything this module would have written. An iteration
+    // read as 16 when the file says `0x10` is a number nobody typed.
+    if (!/^\d+$/.test(value)) return;
     const n = Number(value);
     if (Number.isInteger(n) && n >= 0) entry.iteration = n;
     return;

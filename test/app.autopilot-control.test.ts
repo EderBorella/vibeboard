@@ -26,15 +26,37 @@ describe('the auto-pilot controls', () => {
     expect(await state(app)).toMatchObject({ code: 200, state: IDLE_STATE });
   });
 
+  // FROM `running`, because from `idle` a soft stop is a no-op as of 2026-08-31 — writing `stopped`
+  // over a project that never started described a stop with no run behind it, and nothing anywhere
+  // observed it. This test used to open a fresh project and stop it, so it was asserting the behaviour
+  // that was removed rather than the one it is named for.
   it('soft-stops without touching anything else', async () => {
-    const { app } = await openTestProject();
+    const { app, root } = await openTestProject();
+    // Put it in `running` on disk, the way four other tests in this file already do. `POST /start` is
+    // refused in a test project — readiness needs a backend — so it cannot be used to reach the state.
+    await writeAutopilotState(root, { ...IDLE_STATE, state: 'running', iteration: 4 });
     const res = await app.inject({ method: 'POST', url: '/api/autopilot/stop', payload: {} });
     expect(res.statusCode).toBe(200);
     expect((await state(app)).state).toMatchObject({ state: 'stopped', reason: 'stopped' });
   });
 
-  it('carries the detail into the sentence a person reads', async () => {
+  // THE NO-OP, asserted at the route rather than only on the runtime: a fresh project answers 200 and
+  // its state is untouched. `ok` and not a refusal — asking an idle project to stop is a request that
+  // is already satisfied.
+  it('answers a soft stop on a project that never ran without writing one', async () => {
     const { app } = await openTestProject();
+    const before = (await state(app)).state;
+    const res = await app.inject({ method: 'POST', url: '/api/autopilot/stop', payload: {} });
+    expect(res.statusCode).toBe(200);
+    expect((await state(app)).state).toEqual(before);
+    expect((await state(app)).state.state).toBe('idle');
+  });
+
+  it('carries the detail into the sentence a person reads', async () => {
+    const { app, root } = await openTestProject();
+    // In `running` first, for the reason above: a soft stop from idle now writes nothing, so there
+    // would be no sentence to carry a detail into.
+    await writeAutopilotState(root, { ...IDLE_STATE, state: 'running', iteration: 4 });
     await app.inject({
       method: 'POST',
       url: '/api/autopilot/stop',
@@ -133,11 +155,14 @@ describe('the auto-pilot controls', () => {
   // covered and the server's was not — so the promise that a kill in one tab raises the overlay in
   // another rested on nothing.
   it('pushes every state change to the other tabs', async () => {
-    const { app } = await openTestProject();
+    const { app, root } = await openTestProject();
     const address = await app.listen({ port: 0, host: '127.0.0.1' });
     const client = wsClient<{ type: string; state?: { state: string; reason?: string } }>(address);
     await client.open;
 
+    // In `running` first: a soft stop from idle is a no-op and pushes nothing, so waiting for a state
+    // here would hang until the test timed out.
+    await writeAutopilotState(root, { ...IDLE_STATE, state: 'running', iteration: 4 });
     await app.inject({ method: 'POST', url: '/api/autopilot/stop', payload: {} });
     const stopped = await client.waitFor((m) => m.type === 'autopilot:state');
     expect(stopped.state).toMatchObject({ state: 'stopped', reason: 'stopped' });

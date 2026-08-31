@@ -164,14 +164,31 @@ describe('restarting', () => {
 });
 
 describe('the runtime’s view of a project', () => {
-  it('announces every change once', async () => {
+  it('announces every change once, and a no-op is not a change', async () => {
     const root = await tempDir();
     const { runtime, changes } = build(root);
     await runtime.load();
+    // Soft-stopping an IDLE project writes nothing now, so it announces nothing. This used to expect
+    // three: the entry that reverted the no-op claimed four tests soft-stopped an idle project
+    // deliberately, and by 2026-08-31 it was this one.
     await runtime.softStop();
     await runtime.emergencyStop();
     await runtime.restart();
-    expect(changes).toHaveLength(3);
+    expect(changes).toHaveLength(2);
+  });
+
+  // THE NO-OP ITSELF, which nothing covered — the reverted fix had no test either way.
+  it('does not write `stopped` over a project that never ran', async () => {
+    const root = await tempDir();
+    const { runtime } = build(root);
+    await runtime.load();
+    const before = await readAutopilotState(root, AT);
+    const result = await runtime.softStop('never mind');
+    // `ok`, not a refusal: asking an idle project to stop is a request that is already satisfied, and
+    // a red message on a button press that did what the user wanted would be worse than nothing.
+    expect(result.ok).toBe(true);
+    expect(await readAutopilotState(root, AT)).toEqual(before);
+    expect((await readAutopilotState(root, AT)).state).toBe('idle');
   });
 
   it('refuses a soft stop while halted, and does not touch the file', async () => {

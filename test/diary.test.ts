@@ -284,3 +284,41 @@ describe('the timestamp and the kind', () => {
     expect(block.split('\n').filter((l) => l !== '')).toHaveLength(1);
   });
 });
+
+// A TIMESTAMP AND AN ITERATION THIS MODULE COULD HAVE WRITTEN, not merely ones shaped like them.
+// Both are reachable only by hand-editing the file — the endpoint stamps `nowIso()` and requires a
+// number — but a hand-edited diary is read by the checkup, so an impossible date reaching its
+// reasoning is a fact nobody stated.
+describe('a diary line that was not written here', () => {
+  it('refuses an impossible date that is the right shape', () => {
+    // `\d{4}-\d{2}-\d{2}` accepts this and `[\d:.]+` accepts a time with no digits at all.
+    expect(parseEntry('- `9999-99-99T:::Z` **note** hand-typed')).toBeNull();
+  });
+
+  it('refuses a real date written in a form this module would not produce', () => {
+    // Four fractional digits: `Date.parse` accepts it, `toISOString` writes three, so the round trip
+    // fails. That is the claim — this module wrote it, or it did not.
+    expect(parseEntry('- `2026-08-31T12:00:00.0000Z` **note** close, but not ours')).toBeNull();
+  });
+
+  it('still reads a timestamp it did write', () => {
+    // The positive control. Without it the three refusals above pass on a parser that rejects
+    // everything, which is the vacuous version of this whole block.
+    const entry = parseEntry('- `2026-08-31T12:00:00.000Z` **note** ours');
+    expect(entry?.at).toBe('2026-08-31T12:00:00.000Z');
+    expect(entry?.text).toBe('');
+  });
+
+  it('refuses an iteration that is not decimal digits', () => {
+    // `Number('0x10')` is 16 and `Number('1e3')` is 1000 — both integers, neither typed by anyone.
+    for (const value of ['0x10', '1e3', '+7', ' 7']) {
+      const entry = parseEntry(`- \`2026-08-31T12:00:00.000Z\` **note** iteration ${value} — x`);
+      expect(entry?.iteration, value).toBeUndefined();
+    }
+  });
+
+  it('still reads an iteration it did write', () => {
+    const entry = parseEntry('- `2026-08-31T12:00:00.000Z` **note** iteration 12 — x');
+    expect(entry?.iteration).toBe(12);
+  });
+});

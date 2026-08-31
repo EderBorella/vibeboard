@@ -128,7 +128,13 @@ that gap has actually bitten, not the ways it could.
     function that turns non-ASCII into a separator, a list that always includes its in-memory
     head. Each one became a test of the real contract.
 
-11. **A suite must remove what it writes to disk, and `df -i` is the first thing to check when
+11. **When a test failure will not sit still, check `df -i` before anything else.** Two runs of 2,047
+    tests each returned `1 failed | 2046 passed`, a different test each time, and the cause was never
+    caught by name — it was inode exhaustion, and every file-creating call had become a coin flip.
+    The hunt went to the code first because the symptom is indistinguishable from flaky code. `df -h`
+    looks fine while this is happening; only the inode table shows it.
+
+12. **A suite must remove what it writes to disk, and `df -i` is the first thing to check when
     a failure will not sit still.** `mkdtemp` per test with no cleanup leaks a whole scaffolded
     tree each time: 440,653 of them over four weeks exhausted the filesystem's **inodes** —
     9.43M of 9.83M — while 61G of block space sat free. Past that ceiling every file-creating

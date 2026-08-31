@@ -117,6 +117,26 @@ export class AutopilotRuntime {
     // stop, and the overlay — the only thing telling the user why the project is stopped — would
     // disappear without anyone deciding it should.
     if (state.state === 'halted') return { ok: false, error: HALTED_FIRST };
+    // A NO-OP FROM `idle`, and the reasoning that reverted this the first time was wrong.
+    //
+    // Writing `stopped` here describes a stop with no run behind it, and the chip then says a project
+    // was stopped that never started. The fix was written on 2026-08-04 and REVERTED, because a
+    // `stopped` written from idle was believed to be the only way to pre-empt a start.
+    //
+    // It is not, and the whole chain was checked before restoring this: `routes.ts:stateConflict`
+    // lists `halted` and `running` as the Start refusals and NOT `stopped`; `service-process.ts:start`
+    // writes `running` unconditionally BEFORE the child exists; and `POST /api/autopilot/start` is the
+    // only caller of `service.start()`, so there is no autostart path either. The pre-emptive stop was
+    // erased by the very act it was supposed to pre-empt, in the same request.
+    //
+    // `restart` reads `keepGroup = previous.state === 'stopped'`, which is the one place the value is
+    // read at all — inert from idle, because an idle project has no live pgid worth keeping and its
+    // iteration is already 0.
+    //
+    // Returned as `ok` rather than as a refusal: asking an idle project to stop is not an error, it is
+    // a request that is already satisfied. A refusal here would put a red message on a button press
+    // that did exactly what the user wanted.
+    if (state.state === 'idle') return { ok: true, state };
     return { ok: true, state: await this.#stop('stopped', detail) };
   }
 

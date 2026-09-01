@@ -186,3 +186,38 @@ describe('an unreachable OpenCode server, end to end', () => {
     expect(burnsAttempt({ status: 'failed' })).toBe(true);
   });
 });
+
+// `docker exec` failing before the agent binary runs — the case the entry above opens with and the one
+// `neverReachedModel` refused until 2026-09-01. It is separated from the OpenCode block because the
+// evidence is different in kind: there, a backend answered badly; here, nothing inside the container was
+// ever asked anything, so there is no backend to report usage at all.
+describe('a container that cannot be exec’d into', () => {
+  it('is the machine’s failure, on docker’s own exit code and no usage', () => {
+    // 126: "the command cannot be invoked". What a bind mount pinned to a deleted inode produces —
+    //   OCI runtime exec failed: ... current working directory is outside of container mount namespace
+    // The agent binary never ran, so nothing reported anything.
+    expect(neverReachedModel({ cancelled: false, timedOut: false, exitCode: 126 })).toBe(true);
+    // 125 is docker's other one: the docker command itself failed.
+    expect(neverReachedModel({ cancelled: false, timedOut: false, exitCode: 125 })).toBe(true);
+    expect(burnsAttempt({ status: 'failed', fault: 'infrastructure' })).toBe(false);
+  });
+
+  // THE NARROWING, and it is what stops this being a rule about a number. A run that reported usage
+  // reached a model, so a 126 came from something inside a run that had already done work — a shell
+  // exiting on a permissions error, most likely. That failure is the agent's own.
+  it('is NOT claimed when the backend reported usage', () => {
+    expect(neverReachedModel({ cancelled: false, timedOut: false, exitCode: 126, usage: HEALTHY })).toBe(
+      false,
+    );
+  });
+
+  // The neighbouring codes stay unclassified, because they are the agent's own exits and always were.
+  // Without this the test above would pass against `exitCode !== 0`, which would hand every failing run
+  // in the product a free attempt.
+  it('leaves an ordinary non-zero exit burning', () => {
+    for (const exitCode of [1, 2, 124, 127, 130]) {
+      expect(neverReachedModel({ cancelled: false, timedOut: false, exitCode })).toBe(false);
+    }
+    expect(burnsAttempt({ status: 'failed' })).toBe(true);
+  });
+});

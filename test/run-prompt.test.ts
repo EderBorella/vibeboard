@@ -66,6 +66,7 @@ const inputs = (over: Partial<PromptInputs> = {}): PromptInputs => ({
   attachments: [],
   links: [],
   reportPath: `${RUNS_DIR}/r1.report.md`,
+  runId: 'r1',
   projectRoot: ROOT,
   ...over,
 });

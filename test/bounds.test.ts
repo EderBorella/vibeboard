@@ -175,6 +175,21 @@ describe('inconclusiveReviews', () => {
     expect(inconclusiveReviews([rev('done'), rev('sent-back'), rev('done')], 'E-001')).toBe(0);
   });
 
+  // THE E-022 CASE, closed 2026-09-01. A review whose report the SERVER could not read is not the work
+  // failing, and it must not sit in the count for ever: the bound reads records off disk, so three of
+  // these left the card at its cap even after the parsing bug behind them was fixed and the server
+  // rebuilt. The only way back was moving files out of `results/` by hand.
+  it('does not count a review whose report the server could not read', () => {
+    const unreadable = withReport(
+      base({ skill: 'review' }),
+      { outcome: 'attention', body: 'judged', unreadable: 'its verdict reads "maybe"' },
+      'T',
+    );
+    expect(unreadable.fault).toBe('unreadable-report');
+    expect(unreadable.verdict).toBeUndefined(); // so the OLD rule would have counted it
+    expect(inconclusiveReviews([unreadable], 'E-001')).toBe(0);
+  });
+
   it('does not count a cancelled review — you stopped it', () => {
     // `burnsAttempt` is false for a cancellation, and a decision you took is not an attempt the agent had.
     const stopped = withoutReport(base({ skill: 'review' }), 'cancelled', 'You stopped it.', 'T');

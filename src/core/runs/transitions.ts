@@ -36,6 +36,11 @@ export function withReport(record: RunRecord, report: AgentReport, finished: str
     // The review's own record carries what it SAID; the run it judged carries what came of it as
     // `verification` — one fact, one home, on each side.
     ...(report.verdict === undefined ? {} : { verdict: report.verdict }),
+    // THE SERVER'S OWN FAILURE, RECORDED ON THE RUN. `burnsAttempt` reads this and stops charging the
+    // card, which is the whole point — but the record keeps it, because an attempt that costs nothing
+    // must not also vanish. A parse fault that were merely free would repeat for ever with nobody able
+    // to see that it was happening.
+    ...(report.unreadable === undefined ? {} : { fault: 'unreadable-report' as const }),
     report: report.body,
   };
 }

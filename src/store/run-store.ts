@@ -3,6 +3,8 @@ import { join } from 'node:path';
 import { burnsAttempt } from '../core/accounting.js';
 import { startedAt } from '../core/bounds.js';
 import { boardRel, PROJECT_RUNS_DIR, RESULTS_DIR, RUNS_DIR } from '../core/layout.js';
+import type { Log } from '../core/log.js';
+import type { AgentReport } from '../core/runs.js';
 import {
   isInFlight,
   isProjectRun,
@@ -344,6 +346,33 @@ export async function forgiveProjectRuns(root: string, at: string): Promise<numb
   return spent.length;
 }
 
+// DECISION 10, ANSWERED BY THE FILE RATHER THAN BY A MOUNT.
+//
+// The original deferral said AppArmor could not express per-run report exclusivity and named Landlock as
+// the fix. Containment is Docker now and a single-file mount IS possible — so this was re-decided on
+// 2026-09-01 rather than inherited, and the mount is still the expensive answer. Asking the report which
+// run it belongs to costs nothing, needs no kernel feature, and catches what a mount would not: a hung
+// run whose report lands after the server has moved on, and a report copied from a previous run.
+//
+// WHAT IT IS AND IS NOT. This is an accident check, not a security control — an agent writes the file,
+// so an agent could write the matching id too. What it defends against is confusion: the wrong path, a
+// stale file, a template carried over. `reportPath` already puts the run id in the FILENAME, so the two
+// together mean a report has to be wrong twice before it is believed.
+//
+// Absent is accepted: reports written before this field existed have none, and the on-disk format is
+// frozen. Only a mismatch is refused.
+function checkReportIdentity(report: AgentReport, run: string): AgentReport {
+  if (report.run === undefined || report.run === run) return report;
+  return {
+    ...report,
+    // The agent's own verdict is dropped with it. A report that does not know which run it belongs to
+    // cannot be allowed to decide that run's outcome, which is the same reasoning S1 applies to a run
+    // the user stopped.
+    verdict: undefined,
+    unreadable: `it declares run ${report.run}, and this is run ${run}`,
+  };
+}
+
 // Fold a finished agent report into the record. Returns the updated record, or null when the agent
 // wrote nothing — the caller decides what a report-less run means.
 // `secret` is the run's credential, redacted out of the report before it is folded in. The report
@@ -351,16 +380,28 @@ export async function forgiveProjectRuns(root: string, at: string): Promise<numb
 // agent that quotes its own token there was persisting it, and `expireRun` fires after this, so the
 // value is live at the moment it is written and dead but permanent afterwards. The transcript was
 // already covered; this is the same leak through the other channel.
+//
+// `log` is optional and is how the unreadable case reaches a person before anyone reads the record. It
+// is the port from `core/log.ts`, so this stays a store module: it takes a logger, it does not know
+// what writes the log.
 export async function foldReport(
   root: string,
   record: RunRecord,
   finished: string,
   secret?: string,
+  log?: Log,
 ): Promise<RunRecord | null> {
   const raw = await takeAgentReport(root, record.run);
   if (raw === null) return null;
   const content = redact(raw, secret);
-  const folded = withReport(record, parseAgentReport(content), finished);
+  const report = checkReportIdentity(parseAgentReport(content), record.run);
+  if (report.unreadable !== undefined) {
+    log?.warn(
+      { run: record.run, card: record.card, reason: report.unreadable },
+      'a report the server could not read — the run is recorded and the card is not charged for it',
+    );
+  }
+  const folded = withReport(record, report, finished);
   await writeRun(root, folded);
   return folded;
 }

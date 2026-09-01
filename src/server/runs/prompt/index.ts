@@ -120,6 +120,10 @@ export interface PromptInputs {
   };
   // Where the agent must write its report, project-root-relative.
   reportPath: string;
+  // The run's own id, asked for INSIDE the report as well as being in the path it writes to. A report
+  // that does not know which run it belongs to is not folded in — see `checkReportIdentity` in
+  // `store/run-store.ts` for why that is a file check rather than the per-run mount decision 10 wanted.
+  runId: string;
   projectRoot: string;
   // What this run presents to the API, and where to send it. In the prompt rather than the
   // environment because the OpenCode backend is one long-lived `opencode serve` spawned before any
@@ -209,7 +213,12 @@ export function buildRunPrompt(input: PromptInputs): string {
     );
   }
   const contract = contractFor(input);
-  parts.push(section(contract.heading, contract.lines.join('\n').replace('<REPORT_PATH>', input.reportPath)));
+  parts.push(
+    section(
+      contract.heading,
+      contract.lines.join('\n').replace('<REPORT_PATH>', input.reportPath).replace('<RUN_ID>', input.runId),
+    ),
+  );
 
   return `${parts.join('\n\n')}\n`;
 }

@@ -179,6 +179,59 @@ describe('the agent report handoff', () => {
     expect(onDisk?.prompt).toBe('mine'); // ours, not the agent's to lose
   });
 
+  // DECISION 10, AS A FILE CHECK. A report that names a different run is not folded in — the run is
+  // recorded, the agent's verdict is discarded, and the card is not charged for it.
+  it('refuses a report that declares a different run, and does not charge the card', async () => {
+    const root = await tempDir();
+    const started = record();
+    await writeRun(root, started);
+    await mkdir(join(root, RUNS_DIR), { recursive: true });
+    await writeFile(
+      reportPath(root, started.run),
+      '---\nrun: 20260101-000000-zzzz\noutcome: success\nverdict: done\n---\n## Not mine\n',
+      'utf8',
+    );
+
+    const warned: { run?: string; reason?: string }[] = [];
+    const log = {
+      debug() {},
+      info() {},
+      warn(obj: object) {
+        warned.push(obj as { run?: string; reason?: string });
+      },
+      error() {},
+      fatal() {},
+      child() {
+        return log;
+      },
+    };
+
+    const folded = await foldReport(root, started, '2026-07-26T15:00:00.000Z', undefined, log);
+    expect(folded?.fault).toBe('unreadable-report');
+    // The verdict goes with it: a report that does not know which run it belongs to cannot decide that
+    // run's outcome. Same reasoning S1 applies to a run the user stopped.
+    expect(folded?.verdict).toBeUndefined();
+    // FREE, BUT NOT SILENT — the ruling's own condition. The record carries the fault and the log says so.
+    expect(burnsAttempt(folded as RunRecord)).toBe(false);
+    expect(warned).toHaveLength(1);
+    expect(warned[0]?.reason).toContain('20260101-000000-zzzz');
+  });
+
+  it('folds a report that declares the RIGHT run, with no fault and no warning', async () => {
+    const root = await tempDir();
+    const started = record();
+    await writeRun(root, started);
+    await mkdir(join(root, RUNS_DIR), { recursive: true });
+    await writeFile(
+      reportPath(root, started.run),
+      `---\nrun: ${started.run}\noutcome: success\n---\n## Mine\n`,
+      'utf8',
+    );
+    const folded = await foldReport(root, started, '2026-07-26T15:00:00.000Z');
+    expect(folded?.fault).toBeUndefined();
+    expect(folded?.status).toBe('success');
+  });
+
   it('reports null and leaves the record alone when there is no report', async () => {
     const root = await tempDir();
     await writeRun(root, record());

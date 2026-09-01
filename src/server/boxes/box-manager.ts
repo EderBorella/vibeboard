@@ -1,6 +1,7 @@
 import { execFile } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { promisify } from 'node:util';
+import type { BoxState } from './containers.js';
 import {
   BOX_LABEL,
   type BoxBackend,
@@ -20,6 +21,7 @@ import {
   parsePublishedPort,
   protectedPaths,
   specDigest,
+  workdirProbeArgs,
 } from './containers.js';
 
 const run = promisify(execFile);
@@ -118,14 +120,7 @@ export class BoxManager {
     const wanted = specDigest(spec);
     const found = await inspectState(this.#docker, name);
     let state = found.state;
-
-    // ADOPTION IS BY NAME **AND SPEC**. A box's mounts, published ports and command are fixed when it
-    // is created, so a box built for one purpose cannot serve another — and adopting one anyway is
-    // silent, which is the worst property a containment decision can have. Two real failures came
-    // from adopting on the name alone: an OpenCode server box adopted from a `sleep infinity` box
-    // that any earlier turn had created, so it never published a port; and a box created before the
-    // project had a `.git`, which therefore had no `.git/hooks` pin and never gained one.
-    if (state !== 'absent' && found.spec !== wanted) {
+    if (state !== 'absent' && (await this.#mustRebuild(name, found.spec, wanted, state))) {
       this.#onRebuild?.(name, found.spec, wanted);
       await this.#docker(['rm', '-f', name], { timeoutMs: 60_000 });
       state = 'absent';
@@ -159,6 +154,31 @@ export class BoxManager {
       name,
       hostPort: opts.publishPort ? await this.#publishedPort(name, opts.publishPort) : undefined,
     };
+  }
+
+  // WHETHER THE BOX THAT IS THERE CAN BE ADOPTED. Two questions, and the second cannot be answered by
+  // the first.
+  //
+  // BY NAME **AND SPEC**. A box's mounts, published ports and command are fixed when it is created, so
+  // a box built for one purpose cannot serve another — and adopting one anyway is silent, which is the
+  // worst property a containment decision can have. Two real failures came from adopting on the name
+  // alone: an OpenCode server box adopted from a `sleep infinity` box that any earlier turn had
+  // created, so it never published a port; and a box created before the project had a `.git`, which
+  // therefore had no `.git/hooks` pin and never gained one.
+  //
+  // AND THE SPEC CANNOT SEE THE SECOND. The digest is over mount SOURCES, which are paths — and this
+  // failure is a path that still reads the same while the directory behind it has been replaced. A box
+  // adopted in that state answers every exec with an OCI error before the agent binary runs, which used
+  // to be recorded as the card's failure. `workdirProbeArgs` carries the measurement.
+  //
+  // ONLY A RUNNING BOX IS PROBED, and that is the whole of the exposure rather than a saving: a bind
+  // mount is resolved when a container STARTS, so a stopped box is about to be given a correct one by
+  // `start`. It is the box that stayed up across the replacement that holds a deleted inode.
+  async #mustRebuild(name: string, found: string, wanted: string, state: BoxState): Promise<boolean> {
+    if (found !== wanted) return true;
+    if (state !== 'running') return false;
+    const reachable = await this.#docker(workdirProbeArgs(name), { timeoutMs: 30_000 });
+    return reachable.code !== 0;
   }
 
   // FAILS THE BOX, deliberately. A box whose outbound rules did not apply is a box that can reach

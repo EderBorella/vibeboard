@@ -128,9 +128,11 @@ export default {
     // Extracted OUT of agent-runner.ts, so listed with it for the reason the web block below states:
     // moving code out of a mutated file into an unmutated one loses the coverage silently.
     // redaction.ts is the credential scrub the transcript, the report and the chat all go through. It
-    // stays flat in `src/server/` because three features reach it, which is also why it is not in
-    // `runs/` beside the runner it came out of.
-    'src/server/redaction.ts',
+    // MOVED DOWN to `src/store/` on 2026-09-01 — keeping a run's credential out of a record is a
+    // property of writing to disk, not of serving HTTP, and it was one of the edges making `store/`
+    // import upward. `check-mutate-globs.mjs` caught this line still pointing at the old path on the
+    // very next run, which is the whole reason that gate exists.
+    'src/store/redaction.ts',
     // The dispatch prompt, as a DIRECTORY. It is now filed under the feature that dispatches, and the
     // `run-prompt.ts` barrel that used to stand in front of it is gone — nothing else here reaches
     // `src/server/runs/prompt/`, verified against the FileMatcher rather than assumed, so a pattern left

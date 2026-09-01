@@ -39,7 +39,19 @@ export type RunOutcome = (typeof RUN_OUTCOMES)[number];
 //
 // ABSENT MEANS THE AGENT'S OWN, which is both the common case and the safe default: a run whose fault
 // nothing classified still burns, so a bug in the classifier cannot hand a card unlimited retries.
-export const RUN_FAULTS = ['infrastructure'] as const;
+//
+// `unreadable-report` is the SECOND class, added 2026-09-01, and it is a narrower thing than the first:
+// the agent ran, reached a model and wrote a report, and the SERVER could not read what it said. Measured
+// 2026-08-14 — a verdict-parsing bug left E-022 with three review records carrying `outcome: attention`
+// and no verdict, and because the attempt bound counts records on disk the card stayed at its cap after
+// the bug was fixed and the server rebuilt. The three attempts were spent by a server defect and the card
+// had no way back but moving files out of `results/` by hand.
+//
+// It is deliberately NOT part of the infrastructure streak (`consecutiveInfrastructureFailures` still
+// tests for `infrastructure` by name). A dead box means nothing can run and the project should stop; a
+// report we could not read means the run happened and one answer was lost, which is worth not charging
+// to the card and not worth halting the project over.
+export const RUN_FAULTS = ['infrastructure', 'unreadable-report'] as const;
 export type RunFault = (typeof RUN_FAULTS)[number];
 
 // What a REVIEW run answered about the run it judged. Two values and no third: a report with no `verdict`
@@ -152,5 +164,16 @@ export interface AgentReport {
   // A REVIEW run's answer. Absent when it wrote none, which is a review that decided nothing rather than
   // one that passed the work — the direction that matters, since the other would invent a pass.
   verdict?: ReviewVerdict;
+  // WHICH RUN THE AGENT THOUGHT IT WAS WRITING FOR, when it said. Decision 10 wanted a per-run mount so a
+  // run could not write another's report; a mount is possible now that containment is Docker, and it is
+  // still the expensive answer to a question the file can answer about itself. Optional because reports
+  // written before this existed have none, and the on-disk format is frozen — absent is accepted and
+  // noted, a MISMATCH is refused.
+  run?: string;
+  // WHY THE SERVER COULD NOT READ THIS REPORT, when it could not. Absent is the normal case. Set only for
+  // things the reader can actually see: a verdict key present and unusable, or a run id that names a
+  // different run. An ABSENT verdict is not this — a review that decided nothing is a real inconclusive
+  // review, and calling it unreadable would empty the bound of its meaning.
+  unreadable?: string;
   body: string;
 }

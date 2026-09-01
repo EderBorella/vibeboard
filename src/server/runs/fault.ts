@@ -57,11 +57,31 @@ export interface RunEnding {
 //   reported nothing has not told us the model was never reached; it has told us nothing. That leaves
 //   one known case unclassified — an OpenCode turn that dies with `[opencode failed: fetch failed]` and
 //   no stats block — and it stays unclassified until there is a record to derive it from.
+//
+// THE OTHER CASE THAT WAS STILL UNCLASSIFIED, closed 2026-09-01. `docker exec` can fail before the agent
+// binary is ever invoked, and then there is no backend to report usage — so the clause above refused it
+// and the run went on being charged to the card. That is the exact failure the entry this comes from
+// opens with: a container bind-mounted at a project directory that had since been replaced answered
+//
+//     OCI runtime exec failed: ... current working directory is outside of container mount namespace
+//     root -- possible container breakout detected
+//
+// and auto-pilot reported "the README may be too thin to derive from" about a README nothing had opened.
+//
+// DOCKER'S OWN EXIT CODES ARE THE DISCRIMINATOR, not the message. 125 is "the docker command itself
+// failed", 126 is "the command cannot be invoked" — both are the runtime answering about itself, before
+// anything inside the container ran. Matching the message would be a rule about one release's wording.
+//
+// AND ONLY WITH USAGE ABSENT, which is what keeps it narrow. If a backend reported usage then a model was
+// reached and a 126 came from somewhere else — a shell exiting on a permissions error inside a run that
+// had already done work. That run is the agent's own, and the pair of conditions says so.
+const DOCKER_OWN_FAILURE = new Set([125, 126]);
+
 export function neverReachedModel(ending: RunEnding): boolean {
   if (ending.cancelled || ending.timedOut) return false;
   if (ending.exitCode === null || ending.exitCode === 0) return false;
   const usage = ending.usage;
-  if (usage === undefined) return false;
+  if (usage === undefined) return DOCKER_OWN_FAILURE.has(ending.exitCode);
   return usage.outputTokens === 0 && usage.contextTokens === 0;
 }
 

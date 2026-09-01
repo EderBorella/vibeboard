@@ -172,6 +172,42 @@ describe('parseAgentReport', () => {
     });
   });
 
+  // THE REPORT'S OWN IDENTITY — decision 10, answered by the file rather than by a per-run mount.
+  it('reads the run the agent says the report belongs to', () => {
+    const text = '---\nrun: 20260901-120000-abcd\noutcome: success\n---\ndone\n';
+    expect(parseAgentReport(text).run).toBe('20260901-120000-abcd');
+    expect(parseAgentReport(text).unreadable).toBeUndefined();
+  });
+
+  it('leaves the run absent when the report does not claim one, and says nothing is wrong', () => {
+    // Reports written before the field existed have none, and the on-disk format is frozen. Absent is
+    // accepted; only a MISMATCH is refused, and that decision lives in `foldReport`.
+    const report = parseAgentReport('---\noutcome: success\n---\ndone\n');
+    expect(report.run).toBeUndefined();
+    expect(report.unreadable).toBeUndefined();
+  });
+
+  // A VERDICT PRESENT AND UNUSABLE is the server failing to read the agent, which is what stops the
+  // attempt being charged to the card. Measured 2026-08-14: a verdict-parsing bug left E-022 with three
+  // review records carrying no verdict, and because the bound counts records the card stayed at its cap
+  // after the bug was fixed.
+  it('marks a verdict it cannot use as unreadable, quoting what was written', () => {
+    const report = parseAgentReport('---\noutcome: success\nverdict: maybe\n---\njudged\n');
+    expect(report.verdict).toBeUndefined();
+    expect(report.unreadable).toContain('maybe');
+  });
+
+  // THE OTHER HALF, and without it the assertion above would pass against "any review with no verdict".
+  // An absent verdict is a review that decided nothing — a real inconclusive review, and the entire
+  // subject of `inconclusiveReviews`. Calling it unreadable would empty that bound of its meaning and
+  // hand a genuinely undecidable card unlimited reviews.
+  it('does NOT mark an absent verdict as unreadable', () => {
+    expect(parseAgentReport('---\noutcome: success\n---\njudged\n').unreadable).toBeUndefined();
+    expect(
+      parseAgentReport('---\noutcome: success\nverdict: sent-back\n---\nx\n').unreadable,
+    ).toBeUndefined();
+  });
+
   it('defaults to attention when the agent claims no outcome', () => {
     // Silence is not success: an agent that did not say it succeeded gets looked at.
     expect(parseAgentReport('---\nsummary: did stuff\n---\nbody\n').outcome).toBe('attention');

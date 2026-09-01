@@ -347,7 +347,7 @@ export interface DockerResult {
 
 export type DockerRun = (args: string[], opts?: { timeoutMs?: number }) => Promise<DockerResult>;
 
-type BoxState = 'running' | 'stopped' | 'absent';
+export type BoxState = 'running' | 'stopped' | 'absent';
 
 interface BoxInspection {
   state: BoxState;
@@ -371,6 +371,25 @@ export async function inspectState(docker: DockerRun, name: string): Promise<Box
     // docker prints `<no value>` for a label that is not set.
     spec: spec === '<no value>' ? '' : spec,
   };
+}
+
+// IS THIS BOX'S VIEW OF THE PROJECT STILL THE PROJECT? One exec that does nothing, in the working
+// directory every agent turn will use.
+//
+// A bind mount pins the inode it resolved at container start. Replace the project directory on the host
+// — delete and re-clone, restore from a backup, `mv` a new tree into place — and the container goes on
+// holding the deleted one. Every exec into it then dies before the agent binary runs:
+//
+//     OCI runtime exec failed: ... current working directory is outside of container mount namespace
+//
+// Measured 2026-08-14: `derive-features` burned all three attempts in under four seconds and auto-pilot
+// reported the CARD as the problem, saying a README nothing had opened might be too thin.
+//
+// `true` rather than a shell builtin or a stat: the failure happens in `docker exec` itself, setting the
+// working directory, before the command is looked at. What runs is irrelevant — what matters is that
+// something is asked to run in `/work`.
+export function workdirProbeArgs(name: string): string[] {
+  return ['exec', '-w', WORK_DIR, name, 'true'];
 }
 
 // The exec prefix for a box: what `wrapCommand` returns once containment is a container.

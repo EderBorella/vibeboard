@@ -293,12 +293,53 @@ function rescueFrontmatter(content: string): Record<string, string> {
   return out;
 }
 
+// A VERDICT KEY THE READER COULD NOT USE, which is the one thing about a report that says the loss was
+// ours rather than the work's.
+//
+// Present-and-unusable, never absent: `verdict: maybe`, `verdict: {}`, a key whose value YAML dropped.
+// An absent key is a review that decided nothing, which is a real inconclusive review and the whole
+// subject of `inconclusiveReviews`. Conflating the two would empty that bound of its meaning in exactly
+// the direction that hands a genuinely undecidable card unlimited reviews.
+function unusableVerdict(d: Record<string, unknown>): string | undefined {
+  if (!('verdict' in d) || d.verdict === undefined || d.verdict === null) return undefined;
+  if (isVerdict(d.verdict)) return undefined;
+  const shown = typeof d.verdict === 'string' ? d.verdict : typeof d.verdict;
+  return `its verdict reads "${shown.slice(0, 40)}", which is neither done nor sent-back`;
+}
+
 // Parse what the agent wrote. A missing or unreadable outcome counts as `attention`: the contract
 // says say so explicitly, and silence is not success.
 //
 // TWO READERS, IN ORDER: YAML first, because a well-formed report is the normal case and its `options:`
 // list only exists there; the line reader second, for the fields above when YAML has thrown or when it
 // parsed but lost them.
+// The rescue-only reading, for a report whose YAML threw. Its own function because it is a different
+// reader with a different reach — three fields off single lines, no `options`, no `created`, and no
+// identity — and folding both into one body put `parseAgentReport` over the complexity ceiling.
+function fromRescueAlone(rescued: Record<string, string>, body: string): AgentReport {
+  const unreadable = unusableVerdict(rescued);
+  return {
+    outcome: isOutcome(rescued.outcome) ? rescued.outcome : 'attention',
+    ...(asText(rescued.summary) ? { summary: asText(rescued.summary) } : {}),
+    ...(isVerdict(rescued.verdict) ? { verdict: rescued.verdict } : {}),
+    // NO `run` HERE, and it is not an omission. `RESCUED` is three fields that decide whether a card
+    // moves, and adding an identity to a reader that matches ANY line would let a report mentioning
+    // another run in its prose fail its own identity check. When YAML has thrown, the id is simply not
+    // asked for — the check is worth having on the normal path and not worth a false accusation.
+    ...(unreadable === undefined ? {} : { unreadable }),
+    body,
+  };
+}
+
+// The body of a report whose frontmatter block must be dropped. With YAML thrown, `matter` gives
+// nothing back, so leaving the block in would show the reader the frontmatter as prose — which is what
+// the run record on disk did before 2026-08-14.
+function bodyAfterBlock(content: string): string {
+  const lines = content.split('\n');
+  const end = lines[0]?.trim() === '---' ? lines.indexOf('---', 1) : -1;
+  return (end === -1 ? content : lines.slice(end + 1).join('\n')).trim();
+}
+
 export function parseAgentReport(content: string): AgentReport {
   let parsed: matter.GrayMatterFile<string> | undefined;
   try {
@@ -307,26 +348,11 @@ export function parseAgentReport(content: string): AgentReport {
     parsed = undefined;
   }
   const rescued = rescueFrontmatter(content);
-  // The body is what follows the frontmatter. With YAML thrown, `matter` gives nothing, so the block is
-  // dropped here instead — leaving it in would show the reader the frontmatter as prose, which is what
-  // the run record on disk did.
-  const bodyAfterBlock = (): string => {
-    const lines = content.split('\n');
-    const end = lines[0]?.trim() === '---' ? lines.indexOf('---', 1) : -1;
-    return (end === -1 ? content : lines.slice(end + 1).join('\n')).trim();
-  };
-  if (parsed === undefined) {
-    const outcome = isOutcome(rescued.outcome) ? rescued.outcome : 'attention';
-    return {
-      outcome,
-      ...(asText(rescued.summary) ? { summary: asText(rescued.summary) } : {}),
-      ...(isVerdict(rescued.verdict) ? { verdict: rescued.verdict } : {}),
-      body: bodyAfterBlock(),
-    };
-  }
+  if (parsed === undefined) return fromRescueAlone(rescued, bodyAfterBlock(content));
   // YAML WINS WHERE IT SPOKE. It read a quoted scalar correctly and can carry a multi-line one, which the
   // line reader cannot; the rescued values only fill keys YAML did not produce.
   const d = { ...rescued, ...parsed.data } as Record<string, unknown>;
+  const unreadable = unusableVerdict(d);
   return {
     outcome: isOutcome(d.outcome) ? d.outcome : 'attention',
     ...(asText(d.summary) ? { summary: asText(d.summary) } : {}),
@@ -334,6 +360,8 @@ export function parseAgentReport(content: string): AgentReport {
     ...(asStrings(d.created) ? { created: asStrings(d.created) } : {}),
     // A review's answer, dropped unless it is one of the two. Absent is what an inconclusive review is.
     ...(isVerdict(d.verdict) ? { verdict: d.verdict } : {}),
+    ...(asText(d.run) ? { run: asText(d.run) } : {}),
+    ...(unreadable === undefined ? {} : { unreadable }),
     body: parsed.content.trim(),
   };
 }

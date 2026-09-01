@@ -366,6 +366,7 @@ export class AgentRunner {
       review: input.review,
       checkup: input.checkup,
       reportPath: reportContract(run),
+      runId: run,
       projectRoot: root,
       credential,
     });
@@ -555,7 +556,7 @@ export class AgentRunner {
       // the reasoning is worth reading, and a file left behind would sit in runs/ unread for ever.
       const stopped = cancelled || result.timedOut;
       const evidence = stopped ? await this.#takeEvidence(root, run, secret) : undefined;
-      const folded = stopped ? null : await foldReport(root, spent, finishedAt, secret);
+      const folded = stopped ? null : await foldReport(root, spent, finishedAt, secret, this.#opts.log);
       final =
         folded ??
         (await this.#endWithoutReport(

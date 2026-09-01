@@ -113,11 +113,15 @@ const BURNS: Record<RunStatus, boolean> = {
 // overruling the machine, and it must not be second-guessed by a status test.
 export function burnsAttempt(run: Pick<RunRecord, 'status' | 'fault' | 'forgiven'>): boolean {
   if (run.forgiven) return false;
-  // The machine's failure, not the work's. Note the asymmetry with the table below: an UNCLASSIFIED
-  // failure still burns, so the fail-safe direction here is "count it" — a classifier that misses a
-  // case costs a card an attempt it did not deserve, where the reverse would let a genuinely failing
-  // card retry for ever and never reach a person.
-  if (run.fault === 'infrastructure') return false;
+  // The machine's failure, not the work's. ANY classified fault, not `infrastructure` by name: the field
+  // exists to say the failure was not the card's, and every member of `RUN_FAULTS` means exactly that.
+  // Testing for one value made the second one — `unreadable-report`, added 2026-09-01 — silently burn on
+  // the day it was introduced, which is the bug this line's own comment is about.
+  //
+  // Note the asymmetry with the table below: an UNCLASSIFIED failure still burns, so the fail-safe
+  // direction here is "count it" — a classifier that misses a case costs a card an attempt it did not
+  // deserve, where the reverse would let a genuinely failing card retry for ever and never reach a person.
+  if (run.fault !== undefined) return false;
   return BURNS[run.status];
 }
 

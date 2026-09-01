@@ -109,12 +109,22 @@ is a manual run racing an auto-pilot one. Note the seam that limits it: the agen
 
 **3. The box's own state directory, at `/state`.** Per project *and* per backend — see below.
 
-**4. Exactly one backend credential.** A Claude box mounts `~/.cache/vibeboard/creds/claude/` — a
-directory VibeBoard owns, holding only a mirror of `~/.claude/.credentials.json` — at its own absolute
-host path, so the symlink VibeBoard writes into the config home resolves identically inside and out.
-An OpenCode box mounts nothing of the sort; its credential was copied into its own state directory.
-**Each box sees one backend's credential and never the other's** — that is the whole of why `backend`
-is in the container key.
+**4. Exactly one backend credential.** A Claude box mounts `~/.cache/vibeboard/creds/claude/` and an
+OpenCode box mounts `~/.cache/vibeboard/creds/opencode/` — each a directory VibeBoard owns holding only
+a mirror of that backend's host credential, mounted at its own absolute host path, so the symlink
+VibeBoard writes into the state directory resolves identically inside and out.
+
+**Two sibling leaves, and nothing mounts the parent that holds both.** That is what makes the split a
+property of the mount set rather than a rule somebody has to remember: collapse the two into one
+directory and each backend's credential is inside the other's box. **Each box sees one backend's
+credential and never the other's** — the whole of why `backend` is in the container key.
+
+*Changed 2026-09-01.* An OpenCode box used to mount nothing of the sort, because its credential was
+**copied** into the project's own state directory — once, and only when absent. That made a re-login on
+the host unable to reach a project that already had a copy, and made "newest wins" unanswerable, since
+N projects meant N divergent copies. The per-project split remains for the session **database**, which
+is what forced it: the user's own is 265MB and several boxes writing one SQLite file is several writers
+on one file. A credential is not that.
 
 It is a **directory**, and that is not tidiness. See "A mounted file cannot follow a token refresh"
 below.
@@ -158,8 +168,8 @@ mounted at all. A cache directory is also what it honestly is — deletable at a
 `ensure()` — before every agent turn — and skipped when the bytes are unchanged: two `stat`s reject a
 differing size, and otherwise two reads of a file under a kilobyte. The copy is a temp file plus a
 rename: a torn credential is worse than a stale one, and the rename is also the one write the other
-side of a directory mount can see. The precedent is a few lines away — `opencodeStateDir` copies the
-user's `auth.json` into the box's own state directory for a related reason.
+side of a directory mount can see. Since 2026-09-01 `opencodeStateDir` works the same way, through the
+same `reconcileCredential`, and writes a symlink into the state directory rather than a copy.
 
 The skip compares **content**, not mtime, and that is worth recording because the first version did
 compare mtime and was wrong in a way nothing would have reported. It carried the source's timestamp
@@ -170,13 +180,29 @@ the only symptom would have been a rewrite before every agent turn.
 
 **What this does not fix, stated rather than implied:**
 
-- **Mirroring is one-way**, host → mirror. A refresh performed *inside* the box is overwritten by the
-  next mirror and lost. That costs nothing today, because the `EBUSY` measurement says an in-box
-  refresh is impossible — but a directory mount *is* writable from inside, so the loss becomes
-  reachable the moment the CLI in the box manages one. Newest-mtime-wins is a separate step, and it is
-  deliberately not taken yet.
-- **If nobody ever runs Claude Code on the host**, nothing refreshes the token and the mirror expires
-  exactly when the original does. Mirroring buys freshness; it does not create it.
+- ~~**Mirroring is one-way**~~ — **fixed 2026-09-01, and for both backends.** It was one-way, host →
+  mirror, so a refresh performed *inside* the box was overwritten by the next mirror and lost. The old
+  `EBUSY` measurement said an in-box refresh was impossible, but that was a property of the FILE mount
+  it replaced: a directory mount is writable, and an OAuth refresh is a headless POST of the refresh
+  token to the provider — no browser, no user, no host involvement — which a box has the network to
+  make. The cost was never merely lost freshness: where a provider rotates refresh tokens on use, the
+  host would be left holding a **spent** one and neither side could refresh again.
+
+  It now reconciles both ways, with the **host as the source of truth**: when the bytes differ and the
+  mirror is *strictly* newer and parses as a credential and the host file already exists, the mirror is
+  carried back to the host, which then reseeds every project. Never project to project. Three
+  conditions, because carrying back writes the user's own file — a tie is two files whose order cannot
+  be established, an unparseable file is one caught mid-write, and restoring a credential the user does
+  not have is not a refresh. It cannot flap: a carry-back rewrites the host, so the next call finds the
+  two byte-identical and does nothing.
+
+  Direction is read from mtime **only once the bytes have already said the two differ**. Comparing
+  timestamps for *equality* is the thing the paragraph above says cannot work; comparing them for
+  *order* is a different question, and one a test fixture got wrong on the first run by stamping the
+  mirror from the source's own mtime — which rounds up, and is therefore a carry-back rather than a tie.
+- **If nobody ever runs the CLI on the host**, nothing refreshes the token and the mirror expires
+  exactly when the original does. Mirroring buys freshness; it does not create it — though a box's own
+  refresh now reaches the host, which narrows this considerably.
 - **It is a second copy of a credential at rest.** What protects it is 0700 on the directory and 0600
   on the file, set with an explicit `chmodSync` rather than left to the umask, and asserted in
   `test/copilot-env.test.ts`.

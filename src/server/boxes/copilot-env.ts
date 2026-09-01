@@ -1,7 +1,6 @@
 import { createHash } from 'node:crypto';
 import {
   chmodSync,
-  copyFileSync,
   existsSync,
   lstatSync,
   mkdirSync,
@@ -112,21 +111,36 @@ export function opencodeStateDir(projectRoot: string): string {
   const root = join(projectStateDir(projectRoot), 'opencode');
   const data = join(root, 'data', 'opencode');
   mkdirSync(data, { recursive: true });
-  const real = opencodeAuthFile();
+  // A SYMLINK TO THE SHARED MIRROR, not a copy — changed 2026-09-01, and the link is the same mechanism
+  // `claudeStateDir` uses for the same reason.
+  //
+  // It was a copy made ONCE per project, which meant a host re-login never reached a project that
+  // already had one. `mirrorOpencodeCredential` carries the reasoning. The link is written before the
+  // mirror is asked for so the path exists to point at, and it is ABSOLUTE — the box mounts that same
+  // absolute path, so the link resolves identically inside and out.
   const seeded = join(data, 'auth.json');
-  // Copied, not linked, and only once. A copy per project is what keeps "which credential can this
-  // box see" answerable by looking at the mounts — and the session database is the thing we are
-  // deliberately NOT sharing, since the user's own is 265MB and several boxes writing it at once is
-  // several SQLite writers on one file.
-  if (existsSync(real) && !existsSync(seeded)) {
-    try {
-      copyFileSync(real, seeded);
-    } catch {
-      /* auth will fail loudly if this matters */
-    }
-  }
+  adoptLegacyOpencodeCopy(seeded);
+  mirrorOpencodeCredential();
+  linkTo(seeded, opencodeBoxCredentialPath());
   writeOpencodeConfig(join(root, 'config'));
   return root;
+}
+
+// EVERY PROJECT ON DISK ALREADY HAS ONE OF THE OLD COPIES, and one of them may be the newest credential
+// on the machine — a box that refreshed inside it wrote here, and nothing carried that anywhere. The
+// link below would replace the file, so this runs first and gives the host its chance to take it.
+//
+// The same three conditions as `reconcileCredential`: strictly newer, parses, and the host already has
+// one. A regular file only — a symlink is this migration having already happened, and following it
+// would compare the mirror with itself.
+function adoptLegacyOpencodeCopy(seeded: string): void {
+  const legacy = lstatSync(seeded, { throwIfNoEntry: false });
+  if (!legacy?.isFile()) return;
+  const host = opencodeAuthFile();
+  const on = statSync(host, { throwIfNoEntry: false });
+  if (!on?.isFile() || legacy.mtimeMs <= on.mtimeMs) return;
+  if (!parsesAsCredential(seeded)) return;
+  restoreCredential(seeded, host);
 }
 
 // AN EXISTING LINK IS REPOINTED, NOT LEFT ALONE, and that is the whole reason this is not three lines.
@@ -136,7 +150,11 @@ export function opencodeStateDir(projectRoot: string): string {
 // mounts: it would dangle inside the container, silently, on machines that had run VibeBoard before
 // and nowhere else.
 function linkCredentials(dir: string, target: string): void {
-  const link = join(dir, '.credentials.json');
+  linkTo(join(dir, '.credentials.json'), target);
+}
+
+// The same, given the link's own path — OpenCode's credential is `auth.json`, not `.credentials.json`.
+function linkTo(link: string, target: string): void {
   if (!existsSync(target)) return;
   try {
     const current = lstatSync(link, { throwIfNoEntry: false });
@@ -176,6 +194,16 @@ export function opencodeAuthFile(): string {
 // "what will the CLI in the box actually read" must use this one.
 export function boxCredentialPath(): string {
   return join(credentialHome(), 'claude', '.credentials.json');
+}
+
+// The same, for OpenCode — and it is a SEPARATE LEAF of `credentialHome()`, never the tree itself.
+//
+// S2 says the two backends' credentials must never meet, and it is held here by what is mounted rather
+// than by a rule: a Claude box mounts `<creds>/claude`, an OpenCode box mounts `<creds>/opencode`, and
+// nothing mounts `<creds>`. Mounting the parent to save a line would put each backend's credential in
+// the other's box, which is the one thing this whole file exists to prevent.
+export function opencodeBoxCredentialPath(): string {
+  return join(credentialHome(), 'opencode', 'auth.json');
 }
 
 // THE MEASUREMENT THAT FORCED A MIRROR, because the obvious arrangement — mount the user's credential
@@ -223,11 +251,87 @@ export function boxCredentialPath(): string {
 //
 // Answers with the mirror's path, or `undefined` when there is no credential to mount.
 export function mirrorClaudeCredential(): string | undefined {
-  const source = claudeCredentialFile();
-  const mirror = boxCredentialPath();
-  const from = statSync(source, { throwIfNoEntry: false });
-  if (from?.isFile() && !mirrored(mirror, source, from)) copyCredential(source, mirror);
+  return reconcileCredential(claudeCredentialFile(), boxCredentialPath());
+}
+
+// OpenCode's, and it is now the SAME shape as Claude's rather than a per-project copy.
+//
+// WHAT IT REPLACES, and why that was a bug pointing the other way. `opencodeStateDir` used to copy the
+// host's `auth.json` into each project's state — `if (exists(real) && !exists(seeded))`, so ONCE and
+// never again. A re-login on the host therefore never reached a project that already had a copy, which
+// is stale-FORWARD and reachable with no box doing anything unusual at all. It also made "newest wins"
+// unanswerable: N projects meant N divergent copies and no way to say which was authoritative.
+//
+// One mirror, and the per-project split stays for the session DATABASE, which is what forced it — the
+// user's own is 265MB and several boxes writing one SQLite file is several writers on one file. A
+// credential is not that.
+export function mirrorOpencodeCredential(): string | undefined {
+  return reconcileCredential(opencodeAuthFile(), opencodeBoxCredentialPath());
+}
+
+// TWO-WAY, WITH THE HOST AS THE SOURCE OF TRUTH — ruled 2026-09-01, and the mechanism was confirmed
+// before it was built rather than assumed.
+//
+// An OAuth refresh is a headless POST of the refresh token to the provider: no browser, no user, and no
+// host involvement. A box has the internet (docs/security/containment.md), so the CLI inside one can and
+// will refresh — and a DIRECTORY mount is writable, so it succeeds at exactly the write a one-way mirror
+// then discards. The cost is not merely lost freshness: if the provider rotates refresh tokens on use,
+// the host is left holding a SPENT one and neither side can refresh again. That is the 58ms
+// authentication failure recorded in `fault.ts`.
+//
+// THE DIRECTION IS DECIDED ONLY WHEN THE CONTENTS DIFFER, and never by mtime alone. `mirrored()` below
+// explains why comparing timestamps for EQUALITY cannot work here; comparing them for ORDER is a
+// different question and is only asked once the bytes have already said the two are not the same.
+//
+// THREE CONDITIONS ON CARRYING A CREDENTIAL BACK TO THE HOST, because that writes the user's own file:
+//
+//  - STRICTLY newer. Never on a tie — a tie is two files whose order we cannot actually establish.
+//  - It must PARSE as a credential. A half-written or truncated file is exactly what a rename exists to
+//    prevent us seeing, and belt-and-braces here costs one `JSON.parse` of a file under a kilobyte.
+//  - The host file must already EXIST. Restoring one that does not would create a credential where the
+//    user has none, which is not a refresh, and `~/.claude` is not ours to populate.
+//
+// No flapping: a carry-back rewrites the host, so on the next call the two are byte-identical and
+// nothing happens. Same in the other direction.
+function reconcileCredential(host: string, mirror: string): string | undefined {
+  const from = statSync(host, { throwIfNoEntry: false });
+  const to = statSync(mirror, { throwIfNoEntry: false });
+  if (from?.isFile() && !mirrored(mirror, host, from)) {
+    if (to?.isFile() && to.mtimeMs > from.mtimeMs && parsesAsCredential(mirror)) {
+      restoreCredential(mirror, host);
+    } else {
+      copyCredential(host, mirror);
+    }
+  }
   return existsSync(mirror) ? mirror : undefined;
+}
+
+// Is this a credential at all, or a file caught mid-write? Both backends' files are JSON objects, and
+// that is the whole of the claim — this is not validating a token, it is refusing to overwrite the
+// user's working credential with something that is not one.
+function parsesAsCredential(path: string): boolean {
+  try {
+    const value: unknown = JSON.parse(readFileSync(path, 'utf8'));
+    return value !== null && typeof value === 'object' && Object.keys(value).length > 0;
+  } catch {
+    return false;
+  }
+}
+
+// The carry-back. Deliberately NOT `copyCredential`, which chmods the containing directory to 0700: the
+// target here is `~/.claude` or `~/.local/share/opencode`, the user's own, and tightening the mode of a
+// directory we merely write into would be a side effect nobody asked for. The FILE's 0600 is kept,
+// because that is the mode the credential already has and the temp file must not be looser.
+function restoreCredential(mirror: string, host: string): void {
+  const temp = `${host}.${process.pid}.tmp`;
+  try {
+    writeFileSync(temp, readFileSync(mirror));
+    chmodSync(temp, 0o600);
+    renameSync(temp, host);
+  } catch {
+    rmSync(temp, { force: true });
+    /* the host keeps what it had, which is the safe direction */
+  }
 }
 
 // SIZE FIRST, THEN THE BYTES. Cheap enough for every `ensure()`, which is what it gets: two `stat`s

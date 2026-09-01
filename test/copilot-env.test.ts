@@ -22,6 +22,7 @@ import {
   isolationEnabled,
   mirrorClaudeCredential,
   opencodeAuthFile,
+  opencodeBoxCredentialPath,
   opencodeConfigHome,
   opencodeStateDir,
 } from '../src/server/boxes/copilot-env.js';
@@ -149,6 +150,77 @@ describe('the Claude credential mirror', () => {
     expect(dir).toBe(join(home, '.cache', 'vibeboard', 'creds', 'claude'));
     expect(mirror.includes('.vibeboard')).toBe(false);
     expect(readFileSync(mirror, 'utf8')).toBe('{"token":"one"}');
+  });
+
+  // THE OTHER DIRECTION — ruled 2026-09-01. A box refreshes its own token: the CLI POSTs the refresh
+  // token to the provider, which needs no browser and no host, and the mount is a writable directory,
+  // so the write succeeds. One-way mirroring then threw it away. If the provider rotates refresh tokens
+  // on use, the host is left holding a SPENT one and neither side can refresh again.
+  it('carries a newer credential from the mirror back to the host', async () => {
+    const { source, mirror } = await stage('{"token":"one"}');
+    mirrorClaudeCredential();
+
+    // What a refresh inside the box leaves behind: the mirror rewritten, a minute on.
+    refresh(mirror, '{"token":"refreshed-in-box"}');
+
+    expect(mirrorClaudeCredential()).toBe(mirror);
+    expect(readFileSync(source, 'utf8')).toBe('{"token":"refreshed-in-box"}');
+    expect(readFileSync(mirror, 'utf8')).toBe('{"token":"refreshed-in-box"}');
+  });
+
+  // AND IT SETTLES. A carry-back rewrites the host, so the host is now the newer of the two — if the
+  // next call read the direction off mtime alone it would copy straight back over the mirror and the
+  // pair would flap on every agent turn. It compares BYTES first, so there is nothing to do.
+  it('does nothing at all on the call after a carry-back', async () => {
+    const { source, mirror } = await stage('{"token":"one"}');
+    mirrorClaudeCredential();
+    refresh(mirror, '{"token":"refreshed-in-box"}');
+    mirrorClaudeCredential();
+
+    const before = statSync(mirror).mtimeMs;
+    mirrorClaudeCredential();
+    expect(statSync(mirror).mtimeMs).toBe(before);
+    expect(readFileSync(source, 'utf8')).toBe('{"token":"refreshed-in-box"}');
+  });
+
+  // NEVER ON A TIE, and never on something that is not a credential. Both are conditions on writing the
+  // user's own file, and without them this test's fixture — a mirror that is merely DIFFERENT — would be
+  // enough to overwrite a working host credential with a truncated one.
+  it('refuses to carry back a mirror that is not newer, or does not parse', async () => {
+    const { source, mirror } = await stage('{"token":"one"}');
+    mirrorClaudeCredential();
+
+    // Same mtime, different bytes: order cannot be established, so the host wins and mirrors forward.
+    //
+    // BOTH stamped from one `Date`, not the mirror stamped from the source's `mtime`. `utimesSync` takes
+    // a `Date`, which holds whole milliseconds, while a file's mtime has nanoseconds — so copying one
+    // onto the other ROUNDS UP and produces a mirror a fraction newer, which is a carry-back and not a
+    // tie. That is the same rounding this file's own `mirrored()` comment was written about, and it
+    // caught this fixture on the first run.
+    writeFileSync(mirror, '{"token":"tie"}', 'utf8');
+    const at = new Date(Date.now() - 5_000);
+    utimesSync(source, at, at);
+    utimesSync(mirror, at, at);
+    mirrorClaudeCredential();
+    expect(readFileSync(source, 'utf8')).toBe('{"token":"one"}');
+    expect(readFileSync(mirror, 'utf8')).toBe('{"token":"one"}');
+
+    // Newer, but caught mid-write. The host keeps what it had.
+    refresh(mirror, '{"token": tru');
+    mirrorClaudeCredential();
+    expect(readFileSync(source, 'utf8')).toBe('{"token":"one"}');
+  });
+
+  // The host file must already EXIST. Restoring one that does not would create a credential where the
+  // user has none, and `~/.claude` is not ours to populate.
+  it('does not create a host credential that was never there', async () => {
+    const { source, mirror } = await stage('{"token":"one"}');
+    mirrorClaudeCredential();
+    rmSync(source, { force: true });
+    refresh(mirror, '{"token":"orphan"}');
+
+    mirrorClaudeCredential();
+    expect(existsSync(source)).toBe(false);
   });
 
   it('answers undefined when the host has no credential at all', async () => {
@@ -286,6 +358,9 @@ describe('the OpenCode auth file both the seed and the health check read', () =>
   it('is the path the CLI writes, and is what a project box is seeded from', async () => {
     const home = await tempDir();
     process.env.HOME = home;
+    // The seed is a MIRROR now, and the mirror resolves `XDG_CACHE_HOME` first — so on a machine that
+    // sets it this would write a credential into the developer's real cache while still passing.
+    delete process.env.XDG_CACHE_HOME;
     process.env.VIBEBOARD_COPILOT_HOME = await tempDir();
     const real = join(home, ...AUTH_UNDER_HOME);
     mkdirSync(dirname(real), { recursive: true });
@@ -294,8 +369,88 @@ describe('the OpenCode auth file both the seed and the health check read', () =>
     expect(opencodeAuthFile()).toBe(real);
 
     // And the seed really reaches it. The equality above alone would survive the seed being rewritten
-    // to look somewhere else; this fails if either end moves.
+    // to look somewhere else; this fails if either end moves. Read THROUGH the link, which is what the
+    // CLI in the box does.
     const state = opencodeStateDir(await tempDir());
     expect(readFileSync(join(state, 'data', 'opencode', 'auth.json'), 'utf8')).toBe(AUTH);
+  });
+
+  // ONE MIRROR, SHARED, and a symlink rather than a copy — 2026-09-01. The copy was made once per
+  // project and only when absent, so a re-login on the host never reached a project that already had
+  // one. That is stale-FORWARD and needed no box to do anything unusual.
+  it('links every project at one shared mirror, so a host re-login reaches them all', async () => {
+    const home = await tempDir();
+    process.env.HOME = home;
+    delete process.env.XDG_CACHE_HOME;
+    process.env.VIBEBOARD_COPILOT_HOME = await tempDir();
+    const real = join(home, ...AUTH_UNDER_HOME);
+    mkdirSync(dirname(real), { recursive: true });
+    writeFileSync(real, AUTH, 'utf8');
+
+    // TWO projects, because one cannot distinguish "shared" from "copied": with a single project a
+    // per-project copy and a shared mirror are the same bytes in the same place.
+    const a = join(opencodeStateDir(await tempDir()), 'data', 'opencode', 'auth.json');
+    const b = join(opencodeStateDir(await tempDir()), 'data', 'opencode', 'auth.json');
+    expect(lstatSync(a).isSymbolicLink()).toBe(true);
+    expect(readlinkSync(a)).toBe(opencodeBoxCredentialPath());
+    expect(readlinkSync(b)).toBe(opencodeBoxCredentialPath());
+
+    // The re-login the old copy could not deliver. Project A was created BEFORE it happened.
+    const RELOGIN = JSON.stringify({ someprovider: { type: 'api', key: 'placeholder-after-relogin' } });
+    writeFileSync(real, RELOGIN, 'utf8');
+    opencodeStateDir(await tempDir()); // any ensure() re-mirrors
+    expect(readFileSync(a, 'utf8')).toBe(RELOGIN);
+  });
+
+  // THE MIGRATION. Every project on disk already holds one of the old copies, and one of them may be
+  // the newest credential on the machine — a box that refreshed inside it wrote there and nothing
+  // carried it anywhere. Replacing that file with a link without looking would destroy it.
+  it('carries a legacy per-project copy back to the host before replacing it with the link', async () => {
+    const home = await tempDir();
+    process.env.HOME = home;
+    delete process.env.XDG_CACHE_HOME;
+    process.env.VIBEBOARD_COPILOT_HOME = await tempDir();
+    const real = join(home, ...AUTH_UNDER_HOME);
+    mkdirSync(dirname(real), { recursive: true });
+    writeFileSync(real, AUTH, 'utf8');
+
+    // A project whose state already exists, holding a NEWER copy — what a refresh inside the box left.
+    const project = await tempDir();
+    const state = opencodeStateDir(project);
+    const seeded = join(state, 'data', 'opencode', 'auth.json');
+    rmSync(seeded, { force: true });
+    const FRESH = JSON.stringify({ someprovider: { type: 'api', key: 'placeholder-refreshed-in-box' } });
+    writeFileSync(seeded, FRESH, 'utf8');
+    const older = new Date(Date.now() - 60_000);
+    utimesSync(real, older, older);
+
+    opencodeStateDir(project);
+
+    expect(readFileSync(real, 'utf8')).toBe(FRESH); // the host took it
+    expect(lstatSync(seeded).isSymbolicLink()).toBe(true); // and it is a link now
+    expect(readFileSync(seeded, 'utf8')).toBe(FRESH);
+  });
+
+  // THE OTHER HALF, and without it the test above passes against "always overwrite the host". An OLDER
+  // legacy copy is a project nobody has used since the last re-login, and taking it would roll the
+  // host's credential backwards — which is the failure mode that leaves a spent refresh token in place.
+  it('does NOT let an older legacy copy overwrite the host', async () => {
+    const home = await tempDir();
+    process.env.HOME = home;
+    delete process.env.XDG_CACHE_HOME;
+    process.env.VIBEBOARD_COPILOT_HOME = await tempDir();
+    const real = join(home, ...AUTH_UNDER_HOME);
+    mkdirSync(dirname(real), { recursive: true });
+    writeFileSync(real, AUTH, 'utf8');
+
+    const project = await tempDir();
+    const seeded = join(opencodeStateDir(project), 'data', 'opencode', 'auth.json');
+    rmSync(seeded, { force: true });
+    writeFileSync(seeded, JSON.stringify({ stale: { type: 'api', key: 'placeholder-old' } }), 'utf8');
+    const older = new Date(Date.now() - 60_000);
+    utimesSync(seeded, older, older);
+
+    opencodeStateDir(project);
+    expect(readFileSync(real, 'utf8')).toBe(AUTH);
   });
 });

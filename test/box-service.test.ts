@@ -5,7 +5,7 @@ import { CONFIG_DIR, RUNS_DIR } from '../src/core/layout.js';
 import { BoxManager } from '../src/server/boxes/box-manager.js';
 import { BoxService, boxPathsForBackend } from '../src/server/boxes/box-service.js';
 import { boxMounts, type DockerResult, type DockerRun, WORK_DIR } from '../src/server/boxes/containers.js';
-import { boxCredentialPath } from '../src/server/boxes/copilot-env.js';
+import { boxCredentialPath, opencodeBoxCredentialPath } from '../src/server/boxes/copilot-env.js';
 import { tempDir, testTmp } from './helpers.js';
 
 // What a box gets FOR a project and backend. The mount set is the containment boundary, and two of its
@@ -13,8 +13,10 @@ import { tempDir, testTmp } from './helpers.js';
 //
 //  1. a bind mount whose source does not exist is not skipped by docker — it is CREATED, root-owned, on
 //     the host. So anything this returns must already be on disk.
-//  2. the credential is the whole of the backend split. A Claude box gets the Claude credential; an
-//     OpenCode box must not be able to read it, and that is enforced by absence rather than by a rule.
+//  2. the credential is the whole of the backend split. A Claude box gets the Claude credential and an
+//     OpenCode box must not be able to read it — enforced by WHAT IS MOUNTED and not by a rule. Since
+//     2026-09-01 each backend has a mirror of its own, so the enforcement is two sibling leaves with
+//     nothing mounting the parent, rather than one backend simply having no credential mount at all.
 
 // A HOST AND A COPILOT HOME OF THIS FILE'S OWN, for the whole file rather than per test.
 //
@@ -36,6 +38,16 @@ beforeAll(() => {
   process.env.VIBEBOARD_COPILOT_HOME = mkdtempSync(join(testTmp(), 'vibeboard-copilot-'));
   mkdirSync(join(hostHome, '.claude'), { recursive: true });
   writeFileSync(join(hostHome, '.claude', '.credentials.json'), '{"token":"host"}', 'utf8');
+  // AND OPENCODE'S, which is not decoration. Since 2026-09-01 an OpenCode box mounts a mirror of its
+  // own, and a mirror is only made when the host has a credential to make it from — so without this
+  // file the S2 assertion below would pass because the branch never ran, which is the shape of vacuity
+  // this suite exists to refuse.
+  mkdirSync(join(hostHome, '.local', 'share', 'opencode'), { recursive: true });
+  writeFileSync(
+    join(hostHome, '.local', 'share', 'opencode', 'auth.json'),
+    '{"someprovider":{"type":"api","key":"placeholder-not-a-key"}}',
+    'utf8',
+  );
 });
 
 afterAll(() => {
@@ -85,12 +97,26 @@ describe('the paths a box is given', () => {
     const opencode = boxMounts(boxPathsForBackend(root, 'opencode'));
 
     const creds = dirname(boxCredentialPath());
+    const opencodeCreds = dirname(opencodeBoxCredentialPath());
     expect(opencode.some((m) => m.source.includes('.claude'))).toBe(false);
     // Nor the mirror, which is the credential's OTHER name now and would otherwise be a Claude
     // credential in an OpenCode box that the check above reads straight past.
     expect(opencode.some((m) => m.source === creds || m.source.startsWith(`${creds}/`))).toBe(false);
-    expect(boxPathsForBackend(root, 'opencode').credential).toBeUndefined();
     expect(claude.some((m) => m.source === creds)).toBe(true);
+
+    // AN OPENCODE BOX HAS A CREDENTIAL MOUNT OF ITS OWN as of 2026-09-01 — it used to have none, because
+    // its credential was copied into the state directory instead, once, and so never refreshed again.
+    // S2 is unchanged and is still held by what is mounted: two SIBLING leaves, and nothing mounts the
+    // parent that holds both. Asserted as a sibling relationship rather than as two literals, so a
+    // change that collapsed them into one directory fails here rather than in a box.
+    expect(boxPathsForBackend(root, 'opencode').credential?.source).toBe(opencodeCreds);
+    expect(opencode.some((m) => m.source === opencodeCreds)).toBe(true);
+    expect(claude.some((m) => m.source === opencodeCreds)).toBe(false);
+    expect(dirname(creds)).toBe(dirname(opencodeCreds));
+    expect(creds).not.toBe(opencodeCreds);
+    // And the parent itself is mounted by neither, which is what makes the two leaves meaningful.
+    const parent = dirname(creds);
+    expect([...claude, ...opencode].some((m) => m.source === parent)).toBe(false);
     // The two state directories are different directories, not one shared parent.
     const stateOf = (mounts: { source: string; target: string }[]) =>
       mounts.find((m) => m.target === '/state')?.source;

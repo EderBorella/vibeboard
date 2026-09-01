@@ -11,7 +11,12 @@ import {
   STATE_DIR,
   WORK_DIR,
 } from './containers.js';
-import { claudeStateDir, mirrorClaudeCredential, opencodeStateDir } from './copilot-env.js';
+import {
+  claudeStateDir,
+  mirrorClaudeCredential,
+  mirrorOpencodeCredential,
+  opencodeStateDir,
+} from './copilot-env.js';
 
 // What a box is FOR a given project and backend: which directories it gets, which credential, and
 // which environment the CLI inside it needs. The manager below it knows docker and nothing about
@@ -44,24 +49,29 @@ export function boxPathsForBackend(
     stateDir: backend === 'claude-code' ? claudeStateDir(projectRoot) : opencodeStateDir(projectRoot),
     socketDir: apiSocketDir(),
   };
-  if (backend === 'claude-code') {
-    // Refreshed HERE, not only when a box is created, because this runs on every `ensure()` and
-    // `ensure()` runs before every agent turn. That cadence is the fix: the host's token is refreshed
-    // by the user's own Claude Code at times VibeBoard never hears about, and a mirror updated only at
-    // box creation would go stale exactly as the old file mount did. It is two `stat`s when nothing
-    // has changed.
-    const credential = mirrorClaudeCredential();
-    if (credential) {
-      // THE DIRECTORY, never the file, and this is the whole fix. A bind-mounted file pins an inode;
-      // a token refresh is an atomic replace, which makes a new one; so the box read a deleted inode
-      // forever and every turn failed as an expired session. A directory mount follows the rename.
-      // The measurement is on `mirrorClaudeCredential`.
-      //
-      // Mounted at its own path, not at a tidy one: the symlink VibeBoard writes into the config dir
-      // is absolute, so the path has to mean the same thing on both sides of the boundary.
-      const dir = dirname(credential);
-      extra.credential = { source: dir, target: dir };
-    }
+  // Refreshed HERE, not only when a box is created, because this runs on every `ensure()` and `ensure()`
+  // runs before every agent turn. That cadence is the fix: the host's token is refreshed by the user's
+  // own CLI at times VibeBoard never hears about, and a mirror updated only at box creation would go
+  // stale exactly as the old file mount did. It is two `stat`s when nothing has changed.
+  //
+  // BOTH BACKENDS, as of 2026-09-01. OpenCode used to get a per-project copy made once and never again,
+  // which is the same staleness through a different door — see `mirrorOpencodeCredential`.
+  const credential = backend === 'claude-code' ? mirrorClaudeCredential() : mirrorOpencodeCredential();
+  if (credential) {
+    // THE DIRECTORY, never the file, and this is the whole fix. A bind-mounted file pins an inode; a
+    // token refresh is an atomic replace, which makes a new one; so the box read a deleted inode forever
+    // and every turn failed as an expired session. A directory mount follows the rename. The measurement
+    // is on `mirrorClaudeCredential`.
+    //
+    // Mounted at its own path, not at a tidy one: the symlink VibeBoard writes into the state dir is
+    // absolute, so the path has to mean the same thing on both sides of the boundary.
+    //
+    // S2 STILL HOLDS, by the mechanism it always did: each backend's mirror is its own LEAF of
+    // `credentialHome()`, so a Claude box mounts `<creds>/claude` and an OpenCode box `<creds>/opencode`,
+    // and nothing mounts the parent. One directory for both would have put each backend's credential
+    // inside the other's box, which is the single thing S2 exists to prevent.
+    const dir = dirname(credential);
+    extra.credential = { source: dir, target: dir };
   }
   return boxPathsFor(projectRoot, extra, exists);
 }

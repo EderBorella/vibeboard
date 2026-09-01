@@ -188,7 +188,7 @@ describe('the agent report handoff', () => {
     await mkdir(join(root, RUNS_DIR), { recursive: true });
     await writeFile(
       reportPath(root, started.run),
-      '---\nrun: 20260101-000000-zzzz\noutcome: success\nverdict: done\n---\n## Not mine\n',
+      '---\nrun: 20260101-000000-zzzz\noutcome: success\nverdict: done\ncreated: [E-999]\n---\n## Not mine\n',
       'utf8',
     );
 
@@ -208,9 +208,14 @@ describe('the agent report handoff', () => {
 
     const folded = await foldReport(root, started, '2026-07-26T15:00:00.000Z', undefined, log);
     expect(folded?.fault).toBe('unreadable-report');
-    // The verdict goes with it: a report that does not know which run it belongs to cannot decide that
-    // run's outcome. Same reasoning S1 applies to a run the user stopped.
+    // EVERY DECISION IN IT GOES, not only the verdict — a report that does not know which run it belongs
+    // to cannot decide that run's outcome. Found in review: dropping the verdict alone left
+    // `outcome: success` intact, so a foreign report was recorded as a successful run, and `created:`
+    // brought another run's card ids into this one's record.
     expect(folded?.verdict).toBeUndefined();
+    expect(folded?.status).toBe('attention');
+    expect(folded?.outcome).toBe('attention');
+    expect(folded?.created).toBeUndefined();
     // FREE, BUT NOT SILENT — the ruling's own condition. The record carries the fault and the log says so.
     expect(burnsAttempt(folded as RunRecord)).toBe(false);
     expect(warned).toHaveLength(1);

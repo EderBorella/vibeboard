@@ -329,9 +329,11 @@ reading only the first would answer "no IPv6" for exactly the setups most likely
 answer destroys the box and throws, by the same argument as rules that failed to apply: a box whose
 boundary covers only some of its traffic is worse than one with no boundary, because it looks confined.
 
-Checked where the rules are applied — on **create and on start** — and deliberately not when a running
-box is adopted. A container's address is assigned when it starts, which is the same moment, so there is
-no state in which an adopted box acquires one unobserved.
+Checked in **both** places a box can be reached: after the rules are applied on create and on start, and
+again before a running box is **adopted**. The second is the upgrade case and it was missed at first — a
+container's address is assigned when it starts, so an adopted box cannot *acquire* one unobserved, but a
+box that was already up when this check arrived has one already. The answer costs nothing there: the same
+`docker inspect` that reads the state and the spec digest reads the address.
 
 **If somebody turns up who needs v6 boxes**, the fix is `ip6tables` mirroring `PRIVATE_RANGES` with the
 v6 private ranges (`fc00::/7`, `fe80::/10`, `::1/128`), guarded by a probe for the binary rather than

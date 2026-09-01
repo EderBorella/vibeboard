@@ -122,9 +122,10 @@ export function opencodeStateDir(projectRoot: string): string {
   // mirror is asked for so the path exists to point at, and it is ABSOLUTE — the box mounts that same
   // absolute path, so the link resolves identically inside and out.
   const seeded = join(data, 'auth.json');
-  adoptLegacyOpencodeCopy(seeded);
+  // The link is written only when the old copy is safely dealt with — see the note there.
+  const replaceable = adoptLegacyOpencodeCopy(seeded);
   mirrorOpencodeCredential();
-  linkTo(seeded, opencodeBoxCredentialPath());
+  if (replaceable) linkTo(seeded, opencodeBoxCredentialPath());
   writeOpencodeConfig(join(root, 'config'));
   return root;
 }
@@ -136,14 +137,39 @@ export function opencodeStateDir(projectRoot: string): string {
 // The same three conditions as `reconcileCredential`: strictly newer, parses, and the host already has
 // one. A regular file only — a symlink is this migration having already happened, and following it
 // would compare the mirror with itself.
-function adoptLegacyOpencodeCopy(seeded: string): void {
+function adoptLegacyOpencodeCopy(seeded: string): boolean {
   const legacy = lstatSync(seeded, { throwIfNoEntry: false });
-  if (!legacy?.isFile()) return;
+  if (!legacy?.isFile()) return true;
   const host = opencodeAuthFile();
   const on = statSync(host, { throwIfNoEntry: false });
-  if (!on?.isFile() || legacy.mtimeMs <= on.mtimeMs) return;
-  if (!parsesAsCredential(seeded)) return;
-  restoreCredential(seeded, host);
+  // Nothing to save: the host already holds these bytes, so the link may replace the file freely.
+  if (on?.isFile() && mirrored(seeded, host, on)) return true;
+  if (on?.isFile() && legacy.mtimeMs > on.mtimeMs && parsesAsCredential(seeded)) {
+    restoreCredential(seeded, host);
+    return true;
+  }
+  // NEITHER ADOPTED NOR IDENTICAL, so it is kept rather than deleted — corrected in review, where the
+  // ordering turned out to destroy the newest credential on the machine.
+  //
+  // The sequence: two projects hold legacy copies at T1 and T2, the host is older than both. Opening the
+  // first adopts T1 and rewrites the host, whose mtime becomes NOW. Opening the second then finds T2
+  // older than "now", declines to adopt it — correctly, on the rule as written — and `linkTo` unlinked
+  // it. T2 was the newest credential in existence and it was gone, while the host kept T1. Reproduced
+  // against a two-project fixture; with a provider that rotates refresh tokens on use, the survivor is
+  // the spent one.
+  //
+  // A RENAME AND NOT A CLEVERER RULE. Picking the globally newest would mean enumerating every project's
+  // state directory from inside a function that has been handed one path, and the defect here is the
+  // DELETION rather than the choice. The file keeps its directory and gains a suffix, so it is where
+  // somebody would look for it.
+  try {
+    renameSync(seeded, `${seeded}.superseded`);
+    return true;
+  } catch {
+    // ANSWERS FALSE, so the link is not written either. `linkTo` UNLINKS whatever is in its way, so
+    // linking after a failed preservation would delete the very file the rename was there to keep.
+    return false;
+  }
 }
 
 // AN EXISTING LINK IS REPOINTED, NOT LEFT ALONE, and that is the whole reason this is not three lines.

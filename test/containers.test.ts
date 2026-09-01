@@ -431,6 +431,26 @@ describe('ensure', () => {
     expect(calls.some((c) => c[0] === 'rm' && c[1] === '-f')).toBe(true);
   });
 
+  // AN ALREADY-RUNNING BOX, which is the upgrade case and the one the first version missed. The refusal
+  // lived only in `#applyNetworkRules`, which runs on create and on start — so a box that was up when
+  // this version arrived was adopted, spec digest matching, and used with the address it had acquired
+  // under the previous one. Raised in review; the answer was already in the `inspect` that adoption does.
+  it('refuses an already-running box that has one, rather than adopting it', async () => {
+    const calls: string[][] = [];
+    const mgr = new BoxManager({
+      docker: fakeDocker(
+        { inspect: { code: 0, stdout: `true|${matchingSpec}|2001:db8::7\n`, stderr: '' } },
+        calls,
+      ),
+      user: '1000:1000',
+    });
+
+    await expect(mgr.ensure(opts)).rejects.toThrow(/IPv6/);
+    expect(calls.some((c) => c[0] === 'rm' && c[1] === '-f')).toBe(true);
+    // And it did not go on to exec into it: the probe that decides adoption never ran.
+    expect(calls.some((c) => c[0] === 'exec')).toBe(false);
+  });
+
   // The other half, and without it the test above passes against a manager that refuses every box. An
   // empty address is what a v4-only bridge reports, which is the ordinary case and must be silent.
   it('says nothing about IPv6 when docker gave the box no v6 address', async () => {

@@ -431,6 +431,48 @@ describe('the OpenCode auth file both the seed and the health check read', () =>
     expect(readFileSync(seeded, 'utf8')).toBe(FRESH);
   });
 
+  // TWO PROJECTS, WHICH IS THE CASE THAT LOST A CREDENTIAL. Found in review and reproduced before it was
+  // fixed: adopting the first rewrites the host, whose mtime becomes NOW, so the second — genuinely the
+  // newest credential on the machine — is older than "now", is correctly not adopted, and was then
+  // DELETED by the link that replaced it. A single-project fixture cannot see this at all.
+  it('never deletes a legacy copy it did not adopt, even when it declines to take it', async () => {
+    const home = await tempDir();
+    process.env.HOME = home;
+    delete process.env.XDG_CACHE_HOME;
+    process.env.VIBEBOARD_COPILOT_HOME = await tempDir();
+    const real = join(home, ...AUTH_UNDER_HOME);
+    mkdirSync(dirname(real), { recursive: true });
+    writeFileSync(real, AUTH, 'utf8');
+    const oldest = new Date(Date.now() - 300_000);
+    utimesSync(real, oldest, oldest);
+
+    // The project ROOT is carried, not derived back out of the state path: the state directory is named
+    // by a digest of the root, so walking up from it lands on a directory that hashes to something else.
+    const legacy = async (bytes: string, ageMs: number): Promise<{ root: string; seeded: string }> => {
+      const root = await tempDir();
+      const seeded = join(opencodeStateDir(root), 'data', 'opencode', 'auth.json');
+      rmSync(seeded, { force: true });
+      writeFileSync(seeded, bytes, 'utf8');
+      const at = new Date(Date.now() - ageMs);
+      utimesSync(seeded, at, at);
+      return { root, seeded };
+    };
+    const A = JSON.stringify({ p: { type: 'api', key: 'placeholder-middle' } });
+    const B = JSON.stringify({ p: { type: 'api', key: 'placeholder-newest' } });
+    const a = await legacy(A, 200_000);
+    const b = await legacy(B, 100_000);
+
+    opencodeStateDir(a.root);
+    opencodeStateDir(b.root);
+
+    // The host took the first, which is the rule working as written.
+    expect(readFileSync(real, 'utf8')).toBe(A);
+    // AND THE SECOND STILL EXISTS. It is not the one in use — picking the globally newest would mean
+    // enumerating every project — but it is recoverable, which is the whole of the fix.
+    expect(readFileSync(`${b.seeded}.superseded`, 'utf8')).toBe(B);
+    expect(lstatSync(b.seeded).isSymbolicLink()).toBe(true);
+  });
+
   // THE OTHER HALF, and without it the test above passes against "always overwrite the host". An OLDER
   // legacy copy is a project nobody has used since the last re-login, and taking it would roll the
   // host's credential backwards — which is the failure mode that leaves a spent refresh token in place.

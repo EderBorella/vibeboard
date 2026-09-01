@@ -197,6 +197,38 @@ describe('parseAgentReport', () => {
     expect(report.unreadable).toContain('maybe');
   });
 
+  // A VERDICT MENTIONED IN THE PROSE IS A MENTION, not an answer — and this is a regression test for a
+  // real defect this file's own rescue reader created. `rescueFrontmatter` scans EVERY line of the
+  // document on purpose, so a body that says `Verdict: the approach was sound.` put a `verdict` key in
+  // the merged record. Asked of that merge, "present and unusable" was true for a report whose
+  // frontmatter had no verdict at all — so a run that SUCCEEDED was stamped `unreadable-report`, burned
+  // no attempt, and its card never moved. Found in review; the question is now asked of the frontmatter.
+  it('does NOT mark a report whose prose merely mentions a verdict', () => {
+    const prose =
+      '---\noutcome: success\nsummary: "did the work"\n---\n\n## Notes\nVerdict: the approach was sound.\n';
+    expect(parseAgentReport(prose).unreadable).toBeUndefined();
+    expect(parseAgentReport(prose).outcome).toBe('success');
+    // The markdown-emphasis shape too, which is the one `readPair` was written for.
+    expect(
+      parseAgentReport('---\noutcome: success\n---\n\n**Verdict:** it went well.\n').unreadable,
+    ).toBeUndefined();
+  });
+
+  // AND THE SAME WHEN YAML HAS THROWN, which is the branch that reads the block by hand. Without this the
+  // fix could have been applied to the YAML path alone and the rescue path would still be wrong.
+  it('does not mark prose as a verdict even when the frontmatter is malformed', () => {
+    const broken = '---\noutcome: success\nsummary: a: b: c\n---\n\nVerdict: looks fine to me.\n';
+    expect(parseAgentReport(broken).unreadable).toBeUndefined();
+  });
+
+  // The frontmatter itself is still read, in both branches — or the fix above would have been "never
+  // flag anything", which passes every test above and closes nothing.
+  it('still marks an unusable verdict written in the frontmatter, YAML or not', () => {
+    expect(parseAgentReport('---\noutcome: success\nverdict: maybe\n---\nx\n').unreadable).toContain('maybe');
+    const broken = '---\nverdict: maybe\nsummary: a: b: c\n---\nx\n';
+    expect(parseAgentReport(broken).unreadable).toContain('maybe');
+  });
+
   // THE OTHER HALF, and without it the assertion above would pass against "any review with no verdict".
   // An absent verdict is a review that decided nothing — a real inconclusive review, and the entire
   // subject of `inconclusiveReviews`. Calling it unreadable would empty that bound of its meaning and

@@ -2,7 +2,7 @@ import { rm } from 'node:fs/promises';
 import { basename, dirname, isAbsolute, resolve } from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import { DEFAULT_BACKEND } from '../../core/backends.js';
-import { deleteProjectTree } from '../../store/project/delete.js';
+import { deleteProjectTree, isProjectDir, notAProject } from '../../store/project/delete.js';
 import { type ScaffoldMode, scaffoldProject } from '../../store/project/scaffold.js';
 import { BOX_BACKENDS, type BoxBackend } from '../boxes/containers.js';
 import { projectStateDir } from '../boxes/copilot-env.js';
@@ -198,6 +198,14 @@ export async function registerProjectRoutes(api: FastifyInstance, ctx: AppCtx): 
 
     const refused = await deleteRefusal(path, name);
     if (refused) return reply.code(refused.code).send({ error: refused.error });
+    // THE MARKER IS CHECKED BEFORE ANYTHING IS TORN DOWN. `deleteProjectTree` refuses a directory that is
+    // not a VibeBoard project, and that refusal used to arrive AFTER the session had been closed, the
+    // copilot's credential revoked and both boxes removed — so a project whose `config.yaml` had gone
+    // missing since it was opened answered 400 and left the server with no open project and the browser
+    // showing an error rather than reloading. Raised in review; the ordering was free to fix.
+    if (!(await isProjectDir(path))) {
+      return reply.code(400).send({ error: notAProject(path) });
+    }
     await releaseProject(path, (err, backend) =>
       // Not fatal. A box that cannot be removed is a remainder worth logging, and refusing the whole
       // delete over it would leave the user with a project they have been told is gone.

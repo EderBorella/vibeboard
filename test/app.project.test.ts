@@ -1,8 +1,9 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { mkdir } from 'node:fs/promises';
 import { basename, join, relative as relative_ } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { IDLE_STATE } from '../src/core/autopilot-state.js';
+import { CONFIG_DIR, CONFIG_FILE } from '../src/core/layout.js';
 import { ProjectSession } from '../src/server/boards/session.js';
 import { projectStateDir } from '../src/server/boxes/copilot-env.js';
 import { rememberProject } from '../src/server/settings/app-state.js';
@@ -198,6 +199,25 @@ describe('POST /api/project/delete', () => {
     expect(res.statusCode).toBe(400);
     expect(res.json().error).toContain('.vibeboard/config.yaml');
     expect(existsSync(join(notAProject, 'important.txt'))).toBe(true);
+  });
+
+  // AND IT REFUSES BEFORE IT LETS GO. Raised in review: the marker check ran AFTER the session was
+  // closed, the copilot credential revoked and both boxes removed, so a project whose config.yaml had
+  // gone missing since it was opened answered 400 with the server left holding no open project.
+  it('leaves the open project open when it refuses', async () => {
+    const { root, app: a, session } = await openTestProject();
+    // The marker gone, the folder still there — what a half-deleted or hand-edited project looks like.
+    rmSync(join(root, CONFIG_DIR, CONFIG_FILE), { force: true });
+
+    const res = await del(a, root, basename(root));
+
+    expect(res.statusCode).toBe(400);
+    // STILL OPEN. This is the assertion the ordering is about; the 400 above passed before the fix too.
+    // STILL OPEN. This is the assertion the ordering is about; the 400 above passed before the fix too.
+    // Asserted on the session rather than through `GET /api/state`, which cannot answer here at all: it
+    // builds a snapshot, and the snapshot reads the very config.yaml this fixture removed.
+    expect(session.isOpen).toBe(true);
+    expect(existsSync(root)).toBe(true);
   });
 
   // TYPED ON THE SERVER, not only in the dialog. A confirmation that lives in the browser is one the

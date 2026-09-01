@@ -267,15 +267,22 @@ function readPair(line: string, out: Record<string, string>): void {
 // and says to quote a value containing a colon. A prompt-only fix lowers the odds and cannot close it,
 // which is the argument this whole function was written under; a reader-only fix would licence any
 // shape at all. Both, and the contract is still what is asked for.
-function rescueFrontmatter(content: string): Record<string, string> {
+// STEP 1 ON ITS OWN, because two questions need different answers from it. What VALUE a key has is best
+// answered by both readers; whether a key was WRITTEN AS FRONTMATTER can only be answered by this one.
+// Conflating them stamped a successful run as unreadable because its prose said "Verdict:".
+function frontmatterPairs(content: string): Record<string, string> {
   const lines = content.split('\n');
   const out: Record<string, string> = {};
+  if (lines[0]?.trim() !== '---') return out;
+  const end = lines.indexOf('---', 1);
+  if (end !== -1) for (const line of lines.slice(1, end)) readPair(line, out);
+  return out;
+}
 
+function rescueFrontmatter(content: string): Record<string, string> {
+  const lines = content.split('\n');
   // 1. A frontmatter block, whether or not YAML could read it.
-  if (lines[0]?.trim() === '---') {
-    const end = lines.indexOf('---', 1);
-    if (end !== -1) for (const line of lines.slice(1, end)) readPair(line, out);
-  }
+  const out: Record<string, string> = frontmatterPairs(content);
 
   // 2. Any line in the body, INCLUDING inside a fence. A tagged ```yaml block, a bare fence and a
   //    frontmatter block that was fenced by mistake all reduce to "a line somewhere that reads
@@ -296,11 +303,22 @@ function rescueFrontmatter(content: string): Record<string, string> {
 // A VERDICT KEY THE READER COULD NOT USE, which is the one thing about a report that says the loss was
 // ours rather than the work's.
 //
-// Present-and-unusable, never absent: `verdict: maybe`, `verdict: {}`, a key whose value YAML dropped.
+// Present-and-unusable, never absent: `verdict: maybe`, `verdict: {}`.
 // An absent key is a review that decided nothing, which is a real inconclusive review and the whole
 // subject of `inconclusiveReviews`. Conflating the two would empty that bound of its meaning in exactly
 // the direction that hands a genuinely undecidable card unlimited reviews.
+// WHAT IT IS GIVEN MATTERS MORE THAN WHAT IT DOES, and getting that wrong shipped a real defect for the
+// length of one review. It was handed the MERGED record — YAML plus `rescueFrontmatter`, whose second
+// reader scans every line of the whole document on purpose. So a report whose frontmatter had no verdict
+// at all was flagged because its PROSE said `Verdict: the approach was sound.`, which is one of the exact
+// shapes the rescue reader exists to catch. A successful run was then stamped `unreadable-report`, burned
+// no attempt, and the card did not move — for ever, since the same report would be written again.
+//
+// So this is only ever asked of the FRONTMATTER: `parsed.data` when YAML read it, and the frontmatter
+// block alone when YAML threw. A mention in the body is a mention.
 function unusableVerdict(d: Record<string, unknown>): string | undefined {
+  // `verdict:` with no value parses to null, and that is a review that decided nothing rather than one we
+  // could not read — the same case as an absent key.
   if (!('verdict' in d) || d.verdict === undefined || d.verdict === null) return undefined;
   if (isVerdict(d.verdict)) return undefined;
   const shown = typeof d.verdict === 'string' ? d.verdict : typeof d.verdict;
@@ -316,8 +334,12 @@ function unusableVerdict(d: Record<string, unknown>): string | undefined {
 // The rescue-only reading, for a report whose YAML threw. Its own function because it is a different
 // reader with a different reach — three fields off single lines, no `options`, no `created`, and no
 // identity — and folding both into one body put `parseAgentReport` over the complexity ceiling.
-function fromRescueAlone(rescued: Record<string, string>, body: string): AgentReport {
-  const unreadable = unusableVerdict(rescued);
+function fromRescueAlone(
+  rescued: Record<string, string>,
+  block: Record<string, string>,
+  body: string,
+): AgentReport {
+  const unreadable = unusableVerdict(block);
   return {
     outcome: isOutcome(rescued.outcome) ? rescued.outcome : 'attention',
     ...(asText(rescued.summary) ? { summary: asText(rescued.summary) } : {}),
@@ -348,11 +370,16 @@ export function parseAgentReport(content: string): AgentReport {
     parsed = undefined;
   }
   const rescued = rescueFrontmatter(content);
-  if (parsed === undefined) return fromRescueAlone(rescued, bodyAfterBlock(content));
+  // The BLOCK's own pairs as well as the merged ones: the values are read from the merge, as they always
+  // were, but "was a verdict written in the frontmatter" can only be answered by the block.
+  if (parsed === undefined)
+    return fromRescueAlone(rescued, frontmatterPairs(content), bodyAfterBlock(content));
   // YAML WINS WHERE IT SPOKE. It read a quoted scalar correctly and can carry a multi-line one, which the
   // line reader cannot; the rescued values only fill keys YAML did not produce.
   const d = { ...rescued, ...parsed.data } as Record<string, unknown>;
-  const unreadable = unusableVerdict(d);
+  // `parsed.data`, NOT `d` — see `unusableVerdict`. The merge carries body lines and this question is
+  // about the frontmatter.
+  const unreadable = unusableVerdict(parsed.data as Record<string, unknown>);
   return {
     outcome: isOutcome(d.outcome) ? d.outcome : 'attention',
     ...(asText(d.summary) ? { summary: asText(d.summary) } : {}),

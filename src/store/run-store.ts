@@ -365,10 +365,17 @@ function checkReportIdentity(report: AgentReport, run: string): AgentReport {
   if (report.run === undefined || report.run === run) return report;
   return {
     ...report,
-    // The agent's own verdict is dropped with it. A report that does not know which run it belongs to
-    // cannot be allowed to decide that run's outcome, which is the same reasoning S1 applies to a run
-    // the user stopped.
+    // EVERY DECISION IN IT IS DISCARDED, not only the verdict — corrected in review, where dropping the
+    // verdict alone turned out to leave `outcome: success` intact. A foreign report was therefore written
+    // to disk as a SUCCESSFUL run carrying another run's summary and body, and `created:` brought another
+    // run's card ids with it, which is the loop being told about cards this run never made.
+    //
+    // `attention` and not `failed`: nothing here says the work failed, only that we cannot tell whose
+    // work it was. That is the same reasoning S1 applies to a run the user stopped — the report is kept
+    // as EVIDENCE and its verdict is ours to withhold.
+    outcome: 'attention' as const,
     verdict: undefined,
+    created: undefined,
     unreadable: `it declares run ${report.run}, and this is run ${run}`,
   };
 }

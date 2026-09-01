@@ -191,6 +191,25 @@ export class BoxManager {
       await this.#docker(['rm', '-f', name], { timeoutMs: 60_000 });
       throw new Error(`could not confine the agent box's network: ${firstLine(res.stderr)}`);
     }
+    // AND THE RULES JUST INSTALLED ARE IPv4 ONLY. `iptables` is what `netRuleArgs` writes; `ip6tables` is
+    // never invoked. A box that also holds a v6 address is a box whose boundary covers only some of its
+    // traffic, which is worse than no boundary because it looks confined.
+    //
+    // WRITING THE v6 RULES WAS CONSIDERED AND REJECTED, 2026-09-01. Docker ships bridge IPv6 off, so this
+    // needs somebody to have turned it on deliberately — a v6-capable HOST whose bridge is v4-only gives
+    // its containers no v6 address at all, which is the ordinary case and not a gap. Against that,
+    // `ip6tables` is absent from some hosts and images, so adding the rules blindly would break boxes
+    // that work today to cover a case nobody has. Detect and refuse needs no new dependency and fails
+    // loudly. See docs/security/containment.md.
+    const { ipv6 } = await inspectState(this.#docker, name);
+    if (ipv6 !== '') {
+      await this.#docker(['rm', '-f', name], { timeoutMs: 60_000 });
+      throw new Error(
+        `the agent box was given an IPv6 address (${ipv6}) and VibeBoard's network rules are IPv4 only, ` +
+          'so half its traffic would leave unconfined. Turn IPv6 off on the Docker bridge — see ' +
+          'docs/security/containment.md.',
+      );
+    }
   }
 
   // The privileged half, and the only place in VibeBoard that runs anything in a box as root.

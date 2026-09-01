@@ -357,23 +357,39 @@ interface BoxInspection {
   state: BoxState;
   // The spec digest the box was created with, or '' for one made before this label existed.
   spec: string;
+  // A global IPv6 address, if docker gave it one. '' is the ordinary case and the one we require.
+  ipv6: string;
 }
 
-// State AND spec in one call. Two calls would be two round trips and, worse, a window in which the
-// answers disagree.
+// State, spec AND address in ONE call. Three calls would be three round trips and, worse, three windows
+// in which the answers disagree — and a second `inspect` SHAPE is its own hazard: every test double in
+// the suite keys on `args[0] === 'inspect'`, so a second one would silently be answered with the first
+// one's output. Five tests proved that on the first run.
+//
+// THE IPv6 FIELD IS READ FROM BOTH PLACES IT CAN APPEAR, concatenated: the top-level one is populated
+// for the default bridge, and a container on a user-defined network carries it per network instead.
+// Reading only the first would answer "no IPv6" for exactly the setups most likely to have it. It is the
+// LAST field, and absent from a fixture that predates it, so an answer with two fields still parses.
+const V6 =
+  '{{.NetworkSettings.GlobalIPv6Address}}{{range .NetworkSettings.Networks}}{{.GlobalIPv6Address}}{{end}}';
+
+// A PIPE, NOT WHITESPACE, and that is a correction rather than a preference. Docker prints `<no value>`
+// for a label that is not set — WITH A SPACE IN IT — so splitting on whitespace put `<no` in the spec
+// field and `value>` in whatever came after. The two-field version had the same fault and got away with
+// it: a mangled spec is merely "not the digest we wanted", which rebuilds, so the `=== '<no value>'`
+// line below could never once have matched. Adding a third field turned it into a box refused for
+// holding an IPv6 address called `value>`. None of the three values can contain a pipe.
+const FIELDS = `{{.State.Running}}|{{index .Config.Labels "${SPEC_LABEL}"}}|${V6}`;
+
 export async function inspectState(docker: DockerRun, name: string): Promise<BoxInspection> {
-  const res = await docker([
-    'inspect',
-    '-f',
-    `{{.State.Running}} {{index .Config.Labels "${SPEC_LABEL}"}}`,
-    name,
-  ]);
-  if (res.code !== 0) return { state: 'absent', spec: '' };
-  const [running = '', spec = ''] = res.stdout.trim().split(/\s+/);
+  const res = await docker(['inspect', '-f', FIELDS, name]);
+  if (res.code !== 0) return { state: 'absent', spec: '', ipv6: '' };
+  const [running = '', spec = '', ipv6 = ''] = res.stdout.trim().split('|');
   return {
-    state: running === 'true' ? 'running' : 'stopped',
+    state: running.trim() === 'true' ? 'running' : 'stopped',
     // docker prints `<no value>` for a label that is not set.
-    spec: spec === '<no value>' ? '' : spec,
+    spec: spec.trim() === '<no value>' ? '' : spec.trim(),
+    ipv6: ipv6.trim(),
   };
 }
 

@@ -362,8 +362,8 @@ describe('ensure', () => {
     command: undefined,
     publish: undefined,
   });
-  const running = { code: 0, stdout: `true ${matchingSpec}\n`, stderr: '' };
-  const stopped = { code: 0, stdout: `false ${matchingSpec}\n`, stderr: '' };
+  const running = { code: 0, stdout: `true|${matchingSpec}|\n`, stderr: '' };
+  const stopped = { code: 0, stdout: `false|${matchingSpec}|\n`, stderr: '' };
 
   // `docker run` is no longer a synonym for "made the box": the network sidecar is a `docker run`
   // too. Only a run that NAMES a container creates one, and that is what these assertions mean.
@@ -400,6 +400,54 @@ describe('ensure', () => {
     await mgr.ensure(opts);
     expect(calls.some((c) => c[0] === 'start')).toBe(true);
     expect(createdBox(calls)).toBe(false);
+  });
+
+  // IPv6, AND WHY IT IS A REFUSAL RATHER THAN A SECOND SET OF RULES. `netRuleArgs` writes `iptables`,
+  // which is v4 only, and `ip6tables` is never invoked — so a box holding a v6 address is a box whose
+  // boundary covers only some of its traffic, which is worse than none because it looks confined.
+  it('refuses a box docker gave an IPv6 address, and destroys it', async () => {
+    const calls: string[][] = [];
+    // ABSENT FIRST, so the box is CREATED and the rules path runs. An adopted box is deliberately not
+    // re-checked: a container's address is assigned when it starts, which is exactly when the rules are
+    // applied, so there is no state in which an adopted box acquires one behind our back.
+    let exists = false;
+    const mgr = new BoxManager({
+      docker: async (args) => {
+        calls.push(args);
+        if (args[0] === 'inspect') {
+          return exists
+            ? { code: 0, stdout: `true|${matchingSpec}|2001:db8::2\n`, stderr: '' }
+            : { code: 1, stdout: '', stderr: 'No such object' };
+        }
+        if (args[0] === 'run' && args[1] === '-d') exists = true;
+        return { code: 0, stdout: '', stderr: '' };
+      },
+      user: '1000:1000',
+    });
+
+    await expect(mgr.ensure(opts)).rejects.toThrow(/IPv6/);
+    // DESTROYED, not merely refused. A box left running with a boundary that does not cover it is the
+    // exact state this exists to prevent, and the same reasoning applies as for rules that failed.
+    expect(calls.some((c) => c[0] === 'rm' && c[1] === '-f')).toBe(true);
+  });
+
+  // The other half, and without it the test above passes against a manager that refuses every box. An
+  // empty address is what a v4-only bridge reports, which is the ordinary case and must be silent.
+  it('says nothing about IPv6 when docker gave the box no v6 address', async () => {
+    let exists = false;
+    const mgr = new BoxManager({
+      docker: async (args) => {
+        if (args[0] === 'inspect') {
+          return exists
+            ? { code: 0, stdout: `true|${matchingSpec}|\n`, stderr: '' }
+            : { code: 1, stdout: '', stderr: 'No such object' };
+        }
+        if (args[0] === 'run' && args[1] === '-d') exists = true;
+        return { code: 0, stdout: '', stderr: '' };
+      },
+      user: '1000:1000',
+    });
+    await expect(mgr.ensure(opts)).resolves.toBeDefined();
   });
 
   it('confines the network of a box it just created', async () => {
@@ -443,7 +491,7 @@ describe('ensure', () => {
     // and never gained one — leaving the host-executed hooks directory writable.
     const calls: string[][] = [];
     const mgr = new BoxManager({
-      docker: fakeDocker({ inspect: { code: 0, stdout: 'true otherdigest\n', stderr: '' } }, calls),
+      docker: fakeDocker({ inspect: { code: 0, stdout: 'true|otherdigest|\n', stderr: '' } }, calls),
       user: '1000:1000',
     });
     await mgr.ensure(opts);
@@ -469,7 +517,7 @@ describe('ensure', () => {
   it('says which digests disagreed, so a rebuild is not a mystery', async () => {
     const notices: string[][] = [];
     const mgr = new BoxManager({
-      docker: fakeDocker({ inspect: { code: 0, stdout: 'true otherdigest\n', stderr: '' } }),
+      docker: fakeDocker({ inspect: { code: 0, stdout: 'true|otherdigest|\n', stderr: '' } }),
       user: '1000:1000',
       onRebuild: (name, was, now) => notices.push([name, was, now]),
     });
@@ -482,7 +530,7 @@ describe('ensure', () => {
   it('treats a box with no spec label as unusable — it predates the check', async () => {
     const calls: string[][] = [];
     const mgr = new BoxManager({
-      docker: fakeDocker({ inspect: { code: 0, stdout: 'true <no value>\n', stderr: '' } }, calls),
+      docker: fakeDocker({ inspect: { code: 0, stdout: 'true|<no value>|\n', stderr: '' } }, calls),
       user: '1000:1000',
     });
     await mgr.ensure(opts);

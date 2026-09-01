@@ -175,7 +175,7 @@ describe('a box is the same box whoever asks for it', () => {
     const inspect = (): DockerResult =>
       present === undefined
         ? { code: 1, stdout: '', stderr: 'No such object' }
-        : { code: 0, stdout: `true ${present}\n`, stderr: '' };
+        : { code: 0, stdout: `true|${present}|\n`, stderr: '' };
 
     const create = (args: string[]): DockerResult => {
       created.push(args);

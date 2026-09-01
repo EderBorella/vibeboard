@@ -310,6 +310,34 @@ rather than served.
 
 ---
 
+### IPv6 is out of scope, and a box that has an address is refused
+
+The rules above are `iptables`. **`ip6tables` is never invoked**, so on a daemon with IPv6 on the bridge
+the private-range block would not apply to half a box's traffic — silently, which is the property that
+makes it worth handling at all.
+
+**Writing the v6 rules was considered and rejected on 2026-09-01.** Container IPv6 is a dockerd setting
+(`"ipv6": true` plus a v6 subnet in `daemon.json`) and it ships **off**; a v6-capable *host* whose bridge
+is v4-only gives its containers no v6 address at all, which is the ordinary case and not a gap. v6-only
+Docker networking exists, needs NAT64/DNS64 to reach the v4 internet, and anyone running it knows they
+are. Against that, `ip6tables` is absent from some hosts and some images, so writing the rules blindly
+would break boxes that work today in order to cover a case nobody has.
+
+**So it detects and refuses.** `inspectState` reads `GlobalIPv6Address` — from the top-level field *and*
+from each entry in `Networks`, because a container on a user-defined network carries it per network and
+reading only the first would answer "no IPv6" for exactly the setups most likely to have one. A non-empty
+answer destroys the box and throws, by the same argument as rules that failed to apply: a box whose
+boundary covers only some of its traffic is worse than one with no boundary, because it looks confined.
+
+Checked where the rules are applied — on **create and on start** — and deliberately not when a running
+box is adopted. A container's address is assigned when it starts, which is the same moment, so there is
+no state in which an adopted box acquires one unobserved.
+
+**If somebody turns up who needs v6 boxes**, the fix is `ip6tables` mirroring `PRIVATE_RANGES` with the
+v6 private ranges (`fc00::/7`, `fe80::/10`, `::1/128`), guarded by a probe for the binary rather than
+assumed. Revisit then, not before.
+
+
 ## Two things that are deliberately *not* confined by the box
 
 - **The auto-pilot service process.** It is not sandboxed, and that is correct: it writes

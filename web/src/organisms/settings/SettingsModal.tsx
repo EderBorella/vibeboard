@@ -47,6 +47,9 @@ interface Props {
   // The open project's folder. Only Delete uses it, and it comes down rather than being fetched for the
   // same reason `autopilot` does: a second read is a second answer, and this one names what gets deleted.
   root: string;
+  // Straight through to SandboxPanel, which subscribes for the image build's output. Same socket, same
+  // generation — see the note on `autopilot` below for why this comes down rather than being re-derived.
+  bump: number;
   onClose: () => void;
   onSaved: () => void;
   // Passed down rather than fetched again. `useAutopilot(0)` inside the panel hard-coded App's project
@@ -68,6 +71,7 @@ const NO_MODELS: ModelOption[] = [];
 export function SettingsModal({
   config,
   root,
+  bump,
   onClose,
   onSaved,
   autopilot,
@@ -228,7 +232,7 @@ export function SettingsModal({
         model.
       </Text>
 
-      {sandbox && <SandboxPanel state={sandbox} backend={backend} onChanged={loadSandbox} />}
+      {sandbox && <SandboxPanel state={sandbox} backend={backend} bump={bump} onChanged={loadSandbox} />}
 
       <Text caps ink="accent" className="settings-section">
         Boards

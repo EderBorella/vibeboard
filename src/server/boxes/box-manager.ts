@@ -72,6 +72,8 @@ interface EnsureOptions {
   image?: string;
 }
 
+export type ProbeResult = { ok: true } | { ok: false; reason: string; missing: 'daemon' | 'image' };
+
 export class BoxManager {
   #docker: DockerRun;
   #user: string;
@@ -90,14 +92,27 @@ export class BoxManager {
   // Is a box even possible here? Separate from `ensure` so the answer can be given before a dispatch is
   // attempted rather than as the failure of one — a box that cannot start surfaces as a non-zero exit
   // of the agent's own command, which is indistinguishable from the agent failing.
-  async probe(image = DEFAULT_IMAGE): Promise<{ ok: true } | { ok: false; reason: string }> {
+  // `missing` NAMES WHICH OF THE TWO, and it is not decoration. Both used to come back as one opaque
+  // sentence, so anything downstream that wanted to act on "the image is not built" had to match on the
+  // wording — and building against a daemon that is not running would spend a failed `docker build`
+  // discovering what this call already knew. Two callers need the distinction now: the start script,
+  // which builds, and the settings panel, which offers to.
+  async probe(image = DEFAULT_IMAGE): Promise<ProbeResult> {
     const info = await this.#docker(['version', '-f', '{{.Server.Version}}']);
     if (info.code !== 0) {
-      return { ok: false, reason: `Docker is not available — ${firstLine(info.stderr) || 'no daemon'}` };
+      const reason = `Docker is not available — ${firstLine(info.stderr) || 'no daemon'}`;
+      return { ok: false, reason, missing: 'daemon' };
     }
     const img = await this.#docker(['image', 'inspect', '-f', '{{.Id}}', image]);
     if (img.code !== 0) {
-      return { ok: false, reason: `the agent image ${image} is not built — run \`npm run box:build\`` };
+      // The remedy is no longer a developer command. VibeBoard builds this itself on start, and offers
+      // to from Settings — see `image-build.ts` for why printing `npm run box:build` at an installed
+      // copy was an instruction nobody could follow.
+      return {
+        ok: false,
+        reason: `the agent image ${image} is not built yet`,
+        missing: 'image',
+      };
     }
     return { ok: true };
   }

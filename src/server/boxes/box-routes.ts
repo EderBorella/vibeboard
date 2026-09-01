@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import type { AutopilotStateName } from '../../core/autopilot-state.js';
 import { type AppCtx, ensureOpen } from '../route-context.js';
 import { type BoxBackend, boxName } from './containers.js';
+import { buildAgentImage } from './image-build.js';
 
 // Throwing a project's boxes away, and nothing else.
 //
@@ -71,5 +72,32 @@ export async function registerBoxRoutes(api: FastifyInstance, ctx: AppCtx): Prom
     // asked to run yet.
     req.log.info({ root, removed }, 'agent boxes thrown away');
     return { ok: true, removed };
+  });
+
+  // BUILDING THE AGENT IMAGE FROM THE PRODUCT. The other half of the start-script build in main.ts, for
+  // the machine where the server was already running when the image went missing — and the answer to a
+  // refusal that used to print `npm run box:build` at someone with no repository to run it in.
+  //
+  // STREAMED OVER THE SOCKET, not returned at the end. This takes minutes, and a request that shows
+  // nothing for minutes is indistinguishable from one that has hung — the same argument the copilot's
+  // thinking indicator is built on. `box:build` frames carry one line each and the run transcript's
+  // channel already exists to carry exactly this shape.
+  api.post('/boxes/build', async (req, reply) => {
+    const boxes = ctx.boxes;
+    if (!boxes) {
+      return reply.code(409).send({ error: 'This server is running without containers.' });
+    }
+    // REFUSED IF DOCKER ITSELF IS DOWN, rather than spending a failed build to discover it. `probe`
+    // names which of the two is missing precisely so this can be told apart.
+    const before = await boxes.probe();
+    if (before.ok) return { ok: true, already: true };
+    if (before.missing !== 'image') return reply.code(409).send({ error: before.reason });
+
+    ctx.broadcast({ type: 'box:build', state: 'start' });
+    const result = await buildAgentImage((line: string) => ctx.broadcast({ type: 'box:build', line }));
+    ctx.broadcast({ type: 'box:build', state: result.ok ? 'done' : 'failed', line: result.last });
+    req.log.info({ ok: result.ok }, 'agent image build finished');
+    if (!result.ok) return reply.code(500).send({ error: `The build failed: ${result.last}` });
+    return { ok: true, already: false };
   });
 }

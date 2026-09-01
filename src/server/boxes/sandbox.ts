@@ -35,14 +35,23 @@ import { dockerBin, execArgs } from './containers.js';
 // was refusing and nothing had asked.
 export type SandboxStatus =
   | { ok: true; image: string }
-  | { ok: false; reason: string; kind: 'docker' | 'credential' | 'backend' };
+  | {
+      ok: false;
+      reason: string;
+      kind: 'docker' | 'credential' | 'backend';
+      // WOULD BUILDING THE IMAGE FIX THIS? Only ever true for the one fault that a build addresses.
+      // `kind: 'docker'` covers both a missing daemon and a missing image, and offering to build against
+      // a daemon that is not running is a button that cannot work — the fault a user reads and the
+      // remedy a user is offered have to be the same fault.
+      buildable?: true;
+    };
 
 // `docker`, because "not requested" is a statement about the container layer: nothing asked for a box,
 // so nothing probed for one. It is not a credential we looked at and disbelieved.
 export const NOT_REQUESTED: SandboxStatus = { ok: false, reason: 'not requested', kind: 'docker' };
 
 interface SandboxProbe {
-  probe(): Promise<{ ok: true } | { ok: false; reason: string }>;
+  probe(): Promise<{ ok: true } | { ok: false; reason: string; missing?: 'daemon' | 'image' }>;
 }
 
 // Whether the box is holding the credential the host currently has. Injected as a bare thunk rather
@@ -130,7 +139,14 @@ export async function probeSandbox(
   // cannot run without docker anyway, and if it could, "rebuild the agent boxes" is useless advice to
   // someone whose image was never built. The first message is the one that helps, so it is the one
   // that survives; the credential fault is still there and is reported the moment docker is.
-  if (!res.ok) return { ok: false, reason: res.reason, kind: 'docker' };
+  if (!res.ok) {
+    return {
+      ok: false,
+      reason: res.reason,
+      kind: 'docker',
+      ...(res.missing === 'image' ? { buildable: true as const } : {}),
+    };
+  }
   const cred = await credential?.();
   if (cred && !cred.fresh) return { ok: false, reason: cred.reason, kind: 'credential' };
   // LAST, and the order is the same argument again. A dead credential and an unanswering server are true

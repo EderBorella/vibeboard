@@ -37,7 +37,7 @@
     "visual:record": "VB_VISUAL_RECORD=1 node visual/run.mjs --grep \"record the baseline\"",
     "storybook": "storybook dev -p 6006 --no-open",
     "storybook:build": "storybook build",
-    "box:build": "docker build -f tools/docker/Dockerfile.agent -t vibeboard-agent:latest ."
+    "box:build": "tsx src/server/boxes/build-cli.ts"
   },
   "keywords": [
     "kanban",
@@ -91,5 +91,10 @@
   },
   "engines": {
     "node": ">=20.12"
-  }
+  },
+  "files": [
+    "dist",
+    "tools/docker",
+    "README.md"
+  ]
 }

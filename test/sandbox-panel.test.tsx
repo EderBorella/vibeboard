@@ -6,6 +6,7 @@ const api = vi.hoisted(() => ({
   restartOpencodeServer: vi.fn().mockResolvedValue({ ok: true, url: 'http://127.0.0.1:1' }),
   takeOverOpencodeServer: vi.fn().mockResolvedValue({ ok: true, url: 'http://127.0.0.1:2' }),
   rebuildBoxes: vi.fn().mockResolvedValue({ ok: true, removed: 2 }),
+  buildAgentImage: vi.fn().mockResolvedValue({ ok: true, already: false }),
 }));
 vi.mock('../web/src/lib/api.js', () => api);
 
@@ -18,6 +19,7 @@ afterEach(() => {
   api.restartOpencodeServer.mockClear();
   api.takeOverOpencodeServer.mockClear();
   api.rebuildBoxes.mockClear();
+  api.buildAgentImage.mockClear();
 });
 
 const state = (over: Partial<SandboxState> = {}): SandboxState => ({
@@ -31,7 +33,63 @@ const state = (over: Partial<SandboxState> = {}): SandboxState => ({
 });
 
 const show = (over: Partial<SandboxState> = {}, backend = 'opencode') =>
-  render(<SandboxPanel state={state(over)} backend={backend} onChanged={() => {}} />);
+  render(<SandboxPanel state={state(over)} bump={0} backend={backend} onChanged={() => {}} />);
+
+// BUILDING THE AGENT IMAGE, offered exactly where the refusal appears. The product used to detect this
+// prerequisite, name it, and print a developer command at somebody with no repository to run it in.
+describe('the build button', () => {
+  const build = () => screen.queryByRole('button', { name: /Build the agent image/i });
+
+  it('appears when the image is what is missing', () => {
+    show({
+      ok: false,
+      reason: 'the agent image vibeboard-agent:latest is not built yet',
+      refusalKind: 'docker',
+      agentRefusal: 'no image',
+      buildable: true,
+    });
+    expect(build()).toBeTruthy();
+  });
+
+  // THE HALF THAT MAKES THE FIRST ONE MEAN ANYTHING. `refusalKind` is `docker` for BOTH a missing daemon
+  // and a missing image, so a panel keyed on that alone would offer to build against a daemon that is
+  // not running — a button that cannot work, offered as the remedy for a fault it does not address.
+  it('does NOT appear when docker itself is not running', () => {
+    show({
+      ok: false,
+      reason: 'Docker is not available — no daemon',
+      refusalKind: 'docker',
+      agentRefusal: 'no docker',
+    });
+    expect(build()).toBeNull();
+  });
+
+  it('does not appear when the sandbox is fine', () => {
+    show();
+    expect(build()).toBeNull();
+  });
+
+  it('calls the build and refreshes the panel', async () => {
+    const onChanged = vi.fn();
+    render(
+      <SandboxPanel
+        state={state({
+          ok: false,
+          reason: 'not built yet',
+          refusalKind: 'docker',
+          agentRefusal: 'no image',
+          buildable: true,
+        })}
+        bump={0}
+        backend="opencode"
+        onChanged={onChanged}
+      />,
+    );
+    fireEvent.click(build() as HTMLElement);
+    await waitFor(() => expect(api.buildAgentImage).toHaveBeenCalledTimes(1));
+    expect(onChanged).toHaveBeenCalledTimes(1);
+  });
+});
 
 describe('what it says is enforced', () => {
   it('names the files an agent cannot write, not just that something is on', () => {
@@ -128,9 +186,12 @@ describe('rebuilding the boxes', () => {
     show();
     expect(screen.getByText(/Anything in flight inside them is lost/i)).toBeTruthy();
     expect(screen.getByText(/next agent turn builds new ones/i)).toBeTruthy();
-    // The one people would otherwise assume. `npm run box:build` takes minutes and is a different fix.
+    // The one people would otherwise assume. Building the IMAGE takes minutes and is a different fix —
+    // and since 2026-09-01 it is an action in the product rather than a command in a terminal, so the
+    // copy no longer names one. That is what this second assertion is about: the panel must not send
+    // anyone to `npm run box:build`, which an installed copy does not have.
     expect(screen.getByText(/image is not rebuilt/i)).toBeTruthy();
-    expect(screen.getByText(/box:build/)).toBeTruthy();
+    expect(screen.queryByText(/npm run/)).toBeNull();
   });
 
   it('asks first, and calls nothing if the question is cancelled', async () => {
@@ -143,7 +204,7 @@ describe('rebuilding the boxes', () => {
 
   it('calls the API once confirmed, refreshes the panel, and says how many went', async () => {
     const onChanged = vi.fn();
-    render(<SandboxPanel state={state()} backend="opencode" onChanged={onChanged} />);
+    render(<SandboxPanel state={state()} bump={0} backend="opencode" onChanged={onChanged} />);
     press();
     answer();
     await waitFor(() => expect(api.rebuildBoxes).toHaveBeenCalledTimes(1));

@@ -102,7 +102,6 @@ repository's own root untouched.
 
 ```bash
 npm install
-npm run box:build    # once per machine — builds the container agents run in
 npm run build
 npm start            # → http://localhost:4610
 ```
@@ -152,13 +151,14 @@ Agents build your project; they must not be able to rewrite the things that gove
 runs inside a container — not because a prompt asks it to stay put, but because it has nowhere else
 to go.
 
-```
-npm run box:build   # once per machine, and again when the image changes
-```
+**You do not have to build that container yourself.** `npm start` checks for the image and builds it if
+it is missing, streaming the build into the terminal it was started from — a few minutes the first time,
+nothing at all after that. Settings offers the same build for the case where the image goes missing while
+the server is up. `npm run box:build` still exists and does the same thing, by hand.
 
-**Docker is required.** Without it, the board, the file explorer and Settings all work and no agent
-will start; the refusal says exactly that and names this command. There is deliberately no fallback:
-maintaining a second, weaker containment path would mean most people quietly ran the weaker one.
+**Docker is required.** Without it, the board, the file explorer and Settings all work and no agent will
+start; the refusal says exactly that. There is deliberately no fallback: maintaining a second, weaker
+containment path would mean most people quietly ran the weaker one.
 
 One box per project and backend, created with the project and thrown away when VibeBoard stops. Your
 project is mounted writable, so an agent can build, test and commit normally. Mounted **read-only**

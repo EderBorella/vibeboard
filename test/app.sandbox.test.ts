@@ -53,16 +53,35 @@ describe('GET /api/sandbox', () => {
   it('carries the reason and the refusal when there is no sandbox', async () => {
     const { app } = await open({
       ok: false,
-      reason: 'the agent image is not built — run `npm run box:build`',
+      reason: 'the agent image vibeboard-agent:test is not built yet',
       kind: 'docker',
+      buildable: true,
     });
     const body = (await app.inject({ method: 'GET', url: '/api/sandbox', headers: admin })).json();
     expect(body.ok).toBe(false);
-    expect(body.reason).toContain('box:build');
+    expect(body.reason).toContain('is not built yet');
     // The refusal repeats the reason rather than saying a bare no. This is the string the UI shows,
     // and a dead end here is worse than the condition it describes.
-    expect(body.agentRefusal).toContain('box:build');
+    expect(body.agentRefusal).toContain('is not built yet');
     expect(body.refusalKind).toBe('docker');
+    // AND WHETHER THE PRODUCT'S OWN REMEDY APPLIES. Added 2026-09-01 with the build action.
+    expect(body.buildable).toBe(true);
+  });
+
+  // THE HALF THAT MAKES `buildable` MEAN ANYTHING, and it is asserted at the ROUTE rather than only in
+  // the panel: `kind` is `docker` for BOTH a missing daemon and a missing image, so a route that set
+  // this whenever the sandbox was not ok would hand the UI a Build button for a daemon that is not
+  // running — a remedy that cannot work, offered for a fault it does not address. Measured: with the
+  // route widened that way, every panel test still passed, because nothing here was asking.
+  it('does NOT say a build would help when docker itself is missing', async () => {
+    const { app } = await open({
+      ok: false,
+      reason: 'Docker is not available — no daemon',
+      kind: 'docker',
+    });
+    const body = (await app.inject({ method: 'GET', url: '/api/sandbox', headers: admin })).json();
+    expect(body.refusalKind).toBe('docker');
+    expect(body.buildable).toBeUndefined();
   });
 
   // WHICH cause, reported alongside the sentence, so the UI titles the balloon without reading the

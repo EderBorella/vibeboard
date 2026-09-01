@@ -3,7 +3,7 @@ import { consecutiveInfrastructureFailures } from '../../core/accounting.js';
 import { listRuns } from '../../store/run-store.js';
 import type { AppCtx } from '../route-context.js';
 import { attachedOpencodeUrl, restartOpencodeServer, takeOverOpencodeServer } from './opencode-server.js';
-import { agentRefusal } from './sandbox.js';
+import { agentRefusal, type SandboxStatus } from './sandbox.js';
 
 // What is enforced, and the two ways to change it. Its own module rather than a corner of
 // control.ts, which is the file controller for documents that steer the models — a different
@@ -53,6 +53,16 @@ async function recentFailure(root: string): Promise<{ runs: number; note: string
   };
 }
 
+// WHETHER THE ONE ACTION THE PRODUCT CAN TAKE WOULD HELP. Only the missing-image fault, never a missing
+// daemon: offering to build against a daemon that is not running is a button that cannot work, and a
+// remedy that does not match the fault a person has just read is worse than no remedy.
+//
+// Its own function so the handler stays under the complexity ceiling — and because the rule is worth
+// naming: `kind: 'docker'` covers BOTH faults, so anything reading that alone gets this wrong.
+function buildableFlag(sandbox: SandboxStatus): { buildable?: true } {
+  return !sandbox.ok && sandbox.buildable ? { buildable: true } : {};
+}
+
 export async function registerSandboxRoutes(api: FastifyInstance, ctx: AppCtx): Promise<void> {
   api.get('/sandbox', async () => {
     const attached = attachedOpencodeUrl();
@@ -83,6 +93,7 @@ export async function registerSandboxRoutes(api: FastifyInstance, ctx: AppCtx): 
       // The same gate dispatch uses, not a second opinion about it.
       agentRefusal: agentRefusal(sandbox, attached),
       refusalKind,
+      ...buildableFlag(sandbox),
       // Beside them and not among them: `ok`, `agentRefusal` and `refusalKind` are untouched by this, so
       // a project whose last runs died on infrastructure can still dispatch. Absent rather than null when
       // the last runs were healthy, matching the field's optionality on the wire.

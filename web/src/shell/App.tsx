@@ -311,6 +311,7 @@ export function App() {
         <SettingsModal
           config={snapshot.config}
           root={snapshot.root}
+          bump={bump}
           onClose={() => setSettingsOpen(false)}
           onSaved={() => setSettingsOpen(false)}
           autopilot={autopilot.state}

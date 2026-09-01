@@ -554,10 +554,21 @@ describe('probe', () => {
     const mgr = new BoxManager({
       docker: fakeDocker({ version: { code: 1, stdout: '', stderr: 'Cannot connect to the Docker daemon' } }),
     });
-    expect(await mgr.probe()).toEqual({ ok: false, reason: expect.stringContaining('Cannot connect') });
+    // `missing: 'daemon'` and not `'image'`, which is the distinction the whole field exists for:
+    // building against a daemon that is not running spends a failed multi-minute build to discover
+    // what this call already knew, and a Build button offered here is one that cannot work.
+    expect(await mgr.probe()).toEqual({
+      ok: false,
+      reason: expect.stringContaining('Cannot connect'),
+      missing: 'daemon',
+    });
   });
 
-  it('names the fix when the image has not been built', async () => {
+  // RENAMED AND REWRITTEN 2026-09-01. It used to assert the reason named `npm run box:build`, which was
+  // the defect rather than the contract: a developer command printed at somebody with no repository to
+  // run it in. The remedy is now the product's own, so what this pins is the DISCRIMINATOR the remedy is
+  // chosen by.
+  it('says the image is what is missing, so something can offer to build it', async () => {
     const mgr = new BoxManager({
       docker: fakeDocker({
         version: { code: 0, stdout: '29.6.0\n', stderr: '' },
@@ -566,7 +577,9 @@ describe('probe', () => {
     });
     const res = await mgr.probe();
     expect(res.ok).toBe(false);
-    expect(res.ok === false && res.reason).toMatch(/box:build/);
+    expect(res.ok === false && res.missing).toBe('image');
+    // And the sentence no longer tells anyone to run a script they do not have.
+    expect(res.ok === false && res.reason).not.toMatch(/npm run/);
   });
 
   it('is ok when both are present', async () => {

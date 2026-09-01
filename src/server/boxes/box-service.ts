@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { apiSocketDir } from './api-socket.js';
-import { BoxManager, boxPathsFor } from './box-manager.js';
+import { BoxManager, boxPathsFor, type ProbeResult } from './box-manager.js';
 import type { BoxBackend, BoxPaths } from './containers.js';
 import {
   AGENT_WRITABLE_PATHS,
@@ -135,7 +135,7 @@ export class BoxService {
     return this.#manager;
   }
 
-  async probe(): Promise<{ ok: true } | { ok: false; reason: string }> {
+  async probe(): Promise<ProbeResult> {
     return this.#manager.probe(this.#image);
   }
 

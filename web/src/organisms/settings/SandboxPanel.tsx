@@ -2,12 +2,14 @@ import { useState } from 'react';
 import { Button } from '../../atoms/Button';
 import { Text } from '../../atoms/Text';
 import {
+  buildAgentImage,
   rebuildBoxes,
   restartOpencodeServer,
   type SandboxState,
   takeOverOpencodeServer,
 } from '../../lib/api';
 import { useAction } from '../../lib/useAction';
+import { useBuildLog } from '../../lib/useBuildLog';
 import { useConfirm } from '../../lib/useConfirm';
 import { Notice } from '../../molecules/Notice';
 
@@ -17,23 +19,30 @@ interface Props {
   // Claude Code spawns a process per turn and has no persistent server, so a restart button there
   // would be a lie about what it does. Rebuilding the boxes is not — every project has boxes.
   backend: string;
+  // The socket generation, so the build's progress arrives on the same connection everything else uses.
+  // Passed down rather than defaulted for the reason the autopilot state is: `socketFor` is a
+  // single-entry last-write-wins cache, and a second key here would replace the tab's socket.
+  bump: number;
   onChanged: () => void;
 }
 
 // Which button is spinning. Keyed rather than a shared boolean because more than one is on screen at
 // once in some states, and a shared flag would spin the wrong one.
-type Pressed = 'restart' | 'takeover' | 'rebuild';
+type Pressed = 'restart' | 'takeover' | 'rebuild' | 'build';
 
 // What the OS enforces on agents, stated plainly, plus the three actions that can change it.
 //
 // Its own component rather than more markup inside SettingsModal: it owns a fetch, three async
 // actions and their error state, and it is the part of Settings most worth testing directly.
-export function SandboxPanel({ state, backend, onChanged }: Props) {
+export function SandboxPanel({ state, backend, bump, onChanged }: Props) {
   const { busy, error, run } = useAction<Pressed>();
   const { confirm, dialog } = useConfirm();
   // What the last rebuild actually removed. Reported rather than swallowed: "done" on a project that
   // had no boxes reads as "your problem is fixed", and it is not — the drift is somewhere else.
   const [removed, setRemoved] = useState<number | null>(null);
+  // The build's own output, arriving over the socket as `box:build` frames — not in the response, which
+  // does not come back for minutes. See `useBuildLog`.
+  const build_ = useBuildLog(bump);
 
   async function act(which: 'restart' | 'takeover'): Promise<void> {
     await run(async () => {
@@ -42,10 +51,22 @@ export function SandboxPanel({ state, backend, onChanged }: Props) {
     }, which);
   }
 
+  // BUILDING THE IMAGE, offered exactly where the refusal appears. The product used to detect this
+  // prerequisite, name it, and print `npm run box:build` — a developer command, useless to anyone
+  // running an installed copy with no repository. `main.ts` builds it on start; this is for the server
+  // that was already running when the image went missing.
+  async function build(): Promise<void> {
+    build_.reset();
+    await run(async () => {
+      await buildAgentImage();
+      onChanged();
+    }, 'build');
+  }
+
   async function rebuild(): Promise<void> {
     const ok = await confirm({
       title: 'Throw this project’s agent boxes away?',
-      body: 'Both containers are removed and anything in flight inside them is lost. The next agent turn builds new ones, which takes seconds. The agent image is not rebuilt — that is `npm run box:build`.',
+      body: 'Both containers are removed and anything in flight inside them is lost. The next agent turn builds new ones, which takes seconds. The agent IMAGE is not rebuilt — that is the button above, and it takes minutes.',
       action: 'Throw them away',
       danger: true,
     });
@@ -84,6 +105,31 @@ export function SandboxPanel({ state, backend, onChanged }: Props) {
             work normally — but dispatching a run or sending a chat message will be refused until Docker is
             available and the agent image is built.
           </Notice>
+        )}
+        {/* ONLY WHEN A BUILD IS THE ANSWER. `buildable` is set for the missing-image fault and for
+            nothing else, so this never offers to build against a daemon that is not running — a remedy
+            that does not match the fault a person has just read is worse than no remedy. */}
+        {state.buildable && (
+          <>
+            <Button
+              className="vb-self-start"
+              size="md"
+              variant="primary"
+              disabled={busy !== null}
+              onClick={() => void build()}
+            >
+              {busy === 'build' ? 'Building…' : 'Build the agent image'}
+            </Button>
+            <Text role="hint">
+              Runs the build here rather than asking you for a terminal. It takes a few minutes the first time
+              — it downloads a base image and installs both agent CLIs — and the output appears below as it
+              goes. VibeBoard also does this on start, so this is only needed if the image went missing while
+              the server was up.
+            </Text>
+            {/* ONE LINE, THE LATEST. A docker build prints hundreds and this sits in a settings modal:
+                what a person needs is evidence it is still moving, not the transcript. */}
+            {build_.lines.length > 0 && <Text role="hint">{build_.lines[build_.lines.length - 1]}</Text>}
+          </>
         )}
         {/* Shown whenever it is set, not only when the sandbox is missing: a working image is not
             enough on its own, because a server we did not spawn is not in a box. */}
@@ -139,9 +185,9 @@ export function SandboxPanel({ state, backend, onChanged }: Props) {
         </Button>
         <Text role="hint">
           Removes this project's containers. Anything in flight inside them is lost, and the next agent turn
-          builds new ones. The agent <strong>image is not rebuilt</strong> — that is{' '}
-          <code>npm run box:build</code> and it takes minutes. Use this when a box is stale rather than
-          missing: an expired credential it will not pick up, a mount that no longer points anywhere.
+          builds new ones. The agent <strong>image is not rebuilt</strong> — that is its own action, and it
+          takes minutes. Use this when a box is stale rather than missing: an expired credential it will not
+          pick up, a mount that no longer points anywhere.
         </Text>
         {removed !== null && (
           <Text role="hint">

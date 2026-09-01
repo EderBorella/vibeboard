@@ -48,9 +48,12 @@ RUN mkdir -p /home/node/.npm-global && chmod 0777 /home/node/.npm-global
 
 # The API relay and the entrypoint that starts it. Owned by root and world-readable: the box runs as
 # the host user's uid, which is not known at build time, so nothing here may depend on a particular one.
-COPY tools/docker/relay.mjs /opt/vibeboard/relay.mjs
-COPY tools/docker/entrypoint.sh /opt/vibeboard/entrypoint.sh
-COPY tools/docker/vb-install /opt/vibeboard/vb-install
+# PATHS RELATIVE TO THIS DIRECTORY, because the build CONTEXT is this directory — changed 2026-09-01
+# so an installed VibeBoard can build its own image. It used to be the repository root, which meant the
+# build only worked inside a git clone; see `src/server/boxes/image-build.ts`.
+COPY relay.mjs /opt/vibeboard/relay.mjs
+COPY entrypoint.sh /opt/vibeboard/entrypoint.sh
+COPY vb-install /opt/vibeboard/vb-install
 RUN chmod 0755 /opt/vibeboard/entrypoint.sh /opt/vibeboard/relay.mjs /opt/vibeboard/vb-install
 
 # The agent runs as the host user's uid, passed at `docker run` time, so everything it creates in the

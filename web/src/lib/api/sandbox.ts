@@ -20,6 +20,10 @@ export interface SandboxState {
   // gate itself, and this only says which kind of thing it is about. `null` exactly when
   // `agentRefusal` is null.
   refusalKind: 'docker' | 'credential' | 'attached' | 'backend' | null;
+  // WOULD BUILDING THE AGENT IMAGE FIX THIS? Set only for the one fault a build addresses, so the panel
+  // never offers to build against a daemon that is not running. Absent otherwise, including when the
+  // sandbox is fine.
+  buildable?: true;
   // WHAT ALREADY WENT WRONG, as distinct from what is wrong NOW — and it does not gate anything.
   //
   // Every other field here answers "may an agent start", which is a question about the present and is
@@ -59,4 +63,11 @@ export function takeOverOpencodeServer(): Promise<{ ok: true; url: string }> {
 // rather than implying it fixed something.
 export function rebuildBoxes(): Promise<{ ok: true; removed: number }> {
   return post<{ ok: true; removed: number }>('/api/boxes/rebuild', {});
+}
+
+// BUILD THE AGENT IMAGE. Minutes, and its progress arrives over the socket as `box:build` frames rather
+// than in this response — a request that shows nothing for minutes is indistinguishable from one that
+// has hung. `already` is true when the image turned up between the refusal and the click.
+export function buildAgentImage(): Promise<{ ok: true; already: boolean }> {
+  return post<{ ok: true; already: boolean }>('/api/boxes/build', {});
 }

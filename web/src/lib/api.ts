@@ -140,6 +140,7 @@ export {
   type Verification,
 } from './api/runs';
 export {
+  buildAgentImage,
   getSandbox,
   rebuildBoxes,
   restartOpencodeServer,

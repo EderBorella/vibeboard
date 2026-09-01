@@ -145,6 +145,20 @@ that gap has actually bitten, not the ways it could.
     the leftovers with `find`, never a glob: `ls -1d /tmp/prefix-* | wc -l` prints **0** at that
     scale, because the glob passes `ARG_MAX` and `ls` fails.
 
+13. **A test double encodes an assumption, and the assumption is what breaks.** Every unit test here
+    drives a fake `docker`, so no test ever executes the Go template a real daemon answers. One template
+    referenced a key that version does not have: it did not render empty, it ERRORED, `docker inspect`
+    exited 1, and the caller reads a non-zero exit as "no such container" — so it created a container
+    that already existed and every agent run failed. Twelve source gates, four typechecks, 4,620 tests
+    and a browser harness all passed. **Run the real thing against the real dependency before you push**,
+    and when it finds something, pin it with the strings the dependency actually printed — `invalid IP`
+    and `<no value>` here — because a fixture invented from the documentation is wrong in exactly the way
+    the code was.
+
+14. **An integration test that only CREATES cannot find a bug in adoption.** The one test in that suite
+    with a real daemon made a fresh box every time, so the second-`inspect` path — the whole of
+    production — was never reached. Ask what a passing integration test never does.
+
 ## Comments
 
 Terse. Explain **why**, never what the code already says. A one-line guard does not need

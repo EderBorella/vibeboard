@@ -29,6 +29,7 @@ user-facing; it is the only place the security model is stated end to end.
 | The citation register — every `decision NN` / `ruling NN` / slice ref | [`docs/decisions.md`](docs/decisions.md) |
 | The design system, all five parts, phase records included | [`docs/design-system.md`](docs/design-system.md) |
 | How agents are confined today | [`docs/security/containment.md`](docs/security/containment.md) |
+| **"run a smoke test"** — the manual pass no gate can do | [`docs/smoke-test.md`](docs/smoke-test.md) |
 | What the five seeded `foundation/` docs must decide | [`docs/foundation-bootstrap.md`](docs/foundation-bootstrap.md) |
 | **The only list of outstanding work** | `notes/todo.md` — gitignored, local-only |
 | Superpowers plans / specs / reviews / research | `docs/superpowers/**` — gitignored, local-only |
@@ -49,6 +50,7 @@ Never `npx <tool>`. Use the project's own script or `./node_modules/.bin/<tool>`
 | `npm run lint` | biome, `--error-on-warnings` |
 | `npm run build` | tsc + web typecheck + vite build |
 | `npm run visual` | the Playwright browser harness — the only thing with a layout engine |
+| *(no command)* | **the smoke test** — [`docs/smoke-test.md`](docs/smoke-test.md), by hand, against a running product |
 | `npm run storybook` | the design workbench, port 6006 |
 | `npm run mutate` | stryker; minutes, deliberately not in the pre-commit hook |
 | `npm run dev` / `npm run web:dev` | server with reload / Vite with HMR |
@@ -217,6 +219,12 @@ tick.
 ## Earn the green tick, then distrust it
 
 The house rule, and this repository is where most of `.claude/CODE-QUALITY.md`'s incidents came from.
+
+**And the gates are not the last word.** Twelve source gates, four typechecks, 4,600 unit tests and the
+browser harness all passed on a branch whose first live dispatch failed with *"the container name is
+already in use"* — because every unit test drives a fake docker and none of them executes the template a
+real daemon answers. Before pushing anything that touches boxes, credentials, the run lifecycle or the
+explorer, run [`docs/smoke-test.md`](docs/smoke-test.md) against a throwaway project.
 A gate that has never failed on purpose is not known to work. The Phase 8 post-mortem lists six
 defects, **not one of which a passing gate caught** — including 4,501 unit tests passing over a
 literal `<trigger>` element, and a `PARSE_FLOOR` that failed a run for *succeeding*.

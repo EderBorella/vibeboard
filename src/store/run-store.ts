@@ -346,6 +346,19 @@ export async function forgiveProjectRuns(root: string, at: string): Promise<numb
   return spent.length;
 }
 
+// Has this card already had one? The lookup only happens for a report we could not read, which is rare,
+// so it costs a readdir on exactly the runs that were going to be written to anyway.
+//
+// `forgiven` runs do not count. A person clearing a card's attempts is saying the history is dealt with,
+// and leaving a forgiven record here would make the very next unreadable report burn — which is the
+// override quietly failing to override.
+async function hadUnreadableReport(root: string, record: RunRecord): Promise<boolean> {
+  const previous = isProjectRun(record)
+    ? await listProjectRuns(root)
+    : await listCardRuns(root, record.board as BoardName, record.card as string);
+  return previous.some((r) => r.run !== record.run && r.fault === 'unreadable-report' && !r.forgiven);
+}
+
 // DECISION 10, ANSWERED BY THE FILE RATHER THAN BY A MOUNT.
 //
 // The original deferral said AppArmor could not express per-run report exclusivity and named Landlock as
@@ -401,11 +414,19 @@ export async function foldReport(
   const raw = await takeAgentReport(root, record.run);
   if (raw === null) return null;
   const content = redact(raw, secret);
-  const report = checkReportIdentity(parseAgentReport(content), record.run);
+  const parsed = checkReportIdentity(parseAgentReport(content), record.run);
+  // FREE ONCE, THEN IT BURNS. Asked here rather than derived at read time because `fault` is a stored
+  // classification of how a run ended — the same field `neverReachedModel` writes — and every counter
+  // already reads it from the record. Deriving this one instead would mean giving `burnsAttempt` the
+  // whole history, which is four call sites and a different shape of function for one clause.
+  const repeat = parsed.unreadable !== undefined && (await hadUnreadableReport(root, record));
+  const report = repeat ? { ...parsed, repeat: true as const } : parsed;
   if (report.unreadable !== undefined) {
     log?.warn(
-      { run: record.run, card: record.card, reason: report.unreadable },
-      'a report the server could not read — the run is recorded and the card is not charged for it',
+      { run: record.run, card: record.card, reason: report.unreadable, charged: repeat },
+      repeat
+        ? 'a report the server could not read, and not the first on this card — the run is charged'
+        : 'a report the server could not read — the run is recorded and the card is not charged for it',
     );
   }
   const folded = withReport(record, report, finished);

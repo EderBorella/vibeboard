@@ -40,7 +40,9 @@ export function withReport(record: RunRecord, report: AgentReport, finished: str
     // card, which is the whole point — but the record keeps it, because an attempt that costs nothing
     // must not also vanish. A parse fault that were merely free would repeat for ever with nobody able
     // to see that it was happening.
-    ...(report.unreadable === undefined ? {} : { fault: 'unreadable-report' as const }),
+    // `!repeat`, so the second unreadable report on a card is recorded with NO fault and burns like any
+    // other failure. See `AgentReport.repeat` for the livelock that closes.
+    ...(report.unreadable === undefined || report.repeat ? {} : { fault: 'unreadable-report' as const }),
     report: report.body,
   };
 }

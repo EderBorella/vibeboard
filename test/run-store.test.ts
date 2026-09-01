@@ -222,6 +222,49 @@ describe('the agent report handoff', () => {
     expect(warned[0]?.reason).toContain('20260101-000000-zzzz');
   });
 
+  // FREE ONCE, THEN IT BURNS — ruled after review. `unreadable-report` had no bound at all: every counter
+  // skips a classified fault, and the infrastructure streak BREAKS on one that is not `infrastructure`,
+  // so a card whose agent reliably wrote an unusable verdict was re-dispatched every tick until the
+  // project's own caps tripped. The first is still free; a second is no longer plausibly a one-off.
+  it('charges the SECOND unreadable report on a card, and only the second', async () => {
+    const root = await tempDir();
+    const bad = '---\nrun: 20260101-000000-zzzz\noutcome: success\n---\n## Not mine\n';
+    const fold = async (run: string): Promise<RunRecord> => {
+      const started = { ...record(), run };
+      await writeRun(root, started);
+      await mkdir(join(root, RUNS_DIR), { recursive: true });
+      await writeFile(reportPath(root, run), bad, 'utf8');
+      return (await foldReport(root, started, '2026-07-26T15:00:00.000Z')) as RunRecord;
+    };
+
+    const first = await fold(runId(new Date('2026-07-26T10:00:00.000Z'), 'aaaa'));
+    expect(first.fault).toBe('unreadable-report');
+    expect(burnsAttempt(first)).toBe(false);
+
+    const second = await fold(runId(new Date('2026-07-26T11:00:00.000Z'), 'bbbb'));
+    expect(second.fault).toBeUndefined();
+    expect(burnsAttempt(second)).toBe(true);
+    // Still recorded as unreadable in every other respect — the outcome is not the agent's to decide.
+    expect(second.status).toBe('attention');
+  });
+
+  // FORGIVENESS REALLY FORGIVES. A person clearing a card's attempts is saying the history is dealt with;
+  // counting a forgiven record here would make the very next unreadable report burn, which is the
+  // override quietly failing to override.
+  it('does not count a forgiven unreadable report as the first one', async () => {
+    const root = await tempDir();
+    const bad = '---\nrun: 20260101-000000-zzzz\noutcome: success\n---\n## Not mine\n';
+    const first = { ...record(), run: runId(new Date('2026-07-26T10:00:00.000Z'), 'aaaa') };
+    await writeRun(root, { ...first, status: 'attention', fault: 'unreadable-report', forgiven: 'T' });
+
+    const started = { ...record(), run: runId(new Date('2026-07-26T11:00:00.000Z'), 'bbbb') };
+    await writeRun(root, started);
+    await mkdir(join(root, RUNS_DIR), { recursive: true });
+    await writeFile(reportPath(root, started.run), bad, 'utf8');
+    const folded = await foldReport(root, started, '2026-07-26T15:00:00.000Z');
+    expect(folded?.fault).toBe('unreadable-report');
+  });
+
   it('folds a report that declares the RIGHT run, with no fault and no warning', async () => {
     const root = await tempDir();
     const started = record();

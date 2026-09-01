@@ -170,6 +170,20 @@ export interface AgentReport {
   // written before this existed have none, and the on-disk format is frozen — absent is accepted and
   // noted, a MISMATCH is refused.
   run?: string;
+  // FREE ONCE, THEN IT BURNS — ruled 2026-09-01, after review. Set when this card has ALREADY had a run
+  // whose report the server could not read, and it means the fault is not stamped: the run is charged
+  // like any other failure and the ordinary attempt cap stops the card with its ordinary sentence.
+  //
+  // Without it `unreadable-report` had no bound of any kind. All three counters skip a classified fault —
+  // `attemptsUsed`, `inconclusiveReviews`, and the infrastructure streak, which BREAKS on a fault that is
+  // not `infrastructure` — so a card whose agent reliably wrote an unusable verdict was re-dispatched
+  // every tick until the project's iteration or budget cap tripped, and the stop then named the cap
+  // rather than the card. That is the livelock `consecutiveInfrastructureFailures` exists to prevent,
+  // reached through a door opened by a second non-burning class.
+  //
+  // The FIRST is still free, which is the whole of the original ruling: a one-off parse failure is the
+  // server's fault and the card should not pay for it. A second one is no longer plausibly a one-off.
+  repeat?: true;
   // WHY THE SERVER COULD NOT READ THIS REPORT, when it could not. Absent is the normal case. Set only for
   // things the reader can actually see: a verdict key present and unusable, or a run id that names a
   // different run. An ABSENT verdict is not this — a review that decided nothing is a real inconclusive

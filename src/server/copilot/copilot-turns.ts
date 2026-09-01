@@ -1,10 +1,10 @@
 import { resolveCopilotSelection } from '../../core/copilot-choice.js';
 import { classifyCopilotError } from '../../core/copilot-errors.js';
+import { redactCredential } from '../../store/redaction.js';
 import type { Credential } from '../auth/credentials.js';
 import { attachedOpencodeUrl } from '../boxes/opencode-server.js';
 import { agentRefusal } from '../boxes/sandbox.js';
 import { errorText } from '../errors.js';
-import { redactCredential } from '../redaction.js';
 import type { AppCtx, WsClient } from '../route-context.js';
 import { assistCredentialSection } from '../runs/prompt/credential.js';
 import type { Backend, CopilotMode, EffortLevel } from './copilot.js';

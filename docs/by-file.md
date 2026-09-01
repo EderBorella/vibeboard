@@ -85,7 +85,7 @@ groups write through it.
 | `cards/links.ts` | `decisions.md` | `decision 65` |
 | `cards/mutations.ts` | `decisions.md` | `decision 58`, `decision 65` |
 | `project/config.ts` | `decisions.md` | `decision 45`, `C1`, `C2`, `C3`, `C4` |
-| `project/control-files.ts` | `security/containment.md` — the path sandbox behind Project Control: the `..` rejection, the symlink realpath walk and the category allow-list. It still reaches `server/fs-sandbox.ts` for the first two halves | — |
+| `project/control-files.ts` | `security/containment.md` — the path sandbox behind Project Control: the `..` rejection, the symlink realpath walk and the category allow-list. It reaches `store/fs-sandbox.ts` for the first two halves | — |
 | `project/foundation.ts` | `decisions.md`, `foundation-bootstrap.md` | `decision 66`, `decision 67` |
 | `project/seed-docs.ts` | `foundation-bootstrap.md` — it is what seeds it, and it resolves the bundled folder by **climbing** to the package root rather than counting `..` segments. The count was wrong the moment this file moved, and a wrong path here throws nothing and fails no type check: the reader treats an unreadable source as a packaging problem and carries on. `test/seed-docs.test.ts` asserts the resolved directory exists on disk | — |
 | `project/seed-skills.ts` | `decisions.md` — `decision 11` and `decision 64` are cited **only** by `test/seed-skills.test.ts` against these bodies | `decision 51` |
@@ -103,10 +103,16 @@ and `test/entry-column.test.ts` still enforces that no route imports another rou
 module by that naming convention rather than over one flat directory.
 
 **What is flat, and why.** `app.ts` and `main.ts` are the app and the process. `route-context.ts`,
-`logging.ts`, `errors.ts`, `redaction.ts`, `static.ts`, `ws.ts` and `fs-sandbox.ts` are mechanisms every
+`logging.ts`, `errors.ts`, `static.ts` and `ws.ts` are mechanisms every
 feature reaches through, and a mechanism shared by two features belongs to neither — the same rule that
-keeps `store/write-queue.ts` flat. `fs-sandbox.ts` says so in its own header: the path rule is shared by
-Project Control's allow-listed documents and the Explorer's whole tree, deliberately as one copy.
+keeps `store/write-queue.ts` flat.
+
+**Two of those mechanisms moved DOWN, to `src/store/`, on 2026-09-01.** `fs-sandbox.ts` and
+`redaction.ts` were flat under `server/` and were the reason `store/` imported upward. Neither is about
+serving HTTP: confining a path to the project root is what stops a writer reaching `../config.yaml`, and
+keeping a run's credential out of a transcript is a property of writing a record. Both are now below the
+layer they used to sit above, both have no imports of their own, and the server reads them downward like
+anything else. `tools/check-store-layer.mjs` holds that line.
 `agent-turn.ts` and `copilot-events.ts` are flat for exactly that reason too, and it is worth stating
 because their names suggest otherwise: one turn of an agent process and the parser for what it writes
 back are what BOTH dispatch and the chat go through, so filing them under either would mislead whoever

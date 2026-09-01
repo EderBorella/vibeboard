@@ -12,6 +12,7 @@ import {
 import type { Skill } from '../../core/skills.js';
 import type { BoardName, Card } from '../../core/types.js';
 import type { GitMeasure, GitPoint } from '../../exec/git-measure.js';
+import { redact } from '../../store/redaction.js';
 import {
   appendTranscript,
   foldReport,
@@ -28,7 +29,6 @@ import { type LiveSandbox, NOT_REQUESTED } from '../boxes/sandbox.js';
 import type { ResultStats } from '../copilot-events.js';
 import { errorText } from '../errors.js';
 import type { Log } from '../logging.js';
-import { redact } from '../redaction.js';
 import { infrastructureNote, neverReachedModel } from './fault.js';
 import { type BoardColumns, buildRunPrompt, type PromptInputs } from './prompt/index.js';
 

@@ -18,8 +18,8 @@ import {
   withResolution,
 } from '../core/runs.js';
 import { BOARDS, type BoardName } from '../core/types.js';
-import { redact } from '../server/redaction.js';
 import { groupsOf, reapGroups } from '../server/runs/reaper.js';
+import { redact } from './redaction.js';
 import { writeAtomic } from './write-queue.js';
 
 // Run records on disk.

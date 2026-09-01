@@ -45,7 +45,7 @@ Never `npx <tool>`. Use the project's own script or `./node_modules/.bin/<tool>`
 | command | what it does |
 |---|---|
 | `npm test` | vitest, the whole suite |
-| `npm run check` | four typechecks **and the ten source gates** — the real gate |
+| `npm run check` | four typechecks **and the twelve source gates** — the real gate |
 | `npm run lint` | biome, `--error-on-warnings` |
 | `npm run build` | tsc + web typecheck + vite build |
 | `npm run visual` | the Playwright browser harness — the only thing with a layout engine |
@@ -65,15 +65,21 @@ of getting that wrong were reproduced against it before it was written.
    anywhere it reaches — **not** by grepping the directory, which proves nothing: a pure-looking
    module can reach `node:fs` in three hops, and that is how it used to. One value edge upward
    remains (`find.ts` → `store/cards/board.js`), and it is why the purity gate is still unarmed.
-2. **The auto-pilot loop is a separate process.** `src/service/` reaches the board over HTTP via
+2. **`src/store/` must not reach into `src/server/`**, and `npm run check:store-layer` holds that at
+   zero. Same method as the purity claim above — the import graph resolved, not the directory grepped,
+   because three of the edges it caught when planted were two hops away through `write-queue.ts`.
+   Type-only imports count as edges here on purpose: the boundary exists so a lower layer can be read
+   and moved on its own, which a type defined above it prevents. `run-store.ts` → `runs/reaper.ts` is
+   the one named exception, and the reason is written on the line that names it.
+3. **The auto-pilot loop is a separate process.** `src/service/` reaches the board over HTTP via
    `board-client.ts`. It must not import server internals or touch the filesystem for board state.
-3. **The scope table in `src/server/auth/auth.ts` is the only answer to "who may call this."** A
+4. **The scope table in `src/server/auth/auth.ts` is the only answer to "who may call this."** A
    route absent from it is admin-only. That default is a security property — never restructure it
    into a shape where a new route can silently become reachable.
-4. **The on-disk project format is frozen.** Card files, `.vibeboard/` layout, `config.yaml`.
+5. **The on-disk project format is frozen.** Card files, `.vibeboard/` layout, `config.yaml`.
    Existing projects must keep working.
-5. **The HTTP API is frozen.** The web client and the loop both depend on it.
-6. **Deterministic beats model-driven, everywhere.** The lifecycle machine's premise is that
+6. **The HTTP API is frozen.** The web client and the loop both depend on it.
+7. **Deterministic beats model-driven, everywhere.** The lifecycle machine's premise is that
    anything a machine can decide, a machine decides. Never replace a deterministic check with a
    prompt.
 

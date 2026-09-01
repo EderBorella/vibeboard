@@ -3,38 +3,12 @@
 // content blocks, so parsing returns an array. Unknown/among-the-noise lines (hooks,
 // thinking_tokens, rate_limit_event) map to [] and are simply not forwarded.
 
-// Exported: the run engine records these on the run, not just the chat.
-export interface ResultStats {
-  ok: boolean;
-  text: string;
-  costUsd: number;
-  durationMs: number;
-  // Optional because not every backend reports one: Claude Code has num_turns, OpenCode's message
-  // response has no equivalent, and inventing a 1 there made every OpenCode run claim "1 turn".
-  turns?: number;
-  contextTokens: number; // prompt tokens in play: input + cache read + cache creation
-  outputTokens: number;
-}
+// THE TYPES LIVE IN `core/copilot-event.ts` and are re-exported here, so the ten modules that import
+// them from this file keep working and the parser stays the one thing this module is. See that file for
+// why the split exists.
+import type { CopilotEvent, ResultStats } from '../core/copilot-event.js';
 
-export type CopilotEvent =
-  | { kind: 'init'; sessionId: string; model: string; permissionMode: string }
-  | { kind: 'thinking'; text: string }
-  | { kind: 'text'; text: string }
-  | { kind: 'tool_use'; id: string; name: string; input: unknown }
-  | { kind: 'tool_result'; text: string }
-  | { kind: 'usage'; contextTokens: number } // per-call window occupancy, from message.usage
-  | { kind: 'result'; sessionId: string; stats: ResultStats }
-  // WHAT WENT WRONG, AND WHETHER TO OFFER A RETRY. Added 2026-08-31: the three sites that report a
-  // failed turn all pushed `kind: 'text'`, so a 429 rendered as an ordinary assistant bubble carrying
-  // the provider's raw JSON. `text` is what the MODEL said; an error is not that, and the difference
-  // is what lets the chat style it, and the panel offer a remedy beside it.
-  // `sentence` comes from `core/copilot-errors.ts` and is not reworded downstream.
-  | { kind: 'error'; text: string; retryable: boolean }
-  // Incremental (--include-partial-messages) streaming events:
-  | { kind: 'block_start'; block: 'text' | 'thinking' | 'tool_use' }
-  | { kind: 'text_delta'; text: string }
-  | { kind: 'thinking_delta'; text: string }
-  | { kind: 'block_stop' };
+export type { CopilotEvent, ResultStats };
 
 interface RawBlock {
   type: string;

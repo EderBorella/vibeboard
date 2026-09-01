@@ -1,6 +1,6 @@
 import { lstat, mkdir, rename, rm, rmdir, stat, unlink, writeFile } from 'node:fs/promises';
 import { basename, dirname, join } from 'node:path';
-import { normaliseRel, resolveInRoot } from '../fs-sandbox.js';
+import { normaliseRel, resolveInRoot } from '../../store/fs-sandbox.js';
 import { type FsNode, readFileNode } from './explorer-list.js';
 
 // Changing the project from the Explorer tab. Same boundary as reading it (fs-sandbox.ts) and the

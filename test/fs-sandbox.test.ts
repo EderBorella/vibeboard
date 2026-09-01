@@ -2,7 +2,7 @@ import { mkdir, symlink, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { skillRel } from '../src/core/layout.js';
-import { normaliseRel, resolveInRoot, withinRootRealpath } from '../src/server/fs-sandbox.js';
+import { normaliseRel, resolveInRoot, withinRootRealpath } from '../src/store/fs-sandbox.js';
 import { tempDir } from './helpers.js';
 
 describe('normaliseRel', () => {

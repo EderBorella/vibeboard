@@ -215,14 +215,11 @@ function fileDestination(fd: number): Writable {
 
 // The subset of pino the subsystems use. Narrow on purpose: a fake in a test is five vi.fn()s, and
 // nothing outside this module needs to know a logger comes from Fastify.
-export interface Log {
-  debug(obj: object, msg?: string): void;
-  info(obj: object, msg?: string): void;
-  warn(obj: object, msg?: string): void;
-  error(obj: object, msg?: string): void;
-  fatal(obj: object, msg?: string): void;
-  child(bindings: Record<string, unknown>): Log;
-}
+// The interface is `core/log.ts` — the port, so a lower layer can ask for a log without importing
+// this file's rotation, pruning and redaction. Re-exported so existing importers are unaffected.
+import type { Log } from '../core/log.js';
+
+export type { Log };
 
 // A crash outside the request lifecycle used to kill the process in silence. Node's own default is
 // already to exit on both of these, so this only adds the record of WHY — it does not decide to

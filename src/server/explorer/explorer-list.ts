@@ -1,7 +1,7 @@
 import type { Dirent, Stats } from 'node:fs';
 import { readdir, readFile, readlink, stat } from 'node:fs/promises';
 import { basename, join } from 'node:path';
-import { resolveInRoot, withinRootRealpath } from '../fs-sandbox.js';
+import { resolveInRoot, withinRootRealpath } from '../../store/fs-sandbox.js';
 
 // Reading the project as a filesystem, for the Explorer tab.
 //

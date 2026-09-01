@@ -10,10 +10,10 @@ import {
   ZERO_STATS,
 } from '../core/chat.js';
 import { resolveCopilotSelection } from '../core/copilot-choice.js';
+import type { CopilotEvent } from '../core/copilot-event.js';
 import { CHAT_DIR } from '../core/layout.js';
+import type { Log } from '../core/log.js';
 import type { ProjectConfig } from '../core/types.js';
-import type { CopilotEvent } from '../server/copilot-events.js';
-import type { Log } from '../server/logging.js';
 
 // Persists copilot conversations per project as JSON files under
 // <project>/<CHAT_DIR>/<id>.json. The server is the source of truth: it tees the

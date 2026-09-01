@@ -37,3 +37,10 @@ export function scaffoldProject(
 ): Promise<{ snapshot: ProjectSnapshot }> {
   return post('/api/project/scaffold', { path, name, mode });
 }
+
+// DELETING A PROJECT. `name` is the folder's last segment, typed by the user, and it is re-checked on
+// the server — the dialog's own `requireText` is the same question asked where the answer is convenient,
+// not where it is binding.
+export function deleteProject(path: string, name: string): Promise<{ removed: string }> {
+  return post('/api/project/delete', { path, name });
+}

@@ -1,19 +1,28 @@
-import { existsSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { mkdir } from 'node:fs/promises';
-import { join, relative as relative_ } from 'node:path';
+import { basename, join, relative as relative_ } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
+import { IDLE_STATE } from '../src/core/autopilot-state.js';
 import { ProjectSession } from '../src/server/boards/session.js';
+import { projectStateDir } from '../src/server/boxes/copilot-env.js';
+import { rememberProject } from '../src/server/settings/app-state.js';
+import { writeAutopilotState } from '../src/store/autopilot-store.js';
 import { scaffoldProject } from '../src/store/project/scaffold.js';
 import { openTestProject, tempDir, testApp } from './helpers.js';
 
 let bare: ProjectSession | undefined;
 const originalRoot = process.env.VIBEBOARD_ROOT;
+// The delete tests point this at a temp file. Restored per test, or one of them writes the developer's
+// real `~/.vibeboard/state.json` and forgets whatever project they had open.
+const originalStateFile = process.env.VIBEBOARD_STATE_FILE;
 
 afterEach(async () => {
   await bare?.close();
   bare = undefined;
   if (originalRoot === undefined) delete process.env.VIBEBOARD_ROOT;
   else process.env.VIBEBOARD_ROOT = originalRoot;
+  if (originalStateFile === undefined) delete process.env.VIBEBOARD_STATE_FILE;
+  else process.env.VIBEBOARD_STATE_FILE = originalStateFile;
 });
 
 async function app(): Promise<ReturnType<typeof testApp>> {
@@ -154,5 +163,99 @@ describe('a path that is not absolute', () => {
     // The refusal has to come BEFORE anything is written: a project half-created by a request that was
     // then refused is worse than either outcome on its own.
     expect(existsSync(join(base, 'would-be-created'))).toBe(false);
+  });
+});
+
+// POST /api/project/delete — the only recursive delete a user can aim, and the tests that matter are
+// the ones about what it REFUSES. A wrong path here is a `rm -rf` of whatever the server can reach.
+describe('POST /api/project/delete', () => {
+  const del = (a: Awaited<ReturnType<typeof app>>, path: string, name?: string) =>
+    a.inject({ method: 'POST', url: '/api/project/delete', payload: { path, name } });
+
+  it('removes a project, its agent state, and the folder itself', async () => {
+    const { root, app: a, session } = await openTestProject();
+    const state = projectStateDir(root);
+    mkdirSync(state, { recursive: true });
+    await session.close();
+
+    const res = await del(a, root, basename(root));
+
+    expect(res.statusCode).toBe(200);
+    expect(existsSync(root)).toBe(false);
+    // The remainder the entry is really about: state outside the project, findable only by digest.
+    expect(existsSync(state)).toBe(false);
+  });
+
+  // THE GUARD, and it is the whole reason this module exists rather than a one-line `rm`. Asserted
+  // against a real directory that is NOT a project, because the failure being prevented is deleting one.
+  it('refuses a directory that is not a VibeBoard project, and removes nothing', async () => {
+    const a = await app();
+    const notAProject = await tempDir();
+    writeFileSync(join(notAProject, 'important.txt'), 'do not delete me', 'utf8');
+
+    const res = await del(a, notAProject, basename(notAProject));
+
+    expect(res.statusCode).toBe(400);
+    expect(res.json().error).toContain('.vibeboard/config.yaml');
+    expect(existsSync(join(notAProject, 'important.txt'))).toBe(true);
+  });
+
+  // TYPED ON THE SERVER, not only in the dialog. A confirmation that lives in the browser is one the
+  // API does not have, and this is the call that destroys somebody's work.
+  it('refuses when the typed name does not match the folder', async () => {
+    const { root, app: a, session } = await openTestProject();
+    await session.close();
+
+    expect((await del(a, root, 'something-else')).statusCode).toBe(400);
+    expect((await del(a, root)).statusCode).toBe(400); // and none at all is not a match either
+    expect(existsSync(root)).toBe(true);
+  });
+
+  it('refuses a relative path before it resolves it against VibeBoard’s own folder', async () => {
+    const res = await del(await app(), 'projects/mine', 'mine');
+    expect(res.statusCode).toBe(400);
+    expect(res.json().error).toContain('absolute');
+  });
+
+  // Deleting the ground out from under a live run manufactures the dead-box failure on purpose: a
+  // container bind-mounted at a directory that stops existing answers every exec with an OCI error.
+  it('refuses while auto-pilot is running', async () => {
+    const { root, app: a } = await openTestProject();
+    await writeAutopilotState(root, { ...IDLE_STATE, state: 'running', iteration: 3 });
+
+    const res = await del(a, root, basename(root));
+
+    expect(res.statusCode).toBe(409);
+    expect(res.json().error).toContain('Soft-stop');
+    expect(existsSync(root)).toBe(true);
+  });
+
+  // The open project is CLOSED first — its watcher is on a directory about to be removed — and the
+  // remembered project is cleared, or the next start reopens a folder that is gone.
+  it('closes the open project and forgets it', async () => {
+    const stateFile = join(await tempDir(), 'state.json');
+    process.env.VIBEBOARD_STATE_FILE = stateFile;
+    const { root, app: a } = await openTestProject();
+    await rememberProject(root);
+
+    const res = await del(a, root, basename(root));
+
+    expect(res.statusCode).toBe(200);
+    expect((await a.inject({ method: 'GET', url: '/api/state' })).json().open).toBe(false);
+    expect(JSON.parse(readFileSync(stateFile, 'utf8')).lastProject).toBeUndefined();
+  });
+
+  // A DIFFERENT project's memory is not forgotten. Without this the assertion above passes against a
+  // `forgetProject` that simply clears the field whatever it holds.
+  it('leaves another project’s memory alone', async () => {
+    const stateFile = join(await tempDir(), 'state.json');
+    process.env.VIBEBOARD_STATE_FILE = stateFile;
+    const { root, app: a, session } = await openTestProject();
+    await session.close();
+    await rememberProject('/somewhere/else');
+
+    await del(a, root, basename(root));
+
+    expect(JSON.parse(readFileSync(stateFile, 'utf8')).lastProject).toBe('/somewhere/else');
   });
 });

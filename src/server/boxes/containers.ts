@@ -15,7 +15,11 @@ import { CONFIG_DIR, RUNS_DIR } from '../../core/layout.js';
 // for one reason only — credential isolation. OpenCode must never have the Claude credential mounted,
 // so the two cannot share a container even though their file rights are identical.
 
-export type BoxBackend = 'claude-code' | 'opencode';
+// A LIST rather than only a union, because two callers have to enumerate them: a project delete removes
+// one box per backend, and nothing derived from a type exists at run time to iterate. Declared `as const`
+// so the type is still derived from the list and the two cannot drift.
+export const BOX_BACKENDS = ['claude-code', 'opencode'] as const;
+export type BoxBackend = (typeof BOX_BACKENDS)[number];
 
 // Labels rather than a pid file. A container outlives the process that made it — that is the point of
 // one, and it is also a new failure mode — so after a restart we have to find boxes we no longer hold

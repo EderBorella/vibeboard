@@ -47,6 +47,7 @@ const show = (autopilot: boolean) =>
   render(
     <SettingsModal
       config={configFor(autopilot)}
+      root="/tmp/vibeboard-settings-columns-fixture"
       onClose={() => {}}
       onSaved={() => {}}
       autopilot={null}

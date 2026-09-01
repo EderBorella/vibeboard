@@ -1,10 +1,14 @@
-import { dirname, isAbsolute, resolve } from 'node:path';
+import { rm } from 'node:fs/promises';
+import { basename, dirname, isAbsolute, resolve } from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import { DEFAULT_BACKEND } from '../../core/backends.js';
+import { deleteProjectTree } from '../../store/project/delete.js';
 import { type ScaffoldMode, scaffoldProject } from '../../store/project/scaffold.js';
-import type { BoxBackend } from '../boxes/containers.js';
+import { BOX_BACKENDS, type BoxBackend } from '../boxes/containers.js';
+import { projectStateDir } from '../boxes/copilot-env.js';
+import { stopOpencodeServer } from '../boxes/opencode-server.js';
 import { type AppCtx, today } from '../route-context.js';
-import { rememberProject } from '../settings/app-state.js';
+import { forgetProject, rememberProject } from '../settings/app-state.js';
 import { discoverProjects } from './discover.js';
 
 export async function registerProjectRoutes(api: FastifyInstance, ctx: AppCtx): Promise<void> {
@@ -118,5 +122,97 @@ export async function registerProjectRoutes(api: FastifyInstance, ctx: AppCtx): 
     await ctx.autopilot.load();
     await rememberProject(path);
     return { snapshot };
+  });
+
+  // WHY A DELETE IS REFUSED, kept apart from the doing of it so that neither is long enough to hide a
+  // branch. Answers the status as well as the sentence: one of these is a bad request and two are a
+  // conflict, and a route that flattened them would tell the UI the wrong thing to do about it.
+  async function deleteRefusal(
+    path: string,
+    name: string | undefined,
+  ): Promise<{ code: number; error: string } | undefined> {
+    // REFUSED WHILE ANYTHING IS RUNNING, and both halves are needed. Auto-pilot may be dispatching into
+    // this project from another process; a run may be live in a container whose working directory is
+    // about to stop existing — which is precisely the dead-box failure `workdirProbeArgs` exists for,
+    // manufactured on purpose.
+    if ((await ctx.autopilot.current()).state === 'running') {
+      return { code: 409, error: 'Auto-pilot is running. Soft-stop it before deleting this project.' };
+    }
+    if (samePath(path, ctx.session.root) && ctx.runner.activeIds.length > 0) {
+      return { code: 409, error: 'A run is still going. Stop it before deleting this project.' };
+    }
+    // THE NAME IS THE CONFIRMATION, checked on the server and not only in the dialog. A confirm that
+    // lives only in the browser is a confirm the API does not have — and this is the one call in
+    // VibeBoard that destroys a person's work.
+    const expected = basename(resolve(path));
+    if (name !== expected) {
+      return { code: 400, error: `Type the folder name — ${expected} — to confirm. Nothing was removed.` };
+    }
+    return undefined;
+  }
+
+  // LET GO OF THE PROJECT BEFORE THE FILES GO. A watcher on a directory being deleted, a container
+  // bind-mounted at it, and a server whose working directory it is all behave badly when the ground
+  // disappears underneath them — and none of them can be cleaned up afterwards by anything that has
+  // forgotten where the project was.
+  async function releaseProject(
+    path: string,
+    onBoxError: (err: unknown, backend: BoxBackend) => void,
+  ): Promise<void> {
+    if (samePath(path, ctx.session.root)) {
+      ctx.copilotAuthority.revoke();
+      stopOpencodeServer();
+      await ctx.session.close();
+    }
+    if (!ctx.boxes) return;
+    for (const backend of BOX_BACKENDS) {
+      try {
+        await ctx.boxes.stop(path, backend);
+      } catch (err) {
+        onBoxError(err, backend);
+      }
+    }
+  }
+
+  // DELETING A PROJECT — ruled 2026-09-01, and the list is five things rather than the three the entry
+  // named. Everything VibeBoard creates for a project must be findable from the project alone, or a
+  // delete leaves a remainder nothing will ever clean up while the user reasonably believes it is gone.
+  //
+  //   1. the project tree              — `deleteProjectTree`, which refuses anything without the marker
+  //   2. its box or boxes              — by label, one per backend
+  //   3. its agent state               — `~/.vibeboard/copilot/projects/<digest of the path>`
+  //   4. `lastProject`, if it is this  — or the next start reopens a folder that is gone
+  //   5. its OpenCode server, if live  — a server holding a working directory that no longer exists
+  //
+  // AND WHAT IS DELIBERATELY NOT TOUCHED, because every one of them is shared and app-level: the two
+  // credential mirrors under `~/.cache/vibeboard/creds/`, `~/.vibeboard/token` and the device store,
+  // `~/.vibeboard/run/api.sock`, and `logs/`, which prunes itself by day across every project.
+  //
+  // ADMIN ONLY, by being absent from the scope table in auth.ts. That is the default and it is the
+  // right one here: no agent scope has any business deleting the project it is working in, and an
+  // absent route is admin-only rather than open, which is the property that default exists for.
+  api.post('/project/delete', async (req, reply) => {
+    const { path, name } = req.body as { path: string; name?: string };
+    const badPath = notAbsolute(path);
+    if (badPath) return reply.code(400).send({ error: badPath });
+
+    const refused = await deleteRefusal(path, name);
+    if (refused) return reply.code(refused.code).send({ error: refused.error });
+    await releaseProject(path, (err, backend) =>
+      // Not fatal. A box that cannot be removed is a remainder worth logging, and refusing the whole
+      // delete over it would leave the user with a project they have been told is gone.
+      req.log.warn({ err, path, backend }, 'a box outlived the project it belonged to'),
+    );
+
+    const result = await deleteProjectTree(path);
+    if (!result.ok) return reply.code(400).send({ error: result.reason });
+
+    // AFTER the tree, because the digest is of the path and the path is all either of these needs — and
+    // a failure here must not stop the tree being removed, which is the part the user asked for.
+    await rm(projectStateDir(resolve(path)), { recursive: true, force: true }).catch((err: unknown) => {
+      req.log.warn({ err, path }, 'the project was deleted but its agent state was not');
+    });
+    await forgetProject(path);
+    return { removed: result.removed };
   });
 }

@@ -310,6 +310,7 @@ export function App() {
       {settingsOpen && snapshot && (
         <SettingsModal
           config={snapshot.config}
+          root={snapshot.root}
           onClose={() => setSettingsOpen(false)}
           onSaved={() => setSettingsOpen(false)}
           autopilot={autopilot.state}

@@ -1,6 +1,6 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { readConfig } from '../../store/project/config.js';
 import type { ProjectSession } from '../boards/session.js';
 
@@ -52,6 +52,21 @@ export async function rememberProject(path: string): Promise<void> {
     await writeState({ ...(await readState()), lastProject: path });
   } catch {
     /* remembering the project is a convenience; never fail an operation over it */
+  }
+}
+
+// The other half of `rememberProject`, and without it deleting the open project leaves VibeBoard trying
+// to reopen a folder that is gone on the next start — which lands the user on the picker with an error
+// rather than on the picker. Only clears when it is THIS project: forgetting somebody else's would be a
+// second bug wearing the first one's clothes.
+export async function forgetProject(path: string): Promise<void> {
+  try {
+    const state = await readState();
+    if (state.lastProject === undefined || resolve(state.lastProject) !== resolve(path)) return;
+    const { lastProject: _dropped, ...rest } = state;
+    await writeState(rest);
+  } catch {
+    /* the same reasoning as rememberProject: never fail a delete over what is a convenience */
   }
 }
 

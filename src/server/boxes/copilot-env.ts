@@ -78,7 +78,10 @@ export function claudeConfigDir(): string {
 //    several containers and the user on one file as concurrent writers.
 //
 // So each project gets its own, named by a digest of its path for the same reason a box is.
-function projectStateDir(projectRoot: string): string {
+// EXPORTED so a project delete can find it. Everything VibeBoard creates for a project must be findable
+// FROM THE PROJECT ALONE — a delete that misses one leaves a remainder nothing will ever clean up, and
+// the user will reasonably believe it is gone. Boxes are findable by label; this is findable by digest.
+export function projectStateDir(projectRoot: string): string {
   const digest = createHash('sha256').update(projectRoot).digest('hex').slice(0, 12);
   return join(copilotHome(), 'projects', digest);
 }

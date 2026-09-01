@@ -106,6 +106,7 @@ export {
   type ModelStatus,
 } from './api/models';
 export {
+  deleteProject,
   getState,
   listProjects,
   openProject,

@@ -38,11 +38,15 @@ import { Modal } from '../shared/Modal';
 import { ModelPicker } from '../shared/ModelPicker';
 import { Row } from '../shared/Row';
 import { SignInPanel } from '../signin/SignInPanel';
+import { DeleteProjectPanel } from './DeleteProjectPanel';
 import { DiagnosticsPanel } from './DiagnosticsPanel';
 import { SandboxPanel } from './SandboxPanel';
 
 interface Props {
   config: ProjectConfig;
+  // The open project's folder. Only Delete uses it, and it comes down rather than being fetched for the
+  // same reason `autopilot` does: a second read is a second answer, and this one names what gets deleted.
+  root: string;
   onClose: () => void;
   onSaved: () => void;
   // Passed down rather than fetched again. `useAutopilot(0)` inside the panel hard-coded App's project
@@ -61,7 +65,15 @@ const orKeep = (text: string | number, current: number): number => Number(text) 
 
 const NO_MODELS: ModelOption[] = [];
 
-export function SettingsModal({ config, onClose, onSaved, autopilot, onAutopilotChanged, confirm }: Props) {
+export function SettingsModal({
+  config,
+  root,
+  onClose,
+  onSaved,
+  autopilot,
+  onAutopilotChanged,
+  confirm,
+}: Props) {
   const [backend, setBackend] = useState(resolveChoice(config.copilot, {}).backend);
   // The auto-pilot caps, edited in the panel below and saved with everything else — one Save button,
   // and one place for the server's refusal to appear (which may be about the routing table rather than
@@ -290,6 +302,11 @@ export function SettingsModal({ config, onClose, onSaved, autopilot, onAutopilot
               never touches. It is here so the credential is FINDABLE — "unless he wants to check in
               the settings" — and because signing everything out is the only way to replace one. */}
       <SignInPanel confirm={confirm} />
+
+      {/* After sign-in, which is the other thing nobody comes here for — and after it deliberately,
+              because this is the only control in the app that destroys work. Shown only when a project
+              is actually open: the route needs its path, and there is nothing to delete otherwise. */}
+      {root && <DeleteProjectPanel root={root} confirm={confirm} />}
 
       {error && <Notice tone="bad">{error}</Notice>}
     </Modal>

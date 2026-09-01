@@ -357,40 +357,66 @@ interface BoxInspection {
   state: BoxState;
   // The spec digest the box was created with, or '' for one made before this label existed.
   spec: string;
-  // A global IPv6 address, if docker gave it one. '' is the ordinary case and the one we require.
-  ipv6: string;
 }
 
-// State, spec AND address in ONE call. Three calls would be three round trips and, worse, three windows
-// in which the answers disagree — and a second `inspect` SHAPE is its own hazard: every test double in
-// the suite keys on `args[0] === 'inspect'`, so a second one would silently be answered with the first
-// one's output. Five tests proved that on the first run.
+// State and spec in one call: two calls would be two round trips and, worse, a window in which the
+// answers disagree. The IPv6 address is deliberately NOT among them — see `globalIPv6` below for the
+// production failure that taught that.
 //
-// THE IPv6 FIELD IS READ FROM BOTH PLACES IT CAN APPEAR, concatenated: the top-level one is populated
-// for the default bridge, and a container on a user-defined network carries it per network instead.
-// Reading only the first would answer "no IPv6" for exactly the setups most likely to have it. It is the
-// LAST field, and absent from a fixture that predates it, so an answer with two fields still parses.
-const V6 =
-  '{{.NetworkSettings.GlobalIPv6Address}}{{range .NetworkSettings.Networks}}{{.GlobalIPv6Address}}{{end}}';
-
-// A PIPE, NOT WHITESPACE, and that is a correction rather than a preference. Docker prints `<no value>`
-// for a label that is not set — WITH A SPACE IN IT — so splitting on whitespace put `<no` in the spec
-// field and `value>` in whatever came after. The two-field version had the same fault and got away with
-// it: a mangled spec is merely "not the digest we wanted", which rebuilds, so the `=== '<no value>'`
-// line below could never once have matched. Adding a third field turned it into a box refused for
-// holding an IPv6 address called `value>`. None of the three values can contain a pipe.
-const FIELDS = `{{.State.Running}}|{{index .Config.Labels "${SPEC_LABEL}"}}|${V6}`;
+// A PIPE, NOT WHITESPACE. Docker prints `<no value>` for a label that is not set — WITH A SPACE IN IT —
+// so splitting on whitespace put `<no` in the spec field. The two-field version had the same fault and
+// got away with it: a mangled spec reads as "not the digest we wanted", which rebuilds, so the
+// `=== '<no value>'` line below could never once have matched. Neither value can contain a pipe.
+const FIELDS = `{{.State.Running}}|{{index .Config.Labels "${SPEC_LABEL}"}}`;
 
 export async function inspectState(docker: DockerRun, name: string): Promise<BoxInspection> {
   const res = await docker(['inspect', '-f', FIELDS, name]);
-  if (res.code !== 0) return { state: 'absent', spec: '', ipv6: '' };
-  const [running = '', spec = '', ipv6 = ''] = res.stdout.trim().split('|');
+  if (res.code !== 0) return { state: 'absent', spec: '' };
+  const [running = '', spec = ''] = res.stdout.trim().split('|');
   return {
     state: running.trim() === 'true' ? 'running' : 'stopped',
     // docker prints `<no value>` for a label that is not set.
     spec: spec.trim() === '<no value>' ? '' : spec.trim(),
-    ipv6: ipv6.trim(),
   };
+}
+
+// A GLOBAL IPv6 ADDRESS, IF DOCKER GAVE THE BOX ONE — and a SEPARATE call, which is the whole lesson of
+// this function. It was folded into `inspectState` above to save a round trip and to avoid a second
+// `inspect` shape the test doubles would answer wrongly. Both were true and both were worth less than
+// this: an OPTIONAL field must never be able to make a live box read as absent.
+//
+// WHAT ACTUALLY HAPPENED, on Docker 29 with the first version of the template. `.NetworkSettings` is
+// rendered from a map that has no `GlobalIPv6Address` key at all, so `{{.NetworkSettings.GlobalIPv6Address}}`
+// is not an empty string — it is a TEMPLATE ERROR, and `docker inspect` exits 1. `inspectState` reads a
+// non-zero exit as "no such container", so `ensure` went on to create a box that already existed and
+// every single agent run died on `Conflict. The container name is already in use`. Nothing in the suite
+// could see it: every unit test uses a fake docker, and the one integration test that uses a real
+// daemon only ever CREATES boxes, so it never reaches the adoption path where this bites.
+//
+// AND THE SECOND HALF WAS WRONG TOO, in the opposite direction. `{{range .NetworkSettings.Networks}}{{.GlobalIPv6Address}}{{end}}`
+// exits 0 and prints **`invalid IP`** for a container with no v6 — Go rendering an empty `net.IP` — which
+// the caller would have taken for an address and used to refuse every box on the machine. Ranging with an
+// explicit `$v` and reading it with `index` prints the empty string it really is.
+//
+// SO THE ANSWER IS VALIDATED RATHER THAN TRUSTED: only a token containing a colon is an address. That
+// rejects `<no value>`, `invalid IP`, and anything else a future version decides to print.
+const IPV6 =
+  '{{index .NetworkSettings "GlobalIPv6Address"}} ' +
+  '{{range $k, $v := .NetworkSettings.Networks}}{{index $v "GlobalIPv6Address"}} {{end}}';
+
+export async function globalIPv6(docker: DockerRun, name: string): Promise<string> {
+  // `--format` and not `-f`, so this call is distinguishable from the one above by its argv alone —
+  // every test double in the suite keys on the first argument or the first two.
+  const res = await docker(['inspect', '--format', IPV6, name]);
+  // A FAILURE HERE IS NOT AN ANSWER. Unlike `inspectState`, nothing about this call's exit code says
+  // anything about whether the container exists, and treating it as though it did is the defect above.
+  if (res.code !== 0) return '';
+  return (
+    res.stdout
+      .trim()
+      .split(/\s+/)
+      .find((t) => t.includes(':')) ?? ''
+  );
 }
 
 // IS THIS BOX'S VIEW OF THE PROJECT STILL THE PROJECT? One exec that does nothing, in the working

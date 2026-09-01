@@ -30,7 +30,7 @@ function daemon(probeCode: number): { docker: DockerRun; calls: string[][] } {
   const calls: string[][] = [];
   const docker: DockerRun = async (args) => {
     calls.push(args);
-    if (args[0] === 'inspect') return { code: 0, stdout: `true|${LIVE_SPEC}|\n`, stderr: '' };
+    if (args[0] === 'inspect') return { code: 0, stdout: `true|${LIVE_SPEC}\n`, stderr: '' };
     if (args[0] === 'exec') {
       return probeCode === 0
         ? { code: 0, stdout: '', stderr: '' }

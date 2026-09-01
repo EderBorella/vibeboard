@@ -14,6 +14,7 @@ import {
   type DockerRun,
   dockerBin,
   execArgs,
+  globalIPv6,
   inspectState,
   installArgs,
   isPackageName,
@@ -149,7 +150,7 @@ export class BoxManager {
     // `#applyNetworkRules`, which runs on create and on start, so a box that was already RUNNING when this
     // version arrived would be adopted and used with a v6 address it had acquired under the previous one.
     // That is the upgrade case, and anyone who has turned v6 on is the only population it affects.
-    if (found.state !== 'absent') await this.#refuseIPv6(name, found.ipv6);
+    if (found.state !== 'absent') await this.#refuseIPv6(name);
     let state = found.state;
     if (state !== 'absent' && (await this.#mustRebuild(name, found.spec, wanted, state))) {
       this.#onRebuild?.(name, found.spec, wanted);
@@ -232,15 +233,15 @@ export class BoxManager {
     // `ip6tables` is absent from some hosts and images, so adding the rules blindly would break boxes
     // that work today to cover a case nobody has. Detect and refuse needs no new dependency and fails
     // loudly. See docs/security/containment.md.
-    const { ipv6 } = await inspectState(this.#docker, name);
-    await this.#refuseIPv6(name, ipv6);
+    await this.#refuseIPv6(name);
   }
 
   // DESTROY IT AND SAY SO, wherever the address turns up — after the rules are applied on create and on
   // start, and before a running box is adopted. A box whose boundary covers only some of its traffic is
   // worse than one with no boundary, because it looks confined. Its own method so both callers refuse
   // identically and neither handler carries the branch.
-  async #refuseIPv6(name: string, ipv6: string): Promise<void> {
+  async #refuseIPv6(name: string): Promise<void> {
+    const ipv6 = await globalIPv6(this.#docker, name);
     if (ipv6 === '') return;
     await this.#docker(['rm', '-f', name], { timeoutMs: 60_000 });
     throw new Error(ipv6Refusal(ipv6));

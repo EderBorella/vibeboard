@@ -11,7 +11,9 @@ import {
   type DockerResult,
   type DockerRun,
   execArgs,
+  globalIPv6,
   INSTALL_HELPER,
+  inspectState,
   installArgs,
   isPackageName,
   netRuleArgs,
@@ -362,8 +364,8 @@ describe('ensure', () => {
     command: undefined,
     publish: undefined,
   });
-  const running = { code: 0, stdout: `true|${matchingSpec}|\n`, stderr: '' };
-  const stopped = { code: 0, stdout: `false|${matchingSpec}|\n`, stderr: '' };
+  const running = { code: 0, stdout: `true|${matchingSpec}\n`, stderr: '' };
+  const stopped = { code: 0, stdout: `false|${matchingSpec}\n`, stderr: '' };
 
   // `docker run` is no longer a synonym for "made the box": the network sidecar is a `docker run`
   // too. Only a run that NAMES a container creates one, and that is what these assertions mean.
@@ -414,9 +416,14 @@ describe('ensure', () => {
     const mgr = new BoxManager({
       docker: async (args) => {
         calls.push(args);
+        // `--format` is the IPv6 read, `-f` is the state read. They are separate calls on purpose: an
+        // optional field must never be able to make a live box read as absent.
+        if (args[0] === 'inspect' && args[1] === '--format') {
+          return { code: 0, stdout: '<no value> 2001:db8::2 \n', stderr: '' };
+        }
         if (args[0] === 'inspect') {
           return exists
-            ? { code: 0, stdout: `true|${matchingSpec}|2001:db8::2\n`, stderr: '' }
+            ? { code: 0, stdout: `true|${matchingSpec}\n`, stderr: '' }
             : { code: 1, stdout: '', stderr: 'No such object' };
         }
         if (args[0] === 'run' && args[1] === '-d') exists = true;
@@ -439,7 +446,10 @@ describe('ensure', () => {
     const calls: string[][] = [];
     const mgr = new BoxManager({
       docker: fakeDocker(
-        { inspect: { code: 0, stdout: `true|${matchingSpec}|2001:db8::7\n`, stderr: '' } },
+        {
+          inspect: { code: 0, stdout: `true|${matchingSpec}\n`, stderr: '' },
+          'inspect --format': { code: 0, stdout: '<no value> 2001:db8::7 \n', stderr: '' },
+        },
         calls,
       ),
       user: '1000:1000',
@@ -459,7 +469,7 @@ describe('ensure', () => {
       docker: async (args) => {
         if (args[0] === 'inspect') {
           return exists
-            ? { code: 0, stdout: `true|${matchingSpec}|\n`, stderr: '' }
+            ? { code: 0, stdout: `true|${matchingSpec}\n`, stderr: '' }
             : { code: 1, stdout: '', stderr: 'No such object' };
         }
         if (args[0] === 'run' && args[1] === '-d') exists = true;
@@ -511,7 +521,7 @@ describe('ensure', () => {
     // and never gained one — leaving the host-executed hooks directory writable.
     const calls: string[][] = [];
     const mgr = new BoxManager({
-      docker: fakeDocker({ inspect: { code: 0, stdout: 'true|otherdigest|\n', stderr: '' } }, calls),
+      docker: fakeDocker({ inspect: { code: 0, stdout: 'true|otherdigest\n', stderr: '' } }, calls),
       user: '1000:1000',
     });
     await mgr.ensure(opts);
@@ -537,7 +547,7 @@ describe('ensure', () => {
   it('says which digests disagreed, so a rebuild is not a mystery', async () => {
     const notices: string[][] = [];
     const mgr = new BoxManager({
-      docker: fakeDocker({ inspect: { code: 0, stdout: 'true|otherdigest|\n', stderr: '' } }),
+      docker: fakeDocker({ inspect: { code: 0, stdout: 'true|otherdigest\n', stderr: '' } }),
       user: '1000:1000',
       onRebuild: (name, was, now) => notices.push([name, was, now]),
     });
@@ -550,7 +560,7 @@ describe('ensure', () => {
   it('treats a box with no spec label as unusable — it predates the check', async () => {
     const calls: string[][] = [];
     const mgr = new BoxManager({
-      docker: fakeDocker({ inspect: { code: 0, stdout: 'true|<no value>|\n', stderr: '' } }, calls),
+      docker: fakeDocker({ inspect: { code: 0, stdout: 'true|<no value>\n', stderr: '' } }, calls),
       user: '1000:1000',
     });
     await mgr.ensure(opts);
@@ -566,6 +576,61 @@ describe('ensure', () => {
       user: '1000:1000',
     });
     await expect(mgr.ensure(opts)).rejects.toThrow(/invalid mount config/);
+  });
+});
+
+// THE PRODUCTION FAILURE, PINNED WITH THE STRINGS A REAL DAEMON PRINTED. Found by a smoke test against
+// Docker 29 after everything below passed: the IPv6 read was folded into `inspectState`, and on that
+// version `.NetworkSettings` has no `GlobalIPv6Address` key at all — so the template did not render an
+// empty string, it ERRORED and `docker inspect` exited 1. `inspectState` reads a non-zero exit as "no
+// such container", so `ensure` created a box that already existed and every agent run died on
+// `Conflict. The container name is already in use`.
+//
+// Nothing in the suite could see it. Every unit test uses a fake docker, and the one integration test
+// against a real daemon only ever CREATES boxes, so it never reaches the adoption path.
+describe('reading a box IPv6 address without breaking the read of its state', () => {
+  const answering =
+    (script: Record<string, DockerResult>): DockerRun =>
+    async (args) =>
+      script[args.slice(0, 2).join(' ')] ?? { code: 0, stdout: '', stderr: '' };
+
+  it('reports no address when the IPv6 read FAILS, and never that the box is gone', async () => {
+    // The exact failure: the state read is fine, the address read exits 1 with a template error.
+    const docker = answering({
+      'inspect -f': { code: 0, stdout: 'true|abc\n', stderr: '' },
+      'inspect --format': {
+        code: 1,
+        stdout: '',
+        stderr:
+          'template parsing error: template: :1:82: executing "" at <.NetworkSettings.GlobalIPv6Address>: map has no entry for key "GlobalIPv6Address"',
+      },
+    });
+    expect(await globalIPv6(docker, 'box')).toBe('');
+    // AND THE STATE IS UNTOUCHED BY IT. This is the assertion that would have caught the outage: the
+    // box is running, and a failure to read an optional field must not say otherwise.
+    expect(await inspectState(docker, 'box')).toEqual({ state: 'running', spec: 'abc' });
+  });
+
+  // `invalid IP` is what Go prints for an empty `net.IP`, and it is what the FIRST version of the
+  // per-network template produced for every container with no v6 — exit 0, so it would have been taken
+  // for an address and used to refuse every box on the machine.
+  it('is not fooled by the placeholders a real daemon prints for no address', async () => {
+    for (const stdout of ['<no value>  \n', '<no value> invalid IP \n', 'invalid IP\n', '\n']) {
+      const docker = answering({ 'inspect --format': { code: 0, stdout, stderr: '' } });
+      expect(await globalIPv6(docker, 'box')).toBe('');
+    }
+  });
+
+  // And it still finds a real one, or the test above is satisfied by a function that returns ''.
+  it('finds an address wherever in the output it appears', async () => {
+    const front = answering({
+      'inspect --format': { code: 0, stdout: '2001:db8::2 \n', stderr: '' },
+    });
+    const perNetwork = answering({
+      'inspect --format': { code: 0, stdout: '<no value> fd00::5 \n', stderr: '' },
+    });
+    expect(await globalIPv6(front, 'box')).toBe('2001:db8::2');
+    expect(await globalIPv6(perNetwork, 'box')).toBe('fd00::5');
   });
 });
 

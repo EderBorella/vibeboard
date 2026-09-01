@@ -1,5 +1,5 @@
 {
-  "recorded": "2026-08-31",
+  "recorded": "2026-09-01",
   "surfaces": {
     "boards": {
       "fontSizes": [
@@ -30,7 +30,7 @@
         "overflow": 118,
         "clipping": 38,
         "contrast": 143,
-        "tokens": 50,
+        "tokens": 51,
         "rows": 29,
         "focus": 66
       },
@@ -73,7 +73,7 @@
         "overflow": 64,
         "clipping": 12,
         "contrast": 86,
-        "tokens": 50,
+        "tokens": 51,
         "rows": 12,
         "focus": 43
       },
@@ -115,7 +115,7 @@
         "overflow": 65,
         "clipping": 15,
         "contrast": 84,
-        "tokens": 50,
+        "tokens": 51,
         "rows": 10,
         "focus": 39
       },
@@ -159,7 +159,7 @@
         "overflow": 50,
         "clipping": 13,
         "contrast": 90,
-        "tokens": 50,
+        "tokens": 51,
         "rows": 9,
         "focus": 60
       },
@@ -182,6 +182,7 @@
         "15px"
       ],
       "radii": [
+        "4px",
         "50%",
         "6px",
         "999px"
@@ -196,12 +197,12 @@
         "16px"
       ],
       "examined": {
-        "elements": 151,
-        "textElements": 72,
-        "overflow": 48,
+        "elements": 155,
+        "textElements": 74,
+        "overflow": 50,
         "clipping": 12,
-        "contrast": 72,
-        "tokens": 50,
+        "contrast": 74,
+        "tokens": 51,
         "rows": 15,
         "focus": 44
       },
@@ -246,7 +247,7 @@
         "overflow": 30,
         "clipping": 3,
         "contrast": 35,
-        "tokens": 50,
+        "tokens": 51,
         "rows": 5,
         "focus": 18
       },
@@ -280,7 +281,7 @@
         "overflow": 3,
         "clipping": 2,
         "contrast": 4,
-        "tokens": 50,
+        "tokens": 51,
         "rows": 1,
         "focus": 3
       },
@@ -311,14 +312,14 @@
       ],
       "markerHeights": [],
       "examined": {
-        "elements": 127,
-        "textElements": 80,
-        "overflow": 76,
+        "elements": 130,
+        "textElements": 82,
+        "overflow": 78,
         "clipping": 14,
-        "contrast": 80,
-        "tokens": 50,
+        "contrast": 82,
+        "tokens": 51,
         "rows": 0,
-        "focus": 24
+        "focus": 25
       },
       "findings": {
         "type": 0,
@@ -357,7 +358,7 @@
         "overflow": 22,
         "clipping": 5,
         "contrast": 31,
-        "tokens": 50,
+        "tokens": 51,
         "rows": 5,
         "focus": 14
       },
@@ -391,7 +392,7 @@
         "overflow": 3,
         "clipping": 1,
         "contrast": 4,
-        "tokens": 50,
+        "tokens": 51,
         "rows": 0,
         "focus": 2
       },
@@ -432,7 +433,7 @@
     "overflow": 118,
     "clipping": 38,
     "contrast": 143,
-    "tokens": 50,
+    "tokens": 51,
     "rows": 29,
     "focus": 66,
     "focusUnfocusable": 1

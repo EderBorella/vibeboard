@@ -117,6 +117,77 @@ describe('ExplorerView', () => {
     await waitFor(() => expect(api.listDir.mock.calls.length).toBeGreaterThan(1));
   });
 
+  // SAVING SOMETHING THAT IS NOT CONTENT — git internals, board state, a run's scratch space. A
+  // WARNING and never a refusal: the tab reaches these on purpose, and repairing a corrupt config by
+  // hand is the reason it does.
+  it('asks before saving over a file that is not the user’s content, and quotes the reason', async () => {
+    const why = 'This is board state, not content, and the loop reads it as it is.';
+    api.listDir.mockResolvedValue(listing('', [file('.vibeboard/config.yaml')]));
+    api.readFsFile.mockResolvedValue({
+      ...text('.vibeboard/config.yaml', 'name: T'),
+      sensitive: { kind: 'board-state', why },
+    });
+    api.putFsFile.mockResolvedValue(undefined);
+    render(<ExplorerView snapshot={snapshot} />);
+    await waitFor(() => expect(screen.getByText('config.yaml')).toBeTruthy());
+    fireEvent.click(row('config.yaml'));
+    await waitFor(() => expect(screen.getByRole('textbox')).toBeTruthy());
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'name: U' } });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    // NOT WRITTEN YET, which is the whole assertion. A dialog shown after the write is decoration.
+    await waitFor(() => expect(screen.getByRole('dialog')).toBeTruthy());
+    expect(api.putFsFile.mock.calls).toEqual([]);
+    // The SERVER's sentence, quoted rather than re-worded in the browser.
+    expect(screen.getByText(why)).toBeTruthy();
+    // Not dressed as a deletion: nothing is destroyed, and a `danger` dialog here would train people
+    // to click through the ones that are.
+    expect(within(screen.getByRole('dialog')).queryByRole('textbox')).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save it' }));
+    await waitFor(() => expect(api.putFsFile.mock.calls).toEqual([['.vibeboard/config.yaml', 'name: U']]));
+  });
+
+  it('writes nothing when that warning is cancelled', async () => {
+    api.listDir.mockResolvedValue(listing('', [file('.git/config')]));
+    api.readFsFile.mockResolvedValue({
+      ...text('.git/config', '[core]'),
+      sensitive: { kind: 'git-internal', why: 'This is git’s own state.' },
+    });
+    render(<ExplorerView snapshot={snapshot} />);
+    await waitFor(() => expect(screen.getByText('config')).toBeTruthy());
+    fireEvent.click(row('config'));
+    await waitFor(() => expect(screen.getByRole('textbox')).toBeTruthy());
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: '[core] changed' } });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(screen.getByRole('dialog')).toBeTruthy());
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(api.putFsFile.mock.calls).toEqual([]);
+    // The buffer stays dirty, so the edit is not stranded — Save is still available.
+    expect((screen.getByRole('button', { name: 'Save' }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  // THE OTHER HALF. Without it the two above pass against a view that asks before EVERY save, which
+  // would be a dialog on every README and the fastest way to teach people to dismiss dialogs.
+  it('asks nothing before saving ordinary content', async () => {
+    api.listDir.mockResolvedValue(listing('', [file('README.md')]));
+    api.readFsFile.mockResolvedValue(text('README.md', 'one'));
+    api.putFsFile.mockResolvedValue(undefined);
+    render(<ExplorerView snapshot={snapshot} />);
+    await waitFor(() => expect(screen.getByText('README.md')).toBeTruthy());
+    fireEvent.click(row('README.md'));
+    await waitFor(() => expect(screen.getByRole('textbox')).toBeTruthy());
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'two' } });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(api.putFsFile.mock.calls).toEqual([['README.md', 'two']]));
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
   it('says what a binary file is instead of loading it into a textarea', async () => {
     // The whole point of the three read outcomes: a PNG is visible, selectable and honest about
     // itself, rather than hidden or silently corrupted by a round-trip through the editor.

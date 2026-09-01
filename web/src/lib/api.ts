@@ -96,6 +96,7 @@ export {
   putFsFile,
   readFsFile,
   renameFsNode,
+  type SensitivePath,
 } from './api/explorer';
 export { ApiError, onUnauthorized } from './api/http';
 export {

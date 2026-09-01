@@ -50,6 +50,14 @@ const indent = (depth: number): { paddingLeft: number } => ({ paddingLeft: 8 + d
 // A link out of the project is listed so it can be removed, and never opened — see fs-sandbox.ts.
 const expandable = (node: FsNode): boolean => node.kind === 'dir' && !node.escapes;
 
+// Two words at most, because it sits in a row beside a name and a size. The WHY is a sentence and lives
+// on the node; this is only the flag that makes a reader look for it.
+const SENSITIVE_LABEL: Record<NonNullable<FsNode['sensitive']>['kind'], string> = {
+  'git-internal': 'git',
+  'board-state': 'board state',
+  'run-scratch': 'run files',
+};
+
 function icon(node: FsNode): string {
   if (node.escapes) return '⤴';
   if (node.kind === 'dir') return '📁';
@@ -142,6 +150,20 @@ function NodeRow(props: NodeRowProps) {
         <Chip>
           <Text caps size="inherit" ink="accent2">
             outside
+          </Text>
+        </Chip>
+      )}
+      {/* NOT the user's content: git internals, board state, or a run's scratch space. Marked rather
+          than hidden or locked — the tab reaches everything on purpose, and fixing a corrupt config by
+          hand is the reason it does. The sentence arrives with the node and is quoted at save time. */}
+      {node.sensitive && (
+        <Chip>
+          {/* `accent2`, the same ink as the two chips above rather than a caution colour of its own.
+              A marker is not a warning: the warning is the dialog at save time, and the atom has no
+              `warn` ink — adding one for a chip nobody has to act on would be a design ruling for a
+              label. What distinguishes it is the word. */}
+          <Text caps size="inherit" ink="accent2">
+            {SENSITIVE_LABEL[node.sensitive.kind]}
           </Text>
         </Chip>
       )}

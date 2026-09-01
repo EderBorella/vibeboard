@@ -1,6 +1,7 @@
 import type { Dirent, Stats } from 'node:fs';
 import { readdir, readFile, readlink, stat } from 'node:fs/promises';
 import { basename, join } from 'node:path';
+import { type SensitivePath, sensitivity } from '../../core/sensitive-paths.js';
 import { resolveInRoot, withinRootRealpath } from '../../store/fs-sandbox.js';
 
 // Reading the project as a filesystem, for the Explorer tab.
@@ -31,6 +32,12 @@ export interface FsNode {
   symlink?: true;
   target?: string; // what the link points at, verbatim, for display
   escapes?: true; // resolves outside the project root: listed, never traversed or read
+  // WHY EDITING THIS BY HAND IS WORTH A WORD FIRST, when it is. Computed on the server rather than in
+  // the browser because the answer is about `core/layout.ts`'s directories, and a second copy of that
+  // list in the web tree would drift — the web tree mirrors core deliberately and by hand, so anything
+  // derived from it belongs on the wire instead. `undefined` for ordinary content, which is nearly
+  // everything.
+  sensitive?: SensitivePath;
 }
 
 export interface DirListing {
@@ -96,11 +103,11 @@ export async function listDir(root: string, rel: unknown): Promise<DirListing | 
     return null; // missing, or not a directory
   }
 
-  const nodes: FsNode[] = entries.map((e) => ({
-    path: r.rel === '' ? e.name : `${r.rel}/${e.name}`,
-    name: e.name,
-    kind: baseKind(e),
-  }));
+  const nodes: FsNode[] = entries.map((e) => {
+    const path = r.rel === '' ? e.name : `${r.rel}/${e.name}`;
+    const flag = sensitivity(path);
+    return { path, name: e.name, kind: baseKind(e), ...(flag ? { sensitive: flag } : {}) };
+  });
   await Promise.all(
     entries.map((e, i) =>
       e.isSymbolicLink() ? describeLink(root, nodes[i], join(r.abs, e.name)) : Promise.resolve(),
@@ -134,7 +141,7 @@ async function addSize(abs: string, node: FsNode): Promise<void> {
 // What a read of one file produced. Three outcomes rather than a boolean, because the difference is
 // what the pane tells the user: "not text" and "too big to edit" are different facts.
 export type FileRead =
-  | { kind: 'text'; path: string; name: string; size: number; content: string }
+  | { kind: 'text'; path: string; name: string; size: number; content: string; sensitive?: SensitivePath }
   | { kind: 'binary'; path: string; name: string; size: number }
   | { kind: 'too-large'; path: string; name: string; size: number };
 
@@ -152,5 +159,7 @@ export async function readFileNode(root: string, rel: unknown): Promise<FileRead
   if (info.size > MAX_EDIT_BYTES) return { kind: 'too-large', ...head };
   const buf = await readFile(r.abs);
   if (buf.subarray(0, SNIFF_BYTES).includes(0)) return { kind: 'binary', ...head };
-  return { kind: 'text', ...head, content: buf.toString('utf8') };
+  // Only on the text branch: the other two cannot be edited, so there is no save to warn about.
+  const flag = sensitivity(r.rel);
+  return { kind: 'text', ...head, content: buf.toString('utf8'), ...(flag ? { sensitive: flag } : {}) };
 }

@@ -21,6 +21,7 @@ import {
   deleteEmptyFolderRequest,
   deleteEntryRequest,
   deleteFolderRequest,
+  saveSensitiveRequest,
 } from '../../organisms/explorer/requests';
 import { useOpenFile } from '../../organisms/explorer/useOpenFile';
 import { useTree } from '../../organisms/explorer/useTree';
@@ -73,7 +74,13 @@ export function ExplorerView({ snapshot }: Props) {
 
   async function save(): Promise<void> {
     const file = open.file;
-    if (file && (await open.save())) await tree.reload(parentOf(file.path));
+    if (!file) return;
+    // ASKED BEFORE THE WRITE, not after. The file being saved over is git's own state, board state a
+    // running loop reads, or a run's scratch space — see `core/sensitive-paths.ts` for what each costs.
+    if (file.kind === 'text' && file.sensitive) {
+      if (!(await confirm(saveSensitiveRequest(file.path, file.sensitive.why)))) return;
+    }
+    if (await open.save()) await tree.reload(parentOf(file.path));
   }
 
   async function newNode(kind: 'file' | 'dir'): Promise<void> {

@@ -4,6 +4,14 @@
 
 import { post, request } from './http';
 
+// Mirrors `SensitivePath` in src/core/sensitive-paths.ts. The KINDS are here and the sentence is not
+// re-derived: the server sends `why`, because it is written against `core/layout.ts`'s directories and a
+// second copy of that reasoning in the browser is a second copy that goes stale.
+export interface SensitivePath {
+  kind: 'git-internal' | 'board-state' | 'run-scratch';
+  why: string;
+}
+
 export interface FsNode {
   path: string; // root-relative POSIX
   name: string;
@@ -12,6 +20,7 @@ export interface FsNode {
   symlink?: true;
   target?: string;
   escapes?: true; // points outside the project: shown so it can be removed, never opened
+  sensitive?: SensitivePath; // not the user's content: git internals, board state, a run's scratch
 }
 
 export interface DirListing {
@@ -23,7 +32,7 @@ export interface DirListing {
 
 // Three outcomes rather than a boolean: what the pane says differs, so the difference is data.
 export type FileRead =
-  | { kind: 'text'; path: string; name: string; size: number; content: string }
+  | { kind: 'text'; path: string; name: string; size: number; content: string; sensitive?: SensitivePath }
   | { kind: 'binary'; path: string; name: string; size: number }
   | { kind: 'too-large'; path: string; name: string; size: number };
 

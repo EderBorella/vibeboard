@@ -44,3 +44,22 @@ export function deleteFolderRequest(node: FsNode, count: number): ConfirmRequest
     requireText: node.name,
   };
 }
+
+// SAVING SOMETHING THAT IS NOT THE USER'S CONTENT — git internals, board state, or a run's scratch
+// space. A warning and never a refusal: the tab reaches these on purpose, and repairing a config by
+// hand is the reason it does. What is not acceptable is doing it without being told.
+//
+// It quotes the server's own sentence rather than composing one here. That sentence is written against
+// `core/layout.ts` in `core/sensitive-paths.ts`, and a second wording in the browser would be a second
+// thing to keep true.
+//
+// NOT `danger`, and not a typed confirmation. Nothing is destroyed and nothing is unrecoverable — the
+// file on disk is replaced by what is already on screen. Dressing it as a deletion would teach people to
+// click through the dialogs that ARE deletions.
+export function saveSensitiveRequest(path: string, why: string): ConfirmRequest {
+  return {
+    title: `Save over ${path}?`,
+    body: why,
+    action: 'Save it',
+  };
+}

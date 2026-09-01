@@ -29,7 +29,7 @@ user-facing; it is the only place the security model is stated end to end.
 | The citation register — every `decision NN` / `ruling NN` / slice ref | [`docs/decisions.md`](docs/decisions.md) |
 | The design system, all five parts, phase records included | [`docs/design-system.md`](docs/design-system.md) |
 | How agents are confined today | [`docs/security/containment.md`](docs/security/containment.md) |
-| **"run a smoke test"** — the manual pass no gate can do | [`docs/smoke-test.md`](docs/smoke-test.md) |
+| **"run a smoke test"** — the manual pass over every surface, which no gate can do | [`docs/smoke-test.md`](docs/smoke-test.md) |
 | What the five seeded `foundation/` docs must decide | [`docs/foundation-bootstrap.md`](docs/foundation-bootstrap.md) |
 | **The only list of outstanding work** | `notes/todo.md` — gitignored, local-only |
 | Superpowers plans / specs / reviews / research | `docs/superpowers/**` — gitignored, local-only |

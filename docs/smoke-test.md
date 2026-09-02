@@ -48,9 +48,33 @@ in both directions, and the OpenCode migration rewrites per-project state. Copy
 `~/.claude/.credentials.json` and `~/.local/share/opencode/auth.json` somewhere outside the repository
 before the first start, and diff them at the end.
 
-**Prefer the browser where a browser can do it.** Curl proves a route answers; it cannot see a control
-that renders behind another one, a list that never re-renders, or a button that does nothing. Part B is
-written as things to *do on screen*, with the endpoint named only so you know what to blame.
+**Drive the browser, and do not settle for curl.** Curl proves a route answers; it cannot see a dialog
+that never opens, a chip that never renders, a button that does nothing, or a drag that does not land.
+The first execution of Part B was done at the API layer because a browser extension was unavailable, and
+it was half a test — every one of the findings worth having came from the screen.
+
+**Playwright is already a dependency and its Chromium works here**, so no extension is needed:
+
+```js
+import { chromium } from 'playwright';
+const ctx = await chromium.launchPersistentContext('/tmp/vb-ui/profile',
+  { headless: true, viewport: { width: 1440, height: 900 } });
+```
+
+A persistent context matters — the device claim is stored per browser profile, so a fresh context is a
+fresh sign-in every time. Screenshot each step and **read the images**; several things below were only
+visible in one.
+
+**Getting in is the first test.** A new browser is a pending request, and the owner has to allow it. You
+can play both parts: hold an admin websocket open, and approve each `signin:pending` frame as it arrives
+(`POST /api/signin/approve/:id` — the request id from the socket, **not** a device id from
+`GET /api/signin`, which is a different list and will answer `ok` while changing nothing). Launch the
+browser once, not repeatedly: too many queued requests trips a cap and the page says so, which is correct
+and is also a dead end until the queue drains.
+
+**Watch the console the whole way through.** Attach to `pageerror` and to `console` before the first
+navigation, and report the count at the end. Zero is the expected answer; anything else is a finding
+before you have even looked at the feature.
 
 ---
 
@@ -157,6 +181,11 @@ something is wrong. Work through them in the browser.
 does not belong to any of them, that is worth noticing before you add a section for it: it may mean the
 feature has no home on screen either.
 
+**Six of these cannot be reached any other way**, and if you are short of time they are the six: the
+explorer's save warning, the halt overlay surviving a reload, the copilot's thinking indicator, the
+delete dialog's typed confirmation, the Build button being *absent* when the image is present, and a card
+dragged between columns.
+
 ## B1. Boards
 
 The default tab, and the largest surface. **Three boards** — features, product, engineering — each with
@@ -165,8 +194,11 @@ its own column set.
 - **Read one card.** Open it. Its title, description, tags, links and body all render; the raw editor
   round-trips (`PUT /api/cards/:board/:id/raw`).
 - **Create a card** (`POST /api/cards`) and confirm it appears without a reload.
-- **Drag it within a column and into another one** (`POST …/place`). The order must survive a reload —
-  that is a file rename on disk, and the column a card is in *is* the folder it sits in.
+- **Drag it within a column and into another one** (`POST …/place`). Check it **on disk**, not in the
+  DOM: the column a card is in *is* the folder it sits in, so `ls` of the column directory is the
+  authoritative answer and a tree-walk of the markup is a heuristic that will mislead you. Collapse the
+  lanes above the one you are testing first — the engineering lane is below the fold at 900px, and a
+  card you cannot see is a card you cannot drag.
 - **Archive it and restore it** (`…/archive`, `…/restore`). The archive view is its own surface.
 - **Link two cards** (`PUT …/links`) and confirm the link renders on both.
 - **Flags** (`…/flags`) — the ones an agent may set on itself.
@@ -338,6 +370,30 @@ than asserted, so it drifts silently and is easy to blame on the wrong commit.
 
 **Then clean up, and ask before you do**: the card, the file the run created, anything scaffolded, and
 the backup copies. The run records are worth keeping — they are the evidence.
+
+---
+
+## What the first full execution found
+
+Run 2026-09-01, against a real daemon and a real model. Recorded because a document nobody has executed
+is a proposal, and because the failures are more useful than the passes.
+
+**One outage.** The container-name conflict at the top of this page. Found by A3, the first dispatch.
+
+**Two 500s that should be 4xx**, both on admin-only routes and neither reachable by an agent scope:
+`PUT /cards/:board/:id/raw` with the `raw` field missing, and `POST /control/rename` naming a file that
+is not there. Recorded rather than fixed; they are noted here so the next run does not spend time
+rediscovering them.
+
+**Everything else passed**, and three of the passes are worth naming because only the screen could show
+them: `.gitignore` carries no sensitivity chip while `.git` and `.vibeboard` do; the save warning opens
+before the write and leaves the buffer dirty when cancelled; and the halt overlay survives a reload.
+Zero page errors across every tab, every theme and every dialog.
+
+**Half the elapsed time went on payload shapes** — `columnSlug` not `column`, `raw` not `text`,
+`toColumnSlug` not `columnSlug`, `content` not `text`, a query string not a body on
+`DELETE /control/file`. Read the handler before you call it. Every refusal was correct and every one of
+them named the field it wanted, which is the product being better than the tester.
 
 ---
 

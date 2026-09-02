@@ -90,10 +90,12 @@ export function ChatSwitcher({ chats, currentChatId, backend, running, onOpen, o
         )}
       </div>
       <Button size="sm" disabled={running} onClick={onNew} title="Start a fresh chat">
-        {/* `.chat-new` was one `white-space: nowrap`: "+ New" must not break in two when the switcher
-            beside it is wide. */}
+        {/* `.chat-new` was one `white-space: nowrap`: the mark and the word must not break in two when
+            the switcher beside it is wide. The `+` was an ASCII one until 2026-09-02 — a mark INSIDE a
+            label, which is a fourth place a glyph can hide and one no sweep so far had looked: not a
+            lone character, not non-ASCII, and not a `content:` string. */}
         <Text size="inherit" ink="inherit" nowrap>
-          + New
+          <Icon name="plus" /> New
         </Text>
       </Button>
     </Stack>

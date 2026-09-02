@@ -858,6 +858,44 @@ describe('the checkup’s evidence', () => {
     expect(prompt).not.toContain('The smoke command');
   });
 
+  // RULING 66'S SECOND FIX. A project reached `complete` with every gate green and the tool it built printed
+  // nothing: every layer was asking whether the tasks were done, and they were. This is the only run that
+  // sees a whole feature against the brief, so it is the only one that can be asked the other question.
+  it('asks the FEATURE checkup whether the thing can be used as the README says', () => {
+    const prompt = checkingUp({ feature: true });
+    expect(prompt).toContain('The question this checkup exists for');
+    expect(prompt).toMatch(/can someone use this the way the README says/i);
+    // And it names what an answer is NOT, because "the tasks are done" was the answer that shipped.
+    expect(prompt).toMatch(/is \*\*not\*\* the answer/i);
+    expect(prompt).toMatch(/"The tests pass" is not an answer/i);
+  });
+
+  // THE HALF THAT MAKES IT MEAN SOMETHING. A story checkup is about the stories under it, and this question
+  // is about a whole feature against the README — put to the wrong run it is noise, and noise in a prompt is
+  // how a run learns to skim the parts that matter.
+  it('does NOT ask it of a story checkup', () => {
+    expect(checkingUp()).not.toContain('The question this checkup exists for');
+  });
+
+  // AND IT IS NOT INFERRED FROM THE SMOKE RESULT, which is the tempting shortcut and is wrong in the
+  // direction that matters: a project declaring no smoke command has no smoke evidence, and that is exactly
+  // the project where nothing else is asking whether the thing runs.
+  it('asks it of a feature checkup that has no smoke command at all', () => {
+    const prompt = checkingUp({ feature: true });
+    expect(prompt).not.toContain('The smoke command');
+    expect(prompt).toContain('The question this checkup exists for');
+  });
+
+  // LAST OF THE THREE SECTIONS: the children and the smoke evidence are already in view when the question is
+  // put, which is the exact combination that was mistaken for an answer.
+  it('puts the question after the evidence, not before it', () => {
+    const prompt = checkingUp({ feature: true, smoke: { mode: 'smoke', passed: true, at: 'T' } });
+    expect(prompt.indexOf('The question this checkup exists for')).toBeGreaterThan(
+      prompt.indexOf('The smoke command'),
+    );
+    expect(prompt.indexOf('The smoke command')).toBeGreaterThan(prompt.indexOf('What is under this card'));
+  });
+
   it('renders nothing about a checkup for any other run', () => {
     const prompt = buildRunPrompt(inputs());
     expect(prompt).not.toContain('What is under this card');

@@ -117,6 +117,11 @@ export interface PromptInputs {
     blocked: string[];
     suggestions: { id: string; title: string }[];
     smoke?: Verification;
+    // THE FEATURE CHECKUP, which is asked one question no other run is asked. Ruling 66's second fix, and
+    // the one that answers the incident: a project reached `complete` with every gate green and the tool it
+    // built printed nothing, because every layer was asking whether the tasks were done rather than whether
+    // the thing worked. Only this run sees a whole feature against the brief.
+    feature?: true;
   };
   // Where the agent must write its report, project-root-relative.
   reportPath: string;

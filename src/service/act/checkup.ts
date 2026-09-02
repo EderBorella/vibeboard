@@ -71,6 +71,17 @@ export async function checkupEvidence(
         ? suggestions.value.suggestions.map((s) => ({ id: s.id, title: s.title }))
         : [],
       ...(smoke.smoke === undefined ? {} : { smoke: smoke.smoke }),
+      // WHICH CHECKUP THIS IS, said rather than inferred. The prompt asks the feature checkup one question
+      // no other run is asked (ruling 66's second fix), and this is what decides it.
+      //
+      // `smoke.smoke !== undefined` WOULD WORK TODAY and is still the wrong test — checked, rather than
+      // assumed the other way: `verifySmoke` always answers a `Verification`, a failed one when the project
+      // declares no command, so the two agree for every input that exists now. What separates them is what
+      // they DEPEND on. This reads the phase, which is the fact; that would read an invariant held two
+      // modules away in `smokeFor`, and the day it returns `{}` for an undeclared command — a reasonable
+      // change, since a heading over nothing is a rule this codebase already follows — the question would
+      // stop being asked with nothing to say so.
+      ...(action.phase === 'feature-checkup' ? { feature: true as const } : {}),
     },
   };
 }

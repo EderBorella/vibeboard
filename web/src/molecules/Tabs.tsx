@@ -1,6 +1,7 @@
 import { Fragment, type ReactNode } from 'react';
 import { Button } from '../atoms/Button';
 import { Chip } from '../atoms/Chip';
+import { Icon } from '../atoms/Icon';
 
 // TABS — a row of mutually-exclusive cells where the SURFACE STAYS. Four families were this: the dock's
 // utility panes, the open cards, the editor's Fields/Edit/Preview, and the segmented value pickers.
@@ -110,7 +111,7 @@ export function Tabs({
               title={`Close ${item.value}`}
               onClick={() => onClose?.(item.value)}
             >
-              ✕
+              <Icon name="close" />
             </Button>
           )}
         </Fragment>

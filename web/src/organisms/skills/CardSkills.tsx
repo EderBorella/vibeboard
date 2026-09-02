@@ -1,4 +1,5 @@
 import { Button } from '../../atoms/Button';
+import { Icon } from '../../atoms/Icon';
 import { Stack } from '../../atoms/Stack';
 import { Text } from '../../atoms/Text';
 import type { InvalidSkill, Skill } from '../../lib/api';
@@ -55,7 +56,7 @@ export function CardSkills({ card, skills, invalid, onRun }: Props) {
       )}
       {invalid.length > 0 && (
         <Text role="error" title={invalid.map((i) => `${i.path}: ${i.reason}`).join('\n')}>
-          ⚠ {invalid.length} skill file{invalid.length === 1 ? '' : 's'} invalid
+          <Icon name="warning" /> {invalid.length} skill file{invalid.length === 1 ? '' : 's'} invalid
         </Text>
       )}
     </Stack>

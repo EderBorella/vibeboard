@@ -285,7 +285,7 @@ describe('CardsPane', () => {
     // The claim is that the catalogue REACHED the rail, which is the element existing under the rail's
     // own test id — not the string of classes it happens to carry.
     expect(screen.getByTestId('cs-action').textContent).toBe('Execute');
-    expect(screen.getByText('⚠ 1 skill file invalid')).toBeTruthy();
+    expect(screen.getByText(/1 skill file invalid/)).toBeTruthy();
   });
 
   it('rails the open card with its skill actions, and drops the rail when none is open', () => {

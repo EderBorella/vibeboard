@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Button } from '../../atoms/Button';
 import { Control } from '../../atoms/Control';
+import { Icon } from '../../atoms/Icon';
 import { Readout } from '../../atoms/Readout';
 import { Stack } from '../../atoms/Stack';
 import { Surface } from '../../atoms/Surface';
@@ -107,7 +108,7 @@ export function ArchiveDrawer({ board, config, count, onOpen }: Props) {
           </Button>
           <Stack gap={3} className="vb-fixed">
             <Button size="sm" onClick={() => restore(c)}>
-              Restore → {labelOf(c.restoreTo)}
+              Restore <Icon name="arrow-right" /> {labelOf(c.restoreTo)}
             </Button>
             {/* Somewhere else, for when the original column is no longer the right home. */}
             {/* NOT a `Field`: this is one of two actions in a row of actions, and its own first option

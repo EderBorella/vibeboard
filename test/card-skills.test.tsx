@@ -108,7 +108,7 @@ describe('CardSkills', () => {
       { slug: 'b', path: skillRel('b', 'SKILL.md'), reason: 'unknown board "backlog"' },
     ];
     render(<CardSkills card={card()} skills={[skill()]} invalid={invalid} />);
-    const warn = screen.getByText('⚠ 2 skill files invalid');
+    const warn = screen.getByText(/2 skill files invalid/);
     expect(warn.getAttribute('title')).toBe(
       `${skillRel('a', 'SKILL.md')}: needs a description\n${skillRel('b', 'SKILL.md')}: unknown board "backlog"`,
     );
@@ -116,7 +116,7 @@ describe('CardSkills', () => {
 
   it('says "file" not "files" for one', () => {
     render(<CardSkills card={card()} skills={[skill()]} invalid={[{ slug: 'a', path: 'p', reason: 'r' }]} />);
-    expect(screen.getByText('⚠ 1 skill file invalid')).toBeTruthy();
+    expect(screen.getByText(/1 skill file invalid/)).toBeTruthy();
   });
 
   it('shows no warning when every file is valid', () => {

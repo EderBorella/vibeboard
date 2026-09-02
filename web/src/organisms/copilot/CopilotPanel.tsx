@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '../../atoms/Button';
 import { Control } from '../../atoms/Control';
+import { Icon } from '../../atoms/Icon';
 import { Readout } from '../../atoms/Readout';
 import { Stack } from '../../atoms/Stack';
 import { Text } from '../../atoms/Text';
@@ -86,7 +87,9 @@ function MessageLine({ item, onRetry }: { item: TranscriptItem; onRetry?: () => 
       {item.kind === 'tool' ? (
         // The name of a tool the agent called is machine vocabulary, and `.msg-tool` said so by hand in
         // `--t-small` accent mono — which is `Readout` `small` `accent` value for value.
-        <Readout>⚙ {item.toolName}</Readout>
+        <Readout>
+          <Icon name="tool" /> {item.toolName}
+        </Readout>
       ) : item.kind === 'thinking' ? (
         // `--t-small` muted italic, which is this atom's default face plus the hint role.
         <Text role="hint">{item.text}</Text>
@@ -252,7 +255,7 @@ export function CopilotPanel({
         {/* Not in the ratchet — Phase 2's control reset took its font-size away, so no rule gave it
             geometry any more — but the same `✕` as nine others, so it goes with them. */}
         <Button variant="bare" className="push" onClick={onClose} title="Hide (session keeps running)">
-          ✕
+          <Icon name="close" />
         </Button>
       </Stack>
 
@@ -353,7 +356,8 @@ export function CopilotPanel({
           {/* `role="error"` IS THE `--t-small` DANGER LINE THE CLASS DECLARED BY HAND. The tinted strip
               stays a class: a `color-mix` ground is this warning's own and no atom carries one. */}
           <Text role="error">
-            ⚠ This model can’t use tools — the copilot can’t create or edit cards. Pick a 🔧 model.
+            <Icon name="warning" /> This model can’t use tools — the copilot can’t create or edit cards. Pick
+            one marked for tool use.
           </Text>
         </div>
       )}

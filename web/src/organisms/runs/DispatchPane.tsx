@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Button } from '../../atoms/Button';
 import { Control } from '../../atoms/Control';
+import { Icon } from '../../atoms/Icon';
 import { Readout } from '../../atoms/Readout';
 import { Stack } from '../../atoms/Stack';
 import { Text } from '../../atoms/Text';
@@ -91,7 +92,7 @@ export function DispatchPane({
     >
       <Stack as="header" gap={4}>
         <Button size="sm" onClick={onBack} title="Back to the card">
-          ←
+          <Icon name="arrow-left" />
         </Button>
         {/* `ink="strong"`: the class named no ink and inherited the body's, and the atom's default is
             muted. `.dispatch-title` IS GONE — the display family and the `--t-lead` step are attributes. */}

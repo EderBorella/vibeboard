@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Button } from '../../atoms/Button';
 import { Chip } from '../../atoms/Chip';
 import { Control } from '../../atoms/Control';
+import { Icon } from '../../atoms/Icon';
 import { Readout } from '../../atoms/Readout';
 import { Stack } from '../../atoms/Stack';
 import { Text } from '../../atoms/Text';
@@ -70,7 +71,7 @@ export function ModelPicker({ models, value, defaultModel, onChange, disabled }:
   const selected = models.find((m) => m.id === value);
   const label = selected?.name ?? value ?? '';
 
-  const chip = (on: boolean, set: (v: boolean) => void, text: string): React.ReactNode => (
+  const chip = (on: boolean, set: (v: boolean) => void, text: React.ReactNode): React.ReactNode => (
     <Chip
       as="button"
       pill
@@ -87,10 +88,12 @@ export function ModelPicker({ models, value, defaultModel, onChange, disabled }:
     <div className="mp">
       <Control as="trigger" disabled={disabled} onClick={() => setOpen(true)} title={value}>
         <Readout className="vb-clip">
-          {selected?.free ? '🆓 ' : ''}
+          {selected?.free ? <Icon name="free" /> : null}
           {label}
         </Readout>
-        <span className="vb-caret vb-twist">▾</span>
+        <span className="vb-caret vb-twist">
+          <Icon name="caret-down" />
+        </span>
       </Control>
 
       {open && (
@@ -102,7 +105,7 @@ export function ModelPicker({ models, value, defaultModel, onChange, disabled }:
           onClose={() => setOpen(false)}
           head={
             <Button variant="bare" size="sm" onClick={() => setOpen(false)}>
-              ✕
+              <Icon name="close" />
             </Button>
           }
         >
@@ -114,9 +117,27 @@ export function ModelPicker({ models, value, defaultModel, onChange, disabled }:
           />
 
           <Stack gap={3} wrap pad={[0, 6, 3]}>
-            {chip(toolOnly, setToolOnly, '🔧 Tool use')}
-            {chip(freeOnly, setFreeOnly, '🆓 Free')}
-            {chip(visionOnly, setVisionOnly, '👁 Vision')}
+            {chip(
+              toolOnly,
+              setToolOnly,
+              <>
+                <Icon name="tool" /> Tool use
+              </>,
+            )}
+            {chip(
+              freeOnly,
+              setFreeOnly,
+              <>
+                <Icon name="free" /> Free
+              </>,
+            )}
+            {chip(
+              visionOnly,
+              setVisionOnly,
+              <>
+                <Icon name="eye" /> Vision
+              </>,
+            )}
             {/* NOT a `Field`: a filter in a row of filters, named by its own first option. `push` is
                   the one layout utility in the file and it is what `.mp-prov`'s whole remainder was. */}
             <Control
@@ -156,7 +177,7 @@ export function ModelPicker({ models, value, defaultModel, onChange, disabled }:
                   >
                     {/* `.mp-star` IS GONE: an ink on a `bare` button's label is a nested `Text` now. */}
                     <Text size="inherit" ink="accent2">
-                      {favs.has(m.id) ? '★' : '☆'}
+                      <Icon name={favs.has(m.id) ? 'star-filled' : 'star'} />
                     </Text>
                   </Button>
                 }
@@ -187,9 +208,21 @@ export function ModelPicker({ models, value, defaultModel, onChange, disabled }:
                         which is what they were, and the class has nothing left. */}
                     <Stack as="span" gap={2} className="vb-fixed">
                       {m.contextLength ? <Readout>{fmtCtx(m.contextLength)}</Readout> : null}
-                      {m.caps?.toolCall && <span title="Tool use">🔧</span>}
-                      {m.caps?.reasoning && <span title="Reasoning">🧠</span>}
-                      {m.caps?.vision && <span title="Vision">👁</span>}
+                      {m.caps?.toolCall && (
+                        <span title="Tool use">
+                          <Icon name="tool" />
+                        </span>
+                      )}
+                      {m.caps?.reasoning && (
+                        <span title="Reasoning">
+                          <Icon name="reasoning" />
+                        </span>
+                      )}
+                      {m.caps?.vision && (
+                        <span title="Vision">
+                          <Icon name="eye" />
+                        </span>
+                      )}
                     </Stack>
                   </Stack>
                 </Row>

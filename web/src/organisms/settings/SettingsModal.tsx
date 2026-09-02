@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Button } from '../../atoms/Button';
 import { Control } from '../../atoms/Control';
+import { Icon } from '../../atoms/Icon';
 import { Text } from '../../atoms/Text';
 import {
   type AutopilotState,
@@ -164,7 +165,7 @@ export function SettingsModal({
       onClose={onClose}
       head={
         <Button variant="bare" size="sm" onClick={onClose}>
-          ✕
+          <Icon name="close" />
         </Button>
       }
       actions={

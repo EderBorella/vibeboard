@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Button } from '../../atoms/Button';
 import { Chip } from '../../atoms/Chip';
 import { Control } from '../../atoms/Control';
+import { Icon } from '../../atoms/Icon';
 import { Readout } from '../../atoms/Readout';
 import { Stack } from '../../atoms/Stack';
 import { Surface } from '../../atoms/Surface';
@@ -67,7 +68,7 @@ export function ReportPane({
     >
       <Stack as="header" gap={4}>
         <Button size="sm" onClick={onBack} title="Back to the card">
-          ←
+          <Icon name="arrow-left" />
         </Button>
         {/* `ink="strong"` because the class named no ink and inherited the body's: the atom's default is
             muted, and a title is not. `.report-title` IS GONE WITH IT: the display family and the

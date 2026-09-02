@@ -1,6 +1,7 @@
 import { Button } from '../../atoms/Button';
 import { Chip } from '../../atoms/Chip';
 import { Control } from '../../atoms/Control';
+import { Icon } from '../../atoms/Icon';
 import { Stack } from '../../atoms/Stack';
 import { Text } from '../../atoms/Text';
 import type { ControlCategory, ControlFile, ControlGroup } from '../../lib/api';
@@ -74,7 +75,9 @@ export function ControlFileList({
               data-testid="control-item"
               onClick={() => onSelect(RESOURCES_SENTINEL)}
             >
-              <span className="vb-clip">🔗 Links registry</span>
+              <span className="vb-clip">
+                <Icon name="link" /> Links registry
+              </span>
             </Row>
           )}
           {g.files.length === 0 && g.key !== 'resources' && (

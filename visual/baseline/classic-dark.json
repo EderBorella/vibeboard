@@ -25,11 +25,11 @@
         "16px"
       ],
       "examined": {
-        "elements": 287,
-        "textElements": 146,
-        "overflow": 121,
-        "clipping": 38,
-        "contrast": 146,
+        "elements": 340,
+        "textElements": 129,
+        "overflow": 104,
+        "clipping": 61,
+        "contrast": 129,
         "tokens": 51,
         "rows": 29,
         "focus": 66
@@ -69,11 +69,11 @@
         "16px"
       ],
       "examined": {
-        "elements": 175,
-        "textElements": 89,
-        "overflow": 67,
-        "clipping": 12,
-        "contrast": 89,
+        "elements": 193,
+        "textElements": 81,
+        "overflow": 59,
+        "clipping": 21,
+        "contrast": 81,
         "tokens": 51,
         "rows": 12,
         "focus": 43
@@ -113,11 +113,11 @@
         "16px"
       ],
       "examined": {
-        "elements": 176,
-        "textElements": 87,
-        "overflow": 68,
-        "clipping": 15,
-        "contrast": 87,
+        "elements": 194,
+        "textElements": 79,
+        "overflow": 60,
+        "clipping": 24,
+        "contrast": 79,
         "tokens": 51,
         "rows": 10,
         "focus": 39
@@ -152,17 +152,18 @@
         "28px",
         "29px",
         "30px",
+        "42px",
         "47px"
       ],
       "markerHeights": [
         "16px"
       ],
       "examined": {
-        "elements": 205,
-        "textElements": 93,
-        "overflow": 53,
-        "clipping": 13,
-        "contrast": 93,
+        "elements": 227,
+        "textElements": 85,
+        "overflow": 45,
+        "clipping": 23,
+        "contrast": 85,
         "tokens": 51,
         "rows": 9,
         "focus": 60
@@ -195,18 +196,19 @@
       "controlHeights": [
         "16px",
         "28px",
-        "31.4px",
+        "29px",
+        "30px",
         "47px"
       ],
       "markerHeights": [
         "16px"
       ],
       "examined": {
-        "elements": 160,
-        "textElements": 77,
-        "overflow": 53,
-        "clipping": 12,
-        "contrast": 77,
+        "elements": 208,
+        "textElements": 59,
+        "overflow": 35,
+        "clipping": 33,
+        "contrast": 59,
         "tokens": 51,
         "rows": 15,
         "focus": 44
@@ -247,11 +249,11 @@
         "16px"
       ],
       "examined": {
-        "elements": 58,
-        "textElements": 35,
-        "overflow": 30,
-        "clipping": 3,
-        "contrast": 35,
+        "elements": 60,
+        "textElements": 34,
+        "overflow": 29,
+        "clipping": 4,
+        "contrast": 34,
         "tokens": 51,
         "rows": 5,
         "focus": 18
@@ -281,10 +283,10 @@
       ],
       "markerHeights": [],
       "examined": {
-        "elements": 9,
+        "elements": 11,
         "textElements": 4,
         "overflow": 3,
-        "clipping": 2,
+        "clipping": 3,
         "contrast": 4,
         "tokens": 51,
         "rows": 1,
@@ -317,11 +319,11 @@
       ],
       "markerHeights": [],
       "examined": {
-        "elements": 130,
-        "textElements": 82,
-        "overflow": 78,
-        "clipping": 14,
-        "contrast": 82,
+        "elements": 134,
+        "textElements": 80,
+        "overflow": 76,
+        "clipping": 16,
+        "contrast": 80,
         "tokens": 51,
         "rows": 0,
         "focus": 25
@@ -355,11 +357,11 @@
       ],
       "markerHeights": [],
       "examined": {
-        "elements": 52,
-        "textElements": 25,
-        "overflow": 17,
-        "clipping": 6,
-        "contrast": 25,
+        "elements": 60,
+        "textElements": 22,
+        "overflow": 14,
+        "clipping": 10,
+        "contrast": 22,
         "tokens": 51,
         "rows": 3,
         "focus": 14
@@ -396,11 +398,11 @@
         "16px"
       ],
       "examined": {
-        "elements": 66,
-        "textElements": 31,
-        "overflow": 22,
-        "clipping": 5,
-        "contrast": 31,
+        "elements": 116,
+        "textElements": 14,
+        "overflow": 5,
+        "clipping": 25,
+        "contrast": 14,
         "tokens": 51,
         "rows": 5,
         "focus": 14
@@ -452,15 +454,15 @@
     }
   },
   "fontSizes": {
-    "13px": 159,
-    "15px": 8,
-    "12px": 98,
-    "11px": 22
+    "13px": 173,
+    "15px": 22,
+    "12px": 118,
+    "11px": 27
   },
   "fontSizesOnText": {
-    "15px": 8,
+    "15px": 1,
     "13px": 44,
-    "12px": 73,
+    "12px": 63,
     "11px": 21
   },
   "radii": {
@@ -471,11 +473,11 @@
     "4px": 6
   },
   "examined": {
-    "elements": 287,
-    "textElements": 146,
-    "overflow": 121,
-    "clipping": 38,
-    "contrast": 146,
+    "elements": 340,
+    "textElements": 129,
+    "overflow": 104,
+    "clipping": 61,
+    "contrast": 129,
     "tokens": 51,
     "rows": 29,
     "focus": 66,

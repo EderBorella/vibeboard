@@ -1,5 +1,6 @@
 import { Button } from '../../atoms/Button';
 import { Chip } from '../../atoms/Chip';
+import { Icon } from '../../atoms/Icon';
 import { Readout } from '../../atoms/Readout';
 import { Stack } from '../../atoms/Stack';
 import { Surface } from '../../atoms/Surface';
@@ -113,7 +114,7 @@ export function CardTile({
           >
             {/* The glyph and its count on one line, which is all `.tile-suggestions` ever said. */}
             <Text size="inherit" ink="inherit" nowrap>
-              ⚑ {openSuggestions}
+              <Icon name="flag" /> {openSuggestions}
             </Text>
           </Chip>
         )}
@@ -126,7 +127,7 @@ export function CardTile({
             title={`Carrying ${blocked.length === 1 ? 'a blocked card' : `${blocked.length} blocked cards`}: ${blocked.join(', ')}`}
           >
             <Text size="inherit" ink="inherit" nowrap>
-              ⚠ {blocked.length}
+              <Icon name="warning" /> {blocked.length}
             </Text>
           </Chip>
         )}
@@ -137,7 +138,7 @@ export function CardTile({
           // if a count cannot borrow from it. Mono also puts it under the signature's own rule — the machine
           // counted these.
           <Readout testId="tile-link" title={card.links.join(', ')}>
-            🔗 {card.links.length}
+            <Icon name="link" /> {card.links.length}
           </Readout>
         )}
         {onArchive && (
@@ -150,7 +151,7 @@ export function CardTile({
               onArchive(card);
             }}
           >
-            ✕
+            <Icon name="close" />
           </Button>
         )}
       </Stack>

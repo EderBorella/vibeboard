@@ -1,4 +1,5 @@
 import { Button } from '../../atoms/Button';
+import { Icon } from '../../atoms/Icon';
 import { Stack } from '../../atoms/Stack';
 import { Tabs } from '../../molecules/Tabs';
 import { activePane, type DockPane } from './panes';
@@ -40,7 +41,9 @@ export function UtilityDock({ panes, activeId, onPane, collapsed, onCollapse }: 
           aria-expanded={!collapsed}
           onClick={onCollapse}
         >
-          <span className="vb-twist">{collapsed ? '▴' : '▾'}</span>
+          <span className="vb-twist">
+            <Icon name={collapsed ? 'caret-up' : 'caret-down'} />
+          </span>
         </Button>
       </Tabs>
 

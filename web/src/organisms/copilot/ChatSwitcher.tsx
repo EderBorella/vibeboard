@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Button } from '../../atoms/Button';
 import { Chip } from '../../atoms/Chip';
 import { Control } from '../../atoms/Control';
+import { Icon } from '../../atoms/Icon';
 import { Readout } from '../../atoms/Readout';
 import { Stack } from '../../atoms/Stack';
 import { Text } from '../../atoms/Text';
@@ -32,7 +33,9 @@ export function ChatSwitcher({ chats, currentChatId, backend, running, onOpen, o
       <div className="chat-switcher">
         <Control as="trigger" disabled={running} onClick={() => setChatMenu((v) => !v)} title="Chat history">
           <span className="vb-clip">{currentTitle}</span>
-          <span className="vb-caret vb-twist">▾</span>
+          <span className="vb-caret vb-twist">
+            <Icon name="caret-down" />
+          </span>
         </Control>
         {/* `Menu list`: picking a session takes you somewhere else, and it dismisses — which is the half
             of the definition a `Tabs` never has. Five classes went: the floating box, the row, the
@@ -77,7 +80,7 @@ export function ChatSwitcher({ chats, currentChatId, backend, running, onOpen, o
                   title="Delete chat"
                   onClick={() => onDelete(c.id)}
                 >
-                  ✕
+                  <Icon name="close" />
                 </Button>
               ),
             }))}

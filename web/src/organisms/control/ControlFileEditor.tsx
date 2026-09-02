@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { Button } from '../../atoms/Button';
+import { Icon } from '../../atoms/Icon';
 import type { ControlFile } from '../../lib/api';
 import { Notice } from '../../molecules/Notice';
 import { EditorBody, EditorLayout, type EditorView } from '../shared/EditorLayout';
@@ -71,9 +72,9 @@ export function ControlFileEditor({
       notice={
         file.managed && (
           <Notice tone="bad" className="control-disclaimer" role="alert">
-            ⚠ <strong>{file.name}</strong> is managed by VibeBoard — the copilot won’t edit it, and it steers
-            how the boards work. Edit only if you know what you’re doing. For your own standing instructions,
-            use <strong>INSTRUCTIONS.md</strong> instead.
+            <Icon name="warning" /> <strong>{file.name}</strong> is managed by VibeBoard — the copilot won’t
+            edit it, and it steers how the boards work. Edit only if you know what you’re doing. For your own
+            standing instructions, use <strong>INSTRUCTIONS.md</strong> instead.
           </Notice>
         )
       }

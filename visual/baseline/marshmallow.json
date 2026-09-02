@@ -159,10 +159,10 @@
       ],
       "examined": {
         "elements": 227,
-        "textElements": 85,
-        "overflow": 45,
-        "clipping": 23,
-        "contrast": 85,
+        "textElements": 82,
+        "overflow": 42,
+        "clipping": 26,
+        "contrast": 82,
         "tokens": 51,
         "rows": 9,
         "focus": 60
@@ -202,11 +202,11 @@
         "16px"
       ],
       "examined": {
-        "elements": 208,
-        "textElements": 59,
-        "overflow": 35,
-        "clipping": 33,
-        "contrast": 59,
+        "elements": 207,
+        "textElements": 58,
+        "overflow": 34,
+        "clipping": 34,
+        "contrast": 58,
         "tokens": 51,
         "rows": 15,
         "focus": 44

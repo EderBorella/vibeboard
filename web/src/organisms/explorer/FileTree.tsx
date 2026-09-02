@@ -276,13 +276,13 @@ export function FileTree(props: Props) {
         <Stack gap={1} className="explorer-actions push">
           <Button variant="bare" size="sm" title={`New file in ${where}`} onClick={() => props.onNew('file')}>
             {/* `.control-new` IS GONE: the accent ink is a nested `Text`'s at all four. */}
-            <Text size="inherit" ink="accent">
-              {/* gap 2, not 1: at gap 1 the kind and the plus touch and read as one smudge. */}
-              <Stack as="span" gap={2}>
-                <Icon name="file" />
-                <Icon name="plus" />
-              </Stack>
-            </Text>
+            {/* NO `ink="accent"` WRAPPER: an explicit ink beats `.vb-btn-bare:hover`, so these two were
+                accent at rest and accent on hover — the same shade either way. Bare's own pair answers the
+                pointer. gap 2, not 1: at gap 1 the kind and the plus touch and read as one smudge. */}
+            <Stack as="span" gap={2}>
+              <Icon name="file" />
+              <Icon name="plus" />
+            </Stack>
           </Button>
           <Button
             variant="bare"
@@ -290,12 +290,10 @@ export function FileTree(props: Props) {
             title={`New folder in ${where}`}
             onClick={() => props.onNew('dir')}
           >
-            <Text size="inherit" ink="accent">
-              <Stack as="span" gap={2}>
-                <Icon name="folder" />
-                <Icon name="plus" />
-              </Stack>
-            </Text>
+            <Stack as="span" gap={2}>
+              <Icon name="folder" />
+              <Icon name="plus" />
+            </Stack>
           </Button>
           <Button
             variant="bare"
@@ -304,14 +302,15 @@ export function FileTree(props: Props) {
             disabled={!selected}
             onClick={props.onDelete}
           >
-            <Text size="inherit" ink="accent">
-              <Icon name="close" />
-            </Text>
+            {/* NO `ink="accent"`. It hard-set the colour, so this ✕ rendered ACCENT WHILE DISABLED —
+                measured: rgb(20, 184, 166) with `disabled` on it, dimmed only by the 0.5 opacity every
+                disabled button gets. A control that cannot be used should not wear the colour of one
+                that invites you to. Bare's own pair is muted at rest, accent on hover, and neither on
+                a disabled button. */}
+            <Icon name="close" />
           </Button>
           <Button variant="bare" size="sm" title="Re-read the project from disk" onClick={props.onRefresh}>
-            <Text size="inherit" ink="accent">
-              ⟳
-            </Text>
+            <Icon name="refresh" />
           </Button>
         </Stack>
       </div>

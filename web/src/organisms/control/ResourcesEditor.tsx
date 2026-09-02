@@ -70,7 +70,7 @@ export function ResourcesEditor({ onError }: { onError: (e: string | null) => vo
         <Readout>Links registry{dirty ? ' •' : ''}</Readout>
         <div className="vb-row push">
           <Button size="md" onClick={add}>
-            ＋ Add link
+            <Icon name="plus" /> Add link
           </Button>
           <Button variant="primary" size="md" disabled={busy !== null || !dirty} onClick={save}>
             Save

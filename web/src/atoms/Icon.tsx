@@ -49,6 +49,7 @@ import {
   type LucideIcon,
   Play,
   Plus,
+  RotateCw,
   Settings,
   Sparkles,
   Square,
@@ -117,6 +118,9 @@ const ART = {
   archive: { of: Archive },
   flag: { of: Flag },
   plus: { of: Plus },
+  // ⟳ — re-read from disk. `RotateCw` and not `RefreshCw`: one arrow reads as "again", two read as
+  // "sync", and this button does not reconcile anything — it just looks at the filesystem a second time.
+  refresh: { of: RotateCw },
   // ⤴ — a symlink resolving OUTSIDE the project: listed so it can be removed, never traversed.
   'out-of-tree': { of: ExternalLink },
   // ？ — an entry that is neither a file nor a directory. The tab lists it because an entry it hides is

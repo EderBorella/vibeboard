@@ -163,8 +163,11 @@ export function SettingsModal({
       title="Settings"
       label="Settings"
       onClose={onClose}
+      // `title` IS THE ACCESSIBLE NAME NOW. It used to be the `✕` character itself — text in the
+      // button, so the button had a name. An `Icon` is `aria-hidden`, so replacing the glyph left this
+      // control announcing as "button" and nothing else.
       head={
-        <Button variant="bare" size="sm" onClick={onClose}>
+        <Button variant="bare" size="sm" title="Close" onClick={onClose}>
           <Icon name="close" />
         </Button>
       }

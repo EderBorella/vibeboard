@@ -88,7 +88,12 @@ export function ModelPicker({ models, value, defaultModel, onChange, disabled }:
     <div className="mp">
       <Control as="trigger" disabled={disabled} onClick={() => setOpen(true)} title={value}>
         <Readout className="vb-clip">
+          {/* THE SPACE IS EXPLICIT because the mark it replaced carried its own: the glyph was the string
+              `"\u{1F193} "`, trailing space included, and JSX drops whitespace that spans a newline
+              between two expressions. `.vb-readout` is a plain span with no flex and no gap, so nothing
+              else puts a gap here — unlike `.vb-btn` and `.blockers li`, which are flex rows. */}
           {selected?.free ? <Icon name="free" /> : null}
+          {selected?.free ? ' ' : ''}
           {label}
         </Readout>
         <span className="vb-caret vb-twist">
@@ -103,8 +108,9 @@ export function ModelPicker({ models, value, defaultModel, onChange, disabled }:
           title="Choose a model"
           label="Choose a model"
           onClose={() => setOpen(false)}
+          // Named for the same reason the Settings close is: the `✕` it replaced WAS the name.
           head={
-            <Button variant="bare" size="sm" onClick={() => setOpen(false)}>
+            <Button variant="bare" size="sm" title="Close" onClick={() => setOpen(false)}>
               <Icon name="close" />
             </Button>
           }

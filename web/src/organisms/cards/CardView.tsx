@@ -38,9 +38,14 @@ interface Props {
 // They belong to the card rather than to its miniature: this is the artefact a person opens to decide
 // something, and a state worth acting on is worth reading where the deciding happens.
 //
-// The tones are the meaning rather than the styling, and they are the same three
-// organisms/board/tile-states.css defines: accent for structure, warn for something left behind, bad for
-// a real failure inside something that says it finished.
+// The tones are the meaning rather than the styling: accent for structure, warn for something left
+// behind, bad for a real failure inside something that says it finished. They are three of the five in
+// design/state-tones.ts, rendered by the `.vb-tone-*` rules in atoms/chip.css.
+//
+// That sentence used to name `organisms/board/tile-states.css`, which has never existed in this
+// repository. It came over with the badges from the tile and was re-authored here, where it became the
+// only occurrence of the name — a comment failing CLAUDE.md's "is it still true?" clause, and one no
+// gate can see, since check:citations reads decision and slice identifiers and not file paths.
 //
 // LIFTED OUT OF `CardView` rather than inlined, for the reason `BackendStatus` was: three conditionals of
 // its own on a function already at the complexity ceiling. Flattening beats a suppression.

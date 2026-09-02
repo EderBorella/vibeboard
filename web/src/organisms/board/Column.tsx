@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Button } from '../../atoms/Button';
 import { Chip } from '../../atoms/Chip';
+import { Icon } from '../../atoms/Icon';
 import { Stack } from '../../atoms/Stack';
 import { Surface } from '../../atoms/Surface';
 import { Text } from '../../atoms/Text';
@@ -74,7 +75,12 @@ export function Column({
               title="New card"
               onClick={() => onAdd(board, slug)}
             >
-              +
+              {/* AN ICON AND NOT AN ASCII `+`, since 2026-09-02. It was the last text glyph in the app and
+                  the census could not have found it: that sweep looked for NON-ASCII characters, and a
+                  plus is U+002B. The owner found it by eye — this ＋ and Project Control's sat at visibly
+                  different sizes, because a font's plus is a thin crossbar inside its own advance width
+                  and an icon is a 1em box drawn to a grid. Same mark, same size, both of them now. */}
+              <Icon name="plus" />
             </Button>
           )}
         </>

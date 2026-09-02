@@ -150,8 +150,17 @@
 .column-over { border-color: var(--accent); box-shadow: var(--glow); }
 /* THE BRACKETS ARE THE WHOLE OF THIS CLASS NOW. The face was `--font-display` + `text-transform` +
    `--track`, which is `Text caps`, and the `--t-body` step is `lead`. */
-.column-title::before { content: "["; color: var(--accent); margin-right: var(--s-2); }
-.column-title::after { content: "]"; color: var(--accent); margin-left: var(--s-2); }
+/* THE BRACKET MARGINS ARE `--s-1` AND NOT `--s-2`, AND THE FOUR PIXELS ARE LOAD-BEARING. The head has no
+   slack at 900px: `[ In Progress ]`, the count and the `+` want 156px of a 154px box. It fitted while the
+   `+` was an ASCII glyph, whose ink is narrower than its advance; the icon that replaced it on 2026-09-02
+   draws edge to edge and the row overflowed by 2px — caught by the browser harness's check 9, which
+   measures every column head against its own box at three widths.
+   TAKEN FROM HERE rather than from the button's padding, which was the first fix and cost a class:
+   `check:class-budget` counts SELECTORS, so `.column > .vb-surface-head .vb-btn-bare` was a 221st against
+   a ratchet at 220 with no slack. A declaration changed inside a rule that already exists costs nothing,
+   and 2px of air beside a bracket is the cheapest two pixels on this surface. */
+.column-title::before { content: "["; color: var(--accent); margin-right: var(--s-1); }
+.column-title::after { content: "]"; color: var(--accent); margin-left: var(--s-1); }
 /* `bare` owns the box and the hover; `push` is where it sits. */
 /* A `Stack direction="column" gap={4}`; the padding, the scroll and the scrollbar are what is left. */
 .column-body {

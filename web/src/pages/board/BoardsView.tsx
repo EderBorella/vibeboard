@@ -63,8 +63,6 @@ export function BoardsView({
           cards={filterByTags(snapshot.boards[board] ?? [], activeTags)}
           config={snapshot.config}
           archivedCount={snapshot.archivedCounts?.[board] ?? 0}
-          openSuggestions={snapshot.openSuggestions}
-          carryingAProblem={snapshot.carryingAProblem}
           collapsed={collapsed.has(board)}
           onToggle={() => onToggleBoard(board)}
           onAdd={onAdd}

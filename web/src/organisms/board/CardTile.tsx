@@ -17,33 +17,24 @@ interface Props {
   // Clicking a tag on the tile toggles it in the board filter. Omitted where filtering makes no
   // sense (the archive drawer), which leaves the tags as plain labels.
   onTag?: (tag: string) => void;
-  // Work the agent found and deliberately did not do. Nothing blocks on a suggestion, so a card can
-  // pass every gate and advance with things left behind — the tile has to say so, because the
-  // blocker belongs in the artefact a human reviews rather than in a log.
-  openSuggestions?: number;
-  // The blocked CARD ids under this card (decision 46). A card's OWN state is its column, which the
-  // board already shows; this is the part a person cannot see from here — a story in Done carrying a
-  // blocked task must not look identical to one that finished clean.
-  //
-  // Cards and not tasks, since decision 45's 2026-08-13 correction: a feature can be carrying a story
-  // nobody could break down, so a tooltip that says "task" names the wrong kind of thing on screen.
-  carryingAProblem?: string[];
 }
 
-export function CardTile({
-  card,
-  miniatureChars,
-  onOpen,
-  onArchive,
-  onDragStart,
-  onTag,
-  openSuggestions = 0,
-  carryingAProblem,
-}: Props) {
+// THE THREE STATE BADGES ARE GONE FROM THE TILE — ruled 2026-09-02 by the owner, and they now live in
+// the CARD ITSELF rather than in its miniature on the board. `setup`, the open-suggestion count and the
+// blocked-cards list are all in `CardView`.
+//
+// WHY THEY COULD NOT STAY. The head is a flex row inside a tile of FIXED height, and once the glyphs
+// became icons the row ran out of slack: the link readout has `flex-shrink: 1`, so it squeezed to 13px
+// and wrapped its own content, putting a chain above a number in a box twice its height. Moving them
+// into the tile's body instead cost a line of the summary, because `.tile` is `height: var(--tile-h)`
+// with `overflow: hidden` — the second line was cut mid-glyph. There is no room in a miniature for five
+// signals, and the head now carries the two that belong there: which card it is, and how many it links.
+//
+// `openSuggestions` and `carryingAProblem` are therefore no longer props here, and the whole
+// BoardsView → Board → Column → CardTile chain that carried them is gone with them.
+
+export function CardTile({ card, miniatureChars, onOpen, onArchive, onDragStart, onTag }: Props) {
   const summary = miniature(card, miniatureChars);
-  // Non-empty, not merely present: an empty array is truthy, and the clean card is the ordinary case —
-  // a badge on every tile is a badge that says nothing.
-  const blocked = carryingAProblem ?? [];
   return (
     <Surface
       variant="inset"
@@ -82,69 +73,30 @@ export function CardTile({
         onOpen?.(card);
       }}
     >
+      {/* THE HEAD CARRIES THE ID AND THE LINK COUNT, AND NOTHING ELSE — ruled 2026-09-02 by the owner
+          after the icons landed. It used to hold three state chips as well, and at a column's width they
+          did not fit: the link readout was a flex item with `flex-shrink: 1`, so the row squeezed it to
+          13px and its own content wrapped, leaving a chain above a number in a box twice the height it
+          should be. Fewer things in the row is the fix that does not need one.
+          The three states moved into the card body below, where they wrap freely. */}
       <Stack gap={3} className="tile-head">
         <Readout>{card.id}</Readout>
-        {/* THREE STATE WORDS IN THREE TONES, and the tones are the meaning rather than the styling —
-            see the three rules in organisms/board/tile-states.css and test/chip-boxes.test.tsx, which
-            measures that a person can tell them apart in each theme's own palette. */}
-        {card.setup && (
-          // The project-level barrier. Worth a badge because its effect is invisible from the card
-          // it is on: nothing outside this feature's subtree runs until it is finished, so a board
-          // that looks stuck is explained by a tile somewhere else. `accent` and not `warn`: this is
-          // structure, not a problem.
-          <Chip
-            tone="accent"
-            testId="tile-setup"
-            title="The setup feature — nothing outside it runs until it is done"
-          >
-            {/* `.tile-setup` WAS THE FACE AND NOTHING ELSE — uppercase, the tracking and a `nowrap` — so it
-                is `Text caps nowrap` on the label. `size`/`ink` are `inherit` because the chip already
-                decides both: its step is `--t-micro` and its ink is the tone this state means. */}
-            <Text size="inherit" ink="inherit" caps nowrap>
-              setup
-            </Text>
-          </Chip>
-        )}
-        {openSuggestions > 0 && (
-          // `warn` — not failing, but not plainly done either.
-          <Chip
-            tone="warn"
-            testId="tile-suggestions"
-            title={`${openSuggestions} open ${openSuggestions === 1 ? 'suggestion' : 'suggestions'}`}
-          >
-            {/* The glyph and its count on one line, which is all `.tile-suggestions` ever said. */}
-            <Text size="inherit" ink="inherit" nowrap>
-              <Icon name="flag" /> {openSuggestions}
-            </Text>
-          </Chip>
-        )}
-        {blocked.length > 0 && (
-          // `bad`, the strongest of the three: a real failure inside something that says it finished.
-          <Chip
-            tone="bad"
-            testId="tile-problem"
-            // Every one of them, not just the first: the ids are what a person goes and looks at.
-            title={`Carrying ${blocked.length === 1 ? 'a blocked card' : `${blocked.length} blocked cards`}: ${blocked.join(', ')}`}
-          >
-            <Text size="inherit" ink="inherit" nowrap>
-              <Icon name="warning" /> {blocked.length}
-            </Text>
-          </Chip>
-        )}
         {card.links.length > 0 && (
-          // A READOUT AND NOT A CHIP, beside three chips, on purpose. The other four badges in this head
-          // wear a tone because each signals a state to act on — waiting, unfinished, failed. A link count
-          // signals nothing: it is a structural fact about the card, and the tone vocabulary is worth more
-          // if a count cannot borrow from it. Mono also puts it under the signature's own rule — the machine
-          // counted these.
-          <Readout testId="tile-link" title={card.links.join(', ')}>
+          // A READOUT AND NOT A CHIP, and now the only badge up here. The other three wear a tone because
+          // each signals a state to act on; a link count signals nothing — it is a structural fact, and
+          // the tone vocabulary is worth more if a count cannot borrow from it.
+          //
+          // `push` puts it right, and `vb-fixed` is `flex: none`: it is the shrink that broke it before,
+          // and a count that can be squeezed is a count that can wrap.
+          <Readout testId="tile-link" className="push vb-fixed" title={card.links.join(', ')}>
             <Icon name="link" /> {card.links.length}
           </Readout>
         )}
         {onArchive && (
           <Button
             variant="bare"
-            className="push"
+            // `push` only when nothing before it already pushed, or the two would fight for the slack.
+            className={card.links.length > 0 ? 'vb-fixed' : 'push'}
             title="Archive"
             onClick={(e) => {
               e.stopPropagation();

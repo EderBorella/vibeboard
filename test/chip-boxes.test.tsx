@@ -31,9 +31,9 @@ import { cleanup, render } from '@testing-library/react';
 import type { ComponentProps } from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { Chip } from '../web/src/atoms/Chip.js';
-import type { Card } from '../web/src/lib/shared.js';
+import type { Card, ProjectConfig } from '../web/src/lib/shared.js';
 import { Menu } from '../web/src/molecules/Menu.js';
-import { CardTile } from '../web/src/organisms/board/CardTile.js';
+import { CardView } from '../web/src/organisms/cards/CardView.js';
 import { box } from './css-box.js';
 import { inkIn, inkToken, isColour, THEMES } from './state-ink.js';
 
@@ -351,10 +351,14 @@ describe('a chip that takes a click is still a chip', () => {
 // `white-space` and nothing else. What holds them apart is this suite and the named list in
 // tools/check-shape-coverage.mjs, and nothing else in the repository.
 //
-// RENDERED THROUGH `CardTile` AND NOT THROUGH A CLASS LIST, deliberately: the tone is a PROP now, so a
-// refactor that dropped `tone="warn"` would leave `.tile-suggestions` in place and every class-list
-// fixture green while the board rendered two identical grey words. The board's own component is the only
-// fixture that can fail on that.
+// RENDERED THROUGH THE REAL COMPONENT AND NOT THROUGH A CLASS LIST, deliberately: the tone is a PROP, so
+// a refactor that dropped `tone="warn"` would leave the rule in place and every class-list fixture green
+// while two identical grey words rendered. The component is the only fixture that can fail on that.
+//
+// THAT COMPONENT IS `CardView` SINCE 2026-09-02, not `CardTile`. The three moved out of the board tile
+// and into the card itself — the tile's head had no slack left once the glyphs became icons, and a
+// fixed-height miniature has no room for five signals. The claim this file makes is unchanged: one shape,
+// three tones, tellable apart in every theme. Only the fixture that can fail on it moved.
 const card = (over: Partial<Card> = {}): Card =>
   ({
     id: 'E-001',
@@ -370,23 +374,35 @@ const card = (over: Partial<Card> = {}): Card =>
     ...over,
   }) as Card;
 
-// One tile carrying all three states at once, which is also the case a person most needs to tell apart.
+// A CONFIG WITH THE THREE BOARDS' COLUMNS, because `CardView` renders the card's place in it. Cast
+// rather than built: nothing here reads a column, and a full fixture would be four fields of noise
+// around the one thing this file is about.
+const CONFIG = {
+  boards: {
+    features: { columns: ['Backlog', 'Done'] },
+    product: { columns: ['Backlog', 'Done'] },
+    engineering: { columns: ['Todo', 'Done'] },
+  },
+} as unknown as ProjectConfig;
+
+// One card carrying all three states at once, which is also the case a person most needs to tell apart.
 function tileStates(): { name: string; token: string; el: Element }[] {
   render(
-    <CardTile
+    <CardView
       card={card({ setup: true })}
-      miniatureChars={40}
+      config={CONFIG}
+      allCards={[]}
       openSuggestions={2}
       carryingAProblem={['E-002']}
     />,
   );
   return [
-    { name: '.tile-setup', token: '--accent', testId: 'tile-setup' },
-    { name: '.tile-suggestions', token: '--warn', testId: 'tile-suggestions' },
-    { name: '.tile-problem', token: '--danger', testId: 'tile-problem' },
+    { name: 'setup', token: '--accent', testId: 'cv-setup' },
+    { name: 'suggestions', token: '--warn', testId: 'cv-suggestions' },
+    { name: 'problem', token: '--danger', testId: 'cv-problem' },
   ].map(({ name, token, testId }) => {
     const el = document.querySelector(`[data-testid="${testId}"]`);
-    if (!el) throw new Error(`CardTile rendered no ${testId}`);
+    if (!el) throw new Error(`CardView rendered no ${testId}`);
     return { name, token, el };
   });
 }
@@ -396,9 +412,9 @@ describe('the three tile state words stay three', () => {
     // Asserted as a group rather than one `it` per tone: the claim is about the three together, and
     // three separate passes cannot say that a tile carrying all three shows all three.
     expect(tileStates().map(({ name, token, el }) => `${name} ${inkToken(el).includes(token)}`)).toEqual([
-      '.tile-setup true',
-      '.tile-suggestions true',
-      '.tile-problem true',
+      'setup true',
+      'suggestions true',
+      'problem true',
     ]);
   });
 

@@ -20,10 +20,6 @@ interface Props {
   onTag?: (tag: string) => void;
   // Open suggestions per card id, straight from the snapshot. Threaded rather than fetched here:
   // the board re-renders on every file change, and a badge that arrives a request later is a badge
-  // nobody sees.
-  openSuggestions?: Record<string, number>;
-  // The blocked task ids under each card, from the same snapshot and threaded the same way.
-  carryingAProblem?: Record<string, string[]>;
   // beforeId identifies the card to insert in front of; null means the end of the column.
   onDrop?: (board: BoardName, slug: string, beforeId: string | null) => void;
 }
@@ -40,8 +36,6 @@ export function Column({
   onDragStart,
   onTag,
   onDrop,
-  openSuggestions,
-  carryingAProblem,
 }: Props) {
   const [over, setOver] = useState(false);
   // Which gap the card would land in: 0 = above the first tile, cards.length = at the end.
@@ -132,8 +126,6 @@ export function Column({
               onArchive={onArchive}
               onDragStart={onDragStart}
               onTag={onTag}
-              openSuggestions={openSuggestions?.[c.id] ?? 0}
-              carryingAProblem={carryingAProblem?.[c.id]}
             />
           </div>
         ))}

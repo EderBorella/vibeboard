@@ -22,8 +22,6 @@ interface Props {
   onArchive?: (card: Card) => void;
   onDragStart?: (card: Card) => void;
   onTag?: (tag: string) => void;
-  openSuggestions?: Record<string, number>;
-  carryingAProblem?: Record<string, string[]>;
   onDrop?: (board: BoardName, slug: string, beforeId: string | null) => void;
 }
 
@@ -40,8 +38,6 @@ export function Board({
   onArchive,
   onDragStart,
   onTag,
-  openSuggestions,
-  carryingAProblem,
   onDrop,
 }: Props) {
   const [showArchive, setShowArchive] = useState(false);
@@ -114,8 +110,6 @@ export function Board({
                 onArchive={onArchive}
                 onDragStart={onDragStart}
                 onTag={onTag}
-                openSuggestions={openSuggestions}
-                carryingAProblem={carryingAProblem}
                 onDrop={onDrop}
               />
             ))}

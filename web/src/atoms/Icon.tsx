@@ -151,9 +151,19 @@ export function Icon({ name, className }: Props) {
       // length to check.
       size="1em"
       strokeWidth={WEIGHT}
-      // `block` because an inline SVG sits on the text baseline and inherits the line box's descender
-      // gap, which is the very thing this atom exists to remove. Every call site puts it in a flex row.
-      style={{ display: 'block', flex: 'none' }}
+      // `inline-block`, NOT `block`, and that is a correction the owner found on screen.
+      //
+      // It was `block`, on the reasoning that an inline SVG sits on the text baseline and inherits the
+      // line box's descender gap — true — with the comment "every call site puts it in a flex row". That
+      // was an assumption and it was false for a dozen of them: a card tile's flag and link chips put the
+      // icon inline beside a count, and a block-level SVG takes the whole line, so the count dropped
+      // underneath and the chip grew into a tall box. Visible immediately, invisible to every gate.
+      //
+      // `inline-block` + `vertical-align: middle` works in BOTH places. A flex parent blockifies its
+      // items and ignores `vertical-align`, so every button is exactly as it was; inline, the box centres
+      // on the text's midline instead of hanging off its baseline, which is the gap this atom exists to
+      // close. `middle` is a keyword rather than a tuned length — the thing the top of this file refuses.
+      style={{ display: 'inline-block', verticalAlign: 'middle', flex: 'none' }}
       // Lucide already draws in `currentColor`; the fill is ours, for the four that were solid marks.
       {...(filled ? { fill: 'currentColor' } : {})}
       // `focusable` is not in React's SVG types but IS honoured by the browsers that tab into SVG.

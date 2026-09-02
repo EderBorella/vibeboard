@@ -1,5 +1,5 @@
 {
-  "recorded": "2026-09-01",
+  "recorded": "2026-09-02",
   "surfaces": {
     "boards": {
       "fontSizes": [
@@ -25,11 +25,11 @@
         "16px"
       ],
       "examined": {
-        "elements": 282,
-        "textElements": 143,
-        "overflow": 118,
+        "elements": 287,
+        "textElements": 146,
+        "overflow": 121,
         "clipping": 38,
-        "contrast": 143,
+        "contrast": 146,
         "tokens": 51,
         "rows": 29,
         "focus": 66
@@ -54,6 +54,7 @@
       ],
       "radii": [
         "10px",
+        "4px",
         "50%",
         "6px",
         "999px"
@@ -68,11 +69,11 @@
         "16px"
       ],
       "examined": {
-        "elements": 170,
-        "textElements": 86,
-        "overflow": 64,
+        "elements": 175,
+        "textElements": 89,
+        "overflow": 67,
         "clipping": 12,
-        "contrast": 86,
+        "contrast": 89,
         "tokens": 51,
         "rows": 12,
         "focus": 43
@@ -96,6 +97,8 @@
         "15px"
       ],
       "radii": [
+        "10px",
+        "4px",
         "50%",
         "6px",
         "999px"
@@ -110,11 +113,11 @@
         "16px"
       ],
       "examined": {
-        "elements": 171,
-        "textElements": 84,
-        "overflow": 65,
+        "elements": 176,
+        "textElements": 87,
+        "overflow": 68,
         "clipping": 15,
-        "contrast": 84,
+        "contrast": 87,
         "tokens": 51,
         "rows": 10,
         "focus": 39
@@ -138,6 +141,7 @@
         "15px"
       ],
       "radii": [
+        "10px",
         "4px",
         "50%",
         "6px",
@@ -154,11 +158,11 @@
         "16px"
       ],
       "examined": {
-        "elements": 200,
-        "textElements": 90,
-        "overflow": 50,
+        "elements": 205,
+        "textElements": 93,
+        "overflow": 53,
         "clipping": 13,
-        "contrast": 90,
+        "contrast": 93,
         "tokens": 51,
         "rows": 9,
         "focus": 60
@@ -182,6 +186,7 @@
         "15px"
       ],
       "radii": [
+        "10px",
         "4px",
         "50%",
         "6px",
@@ -197,11 +202,11 @@
         "16px"
       ],
       "examined": {
-        "elements": 155,
-        "textElements": 74,
-        "overflow": 50,
+        "elements": 160,
+        "textElements": 77,
+        "overflow": 53,
         "clipping": 12,
-        "contrast": 74,
+        "contrast": 77,
         "tokens": 51,
         "rows": 15,
         "focus": 44
@@ -332,6 +337,44 @@
         "focus": 0
       }
     },
+    "copilot": {
+      "fontSizes": [
+        "12px",
+        "13px",
+        "15px"
+      ],
+      "radii": [
+        "10px",
+        "4px",
+        "6px",
+        "999px"
+      ],
+      "controlHeights": [
+        "28px",
+        "47px"
+      ],
+      "markerHeights": [],
+      "examined": {
+        "elements": 52,
+        "textElements": 25,
+        "overflow": 17,
+        "clipping": 6,
+        "contrast": 25,
+        "tokens": 51,
+        "rows": 3,
+        "focus": 14
+      },
+      "findings": {
+        "type": 0,
+        "radius": 0,
+        "overflow": 0,
+        "clipping": 0,
+        "contrast": 0,
+        "tokens": 0,
+        "rows": 0,
+        "focus": 0
+      }
+    },
     "model-picker": {
       "fontSizes": [
         "11px",
@@ -409,14 +452,14 @@
     }
   },
   "fontSizes": {
-    "13px": 155,
+    "13px": 159,
     "15px": 8,
-    "12px": 97,
+    "12px": 98,
     "11px": 22
   },
   "fontSizesOnText": {
     "15px": 8,
-    "13px": 41,
+    "13px": 44,
     "12px": 73,
     "11px": 21
   },
@@ -424,15 +467,15 @@
     "999px": 96,
     "50%": 12,
     "6px": 276,
-    "10px": 56,
-    "4px": 4
+    "10px": 62,
+    "4px": 6
   },
   "examined": {
-    "elements": 282,
-    "textElements": 143,
-    "overflow": 118,
+    "elements": 287,
+    "textElements": 146,
+    "overflow": 121,
     "clipping": 38,
-    "contrast": 143,
+    "contrast": 146,
     "tokens": 51,
     "rows": 29,
     "focus": 66,

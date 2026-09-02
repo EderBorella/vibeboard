@@ -54,3 +54,9 @@
 /* The managed-file disclaimer. It was in the editor TEMPLATE's sheet, saying `control-` at a component
    called EditorLayout; the prose ink is this page's and the box is `Notice`'s. */
 .control-disclaimer { margin: var(--s-5) var(--s-6) 0; color: var(--text); }
+
+/* THE SAME HOVER THE EXPLORER'S TREE HAS, and for the same reason — see the long note in
+   pages/explorer/explorer.css. `.vb-row-hit:hover` moves the ground and the border and not the ink, so an
+   icon in the row stayed the muted colour it had while everything around it answered the pointer.
+   Scoped to this list and written against the element, so it costs no class and touches nothing else. */
+.control-list .vb-row-hit:hover svg { color: var(--accent); }

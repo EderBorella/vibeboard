@@ -549,7 +549,10 @@ export function AutopilotBar({
             ) : (
               <List as="ul" gap={2} className="blockers">
                 {model.missing.map((b) => (
-                  <li key={b}>{b}</li>
+                  <li key={b}>
+                    <Icon name="arrow-right" />
+                    {b}
+                  </li>
                 ))}
               </List>
             )}

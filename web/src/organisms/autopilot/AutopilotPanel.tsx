@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Button } from '../../atoms/Button';
 import { Control } from '../../atoms/Control';
+import { Icon } from '../../atoms/Icon';
 import { Stack } from '../../atoms/Stack';
 import { Text } from '../../atoms/Text';
 import {
@@ -177,7 +178,10 @@ export function AutopilotPanel({
       {readiness && !readiness.ok && (
         <List as="ul" gap={2} className="blockers">
           {readiness.blockers.map((b) => (
-            <li key={b}>{b}</li>
+            <li key={b}>
+              <Icon name="arrow-right" />
+              {b}
+            </li>
           ))}
         </List>
       )}

@@ -40,6 +40,7 @@ import {
   ChevronRight,
   ChevronUp,
   CircleHelp,
+  Diamond,
   ExternalLink,
   Eye,
   File,
@@ -116,6 +117,10 @@ const ART = {
   'star-filled': { of: Star, filled: true },
   star: { of: Star },
   archive: { of: Archive },
+  // ◈ — the copilot dock's own mark. It was a CSS `content:` glyph on `.copilot-title::before`, which is
+  // why no sweep of the components ever found it: a pseudo-element is not in any `.tsx`. Same argument as
+  // every other mark here — it sat visibly low against the cap height of the word beside it.
+  diamond: { of: Diamond },
   flag: { of: Flag },
   plus: { of: Plus },
   // ⟳ — re-read from disk. `RotateCw` and not `RefreshCw`: one arrow reads as "again", two read as

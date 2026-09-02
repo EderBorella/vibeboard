@@ -36,7 +36,10 @@
 /* 0.14em → 0.08em, and the dock's title visibly tightens. It was the second-loosest tracking in the
    tree after `.board-label`'s, and a panel heading is not a wordmark. */
 .copilot-title { font-weight: 700; font-family: var(--font-display); text-transform: uppercase; letter-spacing: var(--track); }
-.copilot-title::before { content: "◈ "; color: var(--accent); }
+/* `.copilot-title::before` IS GONE — it held a `◈` and the accent that coloured it, and both are in the
+   component now as an `Icon` inside a `Text ink="accent"`. A mark in a `content:` string is one no sweep
+   of the components can find and one nothing can align: this is the same argument the icon atom opens
+   with, reaching the last place in the app that was still spending a glyph on a shape. */
 
 /* The same control in a form rather than a dense row. Settings used to render its own button group at
    this size, from its own list; the scale was the ONLY thing the two copies disagreed about that was

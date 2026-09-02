@@ -228,6 +228,12 @@ export function CopilotPanel({
       {/* THE DOCK GUTTER AND THE RULE UNDER THE ROW ARE `Stack` OPTIONS NOW, on this and four siblings:
           five classes that each said `padding: var(--s-N) var(--s-5)` and one hairline. */}
       <Stack pad={[4, 5]} edge="bottom">
+        {/* THE ◈ IS AN ICON AND NOT A `content:` GLYPH, since 2026-09-02. `.copilot-title::before` held
+            it, which is a place no sweep of the components could reach, and it carried the same ink
+            offset every other mark did. `Text ink="accent"` is what the pseudo-element's `color` was. */}
+        <Text ink="accent">
+          <Icon name="diamond" />
+        </Text>
         <span className="copilot-title">Copilot</span>
         <BackendPicker
           value={backend}

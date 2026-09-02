@@ -164,7 +164,14 @@
    all this keeps: `.vb-list` is `--s-1` and a list of sentences reads tighter than a list of rows. */
 .blockers { font-size: var(--t-small); }
 .blockers li { padding-left: var(--s-6); position: relative; color: var(--text); line-height: 1.5; }
-.blockers li::before { content: "→"; position: absolute; left: 0; color: var(--warn, var(--danger)); }
+/* THE ARROW IS AN `Icon` IN THE LIST ITEM NOW, and this rule places it where the `content: "→"` used to
+   sit. A `content:` glyph is unreachable by any sweep of the components and unalignable by anything —
+   the same argument atoms/Icon.tsx opens with.
+   `top` IS DERIVED FROM THE LINE HEIGHT THIS RULE SETS, not tuned: the item's line box is `1.5em` and the
+   mark is `1em`, so half the difference centres it on the FIRST line and leaves a wrapped second line
+   alone. Centring on the whole item would drift down as a blocker got longer, and a blocker is a
+   sentence. */
+.blockers li svg { position: absolute; left: 0; top: calc((1.5em - 1em) / 2); color: var(--warn, var(--danger)); }
 /* The other side of the same answer — nothing is blocking — and it is `Text ink="accent"`: `--t-small` is
    the atom's own step, so the class said nothing but the colour. */
 

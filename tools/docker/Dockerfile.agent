@@ -38,17 +38,27 @@ RUN apt-get update \
 # whether a calculator worked, a checkup read the file and reported a deleted line as present. Found
 # 2026-09-03 by planting that defect on purpose.
 #
-# `install-deps` INSTALLS THE LIBRARIES AND NOT THE BROWSERS. Projects fetch their own browser binaries,
-# which already worked; it was only the launch that failed. Keeping the browsers out of the image leaves
-# the version the project pins in charge of itself.
+# THE BROWSER ITSELF SHIPS TOO, not only the libraries. `install-deps` lays down the apt packages and
+# stops there, which left a box that still could not open a page: the first checkup to try it would have
+# had to download 115 MB before it could answer anything, once per box and again after every rebuild.
+# Paying that at build time makes it once per image.
+#
+# `PLAYWRIGHT_BROWSERS_PATH` IS THE WHOLE REASON THIS WORKS. The default is `$HOME/.cache/ms-playwright`,
+# and at this point in the build HOME is root's — while an agent turn runs as the HOST user's uid, which
+# is not known until `docker run`. Browsers under /root would be unreadable by the one process that needs
+# them. /opt with `a+rX` is readable by every uid, and the ENV persists into the container so Playwright
+# looks there rather than in a home directory it cannot write.
 #
 # Installed globally at a pinned version and then removed, rather than run through `npx`: a bare name
-# through a runner is how you end up executing a package that squatted it. The apt packages it lays down
-# survive the uninstall, which is the entire point.
+# through a runner is how you end up executing a package that squatted it. The apt packages and the
+# browsers both survive the uninstall, which is the entire point.
+ENV PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright
 ARG PLAYWRIGHT_VERSION=1.62.1
 RUN npm install -g playwright@${PLAYWRIGHT_VERSION} \
  && playwright install-deps chromium \
+ && playwright install chromium \
  && npm uninstall -g playwright \
+ && chmod -R a+rX /opt/ms-playwright \
  && rm -rf /var/lib/apt/lists/*
 
 # NO `sudo`, DELIBERATELY. The box has two levels — agent turns exec as the host user, package installs

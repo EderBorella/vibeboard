@@ -58,7 +58,21 @@ const text = (path: string, content: string): FileRead => ({
 // The component only ever passes the snapshot through as a change signal, so a stub is honest here.
 const snapshot = { name: 'T' } as unknown as ProjectSnapshot;
 
-const row = (name: string): HTMLElement => screen.getByRole('button', { name: new RegExp(name) });
+// A TREE ROW, and it has to be scoped to the tree since 2026-09-02. The row used to be the only button
+// whose accessible name held the entry's name, because the toolbar's New file / New folder buttons
+// announced themselves as `📄＋` — their content. Their icons are `aria-hidden` now, so those buttons
+// fall back to their `title` — "New file in docs" — and a loose `/docs/` matches both. That is the
+// migration making the toolbar's announcement BETTER and this helper's match too broad, not a
+// regression: `📄＋` was never a useful thing for a screen reader to say.
+const row = (name: string): HTMLElement => {
+  const matching = screen
+    .getAllByTestId('explorer-item')
+    .filter((r) => new RegExp(name).test(r.textContent ?? ''));
+  if (matching.length !== 1) {
+    throw new Error(`expected one tree row matching /${name}/, found ${matching.length}`);
+  }
+  return matching[0] as HTMLElement;
+};
 
 describe('ExplorerView', () => {
   it('shows the project root and invites a selection', async () => {

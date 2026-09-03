@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '../../atoms/Button';
 import { Control } from '../../atoms/Control';
+import { Icon } from '../../atoms/Icon';
 import { Readout } from '../../atoms/Readout';
 import { Stack } from '../../atoms/Stack';
 import { Text } from '../../atoms/Text';
@@ -86,7 +87,9 @@ function MessageLine({ item, onRetry }: { item: TranscriptItem; onRetry?: () => 
       {item.kind === 'tool' ? (
         // The name of a tool the agent called is machine vocabulary, and `.msg-tool` said so by hand in
         // `--t-small` accent mono — which is `Readout` `small` `accent` value for value.
-        <Readout>⚙ {item.toolName}</Readout>
+        <Readout>
+          <Icon name="tool" /> {item.toolName}
+        </Readout>
       ) : item.kind === 'thinking' ? (
         // `--t-small` muted italic, which is this atom's default face plus the hint role.
         <Text role="hint">{item.text}</Text>
@@ -225,6 +228,12 @@ export function CopilotPanel({
       {/* THE DOCK GUTTER AND THE RULE UNDER THE ROW ARE `Stack` OPTIONS NOW, on this and four siblings:
           five classes that each said `padding: var(--s-N) var(--s-5)` and one hairline. */}
       <Stack pad={[4, 5]} edge="bottom">
+        {/* THE ◈ IS AN ICON AND NOT A `content:` GLYPH, since 2026-09-02. `.copilot-title::before` held
+            it, which is a place no sweep of the components could reach, and it carried the same ink
+            offset every other mark did. `Text ink="accent"` is what the pseudo-element's `color` was. */}
+        <Text ink="accent">
+          <Icon name="diamond" />
+        </Text>
         <span className="copilot-title">Copilot</span>
         <BackendPicker
           value={backend}
@@ -252,7 +261,7 @@ export function CopilotPanel({
         {/* Not in the ratchet — Phase 2's control reset took its font-size away, so no rule gave it
             geometry any more — but the same `✕` as nine others, so it goes with them. */}
         <Button variant="bare" className="push" onClick={onClose} title="Hide (session keeps running)">
-          ✕
+          <Icon name="close" />
         </Button>
       </Stack>
 
@@ -353,7 +362,8 @@ export function CopilotPanel({
           {/* `role="error"` IS THE `--t-small` DANGER LINE THE CLASS DECLARED BY HAND. The tinted strip
               stays a class: a `color-mix` ground is this warning's own and no atom carries one. */}
           <Text role="error">
-            ⚠ This model can’t use tools — the copilot can’t create or edit cards. Pick a 🔧 model.
+            <Icon name="warning" /> This model can’t use tools — the copilot can’t create or edit cards. Pick
+            one marked for tool use.
           </Text>
         </div>
       )}

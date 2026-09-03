@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Chip } from '../../atoms/Chip';
+import { Icon } from '../../atoms/Icon';
 import { Stack } from '../../atoms/Stack';
 import { Text } from '../../atoms/Text';
 import type { BoardName, Card, ProjectConfig } from '../../lib/shared';
@@ -21,8 +22,6 @@ interface Props {
   onArchive?: (card: Card) => void;
   onDragStart?: (card: Card) => void;
   onTag?: (tag: string) => void;
-  openSuggestions?: Record<string, number>;
-  carryingAProblem?: Record<string, string[]>;
   onDrop?: (board: BoardName, slug: string, beforeId: string | null) => void;
 }
 
@@ -39,8 +38,6 @@ export function Board({
   onArchive,
   onDragStart,
   onTag,
-  openSuggestions,
-  carryingAProblem,
   onDrop,
 }: Props) {
   const [showArchive, setShowArchive] = useState(false);
@@ -64,7 +61,7 @@ export function Board({
           aria-expanded={!collapsed}
         >
           <Text ink="accent" className="board-chevron vb-twist">
-            {collapsed ? '▸' : '▾'}
+            <Icon name={collapsed ? 'caret-right' : 'caret-down'} />
           </Text>
           {/* `size="body"` AND NOT THE DEFAULT, and the drift baseline is what caught it: `.board-label`
               declared no `font-size` at all, so it INHERITED the body's 13px, and `Text`'s default is
@@ -90,7 +87,7 @@ export function Board({
             ariaExpanded={showArchive}
             onClick={() => setShowArchive((v) => !v)}
           >
-            🗄 {archivedCount}
+            <Icon name="archive" /> {archivedCount}
           </Chip>
         )}
       </Stack>
@@ -113,8 +110,6 @@ export function Board({
                 onArchive={onArchive}
                 onDragStart={onDragStart}
                 onTag={onTag}
-                openSuggestions={openSuggestions}
-                carryingAProblem={carryingAProblem}
                 onDrop={onDrop}
               />
             ))}

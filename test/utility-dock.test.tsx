@@ -81,14 +81,21 @@ describe('UtilityDock', () => {
     const { rerender } = render(<UtilityDock {...props} onCollapse={onCollapse} panes={[pane('cards')]} />);
     const toggle = screen.getByTitle('Collapse the dock');
     expect(toggle.getAttribute('aria-expanded')).toBe('true');
-    expect(toggle.textContent).toBe('▾'); // points the way it will move
+    // POINTS THE WAY IT WILL MOVE, still — but as an icon rather than a character, so the direction is
+    // read off which one was rendered rather than off the text content, which is now empty by design.
+    expect(toggle.textContent).toBe('');
+    expect(toggle.querySelector('svg')).toBeTruthy();
     toggle.click();
     expect(onCollapse).toHaveBeenCalledTimes(1);
 
     rerender(<UtilityDock {...props} onCollapse={onCollapse} panes={[pane('cards')]} collapsed />);
     const expand = screen.getByTitle('Expand the dock');
     expect(expand.getAttribute('aria-expanded')).toBe('false');
-    expect(expand.textContent).toBe('▴');
+    // AN ICON, NOT A CHARACTER, since 2026-09-02: the caret is an `aria-hidden` SVG, so the toggle's
+    // text content is empty and its accessible name comes from its label alone — which is the better
+    // announcement and the reason this assertion changed rather than the behaviour.
+    expect(expand.textContent).toBe('');
+    expect(expand.querySelector('svg')).toBeTruthy();
   });
 
   it('keeps a keepMounted pane in the DOM while another is active, hidden', () => {

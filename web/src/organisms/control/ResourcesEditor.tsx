@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Button } from '../../atoms/Button';
 import { Control } from '../../atoms/Control';
+import { Icon } from '../../atoms/Icon';
 import { Readout } from '../../atoms/Readout';
 import { Stack } from '../../atoms/Stack';
 import { Text } from '../../atoms/Text';
@@ -69,7 +70,7 @@ export function ResourcesEditor({ onError }: { onError: (e: string | null) => vo
         <Readout>Links registry{dirty ? ' •' : ''}</Readout>
         <div className="vb-row push">
           <Button size="md" onClick={add}>
-            ＋ Add link
+            <Icon name="plus" /> Add link
           </Button>
           <Button variant="primary" size="md" disabled={busy !== null || !dirty} onClick={save}>
             Save
@@ -106,7 +107,7 @@ export function ResourcesEditor({ onError }: { onError: (e: string | null) => vo
               onChange={(e) => update(i, { note: e.target.value })}
             />
             <Button variant="bare" size="sm" className="res-del" title="Remove" onClick={() => removeRow(i)}>
-              ✕
+              <Icon name="close" />
             </Button>
           </Row>
         ))}

@@ -121,6 +121,16 @@ function isCheckupEvidence(given: unknown): given is NonNullable<DispatchInput['
   return Array.isArray(o.children) && Array.isArray(o.blocked) && Array.isArray(o.suggestions);
 }
 
+// `feature` NARROWED TO EXACTLY `true`, the same way `reviewFacts` narrows its two booleans, rather than
+// left to travel through on the spread. The body is JSON however trusted the caller is, and this one field
+// decides whether a whole section of the prompt renders — a `"yes"` would be truthy and would put the
+// feature checkup's question in front of a story checkup, where it is about the wrong thing entirely.
+function checkupEvidenceOf(given: unknown): NonNullable<DispatchInput['checkup']> {
+  const evidence = given as NonNullable<DispatchInput['checkup']>;
+  const feature = (given as Record<string, unknown>).feature === true;
+  return { ...evidence, ...(feature ? { feature: true as const } : { feature: undefined }) };
+}
+
 function reviewFacts(given: unknown): { gatesPassed: boolean; setupSubtree: boolean } {
   const o = (given ?? {}) as Record<string, unknown>;
   return { gatesPassed: o.gatesPassed === true, setupSubtree: o.setupSubtree === true };
@@ -298,7 +308,7 @@ async function resolveDispatch(
       // Passed straight through. The route computes nothing here: unlike the review contract, whose PRESENCE is
       // a property of the skill, every field is a fact only the loop holds — so there is no honest default for
       // a hand dispatch, and its absence is what the prompt renders nothing from.
-      ...(isCheckupEvidence(body.checkup) ? { checkup: body.checkup } : {}),
+      ...(isCheckupEvidence(body.checkup) ? { checkup: checkupEvidenceOf(body.checkup) } : {}),
       cardFile,
       linked,
       ...(previous ? { previous: previous.run } : {}),

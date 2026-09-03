@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Button } from '../../atoms/Button';
 import { Chip } from '../../atoms/Chip';
 import { Control } from '../../atoms/Control';
+import { Icon, type IconName } from '../../atoms/Icon';
 import { Readout } from '../../atoms/Readout';
 import { Stack } from '../../atoms/Stack';
 import { Text } from '../../atoms/Text';
@@ -58,11 +59,15 @@ const SENSITIVE_LABEL: Record<NonNullable<FsNode['sensitive']>['kind'], string> 
   'run-scratch': 'run files',
 };
 
-function icon(node: FsNode): string {
-  if (node.escapes) return '⤴';
-  if (node.kind === 'dir') return '📁';
-  if (node.kind === 'other') return '？';
-  return '📄';
+// AN ICON NAME rather than a character, since 2026-09-02. It was four emoji, and the two that mattered —
+// the page and the folder — are the pair a reader tells apart at a glance while scanning a tree, which is
+// the case a character's ink offset is worst for: they sit in a column, so any vertical drift is repeated
+// down the whole list and reads as a ragged edge.
+function iconFor(node: FsNode): IconName {
+  if (node.escapes) return 'out-of-tree';
+  if (node.kind === 'dir') return 'folder';
+  if (node.kind === 'other') return 'unknown';
+  return 'file';
 }
 
 function title(node: FsNode): string {
@@ -90,7 +95,7 @@ interface NodeRowProps {
 // nested conditionals, and cognitive complexity is charged for nesting far more than for length.
 function NodeRow(props: NodeRowProps) {
   const { node, depth, expanded, active, droppable, over } = props;
-  const twist = expandable(node) ? (expanded ? '▾' : '▸') : '';
+  const twist = expandable(node) ? <Icon name={expanded ? 'caret-down' : 'caret-right'} /> : null;
   return (
     <Row
       as="button"
@@ -134,8 +139,10 @@ function NodeRow(props: NodeRowProps) {
     >
       <Text className="explorer-twist vb-twist">{twist}</Text>
       {/* The ink is the ROW's and moves with its hover, which is what `inherit` says. */}
+      {/* `Text` still wraps it: the ink is the ROW's and moves with its hover, which is what `inherit`
+          says — and an `Icon` is `currentColor`, so it inherits exactly that. */}
       <Text ink="inherit" className="vb-fixed">
-        {icon(node)}
+        <Icon name={iconFor(node)} />
       </Text>
       <span className="vb-clip">{node.name}</span>
       {/* `.control-tag` IS GONE — the caps face and the ink are a nested `Text`'s. */}
@@ -269,9 +276,13 @@ export function FileTree(props: Props) {
         <Stack gap={1} className="explorer-actions push">
           <Button variant="bare" size="sm" title={`New file in ${where}`} onClick={() => props.onNew('file')}>
             {/* `.control-new` IS GONE: the accent ink is a nested `Text`'s at all four. */}
-            <Text size="inherit" ink="accent">
-              📄＋
-            </Text>
+            {/* NO `ink="accent"` WRAPPER: an explicit ink beats `.vb-btn-bare:hover`, so these two were
+                accent at rest and accent on hover — the same shade either way. Bare's own pair answers the
+                pointer. gap 2, not 1: at gap 1 the kind and the plus touch and read as one smudge. */}
+            <Stack as="span" gap={2}>
+              <Icon name="file" />
+              <Icon name="plus" />
+            </Stack>
           </Button>
           <Button
             variant="bare"
@@ -279,9 +290,10 @@ export function FileTree(props: Props) {
             title={`New folder in ${where}`}
             onClick={() => props.onNew('dir')}
           >
-            <Text size="inherit" ink="accent">
-              📁＋
-            </Text>
+            <Stack as="span" gap={2}>
+              <Icon name="folder" />
+              <Icon name="plus" />
+            </Stack>
           </Button>
           <Button
             variant="bare"
@@ -290,14 +302,15 @@ export function FileTree(props: Props) {
             disabled={!selected}
             onClick={props.onDelete}
           >
-            <Text size="inherit" ink="accent">
-              ✕
-            </Text>
+            {/* NO `ink="accent"`. It hard-set the colour, so this ✕ rendered ACCENT WHILE DISABLED —
+                measured: rgb(20, 184, 166) with `disabled` on it, dimmed only by the 0.5 opacity every
+                disabled button gets. A control that cannot be used should not wear the colour of one
+                that invites you to. Bare's own pair is muted at rest, accent on hover, and neither on
+                a disabled button. */}
+            <Icon name="close" />
           </Button>
           <Button variant="bare" size="sm" title="Re-read the project from disk" onClick={props.onRefresh}>
-            <Text size="inherit" ink="accent">
-              ⟳
-            </Text>
+            <Icon name="refresh" />
           </Button>
         </Stack>
       </div>

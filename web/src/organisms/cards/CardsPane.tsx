@@ -43,6 +43,11 @@ interface Props {
   // written into a board folder, so the watcher already pushes a snapshot on every status change.
   trigger: unknown;
   onMove: (card: Card, columnSlug: string) => void;
+  // THE TWO FACTS THE CARD CANNOT DERIVE, carried from the snapshot. Both are maps keyed by card id and
+  // both used to feed the board tile instead; they moved to the card itself on 2026-09-02 — see the note
+  // in organisms/board/CardTile.tsx for why a miniature could not hold them.
+  openSuggestions?: Record<string, number>;
+  carryingAProblem?: Record<string, string[]>;
 }
 
 // What the body is showing. A union rather than two booleans: Raw and a dispatch form are mutually
@@ -65,6 +70,8 @@ export function CardsPane({
   onLinks,
   skills,
   invalid,
+  openSuggestions,
+  carryingAProblem,
   dispatch,
   trigger,
   onMove,
@@ -108,6 +115,8 @@ export function CardsPane({
       <div className="cards-main">
         <div className="cards-body">
           <CardsBody
+            openSuggestions={openSuggestions}
+            carryingAProblem={carryingAProblem}
             card={card}
             activeRef={activeRef}
             view={view}

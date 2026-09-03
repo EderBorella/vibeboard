@@ -214,6 +214,45 @@ export const SURFACES: Surface[] = [
     floor: { elements: 25, text: 10, contrast: 10, focus: 4 },
   },
   {
+    name: 'copilot',
+    what: 'the copilot dock — its transcript, the chat switcher and the composer',
+    root: '.copilot',
+    open: async (page) => {
+      // OPEN BY DEFAULT, so this only has to make sure of it rather than toggle it. A blind click on
+      // "Hide copilot" would close a dock that was already open and then measure the board instead — the
+      // shape of failure this file's `prove` steps exist to refuse.
+      if ((await page.locator('.copilot').count()) === 0) {
+        await page
+          .getByRole('button', { name: /copilot/i })
+          .first()
+          .click();
+      }
+      await page.locator('.copilot').waitFor({ state: 'visible' });
+      // The seeded chat, not an empty dock: `visual/run.mjs` writes one under `.vibeboard/chat/`, and a
+      // transcript with nothing in it measures the composer and calls it a surface.
+      await page.locator('.msg-user').first().waitFor({ state: 'visible' });
+    },
+    prove: async (page) => {
+      // ALL FOUR KINDS. They are four bubbles with four inks, and a fixture that rendered two of them
+      // would report a floor over half a surface as though it were whole.
+      for (const kind of ['msg-user', 'msg-assistant', 'msg-tool']) {
+        await expect(page.locator(`.${kind}`).first()).toBeVisible();
+      }
+      // THE ERROR LINE IS NOT `.msg-error`. That class was deleted when the state tones landed — an error
+      // is `.msg` plus `data-state="error"`, and the tone table decides its ink. Written down because the
+      // first version of this check asked for `.msg-error` and failed: the name is still in the source, in
+      // the comment that records its removal, which is exactly the kind of match that reads as proof.
+      await expect(page.locator('.msg[data-state="error"]').first()).toBeVisible();
+      // The composer, which is the one control in the dock a person types into.
+      await expect(page.locator('.copilot-input')).toBeVisible();
+    },
+    // WHAT THIS SURFACE CANNOT SEE, said here so nobody reads its passing as cover for the whole dock.
+    // The THINKING INDICATOR renders only while a turn is in flight — it is driven by a `copilot:state`
+    // frame over the socket, so there is no fixture on disk that produces it and no way to reach it
+    // without a real model call. It is covered by `docs/smoke-test.md` (A4), which drives a live turn.
+    floor: { elements: 25, text: 10, contrast: 10, focus: 3 },
+  },
+  {
     name: 'model-picker',
     what: 'the model picker — a filtered list of models with their prices and capability badges',
     root: '.vb-modal[data-tone="accent"]',

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Button } from '../../atoms/Button';
+import { Icon } from '../../atoms/Icon';
 import { Stack } from '../../atoms/Stack';
 import { Text } from '../../atoms/Text';
 import { stateClass } from '../../design/state-tones';
@@ -231,7 +232,7 @@ function Transport({
       aria-label={control.label}
       onClick={onAct}
     >
-      <span aria-hidden="true">{stopping ? '■' : '▶'}</span>
+      <Icon name={stopping ? 'stop' : 'play'} />
       {control.label}
     </Button>
   );
@@ -353,7 +354,7 @@ export function AutopilotBar({
           data-testid="ap-kill"
           onClick={kill}
         >
-          <span aria-hidden="true">✕</span> Emergency stop
+          <Icon name="close" /> Emergency stop
         </Button>
 
         <TransportChip model={model} />
@@ -449,7 +450,10 @@ export function AutopilotBar({
               onClick={() => setOpen((v) => !v)}
               data-testid="ap-expand"
             >
-              <span className="vb-twist">{open ? '▾' : '▸'}</span> {open ? 'Hide' : 'Details'}
+              <span className="vb-twist">
+                <Icon name={open ? 'caret-down' : 'caret-right'} />
+              </span>{' '}
+              {open ? 'Hide' : 'Details'}
             </Button>
           )}
           {/* THE ghost, and the one the owner ruled on: a help affordance explains, which is what the
@@ -545,7 +549,10 @@ export function AutopilotBar({
             ) : (
               <List as="ul" gap={2} className="blockers">
                 {model.missing.map((b) => (
-                  <li key={b}>{b}</li>
+                  <li key={b}>
+                    <Icon name="arrow-right" />
+                    {b}
+                  </li>
                 ))}
               </List>
             )}

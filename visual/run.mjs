@@ -234,6 +234,42 @@ async function furnish(projectRoot) {
     },
   ];
   for (const s of filed) await writeSuggestion(projectRoot, s);
+
+  // A CHAT ON DISK, so the copilot dock has a transcript to measure rather than an empty state.
+  //
+  // Written as the file rather than through `ChatStore`, which persists privately and exports no writer.
+  // That is the same thing this harness already does for `state.json`: the on-disk format is frozen, so a
+  // fixture written against it is as safe as one written through an API, and it needs no running server.
+  //
+  // ONE OF EVERY TRANSCRIPT KIND. `user`, `assistant`, `tool` and `error` render as four different bubbles
+  // with four different inks, and a fixture holding only the first two would measure half the surface and
+  // report a floor as if it were whole. The error one especially: it is the only red thing in the dock and
+  // it was rendering a raw provider payload until 2026-08-31.
+  const chat = {
+    id: '11111111-2222-4333-8444-555555555555',
+    title: 'What does the board look like?',
+    backend: 'claude-code',
+    model: 'sonnet',
+    createdAt: '2026-01-01T10:00:00.000Z',
+    updatedAt: '2026-01-01T10:02:00.000Z',
+    messageCount: 4,
+    items: [
+      { kind: 'user', text: 'What does the board look like, and what is blocked?' },
+      {
+        kind: 'assistant',
+        text: 'Three boards. One product card and one engineering card, both with runs against them. Nothing is blocked, and there is one open suggestion about the run report renderer.',
+      },
+      { kind: 'tool', text: 'GET /api/state — 200, 3 boards', toolName: 'board' },
+      {
+        kind: 'error',
+        text: 'The provider is rate-limited. Trying again in a moment usually works.',
+      },
+    ],
+    stats: { costUsd: 0.0142, turns: 1, lastDurationMs: 4200, contextTokens: 9364 },
+  };
+  const chatDir = join(projectRoot, '.vibeboard', 'chat');
+  mkdirSync(chatDir, { recursive: true });
+  writeFileSync(join(chatDir, `${chat.id}.json`), `${JSON.stringify(chat, null, 2)}\n`, 'utf8');
 }
 
 const projects = join(root, 'projects');

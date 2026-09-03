@@ -163,8 +163,16 @@
 /* `List as="ul"` DRAWS THE COLUMN AND CANCELS THE BULLET at both call sites, so the gap and the step are
    all this keeps: `.vb-list` is `--s-1` and a list of sentences reads tighter than a list of rows. */
 .blockers { font-size: var(--t-small); }
-.blockers li { padding-left: var(--s-6); position: relative; color: var(--text); line-height: 1.5; }
-.blockers li::before { content: "→"; position: absolute; left: 0; color: var(--warn, var(--danger)); }
+.blockers li { display: flex; gap: var(--s-4); color: var(--text); line-height: 1.5; align-items: baseline; }
+/* THE ARROW IS AN `Icon` IN THE LIST ITEM NOW, where the `content: "→"` used to be. A `content:` glyph is
+   unreachable by any sweep of the components and unalignable by anything — the same argument
+   atoms/Icon.tsx opens with.
+   A FLEX ROW AND NOT AN ABSOLUTE MARK IN A PADDED GUTTER, which is what replaced it: that shape needed a
+   vertical offset of half the leading, and `calc((1.5em - 1em) / 2)` is a magic number wearing arithmetic
+   — check:scale said so and was right. Baseline alignment sits the mark on the text baseline with no
+   offset to derive, and the gap gives the hanging indent the padding used to, so a blocker that wraps
+   still aligns under its own first word. */
+.blockers li svg { flex: none; color: var(--warn, var(--danger)); }
 /* The other side of the same answer — nothing is blocking — and it is `Text ink="accent"`: `--t-small` is
    the atom's own step, so the class said nothing but the colour. */
 

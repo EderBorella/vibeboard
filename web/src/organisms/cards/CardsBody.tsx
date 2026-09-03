@@ -29,6 +29,11 @@ interface Props {
   dispatch: DispatchContext;
   onOpenCard: (card: Card) => void;
   onPatch: (card: Card, patch: CardFrontmatterPatch) => void;
+  // THE TWO FACTS THE CARD CANNOT DERIVE, carried from the snapshot. Both are maps keyed by card id and
+  // both used to feed the board tile instead; they moved to the card itself on 2026-09-02 — see the note
+  // in organisms/board/CardTile.tsx for why a miniature could not hold them.
+  openSuggestions?: Record<string, number>;
+  carryingAProblem?: Record<string, string[]>;
   onLinks: (card: Card, links: string[]) => void;
   onMove: (card: Card, columnSlug: string) => void;
   onRun: (request: import('../../lib/api').DispatchRequest) => void;
@@ -62,6 +67,8 @@ export function CardsBody({
   onMove,
   onRun,
   onForgiven,
+  openSuggestions,
+  carryingAProblem,
 }: Props) {
   const toCard = (): void => setView({ kind: 'card' });
   const { confirm, dialog } = useConfirm();
@@ -124,6 +131,8 @@ export function CardsBody({
     body = (
       <>
         <CardView
+          openSuggestions={openSuggestions?.[card.id] ?? 0}
+          carryingAProblem={carryingAProblem?.[card.id]}
           card={card}
           config={config}
           allCards={live}

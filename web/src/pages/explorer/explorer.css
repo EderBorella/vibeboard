@@ -38,7 +38,20 @@
    row's name lines up with a folder row's, and neither `Stack` nor `Text` carries a width. */
 .explorer-twist { width: var(--t-lead); }
 /* `.explorer-icon` IS GONE — a `Text ink="inherit"` (its step is the atom's default, and the ink is the
-   row's, which changes on hover) on `.vb-fixed`. */
+   row's) on `.vb-fixed`.
+
+   AND THE ROW'S INK DID NOT CHANGE ON HOVER, which the sentence above used to claim. `.vb-row-hit:hover`
+   moves the ground and the border and leaves `color` alone; only `.active` sets it. That was invisible
+   while the twist and the kind were text glyphs sharing the name's ink, and became worth fixing when they
+   became icons — an icon that does not answer the pointer reads as furniture rather than as part of the
+   row you are about to click.
+
+   THE ICONS ONLY, and by element rather than by a class of their own: `Icon` draws in `currentColor`, so
+   one `color` here moves the twist and the kind together and nothing else. `.vb-fixed` would have been
+   the obvious hook and is wrong — the size readout at the end of a file row wears it too, and a number
+   that flushes accent under the pointer is noise. `check:class-budget` is a ratchet at 220 with zero
+   slack, and this costs it nothing. */
+.explorer-list .vb-row-hit:hover svg { color: var(--accent); }
 
 /* The tail of a capped listing. Deliberately not styled as an error — the folder is fine, the
    listing is simply not all of it.

@@ -155,7 +155,58 @@ export function checkupSections(checkup: PromptInputs['checkup']): string[] {
   return [
     section('What is under this card', checkupSection(checkup)),
     ...(checkup.smoke ? [section('The smoke command', smokeSection(checkup.smoke))] : []),
+    ...(checkup.feature ? [section('The question this checkup exists for', usableSection())] : []),
   ];
+}
+
+// RULING 66'S SECOND FIX, and the one the incident actually needed.
+//
+// A project ran to `complete`: 67 iterations, 21 commits, four features closed, sixteen tasks delivered.
+// Every gate was green. The tool it built had no main and printed nothing — three tasks and a whole feature
+// claiming a working CLI, each having passed `npm test` and a review.
+//
+// EVERY LAYER WAS ASKING THE SAME QUESTION, which is why none of them caught it. The gate is the project's
+// own test command; the tests were written by the agents that wrote the code and import its exported
+// functions; nothing anywhere executes the thing; and the smoke command was ALSO `npm test`, so the evidence
+// ruling 55 hands this checkup added nothing the gate had not already said. The first fix closed that last
+// one — a smoke command may no longer equal a gate command — and it is not sufficient, because two different
+// commands can both be vacuous.
+//
+// SO THIS ASKS THE ONE QUESTION NO COMMAND CAN EXPRESS. Not "are the tasks done", which the loop already
+// knows and which was true; but "can a person use this the way the README says they can". It is a judgement,
+// it needs a model, and this is the only run in the machine that sees a whole feature against the brief.
+//
+// LAST OF THE THREE SECTIONS, deliberately. It is read after the children and after the smoke evidence, so
+// "the tasks are done and the command passed" is already in view when the question is put — which is the
+// exact combination that was mistaken for an answer.
+//
+// AND IT IS STILL A CHECKUP. Nothing here blocks: a feature that cannot be used is reported, in the words
+// the report already asks for, and a person decides. Turning this into a gate would stop the project on a
+// judgement, which is what ruling 55 refused for the smoke command and refuses again here.
+function usableSection(): string {
+  return [
+    'The tasks under this card being done is **not** the answer to this. The loop already knows they are',
+    'done — that is why you were dispatched — and a feature can be entirely delivered and entirely unusable.',
+    '',
+    '**Can someone use this the way the README says they can?**',
+    '',
+    'The README at the project root is the brief. Read what it promises a person can DO, then find out',
+    'whether they can. Run the thing. If it is a command, run the command; if it is a page, serve it and',
+    'open it; if it is a library, write the three lines its own README tells a caller to write and execute',
+    'them. Use what is already there to do it — the smoke command above, the scripts in the manifest — and',
+    'if nothing runs it, that is itself the finding.',
+    '',
+    'Two failures to watch for, because both have shipped here green:',
+    '',
+    '- **Nothing executes it.** Exported functions with no entry point, a server with no route, a page',
+    '  nothing serves. The tests pass because they import what the code exports, which is not the same',
+    '  thing as the product working.',
+    '- **The tests were written by whoever wrote the code**, against the same misunderstanding. A suite',
+    '  that agrees with the implementation proves they agree, not that either is right.',
+    '',
+    'Say what you actually did to find out, and what happened. "The tests pass" is not an answer to this',
+    'question; "I ran `npm start` and it printed nothing" is.',
+  ].join('\n');
 }
 
 // The run before this one, under whichever heading fits what this run is for. The same record is a

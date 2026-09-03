@@ -1,5 +1,6 @@
 import { Button } from '../../atoms/Button';
 import { Control } from '../../atoms/Control';
+import { Icon } from '../../atoms/Icon';
 import { Stack } from '../../atoms/Stack';
 import { Text } from '../../atoms/Text';
 import { Menu } from '../../molecules/Menu';
@@ -151,7 +152,7 @@ export function TopBar({
         </Control>
         {showProject && (
           <Button size="sm" className="switch-btn" title="Settings" onClick={onSettings}>
-            ⚙
+            <Icon name="settings" />
           </Button>
         )}
         {showProject && (

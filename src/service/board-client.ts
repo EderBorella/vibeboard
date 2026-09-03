@@ -74,6 +74,8 @@ export interface DispatchRequest {
     blocked: string[];
     suggestions: { id: string; title: string }[];
     smoke?: Verification;
+    // The FEATURE checkup, said rather than inferred from `smoke` — see the note where it is set.
+    feature?: true;
   };
 }
 

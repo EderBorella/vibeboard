@@ -347,7 +347,9 @@ npm run visual
 ```
 
 It has a layout engine, which jsdom does not, so it is the only thing that can see a value appear on a
-surface for the first time. A new radius or font size reported here is either a regression or a
+surface for the first time. **Eleven surfaces in three themes**, the copilot dock among them since
+2026-09-02 — with one exception it cannot cover: the thinking indicator renders only while a turn is in
+flight, driven by a socket frame, so no fixture on disk produces it. That is A4's job, above. A new radius or font size reported here is either a regression or a
 deliberate change — decide which, and if it was deliberate re-record with `npm run visual:record` and
 commit the baseline with the change that caused it.
 

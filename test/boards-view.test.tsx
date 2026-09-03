@@ -146,7 +146,9 @@ describe('BoardsView', () => {
     // Only boards with archived cards offer the drawer, so the zero must stay a zero.
     expect(
       [...document.querySelectorAll('[data-testid="board-archive"]')].map((e) => e.textContent?.trim()),
-    ).toEqual(['🗄 4', '🗄 1']);
+      // The archive glyph is an `aria-hidden` icon now, so the chip reads as its count alone. That is
+      // what a screen reader always should have heard: "🗄 4" was never a useful announcement.
+    ).toEqual(['4', '1']);
   });
 
   it('treats a snapshot with no archive counts at all as none archived', () => {

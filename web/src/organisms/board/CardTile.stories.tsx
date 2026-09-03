@@ -48,8 +48,6 @@ export const Clean: Story = {};
 export const Loaded: Story = {
   args: {
     card: { ...card, setup: true, followUp: true },
-    openSuggestions: 3,
-    carryingAProblem: ['C-051', 'C-052'],
   },
 };
 

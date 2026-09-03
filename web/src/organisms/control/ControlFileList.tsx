@@ -1,6 +1,7 @@
 import { Button } from '../../atoms/Button';
 import { Chip } from '../../atoms/Chip';
 import { Control } from '../../atoms/Control';
+import { Icon } from '../../atoms/Icon';
 import { Stack } from '../../atoms/Stack';
 import { Text } from '../../atoms/Text';
 import type { ControlCategory, ControlFile, ControlGroup } from '../../lib/api';
@@ -58,10 +59,12 @@ export function ControlFileList({
                 title={`New ${g.label.toLowerCase().replace(/s$/, '')}`}
                 onClick={() => onNew(g.key)}
               >
-                {/* `.control-new` IS GONE: the accent is a nested `Text`'s ink. */}
-                <Text size="inherit" ink="accent">
-                  ＋
-                </Text>
+                {/* `.control-new` IS GONE, and so is the `Text ink="accent"` that replaced it.
+                    An explicit ink HARD-SETS the colour, so it beat `.vb-btn-bare:hover`'s accent and the
+                    ＋ was the same shade whether the pointer was on it or not — a control that cannot
+                    answer the pointer. Bare's own pair is muted at rest and accent on hover, which is
+                    what every other bare button in the app does. */}
+                <Icon name="plus" />
               </Button>
             )}
           </Row>
@@ -74,7 +77,9 @@ export function ControlFileList({
               data-testid="control-item"
               onClick={() => onSelect(RESOURCES_SENTINEL)}
             >
-              <span className="vb-clip">🔗 Links registry</span>
+              <span className="vb-clip">
+                <Icon name="link" /> Links registry
+              </span>
             </Row>
           )}
           {g.files.length === 0 && g.key !== 'resources' && (

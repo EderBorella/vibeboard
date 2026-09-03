@@ -93,6 +93,8 @@ export function WorkArea(props: WorkAreaProps) {
       badge: cards.tabs.length || undefined,
       render: () => (
         <CardsPane
+          openSuggestions={snapshot.openSuggestions}
+          carryingAProblem={snapshot.carryingAProblem}
           tabs={cards.tabs}
           activeId={cards.activeId}
           live={allCards}

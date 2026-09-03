@@ -93,6 +93,39 @@ describe('a checkup’s evidence', () => {
     expect(r.requests[0]?.checkup?.smoke).toBeUndefined();
   });
 
+  // WHICH CHECKUP THIS IS, sent by the LOOP rather than worked out by the prompt. Ruling 66's second fix
+  // asks the feature checkup a question no other run is asked, and this is the flag that decides it.
+  //
+  // TESTED HERE AND NOT ONLY IN THE PROMPT, because the prompt's own tests cannot see this: replacing the
+  // phase check with `smoke.smoke ? …` left all 4,627 of them passing, since a prompt handed the flag
+  // renders correctly however the flag was decided. The wrong decision is invisible one layer up.
+  it('marks the FEATURE checkup, so the prompt can ask it the question no gate can', async () => {
+    const r = recorder({ boardCards: board() });
+    await performAction(deps(r.client, { verify: verify(smokePass) }), FEATURE_CHECKUP, context);
+    expect(r.requests[0]?.checkup?.feature).toBe(true);
+  });
+
+  it('does not mark a story checkup', async () => {
+    const r = recorder({ boardCards: board() });
+    await performAction(deps(r.client, { verify: verify(smokePass) }), STORY_CHECKUP, context);
+    expect(r.requests[0]?.checkup?.feature).toBeUndefined();
+  });
+
+  // NOT KEYED ON THE SMOKE RESULT. A failed smoke command is the case that matters most — the feature
+  // demonstrably does not run — so it is the case where the question must certainly still be asked.
+  //
+  // The stronger claim, that inferring from `smoke` would be WRONG, was checked and is false for every
+  // input that exists today: `verifySmoke` always answers a `Verification`, a failed one when nothing is
+  // declared. The reason the phase is read instead is written where the code is, and it is about what the
+  // two DEPEND on rather than what they currently answer. No test can distinguish them, and pretending one
+  // does would be worse than saying so.
+  it('marks it even when the smoke command failed', async () => {
+    const r = recorder({ boardCards: board() });
+    await performAction(deps(r.client, { verify: verify(smokeFail) }), FEATURE_CHECKUP, context);
+    expect(r.requests[0]?.checkup?.smoke).toMatchObject({ passed: false });
+    expect(r.requests[0]?.checkup?.feature).toBe(true);
+  });
+
   it('dispatches the checkup even when the smoke command failed', async () => {
     // EVIDENCE, NOT A GATE (ruling 55). A feature whose smoke command fails is exactly what a person needs
     // told about, and blocking there would stop the project instead of reporting it.

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Button } from '../../atoms/Button';
 import { Chip } from '../../atoms/Chip';
+import { Icon } from '../../atoms/Icon';
 import { Stack } from '../../atoms/Stack';
 import { Surface } from '../../atoms/Surface';
 import { Text } from '../../atoms/Text';
@@ -20,10 +21,6 @@ interface Props {
   onTag?: (tag: string) => void;
   // Open suggestions per card id, straight from the snapshot. Threaded rather than fetched here:
   // the board re-renders on every file change, and a badge that arrives a request later is a badge
-  // nobody sees.
-  openSuggestions?: Record<string, number>;
-  // The blocked task ids under each card, from the same snapshot and threaded the same way.
-  carryingAProblem?: Record<string, string[]>;
   // beforeId identifies the card to insert in front of; null means the end of the column.
   onDrop?: (board: BoardName, slug: string, beforeId: string | null) => void;
 }
@@ -40,8 +37,6 @@ export function Column({
   onDragStart,
   onTag,
   onDrop,
-  openSuggestions,
-  carryingAProblem,
 }: Props) {
   const [over, setOver] = useState(false);
   // Which gap the card would land in: 0 = above the first tile, cards.length = at the end.
@@ -80,7 +75,12 @@ export function Column({
               title="New card"
               onClick={() => onAdd(board, slug)}
             >
-              +
+              {/* AN ICON AND NOT AN ASCII `+`, since 2026-09-02. It was the last text glyph in the app and
+                  the census could not have found it: that sweep looked for NON-ASCII characters, and a
+                  plus is U+002B. The owner found it by eye — this ＋ and Project Control's sat at visibly
+                  different sizes, because a font's plus is a thin crossbar inside its own advance width
+                  and an icon is a 1em box drawn to a grid. Same mark, same size, both of them now. */}
+              <Icon name="plus" />
             </Button>
           )}
         </>
@@ -132,8 +132,6 @@ export function Column({
               onArchive={onArchive}
               onDragStart={onDragStart}
               onTag={onTag}
-              openSuggestions={openSuggestions?.[c.id] ?? 0}
-              carryingAProblem={carryingAProblem?.[c.id]}
             />
           </div>
         ))}

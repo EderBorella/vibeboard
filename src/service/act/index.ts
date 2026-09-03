@@ -231,6 +231,6 @@ async function dispatch(deps: ActDeps, action: Dispatch, context: TickContext): 
     );
   }
   return card
-    ? await afterCardRun(deps, action, card, settled, context, before)
+    ? await afterCardRun(deps, action, card, settled, context, before, gathered.evidence?.smoke)
     : await afterProjectRun(deps, action, settled, context, before);
 }

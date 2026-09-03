@@ -3,12 +3,19 @@ import { countLive, createdNothing } from '../../core/created.js';
 import { type PhaseName, phase } from '../../core/phases.js';
 import { producedNothing, type RunRecord } from '../../core/runs.js';
 import type { Card } from '../../core/types.js';
-import { unverified } from '../../core/verify.js';
+import { unverified, type Verification } from '../../core/verify.js';
 import type { ActResult, TickContext } from '../loop.js';
 import { stamp } from '../stamp.js';
 import type { ActDeps, Dispatch } from './index.js';
 import { refused } from './refusals.js';
-import { emptyCreateLine, emptyRunLine, failedRunLine, heldOpenLine, runLine } from './sentences.js';
+import {
+  emptyCreateLine,
+  emptyRunLine,
+  failedRunLine,
+  heldOpenLine,
+  runLine,
+  smokeHeldOpenLine,
+} from './sentences.js';
 
 // WHAT A SETTLED CARD RUN EARNED: the exit stamp, or one of the four endings that do not take it. Which of
 // them applies is decided here and nowhere else, so the order the questions are asked in is the behaviour.
@@ -62,6 +69,10 @@ export async function afterCardRun(
   context: TickContext,
   // The live-card count before the dispatch, for a phase whose product is cards. See `CREATING_PHASES`.
   before: number | undefined,
+  // The smoke result the LOOP produced before this dispatch, for a feature checkup (decision 69). Threaded
+  // rather than persisted: `act` gathers it, dispatches, waits and lands here inside one call, so the value is
+  // already in scope. A field on the run record would be a second copy of a fact with one reader.
+  smoke: Verification | undefined,
 ): Promise<ActResult> {
   const p = phase(action.phase);
   // An ending nobody is answerable for: the user cancelled it, a restart left it stale, the MACHINE
@@ -116,6 +127,39 @@ export async function afterCardRun(
   // phase until that phase's cap gives up — a failed verdict here would send a task to `fix` instead, spending
   // the fix budget on a run that produced no finding to fix.
   if (settled.status === 'failed') return await recordFailedRun(deps, action, card, settled, context);
+
+  // DECISION 69, AND IT REVERSES HALF OF RULING 55. That ruling made the smoke result EVIDENCE rather than a
+  // gate, so a failing one could not stall a project — and the consequence was a feature closing over a product
+  // that does not run, which is the whole of decision 66's incident. What has changed since is that the
+  // objection is answered elsewhere: `creatingRoundSpent` already stops a feature after one round of created
+  // work, with a sentence asking for a person, so refusing the close here cannot loop forever.
+  //
+  // THE MACHINE DECIDES, NOT THE MODEL, which is the point. Asked to judge a failing smoke, a model reads the
+  // output and talks itself into "environmental" — observed twice on 2026-09-03, once correctly and once from a
+  // stale document. A command that did not pass is a fact, and a fact a machine can check is not a prompt.
+  //
+  // Only the FEATURE checkup: no other phase runs the command, so `smoke` is undefined everywhere else and this
+  // is the same as absent.
+  //
+  // `command` AND NOT JUST `passed`, AND THE DIFFERENCE IS THE WHOLE OF THE CARE HERE. `verifySmoke` answers a
+  // FAILED verification for two unrelated situations: a command ran and did not pass, and there is no command
+  // to run at all (`failedVerification` in core/verify.ts, which sets no `command`). Refusing on `passed` alone
+  // would hold every feature in a project that has not declared a smoke command yet — a stall on a project that
+  // has done nothing wrong, and exactly the outcome ruling 55 was protecting against. `command` is set only by
+  // `commandVerification`, and only for a command that really ran and really failed.
+  //
+  // The undeclared case is somebody else's job and already has an owner: decision 66 gives every project a
+  // mandatory smoke-harness feature, and `complete` refuses while the smoke command is one of the gates.
+  if (smoke?.command !== undefined && !smoke.passed) {
+    await deps.client.log('run', smokeHeldOpenLine(card, action, settled, context), {
+      iteration: context.iteration + 1,
+      card: card.id,
+      board: card.board,
+      skill: action.skill,
+      outcome: settled.status,
+    });
+    return { dispatches: 1 };
+  }
 
   // THE EXIT STAMP, written because the run COMPLETED, whatever it says about itself.
   if (p.exitPass) {

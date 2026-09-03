@@ -126,23 +126,42 @@ function checkupSection(checkup: NonNullable<PromptInputs['checkup']>): string {
   ].join('\n');
 }
 
-// RULING 55: the loop ran it, and this is EVIDENCE rather than a verdict — the model is told what the command
-// did and decides what it means. A feature whose smoke command fails is exactly what a person needs told about,
-// so blocking on it would stop the project instead of reporting it.
+// RULING 55 SET THE PASSING HALF; DECISION 69 CHANGED THE FAILING ONE. A passing smoke is still evidence and
+// the model still decides what it means. A FAILING one is no longer a judgement call, because the judgement was
+// the defect: asked what a failed command meant, models read the output and reasoned their way to
+// "environmental" — twice in one afternoon, once rightly and once by quoting a document that was already
+// out of date.
+//
+// So the failing branch stops inviting an opinion and asks for work instead. It does not need to threaten: the
+// close is refused by the machine in service/act/outcomes.ts whatever this run concludes, and saying so here is
+// what stops the run wasting its turn arguing that the feature is fine.
 function smokeSection(smoke: Verification): string {
-  const lines = smoke.passed
-    ? ['The smoke command passed.']
-    : [
-        'The smoke command did NOT pass.',
-        ...(smoke.reason ? ['', smoke.reason] : []),
-        ...(smoke.command ? ['', `The command: \`${smoke.command}\``] : []),
-        ...(smoke.output ? ['', 'What it printed:', '', '```', smoke.output.trim(), '```'] : []),
-      ];
+  if (smoke.passed) {
+    return [
+      'Auto-pilot ran this in its own process before dispatching you, and it is evidence rather than a verdict:',
+      'what it means is yours to decide.',
+      '',
+      'The smoke command passed.',
+    ].join('\n');
+  }
   return [
-    'Auto-pilot ran this in its own process before dispatching you, and it is evidence rather than a verdict:',
-    'what it means is yours to decide.',
+    'Auto-pilot ran the smoke command in its own process before dispatching you. **It did not pass.**',
     '',
-    ...lines,
+    ...(smoke.reason ? [smoke.reason, ''] : []),
+    ...(smoke.command ? [`The command: \`${smoke.command}\``, ''] : []),
+    ...(smoke.output ? ['What it printed:', '', '```', smoke.output.trim(), '```', ''] : []),
+    'The smoke command is how this project says its product can be run. It did not run, so **this feature is',
+    'not finished** — and that is not a conclusion for you to reach or to argue with: the feature stays open',
+    'whatever you decide, so an answer explaining why it is really fine costs you the turn and changes nothing.',
+    '',
+    'What is yours to decide is WHAT IS WRONG. Read the output above and **create one card for each distinct',
+    'failure**, on the engineering board, each naming what was expected and what happened. Quote the real',
+    'strings the command printed rather than describing them — a card written from the failure reproduces it,',
+    'a card written from a guess sends the next run somewhere else.',
+    '',
+    'If the failure is genuinely not the product — the command itself is wrong, or something it needs is',
+    'missing from this container — say so plainly and say what you ran to establish it. "It looks',
+    'environmental" without a command and its output is the answer this instruction exists to stop.',
   ].join('\n');
 }
 

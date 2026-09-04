@@ -44,6 +44,18 @@ export function heldOpenLine(card: Card, action: Dispatch, settled: RunRecord, c
   return `Iteration ${context.iteration + 1}: ${card.id} ran ${action.skill} for its ${action.phase} phase; it ended as ${settled.status} and created work, so ${card.id} stays open until that work is done and the checkup after it closes ${card.id}.${said(settled)}`;
 }
 
+// DECISION 69: the feature did not close because its smoke command did not pass. Named as its own sentence
+// rather than folded into `heldOpenLine`, because the reader's next move is different: that one says work was
+// created and the loop will do it, this one says the product does not run and points at the command output.
+export function smokeHeldOpenLine(
+  card: Card,
+  action: Dispatch,
+  settled: RunRecord,
+  context: TickContext,
+): string {
+  return `Iteration ${context.iteration + 1}: ${card.id} ran ${action.skill} for its ${action.phase} phase and it ended as ${settled.status}, but the smoke command did not pass — so ${card.id} stays open whatever the checkup concluded. A feature whose product does not run is not finished.${said(settled)}`;
+}
+
 // And about one that died. It names the attempt as spent, because a card that has not moved and a card that
 // cost nothing look identical on the board and are not the same thing.
 export function failedRunLine(

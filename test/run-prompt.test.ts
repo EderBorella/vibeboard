@@ -845,10 +845,32 @@ describe('the checkup’s evidence', () => {
     );
   });
 
-  // EVIDENCE, NOT A VERDICT (ruling 55): the model is told what the command did and decides what it means.
-  it('does not tell the checkup what the smoke result means', () => {
-    const prompt = checkingUp({ smoke: { mode: 'smoke', passed: false, at: 'T', command: 'npm run smoke' } });
-    expect(prompt).toMatch(/what it means is yours to decide/i);
+  // RULING 55 STILL HOLDS FOR A PASSING SMOKE: the model is told what the command did and decides what it means.
+  it('leaves a passing smoke to the checkup to interpret', () => {
+    expect(checkingUp({ smoke: { mode: 'smoke', passed: true, at: 'T' } })).toMatch(
+      /what it means is yours to decide/i,
+    );
+  });
+
+  // DECISION 69 CHANGED THE FAILING HALF, and this pins the change rather than the wording: a failed smoke is
+  // no longer an invitation to interpret. The premise of the test this replaces — "does not tell the checkup
+  // what the smoke result means" — is the defect: told to decide, models decided "environmental".
+  it('asks a failed smoke to be carded rather than interpreted', () => {
+    const prompt = checkingUp({
+      smoke: {
+        mode: 'smoke',
+        passed: false,
+        at: 'T',
+        command: 'npm run smoke',
+        output: 'Expected 56. got 3.',
+      },
+    });
+    expect(prompt).toMatch(/create one card for each distinct/i);
+    expect(prompt).toMatch(/this feature is\s+not finished/i);
+    // The output is quoted, because a card written from the real strings reproduces the failure.
+    expect(prompt).toContain('Expected 56. got 3.');
+    // AND THE INVITATION IS GONE. Without this the new sentences could sit beside the old one and both ship.
+    expect(prompt).not.toMatch(/what it means is yours to decide/i);
   });
 
   it('omits the smoke section entirely for a story checkup', () => {

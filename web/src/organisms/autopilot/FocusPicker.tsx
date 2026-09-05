@@ -41,6 +41,34 @@ function focusable(features: Card[], terminal: string[]): Card[] {
   return features.filter((c) => !terminal.includes(c.columnSlug));
 }
 
+// THE SAVED FOCUS IS ALWAYS ONE OF THE OPTIONS, even when it is finished or gone from the board — and this
+// is here because the control lied on screen. `focus: F-001` was saved, F-001 had been closed by the run
+// that finished it, so the filter above dropped it and a `<select>` whose value matches no option falls back
+// to the first: the picker read **The whole board** over a project the loop was still confined to.
+//
+// Invisible to every gate. jsdom never had a saved focus pointing at a finished feature, Storybook's fixture
+// has none either, and the browser harness runs in standard mode where this control does not render. It was
+// found by opening the page and reading it.
+//
+// The state is LABELLED rather than silently repaired, because both readings are real: a finished focus is
+// what a completed focused run leaves behind, and an absent one is a card somebody archived — which the tick
+// refuses by name (core/position.ts). A picker that quietly cleared either would be deciding for the person.
+function withSavedFocus(options: Card[], features: Card[], focus: string | undefined): FocusOption[] {
+  const out: FocusOption[] = options.map((c) => ({ value: c.id, text: label(c.id, c.title) }));
+  if (focus === undefined || out.some((o) => o.value === focus)) return out;
+  const card = features.find((c) => c.id === focus);
+  out.push({
+    value: focus,
+    text: card ? `${label(focus, card.title)} (finished)` : `${focus} (no longer on the board)`,
+  });
+  return out;
+}
+
+interface FocusOption {
+  value: string;
+  text: string;
+}
+
 // ONE FEATURE, END TO END. Shown only in express mode — see the bar, which is also what clears the saved
 // focus when the mode changes, so a hidden picker can never leave the loop confined to a card nobody can
 // see.
@@ -50,7 +78,7 @@ function focusable(features: Card[], terminal: string[]): Card[] {
 // is the box this design system already draws for exactly that.
 export function FocusPicker({ config, features, onChange, disabled = false }: Props) {
   if (config?.mode !== 'express') return null;
-  const options = focusable(features, config.terminal.features ?? []);
+  const options = withSavedFocus(focusable(features, config.terminal.features ?? []), features, config.focus);
   return (
     <Control
       as="select"
@@ -61,9 +89,9 @@ export function FocusPicker({ config, features, onChange, disabled = false }: Pr
       onChange={(e) => onChange(e.currentTarget.value === NO_FOCUS ? undefined : e.currentTarget.value)}
     >
       <option value={NO_FOCUS}>{WHOLE_BOARD}</option>
-      {options.map((c) => (
-        <option key={c.id} value={c.id}>
-          {label(c.id, c.title)}
+      {options.map((o) => (
+        <option key={o.value} value={o.value}>
+          {o.text}
         </option>
       ))}
     </Control>

@@ -932,6 +932,28 @@ describe('the feature auto-pilot is focused on', () => {
     expect(long.length).toBeLessThan(`F-009 — ${longTitled.title}`.length);
   });
 
+  // THE CONTROL MUST SHOW THE STATE THAT EXISTS, and this was found by opening the page rather than by any
+  // gate. `focus: F-001` was saved, F-001 had been closed by the run that finished it, so the unfinished-only
+  // filter dropped it — and a `<select>` whose value matches no option falls back to the first. The picker
+  // read "The whole board" over a project the loop was still confined to.
+  //
+  // jsdom never had a saved focus pointing at a finished feature; Storybook's fixture has none; the browser
+  // harness runs in standard mode, where this control does not render.
+  it('shows a saved focus even after that feature has finished, and says it is finished', () => {
+    show({ autopilotConfig: { ...EXPRESS, focus: 'F-003' } }); // F-003 is in `done`
+    expect((picker() as HTMLSelectElement).value).toBe('F-003');
+    const chosen = Array.from(picker().querySelectorAll('option')).find((o) => o.value === 'F-003');
+    expect(chosen?.textContent).toMatch(/finished/i);
+  });
+
+  // The other reading, and it is the state the tick refuses by name: somebody archived the focused card.
+  it('shows a saved focus whose card has left the board, and says so', () => {
+    show({ autopilotConfig: { ...EXPRESS, focus: 'F-404' } });
+    expect((picker() as HTMLSelectElement).value).toBe('F-404');
+    const chosen = Array.from(picker().querySelectorAll('option')).find((o) => o.value === 'F-404');
+    expect(chosen?.textContent).toMatch(/no longer on the board/i);
+  });
+
   it('saves the focus with the whole block', async () => {
     show({ autopilotConfig: EXPRESS });
     fireEvent.change(picker(), { target: { value: 'F-002' } });

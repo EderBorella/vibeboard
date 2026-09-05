@@ -1,14 +1,17 @@
 import { burnsAttempt } from '../../core/accounting.js';
+import { DEFAULT_AUTOPILOT } from '../../core/autopilot.js';
+import { coveredBy } from '../../core/covered.js';
 import { countLive, createdNothing } from '../../core/created.js';
 import { type PhaseName, phase } from '../../core/phases.js';
 import { producedNothing, type RunRecord } from '../../core/runs.js';
-import type { Card } from '../../core/types.js';
+import { BOARDS, type Card } from '../../core/types.js';
 import { unverified, type Verification } from '../../core/verify.js';
 import type { ActResult, TickContext } from '../loop.js';
 import { stamp } from '../stamp.js';
 import type { ActDeps, Dispatch } from './index.js';
 import { refused } from './refusals.js';
 import {
+  coveredLine,
   emptyCreateLine,
   emptyRunLine,
   failedRunLine,
@@ -107,9 +110,8 @@ export async function afterCardRun(
   // A different question from `producedNothing`, and both earn their place: that one asks whether the run left
   // anything behind at all, and this one asks whether the board GREW — which is the only honest measure for a
   // phase whose product goes through the API and therefore changes no files.
-  if (grew === false && CREATING_PHASES.includes(action.phase)) {
-    return await recordEmptyCreate(deps, action, card, settled, context);
-  }
+  const emptied = await whenNoCardWasCreated(deps, action, card, settled, context, grew);
+  if (emptied) return emptied;
 
   // AND A FEATURE CHECKUP THAT DID GROW IT takes its other exit: the feature stays open and L2 walks the
   // stories it created (decision 47 allows that once, and `creatingRoundSpent` is what bounds it).
@@ -227,6 +229,78 @@ async function heldOpen(
 // A failing verdict for a creating run whose board did not grow. The card stays where its entry stamp put it
 // and the attempt is burned by the record, exactly as an empty run's is — there is nothing to advance to,
 // because the thing this phase exists to produce does not exist.
+// A CREATING PHASE THAT PRODUCED NO CARD, and the two endings it now has. `undefined` means this was not
+// that case, so the caller falls through to everything else.
+//
+// ONE FUNCTION RATHER THAN TWO BRANCHES IN `afterCardRun`, for a measured reason. The branches took that
+// function to a cognitive complexity of 17 against a ceiling of 15, and flattening the nesting first —
+// which is what CODE-QUALITY.md says to try before extracting — moved it not at all.
+async function whenNoCardWasCreated(
+  deps: ActDeps,
+  action: Dispatch,
+  card: Card,
+  settled: RunRecord,
+  context: TickContext,
+  grew: boolean | undefined,
+): Promise<ActResult | undefined> {
+  if (grew !== false || !CREATING_PHASES.includes(action.phase)) return undefined;
+  // UNLESS IT CREATED NOTHING BECAUSE THERE WAS NOTHING TO CREATE (decision 71). A card whose work already
+  // exists cannot be finished by a phase that only succeeds by producing more of it: the attempt burns,
+  // three times, and the loop stops on a card that was done before it was written. The claim is CHECKED —
+  // see `coverageHolds` — which is what separates it from the unverifiable claim decision 43 refuses.
+  if (await coverageHolds(deps, settled)) {
+    return await advanceOnCoverage(deps, action, card, settled, context);
+  }
+  return await recordEmptyCreate(deps, action, card, settled, context);
+}
+
+// THE CLAIM, VERIFIED AGAINST THE BOARD. Reads the board only when a claim was actually made, so the
+// ordinary empty create — the one decision 43 is about — costs no extra request.
+//
+// A board that cannot be read answers `false`: a citation nobody could check is not a citation, and the
+// safe direction here is the one that burns the attempt rather than the one that advances the card.
+async function coverageHolds(deps: ActDeps, settled: RunRecord): Promise<boolean> {
+  const claimed = settled.covered;
+  if (claimed === undefined || claimed.length === 0) return false;
+  const board = await deps.client.board();
+  if (!board.ok) return false;
+  const ap = board.value.config.autopilot ?? DEFAULT_AUTOPILOT;
+  const cards = BOARDS.flatMap((b) => board.value.boards[b] ?? []);
+  return coveredBy(ap, cards, claimed);
+}
+
+// The card advances exactly as a creating run that DID grow the board would have — same exit stamp, same
+// attempt accounting. The diary says which cards were cited, because "closed having created nothing" is a
+// sentence a person will otherwise come looking for an explanation of.
+async function advanceOnCoverage(
+  deps: ActDeps,
+  action: Dispatch,
+  card: Card,
+  settled: RunRecord,
+  context: TickContext,
+): Promise<ActResult> {
+  const p = phase(action.phase);
+  if (p.exitPass) {
+    const stamped = await stamp(
+      deps,
+      card,
+      p.exitPass,
+      `its ${action.skill} run found the work already done.`,
+    );
+    if (!stamped.ok) {
+      return refused(deps, `could not advance ${card.id} to ${p.exitPass}`, stamped.reason, stamped.fatal, 1);
+    }
+  }
+  await deps.client.log('run', coveredLine(card, action, settled, context), {
+    iteration: context.iteration + 1,
+    card: card.id,
+    board: card.board,
+    skill: action.skill,
+    outcome: settled.status,
+  });
+  return { dispatches: 1 };
+}
+
 async function recordEmptyCreate(
   deps: ActDeps,
   action: Dispatch,

@@ -34,6 +34,7 @@ const DETAIL_KEYS = [
   'summary',
   'options',
   'created',
+  'covered',
   'note',
   'usage',
   'suggestions',

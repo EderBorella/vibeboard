@@ -33,6 +33,7 @@ export function withReport(record: RunRecord, report: AgentReport, finished: str
     ...(report.summary ? { summary: report.summary } : {}),
     ...(report.options ? { options: report.options } : {}),
     ...(report.created ? { created: report.created } : {}),
+    ...(report.covered ? { covered: report.covered } : {}),
     // The review's own record carries what it SAID; the run it judged carries what came of it as
     // `verification` — one fact, one home, on each side.
     ...(report.verdict === undefined ? {} : { verdict: report.verdict }),

@@ -1,6 +1,7 @@
 import type { TickAction } from '../../core/actions.js';
 import type { AutopilotState } from '../../core/autopilot-state.js';
 import { phase } from '../../core/phases.js';
+import type { Verification } from '../../core/verify.js';
 import { commitAll } from '../../exec/git-work.js';
 import type { verifyGates, verifySmoke } from '../../exec/verify.js';
 import type { BoardClient, DispatchRequest } from '../board-client.js';
@@ -139,6 +140,23 @@ async function stampOnly(deps: ActDeps, action: Stamp): Promise<ActResult> {
 // WHAT IS DISPATCHED, in one place. A card run names its card and may carry the run whose findings it is
 // addressing; a project run names neither, because the card it would be about is the thing it exists to
 // create.
+// THE SMOKE RESULT ONLY WHERE IT IS ALLOWED TO REFUSE A CLOSE (decision 69, scoped by the tempconv run).
+//
+// The smoke command proves the ASSEMBLED product runs, so consulting it at every feature refuses closes no
+// feature's own work could earn: watched live, three features in a row stalled on a command that needed a
+// file a LATER feature owned. `bootstrap.ts` already states the rule this restores — "there is nothing to
+// smoke test before the product exists" — which is why the harness feature is last by construction.
+//
+// Handing back `undefined` rather than adding a second parameter keeps the guard in `afterCardRun` a single
+// condition: an undefined smoke cannot refuse anything, which is already true for every non-feature phase.
+// The checkup is still TOLD the result either way — that is `evidence`, and ruling 55's half that stands.
+function smokeThatGates(gathered: {
+  evidence?: CheckupEvidence;
+  lastFeature?: boolean;
+}): Verification | undefined {
+  return gathered.lastFeature === true ? gathered.evidence?.smoke : undefined;
+}
+
 function requestFor(action: Dispatch, checkup?: CheckupEvidence): DispatchRequest {
   const card = action.card;
   if (!card) return { project: true, skill: action.skill };
@@ -231,6 +249,6 @@ async function dispatch(deps: ActDeps, action: Dispatch, context: TickContext): 
     );
   }
   return card
-    ? await afterCardRun(deps, action, card, settled, context, before, gathered.evidence?.smoke)
+    ? await afterCardRun(deps, action, card, settled, context, before, smokeThatGates(gathered))
     : await afterProjectRun(deps, action, settled, context, before);
 }

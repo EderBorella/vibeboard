@@ -3,6 +3,7 @@ import { unreviewedGatesSentence } from '../../core/autopilot-state.js';
 import { latestOwnRun } from '../../core/bounds.js';
 import { blockedUnder } from '../../core/derived-status.js';
 import { childrenOf } from '../../core/hierarchy.js';
+import { isLastOpenFeature } from '../../core/last-feature.js';
 import type { PhaseName } from '../../core/phases.js';
 import type { RunRecord } from '../../core/runs.js';
 import { BOARDS, type Card } from '../../core/types.js';
@@ -37,7 +38,7 @@ export async function checkupEvidence(
   action: Dispatch,
   card: Card,
   context: TickContext,
-): Promise<{ evidence?: CheckupEvidence; refused?: ActResult }> {
+): Promise<{ evidence?: CheckupEvidence; refused?: ActResult; lastFeature?: boolean }> {
   // BEFORE ANY OF THE READS, because for a feature checkup gathering the evidence RUNS A COMMAND, and a
   // command out of a gate document nobody has read does not run (see `refuseWhileGateDocumentUnread`).
   const smoke = await smokeFor(deps, action, context);
@@ -61,7 +62,12 @@ export async function checkupEvidence(
     // the checkup has no way to read it.
     blocked: isBlockedColumn(ap, child.board, child.columnSlug),
   }));
+  // WHETHER THE SMOKE RESULT MAY REFUSE THIS FEATURE'S CLOSE (decision 69, scoped). Computed here because
+  // this is where the board has already been read, and returned beside the evidence rather than inside it:
+  // it is not something the checkup is told, it is something the machine decides afterwards.
+  const lastFeature = isLastOpenFeature(ap, cards, card);
   return {
+    lastFeature,
     evidence: {
       children,
       // Through as many levels as there are: a feature's problem is often two levels down, where its story is
@@ -71,6 +77,9 @@ export async function checkupEvidence(
         ? suggestions.value.suggestions.map((s) => ({ id: s.id, title: s.title }))
         : [],
       ...(smoke.smoke === undefined ? {} : { smoke: smoke.smoke }),
+      // Sent only when true, like every other optional here: a false flag and an absent one mean the same
+      // thing to the prompt, and the wire says less.
+      ...(lastFeature ? { smokeGates: true as const } : {}),
       // WHICH CHECKUP THIS IS, said rather than inferred. The prompt asks the feature checkup one question
       // no other run is asked (ruling 66's second fix), and this is what decides it.
       //

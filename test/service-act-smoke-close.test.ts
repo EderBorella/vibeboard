@@ -92,3 +92,37 @@ describe('a feature checkup whose smoke command failed', () => {
     expect(r.moves).toEqual([{ card: 'F-001', to: 'done' }]);
   });
 });
+
+// THE SCOPE OF THE REFUSAL, added after watching a real greenfield project stall three times on it.
+//
+// The smoke command proves the ASSEMBLED product runs. F-002 was "Temperature conversion", its own ten
+// cards were done and its unit tests passed — and it could not close, because `npm run smoke` spawns
+// `node src/index.js`, which F-004 owned and had not built yet. Three features stalled that way before
+// any product code existed; the moment the CLI landed, four features closed with no person at all.
+//
+// So the refusal now asks a question it did not ask: is this the LAST feature? `bootstrap.ts` already
+// states the rule — "there is nothing to smoke test before the product exists" — which is why the
+// harness feature is created last by construction. The gate simply had not inherited it.
+describe('the smoke refusal applies only to the last open feature', () => {
+  const other = (id: string, columnSlug: string) =>
+    ({ ...CARD(id, 'features'), id, columnSlug }) as typeof feature;
+
+  it('does not refuse the close while another feature is still to come', async () => {
+    const r = recorder({
+      boardBefore: [feature, other('F-004', 'backlog')],
+      boardCards: [feature, other('F-004', 'backlog')],
+    });
+    await performAction(deps(r.client, verifying(ranAndFailed)), CHECKUP, context);
+    // F-002's own work is done; the command it cannot pass belongs to F-004.
+    expect(r.moves).toEqual([{ card: 'F-001', to: 'done' }]);
+  });
+
+  it('still refuses when every other feature is done', async () => {
+    const r = recorder({
+      boardBefore: [feature, other('F-004', 'done')],
+      boardCards: [feature, other('F-004', 'done')],
+    });
+    await performAction(deps(r.client, verifying(ranAndFailed)), CHECKUP, context);
+    expect(r.moves).toEqual([]);
+  });
+});

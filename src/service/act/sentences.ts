@@ -56,6 +56,14 @@ export function smokeHeldOpenLine(
   return `Iteration ${context.iteration + 1}: ${card.id} ran ${action.skill} for its ${action.phase} phase and it ended as ${settled.status}, but the smoke command did not pass — so ${card.id} stays open whatever the checkup concluded. A feature whose product does not run is not finished.${said(settled)}`;
 }
 
+// DECISION 71: the card advanced because the work was already there, not because this run did it. Names the
+// cited cards, because a card that closed having created nothing is the first thing a person will query —
+// and the answer has to be in the diary rather than only in a report they would have to go and open.
+export function coveredLine(card: Card, action: Dispatch, settled: RunRecord, context: TickContext): string {
+  const cited = settled.covered ?? [];
+  return `Iteration ${context.iteration + 1}: ${card.id} ran ${action.skill} for its ${action.phase} phase and created nothing, because the work is already done by ${cited.join(', ')} — checked against the board, and every one of them is settled. ${card.id} moves on.${said(settled)}`;
+}
+
 // And about one that died. It names the attempt as spent, because a card that has not moved and a card that
 // cost nothing look identical on the board and are not the same thing.
 export function failedRunLine(

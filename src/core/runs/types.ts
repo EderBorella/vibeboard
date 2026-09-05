@@ -115,6 +115,9 @@ export interface RunRecord {
   summary?: string; // one line, from the agent
   options?: string[]; // the agent's options — attention only
   created?: string[]; // card ids the run created
+  // Card ids a creating run cited as already doing this card's work. Verified against the board before
+  // it may advance anything — see core/covered.ts.
+  covered?: string[];
   note?: string; // VibeBoard's own explanation when there is no report to speak for the run
   usage?: RunUsage; // what it cost, when the backend said
   // How many suggestions this run filed. A first-class diagnostic, not a footnote: an agent with
@@ -161,6 +164,19 @@ export interface AgentReport {
   summary?: string;
   options?: string[];
   created?: string[];
+  // THE CARDS THAT ALREADY DO THIS CARD'S WORK, when a creating phase found the work already done.
+  //
+  // `decision 43` refuses to advance a creating phase whose board did not grow, whatever the run reported,
+  // because agents claimed cards they had never made. That is right, and it leaves no way to say the
+  // truthful thing: *there is nothing to create, because it already exists*. Watched live, three
+  // break-down runs in a row each reported "I created no cards, because every claim this card makes is
+  // already true", each named the cards that had done it, and the loop stalled on the last card of an
+  // otherwise finished project.
+  //
+  // So the claim is accepted only where it is CHECKABLE: these are card ids, and `coveredBy` in
+  // core/covered.ts verifies every one exists on the board and is settled before the card may advance.
+  // A citation nobody can check is the thing decision 43 refuses, and this is not one.
+  covered?: string[];
   // A REVIEW run's answer. Absent when it wrote none, which is a review that decided nothing rather than
   // one that passed the work — the direction that matters, since the other would invent a pass.
   verdict?: ReviewVerdict;

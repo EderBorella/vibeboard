@@ -855,8 +855,9 @@ describe('the checkup’s evidence', () => {
   // DECISION 69 CHANGED THE FAILING HALF, and this pins the change rather than the wording: a failed smoke is
   // no longer an invitation to interpret. The premise of the test this replaces — "does not tell the checkup
   // what the smoke result means" — is the defect: told to decide, models decided "environmental".
-  it('asks a failed smoke to be carded rather than interpreted', () => {
+  it('asks a failed smoke to be carded rather than interpreted, on the last feature', () => {
     const prompt = checkingUp({
+      smokeGates: true,
       smoke: {
         mode: 'smoke',
         passed: false,
@@ -871,6 +872,22 @@ describe('the checkup’s evidence', () => {
     expect(prompt).toContain('Expected 56. got 3.');
     // AND THE INVITATION IS GONE. Without this the new sentences could sit beside the old one and both ship.
     expect(prompt).not.toMatch(/what it means is yours to decide/i);
+  });
+
+  // THE SCOPE OF THAT DEMAND, learned from a greenfield run that stalled three times. A feature whose own
+  // work is finished must not be told it is unfinished because a command about the WHOLE product failed on
+  // work a later feature owns — a checkup told that spends its one round of creation justifying staying open.
+  it('tells a feature that is not the last one that a red smoke is expected', () => {
+    const prompt = checkingUp({
+      smoke: { mode: 'smoke', passed: false, at: 'T', command: 'npm run smoke', output: 'MODULE_NOT_FOUND' },
+    });
+    expect(prompt).toMatch(/not, on its own, a reason to keep this feature open/i);
+    expect(prompt).toMatch(/expected to fail until the last of them\s+lands/i);
+    // The evidence is still handed over — ruling 55's half that stands.
+    expect(prompt).toContain('MODULE_NOT_FOUND');
+    // And the demanding language is absent, or both would ship and the reader would follow the louder one.
+    expect(prompt).not.toMatch(/this feature is\s+not finished/i);
+    expect(prompt).not.toMatch(/create one card for each distinct/i);
   });
 
   it('omits the smoke section entirely for a story checkup', () => {

@@ -56,6 +56,10 @@ export interface RunRecord {
   summary?: string;
   options?: string[];
   created?: string[];
+  // Card ids a creating run cited as already doing this card's work, verified against the board before
+  // the card advanced. Mirrored for the same reason `created` is: it is what the run produced, and a
+  // reader asking why a card closed with nothing new on the board needs the answer on screen.
+  covered?: string[];
   // VibeBoard's explanation when there is no report to speak for the run.
   note?: string;
   usage?: RunUsage; // what it cost, when the backend said
@@ -105,6 +109,7 @@ export const RUN_RECORD_KEYS = [
   'summary',
   'options',
   'created',
+  'covered',
   'note',
   'usage',
   'suggestions',

@@ -76,6 +76,9 @@ export interface DispatchRequest {
     smoke?: Verification;
     // The FEATURE checkup, said rather than inferred from `smoke` — see the note where it is set.
     feature?: true;
+    // WHETHER A FAILED SMOKE MAY REFUSE THIS FEATURE'S CLOSE — true only for the last open feature.
+    // The prompt reads it to decide whether the failure is this feature's problem or a later one's.
+    smokeGates?: true;
   };
 }
 

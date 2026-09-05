@@ -91,7 +91,7 @@ const isFault = oneOf(RUN_FAULTS);
 // and still at its cap on the next read. Nothing caught that — the round-trip fixture named neither
 // this field nor `fault` — so both are now in the round trip in test/runs-parse.test.ts.
 const TEXT_OPTIONALS = ['finished', 'forgiven', 'resolved', 'previous', 'prompt', 'summary', 'note'] as const;
-const LIST_OPTIONALS = ['attached', 'options', 'created'] as const;
+const LIST_OPTIONALS = ['attached', 'options', 'created', 'covered'] as const;
 
 // Whole-number fields, each with the smallest value it may legitimately hold. One table rather than a
 // guard apiece: the floors are the only thing that differs, and three near-identical blocks pushed
@@ -385,6 +385,7 @@ export function parseAgentReport(content: string): AgentReport {
     ...(asText(d.summary) ? { summary: asText(d.summary) } : {}),
     ...(asStrings(d.options) ? { options: asStrings(d.options) } : {}),
     ...(asStrings(d.created) ? { created: asStrings(d.created) } : {}),
+    ...(asStrings(d.covered) ? { covered: asStrings(d.covered) } : {}),
     // A review's answer, dropped unless it is one of the two. Absent is what an inconclusive review is.
     ...(isVerdict(d.verdict) ? { verdict: d.verdict } : {}),
     ...(asText(d.run) ? { run: asText(d.run) } : {}),

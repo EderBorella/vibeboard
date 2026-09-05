@@ -122,6 +122,9 @@ export interface PromptInputs {
     // built printed nothing, because every layer was asking whether the tasks were done rather than whether
     // the thing worked. Only this run sees a whole feature against the brief.
     feature?: true;
+    // Whether a failed smoke may refuse this feature's close — true only for the last open feature.
+    // See `smokeSection`: it decides whether the failure is this card's problem or a later card's.
+    smokeGates?: true;
   };
   // Where the agent must write its report, project-root-relative.
   reportPath: string;

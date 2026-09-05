@@ -8,8 +8,9 @@ import {
   RUNS_DIR,
   skillRel,
 } from '../src/core/layout.js';
+import { phase } from '../src/core/phases.js';
 import type { Skill } from '../src/core/skills.js';
-import type { BoardName, Card } from '../src/core/types.js';
+import { BOARDS, type BoardName, type Card } from '../src/core/types.js';
 import type { Verification } from '../src/core/verify.js';
 import { allows, endpointsFor } from '../src/server/auth/auth.js';
 import type { Credential, Scope } from '../src/server/auth/credentials.js';
@@ -872,6 +873,41 @@ describe('the checkup’s evidence', () => {
     expect(prompt).toContain('Expected 56. got 3.');
     // AND THE INVITATION IS GONE. Without this the new sentences could sit beside the old one and both ship.
     expect(prompt).not.toMatch(/what it means is yours to decide/i);
+  });
+
+  // THE BOARD THAT DEMAND NAMES, and it was wrong — the whole mechanism decision 69 built was dead on the
+  // only branch that reaches it.
+  //
+  // `smokeSection` told the checkup to file its findings "on the engineering board". `feature-checkup`
+  // declares `creates: 'product'`, and `wrongBoardForRun` (server/boards/cards-routes.ts) enforces exactly
+  // that field — so the server refused every card the instruction asked for. The agent created nothing,
+  // `boardGrew` was false, decision 69 held the feature open, and the round repeated to the attempt cap.
+  //
+  // Widening `creates` to engineering is NOT the fix: `derivePosition` walks feature -> story -> task, so an
+  // engineering card parented to a feature is an orphan no phase picks up (service/act/outcomes.ts:32).
+  //
+  // ASSERTED AGAINST THE PHASE TABLE rather than against the string `product`, which is the point of the fix:
+  // the prompt now reads the same field the server enforces, so the two cannot drift apart again. A test
+  // naming the board itself would be a third copy of the fact, and a third place for it to go wrong.
+  it('names the board its own phase may create on, and no other', () => {
+    const prompt = checkingUp({
+      smokeGates: true,
+      smoke: {
+        mode: 'smoke',
+        passed: false,
+        at: 'T',
+        command: 'npm run smoke',
+        output: 'Expected 56. got 3.',
+      },
+    });
+    const creates = phase('feature-checkup').creates;
+    expect(creates).toBeDefined();
+    expect(prompt).toContain(`on the ${creates} board`);
+    // Not a hardcoded `engineering`: any board but its own is wrong for the same reason, and enumerating
+    // them means a future change to the table cannot leave a stale name behind unnoticed.
+    for (const other of BOARDS.filter((b) => b !== creates)) {
+      expect(prompt).not.toContain(`on the ${other} board`);
+    }
   });
 
   // THE SCOPE OF THAT DEMAND, learned from a greenfield run that stalled three times. A feature whose own

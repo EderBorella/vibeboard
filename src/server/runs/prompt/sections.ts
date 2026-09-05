@@ -1,5 +1,6 @@
 import { relative } from 'node:path';
 import { ARCHIVE_SLUG, RESULTS_DIR } from '../../../core/layout.js';
+import { phase } from '../../../core/phases.js';
 import type { Card } from '../../../core/types.js';
 import type { Verification } from '../../../core/verify.js';
 import type { BoardColumns, PromptInputs } from './index.js';
@@ -126,6 +127,22 @@ function checkupSection(checkup: NonNullable<PromptInputs['checkup']>): string {
   ].join('\n');
 }
 
+// THE BOARD THE DEMAND BELOW NAMES, read from the phase table rather than typed out — and it is a fix, not a
+// tidy-up. This section used to say "on the engineering board" while `feature-checkup` declares
+// `creates: 'product'`, and `wrongBoardForRun` (server/boards/cards-routes.ts) enforces that field: the server
+// refused every card the instruction asked for, so the run created nothing, `boardGrew` was false, decision 69
+// held the feature open and the round repeated to the attempt cap. The whole mechanism was dead on the only
+// branch that reaches it.
+//
+// Widening `creates` to engineering would not have fixed it. `derivePosition` walks feature -> story -> task,
+// so an engineering card parented to a feature is an orphan no phase picks up — see the header of
+// HOLDS_OPEN_HAVING_CREATED in service/act/outcomes.ts. Filed on `product`, each card is a story the machine
+// already knows how to break into tasks, which is what the closing sentence promises.
+//
+// Ruling 52's precedent: a fact the table already carries is read from it, never copied. Two copies is two
+// places to drift, and this is what drifting cost.
+const CHECKUP_CREATES = phase('feature-checkup').creates;
+
 // RULING 55 SET THE PASSING HALF; DECISION 69 CHANGED THE FAILING ONE. A passing smoke is still evidence and
 // the model still decides what it means. A FAILING one is no longer a judgement call, because the judgement was
 // the defect: asked what a failed command meant, models read the output and reasoned their way to
@@ -178,9 +195,12 @@ function smokeSection(smoke: Verification, gates: boolean): string {
     'whatever you decide, so an answer explaining why it is really fine costs you the turn and changes nothing.',
     '',
     'What is yours to decide is WHAT IS WRONG. Read the output above and **create one card for each distinct',
-    'failure**, on the engineering board, each naming what was expected and what happened. Quote the real',
-    'strings the command printed rather than describing them — a card written from the failure reproduces it,',
-    'a card written from a guess sends the next run somewhere else.',
+    `failure**, on the ${CHECKUP_CREATES} board, each naming what was expected and what happened. Quote the`,
+    'real strings the command printed rather than describing them — a card written from the failure reproduces',
+    'it, a card written from a guess sends the next run somewhere else.',
+    '',
+    'Auto-pilot takes it from there: this feature stays open, each card you file is broken down into the work',
+    'that fixes it, and the command is run again when that work is done.',
     '',
     'If the failure is genuinely not the product — the command itself is wrong, or something it needs is',
     'missing from this container — say so plainly and say what you ran to establish it. "It looks',

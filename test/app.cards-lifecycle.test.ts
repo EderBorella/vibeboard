@@ -146,6 +146,36 @@ describe('which board a run may create a card on', () => {
     expect(res.statusCode).toBe(200);
   });
 
+  // THE OTHER HALF OF THAT, and it is the defect decision 69 shipped with rather than a hypothetical.
+  //
+  // `smokeSection` told a feature checkup facing a failed smoke to file its findings "on the engineering
+  // board". This is what the server does with that: the refusal below fired on every card the instruction
+  // asked for, so the run created nothing, `boardGrew` was false, decision 69 held the feature open, and the
+  // round repeated to the attempt cap. It rendered only for the last open feature with a failing smoke
+  // command — the one case the whole mechanism exists for.
+  //
+  // Kept as a test rather than deleted with the wording, because the wording is not what makes it safe: the
+  // prompt now reads `phase('feature-checkup').creates`, and this asserts the server still refuses the board
+  // that field does not name. Widening `creates` to engineering would make both go green and orphan every
+  // card created — `derivePosition` walks feature -> story -> task, so a task parented to a feature is
+  // reached by no phase.
+  it('refuses a feature checkup a card on engineering, two boards down', async () => {
+    const { app, store, root } = await open();
+    const run = store.mintRun('work', 'run-7b', root, 'F-001', {
+      board: 'features',
+      skill: 'checkup-feature',
+    });
+    const res = await create(app, bearer(run.token), {
+      board: 'engineering',
+      columnSlug: 'backlog',
+      title: 'Fix what the smoke test found',
+    });
+    expect(res.statusCode).not.toBe(200);
+    // The sentence matters as much as the code: it is what an agent reads, and it names where the card does
+    // belong rather than only saying no.
+    expect(res.json().error).toContain('may create cards on product only, not on engineering');
+  });
+
   it('lets the bootstrap project run create features', async () => {
     // No `cred.board` at all: a project run has no card, and `bootstrap` is the only card-less phase.
     const { app, store, root } = await open();

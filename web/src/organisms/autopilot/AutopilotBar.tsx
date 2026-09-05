@@ -14,7 +14,7 @@ import {
   softStopAutopilot,
   startAutopilot,
 } from '../../lib/api';
-import type { CopilotConfig } from '../../lib/shared';
+import type { AutopilotConfig, CopilotConfig } from '../../lib/shared';
 import { useAction } from '../../lib/useAction';
 import { useConfirm } from '../../lib/useConfirm';
 import { StatusChip } from '../../molecules/StatusChip';
@@ -25,6 +25,7 @@ import { killProjectRequest } from '../shared/requests';
 import { type LightAdvice, lightAdvice } from '../topbar/connection-light';
 import { AutopilotHelp } from './AutopilotHelp';
 import { ForgiveDerivation } from './ForgiveDerivation';
+import { LifecyclePicker } from './LifecyclePicker';
 import { type TransportModel, transportModel } from './transport';
 import { useReadiness } from './useReadiness';
 
@@ -37,6 +38,10 @@ interface Props {
   // without naming one and the server fills it from here, so this IS the agent auto-pilot runs — it had
   // simply never been shown on the surface that runs it.
   copilot: CopilotConfig;
+  // The project's lifecycle block, for the mode picker. `null` on a project written before the lifecycle
+  // existed — auto-pilot will not start there anyway, and a picker over a block that does not exist would
+  // write one key into nothing.
+  autopilotConfig: AutopilotConfig | null;
   // Whether agents can run at all, already fetched by the shell. Threaded rather than fetched again so
   // there is one answer on screen: a second fetch would be a second opinion with its own refresh
   // schedule, and this bar and the connection light would disagree for the length of it.
@@ -261,6 +266,7 @@ export function AutopilotBar({
   runs,
   bump,
   copilot,
+  autopilotConfig,
   sandbox,
   onChanged,
   onBackendChanged,
@@ -307,6 +313,22 @@ export function AutopilotBar({
       // OpenCode would leave the bar still saying the project cannot run. Nothing about that is visible
       // by inspection, which is why it has a test of its own.
       onBackendChanged();
+    });
+  }
+
+  // THE LIFECYCLE MODE. Written to the project config, exactly like the backend beside it — the same
+  // `patchConfig`, the same "saved as this project's default" reading — because it is a property of the
+  // project and not of this session. A per-session mode would mean two people's boards growing at
+  // different granularities in the same repository.
+  //
+  // THE WHOLE BLOCK IS SPREAD BACK, not `{ mode }` alone. `PATCH /api/config` runs the coverage check over
+  // the autopilot block it is given, and a block carrying one key fails every check that indexes the rest
+  // — the class of refusal `ensureAutopilotKeys` exists to prevent, arriving from the other direction.
+  function chooseMode(next: string): void {
+    if (!autopilotConfig || next === autopilotConfig.mode) return;
+    void runSwitch(async () => {
+      await patchConfig({ autopilot: { ...autopilotConfig, mode: next as AutopilotConfig['mode'] } });
+      onChanged();
     });
   }
 
@@ -415,7 +437,19 @@ export function AutopilotBar({
             thing on the strip. That is the exact defect the box's own comment recorded being fixed at
             29.8px, so the choice was an asymmetric box or no box. The ELEMENT stays: it is the middle of
             the bar's three groups and `.push` on it is what splits the free space. */}
+        {/* THE MIDDLE GROUP: the two PROJECT DEFAULTS this bar owns — which agent runs, and how coarsely
+            the work is broken down. Both are written with the same `patchConfig` and both outlive the
+            session, which is why they sit together rather than beside the transport.
+            THE LIFECYCLE PICKER IS IN THIS GROUP AND NOT ITS OWN, and that is an invariant rather than a
+            preference: `test/autopilot-bar.test.tsx` requires every group after the gate acknowledgement to
+            carry `push`, and `visual/checks/board.spec.ts` treats exactly `ap-agent` and `ap-bar-end` as the
+            pushed pair while measuring everything else as the left group. A third pushed group would
+            re-split the row's slack and be invisible to both. The handle keeps its name for the same
+            reason: three tests and the harness read it.
+            The picker renders nothing where a project has no lifecycle block, so there is no conditional
+            here — see LifecyclePicker. */}
         <Stack gap={3} className="vb-fixed push" testId="ap-agent">
+          <LifecyclePicker config={autopilotConfig} disabled={switching !== null} onChange={chooseMode} />
           <BackendPicker
             value={backend}
             disabled={switching !== null}

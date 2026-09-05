@@ -47,6 +47,14 @@
   padding: var(--s-3) var(--s-5);
   /* The status can be long — a stall names the cards that are stuck — so it is the part that shrinks. */
   min-width: 0;
+  /* AND WHEN SHRINKING IT IS NOT ENOUGH, THE ROW WRAPS. Measured rather than assumed: with the lifecycle
+     picker added the row needs 1005px inside 897px at the 900px viewport, and `.ap-status` is already at
+     zero — every remaining group is a control with a label, and there is nothing left to give. Without
+     this the overflow lands on the app shell, which then scrolls sideways; `visual/checks/board.spec.ts`
+     check 9 refuses that, and it is right to — a horizontally scrolling shell hides the right-hand end of
+     every row on the page, not just this one. */
+  flex-wrap: wrap;
+  row-gap: var(--s-3);
 }
 
 /* `.ap-transport` HAS NO RULE LEFT AT ALL, and the `min-width: 6.5rem` that was here is the measurement

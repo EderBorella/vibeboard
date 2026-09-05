@@ -8,6 +8,7 @@ import { credentialSection, judgeCredentialSection } from './credential.js';
 import {
   checkupSections,
   columnsSection,
+  expressSection,
   foundationSection,
   linkedSection,
   previousSection,
@@ -127,6 +128,11 @@ export interface PromptInputs {
     smokeGates?: true;
   };
   // Where the agent must write its report, project-root-relative.
+  // Whether this project runs the express lifecycle (`autopilot.mode`). COMPUTED BY THE SERVER from the
+  // project's own config rather than accepted on the wire — ruling 63's precedent, and the same reason
+  // `reviewFor` computes the judging contract: a caller that could ask for standard prompts on an express
+  // project would be a second answer to a question the config already answers.
+  express?: true;
   reportPath: string;
   // The run's own id, asked for INSIDE the report as well as being in the path it writes to. A report
   // that does not know which run it belongs to is not folded in — see `checkReportIdentity` in
@@ -167,6 +173,14 @@ export function buildRunPrompt(input: PromptInputs): string {
         )
       : section('This run is about the project, not a card', projectSubject()),
   ];
+
+  // IMMEDIATELY AFTER THE SKILL AND BEFORE THE CARD, and the order is the behaviour. The seeded
+  // `break-down` skill says "one acceptance criterion per card" in its own words; express contradicts that
+  // on purpose, so it has to be read AFTER the sentence it overrides — placed above the skill body it would
+  // be the instruction the agent reasons past. And before the card, because it is about how to size what
+  // this run produces rather than about the subject.
+  const express = input.express ? expressSection(input.skill.slug, input.card?.board) : undefined;
+  if (express) parts.splice(1, 0, section('How this project sizes its cards', express));
 
   // Straight after the card, which names one column: the full set belongs next to the one example of
   // it. Omitted when empty — a heading promising "every column" above nothing would be a lie.

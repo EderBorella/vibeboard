@@ -188,6 +188,27 @@ describe('a block that is not the shape it claims', () => {
     expect(malformed({ blockedColumn: 42 })).toEqual(['autopilot.blockedColumn must be a column slug.']);
   });
 
+  // A MISTYPED MODE MUST NOT READ AS `standard`. `ensureAutopilotKeys` backfills an ABSENT key only, so a
+  // hand-edited `mode: expres` reaches the tick — and defaulting there would run the whole project on the
+  // lifecycle the person was trying to leave, silently and at roughly three times the cost.
+  it('refuses a lifecycle mode that is not one of the two', () => {
+    expect(malformed({ mode: 'expres' })).toEqual([
+      'autopilot.mode must be one of standard or express; it is "expres".',
+    ]);
+    // Absent counts too: a block hand-written without the key is not a project on `standard`, it is a
+    // project whose lifecycle nobody has said. `ensureAutopilotKeys` fills it before this is ever asked on
+    // a saved config, and this is what holds when something skips that.
+    const gone = fresh();
+    delete (ap(gone) as { mode?: unknown }).mode;
+    expect(coverageProblems(gone)).toEqual([
+      'autopilot.mode must be one of standard or express; it is undefined.',
+    ]);
+  });
+
+  it('accepts express, so the check is not simply refusing everything', () => {
+    expect(malformed({ mode: 'express' })).toEqual([]);
+  });
+
   it('refuses a terminal block that is absent, or the flat list it used to be', () => {
     const gone = fresh();
     delete (ap(gone) as { terminal?: unknown }).terminal;

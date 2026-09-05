@@ -1,7 +1,7 @@
 import { relative } from 'node:path';
 import { ARCHIVE_SLUG, RESULTS_DIR } from '../../../core/layout.js';
-import { phase } from '../../../core/phases.js';
-import type { Card } from '../../../core/types.js';
+import { type PhaseName, phase, phaseForRun } from '../../../core/phases.js';
+import type { BoardName, Card } from '../../../core/types.js';
 import type { Verification } from '../../../core/verify.js';
 import type { BoardColumns, PromptInputs } from './index.js';
 
@@ -124,6 +124,57 @@ function checkupSection(checkup: NonNullable<PromptInputs['checkup']>): string {
           ...checkup.suggestions.map((s) => `- ${s.id}: ${s.title}`),
         ]
       : ['There are no open suggestions on this project.']),
+  ].join('\n');
+}
+
+// EXPRESS MODE, and it is the ONLY thing `autopilot.mode` changes. The phase table, the walker, every
+// bound and every refusal are identical under both lifecycles — what differs is how coarse the cards the
+// creating phases are asked for are, which is a fact about the instruction and not about the machine.
+//
+// MEASURED BEFORE IT WAS BUILT, on a throwaway project with the same README, the same foundation documents
+// and the same backend, with these three paragraphs pasted into the project's own skill files by hand:
+// 24 runs against 80, $14.06 against $41.07, 37 minutes of agent time against 109, 12 cards against 39 —
+// and a product that passes its smoke test either way, checked by hand rather than by a gate. The saving
+// is almost entirely break-downs and the implement/review/checkup cycle each extra card brings with it.
+//
+// ONE SECTION RATHER THAN A SECOND SET OF SKILL FILES. Skills are ordinary per-project files a person owns
+// and edits; swapping them on a mode change would either overwrite somebody's edits or leave a project
+// switched to express still running the standard prompts. A section the server adds is neither.
+//
+// The three sizes are stated as NOT the run's to choose, deliberately. A break-down told only that "this
+// project prefers larger cards" splits anyway when a card looks awkward, and each split it makes is a full
+// implement, gates and review cycle — the cost this mode exists to avoid.
+const EXPRESS: Partial<Record<PhaseName, string[]>> = {
+  bootstrap: [
+    '**One feature card for the whole product**, not one per capability. Its body LISTS every capability the',
+    'README requires, in the order they must be built, one bullet each — earlier bullets must not depend on',
+    'later ones. That list is the plan: the break-down of this card turns each bullet into a story, so a',
+    'capability missing from it is a capability this project will not build.',
+  ],
+  'feature-breakdown': [
+    "**One story per bullet in this card's body.** Not one per acceptance criterion — one per bullet. If the",
+    'card carries no list, create the smallest set of stories that covers what it asks for, and say in your',
+    'report how many and why.',
+  ],
+  'story-breakdown': [
+    '**Exactly one task**, carrying the whole of this story end to end: the code, its tests, and whatever the',
+    'story needs to be demonstrably done. A story that seems to need two tasks needs one task with two',
+    'acceptance criteria — say so in the card body and keep it as one.',
+  ],
+};
+
+// `undefined` for a phase express says nothing about, and for every run on a standard project — the rule
+// this file already follows, that a heading over nothing is worse than no heading.
+export function expressSection(skill: string, board: BoardName | undefined): string | undefined {
+  const name = phaseForRun(skill, board)?.name;
+  const lines = name ? EXPRESS[name] : undefined;
+  if (!lines) return undefined;
+  return [
+    'This project runs the **express** lifecycle: granularity is deliberately traded for cost, and the sizes',
+    'below are fixed rather than yours to choose. A card split "to be safe" costs a full implement, gates and',
+    'review cycle that nobody asked for.',
+    '',
+    ...lines,
   ].join('\n');
 }
 

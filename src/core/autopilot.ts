@@ -27,6 +27,27 @@ export type VerifyMode = (typeof VERIFY_MODES)[number];
 // ruling 52 and decision 42 replaced both with the phase table in core/phases.ts, so which skill runs
 // is a fact about the machine rather than about this project's config.
 
+// HOW COARSE THE BOARD IS, and it is a choice between two behaviours written in code — never a table a
+// person edits. Ruling 52's line holds: what the loop DOES stays in core/phases.ts, and this key only says
+// which of two prompts the creating phases are given. The phase table, the walker and every bound are the
+// same under both.
+//
+// `express` trades granularity for cost: one feature card listing the plan, one story per bullet, one task
+// per story. Measured on the same README and the same config — 24 runs against 80, $14.06 against $41.07,
+// 37 minutes against 109, and a product that passes its smoke test either way. The saving is almost all
+// break-downs and the implement/review/checkup cycles each extra card creates.
+//
+// NOT A LIE OF A KEY, which this block has shipped twice (`setupFeatureFlag`, `autoPilotConcurrency`) and
+// says so above. `express` is read on the dispatch path — server/runs/routes.ts computes it from here and
+// server/runs/prompt/sections.ts renders a section from it — and a project set to it whose prompts did not
+// change would be the same defect a third time.
+export const LIFECYCLE_MODES = ['standard', 'express'] as const;
+export type LifecycleMode = (typeof LIFECYCLE_MODES)[number];
+
+export function isLifecycleMode(value: unknown): value is LifecycleMode {
+  return typeof value === 'string' && (LIFECYCLE_MODES as readonly string[]).includes(value);
+}
+
 export interface AutopilotConfig {
   maxIterations: number;
   budgetUsd: number;
@@ -43,6 +64,9 @@ export interface AutopilotConfig {
   // ONE SLUG FOR EVERY BOARD THAT HAS THE COLUMN (`BLOCKED_BOARDS`), not one per board: a card that ran
   // out of attempts means the same thing wherever it sits, and a second key would be a second answer.
   blockedColumn: string;
+  // Which of the two lifecycles above. Defaulted rather than optional: `ensureAutopilotKeys` backfills
+  // every key this default carries, so an existing project reads `standard` and behaves exactly as it did.
+  mode: LifecycleMode;
   // NO `setupFeatureFlag`. The barrier is the `setup` frontmatter flag (types.ts), fixed rather than
   // configurable — this key existed, was defaulted, validated and mirrored to the UI, and was read by
   // nothing. Renaming it therefore validated cleanly and lifted the barrier in silence, which is the
@@ -56,6 +80,7 @@ export const DEFAULT_AUTOPILOT: AutopilotConfig = {
   attemptCap: 3,
   terminal: { features: ['done'], product: ['done'], engineering: ['done'] },
   blockedColumn: 'blocked',
+  mode: 'standard',
 };
 
 // How many of the loop's own runs may be in flight at once. A CONSTANT rather than a setting, and that is a

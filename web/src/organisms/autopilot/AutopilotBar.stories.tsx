@@ -42,6 +42,9 @@ const meta = {
     runs: { runs, active: activeRunIds, queued: queuedRunIds },
     bump: 0,
     copilot: config.copilot,
+    // The lifecycle block, for the mode picker. From the shared fixture rather than written here, so a key
+    // added to the block reaches the workbench without a second edit.
+    autopilotConfig: config.autopilot ?? null,
     sandbox,
     onChanged: () => {},
     onBackendChanged: () => {},

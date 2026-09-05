@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { STOP_REASONS } from '../src/core/dispatch-gate.js';
 import type { AutopilotState, Readiness, RunList, SandboxState } from '../web/src/lib/api.js';
-import type { CopilotConfig } from '../web/src/lib/shared.js';
+import type { AutopilotConfig, CopilotConfig } from '../web/src/lib/shared.js';
 
 const api = vi.hoisted(() => ({
   getReadiness: vi.fn(),
@@ -66,11 +66,25 @@ const GATES_UNREVIEWED: Readiness = {
   unreviewedGates: ['CODE-QUALITY.md', 'TESTING.md'],
 };
 
+// A whole lifecycle block, because the mode picker writes the whole one back: `PATCH /api/config` runs the
+// coverage check over the block it is given, so a patch carrying `{ mode }` alone fails every check that
+// indexes the rest.
+const AP_CONFIG: AutopilotConfig = {
+  maxIterations: 250,
+  budgetUsd: 20,
+  runTimeoutMs: 1_800_000,
+  attemptCap: 3,
+  terminal: { features: ['done'], product: ['done'], engineering: ['done'] },
+  blockedColumn: 'blocked',
+  mode: 'standard',
+};
+
 const show = (
   over: {
     state?: AutopilotState | null;
     runs?: RunList;
     copilot?: CopilotConfig;
+    autopilotConfig?: AutopilotConfig | null;
     sandbox?: SandboxState | null;
     onChanged?: () => void;
     onBackendChanged?: () => void;
@@ -83,6 +97,7 @@ const show = (
       runs={over.runs ?? NO_RUNS}
       bump={0}
       copilot={over.copilot ?? COPILOT}
+      autopilotConfig={over.autopilotConfig === undefined ? AP_CONFIG : over.autopilotConfig}
       sandbox={over.sandbox === undefined ? SANDBOX_OK : over.sandbox}
       onChanged={over.onChanged ?? (() => {})}
       onBackendChanged={over.onBackendChanged ?? (() => {})}
@@ -806,5 +821,47 @@ describe('the agent health chip', () => {
     });
 
     expect(screen.getByTestId('ap-agent-state').textContent).not.toMatch(/failing/i);
+  });
+});
+
+// THE LIFECYCLE MODE PICKER, and what it is for is a trade rather than a preference: express was measured
+// against standard on the same README and the same backend at 24 runs against 80, $14.06 against $41.07 and
+// 12 cards against 39, with a product that passes its smoke test either way.
+describe('the lifecycle mode', () => {
+  const picker = () => screen.getByRole('group', { name: /how coarsely/i });
+
+  it('shows which mode the project is on', () => {
+    show();
+    // The CLASS, because that is the only thing a grouped `Tabs` marks selection with: it sets `role=group`
+    // and drops `aria-selected`, on the argument that a segmented picker's cells are not tabs. It puts
+    // nothing in its place, so the selected option of every segmented picker in this app — this one and the
+    // backend picker beside it — is invisible to a screen reader. Asserted here as what the component
+    // actually does rather than what it should; the gap belongs to `molecules/Tabs`, not to this control.
+    expect(within(picker()).getByRole('button', { name: 'Standard' }).className).toContain('active');
+    expect(within(picker()).getByRole('button', { name: 'Express' }).className).not.toContain('active');
+  });
+
+  // THE WHOLE BLOCK GOES BACK, not `{ mode }` alone. `PATCH /api/config` runs the coverage check over the
+  // autopilot block it is given, and a block carrying one key fails every check that indexes the rest —
+  // the class of refusal `ensureAutopilotKeys` exists to prevent, arriving from the other direction.
+  it('saves the whole block, so the patch cannot fail the coverage check', async () => {
+    show();
+    fireEvent.click(within(picker()).getByRole('button', { name: 'Express' }));
+    await waitFor(() => expect(api.patchConfig).toHaveBeenCalledTimes(1));
+    expect(api.patchConfig).toHaveBeenCalledWith({ autopilot: { ...AP_CONFIG, mode: 'express' } });
+  });
+
+  it('writes nothing when the mode chosen is the one already saved', async () => {
+    show();
+    fireEvent.click(within(picker()).getByRole('button', { name: 'Standard' }));
+    await waitFor(() => expect(api.getReadiness).toHaveBeenCalled());
+    expect(api.patchConfig).not.toHaveBeenCalled();
+  });
+
+  // A project written before the lifecycle existed has no block to write a key into, and auto-pilot refuses
+  // to start there anyway. A picker over nothing would offer a choice that cannot be saved.
+  it('is absent where the project has no lifecycle block at all', () => {
+    show({ autopilotConfig: null });
+    expect(screen.queryByRole('group', { name: /how coarsely/i })).toBeNull();
   });
 });

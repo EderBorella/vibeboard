@@ -2,6 +2,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { Writable } from 'node:stream';
 import { describe, expect, it } from 'vitest';
+import { DEFAULT_AUTOPILOT } from '../src/core/autopilot.js';
 import { IDLE_STATE } from '../src/core/autopilot-state.js';
 import { boardRel, FOUNDATION_DIR, RESULTS_DIR, RUNS_DIR } from '../src/core/layout.js';
 import type { RunRecord } from '../src/core/runs.js';
@@ -32,6 +33,15 @@ async function projectWithCard(): Promise<TestProject & { card: string }> {
   return { ...project, card: state.snapshot.boards.engineering[0].id };
 }
 
+// The sample project's product card, read off the board rather than assumed to be P-001: ids are assigned
+// by the scaffolder and an assumed one dispatches 404 into a poll that only ends as a timeout.
+async function productCard(project: TestProject): Promise<string> {
+  const state = (await project.app.inject({ method: 'GET', url: '/api/state' })).json() as {
+    snapshot: { boards: { product: { id: string }[] } };
+  };
+  return state.snapshot.boards.product[0].id;
+}
+
 // The prompt the shim was spawned with: the last line of the args log, last argument of the call.
 async function promptFrom(argsLog: string): Promise<string> {
   const line = (await readFile(argsLog, 'utf8')).trim().split('\n').at(-1) as string;
@@ -48,6 +58,23 @@ async function recordingShimArgs(): Promise<string> {
   process.env.VIBEBOARD_SHIM_ARGS = argsLog;
   await writeFile(argsLog, '', 'utf8');
   return argsLog;
+}
+
+// The board is a parameter because a break-down does not run on engineering: `settled` below reads the
+// engineering board, and a run on another one is never found — a 30s poll that ends as a test timeout
+// naming nothing, which cost a debugging round.
+async function settledOn(
+  project: TestProject,
+  board: 'features' | 'product' | 'engineering',
+  card: string,
+  run: string,
+): Promise<RunRecord> {
+  for (let i = 0; i < 300; i++) {
+    const record = await readRun(project.root, board, card, run);
+    if (record && record.status !== 'running' && record.status !== 'queued') return record;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  throw new Error(`run never settled on ${board}/${card}`);
 }
 
 async function settled(project: TestProject, card: string, run: string): Promise<RunRecord> {
@@ -151,6 +178,61 @@ describe('POST /api/runs', () => {
     // not to, has two required instructions and no reading that satisfies both.
     expect(prompt).not.toContain('## Changing the board (required)');
     expect(prompt).not.toContain('## Reporting (required)');
+  });
+
+  // EXPRESS MODE REACHES THE PROMPT, and this is the assertion that stops `autopilot.mode` becoming the
+  // third key this config block has shipped that was read by nothing. `setupFeatureFlag` was typed,
+  // defaulted, validated and mirrored to the UI, and renaming it lifted a barrier in silence; the header of
+  // src/core/autopilot.ts names it and `autoPilotConcurrency` for the same reason.
+  //
+  // So it goes through the REAL route with the REAL config on disk, and reads the prompt the agent was
+  // actually spawned with — not the assembler called directly, which would only prove the assembler.
+  it('renders the express sizing section when the project config asks for it', async () => {
+    const argsLog = await recordingShimArgs();
+    const project = await projectWithCard();
+    // Through the config route, so the write is the one a person's dropdown makes.
+    const saved = await project.app.inject({
+      method: 'PATCH',
+      url: '/api/config',
+      payload: { autopilot: { ...DEFAULT_AUTOPILOT, mode: 'express' } },
+    });
+    expect(saved.statusCode).toBe(200);
+    const story = await productCard(project);
+    const res = await project.app.inject({
+      method: 'POST',
+      url: '/api/runs',
+      payload: { board: 'product', card: story, skill: 'break-down' },
+    });
+    expect(res.statusCode, res.body).toBe(200);
+    const { run } = res.json() as { run: RunRecord };
+    await settledOn(project, 'product', story, run.run);
+    delete process.env.VIBEBOARD_SHIM_ARGS;
+
+    const prompt = await promptFrom(argsLog);
+    expect(prompt).toContain('## How this project sizes its cards');
+    // A STORY break-down, so the size is one task — the feature's instruction here would mean the phase was
+    // resolved on the skill alone, which is the bug `phaseForRun` takes a board to avoid.
+    expect(prompt).toMatch(/exactly one task/i);
+    expect(prompt).not.toMatch(/one story per bullet/i);
+  });
+
+  it('leaves the prompt untouched on a standard project', async () => {
+    // The other half, and it is not redundant: a section rendered unconditionally would pass the test above
+    // while changing every existing project's behaviour.
+    const argsLog = await recordingShimArgs();
+    const project = await projectWithCard();
+    const story = await productCard(project);
+    const { run } = (
+      await project.app.inject({
+        method: 'POST',
+        url: '/api/runs',
+        payload: { board: 'product', card: story, skill: 'break-down' },
+      })
+    ).json() as { run: RunRecord };
+    await settledOn(project, 'product', story, run.run);
+    delete process.env.VIBEBOARD_SHIM_ARGS;
+
+    expect(await promptFrom(argsLog)).not.toContain('## How this project sizes its cards');
   });
 
   it('passes the card, its linked cards and the project columns into the prompt', async () => {

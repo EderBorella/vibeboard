@@ -338,7 +338,7 @@ describe('adding a column, and the projects written before the lifecycle changed
     expect(res.json().error).toContain('terminal names "done" for engineering');
   });
 
-  it('scaffolds exactly the six keys the lifecycle needs, and they validate clean', async () => {
+  it('scaffolds exactly the seven keys the lifecycle needs, and they validate clean', async () => {
     const { root } = await openTestProject({ name: 'A', mode: 'brownfield' });
     const disk = await readDisk(root);
     // EXACT. A key nothing reads is dead weight the next reader has to rule out, and a key that has gone
@@ -348,6 +348,9 @@ describe('adding a column, and the projects written before the lifecycle changed
       'blockedColumn',
       'budgetUsd',
       'maxIterations',
+      // `mode` is the seventh, added with express (core/autopilot.ts). It belongs to the same rule the
+      // comment above states: it is read on the dispatch path, so it is not dead weight.
+      'mode',
       'runTimeoutMs',
       'terminal',
     ]);

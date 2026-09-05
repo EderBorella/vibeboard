@@ -28,6 +28,19 @@ export const config: ProjectConfig = {
   keepChats: 20,
   contextBudget: 200_000,
   maxConcurrentRuns: 3,
+  // THE LIFECYCLE BLOCK, and it is here so the workbench shows the bar the app shows. The mode picker
+  // renders only where there is a block to write into, so a fixture without one would leave the story
+  // demonstrating a control that does not exist in any real project — the workbench-lies-about-the-app
+  // failure this repository has already ruled on for the cascade.
+  autopilot: {
+    maxIterations: 250,
+    budgetUsd: 20,
+    runTimeoutMs: 1_800_000,
+    attemptCap: 3,
+    terminal: { features: ['done'], product: ['done'], engineering: ['done'] },
+    blockedColumn: 'blocked',
+    mode: 'standard',
+  },
   copilot: { backend: 'claude-code', backends: {} },
 };
 

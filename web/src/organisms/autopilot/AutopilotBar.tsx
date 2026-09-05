@@ -472,7 +472,7 @@ export function AutopilotBar({
             reason: three tests and the harness read it.
             The picker renders nothing where a project has no lifecycle block, so there is no conditional
             here — see LifecyclePicker. */}
-        <Stack gap={3} className="vb-fixed push" testId="ap-agent">
+        <Stack gap={5} className="vb-fixed push" testId="ap-agent">
           <LifecyclePicker config={autopilotConfig} disabled={switching !== null} onChange={chooseMode} />
           <FocusPicker
             config={autopilotConfig}

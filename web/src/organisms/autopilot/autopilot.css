@@ -57,6 +57,22 @@
   row-gap: var(--s-3);
 }
 
+/* THE FOCUS PICKER HOLDS ITS WIDTH, and it is the only element on this row that would not. A `<select>`
+   sizes to its selected option, and these swing hard: **109px** of ink on "The whole board" against **337px**
+   on "F-001 — greet — a command-line greeter (finished)", measured in the real font. The group is pushed from
+   the left, so every one of those 228px moved the mode selector sideways — choosing a feature shuffled the
+   control you had just used.
+   A FIXED WIDTH RATHER THAN A `min-width`, because a minimum stops it shrinking and not growing, and growing
+   is the direction that does the moving. Long labels clip at the tail, where the least identifying part of
+   them is; `FocusPicker` already shortens the title so the common case does not reach the edge.
+   NO CLASS OF ITS OWN: the class budget is a ratchet at 220 with no slack (CLAUDE.md), so this is written
+   against the row and the element. It sets `width` alone, which no single-class rule on `.vb-ctl` sets, so
+   the (0,1,1) specificity cannot take a box declaration away from the primitive the way `.vb-field input`
+   once did. */
+.ap-bar-row select {
+  width: 18rem;
+}
+
 /* `.ap-transport` HAS NO RULE LEFT AT ALL, and the `min-width: 6.5rem` that was here is the measurement
    worth recording. It was argued as "wider than its label needs, because it is the control anybody on this
    strip is looking for and a target you have to aim at is one you misclick" — and measured, it made the

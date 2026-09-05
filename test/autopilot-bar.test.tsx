@@ -94,6 +94,11 @@ const feature = (id: string, columnSlug: string): Card =>
 const longTitled = feature('F-009', 'backlog');
 longTitled.title = 'The product can be run the way the README describes, end to end';
 
+// The same long title on a FINISHED feature, which is the case the label budget is about: a saved focus whose
+// card its own run closed still has to show, and the "(finished)" is the half worth keeping.
+const longDone = feature('F-010', 'done');
+longDone.title = 'The product can be run the way the README describes, end to end';
+
 const FEATURES: Card[] = [
   feature('F-001', 'backlog'),
   feature('F-002', 'in-progress'),
@@ -920,6 +925,21 @@ describe('the feature auto-pilot is focused on', () => {
   // mandatory harness card is called "The product can be run the way the README describes". The bar wraps
   // rather than overflowing the shell, so this costs a second line rather than a scrollbar; truncating keeps
   // it from costing one. The ID is never truncated: it is the part that identifies the card.
+  // THE SUFFIX SURVIVES AND THE TITLE GIVES WAY, which is the priority the box forces. The select holds a
+  // fixed width so choosing a feature cannot shove the mode selector sideways, and a first version capped the
+  // title alone and let the box clip whatever followed — the option read "…a command-line… (fi", two
+  // truncations fighting with the informative half losing.
+  it('trims the title to fit the state, never the state to fit the title', () => {
+    show({ autopilotConfig: { ...EXPRESS, focus: 'F-010' }, features: [...FEATURES, longDone] });
+    const chosen = Array.from(picker().querySelectorAll('option')).find((o) => o.value === 'F-010');
+    const text = chosen?.textContent ?? '';
+    expect(text).toMatch(/\(finished\)$/); // the whole suffix, at the end, uncut
+    expect(text).toContain('F-010');
+    expect(text.length).toBeLessThanOrEqual(32);
+    // And the title really was cut — otherwise the budget is untested on a title that already fitted.
+    expect(text).not.toContain('end to end');
+  });
+
   it('shortens a long feature title but never the id', () => {
     show({
       autopilotConfig: EXPRESS,

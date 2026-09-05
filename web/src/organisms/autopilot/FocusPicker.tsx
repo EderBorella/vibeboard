@@ -4,19 +4,32 @@ import type { AutopilotConfig, Card } from '../../lib/shared';
 // The whole board is the ordinary state, so the empty option has to say that rather than read as "none
 // chosen yet". A blank first option is how a picker comes to look like it is waiting for an answer.
 
-// A `<select>` IS AS WIDE AS ITS WIDEST OPTION, and a feature title is unbounded — the loop's own mandatory
-// harness card is called "The product can be run the way the README describes". The bar wraps rather than
-// overflowing the shell (autopilot.css), so a long option costs a second line rather than a horizontal
-// scrollbar; this keeps it from costing one for a title nobody needs to read in full. The id is always
-// shown, and it is the part that identifies the card.
-//
-// TRUNCATED IN THE LABEL RATHER THAN BY A WIDTH RULE, because the class budget is a ratchet at 230 with no
-// slack (CLAUDE.md) — a one-declaration class for this would have to displace another.
-const TITLE_CHARS = 32;
-const label = (id: string, title: string): string =>
-  `${id} — ${title.length > TITLE_CHARS ? `${title.slice(0, TITLE_CHARS - 1).trimEnd()}…` : title}`;
+// The whole board is the ordinary state, so the empty option has to say that rather than read as "none
+// chosen yet". A blank first option is how a picker comes to look like it is waiting for an answer.
 const WHOLE_BOARD = 'The whole board';
 export const NO_FOCUS = '';
+
+// THE LABEL IS BUDGETED TO THE BOX, and the TITLE is what gives way rather than the state.
+//
+// The select holds a fixed width so choosing a feature cannot shove the mode selector sideways
+// (autopilot.css), which leaves about 38 characters of room. A first attempt capped the title alone and let
+// the box clip whatever followed, and what followed was the state: the option read
+// "F-001 — greet — a command-line… (fi" — two truncations fighting, with the informative half losing. So the
+// title is trimmed to whatever the id and the suffix leave, and the suffix is never cut.
+//
+// The id is never shortened either: it is the part that identifies the card, and it is what the config holds.
+// A CHARACTER COUNT STANDING IN FOR A PIXEL BOX, and the number is measured rather than reasoned. The select
+// is 288px wide, of which about 252 is usable once the padding and the native arrow are taken; the row's font
+// runs about 7px per character on this text, so 38 characters overran it and clipped "(finished)" to "(finish".
+// 32 leaves room for the wide glyphs a proportional font makes no promises about.
+const LABEL_CHARS = 32;
+const MIN_TITLE = 8;
+
+function label(id: string, title: string, suffix = ''): string {
+  const room = Math.max(MIN_TITLE, LABEL_CHARS - id.length - 3 - suffix.length);
+  const short = title.length > room ? `${title.slice(0, room - 1).trimEnd()}…` : title;
+  return `${id} — ${short}${suffix}`;
+}
 
 interface Props {
   // `null` where a project has no lifecycle block, exactly as the mode picker takes it.
@@ -59,7 +72,7 @@ function withSavedFocus(options: Card[], features: Card[], focus: string | undef
   const card = features.find((c) => c.id === focus);
   out.push({
     value: focus,
-    text: card ? `${label(focus, card.title)} (finished)` : `${focus} (no longer on the board)`,
+    text: card ? label(focus, card.title, ' (finished)') : `${focus} (no longer on the board)`,
   });
   return out;
 }

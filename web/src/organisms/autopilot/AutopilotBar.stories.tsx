@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { activeRunIds, config, queuedRunIds, runs } from '../../../../.storybook/fixtures';
+import { activeRunIds, config, queuedRunIds, runs, snapshot } from '../../../../.storybook/fixtures';
 import { EMPTY, withRoutes } from '../../../../.storybook/route-stub';
 import type { AutopilotState, SandboxState } from '../../lib/api';
 import { AutopilotBar } from './AutopilotBar';
@@ -45,6 +45,9 @@ const meta = {
     // The lifecycle block, for the mode picker. From the shared fixture rather than written here, so a key
     // added to the block reaches the workbench without a second edit.
     autopilotConfig: config.autopilot ?? null,
+    // The feature cards, for the focus picker — which renders only in express, so the Express story below
+    // is the one that shows it.
+    features: snapshot.boards.features,
     sandbox,
     onChanged: () => {},
     onBackendChanged: () => {},
@@ -91,5 +94,24 @@ export const AgentsRefused: Story = {
       agentRefusal: 'The container is holding a credential that has been replaced on the host.',
       refusalKind: 'credential',
     },
+  },
+};
+
+// EXPRESS, which is the only mode that shows a focus picker — so without this story the workbench shows a
+// bar the app has and one control it does not. The same rule the cascade is held to: a workbench that
+// demonstrates less than the product is worse than one that demonstrates nothing.
+export const Express: Story = {
+  args: {
+    autopilotConfig: config.autopilot ? { ...config.autopilot, mode: 'express' } : null,
+  },
+};
+
+// AND FOCUSED ON ONE FEATURE, because the picker showing "The whole board" and the picker naming a card are
+// two different readings of the same control and only one of them says what the loop will do.
+export const ExpressFocused: Story = {
+  args: {
+    autopilotConfig: config.autopilot
+      ? { ...config.autopilot, mode: 'express', focus: snapshot.boards.features[0]?.id }
+      : null,
   },
 };

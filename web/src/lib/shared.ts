@@ -251,6 +251,10 @@ export interface AutopilotConfig {
   terminal: Record<BoardName, string[]>; // per board: a column belongs to one
   blockedColumn: string;
   mode: LifecycleMode;
+  // One feature the loop confines itself to, by id, or absent for the whole board. Optional on both sides:
+  // it is deliberately not in `DEFAULT_AUTOPILOT`, so it is never written into a project that does not use
+  // it — see src/core/autopilot.ts.
+  focus?: string;
 }
 
 // The field set, as data. An interface has no runtime keys, so nothing could compare the two sides and

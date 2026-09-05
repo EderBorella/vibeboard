@@ -67,6 +67,20 @@ export interface AutopilotConfig {
   // Which of the two lifecycles above. Defaulted rather than optional: `ensureAutopilotKeys` backfills
   // every key this default carries, so an existing project reads `standard` and behaves exactly as it did.
   mode: LifecycleMode;
+  // ONE FEATURE THE LOOP CONFINES ITSELF TO, by id, or absent for the whole board.
+  //
+  // OPTIONAL AND ABSENT FROM `DEFAULT_AUTOPILOT` ON PURPOSE. `ensureAutopilotKeys` backfills every key the
+  // default carries, so a defaulted one would write `focus:` into every project's config file — a key that
+  // says nothing, in every clone, for a feature almost no project uses.
+  //
+  // AN INPUT, NOT A CURSOR, which is why decision 39 does not refuse it. That decision refuses auto-pilot
+  // STORING where it is: the position is derived from the board every tick so a restart needs no memory and
+  // a person dragging a card cannot be contradicted. This is the opposite direction — a person saying which
+  // feature to work on — and the derivation still does all the deciding, over a narrowed list.
+  //
+  // Held here rather than in autopilot-state.json for the same reason: that file is the loop's own memory
+  // of its own run, and a person's instruction is not that.
+  focus?: string;
   // NO `setupFeatureFlag`. The barrier is the `setup` frontmatter flag (types.ts), fixed rather than
   // configurable — this key existed, was defaulted, validated and mirrored to the UI, and was read by
   // nothing. Renaming it therefore validated cleanly and lifted the barrier in silence, which is the

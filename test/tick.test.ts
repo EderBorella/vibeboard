@@ -1072,3 +1072,36 @@ describe('decideTick — complete over a blocked story', () => {
     expect(decideTick(input({ cards }))).toMatchObject({ kind: 'stop', reason: 'stalled' });
   });
 });
+
+// THE FOCUS REACHES THE DERIVATION, and this is here rather than in test/focus.test.ts because that is the
+// half that was missing: `derivePosition` honoured `ap.focus` and every one of its own tests passed with the
+// TICK still calling it without one. Deleting the argument in core/lifecycle/tick.ts broke nothing at all.
+//
+// The claim is about the loop, so it is asserted through `decideTick` — the function the service calls.
+describe('the feature the loop is focused on', () => {
+  // CHILDLESS, so the action is a DISPATCH rather than the break-down skip a feature with stories gets
+  // (decision 50). The subject here is which feature was chosen, and a stamp names it just as well — but a
+  // dispatch is the case that spends money, so it is the one worth pinning.
+  const twoFeatures = (): Card[] => [
+    card('F-001', 'features', 'backlog', 10, []),
+    card('F-002', 'features', 'backlog', 20, []),
+  ];
+
+  it('is the one dispatched, and not the one the queue would have picked', () => {
+    // Unfocused, (order, id) picks F-001 — so naming F-002 is what proves the tick passed the focus on.
+    const unfocused = decideTick(input({ cards: twoFeatures() }));
+    expect(unfocused.kind === 'dispatch' && unfocused.card?.id).toBe('F-001');
+
+    const focused = decideTick(input({ cards: twoFeatures(), ap: { ...DEFAULT_AUTOPILOT, focus: 'F-002' } }));
+    expect(focused.kind === 'dispatch' && focused.card?.id).toBe('F-002');
+  });
+
+  it('stalls, naming the card, when the focused feature has left the board', () => {
+    const action = decideTick(input({ cards: twoFeatures(), ap: { ...DEFAULT_AUTOPILOT, focus: 'F-404' } }));
+    expect(action.kind).toBe('stop');
+    expect(detailOf(action)).toMatch(/focused on F-404/);
+    // AND NOTHING WAS DISPATCHED, which is the half that matters: a silent fallback would have been a run on
+    // a card nobody chose, reported as an ordinary one.
+    expect(action.kind === 'dispatch').toBe(false);
+  });
+});

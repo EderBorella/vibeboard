@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { STOP_REASONS } from '../src/core/dispatch-gate.js';
 import type { AutopilotState, Readiness, RunList, SandboxState } from '../web/src/lib/api.js';
-import type { AutopilotConfig, CopilotConfig } from '../web/src/lib/shared.js';
+import type { AutopilotConfig, Card, CopilotConfig } from '../web/src/lib/shared.js';
 
 const api = vi.hoisted(() => ({
   getReadiness: vi.fn(),
@@ -79,12 +79,34 @@ const AP_CONFIG: AutopilotConfig = {
   mode: 'standard',
 };
 
+// TWO features and one already DONE, because a fixture too thin to distinguish two outcomes tests neither:
+// with one card, "lists the unfinished ones" and "lists everything" are the same list.
+const feature = (id: string, columnSlug: string): Card =>
+  ({
+    id,
+    title: `Feature ${id}`,
+    board: 'features',
+    columnSlug,
+    order: 10,
+    tags: [],
+    links: [],
+  }) as unknown as Card;
+const longTitled = feature('F-009', 'backlog');
+longTitled.title = 'The product can be run the way the README describes, end to end';
+
+const FEATURES: Card[] = [
+  feature('F-001', 'backlog'),
+  feature('F-002', 'in-progress'),
+  feature('F-003', 'done'),
+];
+
 const show = (
   over: {
     state?: AutopilotState | null;
     runs?: RunList;
     copilot?: CopilotConfig;
     autopilotConfig?: AutopilotConfig | null;
+    features?: Card[];
     sandbox?: SandboxState | null;
     onChanged?: () => void;
     onBackendChanged?: () => void;
@@ -98,6 +120,7 @@ const show = (
       bump={0}
       copilot={over.copilot ?? COPILOT}
       autopilotConfig={over.autopilotConfig === undefined ? AP_CONFIG : over.autopilotConfig}
+      features={over.features ?? FEATURES}
       sandbox={over.sandbox === undefined ? SANDBOX_OK : over.sandbox}
       onChanged={over.onChanged ?? (() => {})}
       onBackendChanged={over.onBackendChanged ?? (() => {})}
@@ -863,5 +886,81 @@ describe('the lifecycle mode', () => {
   it('is absent where the project has no lifecycle block at all', () => {
     show({ autopilotConfig: null });
     expect(screen.queryByRole('group', { name: /how coarsely/i })).toBeNull();
+  });
+});
+
+// ONE FEATURE, END TO END — the second dropdown, and it appears only in express.
+describe('the feature auto-pilot is focused on', () => {
+  const EXPRESS: AutopilotConfig = { ...AP_CONFIG, mode: 'express' };
+  const picker = () => screen.getByRole('combobox', { name: /feature auto-pilot works on/i });
+
+  it('is not offered at all in standard mode', () => {
+    show();
+    expect(screen.queryByRole('combobox', { name: /feature auto-pilot works on/i })).toBeNull();
+  });
+
+  // BACKLOG IS OFFERED, and it is the deliberate part. A feature that has never been started sits in
+  // `backlog` in this machine — `derive-features` creates them there and the loop moves one to `todo` when
+  // it begins the break-down — so a picker offering only the started ones cannot reach the case the focus
+  // exists for: taking one feature that has not begun and seeing it through.
+  it('offers every unfinished feature, the unstarted ones included, and the whole board', () => {
+    show({ autopilotConfig: EXPRESS });
+    const values = Array.from(picker().querySelectorAll('option')).map((o) => o.value);
+    expect(values).toEqual(['', 'F-001', 'F-002']);
+  });
+
+  // A finished feature is not a run: `derivePosition` reads a focused feature in a terminal column as
+  // nothing left to do, so offering one would be offering a control that does nothing.
+  it('does not offer a feature that is already done', () => {
+    show({ autopilotConfig: EXPRESS });
+    expect(within(picker()).queryByText(/F-003/)).toBeNull();
+  });
+
+  // A `<select>` is as wide as its widest option, and a feature title is unbounded — the loop's own
+  // mandatory harness card is called "The product can be run the way the README describes". The bar wraps
+  // rather than overflowing the shell, so this costs a second line rather than a scrollbar; truncating keeps
+  // it from costing one. The ID is never truncated: it is the part that identifies the card.
+  it('shortens a long feature title but never the id', () => {
+    show({
+      autopilotConfig: EXPRESS,
+      features: [feature('F-001', 'backlog'), longTitled],
+    });
+    const labels = Array.from(picker().querySelectorAll('option')).map((o) => o.textContent ?? '');
+    const long = labels.find((l) => l.startsWith('F-009')) ?? '';
+    expect(long).toContain('F-009');
+    expect(long).toMatch(/…$/);
+    expect(long.length).toBeLessThan(`F-009 — ${longTitled.title}`.length);
+  });
+
+  it('saves the focus with the whole block', async () => {
+    show({ autopilotConfig: EXPRESS });
+    fireEvent.change(picker(), { target: { value: 'F-002' } });
+    await waitFor(() => expect(api.patchConfig).toHaveBeenCalledTimes(1));
+    expect(api.patchConfig).toHaveBeenCalledWith({ autopilot: { ...EXPRESS, focus: 'F-002' } });
+  });
+
+  // CLEARING IS A DELETE, not an empty string: `focus: ''` is refused by the config's own shape check,
+  // because it would confine the loop to a card whose id is the empty string.
+  it('clears the focus by removing the key, never by writing an empty one', async () => {
+    show({ autopilotConfig: { ...EXPRESS, focus: 'F-002' } });
+    fireEvent.change(picker(), { target: { value: '' } });
+    await waitFor(() => expect(api.patchConfig).toHaveBeenCalledTimes(1));
+    const sent = api.patchConfig.mock.calls[0]?.[0] as { autopilot: Record<string, unknown> };
+    expect('focus' in sent.autopilot).toBe(false);
+  });
+
+  // THE HALF THAT MAKES THE PICKER SAFE TO HIDE. The tick honours `focus` whatever the mode says, so a
+  // focus left behind on a switch to standard would confine the loop through a control nobody can see.
+  it('drops a saved focus when the project leaves express', async () => {
+    show({ autopilotConfig: { ...EXPRESS, focus: 'F-002' } });
+    fireEvent.click(
+      within(screen.getByRole('group', { name: /how coarsely/i })).getByRole('button', {
+        name: 'Standard',
+      }),
+    );
+    await waitFor(() => expect(api.patchConfig).toHaveBeenCalledTimes(1));
+    const sent = api.patchConfig.mock.calls[0]?.[0] as { autopilot: Record<string, unknown> };
+    expect(sent.autopilot.mode).toBe('standard');
+    expect('focus' in sent.autopilot).toBe(false);
   });
 });

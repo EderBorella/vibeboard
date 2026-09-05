@@ -205,6 +205,20 @@ describe('a block that is not the shape it claims', () => {
     ]);
   });
 
+  // ABSENT IS THE ORDINARY STATE — the whole board — so only a present value is checked. An empty string is
+  // refused with the non-strings: it would confine the loop to a card whose id is `''`, which no board has,
+  // and the refusal it produced downstream would name nothing.
+  it('refuses a focus that is not a card id, and accepts its absence', () => {
+    expect(malformed({ focus: 42 })).toEqual([
+      'autopilot.focus must be the id of a feature card, or absent for the whole board; it is 42.',
+    ]);
+    expect(malformed({ focus: '  ' })).toEqual([
+      'autopilot.focus must be the id of a feature card, or absent for the whole board; it is "  ".',
+    ]);
+    expect(malformed({ focus: 'F-002' })).toEqual([]);
+    expect(malformed({})).toEqual([]);
+  });
+
   it('accepts express, so the check is not simply refusing everything', () => {
     expect(malformed({ mode: 'express' })).toEqual([]);
   });

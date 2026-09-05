@@ -49,6 +49,14 @@ export function shapeProblems(ap: AutopilotConfig): string[] {
       `autopilot.mode must be one of ${LIFECYCLE_MODES.join(' or ')}; it is ${JSON.stringify(ap.mode)}.`,
     );
   }
+  // A FOCUS THAT IS NOT AN ID IS NOT A FOCUS. Absent is the ordinary state — the whole board — so only a
+  // present value is checked, and an empty string is refused with it: `focus: ''` would confine the loop to
+  // a card whose id is the empty string, which no board has, and the sentence it produced would name nothing.
+  if (ap.focus !== undefined && (typeof ap.focus !== 'string' || ap.focus.trim() === '')) {
+    out.push(
+      `autopilot.focus must be the id of a feature card, or absent for the whole board; it is ${JSON.stringify(ap.focus)}.`,
+    );
+  }
   return out;
 }
 

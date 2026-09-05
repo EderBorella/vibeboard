@@ -524,7 +524,10 @@ export function decideTick(input: TickInput): TickAction {
   // eligibility to fall out of — and a tick that may start nothing need not work out what it would have.
   if (inFlight.length >= AUTOPILOT_CONCURRENCY) return { kind: 'wait' };
 
-  const found = derivePosition(cards);
+  // THE FOCUS, from the config rather than from a field of its own on the input: it is a person's standing
+  // instruction about this project, which is what that block holds, and a second home for it would be a
+  // second answer the moment somebody edited one.
+  const found = derivePosition(cards, ap.focus);
   if ('problem' in found) return stop('stalled', found.problem);
   if ('position' in found) {
     const action = phaseAction(input, found.position);

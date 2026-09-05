@@ -298,6 +298,7 @@ export function App() {
           // The lifecycle block, for the mode picker. Absent on a project created before the lifecycle
           // existed, and the bar renders no picker then rather than inventing a mode for it.
           autopilotConfig={snapshot.config.autopilot ?? null}
+          features={snapshot.boards.features}
           sandbox={sandbox}
           onChanged={autopilot.refresh}
           // `bump`, the same lever sign-in and the attempt-clearing button pull. `useSandbox` is keyed

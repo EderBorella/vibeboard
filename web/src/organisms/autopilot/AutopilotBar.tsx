@@ -14,7 +14,7 @@ import {
   softStopAutopilot,
   startAutopilot,
 } from '../../lib/api';
-import type { AutopilotConfig, CopilotConfig } from '../../lib/shared';
+import type { AutopilotConfig, Card, CopilotConfig } from '../../lib/shared';
 import { useAction } from '../../lib/useAction';
 import { useConfirm } from '../../lib/useConfirm';
 import { StatusChip } from '../../molecules/StatusChip';
@@ -24,6 +24,7 @@ import { List } from '../shared/List';
 import { killProjectRequest } from '../shared/requests';
 import { type LightAdvice, lightAdvice } from '../topbar/connection-light';
 import { AutopilotHelp } from './AutopilotHelp';
+import { FocusPicker } from './FocusPicker';
 import { ForgiveDerivation } from './ForgiveDerivation';
 import { LifecyclePicker } from './LifecyclePicker';
 import { type TransportModel, transportModel } from './transport';
@@ -42,6 +43,9 @@ interface Props {
   // existed — auto-pilot will not start there anyway, and a picker over a block that does not exist would
   // write one key into nothing.
   autopilotConfig: AutopilotConfig | null;
+  // The feature cards, for the focus picker. The board the shell already holds rather than a fetch of its
+  // own: a second read would be a second answer with its own refresh schedule.
+  features: Card[];
   // Whether agents can run at all, already fetched by the shell. Threaded rather than fetched again so
   // there is one answer on screen: a second fetch would be a second opinion with its own refresh
   // schedule, and this bar and the connection light would disagree for the length of it.
@@ -267,6 +271,7 @@ export function AutopilotBar({
   bump,
   copilot,
   autopilotConfig,
+  features,
   sandbox,
   onChanged,
   onBackendChanged,
@@ -327,7 +332,26 @@ export function AutopilotBar({
   function chooseMode(next: string): void {
     if (!autopilotConfig || next === autopilotConfig.mode) return;
     void runSwitch(async () => {
-      await patchConfig({ autopilot: { ...autopilotConfig, mode: next as AutopilotConfig['mode'] } });
+      // THE FOCUS IS CLEARED WITH THE MODE, and it has to be. `FocusPicker` renders only in express, and the
+      // TICK honours `focus` whatever the mode says — so leaving a saved focus behind on a switch to
+      // standard would confine the loop to one feature through a control nobody can see any more. One rule
+      // rather than two: a focus exists only while the picker that set it is on screen.
+      const { focus: _dropped, ...rest } = autopilotConfig;
+      await patchConfig({ autopilot: { ...rest, mode: next as AutopilotConfig['mode'] } });
+      onChanged();
+    });
+  }
+
+  // The whole block again, for `chooseMode`'s reason: `PATCH /api/config` runs the coverage check over the
+  // autopilot block it is given, so a patch carrying one key fails every check that indexes the rest.
+  //
+  // CLEARING IS A DELETE AND NOT AN EMPTY STRING. `focus: ''` is refused by `shapeProblems` on purpose — it
+  // would confine the loop to a card whose id is the empty string, which no board has.
+  function chooseFocus(next: string | undefined): void {
+    if (!autopilotConfig || next === autopilotConfig.focus) return;
+    void runSwitch(async () => {
+      const { focus: _cleared, ...rest } = autopilotConfig;
+      await patchConfig({ autopilot: next === undefined ? rest : { ...rest, focus: next } });
       onChanged();
     });
   }
@@ -450,6 +474,12 @@ export function AutopilotBar({
             here — see LifecyclePicker. */}
         <Stack gap={3} className="vb-fixed push" testId="ap-agent">
           <LifecyclePicker config={autopilotConfig} disabled={switching !== null} onChange={chooseMode} />
+          <FocusPicker
+            config={autopilotConfig}
+            features={features}
+            disabled={switching !== null}
+            onChange={chooseFocus}
+          />
           <BackendPicker
             value={backend}
             disabled={switching !== null}

@@ -4,7 +4,7 @@ import { coveredBy } from '../../core/covered.js';
 import { countLive, createdNothing } from '../../core/created.js';
 import { type PhaseName, phase } from '../../core/phases.js';
 import { producedNothing, type RunRecord } from '../../core/runs.js';
-import { BOARDS, type Card } from '../../core/types.js';
+import { BOARDS, type BoardName, type Card } from '../../core/types.js';
 import { unverified, type Verification } from '../../core/verify.js';
 import type { ActResult, TickContext } from '../loop.js';
 import { stamp } from '../stamp.js';
@@ -248,8 +248,9 @@ async function whenNoCardWasCreated(
   // exists cannot be finished by a phase that only succeeds by producing more of it: the attempt burns,
   // three times, and the loop stops on a card that was done before it was written. The claim is CHECKED —
   // see `coverageHolds` — which is what separates it from the unverifiable claim decision 43 refuses.
-  if (await coverageHolds(deps, settled)) {
-    return await advanceOnCoverage(deps, action, card, settled, context);
+  const covered = await coverageHolds(deps, settled, card.board);
+  if (covered.holds) {
+    return await advanceOnCoverage(deps, action, card, settled, context, covered.terminal);
   }
   return await recordEmptyCreate(deps, action, card, settled, context);
 }
@@ -259,14 +260,22 @@ async function whenNoCardWasCreated(
 //
 // A board that cannot be read answers `false`: a citation nobody could check is not a citation, and the
 // safe direction here is the one that burns the attempt rather than the one that advances the card.
-async function coverageHolds(deps: ActDeps, settled: RunRecord): Promise<boolean> {
+async function coverageHolds(
+  deps: ActDeps,
+  settled: RunRecord,
+  cardBoard: BoardName,
+): Promise<{ holds: boolean; terminal?: string }> {
   const claimed = settled.covered;
-  if (claimed === undefined || claimed.length === 0) return false;
+  if (claimed === undefined || claimed.length === 0) return { holds: false };
   const board = await deps.client.board();
-  if (!board.ok) return false;
+  if (!board.ok) return { holds: false };
   const ap = board.value.config.autopilot ?? DEFAULT_AUTOPILOT;
   const cards = BOARDS.flatMap((b) => board.value.boards[b] ?? []);
-  return coveredBy(ap, cards, claimed);
+  if (!coveredBy(ap, cards, claimed)) return { holds: false };
+  // The board's FIRST terminal column. A board may name several and any of them settles a card; the
+  // first is the one a person would have dragged it to, and autopilot-cover.ts already refuses a board
+  // that names none.
+  return { holds: true, terminal: (ap.terminal[cardBoard] ?? [])[0] };
 }
 
 // The card advances exactly as a creating run that DID grow the board would have — same exit stamp, same
@@ -278,17 +287,23 @@ async function advanceOnCoverage(
   card: Card,
   settled: RunRecord,
   context: TickContext,
+  terminal: string | undefined,
 ): Promise<ActResult> {
-  const p = phase(action.phase);
-  if (p.exitPass) {
-    const stamped = await stamp(
-      deps,
-      card,
-      p.exitPass,
-      `its ${action.skill} run found the work already done.`,
-    );
+  // A TERMINAL COLUMN, AND NOT THE PHASE'S `exitPass` — found by running this live, because a unit test
+  // that asserts the card moved cannot see what the tick does next.
+  //
+  // `phaseAction` in core/lifecycle/tick.ts opens with `if (stories.length === 0) return
+  // dispatchPhase('feature-breakdown')`, BEFORE it looks at any column. A card that closed on coverage
+  // has no children and never will — the work is under other cards — so moving it to `in-progress`,
+  // which is this phase's `exitPass`, left the tick re-dispatching the same break-down until the attempt
+  // cap stopped the project. Observed live: three break-downs, all three declaring coverage, all three
+  // advancing the column, and the loop stalling anyway.
+  //
+  // Settled is what the tick reads, so settled is where the card has to go.
+  if (terminal !== undefined) {
+    const stamped = await stamp(deps, card, terminal, `its ${action.skill} run found the work already done.`);
     if (!stamped.ok) {
-      return refused(deps, `could not advance ${card.id} to ${p.exitPass}`, stamped.reason, stamped.fatal, 1);
+      return refused(deps, `could not advance ${card.id} to ${terminal}`, stamped.reason, stamped.fatal, 1);
     }
   }
   await deps.client.log('run', coveredLine(card, action, settled, context), {

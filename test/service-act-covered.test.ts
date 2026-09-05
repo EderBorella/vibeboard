@@ -1,8 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import type { TickAction } from '../src/core/actions.js';
+import { isSettled } from '../src/core/derived-status.js';
 import type { RunRecord } from '../src/core/runs.js';
 import { performAction } from '../src/service/act.js';
 import { CARD, context, deps, recorder } from './service-act-fixtures.js';
+
+// The same autopilot config the fixtures drive the loop with, so `isSettled` below is asked the question
+// the tick asks rather than a second spelling of it.
+const AP = {
+  terminal: { features: ['done'], product: ['done'], engineering: ['done'] },
+  blockedColumn: 'blocked',
+} as unknown as Parameters<typeof isSettled>[0];
 
 // DECISION 71: A CREATING PHASE MAY CLOSE ITS CARD BY SHOWING THE WORK IS ALREADY DONE.
 //
@@ -71,7 +79,10 @@ describe('a creating phase that found the work already done', () => {
   it('closes the card when every cited id exists and is settled', async () => {
     const r = noGrowth([done('P-030', 'product'), done('E-031', 'engineering')]);
     const result = await performAction(deps(r.client), BREAKDOWN, context);
-    expect(r.moves).toEqual([ENTRY, { card: 'F-007', to: 'in-progress' }]);
+    // A TERMINAL COLUMN, not the phase's `exitPass`. Live, `in-progress` was not enough: the tick
+    // dispatches feature-breakdown whenever a feature has no children, before it looks at any column, so
+    // a card that closed on coverage was re-dispatched until the attempt cap stopped the project.
+    expect(r.moves).toEqual([ENTRY, { card: 'F-007', to: 'done' }]);
     expect(result.dispatches).toBe(1);
   });
 
@@ -82,6 +93,27 @@ describe('a creating phase that found the work already done', () => {
     expect(line).toMatch(/the work is already done by P-030, E-031/);
     // A person querying a card that closed having created nothing must find the answer here.
     expect(line).toMatch(/checked against the board/i);
+  });
+
+  // THE CLAIM THE LIVE RUN TAUGHT, and it is about what the TICK reads rather than about the move. The
+  // first version of this file asserted the card reached the phase's `exitPass` and passed, while the
+  // real loop re-dispatched the same break-down three times and stalled: `phaseAction` dispatches
+  // feature-breakdown whenever a feature has no children, before it looks at any column at all.
+  //
+  // So the assertion is tied to `isSettled` — the rule the tick uses — rather than to the string `done`.
+  // A config whose terminal column is named something else must still land somewhere the loop is finished
+  // with, and a hardcoded column name would pass while the loop span.
+  it('lands the card somewhere the tick treats as settled, not merely moved', async () => {
+    const r = noGrowth([done('P-030', 'product'), done('E-031', 'engineering')]);
+    await performAction(deps(r.client), BREAKDOWN, context);
+    const landed = r.moves.at(-1);
+    expect(landed).toBeDefined();
+    expect(landed?.card).toBe('F-007');
+    expect(
+      isSettled(AP, { ...feature, columnSlug: landed?.to ?? '' } as unknown as Parameters<
+        typeof isSettled
+      >[1]),
+    ).toBe(true);
   });
 
   // THE HALF THAT MAKES IT SAFE, and the reason this is not what decision 43 refuses.

@@ -135,7 +135,7 @@ function checkupSection(checkup: NonNullable<PromptInputs['checkup']>): string {
 // So the failing branch stops inviting an opinion and asks for work instead. It does not need to threaten: the
 // close is refused by the machine in service/act/outcomes.ts whatever this run concludes, and saying so here is
 // what stops the run wasting its turn arguing that the feature is fine.
-function smokeSection(smoke: Verification): string {
+function smokeSection(smoke: Verification, gates: boolean): string {
   if (smoke.passed) {
     return [
       'Auto-pilot ran this in its own process before dispatching you, and it is evidence rather than a verdict:',
@@ -144,12 +144,35 @@ function smokeSection(smoke: Verification): string {
       'The smoke command passed.',
     ].join('\n');
   }
+  // NOT THIS FEATURE'S PROBLEM, and saying so is the difference between a checkup that closes and one that
+  // stalls. The smoke command proves the ASSEMBLED product runs; while other features are still to come it
+  // will fail on work this card does not own, and a checkup told "you are not finished" over that spends its
+  // one round of creation looking for something — anything — to justify staying open. Watched happening three
+  // times in a row on a greenfield project, each time on a feature whose own work was complete.
+  if (!gates) {
+    return [
+      'Auto-pilot ran the smoke command in its own process before dispatching you, and **it did not pass**.',
+      '',
+      ...(smoke.reason ? [smoke.reason, ''] : []),
+      ...(smoke.command ? [`The command: \`${smoke.command}\``, ''] : []),
+      ...(smoke.output ? ['What it printed:', '', '```', smoke.output.trim(), '```', ''] : []),
+      '**This is not, on its own, a reason to keep this feature open.** The smoke command exercises the whole',
+      'assembled product, and features are still outstanding — so it is expected to fail until the last of them',
+      'lands, and it will be run again then. It is here as evidence, in case it shows something that IS yours.',
+      '',
+      'Judge this feature on its own work. If what the smoke command printed reveals a gap inside this feature,',
+      'that is worth a card; if it is waiting on work another feature owns, say so in a line and close.',
+    ].join('\n');
+  }
   return [
     'Auto-pilot ran the smoke command in its own process before dispatching you. **It did not pass.**',
     '',
     ...(smoke.reason ? [smoke.reason, ''] : []),
     ...(smoke.command ? [`The command: \`${smoke.command}\``, ''] : []),
     ...(smoke.output ? ['What it printed:', '', '```', smoke.output.trim(), '```', ''] : []),
+    'Every other feature on this board is finished, so there is nothing left to blame: the product is as',
+    'assembled as it is going to get, and it does not run.',
+    '',
     'The smoke command is how this project says its product can be run. It did not run, so **this feature is',
     'not finished** — and that is not a conclusion for you to reach or to argue with: the feature stays open',
     'whatever you decide, so an answer explaining why it is really fine costs you the turn and changes nothing.',
@@ -173,7 +196,9 @@ export function checkupSections(checkup: PromptInputs['checkup']): string[] {
   if (!checkup) return [];
   return [
     section('What is under this card', checkupSection(checkup)),
-    ...(checkup.smoke ? [section('The smoke command', smokeSection(checkup.smoke))] : []),
+    ...(checkup.smoke
+      ? [section('The smoke command', smokeSection(checkup.smoke, checkup.smokeGates === true))]
+      : []),
     ...(checkup.feature ? [section('The question this checkup exists for', usableSection())] : []),
   ];
 }

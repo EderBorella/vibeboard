@@ -899,9 +899,33 @@ describe('the feature auto-pilot is focused on', () => {
   const EXPRESS: AutopilotConfig = { ...AP_CONFIG, mode: 'express' };
   const picker = () => screen.getByRole('combobox', { name: /feature auto-pilot works on/i });
 
-  it('is not offered at all in standard mode', () => {
+  // PRESENT IN BOTH MODES AND INERT IN STANDARD, and it is layout that decides this rather than taste. The
+  // group is pushed from the left, so a control that comes and goes takes its whole width out of the row —
+  // toggling Standard/Express moved the mode selector about 300px sideways at the very moment you clicked it.
+  // Reserving the lane is the only arrangement in which nothing moves.
+  it('is present but disabled in standard mode, so the row does not resize when the mode changes', () => {
     show();
-    expect(screen.queryByRole('combobox', { name: /feature auto-pilot works on/i })).toBeNull();
+    const sel = screen.getByRole('combobox', { name: /feature auto-pilot works on/i, hidden: true });
+    expect((sel as HTMLSelectElement).disabled).toBe(true);
+    // And it says why, rather than being an inert box with no account of itself.
+    expect(sel.getAttribute('title')).toMatch(/express/i);
+  });
+
+  it('is enabled in express mode', () => {
+    show({ autopilotConfig: EXPRESS });
+    expect((picker() as HTMLSelectElement).disabled).toBe(false);
+  });
+
+  // THE STRUCTURAL HALF OF THE LAYOUT CLAIM, which jsdom can assert and the pixel half it cannot: the same
+  // controls are in the group either way, so there is no width to gain or lose. The pixels are measured on
+  // the running product.
+  it('renders the same controls in the group in both modes', () => {
+    const count = () => screen.getByTestId('ap-agent').querySelectorAll('select, [role="group"]').length;
+    show();
+    const standard = count();
+    cleanup();
+    show({ autopilotConfig: EXPRESS });
+    expect(count()).toBe(standard);
   });
 
   // BACKLOG IS OFFERED, and it is the deliberate part. A feature that has never been started sits in

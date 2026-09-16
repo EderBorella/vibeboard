@@ -3,9 +3,6 @@ import type { AutopilotConfig, Card } from '../../lib/shared';
 
 // The whole board is the ordinary state, so the empty option has to say that rather than read as "none
 // chosen yet". A blank first option is how a picker comes to look like it is waiting for an answer.
-
-// The whole board is the ordinary state, so the empty option has to say that rather than read as "none
-// chosen yet". A blank first option is how a picker comes to look like it is waiting for an answer.
 const WHOLE_BOARD = 'The whole board';
 export const NO_FOCUS = '';
 
@@ -82,23 +79,35 @@ interface FocusOption {
   text: string;
 }
 
-// ONE FEATURE, END TO END. Shown only in express mode — see the bar, which is also what clears the saved
-// focus when the mode changes, so a hidden picker can never leave the loop confined to a card nobody can
-// see.
+// ONE FEATURE, END TO END.
+//
+// PRESENT IN BOTH MODES AND INERT IN STANDARD, rather than rendered only in express — which is what it used
+// to do, and the reason is layout. The group is pushed from the left, so a control that comes and goes takes
+// its whole width out of the row and the mode selector jumps ~300px sideways at the very moment you click it.
+// Reserving the lane is the only arrangement in which nothing moves, and a disabled control that says why is
+// better than the blank space that would otherwise hold it.
+//
+// It is `disabled`, so it is out of the tab order and announced as unavailable; the bar clears any saved
+// focus when the mode leaves express, so an inert picker can never be hiding a live constraint.
 //
 // A `select` AND NOT A SEGMENTED PICKER, unlike the two beside it: those choose between two fixed options
 // and this one is a list of whatever a project happens to have, which can be twenty. `Control as="select"`
 // is the box this design system already draws for exactly that.
 export function FocusPicker({ config, features, onChange, disabled = false }: Props) {
-  if (config?.mode !== 'express') return null;
+  if (!config) return null;
+  const express = config.mode === 'express';
   const options = withSavedFocus(focusable(features, config.terminal.features ?? []), features, config.focus);
   return (
     <Control
       as="select"
       aria-label="The feature auto-pilot works on"
-      title="Confine auto-pilot to one feature: it works that card and its stories and tasks, and stops when they are done. Everything else on the board is left alone."
+      title={
+        express
+          ? 'Confine auto-pilot to one feature: it works that card and its stories and tasks, and stops when they are done. Everything else on the board is left alone.'
+          : 'Working one feature end to end is an express-mode choice. Standard auto-pilot walks the whole board in queue order.'
+      }
       value={config.focus ?? NO_FOCUS}
-      disabled={disabled}
+      disabled={disabled || !express}
       onChange={(e) => onChange(e.currentTarget.value === NO_FOCUS ? undefined : e.currentTarget.value)}
     >
       <option value={NO_FOCUS}>{WHOLE_BOARD}</option>

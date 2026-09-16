@@ -93,7 +93,11 @@ interface FocusOption {
 // and this one is a list of whatever a project happens to have, which can be twenty. `Control as="select"`
 // is the box this design system already draws for exactly that.
 export function FocusPicker({ config, features, onChange, disabled = false }: Props) {
-  if (config?.mode !== 'express') return null;
+  if (!config) return null;
+  // A SPACER OF THE SAME WIDTH IN STANDARD, so the group never changes size and nothing on the row moves when
+  // the mode is toggled. Hidden rather than absent: an absent control takes its width out of a group that is
+  // pushed from the left, and every pixel of that comes out of the position of the control you just clicked.
+  if (config.mode !== 'express') return <div className="vb-ctl" data-testid="ap-focus-spacer" aria-hidden />;
   const options = withSavedFocus(focusable(features, config.terminal.features ?? []), features, config.focus);
   return (
     <Control

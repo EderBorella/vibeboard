@@ -573,27 +573,35 @@ test('7. one line where one line is meant', async ({ board, theme }) => {
     `flex rows whose children sit on more than one line:\n${lines(styles.rows.offenders)}`,
   ).toBeLessThanOrEqual(baseline.findings.rows);
 
-  // The two rows the incident was about, named and blocking at zero: the auto-pilot bar is where a
-  // borrowed class rendered at 10.88px inside a 12.16px row, and the top bar is the other row that
-  // has wrapped in front of the owner.
+  // The two rows the incident was about: the auto-pilot bar is where a borrowed class rendered at 10.88px
+  // inside a 12.16px row, and the top bar is the other row that has wrapped in front of the owner.
   // `.ap-bar-row` rather than the bar itself: the bar is a one-child wrapper, and a row assertion
   // against a container with one child is vacuous — it passed on a single element and proved nothing.
-  for (const selector of ['[data-testid="ap-bar"] .ap-bar-row', 'header.topbar']) {
-    // The band the children occupy against the tallest of them — the same measure audit.ts uses, and
-    // for the same reason: comparing top edges measures `align-items: center`, not wrapping. That
-    // version reported this row as five lines when it is one.
+  //
+  // THE TOP BAR IS STILL ONE LINE AND THE AUTO-PILOT BAR IS ALLOWED TWO, and the difference is a product
+  // change rather than a concession. The bar gained the lifecycle mode picker and the focus picker
+  // (`docs/decisions.md`), and with a project whose status sentence runs long it needs about 1500px to hold
+  // them side by side — more than a 1280 or 1440 viewport has. `flex-wrap` on the row is the designed
+  // answer, so the claim becomes what it was always really about: the row must not wrap UNEXPECTEDLY, and
+  // two lines is the most it may ever take. A third line means something grew that nobody planned.
+  const LINES = { '[data-testid="ap-bar"] .ap-bar-row': 2, 'header.topbar': 1 };
+  for (const [selector, allowed] of Object.entries(LINES)) {
+    // LINES BY THE CENTRES THE CHILDREN SIT ON, not by their top edges: `align-items: center` puts a 16px
+    // chip and a 28px button at different tops on the SAME line, and a version that compared tops reported
+    // this row as five lines when it is one.
     const row = await board.locator(selector).evaluate((el) => {
       const boxes = Array.from(el.children)
         .map((child) => child.getBoundingClientRect())
         .filter((box) => box.height > 0);
-      const band = Math.max(...boxes.map((b) => b.bottom)) - Math.min(...boxes.map((b) => b.top));
-      return { count: boxes.length, band, tallest: Math.max(...boxes.map((b) => b.height)) };
+      const centres = boxes.map((b) => b.top + b.height / 2).sort((a, b) => a - b);
+      const lines = centres.filter((c, i) => i === 0 || c - centres[i - 1] > 8).length;
+      return { count: boxes.length, lines, tallest: Math.max(...boxes.map((b) => b.height)) };
     });
     expect(row.count, `${selector} rendered no children`).toBeGreaterThan(1);
     expect(
-      row.band,
-      `${selector} wrapped: its ${row.count} children span ${row.band}px against a tallest child of ${row.tallest}px`,
-    ).toBeLessThanOrEqual(row.tallest + 1);
+      row.lines,
+      `${selector} took ${row.lines} lines for its ${row.count} children, and ${allowed} is the most it may`,
+    ).toBeLessThanOrEqual(allowed);
   }
 });
 
@@ -1235,9 +1243,13 @@ test('14. the auto-pilot bar reads as three groups', async ({ board, theme }) =>
     if (!row) return null;
     const style = getComputedStyle(row);
     const box = row.getBoundingClientRect();
+    // `line` is the CENTRE the element sits on, so two groups can be compared for "same line" on a row that
+    // is allowed to wrap. See check 7: `align-items: center` makes top edges useless for this.
     const at = (sel: string) => {
       const el = row.querySelector<HTMLElement>(sel);
-      return el ? { left: el.getBoundingClientRect().left, right: el.getBoundingClientRect().right } : null;
+      if (!el) return null;
+      const b = el.getBoundingClientRect();
+      return { left: b.left, right: b.right, line: Math.round(b.top + b.height / 2) };
     };
     // THE LEFT GROUP'S RIGHT EDGE IS THE RIGHTMOST OF EVERYTHING THAT IS NOT ONE OF THE OTHER TWO GROUPS,
     // and computing it this way rather than naming a control is what makes the gap below a GAP. The first
@@ -1290,16 +1302,32 @@ test('14. the auto-pilot bar reads as three groups', async ({ board, theme }) =>
   // the queue this check exists to refuse. Floored well under the ~200px each gap measures at 1440, so
   // ordinary content growth cannot fail it — a queue reads as single-digit gaps, not as a hundred pixels.
   expect(seen?.leftGroup.count, 'nothing in the left group to measure from').toBeGreaterThan(1);
-  const before = agent.left - (seen?.leftGroup.right ?? 0);
-  const after = end.left - agent.right;
-  expect(agent.left, 'the agent group is left of the controls that act').toBeGreaterThan(kill.right);
-  expect(end.left, 'the agent group is right of the explanations').toBeGreaterThan(agent.right);
-  expect(before, `only ${before.toFixed(1)}px between the left group and the agent group`).toBeGreaterThan(
-    24,
-  );
-  expect(after, `only ${after.toFixed(1)}px between the agent group and the explanations`).toBeGreaterThan(
-    24,
-  );
+
+  // THE ORDER AND THE GAPS, ASKED PER LINE — because the row is allowed to wrap to two (check 7, and the
+  // product change that made it necessary: the bar gained the lifecycle mode picker and the focus picker).
+  // Across a wrap, "the explanations are right of the agent group" is false while the layout is perfectly
+  // correct — they are BELOW it. So the claim becomes the one that survives a wrap and still refuses the
+  // queue this check exists to catch: each group is after the previous one, with real space between them
+  // when they share a line, and on a later line when they do not.
+  const ordered = (
+    a: { right: number; line: number },
+    b: { left: number; line: number },
+    what: string,
+  ): void => {
+    if (a.line !== b.line) {
+      expect(b.line, `${what}: the second group is on an EARLIER line than the first`).toBeGreaterThan(
+        a.line,
+      );
+      return;
+    }
+    const gap = b.left - a.right;
+    expect(gap, `only ${gap.toFixed(1)}px ${what}`).toBeGreaterThan(24);
+  };
+  // The left group's rightmost edge sits on the transport's line: both are line-one content by construction,
+  // and `leftGroup` is computed from every child that is not one of the two pushed groups.
+  const leftGroup = { right: seen?.leftGroup.right ?? 0, line: transport.line };
+  ordered(leftGroup, agent, 'between the left group and the agent group');
+  ordered(agent, end, 'between the agent group and the explanations');
 
   // AND EVERY CONTROL SHARES THE ROW'S CENTRE LINE. Its own claim rather than part of check 7: that one
   // asks whether the row WRAPPED — the band its children occupy against the tallest of them — and a chip
@@ -1308,39 +1336,49 @@ test('14. the auto-pilot bar reads as three groups', async ({ board, theme }) =>
   // NESTED ONE LEVEL, because the offender was nested: `.pop-wrap` inside `.ap-agent` was off by 1.88px
   // while `.ap-agent` itself was exactly centred, so a direct-children-only version would have reported
   // half of this defect. 1px of tolerance for the sub-pixel heights the segmented control lands on.
+  //
+  // EACH CONTROL AGAINST ITS OWN LINE'S CENTRE, not the row's. The row may take two lines now (check 7), and
+  // measured against a single mid-point every control on a two-line bar reads as exactly half the row off —
+  // 18px each, all sixteen of them, which says nothing about alignment. The defect this catches is a control
+  // sitting off the line its neighbours are on, and that is what it now asks.
   const off = await board.evaluate(() => {
     const row = document.querySelector<HTMLElement>('[data-testid="ap-bar"] .ap-bar-row');
     if (!row) return [];
-    const box = row.getBoundingClientRect();
-    const mid = box.top + box.height / 2;
-    const centres: { id: string; delta: number }[] = [];
+    const found: { id: string; centre: number }[] = [];
     const walk = (el: Element, depth: number): void => {
       for (const child of Array.from(el.children)) {
         const b = child.getBoundingClientRect();
         if (b.height > 0) {
-          centres.push({
+          found.push({
             id: (child as HTMLElement).dataset.testid ?? child.className,
-            delta: b.top + b.height / 2 - mid,
+            centre: b.top + b.height / 2,
           });
           if (depth < 1) walk(child, depth + 1);
         }
       }
     };
     walk(row, 0);
-    return centres;
+    // Cluster the centres into lines, then measure each control against the centre of its own cluster.
+    const sorted = [...found].map((c) => c.centre).sort((a, b) => a - b);
+    const lines: number[] = [];
+    for (const c of sorted) if (lines.length === 0 || c - (lines.at(-1) ?? 0) > 8) lines.push(c);
+    return found.map((c) => {
+      const line = lines.reduce((best, l) => (Math.abs(l - c.centre) < Math.abs(best - c.centre) ? l : best));
+      return { id: c.id, delta: c.centre - line };
+    });
   });
   expect(off.length, 'nothing on the row to align').toBeGreaterThan(3);
   const adrift = off.filter((c) => Math.abs(c.delta) > 1);
   expect(
     adrift,
-    `off the row's centre line: ${adrift.map((c) => `${c.id} ${c.delta.toFixed(2)}px`).join(', ')}`,
+    `off the centre line of their own row: ${adrift.map((c) => `${c.id} ${c.delta.toFixed(2)}px`).join(', ')}`,
   ).toEqual([]);
 
   console.log(
     `[${theme}] bar layout: ${off.length} controls on one centre line; ` +
       `transport at ${transport.left.toFixed(0)} (edge ${content.left.toFixed(0)}), ` +
-      `left group ends ${(seen?.leftGroup.right ?? 0).toFixed(0)}, gap ${before.toFixed(0)}px, ` +
-      `agent ${agent.left.toFixed(0)}–${agent.right.toFixed(0)}, ` +
-      `gap ${after.toFixed(0)}px, end ends ${end.right.toFixed(0)} (edge ${content.right.toFixed(0)})`,
+      `left group ends ${leftGroup.right.toFixed(0)} on line ${leftGroup.line}, ` +
+      `agent ${agent.left.toFixed(0)}–${agent.right.toFixed(0)} on line ${agent.line}, ` +
+      `end ends ${end.right.toFixed(0)} on line ${end.line} (edge ${content.right.toFixed(0)})`,
   );
 });

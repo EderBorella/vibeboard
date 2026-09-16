@@ -909,21 +909,25 @@ describe('the feature auto-pilot is focused on', () => {
     expect(screen.queryByRole('combobox', { name: /feature auto-pilot works on/i })).toBeNull();
   });
 
-  // THE PLACEMENT IS THE CLAIM, so it is asserted rather than left to the comment above: the picker is NOT
-  // inside either pushed group, and it comes before the acknowledgement — which must stay the last thing that
-  // can vanish without moving anything.
-  it('renders outside the pushed groups, ahead of the gate acknowledgement', () => {
+  // THE LANE IS HELD IN BOTH MODES, which is what stops the row moving when the mode is toggled. The picker
+  // sits in the pushed middle group, and a group that loses a control loses its width — every pixel of which
+  // comes out of the position of the control you just clicked, measured at 148.81px before this.
+  //
+  // So in standard a spacer of the same width stands in its place. This asserts the STRUCTURE, which jsdom
+  // can see; the pixels are measured on the running product, and the browser harness holds the consequence
+  // — the bar may take two lines and no more (visual/checks/board.spec.ts, check 7).
+  it('holds the lane with a spacer in standard, inside the same group as the picker', () => {
     show({ autopilotConfig: EXPRESS });
-    const sel = picker();
-    expect(sel.closest('[data-testid="ap-agent"]')).toBeNull();
-    expect(sel.closest('[data-testid="ap-bar-end"]')).toBeNull();
-    const row = sel.closest('.ap-bar-row');
-    expect(row).not.toBeNull();
-    const kids = Array.from(row?.children ?? []);
-    const at = kids.findIndex((c) => c === sel || c.contains(sel));
-    const pushed = kids.findIndex((c) => c.className.includes('push'));
-    expect(at).toBeGreaterThanOrEqual(0);
-    expect(at).toBeLessThan(pushed);
+    const group = screen.getByTestId('ap-agent');
+    expect(group.contains(picker())).toBe(true);
+    expect(screen.queryByTestId('ap-focus-spacer')).toBeNull();
+
+    cleanup();
+    show();
+    const spacer = screen.getByTestId('ap-focus-spacer');
+    expect(screen.getByTestId('ap-agent').contains(spacer)).toBe(true);
+    // Hidden, not absent: an absent element takes the lane with it.
+    expect(spacer.getAttribute('aria-hidden')).toBe('true');
   });
 
   // THE CONTROL MUST SHOW THE STATE THAT EXISTS, and this was found by opening the page rather than by any

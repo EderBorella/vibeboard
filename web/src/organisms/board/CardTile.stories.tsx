@@ -65,11 +65,16 @@ export const ReadOnly: Story = {
 // THE CASE THAT BREAKS BOXES: a title with no spaces in it. A card title is arbitrary user text and
 // several real ones are file paths, so a tile that sets its own minimum content width pushes its track
 // past its share and takes the whole grid with it.
+//
+// A PATH THAT EXISTS IN THIS REPOSITORY, which is not fussiness: this fixture used to name a file in a
+// gitignored directory, so the one long title the layout is proved against pointed at nothing in any
+// clone. What the case needs is an unbreakable run of characters, and a real path is the honest way to
+// get one.
 export const Unbroken: Story = {
   args: {
     card: {
       ...card,
-      title: 'docs/superpowers/plans/2026-08-14-refactor-structure-and-layers.md',
+      title: 'web/src/organisms/autopilot/AutopilotBar.stories.tsx',
       tags: ['a-very-long-tag-nobody-would-write', 'ui'],
     },
   },

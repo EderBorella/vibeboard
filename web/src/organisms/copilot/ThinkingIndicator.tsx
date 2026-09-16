@@ -6,7 +6,7 @@ import { Text } from '../../atoms/Text';
 
 // WHAT THE COPILOT IS DOING WHILE IT IS DOING NOTHING VISIBLE.
 //
-// Carded 2026-08-10 from real use (`notes/todo.md`, *Show that the copilot is thinking*): a message
+// Carded 2026-08-10 from real use — *Show that the copilot is thinking*: a message
 // took about three minutes to come back with nothing on screen changing, and the honest reading was
 // that the copilot had died. It had not. The card's argument, which this implements: **a healthy slow
 // turn and a dead one look identical**, and the instinct for both is to reload or resend — the one

@@ -131,7 +131,7 @@
    would have lost the muted grey.
    AND `.msg-running` IS GONE NOW TOO, with the line it styled. `…working` was a static string that
    said the same thing at one second and at three minutes, so it could not tell a model that was
-   thinking from a process that had died — the complaint notes/todo.md records from real use. It is
+   thinking from a process that had died — the complaint this came from, raised from real use. It is
    `ThinkingIndicator` instead: a clock that keeps moving, a sentence that changes when the answer is
    late, and a Stop offered only once silence is genuinely suspicious. Nothing survives of the rule,
    because the element it was written against no longer exists. */

@@ -4,7 +4,7 @@
 // THE PATTERN IS ONE SOURCE MIRRORED, and it is chosen rather than assumed: the alternatives are
 // JS-only, which leaves `.vb-dot-pulse` hand-writing `1.6s` forever, and CSS-only, which a JS library
 // cannot read without `getComputedStyle` on every animation. Mirroring is what design systems that
-// carry both actually do — see docs/superpowers/plans/2026-08-31-motion-and-thinking-indicator.md.
+// carry both actually do, which is why it was chosen over either single-source alternative.
 //
 // THE MIRROR IS PER-CONSUMER, AND THE GATE TAUGHT US THAT. The plan said mirror all five names into
 // `tokens.css`; `check:tokens` refused, because four of them are read only from here and would have

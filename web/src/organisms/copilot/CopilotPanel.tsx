@@ -379,8 +379,8 @@ export function CopilotPanel({
         ))}
         {/* THE INDICATOR REPLACES `…working`, which was the whole of the old signal: a static string
             that said the same thing at one second and at three minutes. It could not distinguish a
-            model that was thinking from a process that had died, which is exactly the complaint
-            notes/todo.md records from real use.
+            model that was thinking from a process that had died — which is the complaint this came from,
+            raised from real use rather than from review.
             `!sawText.current` — once the answer starts arriving the bubble IS the signal, and two
             things saying "working" is one too many. The ref is read during a render that `items`
             already triggered, so it is never stale here. */}

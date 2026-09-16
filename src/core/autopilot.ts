@@ -27,7 +27,7 @@ export type VerifyMode = (typeof VERIFY_MODES)[number];
 // ruling 52 and decision 42 replaced both with the phase table in core/phases.ts, so which skill runs
 // is a fact about the machine rather than about this project's config.
 
-// HOW COARSE THE BOARD IS, and it is a choice between two behaviours written in code — never a table a
+// HOW COARSE THE BOARD IS (`decision 72`), and it is a choice between two behaviours written in code — never a table a
 // person edits. Ruling 52's line holds: what the loop DOES stays in core/phases.ts, and this key only says
 // which of two prompts the creating phases are given. The phase table, the walker and every bound are the
 // same under both.
@@ -67,7 +67,7 @@ export interface AutopilotConfig {
   // Which of the two lifecycles above. Defaulted rather than optional: `ensureAutopilotKeys` backfills
   // every key this default carries, so an existing project reads `standard` and behaves exactly as it did.
   mode: LifecycleMode;
-  // ONE FEATURE THE LOOP CONFINES ITSELF TO, by id, or absent for the whole board.
+  // ONE FEATURE THE LOOP CONFINES ITSELF TO (`decision 73`), by id, or absent for the whole board.
   //
   // OPTIONAL AND ABSENT FROM `DEFAULT_AUTOPILOT` ON PURPOSE. `ensureAutopilotKeys` backfills every key the
   // default carries, so a defaulted one would write `focus:` into every project's config file — a key that

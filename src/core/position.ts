@@ -49,7 +49,7 @@ const openIn = (cards: Card[]): Card[] => cards.filter((c) => OPEN.includes(c.co
 const firstQueued = (cards: Card[]): Card | undefined =>
   cards.filter((c) => c.columnSlug === QUEUE).sort(byQueueOrder)[0];
 
-// WHICH FEATURE, and it is the ONE thing focus changes. Everything below this — the stories, the open-story
+// WHICH FEATURE, and it is the ONE thing focus changes (`decision 73`). Everything below this — the stories, the open-story
 // invariant, the tasks — runs exactly as it does unfocused, over the children of whichever feature this
 // returns.
 //

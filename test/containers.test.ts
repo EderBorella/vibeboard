@@ -171,6 +171,13 @@ describe('the run argv', () => {
     expect(joined).not.toContain('--cap-drop');
   });
 
+  // A REAL PID 1. The box's command is `sleep infinity`, which never calls `wait()`, so without an init
+  // nothing reaps an orphan: a Playwright run killed by `runTimeoutMs` left 22 `chrome-headless` entries
+  // in the pid table, every one state `Z`, for the life of a box that is long-lived by design.
+  it('gives the box an init, so orphaned processes are reaped', () => {
+    expect(joined).toContain('--init');
+  });
+
   it('never grants the box NET_ADMIN — its own rules must be beyond its reach', () => {
     expect(joined).not.toContain('NET_ADMIN');
   });
@@ -675,5 +682,41 @@ describe('probe', () => {
       }),
     });
     expect(await mgr.probe()).toEqual({ ok: true });
+  });
+});
+
+// THE CONTAINER'S SHAPE IS PART OF ITS IDENTITY, and this pins it.
+//
+// `specDigest` is what `ensure` compares to decide whether an existing box may be ADOPTED. It hashes the
+// image, mounts, env, published port and command — not the flags — so a change to the flags alone would
+// leave every box on every machine adopted with the old shape, for ever. `shape` in the hashed object is
+// the marker that stops that, and this test is what makes changing it a decision rather than an accident.
+//
+// IF THIS VALUE CHANGES, every existing box is replaced on its next `ensure`. That is correct when the
+// container's shape really changed and wrong the rest of the time, which is the whole reason to pin it.
+describe('the spec digest', () => {
+  const digestOf = () =>
+    specDigest({
+      image: 'vibeboard-agent:latest',
+      mounts: boxMounts(PATHS),
+      env: { VIBEBOARD_PORT: '4610' },
+      publish: { containerPort: 4096 },
+      command: ['sleep', 'infinity'],
+    });
+
+  it('is stable for an unchanged container shape', () => {
+    expect(digestOf()).toBe('99d6a0697e379b5a');
+  });
+
+  it('changes when anything the box is made of changes', () => {
+    // A floor on the claim above: a digest that ignored its input would satisfy the pin and prove nothing.
+    const other = specDigest({
+      image: 'vibeboard-agent:latest',
+      mounts: boxMounts(PATHS),
+      env: { VIBEBOARD_PORT: '4611' },
+      publish: { containerPort: 4096 },
+      command: ['sleep', 'infinity'],
+    });
+    expect(other).not.toBe(digestOf());
   });
 });

@@ -297,6 +297,14 @@ export function specDigest(spec: Omit<CreateArgs, 'name' | 'projectRoot' | 'back
     env: Object.entries(spec.env).sort(),
     publish: spec.publish?.containerPort ?? null,
     command: spec.command ?? null,
+    // THE SHAPE OF THE CONTAINER ITSELF, and it is in the digest so that a box created before it changed
+    // is REPLACED rather than adopted. `--init` is not a per-spec choice — every box gets it — so without
+    // a marker here the digest would be identical and every existing box on every machine would keep the
+    // old pid 1 for ever. Adoption silently keeping the old shape is the exact failure the header of
+    // docs/smoke-test.md records, arrived at from the other side.
+    //
+    // Bump this when the container's FLAGS change in a way an existing box must not keep.
+    shape: 'init-1',
   };
   return createHash('sha256').update(JSON.stringify(shape)).digest('hex').slice(0, 16);
 }
@@ -327,6 +335,16 @@ export function createArgs(spec: CreateArgs): string[] {
     'no-new-privileges',
     '-w',
     WORK_DIR,
+    // A REAL PID 1, so orphaned processes are reaped. The box's command is `sleep infinity` — the right
+    // shape, because a box must outlive any one `docker exec` — but `sleep` never calls `wait()`, so
+    // nothing reaps an orphan. Measured: a Playwright run that hit `runTimeoutMs` left 22 `chrome-headless`
+    // entries in the pid table two minutes later, every one of them state `Z`, reparented to pid 1. The
+    // browsers had died exactly as they should; what survived was the unreaped entry, for the life of a box
+    // that is long-lived by design.
+    //
+    // `--init` is docker's own tini. It costs one process and no configuration, and it also forwards
+    // signals to the command — which `sleep infinity` as pid 1 does not.
+    '--init',
   ];
   for (const m of spec.mounts) {
     args.push('-v', `${m.source}:${m.target}${m.readOnly ? ':ro' : ''}`);

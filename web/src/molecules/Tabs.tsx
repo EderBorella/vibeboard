@@ -74,7 +74,8 @@ export function Tabs({
 }: Props) {
   const strip = ['vb-tabs', grouped && 'vb-tabs-grouped', className].filter(Boolean).join(' ');
   // `group` for a value picker and `tablist` for a view switch, which is the ARIA difference between the
-  // two things `grouped` names: a segmented picker chooses a VALUE and its cells are not tabs.
+  // two things `grouped` names: a segmented picker chooses a VALUE and its cells are not tabs. What a
+  // grouped cell carries in place of `aria-selected` is `aria-pressed` — see the button below.
   return (
     <div className={strip} role={grouped ? 'group' : 'tablist'} aria-label={label}>
       {items.map((item) => (
@@ -86,6 +87,12 @@ export function Tabs({
             type="button"
             role={grouped ? undefined : 'tab'}
             aria-selected={grouped ? undefined : item.value === value}
+            // AND THE GROUPED CELL SAYS SO TOO. Dropping `aria-selected` from a value picker is right —
+            // its cells are not tabs — but nothing was put in its place, so the chosen option of every
+            // segmented picker in this app was carried by a CLASS and a fill alone, and was invisible to
+            // a screen reader. `aria-pressed` is the toggle-button state, which is what a cell in a
+            // `role="group"` of buttons actually is, and it changes nothing on screen.
+            aria-pressed={grouped ? item.value === value : undefined}
             className={item.value === value ? 'vb-tab active' : 'vb-tab'}
             disabled={disabled}
             title={item.title}

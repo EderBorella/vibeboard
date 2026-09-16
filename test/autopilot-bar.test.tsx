@@ -860,13 +860,18 @@ describe('the lifecycle mode', () => {
 
   it('shows which mode the project is on', () => {
     show();
-    // The CLASS, because that is the only thing a grouped `Tabs` marks selection with: it sets `role=group`
-    // and drops `aria-selected`, on the argument that a segmented picker's cells are not tabs. It puts
-    // nothing in its place, so the selected option of every segmented picker in this app — this one and the
-    // backend picker beside it — is invisible to a screen reader. Asserted here as what the component
-    // actually does rather than what it should; the gap belongs to `molecules/Tabs`, not to this control.
+    // THE ACCESSIBLE STATE AND THE CLASS, and the first of those was missing until 2026-09-16. A grouped
+    // `Tabs` sets `role="group"` and drops `aria-selected` — right, because a value picker's cells are not
+    // tabs — and for a while put nothing in its place, so the chosen option of every segmented picker in
+    // this app was carried by a class and a fill alone. `aria-pressed` is the toggle-button state, which is
+    // what these cells are.
+    expect(within(picker()).getByRole('button', { name: 'Standard' }).getAttribute('aria-pressed')).toBe(
+      'true',
+    );
+    expect(within(picker()).getByRole('button', { name: 'Express' }).getAttribute('aria-pressed')).toBe(
+      'false',
+    );
     expect(within(picker()).getByRole('button', { name: 'Standard' }).className).toContain('active');
-    expect(within(picker()).getByRole('button', { name: 'Express' }).className).not.toContain('active');
   });
 
   // THE WHOLE BLOCK GOES BACK, not `{ mode }` alone. `PATCH /api/config` runs the coverage check over the

@@ -6,6 +6,7 @@ import type { Scope } from '../../auth/credentials.js';
 import { CONTRACT_LINES, reviewLines } from './contracts.js';
 import { credentialSection, judgeCredentialSection } from './credential.js';
 import {
+  boxSection,
   checkupSections,
   columnsSection,
   expressSection,
@@ -187,6 +188,11 @@ export function buildRunPrompt(input: PromptInputs): string {
   if (input.boardColumns.length > 0) {
     parts.push(section("The project's columns", columnsSection(input.boardColumns)));
   }
+  // WHAT THE MACHINE IT IS STANDING IN ALREADY HAS, beside the columns for the same reason: this is the
+  // frame, not the work. Placed before the foundation rather than after because a run that is going to
+  // fetch a browser decides to early, while it is still working out how to approach the card at all.
+  parts.push(section('What this container already has', boxSection()));
+
   // Immediately after the columns and before the card's own links: the stack and the gates are the
   // frame everything else is read inside, and a decision an agent meets after the work is described
   // is one it has already reasoned past.

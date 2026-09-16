@@ -3,6 +3,7 @@ import { ARCHIVE_SLUG, RESULTS_DIR } from '../../../core/layout.js';
 import { type PhaseName, phase, phaseForRun } from '../../../core/phases.js';
 import type { BoardName, Card } from '../../../core/types.js';
 import type { Verification } from '../../../core/verify.js';
+import { BOX_BROWSERS_PATH, BOX_PLAYWRIGHT_VERSION } from '../../boxes/image-tools.js';
 import type { BoardColumns, PromptInputs } from './index.js';
 
 // One section per thing the agent is told about, and every one of them a pure function of what it is
@@ -193,6 +194,22 @@ export function expressSection(skill: string, board: BoardName | undefined): str
 // Ruling 52's precedent: a fact the table already carries is read from it, never copied. Two copies is two
 // places to drift, and this is what drifting cost.
 const CHECKUP_CREATES = phase('feature-checkup').creates;
+
+// WHAT THE BOX ALREADY HAS. An agent is told about the board, the cards, the columns and its own
+// credential, and until now nothing at all about the machine it is standing in — so it re-fetched a
+// browser the image ships. See `server/boxes/image-tools.ts` for the measurement and why the version
+// belongs in the sentence.
+export function boxSection(): string {
+  return [
+    `A **Chromium for Playwright ${BOX_PLAYWRIGHT_VERSION}** is already installed in this container, at`,
+    `\`${BOX_BROWSERS_PATH}\`, and \`PLAYWRIGHT_BROWSERS_PATH\` points at it. You do not need to download one,`,
+    'and a run that does spends minutes of its own budget fetching what it was given.',
+    '',
+    `Playwright keeps browsers per release, so that copy answers for ${BOX_PLAYWRIGHT_VERSION}. If this project`,
+    'depends on a different Playwright, it will correctly find nothing it can use and fetch its own — that is',
+    'the one case where installing is right.',
+  ].join('\n');
+}
 
 // RULING 55 SET THE PASSING HALF; DECISION 69 CHANGED THE FAILING ONE. A passing smoke is still evidence and
 // the model still decides what it means. A FAILING one is no longer a judgement call, because the judgement was

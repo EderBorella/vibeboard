@@ -264,13 +264,14 @@ export function opencodeBoxCredentialPath(): string {
 // reason.
 //
 // WHAT THIS DOES NOT FIX, stated so the next reader does not have to discover it the way the last one
-// did:
+// did — and the first of the three has since been fixed, kept here rather than deleted because the
+// reasoning it records is what that fix had to answer:
 //
-//  - MIRRORING IS ONE-WAY, host → mirror, and the host is the source of truth. A refresh performed
-//    INSIDE the box is overwritten by the next mirror and lost. That costs nothing today, because the
-//    EBUSY measurement above says an in-box refresh is impossible — but a directory mount is writable
-//    from inside, so the in-box CLI CAN write here now and the loss becomes reachable the moment it
-//    does. The two-way version (newest mtime wins) is a separate step, deliberately not taken here.
+//  - MIRRORING WAS ONE-WAY AND IS NOT ANY MORE. A refresh performed INSIDE the box used to be
+//    overwritten by the next mirror and lost; the EBUSY measurement above said that was unreachable,
+//    and a directory mount being writable from inside is what made it reachable again.
+//    `reconcileCredential` below is the two-way version: newest mtime wins, and the mirror is restored
+//    to the host only when it is strictly newer AND parses as a credential.
 //  - IF NOBODY EVER RUNS CLAUDE CODE ON THE HOST, nothing refreshes the token, and the mirror expires
 //    exactly when the original does. Mirroring buys freshness; it does not create it.
 //  - THIS IS A SECOND COPY OF A CREDENTIAL AT REST, at `~/.cache/vibeboard/creds/claude/`. What

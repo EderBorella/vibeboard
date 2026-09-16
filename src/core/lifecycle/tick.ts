@@ -27,13 +27,14 @@ import {
 } from '../bounds.js';
 import { allSettled, isSettled } from '../derived-status.js';
 import { mayDispatch, type StopReason } from '../dispatch-gate.js';
-import { liveCards } from '../hierarchy.js';
+import { childrenOf, liveCards } from '../hierarchy.js';
 import { ARCHIVE_SLUG } from '../layout.js';
 import { type PhaseName, phase } from '../phases.js';
 import { derivePosition, type Position } from '../position.js';
 import { isProjectRun, type RunRecord } from '../runs.js';
 import type { BoardName, Card } from '../types.js';
 import {
+  focusFinishedSentence,
   invalidAttemptCap,
   isAre,
   machineBrokenSentence,
@@ -173,6 +174,39 @@ function halfArchivedStop(cards: Card[]): TickAction | undefined {
 // `complete` requires that no non-terminal card exists anywhere AND positive evidence that finished work
 // does. Absence of unfinished work is not presence of finished work: an empty board, a board archived down
 // to nothing, and a fetch that returned nothing all produce the same empty list.
+// A FOCUSED RUN THAT FINISHED ITS FEATURE IS A SUCCESS, and this exists because the first version reported
+// it as a STALL. Found on a live run rather than by a test: `F-001` closed with its five stories and five
+// tasks done and its smoke command passing, and the loop stopped saying "work remains and nothing it can do
+// would move it" — true of the untouched feature behind it, false of the thing the person asked for. A stall
+// is an alarm, and it sends somebody looking for a fault that is not there.
+//
+// POSITIVE EVIDENCE, never an implication, which is `finished`'s own rule one level in: the focused card has
+// to be ON the board and IN a terminal column. A focus naming a card that has gone is already refused by
+// `derivePosition`, and inferring success from "nothing eligible" is how a board holding one blocked card
+// came to report a project finished.
+//
+// BLOCKED CARDS ARE COUNTED UNDER THE FOCUS ONLY. One belonging to another feature is work this run was told
+// not to do, so naming it here would report as a hazard of the run something the run was instructed to leave.
+function focusFinished(
+  ap: AutopilotConfig,
+  live: Card[],
+  commands: DeclaredCommands,
+): TickAction | undefined {
+  if (ap.focus === undefined) return undefined;
+  const feature = live.find((c) => c.id === ap.focus);
+  if (!feature || !isTerminalColumn(ap, feature.board, feature.columnSlug)) return undefined;
+  const stories = childrenOf(feature, live);
+  const subtree = [...stories, ...stories.flatMap((story) => childrenOf(story, live))];
+  const blocked = subtree.filter((c) => isBlockedColumn(ap, c.board, c.columnSlug));
+  // `smokeIsAGate` applies here for the reason it applies to an unfocused finish (ruling 66): a smoke command
+  // that IS one of the gate commands has exercised nothing, so there is no evidence the product runs — and a
+  // focused run reaching that state is no better placed to claim success than a whole project is.
+  const unexercised = smokeIsAGate(commands);
+  if (unexercised !== undefined && blocked.length === 0) return stop('stalled', unexercised);
+  const untouched = live.filter((c) => c.board === 'features' && c.id !== feature.id && !isSettled(ap, c));
+  return stop('complete', focusFinishedSentence(feature.id, untouched, blocked));
+}
+
 function nothingToWorkOn(
   ap: AutopilotConfig,
   cards: Card[],
@@ -186,6 +220,10 @@ function nothingToWorkOn(
   // CHANGE 2 of decision 45's repeal: `unfinished` counts what is not SETTLED, so a blocked task leaves it.
   // Change 1 alone — dropping the sentence — would have left `complete` exactly as unreachable as before,
   // because `complete`'s condition is computed from this set.
+  // BEFORE THE STALL, because under a focus the two are the same board state and only one of them is true:
+  // the features left in the backlog ARE unfinished, and they are unfinished by instruction.
+  const focused = focusFinished(ap, live, commands);
+  if (focused) return focused;
   const unfinished = live.filter((c) => !isSettled(ap, c));
   if (unfinished.length > 0) {
     return stop(
@@ -524,7 +562,10 @@ export function decideTick(input: TickInput): TickAction {
   // eligibility to fall out of — and a tick that may start nothing need not work out what it would have.
   if (inFlight.length >= AUTOPILOT_CONCURRENCY) return { kind: 'wait' };
 
-  const found = derivePosition(cards);
+  // THE FOCUS, from the config rather than from a field of its own on the input: it is a person's standing
+  // instruction about this project, which is what that block holds, and a second home for it would be a
+  // second answer the moment somebody edited one.
+  const found = derivePosition(cards, ap.focus);
   if ('problem' in found) return stop('stalled', found.problem);
   if ('position' in found) {
     const action = phaseAction(input, found.position);

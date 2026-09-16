@@ -222,6 +222,9 @@ async function bar(state: AutopilotState | null, sandbox: SandboxState | null = 
       runs={NO_RUNS}
       bump={0}
       copilot={COPILOT}
+      // No lifecycle block: these files assert INK, and the mode picker contributes none of its own.
+      autopilotConfig={null}
+      features={[]}
       sandbox={sandbox}
       onChanged={vi.fn()}
       onBackendChanged={vi.fn()}
@@ -334,6 +337,8 @@ describe('the auto-pilot bar says its state in a way a glance can tell apart', (
           runs={NO_RUNS}
           bump={0}
           copilot={COPILOT}
+          autopilotConfig={null}
+          features={[]}
           sandbox={sandbox}
           onChanged={vi.fn()}
           onBackendChanged={vi.fn()}

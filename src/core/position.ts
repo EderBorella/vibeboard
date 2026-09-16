@@ -49,15 +49,52 @@ const openIn = (cards: Card[]): Card[] => cards.filter((c) => OPEN.includes(c.co
 const firstQueued = (cards: Card[]): Card | undefined =>
   cards.filter((c) => c.columnSlug === QUEUE).sort(byQueueOrder)[0];
 
-export function derivePosition(cards: Card[]): PositionResult {
+// WHICH FEATURE, and it is the ONE thing focus changes (`decision 73`). Everything below this — the stories, the open-story
+// invariant, the tasks — runs exactly as it does unfocused, over the children of whichever feature this
+// returns.
+//
+// UNDER FOCUS THE TWO-OPEN-FEATURE REFUSAL DOES NOT APPLY, and that is the point rather than an omission.
+// It exists because the loop cannot tell which of two open features it was in the middle of; a person naming
+// one has answered exactly that question, and refusing anyway would make the focus useless in the state it
+// is most wanted.
+//
+// `liveCards` HAS ALREADY RUN on what is passed here, so an ARCHIVED feature is absent and reads as "no
+// longer on the board" — which is what archiving means. The loop must not carry on working a card somebody
+// filed away.
+function featureFor(features: Card[], focus: string | undefined): Card | { problem: string } | undefined {
+  if (focus === undefined) {
+    // THE ONE-OPEN-CARD INVARIANT, half one.
+    const open = openIn(features);
+    if (open.length > 1) return { problem: twoOpen('feature', open.sort(byQueueOrder)) };
+    return open[0] ?? firstQueued(features);
+  }
+  const card = features.find((c) => c.id === focus);
+  // A REFUSAL RATHER THAN A FALLBACK, and this is the whole care of the feature. Quietly picking the next
+  // feature instead is how you focus F-002, walk away, and come back to find the loop three cards deep in
+  // F-005 — work nobody asked for, on a card nobody chose, reported as an ordinary run.
+  if (!card) {
+    return {
+      problem: `Auto-pilot is focused on ${focus}, and there is no such feature on the board any more — it was archived, deleted, or its id changed. Choose another feature to focus on, or clear the focus, and start again.`,
+    };
+  }
+  // AND A FOCUSED FEATURE THAT IS FINISHED READS AS `empty`, exactly as an unfocused one does. `openIn` and
+  // `firstQueued` never pick a card out of `done` above, so returning one here on the strength of its id
+  // would make focus the one way to re-enter a closed feature — and the loop would work it again for ever.
+  // Asked with this file's own vocabulary rather than `isSettled`, because `derivePosition` reads no config
+  // and giving it one would be a second answer to "which columns mean finished".
+  if (!OPEN.includes(card.columnSlug) && card.columnSlug !== QUEUE) return undefined;
+  return card;
+}
+
+export function derivePosition(cards: Card[], focus?: string): PositionResult {
   const live = liveCards(cards);
   const features = live.filter((c) => c.board === 'features');
 
-  // THE ONE-OPEN-CARD INVARIANT, half one.
-  const openFeatures = openIn(features);
-  if (openFeatures.length > 1) return { problem: twoOpen('feature', openFeatures.sort(byQueueOrder)) };
-
-  const feature = openFeatures[0] ?? firstQueued(features);
+  const feature = featureFor(features, focus);
+  if (feature !== undefined && 'problem' in feature) return feature;
+  // A FOCUSED FEATURE THAT IS FINISHED IS `empty`, not a problem: the tick decides whether that means
+  // `complete` or something else, and it has the facts to tell them apart. Unfocused, this is the empty
+  // board; focused, it is the one feature having been seen through — which is the whole ask.
   if (feature === undefined) return { empty: true };
 
   const stories = childrenOf(feature, live);

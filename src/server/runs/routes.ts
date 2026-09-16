@@ -209,7 +209,15 @@ async function dispatchFrame(
 ): Promise<
   Pick<
     DispatchInput,
-    'boardColumns' | 'links' | 'foundation' | 'backend' | 'model' | 'effort' | 'mode' | 'attachments'
+    | 'boardColumns'
+    | 'links'
+    | 'foundation'
+    | 'backend'
+    | 'model'
+    | 'effort'
+    | 'mode'
+    | 'attachments'
+    | 'express'
   >
 > {
   // A dispatch may name any of backend/model/effort, or none: the project's saved selection fills
@@ -232,6 +240,12 @@ async function dispatchFrame(
     : undefined;
   return {
     boardColumns: everyBoardColumns(config),
+    // COMPUTED HERE rather than accepted on the body, which is ruling 63's precedent and the same call
+    // `reviewFor` makes below: the project's config already answers this, and a caller able to ask for
+    // standard prompts on an express project would be a second answer to it. Spread so the key is absent
+    // rather than `false` on a standard project — `exactOptionalPropertyTypes`, and the prompt renders on
+    // presence.
+    ...(config.autopilot?.mode === 'express' ? { express: true as const } : {}),
     links: await readResources(root),
     attachments: Array.isArray(body.attachments) ? body.attachments.map(String) : [],
     foundation: {

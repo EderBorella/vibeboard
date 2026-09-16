@@ -1,4 +1,10 @@
-import { type AutopilotConfig, BLOCKED_BOARDS, isTerminalColumn } from './autopilot.js';
+import {
+  type AutopilotConfig,
+  BLOCKED_BOARDS,
+  isLifecycleMode,
+  isTerminalColumn,
+  LIFECYCLE_MODES,
+} from './autopilot.js';
 import { boardColumnSlugs } from './board/columns.js';
 import { LIFECYCLE_SKILLS, PHASES } from './phases.js';
 import { BOARDS, type BoardName, type ProjectConfig } from './types.js';
@@ -34,6 +40,23 @@ export function shapeProblems(ap: AutopilotConfig): string[] {
     out.push('autopilot.terminal is a flat list; it must name the terminal columns per board.');
   }
   if (typeof ap.blockedColumn !== 'string') out.push('autopilot.blockedColumn must be a column slug.');
+  // A MISTYPED MODE MUST NOT READ AS `standard`. `ensureAutopilotKeys` backfills an ABSENT key only, so a
+  // hand-edited `mode: expres` survives to here — and falling back to the default would run the whole
+  // project on the lifecycle the person was trying to leave, silently and at four times the cost. Named,
+  // like every other sentence in this file, with what to change.
+  if (!isLifecycleMode(ap.mode)) {
+    out.push(
+      `autopilot.mode must be one of ${LIFECYCLE_MODES.join(' or ')}; it is ${JSON.stringify(ap.mode)}.`,
+    );
+  }
+  // A FOCUS THAT IS NOT AN ID IS NOT A FOCUS. Absent is the ordinary state — the whole board — so only a
+  // present value is checked, and an empty string is refused with it: `focus: ''` would confine the loop to
+  // a card whose id is the empty string, which no board has, and the sentence it produced would name nothing.
+  if (ap.focus !== undefined && (typeof ap.focus !== 'string' || ap.focus.trim() === '')) {
+    out.push(
+      `autopilot.focus must be the id of a feature card, or absent for the whole board; it is ${JSON.stringify(ap.focus)}.`,
+    );
+  }
   return out;
 }
 

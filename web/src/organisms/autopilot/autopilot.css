@@ -47,6 +47,66 @@
   padding: var(--s-3) var(--s-5);
   /* The status can be long — a stall names the cards that are stuck — so it is the part that shrinks. */
   min-width: 0;
+  /* AND WHEN SHRINKING IT IS NOT ENOUGH, THE ROW WRAPS. Measured rather than assumed: with the lifecycle
+     picker added the row needs 1005px inside 897px at the 900px viewport, and `.ap-status` is already at
+     zero — every remaining group is a control with a label, and there is nothing left to give. Without
+     this the overflow lands on the app shell, which then scrolls sideways; `visual/checks/board.spec.ts`
+     check 9 refuses that, and it is right to — a horizontally scrolling shell hides the right-hand end of
+     every row on the page, not just this one. */
+  flex-wrap: wrap;
+  row-gap: var(--s-3);
+}
+
+/* THE FOCUS PICKER HOLDS ITS WIDTH, and it is the only element on this row that would not. A `<select>`
+   sizes to its selected option, and these swing hard: 109px of ink on "The whole board" against 337px on
+   "F-001 — greet — a command-line greeter (finished)", measured in the real font. The group is pushed from
+   the left, so every one of those 228px moved the mode selector sideways — choosing a feature shuffled the
+   control you had just used. A FIXED WIDTH rather than a `min-width`, because a minimum stops it shrinking
+   and not growing, and growing is the direction that does the moving.
+
+   AND THE LANE IS RESERVED IN STANDARD TOO (`ap-focus-spacer`, hidden), so the group never changes size when
+   the mode is toggled and nothing on the row moves.
+
+   BELOW 1100px THERE IS NO LANE AT ALL, and that is measured rather than chosen. At 900px the row needs
+   992px of the 897 it has — 95px over — and the lane is only 119 of that, so even at zero the budget is
+   about 36px. The bar cannot hold this control at that width whatever it is given, and a row that wraps is
+   what `visual/checks/board.spec.ts` refuses in two checks: the bar reads as three groups, and its children
+   sit on one line. Crushing the control to fit would be worse than not offering it there.
+
+   NO CLASS OF ITS OWN: the class budget is a ratchet at 220 with no slack (CLAUDE.md), so this is written
+   against the row and the element. It sets width alone, which no single-class rule on `.vb-ctl` sets. */
+@media (min-width: 1100px) {
+  .ap-bar-row select,
+  .ap-bar-row [data-testid='ap-focus-spacer'] {
+    width: 18rem;
+  }
+}
+@media (max-width: 1099px) {
+  .ap-bar-row select,
+  .ap-bar-row [data-testid='ap-focus-spacer'] {
+    display: none;
+  }
+}
+/* The spacer holds the lane and shows nothing: `visibility` keeps the box, `display: none` would not. */
+.ap-bar-row [data-testid='ap-focus-spacer'] {
+  visibility: hidden;
+}
+
+/* AND THE SEGMENTED CELLS KEEP ONE WEIGHT, so the group cannot resize when the selection moves.
+   `.vb-tabs-grouped .vb-tab.active` goes `font-weight: 600`, and bold costs a different amount per word —
+   "Standard" gains 7.63px where "Express" gains 6.02px — so the group's own width changed by the difference
+   and its left edge moved 0.8px on every toggle.
+   THE WEIGHT AND NOT A FIXED CELL WIDTH, which was the first attempt: 5.5rem held every cell steady and
+   padded "Express" and "Claude" out to 88px, so a short word sat in a box of empty space. The selected cell
+   is already inverted — `--accent-fill` behind `--on-fill` ink — which the molecule's own comment calls the
+   one place a tab may wear a fill. The bold was a fourth signal on top of that, and it was the one with a
+   layout cost. Scoped to this row, so every other segmented picker keeps it. */
+.ap-bar-row .vb-tabs-grouped .vb-tab.active {
+  font-weight: inherit;
+}
+/* The spacer holds the lane and shows nothing: `visibility` keeps the box, `display: none` would not. */
+.ap-bar-row [data-testid='ap-focus-spacer'] {
+  visibility: hidden;
 }
 
 /* `.ap-transport` HAS NO RULE LEFT AT ALL, and the `min-width: 6.5rem` that was here is the measurement

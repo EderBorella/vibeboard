@@ -154,5 +154,18 @@ describe('the terminal reasons', () => {
 
   it('carry the detail when there is one, so a stalled board can name the card', () => {
     expect(stopSentence('stalled', 'E-004 has used all three attempts.')).toContain('E-004');
+
+    // A `complete` DETAIL REPLACES THE CANNED SENTENCE, because that one claims something about the WHOLE
+    // BOARD — "nothing is unfinished" — that both details contradict or repeat. Read on a live focused run:
+    // the loop reported success and denied it in the same line.
+    const focused = stopSentence(
+      'complete',
+      'Auto-pilot finished F-001. Auto-pilot is focused on F-001, so the rest of the board was left alone.',
+    );
+    expect(focused).not.toMatch(/nothing is unfinished/);
+    expect(focused).toMatch(/^Auto-pilot finished F-001\./);
+
+    // And with no detail the canned sentence is still the whole message — it is all a plain finish has.
+    expect(stopSentence('complete')).toMatch(/nothing is unfinished/);
   });
 });

@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { STOP_REASONS } from '../src/core/dispatch-gate.js';
 import type { AutopilotState, Readiness, RunList, SandboxState } from '../web/src/lib/api.js';
-import type { CopilotConfig } from '../web/src/lib/shared.js';
+import type { AutopilotConfig, Card, CopilotConfig } from '../web/src/lib/shared.js';
 
 const api = vi.hoisted(() => ({
   getReadiness: vi.fn(),
@@ -66,11 +66,52 @@ const GATES_UNREVIEWED: Readiness = {
   unreviewedGates: ['CODE-QUALITY.md', 'TESTING.md'],
 };
 
+// A whole lifecycle block, because the mode picker writes the whole one back: `PATCH /api/config` runs the
+// coverage check over the block it is given, so a patch carrying `{ mode }` alone fails every check that
+// indexes the rest.
+const AP_CONFIG: AutopilotConfig = {
+  maxIterations: 250,
+  budgetUsd: 20,
+  runTimeoutMs: 1_800_000,
+  attemptCap: 3,
+  terminal: { features: ['done'], product: ['done'], engineering: ['done'] },
+  blockedColumn: 'blocked',
+  mode: 'standard',
+};
+
+// TWO features and one already DONE, because a fixture too thin to distinguish two outcomes tests neither:
+// with one card, "lists the unfinished ones" and "lists everything" are the same list.
+const feature = (id: string, columnSlug: string): Card =>
+  ({
+    id,
+    title: `Feature ${id}`,
+    board: 'features',
+    columnSlug,
+    order: 10,
+    tags: [],
+    links: [],
+  }) as unknown as Card;
+const longTitled = feature('F-009', 'backlog');
+longTitled.title = 'The product can be run the way the README describes, end to end';
+
+// The same long title on a FINISHED feature, which is the case the label budget is about: a saved focus whose
+// card its own run closed still has to show, and the "(finished)" is the half worth keeping.
+const longDone = feature('F-010', 'done');
+longDone.title = 'The product can be run the way the README describes, end to end';
+
+const FEATURES: Card[] = [
+  feature('F-001', 'backlog'),
+  feature('F-002', 'in-progress'),
+  feature('F-003', 'done'),
+];
+
 const show = (
   over: {
     state?: AutopilotState | null;
     runs?: RunList;
     copilot?: CopilotConfig;
+    autopilotConfig?: AutopilotConfig | null;
+    features?: Card[];
     sandbox?: SandboxState | null;
     onChanged?: () => void;
     onBackendChanged?: () => void;
@@ -83,6 +124,8 @@ const show = (
       runs={over.runs ?? NO_RUNS}
       bump={0}
       copilot={over.copilot ?? COPILOT}
+      autopilotConfig={over.autopilotConfig === undefined ? AP_CONFIG : over.autopilotConfig}
+      features={over.features ?? FEATURES}
       sandbox={over.sandbox === undefined ? SANDBOX_OK : over.sandbox}
       onChanged={over.onChanged ?? (() => {})}
       onBackendChanged={over.onBackendChanged ?? (() => {})}
@@ -806,5 +849,138 @@ describe('the agent health chip', () => {
     });
 
     expect(screen.getByTestId('ap-agent-state').textContent).not.toMatch(/failing/i);
+  });
+});
+
+// THE LIFECYCLE MODE PICKER, and what it is for is a trade rather than a preference: express was measured
+// against standard on the same README and the same backend at 24 runs against 80, $14.06 against $41.07 and
+// 12 cards against 39, with a product that passes its smoke test either way.
+describe('the lifecycle mode', () => {
+  const picker = () => screen.getByRole('group', { name: /how coarsely/i });
+
+  it('shows which mode the project is on', () => {
+    show();
+    // The CLASS, because that is the only thing a grouped `Tabs` marks selection with: it sets `role=group`
+    // and drops `aria-selected`, on the argument that a segmented picker's cells are not tabs. It puts
+    // nothing in its place, so the selected option of every segmented picker in this app — this one and the
+    // backend picker beside it — is invisible to a screen reader. Asserted here as what the component
+    // actually does rather than what it should; the gap belongs to `molecules/Tabs`, not to this control.
+    expect(within(picker()).getByRole('button', { name: 'Standard' }).className).toContain('active');
+    expect(within(picker()).getByRole('button', { name: 'Express' }).className).not.toContain('active');
+  });
+
+  // THE WHOLE BLOCK GOES BACK, not `{ mode }` alone. `PATCH /api/config` runs the coverage check over the
+  // autopilot block it is given, and a block carrying one key fails every check that indexes the rest —
+  // the class of refusal `ensureAutopilotKeys` exists to prevent, arriving from the other direction.
+  it('saves the whole block, so the patch cannot fail the coverage check', async () => {
+    show();
+    fireEvent.click(within(picker()).getByRole('button', { name: 'Express' }));
+    await waitFor(() => expect(api.patchConfig).toHaveBeenCalledTimes(1));
+    expect(api.patchConfig).toHaveBeenCalledWith({ autopilot: { ...AP_CONFIG, mode: 'express' } });
+  });
+
+  it('writes nothing when the mode chosen is the one already saved', async () => {
+    show();
+    fireEvent.click(within(picker()).getByRole('button', { name: 'Standard' }));
+    await waitFor(() => expect(api.getReadiness).toHaveBeenCalled());
+    expect(api.patchConfig).not.toHaveBeenCalled();
+  });
+
+  // A project written before the lifecycle existed has no block to write a key into, and auto-pilot refuses
+  // to start there anyway. A picker over nothing would offer a choice that cannot be saved.
+  it('is absent where the project has no lifecycle block at all', () => {
+    show({ autopilotConfig: null });
+    expect(screen.queryByRole('group', { name: /how coarsely/i })).toBeNull();
+  });
+});
+
+// ONE FEATURE, END TO END — the second dropdown, and it appears only in express.
+describe('the feature auto-pilot is focused on', () => {
+  const EXPRESS: AutopilotConfig = { ...AP_CONFIG, mode: 'express' };
+  const picker = () => screen.getByRole('combobox', { name: /feature auto-pilot works on/i });
+
+  // EXPRESS ONLY — and what makes that free of layout cost is WHERE it renders, not whether. It sits in the
+  // row's left, unpushed region: the two groups after the gate acknowledgement are pinned by auto margins, so
+  // a control arriving or leaving there takes nothing from them. Inside the pushed group it moved the mode
+  // selector ~300px at the moment you clicked it; reserving the lane in standard instead made the row wide
+  // enough to wrap, and the browser harness refused that in two separate checks.
+  it('is not offered in standard mode', () => {
+    show();
+    expect(screen.queryByRole('combobox', { name: /feature auto-pilot works on/i })).toBeNull();
+  });
+
+  // THE LANE IS HELD IN BOTH MODES, which is what stops the row moving when the mode is toggled. The picker
+  // sits in the pushed middle group, and a group that loses a control loses its width — every pixel of which
+  // comes out of the position of the control you just clicked, measured at 148.81px before this.
+  //
+  // So in standard a spacer of the same width stands in its place. This asserts the STRUCTURE, which jsdom
+  // can see; the pixels are measured on the running product, and the browser harness holds the consequence
+  // — the bar may take two lines and no more (visual/checks/board.spec.ts, check 7).
+  it('holds the lane with a spacer in standard, inside the same group as the picker', () => {
+    show({ autopilotConfig: EXPRESS });
+    const group = screen.getByTestId('ap-agent');
+    expect(group.contains(picker())).toBe(true);
+    expect(screen.queryByTestId('ap-focus-spacer')).toBeNull();
+
+    cleanup();
+    show();
+    const spacer = screen.getByTestId('ap-focus-spacer');
+    expect(screen.getByTestId('ap-agent').contains(spacer)).toBe(true);
+    // Hidden, not absent: an absent element takes the lane with it.
+    expect(spacer.getAttribute('aria-hidden')).toBe('true');
+  });
+
+  // THE CONTROL MUST SHOW THE STATE THAT EXISTS, and this was found by opening the page rather than by any
+  // gate. `focus: F-001` was saved, F-001 had been closed by the run that finished it, so the unfinished-only
+  // filter dropped it — and a `<select>` whose value matches no option falls back to the first. The picker
+  // read "The whole board" over a project the loop was still confined to.
+  //
+  // jsdom never had a saved focus pointing at a finished feature; Storybook's fixture has none; the browser
+  // harness runs in standard mode, where this control does not render.
+  it('shows a saved focus even after that feature has finished, and says it is finished', () => {
+    show({ autopilotConfig: { ...EXPRESS, focus: 'F-003' } }); // F-003 is in `done`
+    expect((picker() as HTMLSelectElement).value).toBe('F-003');
+    const chosen = Array.from(picker().querySelectorAll('option')).find((o) => o.value === 'F-003');
+    expect(chosen?.textContent).toMatch(/finished/i);
+  });
+
+  // The other reading, and it is the state the tick refuses by name: somebody archived the focused card.
+  it('shows a saved focus whose card has left the board, and says so', () => {
+    show({ autopilotConfig: { ...EXPRESS, focus: 'F-404' } });
+    expect((picker() as HTMLSelectElement).value).toBe('F-404');
+    const chosen = Array.from(picker().querySelectorAll('option')).find((o) => o.value === 'F-404');
+    expect(chosen?.textContent).toMatch(/no longer on the board/i);
+  });
+
+  it('saves the focus with the whole block', async () => {
+    show({ autopilotConfig: EXPRESS });
+    fireEvent.change(picker(), { target: { value: 'F-002' } });
+    await waitFor(() => expect(api.patchConfig).toHaveBeenCalledTimes(1));
+    expect(api.patchConfig).toHaveBeenCalledWith({ autopilot: { ...EXPRESS, focus: 'F-002' } });
+  });
+
+  // CLEARING IS A DELETE, not an empty string: `focus: ''` is refused by the config's own shape check,
+  // because it would confine the loop to a card whose id is the empty string.
+  it('clears the focus by removing the key, never by writing an empty one', async () => {
+    show({ autopilotConfig: { ...EXPRESS, focus: 'F-002' } });
+    fireEvent.change(picker(), { target: { value: '' } });
+    await waitFor(() => expect(api.patchConfig).toHaveBeenCalledTimes(1));
+    const sent = api.patchConfig.mock.calls[0]?.[0] as { autopilot: Record<string, unknown> };
+    expect('focus' in sent.autopilot).toBe(false);
+  });
+
+  // THE HALF THAT MAKES THE PICKER SAFE TO HIDE. The tick honours `focus` whatever the mode says, so a
+  // focus left behind on a switch to standard would confine the loop through a control nobody can see.
+  it('drops a saved focus when the project leaves express', async () => {
+    show({ autopilotConfig: { ...EXPRESS, focus: 'F-002' } });
+    fireEvent.click(
+      within(screen.getByRole('group', { name: /how coarsely/i })).getByRole('button', {
+        name: 'Standard',
+      }),
+    );
+    await waitFor(() => expect(api.patchConfig).toHaveBeenCalledTimes(1));
+    const sent = api.patchConfig.mock.calls[0]?.[0] as { autopilot: Record<string, unknown> };
+    expect(sent.autopilot.mode).toBe('standard');
+    expect('focus' in sent.autopilot).toBe(false);
   });
 });

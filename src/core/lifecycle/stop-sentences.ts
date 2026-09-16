@@ -165,6 +165,27 @@ export function whyStuck(ap: AutopilotConfig, cards: Card[], unfinished: Card[],
 // blocker (server/autopilot/routes.ts), so a second refusal here would be about a state the loop cannot reach.
 // That is also how a project whose CODE-QUALITY.md declares nothing fails in the honest direction: `readGates`
 // answers with a reason rather than a list, `declaredCommands` carries no commands, and nothing collides.
+// A FOCUSED RUN THAT FINISHED ITS FEATURE, and the sentence has two jobs rather than one.
+//
+// It says the run SUCCEEDED, because it did — and the first version of this reported `stalled` over exactly
+// this state: "work remains and nothing it can do would move it", which is true of the rest of the board and
+// false of the thing the person asked for. A stall is an alarm, and somebody reading one goes looking for a
+// fault that is not there.
+//
+// And it says WHY the rest of the board is untouched, naming the focus. Without that half a person sees a
+// finished project with cards still in the backlog and cannot tell a deliberate scope from an abandoned run.
+export function focusFinishedSentence(focus: string, untouched: Card[], blocked: Card[]): string {
+  const rest =
+    untouched.length === 0
+      ? ''
+      : ` Auto-pilot is focused on ${focus}, so the rest of the board was left alone: ${names(untouched)} ${isAre(untouched)} untouched. Clear the focus to carry on with ${untouched.length === 1 ? 'it' : 'them'}.`;
+  const stuck =
+    blocked.length === 0
+      ? ''
+      : ` ${names(blocked)} under it ${isAre(blocked)} blocked and ${blocked.length === 1 ? 'needs' : 'need'} you.`;
+  return `Auto-pilot finished ${focus}.${stuck}${rest}`;
+}
+
 export function smokeIsAGate(commands: DeclaredCommands): string | undefined {
   const smoke = commands.smoke;
   if (smoke === undefined || !commands.gates.includes(smoke)) return undefined;

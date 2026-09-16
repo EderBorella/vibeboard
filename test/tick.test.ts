@@ -1072,3 +1072,107 @@ describe('decideTick — complete over a blocked story', () => {
     expect(decideTick(input({ cards }))).toMatchObject({ kind: 'stop', reason: 'stalled' });
   });
 });
+
+// THE FOCUS REACHES THE DERIVATION, and this is here rather than in test/focus.test.ts because that is the
+// half that was missing: `derivePosition` honoured `ap.focus` and every one of its own tests passed with the
+// TICK still calling it without one. Deleting the argument in core/lifecycle/tick.ts broke nothing at all.
+//
+// The claim is about the loop, so it is asserted through `decideTick` — the function the service calls.
+describe('the feature the loop is focused on', () => {
+  // CHILDLESS, so the action is a DISPATCH rather than the break-down skip a feature with stories gets
+  // (decision 50). The subject here is which feature was chosen, and a stamp names it just as well — but a
+  // dispatch is the case that spends money, so it is the one worth pinning.
+  const twoFeatures = (): Card[] => [
+    card('F-001', 'features', 'backlog', 10, []),
+    card('F-002', 'features', 'backlog', 20, []),
+  ];
+
+  it('is the one dispatched, and not the one the queue would have picked', () => {
+    // Unfocused, (order, id) picks F-001 — so naming F-002 is what proves the tick passed the focus on.
+    const unfocused = decideTick(input({ cards: twoFeatures() }));
+    expect(unfocused.kind === 'dispatch' && unfocused.card?.id).toBe('F-001');
+
+    const focused = decideTick(input({ cards: twoFeatures(), ap: { ...DEFAULT_AUTOPILOT, focus: 'F-002' } }));
+    expect(focused.kind === 'dispatch' && focused.card?.id).toBe('F-002');
+  });
+
+  it('stalls, naming the card, when the focused feature has left the board', () => {
+    const action = decideTick(input({ cards: twoFeatures(), ap: { ...DEFAULT_AUTOPILOT, focus: 'F-404' } }));
+    expect(action.kind).toBe('stop');
+    expect(detailOf(action)).toMatch(/focused on F-404/);
+    // AND NOTHING WAS DISPATCHED, which is the half that matters: a silent fallback would have been a run on
+    // a card nobody chose, reported as an ordinary one.
+    expect(action.kind === 'dispatch').toBe(false);
+  });
+});
+
+// THE OUTCOME OF A FOCUSED RUN THAT FINISHED, and this describe exists because a LIVE run reported the wrong
+// one. F-001 closed with its five stories and five tasks done and its smoke command passing, and the loop
+// stopped `stalled` — "work remains and nothing it can do would move it" — over the one feature the focus had
+// told it to leave. Every gate was green; no test asked what the outcome was.
+describe('a focused run that finished its feature', () => {
+  const done = (id: string, board: BoardName, columnSlug: string, links: string[] = []): Card =>
+    card(id, board, columnSlug, 10, links);
+
+  // F-001 finished, F-002 untouched in the backlog — the live board exactly.
+  const finishedFocus = (): Card[] => [
+    done('F-001', 'features', 'done', ['P-001']),
+    done('P-001', 'product', 'done', ['F-001']),
+    done('F-002', 'features', 'backlog'),
+  ];
+
+  const focusOn = (id: string, cards: Card[]) =>
+    decideTick(input({ cards, ap: { ...DEFAULT_AUTOPILOT, focus: id } }));
+
+  it('reports complete rather than stalled', () => {
+    const action = focusOn('F-001', finishedFocus());
+    expect(action.kind === 'stop' && action.reason).toBe('complete');
+  });
+
+  it('names the focus and says the rest of the board was left alone on purpose', () => {
+    // The half a person acts on: a finished project with cards still in the backlog is indistinguishable
+    // from an abandoned run unless the sentence says which it is.
+    const detail = detailOf(focusOn('F-001', finishedFocus()));
+    expect(detail).toMatch(/finished F-001/i);
+    expect(detail).toMatch(/F-002/);
+    expect(detail).toMatch(/left alone|untouched/i);
+    expect(detail).toMatch(/clear the focus/i);
+  });
+
+  // POSITIVE EVIDENCE, never an implication — `finished`'s own rule, and the reason it exists: inferring
+  // success from "nothing eligible" is how a board holding one blocked card came to report a project done.
+  //
+  // THE STATE THAT REACHES IT is a focused feature PARKED — in a column that is neither where work is picked
+  // up (`backlog`/`todo`/`in-progress`) nor terminal. A project may add such a column, and a person may drag
+  // a card into it. Then the feature is ineligible, so nothing dispatches and `nothingToWorkOn` is reached
+  // with a focus whose feature is plainly not finished.
+  //
+  // A FIRST VERSION OF THIS TEST USED `todo` AND PROVED NOTHING: a focused feature in `todo` is eligible, so
+  // the tick dispatched and never reached the check. Deleting the terminal-column guard left it green.
+  it('does not claim success when the focused feature is parked rather than finished', () => {
+    const withReview: Record<BoardName, string[]> = {
+      ...COLUMNS,
+      features: ['backlog', 'todo', 'in-progress', 'review', 'done'],
+    };
+    const parked = [
+      done('F-001', 'features', 'review', ['P-001']),
+      done('P-001', 'product', 'done', ['F-001']),
+    ];
+    const action = decideTick(
+      input({ cards: parked, columns: withReview, ap: { ...DEFAULT_AUTOPILOT, focus: 'F-001' } }),
+    );
+    expect(action.kind === 'stop' && action.reason).not.toBe('complete');
+  });
+
+  // AND THE SAME BOARD WITH NO FOCUS CARRIES ON, which is what keeps this a focused-run rule rather than a
+  // new way for any project to report success over work it has not done. F-002 is childless, so unfocused
+  // the tick dispatches its break-down — the contrast is not stall-versus-complete but WORK versus done.
+  //
+  // The first version of this asserted `stalled` here, and it was wrong about the code rather than the other
+  // way round: the live run stalled because the FOCUS made F-002 ineligible, not because F-002 was stuck.
+  it('carries on with the untouched feature when nothing is focused', () => {
+    const action = decideTick(input({ cards: finishedFocus() }));
+    expect(action.kind).toBe('dispatch');
+    expect(action.kind === 'dispatch' && action.card?.id).toBe('F-002');
+  });
+});

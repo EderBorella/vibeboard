@@ -20,7 +20,12 @@ import type { Card } from './types.js';
 // work the product still needs, and the assembled thing cannot run without it.
 //
 // `liveCards` first, so an archived feature cannot hold the gate open for ever.
+// UNDER FOCUS THE QUESTION IS ASKED WITHIN THE FOCUS, and without this the gate would never fire in the one
+// mode it matters most. `ap.focus` confines the loop to one feature (core/position.ts), so that feature IS
+// the whole of what this run will build — while another feature sitting untouched in the backlog would make
+// the count below false for ever, and a failing smoke command would never refuse anything.
 export function isLastOpenFeature(ap: AutopilotConfig, cards: Card[], feature: Card): boolean {
+  if (ap.focus !== undefined) return ap.focus === feature.id;
   const others = liveCards(cards).filter((c) => c.board === 'features' && c.id !== feature.id);
   return others.every((c) => isSettled(ap, c));
 }

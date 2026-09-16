@@ -1,6 +1,7 @@
 import { relative } from 'node:path';
 import { ARCHIVE_SLUG, RESULTS_DIR } from '../../../core/layout.js';
-import type { Card } from '../../../core/types.js';
+import { type PhaseName, phase, phaseForRun } from '../../../core/phases.js';
+import type { BoardName, Card } from '../../../core/types.js';
 import type { Verification } from '../../../core/verify.js';
 import type { BoardColumns, PromptInputs } from './index.js';
 
@@ -126,6 +127,73 @@ function checkupSection(checkup: NonNullable<PromptInputs['checkup']>): string {
   ].join('\n');
 }
 
+// EXPRESS MODE, and it is the ONLY thing `autopilot.mode` changes. The phase table, the walker, every
+// bound and every refusal are identical under both lifecycles — what differs is how coarse the cards the
+// creating phases are asked for are, which is a fact about the instruction and not about the machine.
+//
+// MEASURED BEFORE IT WAS BUILT, on a throwaway project with the same README, the same foundation documents
+// and the same backend, with these three paragraphs pasted into the project's own skill files by hand:
+// 24 runs against 80, $14.06 against $41.07, 37 minutes of agent time against 109, 12 cards against 39 —
+// and a product that passes its smoke test either way, checked by hand rather than by a gate. The saving
+// is almost entirely break-downs and the implement/review/checkup cycle each extra card brings with it.
+//
+// ONE SECTION RATHER THAN A SECOND SET OF SKILL FILES. Skills are ordinary per-project files a person owns
+// and edits; swapping them on a mode change would either overwrite somebody's edits or leave a project
+// switched to express still running the standard prompts. A section the server adds is neither.
+//
+// The three sizes are stated as NOT the run's to choose, deliberately. A break-down told only that "this
+// project prefers larger cards" splits anyway when a card looks awkward, and each split it makes is a full
+// implement, gates and review cycle — the cost this mode exists to avoid.
+const EXPRESS: Partial<Record<PhaseName, string[]>> = {
+  bootstrap: [
+    '**One feature card for the whole product**, not one per capability. Its body LISTS every capability the',
+    'README requires, in the order they must be built, one bullet each — earlier bullets must not depend on',
+    'later ones. That list is the plan: the break-down of this card turns each bullet into a story, so a',
+    'capability missing from it is a capability this project will not build.',
+  ],
+  'feature-breakdown': [
+    "**One story per bullet in this card's body.** Not one per acceptance criterion — one per bullet. If the",
+    'card carries no list, create the smallest set of stories that covers what it asks for, and say in your',
+    'report how many and why.',
+  ],
+  'story-breakdown': [
+    '**Exactly one task**, carrying the whole of this story end to end: the code, its tests, and whatever the',
+    'story needs to be demonstrably done. A story that seems to need two tasks needs one task with two',
+    'acceptance criteria — say so in the card body and keep it as one.',
+  ],
+};
+
+// `undefined` for a phase express says nothing about, and for every run on a standard project — the rule
+// this file already follows, that a heading over nothing is worse than no heading.
+export function expressSection(skill: string, board: BoardName | undefined): string | undefined {
+  const name = phaseForRun(skill, board)?.name;
+  const lines = name ? EXPRESS[name] : undefined;
+  if (!lines) return undefined;
+  return [
+    'This project runs the **express** lifecycle: granularity is deliberately traded for cost, and the sizes',
+    'below are fixed rather than yours to choose. A card split "to be safe" costs a full implement, gates and',
+    'review cycle that nobody asked for.',
+    '',
+    ...lines,
+  ].join('\n');
+}
+
+// THE BOARD THE DEMAND BELOW NAMES, read from the phase table rather than typed out — and it is a fix, not a
+// tidy-up. This section used to say "on the engineering board" while `feature-checkup` declares
+// `creates: 'product'`, and `wrongBoardForRun` (server/boards/cards-routes.ts) enforces that field: the server
+// refused every card the instruction asked for, so the run created nothing, `boardGrew` was false, decision 69
+// held the feature open and the round repeated to the attempt cap. The whole mechanism was dead on the only
+// branch that reaches it.
+//
+// Widening `creates` to engineering would not have fixed it. `derivePosition` walks feature -> story -> task,
+// so an engineering card parented to a feature is an orphan no phase picks up — see the header of
+// HOLDS_OPEN_HAVING_CREATED in service/act/outcomes.ts. Filed on `product`, each card is a story the machine
+// already knows how to break into tasks, which is what the closing sentence promises.
+//
+// Ruling 52's precedent: a fact the table already carries is read from it, never copied. Two copies is two
+// places to drift, and this is what drifting cost.
+const CHECKUP_CREATES = phase('feature-checkup').creates;
+
 // RULING 55 SET THE PASSING HALF; DECISION 69 CHANGED THE FAILING ONE. A passing smoke is still evidence and
 // the model still decides what it means. A FAILING one is no longer a judgement call, because the judgement was
 // the defect: asked what a failed command meant, models read the output and reasoned their way to
@@ -178,9 +246,12 @@ function smokeSection(smoke: Verification, gates: boolean): string {
     'whatever you decide, so an answer explaining why it is really fine costs you the turn and changes nothing.',
     '',
     'What is yours to decide is WHAT IS WRONG. Read the output above and **create one card for each distinct',
-    'failure**, on the engineering board, each naming what was expected and what happened. Quote the real',
-    'strings the command printed rather than describing them — a card written from the failure reproduces it,',
-    'a card written from a guess sends the next run somewhere else.',
+    `failure**, on the ${CHECKUP_CREATES} board, each naming what was expected and what happened. Quote the`,
+    'real strings the command printed rather than describing them — a card written from the failure reproduces',
+    'it, a card written from a guess sends the next run somewhere else.',
+    '',
+    'Auto-pilot takes it from there: this feature stays open, each card you file is broken down into the work',
+    'that fixes it, and the command is run again when that work is done.',
     '',
     'If the failure is genuinely not the product — the command itself is wrong, or something it needs is',
     'missing from this container — say so plainly and say what you ran to establish it. "It looks',

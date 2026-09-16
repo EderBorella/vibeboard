@@ -188,6 +188,41 @@ describe('a block that is not the shape it claims', () => {
     expect(malformed({ blockedColumn: 42 })).toEqual(['autopilot.blockedColumn must be a column slug.']);
   });
 
+  // A MISTYPED MODE MUST NOT READ AS `standard`. `ensureAutopilotKeys` backfills an ABSENT key only, so a
+  // hand-edited `mode: expres` reaches the tick — and defaulting there would run the whole project on the
+  // lifecycle the person was trying to leave, silently and at roughly three times the cost.
+  it('refuses a lifecycle mode that is not one of the two', () => {
+    expect(malformed({ mode: 'expres' })).toEqual([
+      'autopilot.mode must be one of standard or express; it is "expres".',
+    ]);
+    // Absent counts too: a block hand-written without the key is not a project on `standard`, it is a
+    // project whose lifecycle nobody has said. `ensureAutopilotKeys` fills it before this is ever asked on
+    // a saved config, and this is what holds when something skips that.
+    const gone = fresh();
+    delete (ap(gone) as { mode?: unknown }).mode;
+    expect(coverageProblems(gone)).toEqual([
+      'autopilot.mode must be one of standard or express; it is undefined.',
+    ]);
+  });
+
+  // ABSENT IS THE ORDINARY STATE — the whole board — so only a present value is checked. An empty string is
+  // refused with the non-strings: it would confine the loop to a card whose id is `''`, which no board has,
+  // and the refusal it produced downstream would name nothing.
+  it('refuses a focus that is not a card id, and accepts its absence', () => {
+    expect(malformed({ focus: 42 })).toEqual([
+      'autopilot.focus must be the id of a feature card, or absent for the whole board; it is 42.',
+    ]);
+    expect(malformed({ focus: '  ' })).toEqual([
+      'autopilot.focus must be the id of a feature card, or absent for the whole board; it is "  ".',
+    ]);
+    expect(malformed({ focus: 'F-002' })).toEqual([]);
+    expect(malformed({})).toEqual([]);
+  });
+
+  it('accepts express, so the check is not simply refusing everything', () => {
+    expect(malformed({ mode: 'express' })).toEqual([]);
+  });
+
   it('refuses a terminal block that is absent, or the flat list it used to be', () => {
     const gone = fresh();
     delete (ap(gone) as { terminal?: unknown }).terminal;

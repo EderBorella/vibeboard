@@ -92,10 +92,24 @@ const SENTENCES: Record<StopReason, string> = {
     'This project is halted because VibeBoard could not read its auto-pilot state. Restart it to start again from idle.',
 };
 
+// A DETAIL ON A `complete` REPLACES THE CANNED SENTENCE RATHER THAN FOLLOWING IT, and every other reason
+// keeps the old behaviour. The reason is that `complete`'s sentence makes a claim about the WHOLE BOARD —
+// "nothing is unfinished" — which both details that exist contradict or repeat:
+//
+//   focused:  "…nothing is unfinished. Auto-pilot finished F-001. …the rest of the board was left alone:
+//              F-002 is untouched." — the first clause is simply false, beside a sentence saying so.
+//   blocked:  "…nothing is unfinished. Auto-pilot finished. 2 cards are blocked and need you: …" — the
+//              words "Auto-pilot finished" twice in one line.
+//
+// Both details already open with the ending in their own words, so they stand alone. Read live on a focused
+// run: the loop reported success and contradicted itself in the same breath.
+const REPLACES_ITS_SENTENCE: readonly StopReason[] = ['complete'];
+
 // The sentence a person reads, with the specifics appended. A reason on its own is a code; a code is
 // something the reader has to look up, and a stalled board that cannot name its card is a dead end.
 export function stopSentence(reason: StopReason, detail?: string): string {
-  return detail ? `${SENTENCES[reason]} ${detail}` : SENTENCES[reason];
+  if (!detail) return SENTENCES[reason];
+  return REPLACES_ITS_SENTENCE.includes(reason) ? detail : `${SENTENCES[reason]} ${detail}`;
 }
 
 // Which cap is unusable, as a sentence, or `undefined` when both are fine. A missing field reaches

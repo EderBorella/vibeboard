@@ -68,6 +68,10 @@ export interface DispatchInput {
   // Carried like `foundation` and for the same reason — a queued checkup must be told about the board and the
   // smoke run that preceded its dispatch, not about whatever they look like when it finally starts.
   checkup?: PromptInputs['checkup'];
+  // Whether the project runs the express lifecycle. Carried at dispatch like `boardColumns` and
+  // `foundation`, and for the same reason: a queued run must be sized by the mode the project had when it
+  // was resolved, not by whatever it says when the run finally starts.
+  express?: true;
   backend: Backend;
   model: string;
   effort: string;
@@ -365,6 +369,9 @@ export class AgentRunner {
       foundation: input.foundation,
       review: input.review,
       checkup: input.checkup,
+      // Spread, not passed: `exactOptionalPropertyTypes` refuses an explicit `undefined` for an optional
+      // `true`, which is the same reason `card`/`cardFile` are spread above.
+      ...(input.express ? { express: true as const } : {}),
       reportPath: reportContract(run),
       runId: run,
       projectRoot: root,

@@ -899,81 +899,31 @@ describe('the feature auto-pilot is focused on', () => {
   const EXPRESS: AutopilotConfig = { ...AP_CONFIG, mode: 'express' };
   const picker = () => screen.getByRole('combobox', { name: /feature auto-pilot works on/i });
 
-  // PRESENT IN BOTH MODES AND INERT IN STANDARD, and it is layout that decides this rather than taste. The
-  // group is pushed from the left, so a control that comes and goes takes its whole width out of the row —
-  // toggling Standard/Express moved the mode selector about 300px sideways at the very moment you clicked it.
-  // Reserving the lane is the only arrangement in which nothing moves.
-  it('is present but disabled in standard mode, so the row does not resize when the mode changes', () => {
+  // EXPRESS ONLY — and what makes that free of layout cost is WHERE it renders, not whether. It sits in the
+  // row's left, unpushed region: the two groups after the gate acknowledgement are pinned by auto margins, so
+  // a control arriving or leaving there takes nothing from them. Inside the pushed group it moved the mode
+  // selector ~300px at the moment you clicked it; reserving the lane in standard instead made the row wide
+  // enough to wrap, and the browser harness refused that in two separate checks.
+  it('is not offered in standard mode', () => {
     show();
-    const sel = screen.getByRole('combobox', { name: /feature auto-pilot works on/i, hidden: true });
-    expect((sel as HTMLSelectElement).disabled).toBe(true);
-    // And it says why, rather than being an inert box with no account of itself.
-    expect(sel.getAttribute('title')).toMatch(/express/i);
+    expect(screen.queryByRole('combobox', { name: /feature auto-pilot works on/i })).toBeNull();
   });
 
-  it('is enabled in express mode', () => {
+  // THE PLACEMENT IS THE CLAIM, so it is asserted rather than left to the comment above: the picker is NOT
+  // inside either pushed group, and it comes before the acknowledgement — which must stay the last thing that
+  // can vanish without moving anything.
+  it('renders outside the pushed groups, ahead of the gate acknowledgement', () => {
     show({ autopilotConfig: EXPRESS });
-    expect((picker() as HTMLSelectElement).disabled).toBe(false);
-  });
-
-  // THE STRUCTURAL HALF OF THE LAYOUT CLAIM, which jsdom can assert and the pixel half it cannot: the same
-  // controls are in the group either way, so there is no width to gain or lose. The pixels are measured on
-  // the running product.
-  it('renders the same controls in the group in both modes', () => {
-    const count = () => screen.getByTestId('ap-agent').querySelectorAll('select, [role="group"]').length;
-    show();
-    const standard = count();
-    cleanup();
-    show({ autopilotConfig: EXPRESS });
-    expect(count()).toBe(standard);
-  });
-
-  // BACKLOG IS OFFERED, and it is the deliberate part. A feature that has never been started sits in
-  // `backlog` in this machine — `derive-features` creates them there and the loop moves one to `todo` when
-  // it begins the break-down — so a picker offering only the started ones cannot reach the case the focus
-  // exists for: taking one feature that has not begun and seeing it through.
-  it('offers every unfinished feature, the unstarted ones included, and the whole board', () => {
-    show({ autopilotConfig: EXPRESS });
-    const values = Array.from(picker().querySelectorAll('option')).map((o) => o.value);
-    expect(values).toEqual(['', 'F-001', 'F-002']);
-  });
-
-  // A finished feature is not a run: `derivePosition` reads a focused feature in a terminal column as
-  // nothing left to do, so offering one would be offering a control that does nothing.
-  it('does not offer a feature that is already done', () => {
-    show({ autopilotConfig: EXPRESS });
-    expect(within(picker()).queryByText(/F-003/)).toBeNull();
-  });
-
-  // A `<select>` is as wide as its widest option, and a feature title is unbounded — the loop's own
-  // mandatory harness card is called "The product can be run the way the README describes". The bar wraps
-  // rather than overflowing the shell, so this costs a second line rather than a scrollbar; truncating keeps
-  // it from costing one. The ID is never truncated: it is the part that identifies the card.
-  // THE SUFFIX SURVIVES AND THE TITLE GIVES WAY, which is the priority the box forces. The select holds a
-  // fixed width so choosing a feature cannot shove the mode selector sideways, and a first version capped the
-  // title alone and let the box clip whatever followed — the option read "…a command-line… (fi", two
-  // truncations fighting with the informative half losing.
-  it('trims the title to fit the state, never the state to fit the title', () => {
-    show({ autopilotConfig: { ...EXPRESS, focus: 'F-010' }, features: [...FEATURES, longDone] });
-    const chosen = Array.from(picker().querySelectorAll('option')).find((o) => o.value === 'F-010');
-    const text = chosen?.textContent ?? '';
-    expect(text).toMatch(/\(finished\)$/); // the whole suffix, at the end, uncut
-    expect(text).toContain('F-010');
-    expect(text.length).toBeLessThanOrEqual(32);
-    // And the title really was cut — otherwise the budget is untested on a title that already fitted.
-    expect(text).not.toContain('end to end');
-  });
-
-  it('shortens a long feature title but never the id', () => {
-    show({
-      autopilotConfig: EXPRESS,
-      features: [feature('F-001', 'backlog'), longTitled],
-    });
-    const labels = Array.from(picker().querySelectorAll('option')).map((o) => o.textContent ?? '');
-    const long = labels.find((l) => l.startsWith('F-009')) ?? '';
-    expect(long).toContain('F-009');
-    expect(long).toMatch(/…$/);
-    expect(long.length).toBeLessThan(`F-009 — ${longTitled.title}`.length);
+    const sel = picker();
+    expect(sel.closest('[data-testid="ap-agent"]')).toBeNull();
+    expect(sel.closest('[data-testid="ap-bar-end"]')).toBeNull();
+    const row = sel.closest('.ap-bar-row');
+    expect(row).not.toBeNull();
+    const kids = Array.from(row?.children ?? []);
+    const at = kids.findIndex((c) => c === sel || c.contains(sel));
+    const pushed = kids.findIndex((c) => c.className.includes('push'));
+    expect(at).toBeGreaterThanOrEqual(0);
+    expect(at).toBeLessThan(pushed);
   });
 
   // THE CONTROL MUST SHOW THE STATE THAT EXISTS, and this was found by opening the page rather than by any

@@ -433,6 +433,31 @@ export function AutopilotBar({
           No confirm dialog: the words on the button ARE the assertion, and a second "are you sure?" over
           the top of them is the kind of prompt people learn to click through without reading.
         */}
+        {/* THE MODE PICKER IS IN THE LEFT REGION, AHEAD OF THE FOCUS PICKER, and the order is the behaviour.
+            The row has TWO auto margins — `ap-agent` and `ap-bar-end` — so free space divides between them,
+            and anything added anywhere moves the middle group by half its width. Measured: the focus picker
+            arriving pushed the mode selector 148.81px sideways at the moment you clicked it.
+            Left-anchored and ahead of the control that comes and goes, it cannot move at all: transport, the
+            emergency stop and this picker hold their positions through every toggle. */}
+        <LifecyclePicker config={autopilotConfig} disabled={switching !== null} onChange={chooseMode} />
+
+        {/* THE FOCUS PICKER LIVES HERE, in the LEFT region, and the placement is the whole of what keeps the
+            row still. The two groups after this point are pinned by auto margins: a control that appears
+            and disappears INSIDE one of them changes that group's width, and because the group is pushed
+            from the left, every pixel comes out of the position of the mode selector you just clicked —
+            about 300px of it, measured.
+            Here, arriving and leaving costs the right-hand groups nothing, and the only thing that gives
+            way is the status sentence beside it, which is the part of this row designed to shrink.
+            BEFORE THE ACKNOWLEDGEMENT, deliberately: `test/autopilot-bar.test.tsx` requires every group
+            after that button to carry `push`, because it is the one control that vanishes the moment it is
+            used and anything to its right would jump as it went. */}
+        <FocusPicker
+          config={autopilotConfig}
+          features={features}
+          disabled={switching !== null}
+          onChange={chooseFocus}
+        />
+
         {model.reviewGates && (
           <Button
             className="ap-review-gates"
@@ -473,13 +498,6 @@ export function AutopilotBar({
             The picker renders nothing where a project has no lifecycle block, so there is no conditional
             here — see LifecyclePicker. */}
         <Stack gap={5} className="vb-fixed push" testId="ap-agent">
-          <LifecyclePicker config={autopilotConfig} disabled={switching !== null} onChange={chooseMode} />
-          <FocusPicker
-            config={autopilotConfig}
-            features={features}
-            disabled={switching !== null}
-            onChange={chooseFocus}
-          />
           <BackendPicker
             value={backend}
             disabled={switching !== null}

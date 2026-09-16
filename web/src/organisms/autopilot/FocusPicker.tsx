@@ -81,33 +81,27 @@ interface FocusOption {
 
 // ONE FEATURE, END TO END.
 //
-// PRESENT IN BOTH MODES AND INERT IN STANDARD, rather than rendered only in express — which is what it used
-// to do, and the reason is layout. The group is pushed from the left, so a control that comes and goes takes
-// its whole width out of the row and the mode selector jumps ~300px sideways at the very moment you click it.
-// Reserving the lane is the only arrangement in which nothing moves, and a disabled control that says why is
-// better than the blank space that would otherwise hold it.
+// EXPRESS ONLY, and it is the BAR that makes that free of layout cost: this sits in the row's left, unpushed
+// region, where arriving and leaving takes nothing from the groups pinned to the right. Rendered inside the
+// pushed group it moved the mode selector ~300px at the moment you clicked it, and reserving the lane in
+// standard instead made the row wide enough to wrap — which the browser harness refused, twice over.
 //
-// It is `disabled`, so it is out of the tab order and announced as unavailable; the bar clears any saved
-// focus when the mode leaves express, so an inert picker can never be hiding a live constraint.
+// The bar also clears any saved focus when the mode leaves express, so an absent picker can never be hiding
+// a live constraint.
 //
 // A `select` AND NOT A SEGMENTED PICKER, unlike the two beside it: those choose between two fixed options
 // and this one is a list of whatever a project happens to have, which can be twenty. `Control as="select"`
 // is the box this design system already draws for exactly that.
 export function FocusPicker({ config, features, onChange, disabled = false }: Props) {
-  if (!config) return null;
-  const express = config.mode === 'express';
+  if (config?.mode !== 'express') return null;
   const options = withSavedFocus(focusable(features, config.terminal.features ?? []), features, config.focus);
   return (
     <Control
       as="select"
       aria-label="The feature auto-pilot works on"
-      title={
-        express
-          ? 'Confine auto-pilot to one feature: it works that card and its stories and tasks, and stops when they are done. Everything else on the board is left alone.'
-          : 'Working one feature end to end is an express-mode choice. Standard auto-pilot walks the whole board in queue order.'
-      }
+      title="Confine auto-pilot to one feature: it works that card and its stories and tasks, and stops when they are done. Everything else on the board is left alone."
       value={config.focus ?? NO_FOCUS}
-      disabled={disabled || !express}
+      disabled={disabled}
       onChange={(e) => onChange(e.currentTarget.value === NO_FOCUS ? undefined : e.currentTarget.value)}
     >
       <option value={NO_FOCUS}>{WHOLE_BOARD}</option>

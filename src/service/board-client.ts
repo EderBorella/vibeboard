@@ -90,7 +90,23 @@ interface ClientOptions {
   fetch?: typeof globalThis.fetch;
 }
 
-const AUTH_FAILURES = [401, 403];
+// REFUSALS THE NEXT TICK CANNOT FIX, so the loop stops rather than asking again.
+//
+// 401 and 403 are the loop's own credential. **412 is the machine's** — `POST /api/runs` answers it when
+// the sandbox will not confine a run, and the commonest reason by far is an expired agent sign-in. It was
+// classified as retryable, and the cost was measured on a real project: **128 diary lines in 11 minutes**,
+// one refusal every five seconds, no cost incurred and no progress made. Nothing in the machine treated the
+// repetition as different from a single failure.
+//
+// AND THE STREAK GUARD COULD NOT SEE IT, which is why this is the right place rather than a bigger one.
+// `consecutiveInfrastructureFailures` stops the loop after two runs whose fault is infrastructure — but a
+// refusal at 412 never becomes a run at all, so there was no record to count. The guard was watching a
+// door the failure does not come through.
+//
+// A SOFT STOP, RESUMABLE — ruled by the owner 2026-09-16. `refused(fatal)` ends the loop with `stalled`,
+// which leaves the project startable the moment somebody signs in again; the emergency halt is for
+// something a person must take back deliberately, and a credential expiring is not that.
+const AUTH_FAILURES = [401, 403, 412];
 
 export class BoardClient {
   #base: string;

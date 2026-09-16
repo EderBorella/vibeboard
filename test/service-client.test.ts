@@ -75,6 +75,53 @@ describe('what the loop is refused', () => {
     expect(credential.scope).toBe('service');
   });
 
+  // AN EXPIRED AGENT SIGN-IN IS NOT WORTH ANOTHER TICK, and it used to be treated as one. `POST /api/runs`
+  // answers 412 when the sandbox will not confine a run — the commonest cause by far being a credential
+  // that has expired — and 412 was absent from the fatal list, so the loop logged a note and asked again.
+  // Measured on a real project: 128 diary lines in 11 minutes, one refusal every five seconds, no cost and
+  // no progress.
+  //
+  // THE STREAK GUARD COULD NOT HAVE CAUGHT IT. `consecutiveInfrastructureFailures` stops the loop after two
+  // runs whose fault is infrastructure, and a refusal at 412 never becomes a run at all — there was no
+  // record to count. That is why this belongs in the client's classification rather than in the tick.
+  it('treats a sandbox refusal as fatal — it is the machine, and the next tick cannot fix it', async () => {
+    const client = new BoardClient({
+      apiBase: 'http://board.test',
+      token: 'anything',
+      fetch: () =>
+        Promise.resolve(
+          new Response(JSON.stringify({ error: 'Agents are disabled: the Claude sign-in has expired.' }), {
+            status: 412,
+            headers: { 'Content-Type': 'application/json' },
+          }),
+        ),
+    });
+    const answer = await client.runs();
+    expect(answer.ok).toBe(false);
+    expect(answer.ok === false && answer.fatal, 'a 412 is retryable, so the loop spins').toBe(true);
+    // The server's own sentence travels with it, because that is what the diary shows a person.
+    expect(answer.ok === false && answer.reason).toContain('sign-in has expired');
+  });
+
+  // THE OTHER SIDE OF THE LINE, so the change above cannot quietly become "stop on anything". A 409 is the
+  // board disagreeing about a card — a card already moved, a column that filled up — and the next tick
+  // derives its position afresh and may well succeed.
+  it('still treats a board-state conflict as worth another tick', async () => {
+    const client = new BoardClient({
+      apiBase: 'http://board.test',
+      token: 'anything',
+      fetch: () =>
+        Promise.resolve(
+          new Response(JSON.stringify({ error: 'That card is not where you think it is.' }), {
+            status: 409,
+            headers: { 'Content-Type': 'application/json' },
+          }),
+        ),
+    });
+    const answer = await client.runs();
+    expect(answer.ok === false && answer.fatal).toBe(false);
+  });
+
   it('treats a server it cannot reach as worth another tick', async () => {
     const client = new BoardClient({
       apiBase: 'http://board.test',

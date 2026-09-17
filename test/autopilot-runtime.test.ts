@@ -191,6 +191,29 @@ describe('the runtime’s view of a project', () => {
     expect((await readAutopilotState(root, AT)).state).toBe('idle');
   });
 
+  // THE SIBLING OF THE NO-OP ABOVE, and it is about the SENTENCE rather than the state. A loop that
+  // ended by itself records why — `complete`, `capped`, `stalled` — and that detail is the only thing on
+  // screen telling the user what was left undone. A soft stop arriving afterwards used to overwrite both
+  // with "you asked it to", which is then untrue of the very field it wrote. Found by the smoke test
+  // 2026-09-17, on a project whose `complete` detail named the feature it had deliberately left alone.
+  it('does not write `stopped` over a stop the loop has already explained', async () => {
+    const root = await tempDir();
+    const { runtime } = build(root);
+    await writeAutopilotState(root, {
+      ...IDLE_STATE,
+      state: 'stopped',
+      reason: 'complete',
+      detail: 'Auto-pilot finished F-001. F-002 is untouched.',
+      iteration: 23,
+    });
+    await runtime.load();
+    const before = await readAutopilotState(root, AT);
+    const result = await runtime.softStop('never mind');
+    expect(result.ok).toBe(true);
+    expect(await readAutopilotState(root, AT)).toEqual(before);
+    expect((await readAutopilotState(root, AT)).reason).toBe('complete');
+  });
+
   it('refuses a soft stop while halted, and does not touch the file', async () => {
     const root = await tempDir();
     const { runtime } = build(root);

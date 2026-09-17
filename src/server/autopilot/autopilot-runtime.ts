@@ -137,6 +137,13 @@ export class AutopilotRuntime {
     // a request that is already satisfied. A refusal here would put a red message on a button press
     // that did exactly what the user wanted.
     if (state.state === 'idle') return { ok: true, state };
+    // AND A NO-OP FROM `stopped`, for the reason above applied to the field that matters most. A loop
+    // that ended by itself has already written why — `complete`, `capped`, `stalled` — and that sentence
+    // is the only thing on screen telling the user what it left undone. Stopping an already-stopped
+    // project replaced it with "you asked it to. Nothing else was touched", which is untrue of the very
+    // field it had just touched. Nothing else was lost: `#stop` kills nothing from here, so the write
+    // WAS the whole effect. Found by the smoke test 2026-09-17.
+    if (state.state === 'stopped') return { ok: true, state };
     return { ok: true, state: await this.#stop('stopped', detail) };
   }
 

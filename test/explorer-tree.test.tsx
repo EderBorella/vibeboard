@@ -155,6 +155,36 @@ describe('useTree', () => {
     await waitFor(() => expect(api.listDir.mock.calls.map(([p]) => p).sort()).toEqual(['', 'docs']));
   });
 
+  // A PATH THAT HAS STOPPED EXISTING MUST STOP BEING ASKED FOR. `refresh` re-lists every open folder,
+  // so a folder that was deleted, renamed or moved while expanded was still a key in the cache and the
+  // next watcher tick asked the server for it — 400, and a console error, on an ordinary action. The
+  // tree looked right because `reload` already survives the failure; nothing had removed the key.
+  // Found by the smoke test 2026-09-17 on a delete, and reproduced on a rename.
+  it('never re-lists a folder it has been told is gone, nor anything under it', async () => {
+    api.listDir.mockImplementation((path: string) =>
+      Promise.resolve(
+        path === ''
+          ? listing('', [dir('docs')])
+          : path === 'docs'
+            ? listing('docs', [dir('docs/deep')])
+            : listing('docs/deep', [file('docs/deep/a.md')]),
+      ),
+    );
+    const { result, rerender } = renderHook(({ t }) => useTree(t), { initialProps: { t: 0 } });
+    await waitFor(() => expect(result.current.rows).toHaveLength(1));
+    act(() => result.current.toggle(dir('docs')));
+    await waitFor(() => expect(result.current.rows).toHaveLength(2));
+    act(() => result.current.toggle(dir('docs/deep')));
+    await waitFor(() => expect(result.current.rows).toHaveLength(3));
+
+    await act(async () => result.current.forget('docs'));
+    api.listDir.mockClear();
+    rerender({ t: 1 });
+    // The root alone. The descendant matters as much as the folder itself: `docs/deep` was its own key
+    // in the cache, and forgetting only the path handed to us would leave that one asking forever.
+    await waitFor(() => expect(api.listDir.mock.calls.map(([p]) => p)).toEqual(['']));
+  });
+
   it('reports a failure to read the root, where nothing else could explain an empty tree', async () => {
     api.listDir.mockRejectedValueOnce(new Error('No project open'));
     const { result } = renderHook(() => useTree(0));

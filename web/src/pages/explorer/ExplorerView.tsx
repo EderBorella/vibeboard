@@ -143,6 +143,9 @@ export function ExplorerView({ snapshot }: Props) {
     // The editor may be showing the file just deleted, or one that was inside a deleted folder.
     const shown = open.file?.path;
     if (shown === node.path || shown?.startsWith(`${node.path}/`)) open.close();
+    // Before the parent is re-listed, not after: the path is gone, and a cache that still holds it asks
+    // the server for it on every watcher tick from here on.
+    tree.forget(node.path);
     await tree.reload(parentOf(node.path));
   }
 
@@ -155,6 +158,7 @@ export function ExplorerView({ snapshot }: Props) {
     setError(null);
     try {
       const moved = await moveFsNode(node.path, dir);
+      tree.forget(node.path); // the old path is as gone as a deleted one
       await tree.reload(parentOf(node.path)); // where it came from
       await tree.open(dir); // and where it went, expanded so it can be seen to have arrived
       setSelected(moved);
@@ -178,6 +182,7 @@ export function ExplorerView({ snapshot }: Props) {
     setError(null);
     try {
       const moved = await renameFsNode(path, name);
+      tree.forget(path); // likewise: renaming an expanded folder left its old path in the cache
       await tree.reload(parentOf(path));
       setSelected(moved);
       // The open file just changed path underneath the editor; re-open it under its new name.

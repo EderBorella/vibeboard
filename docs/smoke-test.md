@@ -243,8 +243,13 @@ answer to scope creep that is neither "do it anyway" nor "lose it".
 The diary — `.vibeboard/PROJECT-LOG.md`, append-only, one line per event.
 
 - Entries from the A3 run are there, in order, with iteration numbers.
-- `POST /api/log` appends; the file is the truth and the tab is a view of it.
-- Append a line to the file by hand and watch the tab follow.
+- `POST /api/log` appends, and the open tab shows the new line without a refresh — the endpoint
+  broadcasts it as a `diary:entry` frame.
+- **A hand edit to the file does NOT reach an open tab**, and asking for it here was this page's own
+  mistake until 2026-09-17, when a run dutifully reported it as a defect. `PROJECT-LOG.md` is excluded
+  from the watcher in `isIgnored` (`src/server/boards/session.ts`) on purpose: it changes nothing on the
+  board, and watching it would rebuild the whole snapshot once per diary line. The tab picks a hand edit
+  up on ⟳ or a reload. If you want to check the file is the truth, edit it and press ⟳.
 
 ## B5. Project Control
 
@@ -396,6 +401,45 @@ Zero page errors across every tab, every theme and every dialog.
 `toColumnSlug` not `columnSlug`, `content` not `text`, a query string not a body on
 `DELETE /control/file`. Read the handler before you call it. Every refusal was correct and every one of
 them named the field it wanted, which is the product being better than the tester.
+
+---
+
+## What the second full execution found
+
+Run 2026-09-17, browser-driven throughout, against a real daemon and a real model. **Three findings, and
+two of them were in this page rather than in the product** — which is the failure mode a document like
+this one has, and worth knowing about before the next run trusts a bullet here over what it sees.
+
+**The credential stop proved itself, unplanned.** The host's Claude Code sign-in expired *during* the run,
+so `POST /api/runs` answered a real 412 and `BoardClient` classified it `fatal: true` — the case the loop's
+`AUTH_FAILURES` list exists for, which until then had only ever been driven by a fake. `POST /autopilot/start`
+refuses it up front too, so the loop never begins. A backend switch to OpenCode carried the rest of the run.
+
+**A soft stop erased why the loop had stopped.** B7 said this was a no-op; it was one from `idle` and not
+from `stopped`, so a project that finished `complete` — with the sentence naming the feature it had
+deliberately left alone — lost that to a second press. Fixed, with the guard beside the `idle` one.
+
+**The explorer asked for a path that had gone.** Deleting an expanded folder left its key in `useTree`'s
+cache, so the next watcher tick re-listed it: 400, and a console error. The same held for a rename and a
+move, which is how it was fixed — one `forget(path)` rather than a patch on the delete.
+
+**B4 was wrong about the diary**, and the correction is now in B4 itself.
+
+**Everything else passed**, and three are worth naming because only a real credential could show them: a
+non-service scope hitting `POST …/verification` is refused `403` while the same credential reads the board
+`200`; a cancelled run records `cancelled` and does not burn an attempt (`accounting` showed one attempt
+over two runs); and the box carries `Init=true` with `docker-init` as pid 1 and finds its browsers at
+`/opt/ms-playwright` rather than downloading them. Zero page errors across every tab and every dialog.
+
+**Payload shapes cost time again**, on top of the list above: `name` not `confirm` on `project/delete`,
+`level` not `kind` on `suggestions/:id/card`, `path`+`name` on `control/rename`, and `kind` required
+alongside `text` on `POST /log`. `explorer/create` and `control/create` ignore a supplied name and answer
+with one of their own. Read the handler before you call it.
+
+**Two things this run did not do.** `POST /signin/clear` was skipped deliberately — it signs the owner's own
+browsers out. And the verification refusal was driven with an `assist` credential (the copilot's authority)
+rather than a `work` one: a work credential is minted in memory per run and delivered only inside the
+prompt, so there is no way to hold one from outside a live box.
 
 ---
 

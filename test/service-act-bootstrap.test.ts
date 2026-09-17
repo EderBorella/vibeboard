@@ -119,6 +119,27 @@ describe('deriving an empty board', () => {
     expect(result.dispatches).toBe(0);
     expect(r.diary.some((d) => d.kind === 'note' && d.text.includes('403'))).toBe(true);
   });
+
+  // AND A FATAL ONE ENDS THE LOOP RATHER THAN BEING NOTED AND RETRIED. This is the path an expired agent
+  // sign-in now takes: `POST /api/runs` answers 412, `BoardClient` classifies it fatal, and the loop stops
+  // instead of asking again every five seconds. Measured before the classification was fixed: 128 diary
+  // lines in 11 minutes, no cost and no progress.
+  //
+  // `stalled` and not a halt, ruled by the owner: the project stays startable the moment somebody signs in.
+  it('stops the loop when the dispatch refusal is one the next tick cannot fix', async () => {
+    const r = recorder({
+      dispatch: {
+        ok: false,
+        reason: 'POST /api/runs was refused with 412: Agents are disabled: the sign-in has expired.',
+        fatal: true,
+      },
+    });
+    const result = await performAction(deps(r.client), BOOTSTRAP, context);
+    expect(result.dispatches).toBe(0);
+    expect(result.stop?.reason).toBe('stalled');
+    // The server's own sentence reaches the stop, because that is what a person reads to know what to do.
+    expect(result.stop?.detail).toContain('sign-in has expired');
+  });
 });
 
 // THE BOOTSTRAP'S EXIT (decision 44, corrected). `setup: true` fires here and at NO other time.

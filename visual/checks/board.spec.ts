@@ -1382,3 +1382,81 @@ test('14. the auto-pilot bar reads as three groups', async ({ board, theme }) =>
       `end ends ${end.right.toFixed(0)} on line ${end.line} (edge ${content.right.toFixed(0)})`,
   );
 });
+
+// CHECK 15 — THE EXPRESS LIFECYCLE'S OWN CONTROL, ON SCREEN.
+//
+// This check exists because its absence let a real defect ship. The harness's project runs the STANDARD
+// lifecycle, so the focus picker — the whole visible surface of `decision 73` — had never been rendered by
+// anything with a layout engine. Every claim about it was asserted in jsdom or measured by hand, and the
+// one that mattered was wrong: with a focus saved on a feature its own run had closed, the picker fell back
+// to its first option and read **"The whole board"** over a project the loop was still confined to. Found
+// by opening the page. A control no check ever renders is a control nobody is checking.
+//
+// IT FLIPS THE MODE AND PUTS IT BACK, rather than the harness gaining a second project. The mode is one
+// config key, the checks run serially (`fullyParallel: false`), and a second seeded project would double
+// every surface's setup for one control. The restore is in a `finally` so a failing assertion cannot leave
+// the mode flipped for whatever runs next — which would be a far worse failure than the one being checked,
+// because it would move silently into another check's measurements.
+test('15. express mode renders its focus picker without breaking the row', async ({ board, theme }) => {
+  const config = await board.evaluate(async () => {
+    const r = await fetch('/api/config');
+    return (await r.json()) as { autopilot?: Record<string, unknown> };
+  });
+  const ap = config.autopilot;
+  expect(ap, 'the harness project has no autopilot block, so there is no mode to flip').toBeTruthy();
+  if (!ap) return;
+
+  const setMode = (mode: string) =>
+    board.evaluate(
+      async ([block, m]) => {
+        const r = await fetch('/api/config', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ autopilot: { ...(block as object), mode: m } }),
+        });
+        return r.status;
+      },
+      [ap, mode] as const,
+    );
+
+  try {
+    expect(await setMode('express'), 'the config route refused the mode change').toBe(200);
+    await board.reload();
+    await board.locator('[data-testid="ap-bar"]').waitFor({ state: 'visible' });
+
+    const seen = await board.evaluate(() => {
+      const row = document.querySelector<HTMLElement>('[data-testid="ap-bar"] .ap-bar-row');
+      const sel = row?.querySelector<HTMLSelectElement>('select');
+      if (!row || !sel) return null;
+      const boxes = Array.from(row.children)
+        .map((c) => c.getBoundingClientRect())
+        .filter((b) => b.height > 0);
+      const centres = boxes.map((b) => b.top + b.height / 2).sort((a, b) => a - b);
+      const shell = document.querySelector('div.app-shell');
+      return {
+        options: sel.options.length,
+        disabled: sel.disabled,
+        named: sel.getAttribute('aria-label') ?? '',
+        lines: centres.filter((c, i) => i === 0 || c - centres[i - 1] > 8).length,
+        shellOverflows: (shell?.scrollWidth ?? 0) > (shell?.clientWidth ?? 0),
+      };
+    });
+
+    expect(seen, 'express mode rendered no picker on the bar').not.toBeNull();
+    if (!seen) return;
+    // ENABLED AND NAMED: in standard the lane is held by a hidden spacer, so a check that only asked
+    // "is there a select" would pass on the wrong element the moment the modes were confused.
+    expect(seen.disabled, 'the focus picker is disabled in express mode').toBe(false);
+    expect(seen.named).toMatch(/feature auto-pilot works on/i);
+    // AT LEAST THE WHOLE BOARD AND ONE FEATURE. A picker with one option cannot tell "lists the features"
+    // from "lists nothing", which is the fixture-too-thin failure this repository has recorded.
+    expect(seen.options, 'the picker offers nothing to focus on').toBeGreaterThan(1);
+    // AND THE ROW STILL OBEYS CHECK 7 with the extra control on it — two lines at most, and the shell
+    // never scrolls sideways, which is what the reserved lane was measured against.
+    expect(seen.lines, 'the bar took a third line in express mode').toBeLessThanOrEqual(2);
+    expect(seen.shellOverflows, 'the app shell scrolls sideways in express mode').toBe(false);
+    console.log(`[${theme}] express bar: ${seen.options} options, ${seen.lines} line(s), no shell overflow`);
+  } finally {
+    await setMode(String(ap.mode ?? 'standard'));
+  }
+});

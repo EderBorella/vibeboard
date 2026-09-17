@@ -46,6 +46,20 @@ function inUse(path: string): Promise<boolean> {
   });
 }
 
+// THE PATH THIS PROCESS ACTUALLY BOUND, and `undefined` in a process that never got one.
+//
+// It exists because the cleanup below is destructive and used to aim at a computed path rather than at a
+// possession. A second VibeBoard is REFUSED the bind and carries on running — deliberately, see the caller
+// in `main.ts` — and then removed the first one's live socket on its way out. Measured 2026-08-31 while
+// serving two builds side by side.
+//
+// The second symptom reported at the time is the same cause seen later: once the file is gone the live
+// server still holds its bound-but-unlinked socket, so the NEXT start finds no file, has nothing to probe,
+// and binds a fresh one at that path. Boxes mount the directory, so every agent then reaches whichever
+// server bound last, while the first serves pages perfectly and nothing of its own can reach it. One
+// possession check removes both.
+let bound: string | undefined;
+
 interface ApiSocket {
   path: string;
   close: () => Promise<void>;
@@ -55,11 +69,15 @@ interface ApiSocket {
 // so an async close would leave the file behind on every ordinary Ctrl-C. A stale socket is not fatal —
 // the next start probes it and unlinks it — but leaving one is how "it works on a fresh boot" happens.
 export function removeApiSocketFile(): void {
+  // Ours or nothing. `apiSocketPath()` would answer for a process that never bound it — and that process
+  // is exactly the one that must not touch it.
+  if (bound === undefined) return;
   try {
-    unlinkSync(apiSocketPath());
+    unlinkSync(bound);
   } catch {
-    /* never created, or already gone */
+    /* already gone */
   }
+  bound = undefined;
 }
 
 // A SECOND http server sharing Fastify's own request handler, rather than a relay process or a second
@@ -94,6 +112,9 @@ export async function listenOnApiSocket(app: FastifyInstance): Promise<ApiSocket
   // API to every other user on the machine — the socket carries no authentication of its own, the
   // credential in the request does.
   chmodSync(path, 0o600);
+  // Recorded only now, after the bind has succeeded: everything above this line can throw, and a process
+  // that failed here owns nothing.
+  bound = path;
 
   return {
     path,
@@ -101,6 +122,14 @@ export async function listenOnApiSocket(app: FastifyInstance): Promise<ApiSocket
     // Verified by planting the deletion — no test could tell the difference, which is the definition of
     // redundant code rather than of an untested path. `removeApiSocketFile` exists for the OTHER ending,
     // where `process.exit` runs before any close callback can.
-    close: () => new Promise<void>((resolve) => server.close(() => resolve())),
+    // Cleared as well as closed, so a signal arriving afterwards does not unlink a path that some other
+    // server may have bound in between.
+    close: () =>
+      new Promise<void>((resolve) =>
+        server.close(() => {
+          if (bound === path) bound = undefined;
+          resolve();
+        }),
+      ),
   };
 }

@@ -42,6 +42,9 @@ interface Tree {
   open: (path: string) => Promise<void>;
   // Re-list one directory: what a rename or delete calls for its parent.
   reload: (path: string) => Promise<void>;
+  // Drop a path and everything under it. What a delete, a rename and a move call for the path that has
+  // stopped existing, BEFORE reloading the parent — see the note on the implementation.
+  forget: (path: string) => void;
   // Re-list everything currently open.
   refresh: () => Promise<void>;
 }
@@ -69,6 +72,29 @@ export function useTree(trigger?: unknown): Tree {
         // A subdirectory that has gone is fully described by no longer being in the tree — an agent
         // deleting a folder must not raise a banner. The root failing is a different matter.
         if (path === '') setError(errorText(e));
+      }
+      rebuild();
+    },
+    [rebuild],
+  );
+
+  // A PATH THAT HAS STOPPED EXISTING, AND EVERYTHING THAT WAS UNDER IT. `refresh` re-lists every key in
+  // the cache, so a folder deleted, renamed or moved while expanded went on being asked for once per
+  // watcher tick — a 400 and a console error on an ordinary action. `reload` already survives that (it
+  // drops the key when the listing fails), which is why the tree looked correct and only the network
+  // tab showed it; this stops the request being made at all.
+  //
+  // The descendants are the half that is easy to miss: every open subfolder is its OWN key, so removing
+  // only the path we were handed leaves `docs/deep` asking forever after `docs` has gone. The `/` guard
+  // is what keeps `docs-old` out of it — a prefix test alone would forget a sibling that merely starts
+  // with the same letters.
+  const forget = useCallback(
+    (path: string): void => {
+      for (const known of [...listings.current.keys()]) {
+        if (known === path || known.startsWith(`${path}/`)) listings.current.delete(known);
+      }
+      for (const known of [...expanded.current]) {
+        if (known === path || known.startsWith(`${path}/`)) expanded.current.delete(known);
       }
       rebuild();
     },
@@ -112,5 +138,5 @@ export function useTree(trigger?: unknown): Tree {
     void refresh();
   }, [trigger]);
 
-  return { rows, busy, error, toggle, open, reload, refresh };
+  return { rows, busy, error, toggle, open, reload, refresh, forget };
 }
